@@ -3546,6 +3546,51 @@ there exactly once; a new point joins a bundle when appended.
   Criticality: HIGH — it is the reason a whole feature reached the user broken while the
   gate reported green, and every further mechanic is built through the same gate.
 
+- [ ] 590. THE BOARD'S QUEUE ORDER IS A SECOND COPY OF THE WORK ORDER, AND IT KEEPS
+  DRIFTING (user 09.08.2026: "Das Problem, dass die Reihenfolge der Karten auf dem
+  Dashboard falsch war, hatten wir immer wieder. Können wir nicht einen Mechanismus
+  etablieren, der das dauerhaft gesichert behebt?"). ESTABLISHED, twice within one hour on
+  09.08.2026: the thirteen play-session points the user had put AHEAD OF EVERYTHING sat at
+  queue position ~90, and the freshly appended 589 landed at the very back — both times
+  because the board renders from an `order` array in `.claude/board-queue.json` that is
+  maintained BY HAND and appends anything it does not already list. `queue-order-guard`
+  did not catch either: it only enforces "fixes before finders" and "the release tag last",
+  never that a point sits where its priority actually puts it. This is the project's own
+  named failure — a second place for one fact — applied to the one artefact the user reads.
+  FINAL STATE:
+  1. THE ORDER HAS ONE HOME. The board's queue is rendered in the order the OPEN points
+     stand in `TASKS.md`, read through `scripts/tasks-source.mjs`. The hand-maintained
+     `order` array is DELETED, not merely validated — a copy that is checked is still a
+     copy, and the check is what nobody runs. The existing rank rules stay and are applied
+     ON TOP of that sequence, exactly as `queueOrder` applies them today: the bug-finding
+     and QA points to the back, the release tag last of all, a point WAITING on a user
+     decision behind everything, a point he has just ANSWERED to the head. The per-point
+     card text, title and estimate stay in `board-queue.json`; only the ORDERING leaves it.
+  2. RE-RANKING A POINT MEANS MOVING IT IN THE WORK ORDER. Where the queue order was
+     edited before, the point's block is moved inside `TASKS.md` — verbatim, with its
+     number. That is one edit in the file the rules already call the work order, and it is
+     visible in the diff instead of hidden in a JSON array.
+  3. AN APPENDED POINT IS RANKED ONCE, DELIBERATELY. Append-and-defer puts a new point at
+     the END, which is a DEFAULT, not a judgment — and 589 shows the default is often
+     wrong. A Stop guard therefore refuses to end the turn that appended a point until its
+     rank was settled: either the point was moved to where it belongs, or the turn recorded
+     that last is right (`node scripts/queue-rank.mjs --ranked <N> --why "<one line>"`).
+     One decision per new point, at the moment its content is freshest.
+  4. THE GUARD CATCHES THE CLASS, NOT THE CASE. `queue-order-guard` gains the rendered-vs-
+     source comparison: a published board whose card sequence does not match what the work
+     order plus the rank rules produce BLOCKS the turn end, naming the first card that is
+     out of place. Today it would have fired on both of the day's misorderings.
+  VERIFIABLE: Vitest over the pure core — the render order of a fixture work order matches
+  the expected sequence with each rank rule in play; a point appended at the end is
+  reported unranked until it is recorded; a board whose sequence was hand-edited is
+  detected as out of place. Plus the real proof on live data: rendering today's board from
+  the work order reproduces the sequence the user asked for, with the play-session points
+  at the head.
+  MECHANISM, so the four-eyes rule applies: the other model reviews the guard and the
+  ranking gate before they land (`scripts/mechanism-review.mjs --record`).
+  Criticality: HIGH — the board is the only thing the user sees while the batch runs, and a
+  queue in the wrong order misrepresents what is being worked on next.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
