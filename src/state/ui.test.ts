@@ -238,3 +238,16 @@ describe('graphics quality level (design.md §21, F9 / point 276 part B)', () =>
     expect(effectiveBloom(u())).toBe(true) // touch keeps bloom, as before
   })
 })
+
+describe('speechConceptLabels (the debug view on the speech labels)', () => {
+  it('is OFF by default — it hands the player the answer the mechanic asks him to work out', () => {
+    expect(useUi.getState().speechConceptLabels).toBe(false)
+  })
+
+  it('toggles both ways', () => {
+    useUi.getState().setSpeechConceptLabels(true)
+    expect(useUi.getState().speechConceptLabels).toBe(true)
+    useUi.getState().setSpeechConceptLabels(false)
+    expect(useUi.getState().speechConceptLabels).toBe(false)
+  })
+})

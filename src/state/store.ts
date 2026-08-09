@@ -3,6 +3,7 @@
 
 import { create } from 'zustand'
 import { balance, prices, START_FOOD_DAYS, START_GIFTS, START_MONEY, START_YEAR } from '../config/balance'
+import { startPlaceFromUrl } from '../config/startPlace'
 import { placeSituationAt, situationChanged } from '../systems/placeSituation'
 import { firstArrivalEntry, returnArrivalEntry } from '../journal/arrival'
 import { clampDay, dayOfMonthJump, dayOfYearJump } from '../systems/season'
@@ -461,13 +462,24 @@ function generateGrave(seed: number): LatLon {
   return { lat: 25.5, lon: 30.5 } // fallback, always desert
 }
 
-function startState(seed: number) {
-  const cairo = placeById('cairo')
-  const pos = latLonToWorld(cairo.lat, cairo.lon)
+/** The place the run opens in: Cairo per design.md, unless a debug `?start=`
+ *  names another (src/config/startPlace.ts — the default is never changed). */
+function startPlaceId(): string {
+  if (typeof window === 'undefined') return 'cairo'
+  return startPlaceFromUrl(window.location.search) ?? 'cairo'
+}
+
+/** Exported for the fast layer alone: the start place is a PARAMETER now, and a
+ *  test must be able to build the opening state for a place other than Cairo
+ *  without driving `window.location`. Nothing in the game calls it with an
+ *  argument — the run resolves its own place through `startPlaceId`. */
+export function startState(seed: number, placeId: string = startPlaceId()) {
+  const start = placeById(placeId)
+  const pos = latLonToWorld(start.lat, start.lon)
   return {
     seed,
     mode: 'place' as GameMode,
-    placeId: 'cairo',
+    placeId,
     // The run opens inside Cairo without a travel scene ever having captured
     // its horizon — the geometry backdrop stands (design.md §2.5).
     enteredFromTravel: false,
@@ -509,19 +521,21 @@ function startState(seed: number) {
     deadlineWarned: 0,
     defeat: null,
     deathCause: null as DeathCause | null,
-    region: 'north' as RegionId,
-    visitedRegions: ['north' as RegionId],
+    region: start.region,
+    visitedRegions: [start.region],
     // The ten port cities are famous ~1890 places known from the start
     // (design.md §3.2/§17.2, point 288): they begin DISCOVERED, so their map
     // labels name them at once and returning to them earns no bounty. Cairo (the
-    // start) is one of them; ordinary villages stay discovery-gated.
-    visitedPlaces: [...KNOWN_FROM_START_PLACES],
-    // Nothing has been ARRIVED at yet (point 394). Cairo is deliberately not
-    // seeded: the run opens inside it without an arrival ever happening, so
-    // the first walk back in writes the city's own vignette.
+    // start) is one of them; ordinary villages stay discovery-gated. The place
+    // the run OPENS in is always discovered, whichever it is — standing in a
+    // settlement whose own name is still hidden is a state no play can produce.
+    visitedPlaces: [...new Set([...KNOWN_FROM_START_PLACES, placeId])],
+    // Nothing has been ARRIVED at yet (point 394). The start place is
+    // deliberately not seeded: the run opens inside it without an arrival ever
+    // happening, so the first walk back in writes that place's own vignette.
     enteredPlaces: [] as string[],
     placeSituations: {} as Record<string, string>,
-    explored: withExplored({}, cairo.lat, cairo.lon) ?? {},
+    explored: withExplored({}, start.lat, start.lon) ?? {},
     goodwill: {},
     reveredGiftGiven: {},
     honoredFriend: {} as Partial<Record<RegionId, boolean>>,

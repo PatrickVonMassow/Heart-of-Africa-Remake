@@ -18,9 +18,10 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
 import { useGame } from '../../state/store'
+import { useUi } from '../../state/ui'
 import { useStrings } from '../../i18n'
 import type { CommunicationMemory } from '../../communication/heard'
-import type { Phrase } from '../../communication/lexicon'
+import { conceptOf, type Phrase } from '../../communication/lexicon'
 import {
   isSpeechLabelVisible,
   labelReadings,
@@ -42,6 +43,10 @@ const WORLD = new THREE.Vector3()
 function SpeechLabelView({ label, memory }: { label: SpeechLabel; memory: CommunicationMemory }) {
   const t = useStrings()
   const group = useRef<THREE.Group>(null)
+  // DEBUG (user 09.08.2026): the concept behind the utterance instead of the
+  // syllables and the player's guess. Never on in a real run — it hands the
+  // player the very answer the mechanic asks him to work out.
+  const conceptLabels = useUi((s) => s.speechConceptLabels)
 
   useFrame(() => {
     const anchor = speechAnchor(label.speakerId)
@@ -64,14 +69,20 @@ function SpeechLabelView({ label, memory }: { label: SpeechLabel; memory: Commun
             check that grabbed "the" label measured whichever one the DOM
             listed first. */}
         <div className="speech-label" data-speaker={label.speakerId}>
-          {labelReadings(memory, label.atoms).map((atom, i) => (
-            <div className="speech-atom" key={`${atom.utterance}-${i}`}>
-              <span className="syllables">{atom.utterance}</span>
-              <span className="reading" aria-label={t.journalPanel.hypothesisFor(atom.utterance)}>
-                {atom.reading}
-              </span>
-            </div>
-          ))}
+          {conceptLabels
+            ? label.atoms.map((utterance, i) => (
+                <div className="speech-atom" key={`${utterance}-${i}`}>
+                  <span className="syllables">{conceptOf(utterance) ?? utterance}</span>
+                </div>
+              ))
+            : labelReadings(memory, label.atoms).map((atom, i) => (
+                <div className="speech-atom" key={`${atom.utterance}-${i}`}>
+                  <span className="syllables">{atom.utterance}</span>
+                  <span className="reading" aria-label={t.journalPanel.hypothesisFor(atom.utterance)}>
+                    {atom.reading}
+                  </span>
+                </div>
+              ))}
         </div>
       </Html>
     </group>
@@ -85,6 +96,11 @@ function SpeechLabelView({ label, memory }: { label: SpeechLabel; memory: Commun
 export function SpeechLabels() {
   const labels = useSyncExternalStore(subscribeSpeechLabels, speechLabelState, speechLabelState)
   const memory = useGame((s) => s.communication)
+  // With the concept view on, the "only what he has already heard" gate is
+  // lifted too: the developer is looking for whether a situation staged the
+  // concept it meant to, and that question is asked about the utterances the
+  // run has NOT taught yet as much as about the others.
+  const conceptLabels = useUi((s) => s.speechConceptLabels)
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
@@ -134,7 +150,7 @@ export function SpeechLabels() {
   return (
     <>
       {labels.labels
-        .filter((label) => isSpeechLabelVisible(memory, label.atoms))
+        .filter((label) => conceptLabels || isSpeechLabelVisible(memory, label.atoms))
         .map((label) => (
           <SpeechLabelView key={label.speakerId} label={label} memory={memory} />
         ))}

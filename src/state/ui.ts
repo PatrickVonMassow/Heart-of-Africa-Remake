@@ -66,6 +66,14 @@ export interface UiState {
   /** Frame counter (FPS) in the screen corner; toggled in the debug menu. */
   fpsVisible: boolean
   /**
+   * DEBUG ONLY (user 09.08.2026): show the CONCEPT behind each utterance over
+   * the speaker's head — `COME`, `GO_THERE`, … — instead of the syllables and
+   * the player's own guess. It is the one view the player must never have, and
+   * exactly the one a developer needs to see whether a situation staged the
+   * concept it meant to. Off by default; nothing but the debug menu sets it.
+   */
+  speechConceptLabels: boolean
+  /**
    * Temporal anti-aliasing (design.md §2.7), default on since the manual
    * WebGPU check (CLAUDE.md §7.1 pt. 32) passed; when off, AA falls back
    * to the render pass' MSAA.
@@ -167,6 +175,7 @@ export interface UiState {
   setWebglFallback: (fallback: boolean) => void
   dismissWebglWarning: () => void
   setFpsVisible: (visible: boolean) => void
+  setSpeechConceptLabels: (on: boolean) => void
   setTraaEnabled: (enabled: boolean) => void
   setSeasonWetnessOverride: (wetness: number | null) => void
   setInvertLook: (invert: boolean) => void
@@ -209,6 +218,7 @@ export const useUi = create<UiState>()((set) => ({
   webglFallback: false,
   webglWarningDismissed: false,
   fpsVisible: true,
+  speechConceptLabels: false,
   traaEnabled: true,
   seasonWetnessOverride: null,
   invertLook: true, // inverted vertical look is the shipped default (point 392)
@@ -254,6 +264,7 @@ export const useUi = create<UiState>()((set) => ({
   setWebglFallback: (webglFallback) => set({ webglFallback }),
   dismissWebglWarning: () => set({ webglWarningDismissed: true }),
   setFpsVisible: (fpsVisible) => set({ fpsVisible }),
+  setSpeechConceptLabels: (speechConceptLabels) => set({ speechConceptLabels }),
   setTraaEnabled: (traaEnabled) => set({ traaEnabled }),
   setSeasonWetnessOverride: (seasonWetnessOverride) => set({ seasonWetnessOverride }),
   setInvertLook: (invertLook) => set({ invertLook }),
