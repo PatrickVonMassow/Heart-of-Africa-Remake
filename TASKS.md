@@ -4883,3 +4883,51 @@ Build order, chosen so no two parallel agents own the same file:
   palette change cannot quietly erase it again.
   Criticality: medium — the boundary is what tells the player where the settlement ends
   and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
+
+- [ ] 582. THE SPEECH LABEL FLOATS FAR OVER THE SPEAKER'S HEAD (user 09.08.2026: "Die
+  Texte der Sprache dürfen nicht so weit oben sein. Vielleicht habe ich bereits welche
+  übersehen ... Die sollen relativ dicht über dem Kopf schweben"). MEASURED:
+  `SPEECH_LABEL_HEIGHT` in `src/communication/speechLabel.ts` is a FLAT 2.3 m above the
+  speaker's own origin — its FEET — and nothing scales it to the figure. An adult stands
+  about 1.45 m in the settlement's units, so its note hangs ~0.85 m above the head; a
+  CHILD at `KID_SCALE` 0.55 is about 0.8 m tall, so its note hangs about TWICE the child's
+  own height above it. The children are the figures that teach most of the concepts, and
+  theirs float highest — which is why a player watching the game at eye level misses them.
+  FINAL STATE:
+  1. The label rides a small, calibratable gap above THAT speaker's head, derived from the
+     figure's own height (the same height the actor record already carries) rather than
+     from a constant — a child's note sits over the child, an adult's over the adult.
+  2. The gap is a balance value in the debug menu's speech group, in both languages.
+  3. The label still clears the head at every scale (it never overlaps the head sphere)
+     and keeps its existing lifetime and content.
+  VERIFIABLE: pure Vitest — for the adult and the child scale the label's world height sits
+  within a stated band above that figure's crown and never below it; a scale change moves
+  the label with it. Then one picture in the Bambara village: the note reads as belonging
+  to the figure under it.
+  Criticality: medium — it is the readability of the PoC's teaching text, and the user
+  reports having missed utterances because of it. Build together with point 580: both are
+  "the label never reaches the player", and one picture check covers them.
+
+- [ ] 583. SOMETHING BLOCKS THE PLAYER WHERE NOTHING IS DRAWN (user 09.08.2026, F6 report
+  `local/bugreports/KollisionMitNichts.zip`: "Bug in der Kollisionserkennung: Ich kann
+  hier nicht durchlaufen"). Repro from the report: seed 1425108822, Bambara village,
+  standing at x/z -59.78 / -129.69 facing the huts across the open courtyard, the woven
+  fence curving away to his left and ENDING in a visible gap. The frame shows open sand
+  where he cannot pass, so a collider stands where the renderer draws nothing.
+  FIRST establish WHICH collider it is — do not guess: dump the settlement's collider set
+  at that seed and project it into the reported frame, so the phantom is identified by
+  the picture rather than by reading the code. The likely families, to be confirmed or
+  ruled out one by one: a fence RUN whose collider spans the whole arc while only its
+  panels are drawn (the gap would then be solid), a hut collider inflated past its
+  drawn wall, and the settlement boundary itself cutting inside its painted edge.
+  FINAL STATE: every collider in a settlement is derived from what the renderer DRAWS, and
+  where the picture shows a gap the player walks through it. The rule points 129/378 wrote
+  for colliders — derive from what the picture draws, never from a second, drifting
+  definition — is applied to whichever family this turns out to be, so the class is fixed
+  and not just this one spot.
+  VERIFIABLE: pure Vitest — at the reported seed a straight walk through the reported gap
+  completes, and no collider in the settlement extends beyond the bounds of the geometry
+  it belongs to. Plus the diagnostic overlay frame that identified the phantom, kept as
+  the evidence. One backend suffices: this is geometry, not shading.
+  Criticality: medium-HIGH — an invisible wall is the defect a player cannot work around
+  or understand, and criterion 16 speaks to exactly this.
