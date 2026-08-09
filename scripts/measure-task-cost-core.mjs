@@ -205,6 +205,53 @@ export function phaseSplits(turns = [], { carry = true, idleGapMs = IDLE_GAP_MS 
   return out
 }
 
+/**
+ * The transcript LINES of one API response folded into ONE turn. PURE.
+ *
+ * `rows` is the line-level reading, `[{ id, at, usage, tools, … }]`; lines that share
+ * an `id` are one response. Returns one turn per response, in first-seen order.
+ *
+ * WHY THIS EXISTS — it repairs a measured defect, not a hypothetical one. The harness
+ * writes ONE assistant response onto SEVERAL lines, one per content block (`thinking`,
+ * `text`, `tool_use`, `tool_use`), and every line repeats the same `usage`. Deduplicating
+ * by `message.id` and keeping the FIRST line is right for the token sums — the usage must
+ * be counted once — but it threw the tool calls away whenever the response began with
+ * thinking, which is the normal case. Measured before this fold: 25,6 % of responses
+ * looked like they issued a tool call, and NO response ever looked like it issued two.
+ * Both were artefacts of the dedup, and both were reported as findings about the work.
+ *
+ * So: usage and the identifying fields come from the FIRST line, the timestamp is the
+ * EARLIEST, and the tool calls are the UNION over all lines, deduplicated by the block's
+ * own `id` (a streamed block can repeat) and falling back to name+input where a line
+ * carries none.
+ */
+export function foldResponseLines(rows = []) {
+  const byId = new Map()
+  const seen = new Map()
+  const order = []
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!row) continue
+    const key = row.id ?? `${row.file ?? ''}:${row.at}`
+    let turn = byId.get(key)
+    if (!turn) {
+      turn = { ...row, tools: [] }
+      byId.set(key, turn)
+      seen.set(key, new Set())
+      order.push(turn)
+    }
+    if (Number.isFinite(row.at) && (!Number.isFinite(turn.at) || row.at < turn.at)) turn.at = row.at
+    const known = seen.get(key)
+    for (const tool of Array.isArray(row.tools) ? row.tools : []) {
+      if (!tool) continue
+      const toolKey = tool.id ?? `${tool.name}:${JSON.stringify(tool.input ?? {})}`
+      if (known.has(toolKey)) continue
+      known.add(toolKey)
+      turn.tools.push({ name: tool.name ?? '', input: tool.input ?? {} })
+    }
+  }
+  return order
+}
+
 /** The work-order point a branch name belongs to, or null. PURE. */
 export function taskOfBranch(branch = '') {
   const m = String(branch).match(/^feat\/(\d+)[-/]/)

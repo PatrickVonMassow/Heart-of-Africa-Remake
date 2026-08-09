@@ -17,6 +17,7 @@ import {
   classifyFile,
   classifyToolCall,
   dominantTaskPerFile,
+  foldResponseLines,
   mergeSpans,
   normalisePath,
   phaseSplits,
@@ -174,6 +175,53 @@ describe('phaseSplits carry-forward', () => {
   it('carry:false is the strict floor and leaves the residue standing', () => {
     const turns = [turn(NOW, [bash('npm run build')]), turn(NOW + MIN)]
     expect(phaseSplits(turns, { carry: false }).get(turns[1])).toEqual({ unattributed: 1 })
+  })
+})
+
+describe('foldResponseLines', () => {
+  // THE DEFECT THIS PINS: one response is written to several transcript lines, one per
+  // content block, every line repeating the same usage. The earlier reading deduplicated
+  // by message id and kept the FIRST line — the thinking block — so the tool call on the
+  // second line was never seen, and the classifier reported the response as evidence-free.
+  const line = (over) => ({ id: 'msg_1', at: NOW, usage: usage(), session: 's', scope: 'subagent', branch: 'feat/572-x', file: 'a.jsonl', tools: [], ...over })
+
+  it('SEES a tool call that sits on the second line of one response', () => {
+    const folded = foldResponseLines([
+      line({ tools: [] }), // thinking
+      line({ at: NOW + 500, tools: [{ id: 'toolu_1', name: 'Bash', input: { command: 'npm run build' } }] }),
+    ])
+    expect(folded).toHaveLength(1)
+    expect(folded[0].tools.map((t) => t.name)).toEqual(['Bash'])
+    expect(turnPhases(folded[0].tools)).toEqual({ gates: 1 })
+  })
+
+  it('counts the usage of a multi-line response ONCE — the token sums must not move', () => {
+    const folded = foldResponseLines([line({}), line({}), line({ tools: [{ id: 't', name: 'Read', input: { file_path: 'src/App.tsx' } }] })])
+    expect(folded).toHaveLength(1)
+    expect(folded[0].usage).toEqual(usage())
+    expect(folded[0].at).toBe(NOW)
+  })
+
+  it('unions SEVERAL tool calls of one response, so a batched turn is visible as batched', () => {
+    const folded = foldResponseLines([
+      line({ tools: [] }),
+      line({ tools: [{ id: 'a', name: 'Bash', input: { command: 'npm run lint' } }] }),
+      line({ tools: [{ id: 'b', name: 'Bash', input: { command: 'node scripts/verify/world.mjs' } }] }),
+    ])
+    expect(folded[0].tools).toHaveLength(2)
+    expect(turnPhases(folded[0].tools)).toEqual({ gates: 0.5, verification: 0.5 })
+  })
+
+  it('does not count a repeated block twice, and keeps distinct responses apart', () => {
+    const repeated = { id: 'a', name: 'Bash', input: { command: 'npm run build' } }
+    const folded = foldResponseLines([line({ tools: [repeated] }), line({ tools: [repeated] }), line({ id: 'msg_2', at: NOW + MIN })])
+    expect(folded).toHaveLength(2)
+    expect(folded[0].tools).toHaveLength(1)
+    expect(folded[1].tools).toEqual([])
+  })
+
+  it('falls back to a per-line key where a line carries no message id', () => {
+    expect(foldResponseLines([line({ id: undefined }), line({ id: undefined, at: NOW + 1 })])).toHaveLength(2)
   })
 })
 

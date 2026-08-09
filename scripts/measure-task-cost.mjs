@@ -19,19 +19,21 @@ import { createInterface } from 'node:readline'
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { listTranscripts, transcriptDir } from './measure-context-cost.mjs'
-import { COST_WEIGHTS, PHASES, PHASE_NOTES, assignTasks, attribute, dominantTaskPerFile, mergeSpans, taskSpread } from './measure-task-cost-core.mjs'
+import { COST_WEIGHTS, PHASES, PHASE_NOTES, assignTasks, attribute, dominantTaskPerFile, foldResponseLines, mergeSpans, taskSpread } from './measure-task-cost-core.mjs'
 
 /**
  * Every assistant turn with usage, carrying the evidence the classifier needs: the tool
  * calls it issued, the git branch it ran on and the transcript it came from.
  *
- * Dedup is by message id, exactly as in `measure-context-cost.mjs` — a streamed turn
- * repeats its usage across lines, and counting lines would triple the spend.
+ * One response is FOLDED from its lines by `foldResponseLines`, not deduplicated down to
+ * the first of them: the usage is counted once (as `measure-context-cost.mjs` does, else
+ * the spend triples) while the tool calls are the union over the response's content
+ * blocks. Keeping only the first line dropped the tool call of every response that began
+ * with thinking — see that function for what it cost the earlier reading.
  */
 export async function readTurns(dir = transcriptDir()) {
-  const turns = []
+  const lineRows = []
   const branchRows = []
-  const seen = new Set()
   for (const { path, rel, scope } of listTranscripts(dir)) {
     const lines = createInterface({ input: createReadStream(path, { encoding: 'utf8' }), crlfDelay: Infinity })
     for await (const line of lines) {
@@ -46,16 +48,15 @@ export async function readTurns(dir = transcriptDir()) {
       const at = Date.parse(rec?.timestamp ?? '')
       if (!usage || !Number.isFinite(at)) continue
       const id = rec.message?.id ?? rec.requestId ?? `${rel}:${rec.uuid ?? at}`
-      if (seen.has(id)) continue
-      seen.add(id)
       const session = rec.agentId ? `${rec.sessionId ?? rel}/agent-${rec.agentId}` : (rec.sessionId ?? rel.replace(/\.jsonl$/, ''))
       const tools = (Array.isArray(rec.message?.content) ? rec.message.content : [])
         .filter((c) => c?.type === 'tool_use')
-        .map((c) => ({ name: c.name, input: c.input ?? {} }))
-      turns.push({ at, usage, session, scope, branch: rec.gitBranch ?? '', file: rel, tools })
-      branchRows.push({ file: rel, scope, branch: rec.gitBranch ?? '' })
+        .map((c) => ({ id: c.id, name: c.name, input: c.input ?? {} }))
+      lineRows.push({ id, at, usage, session, scope, branch: rec.gitBranch ?? '', file: rel, tools })
     }
   }
+  const turns = foldResponseLines(lineRows)
+  for (const t of turns) branchRows.push({ file: t.file, scope: t.scope, branch: t.branch })
   turns.sort((a, b) => a.at - b.at)
   return { turns: assignTasks(turns, dominantTaskPerFile(branchRows)), files: listTranscripts(dir).length }
 }
