@@ -444,6 +444,57 @@ export interface BalanceConfig {
      *  takes the frame. Calibratable/debug-editable. */
     mourningSeconds: number
   }
+  /** Intraspecies combat (design.md §19.17, point 264): territorial/dominance
+   *  fights WITHIN a species, on the researched species only
+   *  (docs/intraspecies-combat-1890.md; the per-species table lives in
+   *  `FIGHT_PROFILES`, wildlifeBehavior.ts). Every value here is calibratable
+   *  and debug-editable (§21.2). */
+  fight: {
+    /** Base chance per eligibility check that an idle adult of a fighting
+     *  species takes the "wants to fight" disposition — scaled by the
+     *  species' own researched rate. Kept LOW: a fight is an occasional
+     *  event, not the plains' normal state. */
+    dispositionRate: number
+    /** Seconds between two disposition checks on one animal — the roll's
+     *  cadence, so the rate above reads as "per this many seconds". */
+    dispositionInterval: number
+    /** How far (world units) an aggressor looks for a same-species opponent. */
+    seekRadius: number
+    /** Centre distance at which the two bodies meet and the clash starts. */
+    contactRadius: number
+    /** How far a chased animal must have fled before the aggressor is
+     *  satisfied and breaks off — the DRIVE-OFF ending, no kill. */
+    driveOffDistance: number
+    /** Hard deadline (seconds) on the approach/chase: past it the bout ends in
+     *  a peaceful break-off, so a converge that can never meet — a river
+     *  between them, a quarry it cannot catch — always resolves (invariant I4). */
+    approachSeconds: number
+    /** Seconds the visible clash itself lasts before it resolves. */
+    clashSeconds: number
+    /** Scales the whole clash POSE — the wedge the two bodies splay into, the
+     *  wheel about their contact point, the shove and the alternating rear.
+     *  One knob rather than five: it decides how violently the bout reads at
+     *  the bird's-eye zoom, and 0 collapses it back to two animals standing
+     *  nose to nose. Affects the picture only, never an outcome. */
+    clashIntensity: number
+    /** Speed factor over the ordinary walking pace for the converge run and
+     *  the chase — a fight is approached at a charge, not a stroll. */
+    approachBurst: number
+    /** The fleeing quarry's share of the aggressor's speed. Below 1 so a chase
+     *  closes: with the drive-off distance above it decides catch vs drive-off
+     *  — a quarry jumped at close range is run down, one with room to run
+     *  clears the patch first. */
+    quarryFleeFactor: number
+    /** Scales every species' researched clash lethality: 1 ships the research's
+     *  own rates, 0 turns every fight into a bloodless contest. */
+    lethalityScale: number
+    /** Seconds an animal is barred from a new fight after one resolved — so a
+     *  driven-off pair does not immediately re-engage. */
+    cooldownSeconds: number
+    /** TEST-ONLY (the point-177 precedent): pins the clash outcome so a staged
+     *  verification needs no retry loop. Never set in normal play. */
+    forceOutcome?: 'death' | 'submission'
+  }
   /** Rivers (design.md §11.3, point 136). */
   river: {
     /**
@@ -892,6 +943,26 @@ export const balance: BalanceConfig = {
     // hold 30 s at the bones). It outlives the body itself (a carcass dissolves
     // in ~9 s), so the later part of the watch is held at the spot it fell.
     mourningSeconds: 30,
+  },
+  // Intraspecies combat (point 264). All calibratable; the per-species rates
+  // and lethalities they scale come from docs/intraspecies-combat-1890.md.
+  fight: {
+    // Rare by design, like the other §19 dramas: with the 8 s cadence below an
+    // eligible ritual-sparring bull picks a quarrel roughly every few minutes,
+    // a zebra stallion less often — an occasional event on the plain, never
+    // the herd's normal state.
+    dispositionRate: 0.012,
+    dispositionInterval: 8,
+    seekRadius: 26, // within a herd's own spread — a fight is with a herd-mate, not a stranger across the plain
+    contactRadius: 2.2, // the two bodies meet: just over the §19.5 separation radius, so the clash is contact, not overlap
+    driveOffDistance: 24, // the quarry is "far enough" — off the aggressor's patch, still on screen
+    approachSeconds: 25, // hard deadline (I4): a converge that cannot meet breaks off here
+    clashSeconds: 5, // the visible clash — long enough to read as a fight, short enough not to freeze two animals
+    clashIntensity: 1, // calibratable: full strength of the clash pose — at the default zoom 0.5 the wedge, the wheel and the rear are what make the bout READ as a fight
+    approachBurst: 1.5, // over PREY_WALK_SPEED (3): a charge at 4.5, still under the hunt's 4.6 so a real predator outruns a fighter
+    quarryFleeFactor: 0.75, // with the 24-unit drive-off: a chase begun inside ~7.5 units is caught, a wider one ends in the drive-off
+    lethalityScale: 1, // ships the researched per-species rates unchanged
+    cooldownSeconds: 45, // a settled pair does not re-engage at once
   },
   crocodile: {
     strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge

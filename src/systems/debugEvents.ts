@@ -24,6 +24,7 @@ export type WildlifeDramaKind =
   | 'grassFire'
   | 'huntCalf'
   | 'huntGeneric'
+  | 'intraspeciesFight'
   | 'lionCubDefence'
   | 'vultureFlock'
 
@@ -36,6 +37,7 @@ export const WILDLIFE_DRAMA_KINDS: readonly WildlifeDramaKind[] = [
   'grassFire',
   'huntCalf',
   'huntGeneric',
+  'intraspeciesFight',
   'lionCubDefence',
   'vultureFlock',
 ]
@@ -58,6 +60,9 @@ export type DebugEventFailure =
   | 'noCalf'
   | 'noCub'
   | 'noElephant'
+  /** No two free adults of one FIGHTING species stand near enough to take each
+   *  other on (design.md §19.17, point 264). */
+  | 'noFightPair'
 
 // ---------------------------------------------------------------------------
 // Entry list: grouped by category, alphabetical within each group.

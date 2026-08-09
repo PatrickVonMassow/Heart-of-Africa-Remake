@@ -96,6 +96,18 @@ import {
   calfFleeStep,
   defendChance,
   killChance,
+  FIGHT_PROFILES,
+  FIGHTING_SPECIES,
+  speciesFightsOwnKind,
+  wantsToFight,
+  pickFightOpponent,
+  fightApproach,
+  fightApproachOutcome,
+  fightResolve,
+  fightPairBroken,
+  clashOver,
+  clashPose,
+  type FightSide,
   parentAttackOutcome,
   parentDefends,
   findAdopter,
@@ -4184,5 +4196,450 @@ describe('the orphan mourns before it plays again (design.md §19.8, point 369)'
     // window must sit above it or the calf would gambol straight through its
     // grief and the picture would say nothing had happened.
     expect(balance.family.mourningSeconds).toBeGreaterThan(balance.family.gambolBoutSeconds + 12)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Intraspecies combat (design.md §19.17, point 264).
+// ---------------------------------------------------------------------------
+
+/** The animals the game actually renders (src/render/fauna.ts build functions
+ *  plus the §19.6 vulture) — the roster docs/intraspecies-combat-1890.md §2
+ *  maps row by row. A new rendered species must gain a row, or the mechanic
+ *  would silently answer "does it fight?" with `undefined`. */
+const RENDERED_FAUNA = [
+  'elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog',
+  'flamingo', 'crocodile', 'plover', 'lion', 'cheetah', 'leopard', 'hyena', 'vulture',
+] as const
+
+describe('FIGHT_PROFILES — the researched per-species fight table (point 264)', () => {
+  it('carries a row for every rendered animal, so nothing answers "undefined"', () => {
+    for (const sp of RENDERED_FAUNA) expect(FIGHT_PROFILES[sp], sp).toBeDefined()
+  })
+
+  it('says the research says: the Tier C birds do not duel at all', () => {
+    // docs/intraspecies-combat-1890.md §3: flamingo/vulture/plover squabble over
+    // food and nest space — displays, not fights, and never lethal.
+    for (const sp of ['flamingo', 'vulture', 'plover']) {
+      expect(FIGHT_PROFILES[sp].fights, sp).toBe(false)
+      expect(FIGHT_PROFILES[sp].lethality, sp).toBe(0)
+      expect(speciesFightsOwnKind(sp), sp).toBe(false)
+    }
+  })
+
+  it('gives a fatal branch ONLY to the researched Tier A species', () => {
+    // §4 Tier A: elephant (musth), lion/leopard/cheetah (territorial), zebra
+    // (harem) — plus the giraffe's rare knock-down. Everything the research
+    // calls ritualised must resolve without a carcass.
+    for (const sp of ['wildebeest', 'antelope', 'warthog', 'crocodile', 'hyena']) {
+      expect(FIGHT_PROFILES[sp].fights, sp).toBe(true) // they DO fight …
+      expect(FIGHT_PROFILES[sp].lethality, sp).toBe(0) // … but nobody dies of it
+    }
+    for (const sp of ['elephant', 'lion', 'leopard', 'cheetah', 'zebra']) {
+      expect(FIGHT_PROFILES[sp].lethality, sp).toBeGreaterThan(0)
+    }
+    expect(FIGHT_PROFILES.giraffe.lethality).toBeGreaterThan(0)
+    // …and the giraffe's stays far below the Tier A register (§4: Tier B with a
+    // very rare injury, not a routine kill).
+    expect(FIGHT_PROFILES.giraffe.lethality).toBeLessThan(FIGHT_PROFILES.zebra.lethality / 2)
+  })
+
+  it('every driver is one the research names, and only a fighter has one', () => {
+    for (const [sp, p] of Object.entries(FIGHT_PROFILES)) {
+      if (p.fights) expect(['musth', 'dominance', 'territorial', 'resource'], sp).toContain(p.driver)
+      else expect(p.driver, sp).toBeUndefined()
+    }
+  })
+
+  it('FIGHTING_SPECIES is exactly the fighting rows that are also live', () => {
+    for (const [sp, p] of Object.entries(FIGHT_PROFILES)) {
+      expect(FIGHTING_SPECIES.includes(sp), sp).toBe(p.fights && p.live)
+    }
+    expect(FIGHTING_SPECIES.length).toBeGreaterThan(0)
+    // A non-live row is a researched species whose locomotion another system
+    // owns; it must never seed a disposition, however the roll falls.
+    for (const sp of ['elephant', 'crocodile', 'lion', 'cheetah', 'leopard', 'hyena']) {
+      expect(FIGHT_PROFILES[sp].live, sp).toBe(false)
+      expect(wantsToFight(sp, 0, 1), sp).toBe(false)
+    }
+  })
+
+  it('every live fighter is a species the ambient herds actually seed', () => {
+    // Two of one kind must be able to stand near each other, or the mechanic
+    // could never fire: each live fighter is in at least one region's prey pool.
+    for (const sp of FIGHTING_SPECIES) {
+      expect(Object.values(REGION_PREY).some((pool) => (pool as string[]).includes(sp)), sp).toBe(true)
+    }
+  })
+})
+
+describe('wantsToFight — the disposition (point 264)', () => {
+  it('scales the base rate by the species and never fires above it', () => {
+    const rate = 0.1
+    const zebra = rate * FIGHT_PROFILES.zebra.disposition
+    expect(wantsToFight('zebra', zebra - 1e-9, rate)).toBe(true)
+    expect(wantsToFight('zebra', zebra, rate)).toBe(false) // half-open band
+    const wildebeest = rate * FIGHT_PROFILES.wildebeest.disposition
+    expect(wildebeest).toBeGreaterThan(zebra) // the ritual sparrer quarrels more often
+    expect(wantsToFight('wildebeest', zebra + 1e-9, rate)).toBe(true)
+  })
+
+  it('a zero (or negative) rate switches the whole mechanic off', () => {
+    for (const roll of [0, 0.5, 0.999]) {
+      expect(wantsToFight('zebra', roll, 0)).toBe(false)
+      expect(wantsToFight('zebra', roll, -1)).toBe(false)
+    }
+  })
+
+  it('a non-fighting or unknown species never wants one, at any rate', () => {
+    expect(wantsToFight('plover', 0, 1)).toBe(false)
+    expect(wantsToFight('goat', 0, 1)).toBe(false) // village dressing, out of scope
+    expect(wantsToFight('hippopotamus', 0, 1)).toBe(false) // researched, not rendered
+  })
+})
+
+describe('pickFightOpponent — who takes on whom (point 264)', () => {
+  const self = { x: 0, z: 0 }
+  it('takes the NEAREST candidate inside the radius', () => {
+    const far = { x: 9, z: 0 }
+    const near = { x: 3, z: 0 }
+    expect(pickFightOpponent(self.x, self.z, [far, near], 20)).toBe(near)
+  })
+  it('refuses everything beyond the radius — including exactly at it', () => {
+    expect(pickFightOpponent(self.x, self.z, [{ x: 10, z: 0 }], 10)).toBeNull()
+    expect(pickFightOpponent(self.x, self.z, [{ x: 10, z: 0 }], 10.001)).not.toBeNull()
+  })
+  it('an empty (fully ineligible) field yields nobody, never a throw', () => {
+    expect(pickFightOpponent(self.x, self.z, [], 100)).toBeNull()
+  })
+})
+
+describe('fightApproach — the two interaction paths (point 264)', () => {
+  it('both want it → they CONVERGE; only one does → it HUNTS the other', () => {
+    expect(fightApproach(true, true)).toBe('converge')
+    expect(fightApproach(true, false)).toBe('hunt')
+  })
+})
+
+describe('fightApproachOutcome — catch, drive-off, deadline (point 264)', () => {
+  const limits = { contactRadius: 2, driveOffDistance: 20, approachSeconds: 25 }
+
+  it('contact starts the clash, in either path', () => {
+    expect(fightApproachOutcome('hunt', 2, 5, 1, limits)).toBe('clash')
+    expect(fightApproachOutcome('converge', 1.9, 5, 1, limits)).toBe('clash')
+  })
+
+  it('a HUNT breaks off once the quarry has cleared the patch — no kill', () => {
+    expect(fightApproachOutcome('hunt', 6, 19.9, 1, limits)).toBe('approach')
+    expect(fightApproachOutcome('hunt', 6, 20, 1, limits)).toBe('driveOff')
+  })
+
+  it('a CONVERGE never drives off on distance — both of them want it', () => {
+    expect(fightApproachOutcome('converge', 6, 100, 1, limits)).toBe('approach')
+  })
+
+  it('the hard deadline resolves BOTH paths (invariant I4)', () => {
+    expect(fightApproachOutcome('converge', 40, 0, 25, limits)).toBe('driveOff')
+    expect(fightApproachOutcome('hunt', 40, 0, 25, limits)).toBe('driveOff')
+    // …and a bout that has already met still clashes: contact outranks the clock,
+    // so an expiring deadline can never rob a fight of its resolution.
+    expect(fightApproachOutcome('hunt', 1, 0, 999, limits)).toBe('clash')
+  })
+
+  it('nothing between the endings: every state is one of the three', () => {
+    for (const mode of ['converge', 'hunt'] as const) {
+      for (const gap of [0, 2, 5, 21, 60]) {
+        for (const origin of [0, 19, 21]) {
+          for (const t of [0, 24, 26]) {
+            expect(['approach', 'clash', 'driveOff']).toContain(
+              fightApproachOutcome(mode, gap, origin, t, limits),
+            )
+          }
+        }
+      }
+    }
+  })
+})
+
+describe('fightResolve — who loses, and does it die (point 264)', () => {
+  const plain = { lethalityScale: 1 }
+
+  it('an even pair is a coin flip on the size-weighted roll', () => {
+    expect(fightResolve('zebra', 1, 1, 0.49, 1, plain).loser).toBe('a')
+    expect(fightResolve('zebra', 1, 1, 0.5, 1, plain).loser).toBe('b')
+  })
+
+  it('the heavier animal wins the more often', () => {
+    // p(a loses) = sizeB/(sizeA+sizeB): a 3-to-1 mismatch loses 'a' on 3 rolls in 4.
+    expect(fightResolve('zebra', 1, 3, 0.74, 1, plain).loser).toBe('a')
+    expect(fightResolve('zebra', 1, 3, 0.76, 1, plain).loser).toBe('b')
+    expect(fightResolve('zebra', 3, 1, 0.24, 1, plain).loser).toBe('a')
+    expect(fightResolve('zebra', 3, 1, 0.26, 1, plain).loser).toBe('b')
+  })
+
+  it('a zero/absurd size cannot divide by zero or invert the rule', () => {
+    expect(['a', 'b']).toContain(fightResolve('zebra', 0, 0, 0.5, 1, plain).loser)
+    expect(fightResolve('zebra', 0, 1, 0.99, 1, plain).loser).toBe('a') // the weightless one loses
+  })
+
+  it('the loss is fatal exactly on the species lethality band', () => {
+    const zebra = FIGHT_PROFILES.zebra.lethality
+    expect(fightResolve('zebra', 1, 1, 0, zebra - 1e-9, plain).lethal).toBe(true)
+    expect(fightResolve('zebra', 1, 1, 0, zebra, plain).lethal).toBe(false)
+  })
+
+  it('a ritual species never leaves a carcass, whatever the roll', () => {
+    for (const sp of ['wildebeest', 'antelope', 'warthog']) {
+      for (const roll of [0, 0.5, 0.999]) {
+        expect(fightResolve(sp, 1, 1, 0.5, roll, plain).lethal, sp).toBe(false)
+      }
+    }
+  })
+
+  it('an unknown species resolves peacefully rather than throwing', () => {
+    const r = fightResolve('hippopotamus', 1, 1, 0.5, 0, plain)
+    expect(r.lethal).toBe(false)
+    expect(['a', 'b']).toContain(r.loser)
+  })
+
+  it('the lethality scale calibrates every species at once', () => {
+    expect(fightResolve('zebra', 1, 1, 0, 0.99, { lethalityScale: 0 }).lethal).toBe(false)
+    expect(fightResolve('zebra', 1, 1, 0, 0.99, { lethalityScale: 10 }).lethal).toBe(true) // clamped to 1
+    expect(fightResolve('zebra', 1, 1, 0, 0.99, { lethalityScale: -5 }).lethal).toBe(false)
+  })
+
+  it('forceOutcome pins the roll (point 177) but may NOT rewrite the table', () => {
+    expect(fightResolve('zebra', 1, 1, 0, 0.999, { lethalityScale: 1, forceOutcome: 'death' }).lethal).toBe(true)
+    expect(fightResolve('zebra', 1, 1, 0, 0, { lethalityScale: 1, forceOutcome: 'submission' }).lethal).toBe(false)
+    // A species the research calls non-lethal stays non-lethal even when forced.
+    expect(fightResolve('antelope', 1, 1, 0, 0, { lethalityScale: 1, forceOutcome: 'death' }).lethal).toBe(false)
+    // …and so does any species once the scale is off.
+    expect(fightResolve('zebra', 1, 1, 0, 0, { lethalityScale: 0, forceOutcome: 'death' }).lethal).toBe(false)
+  })
+})
+
+describe('clashOver — the clash always ends (invariant I4, point 264)', () => {
+  it('resolves at the calibrated duration and not before', () => {
+    expect(clashOver(4.99, 5)).toBe(false)
+    expect(clashOver(5, 5)).toBe(true)
+    expect(clashOver(9, 5)).toBe(true)
+  })
+  it('a zero or negative duration resolves at once — never an endless clash', () => {
+    expect(clashOver(0, 0)).toBe(true)
+    expect(clashOver(0, -3)).toBe(true)
+  })
+})
+
+describe('clashPose — the clash READS as a fight from the bird\'s-eye (point 264)', () => {
+  // The staged bout the verification photographs: the pair on the x axis,
+  // aggressor at -g/2 facing +x, defender at +g/2 facing -x.
+  const GAP = 2.2
+  const TO_FOE_A = Math.PI / 2
+  const TO_FOE_B = -Math.PI / 2
+  const PHASE = 0.3
+  /** Both sides at one instant, at their rendered spots. */
+  const bout = (t: number, intensity = 1) => {
+    const a = clashPose(t, PHASE, true, TO_FOE_A, intensity)
+    const b = clashPose(t, PHASE, false, TO_FOE_B, intensity)
+    return {
+      a, b,
+      ax: -GAP / 2 + a.dx, az: a.dz,
+      bx: GAP / 2 + b.dx, bz: b.dz,
+    }
+  }
+  /** Smallest angle between two headings, folded to [0, pi/2] — a body and its
+   *  opposite lie on the SAME line, which is exactly what must not happen. */
+  const offLine = (u: number, v: number) => {
+    let d = Math.abs(((u - v) % Math.PI) + Math.PI) % Math.PI
+    return Math.min(d, Math.PI - d)
+  }
+  const SAMPLES = Array.from({ length: 240 }, (_, i) => i * 0.05)
+
+  it('at intensity 0 it collapses to two animals standing nose to nose', () => {
+    for (const t of SAMPLES) {
+      const { a, b } = bout(t, 0)
+      expect(a.yaw).toBeCloseTo(TO_FOE_A, 10)
+      expect(b.yaw).toBeCloseTo(TO_FOE_B, 10)
+      expect(a.dx).toBeCloseTo(0, 10)
+      expect(a.dz).toBeCloseTo(0, 10)
+      expect(a.pitch).toBeCloseTo(0, 10)
+      expect(a.lift).toBeCloseTo(0, 10)
+    }
+  })
+
+  it('the two bodies NEVER lie on one line — the wedge is the whole point', () => {
+    // The failure the picture caught: both aimed straight at each other is a
+    // single straight shape from above. Every sampled instant must be a wedge.
+    let worst = Math.PI
+    for (const t of SAMPLES) {
+      const { a, b } = bout(t)
+      worst = Math.min(worst, offLine(a.yaw, b.yaw))
+    }
+    expect(worst).toBeGreaterThan(0.5) // ~29 deg of wedge at the tightest moment
+  })
+
+  it('the pair WHEELS: the contact axis is not frozen on one bearing', () => {
+    const yaws = SAMPLES.map((t) => bout(t).a.yaw)
+    expect(Math.max(...yaws) - Math.min(...yaws)).toBeGreaterThan(0.5)
+  })
+
+  it('the two are in DIFFERENT postures — one rears while the other bores in low', () => {
+    // Two identical bodies read as scenery; the asymmetry is what reads as a
+    // fight. Somewhere in the cycle one must be nose-UP while the other is
+    // nose-DOWN, and they must swap.
+    const opposed = SAMPLES.filter((t) => {
+      const { a, b } = bout(t)
+      return a.pitch < -0.3 && b.pitch > 0.1
+    })
+    const swapped = SAMPLES.filter((t) => {
+      const { a, b } = bout(t)
+      return b.pitch < -0.3 && a.pitch > 0.1
+    })
+    expect(opposed.length).toBeGreaterThan(0)
+    expect(swapped.length).toBeGreaterThan(0)
+  })
+
+  it('the rear is HELD, so most instants catch the two in opposite postures', () => {
+    // A plain sine sits near zero most of the time, which left both bodies
+    // level at whatever moment the eye — or the shutter — caught them. The
+    // saturated rear must be at its top for the bulk of its half-cycle.
+    const opposed = SAMPLES.filter((t) => {
+      const { a, b } = bout(t)
+      return (a.pitch < -0.5 && b.pitch > 0.1) || (b.pitch < -0.5 && a.pitch > 0.1)
+    })
+    expect(opposed.length / SAMPLES.length).toBeGreaterThan(0.6)
+    // And no instant catches the pair merely STANDING: at every moment at
+    // least one body is well off level — reared, or head-down and boring in.
+    for (const t of SAMPLES) {
+      const { a, b } = bout(t)
+      expect(Math.max(Math.abs(a.pitch), Math.abs(b.pitch))).toBeGreaterThan(0.3)
+    }
+  })
+
+  it('a rearing body rises, so it stands on its hind legs instead of through the turf', () => {
+    const reared = SAMPLES.map((t) => bout(t).a).filter((p) => p.pitch < -0.5)
+    expect(reared.length).toBeGreaterThan(0)
+    for (const p of reared) expect(p.lift).toBeGreaterThan(0.25)
+    // A body that is level does not float.
+    for (const t of SAMPLES) {
+      const p = bout(t).a
+      if (Math.abs(p.pitch) < 0.02) expect(p.lift).toBeLessThan(0.02)
+    }
+  })
+
+  it('the shove travels through the pair: the two never gap open or pass through each other', () => {
+    for (const t of SAMPLES) {
+      const s = bout(t)
+      const gap = Math.hypot(s.ax - s.bx, s.az - s.bz)
+      // Bounded both ways — the contact holds without the bodies merging.
+      expect(gap).toBeGreaterThan(GAP * 0.6)
+      expect(gap).toBeLessThan(GAP * 1.6)
+    }
+  })
+
+  it('the offsets are BOUNDED — a render overlay cannot accumulate into a drift', () => {
+    for (const t of Array.from({ length: 4000 }, (_, i) => i * 0.37)) {
+      const { a } = bout(t)
+      expect(Math.hypot(a.dx, a.dz)).toBeLessThan(2)
+    }
+  })
+
+  it('is deterministic: the same instant always poses the same way', () => {
+    for (const t of [0, 1.7, 33.25]) {
+      expect(clashPose(t, PHASE, true, TO_FOE_A, 1)).toEqual(clashPose(t, PHASE, true, TO_FOE_A, 1))
+    }
+  })
+
+  it('a negative intensity is clamped to the standing pose, never inverted', () => {
+    const { a } = bout(3.3, -5)
+    expect(a.yaw).toBeCloseTo(TO_FOE_A, 10)
+    expect(a.pitch).toBeCloseTo(0, 10)
+  })
+})
+
+describe('fightPairBroken — nobody is left engaged with a body that is gone (point 264)', () => {
+  /** A live, mutually engaged pair. */
+  const pair = (): FightSide[] => {
+    const one: FightSide = {}
+    const two: FightSide = {}
+    one.fight = { foe: two }
+    two.fight = { foe: one }
+    return [one, two]
+  }
+
+  it('a live, mutual pair keeps fighting', () => {
+    const [one, two] = pair()
+    expect(fightPairBroken(one, two)).toBe(false)
+    expect(fightPairBroken(two, one)).toBe(false)
+  })
+
+  it('EITHER side dying breaks it — checked from BOTH sides', () => {
+    // The hole this exists to close: an aggressor trampled mid-bout stops being
+    // driven, and its quarry would have kept the drama flag, the fight pose and
+    // the no-flight for good.
+    const [one, two] = pair()
+    one.dead = true
+    expect(fightPairBroken(one, two)).toBe(true)
+    expect(fightPairBroken(two, one)).toBe(true)
+  })
+
+  it('a CULLED opponent breaks it too — a streamed-out body is not a rival', () => {
+    const [one, two] = pair()
+    two.gone = true
+    expect(fightPairBroken(one, two)).toBe(true)
+    expect(fightPairBroken(two, one)).toBe(true)
+  })
+
+  it('a HALF-engaged pair breaks it: the other side moved on', () => {
+    const [one, two] = pair()
+    two.fight = undefined // released by its own ending
+    expect(fightPairBroken(one, two)).toBe(true)
+    // …and re-aimed at a third animal, which is not this bout either.
+    const third = {}
+    two.fight = { foe: third }
+    expect(fightPairBroken(one, two)).toBe(true)
+  })
+})
+
+describe('the fight is a DRAMA like any other (points 197/252/264)', () => {
+  it('a fighter is claimed: no fresh-victim scan may take it', () => {
+    const base = { isLionVictim: false }
+    expect(claimedByAnotherDrama(base)).toBe(false)
+    expect(claimedByAnotherDrama({ ...base, fight: { mode: 'clash' } })).toBe(true)
+  })
+  it('a fighter never breaks off to shy from the traveller', () => {
+    expect(isInDrama({})).toBe(false)
+    expect(isInDrama({ fighting: true })).toBe(true)
+  })
+})
+
+describe('the shipped fight balance is internally consistent (point 264)', () => {
+  const fb = balance.fight
+  it('the distances nest: contact < drive-off < the search that finds a rival', () => {
+    expect(fb.contactRadius).toBeLessThan(fb.driveOffDistance)
+    expect(fb.driveOffDistance).toBeLessThan(fb.seekRadius)
+  })
+  it('the quarry is slower than its pursuer, so a catch is reachable at all', () => {
+    expect(fb.quarryFleeFactor).toBeGreaterThan(0)
+    expect(fb.quarryFleeFactor).toBeLessThan(1)
+  })
+  it('a fight is approached at a charge but never outruns a real hunt', () => {
+    expect(fb.approachBurst).toBeGreaterThan(1)
+    expect(PREY_WALK_SPEED * fb.approachBurst).toBeLessThan(4.6) // HUNT_PREY_SPEED
+  })
+  it('both clocks are finite, so every bout resolves', () => {
+    expect(fb.approachSeconds).toBeGreaterThan(0)
+    expect(fb.clashSeconds).toBeGreaterThan(0)
+    expect(Number.isFinite(fb.approachSeconds + fb.clashSeconds)).toBe(true)
+  })
+  it('the disposition stays RARE — a fight is an event, not the herd\'s state', () => {
+    for (const sp of FIGHTING_SPECIES) {
+      expect(fb.dispositionRate * FIGHT_PROFILES[sp].disposition, sp).toBeLessThan(0.05)
+    }
+    expect(fb.dispositionInterval).toBeGreaterThan(0)
+    expect(fb.cooldownSeconds).toBeGreaterThan(fb.approachSeconds) // a settled pair does not re-engage at once
+  })
+  it('ships unforced: the test-only outcome pin is never set in play', () => {
+    expect(fb.forceOutcome).toBeUndefined()
   })
 })

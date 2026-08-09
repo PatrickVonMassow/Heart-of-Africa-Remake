@@ -5903,6 +5903,250 @@ if (section('crocodile-ambush')) {
   )
 }
 
+// --- Point 264: rivals of one kind fight (design.md §19.17) -------------------
+// The live half of the mechanic — the table, the selection, the resolver and the
+// deadlines are all pinned in the Vitest layer (wildlifeBehavior.test.ts). What
+// needs the real scene is the DRIVE: a staged pair of a fighting species must
+// actually converge, reach the clash, and resolve — one dead into the ordinary
+// carcass system on the lethal branch, both alive and released on the ritual one.
+// Both outcomes are pinned through balance.fight.forceOutcome (the point-177
+// precedent), so neither run needs a retry-until-the-roll-lands loop.
+if (section('intraspecies-fight')) {
+  // The run starts INSIDE Cairo, where no travel scene — and so no
+  // `window.__wildlife` — exists. Step out to the bird's-eye first, or a
+  // standalone `--section` run of this block dies on the missing hook.
+  await page.evaluate(() => { if (window.__game.getState().placeId) window.__game.getState().leavePlace() })
+  await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, { timeout: 30000 }).catch(() => {})
+  await page.evaluate(() => window.__game.getState().debugJumpTo(-2.5, 34.0)) // Serengeti savanna
+  await page.evaluate(() => window.__wildlife.restock())
+  await waitForHerds()
+  /** Stage one bout of the given outcome and report how it resolved. */
+  const stageFight = async (forced) =>
+    page.evaluate(async (force) => {
+      const herds = window.__wildlife.herdsRef.current
+      const fb = window.__balance.fight
+      const p = window.__game.getState().pos
+      const seed = window.__game.getState().seed
+      const U = 10
+      // A quiet stage: no running hunt may claim either fighter mid-bout.
+      const lion = window.__lionHunt.state
+      lion.mode = 'idle'; lion.timer = 9999; lion.victim = null; lion.victimHunt = false
+      // Two adult zebras — the one Tier A species with an ambient herd — set on
+      // dry ground a short way apart, so the converge is a visible run.
+      const land = (x, z) => {
+        const ty = window.__terrainType(-z / U, x / U, seed)
+        return ty !== 'water' && ty !== 'ocean'
+      }
+      let spot = null
+      for (let r = 6; r <= 40 && !spot; r += 2) {
+        for (let k = 0; k < 16; k++) {
+          const a = (k / 16) * Math.PI * 2
+          const x = p.x + Math.sin(a) * r
+          const z = p.z + Math.cos(a) * r
+          if (land(x, z) && land(x + 5, z) && land(x - 5, z)) { spot = { x, z }; break }
+        }
+      }
+      if (!spot) return { staged: false, noLand: true }
+      const mk = (dx) => ({
+        x: spot.x + dx, z: spot.z, y: 0.2, rot: 0, scale: 1, phase: 0.3, chunk: undefined, grounded: true,
+      })
+      const one = mk(-5)
+      const two = mk(5)
+      herds.zebra.push(one, two)
+      const t0 = { clash: fb.clashSeconds, force: fb.forceOutcome }
+      fb.clashSeconds = 2 // a shorter clash keeps the check quick; the drive is unchanged
+      fb.forceOutcome = force
+      // Pair them the way the debug entry does — both willing, so the bout takes
+      // the CONVERGE path and always reaches the clash. Everything after this is
+      // the ordinary drive; the injection only supplies the two animals, exactly
+      // as the §19.16 checks inject a crocodile and its catch.
+      const bout = { mode: 'converge', ox: one.x, oz: one.z, time: 0, clash: 0 }
+      one.fight = { foe: two, aggressor: true, ...bout }
+      two.fight = { foe: one, aggressor: false, ...bout }
+      const out = { staged: true, paired: one.fight !== undefined && two.fight !== undefined }
+      let gap0 = Math.hypot(one.x - two.x, one.z - two.z)
+      let closed = false
+      let clashed = false
+      await window.__pollSim(40, () => {
+        const gap = Math.hypot(one.x - two.x, one.z - two.z)
+        if (gap < gap0 - 1) closed = true
+        if (one.fight?.mode === 'clash' || two.fight?.mode === 'clash') clashed = true
+        return one.dead || two.dead || (clashed && one.fight === undefined && two.fight === undefined)
+      })
+      out.converged = closed
+      out.clashed = clashed
+      out.deaths = (one.dead ? 1 : 0) + (two.dead ? 1 : 0)
+      out.released = one.fight === undefined && two.fight === undefined
+      out.cooldown = (one.fightCooldown ?? 0) > 0 || (two.fightCooldown ?? 0) > 0
+      const corpse = one.dead ? one : two.dead ? two : null
+      out.ordinaryCarcass = corpse !== null && corpse.lionFed !== true && corpse.dissolve !== undefined
+      // Neither body may be parked in the water (point 312).
+      out.dryGround = land(one.x, one.z) && land(two.x, two.z)
+      if (corpse) {
+        // The ordinary carcass system works it: the ground scavenger binds to
+        // the body, or its dissolve is already running down.
+        const d0 = corpse.dissolve
+        await window.__pollSim(25, () => {
+          const bound = window.__wildlife.scavenger.current.target === corpse
+          if (bound || (corpse.dissolve !== undefined && corpse.dissolve < d0)) { out.scavenged = true; return true }
+          return false
+        })
+        if (window.__wildlife.scavenger.current.target === corpse) window.__wildlife.scavenger.current.target = null
+      }
+      fb.clashSeconds = t0.clash
+      fb.forceOutcome = t0.force
+      herds.zebra = herds.zebra.filter((a) => a !== one && a !== two)
+      return out
+    }, forced)
+
+  const lethal = await stageFight('death')
+  check(
+    'a staged same-species pair converges, clashes and ONE dies (point 264)',
+    lethal.staged && lethal.paired && lethal.converged && lethal.clashed &&
+      lethal.deaths === 1 && lethal.released && lethal.dryGround,
+    JSON.stringify(lethal),
+  )
+  check(
+    'the loser is an ORDINARY carcass the scavengers work, not a bespoke body (point 264)',
+    lethal.ordinaryCarcass === true && lethal.scavenged === true,
+    JSON.stringify(lethal),
+  )
+
+  const ritual = await stageFight('submission')
+  check(
+    'the ritual ending: the clash resolves with BOTH alive, released and on cooldown (point 264)',
+    ritual.staged && ritual.clashed && ritual.deaths === 0 && ritual.released && ritual.cooldown &&
+      ritual.dryGround,
+    JSON.stringify(ritual),
+  )
+
+  // The SHIPPED path: the §21.3 debug dropdown must carry the entry and either
+  // pair two rivals or say what is missing — never a silent no-op (point 258).
+  await page.evaluate(() => { if (!window.__ui.getState().debugOpen) window.__ui.getState().toggleDebug() })
+  await page.waitForSelector('.debug-menu', { timeout: 15000 })
+  const dropdown = await page.evaluate(async () => {
+    const sel = [...document.querySelectorAll('.debug-menu select')].find((s) =>
+      [...s.options].some((o) => o.value.startsWith('drama:')),
+    )
+    if (!sel) return { error: 'no event-trigger select' }
+    const opt = [...sel.options].find((o) => o.value === 'drama:intraspeciesFight')
+    if (!opt) return { error: 'no intraspeciesFight option' }
+    window.__game.getState().setToast(null)
+    Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set.call(sel, 'drama:intraspeciesFight')
+    sel.dispatchEvent(new Event('change', { bubbles: true }))
+    await window.__sleepSim(0.4)
+    const herds = window.__wildlife.herdsRef.current
+    let paired = 0
+    for (const sp of Object.keys(herds)) for (const a of herds[sp]) if (a.fight !== undefined) paired++
+    const toast = window.__game.getState().toast
+    // Leave nothing running for the sections after this one.
+    for (const sp of Object.keys(herds)) for (const a of herds[sp]) a.fight = undefined
+    window.__game.getState().setToast(null)
+    return { label: opt.textContent, paired, toast }
+  })
+  await page.evaluate(() => { if (window.__ui.getState().debugOpen) window.__ui.getState().toggleDebug() })
+  check(
+    'the debug dropdown carries the fight and either pairs two rivals or names what is missing (points 258/264)',
+    !dropdown.error && typeof dropdown.label === 'string' && dropdown.label.length > 0 &&
+      (dropdown.paired === 2 || (typeof dropdown.toast === 'string' && dropdown.toast.length > 0)),
+    JSON.stringify(dropdown),
+  )
+
+  // THE PICTURE, and its CONTROL. Everything above measures the drive; none of
+  // it says the clash READS as two animals fighting. So one bout is held open at
+  // the clash — a long clashSeconds freezes the pose rather than the clock, so
+  // the scene keeps animating — and photographed TWICE at the same camera, the
+  // same zoom and with the same two animals: once with the clash pose switched
+  // OFF (clashIntensity 0), which leaves the pair merely standing nose to nose,
+  // and once with it on. The pair is the variable and nothing else, so the two
+  // frames decide whether the FIGHT reads — and, read together, whether the
+  // ANIMAL reads at this zoom at all. Both go through the shutter, so the
+  // evidence is reproducible rather than a one-off screenshot.
+  const posed = await page.evaluate(async () => {
+    const herds = window.__wildlife.herdsRef.current
+    const fb = window.__balance.fight
+    const p = window.__game.getState().pos
+    const seed = window.__game.getState().seed
+    const U = 10
+    const lion = window.__lionHunt.state
+    lion.mode = 'idle'; lion.timer = 9999; lion.victim = null; lion.victimHunt = false
+    const land = (x, z) => {
+      const ty = window.__terrainType(-z / U, x / U, seed)
+      return ty !== 'water' && ty !== 'ocean'
+    }
+    // Close to the camera, so the pair is not two specks: the bird's-eye looks
+    // down at the traveller, so a few units out is the readable distance.
+    let spot = null
+    for (let r = 4; r <= 24 && !spot; r += 2) {
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2
+        const x = p.x + Math.sin(a) * r
+        const z = p.z + Math.cos(a) * r
+        if (land(x, z) && land(x + 3, z) && land(x - 3, z)) { spot = { x, z }; break }
+      }
+    }
+    if (!spot) return { posed: false, noLand: true }
+    const mk = (dx) => ({
+      x: spot.x + dx, z: spot.z, y: 0.2, rot: 0, scale: 1, phase: 0.3, chunk: undefined, grounded: true,
+    })
+    const one = mk(-3)
+    const two = mk(3)
+    herds.zebra.push(one, two)
+    const kept = { clash: fb.clashSeconds, force: fb.forceOutcome, intensity: fb.clashIntensity }
+    fb.clashSeconds = 60
+    fb.forceOutcome = 'submit'
+    fb.clashIntensity = 0 // the CONTROL frame first: the pose off, the pair merely standing
+    const bout = { mode: 'converge', ox: one.x, oz: one.z, time: 0, clash: 0 }
+    one.fight = { foe: two, aggressor: true, ...bout }
+    two.fight = { foe: one, aggressor: false, ...bout }
+    const held = await window.__pollSim(40, () => one.fight?.mode === 'clash' || two.fight?.mode === 'clash')
+    window.__fightPose = { one, two, kept }
+    return { posed: true, held: !!held, clashing: one.fight?.mode === 'clash' || two.fight?.mode === 'clash' }
+  })
+  check('a bout can be held at the clash for the picture (point 264)', posed.posed && posed.clashing, JSON.stringify(posed))
+  if (posed.clashing) {
+    await shot('148a-intraspecies-clash-pose-off', {
+      world: { lat: -2.5, lon: 34.0 },
+      label: 'CONTROL: the same two zebras at the same camera with the clash pose disabled — a standing pair',
+    })
+    // Same animals, same spot, same camera: only the pose comes on. Hold the
+    // shutter until the two are in OPPOSITE postures — one reared, the other
+    // boring in low — so the frame shows the fight at its most legible rather
+    // than whichever instant it happened to catch (the rear alternates).
+    const opposed = await page.evaluate(async () => {
+      window.__balance.fight.clashIntensity = 1
+      const { one, two } = window.__fightPose
+      const seen = []
+      const ok = !!(await window.__pollSim(12, () => {
+        seen.push([one.clashPitch, two.clashPitch])
+        return (one.clashPitch < -0.5 && two.clashPitch > 0.1) || (two.clashPitch < -0.5 && one.clashPitch > 0.1)
+      }))
+      // The pitches are reported either way: a null pair means the pose never
+      // ran on THESE bodies, which is a different fault from a pose that ran
+      // and stayed level, and the two are indistinguishable from a bare false.
+      return { ok, samples: seen.length, pitches: seen[seen.length - 1] }
+    })
+    check('the clash reaches the opposed posture the frame is taken at (point 264)', opposed.ok, JSON.stringify(opposed))
+    await shot('148-intraspecies-fight-clash', {
+      world: { lat: -2.5, lon: 34.0 },
+      label: 'two zebras locked in a rank fight on the Serengeti savanna',
+    })
+  }
+  await page.evaluate(() => {
+    const pose = window.__fightPose
+    if (!pose) return
+    const herds = window.__wildlife.herdsRef.current
+    const fb = window.__balance.fight
+    fb.clashSeconds = pose.kept.clash
+    fb.forceOutcome = pose.kept.force
+    fb.clashIntensity = pose.kept.intensity
+    pose.one.fight = undefined
+    pose.two.fight = undefined
+    herds.zebra = herds.zebra.filter((a) => a !== pose.one && a !== pose.two)
+    window.__fightPose = undefined
+  })
+}
+
 // --- Point 188: the coastal walk-off resolves --------------------------------
 // A predator that finished feeding at a coast pocket must actually LEAVE — the
 // old radial re-aim shuttled it on the beach forever (the user's Cairo report).

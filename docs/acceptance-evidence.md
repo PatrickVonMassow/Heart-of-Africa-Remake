@@ -333,6 +333,20 @@ Verifiable (`scripts/verify/settings.mjs`,
   "scenery" where every other rule calls it foreign — pure-tested via
   `ambientSavannaSpecies` in
   `src/scenes/travel/wildlifeBehavior.test.ts`.
+- Intraspecies combat (§19.17, point 264): the researched per-species
+  table, the disposition roll, the opponent pick, the converge-vs-hunt
+  decision, the catch/drive-off/deadline resolution and the size-weighted
+  lethal-vs-ritual outcome are all pure-tested in
+  `src/scenes/travel/wildlifeBehavior.test.ts` (a fighting species fights,
+  a Tier C bird never does, a ritual species can never leave a carcass —
+  not even when the outcome is forced — and every bout resolves on its
+  clock); the live drive is gated by the `intraspecies-fight` section of
+  `scripts/verify/enrichments.mjs`, which stages a zebra pair, watches it
+  converge and clash, and asserts BOTH endings: exactly one death whose
+  body is an ORDINARY carcass the ground scavenger works (`lionFed`
+  false), and the ritual clash that releases both alive on cooldown —
+  neither ending leaving a body on water (point 312). The debug
+  dropdown's own entry is checked in the same section (point 258).
 - Streaming: the zoom-aware despawn holds (an animal survives a
   tile-boundary crossing while in view, despawns once well outside
   it, and a wider zoom keeps animals the default view would have

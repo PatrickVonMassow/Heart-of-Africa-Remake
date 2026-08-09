@@ -100,6 +100,7 @@ export interface DramaState {
   plungeTo?: unknown // rushing after a swept-over calf (waterfall grief)
   trampleTo?: unknown // charging the elephant that trampled its calf
   defending?: boolean // parent shield / charge / guard / wade for its calf
+  fighting?: boolean // running an intraspecies fight/chase (point 264)
   isLionVictim?: boolean // the designated victim of the running lion hunt
   isHunted?: boolean // actively fleeing a predator this frame
 }
@@ -127,6 +128,7 @@ export function isInDrama(f: DramaState): boolean {
     f.plungeTo !== undefined ||
     f.trampleTo !== undefined ||
     f.defending === true ||
+    f.fighting === true ||
     f.isLionVictim === true ||
     f.isHunted === true
   )
@@ -2107,6 +2109,9 @@ export function claimedByAnotherDrama(f: {
   mired?: number
   crossing?: unknown
   fireTrapped?: number
+  /** Running an intraspecies fight or chase (point 264) — a fighter is spoken
+   *  for exactly like a caught or crossing animal. */
+  fight?: unknown
   isLionVictim: boolean
 }): boolean {
   return (
@@ -2115,6 +2120,7 @@ export function claimedByAnotherDrama(f: {
     f.mired !== undefined ||
     f.crossing !== undefined ||
     f.fireTrapped !== undefined ||
+    f.fight !== undefined ||
     f.isLionVictim
   )
 }
@@ -2508,4 +2514,342 @@ export function parentAttackOutcome(
   if (roll < killChance(prey, predator, weights)) return 'kill'
   if (roll < defendChance(prey, predator, weights)) return 'driveOff'
   return 'taken'
+}
+
+// ---------------------------------------------------------------------------
+// Intraspecies combat (design.md §19.17, point 264).
+// Research: docs/intraspecies-combat-1890.md — which of the game's ~1890
+// species genuinely fight their OWN kind, on which driver, and how lethally.
+// The table below is that research made executable; nothing here is invented.
+// ---------------------------------------------------------------------------
+
+/** What drives a species' same-species fighting (research §1). */
+export type FightDriver = 'musth' | 'dominance' | 'territorial' | 'resource'
+
+/** One species' row of the researched fight table (docs/intraspecies-combat-1890.md §2/§4). */
+export interface FightProfile {
+  /** Does this species fight its OWN kind at all? A `false` row is the
+   *  research's explicit "does not duel" verdict (§3), not a gap. */
+  fights: boolean
+  /** The driver behind it; absent on a non-fighting species. */
+  driver?: FightDriver
+  /** Relative rate at which an eligible adult carries the "wants to fight"
+   *  disposition — multiplied by the calibratable balance rate. Tier A (§4)
+   *  sits low and dramatic, the ritualised Tier B higher and harmless. */
+  disposition: number
+  /** Chance a CLASH kills the loser instead of ending in submission. Tier A
+   *  species (§4) carry a real fatal branch; the ritualised Tier B ones
+   *  resolve by one animal yielding — a fight the research says leaves no
+   *  wound must not leave a carcass. Scaled by the calibratable balance
+   *  lethality factor. */
+  lethality: number
+  /** Is the disposition SEEDED in the live world? A researched species whose
+   *  locomotion is owned by a dedicated system — the elephant herd drive, the
+   *  §19.16 crocodile ambush — or that has no ambient same-species population
+   *  to fight (the predators exist only as the §19.8 lioness-and-cub family
+   *  and as revenge carcasses) keeps its researched row but seeds nothing.
+   *  OPEN: give those species the drive when their own systems can host it. */
+  live: boolean
+}
+
+/**
+ * The per-species fight table (docs/intraspecies-combat-1890.md §2 + §4). Every
+ * animal the game renders has a row, so "does this one fight?" is answered by
+ * the research rather than by whichever species a scan happened to reach.
+ */
+export const FIGHT_PROFILES: Record<string, FightProfile> = {
+  // Tier A — a genuinely lethal same-species fight (research §4).
+  // Zebra stallions fight over a harem: savage, occasionally fatal — and the
+  // one Tier A species with an ambient same-species herd, so it carries the
+  // drive in the live world.
+  zebra: { fights: true, driver: 'dominance', disposition: 1, lethality: 0.75, live: true },
+  // Musth bulls; the deadliest picture of the set, but an elephant's motion is
+  // the herd drive's, not the shared roam core's.
+  elephant: { fights: true, driver: 'musth', disposition: 0.4, lethality: 0.8, live: false },
+  // Male coalitions and pride takeovers. No ambient lion population exists —
+  // herds.lion holds the §19.8 lioness-and-cub family and revenge carcasses.
+  lion: { fights: true, driver: 'territorial', disposition: 0.5, lethality: 0.7, live: false },
+  leopard: { fights: true, driver: 'territorial', disposition: 0.5, lethality: 0.5, live: false },
+  cheetah: { fights: true, driver: 'territorial', disposition: 0.4, lethality: 0.35, live: false },
+
+  // Tier B — a visible contest that ends in submission (research §3/§4).
+  // Necking bulls: mostly bruising, a rare knock-down death at high intensity.
+  giraffe: { fights: true, driver: 'dominance', disposition: 1.2, lethality: 0.12, live: true },
+  // Ritualised lek/rut clashes: the horns meet, nobody dies.
+  wildebeest: { fights: true, driver: 'territorial', disposition: 1.6, lethality: 0, live: true },
+  antelope: { fights: true, driver: 'territorial', disposition: 1.6, lethality: 0, live: true },
+  // Boar shoving, padded by the facial warts.
+  warthog: { fights: true, driver: 'dominance', disposition: 1.4, lethality: 0, live: true },
+  // Breeding-ground territorial males — water-only, and the §19.16 ambush owns
+  // a crocodile's every move.
+  crocodile: { fights: true, driver: 'territorial', disposition: 0.5, lethality: 0, live: false },
+  // Clan rank aggression is drive-off among adults; the lethal hyena cases are
+  // cubs at the den, deliberately out of scope (research §4 Tier B).
+  hyena: { fights: true, driver: 'dominance', disposition: 0.8, lethality: 0, live: false },
+
+  // Tier C — squabbles, not duels (research §3): no fight mechanic at all.
+  flamingo: { fights: false, disposition: 0, lethality: 0, live: false },
+  vulture: { fights: false, disposition: 0, lethality: 0, live: false },
+  plover: { fights: false, disposition: 0, lethality: 0, live: false },
+}
+
+/** The species that seed the live disposition — the researched fighters whose
+ *  locomotion is the shared roam core (see `FightProfile.live`). */
+export const FIGHTING_SPECIES: readonly string[] = Object.keys(FIGHT_PROFILES).filter(
+  (s) => FIGHT_PROFILES[s].fights && FIGHT_PROFILES[s].live,
+)
+
+/** Does this species fight its own kind IN THE WORLD (research §2, live rows
+ *  only)? An unknown species — anything not in the table — never does. */
+export function speciesFightsOwnKind(species: string): boolean {
+  const p = FIGHT_PROFILES[species]
+  return p !== undefined && p.fights && p.live
+}
+
+/**
+ * Does this individual take the "wants to fight" disposition on its roll? The
+ * base rate is one calibratable balance value; the species' own row scales it,
+ * so a ritual sparring species picks quarrels more often than a musth bull.
+ * A non-fighting (or non-live) species never does, whatever the roll.
+ */
+export function wantsToFight(species: string, roll: number, rate: number): boolean {
+  if (!speciesFightsOwnKind(species)) return false
+  return roll < Math.max(0, rate) * FIGHT_PROFILES[species].disposition
+}
+
+/** Nearest same-species opponent within reach, or null. The caller supplies an
+ *  ALREADY-ELIGIBLE list (alive, adult, not drama-claimed, off cooldown), so
+ *  this stays a pure nearest-pick the test can drive without a scene. */
+export function pickFightOpponent<T extends { x: number; z: number }>(
+  x: number,
+  z: number,
+  candidates: readonly T[],
+  radius: number,
+): T | null {
+  let best: T | null = null
+  let bd = radius
+  for (const c of candidates) {
+    const d = Math.hypot(c.x - x, c.z - z)
+    if (d < bd) {
+      bd = d
+      best = c
+    }
+  }
+  return best
+}
+
+/**
+ * The two interaction paths (point 264). BOTH want the fight → they CONVERGE,
+ * running at each other until they meet. Only the aggressor wants it → it
+ * HUNTS the other, which flees; that chase ends in a catch or a drive-off.
+ */
+export function fightApproach(selfWants: boolean, foeWants: boolean): 'converge' | 'hunt' {
+  return selfWants && foeWants ? 'converge' : 'hunt'
+}
+
+/** How a running approach resolves this frame. */
+export type FightApproachOutcome = 'approach' | 'clash' | 'driveOff'
+
+/**
+ * One step of the approach, for BOTH paths (point 264). Contact (`gap` down to
+ * the contact radius) starts the clash. A HUNT additionally breaks off once the
+ * quarry has been driven the calibratable drive-off distance FROM WHERE THE
+ * BOUT BEGAN — the aggressor holds a patch, and once the other is off it the
+ * aggressor is satisfied and no kill follows. Measured from the origin, not
+ * from the shrinking gap, so BOTH endings are genuinely reachable: a quarry
+ * jumped at close range is run down, one with room to run clears the patch
+ * first. Both paths carry the §19.8 hard deadline (invariant I4) on top: a
+ * converge that can never meet — a river between them, a body it cannot reach
+ * — ends in the same peaceful break-off rather than running forever.
+ */
+export function fightApproachOutcome(
+  mode: 'converge' | 'hunt',
+  gap: number,
+  quarryFromOrigin: number,
+  elapsed: number,
+  limits: { contactRadius: number; driveOffDistance: number; approachSeconds: number },
+): FightApproachOutcome {
+  if (gap <= limits.contactRadius) return 'clash'
+  if (elapsed >= limits.approachSeconds) return 'driveOff'
+  if (mode === 'hunt' && quarryFromOrigin >= limits.driveOffDistance) return 'driveOff'
+  return 'approach'
+}
+
+/** The resolution of one clash. */
+export interface FightResolution {
+  /** Which of the pair lost — 'a' is the animal the caller passed first. */
+  loser: 'a' | 'b'
+  /** Did the loser DIE (its body enters the ordinary carcass system), or did
+   *  it merely submit and withdraw? */
+  lethal: boolean
+}
+
+/** Calibratable weights of the clash resolution (balance.fight). */
+export interface FightWeights {
+  /** Scales every species' researched lethality. */
+  lethalityScale: number
+  /** TEST-ONLY (the point-177 `forceOutcome` precedent): pins the lethal
+   *  branch so a staged verification needs no retry-until-the-roll-lands loop.
+   *  Never set in normal play. */
+  forceOutcome?: 'death' | 'submission'
+}
+
+/**
+ * Who loses, and does it die (point 264)? The loser is a SIZE-WEIGHTED roll —
+ * the heavier animal wins the more often, p(a loses) = sizeB / (sizeA + sizeB),
+ * so an even pair is a coin flip and a mismatch reads the way the picture
+ * suggests. Whether the loss is fatal is the species' researched lethality
+ * (docs/intraspecies-combat-1890.md §4) times the calibratable scale: the
+ * lethal Tier A fight leaves a carcass, the ritualised Tier B clash ends with
+ * the loser yielding and withdrawing unhurt. Deterministic — the caller passes
+ * its own rolls, never Math.random.
+ */
+export function fightResolve(
+  species: string,
+  sizeA: number,
+  sizeB: number,
+  rollLoser: number,
+  rollLethal: number,
+  weights: FightWeights,
+): FightResolution {
+  const a = Math.max(1e-6, sizeA)
+  const b = Math.max(1e-6, sizeB)
+  const loser: 'a' | 'b' = rollLoser < b / (a + b) ? 'a' : 'b'
+  const base = FIGHT_PROFILES[species]?.lethality ?? 0
+  const chance = Math.min(1, Math.max(0, base * Math.max(0, weights.lethalityScale)))
+  // A species the research calls non-lethal stays non-lethal whatever is
+  // forced: the force pins a ROLL, it may not rewrite the table.
+  const lethal =
+    chance <= 0 ? false : weights.forceOutcome ? weights.forceOutcome === 'death' : rollLethal < chance
+  return { loser, lethal }
+}
+
+/** Has this clash run its calibratable course? The single exit of the clash
+ *  phase — and, with `fightApproachOutcome`'s deadline, the second half of the
+ *  point-186 I4 guarantee that every started fight RESOLVES. */
+export function clashOver(clashSeconds: number, duration: number): boolean {
+  return clashSeconds >= Math.max(0, duration)
+}
+
+/** Where one fighter's body sits and points this frame, relative to its sim
+ *  spot: a RENDER overlay only — `dx`/`dz` are never written back to the
+ *  animal's position, so the shove cannot accumulate into a drift (the
+ *  point-383 lesson). */
+export interface ClashPose {
+  /** Heading of the body. Off the contact bearing by the splay, so the pair
+   *  makes a wedge from above instead of one straight line. */
+  yaw: number
+  /** Render offset from the sim spot (world units). */
+  dx: number
+  dz: number
+  /** Nose-down positive, reared nose-up negative. */
+  pitch: number
+  /** How far the body rises so the pitched-down end keeps its feet down. */
+  lift: number
+}
+
+/** Geometry of the clash pose (design.md §19.17, point 264) — pure, so the
+ *  thing the picture depends on is assertable without a browser.
+ *
+ *  The bird's-eye looks down from ~60° at the achievable zooms, where an
+ *  animal is a few dozen pixels: only the ground-plane arrangement and the
+ *  height off it carry. Two bodies aimed straight at each other are one
+ *  straight line from up there, which is why the first build photographed
+ *  what looked like two animals standing. So this returns a SPLAY (each body
+ *  turned off the contact bearing about its own head, so the muzzles stay
+ *  locked while the rumps open into a wedge), a WHEEL of the locked pair about
+ *  that contact point, a SHOVE that travels through the pair (one drives, the
+ *  other gives ground, so the contact neither gaps nor interpenetrates), and
+ *  an alternating REAR — one up on its hind legs while the other bores in low.
+ *  That standing asymmetry is what reads as interaction; two identical bodies
+ *  read as scenery.
+ *
+ *  Both sides must be called with the SAME `phase` (the aggressor's) so the
+ *  two interlock rather than drifting into the same posture, and `intensity`
+ *  (balance.fight.clashIntensity) scales the whole thing — 0 collapses it back
+ *  to two animals standing nose to nose. */
+export function clashPose(
+  t: number,
+  phase: number,
+  aggressor: boolean,
+  toFoe: number,
+  intensity: number,
+  g: ClashPoseGeometry = CLASH_POSE,
+): ClashPose {
+  const k = Math.max(0, intensity)
+  const ph = phase * Math.PI * 2
+  const side = aggressor ? 1 : -1
+  const drive = Math.sin(t * g.rate + ph)
+  const wheel = Math.sin(t * g.rate * 0.37 + ph) * g.wheel * k
+  // Saturated, not a plain sine: the rear is HELD near its top for most of its
+  // half-cycle and swaps quickly, so at ~4 instants in 5 one animal is plainly
+  // up while the other bores in low. A sine spends most of its time near zero,
+  // which left both bodies level at whatever moment the eye (or the shutter)
+  // happened to catch them.
+  const rear = Math.min(1, Math.max(0, Math.sin(t * g.rate * 0.5 + ph + (aggressor ? 0 : Math.PI)) * 3))
+  const yaw = toFoe + side * g.splay * k + wheel
+  // Turning about the HEAD, not the body centre: translate back by what the
+  // turn moved the muzzle, so the contact point holds and only the rump swings.
+  let dx = g.headPivot * (Math.sin(toFoe) - Math.sin(yaw))
+  let dz = g.headPivot * (Math.cos(toFoe) - Math.cos(yaw))
+  const along = drive * g.shove * k * side + Math.sin(t * g.rate * 1.3 + ph) * g.gap * k
+  dx += Math.sin(toFoe) * along
+  dz += Math.cos(toFoe) * along
+  const pitch = (g.drive * (1 - rear) - g.rear * rear) * k
+  return { yaw, dx, dz, pitch, lift: Math.abs(Math.sin(pitch)) * g.stance }
+}
+
+/** Amplitudes of the clash pose above. Radians for the angles, world units for
+ *  the distances; `rate` is the shove cycle in rad/s. */
+export interface ClashPoseGeometry {
+  splay: number
+  headPivot: number
+  wheel: number
+  shove: number
+  gap: number
+  rear: number
+  drive: number
+  stance: number
+  rate: number
+}
+
+/** The shipped amplitudes. Tuned against the rendered frame at the player's
+ *  default zoom 0.5, where the pair spans a few dozen pixels. */
+export const CLASH_POSE: ClashPoseGeometry = {
+  splay: 0.62, // half-angle of the wedge the two bodies open into
+  headPivot: 1.05, // local forward distance to the head — the pivot the splay turns about
+  wheel: 0.45, // how far the locked pair swings about its contact point
+  shove: 0.5, // how far the drive carries the pair along the contact line
+  gap: 0.16, // how far the contact gap itself works open and shut
+  rear: 0.95, // the front lifted on the rearing beat
+  drive: 0.45, // the head dropped on the driving beat — heads low and forward, boring in
+  stance: 0.66, // half the stance length: the rise that keeps the low end's feet down
+  rate: 2.6, // a fast, worrying rhythm
+}
+
+/** A minimal structural view of one side of a bout, so the pair check below is
+ *  testable without the render `Animal`. */
+export interface FightSide {
+  dead?: boolean
+  /** Removed from the herd arrays (culled or consumed). */
+  gone?: boolean
+  fight?: { foe: FightSide }
+}
+
+/**
+ * Must this bout be broken off before anything is driven (point 264, the point-341
+ * lesson applied to the fight)? A bout is only alive while BOTH sides are alive,
+ * present, and still hold EACH OTHER. Checked from either side every frame, so a
+ * fighter whose opponent died, was culled or was claimed by another drama is
+ * released rather than left engaged with a body that is gone — which would keep
+ * its drama flag, its fight pose and its no-flight standing forever.
+ */
+export function fightPairBroken(self: FightSide, foe: FightSide): boolean {
+  return (
+    self.dead === true ||
+    self.gone === true ||
+    foe.dead === true ||
+    foe.gone === true ||
+    foe.fight?.foe !== self
+  )
 }

@@ -703,6 +703,11 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 - The seizure ALWAYS resolves (the §19.8 rule): the grip carries a hard release deadline beyond the victim's struggle window, so a victim that vanishes mid-grip — streamed out of view, or taken by another system — can never pin the crocodile; it lets go and submerges.
 - The traveller who walks into a crocodile is attacked through the §14.2 event rules unchanged: the machete always protects, the rifle only from the canoe.
 
+### 19.17 Intraspecies combat — rivals of one kind
+
+- Animals of the SAME species fight each other — but only those that truly do. `docs/intraspecies-combat-1890.md` maps every rendered animal to fights/does-not-fight with its driver and lethality; the mechanic is built from it: territorial and rutting ungulates and solitary cats fight; birds only squabble and are excluded, as are juveniles (§19.8) and anything another drama holds. A low calibratable per-species roll (§21.2) carries the disposition, so fights stay occasional.
+- Two paths: where BOTH want it they CONVERGE; where one does it HUNTS the other — a chase ending in a CATCH, or a DRIVE-OFF once the quarry is driven the calibratable distance off. On contact the two CLASH for a calibratable few seconds, and it must READ as a fight from above: heads locked, bodies splayed into a wedge, the pair wheeling and shoving, one rearing while the other bores low (calibratable intensity, §21.2). It resolves on a size-weighted roll: a lethal species' loser DIES into the ordinary carcass system; a ritualised one SUBMITS unhurt — a fight that leaves no wound may leave no carcass. No second chase system: a new state on the same core, claimed from idle, deflecting around water like any mover, released on a hard deadline — every fight RESOLVES.
+
 ### 19.9 Climate and landscape dressing
 
 - Climate and environmental look: region-typical atmosphere such as heat shimmer in the desert, humid haze in the jungle and clear air in the highlands. Purely visual.
