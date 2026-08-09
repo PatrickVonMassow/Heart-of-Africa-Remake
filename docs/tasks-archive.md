@@ -16081,3 +16081,38 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   `scripts/verify/polish.mjs` settlement, BOTH backends, with screenshots): holding
   Ctrl labels the animals in view and no plant, every label sits on an on-screen
   subject, and releasing clears every one.
+
+- [x] 566. REPAIRING ONE CHECK COSTS A WHOLE SUITE PASS (measured 08.08.2026 on point
+  342, and answering the user's question that day about where the hours go). The feature
+  code took 22 minutes — three commits, 17:56 to 18:18. The remaining four and a half
+  hours were verification, and TWO of the three repair commits in them repaired the
+  CHECK, not the game: one had to STAGE an animal instead of hoping one streamed into
+  view, one read the label list a frame before the drawn labels. Each such repair costs a
+  full `enrichments` pass — one browser session, 251 checks, measured at over 17 minutes
+  on the WebGL 2 lane — and then the same round again on the second backend.
+  IT IS NOT THE MACHINE: the container reaches the real GPU (`hasHardwareGlChain` is
+  true, the WSL D3D12 chain on the 4070 Ti, ~7× the software path when that lane was
+  built), and the Vitest layer runs 8386 tests in 88 s. The cost is the REPLAY.
+  WHY A NAME FILTER ON `check()` WOULD BUY NOTHING: the suites are linear scripts — boot,
+  jump, wait for herds, assert, jump on — and the expensive part is the navigation, the
+  waits and the screenshots, not the assertion. Skipping an assertion still replays every
+  jump before it.
+  FINAL STATE: each browser suite is divided into declared SECTIONS — a named block that
+  owns the setup it needs (its jumps and waits) plus its checks. The boundaries already
+  exist as `// --- … ---` comments; they become a declaration the runner reads.
+  `node scripts/verify/run-all.mjs <suite> --section=<name>` runs that section's setup and
+  its checks and nothing else; without `--section` the suite runs whole, exactly as today.
+  An unknown section name FAILS LOUD, naming the sections that exist. Every PASS/FAIL line
+  carries the section its check sits in, so a failing check names the argument that
+  re-runs it alone. A `--section` run is marked PARTIAL in its output and can never be
+  recorded as suite coverage — the acceptance and closing runs stay whole-suite, and the
+  render-verify recorder rejects a partial run as proof.
+  Scope: `enrichments` first (7904 lines, the largest), then the other render suites; a
+  suite not yet sectioned keeps working unchanged.
+  VERIFIABLE: pure Vitest over the section resolver — a known name selects exactly its
+  setup and its checks, an unknown one fails naming the candidates, no argument selects
+  everything, a partial run is flagged partial and is refused as recorded coverage; plus
+  one real `--section` run of `enrichments` that finishes in a fraction of the full pass
+  and reports only that section's checks.
+  Criticality: medium — no product defect, but it is the batch's largest measured time
+  sink, and it lengthens every iteration on every render point.
