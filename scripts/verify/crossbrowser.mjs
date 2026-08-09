@@ -19,6 +19,7 @@
 // Run standalone (or via run-all, which sets BASE_URL + CROSSBROWSER_DEPTH):
 //   BASE_URL=http://localhost:5173/ CROSSBROWSER_DEPTH=standard node scripts/verify/crossbrowser.mjs
 import { chromium, firefox, webkit } from 'playwright'
+import { applySeedRoute } from './verify-seed.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const DEPTH = ['minimal', 'standard', 'thorough'].includes(process.env.CROSSBROWSER_DEPTH ?? '')
@@ -36,7 +37,9 @@ const check = (label, name, cond, detail = '') => {
 }
 async function launchOrSkip(label, engine) {
   try {
-    return await engine.launch()
+    // The world seed by the shared route (point 557) — one engine must not meet a
+    // different settlement layout than the next, or an engine-specific red is a draw.
+    return applySeedRoute(await engine.launch())
   } catch (e) {
     const msg = String(e.message)
     if (/Executable doesn't exist|not found|install/i.test(msg)) {

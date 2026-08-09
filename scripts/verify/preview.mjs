@@ -4,6 +4,10 @@ import { launchVerifyBrowser } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 
+// The one DELIBERATELY UNSEEDED suite (verify-seed.mjs `UNSEEDED_SUITES`, point 557):
+// the ?seed hook is DEV-only, so the production build randomises its world whatever
+// the URL says. The launcher announces that in this suite's own output rather than
+// leaving the reader to assume a pin that cannot exist here.
 const BASE = process.env.BASE_URL ?? 'http://localhost:4173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 
