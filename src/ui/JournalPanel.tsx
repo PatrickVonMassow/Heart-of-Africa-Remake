@@ -182,9 +182,12 @@ export function JournalPanel() {
     )
   }, [open])
 
+  // The newest entry stays in view (design.md §15.4) — also when the diary
+  // comes back to the front, since the tab behind it is unmounted and its
+  // list returns scrolled to the oldest page (point 579).
   useEffect(() => {
-    if (open) endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [open, journal.length])
+    if (open && tab === 'entries') endRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [open, tab, journal.length])
 
   // While a new entry is written into the book (design.md §16), follow the
   // growing text down so the appearing content stays in view. `writing` gets a

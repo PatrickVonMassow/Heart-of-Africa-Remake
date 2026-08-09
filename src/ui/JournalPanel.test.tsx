@@ -3,7 +3,7 @@
 // Library checks (jsdom): the journal never shows a voice marker, prose stays
 // intact, the read-aloud control is offered for English only. The actual TTS
 // audio and handwriting animation stay in Playwright.
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { act, fireEvent, render } from '@testing-library/react'
@@ -271,6 +271,18 @@ describe('journal tabs (point 579)', () => {
     act(() => g().setJournalOpen(false))
     act(() => g().setJournalOpen(true))
     expect(activeTab()).toBe(en.journalPanel.entries)
+  })
+
+  it('brings the newest page back into view when the diary returns to the front', () => {
+    // The tab behind is unmounted, so the returning list starts at its oldest
+    // page — design.md §15.4 wants the newest content in view.
+    render(<JournalPanel />)
+    const scrolled = vi.spyOn(Element.prototype, 'scrollIntoView')
+    openObservationsTab()
+    expect(scrolled).not.toHaveBeenCalled()
+    fireEvent.click(document.querySelectorAll('.journal .journal-tab')[0])
+    expect(scrolled).toHaveBeenCalled()
+    scrolled.mockRestore()
   })
 
   it('writes no label in upper case, in the text or through the stylesheet', () => {
