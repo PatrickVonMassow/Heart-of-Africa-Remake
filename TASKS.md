@@ -404,6 +404,21 @@ there exactly once; a new point joins a bundle when appended.
   instability — so these are the suite's own staging, not a product defect and not
   the sectioning. Each is a STAGING settle of exactly the two patterns above; fixing
   them is what makes a green run repeatable rather than lucky.
+  AND THEY ARE NAMED BUT NOT CHARGED (found 09.08.2026 while preparing point 309).
+  The measurement above pins each rotating red to an OPEN point (201, 342, 341, 369),
+  but `scripts/render-verify-charges.mjs` holds exactly ONE entry (point 506, polish,
+  goat walker) and none of these four. `render-verify-core`'s `runVerdict` counts a
+  run as covering only when EVERY red is charged to an open point, so an `enrichments`
+  run comes back UNACCOUNTED even though its reds are measured, owned and understood.
+  The cost is exact: point 309's one remaining gate is a green LARGE run, and that gate
+  cannot be reached by waiting for a quiet machine — the run would have to come up clean
+  on the one-in-six chance the measurement recorded.
+  DECIDE, DO NOT DRIFT: either these four staging settles are fixed here (the point's
+  own job, and the honest fix), or the four reds are CHARGED to their points in the
+  ledger the mechanism provides for exactly this case. Charging is legitimate — it is
+  what the ledger is for — but it silences the checks, so it is a deliberate decision
+  written down with its reason, never a quiet workaround. Whichever is chosen, 309 stops
+  waiting on a green that cannot arrive.
   PROGRESS 21.07.2026 (evening): three more increments, each validated green +
   pushed — (1) FAIL-SOFT against a whole-run ABORT (7360b62): a rare mid-check
   scene remount briefly nulls window.__wildlife; a non-optional herdsRef access
