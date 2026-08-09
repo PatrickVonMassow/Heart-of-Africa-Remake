@@ -372,7 +372,13 @@ there exactly once; a new point joins a bundle when appended.
   2. Two inhabitants never share a spot: the separation resolves every frame, and a pair
      that ends up overlapping (a spawn, a catch, a corner) pushes apart rather than
      staying merged.
-  3. The tag game still WORKS — a catch must remain reachable, so the separation must not
+  3. NO JITTER. The user watching the game reports the children "häufig festklemmen und
+     rumzittern" — two bodies that overlap and are pushed apart every frame oscillate, and
+     a child vibrating on the spot reads as broken, not as playing. The separation is
+     damped and settles: a pair that has been pushed apart stays apart without a visible
+     tremble, and a child wedged between a collider and another child leaves that state
+     within a bounded time instead of buzzing in it.
+  4. The tag game still WORKS — a catch must remain reachable, so the separation must not
      hold the chaser off its runner. The catch distance and the body radius are stated
      against each other, and the catch wins.
   VERIFIABLE: pure Vitest beside `src/scenes/place/animalSpots.test.ts` — from a stacked
