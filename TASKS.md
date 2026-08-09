@@ -70,6 +70,305 @@ there exactly once; a new point joins a bundle when appended.
 
 ## Checklist
 
+- [ ] 585. THE LEARNING BOULDER FLOATS IN THE RIVER (user 09.08.2026, F6 report
+  `local/bugreports/SchwebenderFindling.zip`: "Ist das der Findling zum Lernen? Der
+  schwebt in der Luft über der Wasseroberfläche"; seed 1425108822, Bambara village,
+  x/z -60.55 / -130.01). The frame shows a single dark boulder standing OUT IN THE WATER,
+  its underside clear of the surface — on no ground at all.
+  FIRST, IDENTIFY WHICH BOULDER IT IS, because the two have different rules and the answer
+  decides the fix: point 482 item 7 puts a SMALL boulder INSIDE the village, visible from
+  it, and BIG_ROCK is taught on that one; item 6 puts the LARGE target erratic OUTSIDE the
+  settlement, on the Niger's bank at least 1.6° upstream (`src/world/communicationRock.ts`).
+  Neither may stand in the river, and the report is inside the settlement, so the small one
+  is the first suspect — but the seeded placement of the large one must be checked at this
+  seed as well before either is called innocent.
+  ROOT CAUSE TO ESTABLISH, not to guess: the placement samples the terrain
+  (`sampleTerrain`/`isBlocked`) and a boulder both IN the water and ABOVE it means the
+  ground query and the drawn surface disagree — the same class the project already wrote a
+  rule for (points 129/378: derive from what the picture draws). Report which of the two
+  queries was wrong.
+  FINAL STATE:
+  1. Neither boulder is ever placed in water. The placement REJECTS a wet spot instead of
+     accepting it, at every seed.
+  2. Every boulder SITS on the ground it is placed on — its base meets the drawn surface,
+     with no gap and no sinking, at the exact coordinate the digging spot uses.
+  3. The teaching pair still reads as the point intends: the small one visible from inside
+     the village, the large one unmistakably bigger and further away upstream.
+  VERIFIABLE: pure Vitest over MANY seeds — no boulder lands on water, and each one's base
+  height equals the terrain height at its own coordinate within a tight tolerance. Then a
+  picture at the reported seed on one backend: the boulder stands on ground.
+  Criticality: HIGH — the goal of the whole communication PoC is dug up at this boulder,
+  and a rock floating in a river teaches the player that the world is not to be trusted.
+
+
+- [ ] 584. THE RIVER IS A WALL AT THE VILLAGE BANK (user 09.08.2026, F6 report
+  `local/bugreports/WasserWand.zip`: "Ich laufe hier gegen das Wasser wie gegen eine
+  Wand"; seed 1425108822, Bambara village, x/z -60.55 / -130.01). In the settlement the
+  water edge stops the player dead. That contradicts what this very bank exists for:
+  point 482 put the village on the Niger so the player can STAND at the bank and SEE the
+  current, and criterion 21 states for the bird's-eye view that the current pushes the
+  traveller "without ever HOLDING him". The settlement inherited the opposite rule, and
+  it is the same class as open point 312, which found the animals water-BARRED where the
+  design only ever said water-shy — that point's finding is now confirmed for the PLAYER
+  too, in a settlement.
+  SECOND DEFECT IN THE SAME FRAME: the bank is a SHEER VERTICAL CUT. The sand ends in a
+  straight edge and the water plane meets it like a wall of a swimming pool — no shallow,
+  no waterline, no shore. Whatever the walking rule becomes, a bank the player is meant to
+  stand at must read as a bank.
+  FINAL STATE:
+  1. The player is never HELD by water in a settlement. The decision — wade to a depth,
+     swim beyond it, or be turned back by a shallows the picture SHOWS — is made once,
+     written where the settlement's walkable region is defined, and it matches what the
+     bird's-eye view already does, so one river does not behave as two.
+  2. Where the rule does stop him, the picture says why BEFORE he walks into it: a
+     visible shallows, a steep cut bank, reeds — never an invisible plane at the
+     waterline.
+  3. The bank has a shore: the ground meets the water through a short slope with a
+     waterline, not through a vertical face.
+  VERIFIABLE: pure Vitest — a walk from the village centre into the river at the reported
+  seed ends in the state the decision names (wading/swimming/a stated refusal) and never
+  in a dead stop at an undrawn plane; plus the bank profile has no vertical step above a
+  stated height. Then the PICTURE on BOTH backends, since the shore is drawn geometry: a
+  frame from the bank showing shore and waterline.
+  Criticality: HIGH — the bank is the one place the UPSTREAM/DOWNSTREAM teaching of the
+  communication PoC is learned, and the player cannot reach it.
+
+
+- [ ] 577. THE VILLAGE SPEECH IS SILENCED BY THE SLIDER FOR "EVERYTHING ELSE", AND HAS NO
+  SLIDER OF ITS OWN (user 09.08.2026, F6 report `local/bugreports/keineBaBAs.zip`: "Ich
+  höre keine ba-BAs"; his state has `ambientVolume: 0`, `ambienceVolume: 9.9`). ROOT
+  CAUSE, established from the signal path: `playSpeech` in `src/systems/ambience.ts`
+  (~line 784) sends every syllable to `ambientBus`, whose gain IS `balance.ambientVolume`
+  (~line 317/877). Turning "Übrige Ambiente-Lautstärke" to 0 therefore mutes the
+  utterances COMPLETELY — the syllables are still scheduled, at a positive peak, and
+  multiplied away at the bus. Two things make this a trap rather than a setting:
+  (a) the label calls that slider "everything ELSE", which is precisely what the speech
+  is not — it is the material the player must hear to learn the language at all, and the
+  one sound whose loss ends the PoC; and (b) the speech is the ONLY source with no
+  relative slider of its own, while footsteps, birdsong and the rest each have one —
+  `design.md` line 616 states the pattern ("individual sources can be turned down on
+  their own through per-source volume sliders in the debug menu"). The user reached
+  `ambientVolume: 0` deliberately, to hear the syllables over the drums; the only
+  instrument the game offered him for that turns them off.
+  FINAL STATE:
+  1. `balance.communication.speechVolume` exists as a calibratable relative level, in the
+     debug menu's existing speech group, in both languages, with the label naming the
+     village speech (not "voice" — nothing else in the game speaks).
+  2. The speech no longer rides the "everything else" bus. It gets its own bus under the
+     master ambience volume, scaled by `speechVolume`, so `ambientVolume` moves the drums
+     and the rest of the village bed WITHOUT touching the syllables. Raising the speech
+     over the drums — the thing the user was trying to do — is then one slider.
+  3. The three existing sliders keep their meaning; no default changes.
+  VERIFIABLE: Vitest on the pure level computation — with `ambientVolume: 0` the speech
+  peak stays positive, and `speechVolume: 0` silences the speech while the ambient bed
+  stays positive; plus an extension of the existing live audio gate
+  (`scripts/verify/voice.mjs` or the ambience probe) asserting scheduled speech at a
+  positive peak while `ambientVolume` is 0.
+  Criticality: HIGH — it silently disables the mechanic the whole communication PoC
+  teaches, and the game's own advice leads the player straight into it.
+
+- [ ] 576. THE DRUMMER'S HANDS BEAT INSIDE HIS DRUMS, AND EACH ONE OVER THE WRONG DRUM
+  (user 09.08.2026, F6 bug report `local/bugreports/hoa-state-2026-08-09-4047534009.zip`,
+  Bambara village, production 7b7f54d, WebGPU, medium: "Die Arme hängen in den Trommeln
+  drin"). TWO defects at one figure, `Drummer` in `src/scenes/place/PlaceLife.tsx`
+  (~line 1079), both measured against the geometry rather than guessed:
+  (a) VERTICAL — the swing arc lies BELOW the drum heads. The hand rides
+  `armAim(±0.26, -0.2 + lift)` with `lift` in 0..0.42, so from a shoulder at y 0.62 with
+  a 0.44 arm the hand centre travels y 0.533 (bottom) to 0.716 (top) and its underside
+  y 0.475 to 0.658. The LARGE drum's head top is y 0.680 and the SMALL drum's y 0.517.
+  The hand over the large drum is therefore inside it through the WHOLE stroke — even at
+  the top of the swing — and the hand over the small one sinks 0.042 m into the head at
+  the bottom. Horizontally both hands sit well within their drum's radius (0.115 m from
+  the large drum's axis against radius 0.27; 0.058 m against 0.17), so the arm passes
+  through the shell, which is exactly what the report shows.
+  (b) SIDES SWAPPED — the falling hand is over the other drum. `FigurePose.left` is local
+  +X (`src/render/gesture.ts`), and the code drives `p.left` from `lowLift`, the LARGE
+  drum's stroke; but the large drum is placed at x −0.34 and the small one at x +0.30, so
+  the left hand hovers over the SMALL drum and the right hand over the LARGE one. The
+  function's own comment states the opposite ("The LARGE low drum ... stands to his
+  left"), so the placement and the comment disagree and the hand mapping follows the
+  comment. This breaks the rule the same comment states — "the hand over the drum being
+  played is the one that falls ... so the strike is unmistakably ON the drum that
+  sounds" — and it breaks it for the message the whole communication PoC hangs on: the
+  player is meant to LEARN `ba` from the low drum and `BA` from the high one by watching
+  which hand strikes which drum.
+  FINAL STATE:
+  1. The hand's lowest point RESTS ON its drum's head, and its highest point clears it.
+     The stroke is derived FROM the drum head's height and the arm's reach, not from a
+     hand-set elevation range — one drum's dimensions change and the stroke follows.
+     Because the two drums differ in height (heads at 0.680 and 0.517), the two arms get
+     their OWN stroke ranges; a single shared range cannot rest on both.
+  2. Each hand plays the drum it stands over. Whichever way the pair is finally
+     arranged, the drum's x placement, the `p.left`/`p.right` assignment and the comment
+     state the SAME side, and the head that dips is the head under the hand that fell.
+  3. The idle beat obeys 1 and 2 as well — it keeps both hands on the large drum today
+     while only `lowDip` is written, so the second hand beats an undipping drum.
+  4. Nothing else about the figure moves: the shoulder height, arm length and hand
+     radius stay the shared `FIGURE_LIMBS` values, because every other villager reads
+     from them.
+  VERIFIABLE: pure Vitest beside `src/render/figures.test.ts` — for BOTH drums and across
+  the whole stroke, the hand's underside stays at or above that drum's head top (contact
+  at the bottom of the stroke, clearance at the top), and the hand's horizontal distance
+  from the drum axis stays inside that drum's radius; plus an assertion that the arm
+  driven by each drum's stroke is the one on that drum's side. Then the PICTURE, since
+  this is what the report is about: a first-person frame at the drummer in the Bambara
+  village on BOTH backends, at rest and mid-message, judged by looking — the hands beat
+  ON the skins.
+  Criticality: medium — it is a permanent, always-visible figure in the one village the
+  communication PoC is taught in, and (b) actively teaches the player the wrong drum.
+  BUNDLE: build together with point 350 where possible. Both are "the villager figure's
+  pose lies about what the body is doing" in the same component, and pairing them saves a
+  verification round.
+
+- [ ] 578. THE CHILDREN PILE UP INSIDE ONE ANOTHER (user 09.08.2026, F6 report
+  `local/bugreports/keineBaBAs.zip`: "die Kinder hängen immer wieder ineinander fest";
+  the frame shows one body with a fan of limbs radiating out of it — several child
+  figures on the same spot). The fix for exactly this defect already exists ONE class
+  over: `src/scenes/place/animalSpots.ts` records that "no animal was part of the
+  collider set, so nothing could ever separate two of them — several goats stood inside
+  one another", and answers it with `ANIMAL_BODY_RADIUS` (0.18 m, deliberately smaller
+  than the mover radius so a herd does not shoulder itself all day). The children's tag
+  game (`stepTagGame`, driven from `src/scenes/place/PlaceLife.tsx` ~line 565) never got
+  that treatment: the children collide with the village fabric but not with each other,
+  so a chase that converges leaves them interpenetrating and, once stacked, steering
+  toward the same target keeps them there.
+  FINAL STATE:
+  1. A child presents a body radius to the other children, in the same shape as the
+     animals' — calibratable, smaller than the mover footprint, scaled by `KID_SCALE`
+     so a child is not given an adult's girth.
+  2. Two children never share a spot: the separation resolves every frame, and a pair
+     that ends up overlapping (a spawn, a catch, a corner) pushes apart rather than
+     staying merged.
+  3. The tag game still WORKS — a catch must remain reachable, so the separation must not
+     hold the chaser off its runner. The catch distance and the body radius are stated
+     against each other, and the catch wins.
+  VERIFIABLE: pure Vitest beside `src/scenes/place/animalSpots.test.ts` — from a stacked
+  start every pair separates within a bounded time; over a long simulated chase no two
+  children are ever closer than the body separation except within the catch distance; and
+  a catch still happens (the game does not deadlock). Then a picture in the Bambara
+  village on one backend — this is figure placement, not a shader.
+  Criticality: medium — it is in the one village the PoC is taught in, and it is the
+  first thing the eye lands on.
+
+- [ ] 579. THE JOURNAL'S TWO SECTIONS BECOME TABS, AND "FIRST HEARD" NAMES ITS VILLAGE
+  (user 09.08.2026). Today the diary and the overheard utterances stand one under the
+  other in the journal, so reading either means scrolling past the other.
+  FINAL STATE:
+  1. The journal has TWO TABS at the top — the diary and the overheard utterances —
+     switched by mouse click AND by a keyboard shortcut. Both labels come from the
+     language files, German and English.
+  2. The tab in front is remembered while the journal is open; opening it lands on the
+     diary.
+  3. Every "First heard" entry NAMES THE VILLAGE it was first heard in, from the
+     discovered-place name (so it reads the same as the status bar's region line).
+     Utterances recorded before this point have no village and must not invent one — they
+     read without it rather than with a wrong name.
+  4. Neither the tab labels nor the "first heard" line is written in UPPER CASE
+     (user 09.08.2026); the styling carries the emphasis, not capitals.
+  VERIFIABLE: Vitest in the HUD layer — the two tabs exist with their localized labels,
+  click and shortcut switch them, only one panel is in the DOM at a time, a first-heard
+  entry with a known village renders its name and one without renders no placeholder,
+  and no rendered label is upper-case (neither in the text nor via
+  `text-transform: uppercase`).
+  Criticality: low — it is a reading comfort and a naming fix, not a defect.
+
+- [ ] 580. THE FIGURES PANTOMIME OUT OF EARSHOT (user 09.08.2026, F6 report
+  `local/bugreports/GestenOhneSprache.zip`: "Die beiden gestikulieren herum, aber ich
+  sehe keine Texte über ihren Köpfen"). ESTABLISHED: the overlay dump of that moment
+  contains no speech label at all, while the journal in the same dump already holds eight
+  overheard utterances — so the label machinery works and simply did not fire here. The
+  gate is distance: both speaking paths (`PlaceLife.tsx` ~line 388 for the children,
+  ~line 1940 for the adults) hear the utterance, record it and raise the overhead label
+  ONLY inside `isWithinHearing(distance)` — `balance.communication.hearingRadius`, 10 m.
+  The GESTURE has no such range: a figure gestures wherever it is drawn, across the whole
+  village. Beyond ten metres the player therefore watches a mute pantomime, which is
+  exactly what he reported — and worse for the PoC than plain silence, because a gesture
+  without its utterance teaches a concept with no word attached to it.
+  FINAL STATE: a figure that GESTURES is a figure the player can hear and read, or it does
+  not gesture. Either the gesture is gated on the same range as the utterance, or the
+  utterance's range is what the gesture reaches — one decision, applied to BOTH the
+  children's and the adults' paths, with the chosen rule written where the range is
+  defined. The hearing radius itself stays calibratable and the label keeps its own
+  lifetime.
+  VERIFIABLE: pure Vitest — across the range there is no distance at which a figure
+  gestures while neither the utterance nor its label is raised; the existing hearing and
+  label tests keep passing.
+  Criticality: medium — it is the teaching loop of the communication PoC, and it fails
+  quietly.
+
+- [ ] 581. THE SETTLEMENT BOUNDARY IS TOO FAINT, AND ITS SLIDER IS ALREADY AT THE CEILING
+  (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
+  Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
+  state: `placeEdgeBand` stands at the shipped defaults, `widthM: 3`, `wanderM: 0.9`,
+  `strength: 1` — and `strength` is documented as "0 (invisible) .. 1 (the full per-kind
+  look)". He is therefore already looking at the STRONGEST edge the game can draw, and it
+  is not enough. This is not a calibration miss: there is no knob left to turn, so the
+  per-kind look itself carries too little contrast against the ground it sits on.
+  FINAL STATE: the boundary READS at a glance from inside the settlement, at the walking
+  pace and eye height the player actually has, in every settlement kind and on the ground
+  colours they stand on — the Bambara village's pale sand is the case that failed, so it
+  is the case that must be shown to work. The contrast comes from the band's own design
+  (value against the surrounding ground, not hue alone — the report is from a sand-on-sand
+  village), and it stays a give-way rather than becoming a painted stripe: the §2.6 look
+  is a threshold the player reads, not a fence. `strength: 1` remains the full look, so
+  the ceiling moves with the design rather than being raised past it.
+  VERIFIABLE: the PICTURE decides, since the complaint is legibility — a first-person
+  frame from inside the settlement at the boundary in at least the Bambara village and
+  one contrasting settlement kind, on BOTH backends, judged by looking. Plus a pure test
+  pinning the contrast the design settles on (the band's value against the sampled ground
+  value stays above the chosen minimum for every settlement kind), so a later ground or
+  palette change cannot quietly erase it again.
+  Criticality: medium — the boundary is what tells the player where the settlement ends
+  and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
+
+- [ ] 582. THE SPEECH LABEL FLOATS FAR OVER THE SPEAKER'S HEAD (user 09.08.2026: "Die
+  Texte der Sprache dürfen nicht so weit oben sein. Vielleicht habe ich bereits welche
+  übersehen ... Die sollen relativ dicht über dem Kopf schweben"). MEASURED:
+  `SPEECH_LABEL_HEIGHT` in `src/communication/speechLabel.ts` is a FLAT 2.3 m above the
+  speaker's own origin — its FEET — and nothing scales it to the figure. An adult stands
+  about 1.45 m in the settlement's units, so its note hangs ~0.85 m above the head; a
+  CHILD at `KID_SCALE` 0.55 is about 0.8 m tall, so its note hangs about TWICE the child's
+  own height above it. The children are the figures that teach most of the concepts, and
+  theirs float highest — which is why a player watching the game at eye level misses them.
+  FINAL STATE:
+  1. The label rides a small, calibratable gap above THAT speaker's head, derived from the
+     figure's own height (the same height the actor record already carries) rather than
+     from a constant — a child's note sits over the child, an adult's over the adult.
+  2. The gap is a balance value in the debug menu's speech group, in both languages.
+  3. The label still clears the head at every scale (it never overlaps the head sphere)
+     and keeps its existing lifetime and content.
+  VERIFIABLE: pure Vitest — for the adult and the child scale the label's world height sits
+  within a stated band above that figure's crown and never below it; a scale change moves
+  the label with it. Then one picture in the Bambara village: the note reads as belonging
+  to the figure under it.
+  Criticality: medium — it is the readability of the PoC's teaching text, and the user
+  reports having missed utterances because of it. Build together with point 580: both are
+  "the label never reaches the player", and one picture check covers them.
+
+- [ ] 583. SOMETHING BLOCKS THE PLAYER WHERE NOTHING IS DRAWN (user 09.08.2026, F6 report
+  `local/bugreports/KollisionMitNichts.zip`: "Bug in der Kollisionserkennung: Ich kann
+  hier nicht durchlaufen"). Repro from the report: seed 1425108822, Bambara village,
+  standing at x/z -59.78 / -129.69 facing the huts across the open courtyard, the woven
+  fence curving away to his left and ENDING in a visible gap. The frame shows open sand
+  where he cannot pass, so a collider stands where the renderer draws nothing.
+  FIRST establish WHICH collider it is — do not guess: dump the settlement's collider set
+  at that seed and project it into the reported frame, so the phantom is identified by
+  the picture rather than by reading the code. The likely families, to be confirmed or
+  ruled out one by one: a fence RUN whose collider spans the whole arc while only its
+  panels are drawn (the gap would then be solid), a hut collider inflated past its
+  drawn wall, and the settlement boundary itself cutting inside its painted edge.
+  FINAL STATE: every collider in a settlement is derived from what the renderer DRAWS, and
+  where the picture shows a gap the player walks through it. The rule points 129/378 wrote
+  for colliders — derive from what the picture draws, never from a second, drifting
+  definition — is applied to whichever family this turns out to be, so the class is fixed
+  and not just this one spot.
+  VERIFIABLE: pure Vitest — at the reported seed a straight walk through the reported gap
+  completes, and no collider in the settlement extends beyond the bounds of the geometry
+  it belongs to. Plus the diagnostic overlay frame that identified the phantom, kept as
+  the evidence. One backend suffices: this is geometry, not shading.
+  Criticality: medium-HIGH — an invisible wall is the defect a player cannot work around
+  or understand, and criterion 16 speaks to exactly this.
+
 - [ ] 174. Tag the demo build `v0.3` and publish it at
   https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3/.
   GATE (user, 19.07.2026): tag v0.3 only after ALL of these are green — 175 (the
@@ -4696,238 +4995,3 @@ Build order, chosen so no two parallel agents own the same file:
   recognisable — plus the before/after cost measurement, on both backends.
   Criticality: medium — it is the visual identity of every animal in the bird's-eye view,
   and acceptance criterion 11 (no schematic look) speaks to exactly this.
-
-- [ ] 576. THE DRUMMER'S HANDS BEAT INSIDE HIS DRUMS, AND EACH ONE OVER THE WRONG DRUM
-  (user 09.08.2026, F6 bug report `local/bugreports/hoa-state-2026-08-09-4047534009.zip`,
-  Bambara village, production 7b7f54d, WebGPU, medium: "Die Arme hängen in den Trommeln
-  drin"). TWO defects at one figure, `Drummer` in `src/scenes/place/PlaceLife.tsx`
-  (~line 1079), both measured against the geometry rather than guessed:
-  (a) VERTICAL — the swing arc lies BELOW the drum heads. The hand rides
-  `armAim(±0.26, -0.2 + lift)` with `lift` in 0..0.42, so from a shoulder at y 0.62 with
-  a 0.44 arm the hand centre travels y 0.533 (bottom) to 0.716 (top) and its underside
-  y 0.475 to 0.658. The LARGE drum's head top is y 0.680 and the SMALL drum's y 0.517.
-  The hand over the large drum is therefore inside it through the WHOLE stroke — even at
-  the top of the swing — and the hand over the small one sinks 0.042 m into the head at
-  the bottom. Horizontally both hands sit well within their drum's radius (0.115 m from
-  the large drum's axis against radius 0.27; 0.058 m against 0.17), so the arm passes
-  through the shell, which is exactly what the report shows.
-  (b) SIDES SWAPPED — the falling hand is over the other drum. `FigurePose.left` is local
-  +X (`src/render/gesture.ts`), and the code drives `p.left` from `lowLift`, the LARGE
-  drum's stroke; but the large drum is placed at x −0.34 and the small one at x +0.30, so
-  the left hand hovers over the SMALL drum and the right hand over the LARGE one. The
-  function's own comment states the opposite ("The LARGE low drum ... stands to his
-  left"), so the placement and the comment disagree and the hand mapping follows the
-  comment. This breaks the rule the same comment states — "the hand over the drum being
-  played is the one that falls ... so the strike is unmistakably ON the drum that
-  sounds" — and it breaks it for the message the whole communication PoC hangs on: the
-  player is meant to LEARN `ba` from the low drum and `BA` from the high one by watching
-  which hand strikes which drum.
-  FINAL STATE:
-  1. The hand's lowest point RESTS ON its drum's head, and its highest point clears it.
-     The stroke is derived FROM the drum head's height and the arm's reach, not from a
-     hand-set elevation range — one drum's dimensions change and the stroke follows.
-     Because the two drums differ in height (heads at 0.680 and 0.517), the two arms get
-     their OWN stroke ranges; a single shared range cannot rest on both.
-  2. Each hand plays the drum it stands over. Whichever way the pair is finally
-     arranged, the drum's x placement, the `p.left`/`p.right` assignment and the comment
-     state the SAME side, and the head that dips is the head under the hand that fell.
-  3. The idle beat obeys 1 and 2 as well — it keeps both hands on the large drum today
-     while only `lowDip` is written, so the second hand beats an undipping drum.
-  4. Nothing else about the figure moves: the shoulder height, arm length and hand
-     radius stay the shared `FIGURE_LIMBS` values, because every other villager reads
-     from them.
-  VERIFIABLE: pure Vitest beside `src/render/figures.test.ts` — for BOTH drums and across
-  the whole stroke, the hand's underside stays at or above that drum's head top (contact
-  at the bottom of the stroke, clearance at the top), and the hand's horizontal distance
-  from the drum axis stays inside that drum's radius; plus an assertion that the arm
-  driven by each drum's stroke is the one on that drum's side. Then the PICTURE, since
-  this is what the report is about: a first-person frame at the drummer in the Bambara
-  village on BOTH backends, at rest and mid-message, judged by looking — the hands beat
-  ON the skins.
-  Criticality: medium — it is a permanent, always-visible figure in the one village the
-  communication PoC is taught in, and (b) actively teaches the player the wrong drum.
-  BUNDLE: build together with point 350 where possible. Both are "the villager figure's
-  pose lies about what the body is doing" in the same component, and pairing them saves a
-  verification round.
-
-- [ ] 577. THE VILLAGE SPEECH IS SILENCED BY THE SLIDER FOR "EVERYTHING ELSE", AND HAS NO
-  SLIDER OF ITS OWN (user 09.08.2026, F6 report `local/bugreports/keineBaBAs.zip`: "Ich
-  höre keine ba-BAs"; his state has `ambientVolume: 0`, `ambienceVolume: 9.9`). ROOT
-  CAUSE, established from the signal path: `playSpeech` in `src/systems/ambience.ts`
-  (~line 784) sends every syllable to `ambientBus`, whose gain IS `balance.ambientVolume`
-  (~line 317/877). Turning "Übrige Ambiente-Lautstärke" to 0 therefore mutes the
-  utterances COMPLETELY — the syllables are still scheduled, at a positive peak, and
-  multiplied away at the bus. Two things make this a trap rather than a setting:
-  (a) the label calls that slider "everything ELSE", which is precisely what the speech
-  is not — it is the material the player must hear to learn the language at all, and the
-  one sound whose loss ends the PoC; and (b) the speech is the ONLY source with no
-  relative slider of its own, while footsteps, birdsong and the rest each have one —
-  `design.md` line 616 states the pattern ("individual sources can be turned down on
-  their own through per-source volume sliders in the debug menu"). The user reached
-  `ambientVolume: 0` deliberately, to hear the syllables over the drums; the only
-  instrument the game offered him for that turns them off.
-  FINAL STATE:
-  1. `balance.communication.speechVolume` exists as a calibratable relative level, in the
-     debug menu's existing speech group, in both languages, with the label naming the
-     village speech (not "voice" — nothing else in the game speaks).
-  2. The speech no longer rides the "everything else" bus. It gets its own bus under the
-     master ambience volume, scaled by `speechVolume`, so `ambientVolume` moves the drums
-     and the rest of the village bed WITHOUT touching the syllables. Raising the speech
-     over the drums — the thing the user was trying to do — is then one slider.
-  3. The three existing sliders keep their meaning; no default changes.
-  VERIFIABLE: Vitest on the pure level computation — with `ambientVolume: 0` the speech
-  peak stays positive, and `speechVolume: 0` silences the speech while the ambient bed
-  stays positive; plus an extension of the existing live audio gate
-  (`scripts/verify/voice.mjs` or the ambience probe) asserting scheduled speech at a
-  positive peak while `ambientVolume` is 0.
-  Criticality: HIGH — it silently disables the mechanic the whole communication PoC
-  teaches, and the game's own advice leads the player straight into it.
-
-- [ ] 578. THE CHILDREN PILE UP INSIDE ONE ANOTHER (user 09.08.2026, F6 report
-  `local/bugreports/keineBaBAs.zip`: "die Kinder hängen immer wieder ineinander fest";
-  the frame shows one body with a fan of limbs radiating out of it — several child
-  figures on the same spot). The fix for exactly this defect already exists ONE class
-  over: `src/scenes/place/animalSpots.ts` records that "no animal was part of the
-  collider set, so nothing could ever separate two of them — several goats stood inside
-  one another", and answers it with `ANIMAL_BODY_RADIUS` (0.18 m, deliberately smaller
-  than the mover radius so a herd does not shoulder itself all day). The children's tag
-  game (`stepTagGame`, driven from `src/scenes/place/PlaceLife.tsx` ~line 565) never got
-  that treatment: the children collide with the village fabric but not with each other,
-  so a chase that converges leaves them interpenetrating and, once stacked, steering
-  toward the same target keeps them there.
-  FINAL STATE:
-  1. A child presents a body radius to the other children, in the same shape as the
-     animals' — calibratable, smaller than the mover footprint, scaled by `KID_SCALE`
-     so a child is not given an adult's girth.
-  2. Two children never share a spot: the separation resolves every frame, and a pair
-     that ends up overlapping (a spawn, a catch, a corner) pushes apart rather than
-     staying merged.
-  3. The tag game still WORKS — a catch must remain reachable, so the separation must not
-     hold the chaser off its runner. The catch distance and the body radius are stated
-     against each other, and the catch wins.
-  VERIFIABLE: pure Vitest beside `src/scenes/place/animalSpots.test.ts` — from a stacked
-  start every pair separates within a bounded time; over a long simulated chase no two
-  children are ever closer than the body separation except within the catch distance; and
-  a catch still happens (the game does not deadlock). Then a picture in the Bambara
-  village on one backend — this is figure placement, not a shader.
-  Criticality: medium — it is in the one village the PoC is taught in, and it is the
-  first thing the eye lands on.
-
-- [ ] 579. THE JOURNAL'S TWO SECTIONS BECOME TABS, AND "FIRST HEARD" NAMES ITS VILLAGE
-  (user 09.08.2026). Today the diary and the overheard utterances stand one under the
-  other in the journal, so reading either means scrolling past the other.
-  FINAL STATE:
-  1. The journal has TWO TABS at the top — the diary and the overheard utterances —
-     switched by mouse click AND by a keyboard shortcut. Both labels come from the
-     language files, German and English.
-  2. The tab in front is remembered while the journal is open; opening it lands on the
-     diary.
-  3. Every "First heard" entry NAMES THE VILLAGE it was first heard in, from the
-     discovered-place name (so it reads the same as the status bar's region line).
-     Utterances recorded before this point have no village and must not invent one — they
-     read without it rather than with a wrong name.
-  4. Neither the tab labels nor the "first heard" line is written in UPPER CASE
-     (user 09.08.2026); the styling carries the emphasis, not capitals.
-  VERIFIABLE: Vitest in the HUD layer — the two tabs exist with their localized labels,
-  click and shortcut switch them, only one panel is in the DOM at a time, a first-heard
-  entry with a known village renders its name and one without renders no placeholder,
-  and no rendered label is upper-case (neither in the text nor via
-  `text-transform: uppercase`).
-  Criticality: low — it is a reading comfort and a naming fix, not a defect.
-
-- [ ] 580. THE FIGURES PANTOMIME OUT OF EARSHOT (user 09.08.2026, F6 report
-  `local/bugreports/GestenOhneSprache.zip`: "Die beiden gestikulieren herum, aber ich
-  sehe keine Texte über ihren Köpfen"). ESTABLISHED: the overlay dump of that moment
-  contains no speech label at all, while the journal in the same dump already holds eight
-  overheard utterances — so the label machinery works and simply did not fire here. The
-  gate is distance: both speaking paths (`PlaceLife.tsx` ~line 388 for the children,
-  ~line 1940 for the adults) hear the utterance, record it and raise the overhead label
-  ONLY inside `isWithinHearing(distance)` — `balance.communication.hearingRadius`, 10 m.
-  The GESTURE has no such range: a figure gestures wherever it is drawn, across the whole
-  village. Beyond ten metres the player therefore watches a mute pantomime, which is
-  exactly what he reported — and worse for the PoC than plain silence, because a gesture
-  without its utterance teaches a concept with no word attached to it.
-  FINAL STATE: a figure that GESTURES is a figure the player can hear and read, or it does
-  not gesture. Either the gesture is gated on the same range as the utterance, or the
-  utterance's range is what the gesture reaches — one decision, applied to BOTH the
-  children's and the adults' paths, with the chosen rule written where the range is
-  defined. The hearing radius itself stays calibratable and the label keeps its own
-  lifetime.
-  VERIFIABLE: pure Vitest — across the range there is no distance at which a figure
-  gestures while neither the utterance nor its label is raised; the existing hearing and
-  label tests keep passing.
-  Criticality: medium — it is the teaching loop of the communication PoC, and it fails
-  quietly.
-
-- [ ] 581. THE SETTLEMENT BOUNDARY IS TOO FAINT, AND ITS SLIDER IS ALREADY AT THE CEILING
-  (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
-  Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
-  state: `placeEdgeBand` stands at the shipped defaults, `widthM: 3`, `wanderM: 0.9`,
-  `strength: 1` — and `strength` is documented as "0 (invisible) .. 1 (the full per-kind
-  look)". He is therefore already looking at the STRONGEST edge the game can draw, and it
-  is not enough. This is not a calibration miss: there is no knob left to turn, so the
-  per-kind look itself carries too little contrast against the ground it sits on.
-  FINAL STATE: the boundary READS at a glance from inside the settlement, at the walking
-  pace and eye height the player actually has, in every settlement kind and on the ground
-  colours they stand on — the Bambara village's pale sand is the case that failed, so it
-  is the case that must be shown to work. The contrast comes from the band's own design
-  (value against the surrounding ground, not hue alone — the report is from a sand-on-sand
-  village), and it stays a give-way rather than becoming a painted stripe: the §2.6 look
-  is a threshold the player reads, not a fence. `strength: 1` remains the full look, so
-  the ceiling moves with the design rather than being raised past it.
-  VERIFIABLE: the PICTURE decides, since the complaint is legibility — a first-person
-  frame from inside the settlement at the boundary in at least the Bambara village and
-  one contrasting settlement kind, on BOTH backends, judged by looking. Plus a pure test
-  pinning the contrast the design settles on (the band's value against the sampled ground
-  value stays above the chosen minimum for every settlement kind), so a later ground or
-  palette change cannot quietly erase it again.
-  Criticality: medium — the boundary is what tells the player where the settlement ends
-  and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
-
-- [ ] 582. THE SPEECH LABEL FLOATS FAR OVER THE SPEAKER'S HEAD (user 09.08.2026: "Die
-  Texte der Sprache dürfen nicht so weit oben sein. Vielleicht habe ich bereits welche
-  übersehen ... Die sollen relativ dicht über dem Kopf schweben"). MEASURED:
-  `SPEECH_LABEL_HEIGHT` in `src/communication/speechLabel.ts` is a FLAT 2.3 m above the
-  speaker's own origin — its FEET — and nothing scales it to the figure. An adult stands
-  about 1.45 m in the settlement's units, so its note hangs ~0.85 m above the head; a
-  CHILD at `KID_SCALE` 0.55 is about 0.8 m tall, so its note hangs about TWICE the child's
-  own height above it. The children are the figures that teach most of the concepts, and
-  theirs float highest — which is why a player watching the game at eye level misses them.
-  FINAL STATE:
-  1. The label rides a small, calibratable gap above THAT speaker's head, derived from the
-     figure's own height (the same height the actor record already carries) rather than
-     from a constant — a child's note sits over the child, an adult's over the adult.
-  2. The gap is a balance value in the debug menu's speech group, in both languages.
-  3. The label still clears the head at every scale (it never overlaps the head sphere)
-     and keeps its existing lifetime and content.
-  VERIFIABLE: pure Vitest — for the adult and the child scale the label's world height sits
-  within a stated band above that figure's crown and never below it; a scale change moves
-  the label with it. Then one picture in the Bambara village: the note reads as belonging
-  to the figure under it.
-  Criticality: medium — it is the readability of the PoC's teaching text, and the user
-  reports having missed utterances because of it. Build together with point 580: both are
-  "the label never reaches the player", and one picture check covers them.
-
-- [ ] 583. SOMETHING BLOCKS THE PLAYER WHERE NOTHING IS DRAWN (user 09.08.2026, F6 report
-  `local/bugreports/KollisionMitNichts.zip`: "Bug in der Kollisionserkennung: Ich kann
-  hier nicht durchlaufen"). Repro from the report: seed 1425108822, Bambara village,
-  standing at x/z -59.78 / -129.69 facing the huts across the open courtyard, the woven
-  fence curving away to his left and ENDING in a visible gap. The frame shows open sand
-  where he cannot pass, so a collider stands where the renderer draws nothing.
-  FIRST establish WHICH collider it is — do not guess: dump the settlement's collider set
-  at that seed and project it into the reported frame, so the phantom is identified by
-  the picture rather than by reading the code. The likely families, to be confirmed or
-  ruled out one by one: a fence RUN whose collider spans the whole arc while only its
-  panels are drawn (the gap would then be solid), a hut collider inflated past its
-  drawn wall, and the settlement boundary itself cutting inside its painted edge.
-  FINAL STATE: every collider in a settlement is derived from what the renderer DRAWS, and
-  where the picture shows a gap the player walks through it. The rule points 129/378 wrote
-  for colliders — derive from what the picture draws, never from a second, drifting
-  definition — is applied to whichever family this turns out to be, so the class is fixed
-  and not just this one spot.
-  VERIFIABLE: pure Vitest — at the reported seed a straight walk through the reported gap
-  completes, and no collider in the settlement extends beyond the bounds of the geometry
-  it belongs to. Plus the diagnostic overlay frame that identified the phantom, kept as
-  the evidence. One backend suffices: this is geometry, not shading.
-  Criticality: medium-HIGH — an invisible wall is the defect a player cannot work around
-  or understand, and criterion 16 speaks to exactly this.
