@@ -14,6 +14,7 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
+import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
@@ -23,9 +24,23 @@ import sharp from 'sharp'
 // (point 557), so this is the plain URL every other suite carries.
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
+// SECTIONS (point 566). Every block below the boot prologue is a named block
+// that owns the settlement it works in: `if (section('<slug>')) { … }`. Without
+// a request every one runs, in file order, exactly as before; `--section=<slug>`
+// (VERIFY_SECTION) runs ONE of them, which is how repairing a single check stops
+// costing this suite's whole pass. The names are read out of THIS FILE by
+// scripts/verify/sections.mjs, so an unknown one is refused with the list of the
+// real ones — and the run is stamped PARTIAL, never counted as suite coverage.
+const sections = sectionGate()
+const { section } = sections
+if (sections.banner()) console.log(sections.banner())
+
 let failures = 0
 const check = (name, ok, detail) => {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ' — ' + detail : ''}`)
+  // The section tag goes AFTER the ' — ' separator: the check's NAME is its
+  // identity for the red ledger and the baseline classifier and must not change.
+  const tail = [detail, sections.tag().trim()].filter(Boolean).join('  ')
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${tail ? ' — ' + tail : ''}`)
   if (!ok) failures++
 }
 
@@ -125,10 +140,62 @@ await page.evaluate(() => {
   window.__game.getState().setJournalOpen(false)
 })
 
+// SHARED STAGING (point 566). A section is a BLOCK SCOPE, so anything two of
+// them use lives HERE, above them, never inside one of them — the shape
+// scripts/verify/scope.test.mjs fails in the fast layer.
+
+// Advance the scene by RENDERED frames. The headless frame time here swings
+// between ~20 ms and well over a second, so every motion measurement below
+// counts frames DRAWN rather than milliseconds elapsed: a fixed wall wait that
+// happens to span a stall reads the same pose twice and reports the whole
+// panorama as motionless, and one that spans a fast stretch moves a walker too
+// little to measure. Both were seen turning green checks red on this suite.
+const nextFrames = (n) =>
+  page.evaluate(
+    (count) =>
+      new Promise((resolve) => {
+        let left = count
+        const tick = () => (left-- > 0 ? requestAnimationFrame(tick) : resolve())
+        requestAnimationFrame(tick)
+      }),
+    n,
+  )
+/** Step frames until the page arrow `ready(arg)` reads true, capped. Returns
+ *  whether it ever did — the caller ASSERTS on that, so a scene that never gets
+ *  there fails loudly instead of quietly measuring nothing. */
+const stepUntil = async (ready, arg = null, capFrames = 240) => {
+  if (await page.evaluate(ready, arg)) return true
+  for (let f = 0; f < capFrames; f++) {
+    await nextFrames(1)
+    if (await page.evaluate(ready, arg)) return true
+  }
+  return false
+}
+
+/**
+ * Stand in `id` by a DIRECT place->place enter (no travel scene, so no panorama
+ * capture — that is what the capture section's fallback check reads). It is the
+ * setup the sections that work "wherever the suite happens to stand" own for
+ * themselves; a no-op once the place is already the one asked for, so a whole
+ * run walks exactly the path it always did.
+ */
+const goToPlace = async (id) => {
+  if ((await page.evaluate(() => window.__game.getState().placeId)) === id) return
+  await page.evaluate((want) => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+    g.enterPlace(want)
+  }, id)
+  await page
+    .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, id, { timeout: 40000 })
+    .catch(() => {})
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+}
+
 // --- Giza skyline behind Cairo (design.md §4.4, point 82) ----------------------
 // The game starts inside Cairo: the great pyramids stand as the western
 // skyline silhouette (point-69 pattern, like Cape Town's Table Mountain).
-{
+if (section('giza-skyline')) {
   // Point 107: the settlement scatter/fence InstancedMeshes must opt OUT of
   // frustum culling — their bounding sphere is computed at the origin, not over
   // the spread instances, so with culling ON the whole mesh (all rocks/fences)
@@ -216,324 +283,309 @@ await page.evaluate(() => {
 }
 
 // --- Panorama wildlife (design.md §2) ---------------------------------------------
-await page.evaluate(() => {
-  const g = window.__game.getState()
-  g.leavePlace()
-  g.enterPlace('maasai-village')
-})
-await page
-  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "maasai-village", { timeout: 30000 })
-  .catch(() => {})
-await page.waitForTimeout(500)
-// The panorama animals stream in over the first seconds of the scene.
-await page.waitForFunction(() => (window.__placePanoramaWildlife ?? 0) >= 3, null, { timeout: 20000 }).catch(() => {})
-const wildlife = await page.evaluate(() => window.__placePanoramaWildlife ?? 0)
-check('distant wildlife drifts through the panorama', wildlife >= 3, `${wildlife} animals`)
-// Points 92/94: every silhouette stays SMALL (bounded subtended angle) and
-// HAZED toward the sky (not a flat near-black blob), and its feet meet ground
-// the frame draws (point 181) rather than the horizon-at-infinity constant.
-await page.waitForFunction(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length >= 3, null, { timeout: 10000 }).catch(() => {})
-const wInfo = await page.evaluate(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}))
-check(
-  'every panorama silhouette sits on the ground line it was placed on',
-  // Point 300: the body DIPS onto whichever leg is planted (that is what puts
-  // the standing foot on the ground), so the anchor may sit below the line by
-  // that dip — `drop` — and never above it.
-  wInfo.length >= 3 && wInfo.every((w) => w.y >= w.visibleY - w.drop - 1e-3 && w.y <= w.visibleY + 0.2),
-  `y vs line [${wInfo.map((w) => `${w.y.toFixed(2)}/${w.visibleY.toFixed(2)}-${(w.drop ?? 0).toFixed(2)}`).join(', ')}]`,
-)
-await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
-// Advance the scene by RENDERED frames. The headless frame time here swings
-// between ~20 ms and well over a second, so every motion measurement below
-// counts frames DRAWN rather than milliseconds elapsed: a fixed wall wait that
-// happens to span a stall reads the same pose twice and reports the whole
-// panorama as motionless, and one that spans a fast stretch moves a walker too
-// little to measure. Both were seen turning green checks red on this suite.
-const nextFrames = (n) =>
-  page.evaluate(
-    (count) =>
-      new Promise((resolve) => {
-        let left = count
-        const tick = () => (left-- > 0 ? requestAnimationFrame(tick) : resolve())
-        requestAnimationFrame(tick)
-      }),
-    n,
-  )
-/** Step frames until the page arrow `ready(arg)` reads true, capped. Returns
- *  whether it ever did — the caller ASSERTS on that, so a scene that never gets
- *  there fails loudly instead of quietly measuring nothing. */
-const stepUntil = async (ready, arg = null, capFrames = 240) => {
-  if (await page.evaluate(ready, arg)) return true
-  for (let f = 0; f < capFrames; f++) {
-    await nextFrames(1)
-    if (await page.evaluate(ready, arg)) return true
-  }
-  return false
-}
-// Point 255 (3): the silhouettes must WALK the horizon, not glide along it.
-// Their stride phase rides the ground they cover on the ring, so over the same
-// interval each one's phase advance divided by its (scale-normalised, point 286)
-// gait speed is the SAME constant — a wall-clock bob would advance them all
-// alike whatever their speed.
-{
-  const sample = () =>
-    page.evaluate(() =>
-      Object.values(window.__placePanoramaWildlifeInfo ?? {}).map((w) => ({
-        gait: w.gait,
-        speed: w.gaitSpeed,
-        cadence: w.cadence,
-      })),
-    )
-  const before = await sample()
-  // Wait for the STRIDE to actually advance rather than for a wall clock: on a
-  // stalled headless frame a fixed 1200 ms wait read the identical phase twice
-  // and reported every rate as 0.000 with a NaN spread.
-  const walked = await stepUntil((b) => {
-    const now = Object.values(window.__placePanoramaWildlifeInfo ?? {})
-    return now.some((w, i) => Math.abs(w.gait - b[i]?.gait) > 0.2)
-  }, before)
-  const after = await sample()
-  // Point 300: each species walks at its OWN cadence (derived from its leg), so
-  // the shared constant is no longer the phase per unit walked but the phase per
-  // unit walked DIVIDED by that cadence — one full cycle per stride, for every
-  // animal whatever its legs. A clock-driven bob would advance them all alike.
-  const rates = before
-    .map((b, i) => ({ d: after[i].gait - b.gait, speed: b.speed, cadence: b.cadence }))
-    .filter((r) => r.speed > 0 && r.cadence > 0)
-    .map((r) => r.d / (r.speed * r.cadence))
-  const spread = rates.length ? (Math.max(...rates) - Math.min(...rates)) / Math.max(...rates) : 1
-  check(
-    'the panorama silhouettes stride with the ground they cover, not the clock (points 255/300)',
-    walked && rates.length >= 3 && rates.every((r) => r > 0) && spread < 0.02,
-    walked
-      ? `phase per unit walked ÷ cadence [${rates.map((r) => r.toFixed(3)).join(', ')}], spread ${(spread * 100).toFixed(1)}%`
-      : 'MEASURED NOTHING — no silhouette advanced its stride within the frame cap',
-  )
-}
-// Point 286: the silhouettes must WALK FORWARD, never backward. The facing is
-// derived from the ring velocity, so each visible silhouette's displacement over
-// an interval must project POSITIVELY onto its facing (forward = (sin yaw,
-// cos yaw)), and a moving one must actually advance. The reverted bug set the
-// yaw exactly π off the tangent, so every silhouette moonwalked.
-//
-// Stepped by RENDERED FRAMES, never by a wall clock: this scene occasionally
-// stalls for over a second headless, and a fixed 1200 ms wait that spans such a
-// stall reads the SAME pose twice and reports every silhouette as motionless —
-// the check then fails on "no one advanced" while the walk itself is fine (seen
-// once, passing on the very next run). Waiting for the drift to actually happen
-// removes the false red without touching what is asserted: a silhouette that
-// still refuses to advance within the cap fails exactly as before.
-{
-  const snap = () =>
-    page.evaluate(() => {
-      const info = window.__placePanoramaWildlifeInfo ?? {}
-      const out = {}
-      for (const k of Object.keys(info)) out[k] = { x: info[k].x, z: info[k].z, yaw: info[k].yaw, visible: info[k].visible }
-      return out
-    })
-  const b0 = await snap()
-  for (let f = 0; f < 240; f++) {
-    await nextFrames(1)
-    const now = await snap()
-    if (Object.keys(b0).some((k) => now[k] && Math.hypot(now[k].x - b0[k].x, now[k].z - b0[k].z) > 0.05)) break
-  }
-  const b1 = await snap()
-  const along = []
-  for (const k of Object.keys(b0)) {
-    const p = b0[k]
-    const q = b1[k]
-    if (!q || p.visible === false || q.visible === false) continue
-    const dx = q.x - p.x
-    const dz = q.z - p.z
-    along.push({ a: dx * Math.sin(p.yaw) + dz * Math.cos(p.yaw), d: Math.hypot(dx, dz) })
-  }
-  check(
-    'every panorama silhouette walks forward along its facing, never backward (point 286)',
-    along.length >= 3 && along.every((r) => r.a >= -1e-3) && along.some((r) => r.d > 1e-3 && r.a > 0),
-    `along-facing displacement [${along.map((r) => r.a.toFixed(3)).join(', ')}]`,
-  )
-}
-// Point 300: the feet must be PLANTED, not skating. Sample a tracked foot's
-// WORLD position across a series of frames and compare its travel with the
-// body's over the same intervals, counting only the intervals in which that leg
-// never left the ground. A planted foot holds its spot while the body walks on;
-// the old over-driven cadence dragged it along at a large fraction of the
-// body's speed.
-//
-// Point 549 — THE SERIES IS RECORDED IN THE PAGE, ONE SAMPLE PER DRAWN FRAME.
-// The old sampler stepped the scene from Node, one `page.evaluate` per frame,
-// until some animal had covered 5 % of its stride. The scene keeps drawing
-// through those round trips, so the interval was as long as the host was slow —
-// and on this container it grew long enough for the tracked leg to lift, swing
-// and be planted a whole cycle on between two reads. Asking only whether the
-// leg was down at each END then read that replanting as one huge slip: the same
-// unchanged scene reported 0.278, 0.603, 0.727, 0.972 and 1.549 across eight
-// attempts on an idle host, against a bar of 0.25. Recording every frame inside
-// the page makes the sample window the frame it actually is, and lets the
-// judgment demand an UNBROKEN stance across the whole interval, so a wrap is
-// not filtered out — it cannot occur. The judgment itself is the pure,
-// Vitest-covered `judgeStanceSlip` (scripts/verify/stanceSlip.mjs), which also
-// removes the turning body's rigid leg swing through the interval's MEAN
-// heading rather than the heading at its start (measured: a 0.4 rad turn cost
-// 0.200 of spurious slip the old way and 0.006 this way).
-//
-// THE SPREAD, RECORDED (point 549, the way point 387 recorded its five). Four
-// consecutive WebGL 2 runs on this host after the fix reported worst foot/body
-// travel 0.049, 0.047, 0.049 and 0.059 against the unchanged bar of 0.25 — a
-// spread of 0.012 where the eight runs before it spanned 0.278–1.549 and
-// straddled the bar. The interval count came out 37, 43, 43 and 42, so the
-// verdict rests on a comparable population each time rather than on whatever
-// the host managed to draw.
-{
-  /** Record the tracked walkers frame by frame, inside the page: one round trip
-   *  for the whole series, so no sample window can be stretched by the host.
-   *  The reader is named rather than passed as a function — a page-side `new
-   *  Function` would be both a lint finding and an indirection for nothing. */
-  const recordGait = (kind, frames, maxMs) =>
-    page.evaluate(
-      ([which, n, cap]) =>
-        new Promise((res) => {
-          const read = () => {
-            const out = {}
-            const info = (which === 'panorama' ? window.__placePanoramaWildlifeInfo : window.__placeGoatGait) ?? {}
-            for (const k of Object.keys(info)) {
-              const w = info[k]
-              if (w.visible === false) continue
-              out[k] = { x: w.x, z: w.z, yaw: w.yaw, foot: w.foot, stance: w.stance, stride: w.stride }
-            }
-            return out
-          }
-          const samples = []
-          const t0 = performance.now()
-          const step = () => {
-            samples.push(read())
-            if (samples.length >= n || performance.now() - t0 >= cap) return res(samples)
-            requestAnimationFrame(step)
-          }
-          requestAnimationFrame(step)
-        }),
-      [kind, frames, maxMs],
-    )
-
-  const trackFeet = async (kind, label) => {
-    // In chunks, so a fast host stops as soon as it has a verdict's worth of
-    // intervals and a slow one still gets its walking time. The stop condition
-    // is the MEASUREMENT, never a frame count: a goat crosses its pen at
-    // ~0.12 units a second, so how many frames one stance lasts is the host's
-    // business, not the check's.
-    let samples = []
-    let judged = judgeStanceSlip(samples)
-    for (let chunk = 0; chunk < 4 && judged.intervals < 8; chunk++) {
-      samples = samples.concat(await recordGait(kind, 300, 12000))
-      judged = judgeStanceSlip(samples)
-    }
-    check(`${label}: the planted foot holds its ground spot while the body walks over it (point 300)`, judged.enough && judged.worst < 0.25, judged.detail)
-  }
-  await trackFeet('panorama', 'panorama silhouette')
-  await trackFeet('goat', 'settlement walker (goat)')
-}
-// Point 413: the settlement animals must stay OUT of the settlement's solids and
-// out of one another. The report was a goat crossing a compound fence and, the
-// same night, "wildes Durcheinanderclippen" — goats standing inside one another
-// and inside a tent. Sampled as a SERIES over the walk, never one instant: a
-// wandering animal meets a wall only now and then, and a single frame that
-// happened to catch it in open ground would prove nothing.
-{
-  const readOverlap = () =>
-    page.evaluate(() => {
-      const cs = window.__placeLayout?.colliders ?? []
-      const info = window.__placeGoatGait ?? {}
-      const ids = Object.keys(info)
-      const R = 0.3 // WALKER_RADIUS — the radius the animals move with
-      const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v)
-      // How deep a mover at (x,z) sits inside this collider; ≤ 0 is clear.
-      const depth = (c, x, z) => {
-        if (c.kind === 'box') {
-          const sin = Math.sin(c.rot)
-          const cos = Math.cos(c.rot)
-          const dx = x - c.x
-          const dz = z - c.z
-          const lx = cos * dx - sin * dz
-          const lz = sin * dx + cos * dz
-          return R - Math.hypot(lx - clamp(lx, -c.hx, c.hx), lz - clamp(lz, -c.hz, c.hz))
-        }
-        if (c.kind === 'segment') {
-          const ex = c.x2 - c.x1
-          const ez = c.z2 - c.z1
-          const l2 = ex * ex + ez * ez
-          const t = l2 < 1e-12 ? 0 : clamp(((x - c.x1) * ex + (z - c.z1) * ez) / l2, 0, 1)
-          return c.r + R - Math.hypot(x - (c.x1 + ex * t), z - (c.z1 + ez * t))
-        }
-        return c.r + R - Math.hypot(x - c.x, z - c.z)
-      }
-      let solid = -Infinity
-      let pair = Infinity
-      for (const id of ids) {
-        const g = info[id]
-        for (const c of cs) solid = Math.max(solid, depth(c, g.x, g.z))
-      }
-      for (let i = 0; i < ids.length; i++) {
-        for (let j = i + 1; j < ids.length; j++) {
-          const a = info[ids[i]]
-          const b = info[ids[j]]
-          pair = Math.min(pair, Math.hypot(a.x - b.x, a.z - b.z))
-        }
-      }
-      return { animals: ids.length, solid, pair }
-    })
-  const series = []
-  for (let k = 0; k < 20; k++) {
-    series.push(await readOverlap())
-    await nextFrames(3)
-  }
-  const solids = series.filter((s) => s.animals >= 1)
-  const pairs = series.filter((s) => s.animals >= 2)
-  const deepest = solids.length > 0 ? Math.max(...solids.map((s) => s.solid)) : 0
-  const closest = pairs.length > 0 ? Math.min(...pairs.map((s) => s.pair)) : 0
-  check(
-    'no settlement animal stands inside a fence, hut or prop (point 413)',
-    solids.length >= 10 && deepest < 0.02,
-    solids.length >= 10
-      ? `${solids.length} samples, deepest penetration ${deepest.toFixed(3)} m`
-      : `MEASURED NOTHING — only ${solids.length} samples carried an animal`,
-  )
-  check(
-    'no settlement animal stands inside another one (point 413)',
-    pairs.length >= 10 && closest > 0.45,
-    pairs.length >= 10
-      ? `${pairs.length} samples, closest pair ${closest.toFixed(2)} m`
-      : `MEASURED NOTHING — only ${pairs.length} samples carried two animals`,
-  )
-  // The picture behind the numbers. The probe borrows the camera and hands the
-  // pose back exactly as it found it (the lesson of point 375).
-  const aimed = await page.evaluate(() => {
-    const p = window.__placePlayer
-    const herd = Object.values(window.__placeGoatGait ?? {})
-    if (!p || herd.length === 0) return null
-    const pose = { x: p.x, z: p.z, yaw: p.yaw }
-    const cx = herd.reduce((s, g) => s + g.x, 0) / herd.length
-    const cz = herd.reduce((s, g) => s + g.z, 0) / herd.length
-    const d = Math.hypot(cx - p.x, cz - p.z) || 1
-    p.x = cx - ((cx - p.x) / d) * 7
-    p.z = cz - ((cz - p.z) / d) * 7
-    p.yaw = Math.atan2(-(cx - p.x), -(cz - p.z))
-    return { pose, cx, cz }
+if (section('panorama-wildlife')) {
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    g.leavePlace()
+    g.enterPlace('maasai-village')
   })
-  if (aimed) {
-    await nextFrames(2)
-    // The subject is the HERD, so the shutter projects it (point 375): a frame
-    // named after the goats must have the goats in it.
-    await frame('143-village-goat-separation', {
-      local: { x: aimed.cx, y: 0.5, z: aimed.cz },
-      label: 'the goats, each on its own ground',
-    })
-    await page.evaluate((pose) => {
+  await page
+    .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "maasai-village", { timeout: 30000 })
+    .catch(() => {})
+  await page.waitForTimeout(500)
+  // The panorama animals stream in over the first seconds of the scene.
+  await page.waitForFunction(() => (window.__placePanoramaWildlife ?? 0) >= 3, null, { timeout: 20000 }).catch(() => {})
+  const wildlife = await page.evaluate(() => window.__placePanoramaWildlife ?? 0)
+  check('distant wildlife drifts through the panorama', wildlife >= 3, `${wildlife} animals`)
+  // Points 92/94: every silhouette stays SMALL (bounded subtended angle) and
+  // HAZED toward the sky (not a flat near-black blob), and its feet meet ground
+  // the frame draws (point 181) rather than the horizon-at-infinity constant.
+  await page.waitForFunction(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length >= 3, null, { timeout: 10000 }).catch(() => {})
+  const wInfo = await page.evaluate(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}))
+  check(
+    'every panorama silhouette sits on the ground line it was placed on',
+    // Point 300: the body DIPS onto whichever leg is planted (that is what puts
+    // the standing foot on the ground), so the anchor may sit below the line by
+    // that dip — `drop` — and never above it.
+    wInfo.length >= 3 && wInfo.every((w) => w.y >= w.visibleY - w.drop - 1e-3 && w.y <= w.visibleY + 0.2),
+    `y vs line [${wInfo.map((w) => `${w.y.toFixed(2)}/${w.visibleY.toFixed(2)}-${(w.drop ?? 0).toFixed(2)}`).join(', ')}]`,
+  )
+  check(
+    'every panorama silhouette reads small (bounded subtended angle, point 94)',
+    wInfo.length >= 3 && wInfo.every((w) => w.apparentDeg <= 2.6),
+    `apparentDeg [${wInfo.map((w) => w.apparentDeg.toFixed(2)).join(', ')}]`,
+  )
+  check(
+    'every panorama silhouette is hazed toward the sky, not flat black (point 94)',
+    wInfo.length >= 3 && wInfo.every((w) => w.hazeLum > 0.42),
+    `hazeLum [${wInfo.map((w) => w.hazeLum.toFixed(2)).join(', ')}]`,
+  )
+  await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
+  // Point 255 (3): the silhouettes must WALK the horizon, not glide along it.
+  // Their stride phase rides the ground they cover on the ring, so over the same
+  // interval each one's phase advance divided by its (scale-normalised, point 286)
+  // gait speed is the SAME constant — a wall-clock bob would advance them all
+  // alike whatever their speed.
+  {
+    const sample = () =>
+      page.evaluate(() =>
+        Object.values(window.__placePanoramaWildlifeInfo ?? {}).map((w) => ({
+          gait: w.gait,
+          speed: w.gaitSpeed,
+          cadence: w.cadence,
+        })),
+      )
+    const before = await sample()
+    // Wait for the STRIDE to actually advance rather than for a wall clock: on a
+    // stalled headless frame a fixed 1200 ms wait read the identical phase twice
+    // and reported every rate as 0.000 with a NaN spread.
+    const walked = await stepUntil((b) => {
+      const now = Object.values(window.__placePanoramaWildlifeInfo ?? {})
+      return now.some((w, i) => Math.abs(w.gait - b[i]?.gait) > 0.2)
+    }, before)
+    const after = await sample()
+    // Point 300: each species walks at its OWN cadence (derived from its leg), so
+    // the shared constant is no longer the phase per unit walked but the phase per
+    // unit walked DIVIDED by that cadence — one full cycle per stride, for every
+    // animal whatever its legs. A clock-driven bob would advance them all alike.
+    const rates = before
+      .map((b, i) => ({ d: after[i].gait - b.gait, speed: b.speed, cadence: b.cadence }))
+      .filter((r) => r.speed > 0 && r.cadence > 0)
+      .map((r) => r.d / (r.speed * r.cadence))
+    const spread = rates.length ? (Math.max(...rates) - Math.min(...rates)) / Math.max(...rates) : 1
+    check(
+      'the panorama silhouettes stride with the ground they cover, not the clock (points 255/300)',
+      walked && rates.length >= 3 && rates.every((r) => r > 0) && spread < 0.02,
+      walked
+        ? `phase per unit walked ÷ cadence [${rates.map((r) => r.toFixed(3)).join(', ')}], spread ${(spread * 100).toFixed(1)}%`
+        : 'MEASURED NOTHING — no silhouette advanced its stride within the frame cap',
+    )
+  }
+  // Point 286: the silhouettes must WALK FORWARD, never backward. The facing is
+  // derived from the ring velocity, so each visible silhouette's displacement over
+  // an interval must project POSITIVELY onto its facing (forward = (sin yaw,
+  // cos yaw)), and a moving one must actually advance. The reverted bug set the
+  // yaw exactly π off the tangent, so every silhouette moonwalked.
+  //
+  // Stepped by RENDERED FRAMES, never by a wall clock: this scene occasionally
+  // stalls for over a second headless, and a fixed 1200 ms wait that spans such a
+  // stall reads the SAME pose twice and reports every silhouette as motionless —
+  // the check then fails on "no one advanced" while the walk itself is fine (seen
+  // once, passing on the very next run). Waiting for the drift to actually happen
+  // removes the false red without touching what is asserted: a silhouette that
+  // still refuses to advance within the cap fails exactly as before.
+  {
+    const snap = () =>
+      page.evaluate(() => {
+        const info = window.__placePanoramaWildlifeInfo ?? {}
+        const out = {}
+        for (const k of Object.keys(info)) out[k] = { x: info[k].x, z: info[k].z, yaw: info[k].yaw, visible: info[k].visible }
+        return out
+      })
+    const b0 = await snap()
+    for (let f = 0; f < 240; f++) {
+      await nextFrames(1)
+      const now = await snap()
+      if (Object.keys(b0).some((k) => now[k] && Math.hypot(now[k].x - b0[k].x, now[k].z - b0[k].z) > 0.05)) break
+    }
+    const b1 = await snap()
+    const along = []
+    for (const k of Object.keys(b0)) {
+      const p = b0[k]
+      const q = b1[k]
+      if (!q || p.visible === false || q.visible === false) continue
+      const dx = q.x - p.x
+      const dz = q.z - p.z
+      along.push({ a: dx * Math.sin(p.yaw) + dz * Math.cos(p.yaw), d: Math.hypot(dx, dz) })
+    }
+    check(
+      'every panorama silhouette walks forward along its facing, never backward (point 286)',
+      along.length >= 3 && along.every((r) => r.a >= -1e-3) && along.some((r) => r.d > 1e-3 && r.a > 0),
+      `along-facing displacement [${along.map((r) => r.a.toFixed(3)).join(', ')}]`,
+    )
+  }
+  // Point 300: the feet must be PLANTED, not skating. Sample a tracked foot's
+  // WORLD position across a series of frames and compare its travel with the
+  // body's over the same intervals, counting only the intervals in which that leg
+  // never left the ground. A planted foot holds its spot while the body walks on;
+  // the old over-driven cadence dragged it along at a large fraction of the
+  // body's speed.
+  //
+  // Point 549 — THE SERIES IS RECORDED IN THE PAGE, ONE SAMPLE PER DRAWN FRAME.
+  // The old sampler stepped the scene from Node, one `page.evaluate` per frame,
+  // until some animal had covered 5 % of its stride. The scene keeps drawing
+  // through those round trips, so the interval was as long as the host was slow —
+  // and on this container it grew long enough for the tracked leg to lift, swing
+  // and be planted a whole cycle on between two reads. Asking only whether the
+  // leg was down at each END then read that replanting as one huge slip: the same
+  // unchanged scene reported 0.278, 0.603, 0.727, 0.972 and 1.549 across eight
+  // attempts on an idle host, against a bar of 0.25. Recording every frame inside
+  // the page makes the sample window the frame it actually is, and lets the
+  // judgment demand an UNBROKEN stance across the whole interval, so a wrap is
+  // not filtered out — it cannot occur. The judgment itself is the pure,
+  // Vitest-covered `judgeStanceSlip` (scripts/verify/stanceSlip.mjs), which also
+  // removes the turning body's rigid leg swing through the interval's MEAN
+  // heading rather than the heading at its start (measured: a 0.4 rad turn cost
+  // 0.200 of spurious slip the old way and 0.006 this way).
+  //
+  // THE SPREAD, RECORDED (point 549, the way point 387 recorded its five). Four
+  // consecutive WebGL 2 runs on this host after the fix reported worst foot/body
+  // travel 0.049, 0.047, 0.049 and 0.059 against the unchanged bar of 0.25 — a
+  // spread of 0.012 where the eight runs before it spanned 0.278–1.549 and
+  // straddled the bar. The interval count came out 37, 43, 43 and 42, so the
+  // verdict rests on a comparable population each time rather than on whatever
+  // the host managed to draw.
+  {
+    /** Record the tracked walkers frame by frame, inside the page: one round trip
+     *  for the whole series, so no sample window can be stretched by the host.
+     *  The reader is named rather than passed as a function — a page-side `new
+     *  Function` would be both a lint finding and an indirection for nothing. */
+    const recordGait = (kind, frames, maxMs) =>
+      page.evaluate(
+        ([which, n, cap]) =>
+          new Promise((res) => {
+            const read = () => {
+              const out = {}
+              const info = (which === 'panorama' ? window.__placePanoramaWildlifeInfo : window.__placeGoatGait) ?? {}
+              for (const k of Object.keys(info)) {
+                const w = info[k]
+                if (w.visible === false) continue
+                out[k] = { x: w.x, z: w.z, yaw: w.yaw, foot: w.foot, stance: w.stance, stride: w.stride }
+              }
+              return out
+            }
+            const samples = []
+            const t0 = performance.now()
+            const step = () => {
+              samples.push(read())
+              if (samples.length >= n || performance.now() - t0 >= cap) return res(samples)
+              requestAnimationFrame(step)
+            }
+            requestAnimationFrame(step)
+          }),
+        [kind, frames, maxMs],
+      )
+
+    const trackFeet = async (kind, label) => {
+      // In chunks, so a fast host stops as soon as it has a verdict's worth of
+      // intervals and a slow one still gets its walking time. The stop condition
+      // is the MEASUREMENT, never a frame count: a goat crosses its pen at
+      // ~0.12 units a second, so how many frames one stance lasts is the host's
+      // business, not the check's.
+      let samples = []
+      let judged = judgeStanceSlip(samples)
+      for (let chunk = 0; chunk < 4 && judged.intervals < 8; chunk++) {
+        samples = samples.concat(await recordGait(kind, 300, 12000))
+        judged = judgeStanceSlip(samples)
+      }
+      check(`${label}: the planted foot holds its ground spot while the body walks over it (point 300)`, judged.enough && judged.worst < 0.25, judged.detail)
+    }
+    await trackFeet('panorama', 'panorama silhouette')
+    await trackFeet('goat', 'settlement walker (goat)')
+  }
+  // Point 413: the settlement animals must stay OUT of the settlement's solids and
+  // out of one another. The report was a goat crossing a compound fence and, the
+  // same night, "wildes Durcheinanderclippen" — goats standing inside one another
+  // and inside a tent. Sampled as a SERIES over the walk, never one instant: a
+  // wandering animal meets a wall only now and then, and a single frame that
+  // happened to catch it in open ground would prove nothing.
+  {
+    const readOverlap = () =>
+      page.evaluate(() => {
+        const cs = window.__placeLayout?.colliders ?? []
+        const info = window.__placeGoatGait ?? {}
+        const ids = Object.keys(info)
+        const R = 0.3 // WALKER_RADIUS — the radius the animals move with
+        const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v)
+        // How deep a mover at (x,z) sits inside this collider; ≤ 0 is clear.
+        const depth = (c, x, z) => {
+          if (c.kind === 'box') {
+            const sin = Math.sin(c.rot)
+            const cos = Math.cos(c.rot)
+            const dx = x - c.x
+            const dz = z - c.z
+            const lx = cos * dx - sin * dz
+            const lz = sin * dx + cos * dz
+            return R - Math.hypot(lx - clamp(lx, -c.hx, c.hx), lz - clamp(lz, -c.hz, c.hz))
+          }
+          if (c.kind === 'segment') {
+            const ex = c.x2 - c.x1
+            const ez = c.z2 - c.z1
+            const l2 = ex * ex + ez * ez
+            const t = l2 < 1e-12 ? 0 : clamp(((x - c.x1) * ex + (z - c.z1) * ez) / l2, 0, 1)
+            return c.r + R - Math.hypot(x - (c.x1 + ex * t), z - (c.z1 + ez * t))
+          }
+          return c.r + R - Math.hypot(x - c.x, z - c.z)
+        }
+        let solid = -Infinity
+        let pair = Infinity
+        for (const id of ids) {
+          const g = info[id]
+          for (const c of cs) solid = Math.max(solid, depth(c, g.x, g.z))
+        }
+        for (let i = 0; i < ids.length; i++) {
+          for (let j = i + 1; j < ids.length; j++) {
+            const a = info[ids[i]]
+            const b = info[ids[j]]
+            pair = Math.min(pair, Math.hypot(a.x - b.x, a.z - b.z))
+          }
+        }
+        return { animals: ids.length, solid, pair }
+      })
+    const series = []
+    for (let k = 0; k < 20; k++) {
+      series.push(await readOverlap())
+      await nextFrames(3)
+    }
+    const solids = series.filter((s) => s.animals >= 1)
+    const pairs = series.filter((s) => s.animals >= 2)
+    const deepest = solids.length > 0 ? Math.max(...solids.map((s) => s.solid)) : 0
+    const closest = pairs.length > 0 ? Math.min(...pairs.map((s) => s.pair)) : 0
+    check(
+      'no settlement animal stands inside a fence, hut or prop (point 413)',
+      solids.length >= 10 && deepest < 0.02,
+      solids.length >= 10
+        ? `${solids.length} samples, deepest penetration ${deepest.toFixed(3)} m`
+        : `MEASURED NOTHING — only ${solids.length} samples carried an animal`,
+    )
+    check(
+      'no settlement animal stands inside another one (point 413)',
+      pairs.length >= 10 && closest > 0.45,
+      pairs.length >= 10
+        ? `${pairs.length} samples, closest pair ${closest.toFixed(2)} m`
+        : `MEASURED NOTHING — only ${pairs.length} samples carried two animals`,
+    )
+    // The picture behind the numbers. The probe borrows the camera and hands the
+    // pose back exactly as it found it (the lesson of point 375).
+    const aimed = await page.evaluate(() => {
       const p = window.__placePlayer
-      if (!p) return
-      p.x = pose.x
-      p.z = pose.z
-      p.yaw = pose.yaw
-    }, aimed.pose)
+      const herd = Object.values(window.__placeGoatGait ?? {})
+      if (!p || herd.length === 0) return null
+      const pose = { x: p.x, z: p.z, yaw: p.yaw }
+      const cx = herd.reduce((s, g) => s + g.x, 0) / herd.length
+      const cz = herd.reduce((s, g) => s + g.z, 0) / herd.length
+      const d = Math.hypot(cx - p.x, cz - p.z) || 1
+      p.x = cx - ((cx - p.x) / d) * 7
+      p.z = cz - ((cz - p.z) / d) * 7
+      p.yaw = Math.atan2(-(cx - p.x), -(cz - p.z))
+      return { pose, cx, cz }
+    })
+    if (aimed) {
+      await nextFrames(2)
+      // The subject is the HERD, so the shutter projects it (point 375): a frame
+      // named after the goats must have the goats in it.
+      await frame('143-village-goat-separation', {
+        local: { x: aimed.cx, y: 0.5, z: aimed.cz },
+        label: 'the goats, each on its own ground',
+      })
+      await page.evaluate((pose) => {
+        const p = window.__placePlayer
+        if (!p) return
+        p.x = pose.x
+        p.z = pose.z
+        p.yaw = pose.yaw
+      }, aimed.pose)
+    }
   }
 }
 // --- The hypothesis over the speaker's head (design.md §13.4, point 485) ------
@@ -545,7 +597,8 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
 // with, and every label stood at the scene origin. Measured here against the
 // figure's own projected anchor, in the SAME evaluate as the rendered label's
 // DOM box, so no frame passes between deciding and measuring.
-{
+if (section('speech-hypothesis')) {
+  await goToPlace('maasai-village')
   const COME = 'BA-BA-ba-ba-ba'
   const pose = await page.evaluate(() => {
     const p = window.__placePlayer
@@ -813,7 +866,7 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
 // samples that stood on genuinely sloped ground are COUNTED, and a count of
 // zero FAILS. `judgeFootingSeries` holds that decision and is pure-tested in
 // scripts/verify/footingSeries.test.mjs.
-{
+if (section('panorama-slope-footing')) {
   // The TRACKED leg is only planted for half of each cycle, and a single sampled
   // instant can catch every silhouette mid-swing. Reading the feet in the SAME
   // evaluate as the test keeps the pose from changing between deciding and
@@ -882,158 +935,156 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
   // Hand the scene back to the settlement the rest of this suite expects.
   await goTo('maasai-village')
 }
-check(
-  'every panorama silhouette reads small (bounded subtended angle, point 94)',
-  wInfo.length >= 3 && wInfo.every((w) => w.apparentDeg <= 2.6),
-  `apparentDeg [${wInfo.map((w) => w.apparentDeg.toFixed(2)).join(', ')}]`,
-)
-check(
-  'every panorama silhouette is hazed toward the sky, not flat black (point 94)',
-  wInfo.length >= 3 && wInfo.every((w) => w.hazeLum > 0.42),
-  `hazeLum [${wInfo.map((w) => w.hazeLum.toFixed(2)).join(', ')}]`,
-)
 
 // --- Settlement plan on the map (design.md §6.1, point 79) --------------------
 // Inside a place the map opens as a plan of the town: functional buildings
 // marked and named, no continental canvas.
-await page.evaluate(() => window.__ui.getState().toggleMap())
-await page.waitForTimeout(400)
-const plan = await page.evaluate(() => {
-  const el = document.querySelector('.map-place-plan')
-  const labels = [...document.querySelectorAll('.plan-building-label')].map((n) => n.textContent)
-  return { present: !!el, labels, canvas: !!document.querySelector('.map-overlay canvas') }
-})
-await frame('98-place-plan', { element: '.map-place-plan', label: 'the town plan' })
-check('inside a settlement the map shows the town plan', plan.present && !plan.canvas, JSON.stringify({ canvas: plan.canvas }))
-check('the plan names the functional buildings', plan.labels.length >= 2, `labels [${plan.labels.join(', ')}]`)
-await page.evaluate(() => window.__ui.getState().toggleMap())
-await page.waitForTimeout(200)
+if (section('town-plan')) {
+  await goToPlace('maasai-village')
+  await page.evaluate(() => window.__ui.getState().toggleMap())
+  await page.waitForTimeout(400)
+  const plan = await page.evaluate(() => {
+    const el = document.querySelector('.map-place-plan')
+    const labels = [...document.querySelectorAll('.plan-building-label')].map((n) => n.textContent)
+    return { present: !!el, labels, canvas: !!document.querySelector('.map-overlay canvas') }
+  })
+  await frame('98-place-plan', { element: '.map-place-plan', label: 'the town plan' })
+  check('inside a settlement the map shows the town plan', plan.present && !plan.canvas, JSON.stringify({ canvas: plan.canvas }))
+  check('the plan names the functional buildings', plan.labels.length >= 2, `labels [${plan.labels.join(', ')}]`)
+  await page.evaluate(() => window.__ui.getState().toggleMap())
+  await page.waitForTimeout(200)
+}
 
 // --- Orientation after a gift (design.md §17) ---------------------------------------
-const before = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
-check('no building markers before the gift', before === 0, `${before}`)
-const toast = await page.evaluate(() => {
-  const g = window.__game.getState()
-  g.debugAddGift('emerald') // revered in the east
-  g.giveGift('emerald')
-  return window.__game.getState().toast
-})
-await page.waitForTimeout(600)
-const after = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
-check('the gift unlocks the building markers', after >= 1, `${after} markers`)
-check('the orientation announces itself', !!toast && toast.length > 0, `"${toast}"`)
-await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-// AIM the camera at a marked building before photographing its marker. The
-// frame used to be shot from wherever the previous check had left the camera,
-// so whether a marker was in the picture at all was chance — the shutter
-// (point 375) refused the frame and that is how the missing aim was found.
-// The chief's hut is the marker the shutter judges (it is the first
-// `.building-highlight` in DOM order, the layout's first non-villager
-// interactive), so stand back from it on its own bearing and face it.
-const marked = await page.evaluate(() => {
-  const it = (window.__placeLayout?.interactives ?? []).find((i) => i.type !== 'villager')
-  if (!it) return null
-  const p = window.__placePlayer
-  const [mx, mz] = it.pos
-  const d = Math.hypot(mx, mz) || 1
-  // Stand 14 m from the hut on the line toward the settlement centre — the open
-  // ground every layout keeps clear — and far enough back that the marker at
-  // ~5.6 m sits well inside the vertical field of view (the place camera builds
-  // its rotation from yaw alone, so there is no pitch to tilt up with).
-  p.x = mx - (mx / d) * 14
-  p.z = mz - (mz / d) * 14
-  // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
-  p.yaw = Math.atan2(mx - p.x, mz - p.z) + Math.PI
-  return { type: it.type, x: mx, z: mz }
-})
-check('the settlement offers a marked building to photograph', !!marked, JSON.stringify(marked))
-await page.waitForTimeout(400)
-await frame('93-orientation-highlight', { element: '.building-highlight', label: `the marker over the ${marked?.type ?? 'important'} building` })
+if (section('orientation-markers')) {
+  await goToPlace('maasai-village')
+  const before = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
+  check('no building markers before the gift', before === 0, `${before}`)
+  const toast = await page.evaluate(() => {
+    const g = window.__game.getState()
+    g.debugAddGift('emerald') // revered in the east
+    g.giveGift('emerald')
+    return window.__game.getState().toast
+  })
+  await page.waitForTimeout(600)
+  const after = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
+  check('the gift unlocks the building markers', after >= 1, `${after} markers`)
+  check('the orientation announces itself', !!toast && toast.length > 0, `"${toast}"`)
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  // AIM the camera at a marked building before photographing its marker. The
+  // frame used to be shot from wherever the previous check had left the camera,
+  // so whether a marker was in the picture at all was chance — the shutter
+  // (point 375) refused the frame and that is how the missing aim was found.
+  // The chief's hut is the marker the shutter judges (it is the first
+  // `.building-highlight` in DOM order, the layout's first non-villager
+  // interactive), so stand back from it on its own bearing and face it.
+  const marked = await page.evaluate(() => {
+    const it = (window.__placeLayout?.interactives ?? []).find((i) => i.type !== 'villager')
+    if (!it) return null
+    const p = window.__placePlayer
+    const [mx, mz] = it.pos
+    const d = Math.hypot(mx, mz) || 1
+    // Stand 14 m from the hut on the line toward the settlement centre — the open
+    // ground every layout keeps clear — and far enough back that the marker at
+    // ~5.6 m sits well inside the vertical field of view (the place camera builds
+    // its rotation from yaw alone, so there is no pitch to tilt up with).
+    p.x = mx - (mx / d) * 14
+    p.z = mz - (mz / d) * 14
+    // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+    p.yaw = Math.atan2(mx - p.x, mz - p.z) + Math.PI
+    return { type: it.type, x: mx, z: mz }
+  })
+  check('the settlement offers a marked building to photograph', !!marked, JSON.stringify(marked))
+  await page.waitForTimeout(400)
+  await frame('93-orientation-highlight', { element: '.building-highlight', label: `the marker over the ${marked?.type ?? 'important'} building` })
 
-// Persistence: leaving and re-entering keeps the orientation.
-await page.evaluate(() => {
-  const g = window.__game.getState()
-  g.leavePlace()
-})
-await page.waitForTimeout(600)
-await page.evaluate(() => window.__game.getState().enterPlace('maasai-village'))
-await page
-  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "maasai-village", { timeout: 30000 })
-  .catch(() => {})
-await page.waitForTimeout(500)
-const again = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
-check('the orientation persists across re-entry', again >= 1, `${again} markers`)
+  // Persistence: leaving and re-entering keeps the orientation.
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    g.leavePlace()
+  })
+  await page.waitForTimeout(600)
+  await page.evaluate(() => window.__game.getState().enterPlace('maasai-village'))
+  await page
+    .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "maasai-village", { timeout: 30000 })
+    .catch(() => {})
+  await page.waitForTimeout(500)
+  const again = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
+  check('the orientation persists across re-entry', again >= 1, `${again} markers`)
 
-// A settlement without a gift stays unmarked.
-await page.evaluate(() => {
-  const g = window.__game.getState()
-  g.leavePlace()
-  g.enterPlace('swahili-village')
-})
-await page
-  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "swahili-village", { timeout: 30000 })
-  .catch(() => {})
-await page.waitForTimeout(500)
-const other = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
-check('other settlements stay unmarked without a gift', other === 0, `${other}`)
+  // A settlement without a gift stays unmarked.
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    g.leavePlace()
+    g.enterPlace('swahili-village')
+  })
+  await page
+    .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "swahili-village", { timeout: 30000 })
+    .catch(() => {})
+  await page.waitForTimeout(500)
+  const other = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
+  check('other settlements stay unmarked without a gift', other === 0, `${other}`)
+}
 
 // --- Port skyline landmarks (design.md §4.4 Part C) ---------------------------
 // Cape Town: Table Mountain stands as a flat-topped massif behind the town.
-await page.evaluate(() => {
-  const g = window.__game.getState()
-  g.leavePlace()
-  g.enterPlace('capetown')
-})
-await page
-  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, 'capetown', { timeout: 30000 })
-  .catch(() => {})
-await page.waitForTimeout(1200)
-const skyline = await page.evaluate(() => window.__placeSkyline)
-check('Cape Town mounts the Table Mountain skyline', skyline === 'table-mountain', `${skyline}`)
-await page.evaluate(() => {
-  window.__game.getState().setJournalOpen(false)
-  const p = window.__placePlayer
-  p.x = 0
-  p.z = window.__placeLayout.radius - 3
-  p.yaw = 0
-})
-await page.waitForTimeout(600)
-await frame('96-capetown-table-mountain', { place: 'capetown', label: 'Cape Town under Table Mountain' })
-
-// Timbuktu: the Djinguereber mosque stands inside the town fabric, with a
-// collider (an oriented box like every rectangular building).
-await page.evaluate(() => {
-  const g = window.__game.getState()
-  g.leavePlace()
-  g.enterPlace('timbuktu')
-})
-await page
-  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, 'timbuktu', { timeout: 30000 })
-  .catch(() => {})
-await page.waitForTimeout(1200)
-const mosque = await page.evaluate(() => {
-  const d = window.__placeLayout.dwellings.find((dd) => dd.kind === 'mosque')
-  return d ? { x: d.x, z: d.z, door: d.door } : null
-})
-check('Timbuktu builds the Djinguereber mosque', !!mosque, JSON.stringify(mosque))
-if (mosque) {
-  await page.evaluate((m) => {
+if (section('port-skylines')) {
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    g.leavePlace()
+    g.enterPlace('capetown')
+  })
+  await page
+    .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, 'capetown', { timeout: 30000 })
+    .catch(() => {})
+  await page.waitForTimeout(1200)
+  const skyline = await page.evaluate(() => window.__placeSkyline)
+  check('Cape Town mounts the Table Mountain skyline', skyline === 'table-mountain', `${skyline}`)
+  await page.evaluate(() => {
     window.__game.getState().setJournalOpen(false)
     const p = window.__placePlayer
-    // Stand back from the door point (guaranteed free ground) facing the mosque.
-    const dx = m.x - m.door[0]
-    const dz = m.z - m.door[1]
-    const dl = Math.hypot(dx, dz) || 1
-    // Stand on the door approach (kept free by the layout rules), close
-    // enough that no neighbouring house can block the view.
-    p.x = m.door[0] - (dx / dl) * 5
-    p.z = m.door[1] - (dz / dl) * 5
-    p.pitch = 0 // level: the minaret is in frame from here (see the Cairo note)
-    // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
-    p.yaw = Math.atan2(m.x - p.x, m.z - p.z) + Math.PI
-  }, mosque)
+    p.x = 0
+    p.z = window.__placeLayout.radius - 3
+    p.yaw = 0
+  })
   await page.waitForTimeout(600)
-  await frame('97-timbuktu-djinguereber', { local: { x: mosque.x, z: mosque.z, y: 4 }, label: 'the Djinguereber mosque' })
+  await frame('96-capetown-table-mountain', { place: 'capetown', label: 'Cape Town under Table Mountain' })
+
+  // Timbuktu: the Djinguereber mosque stands inside the town fabric, with a
+  // collider (an oriented box like every rectangular building).
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    g.leavePlace()
+    g.enterPlace('timbuktu')
+  })
+  await page
+    .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, 'timbuktu', { timeout: 30000 })
+    .catch(() => {})
+  await page.waitForTimeout(1200)
+  const mosque = await page.evaluate(() => {
+    const d = window.__placeLayout.dwellings.find((dd) => dd.kind === 'mosque')
+    return d ? { x: d.x, z: d.z, door: d.door } : null
+  })
+  check('Timbuktu builds the Djinguereber mosque', !!mosque, JSON.stringify(mosque))
+  if (mosque) {
+    await page.evaluate((m) => {
+      window.__game.getState().setJournalOpen(false)
+      const p = window.__placePlayer
+      // Stand back from the door point (guaranteed free ground) facing the mosque.
+      const dx = m.x - m.door[0]
+      const dz = m.z - m.door[1]
+      const dl = Math.hypot(dx, dz) || 1
+      // Stand on the door approach (kept free by the layout rules), close
+      // enough that no neighbouring house can block the view.
+      p.x = m.door[0] - (dx / dl) * 5
+      p.z = m.door[1] - (dz / dl) * 5
+      p.pitch = 0 // level: the minaret is in frame from here (see the Cairo note)
+      // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+      p.yaw = Math.atan2(m.x - p.x, m.z - p.z) + Math.PI
+    }, mosque)
+    await page.waitForTimeout(600)
+    await frame('97-timbuktu-djinguereber', { local: { x: mosque.x, z: mosque.z, y: 4 }, label: 'the Djinguereber mosque' })
+  }
 }
 
 // --- The season inside a settlement (design.md §19.13, point 120g) ------------
@@ -1041,7 +1092,7 @@ if (mosque) {
 // derives the weather from its OWN coordinates. Overcast must dim the sun AND
 // gray the dome: a dimmed sun under a bright blue sky reads as a bug. The
 // §19.10 fire is a fixed point light, so its glow carries further for it.
-{
+if (section('settlement-season')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
     if (g.placeId) g.leavePlace()
@@ -1152,7 +1203,8 @@ if (mosque) {
 // first-person horizon: at the riverside Nubian village the Nile must show in
 // the north/east sectors (direction-true), while a direct place->place enter
 // (no travel scene) falls back to the geometry backdrop.
-{
+if (section('travel-panorama-capture')) {
+  await goToPlace('maasai-village')
   const before = await page.evaluate(() => window.__placePanoramaActive ?? null)
   check('a direct enter without the travel scene falls back (no capture)', before === false, `active ${before}`)
   // Point 96 gate: this leave happens AFTER several settlement visits (the
@@ -1321,7 +1373,7 @@ if (mosque) {
 // the pyramids and the Nile below the horizon line, so a silhouette anchored to
 // that line hung in the sky over a pyramid flank. Re-enter Cairo out of the
 // travel scene — the only way to get a live capture — and probe the footing.
-{
+if (section('cairo-silhouette-footing')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
     if (g.placeId) g.leavePlace()
@@ -1368,37 +1420,39 @@ if (mosque) {
 // Screenshot evidence of the port/village difference: the Congo street
 // village's single axis (101) vs Cairo's organic lane fabric (102); the
 // masai ring already shows in shot 98.
-for (const [placeId, shot] of [
-  ['mongo-village', '101-street-village-plan.png'],
-  ['cairo', '102-cairo-lane-plan.png'],
-]) {
-  await page.evaluate((id) => {
-    const g = window.__game.getState()
-    if (g.placeId) g.leavePlace()
-    g.enterPlace(id)
-  }, placeId)
-  await page
-    .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, placeId, { timeout: 30000 })
-    .catch(() => {})
-  await page.waitForTimeout(400)
-  await page.evaluate(() => window.__ui.getState().toggleMap())
-  await page.waitForTimeout(400)
-  const fabric = await page.evaluate(() => ({
-    plan: !!document.querySelector('.map-place-plan'),
-    paths: window.__placeLayout.paths.length,
-    dwellings: window.__placeLayout.dwellings.length,
-  }))
-  await frame(shot.replace(/\.png$/, ''), { element: '.map-place-plan', label: `the ${placeId} town plan` })
-  check(`${placeId}: the town plan draws the plan fabric`, fabric.plan && fabric.dwellings >= 6, JSON.stringify(fabric))
-  await page.evaluate(() => window.__ui.getState().toggleMap())
-  await page.waitForTimeout(200)
+if (section('settlement-fabric')) {
+  for (const [placeId, shot] of [
+    ['mongo-village', '101-street-village-plan.png'],
+    ['cairo', '102-cairo-lane-plan.png'],
+  ]) {
+    await page.evaluate((id) => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+      g.enterPlace(id)
+    }, placeId)
+    await page
+      .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, placeId, { timeout: 30000 })
+      .catch(() => {})
+    await page.waitForTimeout(400)
+    await page.evaluate(() => window.__ui.getState().toggleMap())
+    await page.waitForTimeout(400)
+    const fabric = await page.evaluate(() => ({
+      plan: !!document.querySelector('.map-place-plan'),
+      paths: window.__placeLayout.paths.length,
+      dwellings: window.__placeLayout.dwellings.length,
+    }))
+    await frame(shot.replace(/\.png$/, ''), { element: '.map-place-plan', label: `the ${placeId} town plan` })
+    check(`${placeId}: the town plan draws the plan fabric`, fabric.plan && fabric.dwellings >= 6, JSON.stringify(fabric))
+    await page.evaluate(() => window.__ui.getState().toggleMap())
+    await page.waitForTimeout(200)
+  }
 }
 
 // --- Sphinx at travel scale (design.md §4.4, point 91) -------------------------
 // The Giza field's Sphinx is a modelled couchant lion now; screenshot it from
 // the travel camera just south of the field (the skyline-scale view is shot
 // 100 above).
-{
+if (section('sphinx-travel')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
     if (g.placeId) g.leavePlace()
@@ -1423,7 +1477,7 @@ for (const [placeId, shot] of [
 // with the Space use key, then check that the three great pyramids and the
 // sand-buried Sphinx render as collidable masses on the walkable plateau —
 // with a screenshot standing back from the cluster.
-{
+if (section('giza-site')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
     if (g.placeId) g.leavePlace()
@@ -1777,7 +1831,7 @@ for (const [placeId, shot] of [
 // its own while the game runs, and that a figure at rest really stands at rest.
 // The state machine itself (bounded duration, one gesture per figure, the
 // return to rest) is pinned purely in src/render/gesture.test.ts.
-{
+if (section('villager-gestures')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
     if (g.placeId) g.leavePlace()
@@ -1978,7 +2032,7 @@ for (const [placeId, shot] of [
 // its austral winter and shed the cloak in its summer — while the peoples the
 // research found no evidence for stay bare in any month, however cold their
 // own ground gets. See src/systems/dress.ts for the per-people evidence.
-{
+if (section('cold-weather-dress')) {
   // NOTE: debugJumpToMonth is ONE-indexed (dayOfMonthJump clamps to 1..12 then
   // subtracts one; Hud.tsx calls it as i + 1). A zero-based probe lands a month
   // early and CLAMPS 0 to January — several checks here passed by luck that way,
@@ -2138,7 +2192,7 @@ for (const [placeId, shot] of [
 
 // --- Campfire shadows (design.md §19.10): with the debug toggle ON, an occluder
 // between the fire and the ground measurably darkens the ground behind it -------
-{
+if (section('campfire-shadows')) {
   // A dry, weather-free village at a fixed standpoint facing the fire pit.
   await page.evaluate(() => {
     const g = window.__game.getState()
@@ -2274,7 +2328,7 @@ for (const [placeId, shot] of [
 // The band must TELL THE TRUTH, so this measures it in the rendered picture and
 // against the leave check itself, in EVERY kind of place and at BOTH ends of the
 // year — a step visible only in the dry-season straw would be half a feature.
-{
+if (section('settlement-edge')) {
   // Ground crops: how far inside / outside the boundary each sample sits.
   const SAMPLES = [
     { name: 'inside', at: -5 },
@@ -2607,7 +2661,7 @@ for (const [placeId, shot] of [
 // seen running out of steam. Sampled over an interval, and gated on a round
 // actually being in play — the group idles between rounds by design, so a sample
 // window straddling a break would judge the wrong thing.
-{
+if (section('children-tag')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
     if (g.placeId) g.leavePlace()
@@ -3055,7 +3109,7 @@ for (const [placeId, shot] of [
 // village now carries a walkable bank and two stretches along it, so a villager
 // told to go to the water has somewhere to go — and this is where that walk, and
 // the current it is walked beside, can be seen.
-{
+if (section('adult-errands')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
     if (g.placeId) g.leavePlace()
@@ -3485,7 +3539,7 @@ for (const [placeId, shot] of [
 // column. With the window recorded and judged by `judgeEavesColumn`
 // (scripts/verify/eavesColumn.mjs), the standing reading is 1.50 m to
 // ground-disc every run, and what crossed is named in the line.
-{
+if (section('roof-clearance')) {
   // Keep in sync with ROOF_HEADROOM in src/scenes/place/roofClearance.ts.
   const ROOF_HEADROOM = 1.85
 
@@ -3854,7 +3908,7 @@ for (const [placeId, shot] of [
 // The first-person half; the bird's-eye half is in enrichments.mjs. What is
 // checked here is that the SAME layer answers in this perspective, over the
 // inhabitants and their animals, and that it leaves nothing behind.
-{
+if (section('ctrl-actor-labels')) {
   const frames = (n) =>
     page.evaluate(
       (count) =>
@@ -3946,7 +4000,15 @@ for (const [placeId, shot] of [
   check('releasing Ctrl clears the settlement labels too (point 342)', cleared, `cleared=${cleared}`)
 }
 
+// A selected section that never executed is a FAILURE, not a quiet pass: it is
+// the one way a --section run could report green having verified nothing.
+const unrun = sections.unrun()
+if (unrun) check('the selected section actually ran', false, unrun)
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
+// Said again where the verdict is read: a green one-section run is not a green
+// suite, and nothing downstream may quote it as one.
+if (sections.banner()) console.log(sections.banner())
 await browser.close()
 process.exit(failures > 0 || errors.length > 0 ? 1 : 0)
