@@ -500,6 +500,35 @@ await page
   .waitForFunction(() => !window.__game.getState().journalOpen && !document.querySelector('.journal'), null, { timeout: 8000 })
   .catch(() => {})
 await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
+// === Nothing blocks where nothing is drawn (work-order 583) ===================
+// The F6 report "Ich kann hier nicht durchlaufen" was a fence: the scene
+// instanced its panels into a buffer with a FIXED capacity, the Bambara
+// compound's five woven rings asked for more than it held, and the overflow was
+// drawn NOWHERE while every one of its colliders stood — a wall seven panels
+// long across open sand. The mechanism is general, so the check is: no drawn run
+// in a settlement may be longer than the buffer that draws it. Only the live
+// scene knows the buffers, which is why this one check cannot live in Vitest.
+const instances = await page.evaluate(() => {
+  const out = []
+  window.__placeScene.traverse((o) => {
+    if (!o.isInstancedMesh) return
+    out.push({
+      name: o.name || o.geometry?.type || 'instances',
+      wants: o.count,
+      capacity: o.instanceMatrix.count,
+    })
+  })
+  return out
+})
+const truncated = instances.filter((m) => m.wants > m.capacity)
+check(
+  'PoC village: every instanced run fits the buffer that draws it — no collider without a picture',
+  instances.length > 0 && truncated.length === 0,
+  truncated.length
+    ? truncated.map((m) => `${m.name}: ${m.wants} wanted, ${m.capacity} drawn`).join('; ')
+    : `${instances.length} instanced runs, all within their buffers`,
+)
+
 const teachingStone = await page.evaluate(() => window.__placeLayout.teachingStone ?? null)
 check('PoC village: the teaching stone is in the layout', !!teachingStone, JSON.stringify(teachingStone))
 if (teachingStone) {

@@ -213,6 +213,38 @@ const FENCE_PANEL_RADIUS: Record<FenceDef['kind'], number> = { thorn: 0.6, stone
  *  itself and a gate always skips at least one post (≥ 2× the spacing). */
 const FENCE_PANEL_SPAN_FACTOR = 1.5
 
+/** One DRAWN fence panel: where it stands and which way it faces. */
+export interface FencePanel {
+  kind: FenceDef['kind']
+  x: number
+  z: number
+  /** Yaw, oriented toward the next post along the run. */
+  rot: number
+}
+
+/**
+ * The fence panels the renderer INSTANCES, as pure data (work-order 583).
+ *
+ * It lives here, beside `fenceColliders`, because the two are one run seen
+ * twice: one panel per post, one collider per post. They drifted once — the
+ * scene's instance buffer carried a FIXED capacity (160) while the Bambara
+ * compound's five woven rings ask for 167, so the last seven panels were never
+ * drawn while their colliders stood, and the player met a wall in open sand
+ * seven panels long. A buffer sized from THIS list cannot truncate, and a test
+ * can count both without a browser.
+ */
+export function fencePanels(fences: FenceDef[]): FencePanel[] {
+  const out: FencePanel[] = []
+  for (const f of fences) {
+    for (let i = 0; i < f.posts.length; i++) {
+      const [x, z] = f.posts[i]
+      const [nx, nz] = f.posts[(i + 1) % f.posts.length]
+      out.push({ kind: f.kind, x, z, rot: Math.atan2(nx - x, nz - z) + Math.PI / 2 })
+    }
+  }
+  return out
+}
+
 /**
  * The collider run of one fence, DERIVED from the posts the renderer draws
  * (points 129/378/413): a capsule per drawn panel, i.e. per pair of neighbouring

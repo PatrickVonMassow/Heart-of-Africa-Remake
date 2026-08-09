@@ -5,7 +5,7 @@
 // building stands on a lane.
 
 import { describe, expect, it } from 'vitest'
-import { buildLayout, fenceColliders, type PlaceLayout, type Interactive, type DwellingDef } from './layout'
+import { buildLayout, fenceColliders, fencePanels, type PlaceLayout, type Interactive, type DwellingDef } from './layout'
 import { spawnPointFree, standingClear, WALKER_RADIUS } from './collision'
 import { ANIMAL_RADIUS, animalAnchors } from './animalSpots'
 import { closestOnPolyline } from './lanePlan'
@@ -14,6 +14,8 @@ import { ROCK_VILLAGE_ID, ROCK_HEIGHT_UNITS, communicationRockSite } from '../..
 import { VILLAGE_PLANS } from './regionStyles'
 
 const SEEDS = [7, 42, 1337]
+/** The world of the F6 reports behind work-order 583/584. */
+const REPORTED_SEED = 1425108822
 const PORTS = PLACES.filter((p) => p.kind === 'port')
 const VILLAGES = PLACES.filter((p) => p.kind === 'village')
 
@@ -323,7 +325,7 @@ describe('fence colliders follow the drawn panels (point 413)', () => {
   }
 
   it.each(PLACES.map((p) => [p.id] as const))('%s: no gap between neighbouring panel colliders', (id) => {
-    for (const s of SEEDS) {
+    for (const s of [...SEEDS, REPORTED_SEED]) {
       const layout = buildLayout(id, s)
       for (const f of layout.fences) {
         const run = fenceColliders(f)
@@ -360,7 +362,7 @@ describe('fence colliders follow the drawn panels (point 413)', () => {
   })
 
   it.each(PLACES.map((p) => [p.id] as const))('%s: every gate stays walkable', (id) => {
-    for (const s of SEEDS) {
+    for (const s of [...SEEDS, REPORTED_SEED]) {
       const layout = buildLayout(id, s)
       for (const f of layout.fences) {
         const run = fenceColliders(f)
@@ -378,6 +380,39 @@ describe('fence colliders follow the drawn panels (point 413)', () => {
         }
       }
     }
+  })
+
+  it.each(PLACES.map((p) => [p.id] as const))('%s: one DRAWN panel per fence collider — the wall cannot outrun the picture', (id) => {
+    for (const s of [...SEEDS, REPORTED_SEED]) {
+      const layout = buildLayout(id, s)
+      // Work-order 583: the scene instanced its fence panels into a buffer with
+      // a FIXED capacity while the collider run had none, so a compound whose
+      // rings asked for more panels than the buffer held drew the overflow
+      // nowhere — and the player met a wall in open sand. The two lists are one
+      // run seen twice; counting them here is what keeps them that way.
+      const panels = fencePanels(layout.fences)
+      const colliders = layout.fences.flatMap((f) => fenceColliders(f))
+      expect(panels.length, `${id} seed ${s}`).toBe(colliders.length)
+      for (const kind of ['thorn', 'woven', 'stone'] as const) {
+        const drawn = panels.filter((p) => p.kind === kind).length
+        const posts = layout.fences.filter((f) => f.kind === kind).reduce((a, f) => a + f.posts.length, 0)
+        expect(drawn, `${id} seed ${s}: ${kind}`).toBe(posts)
+      }
+      // Every panel stands ON its post, facing the next one — the same frame the
+      // collider capsule is built in.
+      for (const p of panels) {
+        expect(layout.fences.some((f) => f.posts.some(([x, z]) => Math.hypot(x - p.x, z - p.z) < 1e-9))).toBe(true)
+      }
+    }
+  })
+
+  it('the PoC compound really does ask for more panels than the old ceiling held', () => {
+    // The regression in one number: 167 woven panels against a buffer of 160.
+    // If a layout change ever drops this below the old ceiling the test above
+    // still holds, but this line is what says the defect was real.
+    const layout = buildLayout('bambara-village', REPORTED_SEED)
+    const woven = fencePanels(layout.fences).filter((p) => p.kind === 'woven').length
+    expect(woven).toBeGreaterThan(160)
   })
 })
 
