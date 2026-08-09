@@ -104,7 +104,10 @@ export function planSectionRun({ tier = null, filter = [], section = null, known
   if (section === null) return { ok: true, suite: null, message: null }
   const named = Array.isArray(filter) ? filter : []
   if (section === '') {
-    return { ok: false, suite: null, message: '--section needs its value ATTACHED: `--section=<name>` (a space would read as a suite filter)' }
+    // Covers both shapes that arrive empty: `--section` bare (whose value would
+    // have read as a suite filter, which is why every flag here is written
+    // attached) and `--section=` with nothing after it.
+    return { ok: false, suite: null, message: '--section needs a section NAME attached to it: `--section=<name>`' }
   }
   if (tier !== null) {
     return { ok: false, suite: null, message: `--section=${section} is a one-block repair run — it cannot be combined with the ${tier} tier` }
@@ -156,9 +159,30 @@ export function makeSectionGate({ sections = [], requested = null, suite = 'the 
       verdict.partial
         ? `PARTIAL RUN — only section "${verdict.requested}" of ${suite} ran; this is NOT suite coverage`
         : null,
+    /**
+     * THE DEBT A PARTIAL RUN OWES AT ITS END: the requested section must have
+     * actually EXECUTED. `listSections` reads the declarations out of source
+     * TEXT, so a name that only survives inside a comment — or behind a block an
+     * earlier `return`/throw never reached — passes the up-front check, and the
+     * run would then boot, assert nothing and exit 0. A green that proves
+     * nothing is the one outcome that would make this mechanism dangerous, so it
+     * is a FAILURE, checked where the suite counts its failures. Null when the
+     * run owes nothing.
+     */
+    unrun: () =>
+      verdict.partial && !ran.includes(verdict.requested)
+        ? `section "${verdict.requested}" was selected but never ran — ${suite} declares the name (possibly only in a comment or behind an unreached branch) and no block executed it; nothing was verified`
+        : null,
   }
   return gate
 }
+
+/** Did the process that is running ever build a gate? The run recorder asks, so
+ *  a suite that consults NO gate while `VERIFY_SECTION` is exported — a stale
+ *  variable in a shell, a suite not sectioned yet — is reported instead of being
+ *  silently booked as a one-section run of something. */
+let gateBuilt = false
+export const sectionGateWasBuilt = () => gateBuilt
 
 /**
  * The gate for the suite that is running: its own source decides the valid
@@ -172,9 +196,11 @@ export function sectionGate({ suitePath = process.argv[1], env = process.env } =
   } catch {
     /* no source to parse — selection still works, the candidate list does not */
   }
-  return makeSectionGate({
+  const gate = makeSectionGate({
     sections: listSections(source),
     requested: env[SECTION_ENV],
     suite: basename(String(suitePath ?? 'suite'), '.mjs'),
   })
+  gateBuilt = true
+  return gate
 }

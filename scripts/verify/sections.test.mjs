@@ -101,10 +101,14 @@ describe('planSectionRun — the shape of the command line', () => {
     })
   })
 
-  it('refuses a detached value — it would have read as a second suite', () => {
+  it('refuses an empty value — `--section` bare and `--section=` alike', () => {
     const v = planSectionRun({ filter: ['enrichments'], section: '', knownSuites: SUITES })
     expect(v.ok).toBe(false)
-    expect(v.message).toContain('ATTACHED')
+    // The wording must fit BOTH shapes: `--section` bare (whose value would have
+    // read as a second suite) and `--section=` with nothing after it, for which
+    // "attach the value" would be a wrong diagnosis.
+    expect(v.message).toContain('--section=<name>')
+    expect(v.message).toContain('NAME')
   })
 
   it('refuses a tier: a tier is a coverage claim, one section is the opposite', () => {
@@ -175,6 +179,36 @@ describe('the gate — a known name runs exactly its setup and its checks', () =
 
   it('names the env var the runner sets', () => {
     expect(SECTION_ENV).toBe('VERIFY_SECTION')
+  })
+})
+
+describe('a selected section that never RAN is a failure, not a quiet pass', () => {
+  it('owes nothing once the section has executed', () => {
+    const gate = makeSectionGate({ sections: SECTIONS, requested: 'crocodile', suite: 'enrichments' })
+    runFakeSuite(gate)
+    expect(gate.unrun()).toBe(null)
+  })
+
+  it('owes nothing on a whole run', () => {
+    const gate = makeSectionGate({ sections: SECTIONS, suite: 'enrichments' })
+    runFakeSuite(gate)
+    expect(gate.unrun()).toBe(null)
+  })
+
+  it('reports the debt when the declared block never executed', () => {
+    // listSections reads the source as TEXT, so a name surviving only inside a
+    // comment — or behind a branch the run never reaches — passes the up-front
+    // check. Without this the suite would boot, assert nothing and exit 0.
+    const gate = makeSectionGate({ sections: SECTIONS, requested: 'labels', suite: 'enrichments' })
+    gate.section('herds') // the run reaches every block EXCEPT the requested one
+    gate.section('crocodile')
+    expect(gate.unrun()).toContain('"labels"')
+    expect(gate.unrun()).toContain('never ran')
+  })
+
+  it('reports it even when NO block ran at all', () => {
+    const gate = makeSectionGate({ sections: SECTIONS, requested: 'labels', suite: 'enrichments' })
+    expect(gate.unrun()).toContain('nothing was verified')
   })
 })
 

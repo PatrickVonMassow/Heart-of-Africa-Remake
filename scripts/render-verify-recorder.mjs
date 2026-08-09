@@ -29,7 +29,7 @@ import { readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { recordRun } from './render-verify-state.mjs'
 import { failedChecks } from './verify/baseline-classify-core.mjs'
-import { SECTION_ENV } from './verify/sections.mjs'
+import { SECTION_ENV, sectionGateWasBuilt } from './verify/sections.mjs'
 import { chargeReds } from './render-verify-core.mjs'
 
 // Resolved from this module's own location where that is possible, with a
@@ -179,6 +179,16 @@ export function armRunRecorder(backend) {
       try {
         const shots = screenshotsSince(armed.startedAt)
         const exit = code ?? 0
+        // A suite that consulted NO section gate ran WHOLE, whatever the
+        // environment said — a stale exported VERIFY_SECTION, or a suite not
+        // sectioned yet. The record still says partial, which errs toward
+        // refusing coverage rather than granting it, but the mismatch is said
+        // out loud so nobody hunts a suite that "only ran one section".
+        if (armed.section && !sectionGateWasBuilt()) {
+          console.log(
+            `NOTE  ${armed.suite} consulted no section gate, so it ran WHOLE — but ${SECTION_ENV}=${armed.section} is set, so this run is recorded PARTIAL and proves no coverage. Unset it.`,
+          )
+        }
         // A green run has nothing to account for; only a RED one is charged, and
         // it is charged HERE, at record time, against the ledger as it stood
         // when the run happened. A later ledger edit therefore cannot bless a

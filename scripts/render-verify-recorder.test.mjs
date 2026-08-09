@@ -237,6 +237,42 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(record.reds).toBeUndefined()
     expect(runVerdict(record, { openPoints }).status).toBe('clean')
   })
+
+  // Point 566: the env → record → refusal chain, end to end on the real wiring.
+  // The recorder reads the variable the runner set rather than trusting the
+  // suite to declare its own partiality, and that stamp is what stops a
+  // one-section run from ever counting as backend coverage.
+  it('stamps a run started under VERIFY_SECTION partial, and that run never covers', async () => {
+    const before = process.env.VERIFY_SECTION
+    process.env.VERIFY_SECTION = 'crocodile-ambush'
+    try {
+      const run = await armed('enrichments')
+      const record = run.exit(0)
+      expect(record.partial).toBe(true)
+      expect(record.section).toBe('crocodile-ambush')
+      // Exit 0 and every check green — and still not coverage.
+      const verdict = runVerdict(record, { openPoints })
+      expect(verdict.status).toBe('partial')
+      expect(verdict.covers).toBe(false)
+    } finally {
+      if (before === undefined) delete process.env.VERIFY_SECTION
+      else process.env.VERIFY_SECTION = before
+    }
+  })
+
+  it('leaves a run without the variable unstamped, so it can still cover', async () => {
+    const before = process.env.VERIFY_SECTION
+    delete process.env.VERIFY_SECTION
+    try {
+      const run = await armed('enrichments')
+      const record = run.exit(0)
+      expect(record.partial).toBeUndefined()
+      expect(record.section).toBeUndefined()
+      expect(runVerdict(record, { openPoints }).covers).toBe(true)
+    } finally {
+      if (before !== undefined) process.env.VERIFY_SECTION = before
+    }
+  })
 })
 
 describe('node really fires uncaughtExceptionMonitor where the tap cannot see (F1)', () => {

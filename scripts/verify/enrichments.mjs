@@ -1017,6 +1017,10 @@ if (section('hud-bottom-row')) {
 
 // --- Lion: carcass consumed, lion moves on (§7.1.12) -------------------------
 if (section('elephant-trampling')) {
+  // The lion feed below is staged RELATIVE to the traveller, so it used to
+  // inherit wherever the section before it left him. A section owns the setup it
+  // needs (point 566): it goes to that same spot — the Nile mouth — itself.
+  await page.evaluate(() => window.__game.getState().debugJumpTo(29.5, 31.4))
   await page.evaluate(() => {
     const pos = window.__game.getState().pos
     const s = window.__lionHunt.state
@@ -2912,6 +2916,15 @@ if (section('family-life')) {
 // back and forth between frames (the old play/follow boundary ping-pong).
 // Track any hopping calf's position; count per-sample direction reversals.
 if (section('calf-jitter')) {
+  // The tracking below needs LIVE grazer families, which the section before it
+  // happened to leave standing on the Serengeti. A section owns the setup it
+  // needs (point 566), so it stages the same herds itself — without this it
+  // measured whatever herd the previous jump had left behind, and standalone it
+  // found none at all.
+  await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
+  await page.evaluate(() => window.__wildlife.restock())
+  await waitForHerds()
+  await page.evaluate(() => window.__sleepSim(2))
   const calfJitter = await page.evaluate(async () => {
     const herds = window.__wildlife.herdsRef.current
     const SP = ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe']
@@ -8182,6 +8195,11 @@ if (section('ctrl-actor-labels')) {
   }))
   check('releasing Ctrl clears every label (point 342)', cleared && after.dom === 0 && after.hook, JSON.stringify(after))
 }
+
+// A selected section that never executed is a FAILURE, not a quiet pass: it is
+// the one way a --section run could report green having verified nothing.
+const unrun = sections.unrun()
+if (unrun) check('the selected section actually ran', false, unrun)
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))

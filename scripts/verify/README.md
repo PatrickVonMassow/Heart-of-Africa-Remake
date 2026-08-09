@@ -351,10 +351,22 @@ front of each turns one into a declaration.
   `partial` on the record from `VERIFY_SECTION`, and `runVerdict` refuses it
   whatever the exit code, so `render-verify-guard` cannot be cleared by one. This
   is the repair loop; acceptance and closing runs stay whole-suite.
+- **A selected section that never EXECUTED fails the run.** `listSections` reads
+  the source as text, so a name surviving only inside a comment (or behind a
+  branch nothing reaches) would otherwise boot a browser, assert nothing and
+  exit 0. The suite checks `sections.unrun()` at its end and fails on it: a green
+  that proves nothing is the one outcome that would make this mechanism
+  dangerous.
 - Sectioning a further suite is additive: wrap each block in
   `if (section('<slug>')) { … }` and give each block the jump/wait it inherited
   from the one before. A suite that declares none keeps working unchanged and
   refuses `--section` with that reason.
+- **The one recurring defect is a section that does NOT own its setup**: it
+  reads a scene the block before it staged, so it passes in the whole run and
+  fails standalone. Where blocks genuinely share one staging they belong in ONE
+  section; where they do not, the section repeats the jump itself. Prove it by
+  running every section alone once and diffing its checks against the whole
+  run's — that sweep is how `calf-jitter` and `elephant-trampling` were caught.
 
 ## Is the machine QUIET? — before the run (point 296)
 
