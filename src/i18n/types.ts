@@ -164,7 +164,9 @@ export interface Strings {
     stopReading: string
     voiceLoading: string
     voiceError: string
-    /** Heading of the observation section (design.md §13.4): the utterances
+    /** Tab holding the written diary entries (point 579). */
+    entries: string
+    /** Tab holding the observation section (design.md §13.4): the utterances
      *  the player has heard, kept apart from the written entries. */
     observations: string
     /** Line under the heading explaining that the notes are his own. */
@@ -173,8 +175,11 @@ export interface Strings {
     hypothesis: string
     /** Accessible label of that field, naming the utterance it belongs to. */
     hypothesisFor(utterance: string): string
-    /** Day the utterance was first heard, shown beside it. */
+    /** Day the utterance was first heard, shown beside it. Used for an
+     *  utterance whose place of first hearing is unknown (point 579). */
     firstHeard(date: string): string
+    /** The same, naming the settlement it was first heard in (point 579). */
+    firstHeardIn(date: string, place: string): string
     /** Button that reopens the chief's drum message (point 486). */
     reopenDrumMessage: string
   }

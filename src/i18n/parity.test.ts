@@ -128,6 +128,9 @@ const POSITIONAL: Record<string, unknown[]> = {
   'toasts.soldForGifts': ['Machete', 2],
   'toasts.bazaarRejected': ['Silver'],
   'toasts.positionReport': ['30 N', 'North'],
+  'journalPanel.firstHeard': ['1 January 1890'],
+  'journalPanel.firstHeardIn': ['1 January 1890', 'Cairo'],
+  'journalPanel.hypothesisFor': ['ba-BA'],
   'dialogs.priceGifts': [2],
   'dialogs.gift': ['Gold'],
   'dialogs.audienceTitle': ['Masai'],
@@ -172,12 +175,13 @@ describe('template-function callability (de and en behave alike)', () => {
     // Guards the walk itself: 31 positional + 36 journal templates (the +2 are
     // the point-170 villageReturn title and vignette resolver; the +5 the
     // benchmark overlay's progress lines and its GPU-unavailable note; the +1
-    // the point-293 low-preset dominance line; the +2 the journal observation
-    // section's field label and first-heard line; the +7 the point-394 arrival
-    // set — the port/monument first-visit and return templates with their four
-    // titles; the +1 the point-486 drum-message reading label). A drift here
-    // means a template was added/removed and this suite should follow.
-    expect(FUNCTION_PATHS.length).toBe(78)
+    // the point-293 low-preset dominance line; the +3 the journal observation
+    // tab's field label and its two first-heard lines, with and without the
+    // village of point 579; the +7 the point-394 arrival set — the port/monument
+    // first-visit and return templates with their four titles; the +1 the
+    // point-486 drum-message reading label). A drift here means a template was
+    // added/removed and this suite should follow.
+    expect(FUNCTION_PATHS.length).toBe(79)
   })
 
   it.each(FUNCTION_PATHS)('%s: renders in both languages (or throws in both)', (path) => {

@@ -18,8 +18,17 @@ import { Sketch } from '../journal/sketches'
 import { resolveText, useStrings } from '../i18n'
 import { stripVoiceMarkup, toSpeechSegments } from '../journal/voiceMarkup'
 import { speakSegments, speechAvailable, stopSpeech } from '../journal/speech'
+import { onKeyPress } from '../systems/input'
 
 type SpeechUiState = { entryId: number; status: 'loading' | 'speaking' } | null
+
+/** The journal's two sides: the written diary and the overheard utterances. */
+type JournalTab = 'entries' | 'observations'
+
+/** Keyboard shortcut that flips between the two tabs while the journal is open.
+ *  T is free: Tab opens and closes the journal itself, and no scene, HUD or
+ *  debug binding claims this key. */
+const TAB_SWITCH_KEY = 'KeyT'
 
 /** Reveal speed of the handwriting animation (characters per second). */
 const WRITE_CHARS_PER_SEC = 55
@@ -83,10 +92,14 @@ function BloodMarks({ entry }: { entry: JournalEntry }) {
 
 /**
  * The observations the player collected of a people's speech (design.md §13.4):
- * a section of its own beside the written entries, listing every utterance he
- * has actually HEARD — in its sound sequence, in the lexicon's order — each with
- * a free-text field for his own reading. The game never interprets that text; it
+ * a TAB of its own beside the written entries, listing every utterance he has
+ * actually HEARD — in its sound sequence, in the lexicon's order — each with a
+ * free-text field for his own reading. The game never interprets that text; it
  * only stores it, and it travels with the save like the rest of the memory.
+ *
+ * Every line names the day AND the village of the first hearing; an utterance
+ * recorded before that was tracked, or heard out on the map, simply reads
+ * without a village rather than with an invented one (point 579).
  *
  * The field keeps its own draft while typing: the store trims the note, so a
  * directly bound value would swallow every space the moment it is typed.
@@ -99,10 +112,8 @@ function Observations() {
   const setDialog = useUi((s) => s.setDialog)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const heard = heardUtterances(memory)
-  if (heard.length === 0) return null
   return (
     <section className="observations">
-      <h3>{t.journalPanel.observations}</h3>
       <p className="observations-hint">{t.journalPanel.observationsHint}</p>
       {/* The chief's message is never lost (point 486): once his drums have
           spoken it can be read again from here, wherever the traveller is. */}
@@ -114,26 +125,31 @@ function Observations() {
           {t.journalPanel.reopenDrumMessage}
         </button>
       )}
-      {heard.map((h) => (
-        <div className="observation" key={h.utterance}>
-          <div className="utterance">{h.utterance}</div>
-          <div className="first-heard">
-            {t.journalPanel.firstHeard(t.formatDate(h.firstHeardDay, START_YEAR))}
+      {heard.map((h) => {
+        const date = t.formatDate(h.firstHeardDay, START_YEAR)
+        // The village reads exactly as the status bar's region line names it.
+        const place = h.firstHeardPlace ? t.places[h.firstHeardPlace] : undefined
+        return (
+          <div className="observation" key={h.utterance}>
+            <div className="utterance">{h.utterance}</div>
+            <div className="first-heard">
+              {place ? t.journalPanel.firstHeardIn(date, place) : t.journalPanel.firstHeard(date)}
+            </div>
+            <input
+              type="text"
+              className="hypothesis"
+              value={drafts[h.utterance] ?? h.hypothesis}
+              placeholder={t.journalPanel.hypothesis}
+              aria-label={t.journalPanel.hypothesisFor(h.utterance)}
+              onChange={(e) => {
+                const text = e.target.value
+                setDrafts((d) => ({ ...d, [h.utterance]: text }))
+                setHypothesis(h.utterance, text)
+              }}
+            />
           </div>
-          <input
-            type="text"
-            className="hypothesis"
-            value={drafts[h.utterance] ?? h.hypothesis}
-            placeholder={t.journalPanel.hypothesis}
-            aria-label={t.journalPanel.hypothesisFor(h.utterance)}
-            onChange={(e) => {
-              const text = e.target.value
-              setDrafts((d) => ({ ...d, [h.utterance]: text }))
-              setHypothesis(h.utterance, text)
-            }}
-          />
-        </div>
-      ))}
+        )
+      })}
     </section>
   )
 }
@@ -148,10 +164,30 @@ export function JournalPanel() {
   const [speech, setSpeech] = useState<SpeechUiState>(null)
   /** Handwriting animation (design.md §16): entry id and revealed chars. */
   const [writing, setWriting] = useState<{ entryId: number; chars: number } | null>(null)
+  /** Which of the two tabs is in front (point 579). */
+  const [tab, setTab] = useState<JournalTab>('entries')
 
+  // The chosen tab lives only as long as the journal stays open: opening it
+  // always lands on the diary (point 579).
   useEffect(() => {
-    if (open) endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [open, journal.length])
+    if (open) setTab('entries')
+  }, [open])
+
+  // The keyboard flips between the two tabs while the journal is open. The
+  // handler ignores form controls, so typing a reading never switches tabs.
+  useEffect(() => {
+    if (!open) return
+    return onKeyPress(TAB_SWITCH_KEY, () =>
+      setTab((current) => (current === 'entries' ? 'observations' : 'entries')),
+    )
+  }, [open])
+
+  // The newest entry stays in view (design.md §15.4) — also when the diary
+  // comes back to the front, since the tab behind it is unmounted and its
+  // list returns scrolled to the oldest page (point 579).
+  useEffect(() => {
+    if (open && tab === 'entries') endRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [open, tab, journal.length])
 
   // While a new entry is written into the book (design.md §16), follow the
   // growing text down so the appearing content stays in view. `writing` gets a
@@ -274,47 +310,65 @@ export function JournalPanel() {
         <span>{t.journalPanel.title}</span>
         <button onClick={() => setOpen(false)}>{t.journalPanel.close}</button>
       </header>
-      <div className="entries">
-        {journal.map((e) => {
-          const title = resolveText(t, e.title)
-          const text = resolveText(t, e.text)
-          const state = speech?.entryId === e.id ? speech.status : null
-          const plain = stripVoiceMarkup(text)
-          const isWriting = writing?.entryId === e.id
-          return (
-            <div
-              key={e.id}
-              className={`entry${e.kind === 'hint' ? ' hint' : ''}${isWriting ? ' writing' : ''}`}
-              // A click finishes the handwriting immediately (§16 comfort).
-              onClick={isWriting ? () => setWriting(null) : undefined}
-            >
-              <div className="date">{t.formatDate(e.day, START_YEAR)}</div>
-              <h4>
-                {stripVoiceMarkup(title)}
-                {speechAvailable(t.lang) && (
-                  <button
-                    className="speak"
-                    title={state ? t.journalPanel.stopReading : t.journalPanel.readAloud}
-                    aria-label={state ? t.journalPanel.stopReading : t.journalPanel.readAloud}
-                    onClick={() => speakEntry(e.id, title, text)}
-                  >
-                    {state === 'loading' ? '…' : state === 'speaking' ? '■' : '▶'}
-                  </button>
-                )}
-              </h4>
-              {state === 'loading' && <div className="voice-loading">{t.journalPanel.voiceLoading}</div>}
-              {e.sketch && <Sketch id={e.sketch} />}
-              <p>
-                {isWriting ? plain.slice(0, Math.floor(writing.chars)) : plain}
-                {isWriting && <WritingHand wounds={e.wounds ?? 0} />}
-              </p>
-              <BloodMarks entry={e} />
-            </div>
-          )
-        })}
-        <div ref={endRef} />
+      {/* Diary and overheard utterances as two tabs (point 579): only the one
+          in front is in the DOM, so reading either scrolls past nothing. */}
+      <div className="journal-tabs" role="tablist">
+        {(['entries', 'observations'] as const).map((id) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            className={`journal-tab${tab === id ? ' active' : ''}`}
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+          >
+            {t.journalPanel[id]}
+          </button>
+        ))}
       </div>
-      <Observations />
+      {tab === 'observations' && <Observations />}
+      {tab === 'entries' && (
+        <div className="entries">
+          {journal.map((e) => {
+            const title = resolveText(t, e.title)
+            const text = resolveText(t, e.text)
+            const state = speech?.entryId === e.id ? speech.status : null
+            const plain = stripVoiceMarkup(text)
+            const isWriting = writing?.entryId === e.id
+            return (
+              <div
+                key={e.id}
+                className={`entry${e.kind === 'hint' ? ' hint' : ''}${isWriting ? ' writing' : ''}`}
+                // A click finishes the handwriting immediately (§16 comfort).
+                onClick={isWriting ? () => setWriting(null) : undefined}
+              >
+                <div className="date">{t.formatDate(e.day, START_YEAR)}</div>
+                <h4>
+                  {stripVoiceMarkup(title)}
+                  {speechAvailable(t.lang) && (
+                    <button
+                      className="speak"
+                      title={state ? t.journalPanel.stopReading : t.journalPanel.readAloud}
+                      aria-label={state ? t.journalPanel.stopReading : t.journalPanel.readAloud}
+                      onClick={() => speakEntry(e.id, title, text)}
+                    >
+                      {state === 'loading' ? '…' : state === 'speaking' ? '■' : '▶'}
+                    </button>
+                  )}
+                </h4>
+                {state === 'loading' && <div className="voice-loading">{t.journalPanel.voiceLoading}</div>}
+                {e.sketch && <Sketch id={e.sketch} />}
+                <p>
+                  {isWriting ? plain.slice(0, Math.floor(writing.chars)) : plain}
+                  {isWriting && <WritingHand wounds={e.wounds ?? 0} />}
+                </p>
+                <BloodMarks entry={e} />
+              </div>
+            )
+          })}
+          <div ref={endRef} />
+        </div>
+      )}
     </div>
   )
 }

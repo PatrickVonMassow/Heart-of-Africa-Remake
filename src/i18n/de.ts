@@ -256,11 +256,13 @@ export const de: Strings = {
     stopReading: 'Vorlesen stoppen',
     voiceLoading: 'Stimme wird geladen …',
     voiceError: 'Die Vorlesestimme konnte nicht geladen werden.',
+    entries: 'Einträge',
     observations: 'Gehört',
     observationsHint: 'Was ich sie sagen hörte – und was ich darunter verstehe.',
     hypothesis: 'Meine Deutung',
     hypothesisFor: (utterance: string) => `Meine Deutung von ${utterance}`,
     firstHeard: (date: string) => `Zuerst gehört am ${date}`,
+    firstHeardIn: (date: string, place: string) => `Zuerst gehört am ${date} in ${place}`,
     reopenDrumMessage: 'Die Trommelbotschaft noch einmal lesen',
   },
 

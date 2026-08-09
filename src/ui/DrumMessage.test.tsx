@@ -34,6 +34,11 @@ afterEach(() => {
   useUi.getState().clearDrumMessage()
 })
 
+/** The journal opens on the diary; the heard utterances and the reopen button
+ *  live behind its second tab (point 579). */
+const openOverheardTab = () =>
+  fireEvent.click(document.querySelectorAll('.journal .journal-tab')[1])
+
 const readings = () => [...document.querySelectorAll('.drum-concept .reading')].map((e) => e.textContent)
 const syllables = () =>
   [...document.querySelectorAll('.drum-concept .utterance')].map((e) =>
@@ -81,8 +86,9 @@ describe('a reading edited at the drums is the journal note (point 486)', () => 
     })
     drums.unmount()
 
-    // … stands in the journal's observation section.
+    // … stands in the journal's observation tab.
     const journal = render(<JournalPanel />)
+    openOverheardTab()
     const field = journal.getByLabelText(en.journalPanel.hypothesisFor(RIVER)) as HTMLInputElement
     expect(field.value).toBe('water / river')
 
@@ -117,14 +123,16 @@ describe('a reading edited at the drums is the journal note (point 486)', () => 
 
 describe('the message can always be reopened (point 486)', () => {
   it('offers no reopen button before the drums have spoken', () => {
-    g().hearUtterance(DIG) // the observation section needs something to show
+    g().hearUtterance(DIG) // the observation tab needs something to show
     render(<JournalPanel />)
+    openOverheardTab()
     expect(document.querySelector('.reopen-drum-message')).toBeNull()
   })
 
   it('reopens the display from the journal, however often the player asks', () => {
     g().receiveDrumMessage()
     const journal = render(<JournalPanel />)
+    openOverheardTab()
     const button = document.querySelector('.reopen-drum-message') as HTMLButtonElement
     expect(button.textContent).toBe(en.journalPanel.reopenDrumMessage)
     fireEvent.click(button)
@@ -137,6 +145,7 @@ describe('the message can always be reopened (point 486)', () => {
     expect(useUi.getState().dialog).toBeNull()
     dialogs.unmount()
     render(<JournalPanel />)
+    openOverheardTab()
     fireEvent.click(document.querySelector('.reopen-drum-message') as HTMLButtonElement)
     expect(useUi.getState().dialog).toEqual({ kind: 'drumMessage' })
   })

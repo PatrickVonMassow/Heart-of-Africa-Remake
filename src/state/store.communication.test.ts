@@ -8,7 +8,7 @@ import { hasHeard, heardUtterances, hypothesisFor } from '../communication/heard
 import { utteranceOf } from '../communication/lexicon'
 import { chiefMessagePhrase } from '../communication/drumMessage'
 import { isSpeechLabelVisible, labelReadings, NO_READING } from '../communication/speechLabel'
-import { g, freshGame, withWorld } from '../test/store'
+import { g, freshGame, useGame, withWorld } from '../test/store'
 
 withWorld()
 
@@ -48,6 +48,19 @@ describe('hearing utterances (design.md §13.4)', () => {
     expect(g().communication.heard[COME].firstHeardDay).toBe(3)
     // Nothing changed, so the memory is the very same object (no re-render).
     expect(g().communication).toBe(first)
+  })
+
+  it('records the settlement the player stands in, and none out on the map', () => {
+    useGame.setState({ mode: 'place', placeId: 'bambara-village' })
+    g().hearUtterance(COME)
+    expect(g().communication.heard[COME].firstHeardPlace).toBe('bambara-village')
+
+    // Heard while travelling, the utterance keeps no place — the journal then
+    // names no village rather than an invented one (point 579).
+    useGame.setState({ mode: 'travel', placeId: null })
+    g().hearPhrase([DIG, HERE])
+    expect(g().communication.heard[DIG].firstHeardPlace).toBeUndefined()
+    expect(g().communication.heard[HERE].firstHeardPlace).toBeUndefined()
   })
 
   it('a phrase records each of its atoms once', () => {
