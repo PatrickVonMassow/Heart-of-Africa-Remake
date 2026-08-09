@@ -37,12 +37,14 @@
 export const DOC_BUDGETS = [
   {
     path: 'CLAUDE.md',
-    // LOWERED to the size point 555 achieved (791 lines / 6718 words, down from
+    // LOWERED to the size point 555 achieved (770 lines / 6511 words, down from
     // 990 / 8992): the big cut moved ALL of §7.1 out. Every criterion keeps its
     // number, its bold title, one short acceptance condition and its `Detail:`/
     // `Evidence:` pointers, while its complete wording stands verbatim in
     // docs/acceptance-criteria-detail.md — the grip point 459 first used on nos.
-    // 20 and 21, applied to the whole list. The whole saving is banked, for the
+    // 20 and 21, applied to the whole list — those two included, whose own
+    // conditions were shrunk to one sentence once their sections were verified
+    // to carry the criterion complete. The whole saving is banked, for the
     // same reason as last time: this file is sent with EVERY turn of EVERY
     // session and inherited by every delegated subagent, so a ceiling left at
     // the old figure would simply be refilled and the tokens paid again. The
@@ -51,22 +53,23 @@ export const DOC_BUDGETS = [
     // unchanged: a genuinely new rule raises the budget by its measured size
     // with the reason written here, a longer telling of something already in the
     // file does not.
-    maxLines: 794,
-    maxWords: 6739,
+    maxLines: 773,
+    maxWords: 6531,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {
     path: 'docs/acceptance-criteria-detail.md',
-    // MEASURED at the size point 555 left it (518 lines / 5207 words, up from
-    // 204 / 1973): it now holds all 32 criteria in full instead of two, which is
+    // MEASURED at the size point 555 left it (552 lines / 5459 words, up from
+    // 204 / 1973): it now holds 28 of the 32 criteria in full instead of two,
+    // every one the §7.1 condition no longer states completely, which is
     // exactly why it gets a ceiling of its own. Cutting CLAUDE.md and leaving
     // the destination uncapped would only move the accretion one file over. The
     // headroom is the same fraction CLAUDE.md carries (0.4 % / 0.3 %), so a
     // criterion that genuinely gains a rule raises this budget by that rule's
     // measured size with the reason written here — and a criterion that only
     // gets a longer telling does not.
-    maxLines: 520,
-    maxWords: 5223,
+    maxLines: 554,
+    maxWords: 5476,
     why: 'the destination of the §7.1 cut — uncapped, it would simply refill what the cut bought',
   },
   {

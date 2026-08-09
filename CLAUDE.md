@@ -424,18 +424,16 @@ detail section change in the SAME commit.
    Evidence: docs/acceptance-evidence.md §4.
 
 5. **Port city.** At least Cairo as the enterable starting port with trade
-   (buying equipment, provisions and gifts for `$`). Entering triggers the
-   automatic checkpoint (`design.md` §18; simplified saving is
-   sufficient). Buy AND sell dialogs (shop buy-back, bazaar buy/sell,
-   ferry) use the same aligned price-table layout and buy gear back for the
-   local currency per §9.
+   (buying equipment, provisions and gifts for `$`), the automatic checkpoint
+   on entry (`design.md` §18) and the aligned buy/sell dialogs of §9.
+   Detail: docs/acceptance-criteria-detail.md §5.
    Evidence: docs/acceptance-evidence.md §5.
 
 6. **Village and cultural contact.** At least one enterable village with a
-   chief's hut; a culturally correct gift is the condition for a hint —
-   not mere observation (`design.md` §12). The village trading post
-   barters the baseline goods for gifts and buys gear back for gifts —
-   money has no value there (§9).
+   chief's hut where a culturally correct gift — not mere observation — is the
+   condition for a hint (`design.md` §12), and a trading post that barters for
+   gifts, not money (§9).
+   Detail: docs/acceptance-criteria-detail.md §6.
    Evidence: docs/acceptance-evidence.md §6.
 
 7. **Language/direction system.** The full system of `design.md` §13 is
@@ -445,12 +443,10 @@ detail section change in the SAME commit.
    Detail: docs/acceptance-criteria-detail.md §7.
    Evidence: docs/acceptance-evidence.md §7.
 
-8. **Chronicle/journal.** A journal exists, grows automatically on events
-   and stores hints (`design.md` §15); plain text suffices (the
-   animated handwriting is pt. 29). EVERY walkable place — port, village,
-   monument — is journaled on its first entry in its own ~1890 voice
-   (§16), never a boilerplate, and again on a changed situation; a
-   `PLACES` sweep fails on a silent place.
+8. **Chronicle/journal.** A journal exists, grows automatically on events and
+   stores hints (`design.md` §15), and every walkable place is journaled on
+   its first entry in its own ~1890 voice (§16).
+   Detail: docs/acceptance-criteria-detail.md §8.
    Evidence: docs/acceptance-evidence.md §8.
 
 9. **Status bar.** Date, funds, provisions, gifts and current region are
@@ -478,10 +474,10 @@ detail section change in the SAME commit.
    Detail: docs/acceptance-criteria-detail.md §12.
    Evidence: docs/acceptance-evidence.md §12.
 
-13. **Real geodata.** The real-geodata terrain rendering of `design.md`
-    §3.3 is implemented (DEM relief, ~1890 vector coasts/rivers/lakes
-    without raster steps, biome-based PBR splatting, domain-warped
-    meandering biome borders).
+13. **Real geodata.** The real-geodata terrain rendering of `design.md` §3.3
+    is implemented (DEM relief, ~1890 vector coasts/rivers/lakes without
+    raster steps, biome-based PBR splatting).
+   Detail: docs/acceptance-criteria-detail.md §13.
    Evidence: docs/acceptance-evidence.md §13.
 
 14. **Lighting and post-processing pipeline.** The pipeline of `design.md`
@@ -505,12 +501,10 @@ detail section change in the SAME commit.
    Detail: docs/acceptance-criteria-detail.md §16.
    Evidence: docs/acceptance-evidence.md §16.
 
-17. **Localization.** The game is fully playable in English as well as
-    German per `design.md` §17.7 (all player-visible text from the
-    language files, runtime language switch defaulting to English,
-    language-neutral journal storage re-rendered on switch, localized
-    proper names; another language must require only a new language
-    file).
+17. **Localization.** The game is fully playable in English as well as German
+    per `design.md` §17.7, every player-visible text coming from the language
+    files and another language requiring only a new file.
+   Detail: docs/acceptance-criteria-detail.md §17.
    Evidence: docs/acceptance-evidence.md §17.
 
 18. **Lint and dependency hygiene.** The codebase is free of linter
@@ -535,32 +529,17 @@ detail section change in the SAME commit.
    Detail: docs/acceptance-criteria-detail.md §19.
    Evidence: docs/acceptance-evidence.md §19.
 
-20. **Comfort and audio settings.** The control and audio calibration of
-    `design.md` §2.2/§21 holds — look sensitivity, walk and strafe speed,
-    eye height, pitch limit, the single ambience volume with its coastal
-    surf and per-source sliders, the overland travel speed and the
-    terrain relief factors — and every one is editable while the game
-    runs, in English and German, from the §21 debug menu, which is
-    STRUCTURED: collapsible groups under a filter, losing no control.
-    The §21.4 zoom behavior, the §21.3 selectors and the §21.1
-    debug shortcuts hold, F6 producing the complete bug
-    report, F8 the render benchmark and F9 the graphics detail
-    level, whose `QUALITY_PRESETS` registry must carry every lever
-    on every level. Modals and overlays always draw above the
-    in-scene floating labels (§17.4).
+20. **Comfort and audio settings.** The control, audio, zoom and debug-menu
+    calibration of `design.md` §2.2/§21 holds, every value editable while the
+    game runs in both languages, with the §21.1 shortcuts — F6 the bug report,
+    F8 the benchmark, F9 the graphics detail level.
    Detail: docs/acceptance-criteria-detail.md §20.
    Evidence: docs/acceptance-evidence.md §20.
 
-21. **Water realism.** The water realism of `design.md` §11.3 holds:
-    rivers run in carved beds as one continuous ribbon from source to
-    mouth, lakes lie flat just above their beds, five waterfalls foam into
-    their plunge pools, and the mouth-junction, no-interior-notch and
-    width/course rules hold with them. The current pushes the traveller
-    downstream over real distance — advancing time, provisions, health and
-    the deadline, never free movement — and may never HOLD him: a sea
-    mouth runs slack and a blocked boundary slides (§11.2, point 316),
-    while the ocean stays impassable, so no new way off the continent
-    opens.
+21. **Water realism.** The water realism of `design.md` §11.3 holds — rivers
+    in carved beds as one continuous ribbon, flat lakes, five foaming
+    waterfalls — and the current pushes the traveller downstream over real
+    distance without ever HOLDING him (§11.2).
    Detail: docs/acceptance-criteria-detail.md §21.
    Evidence: docs/acceptance-evidence.md §21.
 

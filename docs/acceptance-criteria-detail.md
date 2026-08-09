@@ -7,9 +7,9 @@ the evidence chains made to docs/acceptance-evidence.md, and the same one nos. 2
 made first. Each section carries its criterion COMPLETE and verbatim, notices included,
 so the move can drop nothing; §7.1 keeps the number, the bold title, one short
 acceptance condition, the `Detail:` pointer and the `Evidence:` line, and THIS file is
-what governs where the two differ in detail. A criterion whose condition is already one
-short statement (nos. 1, 5, 6, 8, 10, 11, 13, 17, 18) stays whole in §7.1 and has no
-section here. A criterion and its detail section change in the SAME commit.
+what governs where the two differ in detail. Only nos. 1, 10 and 11 — genuinely one short
+statement each — and no. 18, which the work order exempts by name, stay whole in §7.1 and
+have no section here. A criterion and its detail section change in the SAME commit.
 
 ---
 
@@ -74,6 +74,20 @@ PINS the traveller (§11.2, point 316): a blocked step resolves by SLIDING along
 a fully closed direction fan reports the blocked notice, and the passive current obeys the
 same resolve (pt. 21).
 
+## 5. Port city.
+
+At least Cairo as the enterable starting port with trade (buying equipment, provisions and
+gifts for `$`). Entering triggers the automatic checkpoint (`design.md` §18; simplified
+saving is sufficient). Buy AND sell dialogs (shop buy-back, bazaar buy/sell, ferry) use
+the same aligned price-table layout and buy gear back for the local currency per §9.
+
+## 6. Village and cultural contact.
+
+At least one enterable village with a chief's hut; a culturally correct gift is the
+condition for a hint — not mere observation (`design.md` §12). The village trading post
+barters the baseline goods for gifts and buys gear back for gifts — money has no value
+there (§9).
+
 ## 7. Language/direction system.
 
 The full system of `design.md` §13 is implemented: the regional direction systems and
@@ -90,6 +104,13 @@ mechanic is undecided and needs its own research pass first, so §13.2's glossar
 them either: until the new mechanic is settled, disturbing this system is not a reason to
 compromise a change elsewhere. Once it IS settled and built, it becomes load-bearing like
 any other system.
+
+## 8. Chronicle/journal.
+
+A journal exists, grows automatically on events and stores hints (`design.md` §15); plain
+text suffices (the animated handwriting is pt. 29). EVERY walkable place — port, village,
+monument — is journaled on its first entry in its own ~1890 voice (§16), never a
+boilerplate, and again on a changed situation; a `PLACES` sweep fails on a silent place.
 
 ## 9. Status bar.
 
@@ -118,6 +139,12 @@ states it. The evidence section pins what is BUILT today.
 OPEN: tree-climbing-to-flee (§9 open item), and the one seasonal-dress reading the
 research allows but the figures cannot yet show — a wrap worn DIFFERENTLY in the cold
 rather than in greater number (§19.13).
+
+## 13. Real geodata.
+
+The real-geodata terrain rendering of `design.md` §3.3 is implemented (DEM relief, ~1890
+vector coasts/rivers/lakes without raster steps, biome-based PBR splatting, domain-warped
+meandering biome borders).
 
 ## 14. Lighting and post-processing pipeline.
 
@@ -157,6 +184,13 @@ ever stuck (point 155): every walker errand target and animal grazing anchor has
 standing circle AND an escape direction against the FULL collider set, else nudged to the
 nearest free spot; a walker pinned past `balance.walkerUnstuckSeconds` (debug-editable) is
 teleport-nudged free — inhabitants only, never the player.
+
+## 17. Localization.
+
+The game is fully playable in English as well as German per `design.md` §17.7 (all
+player-visible text from the language files, runtime language switch defaulting to
+English, language-neutral journal storage re-rendered on switch, localized proper names;
+another language must require only a new language file).
 
 ## 19. Journal voice markup and read-aloud.
 
