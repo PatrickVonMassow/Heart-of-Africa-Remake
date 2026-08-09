@@ -486,6 +486,9 @@ export interface Strings {
     speechHearingRadius: string
     speechHearingFalloff: string
     speechLabelSeconds: string
+    speechPitch: string
+    speechPitchInterval: string
+    speechVolume: string
     speechConceptLabels: string
     /** The children's game of tag (design.md §19.10, point 480/351). */
     tagChildCount: string

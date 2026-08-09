@@ -42,12 +42,20 @@ const SURF_BASE = 0.26
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
-// Two sub-buses under the master so footsteps and every other ambient sound can
-// be balanced against each other (design.md §20; user request): footsteps ×2,
-// all else ×0.5. Every layer/emitter routes through ambientBus, footsteps
-// through footstepBus, so the split needs no per-emit change.
+// THREE sub-buses under the master so footsteps, the village speech and every
+// other ambient sound can be balanced against each other (design.md §19.1/§20;
+// user request): footsteps ×2, all else ×0.5. Every layer/emitter routes through
+// ambientBus, footsteps through footstepBus, so the split needs no per-emit
+// change.
 let footstepBus: GainNode | null = null
 let ambientBus: GainNode | null = null
+// The speech bus is the third (point 577). The syllables are the one sound the
+// player MUST hear — the whole communication PoC is learned from them — so they
+// may not hang on the slider labelled "everything ELSE", which the game's own
+// advice (turn the bed down to hear the voices over the drums) leads the player
+// to set to zero. It carries the SAME level the speech had on the ambient bus,
+// so the split moved the routing and left the mix where it was.
+let speechBus: GainNode | null = null
 const layers: Record<string, Layer> = {}
 let scene: AmbienceScene = { region: 'north', mode: 'place', placeKind: 'port', nearVillage: false }
 let started = false
@@ -311,14 +319,18 @@ function buildGraph() {
   master = ctx.createGain()
   master.gain.value = 0.5
   master.connect(ctx.destination)
-  // Footstep and ambient sub-buses (design.md §20): footsteps twice as loud,
-  // every other ambient sound half as loud, both under the master volume.
+  // Footstep, ambient and speech sub-buses (design.md §19.1/§20): footsteps
+  // twice as loud, every other ambient sound half as loud, the village speech on
+  // its own level, all three under the master volume.
   ambientBus = ctx.createGain()
   ambientBus.gain.value = balance.ambientVolume
   ambientBus.connect(master)
   footstepBus = ctx.createGain()
   footstepBus.gain.value = balance.footstepVolume
   footstepBus.connect(master)
+  speechBus = ctx.createGain()
+  speechBus.gain.value = Math.max(0, balance.communication.speechVolume)
+  speechBus.connect(master)
 
   noiseBed('wind', 'lowpass', 420)
   wobble('wind', 0.13, 0.35)
@@ -726,14 +738,38 @@ export function playThunder(delaySeconds: number, strength = 1): void {
 }
 
 // --- Village speech (design.md §13.4, docs/communication-poc-spec.md) --------
-// The two spoken samples: one carrier pitch per tone, low for `ba` and high for
-// `BA`, with a vowel formant over it so a syllable reads as a voice rather than
-// a beep. Only the PITCH distinguishes them — loudness, tempo and length carry
-// no meaning anywhere in the language.
-const SPEECH_TONE: Record<Tone, { carrier: number; formant: number }> = {
-  low: { carrier: 138, formant: 820 },
-  high: { carrier: 226, formant: 1240 },
+// A spoken syllable is a VOICE, not a beep (point 587): a glottal sawtooth whose
+// FUNDAMENTAL reaches the ear intact — the pitch IS the language — shaped by the
+// three resonances of the vowel `a`. Those resonances are the SAME in both
+// tones, exactly as the spec demands ("differing in PITCH alone"), so the player
+// learns ONE syllable spoken low and high, which is what the two message drums
+// repeat later. Only the carrier moves between `ba` and `BA`.
+
+/** The carrier of a tone, in Hz, from the calibratable balance values: `ba` is
+ *  the low pitch, `BA` sits `speechPitchInterval` above it. */
+export function syllableCarrier(tone: Tone): number {
+  const c = balance.communication
+  const low = Math.max(20, c.speechPitchHz)
+  return tone === 'low' ? low : low * Math.max(1, c.speechPitchInterval)
 }
+
+/** The vowel `a` (F1 730 / F2 1090 / F3 2440 Hz, the textbook open vowel), as
+ *  PEAKING resonators: each formant ADDS a resonance and lets everything else
+ *  through, so the fundamental survives — a single bandpass was what threw the
+ *  pitch away. `onset` is where the formant stands at the release of the `b`:
+ *  a labial starts low and rises into the vowel, and that rise is the whole
+ *  difference between hearing `ba` and hearing `a`. */
+const VOWEL_A: ReadonlyArray<{ hz: number; q: number; gainDb: number; onset: number }> = [
+  { hz: 730, q: 5.5, gainDb: 15, onset: 0.55 },
+  { hz: 1090, q: 6.5, gainDb: 13, onset: 0.72 },
+  { hz: 2440, q: 7, gainDb: 9, onset: 1 },
+]
+/** A voice rolls off above its formants; without this the sawtooth buzzes. */
+const VOWEL_TILT_HZ = 3000
+/** How long the `b` transition takes to reach the steady vowel. */
+const VOWEL_ONSET_SECONDS = 0.035
+/** The small pitch fall of a spoken beat — far too small to blur the two tones. */
+const SPEECH_PITCH_FALL = 0.96
 
 /** Dev/verify probe: proves a spoken utterance really SCHEDULED audio. */
 const speechProbe =
@@ -745,23 +781,44 @@ const speechProbe =
       })
     : null
 
-/** One spoken syllable: a voiced carrier through its formant, softly enveloped. */
-function speakSyllable(ac: AudioContext, dest: AudioNode, t0: number, tone: Tone, dur: number, peak: number) {
-  const { carrier, formant } = SPEECH_TONE[tone]
+/**
+ * One spoken syllable `ba`: the voiced carrier of its tone through the vowel's
+ * resonators, with the plosive onset of a `b` — a hard release transient, the
+ * short dip of the closure opening, then the vowel body. Exported so the
+ * offline spectrum check (ambience.speech.test.ts) renders the REAL chain.
+ */
+export function speakSyllable(ac: AudioContext, dest: AudioNode, t0: number, tone: Tone, dur: number, peak: number) {
+  const carrier = syllableCarrier(tone)
   const osc = ac.createOscillator()
   osc.type = 'sawtooth'
   osc.frequency.setValueAtTime(carrier, t0)
-  osc.frequency.linearRampToValueAtTime(carrier * 0.94, t0 + dur) // the small fall of a spoken beat
-  const filter = ac.createBiquadFilter()
-  filter.type = 'bandpass'
-  filter.frequency.value = formant
-  filter.Q.value = 3.2
+  osc.frequency.linearRampToValueAtTime(carrier * SPEECH_PITCH_FALL, t0 + dur)
+  const onset = Math.min(VOWEL_ONSET_SECONDS, dur * 0.3)
+  let node: AudioNode = osc
+  for (const f of VOWEL_A) {
+    const bq = ac.createBiquadFilter()
+    bq.type = 'peaking'
+    bq.frequency.setValueAtTime(f.hz * f.onset, t0)
+    bq.frequency.linearRampToValueAtTime(f.hz, t0 + onset) // the `b` transition
+    bq.Q.value = f.q
+    bq.gain.value = f.gainDb
+    node.connect(bq)
+    node = bq
+  }
+  const tilt = ac.createBiquadFilter()
+  tilt.type = 'lowpass'
+  tilt.frequency.value = VOWEL_TILT_HZ
+  tilt.Q.value = 0.7
+  node.connect(tilt)
   const g = ac.createGain()
+  const attack = Math.min(0.002, dur * 0.05)
+  const body = Math.min(dur * 0.5, onset + 0.05)
   g.gain.setValueAtTime(0.0001, t0)
-  g.gain.linearRampToValueAtTime(peak, t0 + Math.min(0.03, dur * 0.25))
+  g.gain.linearRampToValueAtTime(peak, t0 + attack) // the burst of the `b`
+  g.gain.linearRampToValueAtTime(peak * 0.55, t0 + onset) // …and the dip behind it
+  g.gain.linearRampToValueAtTime(peak * 0.95, t0 + body) // the vowel swells
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
-  osc.connect(filter)
-  filter.connect(g)
+  tilt.connect(g)
   g.connect(dest)
   osc.start(t0)
   osc.stop(t0 + dur + 0.05)
@@ -771,17 +828,17 @@ function speakSyllable(ac: AudioContext, dest: AudioNode, t0: number, tone: Tone
  * Speaks a pure SpeechPlan (src/communication/speaking.ts): its syllables at the
  * constant pace, a phrase's atoms with the constant pause between them, all on
  * the AudioContext clock — so a re-render or a scene change mid-phrase can never
- * cancel what is already scheduled. Every voice goes through the SAME ambient
- * bus as the rest of the soundscape, so the single §21 ambience volume still
- * governs it. A plan that carries no audible syllable (out of range, muted)
- * schedules nothing at all.
+ * cancel what is already scheduled. Every voice goes through the SPEECH bus
+ * (point 577): under the master §21 ambience volume, but beside — never behind —
+ * the ambient bus that carries the drums and the rest of the village bed. A plan
+ * that carries no audible syllable (out of range, muted) schedules nothing.
  */
 export function playSpeech(plan: SpeechPlan): void {
   if (plan.syllables.length === 0) return
   if (speechProbe) speechProbe.spoken++ // an audible plan, even without a started engine
   if (!ctx || !master) return
   const ac = ctx
-  const dest = ambientBus ?? master
+  const dest = speechBus ?? master
   const t0 = ac.currentTime
   for (const s of plan.syllables) {
     speakSyllable(ac, dest, t0 + s.startOffset, s.tone, s.duration, Math.max(0.0001, s.peak))
@@ -876,6 +933,7 @@ export function refreshAmbienceVolume() {
   for (const w of wobbles) w.gain.gain.value = w.baseDepth * balance.ambienceVolume * wobbleExtra(w.name)
   if (ambientBus) ambientBus.gain.value = balance.ambientVolume
   if (footstepBus) footstepBus.gain.value = balance.footstepVolume
+  if (speechBus) speechBus.gain.value = Math.max(0, balance.communication.speechVolume)
 }
 
 /** Update the ambience to the current game situation. */
@@ -899,6 +957,10 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
     setCoast: (prox: number) => setAmbienceCoast(prox),
     coastProx: () => coastProx,
     setScene: (next: AmbienceScene) => setAmbienceScene(next),
+    // The live gain of one sub-bus (point 577): the browser gate reads them to
+    // prove `ambientVolume` moves the bed WITHOUT touching the speech.
+    busGain: (name: 'master' | 'ambient' | 'footstep' | 'speech') =>
+      ({ master, ambient: ambientBus, footstep: footstepBus, speech: speechBus })[name]?.gain.value ?? 0,
     refresh: () => refreshAmbienceVolume(),
     surfWobble: () => wobbles.find((w) => w.name === 'surf')?.gain.gain.value ?? 0,
     // Village speech (design.md §13.4): speak an utterance/phrase from a given

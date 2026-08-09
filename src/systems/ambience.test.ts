@@ -249,6 +249,8 @@ class FakeFilter extends FakeNode {
   type = ''
   frequency = new FakeParam()
   Q = new FakeParam()
+  /** Peaking filters carry a gain in dB (the vowel formants, point 587). */
+  gain = new FakeParam()
 }
 class FakeOscillator extends FakeNode {
   type = ''
@@ -640,17 +642,107 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     balance.ambienceVolume = defaultVolume
   })
 
+  /** Walk a voice's chain (filters, however many) down to its envelope gain,
+   *  so the check assumes nothing about the vowel's filter count. */
+  const envelopeOf = (osc: FakeOscillator): FakeGain => {
+    let node: FakeNode = osc
+    while (!(node instanceof FakeGain)) {
+      const next = node.connected[0] as FakeNode | undefined
+      if (!next) throw new Error('the voice chain ends in no gain node')
+      node = next
+    }
+    return node
+  }
+
   it('is quieter from further away, and never louder than right beside the speaker', () => {
     ctx.currentTime = 120
     const peakOf = (distance: number) => {
       const voices = spoken(() => playSpeech(utterancePlan(utteranceOf('DIG'), distance, { volume: 1 })))
-      const gain = (voices[0].connected[0] as FakeFilter).connected[0] as FakeGain
-      return Math.max(...gain.gain.events.map((e) => e.value ?? 0))
+      return Math.max(...envelopeOf(voices[0]).gain.events.map((e) => e.value ?? 0))
     }
     const near = peakOf(0)
     const far = peakOf(6)
     expect(near).toBeGreaterThan(0)
     expect(far).toBeGreaterThan(0)
     expect(far).toBeLessThan(near)
+  })
+
+  // Point 577: the speech used to hang on the ambient bus, so "Übrige
+  // Ambiente-Lautstärke" — the slider the game's own advice tells the player to
+  // turn DOWN to hear the voices over the drums — multiplied every syllable
+  // away. The bug was invisible to every earlier check because the plan still
+  // reported a positive peak; only the BUS behind it was zero. These cases
+  // therefore assert the routing itself, on the node the voices really reach.
+  describe('the speech has its own bus, out of reach of "everything else" (point 577)', () => {
+    const defaultAmbient = balance.ambientVolume
+    const defaultSpeech = balance.communication.speechVolume
+
+    /** The bus a spoken syllable actually lands on. */
+    const speechBusOf = (voice: FakeOscillator): FakeGain => {
+      const bus = envelopeOf(voice).connected[0] as FakeGain | undefined
+      if (!bus) throw new Error('the voice envelope reaches no bus')
+      return bus
+    }
+    /** The bus a thunderclap — one of the ambient bed's own emitters — lands on. */
+    const ambientBus = (): FakeGain => {
+      const before = ctx.sources.length
+      playThunder(thunderDelaySeconds(3), 0.8)
+      const clap = ctx.sources.slice(before)[0]
+      const gain = (clap.connected[0] as FakeFilter).connected[0] as FakeGain
+      const bus = gain.connected[0] as FakeGain | undefined
+      if (!bus) throw new Error('the clap envelope reaches no bus')
+      return bus
+    }
+    const speak = () => {
+      const before = ctx.oscillators.length
+      playSpeech(utterancePlan(utteranceOf('DIG'), 0, { volume: 1 }))
+      return ctx.oscillators.slice(before)
+    }
+
+    afterEach(() => {
+      balance.ambientVolume = defaultAmbient
+      balance.communication.speechVolume = defaultSpeech
+      refreshAmbienceVolume()
+    })
+
+    it('does not route the syllables through the ambient bus at all', () => {
+      ctx.currentTime = 140
+      expect(speechBusOf(speak()[0])).not.toBe(ambientBus())
+    })
+
+    it('keeps speaking at a positive level with "everything else" turned to zero (the reported bug)', () => {
+      ctx.currentTime = 160
+      balance.ambientVolume = 0 // the user's own state in the F6 report
+      refreshAmbienceVolume()
+      const voices = speak()
+      expect(voices.length).toBeGreaterThan(0)
+      // The syllable is scheduled at a positive peak…
+      expect(Math.max(...envelopeOf(voices[0]).gain.events.map((e) => e.value ?? 0))).toBeGreaterThan(0)
+      // …and, unlike before, nothing behind it multiplies that away.
+      expect(speechBusOf(voices[0]).gain.value).toBeGreaterThan(0)
+      expect(ambientBus().gain.value).toBe(0) // the bed IS silent — that still works
+    })
+
+    it('silences the speech only through its OWN slider, and leaves the bed alone', () => {
+      ctx.currentTime = 180
+      balance.communication.speechVolume = 0
+      refreshAmbienceVolume()
+      expect(speechBusOf(speak()[0]).gain.value).toBe(0)
+      expect(ambientBus().gain.value).toBeGreaterThan(0)
+    })
+
+    it('follows the slider live — no restart of the engine to hear the change', () => {
+      ctx.currentTime = 200
+      balance.communication.speechVolume = 0.9
+      refreshAmbienceVolume()
+      expect(speechBusOf(speak()[0]).gain.value).toBeCloseTo(0.9, 10)
+    })
+
+    it('never lets a negative value invert the bus', () => {
+      ctx.currentTime = 220
+      balance.communication.speechVolume = -3
+      refreshAmbienceVolume()
+      expect(speechBusOf(speak()[0]).gain.value).toBe(0)
+    })
   })
 })

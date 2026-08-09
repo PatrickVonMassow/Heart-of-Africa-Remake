@@ -538,6 +538,16 @@ export function DebugMenu() {
       // How long the player's reading stands over the speaker's head (point 485).
       num(t.debug.speechLabelSeconds, balance.communication.labelSeconds,
         (v) => { balance.communication.labelSeconds = Math.max(0, v); bump() }, 0.2),
+      // The two pitches themselves (point 587): the low tone and the interval
+      // the high one sits above it — the only difference the language carries.
+      num(t.debug.speechPitch, balance.communication.speechPitchHz,
+        (v) => { balance.communication.speechPitchHz = Math.max(20, v); bump() }, 5),
+      num(t.debug.speechPitchInterval, balance.communication.speechPitchInterval,
+        (v) => { balance.communication.speechPitchInterval = Math.max(1, v); bump() }, 0.02),
+      // The speech's OWN level (point 577): its bus sits beside the ambient one,
+      // so this raises the syllables over the drums without touching them.
+      num(t.debug.speechVolume, balance.communication.speechVolume,
+        (v) => { balance.communication.speechVolume = Math.max(0, v); refreshAmbienceVolume(); bump() }, 0.1),
       // DEBUG VIEW (user 09.08.2026): the concept behind each utterance instead
       // of its syllables and the player's guess — and every speaker labelled,
       // not only the ones already heard. It answers "did that situation stage

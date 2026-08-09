@@ -188,6 +188,9 @@ describe('village speech (design.md §13.4)', () => {
       hearingRadius: 10,
       hearingFalloff: 24,
       labelSeconds: 2.6,
+      speechPitchHz: 140,
+      speechPitchInterval: 1.68,
+      speechVolume: 0.5,
     })
     // A five-syllable atom stays well under two seconds, so a seven-atom
     // message is heard in one go rather than sat through.
@@ -197,5 +200,33 @@ describe('village speech (design.md §13.4)', () => {
     expect(balance.communication.labelSeconds).toBeGreaterThan(
       balance.communication.syllableSeconds * 5,
     )
+  })
+
+  it('pitches both syllables inside one human voice, an interval apart that the ear cannot miss', () => {
+    const { speechPitchHz, speechPitchInterval } = balance.communication
+    // `ba` and `BA` must read as ONE speaker at two pitches, so both carriers
+    // stay in a spoken register — a tone below this hums, above it squeals.
+    expect(speechPitchHz).toBeGreaterThanOrEqual(80)
+    expect(speechPitchHz * speechPitchInterval).toBeLessThanOrEqual(400)
+    // The interval is what the whole language rests on: it must survive the
+    // drums beside it, so "merely different" is not enough — a minor sixth
+    // (1.6) is the floor, and the two must not cross an octave, where the ear
+    // hears the same note again (point 587).
+    expect(speechPitchInterval).toBeGreaterThanOrEqual(1.6)
+    expect(speechPitchInterval).toBeLessThan(2)
+  })
+
+  it('gives the speech its own audible level, and the three older sliders keep theirs (point 577)', () => {
+    // The syllables must be audible with NOTHING else configured — the whole
+    // communication PoC is learned from them.
+    expect(balance.communication.speechVolume).toBeGreaterThan(0)
+    // It is exactly the level the speech had while it still rode the ambient
+    // bus: the fix moved the ROUTING, not the mix. Pinned so a future edit that
+    // makes the speech louder has to say so.
+    expect(balance.communication.speechVolume).toBe(0.5)
+    // …and the three sliders that existed before are untouched (point 577 §3).
+    expect(balance.ambienceVolume).toBe(0.1)
+    expect(balance.ambientVolume).toBe(0.5)
+    expect(balance.footstepVolume).toBe(2)
   })
 })
