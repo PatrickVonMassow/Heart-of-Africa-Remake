@@ -23,8 +23,7 @@ Regel —, und zwar ab der ersten Formulierung, nicht erst beim zweiten Schaden.
 
 Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merksätze: „Jedes
 neue Feature bekommt einen Test" wird vergessen, „Etabliere einen Mechanismus, der das
-garantiert" nicht. Wo einer prinzipiell **nicht** möglich ist (etwa „sieht das für einen
-Menschen richtig aus?"), steht das dabei.
+garantiert" nicht. Wo einer prinzipiell **nicht** möglich ist, steht das dabei.
 
 Eine **Schätzung** wie *(Kosten ≈ 2x)* meint den Mehrverbrauch der betroffenen Arbeit,
 nicht des Projekts.
@@ -126,8 +125,9 @@ jede Änderung braucht die volle Batterie — sonst wird Testen umgangen. Bewäh
   Funktionen. Läuft in Sekunden, kann nie durch Browser-Timing flackern. Hierhin gehört
   alles, was ohne Browser prüfbar ist.
 - **Klein (bei Sichtbarem/Interaktion):** die schnelle Schicht + ein Kernsatz echter
-  Browser-/E2E-Tests — nur für das, was einen Browser wirklich braucht (Rendering, Layout,
-  Klick-Flows).
+  Browser-/E2E-Tests — nur für das, was einen Browser braucht (Rendering, Layout,
+  Klick-Flows). Gibt es mehrere Unterbauten, prüf auf dem der Nutzer, nicht auf dem
+  bequemeren Ersatzweg.
 - **Groß (vor jedem Release):** die volle Regression über alle Suiten und **alle
   Ziel-Backends/Geräte**, mehrfach flakefrei.
 
@@ -149,9 +149,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 ## Die häufigsten Fallstricke → und was hilft
 
-- **Grüner Test, falsches Bild.** Der Test ist grün, das Ergebnis trotzdem falsch — er
-  prüfte einen Hilfswert, einen unerreichbaren Zustand, einen geratenen Wert. Oder das
-  Beweisbild entstand, bevor die Szene fertig geladen war.
+- **Grüner Test, falsches Bild.** Der Test ist grün, das Ergebnis falsch — er prüfte
+  einen Hilfswert, einen unerreichbaren Zustand, einen geratenen Wert. Oder das
+  Beweisbild entstand vor der fertigen Szene.
   → *Prompt:* „Eine sichtbare Änderung gilt erst als fertig, wenn sie am **echten gerenderten
   Bild** unter einer erreichbaren Bedingung geprüft wurde — und ein Prüfbild entsteht erst, wenn
   die Darstellung fertig ist." *(≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen richtig aus?)*
@@ -167,11 +167,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   dich zweimal fest, wechsle das Modell."
 
 - **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende
-  Prüfung verschärfen, alles wird grün. Nur schlägt sie jetzt auch nicht mehr an,
-  wenn sie sollte: Ein Fehlalarm meldet sich selbst, ein ausgefallener nie.
+  Prüfung verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie
+  sollte. Ein Fehlalarm meldet sich selbst, ein ausgefallener nie.
   → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme
-  weg UND echte Treffer noch da. Die Fälle erfindet das **andere Modell**; es misst an der
-  Mechanik statt an Testnamen und prüft die **eingeräumten** Grenzen zuerst — eine zugegebene
+  weg UND echte Treffer noch da. Die Fälle erfindet das **andere Modell**, gemessen an der
+  Mechanik statt an Testnamen, die **eingeräumten** Grenzen zuerst — eine zugegebene
   Lücke wird geglaubt, eine verschwiegene gesucht." *(Kosten ≈ 1,3x.)*
 
 - **Der Mechanismus ist gebaut — und wird nie gefüttert.** Die Ausnahme ist entschieden, steht
@@ -404,4 +404,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: b5115e2253461a5417f194fccc21ac36fac0ca3f38cf687b17b070683d2a9aac -->
+<!-- GUIDE-FINGERPRINT: 30014f5c932295705f78ad7114dfe382839325a647c919ef5e0b4505206a616c -->
