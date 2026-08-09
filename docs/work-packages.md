@@ -79,9 +79,9 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 
 | Name | Id | What it is | Points |
 |---|---|---|---|
-| **Dorfleben** | A | Village life | 350, 351, 356, 357, 359, 360, 394 |
+| **Dorfleben** | A | Village life | 350, 351, 356, 357, 359, 360, 394, 578 |
 | **Wetter & Wasser** | B | Weather, ground and water surface | 314, 320, 321, 323, 348, 353, 354, 358, 384, 385 |
-| **Siedlungsgeometrie** | C | Settlement geometry | 299, 349, 352, 380, 415, 428 |
+| **Siedlungsgeometrie** | C | Settlement geometry | 299, 349, 352, 380, 415, 428, 581, 583 |
 | **Sonne & Himmel** | D | Sun and sky | 343, 344, 345, 346 |
 | **Monumente** | E | Monument sites | 315, 379, 391 |
 | **Tierverhalten** | F | Animal behaviour | 265, 269, 312, 362, 363, 364, 414, 565, 575 |
@@ -93,7 +93,7 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 | **Dokumentation** | L | Docs and knowledge transfer | 303, 333, 422, 555 — the rest landed 30.07.2026 (459) |
 | **Steuerung & Performance** | M | Controls and performance | 310, 342, 347 |
 | **Urlaubsfestigkeit** | N | Unattended operation for a fortnight — recovery from a failure at ANY moment, quota waiting, the boot path, the readiness check and the chaos drill that proves it | 442, 443, 444, 445, 446, 447, 448, 449, 450, 533, 562 |
-| **Kommunikation** | O | The communication PoC: the tonal language, who speaks it, where it is spoken, what the player may write down | 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488 (480 IS point 351 and 488 IS point 352, pulled forward — they close together) |
+| **Kommunikation** | O | The communication PoC: the tonal language, who speaks it, where it is spoken, what the player may write down | 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488 (480 IS point 351 and 488 IS point 352, pulled forward — they close together); and the PLAY-SESSION findings of 09.08.2026: 587, 577, 586, 580, 582, 588, 576, 585, 584, 579 |
 
 **Urlaubsfestigkeit** was cut on 30.07.2026 on the user's demand that the batch be
 worked for two weeks without them, surviving an outage of Claude, of their internet
@@ -131,6 +131,35 @@ what lets the wave's render points be merged under the both-backend rule at all.
 THIS PARAGRAPH IS THE QUEUE'S ORDER — when it disagreed with TASKS.md between the
 03. and the 04.08.2026, the queue kept feeding infrastructure while the point the
 user had put first sat at position 60 (that is what the flat list is read as).
+
+**THE 09.08.2026 PLAY SESSION OUTRANKS EVERYTHING, AND ITS MERGES ARE BATCHED**
+(user 09.08.2026). The user played the deployed build and reported thirteen defects
+and two extensions, almost all of them in the communication PoC. They lead the queue,
+ahead of every other bundle including the infrastructure above — his words: "vor allem
+anderen in der Queue".
+
+He also asked for them to be worked and TESTED TOGETHER rather than one by one, and
+that is taken the way this document already settled on 30.07.2026, NOT by putting the
+bundle on one branch (point 471's rule stands: one branch per point) and NOT by
+grouping the queue (point 472 took that back out the same evening). It is taken at the
+MERGE, which is where the only real saving of the scheme sits: the finished per-point
+branches of a package are merged TOGETHER and ONE both-backend regression runs over
+the merged result. Five acceptance runs instead of thirteen, without reopening either
+decision.
+
+The packages, cut by what ONE acceptance run can judge — re-cut them as further
+reports arrive rather than letting a package grow past its own acceptance:
+
+| Package | Points | The one acceptance |
+|---|---|---|
+| Ton | 577, 587 | one listening pass |
+| Lehrtext erreicht den Spieler | 580, 582, 586, 588 | one live session in the village |
+| Figuren | 576, 578 | one picture check |
+| Ufer & Welt | 583, 584, 585, 581 | one walk along the bank and the boundary |
+| Journal | 579 | HUD only, no scene |
+
+Ton leads: while the syllables are a squawk and the speech is muted by the wrong
+slider, nothing else about the language can be judged at all.
 
 Then **Urlaubsfestigkeit** (30.07.2026): the user must be able to leave for two
 weeks and rely on the batch being worked without them, so the layer that keeps it
