@@ -3640,6 +3640,118 @@ there exactly once; a new point joins a bundle when appended.
   Criticality: HIGH — an unnoticed breach means a rule is believed to be in force while it
   is not, which is worse than having no rule: nobody looks again.
 
+The eight points below are the third deliverable of point 572 — the throughput analysis
+of 09.08.2026 — which was ticked without them. `docs/analysis_de/durchsatz-analyse.md` §6
+states them in their final form and ranks them; they are appended here in that order. The
+three further measures of that section are NOT points: measure 4 folds into 569, measure
+10 into 553 and measure 11 into 521, each recorded in the point it belongs to, because a
+second owner for one defect is how two half-fixes get built.
+
+- [ ] 592. STOP PAYING FOR THE WAIT (point 572's measure 1, the largest measured lever).
+  A long-running command is AWAITED, not polled. The verify wrapper and every background
+  run report their completion through the harness notification or through a single
+  blocking call with a timeout; where a poll is genuinely unavoidable, the FIRST wait is
+  0.9 × the suite's measured median runtime (`docs/picture-check-cost.md` §1), and after
+  five polls the run is either awaited blocking or treated as hung. The idle marker the
+  no-idle-stop guard reads is set by a HOOK, not by a model turn — `echo idle` disappears
+  from the transcripts and the guard accepts the hook's marker exactly as it accepts
+  today's turn. The verify wrapper COUNTS the polls of a run and prints the count, so the
+  rule is visible rather than remembered.
+  MEASURED TARGET: polling is 10.9 % of the weighted spend and bare idling another 3.6 %
+  (2857 + 1189 responses, 09.08.2026); the longest unbroken poll chain in the window was
+  437 responses ≈ 11.5 M weighted. Re-measure after the change with
+  `node scripts/measure-task-cost.mjs`.
+  Criticality: HIGH — it touches the idle guard, and a guard that goes blind stops
+  catching an idle stop, so the other model's mechanism review applies.
+
+- [ ] 593. ONE TURN, SEVERAL INDEPENDENT CALLS (point 572's measure 2). The delegation
+  prompt and the batch prompt carry one binding paragraph: independent tool calls go into
+  ONE turn — several reads, several greps, `build` and `lint` — while anything whose input
+  depends on another call's output stays sequential, and a bundled shell chain never hides
+  its failing step.
+  MEASURED BASELINE: 5.0 % of responses issue more than one call, search/read alone is
+  25.1 % of the weighted spend, and one saved response is worth ~22.9k weighted AND ~24 s.
+  The point is complete when the share of multi-call responses has been RE-MEASURED after
+  the change. Enforcement is by prompt and measurement, not by a guard — "could have been
+  bundled" is not machine-decidable.
+  Criticality: low — no mechanism, no guard; the only risk is bundling dependent calls,
+  which the paragraph forbids explicitly.
+
+- [ ] 594. THE LANDING COMMAND (point 572's measure 3). `scripts/land-point.mjs <N>` runs
+  the landing chain deterministically — merge, fast gate, tick, archive move, board
+  publish, worktree cleanup — and prints ONE structured summary with a verdict per step.
+  It fails LOUD at the first red step and never continues past it, so no half state is
+  left behind, and every step it performs is one a guard already governs.
+  MEASURED TARGET: bookkeeping is 26.0 % of the weighted spend and 37.5 % of the machine
+  hours; the chain runs as 8–12 main-session turns today at a median context of 164k, and
+  the main session spends 62.3 % of its own cost on bookkeeping.
+  Criticality: medium — it bundles guard-adjacent steps, and a swallowed intermediate
+  error would advance state nobody verified, so the mechanism review is required.
+
+- [ ] 595. THE VERIFICATION LADDER (point 572's measure 5). While a render point is still
+  being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
+  full proof — both backends where they can differ, LARGE where the change warrants it —
+  runs exactly ONCE, on the state that is merged. The expensive browser suites abort at
+  the FIRST failure during that iteration (a red run is never credited anyway) and run to
+  completion only for the final proof. The rule is a brief building block for render
+  points, so it is applied rather than remembered.
+  MEASURED TARGET: verification is 47.0 % of the weighted spend and 37.4 % of the machine
+  hours, the ten costliest points hold 64.4 % of all point-assigned verification tokens,
+  and eight of ten recorded `enrichments` runs failed while still writing all 37 frames at
+  951–1029 s each.
+  Criticality: medium — it reorders the proof but must not dilute it; the both-backend
+  picture proof stays exactly as binding as it is today.
+
+- [ ] 596. THE TAIL IS VISIBLE WHILE IT RUNS (point 572's measure 6). A point's running
+  cost is measurable DURING the point, not only after it: a hook reports when a branch
+  passes three times the median (≈ 17 M weighted), and that report is a DECISION point —
+  re-cut, re-staff, or continue deliberately — never an automatic abort. In the same
+  mechanism, an agent that has run the same browser suite red three times STOPS, writes a
+  diagnosis of what is red and what was tried, and escalates instead of looping.
+  MEASURED TARGET: 10 of 64 points carry 48.8 % of the point-assigned cost, the costliest
+  single point 15.8 % of it with 89.0 % of that in verification.
+  Criticality: medium — a cap that let a red state pass as green would be worse than the
+  cost it saves, so the escalation path is the mechanism and the abort is not.
+
+- [ ] 597. LARGE TOOL OUTPUT NEVER ENTERS THE CONTEXT WHOLE (point 572's measure 7). The
+  bounded-output discipline `scripts/verify/run-logged.mjs` already applies to verify runs
+  extends to the other big producers: `git diff` (`--stat` first), `grep` (`-c` or a head
+  bound), file reads (`offset`/`limit` instead of a whole file), `npm ls`, `gh run view`.
+  ERROR OUTPUT STAYS UNCUT — every failing test keeps its name.
+  MEASURED TARGET: a 10k output entering a point's context at response 20 is re-read by
+  its remaining ~218 responses at 218k weighted, ten responses' worth; the trade pays up
+  to a follow-up-query rate of ~85 %.
+  Criticality: low — the one real risk is cutting an error message, which the rule
+  excludes.
+
+- [ ] 598. THE BRIEF ORIENTS IN THE CODE, NOT ONLY IN THE SPEC (point 572's measure 8).
+  The delegation brief carries a GENERATED orientation: the paths the specification itself
+  names, and a per-directory line of responsibility derived from the tree and its file
+  headers. It is marked as a HINT, never as an instruction ("the specification names these
+  paths", not "change these files"), and it is generated on every run so it cannot go
+  stale.
+  MEASURED TARGET: search/read is 25.2 % of the weighted spend and the first responses of
+  a delegated agent are almost always search; five saved responses per point is ~2 % of a
+  median point.
+  Criticality: low — a wrong list would misdirect, which generation-from-the-tree and the
+  hint framing address.
+
+- [ ] 599. MEASURE WHAT THE CACHE AND THE CALENDAR HIDE (point 572's measure 9). Two
+  measurements the throughput analysis needed and did not have, delivered together because
+  both are pure readings of data we already keep.
+  (a) CACHE-PREFIX HYGIENE: plot `cache_creation` against `cache_read` per response over a
+      session and name the spikes — a high write share in the MIDDLE of a session points
+      at a per-turn change early in the prompt, a spike after a gap points at TTL expiry
+      (a 42-min run without intervening turns costs ~0.23 M weighted on the next turn).
+  (b) CALENDAR DECOMPOSITION: split the git span first-branch-commit → merge into
+      building, verifying and waiting-for-the-merge, so a statement about wall-clock stops
+      being a guess.
+  Both readings join `scripts/measure-task-cost.mjs`, and that tool becomes a RECORDED
+  step of the closing cycle (`CLOSING_STEPS`), so every structural measure gets its
+  before/after instead of a feeling.
+  Criticality: low — pure measurement; it changes no behaviour, and it is the precondition
+  for judging the remaining structural levers.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
@@ -4602,6 +4714,16 @@ Build order, chosen so no two parallel agents own the same file:
   enrichments suite green on BOTH backends on a machine that is deliberately busy;
   for the tag frame, a run whose standpoint misses the pair FAILS instead of
   writing the frame.
+  FOLDED IN FROM POINT 572 (measure 11, "the capture is deterministic, or the attempt is
+  abandoned"): the settled camera is this point's own subject, so the rest of that measure
+  is delivered here rather than by a second owner of the capture path. Beyond the poll,
+  the PRNG is seeded and the timestep fixed exactly as in the F8 benchmark, and
+  `node scripts/picture-stability.mjs` is RE-MEASURED afterwards — point 375's shutter
+  closed part of this and the stability has not been re-measured since. The extension
+  carries its own ABORT criterion: if the noise floor does not fall below the smallest
+  real defect (0.75 %), the investment is written off and recorded as such in
+  `docs/picture-check-levers.md`, which is a result, not a failure. Nothing diff-based is
+  enabled by this point itself.
 
 - [ ] 522. THE BURNING GRASS DOES NOT BURN (observed 05.08.2026 while closing point
   323). `verification/131-burning-grass.png` is the frame that proves the §19.9
@@ -4857,6 +4979,19 @@ Build order, chosen so no two parallel agents own the same file:
   transcript ALLOWS the stop (fail-open, as every guard here). Live: one point actually
   handed over mid-way and finished by the successor from the handoff alone.
   MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): this changes a guard.
+  FOLDED IN FROM POINT 572 (measure 10, "the window boundary inside a point"): that
+  proposal is this lever, differing only in the cut TRIGGER and in demanding a pilot, so
+  it is decided HERE rather than appended as a second owner. THE TRIGGER QUESTION: cut at
+  every green, pushed commit, or at the measured context ceiling this point already
+  defines? Whichever is chosen, it is PILOTED on ONE point and MEASURED against the median
+  (`measure-task-cost.mjs --tasks`) before any rollout, and the rollout is a separate
+  decision taken on that measurement. ACCEPTANCE: a session after a cut continues WITHOUT
+  ASKING A QUESTION — if that does not hold, the pilot is reported as FAILED rather than
+  tuned. Measured target: context per response is a median of 190k and re-read context is
+  75.8 % of the weighted spend; a cut every ~60 responses would put the mean context near
+  73k. This is the one measure on the list that can silently lower work quality — what an
+  agent has learned and not written down is lost at the cut — which is why it is piloted
+  and measured rather than adopted.
   Criticality: high — this is the batch's dominant running cost, and a lever that reports
   a saving it did not make is worse than none: it retires the question. The measurement is
   therefore part of the delivery, not a follow-up.
@@ -5207,6 +5342,16 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: `npm run test:unit` green in a freshly created worktree AND on `main`, both
   proven by running it in both; a Vitest case pins the resolution so it cannot silently
   return to `process.cwd()`.
+  FOLDED IN FROM POINT 572 (measure 4, "the worktree is gate-ready in seconds"): this
+  point owns the oxlint false red and fixes its RESOLUTION; the missing DEPENDENCIES are
+  delivered here too rather than by a second owner of the same red. A fresh agent worktree
+  carries its dependencies without a per-worktree install — the bootstrap links the main
+  checkout's `node_modules` and VERIFIES the lockfile hash matches, installing for real
+  when it does not — so the delegation brief no longer tells an agent to set the link by
+  hand and the false red of a missing `node_modules/.bin/oxlint` cannot occur at all.
+  Measured target: 1–3 min per agent over ~64 points per window, plus the turns an agent
+  spends today classifying the false red. A wrong lockfile state would test against the
+  wrong tree, which the hash check prevents.
   Criticality: medium — it hides no product defect, but it degrades the signal of the one
   gate every delegated point runs, which is how a real red gets waved through.
 
