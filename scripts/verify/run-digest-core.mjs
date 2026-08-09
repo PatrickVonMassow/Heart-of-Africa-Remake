@@ -44,8 +44,12 @@ export const DEFAULTS = Object.freeze({
  * the scene never finished drawing` was read as a failing suite called "frame".
  * A single space is accepted only for a name long enough to have consumed the
  * padding, so a future 12-character suite name cannot silently fall out.
+ *
+ * `LANE` belongs here for the same reason `SKIP` does (point 571): it says a
+ * suite ran on the OTHER backend from the rest of the pass, and a digest that
+ * drops it reports a WebGPU run that quietly contained a WebGL 2 one.
  */
-const RESULT_HEAD = /^(PASS|FAIL|SKIP)\s{2,}(\S+)(\s*)/
+const RESULT_HEAD = /^(PASS|FAIL|SKIP|LANE)\s{2,}(\S+)(\s*)/
 
 /** The unit a runner verdict line is about, or null if this is not one. */
 export function resultName(line) {

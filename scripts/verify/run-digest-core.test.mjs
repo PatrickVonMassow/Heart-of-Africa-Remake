@@ -80,6 +80,9 @@ describe('resultName', () => {
     expect(resultName('PASS  docs         7 pass, 0 fail, 0 console-errors (exit 0)')).toBe('docs')
     expect(resultName('FAIL  unit         (vitest jsdom, ? tests, exit 1)')).toBe('unit')
     expect(resultName('SKIP  touch        (WebGL2-only — not run on WebGPU)')).toBe('touch')
+    // A suite ROUTED to the other backend (point 571) is as much a fact about
+    // what the run covered as a skip — the digest must not drop it.
+    expect(resultName('LANE  voice        (WebGL2-only — run on WebGL 2 inside this webgpu gate)')).toBe('voice')
     expect(resultName('PASS  crossbrowser  4 pass, 0 fail, 2 skip')).toBe('crossbrowser')
   })
 
@@ -102,6 +105,7 @@ describe('classifyLine', () => {
     expect(classifyLine('PASS  world        12 pass')).toBe('result')
     expect(classifyLine('FAIL  unit         (exit 1)')).toBe('result')
     expect(classifyLine('SKIP  touch        (WebGL2-only)')).toBe('result')
+    expect(classifyLine('LANE  voice        (WebGL2-only — run on WebGL 2)')).toBe('result')
     expect(classifyLine('# lint (oxlint)…')).toBe('heading')
     expect(classifyLine('===== LARGE regression — backend 1/2: WebGL 2 =====')).toBe('banner')
     expect(classifyLine('ALL GREEN — 18 suites run')).toBe('final')

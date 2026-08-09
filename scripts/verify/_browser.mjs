@@ -16,11 +16,12 @@ import { applySeedRoute } from './verify-seed.mjs'
 
 // Which backend the verify run targets. 'webgpu' = system Chrome, headless=new (the
 // player's primary backend); 'webgl' = the bundled Chromium with ANGLE (the WebGL2
-// fallback the game still ships). During the lane's roll-in the default stays 'webgl'
-// (the historical behaviour, so any un-migrated normal run is byte-for-byte
-// unchanged); it flips to 'webgpu' only once every suite is proven green AND
-// flake-free on WebGPU (point 184's condition b), per the user's tier design.
-export const VERIFY_GL = (process.env.VERIFY_GL ?? 'webgl').toLowerCase() === 'webgpu' ? 'webgpu' : 'webgl'
+// fallback the game still ships). The DEFAULT is 'webgpu' since point 571 (user
+// 09.08.2026): the everyday lane is the player's backend, WebGL 2 is the regression
+// lane every LARGE run covers. Mirrored by `selectBackend`/`DEFAULT_BACKEND` in
+// ./tiers.mjs — change both together. run-all.mjs pins VERIFY_GL per suite, so the
+// default here governs a suite script invoked directly.
+export const VERIFY_GL = (process.env.VERIFY_GL ?? 'webgpu').toLowerCase() === 'webgpu' ? 'webgpu' : 'webgl'
 
 /** Launch the browser for the requested backend. WebGPU needs a SYSTEM Chrome/Chromium
  *  — Playwright's bundled Chromium fails requestDevice headless; the system browser with

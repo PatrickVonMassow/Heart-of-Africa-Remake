@@ -190,22 +190,23 @@ The browser suites split into two selectable tiers, so a change can be gated at
 the right cost (the regression-tiers rule: per task, pick Vitest-only /
 Vitest+SMALL / Vitest+LARGE; the **closing cycle ALWAYS runs LARGE**):
 
-| Tier | Command | Browser suites | Preview |
-|------|---------|----------------|---------|
-| **SMALL** (everyday gate) | `npm run test:small` | `docs, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no |
-| **LARGE** (default) | `npm test` / `npm run test:large` | **all 18** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run), `report` (the F6 bug-report archive, whose PNG member is decoded and checked for real scene content) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
+| Tier | Command | Backend | Browser suites | Preview |
+|------|---------|---------|----------------|---------|
+| **SMALL** (everyday gate) | `npm run test:small` | WebGPU | `docs, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no |
+| **LARGE** (default) | `npm test` / `npm run test:large` | WebGL 2, then WebGPU | **all 18** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run), `report` (the F6 bug-report archive, whose PNG member is decoded and checked for real scene content) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
 
 Both tiers run the same Vitest + build + lint preflight. SMALL is a strict subset
 of `DEV_SUITES`; keep it that way. New heavy or flaky browser scenarios join
 LARGE only (they must not slow or flake the everyday gate).
 
 The suite→tier→backend map itself is a **pure module**: `scripts/verify/tiers.mjs`
-holds `DEV_SUITES` / `SMALL_SUITES` / `WEBGL_ONLY_SUITES` and the arg, suite and
-backend-plan functions `run-all.mjs` drives, and `scripts/verify/tiers.test.mjs`
-pins them in the Vitest layer (the subset rule, the WebGPU skip, and that a bare
-LARGE run plans WebGL 2 → WebGPU while a pinned `VERIFY_GL` / SMALL / a bare suite
-filter stays single-backend). Change the map in `tiers.mjs` and this README
-together — never only in the runner.
+holds `DEV_SUITES` / `SMALL_SUITES` / `WEBGL_ONLY_SUITES` / `DEFAULT_BACKEND` and
+the arg, suite, lane and backend-plan functions `run-all.mjs` drives, and
+`scripts/verify/tiers.test.mjs` pins them in the Vitest layer (the subset rule,
+the WebGPU default, the touch/voice lane, and that a bare LARGE run plans
+WebGL 2 → WebGPU while a pinned `VERIFY_GL` / SMALL / a bare suite filter stays
+single-backend). Change the map in `tiers.mjs` and this README together — never
+only in the runner.
 
 `scripts/verify/textureLeak.mjs` is the second such pure module: the verdict and
 the per-kind survivor breakdown of the TRAA-toggle render-target gate in
@@ -909,7 +910,7 @@ Two suites carry no assertion, each for a structural reason:
 | Suite | Why no `assertBackend` |
 |---|---|
 | `docs` | Pure Node doc-structure check — it never opens a browser. |
-| `preview` | Runs the PRODUCTION build, where `window.__renderer` is dev-only and does not exist. It also runs on the WebGL 2 lane only (the WebGPU pass skips the preview). |
+| `preview` | Runs the PRODUCTION build, where `window.__renderer` is dev-only and does not exist. In a LARGE run it rides the WebGL 2 pass only (the WebGPU pass skips the preview). |
 
 A full LARGE run (`npm test` / `npm run test:large`, no `VERIFY_GL` pinned) now
 covers BOTH backends automatically (point 204b): run-all runs the whole LARGE on
@@ -919,6 +920,45 @@ preflight/preview skipped (`RVA_SKIP_PREFLIGHT`). An explicit `VERIFY_GL=…` (t
 render-verify gate's per-backend clear command), the SMALL tier, or a bare
 single-suite filter stays a single-backend pass. The WebGL 2 pass runs first; a
 failure there stops before WebGPU.
+
+### Which lane runs WITHOUT being asked (point 571, user 09.08.2026)
+
+**The everyday lane is WebGPU; WebGL 2 is the regression lane.** With no
+`VERIFY_GL` pinned, `npm run test:small` and a bare suite filter
+(`npm test -- polish`) come up on WebGPU — the PLAYER's backend. WebGL 2 is what
+every LARGE run covers, and LARGE is not rare: it is mandatory on a scene core,
+at roughly every fourth point as a collective gate, and before every closing.
+
+The evidence for the direction: the work order records **no** defect that showed
+on WebGL 2 alone. Every one-backend defect ran the other way — point 334 (the
+TRAA render-target leak, WebGPU only, while the same suite was 39/39 green on
+WebGL 2), point 506 (the goat-stance check, red in both WebGPU runs, green on
+WebGL 2) and point 210, where a coast fix read "done" on WebGL 2 while the WebGPU
+picture was still stepped. Cost does not argue against it either: measured
+09.08.2026 on this host, `polish` took 14.5 / 14.2 min on WebGL 2 and 13.1 /
+14.4 min on WebGPU — the software WebGPU lane is not the slower one.
+
+Two things the swap deliberately does **not** change:
+
+- **`touch` and `voice` keep their WebGL 2 lane, inside the everyday gate.**
+  Headless WebGPU drives neither the CDP touch events nor the TTS speak state, so
+  they are **routed** to WebGL 2 (`laneFor` in `tiers.mjs`; run-all pins
+  `VERIFY_GL` per suite) rather than dropped. `voice` therefore stays in the SMALL
+  gate exactly as before, and `npm test -- touch` runs the suite instead of
+  resolving to nothing. They are SKIPPED in one place only: the WebGPU pass of a
+  both-backends LARGE run, whose companion WebGL 2 pass already ran them
+  (`RVA_WEBGL_COVERED`) — logged as a `SKIP` line, never a silent gap. A routed
+  suite prints a `LANE` line for the same reason.
+- **`render-verify-guard` still demands BOTH pictures.** A change on a
+  backend-sensitive path (`isBackendSensitivePath` in
+  `scripts/render-verify-core.mjs`) is cleared only by a recorded run per backend,
+  as before. What this point changed is which lane runs *without being asked*, not
+  what a render merge must prove.
+
+**The residual, stated rather than assumed away:** a regression that is visible
+**only** on WebGL 2 now surfaces at the next LARGE run instead of at the next
+point. That is the accepted price, and the evidence above — no such defect on
+record, ever — is why it is acceptable.
 
 Per-backend commands (what the render-verify gate uses to clear a GUI change on
 both backends):
@@ -1162,7 +1202,9 @@ selects for `VERIFY_GL=webgpu`); Playwright's *bundled* Chromium has no WebGPU
 adapter and silently falls back, which is exactly what `assertBackend` now makes
 loud. Two suites stay WebGL2-only (`touch`, `voice`): headless WebGPU under
 system Chrome drives neither the CDP touch events nor the TTS speak state, and
-both were verified to render correctly on the WebGL 2 path.
+both were verified to render correctly on the WebGL 2 path. They are ROUTED to
+that lane wherever a run picks them (point 571 above), so making WebGPU the
+everyday lane did not take them out of the everyday gate.
 
 Two documented artifacts of the WebGL 2 fallback path (not real-hardware bugs):
 

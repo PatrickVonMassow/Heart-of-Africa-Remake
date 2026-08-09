@@ -27,11 +27,27 @@ export const SMALL_SUITES = ['docs', 'i18n', 'flow', 'health', 'events', 'collis
 /**
  * WebGL2-ONLY suites (user decision 20.07.2026): headless WebGPU under system
  * Chrome can drive neither touch's CDP touch events nor voice's TTS speak
- * state, and BOTH were verified to render correctly on the WebGL 2 path — so a
- * WebGPU pass SKIPS them (logged, never a silent gap) instead of false-failing
- * on a harness limitation. Everything else runs on the selected backend.
+ * state, and BOTH were verified to render correctly on the WebGL 2 path — so
+ * they are never launched on WebGPU, and never false-fail on a harness
+ * limitation. Everything else runs on the selected backend.
+ *
+ * WHERE they run changed with the lane swap (point 571): they are ROUTED to
+ * WebGL 2 (`laneFor`) wherever a run picks them, so `voice` stays inside the
+ * everyday SMALL gate rather than dropping out of it when that gate moved to
+ * WebGPU. They are SKIPPED only where a companion WebGL 2 pass in the SAME
+ * command already ran them — the second pass of a both-backends LARGE run.
  */
 export const WEBGL_ONLY_SUITES = ['touch', 'voice']
+
+/**
+ * The backend an unpinned run uses (point 571, user 09.08.2026). WebGPU is the
+ * PLAYER's backend, and every one-backend defect on record showed there while
+ * WebGL 2 stayed green (points 210/334/506) — never the other way round. So the
+ * everyday lane (the SMALL tier, a bare suite filter) is WebGPU, and WebGL 2 is
+ * the REGRESSION lane, run by every LARGE. Measured on this host, WebGPU is not
+ * the slower lane, so the swap costs no run time.
+ */
+export const DEFAULT_BACKEND = 'webgpu'
 
 /**
  * Suites that need NO dev server: pure Node checks that read the checkout
@@ -46,9 +62,23 @@ export function needsDevServer(suites) {
   return (suites ?? []).some((s) => !SERVERLESS_SUITES.includes(s))
 }
 
-/** The renderer backend a VERIFY_GL value selects (mirrored from _browser.mjs). */
+/** The renderer backend a VERIFY_GL value selects (mirrored from _browser.mjs).
+ *  UNSET means the everyday lane, DEFAULT_BACKEND; any other value than 'webgpu'
+ *  (including an empty string, which a shell writes for `VERIFY_GL=`) is the
+ *  WebGL 2 regression lane, so a pinned value is never quietly upgraded. */
 export function selectBackend(verifyGl) {
-  return String(verifyGl ?? 'webgl').toLowerCase() === 'webgpu' ? 'webgpu' : 'webgl'
+  return String(verifyGl ?? DEFAULT_BACKEND).toLowerCase() === 'webgpu' ? 'webgpu' : 'webgl'
+}
+
+/**
+ * The backend ONE suite runs on inside a pass on `backend` (point 571). The
+ * WebGL2-only suites are routed to WebGL 2 instead of being dropped, so making
+ * WebGPU the everyday lane cannot silently take `voice` out of the SMALL gate.
+ * run-all.mjs sets VERIFY_GL per suite from this, so each suite's run record
+ * names the backend it really opened.
+ */
+export function laneFor(suite, backend) {
+  return WEBGL_ONLY_SUITES.includes(suite) ? 'webgl' : backend
 }
 
 /**
@@ -86,20 +116,27 @@ export function parseArgs(argv) {
   }
 }
 
-/**
- * The suites this invocation runs on `backend`, in run order: the tier's set
- * (or the explicit filter, intersected with the known suites), minus the
- * WebGL2-only ones on a WebGPU pass.
- */
-export function suitesFor({ tier, filter = [], backend = 'webgl' }) {
-  const chosen = filter.length ? DEV_SUITES.filter((s) => filter.includes(s)) : tier === 'small' ? SMALL_SUITES : DEV_SUITES
-  return chosen.filter((s) => !(backend === 'webgpu' && WEBGL_ONLY_SUITES.includes(s)))
+/** The tier's set, or the explicit filter intersected with the known suites. */
+function chosenSuites(tier, filter) {
+  return filter.length ? DEV_SUITES.filter((s) => filter.includes(s)) : tier === 'small' ? SMALL_SUITES : DEV_SUITES
 }
 
-/** The suites `backend` drops from this invocation (logged as an explicit SKIP). */
-export function skippedSuites({ tier, filter = [], backend = 'webgl' }) {
-  const chosen = filter.length ? DEV_SUITES.filter((s) => filter.includes(s)) : tier === 'small' ? SMALL_SUITES : DEV_SUITES
-  return chosen.filter((s) => backend === 'webgpu' && WEBGL_ONLY_SUITES.includes(s))
+/**
+ * The suites this invocation runs, in run order. `webglOnlyCovered` says a
+ * companion WebGL 2 pass in the SAME command already ran the WebGL2-only suites
+ * — true only for the WebGPU pass of a both-backends LARGE run, where running
+ * them again would just repeat that pass. Everywhere else they stay in the set
+ * and `laneFor` puts them on WebGL 2.
+ */
+export function suitesFor({ tier, filter = [], backend = DEFAULT_BACKEND, webglOnlyCovered = false }) {
+  const drop = backend === 'webgpu' && webglOnlyCovered
+  return chosenSuites(tier, filter).filter((s) => !(drop && WEBGL_ONLY_SUITES.includes(s)))
+}
+
+/** The suites this invocation drops (logged as an explicit SKIP, never a silent gap). */
+export function skippedSuites({ tier, filter = [], backend = DEFAULT_BACKEND, webglOnlyCovered = false }) {
+  const drop = backend === 'webgpu' && webglOnlyCovered
+  return chosenSuites(tier, filter).filter((s) => drop && WEBGL_ONLY_SUITES.includes(s))
 }
 
 /**
@@ -108,14 +145,18 @@ export function skippedSuites({ tier, filter = [], backend = 'webgl' }) {
  * twice: the full LARGE on WebGL 2 (preflight + preview), then the render
  * suites on WebGPU (the backend-agnostic build/lint/unit preflight and the prod
  * preview were already proven, so they are skipped). A pinned VERIFY_GL, the
- * SMALL tier and a bare single-suite filter each stay a single-backend pass.
+ * SMALL tier and a bare single-suite filter each stay a single-backend pass —
+ * on the everyday lane, DEFAULT_BACKEND, unless VERIFY_GL says otherwise.
+ *
+ * `webglOnlyCovered` marks the pass whose companion already ran touch/voice, so
+ * only that one drops them (see suitesFor).
  *
  * Returns [] when this process should just run itself on `selectBackend(verifyGl)`.
  */
 export function planBackends({ isLargeEquivalent, verifyGl, ranBoth = false }) {
   if (!isLargeEquivalent || verifyGl !== undefined || ranBoth) return []
   return [
-    { backend: 'webgl', skipPreflight: false },
-    { backend: 'webgpu', skipPreflight: true },
+    { backend: 'webgl', skipPreflight: false, webglOnlyCovered: false },
+    { backend: 'webgpu', skipPreflight: true, webglOnlyCovered: true },
   ]
 }
