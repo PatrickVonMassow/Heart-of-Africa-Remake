@@ -162,9 +162,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   im Entwicklungsmodus laut meckern — jeder Testlauf wird so zum Detektor."
 
 - **Angeblich behoben, aber nicht.** Der Fix wird als fertig gemeldet, das Symptom bleibt.
-  → *Prompt:* „Ein Fix zählt erst als fertig, wenn das **Symptom am Ort des Symptoms** als
-  behoben gezeigt wurde **und** derselbe Versuch am **alten Stand** noch hindurchgeht. Beißt du
-  dich zweimal fest, wechsle das Modell."
+  → *Prompt:* „Ein Fix zählt erst als fertig, wenn das **Symptom am Ort des Symptoms** als behoben
+  gezeigt wurde **und** derselbe Versuch am **alten Stand** noch hindurchgeht. Beißt du dich
+  zweimal fest, wechsle das Modell."
 
 - **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende
   Prüfung verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie
@@ -174,10 +174,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Mechanik statt an Testnamen, die **eingeräumten** Grenzen zuerst — eine zugegebene
   Lücke wird geglaubt, eine verschwiegene gesucht." *(Kosten ≈ 1,3x.)*
 
-- **Der Mechanismus ist gebaut — und wird nie gefüttert.** Die Ausnahme ist entschieden, steht
-  aber im Fließtext statt in der Datei, die das Werkzeug liest. Nichts bricht — es geht nur nie weiter.
-  → *Prompt:* „Eine Zuordnung oder Ausnahme trägst du **im selben Zug** dort ein, wo der
-  Mechanismus sie liest. Und wenn etwas ‚wartet': **worauf genau**, und stimmt das noch?"
+- **Gebaut — und nie in Betrieb genommen.** Die Ausnahme ist entschieden, steht aber im Fließtext
+  statt in der Datei, die das Werkzeug liest. Oder die Verbesserung ist getestet und dokumentiert —
+  nur führt nichts jemanden dorthin. Kein Test schlägt an: Was niemand kennt, verletzt nichts.
+  → *Prompt:* „Eine Ausnahme trägst du **im selben Zug** dort ein, wo der Mechanismus sie liest;
+  bei einer Fähigkeit die Stelle, an der jemand danach greift, und **woran** man ihre Benutzung
+  erkennt. Und wenn etwas ‚wartet': **worauf genau**?"
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
@@ -344,29 +346,18 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   dort; und wer auf einen fremden Dienst wartet, gibt beim Aufgeben das **Angefangene zurück**, sonst
   sperrt er alle Nachfolger."
 
-- **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er
-  sitzt — Netz, Rechte, Umgebung —, verliert mit dem Fehlschlag die nächste Reparatur mit.
-  Am schlimmsten bei Werkzeugen, die erst abreißen und dann neu aufbauen.
+- **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er sitzt
+  — Netz, Rechte, Umgebung —, verliert mit dem Fehlschlag die nächste Reparatur mit.
   → *Prompt:* „Bevor du deine eigene Umgebung änderst: Gibt es eine **kleinere Handlung**,
   die nur **ergänzt**? Sonst bau sie. Und lass jeden Neuaufbau nach **offen** scheitern —
   ein zu offener Stand ist reparierbar, ein zugesperrter nicht."
 
 - **Verschlucken sieht aus wie Erfolg — und ein Werkzeug, das nie startete, wie ein strenges.**
-  Ein Fehlschlag, der innen zum Ersatzwert wird, läuft als Lüge weiter — am besten verborgen bei
-  Fehlern, die von der **Menge** echter Daten abhängen. Und ein nie gestarteter Prozess liefert den
-  Fehlercode eines korrekten Ablehnens.
+  Ein Fehlschlag, der innen zum Ersatzwert wird, läuft als Lüge weiter. Und ein nie gestarteter
+  Prozess liefert den Fehlercode eines korrekten Ablehnens.
   → *Prompt:* „Ein Ersatzwert im `catch` darf nur verschluckt werden, wenn er zu **weniger** Aktion
   führt. Lass **eine** Prüfung gegen den **echten Bestand** laufen — zeig, dass **gelesen** wurde.
   ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
-
-- **Gebaut, aber niemandem in den Weg gelegt.** Eine Verbesserung existiert, ist getestet
-  und steht in einer Anleitung — und wird trotzdem nie benutzt, weil keine Aufgabenstellung,
-  keine Regel und kein Vorgabewert jemanden dorthin führt. Kein Test schlägt an: Eine
-  Fähigkeit, von der niemand erfährt, verletzt nichts.
-  → *Prompt:* „Wenn du eine Fähigkeit baust, benenne im **selben Commit** die Stelle, an der
-  jemand danach greift — Aufgabenstellung, Regelzeile, Vorgabewert oder ein Hinweis genau dort,
-  wo sonst der teure Weg gewählt wird. Und sag mir, **woran** ich später erkennen würde, dass
-  sie benutzt wird. Ohne beides ist sie nicht fertig, sondern unsichtbar."
 
 - **Einigkeit ist keine Evidenz.** Mehrere Modelle können sich über eine Ursache einig
   sein und gemeinsam danebenliegen; die Einigkeit fühlt sich dann an wie ein Beweis.
@@ -404,7 +395,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 ## Der kürzeste mögliche Start
 
 > „Erarbeite mit mir zuerst ein `design.md` als einzige Wahrheit — frag mich dafür
-> gründlich aus —, dann leg ein `TASKS.md` an. Richte die zwei
+> gründlich aus —, dann leg ein `TASKS.md` an und richte die zwei
 > Testschichten ein. Nach jeder Änderung: Build/Lint/Audit sauber, ein Test auf der
 > passenden Schicht, ein atomarer Commit. Beurteile Sichtbares am Screenshot. Wenn
 > wir eine Regel festlegen, bau sofort den Check, der sie erzwingt. Bei Kritischem
