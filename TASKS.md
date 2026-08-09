@@ -369,6 +369,16 @@ there exactly once; a new point joins a bundle when appended.
   so a chase that converges leaves them interpenetrating and, once stacked, steering
   toward the same target keeps them there. The adults' errand walkers have the same hole:
   two of them routed to neighbouring spots end up in one body.
+  NOT A GESTURE BUG — DO NOT "FIX" THE GESTURES (established 09.08.2026 from the video).
+  The user saw no gesture at all and asked whether any of them work. They do: a situation
+  calls `startGesture` in `speakSituation` (`PlaceLife.tsx`), and the children's per-frame
+  code deliberately writes the advanced gesture INTO the pose the Figure draws — the
+  comment there names the trap and avoids it — with durations of 1.6–2.6 s, so a gesture
+  stands about as long as its label. Magnified 2× in the clip's 19.4–22.4 s window the
+  arms demonstrably MOVE between frames. What makes them unreadable is exactly this
+  point: three children stand inside one another, so every arm and leg is one tangle of
+  cylinders and no limb can be traced to a body. Separate the children and the gestures
+  become legible without a line changed in the gesture system.
   FINAL STATE:
   1. EVERY inhabitant — child and adult — presents a body radius to every other, in the
      same shape as the animals' — calibratable, smaller than the mover footprint, and
