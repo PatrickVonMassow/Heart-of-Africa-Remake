@@ -3591,6 +3591,55 @@ there exactly once; a new point joins a bundle when appended.
   Criticality: HIGH — the board is the only thing the user sees while the batch runs, and a
   queue in the wrong order misrepresents what is being worked on next.
 
+- [ ] 591. DOES THE PROJECT STILL OBEY ITS OWN RULES? A FULL ADHERENCE AUDIT (user
+  09.08.2026: "Wir scheinen so einige unserer eigenen Projektregeln zu verletzen. Lege
+  auch einen Task an, der ein Review des ganzen Projekts macht, um zu prüfen, ob es noch
+  mehr in der Richtung gibt"). THIS IS A DIFFERENT AXIS FROM POINT 307. That audit
+  (`docs/rule-corpus-audit.md`, 27.07.2026) judged the rules AGAINST EACH OTHER —
+  duplication, contradiction, dead entries. This one judges the rules against REALITY: for
+  every written rule, does the repository, the mechanism set and the daily practice
+  actually comply? The two cases that prompted it both passed 307 untouched, because
+  neither is a defect IN a rule: the board sorted its queue from a hand-kept array while
+  the work order was declared the single home of the order (point 590), and the play
+  session found twelve accepted points broken against the "judge by the real signal" rule
+  CLAUDE.md §7.2 has stated since the beginning (point 589).
+  SCOPE — the whole corpus, each part named so none is silently skipped: `CLAUDE.md`;
+  `design.md`'s process sections; the `TASKS.md` preamble; `docs/work-packages.md`;
+  `scripts/verify/README.md`; the project memories and their index; the derived advice
+  documents in `docs/analysis_de/`; and the user-global `~/.claude/CLAUDE.md`, which 307
+  named as a gap and did not judge.
+  METHOD — THIS IS A DIVERGENT STEP, so it runs BLIND PARALLEL, not as a review (CLAUDE.md
+  §6): both models work from the same corpus to their own complete finding list, neither
+  seeing the other's, and the two are merged into a union deduplicated BY MEANING, keeping
+  both wherever it is unclear that one subsumes the other and marking what only one found.
+  A reviewer handed a finished list checks that list, and the whole risk here is the
+  violation nobody thought to look for.
+  EVERY FINDING CARRIES ITS EVIDENCE — the rule text quoted, and the artefact, command
+  output or commit that contradicts it. A suspicion without both is not a finding.
+  EVERY FINDING IS THEN CLASSIFIED, because "we broke a rule" is not yet a decision:
+    (a) THE RULE IS RIGHT, THE PRACTICE IS WRONG → repair the practice, and where the
+        breach could recur silently, name the enforcer that would have caught it;
+    (b) THE PRACTICE IS RIGHT, THE RULE IS STALE → change the rule, in the document that
+        owns it, so the corpus stops describing a past state;
+    (c) THE RULE IS UNENFORCEABLE OR DEAD → abolish it the way point 559 abolished the
+        time-tracking mandate. A rule that formally binds every session while nobody
+        follows it teaches that the corpus may be ignored, and that cost is charged to
+        every other rule.
+  ONE CUT MUST BE MADE EXPLICITLY: list every rule whose ONLY enforcement is memory — no
+  guard, no gate, no hook, no test. That list is the audit's most valuable single output,
+  because it is exactly the set that can drift without anything going red, and it is where
+  both of today's cases sat.
+  DELIVERABLE: `docs/rule-adherence-audit.md` — the findings with evidence and class, the
+  memory-only list, and what was repaired on the spot. Everything not repairable in the
+  audit itself becomes an appended point, ranked deliberately (point 590's rule), NOT a
+  paragraph in a document nobody re-reads.
+  VERIFIABLE: every finding names a rule location and a contradicting artefact that can be
+  re-checked by a command; the memory-only list is reproduced by a repeatable search over
+  the enforcer set; and the two known cases (589, 590) appear in the audit, since an audit
+  that misses the findings that triggered it has not covered its own ground.
+  Criticality: HIGH — an unnoticed breach means a rule is believed to be in force while it
+  is not, which is worse than having no rule: nobody looks again.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
