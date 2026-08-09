@@ -658,12 +658,14 @@ After completion and after every major system:
     `webgl` run that came up on WebGPU — FAILS LOUD.
     The only exceptions are `docs` (pure Node, no browser) and
     `preview` (production build, where `__renderer` is dev-only).
-  - A LARGE run (`npm test` / `npm run test:large`, no `VERIFY_GL` pinned) covers
-    BOTH backends in one command: the whole LARGE on WebGL 2 (with preflight and
-    prod preview), then the render suites on WebGPU. A pinned `VERIFY_GL`, the
-    SMALL tier and a bare suite filter stay single-backend. `touch` and `voice`
-    are the documented WebGL2-only skip (headless WebGPU drives neither the CDP
-    touch events nor the TTS speak state; both were verified there).
+  - The everyday lane is WEBGPU, the player's backend (user 09.08.2026): unpinned,
+    the SMALL tier and a bare suite filter run there — every one-backend defect on
+    record showed on WebGPU, never on WebGL 2 alone. WebGL 2 is the REGRESSION lane
+    a LARGE run covers (no `VERIFY_GL` pinned): the whole LARGE on WebGL 2 with
+    preflight and preview, then the render suites on WebGPU. `touch`/`voice` are
+    ROUTED to WebGL 2 wherever picked (headless WebGPU cannot drive them), never
+    dropped from it. RESIDUAL: a WebGL-2-only regression now surfaces only at the
+    next LARGE.
   - The suite→tier→backend map is the pure module `scripts/verify/tiers.mjs`,
     pinned by `scripts/verify/tiers.test.mjs` in the Vitest layer; change it
     there and in `scripts/verify/README.md` together.

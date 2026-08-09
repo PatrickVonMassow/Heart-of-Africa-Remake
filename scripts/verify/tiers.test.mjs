@@ -2,10 +2,11 @@
 // servers and child processes, so its wiring is proven here at the decision
 // level instead of by running every suite twice: which suites a tier picks,
 // which backend(s) a command covers, and which suites a WebGPU pass skips.
+import { readFile } from 'node:fs/promises'
 import { describe, it, expect } from 'vitest'
 import {
-  DEV_SUITES, SMALL_SUITES, WEBGL_ONLY_SUITES,
-  parseArgs, planBackends, selectBackend, skippedSuites, suitesFor,
+  DEFAULT_BACKEND, DEV_SUITES, SMALL_SUITES, WEBGL_ONLY_SUITES,
+  laneFor, parseArgs, planBackends, selectBackend, skippedSuites, suitesFor,
 } from './tiers.mjs'
 
 describe('tier sets (point 173)', () => {
@@ -76,12 +77,60 @@ describe('argument parsing', () => {
 
 
 describe('backend selection (mirrors _browser.mjs)', () => {
-  it('defaults to WebGL 2 and only "webgpu" (any case) selects WebGPU', () => {
-    expect(selectBackend(undefined)).toBe('webgl')
-    expect(selectBackend('')).toBe('webgl')
-    expect(selectBackend('webgl')).toBe('webgl')
-    expect(selectBackend('nonsense')).toBe('webgl')
+  it('makes WEBGPU the everyday lane an unpinned run gets (point 571)', () => {
+    expect(DEFAULT_BACKEND).toBe('webgpu')
+    expect(selectBackend(undefined)).toBe('webgpu')
     expect(selectBackend('WebGPU')).toBe('webgpu')
+  })
+
+  it('keeps a PINNED value exactly as pinned — nothing is upgraded to the default', () => {
+    expect(selectBackend('webgl')).toBe('webgl')
+    // `VERIFY_GL=` in a shell arrives as '', and an unknown value is not a
+    // licence to run the player's lane: both stay on the regression lane.
+    expect(selectBackend('')).toBe('webgl')
+    expect(selectBackend('nonsense')).toBe('webgl')
+  })
+
+  it('mirrors the default of _browser.mjs, the module the suites actually read', async () => {
+    const source = await readFile('scripts/verify/_browser.mjs', 'utf8')
+    expect(source).toMatch(/process\.env\.VERIFY_GL \?\? 'webgpu'/)
+  })
+})
+
+describe('the WebGL2-only suites keep a real lane (point 571)', () => {
+  it('routes touch/voice to WebGL 2 on a WebGPU pass, and leaves the rest alone', () => {
+    for (const s of WEBGL_ONLY_SUITES) {
+      expect(laneFor(s, 'webgpu')).toBe('webgl')
+      expect(laneFor(s, 'webgl')).toBe('webgl')
+    }
+    for (const s of ['polish', 'flow', 'collision']) {
+      expect(laneFor(s, 'webgpu')).toBe('webgpu')
+      expect(laneFor(s, 'webgl')).toBe('webgl')
+    }
+  })
+
+  it('keeps voice IN the everyday SMALL gate now that the gate runs on WebGPU', () => {
+    const small = suitesFor({ tier: 'small', backend: DEFAULT_BACKEND })
+    expect(small).toContain('voice')
+    expect(skippedSuites({ tier: 'small', backend: DEFAULT_BACKEND })).toEqual([])
+    // …and it runs there on WebGL 2, the only lane that can drive it.
+    expect(laneFor('voice', DEFAULT_BACKEND)).toBe('webgl')
+  })
+
+  it('never resolves a named WebGL2-only suite to NOTHING', () => {
+    for (const s of WEBGL_ONLY_SUITES) {
+      const picked = suitesFor({ tier: null, filter: [s], backend: DEFAULT_BACKEND })
+      expect(picked).toEqual([s])
+      expect(laneFor(picked[0], DEFAULT_BACKEND)).toBe('webgl')
+    }
+  })
+
+  it('drops them ONLY where a companion WebGL 2 pass already ran them', () => {
+    const opts = { tier: 'large', backend: 'webgpu', webglOnlyCovered: true }
+    expect(suitesFor(opts)).toEqual(DEV_SUITES.filter((s) => !WEBGL_ONLY_SUITES.includes(s)))
+    expect(skippedSuites(opts)).toEqual(['touch', 'voice'])
+    // The WebGL 2 pass of the same command drops nothing.
+    expect(skippedSuites({ tier: 'large', backend: 'webgl', webglOnlyCovered: false })).toEqual([])
   })
 })
 
@@ -91,14 +140,18 @@ describe('suite selection per tier and backend', () => {
     expect(suitesFor({ tier: 'large', backend: 'webgl' })).toEqual(DEV_SUITES)
   })
 
-  it('drops exactly touch/voice on the WebGPU pass, and reports them as skipped', () => {
-    const webgpu = suitesFor({ tier: 'large', backend: 'webgpu' })
+  it('drops exactly touch/voice on the SECOND (WebGPU) pass of a both-backends run', () => {
+    const webgpu = suitesFor({ tier: 'large', backend: 'webgpu', webglOnlyCovered: true })
     expect(webgpu).not.toContain('touch')
     expect(webgpu).not.toContain('voice')
     expect(webgpu).toEqual(DEV_SUITES.filter((s) => !WEBGL_ONLY_SUITES.includes(s)))
-    expect(skippedSuites({ tier: 'large', backend: 'webgpu' })).toEqual(['touch', 'voice'])
+    expect(skippedSuites({ tier: 'large', backend: 'webgpu', webglOnlyCovered: true })).toEqual(['touch', 'voice'])
     // Nothing is silently dropped on the WebGL 2 pass.
     expect(skippedSuites({ tier: 'large', backend: 'webgl' })).toEqual([])
+    // …nor on a STANDALONE WebGPU run, which has no companion pass to lean on:
+    // there they stay in the set and laneFor puts them on WebGL 2 (point 571).
+    expect(suitesFor({ tier: 'large', backend: 'webgpu' })).toEqual(DEV_SUITES)
+    expect(skippedSuites({ tier: 'large', backend: 'webgpu' })).toEqual([])
   })
 
   it('runs the SMALL gate on its own set, in LARGE order', () => {
@@ -110,8 +163,9 @@ describe('suite selection per tier and backend', () => {
   it('honours a suite filter and ignores unknown names', () => {
     expect(suitesFor({ tier: null, filter: ['polish', 'flow'], backend: 'webgl' })).toEqual(['flow', 'polish'])
     expect(suitesFor({ tier: null, filter: ['build', 'lint', 'unit'], backend: 'webgl' })).toEqual([])
-    // A filtered WebGPU run still drops the WebGL2-only suite it named.
-    expect(suitesFor({ tier: null, filter: ['flow', 'voice'], backend: 'webgpu' })).toEqual(['flow'])
+    // A filtered WebGPU run KEEPS the WebGL2-only suite it named — it runs it on
+    // WebGL 2 (laneFor). Dropping it would answer `npm test -- voice` with nothing.
+    expect(suitesFor({ tier: null, filter: ['flow', 'voice'], backend: 'webgpu' })).toEqual(['flow', 'voice'])
   })
 })
 
@@ -120,8 +174,8 @@ describe('both-backends LARGE wiring (point 204b)', () => {
     for (const argv of [[], ['large']]) {
       const { isLargeEquivalent } = parseArgs(argv)
       expect(planBackends({ isLargeEquivalent, verifyGl: undefined })).toEqual([
-        { backend: 'webgl', skipPreflight: false },
-        { backend: 'webgpu', skipPreflight: true },
+        { backend: 'webgl', skipPreflight: false, webglOnlyCovered: false },
+        { backend: 'webgpu', skipPreflight: true, webglOnlyCovered: true },
       ])
     }
   })
@@ -153,8 +207,27 @@ describe('both-backends LARGE wiring (point 204b)', () => {
   it('covers every render suite on BOTH backends across the planned passes', () => {
     const { tier, isLargeEquivalent } = parseArgs([])
     const plan = planBackends({ isLargeEquivalent, verifyGl: undefined })
-    const perBackend = plan.map((p) => suitesFor({ tier, backend: p.backend }))
+    const perBackend = plan.map((p) => suitesFor({ tier, backend: p.backend, webglOnlyCovered: p.webglOnlyCovered }))
     const renderSuites = DEV_SUITES.filter((s) => !WEBGL_ONLY_SUITES.includes(s) && s !== 'docs')
     for (const s of renderSuites) for (const run of perBackend) expect(run).toContain(s)
+    // The WebGL2-only pair is covered EXACTLY ONCE, on WebGL 2 — never zero times.
+    for (const s of WEBGL_ONLY_SUITES) {
+      const lanes = plan
+        .filter((p, i) => perBackend[i].includes(s))
+        .map((p) => laneFor(s, p.backend))
+      expect(lanes).toEqual(['webgl'])
+    }
+  })
+
+  it('sends the everyday commands to WebGPU while LARGE keeps both lanes (point 571)', () => {
+    // The everyday gate and a per-point suite pick: one pass, on the player's backend.
+    for (const argv of [['small'], ['polish'], ['flow', 'collision']]) {
+      const a = parseArgs(argv)
+      expect(planBackends({ ...a, verifyGl: undefined })).toEqual([])
+      expect(selectBackend(process.env.VERIFY_GL_UNSET_FOR_TEST)).toBe('webgpu')
+    }
+    // LARGE is unchanged: still the regression lane FIRST, then the player's.
+    const large = planBackends({ ...parseArgs(['large']), verifyGl: undefined })
+    expect(large.map((p) => p.backend)).toEqual(['webgl', 'webgpu'])
   })
 })

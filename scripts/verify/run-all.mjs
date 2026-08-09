@@ -20,7 +20,7 @@ import {
   LEVEL, annotateResult, annotateStageFailure, decideRun, formatLoadReport, onLoadMode,
 } from './machine-load-core.mjs'
 import { readMachine } from './machine-load.mjs'
-import { DEV_SUITES, needsDevServer, parseArgs, planBackends, selectBackend, skippedSuites, suitesFor } from './tiers.mjs'
+import { DEV_SUITES, laneFor, needsDevServer, parseArgs, planBackends, selectBackend, skippedSuites, suitesFor } from './tiers.mjs'
 import { SECTION_ENV, listSections, planSectionRun, resolveSelection } from './sections.mjs'
 import { readFileSync } from 'node:fs'
 
@@ -40,16 +40,23 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 // Regression tiers (point 173) and the backend dimension (points 184/204) are
 // the pure decision layer in ./tiers.mjs (Vitest-pinned in tiers.test.mjs):
 // DEV_SUITES (the LARGE set), SMALL_SUITES (the fast everyday gate),
-// WEBGL_ONLY_SUITES (touch/voice — the documented headless-WebGPU exception),
-// and the arg/backend planning below. Pick per task:
-//   npm run test:small   # Vitest + the small browser gate (no prod preview)
+// WEBGL_ONLY_SUITES (touch/voice — the documented headless-WebGPU exception,
+// ROUTED to WebGL 2 rather than dropped since point 571), DEFAULT_BACKEND (the
+// everyday lane, WebGPU) and the arg/backend planning below. Pick per task:
+//   npm run test:small   # Vitest + the small browser gate (no prod preview), WebGPU
 //   npm run test:large   # Vitest + every browser suite + preview, BOTH backends
 //   npm test             # the full LARGE regression (default) — same
 //   npm test -- flow …   # just the named suite(s); dev server managed, no preflight
 // The closing cycle ALWAYS runs LARGE.
-// VERIFY_GL selects the renderer the suites launch (mirrored from _browser.mjs;
-// default webgl, propagated to each suite via the inherited env).
+// VERIFY_GL selects the renderer the suites launch (mirrored from _browser.mjs).
+// Since point 571 the default is WEBGPU — the player's backend is the everyday
+// lane, WebGL 2 the regression lane every LARGE run covers. It is pinned PER SUITE
+// below (laneFor), so touch/voice keep their WebGL 2 lane wherever they are picked.
 const VERIFY_GL = selectBackend(process.env.VERIFY_GL)
+// Set by the parent on the WebGPU pass of a both-backends LARGE run: its companion
+// WebGL 2 pass already ran the WebGL2-only suites, so this pass drops them instead
+// of repeating them.
+const WEBGL_ONLY_COVERED = process.env.RVA_WEBGL_COVERED === '1'
 
 const args = process.argv.slice(2)
 const { tier, filter, flags, fullRun, isLargeEquivalent, baseline, section } = parseArgs(args)
@@ -107,6 +114,7 @@ if (backendPlan.length > 0) {
         RVA_RAN_BOTH: '1',
         VERIFY_GL: pass.backend,
         ...(pass.skipPreflight ? { RVA_SKIP_PREFLIGHT: '1' } : {}),
+        ...(pass.webglOnlyCovered ? { RVA_WEBGL_COVERED: '1' } : {}),
       },
     }).status ?? 1
   for (const [i, pass] of backendPlan.entries()) {
@@ -143,7 +151,7 @@ const loadMode = onLoadMode({ flags, env: process.env.VERIFY_ON_LOAD })
 let machine = { level: LEVEL.unknown, strays: [] }
 if (loadMode !== 'off') {
   machine = await readMachine()
-  const plannedSuites = suitesFor({ tier, filter, backend: VERIFY_GL })
+  const plannedSuites = suitesFor({ tier, filter, backend: VERIFY_GL, webglOnlyCovered: WEBGL_ONLY_COVERED })
   const decision = decideRun({ suites: plannedSuites, level: machine.level, mode: loadMode })
   for (const line of formatLoadReport({ load: machine, decision, mode: loadMode })) console.log(line)
   if (decision.action === 'defer') {
@@ -164,7 +172,14 @@ function runSuite(name, baseUrl) {
     encoding: 'utf8',
     // The suites read BASE_URL (default :5173/:4173); pass the actual server
     // URL so they hit the regression's own server, not a manual dev server.
-    env: baseUrl ? { ...process.env, BASE_URL: baseUrl } : process.env,
+    // VERIFY_GL is pinned PER SUITE (point 571): the pass's backend for all but
+    // the WebGL2-only ones, which are routed to WebGL 2 rather than dropped — so
+    // each suite's own run record names the backend it really opened.
+    env: {
+      ...process.env,
+      ...(baseUrl ? { BASE_URL: baseUrl } : {}),
+      VERIFY_GL: laneFor(name, VERIFY_GL),
+    },
     timeout: SUITE_TIMEOUT_MS,
     killSignal: 'SIGKILL',
   })
@@ -370,18 +385,26 @@ if (!skipPreflight && (fullRun || filter.includes('unit'))) {
 
 let dev
 try {
-  // On WebGPU, drop the WebGL2-only suites (logged so the skip is explicit, never a
-  // silent gap) — the rest run on the selected backend.
-  const devPick = suitesFor({ tier, filter, backend: VERIFY_GL })
-  for (const s of skippedSuites({ tier, filter, backend: VERIFY_GL })) {
-    console.log(`SKIP  ${s.padEnd(12)} (WebGL2-only — not run on WebGPU, point 184)`)
+  // The suites this pass runs, and the lane each one opens. A WebGL2-only suite is
+  // ROUTED to WebGL 2 (point 571) rather than dropped, so the everyday gate keeps
+  // `voice` now that it runs on WebGPU; it is dropped only where the companion
+  // WebGL 2 pass of the same command already ran it — logged either way, never a
+  // silent gap.
+  const devPick = suitesFor({ tier, filter, backend: VERIFY_GL, webglOnlyCovered: WEBGL_ONLY_COVERED })
+  for (const s of skippedSuites({ tier, filter, backend: VERIFY_GL, webglOnlyCovered: WEBGL_ONLY_COVERED })) {
+    console.log(`SKIP  ${s.padEnd(12)} (WebGL2-only — already run by this command's WebGL 2 pass, point 184/571)`)
+  }
+  for (const s of devPick) {
+    if (laneFor(s, VERIFY_GL) !== VERIFY_GL) {
+      console.log(`LANE  ${s.padEnd(12)} (WebGL2-only — run on WebGL 2 inside this ${VERIFY_GL} gate, point 571)`)
+    }
   }
   // Cross-browser smoke (point 213): on a FULL tier/default run (not a bare
   // single-suite filter) or when asked by name; depth scales with the tier
-  // (minimal for SMALL, standard for LARGE/default). Run once, on the WebGL2
-  // Chromium lane only — it covers the OTHER engines, so re-running it on the
-  // WebGPU lane would be redundant.
-  const wantCross = (fullRun || filter.includes('crossbrowser')) && VERIFY_GL !== 'webgpu'
+  // (minimal for SMALL, standard for LARGE/default). Run ONCE per command — so it
+  // is skipped on the second pass of a both-backends LARGE run, whose first pass
+  // already ran it. It covers the OTHER engines, which no Chromium backend changes.
+  const wantCross = (fullRun || filter.includes('crossbrowser')) && !WEBGL_ONLY_COVERED
   if (devPick.length > 0 || wantCross) {
     // A pure-Node pick (`npm test -- docs`) starts no vite server at all.
     const server = needsDevServer(devPick) || wantCross
