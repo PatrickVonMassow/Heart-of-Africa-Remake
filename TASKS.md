@@ -3901,6 +3901,15 @@ Build order, chosen so no two parallel agents own the same file:
      exempted by kind, so the exemption is visible in the declaration and not a
      silent property of the mode. A clipped or locator-bound capture that never
      includes the canvas is out of scope.
+     CORROBORATED 09.08.2026 by running each `enrichments` section alone: the fault
+     is not one frame and not only BLACK. `88-canoe-ride.png` collapsed 993 KB → 47 KB
+     as a uniform GREY HAZE at 11 FPS, `104-region-border-river.png` 1.39 MB → 51 KB
+     as a black canvas carrying only the HUD and its "Unknown waterfall"/"Unknown
+     lake" labels — both accepted, both exit 0. Most such captures pass `settle:
+     false`, whose readiness mode requires only THAT a picture exists. This is why
+     the measure is colour DOMINANCE and not file size: on identical code one
+     section's frame moved 261 KB ↔ 662 KB between two runs, so size decides
+     nothing and a reviewer must open the image.
   The re-probe of item 1 applies in the STAND-STILL mode only: the drawn-only wait
   is near zero, and re-probing there would add flake on exactly the fast-moving
   subjects that mode serves. The stale comment in `frameSubject.mjs` claiming
