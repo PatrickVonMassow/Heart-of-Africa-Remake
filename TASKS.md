@@ -355,7 +355,11 @@ there exactly once; a new point joins a bundle when appended.
   its frame showing one body with a fan of limbs radiating out of it; and
   `local/bugreports/DorfbewohnerIneinander.zip`: "Die Beiden hängen ineinander", the same
   defect between two ADULTS. It is therefore not the tag game but the inhabitant set as a
-  whole: no villager, child or adult, presents a body to any other). The fix for exactly this defect already exists ONE class
+  whole: no villager, child or adult, presents a body to any other). CONFIRMED IN MOTION
+  (`local/bugreports/Kinderspiel.mp4`): across the whole 53 s clip two to three children
+  stand as ONE knot in the same corner of the village, drifting a little and never
+  separating — at t=19–24 s they do not come apart for a single sampled frame. Nothing in
+  those 53 s reads as a chase: no runner, no pursuer, no catch. The fix for exactly this defect already exists ONE class
   over: `src/scenes/place/animalSpots.ts` records that "no animal was part of the
   collider set, so nothing could ever separate two of them — several goats stood inside
   one another", and answers it with `ANIMAL_BODY_RADIUS` (0.18 m, deliberately smaller
@@ -469,6 +473,13 @@ there exactly once; a new point joins a bundle when appended.
   CHILD at `KID_SCALE` 0.55 is about 0.8 m tall, so its note hangs about TWICE the child's
   own height above it. The children are the figures that teach most of the concepts, and
   theirs float highest — which is why a player watching the game at eye level misses them.
+  MEASURED IN THE VIDEO (`local/bugreports/Kinderspiel.mp4`, 53 s from the Bambara
+  village, frames sampled at 0.5 s): a label stands from t=19.5 s to t≈22.3 s while the
+  children who spoke it are in the LOWER SIXTH of the frame — the note sits roughly two
+  thirds of the screen height above their heads, higher than the hut roof behind them,
+  and reads as belonging to nothing at all. Every label in that clip (t≈0, 12, 19.5, 32,
+  36, 44, 52) sits at the same extreme height. That is what "ich sehe keine Texte über
+  ihren Köpfen" turned out to be: they are there, far above the place the eye looks.
   FINAL STATE:
   1. The label rides a small, calibratable gap above THAT speaker's head, derived from the
      figure's own height (the same height the actor record already carries) rather than
