@@ -26,85 +26,116 @@ Vereinigungs-Commit).
 
 ## 1. Die gemessene Basislinie
 
-### 1.0 Eine Korrektur an der ersten Fassung dieser Messung — bitte zuerst lesen
+### 1.0 Zwei Korrekturen an dieser Messung — bitte zuerst lesen
 
-Die erste Fassung von §1 (Commit `ddef1d66`) hatte einen **Messfehler**, den
-die Prüfung der Opus-Hälfte gefunden hat. Er ist behoben, alle Zahlen unten
-sind neu erhoben, und weil die beiden Ideenlisten gegen die **alten** Zahlen
-geschrieben wurden, steht hier zuerst, was sich bewegt hat.
+Die Faltung der Transkript-Zeilen hatte **zwei** Messfehler, beide gefunden,
+beide behoben, beide an derselben Stelle: an der Annahme, die mehreren Zeilen
+einer API-Antwort seien beliebig austauschbar. Alle Zahlen unten sind mit der
+korrigierten Faltung neu erhoben; weil die beiden Ideenlisten gegen die
+**alten** Zahlen geschrieben wurden, steht hier zuerst, was sich bewegt hat.
 
-**Der Fehler.** Eine API-Antwort wird im Transkript auf **mehrere Zeilen mit
-derselben `message.id`** verteilt — eine je Inhaltsblock (`thinking`, `text`,
-`tool_use`, `tool_use`), und jede Zeile wiederholt dieselbe `usage` in den
-Cache-Zählern (**nicht** in `output_tokens` — siehe §1.9, Review-Befund). Die
-Deduplizierung nach `message.id` behielt die **erste** Zeile. Für die
-Token-Summen ist das richtig (die `usage` darf nur einmal zählen), für alles
-andere war es falsch: begann eine Antwort mit Denken — der Normalfall —, ging
-ihr Werkzeugaufruf verloren.
+**Der gemeinsame Ursprung.** Eine API-Antwort wird im Transkript auf **mehrere
+Zeilen mit derselben `message.id`** verteilt — eine je Inhaltsblock
+(`thinking`, `text`, `tool_use`, `tool_use`). Die Deduplizierung nach
+`message.id` behielt die **erste** Zeile und warf die übrigen weg.
 
-**Die Behebung.** `foldResponseLines()` in
-`scripts/measure-task-cost-core.mjs` faltet die Zeilen einer Antwort zu **einem**
-Turn: `usage` und Kennfelder aus der ersten Zeile, frühester Zeitstempel, und
-die **Vereinigung** der Werkzeugaufrufe, dedupliziert über die Block-`id`. Der
-Fall ist im Unit-Test festgenagelt (`measure-task-cost-core.test.mjs`,
-`describe('foldResponseLines')`): eine mehrzeilige Antwort, deren Werkzeugaufruf
-auf der zweiten Zeile sitzt, **muss** gesehen werden.
+**Fehler 1 — die verlorenen Werkzeugaufrufe** (gefunden von der Prüfung der
+Opus-Hälfte). Begann eine Antwort mit Denken — der Normalfall —, ging ihr
+Werkzeugaufruf verloren, und der Klassifikator sah eine evidenzfreie Antwort.
 
-**Was sich dadurch bewegt hat:**
+**Fehler 2 — der unterzählte Output** (gefunden vom Vier-Augen-Review der
+Vereinigung, 09.08.2026). Die Zeilen wiederholen **nicht** dieselbe `usage`:
+`output_tokens` ist ein **wachsender Zwischenstand**, den die Harness je Zeile
+neu schreibt (5 → 234 → 234). Die erste Zeile zu nehmen zählte den Output damit
+um den Faktor **1,84** zu klein — 7,65 M statt der tatsächlich abgerechneten
+14,09 M.
+
+**Die Behebung.** `foldUsage()` in `scripts/measure-context-cost-core.mjs`
+faltet die Zeilen einer Antwort **je Zähler unabhängig auf das Maximum**;
+`foldResponseLines()` in `scripts/measure-task-cost-core.mjs` benutzt sie und
+ergänzt die **Vereinigung** der Werkzeugaufrufe über die Block-`id`. **Beide**
+Messwerkzeuge falten durch dieselbe Funktion, können also nicht mehr
+verschiedene Token-Summen melden. Warum das Maximum und nicht die Summe oder
+die letzte Zeile, ist am Rohbestand geprüft und nicht angenommen (§1.9). Beide
+Fälle sind im Unit-Test festgenagelt.
+
+**Was Fehler 1 bewegt hat (Phasen-Zuordnung):**
 
 | Größe | alte Fassung | korrigiert |
 | --- | ---: | ---: |
 | Antworten mit ≥ 1 Werkzeugaufruf | 25,6 % | **97,4 %** |
-| Antworten mit einem Aufruf, den der Klassifikator **als Phasen-Evidenz** liest | 25,6 % | **48,4 %** (43,1 % der Kosten) |
+| Antworten mit einem Aufruf, den der Klassifikator **als Phasen-Evidenz** liest | 25,6 % | **48,4 %** (43,8 % der Kosten) |
 | nach der Füllung offen (`unattributed`) | 0,9 % | **0,1 %** |
-| Antworten mit **mehr als einem** Werkzeugaufruf | „kein einziger" | **1.596 = 4,9 %** |
-| `verification` (gewichtet) | 43,1 % | **47,6 %** |
-| `bookkeeping` (gewichtet) | 26,7 % | 26,2 % |
-| `implementation` / `gates` | 16,0 % / 11,6 % | 13,2 % / 9,5 % |
+| Antworten mit **mehr als einem** Werkzeugaufruf | „kein einziger" | **1.634 = 5,0 %** |
+| `verification` (gewichtet) | 43,1 % | **47,0 %** |
+| `bookkeeping` (gewichtet) | 26,7 % | 26,0 % |
+| `implementation` / `gates` | 16,0 % / 11,6 % | 13,9 % / 9,6 % |
 | `brief` | 0,5 % | **1,9 %** |
-| Maschinenstunden `verification` | 31,5 % | **37,5 %** (gleichauf mit `bookkeeping`) |
-| Median-Punkt gewichtet | 5,01 M | **5,69 M** |
+| Maschinenstunden `verification` | 31,5 % | **37,4 %** (gleichauf mit `bookkeeping`) |
+| Median-Punkt gewichtet | 5,01 M | **5,82 M** |
 
-**Hat sich die Rangfolge der Phasen bewegt?** An der Spitze **nein**:
-`verification` und `bookkeeping` bleiben die beiden großen Posten und haben
-zusammen 73,8 % der Tokens (vorher 69,8 %). Drei Dinge haben sich aber
-verschoben, und sie treffen Vorschläge beider Hälften:
+**Was Fehler 2 bewegt hat (Token-Summen).** Auf demselben Datenbestand
+gerechnet, damit die Spalten nur den Faltungsfehler zeigen und nicht das
+Fensterwachstum:
+
+| Größe | erste Zeile | je Zähler Maximum |
+| --- | ---: | ---: |
+| `output` roh | 7,65 M | **14,09 M** (×1,84) |
+| Gesamtsumme gewichtet | 851,7 M | **883,9 M** (+3,8 %) |
+| **Output-Anteil gewichtet** | 4,5 % | **8,0 %** |
+| Cache-Read-Anteil gewichtet | 78,6 % | **75,8 %** |
+| Output je Antwort, Median | 119 | **197** |
+| Anteil der Subagenten an der Gesamtausgabe | 69,1 % | **70,2 %** |
+
+**Wo Fehler 2 saß, ist selbst ein Befund:** der wachsende Zwischenstand steht
+**ausschließlich** in den Transkripten der delegierten Agenten. Von 5.676
+mehrzeiligen Antworten der Hauptsitzungen differiert **keine einzige** in
+`output_tokens`, von 7.988 der Agenten differieren **6.736**. Deshalb bewegt
+sich der Hauptsitzungs-Scope des älteren Werkzeugs kein Stück (§2c), und
+deshalb wächst der Agenten-Anteil.
+
+**Hat sich die Rangfolge bewegt?** An der Spitze **nein**: `verification` und
+`bookkeeping` bleiben die beiden großen Posten und haben zusammen 73,0 % der
+Tokens (vorher 69,8 %), und wieder-gelesener Kontext bleibt mit 75,8 % die
+dominante Größe. Vier Dinge haben sich verschoben, und sie treffen Vorschläge
+beider Hälften:
 
 1. **`verification` ist größer als gedacht** — auf der Token-Achse (43,1 →
-   47,6 %) und besonders auf der Zeitachse (31,5 → 37,5 %, jetzt gleichauf mit
+   47,0 %) und besonders auf der Zeitachse (31,5 → 37,4 %, jetzt gleichauf mit
    der Buchführung statt sieben Punkte dahinter). Jeder Verifikations-Vorschlag
    beider Hälften **gewinnt** dadurch, keiner verliert.
-2. **`brief` ist viermal so groß wie behauptet** (0,5 → 1,9 %; Median 103 k je
+2. **`brief` ist viermal so groß wie behauptet** (0,5 → 1,9 %; Median 105 k je
    Punkt statt 0,00 M). Beide Hälften haben die weitere Brief-Arbeit mit
    *genau* dieser 0,5-%-Zahl verworfen (A-V12, B-R10, B-R15). Diese Verwerfungen
    bleiben im Ergebnis stehen — 1,9 % ist immer noch klein —, aber ihre
    Begründung ist neu zu schreiben, und sie ist jetzt eine Abwägung statt einer
    Selbstverständlichkeit (§4).
 3. **Der Satz „kein einziger Turn setzt mehr als einen Werkzeugaufruf ab" war
-   ein Artefakt.** 4,9 % tun es. Das entscheidet einen **Widerspruch zwischen
+   ein Artefakt.** 5,0 % tun es. Das entscheidet einen **Widerspruch zwischen
    den beiden Hälften** (Opus maß 4,9 %, Fable zitierte die 0 aus der alten
    Basislinie und nannte sie „die härteste Einzelzahl"): die Maßnahme
    „unabhängige Aufrufe bündeln" bleibt richtig und groß, aber ihr Nenner ist
-   95,1 %, nicht 100 %.
+   95,0 %, nicht 100 %.
+4. **Der Output ist knapp doppelt so groß wie gedacht — und das trifft zwei
+   Verwerfungen in entgegengesetzte Richtungen.** „Kürzere Berichte" wird durch
+   die Korrektur **stärker** verworfen, „Reasoning-Effort senken" **schwächer**;
+   welche Zahl das entscheidet, steht in §4 an den beiden Zeilen selbst.
 
-**Was sich NICHT bewegt hat:** die Token-Summen (6.790 M roh / 847,6 M
-gewichtet), die Zähler-Anteile (78,7 % Cache-Read), die Streuung über die
-Punkte, der Sockel und beide Uhren. Der Fehler saß allein in der
-**Phasen-Zuordnung**, und dort in die vertrauensbildende Richtung: die
-Verteilung ruht auf doppelt so viel Evidenz wie die alte Fassung zugab.
+**Was sich NICHT bewegt hat:** die Streuung über die Punkte, der Sockel, beide
+Uhren, die Rangfolge der Phasen und die Dominanz des wieder-gelesenen Kontexts.
 
 ### 1.1 Woher die Zahlen kommen
 
 | Quelle | Was daraus kommt |
 | --- | --- |
-| `~/.claude/projects/-workspace-hoa/` — 262 Transkripte (91 Hauptsitzungen + 171 delegierte Agenten) | Tokens und Maschinenstunden pro Antwort, pro Phase, pro Punkt |
+| `~/.claude/projects/-workspace-hoa/` — 265 Transkripte (91 Hauptsitzungen + 174 delegierte Agenten) | Tokens und Maschinenstunden pro Antwort, pro Phase, pro Punkt |
 | `scripts/measure-task-cost.mjs` (+ `-core.mjs`, Vitest-gedeckt) | die Phasen-Zuordnung selbst; `--json` gibt jede Zahl unten aus |
 | `scripts/measure-context-cost-core.mjs` | Gewichtung (`COST_WEIGHTS`) und Leerlauf-Regel (30 min) — **unverändert übernommen**, damit beide Werkzeuge nicht verschieden rechnen |
 | `git log --first-parent main` (214 Merges seit 06.07.2026) | die Kalender-Uhr: erster Branch-Commit → Merge, und die Main-Commits danach |
 | `docs/picture-check-cost.md`, `docs/picture-check-levers.md` | die bereits gemessenen Kosten der Bild-Prüfung — zitiert, nicht neu gemessen |
 
-**Messfenster:** 03.08.2026 11:01 UTC – 09.08.2026 11:18 UTC, also 6,01 Tage,
-**32.531 API-Antworten**, **64 nach `main` gemergte Punkte**. Ältere
+**Messfenster:** 03.08.2026 11:01 UTC – 09.08.2026 11:55 UTC, also 6,04 Tage,
+**32.746 API-Antworten**, **64 nach `main` gemergte Punkte**. Ältere
 Transkripte hält die Maschine nicht mehr vor — das ist die härteste Grenze
 dieser Messung (§1.8).
 
@@ -121,20 +152,20 @@ dieser Messung (§1.8).
 | `bookkeeping` | Board, Focus, Queue, `batch-*`, die Guards, TASKS-Pflege — und die Delegations-Aufrufe selbst |
 | `unattributed` | der Turn hat **keinen** erkannten Werkzeugaufruf abgesetzt — bleibt offen, wird nicht geraten |
 
-Ein Punkt („Task") ist der Git-Branch: `feat/<N>-<slug>` → Punkt N. 63,1 % der
-gewichteten Kosten ordnet der Branch des Turns selbst zu, 10,0 % das Transkript
-des delegierten Agenten (ein Agenten-Transkript **ist** ein Punkt), 26,9 %
+Ein Punkt („Task") ist der Git-Branch: `feat/<N>-<slug>` → Punkt N. 62,8 % der
+gewichteten Kosten ordnet der Branch des Turns selbst zu, 10,8 % das Transkript
+des delegierten Agenten (ein Agenten-Transkript **ist** ein Punkt), 26,4 %
 gehören zu keinem Branch — das ist die Hauptsitzung (§1.6).
 
 ### 1.2 Was hier ein „Token" ist
 
 | Zähler | roh | Anteil roh | Anteil **gewichtet** |
 | --- | ---: | ---: | ---: |
-| `cache_read` | 6.668,7 M | 98,2 % | **78,7 %** |
-| `cache_creation` | 113,8 M | 1,7 % | 16,8 % |
-| `output` | 7,6 M | 0,1 % | **4,5 %** |
+| `cache_read` | 6.704,7 M | 98,1 % | **75,8 %** |
+| `cache_creation` | 115,0 M | 1,7 % | 16,2 % |
+| `output` | 14,1 M | 0,2 % | **8,0 %** |
 | `input` | 0,1 M | 0,0 % | 0,0 % |
-| **Summe** | **6.790 M** | | **847,6 M gewichtet** |
+| **Summe** | **6.834 M** | | **884,8 M gewichtet** |
 
 Die gewichtete Zahl ist das **Proxy** aus `COST_WEIGHTS` (Cache-Read 0,1 ·
 Cache-Write 1,25 · Output 5 relativ zu einem Input-Token), keine Rechnung. Sie
@@ -143,28 +174,32 @@ die Aufteilung eine andere Operation wäre als auf den rohen Zählern. Gegen die
 veröffentlichten Preise geprüft ist sie **exakt** die reale Preisrelation
 (§2f).
 
-Die Zeile, die alles Weitere rahmt: **rund vier Fünftel der gewichteten
-Ausgabe ist wieder-gelesener Kontext, 4,5 % ist das, was das Modell
-schreibt.**
+Die Zeile, die alles Weitere rahmt: **rund drei Viertel der gewichteten Ausgabe
+ist wieder-gelesener Kontext, 8,0 % ist das, was das Modell schreibt.** Von
+diesen 8,0 % sind nur **0,4 Prozentpunkte** die Prosa, die ein Mensch liest
+(Antworten ohne jeden Werkzeugaufruf); der Rest ist Denken und die Argumente
+der Werkzeugaufrufe selbst — Code und Kommandos. Diese Zerlegung entscheidet
+zwei Verwerfungen in §4, und sie ist der Grund, warum „knapper schreiben" auch
+bei verdoppeltem Output kein Hebel ist.
 
 ### 1.3 Wohin die Tokens gehen — pro Phase
 
 | Phase | gewichtet | Anteil | roh | Anteil **strikt** |
 | --- | ---: | ---: | ---: | ---: |
-| `verification` | 403,0 M | **47,6 %** | 3.294 M | 29,6 % |
-| `bookkeeping` | 221,7 M | **26,2 %** | 1.701 M | 37,1 % |
-| `implementation` | 111,9 M | 13,2 % | 943 M | 18,0 % |
-| `gates` | 80,5 M | 9,5 % | 670 M | 10,6 % |
-| `brief` | 15,8 M | 1,9 % | 80 M | 2,4 % |
-| `merge` | 13,6 M | 1,6 % | 107 M | 2,2 % |
-| `unattributed` | 0,7 M | 0,1 % | 3 M | — |
+| `verification` | 415,5 M | **47,0 %** | 3.300 M | 29,8 % |
+| `bookkeeping` | 229,8 M | **26,0 %** | 1.711 M | 36,4 % |
+| `implementation` | 122,8 M | 13,9 % | 955 M | 18,9 % |
+| `gates` | 85,0 M | 9,6 % | 677 M | 10,5 % |
+| `brief` | 16,9 M | 1,9 % | 80 M | 2,3 % |
+| `merge` | 14,0 M | 1,6 % | 108 M | 2,2 % |
+| `unattributed` | 0,8 M | 0,1 % | 3 M | — |
 
 Die Spalte **strikt** ist der Fehlerbalken, nicht eine zweite Meinung: sie
 ordnet nur Turns zu, die selbst einen Werkzeugaufruf abgesetzt haben, den der
-Klassifikator als Phasen-Evidenz liest (48,4 % der Antworten, 43,1 % der
+Klassifikator als Phasen-Evidenz liest (48,4 % der Antworten, 43,8 % der
 Kosten), und zeigt deren Verteilung. Beide Lesarten stellen dieselben zwei
-Phasen an die Spitze — `verification` und `bookkeeping` zusammen **73,8 %**
-(gefüllt) bzw. **66,7 %** (strikt). Ihre Reihenfolge untereinander ist
+Phasen an die Spitze — `verification` und `bookkeeping` zusammen **73,0 %**
+(gefüllt) bzw. **66,2 %** (strikt). Ihre Reihenfolge untereinander ist
 weiterhin *nicht* robust: strikt liegt `bookkeeping` vorn, gefüllt
 `verification`. Der Grund ist erklärbar — Buchführung setzt viele kurze Aufrufe
 ab, eine Verifikation setzt einen Aufruf ab und wartet danach viele teure Turns
@@ -177,14 +212,14 @@ abgeschnitten; parallele Agenten zählen jeder für sich):
 
 | Phase | Stunden | Anteil |
 | --- | ---: | ---: |
-| `bookkeeping` | 81,3 | **37,5 %** |
-| `verification` | 81,3 | **37,5 %** |
-| `implementation` | 25,1 | 11,6 % |
-| `gates` | 20,8 | 9,6 % |
-| `merge` | 4,7 | 2,2 % |
+| `bookkeeping` | 81,8 | **37,5 %** |
+| `verification` | 81,5 | **37,4 %** |
+| `implementation` | 25,4 | 11,7 % |
+| `gates` | 21,0 | 9,6 % |
+| `merge` | 4,8 | 2,2 % |
 | `brief` | 2,5 | 1,2 % |
 | `unattributed` | 1,1 | 0,5 % |
-| **Summe** | **216,8** | |
+| **Summe** | **218,2** | |
 
 **Uhr 2 — Kalenderstunden** (Git, erster Branch-Commit → Merge). Sie enthält
 die Wartezeiten, die Uhr 1 wegwirft:
@@ -196,6 +231,9 @@ die Wartezeiten, die Uhr 1 wegwirft:
 | Commits pro Branch (Fenster) | 5 | 11 | 87 | 64 |
 | Main-Commits **nach** einem Merge (Fenster) | 3 | 9 | 12 | 64 |
 
+(Unverändert gegenüber der ersten Fassung: die Kalenderuhr kommt aus git und
+kennt keine Token, der Faltungsfehler konnte sie nicht berühren.)
+
 Der Median-Punkt ist in **unter einer Stunde** Kalenderzeit vom ersten
 Branch-Commit bis zum Merge durch, während er **1,39 Maschinenstunden**
 verbraucht (§1.7) — weil in dieser Stunde bis zu drei Agenten parallel laufen.
@@ -206,49 +244,51 @@ streckt als der Median vermuten lässt.
 
 | Scope | gewichtet | Anteil | Maschinen-h |
 | --- | ---: | ---: | ---: |
-| delegierte Agenten (171 Transkripte) | 585,6 M | **69,1 %** | 108,5 |
-| Hauptsitzungen (91 Transkripte) | 262,6 M | **30,9 %** | 108,5 |
+| delegierte Agenten (174 Transkripte) | 620,7 M | **70,2 %** | 109,2 |
+| Hauptsitzungen (91 Transkripte) | 264,1 M | **29,8 %** | 109,0 |
 
-Die beiden verbrauchen **exakt gleich viel Zeit**, aber die Agenten verbrauchen
-**mehr als doppelt so viele Tokens**. Ihre inneren Verteilungen sind fast
-gegensätzlich:
+Die beiden verbrauchen **fast exakt gleich viel Zeit**, aber die Agenten
+verbrauchen **mehr als doppelt so viele Tokens**. Ihre inneren Verteilungen
+sind fast gegensätzlich:
 
 | Phase | in den Agenten | in der Hauptsitzung |
 | --- | ---: | ---: |
-| `verification` | **61,3 %** | 17,0 % |
-| `implementation` | 14,3 % | 10,8 % |
+| `verification` | **59,7 %** | 17,1 % |
+| `implementation` | 15,2 % | 10,7 % |
 | `gates` | 12,0 % | 4,0 % |
-| `bookkeeping` | 10,0 % | **62,2 %** |
-| `merge` | 0,5 % | 4,0 % |
-| `brief` | 1,8 % | 2,0 % |
+| `bookkeeping` | 10,5 % | **62,3 %** |
+| `merge` | 0,6 % | 4,0 % |
+| `brief` | 1,9 % | 1,9 % |
 
 Das ist genau die Arbeitsteilung, die CLAUDE.md §6 vorschreibt (die
 Hauptsitzung delegiert und führt Buch, der Agent baut und prüft) — hier in
-Zahlen. Pro Punkt gemessen liegt der Agenten-Anteil im Median bei **88,2 %**
-der Kosten (p25 78,0 %, Minimum 41,4 %).
+Zahlen. Pro Punkt gemessen liegt der Agenten-Anteil im Median bei **89,2 %**
+der Kosten (p25 81,1 %, Minimum 43,1 %). Dass dieser Anteil gegenüber der
+ersten Fassung gestiegen ist, ist kein Verhaltensbefund, sondern die Korrektur:
+der unterzählte Output saß ausschließlich bei den Agenten (§1.0).
 
 ### 1.6 Wie viel Aufwand pro Task fix ist
 
 Zwei getrennt gemessene Größen, und beide sind **nicht** dasselbe:
 
-1. **Was in der Hauptsitzung zu keinem Branch gehört:** 228,1 M gewichtet
-   (26,9 % der Gesamtausgabe). Verteilt auf die 64 Merges des Fensters sind das
-   **3,56 M gewichtet je gemergtem Punkt** — ein *amortisierter* Wert, keine
+1. **Was in der Hauptsitzung zu keinem Branch gehört:** 233,3 M gewichtet
+   (26,4 % der Gesamtausgabe). Verteilt auf die 64 Merges des Fensters sind das
+   **3,65 M gewichtet je gemergtem Punkt** — ein *amortisierter* Wert, keine
    Messung pro Task: Orchestrierung, Board, Queue und Chat-Betrieb zerfallen
    nicht in Punkte.
 2. **Was innerhalb eines Punktes größenunabhängig aussieht** (`brief` +
-   `merge` + `bookkeeping` im Branch): Median **1,32 M**, p90 4,72 M,
-   Max 8,13 M gewichtet.
+   `merge` + `bookkeeping` im Branch): Median **1,33 M**, p90 5,00 M,
+   Max 8,47 M gewichtet.
 
-Zusammen liegt der Sockel bei rund **4,9 M gewichtet je Punkt**, gegen einen
-Median-Punkt von 5,69 M (§1.7). Das ist die belastbarste Einzelaussage der
+Zusammen liegt der Sockel bei rund **5,0 M gewichtet je Punkt**, gegen einen
+Median-Punkt von 5,82 M (§1.7). Das ist die belastbarste Einzelaussage der
 Messung — **der Sockel hat die Größenordnung eines ganzen Median-Punktes** —
 mit einem Fehlerbalken: der amortisierte Anteil aus (1) ist ein
 Fenster-Durchschnitt, und ein Fenster mit mehr Chat-Betrieb verschiebt ihn.
 
 **Diese Zahl ist zugleich der Preis jeder Maßnahme in §3:** wer einen
 Mechanismus baut, eröffnet einen Punkt und zahlt diesen Sockel. Das Fenster
-umfasst 847,6 M, also ist **1 % des Fensters = 8,5 M ≈ 1,7 Sockel**. Eine
+umfasst 884,8 M, also ist **1 % des Fensters = 8,8 M ≈ 1,8 Sockel**. Eine
 gebaute Maßnahme, die weniger als **≈ 0,6 % des Fensters** spart, verdient
 ihren Bau erst nach mehr als einem Fenster zurück; eine, die einen Guard
 berührt, kostet wegen Vier-Augen und Mechanismus-Review grob das Doppelte.
@@ -262,39 +302,39 @@ Transkript-Fragmente, keine Punkte; die Schwelle steht in `--min-weighted`):
 
 | Größe | Min | p25 | **Median** | p75 | p90 | **Max** |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| gewichtet | 0,40 M | 2,85 M | **5,69 M** | 13,07 M | 20,35 M | **101,76 M** |
-| roh | 2,4 M | 19,4 M | 45,8 M | 92,1 M | 149,5 M | 979,7 M |
-| Output-Tokens | 2 k | 23 k | 48 k | 82 k | 122 k | 213 k |
-| Maschinenstunden | 0,07 | 0,67 | **1,39** | 2,85 | 5,20 | **9,58** |
+| gewichtet | 0,42 M | 3,05 M | **5,82 M** | 14,54 M | 20,92 M | **102,63 M** |
+| roh | 2,4 M | 19,4 M | 45,8 M | 102,2 M | 149,7 M | 979,9 M |
+| Output-Tokens | 6 k | 60 k | 128 k | 204 k | 319 k | 516 k |
+| Maschinenstunden | 0,07 | 0,67 | **1,39** | 2,95 | 5,20 | **9,58** |
 
 **Das Geld liegt im Ausläufer.** Der teuerste Punkt allein (342,
-Ctrl-Beschriftung der Akteure) trägt **16,4 %** der punktzugeordneten Kosten;
-**10 von 64 Punkten tragen 50,2 %**; Mittelwert/Median = 1,70. Und die
+Ctrl-Beschriftung der Akteure) trägt **15,8 %** der punktzugeordneten Kosten;
+**10 von 64 Punkten tragen 48,8 %**; Mittelwert/Median = 1,75. Und die
 Verifikation konzentriert sich dort noch stärker: **die zehn teuersten Punkte
-halten 65,5 % aller punktzugeordneten Verifikations-Tokens.**
+halten 64,4 % aller punktzugeordneten Verifikations-Tokens.**
 
 Die teuersten zwölf, mit ihrem Verifikations-Anteil:
 
 | Punkt | gewichtet | Maschinen-h | davon `verification` |
 | ---: | ---: | ---: | ---: |
-| 342 | 101,8 M | 9,58 | 89,5 % |
-| 549 | 33,8 M | 3,11 | 95,4 % |
-| 479 | 28,1 M | 7,96 | 33,5 % |
-| 418 | 25,4 M | 4,55 | 78,0 % |
-| 485 | 24,1 M | 3,23 | 70,8 % |
-| 482 | 20,8 M | 5,20 | 52,4 % |
-| 323 | 20,4 M | 8,57 | 65,6 % |
-| 483 | 19,9 M | 1,21 | 68,1 % |
-| 475 | 18,3 M | 7,20 | 20,9 % |
-| 524 | 18,2 M | 2,95 | 60,4 % |
-| 493 | 17,2 M | 4,56 | 48,4 % |
-| 546 | 15,5 M | 3,94 | 36,3 % |
+| 342 | 102,6 M | 9,58 | 89,0 % |
+| 549 | 34,3 M | 3,11 | 95,4 % |
+| 479 | 29,7 M | 7,96 | 33,3 % |
+| 418 | 25,8 M | 4,55 | 77,5 % |
+| 485 | 24,4 M | 3,23 | 70,8 % |
+| 482 | 22,0 M | 5,20 | 51,4 % |
+| 323 | 20,9 M | 8,57 | 65,4 % |
+| 483 | 20,4 M | 1,21 | 66,9 % |
+| 475 | 19,2 M | 7,20 | 20,9 % |
+| 524 | 18,7 M | 2,95 | 60,9 % |
+| 493 | 18,2 M | 4,56 | 48,4 % |
+| 546 | 16,4 M | 3,94 | 37,3 % |
 
 Der Median-Punkt sieht ausgewogener aus — Anteile *innerhalb* eines Punktes,
-Median über die 64: `verification` 32,8 %, `bookkeeping` 20,2 %,
-`implementation` 19,7 %, `gates` 15,9 %, `brief` 1,4 %, `merge` 0,6 %. Der
+Median über die 64: `verification` 33,3 %, `bookkeeping` 19,3 %,
+`implementation` 19,8 %, `gates` 15,8 %, `brief` 1,4 %, `merge` 0,6 %. Der
 Unterschied zwischen diesem Median-Profil und der Gesamtverteilung aus §1.3
-(47,6 % Verifikation) ist selbst ein Befund: **die Verifikation dominiert nicht
+(47,0 % Verifikation) ist selbst ein Befund: **die Verifikation dominiert nicht
 den typischen Punkt, sondern den teuren.**
 
 ### 1.8 Die Grundgleichung — Antworten × Kontext
@@ -303,24 +343,24 @@ Die beiden Faktoren, aus denen fast jede Bezifferung in §3 folgt:
 
 | Größe (Fenster) | Wert |
 | --- | ---: |
-| Antworten (dedupliziert, gefaltet) | 32.531 |
+| Antworten (dedupliziert, gefaltet) | 32.746 |
 | Kontext je Antwort | Median **190 k**, p25 127 k, p75 270 k, p90 347 k |
-| Output je Antwort | Median **119 Tokens**, p90 565 |
-| gewichtete Kosten je Antwort | Median **21,9 k**, Mittel **26,1 k** |
-| Sekunden zwischen zwei Antworten (< 30 min) | Median **6,2 s**, Mittel **24,4 s**, p90 27,3 s |
-| Antworten je Punkt (branch-zugeordnet) | Median **238**, p75 417, p90 655, Max 2.438 |
+| Output je Antwort | Median **197 Tokens**, p75 437, p90 925 |
+| gewichtete Kosten je Antwort | Median **22,9 k**, Mittel **27,0 k** |
+| Sekunden zwischen zwei Antworten (< 30 min) | Median **6,2 s**, Mittel **24,4 s**, p90 27,4 s |
+| Antworten je Punkt (branch-zugeordnet) | Median **238**, p75 486, p90 655, Max 2.438 |
 | Boot-Sockel (Kontext der ersten Antwort) | Subagent **43,6 k**, Hauptsitzung **58,9 k** |
-| Kontext je Antwort nach Scope | Subagent **208 k**, Hauptsitzung **164 k** |
+| Kontext je Antwort nach Scope | Subagent **207 k**, Hauptsitzung **164 k** |
 
 Daraus zwei Rechenregeln, die im Folgenden benannt werden:
 
-- **Regel 1 (Antworten).** Eine gesparte Antwort spart median **21,9 k
+- **Regel 1 (Antworten).** Eine gesparte Antwort spart median **22,9 k
   gewichtet** und im Mittel **24,4 s Maschinenzeit**. Das ist der einzige
   Hebel, der auf **beiden** Achsen gleichzeitig zieht. Gegenprobe: 238
   Antworten × 24,4 s = 1,61 h gegen gemessene 1,39 Maschinenstunden, und 238 ×
-  21,9 k = 5,2 M gegen gemessene 5,69 M — die Gleichung trägt.
+  22,9 k = 5,45 M gegen gemessene 5,82 M — die Gleichung trägt.
 - **Regel 2 (Dauerlast).** 1 k Tokens, die in **jeder** Antwort mitgelesen
-  werden, kosten **3,25 M gewichtet je Fenster** (1 k × 0,1 × 32.531) bzw.
+  werden, kosten **3,27 M gewichtet je Fenster** (1 k × 0,1 × 32.746) bzw.
   **23,8 k je Median-Punkt**. Der Boot-Sockel eines Agenten (43,6 k) kostet
   damit **1,04 M je Punkt = 18 % eines Median-Punktes**, bevor eine einzige
   Projektdatei gelesen ist.
@@ -333,45 +373,64 @@ Daraus zwei Rechenregeln, die im Folgenden benannt werden:
 > Fenster richtige** und Opus' die für einen einzelnen Punkt. Beide stehen oben
 > nebeneinander.
 
-**Werkzeug-Taxonomie.** 33.318 Werkzeugaufrufe: Bash 26.665 (80,0 %), Edit
-2.734, Read 2.448, Write 619, ToolSearch 187, Monitor 186, Agent 181,
-TaskOutput 84, SendMessage 83, TaskStop 54, WebSearch 35, TodoWrite 23. **4,9 %
-der Antworten setzen mehr als einen Aufruf ab** (1.596 Antworten, 3,8 % der
-Kosten) — paralleles Werkzeugaufrufen ist fast ungenutzt.
+**Werkzeug-Taxonomie.** 33.567 Werkzeugaufrufe: Bash 26.841 (80,0 %), Edit
+2.768, Read 2.470, Write 633, ToolSearch 187, Monitor 186, Agent 184,
+TaskOutput 84, SendMessage 83, TaskStop 54, WebSearch 35, TodoWrite 23,
+WebFetch 18. **5,0 % der Antworten setzen mehr als einen Aufruf ab** (1.634
+Antworten, 4,2 % der Kosten) — paralleles Werkzeugaufrufen ist fast ungenutzt.
 
-Antworten nach Kommando-Klasse (die erste Bash-Regel gewinnt; die Klassen sind
-grob, das Ordnungsverhältnis ist robust — eigene Nachmessung, nicht Teil der
+Antworten nach Kommando-Klasse (die erste Bash-Regel gewinnt, gelesen an der
+**ersten** Werkzeugkarte der Antwort; die Klassen sind grob, das
+Ordnungsverhältnis ist robust — eigene Nachmessung, nicht Teil der
 Phasen-Zuordnung):
 
 | Klasse | Antworten | Anteil an der **Gesamtausgabe** |
 | --- | ---: | ---: |
-| Suchen/Lesen (`grep`, `find`, `ls`, `wc`, `head`, `cat`, `sed`, `awk`, `node -e`, `jq`) | 7.835 | **25,2 %** |
-| Nicht-Bash-Werkzeug (Edit/Read/Write/Agent/…) | 6.297 | 18,2 % |
-| Buchführungs-Skripte (`board`, `focus`, `batch-*`, Guards, `tasks-*`) | 4.755 | 12,5 % |
-| **Warten/Pollen** (`sleep`, `tail -f`, `ps`, `pgrep`, `--show`) | 2.798 | **11,1 %** |
-| Verify-Suiten starten | 2.499 | 6,6 % |
-| Gates (`build`/`lint`/`test:unit`/`audit`) | 1.782 | 4,7 % |
-| Git-Lesen | 1.349 | 3,8 % |
-| Git-Schreiben | 1.335 | 3,5 % |
-| **Leerlauf-Halter** (blankes `echo idle` / `true`) | 1.189 | **3,8 %** |
-| keine Werkzeugaufruf | 858 | 2,4 % |
-| sonstige Shell | 395 | 1,1 % |
-| `gh` | 162 | 0,4 % |
+| Suchen/Lesen (`grep`, `find`, `ls`, `wc`, `head`, `cat`, `sed`, `awk`, `node -e`, `jq`) | 7.821 | **25,1 %** |
+| Nicht-Bash-Werkzeug (Edit/Read/Write/Agent/…) | 6.441 | 19,2 % |
+| Buchführungs-Skripte (`board`, `focus`, `batch-*`, Guards, `tasks-*`) | 4.951 | 12,6 % |
+| **Warten/Pollen** (`sleep`, `tail -f`, `ps`, `pgrep`, `--show`) | 2.857 | **10,9 %** |
+| sonstige Shell | 1.731 | 7,9 % |
+| Verify-Suiten starten | 2.433 | 6,4 % |
+| Git-Schreiben | 1.617 | 4,2 % |
+| Gates (`build`/`lint`/`test:unit`/`audit`) | 1.449 | 3,8 % |
+| **Leerlauf-Halter** (blankes `echo idle` / `true`) | 1.189 | **3,6 %** |
+| Git-Lesen | 1.233 | 3,5 % |
+| kein Werkzeugaufruf | 866 | 2,4 % |
+| `gh` | 161 | 0,4 % |
+
+Die Klassenregeln sind bei dieser Neuerhebung neu formuliert worden und
+zerlegen das Fenster jetzt **vollständig** (die Zeilen summieren sich auf alle
+32.749 Antworten der Erhebung; die erste Fassung ließ 1.277 Antworten
+unklassifiziert). Deshalb verschieben sich die mittleren Klassen — Gates, Git,
+„sonstige Shell" — stärker, als das Fensterwachstum erklärt. Die beiden
+Klassen, auf denen die Maßnahmen 1 und 3 ruhen, sind **unverändert definiert**:
+der Leerlauf-Halter reproduziert mit exakt denselben 1.189 Antworten.
 
 Quer dazu, und **unabhängig nachgerechnet** (die Opus-Hälfte hatte diesen
 Befund gemeldet, er ist hier neu erhoben und **bestätigt**):
 
-- **Warten + Leerlauf-Halten zusammen: 3.987 Antworten = 14,8 % der gesamten
-  gewichteten Ausgabe (125,7 M).** Die Opus-Hälfte nannte 15,8 % über ein 48
-  Minuten kürzeres Fenster; die Differenz ist Fensterwachstum, nicht Dissens.
-  Die längste ununterbrochene Poll-Kette ist **437 Antworten = 11,5 M
-  gewichtet ≈ zwei Median-Punkte, für nichts**; die nächsten sind 285, 271,
-  135, 130, 91. **15 Ketten ≥ 10 tragen 1.482 Antworten = 5,2 % der
-  Gesamtausgabe.** Zählt man auch Kommandos mit, die einen echten Aufruf
-  *und* einen angehängten Leerlauf-Marker tragen, steigt die Klasse auf
-  21,6 % — das ist die Obergrenze der Spanne, 14,8 % die harte Untergrenze.
-- **Exakt wiederholte Shell-Kommandos in derselben Sitzung: 4.031 Antworten =
-  15,8 % der Ausgabe.** Ein Teil davon ist legitim (`git status` nach einer
+- **Warten + Leerlauf-Halten zusammen: 4.046 Antworten = 14,5 % der gesamten
+  gewichteten Ausgabe (128,5 M).** Die Opus-Hälfte nannte 15,8 % über ein
+  kürzeres Fenster und vor der Output-Korrektur; die Differenz ist
+  Fensterwachstum und der um 3,8 % gewachsene Nenner, nicht Dissens — Poll- und
+  Leerlauf-Antworten schreiben fast nichts, also **sinkt** ihr Anteil, wenn der
+  Output korrekt gezählt wird. Die längste ununterbrochene Poll-Kette ist
+  **437 Antworten = 11,5 M gewichtet ≈ zwei Median-Punkte, für nichts**; die
+  nächsten sind 285, 271, 135, 130, 91. **13 Ketten ≥ 10 tragen 1.461
+  Antworten = 4,9 % der Gesamtausgabe.** Zählt man auch Kommandos mit, die
+  einen echten Aufruf *und* einen angehängten Leerlauf-Marker tragen, steigt
+  die Klasse auf rund 21 % — das ist die Obergrenze der Spanne.
+  **Wie hart ist die Untergrenze?** Nachgemessen statt behauptet: von den 2.857
+  Antworten der Poll-Klasse sind **102 gar keine Wartevorgänge** (3,6 % der
+  Klasse, **0,42 % der Gesamtausgabe**) — fast ausschließlich
+  `git status … && git branch --show-current`, das die `--show`-Regel
+  einfängt. Die Untergrenze ist also **≈ 14,1 %**, und die 14,5 % sind eine
+  Untergrenze *mit dieser benannten Unschärfe*, nicht im strengen Sinn eine
+  harte. An der Größenordnung und an jeder Maßnahme, die darauf ruht, ändert
+  das nichts.
+- **Exakt wiederholte Shell-Kommandos in derselben Sitzung: 4.036 Antworten =
+  15,2 % der Ausgabe.** Ein Teil davon ist legitim (`git status` nach einer
   Änderung liest absichtlich neu).
 
 ### 1.9 Fehlerbalken, und was nicht messbar war
@@ -382,12 +441,12 @@ Befund gemeldet, er ist hier neu erhoben und **bestätigt**):
   einzige Größe hier mit längerem Horizont.
 - **Der Füll-Fehlerbalken ist halbiert, aber nicht verschwunden.** 97,4 % der
   Antworten setzen einen Werkzeugaufruf ab, aber nur **48,4 %** setzen einen
-  ab, den der Klassifikator als Phasen-Evidenz liest (43,1 % der Kosten):
+  ab, den der Klassifikator als Phasen-Evidenz liest (43,8 % der Kosten):
   Shell-Plumbing (`grep`, `git status`, `cat`) bekommt bewusst **keine**
   Stimme. Die übrigen erben die Phase des nächstgelegenen Evidenz-Turns
   **derselben Sitzung** und nie über eine Leerlauf-Lücke hinweg; nach dem
   Füllen bleiben 0,1 % offen. Der Satz „der ganze Fehlerbalken verschwindet"
-  aus der Opus-Hälfte ist also **zu stark** — er halbiert sich (22,8 % → 43,1 %
+  aus der Opus-Hälfte ist also **zu stark** — er halbiert sich (22,8 % → 43,8 %
   der Kosten mit eigener Evidenz).
 - **Die Proportional-Aufteilung eines Turns greift jetzt, aber selten:** 0,5 %
   der Kosten liegen auf Antworten, die mehrere Phasen berühren.
@@ -398,25 +457,33 @@ Befund gemeldet, er ist hier neu erhoben und **bestätigt**):
   datiert Turns, nicht Prozesse); wie viel eines evidenzfreien Turns Denken
   gegen Lesen ist; und die tatsächliche Rechnung in Euro — die Gewichtung ist
   ein Proxy (§2f).
-- **Bekannter Unterzähler bei `output_tokens` (Review-Befund, 09.08.2026,
-  unkorrigiert):** die Annahme „jede Zeile einer Antwort wiederholt dieselbe
-  `usage`" ist für die Cache-Zähler richtig, für `output_tokens` **falsch** —
-  dort schreibt die Harness einen **wachsenden** Zwischenstand (nachgemessen:
-  6.658 von 13.564 mehrzeiligen Antworten differieren, jede Folge monoton
-  steigend). Die Faltung nimmt die ERSTE Zeile und unterzählt Output damit um
-  rund die Hälfte: 7,6 M → 14,0 M roh, gewichtet +3,8 % auf die Gesamtsumme
-  (849 → 881 M); der Output-Anteil ist real ≈ 7,9 % statt 4,5 %, der
-  Median-Output je Antwort entsprechend höher. **Keine Rangfolge kippt** —
-  Cache-Read bleibt mit ~76 % dominant, und die Verwerfungen „kürzere
-  Berichte" / „Reasoning-Effort senken" (§4) halten auch bei verdoppelter
-  Basis (ihre Arithmetik verdoppelt sich mit). Die Behebung — die Faltung
-  nimmt je Zähler das MAXIMUM über die Zeilen, im Gleichschritt mit
-  `measure-context-cost.mjs`, das denselben Unterzähler hat — steht aus und
-  gehört zum Messwerkzeug-Punkt, nicht in dieses Dokument gepatcht.
+- **Der Output-Unterzähler ist BEHOBEN (Review-Befund 09.08.2026, Behebung
+  09.08.2026), und die Faltungsregel ist am Rohbestand geprüft, nicht
+  angenommen.** Die Annahme „jede Zeile einer Antwort wiederholt dieselbe
+  `usage`" ist für die Cache-Zähler richtig, für `output_tokens` falsch — dort
+  schreibt die Harness einen wachsenden Zwischenstand. Beide Werkzeuge falten
+  jetzt **je Zähler auf das Maximum** (`foldUsage`). Was dafür nachgemessen
+  wurde, über alle 32.697 Antworten des Bestands:
+  - `input_tokens` variiert **innerhalb keiner einzigen** Antwort;
+  - `cache_read_input_tokens` variiert in **einer** Antwort, und dort steigend;
+  - `output_tokens` variiert in **6.708** Antworten und fällt in **keiner** —
+    die Monotonie hält also, sie wurde nicht unterstellt;
+  - **eine** Antwort fällt aus der Regel: ein Modell-Fallback, bei dem ein
+    ZWEITER API-Aufruf unter derselben `message.id` abgerechnet wurde und die
+    Zähler neu anfangen. Dort ist das Maximum zu **klein**, und die Faltung
+    summiert stattdessen den `iterations`-Block, den genau diese Zeile
+    mitführt. Das ist der Grund, die Regel nicht zu erzwingen: sie ist für
+    32.696 Antworten richtig und für eine nachweislich nicht.
+  Der Effekt der Behebung steht in §1.0; das Wichtigste hier: **keine Rangfolge
+  kippt**, Cache-Read bleibt mit 75,8 % dominant. Die Summe der Zeilen wäre die
+  falsche Alternative gewesen — sie bläht die Rohsumme um 38 % auf.
 - **Reproduzierbarkeit:** der Batch schreibt weiter, das Fenster wächst also
   mit jedem Lauf. Die Zahlen oben sind ein Schnappschuss vom 09.08.2026,
-  11:18 UTC; `node scripts/measure-task-cost.mjs` liefert den jeweils aktuellen
-  Stand, nicht exakt diese Werte.
+  11:55 UTC; `node scripts/measure-task-cost.mjs` liefert den jeweils aktuellen
+  Stand, nicht exakt diese Werte. Die Nebenrechnungen dieses Abschnitts
+  (Kommando-Klassen, Ketten, Output-Zerlegung) sind in denselben Minuten
+  erhoben und liegen um bis zu 30 Antworten daneben — das ist die Drift des
+  laufenden Batches, kein Rechenunterschied.
 
 ---
 
@@ -442,17 +509,26 @@ beide Ideenlisten sie abgeräumt haben (§1.0, Punkt 2).
 **c) „87–94 % der Ausgabe über 150 k Kontext" — teilweise widerlegt, und der
 Vergleich ist mit diesen Daten gar nicht sauber führbar.**
 `node scripts/measure-context-cost.mjs` misst im Scope *nur Hauptsitzungen*
-**67,8 %** nach der ersten Übergabe des Fensters (davor 82,4 %), im Scope
-*inklusive Subagenten* aber **80,0 %** — und dort ist der Wert **gestiegen**
-(davor 75,9 %). Zwei Dinge folgen: der Anker beschreibt ein Regime, das oben
+**68,2 %** nach der ersten Übergabe des Fensters (davor 82,4 %), im Scope
+*inklusive Subagenten* aber **78,9 %** — und dort ist der Wert **gestiegen**
+(davor 74,0 %). Zwei Dinge folgen: der Anker beschreibt ein Regime, das oben
 nicht mehr gilt, und der Effekt der Punktgrenze ist im ehrlichen Gesamt-Scope
 nicht sichtbar. Einschränkung: das „davor" liegt am 03./04.08. und **nicht** vor
 der Einführung der Grenze — die alten Transkripte fehlen. Der saubere
 Vorher-Nachher-Vergleich ist aus diesen Daten **nicht** herstellbar.
+**Nach der Faltungskorrektur nachgeprüft** (§1.0): der Hauptsitzungs-Scope
+bewegt sich um **keine einzige Stelle**, weil der wachsende Output-Zwischenstand
+nur in den Agenten-Transkripten steht; im Gesamt-Scope fallen die
+Großkontext-Anteile um rund 1,5 Punkte, weil der korrekt gezählte Output auch
+auf kleinkontextigen Antworten sitzt. Die Aussage des Absatzes ist davon
+unberührt. Was das für die schon veröffentlichten %/h-Zahlen zu Punkt 373
+bedeutet, steht in `docs/batch-autonomy.md` an der Messung selbst — kurz: die
+abgeleitete Rate ist ein **Verhältnis**, und der Unterzähler wirkte auf beide
+Seiten fast gleich, also verschiebt er sie nur von 0,988 auf 0,997 %/h.
 
 **d) „~3 M Tokens pro Workflow-Fan-out" — die Einheit ist unklar, und in jeder
 Lesart ist die Zahl heute kein Ausnahmefall mehr.** Gewichtet kostet der
-**Median**-Punkt 5,69 M und der p90-Punkt 20,35 M; roh kostet der Median-Punkt
+**Median**-Punkt 5,82 M und der p90-Punkt 20,92 M; roh kostet der Median-Punkt
 45,8 M. In beiden Lesarten liegt ein gewöhnlicher Punkt heute über der Marke,
 die damals einen großen Fan-out kennzeichnete.
 
@@ -460,7 +536,7 @@ die damals einen großen Fan-out kennzeichnete.
 Projekts" — als Wall-Clock-Aussage bestätigt, als Token-Aussage widerlegt.**
 Dort gemessen: ein LARGE-Lauf auf einem Backend braucht 2.536 s = 42,3 min und
 schreibt 93 Frames; sie **anzusehen** kostet 150.289 Tokens, auf beiden Backends
-294.096. Diese Messung zeigt: die Phase `verification` verbraucht **3.294 M
+294.096. Diese Messung zeigt: die Phase `verification` verbraucht **3.300 M
 rohe** Tokens im Fenster. Selbst wenn jeder Frame jedes Laufs angesehen worden
 wäre, läge das Ansehen bei einem Bruchteil eines Prozents davon. **Der Preis der
 Bild-Prüfung liegt nicht im Ansehen der Bilder, sondern in der Schleife um den
@@ -493,7 +569,7 @@ abgerufen 09.08.2026.)
 - **Zwei Achsen, nie addiert.** Jede Maßnahme nennt getrennt, was sie auf
   Achse A (Wall-Clock) und auf Achse B (Tokens) tut.
 - **Baukosten gegengerechnet (§1.6).** Jede gebaute Maßnahme ist selbst ein
-  Arbeitsauftrag-Punkt mit ~4,9 M Sockel ≈ 0,6 % des Fensters; mit
+  Arbeitsauftrag-Punkt mit ~5,0 M Sockel ≈ 0,6 % des Fensters; mit
   Guard-Berührung grob das Doppelte. Die Spalte „Netto" sagt, ob sich der Bau
   **innerhalb eines Fensters** trägt.
 - **Die Prozente sind nicht additiv.** Sie überschneiden sich (eine Poll-Antwort
@@ -503,9 +579,9 @@ abgerufen 09.08.2026.)
 
 | # | Maßnahme | Herkunft | Achse B (Tokens) | Achse A (Wall-Clock) | Bau | Netto im Fenster |
 | ---: | --- | --- | --- | --- | --- | --- |
-| 1 | Blockierend warten statt pollen | [A+B] | **−7 bis −9 %** (gemessen 11,1 % Poll) | neutral bis **+** | klein | **stark positiv** |
+| 1 | Blockierend warten statt pollen | [A+B] | **−7 bis −9 %** (gemessen 10,9 % Poll) | neutral bis **+** | klein | **stark positiv** |
 | 2 | Unabhängige Werkzeugaufrufe bündeln | [A+B] | **−4 bis −7 %** | **−4 bis −7 %** | **keiner** (Disziplin) | **stark positiv** |
-| 3 | Leerlauf-Marker per Hook statt `echo idle` | [nur A] | **−3,8 %** (gemessen) | neutral | klein, Guard-nah | **positiv** |
+| 3 | Leerlauf-Marker per Hook statt `echo idle` | [nur A] | **−3,6 %** (gemessen) | neutral | klein, Guard-nah | **positiv** |
 | 4 | Fenstergrenze auch INNERHALB eines Punktes | [nur A] | **−35 bis −45 % je Punkt** (grob) | leicht − | mittel, Pilot nötig | positiv, **höchstes Risiko** |
 | 5 | Verifikations-Leiter: billig iterieren, teuer einmal beweisen | [nur B] | −5 bis −15 % (grob, am Ausläufer) | **+** | klein (Regel) | **positiv** |
 | 6 | Der Lande-Befehl: Buchführungsketten als EIN Kommando | [A+B] | −1,3 bis −1,9 % | **−** (serieller Engpass) | mittel | positiv |
@@ -518,7 +594,7 @@ abgerufen 09.08.2026.)
 | 13 | Worktree-Bootstrap: `node_modules` teilen | [nur B] | klein | **1–3 min je Agent** | sehr klein | positiv |
 | 14 | Wiederholte identische Abfragen abstellen | [nur A] | −3 bis −5 % (grob) | − | keiner (Disziplin) | positiv |
 | 15 | Brief liefert Code-Orientierung (Pfadliste / Modul-Landkarte) | [A+B] | −2 % je Punkt | − | klein | positiv |
-| 16 | Cache-Präfix- und TTL-Messung | [A+B] | unbeziffert (16,8 % Cache-Write ist der Topf) | keine | klein (Messung) | positiv als Messung |
+| 16 | Cache-Präfix- und TTL-Messung | [A+B] | unbeziffert (16,2 % Cache-Write ist der Topf) | keine | klein (Messung) | positiv als Messung |
 | 17 | Guard-Vorabprüfung erweitern + Guard-Telemetrie | [A+B] | −1 bis −3 % (Ausläufer) | − | klein/mittel | positiv |
 | 18 | Buchführung delegieren statt im 300-k-Kontext fahren | [nur A] | −4 bis −6 % (bedingt) | + | groß, Lease-Eingriff | offen |
 | 19 | Projekteigene Abfragekommandos statt ad-hoc-`grep` | [nur A] | −3 bis −4 % (grob) | − | mittel, je Kommando | positiv, gestaffelt |
@@ -539,10 +615,10 @@ abgerufen 09.08.2026.)
 Nur die Angaben, die die Tabelle nicht trägt: Gegenkosten, Risiko, und was wahr
 sein müsste.
 
-**1 — Blockierend warten statt pollen [A+B].** Gemessen 2.798 Poll-Antworten =
-11,1 % der Gesamtausgabe (93,8 M), die längste Kette 437 Antworten = 11,5 M.
-Ein LARGE-Lauf dauert 42,3 min; bei 30-s-Poll sind das ~84 Antworten × 21,9 k =
-**1,84 M je Lauf**, ein Drittel eines Median-Punktes für einen Lauf, dessen
+**1 — Blockierend warten statt pollen [A+B].** Gemessen 2.857 Poll-Antworten =
+10,9 % der Gesamtausgabe (96,6 M), die längste Kette 437 Antworten = 11,5 M.
+Ein LARGE-Lauf dauert 42,3 min; bei 30-s-Poll sind das ~84 Antworten × 22,9 k =
+**1,93 M je Lauf**, ein Drittel eines Median-Punktes für einen Lauf, dessen
 Ergebnis ein Wort ist. Ersatz: ein blockierender Aufruf (Bash-`timeout`, max.
 600 s) oder `run_in_background` plus die Fertig-Benachrichtigung, die die
 Harness liefert und die `docs/harness-primitives-evaluation.md` §5 bereits als
@@ -566,10 +642,10 @@ sichtbar, ohne einen neuen Blocker zu bauen [nur B]. Für die Gates gilt dasselb
 im Kleinen (1–3 min je Lauf, aber hohe Frequenz) [nur B].
 
 **2 — Unabhängige Werkzeugaufrufe in EINEM Zug bündeln [A+B].** Gemessen setzen
-nur **4,9 %** der Antworten mehr als einen Aufruf ab, während 80 % aller Aufrufe
-Shell-Kommandos sind und Suchen/Lesen mit 25,2 % der Ausgabe der größte
-Einzelposten ist. Würde nur die Hälfte der 7.835 Such-/Lese-Antworten zu
-Zweierpaaren, fielen ~1.960 Antworten weg: **−5 bis −6 % auf beiden Achsen**,
+nur **5,0 %** der Antworten mehr als einen Aufruf ab, während 80 % aller Aufrufe
+Shell-Kommandos sind und Suchen/Lesen mit 25,1 % der Ausgabe der größte
+Einzelposten ist. Würde nur die Hälfte der 7.821 Such-/Lese-Antworten zu
+Zweierpaaren, fielen ~1.955 Antworten weg: **−5 bis −6 % auf beiden Achsen**,
 ohne dass sonst irgendetwas geschieht.
 *Gegenkosten:* keine — dieselbe Arbeit in weniger Runden.
 *Risiko:* zwei Kommandos in einem Zug, die **doch** voneinander abhängen (ein
@@ -582,11 +658,11 @@ Disziplin**, und Disziplin wirkt in diesem Projekt nachweislich schlecht
 nicht baubar — „hätte gebündelt werden können" ist maschinell kaum entscheidbar.
 Der realistische Weg ist ein Baustein im Delegations-Prompt **plus die
 Nachmessung** (der Anteil der Mehrfach-Antworten ist mit
-`measure-task-cost.mjs` messbar und heute 4,9 % — steigt er nicht, wirkt die
+`measure-task-cost.mjs` messbar und heute 5,0 % — steigt er nicht, wirkt die
 Maßnahme nicht).
 
 **3 — Leerlauf-Marker per Hook statt `echo idle` [nur A].** 1.189 Antworten,
-**3,8 % der Gesamtausgabe**, gemessen. Das Kommando existiert nur, weil ein
+**3,6 % der Gesamtausgabe**, gemessen. Das Kommando existiert nur, weil ein
 Guard „kein Leerlauf-Stopp" durchsetzt; es ist ein Modell-Zug, der nichts tut,
 außer einen Zähler zu bedienen. Ein Marker, den ein **Hook** setzt, leistet
 dasselbe.
@@ -599,7 +675,7 @@ Fenstergrenze an die Punktgrenze gekoppelt; ein Punkt läuft in **einem** Fenste
 und der Kontext wächst über seine 238 Median-Antworten von 44 k auf ~250 k
 (Median über alle Antworten: 190 k). Schneidet man an jedem grünen, gepushten
 Commit, liegt der mittlere Kontext bei rund 73 k statt 190 k: die
-Cache-Read-Komponente (78,7 % der gewichteten Ausgabe) fiele grob auf ein
+Cache-Read-Komponente (75,8 % der gewichteten Ausgabe) fiele grob auf ein
 Drittel bis die Hälfte.
 *Gegenkosten Achse A:* der Wiederaufsatz — `batch-resume-hook.mjs` orientiert
 eine frische Sitzung für **~600 Tokens**, also 1–2 Antworten je Schnitt, gegen
@@ -643,9 +719,9 @@ prüfen, dann alles schreiben. Mechanismus-Review nötig, da er Guard-nahe Ablä
 bündelt.
 
 **7 — Die Ausläufer-Bremse [A+B, drei verschiedene Mechanismen, alle drei
-behalten].** Das Ziel ist gemessen: **10 von 64 Punkten tragen 50,2 %** der
-punktzugeordneten Kosten, die zehn teuersten halten **65,5 %** aller
-Verifikations-Tokens, der teuerste allein 16,4 %.
+behalten].** Das Ziel ist gemessen: **10 von 64 Punkten tragen 48,8 %** der
+punktzugeordneten Kosten, die zehn teuersten halten **64,4 %** aller
+Verifikations-Tokens, der teuerste allein 15,8 %.
 - *(a) Sichtbarkeit* [nur A]: `measure-task-cost.mjs` kann je Branch messen; ein
   Hook meldet beim Überschreiten des 3-fachen Medians, und dann wird
   **entschieden**. Heute merkt niemand, dass ein Punkt 100 M kostet, bis er
@@ -660,7 +736,7 @@ Verifikations-Tokens, der teuerste allein 16,4 %.
 - *(c) Vorhersage-Split beim Einstellen* [nur B]: ein Punkt, dessen Spec Render
   + beide Backends + mehrere Systeme berührt, wird beim **Einstellen**
   geschnitten — aber nur, wenn er nach Einschätzung ≥ 3× Median (≥ ~17 M) wird,
-  weil jeder Teilpunkt den Sockel von 4,9 M kostet.
+  weil jeder Teilpunkt den Sockel von 5,0 M kostet.
 *Gemeinsames Risiko (Retrospektive §3.33):* eine Ersparnis, die Nacharbeit
 auslöst, ist keine. Ein teurer Punkt ist oft teuer, *weil* er schwer ist.
 Deshalb **Warnung + Entscheidung, nie automatischer Abbruch.**
@@ -701,7 +777,7 @@ mitgelesen: 10 k × 0,1 × 218 = **218 k gewichtet, so viel wie zehn Antworten.*
 `gh run view`.
 *Gegenkosten Achse A:* leicht negativ — eine zu knappe Ausgabe erzwingt einen
 Nachschlag-Zug. Der Tausch lohnt bis zu einer Nachschlagquote von ~85 % (ein
-Nachschlag kostet 21,9 k, eine gesparte 10-k-Ausgabe bringt bis zu 218 k).
+Nachschlag kostet 22,9 k, eine gesparte 10-k-Ausgabe bringt bis zu 218 k).
 *Risiko:* gering, **solange die Fehlerausgabe unbeschnitten bleibt** —
 `run-logged` macht das bereits richtig.
 *Feld-Bestätigung:* „regelbasiertes Beschneiden filtert Umgebungsrauschen,
@@ -734,6 +810,14 @@ Ergebnis beeinflussen kann.** Ein zu enger Hash ist ein grüner Haken gegen eine
 falschen Proxy — genau die Falle, die die Verifikations-Disziplin verbietet.
 Konservativ schneiden, Mechanismus-Review, und der finale Merge-Beweis bleibt
 echt.
+*Entschieden (Review-Frage: geht A-F2 „prüfen, ob Gates doppelt laufen" hierin
+auf?):* **nein, aber es ist auch keine eigene Maßnahme.** A-F2 ist die MESSUNG,
+die diesen Bau überhaupt erst rechtfertigt oder tötet — wie oft läuft
+`npm run build` im selben Branch ohne Änderung dazwischen, zwischen Pre-Push-Hook,
+Fast-Gate nach dem Merge und CI. Sie steht deshalb als **Vorbedingung von 12** und
+nicht als Ranglisteneintrag: fällt die Zahl klein aus, entfällt 12 ersatzlos, und
+die Messung hat einen Punkt Baukosten gespart. Der Wiederholungsdetektor aus §1.8
+(15,2 % exakt wiederholte Kommandos) liefert sie ohne neuen Bau.
 
 **13 — Worktree-Bootstrap [nur B].** Ein frischer Worktree hat kein
 `node_modules`; jeder Agent installiert neu oder läuft in ein falsches Rot
@@ -748,7 +832,7 @@ Testbasis. Der Bootstrap muss den Lockfile-Hash prüfen und bei Abweichung echt
 installieren.
 
 **14 — Wiederholte identische Abfragen abstellen [nur A].** 4.031 Antworten
-(15,8 %) sind ein Shell-Kommando, das in derselben Sitzung schon wortgleich
+(15,2 %) sind ein Shell-Kommando, das in derselben Sitzung schon wortgleich
 lief. Ein Teil ist legitim; der illegitime Teil ist das erneute Suchen nach
 einem Fakt, der schon im Kontext steht.
 *Risiko:* ein zwischenzeitlich veralteter Fakt wird nicht neu geholt — deshalb
@@ -770,7 +854,7 @@ Hinweis kennzeichnen, nicht als Vorgabe, und aus dem Baum **generieren**, nicht
 pflegen (Retrospektive §3.37: ein Werkzeug, das rät, ersetzt still).
 
 **16 — Cache-Präfix- und TTL-Messung [A+B].** Der Cache ist ein Präfix-Match:
-jede Byte-Änderung im Präfix entwertet alles danach. Gemessen sind 16,8 % der
+jede Byte-Änderung im Präfix entwertet alles danach. Gemessen sind 16,2 % der
 gewichteten Ausgabe Cache-Write bei nur 1,7 % der rohen Tokens (140 M
 gewichtet) — der zweitgrößte Zählerposten, und niemand hat geprüft, ob er
 niedriger sein könnte. Zwei prüfbare Verdachtsquellen: **(a)** Hook-Ausgaben
@@ -828,9 +912,9 @@ Punkt ≈ −3 % der Maschinenzeit.
 *Risiko:* **ein inkrementeller Grün-Status ist kein Abnahme-Beweis** — strikt auf
 die Iteration begrenzen.
 
-**21 — Verwandte Punkte in einem Branch bündeln [A+B].** Der Sockel ist 4,9 M
-gegen einen Median-Punkt von 5,69 M. Zwei verwandte Punkte in **einem** Branch
-sparen grob den amortisierten Hauptsitzungs-Anteil (3,56 M) und kosten das
+**21 — Verwandte Punkte in einem Branch bündeln [A+B].** Der Sockel ist 5,0 M
+gegen einen Median-Punkt von 5,82 M. Zwei verwandte Punkte in **einem** Branch
+sparen grob den amortisierten Hauptsitzungs-Anteil (3,65 M) und kosten das
 zusätzliche Kontextwachstum (~0,5–1 M): **netto −2,5 bis −3 M je Paar.** Für die
 ~16 Punkte unter p25 (≤ 2,85 M) ist der Sockel **größer als der Punkt**.
 *Gegenkosten Achse A:* der Kalender-Median steigt (zwei Punkte werden gemeinsam
@@ -864,6 +948,14 @@ fester Schritt im Closing-Zyklus (`CLOSING_STEPS`), damit jede Strukturmaßnahme
 ihren Vorher/Nachher-Vergleich bekommt statt eines Bauchgefühls. Kostet Minuten
 je Closing, Risiko keins — und ohne sie ist keine Maßnahme dieser Liste
 abrechenbar.
+*Entschieden (Review-Frage: ist die Nachmess-Hälfte von B-V8 — „was hat Punkt 571
+gebracht?" — hierin aufgegangen?):* **ja.** B-V8 bestand aus einer
+Institutionalisierung (das ist 24) und einer einmaligen Nachmessung; sobald 24
+steht, liefert der erste institutionalisierte Lauf genau diesen Vorher/Nachher
+mit. Ein eigener Ranglisteneintrag wäre eine Maßnahme, deren ganzer Inhalt der
+erste Lauf einer anderen ist. Sie bleibt als **erste konkrete Frage, die 24
+beantworten muss**, hier vermerkt — mit der Einschränkung, die schon in der
+B-Hälfte stand: die einzige Doppelmessung ist n = 1.
 
 **25 — Deterministische Aufnahme [A+B].** Heute bewegen zwei Läufe **derselben**
 Suite auf **identischem** Code 10,9–98,6 % der Pixel, während der kleinste echte
@@ -879,7 +971,7 @@ Golden-Image-Vorfilter wäre gemessen 12× auf einer typischen Änderung).
 kleines Investitionspaket mit **messbarem Abbruchkriterium**.
 
 **26 — Der Agent sieht seinen eigenen Verbrauch [nur A].** Der
-Delegations-Prompt nennt den Median (5,69 M / 238 Antworten) als Erwartung, und
+Delegations-Prompt nennt den Median (5,82 M / 238 Antworten) als Erwartung, und
 der Agent prüft sich einmal in der Mitte.
 *Risiko, das gegen die Maßnahme spricht:* die Literatur warnt, dass ein
 sichtbarer Zähler ein Modell zu früh abschließen lässt („Kontext-Angst",
@@ -890,7 +982,7 @@ ist nicht dasselbe wie ein Kontextzähler, aber die Nähe ist zu beachten.
 
 **27 — Deterministische Buchführung in Hooks [nur A].** Board-Publish,
 Batch-Marker, CI-Statusprüfung, Zeitstempel sind Schritte ohne Urteil; jeder als
-Hook statt als Werkzeugaufruf spart eine Antwort à 21,9 k (grob −1,6 %).
+Hook statt als Werkzeugaufruf spart eine Antwort à 22,9 k (grob −1,6 %).
 *Risiko:* **mittel bis hoch.** Ein Hook, der schreibt, ist schwer zu debuggen;
 Retrospektive §3.38 und §3.43 sind beide an dieser Klasse entstanden.
 *Voraussetzung:* der Schritt ist wirklich urteilsfrei. Board-**Karten** sind es
@@ -899,7 +991,7 @@ nicht (sie formulieren), Board-**Publish** ist es.
 **28/29 — `npm audit` nur bei Lock-Änderung [nur A] · Board-Publish nur bei
 Änderung [nur B].** Beide < 0,3 %, beide trivial. Sie sind hier, damit die
 Vereinigung sie nicht verliert, aber **keiner von beiden rechtfertigt einen
-eigenen Punkt** (Sockel 4,9 M) — sie gehören in ein bestehendes Bündel. Bei
+eigenen Punkt** (Sockel 5,0 M) — sie gehören in ein bestehendes Bündel. Bei
 `npm audit` ist Kriterium 18 zu **präzisieren** („nach jeder Änderung" → „nach
 jeder Änderung am Abhängigkeitsbaum"), nicht zu lockern; CI fährt es ohnehin.
 
@@ -953,19 +1045,19 @@ geschrieben; sie sind hier vereinigt und **keine wurde fallengelassen**.
 | **Frames weglassen / die teure Suite aufteilen** | [A+B] | Der Korpus läuft andersherum: der Horizontstreifen wurde durch **Hinzufügen** eines Frames gefunden. |
 | **Allgemeine Pfad→Suite-Kopplungskarte** | [A+B] | Vom Replay getötet (`TravelScene.tsx` liegt in drei Suiten). Nur die Verengung auf reine `src/ui/`-Änderungen überlebte und **ist implementiert**. |
 | **Abdeckungsbasierte Testauswahl** (gemessene statt geratener Kopplung) | [nur A, mit ausdrücklichem Risikovermerk] | **Hier als „nicht jetzt" eingeordnet.** Es ist ein *anderes* Instrument als die verworfene Karte, aber: erheblicher Bau (Instrumentierung eines Browser-Laufs), laufende Kosten, und **die Verifikations-Disziplin steht auf dem Spiel** — eine Abdeckungsmessung sagt, welche Datei *ausgeführt* wurde, nicht welche das **Bild** verändert. Der gestufte Küstenverlauf kam aus einer Datei, die zur Laufzeit Geometrie liefert. Die Literatur (Rothermel/Harrold; minware; Parasoft, alle abgerufen 09.08.2026) meldet ≥ 50 % Ersparnis — **Hypothese**, und sie gilt für Unit-Suiten, nicht für Bildprüfungen. |
-| **Punkte grundsätzlich kleiner schneiden** | [nur A] · Gegenposition [nur B: S1] | Rechnet sich **nicht**: Punkte halbieren verdoppelt den Sockel (4,9 M) und spart nur Kontextwachstum. **Auflösung des Widerspruchs:** Fables Vorschlag ist damit *vereinbar*, weil er den Split ausdrücklich auf Punkte ≥ 3× Median beschränkt — dort übersteigt die Ersparnis den zweiten Sockel. Als Maßnahme 7(c) übernommen, als **allgemeine** Regel verworfen. |
+| **Punkte grundsätzlich kleiner schneiden** | [nur A] · Gegenposition [nur B: S1] | Rechnet sich **nicht**: Punkte halbieren verdoppelt den Sockel (5,0 M) und spart nur Kontextwachstum. **Auflösung des Widerspruchs:** Fables Vorschlag ist damit *vereinbar*, weil er den Split ausdrücklich auf Punkte ≥ 3× Median beschränkt — dort übersteigt die Ersparnis den zweiten Sockel. Als Maßnahme 7(c) übernommen, als **allgemeine** Regel verworfen. |
 | **Den Arbeitsauftrag weiter aufteilen / das Archiv verschlanken / den Brief weiter optimieren** | [A+B] | **Neu begründet nach der Messkorrektur:** die Phase `brief` ist 1,9 % der Gesamtausgabe (nicht 0,5 %), Median 103 k je Punkt = 1,4 % eines Punktes. Das ist immer noch zu klein, um einen 4,9-M-Punkt zu tragen — aber die Begründung ist jetzt eine Abwägung, keine Selbstverständlichkeit. Die 1,2 M Zeichen des Archivs werden im Normalbetrieb von niemandem gelesen. **Ausnahme:** Maßnahme 15 (Code-Orientierung im Brief) ist etwas anderes und bleibt. |
-| **Kürzere Berichte / knapper schreiben als Sparmaßnahme** | [A: als kleine Maßnahme] · [B: ausdrücklich NICHT als Hebel] | **Aufgelöst zugunsten von B.** Output ist 4,5 % gewichtet; selbst 30 % knapperes Schreiben spart ~1,4 %. Schreibdisziplin lohnt für Lesbarkeit, nicht für Tokens — und ein zu knapper Bericht kostet eine Rückfrage. Retrospektive §3.57: „die Anleitung an den Nutzer ist die schlechteste aller Antworten." **Kein Widerspruch zu Maßnahme 10:** dort geht es um GELESENE Werkzeug-Ausgaben, hier um GESCHRIEBENE Prosa. |
-| **Reasoning-Effort senken / Denk-Token deckeln** | [nur B] | Output + Denken sind zusammen 4,5 % gewichtet; selbst eine Halbierung wäre ≤ 2,3 %, gegen ein reales Qualitätsrisiko und die stehende Nutzer-Regel „Effort High für Implementierung". Musterfall „externe Zahl überlebt die eigene Messung nicht" (Quellen: Boundev; T-Minus AI, abgerufen 09.08.2026, melden 3–7× Denk-Token auf mechanischen Schritten). |
+| **Kürzere Berichte / knapper schreiben als Sparmaßnahme** | [A: als kleine Maßnahme] · [B: ausdrücklich NICHT als Hebel] | **Aufgelöst zugunsten von B — und die Output-Korrektur (§1.0) macht die Verwerfung SCHÄRFER, nicht schwächer.** Der Output ist zwar 8,0 % statt 4,5 % gewichtet, aber die alte Rechnung „30 % knapper spart ~1,4 %" hat den falschen Topf angegriffen: von den 8,0 % liegen nur **0,43 Prozentpunkte** auf Antworten ohne jeden Werkzeugaufruf, also auf der Prosa, die ein Mensch liest. Der Rest ist Denken und die Argumente der Werkzeugaufrufe (Edits, Dateiinhalte, Kommandos) — Code, kein Stil. 30 % knapper zu schreiben spart damit **~0,13 % des Fensters**, eine Größenordnung weniger als bisher angenommen. Schreibdisziplin lohnt für Lesbarkeit, nicht für Tokens — und ein zu knapper Bericht kostet eine Rückfrage. Retrospektive §3.57: „die Anleitung an den Nutzer ist die schlechteste aller Antworten." **Kein Widerspruch zu Maßnahme 10:** dort geht es um GELESENE Werkzeug-Ausgaben, hier um GESCHRIEBENE Prosa. |
+| **Reasoning-Effort senken / Denk-Token deckeln** | [nur B] | **Bleibt verworfen — aber die Begründung ist nach der Output-Korrektur neu zu schreiben, und die Arithmetik trägt sie nicht mehr allein.** Die alte Zahl („zusammen 4,5 %, halbiert ≤ 2,3 %") war zu klein: der Output ist 8,0 % gewichtet, und der überwiegende Teil davon steht gar nicht als Text im Transkript — geschätzt aus den Inhaltsblöcken sind rund 3,8 M der 14,1 M Output-Tokens Werkzeug-Argumente und nur 0,4 M sichtbare Prosa, der Rest ist **Denken**. Eine Halbierung läge damit bei grob **2,8 %** des Fensters, mehr als die meisten gebauten Maßnahmen dieser Liste. Verworfen wird sie trotzdem, und zwar aus den beiden Gründen, die von der Zahl unabhängig sind: der stehenden Nutzer-Regel „Effort High für Implementierung", und dem Qualitätsrisiko — Denken ist die Arbeit, nicht ihr Beiprodukt, und dieses Projekt hat den Preis schlechter Arbeit gemessen (Retrospektive §3.33). Musterfall bleibt es dennoch für „externe Zahl überlebt die eigene Messung nicht" (Quellen: Boundev; T-Minus AI, abgerufen 09.08.2026, melden 3–7× Denk-Token auf mechanischen Schritten). **Was sich daraus ehrlich ergibt:** Denken ist nach dem wieder-gelesenen Kontext der zweitgrößte Posten, den das Modell selbst erzeugt. Das ist ein Messbefund, kein Hebel — und die Zerlegung ist eine Schätzung aus Zeichenlängen (≈ 4 Zeichen je Token), keine abgerechnete Zahl. |
 | **Den Pool verkleinern, um Tokens zu sparen** | [nur B] | Bereits gemacht und als Denkfehler seziert (Retrospektive §3.27): Parallelität vervielfacht Rate und Durchsatz gemeinsam; **pro fertigem Punkt** bleibt es gleich. Dieselbe Falle steckt in der Feldzahl „Multi-Agenten kosten 15×" — sie misst **pro Anfrage**, nicht **pro Arbeit**. |
 | **Den Beide-Backends-Beweis breiter aussetzen** | [nur B] | Verengt ein Sicherheitsnetz über das beweisbar Beitragslose hinaus (Retrospektive §3.28: die zwei Ein-Backend-Fälle saßen in backend-neutral **aussehendem** Code). Nicht verhandelbar. Maßnahme 5 verschiebt nur die Reihenfolge, nie den Beweis. |
 | **Vier-Augen sparen** | [nur A] | Nicht verhandelbar, und §3.33 quantifiziert die Gegenrechnung. |
 | **Screenshots ganz aus der Regression nehmen** | [nur A] | Verletzt die Verifikations-Disziplin unmittelbar. Nicht diskutabel. |
 | **`verification/` untracken** | [nur A] | Spart Speicher, keine Token; und die archivierten Frames sind der Replay-Korpus. |
 | **Kontext-Kompaktierung mitten in der Sitzung selbst bauen** (Summarizer) | [A+B] | Die Ebene darunter tut es bereits (das Kontext-Plateau bei ~330 k ist vermutlich genau das), und die Forschung benennt die Kosten selbst: Verlust, zerstörte Kausalstruktur, kompressions-induzierte Halluzination (arXiv 2606.11213; arXiv 2510.11967; SelfCompact via AI Weekly, alle abgerufen 09.08.2026). Der **verlustfreie** Schnitt an einem git-Zustand (Maßnahme 4) und die Quarantäne (11) sind das, was die Ebene darunter **nicht** tut. |
-| **Batch-API (50 % Rabatt) · Fast Mode (2,5× Ausgabegeschwindigkeit)** | [nur A] | Batch-API ist asynchron ohne Werkzeugschleife — unsere Schleife ist interaktiv und werkzeuggetrieben; die Harness bietet den Weg nicht an. Fast Mode kostet den doppelten Preis und griffe an der falschen Stelle: unsere Wall-Clock hängt an der **Zahl** der Antworten, nicht an der Ausgabegeschwindigkeit (Median-Output 119 Tokens). |
+| **Batch-API (50 % Rabatt) · Fast Mode (2,5× Ausgabegeschwindigkeit)** | [nur A] | Batch-API ist asynchron ohne Werkzeugschleife — unsere Schleife ist interaktiv und werkzeuggetrieben; die Harness bietet den Weg nicht an. Fast Mode kostet den doppelten Preis und griffe an der falschen Stelle: unsere Wall-Clock hängt an der **Zahl** der Antworten, nicht an der Ausgabegeschwindigkeit (Median-Output 197 Tokens). |
 | **Beide Backend-Pässe parallel auf dieser Maschine** | [nur B] | Halbiert nominell die LARGE-Wall-Clock, aber die Suiten brauchen eine ruhige Maschine (19 % Laufzeit-Spread unter Last; rotierende Flakes unter Parallel-Agenten sind aktenkundig). Ein Flake-Retest frisst die Ersparnis. |
-| **Prompt-Caching „einführen"** | [A+B] | Bereits eingelöst: 98,2 % der rohen Tokens sind Cache-Reads — über dem für Claude Code zitierten Wert von 92,7 %. **Wichtiges negatives Ergebnis:** die populärste Sparmaßnahme des Feldes ist hier ausgereizt; die verbleibende Frage ist nicht „wie cachen wir besser", sondern „wie lesen wir weniger **oft**" (4) und „wie lesen wir weniger" (9/10). Offen bleibt allein die Präfix-Stabilität (16). |
+| **Prompt-Caching „einführen"** | [A+B] | Bereits eingelöst: 98,1 % der rohen Tokens sind Cache-Reads — über dem für Claude Code zitierten Wert von 92,7 %. **Wichtiges negatives Ergebnis:** die populärste Sparmaßnahme des Feldes ist hier ausgereizt; die verbleibende Frage ist nicht „wie cachen wir besser", sondern „wie lesen wir weniger **oft**" (4) und „wie lesen wir weniger" (9/10). Offen bleibt allein die Präfix-Stabilität (16). |
 
 **Ein ungelöster Widerspruch, ausdrücklich als solcher stehengelassen: der
 Pool-Deckel.** [nur A] schlägt einen **getrennten** Deckel vor („3
@@ -1018,41 +1110,42 @@ Entscheidung ist Deutsch**, weil der Nutzer die Antworten liest.
 > Angaben ist unbrauchbar. Nenne zusätzlich, **was in diesem Repository wahr
 > sein müsste**, damit er wirkt.
 >
-> **DIE GEMESSENE BASISLINIE** (Fenster 03.–09.08.2026, 262 Transkripte, 32.531
+> **DIE GEMESSENE BASISLINIE** (Fenster 03.–09.08.2026, 265 Transkripte, 32.746
 > API-Antworten, 64 fertig gemergte Punkte; Werkzeug: `scripts/measure-task-cost.mjs`;
 > Details und Fehlerbalken in `docs/analysis_de/durchsatz-analyse.md` — **traue
 > dieser Datei mehr als dieser Zusammenfassung**):
 >
-> - **Tokens je Phase (gewichtet):** Verifikation **47,6 %**, Buchführung
->   **26,2 %**, Implementierung 13,2 %, Gates 9,5 %, Brief 1,9 %, Merge 1,6 %.
-> - **Maschinenzeit je Phase:** Buchführung 37,5 %, Verifikation 37,5 %,
->   Implementierung 11,6 %, Gates 9,6 %.
-> - **78,7 % der gewichteten Ausgabe ist wieder-gelesener Kontext; nur 4,5 % ist
->   das, was das Modell schreibt.** 98,2 % der rohen Tokens sind Cache-Reads —
+> - **Tokens je Phase (gewichtet):** Verifikation **47,0 %**, Buchführung
+>   **26,0 %**, Implementierung 13,9 %, Gates 9,6 %, Brief 1,9 %, Merge 1,6 %.
+> - **Maschinenzeit je Phase:** Buchführung 37,5 %, Verifikation 37,4 %,
+>   Implementierung 11,7 %, Gates 9,6 %.
+> - **75,8 % der gewichteten Ausgabe ist wieder-gelesener Kontext; 8,0 % ist
+>   das, was das Modell schreibt — davon nur 0,4 Prozentpunkte lesbare Prosa,
+>   der Rest Denken und Werkzeug-Argumente.** 98,1 % der rohen Tokens sind Cache-Reads —
 >   der Prompt-Cache ist also bereits ausgereizt. Greife den Kontext an, nicht
 >   die Prosa.
-> - **Subagenten tragen 69,1 % der Tokens** bei exakt derselben Maschinenzeit
->   wie die Hauptsitzung; die Hauptsitzung gibt 62,2 % ihrer eigenen Kosten für
+> - **Subagenten tragen 70,2 % der Tokens** bei praktisch derselben Maschinenzeit
+>   wie die Hauptsitzung; die Hauptsitzung gibt 62,3 % ihrer eigenen Kosten für
 >   Buchführung aus.
-> - **Pro Punkt:** Median **5,69 M gewichtet / 238 API-Antworten / 1,39
->   Maschinenstunden**; p90 20,35 M; Maximum 101,8 M. **10 von 64 Punkten tragen
->   die Hälfte der Kosten, und die zehn teuersten halten 65,5 % aller
->   Verifikations-Tokens. Das Geld liegt im Ausläufer.**
-> - **Pro Antwort:** Median 190 k Kontext, 119 Output-Tokens, 21,9 k gewichtete
+> - **Pro Punkt:** Median **5,82 M gewichtet / 238 API-Antworten / 1,39
+>   Maschinenstunden**; p90 20,9 M; Maximum 102,6 M. **10 von 64 Punkten tragen
+>   knapp die Hälfte der Kosten (48,8 %), und die zehn teuersten halten 64,4 %
+>   aller Verifikations-Tokens. Das Geld liegt im Ausläufer.**
+> - **Pro Antwort:** Median 190 k Kontext, 197 Output-Tokens, 22,9 k gewichtete
 >   Kosten, 24,4 s mittlerer Abstand. Daraus: *Kosten ≈ Antworten × Kontext ×
->   0,1* und *Zeit ≈ Antworten × 24 s*. **Eine gesparte Antwort spart ~22 k
->   Tokens UND ~24 s.** Und: **1 k Tokens Dauerlast im Kontext kosten 3,25 M je
+>   0,1* und *Zeit ≈ Antworten × 24 s*. **Eine gesparte Antwort spart ~23 k
+>   Tokens UND ~24 s.** Und: **1 k Tokens Dauerlast im Kontext kosten 3,27 M je
 >   Fenster.**
-> - **Fixer Sockel je Punkt ≈ 4,9 M gewichtet** (Orchestrierung + Board + Brief
->   + Merge) gegen einen Median-Punkt von 5,69 M — **die Größenordnung eines
+> - **Fixer Sockel je Punkt ≈ 5,0 M gewichtet** (Orchestrierung + Board + Brief
+>   + Merge) gegen einen Median-Punkt von 5,82 M — **die Größenordnung eines
 >   ganzen Punktes.** Rechne das gegen: jede Mechanik, die du vorschlägst, ist
 >   selbst ein Punkt und kostet diesen Sockel. Eine Maßnahme, die weniger spart
 >   als ihr Bau kostet, gehört in deine Verwerfungsliste.
 > - **Werkzeug-Taxonomie:** 80 % aller Werkzeugaufrufe sind Shell-Kommandos.
->   Anteile an der Gesamtausgabe: Suchen/Lesen **25,2 %**, Buchführungs-Skripte
->   12,5 %, **Warten/Pollen 11,1 %**, Verify-Läufe 6,6 %, Gates 4,7 %,
->   **blankes `echo idle` als Leerlauf-Halter 3,8 %**. **Nur 4,9 % der Antworten
->   setzen mehr als einen Werkzeugaufruf ab. 15,8 % der Ausgabe geht für exakt
+>   Anteile an der Gesamtausgabe: Suchen/Lesen **25,1 %**, Buchführungs-Skripte
+>   12,6 %, **Warten/Pollen 10,9 %**, Verify-Läufe 6,4 %, Gates 3,8 %,
+>   **blankes `echo idle` als Leerlauf-Halter 3,6 %**. **Nur 5,0 % der Antworten
+>   setzen mehr als einen Werkzeugaufruf ab. 15,2 % der Ausgabe geht für exakt
 >   wiederholte Kommandos drauf.**
 > - **Kalenderuhr (git):** erster Branch-Commit → Merge, Median 0,75 h, p90
 >   4,65 h, Maximum 86,5 h.
@@ -1130,7 +1223,7 @@ Entscheidung ist Deutsch**, weil der Nutzer die Antworten liest.
 > - **Geprüft und nicht verfügbar:** eine harte Token-Obergrenze je Aufgabe über
 >   die Werkzeug-Ebene; entfernte Ausführung; ein Workflow-Resume. Wenn dein
 >   Vorschlag eine dieser Fähigkeiten voraussetzt, sag das ausdrücklich dazu.
-> - **Bereits eingelöst:** Prompt-Caching (98,2 % der rohen Tokens sind
+> - **Bereits eingelöst:** Prompt-Caching (98,1 % der rohen Tokens sind
 >   Cache-Reads). „Nutzt doch Prompt-Caching" läuft ins Leere.
 >
 > **WAS ICH VON DIR WILL:**
@@ -1173,8 +1266,8 @@ blocking or treated as hung. The idle marker the no-idle-stop guard reads is set
 by a HOOK, not by a model turn — `echo idle` disappears from the transcripts, and
 the guard accepts the hook's marker exactly as it accepts today's turn. The
 verify wrapper counts the polls of a run and prints the count, so the rule is
-visible rather than remembered. Measured target: polling is 11,1 % of the
-weighted spend and the bare idle holds another 3,8 % (2.798 + 1.189 responses,
+visible rather than remembered. Measured target: polling is 10,9 % of the
+weighted spend and the bare idle holds another 3,6 % (2.857 + 1.189 responses,
 09.08.2026); the longest unbroken poll chain in the window was 437 responses ≈
 11,5 M weighted. Re-measure after the change with
 `node scripts/measure-task-cost.mjs`.
@@ -1185,9 +1278,9 @@ catching an idle stop — the mechanism review of the other model applies).*
 prompt carry one binding paragraph: independent tool calls go into ONE turn —
 several reads, several greps, `build` and `lint` — while anything whose input
 depends on another call's output stays sequential, and a bundled shell chain
-never hides its failing step. Measured baseline: 4,9 % of responses issue more
-than one call, search/read alone is 25,2 % of the weighted spend, and one saved
-response is worth ~21,9 k weighted AND ~24 s. The point is complete when the
+never hides its failing step. Measured baseline: 5,0 % of responses issue more
+than one call, search/read alone is 25,1 % of the weighted spend, and one saved
+response is worth ~22,9 k weighted AND ~24 s. The point is complete when the
 share of multi-call responses has been re-measured after the change; enforcement
 is by prompt and measurement, not by a guard — "could have been bundled" is not
 machine-decidable.
@@ -1199,9 +1292,9 @@ deterministically — merge, fast gate, tick, archive move, board publish, workt
 cleanup — and prints ONE structured summary with a verdict per step. It fails
 LOUD at the first red step and never continues past it, so no half state is left
 behind, and every step it performs is one a guard already governs. Measured
-target: bookkeeping is 26,2 % of the weighted spend and 37,5 % of the machine
+target: bookkeeping is 26,0 % of the weighted spend and 37,5 % of the machine
 hours, the chain runs as 8–12 main-session turns today at a median context of
-164 k, and the main session spends 62,2 % of its own cost on bookkeeping.
+164 k, and the main session spends 62,3 % of its own cost on bookkeeping.
 *Criticality: med (it bundles guard-adjacent steps; a swallowed intermediate
 error would advance state that nobody verified — mechanism review required).*
 
@@ -1227,8 +1320,8 @@ exactly ONCE, on the state that is merged. The expensive browser suites abort at
 the FIRST failure during that iteration (a red run is never credited anyway) and
 run to completion only for the final proof. The rule is a brief building block
 for render points, so it is applied rather than remembered. Measured target:
-verification is 47,6 % of the weighted spend and 37,5 % of the machine hours, the
-ten costliest points hold 65,5 % of all point-assigned verification tokens, and
+verification is 47,0 % of the weighted spend and 37,4 % of the machine hours, the
+ten costliest points hold 64,4 % of all point-assigned verification tokens, and
 eight of ten recorded `enrichments` runs failed while still writing all 37 frames
 at 951–1029 s each.
 *Criticality: med (it reorders the proof but must not dilute it — the
@@ -1240,8 +1333,8 @@ times the median (≈ 17 M weighted), and the report is a DECISION point — re-
 re-staff, or continue deliberately — never an automatic abort. In the same
 mechanism, an agent that has run the same browser suite red three times stops,
 writes a diagnosis of what is red and what was tried, and escalates instead of
-looping. Measured target: 10 of 64 points carry 50,2 % of the point-assigned
-cost, the costliest single point 16,4 % with 89,5 % of it verification.
+looping. Measured target: 10 of 64 points carry 48,8 % of the point-assigned
+cost, the costliest single point 15,8 % with 89,0 % of it verification.
 *Criticality: med (a cap that let a red state pass as green would be worse than
 the cost it saves; the escalation path is the mechanism, the abort is not).*
 
@@ -1290,7 +1383,7 @@ point delivers it for ONE point and MEASURES the result against the median
 that measurement. A session after a cut must continue without asking a question —
 that is the acceptance condition, and if it does not hold the pilot is reported as
 failed rather than tuned. Measured target: context per response is a median of
-190 k and re-read context is 78,7 % of the weighted spend; a cut every ~60
+190 k and re-read context is 75,8 % of the weighted spend; a cut every ~60
 responses would put the mean context near 73 k.
 *Overlap with the open work order (found in review): point 553 (AN EXPLICIT
 CONTEXT BUDGET PER POINT, AND A WRITTEN HANDOFF WHEN IT IS SPENT) already
