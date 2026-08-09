@@ -35,7 +35,8 @@ geschrieben wurden, steht hier zuerst, was sich bewegt hat.
 
 **Der Fehler.** Eine API-Antwort wird im Transkript auf **mehrere Zeilen mit
 derselben `message.id`** verteilt — eine je Inhaltsblock (`thinking`, `text`,
-`tool_use`, `tool_use`), und jede Zeile wiederholt dieselbe `usage`. Die
+`tool_use`, `tool_use`), und jede Zeile wiederholt dieselbe `usage` in den
+Cache-Zählern (**nicht** in `output_tokens` — siehe §1.9, Review-Befund). Die
 Deduplizierung nach `message.id` behielt die **erste** Zeile. Für die
 Token-Summen ist das richtig (die `usage` darf nur einmal zählen), für alles
 andere war es falsch: begann eine Antwort mit Denken — der Normalfall —, ging
@@ -397,6 +398,21 @@ Befund gemeldet, er ist hier neu erhoben und **bestätigt**):
   datiert Turns, nicht Prozesse); wie viel eines evidenzfreien Turns Denken
   gegen Lesen ist; und die tatsächliche Rechnung in Euro — die Gewichtung ist
   ein Proxy (§2f).
+- **Bekannter Unterzähler bei `output_tokens` (Review-Befund, 09.08.2026,
+  unkorrigiert):** die Annahme „jede Zeile einer Antwort wiederholt dieselbe
+  `usage`" ist für die Cache-Zähler richtig, für `output_tokens` **falsch** —
+  dort schreibt die Harness einen **wachsenden** Zwischenstand (nachgemessen:
+  6.658 von 13.564 mehrzeiligen Antworten differieren, jede Folge monoton
+  steigend). Die Faltung nimmt die ERSTE Zeile und unterzählt Output damit um
+  rund die Hälfte: 7,6 M → 14,0 M roh, gewichtet +3,8 % auf die Gesamtsumme
+  (849 → 881 M); der Output-Anteil ist real ≈ 7,9 % statt 4,5 %, der
+  Median-Output je Antwort entsprechend höher. **Keine Rangfolge kippt** —
+  Cache-Read bleibt mit ~76 % dominant, und die Verwerfungen „kürzere
+  Berichte" / „Reasoning-Effort senken" (§4) halten auch bei verdoppelter
+  Basis (ihre Arithmetik verdoppelt sich mit). Die Behebung — die Faltung
+  nimmt je Zähler das MAXIMUM über die Zeilen, im Gleichschritt mit
+  `measure-context-cost.mjs`, das denselben Unterzähler hat — steht aus und
+  gehört zum Messwerkzeug-Punkt, nicht in dieses Dokument gepatcht.
 - **Reproduzierbarkeit:** der Batch schreibt weiter, das Fenster wächst also
   mit jedem Lauf. Die Zahlen oben sind ein Schnappschuss vom 09.08.2026,
   11:18 UTC; `node scripts/measure-task-cost.mjs` liefert den jeweils aktuellen
@@ -516,6 +532,7 @@ abgerufen 09.08.2026.)
 | 27 | Deterministische Buchführung in Hooks verlegen | [nur A] | −1,6 % (grob) | − | mittel, Guard-Eingriff | grenzwertig |
 | 28 | `npm audit` nur bei Lock-Änderung | [nur A] | < 0,3 % | klein | trivial | nur **gebündelt** |
 | 29 | Board-Publish nur bei Änderung | [nur B] | klein | klein | trivial | nur **gebündelt** |
+| 30 | Die Hauptsitzung sieht die Frames, nicht den Lauf | [nur A; im Review wiederhergestellt] | −1 bis −1,8 M je Bildprüfung | neutral | klein | positiv |
 
 ### 3.2 Die Einträge im Einzelnen
 
@@ -886,7 +903,26 @@ eigenen Punkt** (Sockel 4,9 M) — sie gehören in ein bestehendes Bündel. Bei
 `npm audit` ist Kriterium 18 zu **präzisieren** („nach jeder Änderung" → „nach
 jeder Änderung am Abhängigkeitsbaum"), nicht zu lockern; CI fährt es ohnehin.
 
-### 3.3 Was die Harness gibt oder nicht gibt [beide Hälften, gleichlautend]
+**30 — Die Hauptsitzung sieht die FRAMES, nicht den LAUF [nur A].** *(Dieser
+Eintrag fehlte in der ersten Fassung der Vereinigung und ist im
+Vier-Augen-Review wiederhergestellt — die Vereinigungsregel verlangt, nichts
+stillschweigend zu verlieren.)* Den Lauf fahren und die Bilder ansehen sind
+zwei Dinge, und nur das Zweite gehört in die Hauptsitzung: der Lauf wandert in
+den Hintergrund bzw. zu einem Agenten, die Hauptsitzung erhält die **Frames**
+(10–20 k Tokens) und behält das Urteil. Die Schleife um einen Lauf (Starten,
+Pollen, Ausgabe lesen, Nachfassen) kostet bei 42 min und 30-s-Poll ~1,85 M —
+**−1 bis −1,8 M je Bildprüfung**.
+*Risiko:* hier sitzt die Verifikations-Disziplin: der Bildbeweis auf beiden
+Backends bleibt unangetastet, `render-verify-guard` wird nicht weicher (er
+kreditiert ohnehin nur Exit-0-Läufe).
+*Voraussetzung:* die Frames erreichen die Hauptsitzung zuverlässig — sie liegen
+unter `verification/` in git, also über den Branch. Das ist heute schon so.
+*Verhältnis zu 1 und 11:* 1 verbilligt das Warten, 11 quarantänisiert die
+Schleife eines PUNKTES; 30 verlegt den Lauf der HAUPTSITZUNGS-Bildprüfung.
+Sie schließen einander nicht aus.
+
+### 3.3 Was die Harness gibt oder nicht gibt [beide Hälften, gleichlautend zu
+Budget und Remote; die `defer_loading`-/Mid-Conversation-Zeilen sind nur A]
 
 - **Hartes Token-Budget je Aufgabe:** `docs/harness-primitives-evaluation.md` §3
   hat das Workflow-BUDGET als **nicht verfügbar** befunden (Probe 07.08.2026);
@@ -1176,6 +1212,11 @@ real when it does not. The delegation brief no longer needs to tell an agent to
 set the link by hand, and the false red of a missing `node_modules/.bin/oxlint`
 cannot occur. Measured target: 1–3 min per agent over ~64 points per window, plus
 the turns an agent spends today classifying the false red.
+*Overlap with the open work order (found in review): point 569 already owns the
+oxlint false red and fixes its RESOLUTION (`REPO_ROOT` instead of
+`process.cwd()`); this point delivers the missing DEPENDENCIES. Land it as an
+extension of 569's bundle (Testinfrastruktur), not as a second owner of the
+same red.*
 *Criticality: low (a wrong lockfile state would test against the wrong tree,
 which the hash check prevents).*
 
@@ -1251,6 +1292,13 @@ that is the acceptance condition, and if it does not hold the pilot is reported 
 failed rather than tuned. Measured target: context per response is a median of
 190 k and re-read context is 78,7 % of the weighted spend; a cut every ~60
 responses would put the mean context near 73 k.
+*Overlap with the open work order (found in review): point 553 (AN EXPLICIT
+CONTEXT BUDGET PER POINT, AND A WRITTEN HANDOFF WHEN IT IS SPENT) already
+delivers this lever — measured ceiling, `point-handoff.mjs`, the guard's third
+legal stop, the same successor-resume. This proposal differs only in the cut
+TRIGGER (every green, pushed commit instead of a measured context ceiling) and
+in demanding a pilot. It must be folded INTO 553 as the trigger/pilot decision,
+never appended beside it as a second point.*
 *Criticality: high (what an agent has learned and not written down is lost at the
 cut; this is the one measure on the list that can silently lower work quality,
 which is why it is piloted and measured rather than adopted).*
@@ -1264,6 +1312,11 @@ since. The point carries its own ABORT criterion: if the noise floor does not fa
 below the smallest real defect (0,75 %), the investment is written off and
 recorded as such in `docs/picture-check-levers.md`, which is a result, not a
 failure. Nothing diff-based is enabled by this point itself.
+*Overlap with the open work order (found in review): the settled-camera half is
+already open as point 521 (the enrichments jump waits a fixed 1500 ms; final
+state polls the camera's arrival through `__camera`). This point extends 521
+with the seeded PRNG, the fixed timestep and the stability re-measure with its
+abort criterion — fold them, one owner for the capture path.*
 *Criticality: med (it touches the capture path every render verification depends
 on; a capture that waits wrongly would produce false greens, the exact failure
 point 375 was built against).*
