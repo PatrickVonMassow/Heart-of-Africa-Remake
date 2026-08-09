@@ -3504,6 +3504,48 @@ there exactly once; a new point joins a bundle when appended.
   Criticality: medium — no player ever sees it, but it costs every delegated agent time
   and it can hide a rotted lint rule behind a green suite.
 
+- [ ] 589. WHY THE COMMUNICATION MECHANIC SHIPPED BROKEN THOUGH EVERY SUITE WAS GREEN
+  (root-cause finding of the play session 09.08.2026). Twelve defects in ONE mechanic
+  whose twelve points had all been accepted as finished. Four causes, each pinned to a
+  concrete case:
+  (a) THE TESTS CHECK THE MECHANISM, NOT THE RESULT. `speechProbe` counts planned
+      syllables and their level — it cannot hear that the same tone is multiplied by zero
+      further down at the ambient bus (577), nor that it sounds like a squawk (587). The
+      label tests check the visibility RULE and the presence in the DOM, not whether the
+      note stands at the speaker's head (582). The catch-game tests check the game LOGIC,
+      not whether two children occupy the same point in space (578). That is exactly the
+      "green against a proxy" failure CLAUDE.md §7.2 warns about — the rule existed, this
+      area did not follow it.
+  (b) NO PICTURE SHOWS THE FEATURE. The frame shutter secures WHICH place is
+      photographed, not whether the subject is legible; for the drummer, the playing
+      children and the speech labels no verification frame existed at all.
+  (c) NOTHING MEASURES TIME. 586 (the adults fall permanently silent after minutes) is
+      unreachable for any suite that simulates seconds.
+  (d) THE PARTS WERE ACCEPTED, THE COMPOSITION NEVER. Each of the twelve points was green
+      on its own; nobody ever stood in the village as a PLAYER, with sound, for two
+      minutes.
+  FINAL STATE — three mechanisms, and deliberately NOT "more tests":
+  1. PER FIX, ONE ASSERTION AT THE LEVEL THE PLAYER EXPERIENCES IT. Sound is judged at
+     the END of the chain (the level that actually reaches the output, not the level a
+     source planned), position is judged in WORLD space (do two bodies overlap, does the
+     note sit within a hand's breadth of the head), not by the rule that was supposed to
+     produce it. A fix whose assertion can only reach the mechanism names in its commit
+     why the result is not assertable.
+  2. ONE PLAY ACCEPTANCE PER PACKAGE. A package of play-session fixes is not finished by
+     its suites: the merged result is entered as a player — the scene, the sound, two
+     minutes — and what was seen and heard is recorded with the merge.
+  3. AN IN-APP ALARM FOR EVERYTHING TIME-DEPENDENT. The dev-mode assert channel gains a
+     LONG-RUN rule family: a system that must keep producing (the adults' utterances, the
+     children's play, the errand loop) raises a `console.error` when it falls silent
+     longer than its own specified maximum. That turns every session — test or manual —
+     into a detector for the class 586 belongs to, which no seconds-long suite can reach.
+  VERIFIABLE: the alarm family is Vitest-covered (a stalled producer trips it, a
+  producing one does not); the assertion rule and the play acceptance are recorded in
+  `scripts/verify/README.md` and in `docs/acceptance-evidence.md` beside the criteria
+  they serve.
+  Criticality: HIGH — it is the reason a whole feature reached the user broken while the
+  gate reported green, and every further mechanic is built through the same gate.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
