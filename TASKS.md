@@ -4749,3 +4749,137 @@ Build order, chosen so no two parallel agents own the same file:
   BUNDLE: build together with point 350 where possible. Both are "the villager figure's
   pose lies about what the body is doing" in the same component, and pairing them saves a
   verification round.
+
+- [ ] 577. THE VILLAGE SPEECH IS SILENCED BY THE SLIDER FOR "EVERYTHING ELSE", AND HAS NO
+  SLIDER OF ITS OWN (user 09.08.2026, F6 report `local/bugreports/keineBaBAs.zip`: "Ich
+  höre keine ba-BAs"; his state has `ambientVolume: 0`, `ambienceVolume: 9.9`). ROOT
+  CAUSE, established from the signal path: `playSpeech` in `src/systems/ambience.ts`
+  (~line 784) sends every syllable to `ambientBus`, whose gain IS `balance.ambientVolume`
+  (~line 317/877). Turning "Übrige Ambiente-Lautstärke" to 0 therefore mutes the
+  utterances COMPLETELY — the syllables are still scheduled, at a positive peak, and
+  multiplied away at the bus. Two things make this a trap rather than a setting:
+  (a) the label calls that slider "everything ELSE", which is precisely what the speech
+  is not — it is the material the player must hear to learn the language at all, and the
+  one sound whose loss ends the PoC; and (b) the speech is the ONLY source with no
+  relative slider of its own, while footsteps, birdsong and the rest each have one —
+  `design.md` line 616 states the pattern ("individual sources can be turned down on
+  their own through per-source volume sliders in the debug menu"). The user reached
+  `ambientVolume: 0` deliberately, to hear the syllables over the drums; the only
+  instrument the game offered him for that turns them off.
+  FINAL STATE:
+  1. `balance.communication.speechVolume` exists as a calibratable relative level, in the
+     debug menu's existing speech group, in both languages, with the label naming the
+     village speech (not "voice" — nothing else in the game speaks).
+  2. The speech no longer rides the "everything else" bus. It gets its own bus under the
+     master ambience volume, scaled by `speechVolume`, so `ambientVolume` moves the drums
+     and the rest of the village bed WITHOUT touching the syllables. Raising the speech
+     over the drums — the thing the user was trying to do — is then one slider.
+  3. The three existing sliders keep their meaning; no default changes.
+  VERIFIABLE: Vitest on the pure level computation — with `ambientVolume: 0` the speech
+  peak stays positive, and `speechVolume: 0` silences the speech while the ambient bed
+  stays positive; plus an extension of the existing live audio gate
+  (`scripts/verify/voice.mjs` or the ambience probe) asserting scheduled speech at a
+  positive peak while `ambientVolume` is 0.
+  Criticality: HIGH — it silently disables the mechanic the whole communication PoC
+  teaches, and the game's own advice leads the player straight into it.
+
+- [ ] 578. THE CHILDREN PILE UP INSIDE ONE ANOTHER (user 09.08.2026, F6 report
+  `local/bugreports/keineBaBAs.zip`: "die Kinder hängen immer wieder ineinander fest";
+  the frame shows one body with a fan of limbs radiating out of it — several child
+  figures on the same spot). The fix for exactly this defect already exists ONE class
+  over: `src/scenes/place/animalSpots.ts` records that "no animal was part of the
+  collider set, so nothing could ever separate two of them — several goats stood inside
+  one another", and answers it with `ANIMAL_BODY_RADIUS` (0.18 m, deliberately smaller
+  than the mover radius so a herd does not shoulder itself all day). The children's tag
+  game (`stepTagGame`, driven from `src/scenes/place/PlaceLife.tsx` ~line 565) never got
+  that treatment: the children collide with the village fabric but not with each other,
+  so a chase that converges leaves them interpenetrating and, once stacked, steering
+  toward the same target keeps them there.
+  FINAL STATE:
+  1. A child presents a body radius to the other children, in the same shape as the
+     animals' — calibratable, smaller than the mover footprint, scaled by `KID_SCALE`
+     so a child is not given an adult's girth.
+  2. Two children never share a spot: the separation resolves every frame, and a pair
+     that ends up overlapping (a spawn, a catch, a corner) pushes apart rather than
+     staying merged.
+  3. The tag game still WORKS — a catch must remain reachable, so the separation must not
+     hold the chaser off its runner. The catch distance and the body radius are stated
+     against each other, and the catch wins.
+  VERIFIABLE: pure Vitest beside `src/scenes/place/animalSpots.test.ts` — from a stacked
+  start every pair separates within a bounded time; over a long simulated chase no two
+  children are ever closer than the body separation except within the catch distance; and
+  a catch still happens (the game does not deadlock). Then a picture in the Bambara
+  village on one backend — this is figure placement, not a shader.
+  Criticality: medium — it is in the one village the PoC is taught in, and it is the
+  first thing the eye lands on.
+
+- [ ] 579. THE JOURNAL'S TWO SECTIONS BECOME TABS, AND "FIRST HEARD" NAMES ITS VILLAGE
+  (user 09.08.2026). Today the diary and the overheard utterances stand one under the
+  other in the journal, so reading either means scrolling past the other.
+  FINAL STATE:
+  1. The journal has TWO TABS at the top — the diary and the overheard utterances —
+     switched by mouse click AND by a keyboard shortcut. Both labels come from the
+     language files, German and English.
+  2. The tab in front is remembered while the journal is open; opening it lands on the
+     diary.
+  3. Every "First heard" entry NAMES THE VILLAGE it was first heard in, from the
+     discovered-place name (so it reads the same as the status bar's region line).
+     Utterances recorded before this point have no village and must not invent one — they
+     read without it rather than with a wrong name.
+  4. Neither the tab labels nor the "first heard" line is written in UPPER CASE
+     (user 09.08.2026); the styling carries the emphasis, not capitals.
+  VERIFIABLE: Vitest in the HUD layer — the two tabs exist with their localized labels,
+  click and shortcut switch them, only one panel is in the DOM at a time, a first-heard
+  entry with a known village renders its name and one without renders no placeholder,
+  and no rendered label is upper-case (neither in the text nor via
+  `text-transform: uppercase`).
+  Criticality: low — it is a reading comfort and a naming fix, not a defect.
+
+- [ ] 580. THE FIGURES PANTOMIME OUT OF EARSHOT (user 09.08.2026, F6 report
+  `local/bugreports/GestenOhneSprache.zip`: "Die beiden gestikulieren herum, aber ich
+  sehe keine Texte über ihren Köpfen"). ESTABLISHED: the overlay dump of that moment
+  contains no speech label at all, while the journal in the same dump already holds eight
+  overheard utterances — so the label machinery works and simply did not fire here. The
+  gate is distance: both speaking paths (`PlaceLife.tsx` ~line 388 for the children,
+  ~line 1940 for the adults) hear the utterance, record it and raise the overhead label
+  ONLY inside `isWithinHearing(distance)` — `balance.communication.hearingRadius`, 10 m.
+  The GESTURE has no such range: a figure gestures wherever it is drawn, across the whole
+  village. Beyond ten metres the player therefore watches a mute pantomime, which is
+  exactly what he reported — and worse for the PoC than plain silence, because a gesture
+  without its utterance teaches a concept with no word attached to it.
+  FINAL STATE: a figure that GESTURES is a figure the player can hear and read, or it does
+  not gesture. Either the gesture is gated on the same range as the utterance, or the
+  utterance's range is what the gesture reaches — one decision, applied to BOTH the
+  children's and the adults' paths, with the chosen rule written where the range is
+  defined. The hearing radius itself stays calibratable and the label keeps its own
+  lifetime.
+  VERIFIABLE: pure Vitest — across the range there is no distance at which a figure
+  gestures while neither the utterance nor its label is raised; the existing hearing and
+  label tests keep passing.
+  Criticality: medium — it is the teaching loop of the communication PoC, and it fails
+  quietly.
+
+- [ ] 581. THE SETTLEMENT BOUNDARY IS TOO FAINT, AND ITS SLIDER IS ALREADY AT THE CEILING
+  (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
+  Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
+  state: `placeEdgeBand` stands at the shipped defaults, `widthM: 3`, `wanderM: 0.9`,
+  `strength: 1` — and `strength` is documented as "0 (invisible) .. 1 (the full per-kind
+  look)". He is therefore already looking at the STRONGEST edge the game can draw, and it
+  is not enough. This is not a calibration miss: there is no knob left to turn, so the
+  per-kind look itself carries too little contrast against the ground it sits on.
+  FINAL STATE: the boundary READS at a glance from inside the settlement, at the walking
+  pace and eye height the player actually has, in every settlement kind and on the ground
+  colours they stand on — the Bambara village's pale sand is the case that failed, so it
+  is the case that must be shown to work. The contrast comes from the band's own design
+  (value against the surrounding ground, not hue alone — the report is from a sand-on-sand
+  village), and it stays a give-way rather than becoming a painted stripe: the §2.6 look
+  is a threshold the player reads, not a fence. `strength: 1` remains the full look, so
+  the ceiling moves with the design rather than being raised past it.
+  VERIFIABLE: the PICTURE decides, since the complaint is legibility — a first-person
+  frame from inside the settlement at the boundary in at least the Bambara village and
+  one contrasting settlement kind, on BOTH backends, judged by looking. Plus a pure test
+  pinning the contrast the design settles on (the band's value against the sampled ground
+  value stays above the chosen minimum for every settlement kind), so a later ground or
+  palette change cannot quietly erase it again.
+  Criticality: medium — the boundary is what tells the player where the settlement ends
+  and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
