@@ -91,4 +91,10 @@ describe('the real documents', () => {
     expect(paths).toContain('CLAUDE.md')
     expect(paths).toContain('TASKS.md')
   })
+
+  // Point 555 moved §7.1 out of CLAUDE.md, so the detail file is now where the
+  // criteria grow. A cut whose DESTINATION is uncapped buys nothing for long.
+  it('budgets the destination of the §7.1 cut too', () => {
+    expect(DOC_BUDGETS.map((b) => b.path)).toContain('docs/acceptance-criteria-detail.md')
+  })
 })

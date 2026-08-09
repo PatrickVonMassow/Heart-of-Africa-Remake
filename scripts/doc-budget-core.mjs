@@ -18,11 +18,17 @@
 //   - PREAMBLE ONLY for the work order: its POINTS are legitimate growth (a
 //     queue may be long), while its framing sections are where rules pile up.
 //     A line budget on the whole file would punish appending work.
-//   - Not budgeted: docs/acceptance-evidence.md, docs/acceptance-criteria-detail.md,
-//     docs/design-reference.md and the archive (reference material, read on
-//     demand — their size costs nothing per turn), and the retrospective (its
-//     job is to hold every problem class; capping it would trade the wrong
-//     thing away).
+//   - docs/acceptance-criteria-detail.md, which point 555 turned from a two-
+//     criterion offcut into the home of all 32. It is read on demand like the
+//     evidence chains beside it, so its size costs nothing per turn — but it is
+//     now THE FILE THAT GROWS INSTEAD, and an uncapped destination is how a cut
+//     comes back: the §7.1 text would simply accrete over there and be dragged
+//     into every context that opens a criterion. A budget on it keeps the growth
+//     a decision.
+//   - Not budgeted: docs/acceptance-evidence.md, docs/design-reference.md and
+//     the archive (reference material, read on demand — their size costs
+//     nothing per turn), and the retrospective (its job is to hold every
+//     problem class; capping it would trade the wrong thing away).
 
 /**
  * The budgets. `headingRe` limits the measurement to the part of a file BEFORE
@@ -31,25 +37,37 @@
 export const DOC_BUDGETS = [
   {
     path: 'CLAUDE.md',
-    // LOWERED to the size point 459 achieved (987 lines / 8964 words, down from
-    // 1134 / 10419): §7.1 nos. 20 and 21 — the two largest criteria — keep their
-    // number, title, a short acceptance condition and their pointers, while
-    // their detail moved verbatim to docs/acceptance-criteria-detail.md, which is
-    // unbudgeted reference material like the evidence chains beside it. The whole
-    // saving is banked: this file is sent with EVERY turn of EVERY session and
-    // inherited by every delegated subagent, so a ceiling left at the old figure
-    // would simply be refilled and the ~18k tokens per turn paid again. The raise
-    // log this replaces belonged to a ceiling that no longer exists; the standing
-    // rule is unchanged — a genuinely new rule raises the budget by its measured
-    // size with the reason written here, a longer telling of something already in
-    // the file does not. The margin left is a sentence, not a section. The same
-    // point's §6 precision — a cross-cutting change beyond a small commit is
-    // delegated like any point, only the arming and the bookkeeping stay — is
-    // inside the measured figure above, so it is paid for by the move, not by
-    // the margin.
-    maxLines: 991,
-    maxWords: 8992,
+    // LOWERED to the size point 555 achieved (791 lines / 6718 words, down from
+    // 990 / 8992): the big cut moved ALL of §7.1 out. Every criterion keeps its
+    // number, its bold title, one short acceptance condition and its `Detail:`/
+    // `Evidence:` pointers, while its complete wording stands verbatim in
+    // docs/acceptance-criteria-detail.md — the grip point 459 first used on nos.
+    // 20 and 21, applied to the whole list. The whole saving is banked, for the
+    // same reason as last time: this file is sent with EVERY turn of EVERY
+    // session and inherited by every delegated subagent, so a ceiling left at
+    // the old figure would simply be refilled and the tokens paid again. The
+    // margin left is the same fraction as before — 0.4 % of the lines, 0.3 % of
+    // the words, a sentence rather than a section — and the standing rule is
+    // unchanged: a genuinely new rule raises the budget by its measured size
+    // with the reason written here, a longer telling of something already in the
+    // file does not.
+    maxLines: 794,
+    maxWords: 6739,
     why: 'loaded at every session start — the most expensive document in the project',
+  },
+  {
+    path: 'docs/acceptance-criteria-detail.md',
+    // MEASURED at the size point 555 left it (518 lines / 5207 words, up from
+    // 204 / 1973): it now holds all 32 criteria in full instead of two, which is
+    // exactly why it gets a ceiling of its own. Cutting CLAUDE.md and leaving
+    // the destination uncapped would only move the accretion one file over. The
+    // headroom is the same fraction CLAUDE.md carries (0.4 % / 0.3 %), so a
+    // criterion that genuinely gains a rule raises this budget by that rule's
+    // measured size with the reason written here — and a criterion that only
+    // gets a longer telling does not.
+    maxLines: 520,
+    maxWords: 5223,
+    why: 'the destination of the §7.1 cut — uncapped, it would simply refill what the cut bought',
   },
   {
     path: 'TASKS.md',
