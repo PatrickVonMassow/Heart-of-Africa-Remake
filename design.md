@@ -703,6 +703,11 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 - The seizure ALWAYS resolves (the §19.8 rule): the grip carries a hard release deadline beyond the victim's struggle window, so a victim that vanishes mid-grip — streamed out of view, or taken by another system — can never pin the crocodile; it lets go and submerges.
 - The traveller who walks into a crocodile is attacked through the §14.2 event rules unchanged: the machete always protects, the rifle only from the canoe.
 
+### 19.17 Intraspecies combat — rivals of one kind
+
+- Animals of the SAME species fight each other — but only the species that truly do. `docs/intraspecies-combat-1890.md` maps every rendered animal to fights/does-not-fight with its driver and real lethality, and the mechanic is built from that table: territorial and rutting ungulates and the solitary cats fight; the birds only squabble and are excluded, as are juveniles (§19.8's protected young) and anything another drama holds. A low calibratable per-species roll (§21.2) carries the "wants to fight" disposition, so a fight stays an occasional event.
+- Two paths: where BOTH want it they CONVERGE; where one does it HUNTS the other — a chase ending in a CATCH, or in a DRIVE-OFF once the quarry is driven the calibratable distance off the patch. On contact the two CLASH for a calibratable few seconds, resolved on a size-weighted roll: for a researched-lethal species the loser DIES and its body enters the ordinary carcass system like any death; for a ritualised one it SUBMITS and withdraws unhurt — a fight the field record says leaves no wound may not leave a carcass. No second chase system: a new state on the same core, claimed from idle, deflecting around water like every mover, released on a hard deadline — every fight RESOLVES.
+
 ### 19.9 Climate and landscape dressing
 
 - Climate and environmental look: region-typical atmosphere such as heat shimmer in the desert, humid haze in the jungle and clear air in the highlands. Purely visual.

@@ -122,7 +122,18 @@ export const DOC_BUDGETS = [
     // meet, and the answer is the difference between a swim and a softlock.
     // The tunable-value entry behind the slack ramp went to
     // docs/design-reference.md §21.2, which is unbudgeted.
-    maxWords: 28171,
+    // RAISED by the 215 measured words of the new §19.17 (point 264): animals
+    // of one species fight each other, on the researched species only. A whole
+    // §19 behaviour the document did not describe in any form — the disposition,
+    // the converge/chase paths, the clash and its lethal-vs-ritual resolution —
+    // not a longer telling of anything already here; the §19.8 dramas beside it
+    // are all predator-, family- or water-driven and say nothing about rivals of
+    // one kind. It was compressed twice before this raise (from 245 to 215 words
+    // and from 7 lines to 6, so the LINE ceiling is untouched), and the research
+    // record it summarises lives in docs/intraspecies-combat-1890.md while its
+    // eleven tunable values went to docs/design-reference.md §21.2 — both
+    // unbudgeted, so only the design decision itself is priced here.
+    maxWords: 28386,
     why: 'read on demand, but every point that cites a section pays for the bulk around it',
   },
 ]
