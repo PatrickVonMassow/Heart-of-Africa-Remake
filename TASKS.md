@@ -2923,9 +2923,19 @@ there exactly once; a new point joins a bundle when appended.
   the code; (b) `countCorpusEntries` imports `ENFORCER_RE` instead of restating it, as
   `guard-inventory-core` already does. The count moves 107 → 109, so the review attestation is
   RE-RECORDED in the same commit or the schedule reads the change as growth.
+  A THIRD SHAPE, met 09.08.2026 while closing point 566: a gate need not be a `.mjs` enforcer
+  at all. Arming `no-undef`/`no-var` over `scripts/**/*.mjs` in `.oxlintrc.json` created a gate
+  that now refuses commits through `npm run lint` in CI, the fast gate and the pre-push hook —
+  and `isMechanismPath` matches neither a `.json` config nor `scripts/verify/*`, so nothing
+  fired. The review happened because §6 was obeyed by hand, and it returned
+  `merge-with-fixes` on four confirmed defects, one of which let the very bug the gate exists
+  to kill return undetected. So the reach must also cover WHAT A GATE IS WIRED THROUGH, not
+  only what a file is called: at minimum the lint/audit configuration the gate commands read
+  (`.oxlintrc.json`, and the `test`/`lint` script definitions in `package.json`).
   VERIFIABLE: pure Vitest — a `-hook` path is a mechanism path and a `-hook` change with no
-  review record BLOCKS; the corpus count matches `guard-inventory`'s enforcer count on the real
-  tree. Criticality: high (it decides what the four-eyes gate sees at all).
+  review record BLOCKS; an `.oxlintrc.json` rule change likewise BLOCKS unreviewed; the corpus
+  count matches `guard-inventory`'s enforcer count on the real tree.
+  Criticality: high (it decides what the four-eyes gate sees at all).
 
 - [ ] 536. THE TWO WIRED ENFORCERS NO SELECTOR REACHES GET CONVENTIONAL NAMES
   (guard/memory audit 07.08.2026, finding 4). `dashboard-sync.mjs` (Stop) and
