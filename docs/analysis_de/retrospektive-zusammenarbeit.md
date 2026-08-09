@@ -44,6 +44,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 04.08. abends | Sechs rote Suiten eingeordnet: vier waren der Prüfstand — gesperrtes Auslieferungsnetz und feste Wartezeiten von einer schnelleren Maschine (§3.83); der Starter enteignet jeden Besitzer nach einer halben Stunde (Punkt 504) |
 | 05.08. | Vier Recherchen ohne eine Messung: die fehlende Treiberfähigkeit stand hinter einem Befehl, die Lösung dann in einer längst laufenden Kette (§3.84) — die zweite Bahn zeichnet seither auf der Grafikkarte |
 | 07.08. | Erster vollständiger Aufräumpass über Wächterkette und Merkposten: kein verwaister Wächter, aber zehn Befunde — die Regel behauptet eine Reichweite, die der Mechanismus nicht hat (§3.88) |
+| 09.08. | Ein Punkt wartete auf ein Tor, das nicht aufgehen konnte: die Zuordnung der Fehlschläge war getroffen, aber nie in das Register eingetragen, das der Wächter liest (§3.97) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -924,6 +925,16 @@ Zwei Denkfehler stecken darin, und beide sind allgemein. Erstens wird ein **Tran
 
 **Lehre:** Eine Gesundheitsprobe, die den Betrieb anhalten darf, braucht dieselbe Sorgfalt wie ein Wächter, der eine Freigabe blockiert: sofortiger Wiederholversuch, bevor ein Fehlschlag zählt, Eskalation nur auf **aufeinanderfolgende** Fehlschläge, und eine Meldung, die Leitung und Inhalt auseinanderhält. Sonst ist die schärfste Stufe des Alarms — der Stillstand — genau die, die am leichtesten falsch auslöst.
 
+### 3.97 Der Mechanismus war gebaut, dokumentiert — und wurde nie gefüttert
+
+Am 09.08.2026 wartete Punkt 309 auf sein letztes Tor: einen großen Durchlauf, der durchkommt. Auf der Tafel stand als Grund „braucht eine ruhige Maschine". Das war falsch, und zwar nachweisbar. Die Nacht zuvor hatte eine Messung die vier reihum ausfallenden Prüfungen der Suite sauber benannt und **jede einem offenen Punkt zugeordnet** (201, 342, 341, 369). Ein Durchlauf zählt aber nur dann als abgedeckt, wenn *jeder* Fehlschlag einem offenen Punkt zugeschrieben ist — und im dafür gebauten Verrechnungs-Register stand genau **ein** Eintrag, der eine ganz andere Bahn betraf. Das Tor war also unerreichbar, unabhängig von der Maschine.
+
+Das ist eine eigene Fehlerklasse, verschieden von §3.88. Dort behauptet eine Regel eine Reichweite, die der Mechanismus nicht hat. Hier stimmt alles: Das Register existiert, seine Regeln stehen sauber im Kopf der Datei, die Messung liegt vor, die Zuordnung ist getroffen — nur ist der letzte Handgriff nie geschehen. Eine Zuordnung, die in einem Fließtext steht statt in der Datei, die der Wächter liest, ist für den Wächter nicht vorhanden. Zwischen „wir wissen, wem das gehört" und „die Maschine weiß es" liegt ein Schritt, den niemand als Arbeit empfindet und den deshalb niemand tut.
+
+Verstärkt wird das dadurch, dass der Schaden **still** ist. Ein nicht gefüttertes Register bricht nichts; es lässt nur ein Tor zu, das nie aufgeht. Der Punkt sieht aus, als warte er auf Gelegenheit, und wartet in Wahrheit auf einen Eintrag von zwei Zeilen. Genauso still war die Diagnose auf der Tafel — sie nannte eine plausible Ursache, die niemand nachgeprüft hatte.
+
+**Lehre:** Wer eine Zuordnung trifft, trägt sie in demselben Zug dort ein, wo der Mechanismus sie liest — sonst ist sie Prosa. Und ein Punkt, der „wartet", verdient dieselbe Frage wie ein roter Test: *worauf genau*, und ist das noch wahr? Am selben Vormittag hat der Mechanismus dann gezeigt, dass er trägt: Zwei herrenlose Fehlschläge bekamen erst ihre Punkte (568, 570) und danach ihre Einträge — Punkt zuerst, Eintrag danach, denn ein Eintrag ohne Punkt wäre nur ein leiserer Weg, einen Fehler verschwinden zu lassen.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -1013,7 +1024,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 08.08.2026, 22:14 · Quellen-Fingerprint: `88c45d67777e…`
+Zuletzt aktualisiert: Sonntag, 09.08.2026, 10:30 · Quellen-Fingerprint: `b5115e225346…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1093,8 +1104,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 41 Prozess-/Meta-TASKS-Punkte (davon 17 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 42 Prozess-/Meta-TASKS-Punkte (davon 18 offen).
 
-<!-- RETRO-FINGERPRINT: 88c45d67777e2d4f41b4249c4437ae39d3d7b961a5d011ef616c88e8bbd9d3ea -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-08T20:14:49.461Z -->
+<!-- RETRO-FINGERPRINT: b5115e2253461a5417f194fccc21ac36fac0ca3f38cf687b17b070683d2a9aac -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-09T08:30:18.483Z -->
 <!-- AUTO-GENERATED:END -->

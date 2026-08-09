@@ -174,6 +174,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Mechanik statt an Testnamen und prüft die **eingeräumten** Grenzen zuerst — eine zugegebene
   Lücke wird geglaubt, eine verschwiegene gesucht." *(Kosten ≈ 1,3x.)*
 
+- **Der Mechanismus ist gebaut — und wird nie gefüttert.** Ihr richtet eine Liste ein, in
+  der bekannte Fehlschläge ihrem jeweiligen offenen Punkt zugeschrieben werden. Die Regeln
+  stehen sauber da, die Zuordnung wird sogar getroffen — aber sie landet in einem Fließtext
+  statt in der Datei, die das Werkzeug liest. Für das Werkzeug existiert sie damit nicht,
+  und ein Arbeitspaket wartet monatelang auf ein Tor, das gar nicht aufgehen kann. Der
+  Schaden ist still: Nichts bricht, es geht nur nie weiter.
+  → *Prompt:* „Triffst du eine Zuordnung oder eine Ausnahme, trage sie **im selben Zug**
+  dort ein, wo der Mechanismus sie liest — sonst ist sie Prosa. Und wenn etwas ‚wartet',
+  sag mir **worauf genau** und ob das noch stimmt; ein Wartegrund altert wie ein Kommentar."
+
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
   → *Prompt:* „Laufzeiten, Performance und Kosten nennst du nur **gemessen**, Performance auf der
@@ -404,4 +414,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 88c45d67777e2d4f41b4249c4437ae39d3d7b961a5d011ef616c88e8bbd9d3ea -->
+<!-- GUIDE-FINGERPRINT: b5115e2253461a5417f194fccc21ac36fac0ca3f38cf687b17b070683d2a9aac -->
