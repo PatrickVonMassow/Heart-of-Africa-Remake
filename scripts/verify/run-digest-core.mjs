@@ -64,8 +64,10 @@ const isResult = (line) => resultName(line) !== null
 const HEADING = /^#\s/
 /** `===== LARGE regression — backend 1/2: WebGL 2 (…) =====` */
 const BANNER = /^={3,}/
-/** The run's own conclusions. */
-const FINAL = /^(ALL GREEN\b|\d+\s+SUITE\(S\) FAILED\b|DEFERRED\b|LARGE FAILED\b)/
+/** The run's own conclusions. `PARTIAL` (point 566) belongs here and not to the
+ *  droppable bulk: it is the line that says the green headline above it covers
+ *  ONE section, and a digest that loses it hands the reader a suite pass. */
+const FINAL = /^(ALL GREEN\b|\d+\s+SUITE\(S\) FAILED\b|DEFERRED\b|LARGE FAILED\b|PARTIAL\b)/
 /** `↻ retry world once…`, `⚠ PASSED ON RETRY  world …` */
 const FLAKE = /^[↻⚠]/
 /** The runner's indented failure echo (`      FAIL …`, `      ERR: …`,
