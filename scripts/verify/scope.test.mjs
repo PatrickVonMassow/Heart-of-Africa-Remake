@@ -202,6 +202,15 @@ if (section('borrows')) {
     expect(sectionAt(ranges, src.indexOf('__after'))).toBe(null)
   })
 
+  it('sees the same global written as globalThis — it is the same object', () => {
+    const src = "if (section('a')) {\n  await page.evaluate(() => { globalThis.__h = () => 1 })\n}\nif (section('b')) {\n  await page.evaluate(() => globalThis.__h())\n}\n"
+    expect(crossSectionGlobals(src)).toEqual([{ name: '__h', installedIn: ['a'], usedIn: 'b', line: 5 }])
+    // …and the two spellings are ONE name, so installing as `window.` and
+    // borrowing as `globalThis.` is no evasion either.
+    const mixed = "if (section('a')) { window.__h = 1 }\nif (section('b')) { globalThis.__h }\n"
+    expect(crossSectionGlobals(mixed).map((f) => f.usedIn)).toEqual(['b'])
+  })
+
   it('anchors the block on the CONDITION, so braces in the if-head cannot shrink it', () => {
     // `{ x: 1 }` used to be recorded as the whole of section 'a', which left the
     // real body counting as shared code — the install then looked legitimate and

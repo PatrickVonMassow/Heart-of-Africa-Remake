@@ -17,6 +17,28 @@
 //
 // Pure text in / findings out; the suite files are read by the caller
 // (scripts/verify/scope.test.mjs).
+//
+// KNOWN LIMITS. This is a TEXT audit over a CONVENTION, and the boundary is
+// written down so the next reader does not mistake it for coverage. None of
+// these is reported today; each is a shape a determined author could write and
+// the net would stay silent:
+//   · a bracketed install or read — `window['__h']`, `globalThis[name]`. Only
+//     the dotted form is matched.
+//   · an install written ONLY as `window.__h ??= …` (or `||=`/`&&=`). That reads
+//     as a read, so the name never counts as installed and drops out entirely.
+//   · an install performed by a SHARED function that a section calls. The
+//     assignment text sits outside the blocks, which is precisely what this
+//     check treats as legitimate staging — it cannot see WHEN the call happens.
+//   · a section slug written with backticks or outside `[a-z0-9-]`: no
+//     declaration is recognised, so the block counts as shared code. Such a slug
+//     is not runnable either (scripts/verify/sections.mjs reads the same shape),
+//     so it fails on the CLI first.
+//   · for crossSectionBindings: an initialiser at the declaration (`let herd =
+//     null`) counts as a shared assignment by design — see there; only the FIRST
+//     declarator of a `let a, b` list is examined; and a name shadowed in a
+//     nested scope is read as the module-level one.
+// Closing any of these means moving from text to a parse, which is a different
+// mechanism, not a bigger regex.
 import { maskCode, balancedEnd } from '../window-hide-core.mjs'
 
 /** A section declaration up to the opening quote, matched in MASKED source (so
@@ -24,8 +46,10 @@ import { maskCode, balancedEnd } from '../window-hide-core.mjs'
  *  whose string bodies the mask blanked. */
 const DECL_HEAD = /(?<![\w.$])section\(\s*['"]/g
 const DECL_NAME = /(?<![\w.$])section\(\s*(['"])([a-z0-9][a-z0-9-]*)\1\s*\)/g
-/** Any `window.__something` — the convention every dev hook in this project uses. */
-const GLOBAL = /\bwindow\.(__[A-Za-z0-9_$]+)/g
+/** Any `window.__something` — the convention every dev hook in this project uses.
+ *  `globalThis` is the same object from the same callback and is written by hand
+ *  often enough that leaving it out would be an evasion nobody had to intend. */
+const GLOBAL = /\b(?:window|globalThis)\.(__[A-Za-z0-9_$]+)/g
 
 /**
  * The `(` of the `if`-head whose condition contains the call starting at
@@ -241,7 +265,9 @@ export function formatCrossSectionBindings(findings, file = 'the suite') {
 export function formatCrossSectionGlobals(findings, file = 'the suite') {
   if (!findings?.length) return ''
   const lines = findings.map(
-    (f) => `  · window.${f.name} is installed in [${f.installedIn.join(', ')}] but read from ` +
+    // No `window.` prefix on the name: the same global is written both ways, and
+    // a message naming a spelling the file does not use sends the reader hunting.
+    (f) => `  · the page global ${f.name} is installed in [${f.installedIn.join(', ')}] but read from ` +
       `"${f.usedIn}" (${file}:${f.line}) — that block cannot run on its own`,
   )
   return (
