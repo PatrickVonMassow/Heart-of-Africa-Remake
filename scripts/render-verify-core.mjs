@@ -83,6 +83,7 @@ export const NON_RENDER_VERIFY = new Set([
   'run-digest-core.mjs', // which of a run's OUTPUT lines the caller reads; it draws nothing
   'run-logged.mjs', // the logging wrapper around run-all; it spawns the runner, it does not render
   'sceneReady-core.mjs', // the scene-readiness verdict; frameSubject.mjs polls the page for it
+  'sectionScope.mjs', // a TEXT audit of the suites' section blocks; it opens no page
   'sections.mjs', // WHICH block of a suite a --section run selects; the suite does the driving
   'snowMetric.mjs', // the snow-vs-sand pixel verdict; enrichments.mjs feeds it a crop
   'stanceSlip.mjs', // the planted-foot verdict over a sample series; polish.mjs records the samples
