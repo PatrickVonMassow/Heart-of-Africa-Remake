@@ -4643,6 +4643,13 @@ Build order, chosen so no two parallel agents own the same file:
   same way (poll on the app's own clock, never a fixed wait). The threshold (67 px,
   unoccluded, village behind) is NOT relaxed to make the red go away — it is the wording
   point 524 was accepted against.
+  MEASURED FURTHER THE SAME MORNING, and it shifts the odds: across four `polish` runs on
+  09.08.2026 the suite failed with THREE DIFFERENT pairs of checks and passed twice — the
+  children pair, then the water check alone, then two `giza (wet)` checks, then two clean
+  runs (WebGL 2 exit 0, WebGPU exit 0 on the retry). So the children check is most likely
+  another member of the rotating staging family of point 200 rather than a regression
+  against point 524. It is NOT ruled out — the ten-run measurement below still decides —
+  but expect the staging fix, not a product fix.
   VERIFIABLE: ten consecutive runs on the pinned seed with the same verdict, and the
   cause named in the commit message with its evidence.
   Criticality: medium — it may be a real regression against a closed criterion, and until
