@@ -104,7 +104,7 @@ export function classifyFile(path = '', { read = false } = {}) {
 /** Tools that are orchestration whatever their arguments carry. */
 const ORCHESTRATION_TOOLS = new Set(['Agent', 'SendMessage', 'TaskStop', 'TaskOutput'])
 /** Tools that carry no phase evidence at all — they must not vote. */
-const SILENT_TOOLS = new Set(['Monitor', 'ToolSearch', 'TodoWrite', 'WebSearch', 'WebFetch', 'Skill', 'Artifact'])
+const SILENT_TOOLS = new Set(['Monitor', 'ToolSearch', 'TodoWrite', 'WebSearch', 'WebFetch', 'Skill'])
 
 /** The phase ONE tool call is evidence for, or null when it is no evidence. PURE. */
 export function classifyToolCall({ name = '', input = {} } = {}) {

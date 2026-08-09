@@ -60,7 +60,13 @@ export async function readTurns(dir = transcriptDir()) {
   return { turns: assignTasks(turns, dominantTaskPerFile(branchRows)), files: listTranscripts(dir).length }
 }
 
-const git = (args) => execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+const git = (args) =>
+  execFileSync('git', args, {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    windowsHide: true, // point 401: no console window flashing at a turn end
+  })
 
 /**
  * The calendar clock: every first-parent merge on `main`, with the span from its
