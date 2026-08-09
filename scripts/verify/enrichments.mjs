@@ -5903,6 +5903,150 @@ if (section('crocodile-ambush')) {
   )
 }
 
+// --- Point 264: rivals of one kind fight (design.md §19.17) -------------------
+// The live half of the mechanic — the table, the selection, the resolver and the
+// deadlines are all pinned in the Vitest layer (wildlifeBehavior.test.ts). What
+// needs the real scene is the DRIVE: a staged pair of a fighting species must
+// actually converge, reach the clash, and resolve — one dead into the ordinary
+// carcass system on the lethal branch, both alive and released on the ritual one.
+// Both outcomes are pinned through balance.fight.forceOutcome (the point-177
+// precedent), so neither run needs a retry-until-the-roll-lands loop.
+if (section('intraspecies-fight')) {
+  await page.evaluate(() => window.__game.getState().debugJumpTo(-2.5, 34.0)) // Serengeti savanna
+  await waitForHerds()
+  /** Stage one bout of the given outcome and report how it resolved. */
+  const stageFight = async (forced) =>
+    page.evaluate(async (force) => {
+      const herds = window.__wildlife.herdsRef.current
+      const fb = window.__balance.fight
+      const p = window.__game.getState().pos
+      const seed = window.__game.getState().seed
+      const U = 10
+      // A quiet stage: no running hunt may claim either fighter mid-bout.
+      const lion = window.__lionHunt.state
+      lion.mode = 'idle'; lion.timer = 9999; lion.victim = null; lion.victimHunt = false
+      // Two adult zebras — the one Tier A species with an ambient herd — set on
+      // dry ground a short way apart, so the converge is a visible run.
+      const land = (x, z) => {
+        const ty = window.__terrainType(-z / U, x / U, seed)
+        return ty !== 'water' && ty !== 'ocean'
+      }
+      let spot = null
+      for (let r = 6; r <= 40 && !spot; r += 2) {
+        for (let k = 0; k < 16; k++) {
+          const a = (k / 16) * Math.PI * 2
+          const x = p.x + Math.sin(a) * r
+          const z = p.z + Math.cos(a) * r
+          if (land(x, z) && land(x + 5, z) && land(x - 5, z)) { spot = { x, z }; break }
+        }
+      }
+      if (!spot) return { staged: false, noLand: true }
+      const mk = (dx) => ({
+        x: spot.x + dx, z: spot.z, y: 0.2, rot: 0, scale: 1, phase: 0.3, chunk: undefined, grounded: true,
+      })
+      const one = mk(-5)
+      const two = mk(5)
+      herds.zebra.push(one, two)
+      const t0 = { clash: fb.clashSeconds, force: fb.forceOutcome }
+      fb.clashSeconds = 2 // a shorter clash keeps the check quick; the drive is unchanged
+      fb.forceOutcome = force
+      // Pair them the way the debug entry does — both willing, so the bout takes
+      // the CONVERGE path and always reaches the clash. Everything after this is
+      // the ordinary drive; the injection only supplies the two animals, exactly
+      // as the §19.16 checks inject a crocodile and its catch.
+      const bout = { mode: 'converge', ox: one.x, oz: one.z, time: 0, clash: 0 }
+      one.fight = { foe: two, aggressor: true, ...bout }
+      two.fight = { foe: one, aggressor: false, ...bout }
+      const out = { staged: true, paired: one.fight !== undefined && two.fight !== undefined }
+      let gap0 = Math.hypot(one.x - two.x, one.z - two.z)
+      let closed = false
+      let clashed = false
+      await window.__pollSim(40, () => {
+        const gap = Math.hypot(one.x - two.x, one.z - two.z)
+        if (gap < gap0 - 1) closed = true
+        if (one.fight?.mode === 'clash' || two.fight?.mode === 'clash') clashed = true
+        return one.dead || two.dead || (clashed && one.fight === undefined && two.fight === undefined)
+      })
+      out.converged = closed
+      out.clashed = clashed
+      out.deaths = (one.dead ? 1 : 0) + (two.dead ? 1 : 0)
+      out.released = one.fight === undefined && two.fight === undefined
+      out.cooldown = (one.fightCooldown ?? 0) > 0 || (two.fightCooldown ?? 0) > 0
+      const corpse = one.dead ? one : two.dead ? two : null
+      out.ordinaryCarcass = corpse !== null && corpse.lionFed !== true && corpse.dissolve !== undefined
+      // Neither body may be parked in the water (point 312).
+      out.dryGround = land(one.x, one.z) && land(two.x, two.z)
+      if (corpse) {
+        // The ordinary carcass system works it: the ground scavenger binds to
+        // the body, or its dissolve is already running down.
+        const d0 = corpse.dissolve
+        await window.__pollSim(25, () => {
+          const bound = window.__wildlife.scavenger.current.target === corpse
+          if (bound || (corpse.dissolve !== undefined && corpse.dissolve < d0)) { out.scavenged = true; return true }
+          return false
+        })
+        if (window.__wildlife.scavenger.current.target === corpse) window.__wildlife.scavenger.current.target = null
+      }
+      fb.clashSeconds = t0.clash
+      fb.forceOutcome = t0.force
+      herds.zebra = herds.zebra.filter((a) => a !== one && a !== two)
+      return out
+    }, forced)
+
+  const lethal = await stageFight('death')
+  check(
+    'a staged same-species pair converges, clashes and ONE dies (point 264)',
+    lethal.staged && lethal.paired && lethal.converged && lethal.clashed &&
+      lethal.deaths === 1 && lethal.released && lethal.dryGround,
+    JSON.stringify(lethal),
+  )
+  check(
+    'the loser is an ORDINARY carcass the scavengers work, not a bespoke body (point 264)',
+    lethal.ordinaryCarcass === true && lethal.scavenged === true,
+    JSON.stringify(lethal),
+  )
+
+  const ritual = await stageFight('submission')
+  check(
+    'the ritual ending: the clash resolves with BOTH alive, released and on cooldown (point 264)',
+    ritual.staged && ritual.clashed && ritual.deaths === 0 && ritual.released && ritual.cooldown &&
+      ritual.dryGround,
+    JSON.stringify(ritual),
+  )
+
+  // The SHIPPED path: the §21.3 debug dropdown must carry the entry and either
+  // pair two rivals or say what is missing — never a silent no-op (point 258).
+  await page.evaluate(() => { if (!window.__ui.getState().debugOpen) window.__ui.getState().toggleDebug() })
+  await page.waitForSelector('.debug-menu', { timeout: 15000 })
+  const dropdown = await page.evaluate(async () => {
+    const sel = [...document.querySelectorAll('.debug-menu select')].find((s) =>
+      [...s.options].some((o) => o.value.startsWith('drama:')),
+    )
+    if (!sel) return { error: 'no event-trigger select' }
+    const opt = [...sel.options].find((o) => o.value === 'drama:intraspeciesFight')
+    if (!opt) return { error: 'no intraspeciesFight option' }
+    window.__game.getState().setToast(null)
+    Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set.call(sel, 'drama:intraspeciesFight')
+    sel.dispatchEvent(new Event('change', { bubbles: true }))
+    await window.__sleepSim(0.4)
+    const herds = window.__wildlife.herdsRef.current
+    let paired = 0
+    for (const sp of Object.keys(herds)) for (const a of herds[sp]) if (a.fight !== undefined) paired++
+    const toast = window.__game.getState().toast
+    // Leave nothing running for the sections after this one.
+    for (const sp of Object.keys(herds)) for (const a of herds[sp]) a.fight = undefined
+    window.__game.getState().setToast(null)
+    return { label: opt.textContent, paired, toast }
+  })
+  await page.evaluate(() => { if (window.__ui.getState().debugOpen) window.__ui.getState().toggleDebug() })
+  check(
+    'the debug dropdown carries the fight and either pairs two rivals or names what is missing (points 258/264)',
+    !dropdown.error && typeof dropdown.label === 'string' && dropdown.label.length > 0 &&
+      (dropdown.paired === 2 || (typeof dropdown.toast === 'string' && dropdown.toast.length > 0)),
+    JSON.stringify(dropdown),
+  )
+}
+
 // --- Point 188: the coastal walk-off resolves --------------------------------
 // A predator that finished feeding at a coast pocket must actually LEAVE — the
 // old radial re-aim shuttled it on the beach forever (the user's Cairo report).
