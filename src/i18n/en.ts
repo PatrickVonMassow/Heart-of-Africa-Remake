@@ -543,6 +543,8 @@ export const en: Strings = {
     adultErrandDwell: 'Adults: stay at the errand (s)',
     adultErrandDig: 'Adults: digging lasts (s)',
     adultErrandLife: 'Adults: errand gives up after (s)',
+    adultErrandStall: 'Adults: release an errand going nowhere after (s)',
+    adultErrandSilence: 'Adults: alarm when nobody speaks for (s)',
     adultErrandPace: 'Adults: errand pace (m/s)',
     adultErrandCount: 'Adults: villagers running errands',
     foodPerDay: 'Food use per day (0 = infinite)',

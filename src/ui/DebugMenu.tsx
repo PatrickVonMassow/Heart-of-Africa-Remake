@@ -199,6 +199,8 @@ const ADULT_ERRAND_FIELDS: ReadonlyArray<{
   { key: 'dwellSeconds', label: 'adultErrandDwell', step: 0.5, min: 0 },
   { key: 'digSeconds', label: 'adultErrandDig', step: 0.5, min: 0 },
   { key: 'errandSeconds', label: 'adultErrandLife', step: 5, min: 1 },
+  { key: 'stallSeconds', label: 'adultErrandStall', step: 1, min: 1 },
+  { key: 'silenceSeconds', label: 'adultErrandSilence', step: 5, min: 1 },
   { key: 'pace', label: 'adultErrandPace', step: 0.1, min: 0.1 },
   { key: 'villagerCount', label: 'adultErrandCount', step: 1, min: 0, max: 12 },
 ]

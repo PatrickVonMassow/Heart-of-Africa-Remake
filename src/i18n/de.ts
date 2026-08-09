@@ -545,6 +545,8 @@ export const de: Strings = {
     adultErrandDwell: 'Erwachsene: Aufenthalt am Ziel (s)',
     adultErrandDig: 'Erwachsene: Graben dauert (s)',
     adultErrandLife: 'Erwachsene: Auftrag bricht ab nach (s)',
+    adultErrandStall: 'Erwachsene: Auftrag ohne Fortschritt freigeben nach (s)',
+    adultErrandSilence: 'Erwachsene: Alarm, wenn niemand spricht (s)',
     adultErrandPace: 'Erwachsene: Tempo beim Auftrag (m/s)',
     adultErrandCount: 'Erwachsene: Dorfbewohner mit Auftrag',
     foodPerDay: 'Nahrungsverbrauch/Tag (0 = ewig)',

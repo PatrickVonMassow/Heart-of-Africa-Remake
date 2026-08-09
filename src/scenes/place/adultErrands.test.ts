@@ -8,7 +8,7 @@
 // browser is left with the one thing only it can show: that the villager
 // actually walks.
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ADULT_CONCEPTS,
   AT_PLACE_RADIUS,
@@ -28,6 +28,7 @@ import {
   type ErrandView,
   type SpokenErrand,
 } from './adultErrands'
+import { resetDevAsserts } from '../../systems/devAssert'
 import { CHILD_CONCEPTS } from './childSituations'
 import { MIRROR_PAIRS, utteranceOf, type ConceptId } from '../../communication/lexicon'
 import { mulberry32 } from '../../world/noise'
@@ -40,6 +41,8 @@ const CFG: AdultErrandConfig = {
   dwellSeconds: 4,
   digSeconds: 6,
   errandSeconds: 60,
+  stallSeconds: 15,
+  silenceSeconds: 60,
   pace: 1.3,
 }
 
@@ -80,7 +83,18 @@ function villagers(count: number) {
 function simulate(
   seconds: number,
   geography: ErrandGeography,
-  options: { count?: number; dt?: number; cfg?: AdultErrandConfig; seed?: number } = {},
+  options: {
+    count?: number
+    dt?: number
+    cfg?: AdultErrandConfig
+    seed?: number
+    /**
+     * A wall the walkers cannot pass (point 586 / 583): a target this returns
+     * true for is approached to within five metres and never reached, exactly
+     * as a spot behind a fence or inside a collider behaves in the settlement.
+     */
+    unreachable?: (x: number, z: number) => boolean
+  } = {},
 ) {
   const cfg = options.cfg ?? CFG
   const dt = options.dt ?? 0.5
@@ -91,15 +105,32 @@ function simulate(
   const rand = mulberry32(options.seed ?? 1234)
   const spoken: SpokenErrand[] = []
   const walkTargets: Array<{ said: SpokenErrand; x: number; z: number }> = []
+  /** Seconds between two staged errands, the longest first — what the player
+   *  experiences as silence. */
+  let gap = 0
+  let longestGap = 0
+  /** The longest a single assignment was ever held, and the longest STALL any
+   *  assignment reached before it was let go. */
+  let longestHold = 0
+  let longestStall = 0
+  const held = new Map<number, number>()
   for (let t = 0; t < seconds; t += dt) {
     for (let i = 0; i < count; i++) {
       const a = errandOf(state, i)
       people[i].free = !a
-      if (!a || a.arrived) continue
+      if (!a) {
+        held.delete(i)
+        continue
+      }
+      held.set(i, (held.get(i) ?? 0) + dt)
+      longestHold = Math.max(longestHold, held.get(i)!)
+      longestStall = Math.max(longestStall, a.stall)
+      if (a.arrived) continue
       const dx = a.x - people[i].x
       const dz = a.z - people[i].z
       const d = Math.hypot(dx, dz)
       const stepLen = cfg.pace * dt
+      if (options.unreachable?.(a.x, a.z) && d <= 5) continue
       if (d <= stepLen + 0.25) {
         people[i].x = a.x
         people[i].z = a.z
@@ -113,9 +144,21 @@ function simulate(
     if (said) {
       spoken.push(said)
       walkTargets.push({ said, x: said.walkTo.x, z: said.walkTo.z })
-    }
+      longestGap = Math.max(longestGap, gap)
+      gap = 0
+    } else gap += dt
   }
-  return { state, spoken, walkTargets, people, view, cfg }
+  return {
+    state,
+    spoken,
+    walkTargets,
+    people,
+    view,
+    cfg,
+    longestGap: Math.max(longestGap, gap),
+    longestHold,
+    longestStall,
+  }
 }
 
 describe('the adults’ errand catalogue', () => {
@@ -518,7 +561,10 @@ describe('the scheduler', () => {
   })
 
   it('drops an errand whose walk never finishes, rather than pinning the villager', () => {
-    const cfg: AdultErrandConfig = { ...CFG, errandSeconds: 12 }
+    // THE BACKSTOP on its own: the stall release (pinned in its own block
+    // below) is put out of reach here, so what has to let go of this errand is
+    // `errandSeconds` and nothing else.
+    const cfg: AdultErrandConfig = { ...CFG, errandSeconds: 12, stallSeconds: 1e6 }
     const people = villagers(3)
     const view: ErrandView = { villagers: people, geography: fullGeography() }
     const state = createAdultErrands(3, cfg)
@@ -665,5 +711,206 @@ describe('the scheduler', () => {
     expect(placeOf(view, 3)).toBe('dig')
     expect(placeOf(view, 4)).toBeNull()
     expect(placeOf(view, 99)).toBeNull()
+  })
+})
+
+/**
+ * THE VILLAGE MUST NEVER RUN OUT OF SPEAKERS (work-order point 586).
+ *
+ * The defect this block exists for is TIME-DEPENDENT, which is exactly why no
+ * suite caught it: the adults went quiet after MINUTES of play, and every
+ * browser suite simulates seconds. So these cases run a whole visit — half an
+ * hour of village time — and judge the RATE of speech at the end of it, not
+ * whether the staging function would fire once.
+ *
+ * What was measured on the shipped code: with the river places walled off, all
+ * four villagers hang on errands they cannot finish, each one held for the full
+ * 180-second backstop — twenty staged errands long — and the village stands
+ * silent for stretches of nearly three minutes. That is what the user saw.
+ */
+describe('a village never runs out of speakers, however the walks go', () => {
+  /** The river places behind a wall: a spot nobody can reach (point 583 found
+   *  exactly such an invisible wall in this very village). */
+  const walledRiver = (_x: number, z: number) => z > 12
+
+  it('keeps speaking through half an hour of village time', () => {
+    const { spoken, longestGap } = simulate(1800, fullGeography())
+    expect(spoken.length).toBeGreaterThan(150)
+    expect(longestGap).toBeLessThan(CFG.silenceSeconds)
+  })
+
+  it('keeps speaking when the places it sends people to cannot be reached', () => {
+    const { spoken, longestGap } = simulate(1800, fullGeography(), {
+      unreachable: walledRiver,
+    })
+    expect(spoken.length).toBeGreaterThan(120)
+    // Nowhere near the silence the user reported: a walk that gets nowhere is
+    // let go, and the next errand is staged behind it.
+    expect(longestGap).toBeLessThan(CFG.silenceSeconds)
+  })
+
+  it('WOULD go quiet without the release — the case has teeth', () => {
+    // The same walled village with the stall release out of reach: the backstop
+    // alone leaves the gaps the defect report describes. Without this the two
+    // cases above would pass on the broken code too.
+    const backstopOnly: AdultErrandConfig = { ...CFG, stallSeconds: 1e6 }
+    const { longestGap } = simulate(1800, fullGeography(), {
+      cfg: backstopOnly,
+      unreachable: walledRiver,
+    })
+    expect(longestGap).toBeGreaterThan(CFG.errandSeconds / 2)
+  })
+
+  it('lets no assignment outlive its bound, reachable target or not', () => {
+    for (const unreachable of [undefined, walledRiver]) {
+      const { longestHold, longestStall } = simulate(1800, fullGeography(), { unreachable })
+      // The stall release is the tight bound; the backstop is the outer one.
+      expect(longestStall).toBeLessThanOrEqual(CFG.stallSeconds + 0.5)
+      expect(longestHold).toBeLessThanOrEqual(CFG.errandSeconds + 0.5)
+    }
+  })
+
+  it('keeps the rotation fair while it does it: no concept is starved', () => {
+    const { state } = simulate(1800, fullGeography(), { unreachable: walledRiver })
+    for (const s of ERRAND_SITUATIONS) {
+      // The three that need somebody ALREADY STANDING at a walled-off place
+      // cannot be cast in this village at all, and are excluded for that reason
+      // alone. Every other errand keeps coming round — the release frees stuck
+      // villagers, it does not re-order anyone.
+      const needsSomeoneAtTheRiver =
+        s.id === 'callBackFromTheBank' ||
+        s.id === 'gatherAtTheBank' ||
+        s.id === 'callInFromUpstream'
+      if (needsSomeoneAtTheRiver) continue
+      expect(state.staged[s.id], `${s.id} was starved`).toBeGreaterThan(0)
+    }
+  })
+
+  it('carries a follower without ever calling its steady gap a stall', () => {
+    // A follower walks at its leader's pace and so never closes the distance to
+    // it. Measured as headway that reads as a stall, and the two errands whose
+    // whole picture is the pair walking the stretch together would be cut in
+    // half every time.
+    const cfg: AdultErrandConfig = { ...CFG, stallSeconds: 2 }
+    const geo = fullGeography()
+    const people = villagers(4)
+    const view: ErrandView = { villagers: people, geography: geo }
+    const state = createAdultErrands(4, cfg)
+    const rand = mulberry32(77)
+    let follower = -1
+    let leader = -1
+    for (let t = 0; t < 400 && follower < 0; t += 0.5) {
+      for (let i = 0; i < people.length; i++) people[i].free = !errandOf(state, i)
+      const said = stepAdultErrands(state, view, 0.5, cfg, rand)
+      if (said?.action === 'followToTarget') {
+        leader = said.speaker
+        follower = said.addressees[0]
+      }
+    }
+    expect(follower).toBeGreaterThanOrEqual(0)
+    // The leader walks the stretch; the follower keeps its distance behind it.
+    for (let t = 0; t < cfg.stallSeconds * 3; t += 0.5) {
+      for (let i = 0; i < people.length; i++) people[i].free = !errandOf(state, i)
+      const lead = errandOf(state, leader)
+      if (lead && !lead.arrived) {
+        const d = Math.hypot(lead.x - people[leader].x, lead.z - people[leader].z)
+        people[leader].x += ((lead.x - people[leader].x) / d) * cfg.pace * 0.5
+        people[leader].z += ((lead.z - people[leader].z) / d) * cfg.pace * 0.5
+      }
+      // Two paces behind, all the way — no headway, and no stall either.
+      people[follower].x = people[leader].x - 2
+      people[follower].z = people[leader].z
+      stepAdultErrands(state, view, 0.5, cfg, rand)
+      expect(errandOf(state, follower)?.situation ?? null).not.toBeNull()
+    }
+  })
+
+  it('lets a follower go once there is nobody left to walk after', () => {
+    const cfg: AdultErrandConfig = { ...CFG, stallSeconds: 3 }
+    const geo = fullGeography()
+    const people = villagers(4)
+    const view: ErrandView = { villagers: people, geography: geo }
+    const state = createAdultErrands(4, cfg)
+    const rand = mulberry32(77)
+    let follower = -1
+    let leader = -1
+    for (let t = 0; t < 400 && follower < 0; t += 0.5) {
+      for (let i = 0; i < people.length; i++) people[i].free = !errandOf(state, i)
+      const said = stepAdultErrands(state, view, 0.5, cfg, rand)
+      if (said?.action === 'followToTarget') {
+        leader = said.speaker
+        follower = said.addressees[0]
+      }
+    }
+    clearErrand(state, leader)
+    for (let t = 0; t < cfg.stallSeconds + 1; t += 0.5) {
+      for (let i = 0; i < people.length; i++) people[i].free = !errandOf(state, i)
+      stepAdultErrands(state, view, 0.5, cfg, rand)
+    }
+    expect(errandOf(state, follower)).toBeNull()
+  })
+})
+
+/**
+ * THE ARMED ALARM (point 207(i)): a village that has gone quiet says so. This
+ * defect class leaves no trace in a screenshot and none in a short suite, so the
+ * running game is what has to report it — in every headless run, whose
+ * console-error gates fail on it, and in every manual session.
+ */
+describe('the silence alarm', () => {
+  let spy: ReturnType<typeof vi.spyOn>
+  beforeEach(() => {
+    resetDevAsserts()
+    spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+  afterEach(() => spy.mockRestore())
+
+  const codes = () => spy.mock.calls.map((c) => String(c[0]))
+
+  it('says nothing through half an hour of a healthy village', () => {
+    simulate(1800, fullGeography())
+    expect(codes()).toEqual([])
+  })
+
+  it('nor when the walks cannot be finished — because the village keeps speaking', () => {
+    simulate(1800, fullGeography(), { unreachable: (_x, z) => z > 12 })
+    expect(codes()).toEqual([])
+  })
+
+  it('nor in a village with nowhere at all to send anyone, which is silent by right', () => {
+    simulate(600, { bank: null, upstream: null, downstream: null, stone: null, digSites: [] })
+    expect(codes()).toEqual([])
+  })
+
+  it('nor with a single villager, who has nobody to speak to', () => {
+    simulate(600, fullGeography(), { count: 1 })
+    expect(codes()).toEqual([])
+  })
+
+  it('FIRES when a village that could speak has said nothing for the stated window', () => {
+    // Whatever the future cause — this is the caller holding every villager, so
+    // nothing can be cast — the alarm names it rather than letting the teaching
+    // die quietly.
+    const people = villagers(4).map((p) => ({ ...p, free: false }))
+    const view: ErrandView = { villagers: people, geography: fullGeography() }
+    const state = createAdultErrands(4, CFG)
+    const rand = mulberry32(5)
+    for (let t = 0; t < CFG.silenceSeconds + 5; t += 0.5) stepAdultErrands(state, view, 0.5, CFG, rand)
+    expect(codes().join(' ')).toContain('errands-silent')
+  })
+
+  it('re-arms: it goes quiet again as soon as the village speaks again', () => {
+    const people = villagers(4).map((p) => ({ ...p, free: false }))
+    const view: ErrandView = { villagers: people, geography: fullGeography() }
+    const state = createAdultErrands(4, CFG)
+    const rand = mulberry32(5)
+    for (let t = 0; t < CFG.silenceSeconds + 5; t += 0.5) stepAdultErrands(state, view, 0.5, CFG, rand)
+    expect(codes().join(' ')).toContain('errands-silent')
+    // The village is let go: it stages again, and the counter is back to nothing.
+    for (const p of people) p.free = true
+    let said = null
+    for (let t = 0; t < 60 && !said; t += 0.5) said = stepAdultErrands(state, view, 0.5, CFG, rand)
+    expect(said).not.toBeNull()
+    expect(state.silence).toBeLessThan(1)
   })
 })

@@ -39,6 +39,7 @@
 // what lets the whole teaching be pinned in the fast test layer.
 
 import { phraseOf, type ConceptId, type Phrase } from '../../communication/lexicon'
+import { devAssert } from '../../systems/devAssert'
 import type { GestureKind } from '../../render/gesture'
 
 /** Every errand the adults stage, in the catalogue's own order. */
@@ -91,6 +92,15 @@ export const ERRAND_AIM = {
 
 /** How near a villager must stand to count as being AT a named place. */
 export const AT_PLACE_RADIUS = 2.6
+
+/**
+ * How much nearer its target a villager must get for the step to call it
+ * headway. Anything smaller is the wobble of a figure sliding along a wall or
+ * walking a detour, not progress — and a detour that goes AROUND a hut may not
+ * shorten the straight line for several seconds, which is why the stall window
+ * itself (`stallSeconds`) is many times longer than one detour.
+ */
+const HEADWAY = 0.25
 
 /** A point on the settlement ground. */
 export interface ErrandPoint {
@@ -205,6 +215,19 @@ export interface AdultErrandConfig {
   digSeconds: number
   /** Backstop: an errand never outlives this, however the walk goes. */
   errandSeconds: number
+  /**
+   * How long a villager may make NO headway toward what it was sent to before
+   * the errand is given up and it is free to be spoken to again. The backstop
+   * above is far too coarse for that on its own: it is twenty staged errands
+   * long, so a village of four whose walks cannot complete stands silent for
+   * minutes at a time (measured, work-order point 586).
+   */
+  stallSeconds: number
+  /**
+   * The dev-mode alarm window: no errand staged for this long while the village
+   * could stage one is a defect, not a quiet spell, and says so (`devAssert`).
+   */
+  silenceSeconds: number
   /** The pace a villager walks at while carrying out an errand (m/s). */
   pace: number
 }
@@ -227,6 +250,12 @@ export interface ErrandAssignment {
   dwell: number
   /** Seconds before the errand is abandoned however the walk goes. */
   seconds: number
+  /** The nearest this villager has yet come to its target — what headway is
+   *  measured against. Infinity until the first step measures it. */
+  best: number
+  /** Seconds it has made no headway (for a follower: seconds with no leader
+   *  left to walk after). Past `stallSeconds` the errand is let go. */
+  stall: number
 }
 
 /** The scheduler's own memory. Plain data — the scene holds one per visit. */
@@ -246,6 +275,9 @@ export interface AdultErrandState {
   /** How often each errand has been staged this visit — the probe a live check
    *  and the dev hook read. */
   staged: Record<ErrandSituationId, number>
+  /** Seconds since the last errand was staged. The alarm below reads it, and so
+   *  does the dev hook — a village that has gone quiet says how long ago. */
+  silence: number
 }
 
 const dist = (a: ErrandPoint, b: ErrandPoint) => Math.hypot(a.x - b.x, a.z - b.z)
@@ -622,6 +654,7 @@ export function createAdultErrands(count: number, cfg: AdultErrandConfig): Adult
     last: null,
     assignments: Array.from({ length: Math.max(0, count) }, () => null),
     staged,
+    silence: 0,
   }
 }
 
@@ -668,7 +701,7 @@ function assign(
   state: AdultErrandState,
   view: ErrandView,
   index: number,
-  assignment: Omit<ErrandAssignment, 'arrived' | 'dwell' | 'seconds'>,
+  assignment: Omit<ErrandAssignment, 'arrived' | 'dwell' | 'seconds' | 'best' | 'stall'>,
   cfg: AdultErrandConfig,
 ): void {
   if (index < 0 || index >= state.assignments.length) return
@@ -683,6 +716,8 @@ function assign(
       ? Math.max(0, assignment.kind === 'dig' ? cfg.digSeconds : cfg.dwellSeconds)
       : 0,
     seconds: Math.max(0.1, cfg.errandSeconds),
+    best: me ? Math.hypot(me.x - assignment.x, me.z - assignment.z) : Infinity,
+    stall: 0,
   }
 }
 
@@ -758,7 +793,81 @@ function stage(
     age: 0,
   }
   state.staged[event.id]++
+  state.silence = 0
   return event
+}
+
+/** Whether this settlement draws anything an errand could be about at all. A
+ *  village with no bank, no stone and no dig site legitimately says nothing. */
+function hasErrandPlaces(view: ErrandView): boolean {
+  const g = view.geography
+  return !!(g.bank || g.upstream || g.downstream || g.stone) || g.digSites.length > 0
+}
+
+/**
+ * THE ARMED INVARIANT (point 207(i), work-order point 586): a village that CAN
+ * stage errands and has not staged one for the stated window is broken, and says
+ * so — in every headless suite, whose console-error gates fail on it, and in
+ * every manual session.
+ *
+ * This defect class is invisible in a screenshot and invisible in a test that
+ * simulates seconds: the adults went quiet after MINUTES of play, and no suite
+ * ran that long. What a picture cannot show, the running game reports itself.
+ *
+ * The guards are what a healthy village legitimately needs to speak at all: two
+ * villagers (all but one errand casts a speaker AND an addressee) and somewhere
+ * to send them. Measured on a healthy village, the longest quiet spell is ~25 s,
+ * so the default window sits well clear of it.
+ */
+function assertStillSpeaking(
+  state: AdultErrandState,
+  view: ErrandView,
+  cfg: AdultErrandConfig,
+): void {
+  const window = Math.max(1, cfg.silenceSeconds)
+  devAssert(
+    view.villagers.length < 2 || !hasErrandPlaces(view) || state.silence <= window,
+    'errands-silent',
+    () =>
+      `no adult has spoken for ${state.silence.toFixed(0)}s of ${window}s — ` +
+      `${view.villagers.length} villagers, ${view.villagers.filter((v) => !v.free).length} of them on an errand`,
+  )
+}
+
+/**
+ * Ages one unfinished assignment's STALL counter — the measure of whether the
+ * errand is still going anywhere.
+ *
+ * A walker is judged by the ground it covers toward its target: every step that
+ * brings it nearer than it has ever been resets the counter, and everything else
+ * — pressed against a fence, sent to a spot inside a collider, sent somewhere
+ * the route cannot reach — adds to it.
+ *
+ * A FOLLOWER cannot be judged that way: it walks at its leader's pace and so
+ * never closes the gap, and measuring it would abandon exactly the two errands
+ * whose picture IS the pair walking the stretch together. It is bounded by the
+ * leader instead — once nobody is on that errand ahead of it any more, there is
+ * nothing left to walk after.
+ */
+function ageStall(
+  state: AdultErrandState,
+  view: ErrandView,
+  index: number,
+  a: ErrandAssignment,
+  step: number,
+): void {
+  if (a.kind === 'follow' && a.follow !== undefined) {
+    const lead = state.assignments[a.follow]
+    if (lead && lead.situation === a.situation) a.stall = 0
+    else a.stall += step
+    return
+  }
+  const me = view.villagers[index]
+  const d = me ? Math.hypot(me.x - a.x, me.z - a.z) : Infinity
+  if (d < a.best - HEADWAY) {
+    a.best = d
+    a.stall = 0
+  } else a.stall += step
 }
 
 /**
@@ -789,8 +898,13 @@ export function stepAdultErrands(
     if (!a) continue
     a.seconds -= step
     if (a.arrived) a.dwell -= step
-    // Done, or given up on: either way the villager goes back to its routine.
-    if ((a.arrived && a.dwell <= 0) || a.seconds <= 0) state.assignments[i] = null
+    else ageStall(state, view, i, a, step)
+    // Done, given up on, or getting nowhere: either way the villager goes back
+    // to its routine — and is free to be spoken to again, which is the whole
+    // point. A village whose walkers all hang on an errand they cannot finish
+    // has nobody left to stage one for, and falls silent for good (point 586).
+    const stalled = !a.arrived && a.stall > Math.max(0.1, cfg.stallSeconds)
+    if ((a.arrived && a.dwell <= 0) || a.seconds <= 0 || stalled) state.assignments[i] = null
     else if (a.kind === 'follow' && a.follow !== undefined) {
       // The leader is the target, so the destination travels with it.
       const lead = view.villagers[a.follow]
@@ -801,6 +915,8 @@ export function stepAdultErrands(
     }
   }
   if (state.last) state.last.age += step
+  state.silence += step
+  assertStillSpeaking(state, view, cfg)
   state.cooldown -= step
   if (state.cooldown > 0) return null
   if (view.villagers.length === 0) {

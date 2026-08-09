@@ -525,6 +525,8 @@ export interface Strings {
     adultErrandDwell: string
     adultErrandDig: string
     adultErrandLife: string
+    adultErrandStall: string
+    adultErrandSilence: string
     adultErrandPace: string
     adultErrandCount: string
     foodPerDay: string
