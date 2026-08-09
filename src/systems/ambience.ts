@@ -726,14 +726,38 @@ export function playThunder(delaySeconds: number, strength = 1): void {
 }
 
 // --- Village speech (design.md §13.4, docs/communication-poc-spec.md) --------
-// The two spoken samples: one carrier pitch per tone, low for `ba` and high for
-// `BA`, with a vowel formant over it so a syllable reads as a voice rather than
-// a beep. Only the PITCH distinguishes them — loudness, tempo and length carry
-// no meaning anywhere in the language.
-const SPEECH_TONE: Record<Tone, { carrier: number; formant: number }> = {
-  low: { carrier: 138, formant: 820 },
-  high: { carrier: 226, formant: 1240 },
+// A spoken syllable is a VOICE, not a beep (point 587): a glottal sawtooth whose
+// FUNDAMENTAL reaches the ear intact — the pitch IS the language — shaped by the
+// three resonances of the vowel `a`. Those resonances are the SAME in both
+// tones, exactly as the spec demands ("differing in PITCH alone"), so the player
+// learns ONE syllable spoken low and high, which is what the two message drums
+// repeat later. Only the carrier moves between `ba` and `BA`.
+
+/** The carrier of a tone, in Hz, from the calibratable balance values: `ba` is
+ *  the low pitch, `BA` sits `speechPitchInterval` above it. */
+export function syllableCarrier(tone: Tone): number {
+  const c = balance.communication
+  const low = Math.max(20, c.speechPitchHz)
+  return tone === 'low' ? low : low * Math.max(1, c.speechPitchInterval)
 }
+
+/** The vowel `a` (F1 730 / F2 1090 / F3 2440 Hz, the textbook open vowel), as
+ *  PEAKING resonators: each formant ADDS a resonance and lets everything else
+ *  through, so the fundamental survives — a single bandpass was what threw the
+ *  pitch away. `onset` is where the formant stands at the release of the `b`:
+ *  a labial starts low and rises into the vowel, and that rise is the whole
+ *  difference between hearing `ba` and hearing `a`. */
+const VOWEL_A: ReadonlyArray<{ hz: number; q: number; gainDb: number; onset: number }> = [
+  { hz: 730, q: 5.5, gainDb: 15, onset: 0.55 },
+  { hz: 1090, q: 6.5, gainDb: 13, onset: 0.72 },
+  { hz: 2440, q: 7, gainDb: 9, onset: 1 },
+]
+/** A voice rolls off above its formants; without this the sawtooth buzzes. */
+const VOWEL_TILT_HZ = 3000
+/** How long the `b` transition takes to reach the steady vowel. */
+const VOWEL_ONSET_SECONDS = 0.035
+/** The small pitch fall of a spoken beat — far too small to blur the two tones. */
+const SPEECH_PITCH_FALL = 0.96
 
 /** Dev/verify probe: proves a spoken utterance really SCHEDULED audio. */
 const speechProbe =
@@ -745,23 +769,44 @@ const speechProbe =
       })
     : null
 
-/** One spoken syllable: a voiced carrier through its formant, softly enveloped. */
-function speakSyllable(ac: AudioContext, dest: AudioNode, t0: number, tone: Tone, dur: number, peak: number) {
-  const { carrier, formant } = SPEECH_TONE[tone]
+/**
+ * One spoken syllable `ba`: the voiced carrier of its tone through the vowel's
+ * resonators, with the plosive onset of a `b` — a hard release transient, the
+ * short dip of the closure opening, then the vowel body. Exported so the
+ * offline spectrum check (ambience.speech.test.ts) renders the REAL chain.
+ */
+export function speakSyllable(ac: AudioContext, dest: AudioNode, t0: number, tone: Tone, dur: number, peak: number) {
+  const carrier = syllableCarrier(tone)
   const osc = ac.createOscillator()
   osc.type = 'sawtooth'
   osc.frequency.setValueAtTime(carrier, t0)
-  osc.frequency.linearRampToValueAtTime(carrier * 0.94, t0 + dur) // the small fall of a spoken beat
-  const filter = ac.createBiquadFilter()
-  filter.type = 'bandpass'
-  filter.frequency.value = formant
-  filter.Q.value = 3.2
+  osc.frequency.linearRampToValueAtTime(carrier * SPEECH_PITCH_FALL, t0 + dur)
+  const onset = Math.min(VOWEL_ONSET_SECONDS, dur * 0.3)
+  let node: AudioNode = osc
+  for (const f of VOWEL_A) {
+    const bq = ac.createBiquadFilter()
+    bq.type = 'peaking'
+    bq.frequency.setValueAtTime(f.hz * f.onset, t0)
+    bq.frequency.linearRampToValueAtTime(f.hz, t0 + onset) // the `b` transition
+    bq.Q.value = f.q
+    bq.gain.value = f.gainDb
+    node.connect(bq)
+    node = bq
+  }
+  const tilt = ac.createBiquadFilter()
+  tilt.type = 'lowpass'
+  tilt.frequency.value = VOWEL_TILT_HZ
+  tilt.Q.value = 0.7
+  node.connect(tilt)
   const g = ac.createGain()
+  const attack = Math.min(0.002, dur * 0.05)
+  const body = Math.min(dur * 0.5, onset + 0.05)
   g.gain.setValueAtTime(0.0001, t0)
-  g.gain.linearRampToValueAtTime(peak, t0 + Math.min(0.03, dur * 0.25))
+  g.gain.linearRampToValueAtTime(peak, t0 + attack) // the burst of the `b`
+  g.gain.linearRampToValueAtTime(peak * 0.55, t0 + onset) // …and the dip behind it
+  g.gain.linearRampToValueAtTime(peak * 0.95, t0 + body) // the vowel swells
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
-  osc.connect(filter)
-  filter.connect(g)
+  tilt.connect(g)
   g.connect(dest)
   osc.start(t0)
   osc.stop(t0 + dur + 0.05)

@@ -507,6 +507,8 @@ export const de: Strings = {
     speechHearingRadius: 'Sprache: Hörweite',
     speechHearingFalloff: 'Sprache: Abfallschärfe',
     speechLabelSeconds: 'Sprache: Notiz über dem Kopf (s)',
+    speechPitch: 'Sprache: Tonhöhe des tiefen Tons (Hz)',
+    speechPitchInterval: 'Sprache: hoher Ton über dem tiefen (×)',
     speechConceptLabels: 'Sprache: Begriffe statt Silben zeigen',
     tagChildCount: 'Fangen: Zahl der Kinder',
     tagSprintSpeed: 'Fangen: Sprint des Fängers (m/s)',

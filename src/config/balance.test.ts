@@ -188,6 +188,8 @@ describe('village speech (design.md §13.4)', () => {
       hearingRadius: 10,
       hearingFalloff: 24,
       labelSeconds: 2.6,
+      speechPitchHz: 140,
+      speechPitchInterval: 1.68,
     })
     // A five-syllable atom stays well under two seconds, so a seven-atom
     // message is heard in one go rather than sat through.
@@ -197,5 +199,19 @@ describe('village speech (design.md §13.4)', () => {
     expect(balance.communication.labelSeconds).toBeGreaterThan(
       balance.communication.syllableSeconds * 5,
     )
+  })
+
+  it('pitches both syllables inside one human voice, an interval apart that the ear cannot miss', () => {
+    const { speechPitchHz, speechPitchInterval } = balance.communication
+    // `ba` and `BA` must read as ONE speaker at two pitches, so both carriers
+    // stay in a spoken register — a tone below this hums, above it squeals.
+    expect(speechPitchHz).toBeGreaterThanOrEqual(80)
+    expect(speechPitchHz * speechPitchInterval).toBeLessThanOrEqual(400)
+    // The interval is what the whole language rests on: it must survive the
+    // drums beside it, so "merely different" is not enough — a minor sixth
+    // (1.6) is the floor, and the two must not cross an octave, where the ear
+    // hears the same note again (point 587).
+    expect(speechPitchInterval).toBeGreaterThanOrEqual(1.6)
+    expect(speechPitchInterval).toBeLessThan(2)
   })
 })

@@ -700,6 +700,11 @@ export interface BalanceConfig {
     hearingFalloff: number
     /** How long the hypothesis stands over a speaker's head, for one atom. */
     labelSeconds: number
+    /** Carrier pitch of the LOW syllable `ba`, in Hz (point 587). */
+    speechPitchHz: number
+    /** The HIGH syllable `BA` as a multiple of the low pitch — the interval that
+     *  carries the entire language, so it is calibratable on its own. */
+    speechPitchInterval: number
   }
 }
 
@@ -1131,6 +1136,12 @@ export const balance: BalanceConfig = {
     // enough that the scene never carries standing text; a phrase adds one
     // pause per further atom (speechLabelSeconds).
     labelSeconds: 2.6,
+    // A low chest voice, and a major sixth above it for `BA` (point 587): wide
+    // enough to be unmistakable side by side and over the drums, and NOT an
+    // octave, which the ear is prone to confuse with the same note. Both pitches
+    // stay in one human speaking range, so the two read as one voice.
+    speechPitchHz: 140,
+    speechPitchInterval: 1.68,
   },
 }
 

@@ -249,6 +249,8 @@ class FakeFilter extends FakeNode {
   type = ''
   frequency = new FakeParam()
   Q = new FakeParam()
+  /** Peaking filters carry a gain in dB (the vowel formants, point 587). */
+  gain = new FakeParam()
 }
 class FakeOscillator extends FakeNode {
   type = ''
@@ -642,10 +644,20 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
 
   it('is quieter from further away, and never louder than right beside the speaker', () => {
     ctx.currentTime = 120
+    /** Walk a voice's chain (filters, however many) down to its envelope gain,
+     *  so the check assumes nothing about the vowel's filter count. */
+    const envelopeOf = (osc: FakeOscillator): FakeGain => {
+      let node: FakeNode = osc
+      while (!(node instanceof FakeGain)) {
+        const next = node.connected[0] as FakeNode | undefined
+        if (!next) throw new Error('the voice chain ends in no gain node')
+        node = next
+      }
+      return node
+    }
     const peakOf = (distance: number) => {
       const voices = spoken(() => playSpeech(utterancePlan(utteranceOf('DIG'), distance, { volume: 1 })))
-      const gain = (voices[0].connected[0] as FakeFilter).connected[0] as FakeGain
-      return Math.max(...gain.gain.events.map((e) => e.value ?? 0))
+      return Math.max(...envelopeOf(voices[0]).gain.events.map((e) => e.value ?? 0))
     }
     const near = peakOf(0)
     const far = peakOf(6)
