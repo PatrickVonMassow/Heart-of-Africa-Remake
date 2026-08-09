@@ -389,6 +389,21 @@ there exactly once; a new point joins a bundle when appended.
   PROGRESS 21.07.2026: converted the six named non-enrichments waits (commit
   7ed3c56) + six enrichments family/predator/scavenge/rescue STAGING settles to
   __sleepSim (5127afa, af4533f) — all touched suites green.
+  MEASURED 09.08.2026 (closing point 566, WebGL 2): the residue is a ROTATING
+  SINGLE failure, and it is what makes the suite unable to produce a clean run on
+  demand. Six runs of `enrichments` on byte-identical product code (`src/` did not
+  change) gave one fully green 251/251 and five runs of 249–250 pass with 1–2 red
+  — never the same check twice: "prey squeezed against a bank flees ALONG it"
+  (pt. 201; the failing sample ended `onWater:true`, path 8.2 / net 6.2, against
+  11.3 / 11.3 when it passes), "holding Ctrl names the animals in view" (pt. 342;
+  `0 animals of 1 labels`), "a calf out of reach past the reunion window is handed
+  to the adoption" (pt. 341; `separated:false`) and "a predator staged during the
+  window still makes the calf RUN" (pt. 369; `fleeBefore 5 == fleeAfter 5`). The
+  runner's own classifier called both double-reds a LOAD/FLAKE signature, and a
+  baseline run of the CURRENT checks against the pre-566 tree reproduced the same
+  instability — so these are the suite's own staging, not a product defect and not
+  the sectioning. Each is a STAGING settle of exactly the two patterns above; fixing
+  them is what makes a green run repeatable rather than lucky.
   PROGRESS 21.07.2026 (evening): three more increments, each validated green +
   pushed — (1) FAIL-SOFT against a whole-run ABORT (7360b62): a rare mid-check
   scene remount briefly nulls window.__wildlife; a non-optional herdsRef access
