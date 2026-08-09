@@ -584,7 +584,7 @@ abgerufen 09.08.2026.)
 | # | Maßnahme | Herkunft | Achse B (Tokens) | Achse A (Wall-Clock) | Bau | Netto im Fenster |
 | ---: | --- | --- | --- | --- | --- | --- |
 | 1 | Blockierend warten statt pollen | [A+B] | **−7 bis −9 %** (gemessen 10,9 % Poll) | neutral bis **+** | klein | **stark positiv** |
-| 2 | Unabhängige Werkzeugaufrufe bündeln | [A+B] | **−4 bis −7 %** | **−4 bis −7 %** | **keiner** (Disziplin) | **stark positiv** |
+| 2 | Unabhängige Werkzeugaufrufe bündeln | [A+B] | **−4 bis −7 %** | **−4 bis −7 % Maschinenzeit**, Kalenderwirkung offen (s. u.) | **keiner** (Disziplin) | **stark positiv** |
 | 3 | Leerlauf-Marker per Hook statt `echo idle` | [nur A] | **−3,6 %** (gemessen) | neutral | klein, Guard-nah | **positiv** |
 | 4 | Fenstergrenze auch INNERHALB eines Punktes | [nur A] | **−35 bis −45 % je Punkt** (grob) | leicht − | mittel, Pilot nötig | positiv, **höchstes Risiko** |
 | 5 | Verifikations-Leiter: billig iterieren, teuer einmal beweisen | [nur B] | −5 bis −15 % (grob, am Ausläufer) | **+** | klein (Regel) | **positiv** |
@@ -613,6 +613,16 @@ abgerufen 09.08.2026.)
 | 28 | `npm audit` nur bei Lock-Änderung | [nur A] | < 0,3 % | klein | trivial | nur **gebündelt** |
 | 29 | Board-Publish nur bei Änderung | [nur B] | klein | klein | trivial | nur **gebündelt** |
 | 30 | Die Hauptsitzung sieht die Frames, nicht den Lauf | [nur A; im Review wiederhergestellt] | −1 bis −1,8 M je Bildprüfung | neutral | klein | positiv |
+
+**Korrektur an dieser Tabelle (09.08.2026, von der externen Gegenprüfung gefunden
+und von der zweiten blinden Lesung bestätigt).** Aus »eine gesparte Antwort ≈
+24,4 s« folgt **Maschinen**zeit, nicht ohne Weiteres Kalenderzeit: Bis zu drei
+Agenten laufen parallel, weshalb ein Median-Punkt 0,75 h Kalender gegen 1,39
+Maschinenstunden steht. Zeile 2 hat die eine Größe stillschweigend als die
+andere ausgewiesen; die Kalenderwirkung bleibt **unbeziffert**, bis Maßnahme 23
+(Kalender zerlegen, Arbeitsauftragspunkt 599 b) den kritischen Pfad rechnet. Die
+Achse-A-Spalten der übrigen Zeilen sind daran zu lesen: Wo »−x %« ohne
+Kalenderbeleg steht, ist Maschinenzeit gemeint.
 
 ### 3.2 Die Einträge im Einzelnen
 
@@ -1073,6 +1083,23 @@ die reale Grenze sei die Urteilsfähigkeit der Hauptsitzung. **Die Messung
 entscheidet es nicht:** dazu fehlt genau die Zerlegung der Kalenderuhr aus
 Maßnahme 23. Beide Positionen stehen; die Entscheidung gehört hinter diese
 Messung, nicht davor.
+
+**Zwei Nachträge aus der externen Gegenprüfung (09.08.2026)**, damit sie nicht
+erneut vorgeschlagen werden:
+
+- **Kurze Punkte zuerst abarbeiten** (»shortest job first«). Verschiebt die
+  Reihenfolge, spart keine Arbeit — und die Reihenfolge ist hier eine
+  Prioritätsentscheidung des Nutzers, keine Durchsatzstellschraube.
+- **Dem Agenten seinen eigenen Verbrauch in jeden Prompt schreiben.** Kostet ein
+  bis zwei zusätzliche Antworten je Punkt und verleitet dazu, kurz vor dem Ziel
+  abzubrechen — ein Agent, der auf seine eigene Rechnung schaut, optimiert die
+  Rechnung, nicht die Arbeit.
+
+Ebenfalls aus der Gegenprüfung, als **Berichtigung einer Begründung**: Die
+Ablehnung »Reasoning-Effort senken« stützt sich auf die Nutzerregel und das
+Qualitätsrisiko — **nicht** auf den Vorfall vom 24.07.2026. Der war eine
+stillschweigend degradierte Haiku-Sitzung (Modell-Allowlist), kein
+Effort-Experiment, und darf nicht als dessen Beleg zitiert werden.
 
 ---
 

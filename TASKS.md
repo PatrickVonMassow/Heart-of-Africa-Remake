@@ -3647,6 +3647,22 @@ three further measures of that section are NOT points: measure 4 folds into 569,
 10 into 553 and measure 11 into 521, each recorded in the point it belongs to, because a
 second owner for one defect is how two half-fixes get built.
 
+THEY WERE THEN CHECKED AGAINST THREE EXTERNAL ANALYSES (Deepseek, Gemini and ChatGPT, given
+the same repository documents; `local/Optimierungen.md`), blind-parallel by two models per
+CLAUDE.md §6. RESULT: not one external proposal earned a point of its own — a point costs
+about 5.0 M weighted to run, and every genuinely new item saves less than that, so each was
+folded into the owner it belongs to and the specs above carry them. What the outside eyes
+DID deliver: the largest single uncaptured pot (15.2 % of all output spent re-asking exactly
+identical questions, now in 593), a defect in our own ranking table (machine time was sold
+as calendar time, corrected in 593 and measured by 599), and the discovery that our run
+records name neither the tree nor the machine a run happened on — which is why two of the
+proposals could not even be decided (599 c/d). Everything else was already covered, already
+built, or already rejected on our own measurements. THE ORDER CHANGED with it: 593 runs
+first because it is the only member with zero build cost, 599 moved forward because four
+later decisions wait on its readings, and the ladder (595) now precedes the landing command
+(594) — verification is 47 % of the spend against bookkeeping's 26 %, and a rule is cheaper
+to land than a mechanism that needs a review.
+
 - [ ] 592. STOP PAYING FOR THE WAIT (point 572's measure 1, the largest measured lever).
   A long-running command is AWAITED, not polled. The verify wrapper and every background
   run report their completion through the harness notification or through a single
@@ -3659,8 +3675,22 @@ second owner for one defect is how two half-fixes get built.
   rule is visible rather than remembered.
   MEASURED TARGET: polling is 10.9 % of the weighted spend and bare idling another 3.6 %
   (2857 + 1189 responses, 09.08.2026); the longest unbroken poll chain in the window was
-  437 responses ≈ 11.5 M weighted. Re-measure after the change with
+  437 responses ≈ 11.5 M weighted; the upper bound on removed model time is 2755 real poll
+  responses × 24.4 s ≈ 18.7 machine-hours in that window, and one 42-minute run polled every
+  30 s costs ≈ 1.9 M for the loop alone. Re-measure after the change with
   `node scripts/measure-task-cost.mjs`.
+  THE COMPLETION MESSAGE IS A STRUCTURED RECEIPT, not prose: exit code, backend, suite, the
+  `git HEAD` it ran on, the log path, the failing test names UNCUT, and the frames EXPECTED
+  against the frames WRITTEN. The last pair is invisible today — point 375's shutter refuses
+  a frame whose subject is missing, but a frame that was never written at all goes unnoticed,
+  and awaiting instead of polling is exactly the moment to make the run state one checkable
+  object.
+  THE MAIN SESSION SEES THE FRAMES, NOT THE RUNNING PROCESS. A picture check today spends
+  1 to 1.8 M weighted on watching a run in the scarcest context there is (the main session's
+  median is 164k against an agent's 207k). It waits, then looks at the result.
+  The primitive already exists and is NOT to be re-derived: `docs/harness-primitives-evaluation.md`
+  §5 records that a background run plus its completion notification replaces log polling, and
+  names `Monitor` for the per-occurrence case.
   Criticality: HIGH — it touches the idle guard, and a guard that goes blind stops
   catching an idle stop, so the other model's mechanism review applies.
 
@@ -3668,14 +3698,29 @@ second owner for one defect is how two half-fixes get built.
   prompt and the batch prompt carry one binding paragraph: independent tool calls go into
   ONE turn — several reads, several greps, `build` and `lint` — while anything whose input
   depends on another call's output stays sequential, and a bundled shell chain never hides
-  its failing step.
+  its failing step. The paragraph NAMES its recurring candidates rather than stating the
+  principle: several reads, several greps, `build` beside `lint`, status beside branch, and
+  the screenshot reads of a picture check (small semantic groups, full resolution, judgment
+  quality before batching).
+  AND THE SAME PARAGRAPH CARRIES THE SECOND HALF: a fact that CANNOT have changed since it
+  was read is not read again — a file nobody edited, a `--help`, a config value, a spec
+  section already in the context. Mutable state stays re-read by rule: `git status`, CI
+  state, a running process, anything this session or another agent has written since.
   MEASURED BASELINE: 5.0 % of responses issue more than one call, search/read alone is
-  25.1 % of the weighted spend, and one saved response is worth ~22.9k weighted AND ~24 s.
-  The point is complete when the share of multi-call responses has been RE-MEASURED after
-  the change. Enforcement is by prompt and measurement, not by a guard — "could have been
-  bundled" is not machine-decidable.
-  Criticality: low — no mechanism, no guard; the only risk is bundling dependent calls,
-  which the paragraph forbids explicitly.
+  25.1 % of the weighted spend, and 4036 responses — 15.2 % of all output — repeated an
+  EXACTLY identical shell command inside one session. At a quarter of that pot avoided the
+  saving is 23.1 M weighted (2.6 % of the window) and 6.8 machine-hours.
+  ONE SAVED RESPONSE IS 22.9k WEIGHTED AND 24.4 s OF MACHINE TIME — NOT of calendar time.
+  Up to three agents run in parallel (a median point spans 0.75 h of calendar against 1.39
+  machine-hours), so machine time becomes wall-clock only on the critical path. The ranking
+  table converted the two silently; the calendar effect stays UNQUANTIFIED until point 599
+  computes the critical path.
+  The point is complete when both shares — multi-call responses and exactly repeated
+  commands — have been RE-MEASURED after the change. Enforcement is by prompt and
+  measurement, not by a guard: "could have been bundled" is not machine-decidable.
+  Criticality: low — no mechanism, no guard; the risks are bundling dependent calls and
+  re-using a fact that has since changed, and the paragraph excludes both explicitly. It
+  is the ONLY member of this series with zero build cost, which is why it runs first.
 
 - [ ] 594. THE LANDING COMMAND (point 572's measure 3). `scripts/land-point.mjs <N>` runs
   the landing chain deterministically — merge, fast gate, tick, archive move, board
@@ -3685,16 +3730,48 @@ second owner for one defect is how two half-fixes get built.
   MEASURED TARGET: bookkeeping is 26.0 % of the weighted spend and 37.5 % of the machine
   hours; the chain runs as 8–12 main-session turns today at a median context of 164k, and
   the main session spends 62.3 % of its own cost on bookkeeping.
+  THREE SMALL RIDERS, each below the 5.0 M a point of its own would cost, so each lands
+  here rather than owning one:
+  (a) `npm audit` runs in the chain only when the LOCKFILE changed — the verdict depends on
+      the dependency tree and on nothing else, so this is the same fact, not a proxy for it;
+      the rule texts that demand the audit are adjusted in the same commit.
+  (b) A board publish whose content is unchanged is skipped.
+  (c) The fast gate runs build, lint and the unit layer CONCURRENTLY — gates are 21.0
+      machine-hours per window, so 30–60 % of that is 2.9–5.8 % of all machine hours, while
+      the token effect is ~0.33 % and this is therefore an axis-A measure only. INTERLOCK,
+      not optional: it never runs while a browser suite runs, or it manufactures exactly the
+      load the quiet-machine gate exists to prevent. Acceptance is ten serial against ten
+      parallel runs on a quiet machine.
+  NOT A FAST-FORWARD MERGE, and the reason is not obvious: a fast-forward leaves no merge
+  commit, and `git log --first-parent main` is the only calendar measurement we have — every
+  fast-forwarded point would silently vanish from it and from the CI guard's ref accounting.
+  The case it would apply to is also the one that costs nothing today, and the fast gate
+  after the merge is mandatory either way, so nothing is skipped in exchange.
   Criticality: medium — it bundles guard-adjacent steps, and a swallowed intermediate
   error would advance state nobody verified, so the mechanism review is required.
 
 - [ ] 595. THE VERIFICATION LADDER (point 572's measure 5). While a render point is still
   being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
   full proof — both backends where they can differ, LARGE where the change warrants it —
-  runs exactly ONCE, on the state that is merged. The expensive browser suites abort at
-  the FIRST failure during that iteration (a red run is never credited anyway) and run to
-  completion only for the final proof. The rule is a brief building block for render
-  points, so it is applied rather than remembered.
+  runs exactly ONCE, on the EXACT MERGE CANDIDATE — `main` merged into the branch, the tree
+  that will land — with the recorded `git HEAD` of that run as the evidence that the verified
+  tree IS the merged one. Nothing enforces or measures that today. The expensive browser
+  suites abort at the FIRST failure during that iteration (a red run is never credited
+  anyway) and run to completion only for the final proof. The rule is a brief building block
+  for render points, so it is applied rather than remembered.
+  A RED IS A RED. No "critical versus cosmetic" class is introduced to decide what may be
+  aborted on — the classification buys nothing here, because an iteration run is not credited
+  either way, and it would open the door to waving a red through.
+  THE SHARED FINAL RUN IS ALREADY DECIDED, and this point must not be read as contradicting
+  it: `docs/work-packages.md` settled that several FINISHED per-point branches may be merged
+  together and ONE regression run over the merged result — "the only sizeable saving left".
+  What that shared run may replace is the repeated full REGRESSION. The both-backend PICTURE
+  proof stays on the branch, BEFORE the merge, exactly as it is today; merging first to
+  verify afterwards cost about thirty turns of a block-loop on 24.07.2026.
+  THE UNIT LAYER HAS THE SAME LADDER: `vitest --changed` or a path filter and
+  `tsc --incremental` are legal WHILE REPAIRING, and an incremental green is never an
+  acceptance — the full fast gate stays the proof. One rule covering both layers, not two
+  half-rules.
   MEASURED TARGET: verification is 47.0 % of the weighted spend and 37.4 % of the machine
   hours, the ten costliest points hold 64.4 % of all point-assigned verification tokens,
   and eight of ten recorded `enrichments` runs failed while still writing all 37 frames at
@@ -3725,6 +3802,17 @@ second owner for one defect is how two half-fixes get built.
   diagnosis of what is red and what was tried, and escalates instead of looping.
   MEASURED TARGET: 10 of 64 points carry 48.8 % of the point-assigned cost, the costliest
   single point 15.8 % of it with 89.0 % of that in verification.
+  THE DIAGNOSIS MUST LAND WHERE THE SUCCESSOR LOOKS — on the work order or the board, not
+  only inside the agent's report, which nobody reads again. Otherwise the next attempt is
+  the same attempt.
+  THE AUTOMATIC ABORT IS REFUSED, and the refusal is recorded here so it is not proposed a
+  fourth time: a hard turn cap or a four-hour timeout discards work that may be nearly done
+  AND pays a second 5.0 M build socle against a 5.82 M median point; its progress metric
+  ("share of tests passed") is a proxy, and judging by a proxy is the one thing this project
+  does not trade. Our tail points were expensive because the work was hard — the costliest
+  carried 89 % verification — not because a loop ran away.
+  A WALL-CLOCK TRIGGER may join the token trigger once point 599 delivers an honest calendar
+  decomposition; until then there is no honest wall-clock per point to trigger on.
   Criticality: medium — a cap that let a red state pass as green would be worse than the
   cost it saves, so the escalation path is the mechanism and the abort is not.
 
@@ -3733,9 +3821,19 @@ second owner for one defect is how two half-fixes get built.
   extends to the other big producers: `git diff` (`--stat` first), `grep` (`-c` or a head
   bound), file reads (`offset`/`limit` instead of a whole file), `npm ls`, `gh run view`.
   ERROR OUTPUT STAYS UNCUT — every failing test keeps its name.
+  THE ON-DEMAND PATH IS NAMED, not reinvented: `node scripts/verify/run-logged.mjs --show
+  <log>` already hands back the whole run when the digest is not enough. What must NOT be
+  adopted is the tempting inverse — a runner that returns only the names of failing suites
+  by default; error output stays uncut.
   MEASURED TARGET: a 10k output entering a point's context at response 20 is re-read by
   its remaining ~218 responses at 218k weighted, ten responses' worth; the trade pays up
   to a follow-up-query rate of ~85 %.
+  THE STANDING LOAD IS THE SAME ARITHMETIC ON A LARGER SCALE: 1k of permanently carried
+  text costs 3.27 M per window, so CLAUDE.md alone (~11.4k tokens) is ~4.2 % of it, and
+  per-turn injected text that CHANGES additionally breaks the cache prefix. So: a hook that
+  succeeded says nothing, and the per-turn injections are audited. CONDITIONAL on point
+  599's cache reading, and it cuts TEXT only — never a duty that is enforced rather than
+  remembered.
   Criticality: low — the one real risk is cutting an error message, which the rule
   excludes.
 
@@ -3745,9 +3843,18 @@ second owner for one defect is how two half-fixes get built.
   headers. It is marked as a HINT, never as an instruction ("the specification names these
   paths", not "change these files"), and it is generated on every run so it cannot go
   stale.
+  AND IT NAMES THE PLANNED CHECK: which suite, and which `--section` of it, will verify this
+  point — derived from the diff→suite mapping and the ladder rung, generated like the rest so
+  it cannot go stale, and marked as a hint like the path list. This is the cheapest possible
+  answer to what the ladder point found: a rung that is built and routed to nobody gets used
+  when it stands in the artefact the agent reads FIRST, not in a rule it must remember.
   MEASURED TARGET: search/read is 25.2 % of the weighted spend and the first responses of
   a delegated agent are almost always search; five saved responses per point is ~2 % of a
   median point.
+  NOT THE OPPOSITE DIRECTION: shrinking the brief was weighed and rejected on the arithmetic.
+  Removing 1.5k tokens saves ~35.7k weighted per point, while a single reference the agent
+  must then look up costs 22.9k — it breaks even at 1.5 extra lookups and goes negative
+  after. The brief is 1.9 % of the spend and exists to avoid the ~108k wholesale read.
   Criticality: low — a wrong list would misdirect, which generation-from-the-tree and the
   hint framing address.
 
@@ -3759,11 +3866,39 @@ second owner for one defect is how two half-fixes get built.
       at a per-turn change early in the prompt, a spike after a gap points at TTL expiry
       (a 42-min run without intervening turns costs ~0.23 M weighted on the next turn).
   (b) CALENDAR DECOMPOSITION: split the git span first-branch-commit → merge into
-      building, verifying and waiting-for-the-merge, so a statement about wall-clock stops
-      being a guess.
-  Both readings join `scripts/measure-task-cost.mjs`, and that tool becomes a RECORDED
+      building, verifying and waiting-for-the-merge, from named timestamps, and compute the
+      CRITICAL PATH — machine hours are not calendar hours while three agents run in
+      parallel, and that conversion is where our own ranking table slipped.
+  (c) THE RUN RECORD MUST NAME THE STATE IT RAN ON. `recordRun` in
+      `scripts/render-verify-recorder.mjs` stores backend, suite, exit, screenshots and reds
+      — and neither the `git HEAD` nor the TREE HASH. So the two questions that would decide
+      a verification memo cannot be asked at all: how often did the identical check run twice
+      on an identical tree, and how often did a final proof run on a tree that differs from
+      the one that was merged. Both fields are added, and the grouping by
+      `(treeHash, suite, backend, tier)` becomes a reading. Nothing is BUILT on the answer
+      until the answer exists — a cached green standing in for a real rendered result is the
+      forbidden proxy, which is why the memo itself stays unbuilt.
+  (d) THE RUN RECORD MUST NAME THE MACHINE IT RAN ON. `scripts/verify/machine-load-core.mjs`
+      already computes a quiet/busy/loaded verdict and `run-all.mjs` already probes it — the
+      verdict is simply not stored. Stored, it turns "browser reds correlate with load" from
+      an anecdote into a measurement (first attempt against retry, by load level), and that
+      decides whether the answer is a new semaphore or simply making the EXISTING
+      `--on-load=defer` the default for browser suites. Widening what exists beats building.
+  (e) THE PICTURE-READING PATTERN IS COUNTED BEFORE IT IS CHANGED: how many responses read a
+      `verification/*.png`, how many images each carried, what share of a picture check that
+      is. A proposal to view several frames per turn is worth up to ~1.58 M per backend per
+      check IF frames are read one at a time today — which nobody has measured, and an
+      earlier reading points the other way. If the count is low the idea dies for free. Were
+      it ever acted on: frames stay full-resolution and individually attached, groups stay
+      small, and this never becomes a contact sheet or a downscale.
+  (f) GUARD TELEMETRY: which guard blocks how often, and what a blocked turn cost.
+  Every reading joins `scripts/measure-task-cost.mjs`, and that tool becomes a RECORDED
   step of the closing cycle (`CLOSING_STEPS`), so every structural measure gets its
   before/after instead of a feeling.
+  IT RUNS EARLY IN THIS SERIES, not late: four separate decisions now wait on it — the
+  verification memo, the merge-candidate proof, the load semaphore and the frame-reading
+  change — plus the machine-versus-calendar correction. A measurement that gates four
+  judgments belongs before them, not after.
   Criticality: low — pure measurement; it changes no behaviour, and it is the precondition
   for judging the remaining structural levers.
 
