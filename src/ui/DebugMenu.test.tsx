@@ -43,6 +43,7 @@ const DEFAULTS = {
   tag: { ...balance.villageLife.tag },
   childSpeech: { ...balance.villageLife.childSpeech },
   adultErrands: { ...balance.villageLife.adultErrands },
+  separation: { ...balance.villageLife.separation },
   startupFreezeBudgetMs: balance.startup.pictureFreezeBudgetMs,
   labelOverlayMax: balance.labelOverlay.maxLabels,
   birdsongVolume: balance.birdsongVolume,
@@ -128,6 +129,7 @@ afterEach(() => {
   Object.assign(balance.villageLife.tag, DEFAULTS.tag)
   Object.assign(balance.villageLife.childSpeech, DEFAULTS.childSpeech)
   Object.assign(balance.villageLife.adultErrands, DEFAULTS.adultErrands)
+  Object.assign(balance.villageLife.separation, DEFAULTS.separation)
   balance.startup.pictureFreezeBudgetMs = DEFAULTS.startupFreezeBudgetMs
   balance.labelOverlay.maxLabels = DEFAULTS.labelOverlayMax
   balance.birdsongVolume = DEFAULTS.birdsongVolume
@@ -254,6 +256,13 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.adultErrandDwell, read: () => balance.villageLife.adultErrands.dwellSeconds, value: 8 },
     { label: en.debug.adultErrandDig, read: () => balance.villageLife.adultErrands.digSeconds, value: 12 },
     { label: en.debug.adultErrandCount, read: () => balance.villageLife.adultErrands.villagerCount, value: 6 },
+    // The body every inhabitant presents to every other, and its damping (point
+    // 578): the radius, the dead band, the stiffness, the cap and the wedge window.
+    { label: en.debug.separationRadius, read: () => balance.villageLife.separation.bodyRadius, value: 0.3 },
+    { label: en.debug.separationSlop, read: () => balance.villageLife.separation.slop, value: 0.02 },
+    { label: en.debug.separationStiffness, read: () => balance.villageLife.separation.stiffness, value: 0.4 },
+    { label: en.debug.separationSpeed, read: () => balance.villageLife.separation.maxSpeed, value: 1.5 },
+    { label: en.debug.separationWedge, read: () => balance.villageLife.separation.wedgeSeconds, value: 2 },
     // The loading picture's freeze budget the startup gate binds (point 337).
     { label: en.debug.startupFreezeBudget, read: () => balance.startup.pictureFreezeBudgetMs, value: 6000 },
     // How many hold-Ctrl labels may stand at once (point 342).
@@ -795,6 +804,8 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.childSpeechPace', 'debug.childSpeechRefusal', 'debug.childSpeechReply',
     'debug.adultErrandInterval', 'debug.adultErrandSpread', 'debug.adultErrandDwell',
     'debug.adultErrandDig', 'debug.adultErrandLife', 'debug.adultErrandPace', 'debug.adultErrandCount',
+    'debug.separationRadius', 'debug.separationSlop', 'debug.separationStiffness',
+    'debug.separationSpeed', 'debug.separationWedge',
   ],
   weather: ['debug.season', 'debug.seasonStrength', 'debug.wetGroundStrength', 'debug.foliageCollapse'],
   economy: [
@@ -881,19 +892,19 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 149 controls in total, and none twice', () => {
+  it('carries all 151 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(149)
+    expect(labels.length).toBe(151)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(149)
+    expect(rows.length).toBe(151)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -947,7 +958,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(149)
+    expect(renderedRowLabels().length).toBe(151)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -993,9 +1004,9 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     render(<DebugMenu />)
     fireEvent.click(groupHead(en.debug.groups.tools))
     typeFilter('croc')
-    expect(renderedRowLabels().length).toBeLessThan(149)
+    expect(renderedRowLabels().length).toBeLessThan(151)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(149)
+    expect(renderedRowLabels().length).toBe(151)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 

@@ -85,6 +85,24 @@ import { playSpeech } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
 import { placePlayerPosition } from './playerPosition'
 import { animalAnchors, animalBodies, animalScene, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
+import {
+  addBodies,
+  createBodies,
+  createInhabitantSet,
+  releaseBodies,
+  separateBody,
+  type InhabitantBody,
+  type InhabitantSet,
+} from './inhabitantBodies'
+import {
+  drumHandPose,
+  drumHeadY,
+  drumStroke,
+  DRUMMER_LEAN,
+  HIGH_DRUM,
+  LOW_DRUM,
+  type DrumGeometry,
+} from './drummerPose'
 import { childPlayGround, PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations } from './lifeSpots'
 
 /** Collision radius of inhabitants (matches the player's). */
@@ -104,6 +122,58 @@ const ColdCloaksContext = createContext<ColdDress | null>(null)
  * read the same number, so PlaceLife subscribes once and hands it down.
  */
 const LimbDetailContext = createContext<number>(8)
+
+/**
+ * The settlement's inhabitant bodies (work-order point 578). A context for the
+ * reason the two above are: the life vignettes are a dozen separate components,
+ * and every one of them has to see EVERY other one's figures — the defect was
+ * exactly that none of them did. PlaceLife owns one set per settlement; each
+ * component claims its slots, writes them where it moved its figures, and
+ * separates them there.
+ */
+const InhabitantBodiesContext = createContext<InhabitantSet>(createInhabitantSet())
+
+/** Claims `count` bodies from the settlement's set for the lifetime of the
+ *  component. The owner writes each body's position and radius per frame.
+ *  The bodies are BUILT while rendering but JOINED to the set in an effect:
+ *  React StrictMode mounts an effect, tears it down and mounts it again, and a
+ *  set joined during render would have kept only the teardown. */
+function useInhabitantBodies(
+  count: number,
+  options: { fixed?: boolean; x?: number; z?: number; scale?: number } = {},
+): InhabitantBody[] {
+  const set = useContext(InhabitantBodiesContext)
+  const { fixed, x, z, scale } = options
+  const bodies = useMemo(
+    () => createBodies(count, { fixed, x, z, scale }),
+    [count, fixed, x, z, scale],
+  )
+  useEffect(() => {
+    addBodies(set, bodies)
+    return () => releaseBodies(set, bodies)
+  }, [set, bodies])
+  return bodies
+}
+
+/** One body for a vignette figure standing at its station: it pushes the
+ *  passers-by aside and never gives way itself. */
+function useStandingBody(x: number, z: number, scale = 1): void {
+  useInhabitantBodies(1, { fixed: true, x, z, scale })
+}
+
+/** The same for a vignette of SEVERAL standing figures (a conversing pair, the
+ *  traders on the plaza). */
+function useStandingBodies(spots: ReadonlyArray<{ x: number; z: number }>, scale = 1): void {
+  const bodies = useInhabitantBodies(spots.length, { fixed: true, scale })
+  useEffect(() => {
+    spots.forEach((s, i) => {
+      const b = bodies[i]
+      if (!b) return
+      b.x = s.x
+      b.z = s.z
+    })
+  }, [bodies, spots])
+}
 
 /** The two shoulder pivots in render order: index 0 is the figure's LEFT arm
  *  (local +x), index 1 its RIGHT (local −x, because forward is +z and up is +y). */
@@ -306,6 +376,8 @@ function Figure({
 
 /** Kneeling cook with a three-stick pot beside the village fire. */
 function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  // A body the passers-by go round (point 578).
+  useStandingBody(x, z)
   return (
     <group position={[x, 0, z]} rotation={[0, Math.PI / 3, 0]}>
       <Figure cloth={cloth} kneel />
@@ -336,6 +408,8 @@ function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
 
 /** Weaver working at a simple standing loom. */
 function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; weave: string }) {
+  // A body the passers-by go round (point 578).
+  useStandingBody(x, z)
   const facing = Math.atan2(-x, -z)
   return (
     <group position={[x, 0, z]} rotation={[0, facing, 0]}>
@@ -525,6 +599,13 @@ function Kids({
     }),
     [game, x, z, playRadius],
   )
+  // The body each child presents to every other inhabitant (point 578). The
+  // chase collides with the huts and the fences but never with the other
+  // children, which is why a converging chase used to leave three of them
+  // standing inside one another.
+  const bodySet = useContext(InhabitantBodiesContext)
+  const bodies = useInhabitantBodies(count, { scale: KID_SCALE })
+
   const gestures = useRef<Array<RefObject<GestureState>>>([])
   if (gestures.current.length !== count) {
     gestures.current = Array.from(
@@ -563,6 +644,21 @@ function Kids({
     // What was said last frame steers the children this one: the chase keeps
     // the collisions, the stamina and the floor pace.
     stepTagGame(game, dt, balance.villageLife.tag, world, (i) => childSteer(speech, view, i, cfg))
+    // THE BODIES (point 578), resolved where the chase left them and before
+    // anything is drawn: a child's body is its own scale's, the push is damped
+    // so a separated pair does not tremble, and it is far smaller than the catch
+    // distance — the tag always wins over the separation.
+    const sep = balance.villageLife.separation
+    for (let i = 0; i < game.children.length; i++) {
+      const c = game.children[i]
+      const b = bodies[i]
+      if (!b) continue
+      b.x = c.x
+      b.z = c.z
+      separateBody(bodySet, b, dt, sep, world)
+      c.x = b.x
+      c.z = b.z
+    }
     const said = stepChildSpeech(speech, view, dt, cfg, speechRand)
     if (said) speakSituation(said, game.children[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
     game.children.forEach((c, i) => {
@@ -836,7 +932,15 @@ function Porters({
   const carry = useRef<FigurePose | null>({ left: armAim(0.3, 0.45), right: armAim(-0.3, 0.45), lean: 0.05, turn: 0 })
   // Where each porter actually stands, so its move can be swept from there.
   const pos = useRef<Array<{ x: number; z: number } | null>>([])
-  useFrame(({ clock }) => {
+  // The body each porter presents to the other inhabitants (point 578).
+  const bodySet = useContext(InhabitantBodiesContext)
+  const bodies = useInhabitantBodies(routes.length)
+  const separationWorld = useMemo(
+    () => ({ blocked: (px: number, pz: number) => !standingClear(colliders, px, pz, NPC_RADIUS) }),
+    [colliders],
+  )
+  useFrame(({ clock }, rawDt) => {
+    const dt = Math.min(rawDt, 0.1)
     const t = clock.elapsedTime
     refs.current.forEach((g, i) => {
       const r = routes[i]
@@ -847,9 +951,19 @@ function Porters({
       const z = r.az + (r.bz - r.az) * u
       const dir = Math.cos(t * r.speed + r.phase) >= 0 ? 1 : -1
       const p = (pos.current[i] ??= { x, z })
-      const [px, pz] = resolveMove(colliders, x, z, NPC_RADIUS, [p.x, p.z])
-      p.x = px
-      p.z = pz
+      const [px0, pz0] = resolveMove(colliders, x, z, NPC_RADIUS, [p.x, p.z])
+      p.x = px0
+      p.z = pz0
+      const b = bodies[i]
+      if (b) {
+        b.x = p.x
+        b.z = p.z
+        separateBody(bodySet, b, dt, balance.villageLife.separation, separationWorld)
+        p.x = b.x
+        p.z = b.z
+      }
+      const px = p.x
+      const pz = p.z
       g.position.set(px, Math.abs(Math.sin(t * 5 + r.phase)) * 0.05, pz)
       g.rotation.y = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
     })
@@ -947,6 +1061,9 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
     ],
     [x, z],
   )
+  // Two bodies the passers-by go round (point 578); the pair stands a metre
+  // apart, well clear of the separation distance, so it never pushes itself.
+  useStandingBodies(stances)
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
@@ -1022,6 +1139,8 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
 
 /** Grain pounding: mortar and a rising, falling pestle (period staple). */
 function Pounder({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  // A body the passers-by go round (point 578).
+  useStandingBody(x, z)
   const pestle = useRef<THREE.Mesh>(null)
   const body = useRef<THREE.Group>(null)
   // Both hands on the pestle (point 479): the arms ride the stroke, so the grip
@@ -1059,25 +1178,50 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   )
 }
 
-/** How deep a struck drum head sinks under the hand, in metres. */
-const DRUM_HEAD_DIP = 0.05
+/** One of the drummer's drums, drawn from its own geometry so the stroke the
+ *  hand beats and the drum the picture shows can never describe different
+ *  drums (work-order point 576). */
+function Drum({ drum, headRef }: { drum: DrumGeometry; headRef: RefObject<THREE.Mesh | null> }) {
+  return (
+    <group position={[drum.x, 0, drum.z]}>
+      <mesh position={[0, drum.shellHeight / 2, 0]} castShadow>
+        <cylinderGeometry args={[drum.shellRadius[0], drum.shellRadius[1], drum.shellHeight, 9]} />
+        <meshStandardMaterial color="#8a5a30" roughness={0.9} />
+      </mesh>
+      <mesh ref={headRef} position={[0, drum.headY, 0]} castShadow>
+        <cylinderGeometry args={[drum.headRadius, drum.headRadius, drum.headThickness, 9]} />
+        <meshStandardMaterial color="#cbb391" roughness={0.85} />
+      </mesh>
+    </group>
+  )
+}
+
+/** The stroke each drum is beaten with, solved once from its own dimensions
+ *  (`drummerPose.ts`): which hand, aimed where, between which elevations. */
+const LOW_STROKE = drumStroke(LOW_DRUM)
+const HIGH_STROKE = drumStroke(HIGH_DRUM)
 
 /**
  * Drummer at his pair of drums — the audible village drums made visible, and
  * the voice the chief's message goes out on (design.md §13.4, point 486).
  *
- * The LARGE low drum speaks `ba` and stands to his left, the SMALL high one
- * speaks `BA` and stands to his right; the hand over the drum being played is
- * the one that falls, and that drum's head dips under it, so the strike is
- * unmistakably ON the drum that sounds. While no message is going out he keeps
- * the village's own idle beat on the large drum.
+ * The LARGE low drum speaks `ba` and stands to his RIGHT, the SMALL high one
+ * speaks `BA` and stands to his LEFT — and neither side is stated twice: each
+ * drum's stroke reads its hand off the drum's OWN placement (`drummerPose.ts`),
+ * so the hand that falls is always the one standing over the drum that sounds,
+ * and that drum's head dips under it. While no message is going out the two
+ * hands keep the village's own idle beat half a beat apart, the large drum on
+ * the strong beat and the small one on the lighter off-beat, as the ambient drum
+ * bar sounds them.
  *
  * Both the falling hand and the sounding beat come from the ONE plan
  * (src/communication/drumMessage.ts) the ambience engine plays, so the picture
  * and the sound can never tell different messages.
  */
 function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
-  const pose = useRef<FigurePose | null>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0.12, turn: 0 })
+  // A body the passers-by go round (point 578).
+  useStandingBody(x, z)
+  const pose = useRef<FigurePose | null>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: DRUMMER_LEAN, turn: 0 })
   const lowHead = useRef<THREE.Mesh>(null)
   const highHead = useRef<THREE.Mesh>(null)
   // The plan of the message currently going out, kept with the start it was
@@ -1087,10 +1231,9 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
     const p = pose.current
     if (!p) return
     const beating = useUi.getState().drumPerformance
-    let lowLift = 0.42
-    let highLift = 0.42
-    let lowDip = 0
-    let highDip = 0
+    // Each hand's swing on its OWN drum: 0 is on the head, 1 the top of the lift.
+    let lowSwing = 1
+    let highSwing = 1
     if (beating) {
       if (sending.current?.startedAt !== beating.startedAt) {
         sending.current = { startedAt: beating.startedAt, plan: drumMessagePlan() }
@@ -1100,59 +1243,39 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
       const strike = drumStrikeAt(sending.current.plan, elapsed)
       // The hand falls at the beat and rises again through the strike's ring;
       // between two beats both hands wait raised over their own drum.
-      const swing = strike ? drumStrikeProgress(strike, elapsed) * 0.42 : 0.42
-      if (strike?.drum === 'low') {
-        lowLift = swing
-        lowDip = 1 - swing / 0.42
-      } else if (strike?.drum === 'high') {
-        highLift = swing
-        highDip = 1 - swing / 0.42
-      }
+      const swing = strike ? drumStrikeProgress(strike, elapsed) : 1
+      if (strike?.drum === 'low') lowSwing = swing
+      else if (strike?.drum === 'high') highSwing = swing
     } else {
       sending.current = null
-      // The idle village beat (design.md §19): the two hands half a beat apart
-      // on the large drum, as the ambient drum bar sounds it.
+      // The idle village beat (design.md §19): the two hands half a beat apart,
+      // each on its OWN drum and each dipping the head it strikes — the large
+      // drum on the strong beat, the small one on the lighter off-beat, as the
+      // ambient drum bar sounds them.
       const t = clock.elapsedTime * 4.2
-      lowLift = Math.max(0, Math.sin(t)) * 0.42
-      highLift = Math.max(0, Math.sin(t + Math.PI)) * 0.42
-      lowDip = 1 - lowLift / 0.42
+      lowSwing = Math.abs(Math.sin(t))
+      highSwing = Math.abs(Math.cos(t))
     }
-    Object.assign(p.left, armAim(0.26, -0.2 + lowLift))
-    Object.assign(p.right, armAim(-0.26, -0.2 + highLift))
-    if (lowHead.current) lowHead.current.position.y = 0.66 - lowDip * DRUM_HEAD_DIP
-    if (highHead.current) highHead.current.position.y = 0.5 - highDip * DRUM_HEAD_DIP
+    Object.assign(p[LOW_STROKE.side], drumHandPose(LOW_STROKE, lowSwing))
+    Object.assign(p[HIGH_STROKE.side], drumHandPose(HIGH_STROKE, highSwing))
+    if (lowHead.current) lowHead.current.position.y = drumHeadY(LOW_DRUM, lowSwing)
+    if (highHead.current) highHead.current.position.y = drumHeadY(HIGH_DRUM, highSwing)
   })
   return (
     <group position={[x, 0, z]} rotation={[0, Math.atan2(-x + 3.5, -z + 2.5), 0]}>
       <Figure cloth={cloth} pose={pose} />
-      {/* The large low drum (`ba`), to the drummer's left. */}
-      <group position={[-0.34, 0, 0.5]}>
-        <mesh position={[0, 0.33, 0]} castShadow>
-          <cylinderGeometry args={[0.27, 0.21, 0.66, 9]} />
-          <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-        </mesh>
-        <mesh ref={lowHead} position={[0, 0.66, 0]} castShadow>
-          <cylinderGeometry args={[0.28, 0.28, 0.04, 9]} />
-          <meshStandardMaterial color="#cbb391" roughness={0.85} />
-        </mesh>
-      </group>
-      {/* The small high drum (`BA`), to his right — the same drum, smaller. */}
-      <group position={[0.3, 0, 0.46]}>
-        <mesh position={[0, 0.25, 0]} castShadow>
-          <cylinderGeometry args={[0.17, 0.13, 0.5, 9]} />
-          <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-        </mesh>
-        <mesh ref={highHead} position={[0, 0.5, 0]} castShadow>
-          <cylinderGeometry args={[0.18, 0.18, 0.035, 9]} />
-          <meshStandardMaterial color="#cbb391" roughness={0.85} />
-        </mesh>
-      </group>
+      {/* The large low drum (`ba`) and the small high one (`BA`) — each on the
+          side its own x puts it, which is the side its hand is read from. */}
+      <Drum drum={LOW_DRUM} headRef={lowHead} />
+      <Drum drum={HIGH_DRUM} headRef={highHead} />
     </group>
   )
 }
 
 /** Fire tender kneeling at the fire pit, stoking the embers with a stick. */
 function FireTender({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  // A body the passers-by go round (point 578).
+  useStandingBody(x, z)
   const stick = useRef<THREE.Mesh>(null)
   useFrame(({ clock }) => {
     if (stick.current) stick.current.rotation.x = 0.85 + Math.sin(clock.elapsedTime * 1.6) * 0.12
@@ -1235,6 +1358,14 @@ function TaskWalker({
     yaw: 0,
     timer: startDelay,
   })
+  // The body it presents to the other inhabitants (point 578) — only while it is
+  // out of its dwelling.
+  const bodySet = useContext(InhabitantBodiesContext)
+  const [body] = useInhabitantBodies(1)
+  const separationWorld = useMemo(
+    () => ({ blocked: (px: number, pz: number) => !standingClear(colliders, px, pz, NPC_RADIUS) }),
+    [colliders],
+  )
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
@@ -1242,6 +1373,11 @@ function TaskWalker({
     const stand = standing.current
     const kneel = kneeling.current
     if (!stand || !kneel) return
+    if (body) {
+      body.active = s.mode !== 'inside'
+      body.x = s.x
+      body.z = s.z
+    }
 
     const route =
       s.mode === 'back'
@@ -1304,6 +1440,16 @@ function TaskWalker({
       s.x = nx
       s.z = nz
       s.yaw = Math.atan2(dx, dz)
+      // Point 578: pushed clear of the other inhabitants where the step left it.
+      // The door leg is left out — it runs through its own hut, where every
+      // direction is blocked anyway.
+      if (body) {
+        body.x = s.x
+        body.z = s.z
+        separateBody(bodySet, body, dt, balance.villageLife.separation, separationWorld)
+        s.x = body.x
+        s.z = body.z
+      }
     }
     stand.position.set(s.x, 0, s.z)
     stand.rotation.y = s.yaw
@@ -1413,6 +1559,22 @@ function Walkers({
   }
   const refs = useRef<Array<THREE.Group | null>>([])
 
+  // The body each walker presents to every other inhabitant (point 578) — it
+  // counts only while the walker is actually out: one asleep in its hut must not
+  // block the lane above it.
+  const bodySet = useContext(InhabitantBodiesContext)
+  const bodies = useInhabitantBodies(defs.length)
+  const separationWorld = useMemo(
+    () => ({
+      blocked: (px: number, pz: number) => !standingClear(colliders, px, pz, NPC_RADIUS),
+      nudge: (px: number, pz: number) => {
+        const free = tryNudgeToFree(colliders, px, pz, NPC_RADIUS)
+        return { x: free.pos[0], z: free.pos[1], found: free.found }
+      },
+    }),
+    [colliders],
+  )
+
   // Dev hook for the headless verification (CLAUDE.md §7.2).
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -1426,12 +1588,30 @@ function Walkers({
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
     const t = clock.elapsedTime
+    /** Point 578: this walker's body, pushed clear of the other inhabitants
+     *  where its own step left it. Skipped on the door segments, which pass
+     *  through the walker's own hut — every direction is blocked in there, and a
+     *  wedge escape would teleport it out of its own doorway. */
+    const settleBody = (i: number, s: WalkerState, separate: boolean) => {
+      const b = bodies[i]
+      if (!b) return
+      b.active = s.mode !== 'inside'
+      if (!b.active) return
+      const sep = balance.villageLife.separation
+      b.x = s.x
+      b.z = s.z
+      if (!separate) return
+      separateBody(bodySet, b, dt, sep, separationWorld)
+      s.x = b.x
+      s.z = b.z
+    }
     defs.forEach((def, i) => {
       const s = states.current[i]
       const g = refs.current[i]
       if (!s || !g) return
 
       if (s.mode === 'inside') {
+        settleBody(i, s, false)
         // Invisible while at home; step out through the door when done.
         g.visible = false
         s.timer -= dt
@@ -1456,6 +1636,7 @@ function Walkers({
       if (s.pause > 0) {
         // Linger at the errand: slight idle sway, no bob.
         s.pause -= dt
+        settleBody(i, s, true)
         g.position.set(s.x, 0, s.z)
         g.rotation.y = s.yaw + Math.sin(t * 0.6 + i) * 0.35
         return
@@ -1532,6 +1713,7 @@ function Walkers({
       } else {
         s.pinned = 0
       }
+      settleBody(i, s, !throughDoor)
       g.position.set(s.x, Math.abs(Math.sin(t * 6.5 + i * 2)) * 0.05, s.z)
       g.rotation.y = s.yaw
     })
@@ -1697,6 +1879,23 @@ function ErrandVillagers({
 
   const view = useMemo<ErrandView>(() => ({ villagers: people, geography }), [people, geography])
 
+  // The body each villager presents to every other inhabitant (point 578): two
+  // of them sent to neighbouring spots used to end up in one body.
+  const bodySet = useContext(InhabitantBodiesContext)
+  const bodies = useInhabitantBodies(count)
+  const separationWorld = useMemo(
+    () => ({
+      blocked: (px: number, pz: number) =>
+        !insidePlace({ radius, bank }, px, pz, NPC_RADIUS * 2) ||
+        !standingClear(colliders, px, pz, NPC_RADIUS),
+      nudge: (px: number, pz: number) => {
+        const free = tryNudgeToFree(colliders, px, pz, NPC_RADIUS)
+        return { x: free.pos[0], z: free.pos[1], found: free.found }
+      },
+    }),
+    [colliders, radius, bank],
+  )
+
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
     const cfg = balance.villageLife.adultErrands
@@ -1818,6 +2017,18 @@ function ErrandVillagers({
             state.stuck = 0
           }
         }
+      }
+
+      // THE BODY (point 578), resolved where this villager's own step left it,
+      // against every other inhabitant of the settlement.
+      const body = bodies[i]
+      if (body) {
+        const sep = balance.villageLife.separation
+        body.x = me.x
+        body.z = me.z
+        separateBody(bodySet, body, dt, sep, separationWorld)
+        me.x = body.x
+        me.z = body.z
       }
 
       // The pose: digging wins over everything, then the gesture, then rest.
@@ -1960,6 +2171,8 @@ function Traders({ seed, cloth }: { seed: number; cloth: string[] }) {
     ]
   }, [seed])
   const refs = useRef<Array<THREE.Group | null>>([])
+  // Bodies the passers-by go round (point 578).
+  useStandingBodies(spots)
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     refs.current.forEach((g, i) => {
@@ -2030,6 +2243,14 @@ export function PlaceLife({
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
   const localSeed = (seed ^ hash) >>> 0
+
+  // THE SETTLEMENT'S INHABITANT BODIES (work-order point 578). One set per
+  // settlement, shared by every life vignette below: the defect was that no
+  // villager was in any set the others resolved against, so children and adults
+  // alike walked into one another and stayed there as one tangle of limbs. One
+  // per mounted settlement: every vignette claims its slots from it and gives
+  // them back when it goes.
+  const inhabitantBodies = useMemo(() => createInhabitantSet(), [])
 
   // The cold-weather dress of §19.13, from THIS settlement's own place and the
   // date — like the settlement's weather, and for the same reason. Almost every
@@ -2111,10 +2332,12 @@ export function PlaceLife({
     return (
       <ColdCloaksContext.Provider value={cloaks}>
         <LimbDetailContext.Provider value={limbSegments}>
-          <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
-          <Traders seed={localSeed} cloth={style.cloth} />
-          <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
-          <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} />
+          <InhabitantBodiesContext.Provider value={inhabitantBodies}>
+            <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
+            <Traders seed={localSeed} cloth={style.cloth} />
+            <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
+            <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} />
+          </InhabitantBodiesContext.Provider>
         </LimbDetailContext.Provider>
       </ColdCloaksContext.Provider>
     )
@@ -2122,57 +2345,59 @@ export function PlaceLife({
   return (
     <ColdCloaksContext.Provider value={cloaks}>
       <LimbDetailContext.Provider value={limbSegments}>
-        <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
-        <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
-        <Kids
-          x={playGround.x}
-          z={playGround.z}
-          playRadius={playGround.radius}
-          count={kidCount}
-          seed={localSeed}
-          cloth={style.cloth}
-          colliders={colliders}
-          radius={radius}
-        />
-        {/* The adults at their errands (point 483): the five landscape and
-            action concepts, taught by what the villagers visibly go and do. */}
-        <ErrandVillagers
-          seed={localSeed}
-          cloth={style.cloth}
-          colliders={colliders}
-          radius={radius}
-          bank={bank}
-          geography={errandGeography}
-          count={Math.max(1, Math.round(balance.villageLife.adultErrands.villagerCount * presence))}
-        />
-        <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
-        <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} />
-        {/* Inhabitant/prop interactions (design.md §19). */}
-        <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
-        <Talkers x={VILLAGE_SPOTS.talkers[0]} z={VILLAGE_SPOTS.talkers[1]} cloth={style.cloth} />
-        <Pounder x={VILLAGE_SPOTS.pounder[0]} z={VILLAGE_SPOTS.pounder[1]} cloth={style.cloth[0]} />
-        <Drummer x={VILLAGE_SPOTS.drummer[0]} z={VILLAGE_SPOTS.drummer[1]} cloth={style.cloth[1 % style.cloth.length]} />
-        <Well x={VILLAGE_SPOTS.well[0]} z={VILLAGE_SPOTS.well[1]} />
-        {homes.length > 0 && (
-          <TaskWalker
-            home={homes[0]}
-            target={[firePos[0] + 0.7, firePos[1] + 1.8]}
-            cloth={style.cloth[0]}
-            carry="bundle"
+        <InhabitantBodiesContext.Provider value={inhabitantBodies}>
+          <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
+          <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
+          <Kids
+            x={playGround.x}
+            z={playGround.z}
+            playRadius={playGround.radius}
+            count={kidCount}
+            seed={localSeed}
+            cloth={style.cloth}
             colliders={colliders}
-            startDelay={4}
+            radius={radius}
           />
-        )}
-        {homes.length > 1 && (
-          <TaskWalker
-            home={homes[1]}
-            target={[VILLAGE_SPOTS.well[0] - 1.1, VILLAGE_SPOTS.well[1]]}
-            cloth={style.cloth[1 % style.cloth.length]}
-            carry="jar"
+          {/* The adults at their errands (point 483): the five landscape and
+              action concepts, taught by what the villagers visibly go and do. */}
+          <ErrandVillagers
+            seed={localSeed}
+            cloth={style.cloth}
             colliders={colliders}
-            startDelay={9}
+            radius={radius}
+            bank={bank}
+            geography={errandGeography}
+            count={Math.max(1, Math.round(balance.villageLife.adultErrands.villagerCount * presence))}
           />
-        )}
+          <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
+          <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} />
+          {/* Inhabitant/prop interactions (design.md §19). */}
+          <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
+          <Talkers x={VILLAGE_SPOTS.talkers[0]} z={VILLAGE_SPOTS.talkers[1]} cloth={style.cloth} />
+          <Pounder x={VILLAGE_SPOTS.pounder[0]} z={VILLAGE_SPOTS.pounder[1]} cloth={style.cloth[0]} />
+          <Drummer x={VILLAGE_SPOTS.drummer[0]} z={VILLAGE_SPOTS.drummer[1]} cloth={style.cloth[1 % style.cloth.length]} />
+          <Well x={VILLAGE_SPOTS.well[0]} z={VILLAGE_SPOTS.well[1]} />
+          {homes.length > 0 && (
+            <TaskWalker
+              home={homes[0]}
+              target={[firePos[0] + 0.7, firePos[1] + 1.8]}
+              cloth={style.cloth[0]}
+              carry="bundle"
+              colliders={colliders}
+              startDelay={4}
+            />
+          )}
+          {homes.length > 1 && (
+            <TaskWalker
+              home={homes[1]}
+              target={[VILLAGE_SPOTS.well[0] - 1.1, VILLAGE_SPOTS.well[1]]}
+              cloth={style.cloth[1 % style.cloth.length]}
+              carry="jar"
+              colliders={colliders}
+              startDelay={9}
+            />
+          )}
+        </InhabitantBodiesContext.Provider>
       </LimbDetailContext.Provider>
     </ColdCloaksContext.Provider>
   )
