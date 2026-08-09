@@ -3699,6 +3699,21 @@ second owner for one defect is how two half-fixes get built.
   hours, the ten costliest points hold 64.4 % of all point-assigned verification tokens,
   and eight of ten recorded `enrichments` runs failed while still writing all 37 frames at
   951–1029 s each.
+  THE LADDER'S CHEAPEST RUNG ALREADY EXISTS AND IS UNUSED (user question 09.08.2026: "Und
+  die neuen Möglichkeiten für differenziertes Testen durch 566 werden auch inzwischen bei
+  den Feature- und Bugtests eingesetzt?"). Point 566 built `--section=<name>`, and
+  `enrichments` declares nine of them; the resolver, the PARTIAL marking and the refusal to
+  count a partial run as coverage all work. CHECKED 09.08.2026: nothing routes anyone to
+  it. It appears in `scripts/verify/README.md` and in `tiers.mjs`, in no delegation brief,
+  in no agent prompt and in no rule text — the three agents commissioned that same evening
+  were not told about it either — and the recorded render-verify runs contain no partial
+  run at all. So the ladder's bottom rung is not a thing to invent here; it is a built
+  tool to PUT IN THE PATH. This point therefore also: (a) makes `--section` the stated
+  iteration rung for a render point in the delegation brief's building block, so an agent
+  reaches for it before replaying a whole pass; (b) SECTIONS the remaining render suites,
+  which 566 deferred ("enrichments first, then the other render suites"); and (c) states
+  in the same building block that the final proof is whole-suite, so the cheap rung can
+  never be mistaken for the acceptance.
   Criticality: medium — it reorders the proof but must not dilute it; the both-backend
   picture proof stays exactly as binding as it is today.
 
