@@ -4,7 +4,7 @@
 // puts it, the two stretches run opposite ways along the current, and the
 // landmark boulder the chief sends the player to is nowhere near any of it.
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import {
   BANK_BED_REACH,
   BANK_MAX_GAP,
@@ -24,6 +24,14 @@ import { buildPlaceNavGrid, findPlaceRoute } from './routing'
 import { PLACES, RIVERS, VILLAGE_RIVER_CLEARANCE_DEG, placeById, latLonToWorld } from '../../world/geo'
 import { RIVER_WIDTH_DEG } from '../../world/riverWidth'
 import { communicationRockSite, ROCK_VILLAGE_ID } from '../../world/communicationRock'
+import { setupGeodata } from '../../test/geodata'
+
+// The landmark boulder is placed against the REAL terrain (it refuses every wet
+// spot — work-order 585), so this file needs the elevation dataset the browser
+// has; without it the whole map reads as ocean and no bank exists to place it on.
+beforeAll(async () => {
+  await setupGeodata()
+})
 
 const SEED = 4711
 /** The verify lane's world, and the one the F6 reports of work-order 583/584

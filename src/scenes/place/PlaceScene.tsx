@@ -102,6 +102,7 @@ import {
 } from '../../render/placeRiver'
 import { RIVER_DRIFT_SPEED } from '../../render/waterAppearance'
 import { bankGroundHeight, type PlaceRiverBank } from './riverBank'
+import { scatterGrassTufts } from './groundScatter'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { devAssert } from '../../systems/devAssert'
 import { buildLayout, builtFabric, DIG_SITE_RADIUS, fencePanels, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
@@ -1137,6 +1138,7 @@ function GroundScatter({
   grassFactor = 1,
   rocks,
   radius,
+  bank,
 }: {
   placeId: string
   seed: number
@@ -1144,20 +1146,14 @@ function GroundScatter({
   grassFactor?: number
   rocks: Array<[number, number, number]>
   radius: number
+  bank: PlaceRiverBank | null
 }) {
-  const tufts = useMemo(() => {
-    let hash = 0
-    for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
-    const rand = mulberry32(((seed ^ hash) + 977) >>> 0)
-    const tufts: Array<[number, number, number]> = []
-    const tuftCount = Math.round((isPort ? 30 : 70) * grassFactor)
-    for (let i = 0; i < tuftCount; i++) {
-      const a = rand() * Math.PI * 2
-      const r = 4 + rand() * (radius + 8)
-      tufts.push([Math.cos(a) * r, Math.sin(a) * r, 0.55 + rand() * 0.55])
-    }
-    return tufts
-  }, [placeId, seed, isPort, grassFactor, radius])
+  // The scatter itself is pure (groundScatter.ts), so the rule it keeps — no
+  // tuft on the shore, work-order 585 — is pinned in the unit layer.
+  const tufts = useMemo(
+    () => scatterGrassTufts({ placeId, seed, isPort, grassFactor, radius, bank }),
+    [placeId, seed, isPort, grassFactor, radius, bank],
+  )
 
   const tuftGeo = useMemo(() => buildGrassTuft(), [])
   const rockGeo = useMemo(() => buildRock(), [])
@@ -2893,7 +2889,7 @@ export function PlaceScene() {
 
       <PlaceFlora slots={layout.flora} style={sandy ? REGION_PLACE_STYLES.north : style} material={floraMaterial} geos={floraGeos} />
 
-      <GroundScatter placeId={place.id} seed={seed} isPort={sandy} grassFactor={style.grass} rocks={layout.rocks} radius={layout.radius} />
+      <GroundScatter placeId={place.id} seed={seed} isPort={sandy} grassFactor={style.grass} rocks={layout.rocks} radius={layout.radius} bank={layout.bank} />
 
       {/* The communication PoC's teaching stone (work-order 482): the boulder in
           the open the adults teach the word for a rock at. Drawn from the same
