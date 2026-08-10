@@ -8,6 +8,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   coastSurfGain,
+  emitFootstep,
   playSpeech,
   playThunder,
   proximityGain,
@@ -19,6 +20,7 @@ import {
   trampleCrunchFires,
   trampleCrunchGain,
   trampleCrunchPlan,
+  DRUM_BEAT_PEAK,
   PROXIMITY_AUDIBLE,
 } from './ambience'
 import { thunderDelaySeconds } from './season'
@@ -743,6 +745,103 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       balance.communication.speechVolume = -3
       refreshAmbienceVolume()
       expect(speechBusOf(speak()[0]).gain.value).toBe(0)
+    })
+  })
+
+  // Point 605: point 577 gave the speech its own bus at the level it had had on
+  // the ambient one, and at that level the syllables sat BELOW the village drum
+  // bed — the user still reported them too quiet. The default is calibrated
+  // against the graph, so this case measures the whole chain the ear gets:
+  // syllable peak × speech bus against drum beat × drum layer × ambient bus,
+  // all read off the LIVE nodes at the default balance. A later change to
+  // either side then fails here instead of quietly re-burying the voices.
+  describe('the speech carries over the drums at the DEFAULT mix (point 605)', () => {
+    /** What a syllable's own synthesis puts out per unit of scheduled envelope
+     *  peak — the vowel's formant filters sit before the envelope, so the wave
+     *  is louder than the peak. MEASURED on the shipped chain and pinned in
+     *  src/systems/ambience.speech.test.ts; kept conservative here, so the
+     *  relation is understated rather than flattered. */
+    const SYLLABLE_SYNTHESIS_GAIN = 1.7
+
+    /** The bus a spoken syllable lands on, and the master behind it. */
+    const busOf = (voice: FakeOscillator): FakeGain => {
+      const bus = envelopeOf(voice).connected[0] as FakeGain | undefined
+      if (!bus) throw new Error('the voice envelope reaches no bus')
+      return bus
+    }
+    const masterOf = (bus: FakeGain): FakeGain => {
+      const m = bus.connected[0] as FakeGain | undefined
+      if (!m) throw new Error('the bus reaches no master')
+      return m
+    }
+    /** The ambient bus, via one of the bed's own emitters. */
+    const ambientBusOf = (): FakeGain => {
+      const before = ctx.sources.length
+      playThunder(thunderDelaySeconds(3), 0.8)
+      const clap = ctx.sources.slice(before)[0]
+      const gain = (clap.connected[0] as FakeFilter).connected[0] as FakeGain
+      const bus = gain.connected[0] as FakeGain | undefined
+      if (!bus) throw new Error('the clap envelope reaches no bus')
+      return bus
+    }
+    /** The drum bed's own layer gain, identified by the ONE ramp that separates
+     *  standing IN a village from hearing it from outside — no assumption about
+     *  the graph's build order. */
+    const drumLayerGain = (): number => {
+      setAmbienceScene({ region: 'central', mode: 'place', placeKind: null, nearVillage: true })
+      const before = ctx.gains.map((g) => g.gain.events.length)
+      setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
+      const moved = ctx.gains.filter((g, i) => g.gain.events.length > before[i])
+      expect(moved, 'exactly one layer separates the two scenes: the drums').toHaveLength(1)
+      return moved[0].gain.value
+    }
+    /** One syllable spoken right beside the player, at the DEFAULT volume — no
+     *  option override, so the plan reads the shipped balance. */
+    const syllableBesideThePlayer = (): { peak: number; bus: FakeGain } => {
+      const before = ctx.oscillators.length
+      playSpeech(utterancePlan(utteranceOf('DIG'), 0))
+      const voice = ctx.oscillators.slice(before)[0]
+      expect(voice, 'a villager beside the player schedules a voice').toBeDefined()
+      const peak = Math.max(...envelopeOf(voice).gain.events.map((e) => e.value ?? 0))
+      return { peak, bus: busOf(voice) }
+    }
+
+    /** The level the ear gets, on the two sides, at the master's input. */
+    const measure = () => {
+      refreshAmbienceVolume() // the live buses carry the shipped balance
+      const drums = DRUM_BEAT_PEAK * drumLayerGain() * ambientBusOf().gain.value
+      const { peak, bus } = syllableBesideThePlayer()
+      return { drums, speech: peak * bus.gain.value * SYLLABLE_SYNTHESIS_GAIN, master: masterOf(bus).gain.value }
+    }
+
+    it('measures the syllables well ABOVE the drum bed, not under it', () => {
+      ctx.currentTime = 240
+      // The mix this measures is the DEFAULT one — the state the player starts in.
+      expect(balance.ambienceVolume).toBe(0.1)
+      expect(balance.ambientVolume).toBe(0.5)
+      expect(balance.communication.speechVolume).toBe(1.5)
+      const { drums, speech } = measure()
+      expect(drums).toBeGreaterThan(0)
+      // MEASURED: 2.04× the drum beat (0.459 against 0.225) at the pinned
+      // synthesis gain. Under 1 is the reported bug; a shout is no fix either.
+      expect(speech / drums).toBeGreaterThanOrEqual(1.6)
+      expect(speech / drums).toBeLessThanOrEqual(4)
+    })
+
+    it('leaves the mix headroom — the loudest realistic moment stays under full scale', () => {
+      ctx.currentTime = 260
+      const { drums, speech, master } = measure()
+      // A footstep, on its own bus, is the third voice in that moment.
+      const before = ctx.sources.length
+      emitFootstep('stone')
+      const step = ctx.sources.slice(before)[0]
+      const stepGain = (step.connected[0] as FakeFilter).connected[0] as FakeGain
+      const stepBus = stepGain.connected[0] as FakeGain
+      const footstep =
+        Math.max(...stepGain.gain.events.map((e) => e.value ?? 0)) * stepBus.gain.value
+      // Two villagers speaking right beside the player, over the drum bed, with
+      // the player walking: MEASURED 0.62 of full scale after the master.
+      expect((2 * speech + drums + footstep) * master).toBeLessThan(1)
     })
   })
 })

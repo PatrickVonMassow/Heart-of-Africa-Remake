@@ -1208,13 +1208,17 @@ export const balance: BalanceConfig = {
     // stay in one human speaking range, so the two read as one voice.
     speechPitchHz: 140,
     speechPitchInterval: 1.68,
-    // 0.5 is exactly the level the speech had while it still rode the ambient
-    // bus, so the fix changes the ROUTING and not the loudness — and SPEECH_PEAK
-    // (src/communication/speaking.ts), which compensates bus 0.5 × master 0.5,
-    // stays correct. Raising this is now the one slider that lifts the speech
-    // over the drums — what the player was reaching for when he turned
-    // "everything else" down to nothing (point 577).
-    speechVolume: 0.5,
+    // Calibrated against the audio graph, not by feel (point 605). At the
+    // master's input a syllable spoken beside the player arrives at
+    // SPEECH_PEAK × ambienceVolume × this × the syllable's own synthesis gain
+    // (0.18 × 1.5 × ~2.07), a village drum beat at 0.9 × its layer 0.5 ×
+    // ambientVolume 0.5 — so the voices sit ~2.5× over the drums they must
+    // carry through, and the loudest realistic moment (two close speakers, the
+    // drum bed, a footstep) still stays under full scale. 0.5, the level
+    // inherited from the ambient bus in point 577, left them BELOW the drums,
+    // which is what "zu leise" meant. src/systems/ambience.test.ts measures the
+    // relation on the live buses.
+    speechVolume: 1.5,
     // A hand's breadth over the head, no more (point 582). The note used to
     // hang at a flat 2.3 m over the speaker's FEET — 0.85 m over a grown
     // villager's head and about twice a child's own height over a child's — so

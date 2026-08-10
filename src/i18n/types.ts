@@ -483,6 +483,7 @@ export interface Strings {
     footstepVolume: string
     ambientVolume: string
     birdsongVolume: string
+    speechVolume: string
     surfNearRadius: string
     surfCutoff: string
     /** Village speech: pace, phrase pause and how far an utterance carries (§13.4). */
@@ -493,7 +494,6 @@ export interface Strings {
     speechLabelSeconds: string
     speechPitch: string
     speechPitchInterval: string
-    speechVolume: string
     speechLabelHeadroom: string
     speechConceptLabels: string
     /** The children's game of tag (design.md §19.10, point 480/351). */

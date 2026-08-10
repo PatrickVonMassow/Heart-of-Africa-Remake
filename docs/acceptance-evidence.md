@@ -1324,6 +1324,23 @@ Verifiable, by suite:
   restoring the full set and the remembered collapse when cleared,
   saying so when nothing matches, and matching the German labels once
   German is active. `matchesDebugFilter` is pure-tested beside them.
+- Every LEVEL is where a player looks for it, and the village speech is
+  audible at the default mix (point 605). `src/ui/DebugMenu.test.tsx`
+  pins the rule rather than the one control: every debug field whose id
+  ends in `Volume` sits in the graphics-and-sound group and nowhere
+  else (asserted over the completeness table AND on the rendered menu),
+  and the speech row's label reads as a volume in the wording family of
+  its neighbours in both languages while still naming the village
+  speech. The DEFAULT (`balance.communication.speechVolume` 1.5, pinned
+  in `src/config/balance.test.ts`) is calibrated on the audio graph:
+  `src/systems/ambience.test.ts` measures, off the live nodes at the
+  default balance, a syllable spoken beside the player against a
+  village drum beat — 2.04× at the master's input — and that the
+  loudest realistic moment (two close speakers, the drum bed, a
+  footstep) reaches 0.62 of full scale, so nothing clips. The one
+  factor the node graph does not carry, a syllable's ~2× synthesis
+  gain, is measured on the rendered chain in
+  `src/systems/ambience.speech.test.ts`.
 
 ## 21. Water realism.
 

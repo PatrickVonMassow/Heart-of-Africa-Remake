@@ -570,10 +570,8 @@ export function DebugMenu() {
         (v) => { balance.communication.speechPitchHz = Math.max(20, v); bump() }, 5),
       num(t.debug.speechPitchInterval, balance.communication.speechPitchInterval,
         (v) => { balance.communication.speechPitchInterval = Math.max(1, v); bump() }, 0.02),
-      // The speech's OWN level (point 577): its bus sits beside the ambient one,
-      // so this raises the syllables over the drums without touching them.
-      num(t.debug.speechVolume, balance.communication.speechVolume,
-        (v) => { balance.communication.speechVolume = Math.max(0, v); refreshAmbienceVolume(); bump() }, 0.1),
+      // The speech's own LEVEL is a volume, so it lives with the other volumes
+      // in the graphics-and-sound group, not here (point 605).
       // How close over that speaker's own head it floats (point 582).
       num(t.debug.speechLabelHeadroom, balance.communication.labelHeadroom,
         (v) => { balance.communication.labelHeadroom = Math.max(0, v); bump() }, 0.05),
@@ -704,6 +702,17 @@ export function DebugMenu() {
       num(t.debug.birdsongVolume, balance.birdsongVolume, (v) => {
         set('birdsongVolume', Math.max(0, v))
         refreshAmbienceVolume()
+      }, 0.1),
+      // The village speech's OWN level (point 577): its bus sits beside the
+      // ambient one, so this raises the syllables over the drums without
+      // touching them. It belongs among the volumes, where a player looking for
+      // "the speech is too quiet" actually looks — it sat in the settlement
+      // group until point 605, and the player concluded there was no such
+      // slider at all.
+      num(t.debug.speechVolume, balance.communication.speechVolume, (v) => {
+        balance.communication.speechVolume = Math.max(0, v)
+        refreshAmbienceVolume()
+        bump()
       }, 0.1),
       num(t.debug.surfNearRadius, balance.surf.nearRadius,
         (v) => { balance.surf.nearRadius = Math.max(0, v); bump() }, 0.1),

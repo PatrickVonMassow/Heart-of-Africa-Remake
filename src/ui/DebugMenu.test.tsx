@@ -799,7 +799,7 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.separationSpeed', 'debug.separationWedge',
     'debug.speechSyllable', 'debug.speechPhrasePause', 'debug.speechHearingRadius',
     'debug.speechHearingFalloff', 'debug.speechLabelSeconds', 'debug.speechLabelHeadroom',
-    'debug.speechPitch', 'debug.speechPitchInterval', 'debug.speechVolume',
+    'debug.speechPitch', 'debug.speechPitchInterval',
     'debug.speechConceptLabels',
     'debug.tagChildCount', 'debug.tagSprintSpeed', 'debug.tagRunnerBoost', 'debug.tagTrotFactor',
     'debug.tagRecoverFactor', 'debug.tagFloorFactor', 'debug.tagDrain', 'debug.tagRecover',
@@ -822,8 +822,8 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
   graphics: [
     'debug.detailLevel', 'debug.flatGround', 'debug.startupFreezeBudget', 'debug.labelOverlayMax',
     'debug.ambienceVolume',
-    'debug.footstepVolume', 'debug.ambientVolume', 'debug.birdsongVolume', 'debug.surfNearRadius',
-    'debug.surfCutoff',
+    'debug.footstepVolume', 'debug.ambientVolume', 'debug.birdsongVolume', 'debug.speechVolume',
+    'debug.surfNearRadius', 'debug.surfCutoff',
   ],
   jump: ['debug.jumpTo'],
   tools: [
@@ -905,6 +905,46 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     expect(labels.length).toBe(expected.length)
     expect(labels.length).toBe(158)
     expect(new Set(labels).size).toBe(labels.length)
+  })
+
+  // Point 605: the speech level sat in the SETTLEMENT group while every other
+  // level sat here, so a player who wanted the voices louder opened the sound
+  // group, found no speech in it and reported that no such slider existed. The
+  // rule that prevents the next one is not "speech is in graphics" but the
+  // general one: a control whose effect is a volume lives with the volumes.
+  it('keeps EVERY volume control in the graphics-and-sound group, and nowhere else (point 605)', () => {
+    const isVolume = (path: string) => path.split('.').pop()?.endsWith('Volume') ?? false
+    const volumes = DEBUG_GROUP_ORDER.flatMap((id) =>
+      EXPECTED_CONTROLS[id].filter(isVolume).map((path) => ({ id, path })),
+    )
+    // The rule is worth nothing if it governs an empty set.
+    expect(volumes.length).toBeGreaterThanOrEqual(5)
+    expect(volumes.filter((v) => v.id !== 'graphics')).toEqual([])
+    // …and the speech is one of them, by name — the control the report was about.
+    expect(EXPECTED_CONTROLS.graphics).toContain('debug.speechVolume')
+    // The expectation table is only a claim; the rendered menu is the fact. The
+    // set-equality test above ties the two together, so asserting the rule here
+    // and the rendering there proves it of the real menu.
+    render(<DebugMenu />)
+    const groups = renderedGroups()
+    const graphics = groups[DEBUG_GROUP_ORDER.indexOf('graphics')]
+    expect(graphics.labels).toContain(en.debug.speechVolume)
+    for (const g of groups) {
+      if (g === graphics) continue
+      expect(g.labels, g.title).not.toContain(en.debug.speechVolume)
+    }
+  })
+
+  // Its label must read as a volume, like its neighbours, in BOTH languages —
+  // it is found by scanning the sound group for "volume"/"Lautstärke".
+  it.each(dicts)('labels the speech level as a volume, in the wording family of its neighbours — %s', (_name, dict) => {
+    const word = dict === de ? 'lautstärke' : 'volume'
+    const neighbours = ['ambienceVolume', 'footstepVolume', 'ambientVolume', 'birdsongVolume'] as const
+    for (const key of neighbours) expect(dict.debug[key].toLowerCase()).toContain(word)
+    expect(dict.debug.speechVolume.toLowerCase()).toContain(word)
+    // …and it still names the VILLAGE SPEECH, not a "voice" (point 577): the
+    // journal read-aloud is the only other thing that speaks, and this is not it.
+    expect(dict.debug.speechVolume.toLowerCase()).toContain(dict === de ? 'sprache' : 'speech')
   })
 
   it('gives every control a real input, select or button — no label without a control', () => {
