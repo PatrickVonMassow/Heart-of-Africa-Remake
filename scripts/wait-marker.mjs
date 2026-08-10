@@ -19,7 +19,7 @@ import { existsSync, statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { repoPath } from './repo-paths.mjs'
-import { latestRecordPath, logDir, readRecord, runIsLive } from './verify/run-record.mjs'
+import { activeRecordPath, logDir, readRecord, runIsLive } from './verify/run-record.mjs'
 import { clearDeclaration, readDeclaration, writeDeclaration } from './batch-in-flight.mjs'
 import { extendLease, readOwnerLock, clearDeclaredWait } from './batch-singleton.mjs'
 import { DECLARED_WAIT_LEASE_MS } from './batch-lease-core.mjs'
@@ -29,21 +29,28 @@ import { markerDeclaration, waitMarkerDecision } from './wait-marker-core.mjs'
  *  log. All of it failure-tolerant: nothing readable means nothing declared. */
 export function readActiveRun({ dir = logDir() } = {}) {
   try {
-    const path = latestRecordPath(dir)
-    if (!path) return { record: null, live: false, logMtime: null }
+    // The newest LIVE run, not merely the newest (four-eyes finding 2): a quick
+    // suite finishing beside a running LARGE must not make the hook believe the
+    // LARGE is over and withdraw the marker mid-wait.
+    const path = activeRecordPath(dir)
+    if (!path) return { record: null, live: false, logMtime: null, logPath: null }
     const record = readRecord(path)
-    if (!record) return { record: null, live: false, logMtime: null }
+    if (!record) return { record: null, live: false, logMtime: null, logPath: null }
+    // ABSOLUTE, because that is what the declaration must carry: the guard's own
+    // probe stats the recorded path from ITS cwd, and every hand-written
+    // declaration absolutizes (`absPath` in batch-in-flight.mjs). A relative one
+    // reads as "log missing" from anywhere but the repo root — fail-closed, but
+    // it would end the wait for the wrong reason (four-eyes finding 6).
+    const logPath = record.log ? (isAbsolute(record.log) ? record.log : repoPath(record.log)) : null
     let logMtime = null
     try {
-      // The record stores the log the way the wrapper printed it — repo-relative
-      // where it can be, absolute where the caller chose a path outside the tree.
-      logMtime = statSync(isAbsolute(record.log) ? record.log : repoPath(record.log)).mtimeMs
+      logMtime = statSync(logPath).mtimeMs
     } catch {
       /* an unreadable log is no evidence — the decision answers 'none' */
     }
-    return { record, live: runIsLive(record).live, logMtime }
+    return { record: { ...record, log: logPath ?? record.log }, live: runIsLive(record).live, logMtime, logPath }
   } catch {
-    return { record: null, live: false, logMtime: null }
+    return { record: null, live: false, logMtime: null, logPath: null }
   }
 }
 
@@ -80,8 +87,16 @@ export function armWaitMarker({
       // inside one blocking call from losing the batch to its own expiring lease
       // (point 556). It is owner-guarded, monotonic, and the launcher ends it
       // early the moment the declared evidence stops advancing.
-      extendLease(sid, now + DECLARED_WAIT_LEASE_MS, { declaredWait: true, now, ...(lockPath ? { lockPath } : {}) })
-      return { ...decision, written: true }
+      // REPORTED, not assumed (four-eyes finding 9): the extension is refused
+      // whenever the lock names another session id — after a context compaction
+      // it can be, and the hand-written path at least PRINTS that. The verdict
+      // carries it so `--status` and the tests can see it.
+      const extended = extendLease(sid, now + DECLARED_WAIT_LEASE_MS, {
+        declaredWait: true,
+        now,
+        ...(lockPath ? { lockPath } : {}),
+      })
+      return { ...decision, written: true, extended }
     }
     if (decision.action === 'clear') {
       if (declarationPath === undefined) clearDeclaration()

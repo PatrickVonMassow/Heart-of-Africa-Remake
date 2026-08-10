@@ -54,7 +54,7 @@ describe('--plan: the decision that belongs BEFORE the run', () => {
     expect(res.status).toBe(0)
     expect(res.stdout).toMatch(/BACKGROUND/)
     expect(res.stdout).toMatch(/notification/)
-    expect(res.stdout).toMatch(/93 expected/)
+    expect(res.stdout).toMatch(/94 expected/)
   })
 
   it('lets a single measured suite be one blocking foreground call', () => {
@@ -77,6 +77,17 @@ describe('--await: one blocking call, and no poll counted', () => {
   it('hands back the run’s own exit code, so a red run is red here too', () => {
     const { log } = fixture({ ...finished, exitCode: 1, receipt: { ...finished.receipt, exitCode: 1 } })
     expect(run(['--await', log]).status).toBe(1)
+  })
+
+  it('FAILS for a run whose wrapper was killed — an unknown outcome is not a pass', () => {
+    // status stayed 'running', the pid is gone, no exit code was ever written.
+    // Answering 0 here would report success for a run that proved nothing.
+    const { log } = fixture({ ...finished, status: 'running', pid: 4_194_303, exitCode: null, receipt: null })
+    const res = run(['--await', log])
+    expect(res.status).toBe(1)
+    expect(res.stdout).toMatch(/pid-gone/)
+    expect(run(['--receipt', log]).status).toBe(1)
+    expect(run(['--status', log]).status).toBe(1)
   })
 
   it('gives up with instructions rather than looping when its budget is spent', () => {

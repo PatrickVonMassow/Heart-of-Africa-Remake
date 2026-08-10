@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
+  SCAN_LIMIT,
+  activeRecordPath,
   countPoll,
   elapsedMs,
   framesWrittenSince,
@@ -42,6 +44,46 @@ describe('the record lives beside its log', () => {
     writeFileSync(join(dir, 'junk.run.json'), '{}')
     expect(latestRecordPath(dir)).toBe(join(dir, 'new.log.run.json'))
     expect(latestRecordPath(join(dir, 'nope'))).toBeNull()
+  })
+
+  it('bounds its scan, so a hook on every tool call does not grow with the log directory', () => {
+    const dir = tmp()
+    for (let i = 0; i < SCAN_LIMIT + 5; i++) {
+      writeRecord(join(dir, `2026-08-10T00-00-${String(i).padStart(2, '0')}.log.run.json`), { startedAt: 1000 + i })
+    }
+    // The oldest five are outside the window; the newest is still found.
+    expect(latestRecordPath(dir)).toContain(`00-${String(SCAN_LIMIT + 4).padStart(2, '0')}`)
+    expect(latestRecordPath(dir, { max: 1 })).toContain(`00-${String(SCAN_LIMIT + 4).padStart(2, '0')}`)
+  })
+})
+
+describe('activeRecordPath — the run a WAIT is about', () => {
+  const alive = (at) => ({ startedAt: at, status: 'running', pid: process.pid })
+  const over = (at) => ({ startedAt: at, status: 'finished', exitCode: 0 })
+
+  it('prefers a run that is still GOING over a newer one that has finished', () => {
+    // The real case: a quick single-suite verify finishes beside a running
+    // LARGE. Judging liveness on the newer record would call the LARGE over and
+    // withdraw the wait marker in the middle of the wait it exists for.
+    const dir = tmp()
+    writeRecord(join(dir, 'a-large.log.run.json'), alive(1000))
+    writeRecord(join(dir, 'b-quick.log.run.json'), over(2000))
+    expect(activeRecordPath(dir)).toBe(join(dir, 'a-large.log.run.json'))
+  })
+
+  it('falls back to the newest record when nothing is running', () => {
+    const dir = tmp()
+    writeRecord(join(dir, 'a.log.run.json'), over(1000))
+    writeRecord(join(dir, 'b.log.run.json'), over(2000))
+    expect(activeRecordPath(dir)).toBe(join(dir, 'b.log.run.json'))
+  })
+
+  it('takes the newest of several live runs, and answers null for nothing at all', () => {
+    const dir = tmp()
+    writeRecord(join(dir, 'a.log.run.json'), alive(1000))
+    writeRecord(join(dir, 'b.log.run.json'), alive(2000))
+    expect(activeRecordPath(dir)).toBe(join(dir, 'b.log.run.json'))
+    expect(activeRecordPath(join(dir, 'nope'))).toBeNull()
   })
 })
 

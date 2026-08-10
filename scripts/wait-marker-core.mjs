@@ -43,6 +43,22 @@ export const LOG_FRESH_MS = 10 * 60 * 1000
 export const MARKER_SOURCE = 'wait-marker-hook'
 
 /**
+ * HOW OLD THE MARKER MAY GET BEFORE IT IS RE-STAMPED.
+ *
+ * A declaration ages out at `IN_FLIGHT_MAX_AGE_MS` (45 min) wherever its
+ * evidence is not one of the OUTPUT kinds, and a log is not one of them — so a
+ * marker written once at the start of an 81-minute both-backends LARGE would be
+ * `expired` by minute 46, half way through the very wait it exists for
+ * (four-eyes finding 1). It is therefore re-written whenever it passes this age,
+ * which costs nothing: the run and its log are re-proved at every write, so a
+ * refresh is only ever granted to a wait that is still real.
+ *
+ * Comfortably under half the expiry, and `wait-marker-core.test.mjs` pins that
+ * relation against the constant itself rather than trusting this sentence.
+ */
+export const MARKER_REFRESH_MS = 15 * 60 * 1000
+
+/**
  * WHAT SHOULD THE HOOK DO ON THIS TOOL CALL?
  *
  * Returns `{ action, reason }` and, for `declare`, the `waitingOn` sentence and
@@ -64,6 +80,7 @@ export function waitMarkerDecision({
   declaration = null,
   now = Date.now(),
   logFreshMs = LOG_FRESH_MS,
+  refreshMs = MARKER_REFRESH_MS,
 } = {}) {
   const mine = declaration && declaration.source === MARKER_SOURCE
   const declaredRun = mine ? declaration.runLog ?? null : null
@@ -91,11 +108,17 @@ export function waitMarkerDecision({
   }
 
   if (declaration && !mine) return { action: 'none', reason: 'declared-by-hand' }
-  if (mine && declaredRun === (record.log ?? null)) return { action: 'none', reason: 'already-marked' }
+  let why = mine ? 'run-changed' : 'run-live'
+  if (mine && declaredRun === (record.log ?? null)) {
+    const at = Number(declaration.at)
+    const stale = Number.isFinite(at) ? now - at > refreshMs : true
+    if (!stale) return { action: 'none', reason: 'already-marked' }
+    why = 'refresh'
+  }
 
   return {
     action: 'declare',
-    reason: mine ? 'run-changed' : 'run-live',
+    reason: why,
     runLog: record.log ?? null,
     waitingOn: describeRun(record),
     evidence: [{ kind: 'log', path: record.log ?? null }],

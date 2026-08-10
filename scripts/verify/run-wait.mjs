@@ -37,9 +37,9 @@ import {
 } from './run-wait-core.mjs'
 import {
   ROOT,
+  activeRecordPath,
   countPoll,
   elapsedMs,
-  latestRecordPath,
   logDir,
   readRecord,
   recordPathFor,
@@ -70,8 +70,19 @@ function resolveRecord(logArg) {
     const path = recordPathFor(isAbsolute(logArg) ? logArg : join(ROOT, logArg))
     return { path, record: readRecord(path) }
   }
-  const path = latestRecordPath(logDir())
+  // The newest LIVE run, not merely the newest: a quick suite that finished
+  // beside a running LARGE must not become "the run" (four-eyes finding 2).
+  const path = activeRecordPath(logDir())
   return { path, record: path ? readRecord(path) : null }
+}
+
+/**
+ * The exit code a CALLER gets. A run whose wrapper was killed leaves no exit
+ * code at all, and answering 0 for it would report success for a run that
+ * proved nothing (four-eyes finding 3) — an unknown outcome is a failure.
+ */
+function exitOf(record) {
+  return Number.isFinite(record?.exitCode) ? record.exitCode : 1
 }
 
 function noRecord(path) {
@@ -90,7 +101,7 @@ function receiptOf(record) {
     command: record?.command ?? '',
     tier: record?.tier ?? null,
     suites: record?.suites ?? [],
-    backends: backendsFrom({ lines: [], verifyGl: record?.verifyGl, fallback: record?.backends?.[0] }),
+    backends: backendsFrom({ lines: [], verifyGl: record?.verifyGl, fallback: record?.backends }),
     head: record?.head ?? null,
     branch: record?.branch ?? null,
     logPath: record?.log ?? '',
@@ -113,7 +124,10 @@ function doPlan(argv) {
   console.log(`  suites:   ${plan.suites.join(', ') || '(none)'}`)
   console.log(`  expected: ${formatDuration(plan.expectedMs)} (measured medians, docs/picture-check-cost.md §1)`)
   console.log(`  frames:   ${plan.expectedFrames} expected`)
-  if (plan.unmeasured.length > 0) console.log(`  unmeasured (not in the expectation): ${plan.unmeasured.join(', ')}`)
+  if (plan.unmeasured.length > 0) {
+    console.log(`  runtime never measured for (so not in the time above): ${plan.unmeasured.join(', ')}`)
+  }
+  if (plan.framesUnmeasured?.length > 0) console.log(`  frame count unknown for: ${plan.framesUnmeasured.join(', ')}`)
   console.log(`  HOW TO WAIT: ${how.message}`)
   if (how.shape === 'blocking') {
     console.log(`  first look after ${formatDuration(nextWaitMs({ polls: 0, expectedMs: plan.expectedMs }))} if you must look at all.`)
@@ -130,7 +144,7 @@ async function doAwait(logArg, timeoutS) {
     const fresh = readRecord(path) ?? record
     console.log(`# the run is already over (${live.reason}) — no waiting was needed.`)
     printReceipt(fresh)
-    return fresh.exitCode ?? 0
+    return exitOf(fresh)
   }
   const budget = Number.isFinite(timeoutS) && timeoutS > 0
     ? timeoutS * 1000
@@ -146,7 +160,7 @@ async function doAwait(logArg, timeoutS) {
     current = readRecord(path) ?? current
     if (!runIsLive(current).live) {
       printReceipt(current)
-      return current.exitCode ?? 0
+      return exitOf(current)
     }
   }
   const waited = elapsedMs(current) ?? budget
@@ -168,7 +182,7 @@ function doStatus(logArg) {
     const fresh = readRecord(path) ?? record
     console.log(`# finished (${live.reason}) — not counted as a poll.`)
     printReceipt(fresh)
-    return fresh.exitCode ?? 0
+    return exitOf(fresh)
   }
   const counted = countPoll(path) ?? record
   const verdict = pollBudget({
@@ -193,7 +207,7 @@ function doReceipt(logArg) {
     console.log('# the run is NOT over — this is the receipt of a run in progress, and it is incomplete.')
   }
   printReceipt(record)
-  return record.exitCode ?? 0
+  return exitOf(record)
 }
 
 async function main(argv) {

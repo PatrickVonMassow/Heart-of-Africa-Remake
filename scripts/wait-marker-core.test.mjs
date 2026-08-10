@@ -3,7 +3,15 @@
 // written only where the same evidence a hand-written declaration would name is
 // genuinely there, and it is withdrawn the moment that evidence is over.
 import { describe, it, expect } from 'vitest'
-import { LOG_FRESH_MS, MARKER_SOURCE, describeRun, markerDeclaration, waitMarkerDecision } from './wait-marker-core.mjs'
+import {
+  LOG_FRESH_MS,
+  MARKER_REFRESH_MS,
+  MARKER_SOURCE,
+  describeRun,
+  markerDeclaration,
+  waitMarkerDecision,
+} from './wait-marker-core.mjs'
+import { IN_FLIGHT_MAX_AGE_MS } from './batch-in-flight-core.mjs'
 
 const NOW = 1_760_000_000_000
 const RUN = { command: 'verify large', log: 'local/verify-logs/x.log', expectedRuntimeMs: 2_536_000 }
@@ -18,7 +26,7 @@ const live = (over = {}) => ({
   now: NOW,
   ...over,
 })
-const mine = (over = {}) => ({ source: MARKER_SOURCE, runLog: RUN.log, sessionId: 's1', ...over })
+const mine = (over = {}) => ({ source: MARKER_SOURCE, runLog: RUN.log, sessionId: 's1', at: NOW, ...over })
 
 describe('the marker is written only where the evidence really is', () => {
   it('declares for a running verify run whose log is still moving', () => {
@@ -66,6 +74,21 @@ describe('it never overwrites a person’s declaration, only its own', () => {
   it('refreshes its own marker when a DIFFERENT run is now going', () => {
     const d = waitMarkerDecision(live({ declaration: mine({ runLog: 'local/verify-logs/old.log' }) }))
     expect(d).toMatchObject({ action: 'declare', reason: 'run-changed', runLog: RUN.log })
+  })
+
+  it('RE-STAMPS its own marker before it can age out under the run it covers', () => {
+    // A declaration whose evidence is a log ages out at IN_FLIGHT_MAX_AGE_MS, and
+    // a both-backends LARGE runs about 81 min — so a marker written once would be
+    // expired half way through the very wait it exists for.
+    const stale = waitMarkerDecision(live({ declaration: mine({ at: NOW - MARKER_REFRESH_MS - 1 }) }))
+    expect(stale).toMatchObject({ action: 'declare', reason: 'refresh' })
+    expect(waitMarkerDecision(live({ declaration: mine({ at: NOW - MARKER_REFRESH_MS + 1 }) })).action).toBe('none')
+    // A marker carrying no timestamp cannot be aged, so it is re-stamped.
+    expect(waitMarkerDecision(live({ declaration: mine({ at: undefined }) })).reason).toBe('refresh')
+  })
+
+  it('refreshes well before the guard would call the declaration expired', () => {
+    expect(MARKER_REFRESH_MS * 2).toBeLessThanOrEqual(IN_FLIGHT_MAX_AGE_MS)
   })
 })
 

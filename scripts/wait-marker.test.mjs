@@ -2,7 +2,7 @@
 // so no case can touch this checkout's real batch state.
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { armWaitMarker, readActiveRun } from './wait-marker.mjs'
 import { MARKER_SOURCE } from './wait-marker-core.mjs'
@@ -88,5 +88,34 @@ describe('armWaitMarker', () => {
     const f = fixture({ pid: 4_194_303 })
     expect(armWaitMarker({ sid: 's1', ownsBatch: true, ...f }).written).toBe(false)
     expect(existsSync(f.declarationPath)).toBe(false)
+  })
+
+  it('reports whether the lease extension actually took, instead of assuming it', () => {
+    const f = fixture()
+    // No lock file at the injected path, so the extension is refused — and the
+    // verdict says so rather than leaving the caller to believe it happened.
+    expect(armWaitMarker({ sid: 's1', ownsBatch: true, ...f }).extended).toBe(false)
+  })
+
+  it('names the log ABSOLUTELY, the way a hand-written declaration does', () => {
+    const f = fixture()
+    armWaitMarker({ sid: 's1', ownsBatch: true, ...f })
+    const [evidence] = JSON.parse(readFileSync(f.declarationPath, 'utf8')).evidence
+    expect(isAbsolute(evidence.path)).toBe(true)
+  })
+
+  it('keeps the marker on a LIVE run when a quicker one finishes beside it', () => {
+    // The failure this prevents: judging liveness on whichever record is newest
+    // would call the running LARGE over and withdraw the marker mid-wait.
+    const f = fixture()
+    armWaitMarker({ sid: 's1', ownsBatch: true, ...f })
+    const quick = join(f.dir, 'zz-quick.log')
+    writeFileSync(quick, 'PASS\n')
+    writeFileSync(
+      `${quick}.run.json`,
+      JSON.stringify({ command: 'verify docs', log: quick, status: 'finished', exitCode: 0, startedAt: Date.now() + 1000 }),
+    )
+    expect(armWaitMarker({ sid: 's1', ownsBatch: true, ...f })).toMatchObject({ action: 'none', reason: 'already-marked' })
+    expect(existsSync(f.declarationPath)).toBe(true)
   })
 })

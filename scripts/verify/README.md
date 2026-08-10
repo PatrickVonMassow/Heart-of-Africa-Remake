@@ -124,7 +124,13 @@ the `git HEAD` it ran on, the log path, the failing names **uncut**, the polls,
 and **frames expected against frames written**. That last pair is the half point
 375 cannot see — its shutter refuses a frame whose subject is missing, but a
 frame that was never written at all is silent, and a run that photographs 60 of
-its 93 frames exits 0 today.
+its 94 frames exits 0 today. The expectation is a measured **floor** (the table
+of 09.08.2026 plus `startup`'s one frame, which the recorder never logged), so
+*fewer* is the alarm and *more* only means suites have gained frames since.
+
+The **backend** in the receipt is the lane each suite really opened, not the pass
+it sat in: `laneFor` routes `touch`/`voice` to WebGL 2 inside a WebGPU gate, so
+an unpinned `npm test -- voice` reports WebGL 2 and a SMALL run reports both.
 
 **The wait is still visible.** Point 402 (b) demanded polling because a silently
 waiting session was indistinguishable from a dead one. That is now the hook's

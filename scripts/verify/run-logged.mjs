@@ -126,7 +126,7 @@ function closeRecord({ lines, exitCode, started, recordPath, baseRecord }) {
       command: baseRecord.command,
       tier: baseRecord.tier,
       suites: baseRecord.suites,
-      backends: backendsFrom({ lines, verifyGl: baseRecord.verifyGl, fallback: baseRecord.backends[0] }),
+      backends: backendsFrom({ lines, verifyGl: baseRecord.verifyGl, fallback: baseRecord.backends }),
       head: baseRecord.head,
       branch: baseRecord.branch,
       logPath: baseRecord.log,

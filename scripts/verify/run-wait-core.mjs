@@ -26,7 +26,7 @@
 // Everything here is data-in / data-out so the Vitest layer can pin it; all
 // process work — the record file, the frame scan, the blocking wait — lives in
 // run-wait.mjs and run-logged.mjs.
-import { parseArgs, planBackends, selectBackend, suitesFor } from './tiers.mjs'
+import { laneFor, parseArgs, planBackends, selectBackend, suitesFor } from './tiers.mjs'
 
 /**
  * MEASURED median wall clock per suite, in SECONDS, on the WebGL 2 lane —
@@ -85,13 +85,32 @@ export const SUITE_FRAMES = Object.freeze({
 })
 
 /**
- * Suites the cost measurement never recorded: `docs` is a pure Node check that
- * opens no browser (the recorder never logs it), and `startup`/`report`/
- * `crossbrowser` predate the recording window. They are NAMED rather than
- * silently treated as zero — an estimate that quietly omits a suite is how a
- * wait comes out too short and the poll loop returns.
+ * Suites whose RUNTIME the cost measurement never recorded: `docs` is a pure
+ * Node check that opens no browser (the recorder never logs it), and
+ * `startup`/`report`/`crossbrowser` predate the recording window. They are
+ * NAMED rather than silently treated as zero — an estimate that quietly omits a
+ * suite is how a wait comes out too short and the poll loop returns.
  */
 export const UNMEASURED_SUITES = Object.freeze(['docs', 'startup', 'report', 'crossbrowser'])
+
+/**
+ * Their FRAME counts, which — unlike their runtimes — can be established by
+ * reading the suite: `startup` takes exactly one shutter frame
+ * (`142-startup-picture-live`, scripts/verify/startup.mjs), and `docs`,
+ * `report` and `crossbrowser` take none. Kept apart from SUITE_RUNTIME_S's
+ * table so the lockstep test can hold that table to the document verbatim
+ * while these stay counted from the source.
+ *
+ * Without `startup` here every clean LARGE run reported one frame MORE than it
+ * expected, and a permanent false alarm is how a reader learns to skip the one
+ * line that would have caught a missing picture.
+ */
+export const COUNTED_SUITE_FRAMES = Object.freeze({ docs: 0, startup: 1, report: 0, crossbrowser: 0 })
+
+/** When the runtime/shot table was measured — printed with a frames verdict, so
+ *  a reader can tell "the table is older than the suites" from "a suite stopped
+ *  short". */
+export const FRAME_TABLE_MEASURED = '09.08.2026'
 
 /** The first wait is 0.9 × the measured median: long enough that the run is
  *  almost always over, short enough that it is not idling past the end. */
@@ -123,9 +142,10 @@ export function suiteRuntimeMs(suite) {
   return Number.isFinite(s) ? Math.round(s * 1000) : null
 }
 
-/** Frames a passing run of this suite writes, or null when it was never measured. */
+/** Frames a passing run of this suite writes, or null when nothing establishes it. */
 export function suiteFrames(suite) {
-  const n = SUITE_FRAMES[String(suite ?? '')]
+  const key = String(suite ?? '')
+  const n = SUITE_FRAMES[key] ?? COUNTED_SUITE_FRAMES[key]
   return Number.isFinite(n) ? n : null
 }
 
@@ -208,14 +228,28 @@ export function planRun({ argv = [], verifyGl } = {}) {
   const union = [...new Set(passes.flatMap((p) => p.suites))]
   if (wantsPreview) union.push('preview')
   const frames = expectedFrames(union)
+  // THE LANE, NOT THE PASS (four-eyes finding 4). A pass's nominal backend is
+  // not what every suite in it opens: `laneFor` routes the WebGL2-only suites
+  // (touch, voice) to WebGL 2 inside a WebGPU gate, so an unpinned `npm test --
+  // voice` runs on WebGL 2 while its pass is called `webgpu`. Reporting the pass
+  // would put a backend in the receipt that no suite ever opened.
+  const lanes = []
+  for (const pass of passes) {
+    for (const suite of pass.suites) {
+      const lane = laneFor(suite, pass.backend)
+      if (!lanes.includes(lane)) lanes.push(lane)
+    }
+    if (pass.suites.length === 0 && !lanes.includes(pass.backend)) lanes.push(pass.backend)
+  }
   return {
     tier,
     filter,
     passes,
-    backends: passes.map((p) => p.backend),
+    backends: lanes,
     suites: union,
     expectedMs: ms,
     expectedFrames: frames.frames,
+    framesUnmeasured: frames.unmeasured,
     unmeasured: [...unmeasured],
   }
 }
@@ -355,9 +389,15 @@ export function backendsFrom({ lines = [], verifyGl = null, fallback = null } = 
   if (seen.length > 0) return seen
   const pinned = String(verifyGl ?? '').trim().toLowerCase()
   if (pinned === 'webgpu' || pinned === 'webgl') return [BACKEND_LABEL[pinned]]
-  const fb = String(fallback ?? '').trim().toLowerCase()
-  if (fb === 'webgpu' || fb === 'webgl') return [BACKEND_LABEL[fb]]
-  return []
+  // The fallback is the PLAN's lane list (`planRun().backends`), which may hold
+  // both — a WebGPU gate containing `voice` really opens WebGL 2 for it. A bare
+  // string is accepted too, for a caller that knows only one.
+  const labels = []
+  for (const raw of Array.isArray(fallback) ? fallback : [fallback]) {
+    const fb = String(raw ?? '').trim().toLowerCase()
+    if ((fb === 'webgpu' || fb === 'webgl') && !labels.includes(BACKEND_LABEL[fb])) labels.push(BACKEND_LABEL[fb])
+  }
+  return labels
 }
 
 /**
@@ -382,11 +422,14 @@ export function framesVerdict({ expected = null, written = null } = {}) {
         '(point 375) but a frame never written at all is silent; find which suite stopped short.',
     }
   }
+  // NOT an alarm. The expectation is a measured FLOOR from one day, and suites
+  // have gained frames since; a receipt that cried wolf on every clean run would
+  // teach its reader to skip the one line that catches a missing picture.
   return {
     status: 'extra',
     expected: exp,
     written: got,
-    message: `frames: ${got}/${exp} — ${got - exp} MORE than the measured expectation; the table in docs/picture-check-cost.md §1 is behind.`,
+    message: `frames: ${got} written, ${exp} expected — more than the ${FRAME_TABLE_MEASURED} table, which is a floor, not a ceiling.`,
   }
 }
 

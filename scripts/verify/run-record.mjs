@@ -9,9 +9,10 @@
 //
 // It is written by scripts/verify/run-logged.mjs (the wrapper owns the run) and
 // read by scripts/verify/run-wait.mjs (the caller awaits it) and by
-// scripts/wait-marker-hook.mjs (the hook that proves to the batch guard that a
-// session is waiting rather than idling). Every read is failure-tolerant: an
-// absent or unreadable record means "nothing known", never a false verdict.
+// scripts/wait-marker.mjs (duty (8) of scripts/lock-heartbeat-hook.mjs, which
+// proves to the batch guard that a session is waiting rather than idling).
+// Every read is failure-tolerant: an absent or unreadable record means "nothing
+// known", never a false verdict.
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, isAbsolute, join } from 'node:path'
@@ -63,22 +64,60 @@ export function writeRecord(path, record) {
  * rewrites the file). This is what `run-wait.mjs` resolves when no log is
  * named, which is the ordinary case: the session has just started one run.
  */
-export function latestRecordPath(dir = logDir()) {
-  let names = []
-  try {
-    names = readdirSync(dir).filter((n) => n.endsWith('.run.json'))
-  } catch {
-    return null
-  }
+export function latestRecordPath(dir = logDir(), { max = SCAN_LIMIT } = {}) {
   let best = null
-  for (const name of names) {
-    const path = join(dir, name)
-    const record = readRecord(path)
+  for (const { path, record } of scanRecords(dir, max)) {
     const at = Number(record?.startedAt)
     if (!Number.isFinite(at)) continue
     if (!best || at > best.at) best = { path, at }
   }
   return best?.path ?? null
+}
+
+/**
+ * How many record files a scan reads. Records are never pruned, so an unbounded
+ * scan would grow the cost of a hook that runs on EVERY tool call without limit.
+ * The filenames start with an ISO stamp, so a descending sort is chronological
+ * and the newest few are always the interesting ones.
+ */
+export const SCAN_LIMIT = 20
+
+/** The newest `max` records, newest filename first, each already parsed. */
+function scanRecords(dir, max = SCAN_LIMIT) {
+  let names = []
+  try {
+    names = readdirSync(dir).filter((n) => n.endsWith('.run.json')).sort().reverse().slice(0, max)
+  } catch {
+    return []
+  }
+  const out = []
+  for (const name of names) {
+    const path = join(dir, name)
+    const record = readRecord(path)
+    if (record) out.push({ path, record })
+  }
+  return out
+}
+
+/**
+ * THE RUN A WAIT IS ABOUT: the newest one still GOING, and only failing that the
+ * newest one at all.
+ *
+ * "Newest" alone was wrong (four-eyes finding 2): a quick single-suite verify
+ * that starts and finishes while a background LARGE still runs becomes the
+ * newest record, and a caller judging liveness on it would call the LARGE over —
+ * withdrawing the wait marker in the middle of the very wait it exists for.
+ */
+export function activeRecordPath(dir = logDir(), { max = SCAN_LIMIT } = {}) {
+  let live = null
+  let any = null
+  for (const { path, record } of scanRecords(dir, max)) {
+    const at = Number(record?.startedAt)
+    if (!Number.isFinite(at)) continue
+    if (!any || at > any.at) any = { path, at }
+    if (runIsLive(record).live && (!live || at > live.at)) live = { path, at }
+  }
+  return (live ?? any)?.path ?? null
 }
 
 /**

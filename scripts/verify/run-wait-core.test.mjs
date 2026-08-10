@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import {
   BLOCKING_LIMIT_MS,
+  COUNTED_SUITE_FRAMES,
   FIRST_WAIT_FRACTION,
   HUNG_FACTOR,
   MAX_POLLS,
@@ -20,6 +21,7 @@ import {
   formatReceipt,
   framesVerdict,
   nextWaitMs,
+  planRun,
   pollBudget,
   suiteFrames,
   suiteRuntimeMs,
@@ -72,14 +74,51 @@ describe('the measured constants stay in lockstep with docs/picture-check-cost.m
     }
   })
 
+  it('gives EVERY suite a frame count, measured or counted from its source', () => {
+    // The gap this closes: `startup` writes one shutter frame and is absent from
+    // the table, so a LARGE run wrote 94 against an expectation of 93 and every
+    // clean receipt reported a discrepancy.
+    for (const suite of [...DEV_SUITES, 'preview']) {
+      expect(suiteFrames(suite), `${suite} has no frame count`).not.toBeNull()
+    }
+    expect(COUNTED_SUITE_FRAMES.startup).toBe(1)
+  })
+
   it('reproduces the document’s own SMALL and LARGE totals', () => {
     // SMALL: 19 shots, 469.3 s (docs/picture-check-cost.md §1, "Tier totals").
+    // `docs` rides along in that tier and writes none, which is why the shot
+    // total is the document's while the runtime total names it unmeasured.
     expect(expectedFrames(SMALL_SUITES).frames).toBe(19)
     expect(Math.round(expectedRuntimeMs(SMALL_SUITES).ms / 100) / 10).toBe(469.3)
-    // LARGE, one backend: 93 shots, 2536.0 s — over the suites plus the preview.
+    // LARGE, one backend: the document's 93 shots plus `startup`'s single frame,
+    // which the recorder never logged; 2536.0 s over the suites plus the preview.
     const large = [...DEV_SUITES, 'preview']
-    expect(expectedFrames(large).frames).toBe(93)
+    expect(expectedFrames(large).frames).toBe(94)
     expect(Math.round(expectedRuntimeMs(large).ms / 100) / 10).toBe(2536.0)
+  })
+})
+
+describe('planRun — what the command will really do', () => {
+  it('plans a bare LARGE as two passes and adds the preview to the first only', () => {
+    const plan = planRun({ argv: ['large'], verifyGl: undefined })
+    expect(plan.passes).toHaveLength(2)
+    expect(plan.suites).toContain('preview')
+    // 2536.0 s (full pass + preview) + the render-only WebGPU pass.
+    expect(plan.expectedMs).toBeGreaterThan(2_536_000)
+    expect(plan.expectedFrames).toBe(94)
+  })
+
+  it('reports the LANE a suite really opens, not the pass it sits in', () => {
+    // `voice` is WebGL2-only and is ROUTED there inside a WebGPU gate
+    // (tiers.mjs laneFor). Reporting the pass would name a backend no suite used.
+    expect(planRun({ argv: ['voice'], verifyGl: undefined }).backends).toEqual(['webgl'])
+    expect(planRun({ argv: ['world'], verifyGl: undefined }).backends).toEqual(['webgpu'])
+    expect(planRun({ argv: ['small'], verifyGl: undefined }).backends).toEqual(['webgpu', 'webgl'])
+  })
+
+  it('honours a pinned backend', () => {
+    expect(planRun({ argv: ['large'], verifyGl: 'webgl' }).passes).toHaveLength(1)
+    expect(planRun({ argv: ['world'], verifyGl: 'webgl' }).backends).toEqual(['webgl'])
   })
 })
 
@@ -88,8 +127,9 @@ describe('suite lookups', () => {
     expect(suiteRuntimeMs('world')).toBe(73_100)
     expect(suiteFrames('world')).toBe(8)
     expect(suiteRuntimeMs('docs')).toBeNull()
-    expect(suiteFrames('docs')).toBeNull()
+    expect(suiteFrames('docs')).toBe(0)
     expect(suiteRuntimeMs('no-such-suite')).toBeNull()
+    expect(suiteFrames('no-such-suite')).toBeNull()
   })
 
   it('NAMES the unmeasured members of a selection instead of counting them as zero', () => {
@@ -97,7 +137,8 @@ describe('suite lookups', () => {
     expect(ms).toBe(73_100)
     expect(unmeasured).toEqual(['docs', 'startup'])
     expect(measured).toBe(1)
-    expect(expectedFrames(['world', 'docs']).unmeasured).toEqual(['docs'])
+    expect(expectedFrames(['world', 'docs']).unmeasured).toEqual([])
+    expect(expectedFrames(['world', 'no-such-suite']).unmeasured).toEqual(['no-such-suite'])
   })
 
   it('counts a suite once however often it is named, and multiplies only TIME by the passes', () => {
@@ -188,9 +229,12 @@ describe('backendsFrom — read from the run, never guessed', () => {
     expect(backendsFrom({ lines })).toEqual(['WebGL 2', 'WebGPU'])
   })
 
-  it('falls back to the pinned VERIFY_GL, then to the lane default', () => {
+  it('falls back to the pinned VERIFY_GL, then to the plan’s lane list', () => {
     expect(backendsFrom({ lines: [], verifyGl: 'webgpu' })).toEqual(['WebGPU'])
     expect(backendsFrom({ lines: [], verifyGl: '', fallback: 'webgl' })).toEqual(['WebGL 2'])
+    // A WebGPU gate containing a WebGL2-only suite really opened BOTH.
+    expect(backendsFrom({ lines: [], fallback: ['webgpu', 'webgl'] })).toEqual(['WebGPU', 'WebGL 2'])
+    expect(backendsFrom({ lines: [], fallback: ['webgl', 'nonsense'] })).toEqual(['WebGL 2'])
   })
 
   it('answers UNKNOWN rather than guessing', () => {
@@ -210,8 +254,11 @@ describe('framesVerdict — the half the shutter cannot see', () => {
     expect(v.message).toMatch(/33 FRAME\(S\) MISSING/)
   })
 
-  it('flags a stale expectation rather than a failure when there are MORE', () => {
-    expect(framesVerdict({ expected: 8, written: 9 }).status).toBe('extra')
+  it('treats MORE frames as a floor being out of date, not as an alarm', () => {
+    const v = framesVerdict({ expected: 8, written: 9 })
+    expect(v.status).toBe('extra')
+    expect(v.message).toMatch(/floor, not a ceiling/)
+    expect(v.message).not.toMatch(/MISSING/)
   })
 
   it('says UNKNOWN rather than satisfied when there is no expectation', () => {
