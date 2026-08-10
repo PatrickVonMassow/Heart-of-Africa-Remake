@@ -848,7 +848,18 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
             (p) =>
               Math.hypot(x - p.x, z - p.z) >=
               ring + p.ring + 2 * FENCE_PANEL_RADIUS.woven + COMPOUND_RING_CORRIDOR,
-          )
+          ) &&
+          // And clear of the functional buildings: a palisade drawn straight
+          // through the chief's hut is the same trap seen from the other side,
+          // and it seals the door the audience is held at (design.md §2.6).
+          interactives.every((it) => {
+            if (it.type === 'villager') return true
+            const rInt = interactiveCircleRadius(it.type, style)
+            return (
+              Math.hypot(x - it.pos[0], z - it.pos[1]) >=
+              ring + rInt + FENCE_PANEL_RADIUS.woven + COMPOUND_WALL_GAP
+            )
+          })
         let cx = Math.cos(a) * cr
         let cz = Math.sin(a) * cr
         for (let tries = 0; tries < 16 && !clears(cx, cz); tries++) {
@@ -1018,13 +1029,28 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
   }
 
+  // THE LOOSE DRESSING KEEPS ITS DISTANCE (work-order 604). A tree and a boulder
+  // dropped independently can end up 0.4 m apart, and that slot is narrower than
+  // anyone who walks: a villager routed past it is caught in the notch and a
+  // traveller pressed into it cannot walk out. Every loose object therefore keeps
+  // a walkable gap from every other one — `isFree` covers the buildings, this
+  // covers the dressing among itself.
   const flora: PlaceLayout['flora'] = []
+  const rocks: PlaceLayout['rocks'] = []
+  let teachingStone: PlaceLayout['teachingStone'] = null
+  // The TRAVELLER's width, not the villager's: he is the wider of the two and
+  // the one who cannot be nudged free by the game.
+  const dressingGap = 2 * PLAYER_RADIUS
+  const clearOfDressing = (x: number, z: number, bodyR: number) =>
+    flora.every((t) => Math.hypot(x - t.x, z - t.z) > 0.45 + bodyR + dressingGap) &&
+    rocks.every(([rx, rz, rs]) => Math.hypot(x - rx, z - rz) > 0.35 + rs * 0.5 + bodyR + dressingGap) &&
+    (!teachingStone || Math.hypot(x - teachingStone.x, z - teachingStone.z) > teachingStone.r + bodyR + dressingGap)
   for (let i = 0; i < 48 && flora.length < 9; i++) {
     const angle = rand() * Math.PI * 2
     const r = 8 + rand() * 18
     const x = Math.cos(angle) * r
     const z = Math.sin(angle) * r
-    if (!isFree(x, z, 3.5) || onLane(x, z, 0.5)) continue
+    if (!isFree(x, z, 3.5) || onLane(x, z, 0.5) || !clearOfDressing(x, z, 0.45)) continue
     flora.push({ x, z, h: 3 + rand() * 2 })
   }
 
@@ -1032,15 +1058,18 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // rock scatter so the dressing grows around it, in the open at a walkable
   // distance from the centre where it is visible from the middle of the village
   // and from the arrival path. Seeded like everything else in the layout.
-  let teachingStone: PlaceLayout['teachingStone'] = null
   if (placeId === ROCK_VILLAGE_ID) {
-    for (let i = 0; i < 32 && !teachingStone; i++) {
+    for (let i = 0; i < 48 && !teachingStone; i++) {
       // A deterministic golden-angle sweep, so a crowded seed still finds a spot.
+      // The band reaches in as well as out: the compounds' walls stand between 7
+      // and 14 m out (work-order 604), and a sweep that only tried that ring
+      // could come back empty-handed in a well-filled village.
       const a = rand() * Math.PI * 2 + i * 2.399963
-      const r = 9 + (i % 5) * 1.1
+      const r = 6.5 + (i % 8) * 0.9
       const x = Math.cos(a) * r
       const z = Math.sin(a) * r
       if (!isFree(x, z, 3.2, TEACHING_STONE_RADIUS) || onLane(x, z, TEACHING_STONE_RADIUS + 0.3)) continue
+      if (!clearOfDressing(x, z, TEACHING_STONE_RADIUS)) continue
       teachingStone = { x, z, r: TEACHING_STONE_RADIUS, scale: TEACHING_STONE_SCALE }
       // Villagers have an errand at it — the adults' pointing situations
       // (docs/communication-poc-spec.md) need someone standing there.
@@ -1071,7 +1100,6 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
   }
 
-  const rocks: PlaceLayout['rocks'] = []
   for (let i = 0; i < 40 && rocks.length < 14; i++) {
     const a = rand() * Math.PI * 2
     const r = 6 + rand() * (radius + 6)
@@ -1079,6 +1107,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     const z = Math.sin(a) * r
     const s = 0.3 + rand() * 0.7
     if (!isFree(x, z, 2) || onLane(x, z, 0.35 + s * 0.5)) continue
+    if (!clearOfDressing(x, z, 0.35 + s * 0.5)) continue
     rocks.push([x, z, s])
   }
 
@@ -1132,20 +1161,13 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   for (const [x, z, s] of rocks) colliders.push({ x, z, r: 0.35 + s * 0.5 })
   if (teachingStone) colliders.push({ x: teachingStone.x, z: teachingStone.z, r: teachingStone.r })
   if (place.kind === 'village') {
-    // The fire pit AND the cook kneeling at its edge as ONE body (work-order
-    // 604). Two circles 1.56 m apart with radii 1.3 and 0.45 overlap by a
-    // finger's breadth, and the notch where they cross is narrower than a
-    // walker: an errand villager sent past the fire was caught in it. She kneels
-    // against the fire, so one obstacle is also the truer shape.
-    const cookAt: [number, number] = [VILLAGE_FIRE[0] + 1.2, VILLAGE_FIRE[1] + 1.0]
-    const cookD = Math.hypot(cookAt[0] - VILLAGE_FIRE[0], cookAt[1] - VILLAGE_FIRE[1])
-    const hearthR = (cookD + 1.3 + 0.45) / 2
-    const hearthShift = hearthR - 1.3
-    colliders.push({
-      x: VILLAGE_FIRE[0] + ((cookAt[0] - VILLAGE_FIRE[0]) / cookD) * hearthShift,
-      z: VILLAGE_FIRE[1] + ((cookAt[1] - VILLAGE_FIRE[1]) / cookD) * hearthShift,
-      r: hearthR,
-    })
+    // The fire pit alone (work-order 604). The cook used to carry a collider of
+    // her own 1.56 m from the fire's centre, which overlapped the fire's 1.3 m by
+    // a finger's breadth — and the notch where two circles cross is narrower than
+    // a walker, so an errand villager sent past the fire was caught in it. Her own
+    // collider bought nothing: she kneels INSIDE the fire's stand-off (1.3 + the
+    // traveller's 0.35), so nobody could reach her spot in the first place.
+    colliders.push({ x: VILLAGE_FIRE[0], z: VILLAGE_FIRE[1], r: 1.3 })
     colliders.push({ x: -8.5, z: -7, r: 1.0 }) // weaver's loom
     // Village-life props (design.md §19; positions from PlaceLife).
     colliders.push({ x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 })

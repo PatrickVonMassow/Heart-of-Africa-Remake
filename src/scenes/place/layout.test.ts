@@ -417,13 +417,17 @@ describe('fence colliders follow the drawn panels (point 413)', () => {
     }
   })
 
-  it('the PoC compound really does ask for more panels than the old ceiling held', () => {
-    // The regression in one number: 167 woven panels against a buffer of 160.
-    // If a layout change ever drops this below the old ceiling the test above
-    // still holds, but this line is what says the defect was real.
-    const layout = buildLayout('bambara-village', REPORTED_SEED)
-    const woven = fencePanels(layout.fences).filter((p) => p.kind === 'woven').length
-    expect(woven).toBeGreaterThan(160)
+  it('a compound village really does ask for more panels than the old ceiling held', () => {
+    // The regression in one number: a woven run longer than the fixed buffer of
+    // 160 the scene used to carry. The test above already proves draw and
+    // collider agree; this line is what says the defect was real. It asks the
+    // WORLDS rather than one seed — the compound walls are sized from the huts
+    // they enclose (work-order 604), so which seed holds the longest run moved.
+    let most = 0
+    for (const id of VILLAGES.map((p) => p.id))
+      for (const s of [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3, 4, 5, 6, 7, 8])
+        most = Math.max(most, fencePanels(buildLayout(id, s).fences).filter((p) => p.kind === 'woven').length)
+    expect(most).toBeGreaterThan(160)
   })
 })
 

@@ -388,7 +388,7 @@ export const en: Strings = {
     campNeedsFriend: 'Only an Honored Friend of this region may leave belongings in the village.',
     positionReport: (coords, region) => `By my reckoning: ${coords} — the ${region} region.`,
     orientationGained: 'In thanks for the gift, they point out the important buildings to me.',
-    stuckHint: (key) => `Wedged in? Press ${key} to work yourself free.`,
+    stuckHint: (key) => `Wedged in? Press ${key} to work free.`,
     unstuckFreed: 'I worked myself loose and stand on open ground again.',
   },
 
