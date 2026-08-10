@@ -104,30 +104,6 @@ there exactly once; a new point joins a bundle when appended.
   Criticality: HIGH — it destroys the player's session without a prompt, and it is
   triggered by the feature's ordinary use, not by an unusual one.
 
-- [ ] 580. THE FIGURES PANTOMIME OUT OF EARSHOT (user 09.08.2026, F6 report
-  `local/bugreports/GestenOhneSprache.zip`: "Die beiden gestikulieren herum, aber ich
-  sehe keine Texte über ihren Köpfen"). ESTABLISHED: the overlay dump of that moment
-  contains no speech label at all, while the journal in the same dump already holds eight
-  overheard utterances — so the label machinery works and simply did not fire here. The
-  gate is distance: both speaking paths (`PlaceLife.tsx` ~line 388 for the children,
-  ~line 1940 for the adults) hear the utterance, record it and raise the overhead label
-  ONLY inside `isWithinHearing(distance)` — `balance.communication.hearingRadius`, 10 m.
-  The GESTURE has no such range: a figure gestures wherever it is drawn, across the whole
-  village. Beyond ten metres the player therefore watches a mute pantomime, which is
-  exactly what he reported — and worse for the PoC than plain silence, because a gesture
-  without its utterance teaches a concept with no word attached to it.
-  FINAL STATE: a figure that GESTURES is a figure the player can hear and read, or it does
-  not gesture. Either the gesture is gated on the same range as the utterance, or the
-  utterance's range is what the gesture reaches — one decision, applied to BOTH the
-  children's and the adults' paths, with the chosen rule written where the range is
-  defined. The hearing radius itself stays calibratable and the label keeps its own
-  lifetime.
-  VERIFIABLE: pure Vitest — across the range there is no distance at which a figure
-  gestures while neither the utterance nor its label is raised; the existing hearing and
-  label tests keep passing.
-  Criticality: medium — it is the teaching loop of the communication PoC, and it fails
-  quietly.
-
 - [ ] 585. THE LEARNING BOULDER FLOATS IN THE RIVER (user 09.08.2026, F6 report
   `local/bugreports/SchwebenderFindling.zip`: "Ist das der Findling zum Lernen? Der
   schwebt in der Luft über der Wasseroberfläche"; seed 1425108822, Bambara village,
