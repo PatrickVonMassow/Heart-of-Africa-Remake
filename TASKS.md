@@ -120,42 +120,6 @@ there exactly once; a new point joins a bundle when appended.
   free and can walk, with a frame of the freed position through the shutter.
   Criticality: high — it is the difference between a lost expedition and a lost second.
 
-- [ ] 605. THE SPEECH VOLUME SITS WHERE NOBODY LOOKS, AND STARTS TOO LOW (user 10.08.2026,
-  on the build that already HAS point 577's slider — 787817c: "es gibt nach wie vor keinen
-  eigenen Lautstärkeregler für die Sprache und sie ist standardmäßig zu leise"). Checked
-  against his dump: `communication.speechVolume` is there and it works — he now hears the
-  children and can tell the syllables apart. What is wrong is WHERE its control sits.
-  Every other level in the game — the master ambience, the footsteps, the "everything
-  else" bus, the birdsong — is a row of the debug menu's GRAPHICS AND SOUND group
-  (`src/ui/DebugMenu.tsx` ~line 696); the speech volume is a row of the SETTLEMENT group
-  (~line 575), between the syllable length and the label headroom. A player who wants the
-  speech louder opens the sound group, finds no speech in it, and concludes there is none
-  — which is exactly what he reported.
-  FINAL STATE:
-  1. The speech volume is a row of the GRAPHICS AND SOUND group, among the other volumes.
-     It MOVES there — one control, one home, not a second copy in the settlement group.
-  2. Its label reads as a volume in the same wording family as its neighbours, in both
-     languages, and still names the village speech rather than "voice" (nothing else in
-     the game speaks; point 577's rule stands).
-  3. THE SAME QUESTION IS ASKED OF EVERY OTHER LEVEL, not just this one: any debug control
-     whose effect is a volume belongs to that group. A Vitest test pins the rule so the
-     next one cannot drift back — every field whose id ends in `Volume` is in the graphics
-     and sound group, and no such field sits anywhere else.
-  4. THE DEFAULT IS RAISED so the syllables carry over the drums and the ambience at the
-     DEFAULT settings, without clipping the mix. It is calibrated against the audio graph,
-     not by feel: the existing ambience test measures the speech bus against the drum and
-     ambient buses at default balance and holds the new relation, so a later change to
-     either side fails loudly instead of quietly re-burying the speech. The user judges
-     the final loudness on the deployed build; this point delivers a default that is
-     audibly present rather than one that needs a slider to be found at all.
-  DOCS: `design.md`'s sound section keeps its statement that each source carries its own
-  level (line 616) and gains nothing; `docs/acceptance-evidence.md` §20 records the proof.
-  VERIFIABLE: Vitest — the group rule of 3, the new default in `balance.ts`, both labels
-  present and localized, and the measured bus relation of 4. No browser suite: this is a
-  menu row and a gain value, neither of which a picture judges.
-  Criticality: medium — the mechanic itself works; what fails is the player's ability to
-  reach it, which is how the defect reached him a second time.
-
 - [ ] 588. GUESS A MEANING WHERE IT IS SPOKEN, NOT ONLY IN THE JOURNAL (user
   09.08.2026). Today a reading is written only in the journal (`src/ui/JournalPanel.tsx`
   → `setUtteranceHypothesis`), so the player must break off watching, open the journal
