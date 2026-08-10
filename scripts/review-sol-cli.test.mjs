@@ -154,7 +154,12 @@ describe('the guards around the run', () => {
     expect(r.status).not.toBe(0)
     expect(r.stderr).toMatch(/does not diverge/)
     expect(r.stderr).toMatch(/--since/)
-    expect(run(['--sha', onMain, '--since', `${onMain}~1`, '--brief', 'judge it']).status).toBe(0)
+    // A narrowed range is allowed — but it may not be RECORDED, because the
+    // record would clear commits this reviewer never saw (fourth round).
+    const narrow = run(['--sha', onMain, '--since', `${onMain}~1`, '--brief', 'judge it'])
+    expect(narrow.status).toBe(0)
+    expect(narrow.stdout).toMatch(/NO RECORD COMMAND IS PRINTED/)
+    expect(narrow.stdout).not.toContain('mechanism-review.mjs --record')
   })
 
   it('refuses an explicit --since that is not a proper ancestor of the sha', () => {

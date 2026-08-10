@@ -478,7 +478,24 @@ export function formatRecordCommand({ sha = '', model = '', verdict = '', eviden
  * happened — LOUD on a fallback, per the point's "name the cause in ONE line" —
  * then the record command.
  */
-export function formatReviewReport({ decision = {}, sha = '', mode = 'review', point = '' } = {}) {
+export function formatReviewReport({ decision = {}, sha = '', mode = 'review', point = '', partial = null } = {}) {
+  // A RECORD IS NEVER PRINTED FOR LESS THAN IT CLEARS (fourth cross-vendor
+  // round). Both gates treat a record as covering every commit it CONTAINS, so a
+  // narrowed range — `--since <sha>~1` on a branch with older commits — would
+  // produce a ledger line that clears work this reviewer never saw. The verdict
+  // is still reported; the ready-to-run command is not.
+  if (partial) {
+    const said = decision.fellBack
+      ? `${SOL_MODEL_NAME} did not review it: ${decision.cause}`
+      : `${SOL_MODEL_NAME} reviewed ${partial.reviewedBase.slice(0, 7)}..${String(sha).slice(0, 7)} → ${decision.verdict}\n  ${decision.evidence}`
+    return [
+      `review-sol: ${said}`,
+      '',
+      `  NO RECORD COMMAND IS PRINTED. A record at ${String(sha).slice(0, 7)} clears every commit it contains,`,
+      `  back to ${partial.coverageBase.slice(0, 7)}, and this review only saw back to ${partial.reviewedBase.slice(0, 7)}.`,
+      '  Re-run without --since to review the whole range, then record that.',
+    ].join('\n')
+  }
   const cmd = formatRecordCommand({
     sha,
     model: decision.model,

@@ -451,6 +451,10 @@ if (isMainModule(import.meta.url)) {
 
     const since = flag('--since')
     const base = mergeBase(since || 'main', full, { explicit: Boolean(since) })
+    // What a record at this sha would CLEAR: everything back to where the branch
+    // left `main`. A narrower review is allowed, but it may not be recorded.
+    const coverageBase = since ? git(['merge-base', 'main', full], { required: false }) || '' : base
+    const partial = coverageBase && coverageBase !== base ? { reviewedBase: base, coverageBase } : null
     const material = gatherMaterial(full, base)
     console.error(
       `  material: ${material.length} characters of diff and file content ` +
@@ -471,7 +475,7 @@ if (isMainModule(import.meta.url)) {
     if (said) {
       console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end of review ---\n`)
     }
-    console.log(formatReviewReport({ decision, sha: full, mode, point }))
+    console.log(formatReviewReport({ decision, sha: full, mode, point, partial }))
     // A fallback is not an error of THIS command — it did its job by refusing to
     // invent a review — but it must not read as a finished one either, so the
     // exit code distinguishes them for any script that chains on it.

@@ -280,6 +280,21 @@ describe('the record the command prints', () => {
     ).toBe(false)
   })
 
+  it('is NOT printed at all when the review saw less than the record would clear', () => {
+    const d = decideReview(okRun())
+    const report = formatReviewReport({
+      decision: d,
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      partial: { reviewedBase: 'b'.repeat(40), coverageBase: 'c'.repeat(40) },
+    })
+    expect(report).toMatch(/NO RECORD COMMAND IS PRINTED/)
+    expect(report).not.toContain('mechanism-review.mjs --record')
+    // The verdict itself is still reported — the review happened, it just does
+    // not cover what a record at this sha would clear.
+    expect(report).toContain('merge')
+  })
+
   it('the report names the cause in one loud line on a fallback', () => {
     const d = decideReview({ outcome: classifyOutcome({ exitCode: 1, stderr: 'usage limit' }), parsed: { ok: false } })
     const report = formatReviewReport({ decision: d, sha: 'c'.repeat(40), mode: 'review' })
