@@ -5596,3 +5596,31 @@ to land than a mechanism that needs a review.
   they stood on 11.08.2026, is reported as a twin AND as overlapping.
   Criticality: MEDIUM — no player-visible behaviour, but it wastes whole agent runs and
   produces branches that cannot both land.
+
+- [ ] 626. THE BOULDER'S PROOF PROVES THE WRONG THING (four-eyes review by GPT-5.6 Sol of
+  the landed point 585, 11.08.2026; two findings re-verified against the tree before
+  filing). 585 stood the landmark erratic on the ground and was landed on a green picture
+  — but its evidence does not hold what it claims, and a second defect class it fixed is
+  untested:
+  1. THE SEAT CHECK IS SELF-REFERENTIAL. `scripts/verify/world.mjs:154-174` calls the
+     block "seated" when `r.y` equals `r.groundY` — both read from the SAME site object.
+     That proves the SCENE COPIED the site's number, never that the block stands on the
+     DRAWN terrain. It is exactly the proxy this project forbids (CLAUDE.md §7.2: judge by
+     the rendered result, never by an assumed value). The check must read the height of the
+     drawn mesh under the block's footprint — the vertices the bird's-eye mesh was built
+     from — and compare THAT with the drawn base.
+  2. A NEW TEST ASSERTS AGAINST AN OCEAN. `src/scenes/place/groundScatter.test.ts` never
+     calls `setupGeodata()`, so its world is water everywhere — the trap 585's own report
+     named for two other files, reproduced in the file it added. It loads the dataset, or
+     it proves nothing about the shore rule.
+  3. AND THE PLACEMENT STILL HAS EDGES the review named and nobody has refuted: the
+     footprint is probed at 25 discrete points, so a wet or blocked sliver between them
+     survives; an exhausted search returns the village coordinate WITHOUT proving it dry;
+     and the all-water seed 4242 is returned wet with `communicationRock.test.ts:207-232`
+     blessing it. Either each is genuinely unreachable in play — then the test says so in
+     one line — or the search fails LOUDLY instead of returning a spot it cannot vouch for.
+  VERIFIABLE: the seat check FAILS when the scene is made to draw the block a metre above
+  its site (a deliberate regression, reverted), which the current check cannot detect;
+  `groundScatter.test.ts` green with the geodata loaded; and a stated verdict per edge in 3.
+  Criticality: HIGH — this is the landmark the communication goal is dug up at, and the
+  check that was supposed to protect it does not.
