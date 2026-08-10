@@ -48,6 +48,27 @@ export const normPath = (p) =>
     .toLowerCase()
 
 /**
+ * The worktree DIRECTORY a `worktree-agent-<id>` branch was created for, or
+ * null for any other branch. `origin/` is stripped first: the remote twin of a
+ * stub names the same tree.
+ *
+ * WHY (point 613): cutting an agent worktree also creates that setup branch,
+ * and the agent switches to its own `feat/<point>-<slug>` within seconds. The
+ * stub is then abandoned on the commit `main` had when the tree was cut — so
+ * the moment `main` moves, containment says "already merged" and this guard
+ * demanded its deletion on every turn of a healthy delegation. The existing
+ * worktree protection missed it because the branch is genuinely checked out
+ * NOWHERE; the tree it belongs to is identified by its NAME, not by its HEAD.
+ * The stub is cleaned up where it is created (`scripts/worktree-cleanup.mjs`
+ * removes it with the tree), so while the tree stands there is nothing to
+ * report.
+ */
+export const stubBranchTree = (branch) => {
+  const m = /^worktree-(agent-[a-z0-9][a-z0-9._-]*)$/.exec(normBranch(branch).replace(/^origin\//, ''))
+  return m ? m[1] : null
+}
+
+/**
  * Is this worktree one of the verify-baseline checkouts? Those live under
  * `local/` and are CACHES keyed by sha — not branches, not agent debris, and
  * removing one only costs the next verification a re-checkout. They are carved
@@ -134,9 +155,14 @@ export function assessBranchHygiene({
   // git would refuse the branch deletion anyway, so a finding there is noise.
   const protectedByWorktree = new Set()
   const sweepable = []
+  // Every worktree git knows, by DIRECTORY NAME. That name is the only thing
+  // tying an abandoned setup branch to the tree it was cut for, since the stub
+  // is checked out nowhere the moment the agent switches to its feat branch.
+  const worktreeDirs = new Set()
   for (const wt of Array.isArray(worktrees) ? worktrees : []) {
     const path = normPath(wt?.path)
     if (!path) continue
+    worktreeDirs.add(path.slice(path.lastIndexOf('/') + 1))
     const branch = normBranch(wt?.branch)
     const living =
       path === normPath(repoRoot) ||
@@ -149,6 +175,14 @@ export function assessBranchHygiene({
       continue
     }
     sweepable.push(wt)
+  }
+
+  // A SETUP BRANCH IS PART OF ITS TREE, not debris beside it: while the tree
+  // stands, `worktree-agent-<id>` is reported nowhere, and when the tree goes
+  // the branch goes with it (worktree-cleanup.mjs). See stubBranchTree.
+  const stubOfExistingTree = (name) => {
+    const dir = stubBranchTree(name)
+    return dir !== null && worktreeDirs.has(dir)
   }
 
   // 1. WORKTREES first: the branch inside one cannot be deleted while the tree
@@ -170,7 +204,7 @@ export function assessBranchHygiene({
   for (const b of Array.isArray(localMerged) ? localMerged : []) {
     const name = normBranch(b?.name)
     if (!name || PROTECTED_REFS.has(name)) continue
-    if (heldBranches.has(name) || protectedByWorktree.has(name)) continue
+    if (heldBranches.has(name) || protectedByWorktree.has(name) || stubOfExistingTree(name)) continue
     if (fresh(b?.tipAt) || onMainTip(b?.tipSha)) continue
     findings.push({
       kind: 'local',
@@ -188,7 +222,8 @@ export function assessBranchHygiene({
     const name = normBranch(b?.name)
     if (!name || PROTECTED_REFS.has(name)) continue
     const bare = name.replace(/^origin\//, '')
-    if (heldBranches.has(bare) || heldBranches.has(name) || protectedByWorktree.has(bare)) continue
+    if (heldBranches.has(bare) || heldBranches.has(name) || protectedByWorktree.has(bare) || stubOfExistingTree(bare))
+      continue
     // The same exemption the local loop carries, and for the same branch: the
     // workflow pushes a feature branch the moment it is cut, for durability, so
     // between the cut and the first commit the REMOTE ref stands on main's tip

@@ -124,6 +124,34 @@ export function assertInside(path, root) {
   return resolve(String(path))
 }
 
+/**
+ * THE SETUP BRANCH THAT COMES WITH AN AGENT WORKTREE. PURE.
+ *
+ * Creating the isolated tree `<repo>/.claude/worktrees/agent-<id>` also creates
+ * a branch named after it, `worktree-agent-<id>`. The agent switches to its own
+ * `feat/<point>-<slug>` within seconds, so that stub is abandoned on whatever
+ * `main` pointed at when the tree was cut — and the moment `main` moves it reads
+ * as "already contained in origin/main" to branch-hygiene-guard, which then
+ * demands its deletion on every turn of a perfectly healthy delegation
+ * (measured 10.08.2026: three agents, three findings). The stub belongs to the
+ * tree, so it goes WITH the tree instead of being reported where it is found.
+ *
+ * Returns the branch name for an agent worktree path, or null for anything else
+ * — a hand-made worktree carries no such stub and must not have a branch of its
+ * own guessed at.
+ */
+export function stubBranchFor(target) {
+  // Deliberately NOT normPath: that lowercases, and a branch name is
+  // case-sensitive to git. Only the separators are normalised here.
+  const p = String(target ?? '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/\/+$/, '')
+  if (!p) return null
+  const base = p.slice(p.lastIndexOf('/') + 1)
+  return /^agent-[A-Za-z0-9][A-Za-z0-9._-]*$/.test(base) ? `worktree-${base}` : null
+}
+
 /** The one line a refusal prints. */
 export const formatRefusal = (verdict) =>
   `worktree-cleanup: REFUSED ${verdict?.path ?? '(nothing)'} — ${REFUSALS[verdict?.reason] ?? verdict?.reason}`

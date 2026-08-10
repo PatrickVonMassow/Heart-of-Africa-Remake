@@ -308,7 +308,10 @@ describe('closingPointNumbers — which ticks the checklist gates', () => {
   })
   it('holds on the REAL work order: the demo checkpoint counts, the guard points do not', () => {
     const closing = closingPointNumbers(readTasksAll())
-    expect(closing.has(224)).toBe(true) // DEMO CHECKPOINT — full closing run
+    expect(closing.has(174)).toBe(true) // THE v0.3 TAG — a full closing run before it
+    // 224 is NOT here any more: its closing shipped with the v0.2 tag on 24.07.2026,
+    // and the point was re-cut on 10.08.2026 to the one thing still owed — confirming
+    // /v0.2/ and /poc/ still serve. A point that delivers no closing must not gate one.
     expect(closing.has(306)).toBe(false) // this guard itself
     expect(closing.has(331)).toBe(false) // the guard hardening
     // the detector stays narrow — a corpus of 500+ points yields a handful

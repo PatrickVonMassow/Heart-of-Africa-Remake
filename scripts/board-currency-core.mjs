@@ -316,6 +316,12 @@ export function liveBoardVerdict({
 /**
  * The launcher's alert decision (delta E), with an injected clock so it is pure.
  *
+ * Since point 562 it also speaks the probe's own vocabulary (board-probe-core):
+ * 'transport' is a fetch that failed while the other transport answered — a real
+ * event, reported at 'default' so the ladder can only ever throttle it, never
+ * pause the batch on it — and 'flaky' is a failure that has not yet repeated for
+ * the whole streak, which is reported to nobody at all.
+ *
  * It alerts on a board that is BEHIND or UNREACHABLE, and on a `publishDue` /
  * `publishFailed` that has survived a whole tick — the case where the session is
  * wedged and no Stop hook will ever run again. Each alert is keyed, so one
@@ -342,7 +348,17 @@ export function watchdogDecision({
   } else if (verdict === 'unreachable') {
     parts.push(`The live board could not be read: ${reason || 'unknown reason'}.`)
     priority = 'high'
+  } else if (verdict === 'transport') {
+    // A TRANSPORT FAILURE IS NOT A STALE BOARD (point 562), and the difference is
+    // carried by the PRIORITY as well as by the words: an alert raised at
+    // 'default' is an EVENT to the escalation ladder, which throttles it and may
+    // never pause the batch on it (PAUSE_MIN_PRIORITY in
+    // scripts/alert-escalation-core.mjs). On 08.08.2026 a flickering fetch climbed
+    // the ladder as a condition and stopped every point in the queue.
+    parts.push(`A board fetch FAILED, but the board is not stale: ${reason || 'the other transport answered'}.`)
   }
+  // 'flaky' is deliberately silent here: a failure that has not yet repeated for
+  // the whole streak is logged by the launcher and reported to nobody.
 
   const dueAt = Number(s.publishDue && s.publishDue.at)
   if (Number.isFinite(dueAt) && dueAt > 0 && now - dueAt > tickMs) {
@@ -362,6 +378,12 @@ export function watchdogDecision({
   // over a page that IS current is not "out of date" — mislabelling it teaches
   // the reader to distrust the one channel that speaks when a session is wedged.
   const title =
-    verdict === 'unreachable' ? 'Board unreachable' : verdict === 'behind' ? 'Board out of date' : 'Board publish outstanding'
+    verdict === 'unreachable'
+      ? 'Board unreachable'
+      : verdict === 'behind'
+        ? 'Board out of date'
+        : verdict === 'transport'
+          ? 'Board transport hiccup'
+          : 'Board publish outstanding'
   return { notify: true, key, title, message: `${parts.join(' ')} ${BOARD_PAGE_URL}`, priority }
 }

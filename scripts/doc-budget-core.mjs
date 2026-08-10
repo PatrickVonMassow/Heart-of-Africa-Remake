@@ -136,7 +136,20 @@ export const DOC_BUDGETS = [
     // APPROVED this raise on 09.08.2026 — the board asked him to confirm it or
     // have 215 words found elsewhere, and he chose to confirm. That yes is what
     // the rule above demands for a raise; it is settled, not open.
-    maxWords: 28386,
+    // RAISED by the 102 measured words of the keyboard capture (work-order 601):
+    // §17.8's third rule said the browser's Ctrl combinations stay the browser's,
+    // and that decision is what closes the player's tab while he walks — Ctrl is
+    // the hold key and W walks forward. Its replacement is a genuinely new
+    // decision and states three things the document did not carry in any form:
+    // what a page may prevent is prevented, the three reserved chords are held by
+    // a keyboard lock bound to fullscreen + pointer lock, and where that lock is
+    // unavailable the hold key is REBINDABLE. The LINE ceiling is untouched (the
+    // rule is one bullet, as before), the §17.5 mention was cut to a
+    // parenthesis, and the mechanics went to the code and to
+    // docs/acceptance-criteria-detail.md, so only the decision is priced here.
+    // NOT yet confirmed by the user: the rule above wants his yes for a raise,
+    // and the alternative is 102 words found elsewhere in design.md.
+    maxWords: 28488,
     why: 'read on demand, but every point that cites a section pays for the bulk around it',
   },
 ]

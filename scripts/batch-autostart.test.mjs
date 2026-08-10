@@ -195,10 +195,38 @@ describe('the board watchdog child', () => {
   const code = source.split('\n').filter((l) => !l.trimStart().startsWith('//')).join('\n')
 
   it('reads the LIVE page — the point of delta E is not reading a state file', () => {
-    expect(code).toMatch(/fetch\(liveCheckUrl\(BOARD_CONTENT_URL/)
+    expect(code).toMatch(/probe\(\(\) => liveCheckUrl\(BOARD_CONTENT_URL/)
     expect(code).toMatch(/liveBoardVerdict\(\{/)
     expect(code).toMatch(/watchdogDecision\(\{/)
     expect(code).toMatch(/await notify\(d\.title, d\.message, d\.priority\)/)
+  })
+
+  it('RETRIES a failed probe and corroborates it against the other transport (point 562)', () => {
+    // Every rule is pure and pinned in board-probe-core.test; what no unit test
+    // can see is whether this child APPLIES them. A flickering fetch paused the
+    // whole batch on 08.08.2026, so an edit that dropped the retry or the second
+    // transport would restore exactly that with every other test still green.
+    expect(code).toMatch(/for \(let i = 0; i < Math\.max\(1, attempts\); i\+\+\)/)
+    expect(code).toMatch(/probeResult\(tries\)/)
+    expect(code).toMatch(/currency\.ok \? null : await probe\(`\$\{BOARD_PAGE_URL\}/)
+    expect(code).toMatch(/classifyBoardProbe\(\{ currency, viewer \}\)/)
+    expect(code).toMatch(/nextFailureStreak\(\{ streak: priorStreak, kind \}\)/)
+    // The verdict of a FAILED fetch comes from the probe, never from the
+    // currency check — the latter can only ever say "unreachable" about a body
+    // it never got, which is the claim the point forbids.
+    expect(code).toMatch(/currency\.ok \? live : \{ \.\.\.live, verdict: reach\.verdict/)
+  })
+
+  it('hands the consecutive-failure count back, so only CONSECUTIVE failures escalate', () => {
+    // The child is a fresh process per tick and can hold no memory of its own.
+    expect(code).toMatch(/priorStreak/)
+    expect(code).toMatch(/\bstreak,/)
+    const launcher = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+      .split('\n')
+      .filter((l) => !l.trimStart().startsWith('//'))
+      .join('\n')
+    expect(launcher).toMatch(/'--streak'/)
+    expect(launcher).toMatch(/state\.boardProbeStreak = Number\(r\.streak\) \|\| 0/)
   })
 
   it('bounds the fetch and clears its timer', () => {

@@ -1217,6 +1217,12 @@ export const balance: BalanceConfig = {
     // radius is a bit over twice the interact radius (4.5), so the children's
     // group and the adults' group are never heard at once from the middle.
     phrasePauseSeconds: 0.9,
+    // THE RANGE OF THE WHOLE ACT, not of the voice alone (point 580): a figure
+    // gestures only where it is also heard and read, so this one value bounds
+    // the utterance, the note over the head AND the arms. Beyond it a villager
+    // stands still rather than miming a concept the player gets no word for.
+    // The rule lives in src/communication/spokenGesture.ts and follows this
+    // value wherever the debug menu sets it.
     hearingRadius: 10,
     // One five-syllable atom takes 1.5 s at this pace — slow enough to count
     // the beats by ear, quick enough that a seven-atom message stays short.

@@ -481,18 +481,22 @@ export function Hud() {
       // Silent at the window's edge: nothing moved, so say nothing.
       if (g.day !== before) useGame.getState().setToast(st.formatDateShort(g.day, START_YEAR))
     }
+    // The calendar row keeps its chords with the BROWSER (work-order 601: the
+    // keyboard zoom and the tab jumps), so these handlers must ignore a
+    // modified press — otherwise Ctrl+3 switches the tab AND jumps to March.
+    const calendarKey = { ignoreModified: true }
     const offYears = [
-      onKeyPress('BracketRight', () => jumpYear(1)),
-      onKeyPress('NumpadAdd', () => jumpYear(1)),
-      onKeyPress('Slash', () => jumpYear(-1)),
-      onKeyPress('NumpadSubtract', () => jumpYear(-1)),
+      onKeyPress('BracketRight', () => jumpYear(1), calendarKey),
+      onKeyPress('NumpadAdd', () => jumpYear(1), calendarKey),
+      onKeyPress('Slash', () => jumpYear(-1), calendarKey),
+      onKeyPress('NumpadSubtract', () => jumpYear(-1), calendarKey),
     ]
     const offMonths = MONTH_KEYS.map((code, i) =>
       onKeyPress(code, () => {
         useGame.getState().debugJumpToMonth(i + 1)
         const s = getStrings()
         useGame.getState().setToast(`${s.months[i]} ${s.formatDateShort(useGame.getState().day, START_YEAR).slice(6)}`)
-      }),
+      }, calendarKey),
     )
     const offEsc = onKeyPress('Escape', () => {
       // A running benchmark comes first: Esc aborts it and the runner restores

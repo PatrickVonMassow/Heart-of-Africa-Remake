@@ -18,7 +18,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { readLauncherRecord, stopDaemon } from './batch-launcher.mjs'
+import { writeJsonAtomic } from './atomic-write.mjs'
+import { readLauncherRecord, runDaemon, stopDaemon } from './batch-launcher.mjs'
 import { probePid } from './batch-singleton.mjs'
 
 const LAUNCHER = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), 'batch-launcher.mjs')).href
@@ -151,6 +152,184 @@ describe('runDaemon — six starts at once leave exactly one launcher', () => {
         }
         place.cleanup()
       }
+    }
+  })
+})
+
+// --- THE RELEASE BRINGS THE TICK FORWARD (point 612) --------------------------
+// The pure decision is pinned in batch-launcher-core.test; what THIS one proves is
+// that the loop acts on it — the failure of 10.08.2026 was not a wrong decision
+// but a sleep that nobody interrupted, and a decision nothing consults would
+// reproduce it exactly while every unit test stayed green.
+describe('runDaemon — a released lock is not waited out', () => {
+  /** The daemon is stopped from inside its own tick, by laying down the stop mark
+   *  its next publish honours. No signals: this runs in the vitest process. */
+  const stopFrom = (recordPath) => writeJsonAtomic(recordPath, { stopped: true, stoppedAt: Date.now() + 1 })
+
+  it('ticks again within seconds of a handover, not at the next quarter hour', { timeout: 30_000 }, async () => {
+    const place = arena()
+    try {
+      // One whole interval is far longer than this test waits: a SECOND tick can
+      // only come from the watcher.
+      const tickMs = 10 * 60 * 1000
+      let lock = { sessionId: 's1', claimedAt: Date.now() }
+      const ticks = []
+      const started = Date.now()
+      const outcome = await runDaemon({
+        recordPath: place.recordPath,
+        logPath: place.logPath,
+        tickMs,
+        pollMs: 20,
+        wakeGapMs: 0,
+        readLock: () => lock,
+        isPaused: () => false,
+        tick: () => {
+          ticks.push(Date.now() - started)
+          if (ticks.length === 1) {
+            // The boundary marks the lock handed over a moment after the tick that
+            // saw it held — precisely the 13:20/13:31 gap that cost half an hour.
+            setTimeout(() => {
+              lock = { sessionId: 's1', handedOver: true, handedOverAt: Date.now() }
+            }, 60)
+          } else {
+            stopFrom(place.recordPath)
+          }
+          return Promise.resolve(0)
+        },
+      })
+      expect(ticks.length).toBeGreaterThanOrEqual(2)
+      // SECONDS, not a quarter of an hour. The bound is deliberately loose against
+      // a loaded machine and still two orders of magnitude under the interval.
+      expect(ticks[1] - ticks[0]).toBeLessThan(5000)
+      expect(outcome).toBe('yielded')
+    } finally {
+      place.cleanup()
+    }
+  })
+
+  it('ticks again within seconds of an IDLE lapse too, not only a handover', { timeout: 30_000 }, async () => {
+    // 612's refinement: an idle lapse and an expired lease end ownership just as
+    // definitively as a handover, and a signal hung on the mark alone would leave
+    // those waiting out the quarter hour — the very latency this removes. The
+    // verdict is `assessOwner`'s here, exactly as in the tick.
+    const place = arena()
+    try {
+      let lock = { sessionId: 's1', claimedAt: Date.now(), acquiredAt: Date.now() }
+      const ticks = []
+      const started = Date.now()
+      const outcome = await runDaemon({
+        recordPath: place.recordPath,
+        logPath: place.logPath,
+        tickMs: 10 * 60 * 1000,
+        pollMs: 20,
+        wakeGapMs: 0,
+        readLock: () => lock,
+        isPaused: () => false,
+        tick: () => {
+          ticks.push(Date.now() - started)
+          if (ticks.length === 1) {
+            setTimeout(() => {
+              // Took the lock, never ran a thing, and the window has passed.
+              const at = Date.now() - 6 * 60 * 1000
+              lock = { sessionId: 's1', claimedAt: at, acquiredAt: at, pid: process.pid }
+            }, 60)
+          } else {
+            stopFrom(place.recordPath)
+          }
+          return Promise.resolve(0)
+        },
+      })
+      expect(ticks.length).toBeGreaterThanOrEqual(2)
+      expect(ticks[1] - ticks[0]).toBeLessThan(5000)
+      expect(outcome).toBe('yielded')
+    } finally {
+      place.cleanup()
+    }
+  })
+
+  it('sleeps the whole interval out while the owner holds the lock', { timeout: 30_000 }, async () => {
+    const place = arena()
+    try {
+      const ticks = []
+      const lock = { sessionId: 's1', claimedAt: Date.now() }
+      const outcome = await runDaemon({
+        recordPath: place.recordPath,
+        logPath: place.logPath,
+        tickMs: 2500,
+        pollMs: 20,
+        wakeGapMs: 0,
+        // A heartbeat moves `claimedAt` on every tool call — that is a change, and
+        // it must not be read as a release, or a working owner would be ticked at
+        // five times a second.
+        readLock: () => ({ ...lock, claimedAt: Date.now() }),
+        isPaused: () => false,
+        tick: () => {
+          ticks.push(Date.now())
+          if (ticks.length >= 2) stopFrom(place.recordPath)
+          return Promise.resolve(0)
+        },
+      })
+      expect(ticks.length).toBe(2)
+      expect(ticks[1] - ticks[0]).toBeGreaterThanOrEqual(2000)
+      expect(outcome).toBe('yielded')
+    } finally {
+      place.cleanup()
+    }
+  })
+
+  it('does NOT bring a tick forward while the batch is paused', { timeout: 30_000 }, async () => {
+    const place = arena()
+    try {
+      let lock = { sessionId: 's1', claimedAt: Date.now() }
+      const ticks = []
+      const outcome = await runDaemon({
+        recordPath: place.recordPath,
+        logPath: place.logPath,
+        tickMs: 2500,
+        pollMs: 20,
+        wakeGapMs: 0,
+        readLock: () => lock,
+        isPaused: () => true,
+        tick: () => {
+          ticks.push(Date.now())
+          if (ticks.length === 1) setTimeout(() => (lock = null), 60)
+          else stopFrom(place.recordPath)
+          return Promise.resolve(0)
+        },
+      })
+      expect(ticks.length).toBe(2)
+      expect(ticks[1] - ticks[0]).toBeGreaterThanOrEqual(2000)
+      expect(outcome).toBe('yielded')
+    } finally {
+      place.cleanup()
+    }
+  })
+
+  it('a lock that cannot be read never takes the launcher down', { timeout: 30_000 }, async () => {
+    const place = arena()
+    try {
+      const ticks = []
+      const outcome = await runDaemon({
+        recordPath: place.recordPath,
+        logPath: place.logPath,
+        tickMs: 2000,
+        pollMs: 20,
+        wakeGapMs: 0,
+        readLock: () => {
+          throw new Error('EACCES')
+        },
+        isPaused: () => false,
+        tick: () => {
+          ticks.push(Date.now())
+          if (ticks.length >= 2) stopFrom(place.recordPath)
+          return Promise.resolve(0)
+        },
+      })
+      // The 15-minute backstop is what still runs, and it did.
+      expect(ticks.length).toBe(2)
+      expect(outcome).toBe('yielded')
+    } finally {
+      place.cleanup()
     }
   })
 })

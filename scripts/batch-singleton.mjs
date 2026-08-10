@@ -58,16 +58,13 @@ import { repoPath } from './repo-paths.mjs'
 import { writeJsonAtomic, tryWriteJsonAtomic } from './atomic-write.mjs'
 import {
   LEASE_MS,
-  leaseExpired,
-  leaseUntilOf,
-  leaseTakeoverDecision,
-  declaredWaitStale,
   renewedLock,
   renewalDecision,
   nextFence,
   grantedFenceState,
   normaliseFence,
 } from './batch-lease-core.mjs'
+import { IDLE_WINDOW_MS, ownershipVerdict } from './batch-ownership-core.mjs'
 
 // --- Constants (exported for tests and callers) -------------------------------
 
@@ -84,15 +81,24 @@ export const LAUNCHER_TICK_MS = 15 * 60 * 1000
 /** A pending-spawn lock (launcher claimed, claude -p still booting) older than
  *  this with a dead child pid is reapable. */
 export const PENDING_STALE_MS = 10 * 60 * 1000
-/** After a HANDOVER (point 388) whose owning process is still ALIVE, the lock
- *  stays "alive" this long before the successor may take it. A headless `claude
- *  -p` — the batch's normal mode — exits at the boundary and is taken over at
- *  once by the dead-pid path, so this window only ever costs an interactive
- *  window something. It is one full launcher tick wide on purpose (four-eyes
- *  review, finding 1): the handover is withdrawn by the session's next tool
- *  call, and a session that neither ends nor calls a tool for a quarter of an
- *  hour does not exist. */
+/** THE HANDOVER NO LONGER WAITS (point 612). This was the window a live owning
+ *  process bought itself after marking the lock handed over; on 10.08.2026 it,
+ *  together with the `claimedAt <= handedOverAt` qualifier, cost 35 minutes of
+ *  idle batch, and `ownershipVerdict` now frees a handed-over lock at once. What
+ *  the constant still means is the OBSERVER's tolerance: how long after a handover
+ *  a launcher skip is merely late rather than broken (batch-handover-observe). */
 export const HANDOVER_GRACE_MS = 15 * 60 * 1000
+
+/**
+ * The idle window (point 612), with its runtime override. Five minutes by
+ * default; `HOA_IDLE_WINDOW_MIN` widens or narrows it without a code change, which
+ * is what "calibratable" means for a value the batch's own liveness hangs on. A
+ * junk or non-positive value reads as the default rather than as "no window".
+ */
+export function idleWindow(env = process.env) {
+  const m = Number(env?.HOA_IDLE_WINDOW_MIN)
+  return Number.isFinite(m) && m > 0 ? m * 60 * 1000 : IDLE_WINDOW_MS
+}
 /** Tool activity younger than this counts a session as "live" for the
  *  parallel-session detector. */
 export const PARALLEL_FRESH_MS = 10 * 60 * 1000
@@ -219,88 +225,44 @@ const readJson = (p) => {
  * the same shape the demolished age valve had. The live owner across this change
  * keeps working and writes a real lease at its next tool call.
  *
- * HANDOVER (point 388): a lock the owner itself marked handed-over at a VALID
- * point boundary reads NOT alive, even while its process still runs. That is the
- * one place where a live pid does not mean a live owner — and it is not a
- * heuristic like the age window that caused the e9407cae incident, but the
- * owner's own statement, written only after the Stop hook confirmed a fresh
- * session-bound marker, a verifiably closed point and an armed launcher. Two
- * conditions keep it honest:
- *   - `claimedAt <= handedOverAt`: the PostToolUse heartbeat stamps claimedAt on
- *     EVERY tool call, so a session that did NOT actually stop (a later Stop hook
- *     in the chain blocked the turn end) withdraws its own handover at its next
- *     tool call. No mutation, just a comparison.
- *   - while the pid is still alive the successor waits HANDOVER_GRACE_MS, so a
- *     session mid-shutdown is never raced.
+ * HANDOVER (point 388, revised by point 612): a lock the owner itself marked
+ * handed-over reads NOT alive, even while its process still runs, and it does so
+ * AT ONCE. That is the one place where a live pid does not mean a live owner —
+ * and it is not a heuristic like the age window that caused the e9407cae
+ * incident, but the owner's own statement, written only after the Stop hook
+ * confirmed a fresh session-bound marker, a verifiably closed point and an armed
+ * launcher. The two conditions that used to qualify it — `claimedAt <=
+ * handedOverAt` and a 15-minute wait for a live process — are GONE, because on
+ * 10.08.2026 they cost 35 minutes of idle batch: any later write of the lock
+ * stamps `claimedAt` past the mark without deleting it, and the handover then
+ * silently stopped counting while the flag still sat in the file. A handover is
+ * withdrawn by DELETING it (`withdrawHandover`, and `heartbeat` where
+ * `withdrawalIsCausal` says the work really came after) — an explicit act.
+ *
+ * THE VERDICT ITSELF IS NOT HERE. Everything above — the handover, the fresh
+ * heartbeat, the boot check, the lease and the idle window — is one decision, and
+ * it lives in `ownershipVerdict` (scripts/batch-ownership-core.mjs) so that point
+ * 612's idle rule and point 517's lease extension cannot become two competing
+ * arithmetics on the same number. This function reads the files and the pid probe
+ * and asks that one; only the pid branches below, which ARE probe semantics, stay.
  */
-export function assessOwner(lock, { now, bootTime, probe, work, leaseMs = LEASE_MS } = {}) {
-  if (!lock || typeof lock.claimedAt !== 'number') {
-    return { alive: false, reason: 'no-lock' }
-  }
-  if (lock.handedOver === true && typeof lock.handedOverAt === 'number' && lock.claimedAt <= lock.handedOverAt) {
-    const pidGone = probe ? probe.exists !== true : false
-    if (pidGone || now - lock.handedOverAt >= HANDOVER_GRACE_MS) {
-      return { alive: false, reason: 'handed-over' }
-    }
-    return { alive: true, reason: 'handover-grace' }
+export function assessOwner(lock, { now, bootTime, probe, work, leaseMs = LEASE_MS, paused = false, idleWindowMs = idleWindow() } = {}) {
+  const v = ownershipVerdict({
+    lock,
+    now,
+    bootTime,
+    work,
+    paused,
+    idleWindowMs,
+    leaseMs,
+    corroboration: pidCorroboration(lock, probe),
+  })
+  if (v.settled) {
+    return v.detail === undefined
+      ? { alive: v.owns, reason: v.reason }
+      : { alive: v.owns, reason: v.reason, detail: v.detail }
   }
   const age = now - lock.claimedAt
-  // Fresh heartbeat proves life — REBOOT IS NOT SUFFICIENT to declare death
-  // when a fresh heartbeat exists (a re-claimed post-boot session writes one).
-  if (age < DEAD_CONFIRM_MS) return { alive: true, reason: 'fresh-heartbeat' }
-  // A heartbeat from BEFORE this boot cannot have a living writer: no claude
-  // process survives a reboot. (A live re-claimed session would have written a
-  // post-boot heartbeat, caught above.)
-  if (typeof bootTime === 'number' && lock.claimedAt < bootTime) {
-    return { alive: false, reason: 'heartbeat-predates-boot' }
-  }
-  // THE LEASE — and since point 556 it is NECESSARY, not sufficient. A lease that
-  // ran out ends ownership by arithmetic exactly as before; what it no longer does
-  // ALONE is license the takeover. `work` is the corroboration the caller already
-  // holds (`assessOwnerWork`), and it is passed only by the launcher tick, which
-  // reads it a few lines before this call. Every other caller passes nothing and
-  // gets the pre-556 verdict — being wrong toward "take it" is what cost a live
-  // owner its batch on 08.08.2026, so the widening is deliberate and narrow.
-  // Nothing is killed here or anywhere else.
-  const expired = leaseExpired(lock, { now, leaseMs })
-  // A DEAD DECLARED WAIT DOES NOT DISPOSSESS ON THE SPOT — it merely withdraws the
-  // extension, and the ORDINARY lease applies again from the owner's last
-  // heartbeat (four-eyes review, finding 3). Without that step the owner who
-  // forgot `--clear` and walked straight into a NEW long call is shot for the
-  // paperwork of a finished one; `claimedAt` is stamped by every completed tool
-  // call, so "silent for a full ordinary window" is the honest test, and it is the
-  // same one that applied before the extension existed. It also keeps the reported
-  // age positive (finding 5): `leaseUntil` is still in the future here, so the
-  // extension's own number would read as a negative lease age.
-  const waitDied =
-    !expired &&
-    declaredWaitStale(lock, { now, leaseMs, workAdvancing: work?.advancing, workDeclared: work?.declared }) &&
-    now > lock.claimedAt + leaseMs
-  if (expired || waitDied) {
-    const corroboration = pidCorroboration(lock, probe)
-    const verdict = leaseTakeoverDecision({
-      leaseAgeMs: (() => {
-        if (waitDied) return now - (lock.claimedAt + leaseMs)
-        const until = leaseUntilOf(lock, { leaseMs })
-        return typeof until === 'number' ? now - until : null
-      })(),
-      pid: corroboration.pid,
-      pidIdentifiable: corroboration.identifiable,
-      pidLive: corroboration.live,
-      // A declared wait that stopped moving is over BY DEFINITION (it bought its
-      // window on the promise that its evidence keeps advancing), so that branch
-      // never asks the work question a second time.
-      workAdvancing: waitDied ? false : work?.advancing === true,
-      // WHAT the advance rests on: a breathing pid corroborates nothing.
-      // `corroboratedBy`, NOT `judgedOn` — the latter ranks a live pid above a
-      // fresh log, so a `--pid` + `--log` verification would read breathing-only
-      // while its output was demonstrably still being written.
-      workJudgedOn: waitDied ? 'none' : (work?.corroboratedBy ?? work?.judgedOn ?? 'none'),
-      workSummary: work?.summary ?? '',
-    })
-    if (verdict.take) return { alive: false, reason: waitDied ? 'declared-wait-stale' : 'lease-expired', detail: verdict.why }
-    return { alive: true, reason: 'lease-expired-owner-working', detail: verdict.why }
-  }
   const kind = lock.kind === 'pending-spawn' ? 'pending-spawn' : 'session'
   const pid = typeof lock.pid === 'number' && lock.pid > 0 ? lock.pid : null
   if (pid === null) {

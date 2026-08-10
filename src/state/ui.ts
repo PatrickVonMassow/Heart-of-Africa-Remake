@@ -7,6 +7,20 @@ import { QUALITY_PRESETS, nextDetailLevel, type DetailLevel } from '../config/qu
 
 export type BuildingType = 'shop' | 'weapons' | 'tools' | 'market' | 'bazaar' | 'agency' | 'chief'
 
+/**
+ * The modifier the player holds for the name labels of design.md §17.8. Only
+ * modifiers are offered: the layer is a HOLD, and a modifier is the one kind of
+ * key that can be held without the character doing anything else. SHIFT is the
+ * safe one — no browser binds a chord on it. Alt is offered for a player whose
+ * keyboard makes it easier to reach, and its option text names the cost: on
+ * Windows and Linux a plain Alt press-and-release focuses the browser menu, so
+ * it steals the keyboard after every peek (work-order 601).
+ */
+export type LabelModifier = 'ctrl' | 'shift' | 'alt'
+
+/** The picker's order, so the debug menu and its test cannot drift apart. */
+export const LABEL_MODIFIERS: readonly LabelModifier[] = ['ctrl', 'shift', 'alt']
+
 /** Progress of the running in-game benchmark (design.md §21.1, F8). */
 export interface BenchProgress {
   /** Config name, or null while the discarded warm-up pass runs. */
@@ -93,6 +107,14 @@ export interface UiState {
    * checkbox turns it off; the horizontal look never changes with it.
    */
   invertLook: boolean
+  /**
+   * The key held to name what acts on screen (design.md §17.8), REBINDABLE
+   * (work-order 601). Ctrl is the shipped default — it is what §17.8 states and
+   * what the player already knows — but outside fullscreen no page can keep
+   * Ctrl+W from closing the tab, so a player in a window can move the layer
+   * onto Shift, which no browser claims.
+   */
+  labelModifier: LabelModifier
   /**
    * Debug unlock (design.md §21): allow zooming *out* beyond the default
    * camera distance. Zooming in is always available.
@@ -184,6 +206,7 @@ export interface UiState {
   setTraaEnabled: (enabled: boolean) => void
   setSeasonWetnessOverride: (wetness: number | null) => void
   setInvertLook: (invert: boolean) => void
+  setLabelModifier: (modifier: LabelModifier) => void
   setWheelZoomEnabled: (enabled: boolean) => void
   setTravelZoom: (zoom: number) => void
   setJournalDnd: (dnd: boolean) => void
@@ -227,6 +250,7 @@ export const useUi = create<UiState>()((set) => ({
   traaEnabled: true,
   seasonWetnessOverride: null,
   invertLook: true, // inverted vertical look is the shipped default (point 392)
+  labelModifier: 'ctrl', // design.md §17.8 states Ctrl; the rebind is the escape hatch
   wheelZoomEnabled: false,
   journalDnd: false,
   travelZoom: DEFAULT_TRAVEL_ZOOM,
@@ -273,6 +297,7 @@ export const useUi = create<UiState>()((set) => ({
   setTraaEnabled: (traaEnabled) => set({ traaEnabled }),
   setSeasonWetnessOverride: (seasonWetnessOverride) => set({ seasonWetnessOverride }),
   setInvertLook: (invertLook) => set({ invertLook }),
+  setLabelModifier: (labelModifier) => set({ labelModifier }),
   // Disabling the unlock clamps any zoom-out back to the default distance;
   // a zoomed-in view is kept.
   setWheelZoomEnabled: (wheelZoomEnabled) =>

@@ -25,7 +25,7 @@ import { EVENT_KINDS, type EventKind } from '../systems/events'
 import { debugEventGroups, fireDebugEvent, sortByLabel } from '../systems/debugEvents'
 import { jumpTargetPlaceId } from '../systems/jumpTargets'
 import { TREASURE_IDS, type TreasureId } from '../systems/economy'
-import { useUi } from '../state/ui'
+import { LABEL_MODIFIERS, useUi, type LabelModifier } from '../state/ui'
 import type { DetailLevel } from '../config/quality'
 import { startBenchmarkSafely } from '../systems/startBenchmark'
 import { PLACES, type Material } from '../world/geo'
@@ -50,7 +50,14 @@ type DebugLabelKey = {
 /** One control row: the localized label the filter matches on, and its node. */
 type DebugRow = { label: string; node: ReactNode }
 
-const EQUIPMENT_IDS: EquipmentId[] = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'canoe']
+/** The label key each hold-key option carries (design.md §17.8, work-order 601). */
+const LABEL_MODIFIER_LABELS: Record<LabelModifier, 'labelModifierCtrl' | 'labelModifierShift' | 'labelModifierAlt'> = {
+  ctrl: 'labelModifierCtrl',
+  shift: 'labelModifierShift',
+  alt: 'labelModifierAlt',
+}
+
+const EQUIPMENT_IDS: EquipmentId[] =['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'canoe']
 const MATERIALS: Material[] = ['gold', 'silver', 'emerald', 'copper', 'ivory']
 
 /** Labeled dropdown that fires an action on pick and snaps back to the placeholder. */
@@ -285,6 +292,7 @@ export function DebugMenu() {
   const groundDebugFlat = useUi((s) => s.groundDebugFlat)
   const seasonCollapseEnabled = useUi((s) => s.seasonCollapseEnabled)
   const invertLook = useUi((s) => s.invertLook)
+  const labelModifier = useUi((s) => s.labelModifier)
   const wheelZoomEnabled = useUi((s) => s.wheelZoomEnabled)
   const webglFallback = useUi((s) => s.webglFallback)
   const journalDnd = useUi((s) => s.journalDnd)
@@ -402,6 +410,23 @@ export function DebugMenu() {
       num(t.debug.unstuckSearchStep, balance.unstuck.searchStep,
         (v) => { balance.unstuck.searchStep = Math.max(0.1, v); bump() }, 0.1),
       check(t.debug.invertLook, invertLook, (v) => useUi.getState().setInvertLook(v)),
+      // The hold key for the §17.8 name labels (work-order 601). Ctrl is the
+      // shipped default, but its chords are the browser's outside fullscreen —
+      // Ctrl+W closes the tab while walking forward — so the player can move
+      // the layer onto a modifier no browser claims.
+      custom(t.debug.labelModifier, (
+        <label>
+          <span>{t.debug.labelModifier}</span>
+          <select
+            value={labelModifier}
+            onChange={(e) => useUi.getState().setLabelModifier(e.target.value as LabelModifier)}
+          >
+            {LABEL_MODIFIERS.map((m) => (
+              <option key={m} value={m}>{t.debug[LABEL_MODIFIER_LABELS[m]]}</option>
+            ))}
+          </select>
+        </label>
+      )),
       // The §21.4 zoom unlock is a control, not a graphics setting.
       check(t.debug.wheelZoom, wheelZoomEnabled, (v) => useUi.getState().setWheelZoomEnabled(v)),
     ],
