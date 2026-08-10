@@ -47,7 +47,7 @@ import {
   settlementEnterCandidate,
   settlementToEnter,
 } from './settlementEntry'
-import { sampleTerrain, type TerrainType } from '../../world/terrain'
+import { isBlocked, sampleTerrain, type TerrainType } from '../../world/terrain'
 import { REFINE_RING_MAX, chunkNeedsRefine, refinedSegments, setTerrainRefine } from './terrainLod'
 import { drainChunkQueue, orderChunkJobs, planChunkWindow, predictedNextCenter, type ChunkJob } from './terrainQueue'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
@@ -121,8 +121,44 @@ import { markActor } from '../actorLabelSource'
 import { RegionBorders } from './RegionBorders'
 import { Wildlife } from './Wildlife'
 import { collidableAnimalsNear } from './wildlifeCollision'
+import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, findFreeSpot, newStallState, updateStall } from '../../systems/unstuck'
+
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js'
 import { releaseCascadeShadowMaps, type CascadedShadowNode } from '../../render/shadowRelease'
+
+/** The bird's-eye traveller's own collision radius, in world units. */
+const TRAVEL_PLAYER_RADIUS = 0.5
+
+/**
+ * The escape values are calibrated for the walking scale of a settlement
+ * (metres); on the continent map one second of movement is `travelSpeed` world
+ * units instead of `placeWalkSpeed` metres, so the lengths are scaled by that
+ * ratio and "half a step of progress" keeps its meaning in both views.
+ */
+function travelScale(): number {
+  return balance.travelSpeed / Math.max(1e-3, balance.placeWalkSpeed)
+}
+
+/**
+ * The circles the bird's-eye traveller collides with around (x,z) — the large
+ * flora, the wildlife and the settlement footprints (design.md §11/§19). The
+ * settlement circles stay ONE-WAY, so a traveller who already stands inside one
+ * is never pushed out of it.
+ */
+function travelObstacles(x: number, z: number, seed: number): Array<[number, number, number]> {
+  const out = collidableFloraNear(x, z, seed)
+  for (const a of collidableAnimalsNear(x, z, TRAVEL_PLAYER_RADIUS + 1.5)) out.push(a)
+  const places = settlementColliders(
+    x,
+    z,
+    PLACE_WORLD_POSITIONS,
+    settlementCollisionRadius(balance.placeEnterRadius, balance.placeCollisionFactor),
+    TRAVEL_PLAYER_RADIUS,
+    1,
+  )
+  for (const c of places) out.push(c)
+  return out
+}
 
 const CHUNK_SIZE = 24 // world units
 const CHUNK_RADIUS = 6 // chunks kept around the player in each direction (terrain LOD)
@@ -2683,6 +2719,9 @@ function Player() {
 export function TravelScene() {
   const camera = useThree((s) => s.camera)
   const setPrompt = useUi((s) => s.setPrompt)
+  /** Stall watch (work-order 604): a held input that gets nowhere raises the
+   *  hint naming the escape key — it never frees the traveller by itself. */
+  const travelStall = useRef(newStallState(useGame.getState().pos.x, useGame.getState().pos.z))
 
   // Snap the camera to the follow pose on mount (no visible flight from the
   // previous first-person pose). On unmount the near plane returns to the
@@ -2858,6 +2897,40 @@ export function TravelScene() {
     }
   }, [])
 
+  // The escape from a wedge, in the bird's-eye view too (work-order 604): the
+  // same wedge can close around a landmark's collider, a settlement circle and a
+  // stand of trees. The lengths are calibrated for the walking scale of a
+  // settlement, so they are scaled here by the ratio of the travel speed — half
+  // a step of progress means the same thing on the continent map. Free of cost:
+  // no day passes, no provisions, nothing is journaled.
+  useEffect(() => {
+    const off = onKeyPress(UNSTUCK_KEY_CODE, () => {
+      if (useUi.getState().dialog) return
+      const g = useGame.getState()
+      const p = g.pos
+      const obstacles = travelObstacles(p.x, p.z, g.seed)
+      const scale = travelScale()
+      const free = (x: number, z: number) => {
+        const ll = worldToLatLon(x, z)
+        if (isBlocked(sampleTerrain(ll.lat, ll.lon, g.seed).type, ll.lat, ll.lon)) return false
+        return obstacles.every(([ox, oz, r]) => Math.hypot(x - ox, z - oz) >= r + TRAVEL_PLAYER_RADIUS)
+      }
+      const { pos } = findFreeSpot(p.x, p.z, {
+        step: balance.unstuck.searchStep * scale,
+        maxRadius: balance.unstuck.searchRadius * scale,
+        accept: free,
+        blocked: (x, z) => obstacles.some(([ox, oz, r]) => Math.hypot(x - ox, z - oz) < r),
+        // Nothing within reach: he stays where he is rather than being flung
+        // across the continent — the map has no entry point to fall back on.
+        fallback: [p.x, p.z],
+      })
+      useGame.setState({ pos: { x: pos[0], z: pos[1] } })
+      travelStall.current = newStallState(pos[0], pos[1])
+      g.setToast(getStrings().toasts.unstuckFreed)
+    })
+    return off
+  }, [])
+
   useFrame((_, rawDt) => {
     if (import.meta.env.DEV) recordFrame(performance.now(), rawDt * 1000)
     const dt = Math.min(rawDt, 0.1)
@@ -2866,11 +2939,13 @@ export function TravelScene() {
     // Movement: screen up = north (-z). The open journal (even while it is
     // being read aloud) no longer freezes travel (design.md §16); only a modal
     // dialog blocks movement.
+    let movingInput = false
     if (!useUi.getState().dialog) {
       const beforeX = s.pos.x // position before this frame's move (s is the pre-move snapshot)
       const beforeZ = s.pos.z
       const a = moveAxes()
-      if (a.x !== 0 || a.y !== 0) s.moveTravel(a.x, -a.y, dt)
+      movingInput = a.x !== 0 || a.y !== 0
+      if (movingInput) s.moveTravel(a.x, -a.y, dt)
       // The river current sweeps the traveller downstream even while idle
       // (design.md §11); moving with it is faster, against it slower.
       s.driftCurrent(dt)
@@ -2885,7 +2960,7 @@ export function TravelScene() {
       // walk back out, and its radius stays below the enter radius so the
       // "Space to enter" hint always arms before the collider stops him.
       const p = useGame.getState().pos
-      const PLAYER_R = 0.5
+      const PLAYER_R = TRAVEL_PLAYER_RADIUS
       const obstacles = collidableFloraNear(p.x, p.z, s.seed)
       const animals = collidableAnimalsNear(p.x, p.z, PLAYER_R + 1.5)
       for (const o of animals) obstacles.push(o)
@@ -2901,6 +2976,26 @@ export function TravelScene() {
       if (obstacles.length > 0) {
         const [nx, nz] = resolveTravelMove(beforeX, beforeZ, p.x, p.z, obstacles, PLAYER_R)
         if (nx !== p.x || nz !== p.z) useGame.setState({ pos: { x: nx, z: nz } })
+      }
+    }
+
+    // Stall watch (work-order 604), the same rule as inside a settlement: an
+    // input held while the position does not advance raises the hint that names
+    // the escape key. It only informs — it never moves him by itself.
+    {
+      const here = useGame.getState().pos
+      const scale = travelScale()
+      const before = travelStall.current.stuck
+      travelStall.current = updateStall(travelStall.current, here.x, here.z, movingInput, dt, {
+        stallDistance: balance.unstuck.stallDistance * scale,
+        stallSeconds: balance.unstuck.stallSeconds,
+      })
+      const strings = getStrings()
+      if (travelStall.current.stuck && !before) {
+        useGame.getState().setToast(strings.toasts.stuckHint(UNSTUCK_KEY_LABEL))
+      } else if (!travelStall.current.stuck && before) {
+        const g = useGame.getState()
+        if (g.toast === strings.toasts.stuckHint(UNSTUCK_KEY_LABEL)) g.setToast(null)
       }
     }
 

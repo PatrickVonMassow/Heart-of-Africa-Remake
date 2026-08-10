@@ -646,6 +646,147 @@ if (section('river-bank')) {
   }
 }
 
+// === No wedge is fatal (work-order 604) ======================================
+// The collision rules keep the traveller out of the walls; this keeps him out of
+// the gaps BETWEEN them. The pure halves (the stall detector, the outward search)
+// are pinned in the unit layer — what only the live scene can show is that the
+// key works where the player actually stands: pressed into the narrowest slot
+// this village has, with the game's own resolver deciding every step.
+if (section('unstuck')) {
+  await enterSettlement('bambara-village')
+  // The tightest slot the layout really has: the two colliders of DIFFERENT
+  // bodies that approach closest, and the midpoint of that approach.
+  const wedge = await page.evaluate(() => {
+    const cs = window.__placeColliders
+    const sample = (c) =>
+      c.kind === 'segment'
+        ? Array.from({ length: 9 }, (_, i) => [c.x1 + ((c.x2 - c.x1) * i) / 8, c.z1 + ((c.z2 - c.z1) * i) / 8])
+        : [[c.x, c.z]]
+    let best = null
+    for (let i = 0; i < cs.length; i++)
+      for (let j = i + 1; j < cs.length; j++) {
+        for (const [ax, az] of sample(cs[i]))
+          for (const [bx, bz] of sample(cs[j])) {
+            const d = Math.hypot(ax - bx, az - bz)
+            const gap = d - window.__colliderSize(cs[i]) - window.__colliderSize(cs[j])
+            if (gap < 0) continue // colliders that merge into one body are no slot
+            if (!best || gap < best.gap) best = { gap, x: (ax + bx) / 2, z: (az + bz) / 2 }
+          }
+      }
+    return best
+  })
+  check(
+    'PoC village: a narrowest slot was found to test in',
+    !!wedge,
+    wedge ? `gap ${wedge.gap.toFixed(2)} m at ${wedge.x.toFixed(1)},${wedge.z.toFixed(1)}` : 'none',
+  )
+  if (wedge) {
+    // FIRST the hint. Walked against the biggest wall the village has, the
+    // traveller holds his key and gets nowhere — which is what being wedged
+    // looks like from the inside — and the game must tell him the key exists.
+    // The key is pressed ONCE and left down (no keyup until the wait returns),
+    // so the wait is on the hint's own appearance, never on the wall clock.
+    await page.evaluate(() => {
+      const c = [...window.__placeColliders].sort((a, b) => window.__colliderSize(b) - window.__colliderSize(a))[0]
+      const p = window.__placePlayer
+      const len = Math.hypot(c.x, c.z) || 1
+      p.x = c.x - (c.x / len) * (window.__colliderSize(c) + 1.2)
+      p.z = c.z - (c.z / len) * (window.__colliderSize(c) + 1.2)
+      p.yaw = Math.atan2(-(c.x - p.x), -(c.z - p.z))
+      p.pitch = 0
+      window.__game.getState().setToast(null)
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }))
+    })
+    const hinted = await page
+      .waitForFunction(() => document.querySelector('.toast')?.textContent || null, null, { timeout: 30000 })
+      .then((h) => h.jsonValue())
+      .catch(() => '')
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
+    check(
+      'PoC village: pushing into a wall and getting nowhere raises the hint that names the key',
+      String(hinted).includes('U'),
+      String(hinted) || '(no toast)',
+    )
+    const before = await page.evaluate((w) => {
+      const p = window.__placePlayer
+      p.x = w.x
+      p.z = w.z
+      p.yaw = 0
+      p.pitch = 0
+      const g = window.__game.getState()
+      return { day: g.day, foodDays: g.foodDays, health: g.health, journal: g.journal.length }
+    }, wedge)
+    // The escape itself. Wait on the CONDITION the press stands for — the toast
+    // the handler raises in place of the hint — not on the wall clock.
+    await page.keyboard.press('KeyU')
+    await page.waitForFunction(
+      (previous) => (document.querySelector('.toast')?.textContent ?? '') !== previous,
+      hinted,
+      { timeout: 8000 },
+    )
+    const freed = await page.evaluate(() => {
+      const p = window.__placePlayer
+      const g = window.__game.getState()
+      let worst = Infinity
+      for (const c of window.__placeColliders) worst = Math.min(worst, window.__clearanceTo(c, p.x, p.z) - 0.35)
+      return {
+        x: p.x,
+        z: p.z,
+        clearance: worst,
+        fromCentre: Math.hypot(p.x, p.z),
+        radius: window.__placeLayout.radius,
+        day: g.day,
+        foodDays: g.foodDays,
+        health: g.health,
+        journal: g.journal.length,
+        mode: g.mode,
+      }
+    })
+    check('PoC village: U sets him down on collision-free ground', freed.clearance >= 0, `clearance ${freed.clearance.toFixed(3)} m`)
+    check(
+      'PoC village: and inside the settlement he was standing in',
+      freed.mode === 'place' && freed.fromCentre <= freed.radius,
+      `${freed.fromCentre.toFixed(1)} m from the centre of a ${freed.radius} m place`,
+    )
+    check(
+      'PoC village: the rescue costs nothing — no day, no provisions, no health, no entry',
+      freed.day === before.day &&
+        freed.foodDays === before.foodDays &&
+        freed.health === before.health &&
+        freed.journal === before.journal,
+      `day ${before.day}->${freed.day}, food ${before.foodDays}->${freed.foodDays}, health ${before.health}->${freed.health}`,
+    )
+    // And he can WALK from where he was put down — the whole point of freeing him.
+    // Held once and waited on by DISTANCE, not by a count of frames: how far a
+    // fixed number of frames carries him is the host's drawing speed, and this
+    // check is about the ground, not the clock.
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+    const walked = await page
+      .waitForFunction(
+        (from) => {
+          const d = Math.hypot(window.__placePlayer.x - from.x, window.__placePlayer.z - from.z)
+          return d > 0.5 ? d : null
+        },
+        { x: freed.x, z: freed.z },
+        { timeout: 30000 },
+      )
+      .then((h) => h.jsonValue())
+      .catch(() => 0)
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
+    check('PoC village: and he walks away from the spot he was set down on', walked > 0.5, `walked ${Number(walked).toFixed(2)} m`)
+    // Point 375: the frame must show the settlement he was freed into, projected
+    // through the place camera rather than assumed from the teleport. Turn him to
+    // face the village first — a picture of the empty plain behind him would pass
+    // the subject gate and show a reader nothing.
+    await page.evaluate(() => {
+      const p = window.__placePlayer
+      p.yaw = Math.atan2(-(0 - p.x), -(0 - p.z))
+      p.pitch = 0
+    })
+    await shot('604-unstuck-freed', { place: 'bambara-village', label: 'the freed position' })
+  }
+}
+
 // A selected section that never executed is a FAILURE, not a quiet pass: it is
 // the one way a --section run could report green having verified nothing.
 const unrun = sections.unrun()

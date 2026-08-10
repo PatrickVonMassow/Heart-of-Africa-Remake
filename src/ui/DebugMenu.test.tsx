@@ -40,6 +40,7 @@ const DEFAULTS = {
   footstepVolume: balance.footstepVolume,
   ambientVolume: balance.ambientVolume,
   walkerUnstuckSeconds: balance.walkerUnstuckSeconds,
+  unstuck: { ...balance.unstuck },
   tag: { ...balance.villageLife.tag },
   childSpeech: { ...balance.villageLife.childSpeech },
   adultErrands: { ...balance.villageLife.adultErrands },
@@ -127,6 +128,7 @@ afterEach(() => {
   balance.footstepVolume = DEFAULTS.footstepVolume
   balance.ambientVolume = DEFAULTS.ambientVolume
   balance.walkerUnstuckSeconds = DEFAULTS.walkerUnstuckSeconds
+  Object.assign(balance.unstuck, DEFAULTS.unstuck)
   Object.assign(balance.villageLife.tag, DEFAULTS.tag)
   Object.assign(balance.villageLife.childSpeech, DEFAULTS.childSpeech)
   Object.assign(balance.villageLife.adultErrands, DEFAULTS.adultErrands)
@@ -241,6 +243,10 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.ambientVolume, read: () => balance.ambientVolume, value: 0.3 },
     // The inhabitant unstuck window (point 155).
     { label: en.debug.walkerUnstuck, read: () => balance.walkerUnstuckSeconds, value: 8 },
+    // The PLAYER's escape from a wedge (work-order 604): when he counts as
+    // stuck, and how far the search for free ground reaches.
+    { label: en.debug.unstuckStallSeconds, read: () => balance.unstuck.stallSeconds, value: 5 },
+    { label: en.debug.unstuckSearchRadius, read: () => balance.unstuck.searchRadius, value: 20 },
     // The children's game of tag (point 480/351): a pace, a threshold and a
     // distance, one from each family of the chase's calibration.
     { label: en.debug.tagSprintSpeed, read: () => balance.villageLife.tag.sprintSpeed, value: 4.5 },
@@ -766,7 +772,11 @@ describe('DebugMenu event-trigger dropdown (design.md §21.3, point 258)', () =>
 const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
   movement: [
     'debug.walkSpeed', 'debug.strafeFactor', 'debug.placeCollisionFactor',
-    'debug.mouseSensitivity', 'debug.lookPitchLimit', 'debug.invertLook', 'debug.wheelZoom',
+    'debug.mouseSensitivity', 'debug.lookPitchLimit',
+    // The player's own escape from a wedge (work-order 604).
+    'debug.unstuckStallDistance', 'debug.unstuckStallSeconds',
+    'debug.unstuckSearchRadius', 'debug.unstuckSearchStep',
+    'debug.invertLook', 'debug.wheelZoom',
   ],
   travel: [
     'debug.travelSpeed', 'debug.daysPerUnit', 'debug.canoeSpeedup', 'debug.junglePenalty',
@@ -898,12 +908,12 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 158 controls in total, and none twice', () => {
+  it('carries all 162 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(158)
+    expect(labels.length).toBe(162)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
@@ -950,7 +960,7 @@ describe('DebugMenu completeness: every control is present, in its group (point 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(158)
+    expect(rows.length).toBe(162)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -1004,7 +1014,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(158)
+    expect(renderedRowLabels().length).toBe(162)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -1052,7 +1062,7 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     typeFilter('croc')
     expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(158)
+    expect(renderedRowLabels().length).toBe(162)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 

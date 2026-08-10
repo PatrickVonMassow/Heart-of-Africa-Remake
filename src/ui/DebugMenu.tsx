@@ -391,6 +391,16 @@ export function DebugMenu() {
       // Vertical look (design.md §17.5/§21.2, point 392): the clamp in degrees
       // from the horizon, and the inversion — checked by default.
       num(t.debug.lookPitchLimit, balance.lookPitchLimitDeg, (v) => set('lookPitchLimitDeg', Math.max(0, v)), 5),
+      // The player's own escape from a wedge (work-order 604): when the game
+      // calls him stuck, and how far out it looks for free ground.
+      num(t.debug.unstuckStallDistance, balance.unstuck.stallDistance,
+        (v) => { balance.unstuck.stallDistance = Math.max(0.05, v); bump() }, 0.1),
+      num(t.debug.unstuckStallSeconds, balance.unstuck.stallSeconds,
+        (v) => { balance.unstuck.stallSeconds = Math.max(0.5, v); bump() }, 0.5),
+      num(t.debug.unstuckSearchRadius, balance.unstuck.searchRadius,
+        (v) => { balance.unstuck.searchRadius = Math.max(1, v); bump() }, 1),
+      num(t.debug.unstuckSearchStep, balance.unstuck.searchStep,
+        (v) => { balance.unstuck.searchStep = Math.max(0.1, v); bump() }, 0.1),
       check(t.debug.invertLook, invertLook, (v) => useUi.getState().setInvertLook(v)),
       // The §21.4 zoom unlock is a control, not a graphics setting.
       check(t.debug.wheelZoom, wheelZoomEnabled, (v) => useUi.getState().setWheelZoomEnabled(v)),

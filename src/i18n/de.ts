@@ -390,6 +390,8 @@ export const de: Strings = {
     campNeedsFriend: 'Nur ein Ehrenfreund dieser Region darf seine Habe im Dorf zurücklassen.',
     positionReport: (coords, region) => `Nach meiner Rechnung: ${coords} – Region ${region}.`,
     orientationGained: 'Zum Dank für die Gabe zeigt man mir die wichtigen Gebäude.',
+    stuckHint: (key) => `Festgeklemmt? ${key} befreit dich.`,
+    unstuckFreed: 'Ich habe mich losgearbeitet und stehe wieder im Freien.',
   },
 
   dialogs: {
@@ -497,6 +499,10 @@ export const de: Strings = {
     labelOverlayMax: 'Strg-Beschriftungen (max.)',
     mouseSensitivity: 'Maus-Empfindlichkeit (Ego-Sicht)',
     lookPitchLimit: 'Blickgrenze hoch/runter (°)',
+    unstuckStallDistance: 'Festhängen: Fortschrittsschwelle (m)',
+    unstuckStallSeconds: 'Festhängen: Hinweis nach (s)',
+    unstuckSearchRadius: 'Befreien: Suchradius (m)',
+    unstuckSearchStep: 'Befreien: Suchschritt (m)',
     invertLook: 'Mausblick invertieren',
     ambienceVolume: 'Ambiente-Lautstärke',
     footstepVolume: 'Schritt-Lautstärke',

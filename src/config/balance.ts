@@ -17,6 +17,22 @@ export interface BalanceConfig {
    *  has a walk target) before it is teleport-nudged to the nearest free spot
    *  (point 155) — a small invisible correction, inhabitants only. */
   walkerUnstuckSeconds: number
+  /** The PLAYER's own escape from a wedge (work-order 604): the key frees him,
+   *  the detection only tells him the key exists. The lengths are calibrated for
+   *  the walking scale of a settlement; the bird's-eye view scales them by the
+   *  ratio of its own travel speed, so "half a step of progress" means the same
+   *  thing on the continent map. */
+  unstuck: {
+    /** How far he must get from where the stall began before that counts as
+     *  movement, in metres. */
+    stallDistance: number
+    /** Seconds of HELD movement input without that progress before the hint shows. */
+    stallSeconds: number
+    /** How far the outward search for free ground looks, in metres. */
+    searchRadius: number
+    /** Ring spacing of that search, in metres. */
+    searchStep: number
+  }
   /** How deep the traveller wades into a settlement's river before he is out of
    *  his depth, in metres (work-order 584). It is the settlement's walkable
    *  region ON the water: he walks down the drawn shore this far, and past it
@@ -745,6 +761,17 @@ export const balance: BalanceConfig = {
   placeWalkSpeed: 10,
   placeStrafeFactor: 0.8,
   walkerUnstuckSeconds: 4, // an inhabitant wedged this long is teleport-nudged free (point 155)
+  unstuck: {
+    // Calibratable: half a metre is well under one walking step, so a man who
+    // really is wedged never crosses it while a man edging along a wall does;
+    // three seconds of holding the key is long enough that ordinary bumping into
+    // a hut stays silent. The search reaches across a compound (12 m) in half-
+    // metre rings — fine enough to find the slot between two huts.
+    stallDistance: 0.5,
+    stallSeconds: 3,
+    searchRadius: 12,
+    searchStep: 0.5,
+  },
   // Calibratable: 0.7 m is about mid-thigh on a grown man — the depth at which
   // wading stops being walking. It lands the far edge of the walkable region
   // roughly three metres past the waterline, well inside the drawn shallows.

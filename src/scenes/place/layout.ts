@@ -8,7 +8,7 @@ import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS, type RegionPlaceStyle } from './regionStyles'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
-import { boxCollider, nudgeToFree, spawnPointFree, WALKER_RADIUS, type Collider } from './collision'
+import { boxCollider, nudgeToFree, spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
@@ -206,6 +206,20 @@ export function nearestActionable(
 
 /** Half-thickness of the drawn fence run, per material. */
 const FENCE_PANEL_RADIUS: Record<FenceDef['kind'], number> = { thorn: 0.6, stone: 0.5, woven: 0.42 }
+
+/**
+ * The Sahel family compound's palisade (work-order 604). Three lengths, all in
+ * metres: the smallest ring drawn, the walkable gap the wall keeps from the
+ * roofs it encloses, and the lane between two neighbouring compounds. They exist
+ * because a gap NARROWER than the traveller is a trap rather than a tight spot —
+ * he can be pressed into it and cannot walk out — so the wall never grows through
+ * a hut and two walls never cross. The lane is 2.5 m, not the traveller's bare
+ * diameter: an inhabitant is routed to the river on a 0.55 m nav grid, and a
+ * passage only just wide enough leaves that grid too few free cells to find.
+ */
+export const COMPOUND_RING_MIN = 6.2
+export const COMPOUND_WALL_GAP = 0.9
+export const COMPOUND_RING_CORRIDOR = 2.5
 
 /** Neighbouring posts further apart than this multiple of the ring's own post
  *  spacing span a GATE the renderer leaves open — they are never joined. Posts
@@ -406,6 +420,14 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // life-prop spots (PlaceLife) clear.
   const lifeSpots: Array<[number, number]> =
     place.kind === 'village' ? Object.values(VILLAGE_SPOTS) : [PORT_TALKERS]
+  // No solid body may grow THROUGH a fence (work-order 604): where a hut or a
+  // shed crosses a palisade, the slot left on either side of the crossing is
+  // narrower than a man, and a traveller pressed into it cannot walk out. The
+  // clearance is the traveller's own width, so what is left beside the wall is
+  // either nothing at all or ground he can walk on.
+  const clearOfFences = (x: number, z: number, bodyR: number) =>
+    fences.every((f) => standingClear(fenceColliders(f), x, z, bodyR + 2 * PLAYER_RADIUS))
+
   const isFree = (x: number, z: number, margin: number, ownR = 0) => {
     if (Math.abs(x) < 4.5 && z > 5) return false
     if (Math.hypot(x, z - 18) < 6) return false
@@ -432,6 +454,8 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // the traveller wades through. Seed 1425108822 dropped one 1.8 m past the
     // Bambara waterline, which is how it was found.
     if (bank && x * bank.nx + z * bank.nz + Math.max(ownR, 0.9) > bank.walkEdge) return false
+    // No body grows THROUGH a fence (work-order 604) — see `clearOfFences`.
+    if (!clearOfFences(x, z, ownR)) return false
     // Window clearance (design.md §2.6): no wall pressed against a neighbour —
     // every pair of building bodies keeps at least a 0.9 m free gap.
     return dwellings.every((d) => Math.hypot(x - d.x, z - d.z) > Math.max(margin * 0.55, ownR + 0.9) + d.r)
@@ -441,6 +465,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // placement checks run against full segments conservatively.
   const onLane = (x: number, z: number, bodyR: number) =>
     paths.some((p) => closestOnPolyline(p.points, x, z).dist < p.width / 2 + bodyR)
+
 
   // Door point just outside a dwelling's front face for a given facing.
   const doorAt = (x: number, z: number, r: number, rot: number): [number, number] => [
@@ -770,23 +795,85 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       // attested for their victims (Mambwe, Lungu), not for Bemba villages
       // themselves (docs/peoples-1890.md §5.1), so none is invented here.
       const walled = style.fence !== 'none' && place.peopleId !== 'bemba'
-      const baseAngles = [0.1, 2.3, 3.35, 4.15, 5.5]
-      const compounds = Math.min(4 + (rand() < 0.7 ? 1 : 0), baseAngles.length)
-      for (let c = 0; c < compounds; c++) {
-        const a = baseAngles[c] + (rand() - 0.5) * 0.3
-        const cr = 13.5 + rand() * 4
-        const cx = Math.cos(a) * cr
-        const cz = Math.sin(a) * cr
-        const huts = 2 + Math.floor(rand() * 2)
-        let seated = 0
-        for (let t = 0; t < huts * 6 && seated < huts; t++) {
-          const ha = a + Math.PI + ((t % huts) - (huts - 1) / 2) * 1.1 + (rand() - 0.5) * 0.5
-          const x = cx + Math.cos(ha) * (3.4 + rand() * 1.6)
-          const z = cz + Math.sin(ha) * (3.4 + rand() * 1.6)
-          const r = 1.5 + rand() * 0.5
-          if (!isFree(x, z, 3.2, r) || onLane(x, z, r)) continue
-          addDwelling('hut', x, z, faceTo(x, z, cx, cz), r, 1.9 + rand() * 0.5)
-          seated++
+      // TWO GEOMETRY RULES HOLD THIS PLAN TOGETHER (work-order 604), because the
+      // wedge between two colliders is where a traveller is lost:
+      //   1. A compound's palisade ENCLOSES its own huts. It used to be a fixed
+      //      6.2 m ring while the huts stood up to 5 m out with a 2.5 m roof, so
+      //      every second hut grew through its own wall — and the slot between
+      //      the hut's body and the wall is narrower than a man, which is a trap,
+      //      not a tight spot. The ring is sized from the huts it holds.
+      //   2. No two palisades cross. The reported traveller was pressed into
+      //      exactly such a crossing of two Bambara compounds: two shallow arcs
+      //      running through each other leave a sliver with no free ground in it
+      //      at all. The compounds sit evenly around the plaza and each is pushed
+      //      outward until its ring keeps a walkable lane from every ring already
+      //      standing; one that cannot be seated is left out rather than crossed.
+      const requested = 4 + (rand() < 0.7 ? 1 : 0)
+      const startAngle = rand() * Math.PI * 2
+      const hutBody = (r: number, h: number) =>
+        dwellingCircleRadius({ x: 0, z: 0, rot: 0, kind: 'hut', r, h, floors: 1, door: [0, 0] }, style) ?? r
+      const placedRings: Array<{ x: number; z: number; a: number; ring: number }> = []
+      for (let c = 0; c < requested; c++) {
+        const a = startAngle + (c / requested) * Math.PI * 2 + (rand() - 0.5) * 0.1
+        // The family's huts, drawn once as offsets from the compound's own centre
+        // so the ring can be sized around them and the compound can still move.
+        const wanted = 2 + Math.floor(rand() * 2)
+        const seats: Array<{ angle: number; dist: number; r: number; h: number }> = []
+        for (let t = 0; t < wanted * 12 && seats.length < wanted; t++) {
+          const angle = Math.PI + ((t % wanted) - (wanted - 1) / 2) * 1.15 + (rand() - 0.5) * 0.6
+          const dist = 2.8 + rand() * 1.6
+          const r = 1.35 + rand() * 0.5
+          const h = 1.9 + rand() * 0.5
+          const dx = Math.cos(angle) * dist
+          const dz = Math.sin(angle) * dist
+          // Against its own siblings: the global `isFree` cannot see them yet.
+          // The SAME window rule it applies (§2.6, a 0.9 m gap between bodies),
+          // so a compound is packed no tighter and no looser than the village.
+          const fits = seats.every((o) => {
+            const od = Math.hypot(Math.cos(o.angle) * o.dist - dx, Math.sin(o.angle) * o.dist - dz)
+            return od > Math.max(3.2 * 0.55, r + 0.9) + o.r
+          })
+          if (fits) seats.push({ angle, dist, r, h })
+        }
+        // Rule 1: the wall stands clear of every roof it encloses, with room to
+        // walk between the two.
+        const ring = seats.reduce(
+          (m, sIt) => Math.max(m, sIt.dist + hutBody(sIt.r, sIt.h) + FENCE_PANEL_RADIUS.woven + COMPOUND_WALL_GAP),
+          COMPOUND_RING_MIN,
+        )
+        // Rule 2: push outward until the ring clears every ring already standing.
+        let cr = 13.5 + rand() * 4
+        const clears = (x: number, z: number) =>
+          placedRings.every(
+            (p) =>
+              Math.hypot(x - p.x, z - p.z) >=
+              ring + p.ring + 2 * FENCE_PANEL_RADIUS.woven + COMPOUND_RING_CORRIDOR,
+          ) &&
+          // And clear of the functional buildings: a palisade drawn straight
+          // through the chief's hut is the same trap seen from the other side,
+          // and it seals the door the audience is held at (design.md §2.6).
+          interactives.every((it) => {
+            if (it.type === 'villager') return true
+            const rInt = interactiveCircleRadius(it.type, style)
+            return (
+              Math.hypot(x - it.pos[0], z - it.pos[1]) >=
+              ring + rInt + FENCE_PANEL_RADIUS.woven + COMPOUND_WALL_GAP
+            )
+          })
+        let cx = Math.cos(a) * cr
+        let cz = Math.sin(a) * cr
+        for (let tries = 0; tries < 16 && !clears(cx, cz); tries++) {
+          cr += 0.5
+          cx = Math.cos(a) * cr
+          cz = Math.sin(a) * cr
+        }
+        if (!clears(cx, cz) || cr + ring > PLACE_RADIUS - 2) continue
+        placedRings.push({ x: cx, z: cz, a, ring })
+        for (const seat of seats) {
+          const x = cx + Math.cos(a + seat.angle) * seat.dist
+          const z = cz + Math.sin(a + seat.angle) * seat.dist
+          if (!isFree(x, z, 3.2, seat.r) || onLane(x, z, seat.r)) continue
+          addDwelling('hut', x, z, faceTo(x, z, cx, cz), seat.r, seat.h)
         }
         if (style.granaries && isFree(cx + 2, cz + 2, 2.2, 0.85) && !onLane(cx + 2, cz + 2, 1.2)) {
           addDwelling('granary', cx + 2, cz + 2, faceTo(cx + 2, cz + 2, cx, cz), 0.85, 1.1)
@@ -796,13 +883,32 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
           // Fence around the compound, opening toward the plaza.
           fences.push({
             kind: style.fence === 'stone' ? 'stone' : 'woven',
-            posts: fenceRing(cx, cz, 6.2, style.fence === 'stone' ? 1.0 : 0.9, [[openingAngle, 0.7]]),
+            posts: fenceRing(cx, cz, ring, style.fence === 'stone' ? 1.0 : 0.9, [[openingAngle, 0.7]]),
           })
         }
-        const gx = cx + Math.cos(openingAngle) * 6.2
-        const gz = cz + Math.sin(openingAngle) * 6.2
+        const gx = cx + Math.cos(openingAngle) * ring
+        const gz = cz + Math.sin(openingAngle) * ring
         pushPath([center, [gx, gz]], 1.3)
         if (c < 2) errands.push([gx, gz])
+      }
+      // Top up the family huts where the jitter left a compound thin: a hut
+      // rejected by a lane, a neighbour or the plaza corridor would otherwise
+      // make the whole village read as half-abandoned, and how densely a Sahel
+      // compound is built is a design decision (design.md §4.5), not a dice roll.
+      const familyHuts = () => dwellings.filter((d) => d.kind === 'hut').length
+      const hutTarget = Math.max(7, placedRings.length * 2)
+      for (let t = 0; t < 240 && placedRings.length > 0 && familyHuts() < hutTarget; t++) {
+        const compound = placedRings[t % placedRings.length]
+        const ha = compound.a + Math.PI + (rand() - 0.5) * 3.4
+        const r = 1.3 + rand() * 0.6
+        const h = 1.9 + rand() * 0.5
+        // Inside its own wall like every other hut of the compound.
+        const hd = Math.min(3.1 + rand() * 1.9, compound.ring - FENCE_PANEL_RADIUS.woven - COMPOUND_WALL_GAP - hutBody(r, h))
+        if (hd < 1.5) continue
+        const x = compound.x + Math.cos(ha) * hd
+        const z = compound.z + Math.sin(ha) * hd
+        if (!isFree(x, z, 3.2, r) || onLane(x, z, r) || !clearOfFences(x, z, hutBody(r, h))) continue
+        addDwelling('hut', x, z, faceTo(x, z, compound.x, compound.z), r, h)
       }
       // A shed and a drying rack scattered between the compounds.
       for (let i = 0; i < 6 && dwellings.filter((d) => d.kind === 'shed').length < 2; i++) {
@@ -810,7 +916,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         const r = 9 + rand() * 8
         const x = Math.cos(a) * r
         const z = Math.sin(a) * r
-        if (!isFree(x, z, 3, 1.1) || onLane(x, z, 1.45)) continue
+        if (!isFree(x, z, 3, 1.1) || onLane(x, z, 1.45) || !clearOfFences(x, z, 1.45)) continue
         addDwelling('shed', x, z, rand() * Math.PI * 2, 1.1, 1.4)
       }
     } else if (plan === 'scatter') {
@@ -923,13 +1029,28 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
   }
 
+  // THE LOOSE DRESSING KEEPS ITS DISTANCE (work-order 604). A tree and a boulder
+  // dropped independently can end up 0.4 m apart, and that slot is narrower than
+  // anyone who walks: a villager routed past it is caught in the notch and a
+  // traveller pressed into it cannot walk out. Every loose object therefore keeps
+  // a walkable gap from every other one — `isFree` covers the buildings, this
+  // covers the dressing among itself.
   const flora: PlaceLayout['flora'] = []
+  const rocks: PlaceLayout['rocks'] = []
+  let teachingStone: PlaceLayout['teachingStone'] = null
+  // The TRAVELLER's width, not the villager's: he is the wider of the two and
+  // the one who cannot be nudged free by the game.
+  const dressingGap = 2 * PLAYER_RADIUS
+  const clearOfDressing = (x: number, z: number, bodyR: number) =>
+    flora.every((t) => Math.hypot(x - t.x, z - t.z) > 0.45 + bodyR + dressingGap) &&
+    rocks.every(([rx, rz, rs]) => Math.hypot(x - rx, z - rz) > 0.35 + rs * 0.5 + bodyR + dressingGap) &&
+    (!teachingStone || Math.hypot(x - teachingStone.x, z - teachingStone.z) > teachingStone.r + bodyR + dressingGap)
   for (let i = 0; i < 48 && flora.length < 9; i++) {
     const angle = rand() * Math.PI * 2
     const r = 8 + rand() * 18
     const x = Math.cos(angle) * r
     const z = Math.sin(angle) * r
-    if (!isFree(x, z, 3.5) || onLane(x, z, 0.5)) continue
+    if (!isFree(x, z, 3.5) || onLane(x, z, 0.5) || !clearOfDressing(x, z, 0.45)) continue
     flora.push({ x, z, h: 3 + rand() * 2 })
   }
 
@@ -937,15 +1058,18 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // rock scatter so the dressing grows around it, in the open at a walkable
   // distance from the centre where it is visible from the middle of the village
   // and from the arrival path. Seeded like everything else in the layout.
-  let teachingStone: PlaceLayout['teachingStone'] = null
   if (placeId === ROCK_VILLAGE_ID) {
-    for (let i = 0; i < 32 && !teachingStone; i++) {
+    for (let i = 0; i < 48 && !teachingStone; i++) {
       // A deterministic golden-angle sweep, so a crowded seed still finds a spot.
+      // The band reaches in as well as out: the compounds' walls stand between 7
+      // and 14 m out (work-order 604), and a sweep that only tried that ring
+      // could come back empty-handed in a well-filled village.
       const a = rand() * Math.PI * 2 + i * 2.399963
-      const r = 9 + (i % 5) * 1.1
+      const r = 6.5 + (i % 8) * 0.9
       const x = Math.cos(a) * r
       const z = Math.sin(a) * r
       if (!isFree(x, z, 3.2, TEACHING_STONE_RADIUS) || onLane(x, z, TEACHING_STONE_RADIUS + 0.3)) continue
+      if (!clearOfDressing(x, z, TEACHING_STONE_RADIUS)) continue
       teachingStone = { x, z, r: TEACHING_STONE_RADIUS, scale: TEACHING_STONE_SCALE }
       // Villagers have an errand at it — the adults' pointing situations
       // (docs/communication-poc-spec.md) need someone standing there.
@@ -976,7 +1100,6 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
   }
 
-  const rocks: PlaceLayout['rocks'] = []
   for (let i = 0; i < 40 && rocks.length < 14; i++) {
     const a = rand() * Math.PI * 2
     const r = 6 + rand() * (radius + 6)
@@ -984,10 +1107,27 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     const z = Math.sin(a) * r
     const s = 0.3 + rand() * 0.7
     if (!isFree(x, z, 2) || onLane(x, z, 0.35 + s * 0.5)) continue
+    if (!clearOfDressing(x, z, 0.35 + s * 0.5)) continue
     rocks.push([x, z, s])
   }
 
   // --- Collision set: every solid object becomes one or more circles ------
+  // A POST STANDING IN A BUILDING IS PULLED (work-order 604). Some plans raise
+  // their fence after the dwellings — a Tuareg camp windbreak, a kraal ring — so
+  // `isFree` cannot keep the two apart, and a panel that runs through a tent
+  // leaves a slot narrower than a man on either side of the crossing. The post is
+  // dropped instead: the drawn run and the collider run are cut from the same
+  // list, so what is left is an opening beside the building, which is what a
+  // fence meeting a wall looks like anyway.
+  for (const f of fences) {
+    f.posts = f.posts.filter((post) =>
+      dwellings.every((d) => {
+        const body = dwellingCircleRadius(d, style) ?? d.r + 0.3
+        return Math.hypot(post[0] - d.x, post[1] - d.z) > body + FENCE_PANEL_RADIUS[f.kind]
+      }),
+    )
+  }
+
   const colliders: Collider[] = []
   interactives.forEach((it) => {
     if (it.type === 'villager') {
@@ -1021,9 +1161,14 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   for (const [x, z, s] of rocks) colliders.push({ x, z, r: 0.35 + s * 0.5 })
   if (teachingStone) colliders.push({ x: teachingStone.x, z: teachingStone.z, r: teachingStone.r })
   if (place.kind === 'village') {
-    colliders.push({ x: VILLAGE_FIRE[0], z: VILLAGE_FIRE[1], r: 1.3 }) // fire pit
+    // The fire pit alone (work-order 604). The cook used to carry a collider of
+    // her own 1.56 m from the fire's centre, which overlapped the fire's 1.3 m by
+    // a finger's breadth — and the notch where two circles cross is narrower than
+    // a walker, so an errand villager sent past the fire was caught in it. Her own
+    // collider bought nothing: she kneels INSIDE the fire's stand-off (1.3 + the
+    // traveller's 0.35), so nobody could reach her spot in the first place.
+    colliders.push({ x: VILLAGE_FIRE[0], z: VILLAGE_FIRE[1], r: 1.3 })
     colliders.push({ x: -8.5, z: -7, r: 1.0 }) // weaver's loom
-    colliders.push({ x: VILLAGE_FIRE[0] + 1.2, z: VILLAGE_FIRE[1] + 1.0, r: 0.45 }) // cook
     // Village-life props (design.md §19; positions from PlaceLife).
     colliders.push({ x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 })
     colliders.push({ x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 })

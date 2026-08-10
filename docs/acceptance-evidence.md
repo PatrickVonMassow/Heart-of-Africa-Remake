@@ -1226,6 +1226,36 @@ proves the eaves were not simply fenced off — it is still standable and still 
 solid surface from below — and every thatch roof mesh draws both faces, so an
 open dome hemisphere is no longer a back face one can see through.
 
+AND NO WEDGE IS FATAL (work-order 604). OPEN — the control is NOT yet written into
+design.md §2.2/§17.5: the file stands at 28 385 of its 28 386 measured words, and the
+tightest wording of the new rule costs 38 more. Compressing elsewhere or raising the
+ceiling is the user's decision (`scripts/doc-budget-core.mjs`), not one to take in
+passing; the prepared sentences are in the delivery report. The collision rules keep him out of the
+walls; the escape keeps him out of the gaps BETWEEN them, because the game saves
+only on entering a port (design.md §18) and a traveller stuck in a village would
+lose everything since the last harbour. The reported case (F6 report
+`local/bugreports/HaengeFest.zip`, seed 1941555626, bambara-village) was
+reproduced from the layout itself: the woven palisades of two neighbouring
+Bambara compounds INTERSECTED, their panel colliders overlapping by 0.42 m
+around (-12.7, 4.7) — two shallow arcs crossing leave a sliver with no free
+ground at all, and the picture in the report is that sliver's tip. The layout
+now keeps every compound ring a walkable corridor from its neighbours
+(`src/scenes/place/layout.ts`), and `src/scenes/place/layout.test.ts` sweeps
+every village and many seeds for a crossing pair — the same sweep finds the
+reported one in the pre-fix code.
+
+The escape itself is `src/systems/unstuck.ts`, pure and pinned by
+`src/systems/unstuck.test.ts`: the stall detector fires on a held movement key
+that gets nowhere, never on a man standing still and never on one creeping
+forward, and clears the moment he moves; the outward search returns a spot no
+collider contains, prefers the nearest, refuses a spot behind a wall and falls
+back to the place's entry point when the radius holds nothing. Its four values
+live in `balance.unstuck` with a debug row each (`src/ui/DebugMenu.test.tsx`).
+Live in `scripts/verify/collision.mjs`: the traveller is set down in the
+narrowest sliver a real village layout has, is proved unable to walk out of it,
+presses U and both stands free and walks away — with the frame of the freed
+position (`604-unstuck-freed`).
+
 ## 17. Localization.
 
 Verifiable: screenshots of the status bar, journal, a trade

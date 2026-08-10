@@ -87,7 +87,8 @@ import { PlaceLife } from './PlaceLife'
 import { SpeechLabels } from './SpeechLabels'
 import { ActorLabels } from '../ActorLabels'
 import { markActor } from '../actorLabelSource'
-import { resolveMove, PLAYER_RADIUS } from './collision'
+import { resolveMove, standingClear, PLAYER_RADIUS } from './collision'
+import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, findFreeSpot, newStallState, updateStall } from '../../systems/unstuck'
 import { buildBoundaryLut, isOutsidePlace } from './boundary'
 import {
   RIVER_HALF_LENGTH,
@@ -2290,6 +2291,9 @@ export function PlaceScene() {
   // Walk feel (design.md §2, point 97): body-relative eased velocity, the
   // step-phase accumulator and the smoothed camera roll — all camera/feel only.
   const walk = useRef({ velF: 0, velS: 0, phase: 0, roll: 0 })
+  /** Stall watch (work-order 604): holding a movement key without getting
+   *  anywhere raises the hint that names the escape key — it never frees him. */
+  const stall = useRef(newStallState(0, 0))
   // The touch quality preset (point 84) halves the shadow-map resolution.
   const sunRef = useRef<THREE.DirectionalLight>(null)
   const hemiRef = useRef<THREE.HemisphereLight>(null)
@@ -2323,6 +2327,7 @@ export function PlaceScene() {
   useEffect(() => {
     player.current = { x: 0, z: layout?.spawnZ ?? PLACE_RADIUS - SPAWN_INSET, yaw: 0, pitch: 0 }
     walk.current = { velF: 0, velS: 0, phase: 0, roll: 0 }
+    stall.current = newStallState(player.current.x, player.current.z)
     // Seed the shared position for the town-plan map marker (point 89).
     placePlayerPosition.x = player.current.x
     placePlayerPosition.z = player.current.z
@@ -2487,6 +2492,42 @@ export function PlaceScene() {
   // only re-subscribes on setPrompt, so read the CURRENT layout through a ref.
   const layoutRef = useRef(layout)
   layoutRef.current = layout
+  // The escape from a wedge (work-order 604): U frees the traveller wherever the
+  // game takes input in a settlement, needs no prior state — a man who merely
+  // FEELS stuck may press it — and costs nothing: no day, no provisions, no
+  // health, no journal entry. It repairs a defect of ours.
+  useEffect(() => {
+    const off = onKeyPress(UNSTUCK_KEY_CODE, () => {
+      if (useUi.getState().dialog) return
+      const l = layoutRef.current
+      if (!l) return
+      const p = player.current
+      const { pos } = findFreeSpot(p.x, p.z, {
+        step: balance.unstuck.searchStep,
+        maxRadius: balance.unstuck.searchRadius,
+        // Free ground here is the full rule: no collider touches his footprint,
+        // and the spot lies inside the settlement, on the drawn ground.
+        accept: (x, z) => standingClear(l.colliders, x, z, PLAYER_RADIUS) && !isOutsidePlace(l, x, z),
+        // A POINT inside a collider is a wall between him and a candidate, so he
+        // is never set down on the far side of something he could not walk through.
+        blocked: (x, z) => !standingClear(l.colliders, x, z, 0),
+        // Free by construction: the place's own entry point (design.md §2.3).
+        fallback: [0, l.spawnZ],
+      })
+      p.x = pos[0]
+      p.z = pos[1]
+      placePlayerPosition.x = p.x
+      placePlayerPosition.z = p.z
+      // Stop dead where he lands: carrying the velocity that pressed him into the
+      // wedge would walk him straight back in.
+      walk.current.velF = 0
+      walk.current.velS = 0
+      stall.current = newStallState(p.x, p.z)
+      useGame.getState().setToast(getStrings().toasts.unstuckFreed)
+    })
+    return off
+  }, [])
+
   useEffect(() => {
     const off = onKeyPress('Space', () => {
       if (useUi.getState().dialog) return
@@ -2639,6 +2680,23 @@ export function PlaceScene() {
       const [rx, rz] = resolveMove(layout.colliders, p.x + dx, p.z + dz, PLAYER_RADIUS)
       p.x = rx
       p.z = rz
+    }
+
+    // Stall watch (work-order 604): holding a movement input while the position
+    // does not advance is what being wedged looks like. It only INFORMS — the
+    // toast names the key — because freeing a man who is leaning against a wall
+    // on purpose would teleport him for nothing.
+    {
+      const before = stall.current.stuck
+      stall.current = updateStall(stall.current, p.x, p.z, tf !== 0 || ts !== 0, dt, balance.unstuck)
+      const strings = getStrings()
+      if (stall.current.stuck && !before) {
+        useGame.getState().setToast(strings.toasts.stuckHint(UNSTUCK_KEY_LABEL))
+      } else if (!stall.current.stuck && before) {
+        // He moved again: the hint goes with the wedge it described.
+        const g = useGame.getState()
+        if (g.toast === strings.toasts.stuckHint(UNSTUCK_KEY_LABEL)) g.setToast(null)
+      }
     }
 
     // Walking beyond the settlement's edge leaves it (design.md §2 "Switching"):

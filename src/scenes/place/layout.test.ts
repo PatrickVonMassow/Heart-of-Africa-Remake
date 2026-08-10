@@ -5,17 +5,28 @@
 // building stands on a lane.
 
 import { describe, expect, it } from 'vitest'
-import { buildLayout, fenceColliders, fencePanels, type PlaceLayout, type Interactive, type DwellingDef } from './layout'
-import { spawnPointFree, standingClear, WALKER_RADIUS } from './collision'
+import {
+  COMPOUND_RING_MIN,
+  buildLayout,
+  dwellingCircleRadius,
+  fenceColliders,
+  fencePanels,
+  type PlaceLayout,
+  type Interactive,
+  type DwellingDef,
+} from './layout'
+import { spawnPointFree, standingClear, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
 import { ANIMAL_RADIUS, animalAnchors } from './animalSpots'
 import { closestOnPolyline } from './lanePlan'
 import { PLACES, placeById } from '../../world/geo'
 import { ROCK_VILLAGE_ID, ROCK_HEIGHT_UNITS, communicationRockSite } from '../../world/communicationRock'
-import { VILLAGE_PLANS } from './regionStyles'
+import { REGION_PLACE_STYLES, VILLAGE_PLANS } from './regionStyles'
 
 const SEEDS = [7, 42, 1337]
 /** The world of the F6 reports behind work-order 583/584. */
 const REPORTED_SEED = 1425108822
+/** The world of the "Ich hänge fest" report behind work-order 604. */
+const WEDGE_SEED = 1941555626
 const PORTS = PLACES.filter((p) => p.kind === 'port')
 const VILLAGES = PLACES.filter((p) => p.kind === 'village')
 
@@ -406,13 +417,17 @@ describe('fence colliders follow the drawn panels (point 413)', () => {
     }
   })
 
-  it('the PoC compound really does ask for more panels than the old ceiling held', () => {
-    // The regression in one number: 167 woven panels against a buffer of 160.
-    // If a layout change ever drops this below the old ceiling the test above
-    // still holds, but this line is what says the defect was real.
-    const layout = buildLayout('bambara-village', REPORTED_SEED)
-    const woven = fencePanels(layout.fences).filter((p) => p.kind === 'woven').length
-    expect(woven).toBeGreaterThan(160)
+  it('a compound village really does ask for more panels than the old ceiling held', () => {
+    // The regression in one number: a woven run longer than the fixed buffer of
+    // 160 the scene used to carry. The test above already proves draw and
+    // collider agree; this line is what says the defect was real. It asks the
+    // WORLDS rather than one seed — the compound walls are sized from the huts
+    // they enclose (work-order 604), so which seed holds the longest run moved.
+    let most = 0
+    for (const id of VILLAGES.map((p) => p.id))
+      for (const s of [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3, 4, 5, 6, 7, 8])
+        most = Math.max(most, fencePanels(buildLayout(id, s).fences).filter((p) => p.kind === 'woven').length)
+    expect(most).toBeGreaterThan(160)
   })
 })
 
@@ -568,3 +583,87 @@ describe('the ground work villagers dig at (work-order 483)', () => {
   })
 })
 
+describe('no two palisades cross (work-order 604)', () => {
+  /** Distance between the SURFACES of two capsule/circle colliders. */
+  const gap = (a: Collider, b: Collider) => {
+    const pts = (c: Collider): Array<[number, number]> =>
+      c.kind === 'segment'
+        ? Array.from({ length: 21 }, (_, i) => [c.x1 + ((c.x2 - c.x1) * i) / 20, c.z1 + ((c.z2 - c.z1) * i) / 20])
+        : c.kind === 'box'
+          ? [[c.x, c.z]]
+          : [[c.x, c.z]]
+    const radius = (c: Collider) => (c.kind === 'box' ? Math.hypot(c.hx, c.hz) : c.r)
+    let best = Infinity
+    for (const [ax, az] of pts(a))
+      for (const [bx, bz] of pts(b)) best = Math.min(best, Math.hypot(ax - bx, az - bz))
+    return best - radius(a) - radius(b)
+  }
+
+  /** The worst approach between the colliders of two DIFFERENT fence runs. */
+  const worstFencePair = (layout: PlaceLayout) => {
+    const runs = layout.fences.map((f) => fenceColliders(f))
+    let worst = Infinity
+    for (let i = 0; i < runs.length; i++)
+      for (let j = i + 1; j < runs.length; j++)
+        for (const a of runs[i])
+          for (const b of runs[j]) {
+            if (Math.hypot(centre(a)[0] - centre(b)[0], centre(a)[1] - centre(b)[1]) > 6) continue
+            worst = Math.min(worst, gap(a, b))
+          }
+    return worst
+  }
+  const centre = (c: Collider): [number, number] =>
+    c.kind === 'segment' ? [(c.x1 + c.x2) / 2, (c.z1 + c.z2) / 2] : [c.x, c.z]
+
+  it.each(VILLAGES.map((p) => [p.id] as const))(
+    '%s: two fence runs always leave the player room to walk between them',
+    (id) => {
+      for (const s of [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3, 4, 5, 6]) {
+        const worst = worstFencePair(buildLayout(id, s))
+        expect(
+          worst,
+          `${id} seed ${s}: two fence runs approach to ${worst.toFixed(2)} m`,
+        ).toBeGreaterThan(2 * PLAYER_RADIUS)
+      }
+    },
+  )
+
+  // The witness: the reported world had two Bambara compound palisades running
+  // THROUGH each other, and the traveller was pressed into the sliver where they
+  // crossed. The old rule is replayed here — five compounds on a hand-picked
+  // angle set, two of them 0.8 rad apart at ~15 m — and the same measurement
+  // that passes above finds the crossing in it.
+  it('the pre-fix compound spacing put two rings through each other', () => {
+    const oldAngles = [0.1, 2.3, 3.35, 4.15, 5.5]
+    const rings = oldAngles.map((a) => [Math.cos(a) * 15, Math.sin(a) * 15] as [number, number])
+    let closest = Infinity
+    for (let i = 0; i < rings.length; i++)
+      for (let j = i + 1; j < rings.length; j++)
+        closest = Math.min(closest, Math.hypot(rings[i][0] - rings[j][0], rings[i][1] - rings[j][1]))
+    // Two rings of the smallest radius the plan draws already overlap at that
+    // spacing — before a single hut widens either of them.
+    expect(closest).toBeLessThan(2 * COMPOUND_RING_MIN)
+  })
+
+  // Rule 1 of the same repair: a compound's wall ENCLOSES its huts instead of
+  // growing through them. Checked across every village, because the placement
+  // rule that enforces it is the shared one.
+  it.each(VILLAGES.map((p) => [p.id] as const))('%s: no dwelling grows through a fence', (id) => {
+    const style = REGION_PLACE_STYLES[placeById(id).region]
+    for (const s of [...SEEDS, REPORTED_SEED, WEDGE_SEED, 1, 2, 3]) {
+      const layout = buildLayout(id, s)
+      const runs = layout.fences.flatMap((f) => fenceColliders(f))
+      for (const d of layout.dwellings) {
+        const body = dwellingCircleRadius(d, style)
+        if (body === null) continue
+        for (const c of runs) {
+          const g = gap({ x: d.x, z: d.z, r: body }, c)
+          expect(
+            g,
+            `${id} seed ${s}: ${d.kind} at ${d.x.toFixed(1)},${d.z.toFixed(1)} crosses a fence`,
+          ).toBeGreaterThan(-0.5)
+        }
+      }
+    }
+  })
+})
