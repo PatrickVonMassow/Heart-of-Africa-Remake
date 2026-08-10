@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   useUi,
+  LABEL_MODIFIERS,
   DEFAULT_TRAVEL_ZOOM,
   effectiveDprCap,
   effectiveSsao,
@@ -42,6 +43,18 @@ describe('vertical look inversion (design.md §17.5, point 392)', () => {
     expect(u().invertLook).toBe(false)
     u().setInvertLook(true)
     expect(u().invertLook).toBe(true)
+  })
+})
+
+describe('the hold key for the name labels (design.md §17.8, work-order 601)', () => {
+  it('ships on Ctrl and takes each of the offered modifiers', () => {
+    expect(useUi.getInitialState().labelModifier).toBe('ctrl') // what §17.8 states
+    expect(LABEL_MODIFIERS).toEqual(['ctrl', 'shift', 'alt'])
+    for (const m of LABEL_MODIFIERS) {
+      u().setLabelModifier(m)
+      expect(u().labelModifier).toBe(m)
+    }
+    u().setLabelModifier('ctrl')
   })
 })
 

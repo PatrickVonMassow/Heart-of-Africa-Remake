@@ -355,7 +355,8 @@ canteen's consumption
 rates and capacity are editable (§21.2), as is the parental rescue
 burst (`balance.family.rescueBurst`, §19.8 pt. 12 — the field's
 write-through pinned in `src/ui/DebugMenu.test.tsx`). Modal windows and full-screen
-overlays always render above the in-scene floating labels (§17.4).
+overlays always render above the in-scene floating labels (§17.4). The §17.8
+hold key is REBINDABLE in both languages (Ctrl default, Shift safe from Ctrl+W).
 
 ## 21. Water realism.
 

@@ -1028,6 +1028,12 @@ if (section('keyboard-lock')) {
       fake('fullscreenElement', s.fullscreen ? el : null)
       fake('pointerLockElement', s.pointerLocked ? el : null)
       fake('hidden', s.hidden === true)
+      // The guard also reads a FILLED viewport as fullscreen (F11 sets no
+      // fullscreenElement), so the not-fullscreen case must really not fill it.
+      Object.defineProperty(window.screen, 'height', {
+        configurable: true,
+        get: () => window.innerHeight + (s.fullscreen ? 0 : 400),
+      })
       document.dispatchEvent(new Event(s.event))
       return window.__lockCalls
     }, state)
@@ -1057,6 +1063,7 @@ if (section('keyboard-lock')) {
   // measure a stubbed state.
   await page.evaluate(() => {
     for (const name of ['fullscreenElement', 'pointerLockElement', 'hidden']) delete document[name]
+    delete window.screen.height
     delete navigator.keyboard
     delete window.__lockCalls
   })

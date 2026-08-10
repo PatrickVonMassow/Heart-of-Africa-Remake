@@ -8,6 +8,7 @@ import {
   KEYBOARD_LOCK_CODES,
   createKeyboardLockController,
   isGameKeyCode,
+  looksFullscreen,
   preventsBrowserChord,
   shouldLockKeyboard,
 } from './keyboardGuard'
@@ -79,6 +80,23 @@ describe('shouldLockKeyboard', () => {
     expect(shouldLockKeyboard({ fullscreen: true, pointerLocked: false })).toBe(false)
     expect(shouldLockKeyboard({ fullscreen: false, pointerLocked: true })).toBe(false)
     expect(shouldLockKeyboard({ fullscreen: false, pointerLocked: false })).toBe(false)
+  })
+})
+
+describe('looksFullscreen', () => {
+  it('takes the page-requested fullscreen', () => {
+    expect(looksFullscreen({ fullscreenElement: {}, innerHeight: 400, screenHeight: 1080 })).toBe(true)
+  })
+
+  it('takes the F11 fullscreen too, which sets no fullscreenElement', () => {
+    // The player who pressed F11 is exactly the one whose Ctrl+W must be caught.
+    expect(looksFullscreen({ fullscreenElement: null, innerHeight: 1080, screenHeight: 1080 })).toBe(true)
+  })
+
+  it('is false for an ordinary window, however large', () => {
+    expect(looksFullscreen({ fullscreenElement: null, innerHeight: 980, screenHeight: 1080 })).toBe(false)
+    // A headless page with no screen reading must not count as fullscreen.
+    expect(looksFullscreen({ fullscreenElement: null, innerHeight: 0, screenHeight: 0 })).toBe(false)
   })
 })
 

@@ -143,15 +143,34 @@ function browserKeyboard(): KeyboardLockApi | undefined {
 
 const controller = createKeyboardLockController(browserKeyboard)
 
-/** Is the keyboard lock held right now? (Read by the tests and the verify hook.) */
-export function keyboardLockHeld(): boolean {
-  return controller.held()
+/**
+ * Is the document fullscreen? `fullscreenElement` answers only for the
+ * fullscreen a PAGE asked for — the player who pressed F11 leaves it null while
+ * his window fills the screen, and he is exactly the player whose Ctrl+W the
+ * lock has to catch. So a filled viewport counts too. A false positive costs
+ * nothing: the request is refused outside fullscreen, which this module treats
+ * as "not held" and retries at the next transition.
+ */
+export function looksFullscreen(v: {
+  fullscreenElement: unknown
+  innerHeight: number
+  screenHeight: number
+}): boolean {
+  if (v.fullscreenElement != null) return true
+  if (!v.innerHeight || !v.screenHeight) return false
+  return v.screenHeight - v.innerHeight <= 2
 }
 
 function documentLockState(): { fullscreen: boolean; pointerLocked: boolean } {
-  if (typeof document === 'undefined') return { fullscreen: false, pointerLocked: false }
+  if (typeof document === 'undefined' || typeof window === 'undefined') {
+    return { fullscreen: false, pointerLocked: false }
+  }
   return {
-    fullscreen: document.fullscreenElement != null,
+    fullscreen: looksFullscreen({
+      fullscreenElement: document.fullscreenElement,
+      innerHeight: window.innerHeight,
+      screenHeight: window.screen?.height ?? 0,
+    }),
     // A hidden tab holds nothing: the release the player never made must not
     // leave his browser captured behind another window.
     pointerLocked: document.pointerLockElement != null && !document.hidden,
