@@ -13,7 +13,7 @@ import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOf
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
 import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
-import { buildRiverBank, settleBankPoints, type PlaceRiverBank } from './riverBank'
+import { buildRiverBank, settleBankPoints, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
 import type { BuildingType } from '../../state/ui'
 
 export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
@@ -447,13 +447,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // Keep every dwelling's entrance-door approach clear too, so a later object
     // never seals an earlier hut's door (design.md §2, point 6 reachability).
     if (!dwellings.every((d) => Math.hypot(x - d.door[0], z - d.door[1]) > 1.7)) return false
-    // NOTHING STANDS ON THE SHORE (work-order 584). Past the top of the bank the
-    // ground slopes away under the water, and the dressing is placed and drawn on
-    // the flat plate — so a boulder that lands there stands in the river, hovering
-    // over the shore it does not follow, and it is a collider in the one stretch
-    // the traveller wades through. Seed 1425108822 dropped one 1.8 m past the
-    // Bambara waterline, which is how it was found.
-    if (bank && x * bank.nx + z * bank.nz + Math.max(ownR, 0.9) > bank.walkEdge) return false
+    // NOTHING STANDS ON THE SHORE (work-order 584/585) — the rule itself is
+    // `standsOnGroundPlate` in riverBank.ts, which the ground scatter reads too.
+    // A body past the top of the bank is drawn on the flat plate over ground that
+    // has sloped away under it, and it is a collider in the one stretch the
+    // traveller wades through.
+    if (!standsOnGroundPlate(bank, x, z, ownR)) return false
     // No body grows THROUGH a fence (work-order 604) — see `clearOfFences`.
     if (!clearOfFences(x, z, ownR)) return false
     // Window clearance (design.md §2.6): no wall pressed against a neighbour —
