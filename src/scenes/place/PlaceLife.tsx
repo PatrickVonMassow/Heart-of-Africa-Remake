@@ -72,7 +72,7 @@ import {
   type ErrandView,
   type SpokenErrand,
 } from './adultErrands'
-import { isWithinHearing } from '../../communication/heard'
+import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
 import { phrasePlan, utterancePlan } from '../../communication/speaking'
 import {
   drumMessagePlan,
@@ -444,10 +444,12 @@ const KID_SCALE = 0.55
  * curve, the reading over the speaker's head, and the gesture on its own arms,
  * aimed at the world point the situation named.
  *
- * The DISTANCE decides all three. What the player could not hear teaches him
- * nothing however plainly he saw the gesture, so the same range gate that
- * silences the voice keeps the utterance out of his memory and the note off the
- * speaker's head (docs/communication-poc-spec.md).
+ * The DISTANCE decides all three, as ONE decision (point 580): what the player
+ * could not hear teaches him nothing however plainly he saw the gesture, so the
+ * same range gate that silences the voice keeps the utterance out of his memory,
+ * the note off the speaker's head AND the arms at rest — a mute pantomime is
+ * worse than silence, because it shows a concept with no word attached to it
+ * (docs/communication-poc-spec.md, src/communication/spokenGesture.ts).
  */
 function speakSituation(
   said: SpokenSituation,
@@ -459,8 +461,9 @@ function speakSituation(
   const distance = placePlayerPosition.active
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
     : Infinity
+  const reach = speechReach(distance)
   playSpeech(utterancePlan(said.utterance, distance))
-  if (isWithinHearing(distance)) {
+  if (reach.audible) {
     useGame.getState().hearUtterance(said.utterance)
     if (anchor) {
       speakOverhead(`kid-${said.speaker}`, [said.utterance], anchor, {
@@ -469,8 +472,9 @@ function speakSituation(
     }
   }
   // The aim is taken in the speaker's OWN frame, so a child that turns takes it
-  // with it; the shoulder is the child's, not a grown figure's.
-  gesture.current = startGesture(said.gesture, {
+  // with it; the shoulder is the child's, not a grown figure's. Out of earshot
+  // the same call hands back REST, so the child never mimes unheard.
+  gesture.current = gestureIfHeard(distance, said.gesture, {
     ...aimAt(
       { x: speaker.x, z: speaker.z, yaw: speaker.facing },
       said.aim,
@@ -2133,8 +2137,9 @@ function ErrandVillagers({
  * curve, one reading per atom over the speaker's head, and the gesture on its
  * own arms, aimed at the world point the errand named.
  *
- * The DISTANCE decides all three, exactly as it does for the children: what the
- * player could not hear teaches him nothing however plainly he saw the walk.
+ * The DISTANCE decides all three, exactly as it does for the children (point
+ * 580): what the player could not hear teaches him nothing however plainly he
+ * saw the walk, so beyond the hearing radius the villager's arms stay down.
  */
 function speakErrand(
   said: SpokenErrand,
@@ -2147,8 +2152,9 @@ function speakErrand(
   const distance = placePlayerPosition.active
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
     : Infinity
+  const reach = speechReach(distance)
   playSpeech(phrasePlan(said.utterances, distance))
-  if (isWithinHearing(distance)) {
+  if (reach.audible) {
     const store = useGame.getState()
     // Each atom of the phrase is observed on its own, in order.
     for (const atom of said.utterances) store.hearUtterance(atom)
@@ -2158,7 +2164,7 @@ function speakErrand(
       })
     }
   }
-  gesture.current = startGesture(said.gesture, {
+  gesture.current = gestureIfHeard(distance, said.gesture, {
     ...aimAt({ x: speaker.x, z: speaker.z, yaw }, said.aim, FIGURE_LIMBS.shoulderY),
     phase: said.speaker * 1.1, // no two villagers beat in lockstep
   })
