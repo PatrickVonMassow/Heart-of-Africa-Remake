@@ -5479,3 +5479,28 @@ to land than a mechanism that needs a review.
   Criticality: medium — nothing the player sees is broken, but a real regression in that
   view is invisible on the WebGL 2 lane for as long as this stands, which is the exact harm
   the picture check exists to prevent.
+
+- [ ] 621. A CEILING RAISE IS NO LONGER A QUESTION FOR THE USER (user decision
+  10.08.2026, via the board chat: "Frage mich in Zukunft allgemein nicht mehr bzgl.
+  Anhebungen"; bundle Chat & Tafel). The measured doc ceilings in
+  `scripts/doc-budget-core.mjs` currently have two ways out, and the second one —
+  raising the limit — is written everywhere as needing the user's agreement, so a
+  blocked addition can stall on a question. The user has withdrawn that requirement
+  generally: the decision is ours to take.
+  FINAL STATE:
+  1. The rule reads: when a budget blocks an addition, SHORTEN or MERGE what is
+     there; where no tightening of comparable value exists, RAISE the ceiling in the
+     SAME commit and JUSTIFY the raise in that commit message. No user question, in
+     either direction — the raise stays a deliberate, written act, it is simply not
+     escalated.
+  2. Point 531's spec drops its closing escalation clause ("the point ESCALATES the
+     ceiling question to the user instead of silently raising it") and states the
+     rule above instead; the rest of that point is untouched.
+  3. Every place that repeats the old wording says the new one: the header of
+     `scripts/doc-budget-core.mjs`, `docs/analysis_de/vibe-coding-anleitung.md`,
+     `docs/analysis_de/lesson-mechanisms.md` §3.30 and the rule row in
+     `docs/analysis_de/retrospektive-zusammenarbeit.md`.
+  VERIFIABLE: a grep for "user's agreement" / "Begründung anheben" / "ESCALATES the
+  ceiling" finds no doc-budget occurrence that still routes a raise through the user;
+  `node scripts/doc-budget-core.mjs` and `scripts/verify/docs.mjs` green.
+  Criticality: low — a process rule, no player-visible behaviour.
