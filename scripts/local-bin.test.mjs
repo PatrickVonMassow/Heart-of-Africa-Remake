@@ -241,14 +241,11 @@ describe('a spawn that never started', () => {
   const absent = () =>
     spawnSync(join(tmpdir(), 'hoa-no-such-binary-573'), ['--anything'], { encoding: 'utf8', windowsHide: true })
 
-  it('is INDISTINGUISHABLE from a rejection by exit code alone — the defect, demonstrated', () => {
+  it('passes the old assertion and fails the new one — the defect and its catch, side by side', () => {
     const r = absent()
-    // What the old assertion asked. It passes. Nothing ran.
+    // What the shipped check asked. It PASSES. Nothing ran. That is the bug.
     expect(r.status ?? 1).not.toBe(0)
-  })
-
-  it('is caught by didRun, which reports it instead of counting it as a verdict', () => {
-    const r = absent()
+    // What it must ask instead.
     expect(didRun(r)).toBe(false)
     expect(NOT_RUN('linter', r)).toContain('DID NOT RUN')
   })
