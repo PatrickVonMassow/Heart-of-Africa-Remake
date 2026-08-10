@@ -362,6 +362,20 @@ front of each turns one into a declaration.
   `if (section('<slug>')) { … }` and give each block the jump/wait it inherited
   from the one before. A suite that declares none keeps working unchanged and
   refuses `--section` with that reason.
+- **Which suites are sectioned (point 595 finished what 566 began).** Every
+  browser suite is, except two that are ONE measurement each and would gain a
+  single section naming the whole file: `startup` (one liveness window across the
+  whole load) and `benchmark` (one F8 sweep, which every check afterwards reads
+  out of the same report). `docs` drives no browser at all. `invariants` is
+  sectioned by ROUTE STOP, and its declarations therefore SELECT a stop rather
+  than wrap a block — the two invariants are judged over the driven route at the
+  end, so a partial run judges them over the stops that ran.
+- **A partial run must not damage the runs after it.** `voice` records the TTS
+  asset cache (point 88) and seals it as COMPLETE at the end; one section asks
+  for a fraction of the assets, so the seal is skipped on a partial run
+  (`sections.partial`) — otherwise the cheap rung would make every later STRICT
+  run abort on a gap it created itself. A suite that WRITES a shared artefact
+  owes the same check.
 - **A section is a BLOCK SCOPE, so anything two of them share lives ABOVE
   them.** A helper declared inside one block is invisible to the next, and
   nothing says so until the browser run reaches the call: `pinFamily`, declared

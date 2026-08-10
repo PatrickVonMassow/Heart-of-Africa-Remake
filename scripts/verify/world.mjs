@@ -5,12 +5,25 @@
 // bird's-eye view at characteristic locations. Dev server only.
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
+import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import { mkdirSync, existsSync, rmSync } from 'node:fs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 mkdirSync(OUT, { recursive: true })
+
+// SECTIONS (points 566/595). Three blocks that share only the boot and the step
+// out into travel: the first frame after the scene switch (the point-489 blank
+// picture), the communication errand's frames and dig, and the landmark frames.
+// Re-shooting one landmark used to replay the whole errand, dig included;
+// `--section=landmark-frames` is that repair loop. The names are read out of
+// THIS FILE by scripts/verify/sections.mjs, so an unknown one is refused with
+// the list of the real ones — and the run is stamped PARTIAL, never suite
+// coverage.
+const sections = sectionGate()
+const { section } = sections
+if (sections.banner()) console.log(sections.banner())
 
 // Point 204: the shared launcher, so VERIFY_GL selects the backend these
 // acceptance screenshots are taken on (this suite used to hard-launch the
@@ -104,128 +117,150 @@ if (process.env.FRAME_SUBJECT_SELFTEST) {
 // without pretending to be a golden-image comparison (point 361 — no frame is
 // compared against a reference here).
 const BLANK_FRAME_BYTES = 200000
-const firstTravelFrame = await shot('10-worldmodel-nile-delta-cairo', {
-  world: { lat: 30.0, lon: 31.3 },
-  label: 'the Nile delta at Cairo',
-})
-const firstOk = firstTravelFrame.length >= BLANK_FRAME_BYTES
-console.log(
-  `${firstOk ? 'PASS' : 'FAIL'}  the first world frame after the scene switch shows the terrain, not the background ` +
-    `(${firstTravelFrame.length} bytes, floor ${BLANK_FRAME_BYTES})`,
-)
-if (!firstOk) {
-  errors.push(
-    `the first travel frame is ${firstTravelFrame.length} bytes — a blank picture; the scene-readiness wait did not hold (point 489)`,
+if (section('first-travel-frame')) {
+  const firstTravelFrame = await shot('10-worldmodel-nile-delta-cairo', {
+    world: { lat: 30.0, lon: 31.3 },
+    label: 'the Nile delta at Cairo',
+  })
+  const firstOk = firstTravelFrame.length >= BLANK_FRAME_BYTES
+  console.log(
+    `${firstOk ? 'PASS' : 'FAIL'}  the first world frame after the scene switch shows the terrain, not the background ` +
+      `(${firstTravelFrame.length} bytes, floor ${BLANK_FRAME_BYTES})${sections.tag()}`,
   )
+  if (!firstOk) {
+    errors.push(
+      `the first travel frame is ${firstTravelFrame.length} bytes — a blank picture; the scene-readiness wait did not hold (point 489)`,
+    )
+  }
 }
 
 // Work-order 482: the communication PoC's two ends of the errand — the Bambara
 // village standing on the Niger, and the erratic upstream where 487 will dig.
 // The coordinates come from the scene's OWN dev hook, so the frames are aimed at
 // what the renderer actually placed for this run's seed, never at a coordinate
-// copied into this script.
-const poc = await page.evaluate(() => window.__communicationRock ?? null)
-if (!poc) {
-  errors.push('window.__communicationRock is missing — the erratic was not placed')
-} else {
-  // Both frames are taken inside the player's own zoom range (point 172:
-  // 0.125-0.5), close enough that they show what they claim — at the wide
-  // default a village and a single block of stone are a few pixels of nothing.
-  // The village is framed a step wider so its huts AND the water fit; the
-  // erratic at the closest zoom, where its shape is the evidence.
-  await page.evaluate(() => window.__ui.getState().setTravelZoom(0.25))
-  await jump(poc.village.lat, poc.village.lon)
-  await shot('18-worldmodel-bambara-village-niger', {
-    world: { lat: poc.village.lat, lon: poc.village.lon },
-    label: 'the Bambara village on the Niger',
-  })
-  await page.evaluate(() => window.__ui.getState().setTravelZoom(0.125))
-  await jump(poc.lat, poc.lon)
-  await shot('19-worldmodel-communication-erratic', {
-    world: { lat: poc.lat, lon: poc.lon },
-    label: `the erratic ${poc.upstreamDeg.toFixed(1)}° upstream of the Bambara village`,
-  })
-  await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
+// copied into this script. The whole errand — its two frames and its three digs
+// — is ONE section: the dig proves the spot the frames show, so splitting them
+// would leave each half proving half a claim.
+if (section('communication-errand')) {
+  const poc = await page.evaluate(() => window.__communicationRock ?? null)
+  if (!poc) {
+    errors.push('window.__communicationRock is missing — the erratic was not placed')
+  } else {
+    // Both frames are taken inside the player's own zoom range (point 172:
+    // 0.125-0.5), close enough that they show what they claim — at the wide
+    // default a village and a single block of stone are a few pixels of nothing.
+    // The village is framed a step wider so its huts AND the water fit; the
+    // erratic at the closest zoom, where its shape is the evidence.
+    await page.evaluate(() => window.__ui.getState().setTravelZoom(0.25))
+    await jump(poc.village.lat, poc.village.lon)
+    await shot('18-worldmodel-bambara-village-niger', {
+      world: { lat: poc.village.lat, lon: poc.village.lon },
+      label: 'the Bambara village on the Niger',
+    })
+    await page.evaluate(() => window.__ui.getState().setTravelZoom(0.125))
+    await jump(poc.lat, poc.lon)
+    await shot('19-worldmodel-communication-erratic', {
+      world: { lat: poc.lat, lon: poc.lon },
+      label: `the erratic ${poc.upstreamDeg.toFixed(1)}° upstream of the Bambara village`,
+    })
+    await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
 
-  // Point 487, the errand's end, driven in the REAL browser against the
-  // placement the scene drew (window.__communicationRock, not a coordinate this
-  // script computed): digging away from the block finds nothing, digging at it
-  // recovers the artefact, and handing it to the chief in his own village
-  // closes the loop. The store transitions themselves are pinned in
-  // src/state/store.rockArtefact.test.ts — what this adds is the proof that the
-  // spot the picture shows and the spot that yields are the same spot.
-  const reachDeg = await page.evaluate(() => window.__balance.digRadius / 10)
-  const digAt = async (lat, lon) => {
-    await jump(lat, lon, 400)
-    return page.evaluate(() => {
+    // Point 487, the errand's end, driven in the REAL browser against the
+    // placement the scene drew (window.__communicationRock, not a coordinate this
+    // script computed): digging away from the block finds nothing, digging at it
+    // recovers the artefact, and handing it to the chief in his own village
+    // closes the loop. The store transitions themselves are pinned in
+    // src/state/store.rockArtefact.test.ts — what this adds is the proof that the
+    // spot the picture shows and the spot that yields are the same spot.
+    const reachDeg = await page.evaluate(() => window.__balance.digRadius / 10)
+    const digAt = async (lat, lon) => {
+      await jump(lat, lon, 400)
+      return page.evaluate(() => {
+        const g = window.__game.getState()
+        g.debugAddEquipment('shovel')
+        g.dig()
+        const s = window.__game.getState()
+        return { artefact: s.rockArtefact, keys: s.journal.map((e) => e.text.key) }
+      })
+    }
+    // The procedural caches are cleared for the negative probe so only the
+    // boulder's own branch can answer, then put back.
+    const caches = await page.evaluate(() => {
+      const sites = window.__game.getState().treasureSites
+      window.__game.setState({ treasureSites: [] })
+      return sites
+    })
+    const away = await digAt(poc.lat + reachDeg * 4, poc.lon + reachDeg * 4)
+    const awayOk = away.artefact === 'buried' && !away.keys.includes('journal.rockArtefact')
+    console.log(
+      `${awayOk ? 'PASS' : 'FAIL'}  digging clear of the erratic recovers nothing (state ${away.artefact})`,
+    )
+    if (!awayOk) errors.push(`a dig ${(reachDeg * 4).toFixed(2)}° off the erratic recovered ${away.artefact}`)
+
+    const atRock = await digAt(poc.lat, poc.lon)
+    const atRockOk = atRock.artefact === 'carried' && atRock.keys.includes('journal.rockArtefact')
+    console.log(
+      `${atRockOk ? 'PASS' : 'FAIL'}  digging at the erratic the scene drew recovers the artefact and journals it`,
+    )
+    if (!atRockOk) errors.push(`the dig at the drawn erratic left the artefact ${atRock.artefact}`)
+
+    const handed = await page.evaluate(() => {
       const g = window.__game.getState()
-      g.debugAddEquipment('shovel')
-      g.dig()
+      g.enterPlace('bambara-village')
+      window.__game.getState().handArtefactToChief()
       const s = window.__game.getState()
       return { artefact: s.rockArtefact, keys: s.journal.map((e) => e.text.key) }
     })
+    const handedOk = handed.artefact === 'given' && handed.keys.includes('journal.artefactGiven')
+    console.log(
+      `${handedOk ? 'PASS' : 'FAIL'}  the artefact laid in the chief's hands solves the puzzle and is journaled`,
+    )
+    if (!handedOk) errors.push(`the hand-over left the artefact ${handed.artefact}`)
+
+    // Back onto the map for the remaining frames, with the world as it was.
+    await page.evaluate((sites) => {
+      const g = window.__game.getState()
+      if (g.mode === 'place') g.leavePlace()
+      window.__game.setState({ treasureSites: sites })
+      window.__game.getState().setJournalOpen(false)
+    }, caches)
+    // Wait on the STATE, not the wall clock: the map frames below may only be
+    // taken once the traveller is back out of the settlement.
+    await page.waitForFunction(() => window.__game.getState().mode === 'travel', null, { timeout: 20000 })
   }
-  // The procedural caches are cleared for the negative probe so only the
-  // boulder's own branch can answer, then put back.
-  const caches = await page.evaluate(() => {
-    const sites = window.__game.getState().treasureSites
-    window.__game.setState({ treasureSites: [] })
-    return sites
-  })
-  const away = await digAt(poc.lat + reachDeg * 4, poc.lon + reachDeg * 4)
-  const awayOk = away.artefact === 'buried' && !away.keys.includes('journal.rockArtefact')
-  console.log(
-    `${awayOk ? 'PASS' : 'FAIL'}  digging clear of the erratic recovers nothing (state ${away.artefact})`,
-  )
-  if (!awayOk) errors.push(`a dig ${(reachDeg * 4).toFixed(2)}° off the erratic recovered ${away.artefact}`)
-
-  const atRock = await digAt(poc.lat, poc.lon)
-  const atRockOk = atRock.artefact === 'carried' && atRock.keys.includes('journal.rockArtefact')
-  console.log(
-    `${atRockOk ? 'PASS' : 'FAIL'}  digging at the erratic the scene drew recovers the artefact and journals it`,
-  )
-  if (!atRockOk) errors.push(`the dig at the drawn erratic left the artefact ${atRock.artefact}`)
-
-  const handed = await page.evaluate(() => {
-    const g = window.__game.getState()
-    g.enterPlace('bambara-village')
-    window.__game.getState().handArtefactToChief()
-    const s = window.__game.getState()
-    return { artefact: s.rockArtefact, keys: s.journal.map((e) => e.text.key) }
-  })
-  const handedOk = handed.artefact === 'given' && handed.keys.includes('journal.artefactGiven')
-  console.log(
-    `${handedOk ? 'PASS' : 'FAIL'}  the artefact laid in the chief's hands solves the puzzle and is journaled`,
-  )
-  if (!handedOk) errors.push(`the hand-over left the artefact ${handed.artefact}`)
-
-  // Back onto the map for the remaining frames, with the world as it was.
-  await page.evaluate((sites) => {
-    const g = window.__game.getState()
-    if (g.mode === 'place') g.leavePlace()
-    window.__game.setState({ treasureSites: sites })
-    window.__game.getState().setJournalOpen(false)
-  }, caches)
-  // Wait on the STATE, not the wall clock: the map frames below may only be
-  // taken once the traveller is back out of the settlement.
-  await page.waitForFunction(() => window.__game.getState().mode === 'travel', null, { timeout: 20000 })
 }
 
 // The Nile delta is already photographed above, out of the scene switch itself.
-const shots = [
-  [15.6, 32.6, '11-worldmodel-khartoum-confluence', 'the Nile confluence at Khartoum'],
-  [-0.8, 33.0, '12-worldmodel-lake-victoria', 'Lake Victoria'],
-  [-3.05, 37.3, '13-worldmodel-kilimanjaro', 'Kilimanjaro'],
-  [-5.9, 12.8, '14-worldmodel-congo-mouth-boma', 'the Congo mouth at Boma'],
-  [-17.9, 25.9, '15-worldmodel-victoria-falls', 'Victoria Falls'],
-  [-33.9, 18.6, '16-worldmodel-cape-town', 'Cape Town'],
-  [13.2, 14.2, '17-worldmodel-lake-chad', 'Lake Chad'],
-]
-for (const [lat, lon, name, label] of shots) {
-  await jump(lat, lon)
-  await shot(name, { world: { lat, lon }, label })
+// Each jump stands on its own — the block needs nothing the errand left behind,
+// and it restores no state, so it runs alone exactly as it runs in sequence.
+if (section('landmark-frames')) {
+  const shots = [
+    [15.6, 32.6, '11-worldmodel-khartoum-confluence', 'the Nile confluence at Khartoum'],
+    [-0.8, 33.0, '12-worldmodel-lake-victoria', 'Lake Victoria'],
+    [-3.05, 37.3, '13-worldmodel-kilimanjaro', 'Kilimanjaro'],
+    [-5.9, 12.8, '14-worldmodel-congo-mouth-boma', 'the Congo mouth at Boma'],
+    [-17.9, 25.9, '15-worldmodel-victoria-falls', 'Victoria Falls'],
+    [-33.9, 18.6, '16-worldmodel-cape-town', 'Cape Town'],
+    [13.2, 14.2, '17-worldmodel-lake-chad', 'Lake Chad'],
+  ]
+  for (const [lat, lon, name, label] of shots) {
+    await jump(lat, lon)
+    await shot(name, { world: { lat, lon }, label })
+  }
+}
+
+// A selected section that never executed is a FAILURE, not a quiet pass: it is
+// the one way a --section run could report green having photographed nothing.
+// This suite reports through `errors`, so it is said in that language.
+const unrun = sections.unrun()
+if (unrun) {
+  console.log(`FAIL  the selected section actually ran — ${unrun}`)
+  errors.push(unrun)
 }
 
 console.log('console errors:', errors.length ? errors : 'none')
+// Said again where the verdict is read: a green one-section run is not a green
+// suite, and nothing downstream may quote it as one.
+if (sections.banner()) console.log(sections.banner())
 await browser.close()
 process.exit(errors.length ? 1 : 0)

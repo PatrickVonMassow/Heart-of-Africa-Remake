@@ -4,14 +4,30 @@
 // entry, and do-not-disturb writes silently. Dev server only.
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
+import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import { installTtsCache } from './ttsCache.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
+
+// SECTIONS (points 566/595). Each block adds the journal entry it needs and puts
+// the wound level and the do-not-disturb switch back where it found them, so one
+// of them repairs alone: `--section=autoscroll` costs one boot instead of four
+// reveal animations, each of which waits out a stroke-by-stroke run. The names
+// are read out of THIS FILE by scripts/verify/sections.mjs, so an unknown one is
+// refused with the list of the real ones — and the run is stamped PARTIAL, never
+// suite coverage.
+const sections = sectionGate()
+const { section } = sections
+if (sections.banner()) console.log(sections.banner())
+
 let failures = 0
 const check = (name, ok, detail) => {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ' — ' + detail : ''}`)
+  // The tag goes AFTER the ' — ' separator: the check's NAME is its identity for
+  // the red ledger and the baseline classifier and must not change.
+  const tail = [detail, sections.tag().trim()].filter(Boolean).join('  ')
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${tail ? ' — ' + tail : ''}`)
   if (!ok) failures++
 }
 
@@ -53,143 +69,159 @@ await page.waitForTimeout(400)
 const lastEntryText = () => page.evaluate(() => [...document.querySelectorAll('.journal .entry p')].at(-1)?.textContent ?? '')
 
 // --- A new entry is written by the hand, stroke by stroke -----------------------
-await page.evaluate(() =>
-  window.__game.getState().addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' }),
-)
-// The reveal is a main-thread setInterval; adding the entry also fires the
-// auto-narration, whose FIRST-EVER TTS model load (worker WASM compile) can
-// block the main thread for several seconds and delay the first stroke
-// (point 100). So poll for the reveal — condition-based, the documented flake
-// pattern — instead of sampling at a fixed 350 ms: capture the writing/hand
-// state and the first revealed length once a stroke shows, then confirm it
-// keeps advancing.
-let early = { writing: 0, hand: 0, len: 0 }
-const revealDeadline = Date.now() + 25000
-while (Date.now() < revealDeadline) {
-  early = await page.evaluate(() => ({
+if (section('entry-written')) {
+  await page.evaluate(() =>
+    window.__game.getState().addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' }),
+  )
+  // The reveal is a main-thread setInterval; adding the entry also fires the
+  // auto-narration, whose FIRST-EVER TTS model load (worker WASM compile) can
+  // block the main thread for several seconds and delay the first stroke
+  // (point 100). So poll for the reveal — condition-based, the documented flake
+  // pattern — instead of sampling at a fixed 350 ms: capture the writing/hand
+  // state and the first revealed length once a stroke shows, then confirm it
+  // keeps advancing.
+  let early = { writing: 0, hand: 0, len: 0 }
+  const revealDeadline = Date.now() + 25000
+  while (Date.now() < revealDeadline) {
+    early = await page.evaluate(() => ({
+      writing: document.querySelectorAll('.journal .entry.writing').length,
+      hand: document.querySelectorAll('.writing-hand').length,
+      len: document.querySelector('.journal .entry.writing p')?.textContent?.length ?? 0,
+    }))
+    if (early.len > 0) break
+    await page.waitForTimeout(80)
+  }
+  check('a new entry starts in the writing state with the hand', early.writing === 1 && early.hand === 1, '')
+  let laterLen = early.len
+  const advanceDeadline = Date.now() + 5000
+  while (Date.now() < advanceDeadline) {
+    laterLen = (await lastEntryText()).length
+    if (laterLen > early.len) break
+    await page.waitForTimeout(80)
+  }
+  check(
+    'the text reveals stroke by stroke',
+    early.len > 0 && laterLen > early.len,
+    `${early.len} → ${laterLen} chars`,
+  )
+  await shot('81-handwriting', { element: '.journal .entry.writing', label: 'the entry being written' })
+  // Wait for the stroke animation to END (a fixed sleep undershoots when the
+  // throttled headless RAF slows the reveal under full-regression load).
+  await page.waitForFunction(() => document.querySelectorAll('.journal .entry.writing').length === 0, null, { timeout: 25000 }).catch(() => {})
+  await page.waitForTimeout(300)
+  const finished = await page.evaluate(() => ({
     writing: document.querySelectorAll('.journal .entry.writing').length,
-    hand: document.querySelectorAll('.writing-hand').length,
-    len: document.querySelector('.journal .entry.writing p')?.textContent?.length ?? 0,
+    text: [...document.querySelectorAll('.journal .entry p')].at(-1)?.textContent ?? '',
   }))
-  if (early.len > 0) break
-  await page.waitForTimeout(80)
+  check(
+    'the finished entry shows the full clean text',
+    finished.writing === 0 && finished.text.length > 80 && !finished.text.includes('['),
+    `${finished.text.length} chars`,
+  )
 }
-check('a new entry starts in the writing state with the hand', early.writing === 1 && early.hand === 1, '')
-let laterLen = early.len
-const advanceDeadline = Date.now() + 5000
-while (Date.now() < advanceDeadline) {
-  laterLen = (await lastEntryText()).length
-  if (laterLen > early.len) break
-  await page.waitForTimeout(80)
-}
-check(
-  'the text reveals stroke by stroke',
-  early.len > 0 && laterLen > early.len,
-  `${early.len} → ${laterLen} chars`,
-)
-await shot('81-handwriting', { element: '.journal .entry.writing', label: 'the entry being written' })
-// Wait for the stroke animation to END (a fixed sleep undershoots when the
-// throttled headless RAF slows the reveal under full-regression load).
-await page.waitForFunction(() => document.querySelectorAll('.journal .entry.writing').length === 0, null, { timeout: 25000 }).catch(() => {})
-await page.waitForTimeout(300)
-const finished = await page.evaluate(() => ({
-  writing: document.querySelectorAll('.journal .entry.writing').length,
-  text: [...document.querySelectorAll('.journal .entry p')].at(-1)?.textContent ?? '',
-}))
-check(
-  'the finished entry shows the full clean text',
-  finished.writing === 0 && finished.text.length > 80 && !finished.text.includes('['),
-  `${finished.text.length} chars`,
-)
 
 // --- The wounded hand and its blood traces ---------------------------------------
-await page.evaluate(() => {
-  window.__game.getState().debugSetAffliction('wounds', 2)
-  window.__game.getState().addEntry({ key: 'journal.titles.attack' }, { key: 'journal.healthPoor' })
-})
-await page.waitForTimeout(350)
-const bloody = await page.evaluate(() => ({
-  bloodyHand: document.querySelectorAll('.writing-hand.bloody').length,
-  marks: [...document.querySelectorAll('.journal .entry')].at(-1)?.querySelectorAll('.blood-marks.severe span').length ?? 0,
-}))
-check('a severely wounded hand writes bloody', bloody.bloodyHand === 1, '')
-check('the entry carries blood traces', bloody.marks >= 3, `${bloody.marks} marks`)
-await shot('82-handwriting-blood', { element: '.writing-hand.bloody', label: 'the bloody writing hand' })
+if (section('wounded-hand')) {
+  await page.evaluate(() => {
+    window.__game.getState().debugSetAffliction('wounds', 2)
+    window.__game.getState().addEntry({ key: 'journal.titles.attack' }, { key: 'journal.healthPoor' })
+  })
+  await page.waitForTimeout(350)
+  const bloody = await page.evaluate(() => ({
+    bloodyHand: document.querySelectorAll('.writing-hand.bloody').length,
+    marks: [...document.querySelectorAll('.journal .entry')].at(-1)?.querySelectorAll('.blood-marks.severe span').length ?? 0,
+  }))
+  check('a severely wounded hand writes bloody', bloody.bloodyHand === 1, '')
+  check('the entry carries blood traces', bloody.marks >= 3, `${bloody.marks} marks`)
+  await shot('82-handwriting-blood', { element: '.writing-hand.bloody', label: 'the bloody writing hand' })
 
-// A click finishes the handwriting immediately. DND is raised around the
-// click: it is the page's first user gesture and would otherwise start the
-// deferred initial narration (TTS model download).
-await page.evaluate(() => window.__ui.getState().setJournalDnd(true))
-// Wait for the RAF-driven writing entry to appear, then force-click it to finish —
-// on the WebGPU backend's slower headless cadence it starts later and keeps animating,
-// so a bare .click() hangs on the actionability/stability wait until the default
-// timeout (point 184). force skips stability, the timeout+catch prevent the hang.
-await page.locator('.journal .entry.writing').click({ force: true, timeout: 15000 }).catch(() => {})
-// Poll for the click-to-finish to clear the writing state rather than a fixed wait —
-// the finish is applied in the render loop and lags on the slower WebGPU headless
-// cadence (point 184, the same timing class); a real failure exhausts the window.
-await page
-  .waitForFunction(() => document.querySelectorAll('.journal .entry.writing').length === 0, null, { timeout: 15000 })
-  .catch(() => {})
-await page.evaluate(() => window.__ui.getState().setJournalDnd(false))
-const clicked = await page.evaluate(() => ({
-  writing: document.querySelectorAll('.journal .entry.writing').length,
-  marks: [...document.querySelectorAll('.journal .entry')].at(-1)?.querySelectorAll('.blood-marks span').length ?? 0,
-}))
-check('a click finishes the entry immediately', clicked.writing === 0, '')
-check('the blood traces persist after writing', clicked.marks >= 3, `${clicked.marks} marks`)
-await page.evaluate(() => window.__game.getState().debugSetAffliction('wounds', 0))
+  // A click finishes the handwriting immediately. DND is raised around the
+  // click: it is the page's first user gesture and would otherwise start the
+  // deferred initial narration (TTS model download).
+  await page.evaluate(() => window.__ui.getState().setJournalDnd(true))
+  // Wait for the RAF-driven writing entry to appear, then force-click it to finish —
+  // on the WebGPU backend's slower headless cadence it starts later and keeps animating,
+  // so a bare .click() hangs on the actionability/stability wait until the default
+  // timeout (point 184). force skips stability, the timeout+catch prevent the hang.
+  await page.locator('.journal .entry.writing').click({ force: true, timeout: 15000 }).catch(() => {})
+  // Poll for the click-to-finish to clear the writing state rather than a fixed wait —
+  // the finish is applied in the render loop and lags on the slower WebGPU headless
+  // cadence (point 184, the same timing class); a real failure exhausts the window.
+  await page
+    .waitForFunction(() => document.querySelectorAll('.journal .entry.writing').length === 0, null, { timeout: 15000 })
+    .catch(() => {})
+  await page.evaluate(() => window.__ui.getState().setJournalDnd(false))
+  const clicked = await page.evaluate(() => ({
+    writing: document.querySelectorAll('.journal .entry.writing').length,
+    marks: [...document.querySelectorAll('.journal .entry')].at(-1)?.querySelectorAll('.blood-marks span').length ?? 0,
+  }))
+  check('a click finishes the entry immediately', clicked.writing === 0, '')
+  check('the blood traces persist after writing', clicked.marks >= 3, `${clicked.marks} marks`)
+  await page.evaluate(() => window.__game.getState().debugSetAffliction('wounds', 0))
+}
 
 // --- Do not disturb: entries appear silently without the animation -----------------
-await page.evaluate(() => {
-  window.__ui.getState().setJournalDnd(true)
-  window.__game.getState().setJournalOpen(false)
-  window.__game.getState().addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' })
-})
-await page.waitForTimeout(300)
-const dnd = await page.evaluate(() => ({
-  open: window.__game.getState().journalOpen,
-  writing: document.querySelectorAll('.journal .entry.writing').length,
-}))
-check('do-not-disturb writes silently without the animation', dnd.open === false && dnd.writing === 0, '')
-await page.evaluate(() => window.__ui.getState().setJournalDnd(false))
+if (section('do-not-disturb')) {
+  await page.evaluate(() => {
+    window.__ui.getState().setJournalDnd(true)
+    window.__game.getState().setJournalOpen(false)
+    window.__game.getState().addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' })
+  })
+  await page.waitForTimeout(300)
+  const dnd = await page.evaluate(() => ({
+    open: window.__game.getState().journalOpen,
+    writing: document.querySelectorAll('.journal .entry.writing').length,
+  }))
+  check('do-not-disturb writes silently without the animation', dnd.open === false && dnd.writing === 0, '')
+  await page.evaluate(() => window.__ui.getState().setJournalDnd(false))
+}
 
 // --- The view follows new content down while it is written (design.md §15/§16) ---
-// Fill the journal so it overflows, reopen it, then add an animated entry: the
-// scroll container must follow the growing text to the bottom so the newly
-// appearing strokes stay visible.
-await page.evaluate(() => {
-  const g = window.__game.getState()
-  window.__ui.getState().setJournalDnd(true) // silent fillers while closed
-  for (let i = 0; i < 24; i++) g.addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' })
-  window.__ui.getState().setJournalDnd(false)
-  g.setJournalOpen(true)
-})
-await page.waitForTimeout(400)
-await page.evaluate(() =>
-  window.__game.getState().addEntry({ key: 'journal.titles.attack' }, { key: 'journal.healthPoor' }),
-)
-await page.waitForTimeout(500) // mid-animation
-const scroll = await page.evaluate(() => {
-  const el = document.querySelector('.journal .entries')
-  const wp = document.querySelector('.journal .entry.writing p')
-  const cRect = el.getBoundingClientRect()
-  const pRect = wp ? wp.getBoundingClientRect() : null
-  return {
-    overflow: el.scrollHeight - el.clientHeight,
-    bottomGap: el.scrollHeight - el.clientHeight - el.scrollTop,
-    writingVisible: pRect ? pRect.bottom <= cRect.bottom + 6 && pRect.bottom >= cRect.top : false,
-  }
-})
-check('the journal overflows so scrolling is required', scroll.overflow > 40, `overflow ${scroll.overflow.toFixed(0)}px`)
-check(
-  'the view auto-scrolls down to the still-writing entry',
-  scroll.bottomGap < 10 && scroll.writingVisible,
-  `bottomGap ${scroll.bottomGap.toFixed(0)}px, writingVisible ${scroll.writingVisible}`,
-)
-await shot('83-handwriting-autoscroll', { element: '.journal .entry.writing', label: 'the still-writing entry the journal scrolled to' })
+if (section('autoscroll')) {
+  // Fill the journal so it overflows, reopen it, then add an animated entry: the
+  // scroll container must follow the growing text to the bottom so the newly
+  // appearing strokes stay visible.
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    window.__ui.getState().setJournalDnd(true) // silent fillers while closed
+    for (let i = 0; i < 24; i++) g.addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' })
+    window.__ui.getState().setJournalDnd(false)
+    g.setJournalOpen(true)
+  })
+  await page.waitForTimeout(400)
+  await page.evaluate(() =>
+    window.__game.getState().addEntry({ key: 'journal.titles.attack' }, { key: 'journal.healthPoor' }),
+  )
+  await page.waitForTimeout(500) // mid-animation
+  const scroll = await page.evaluate(() => {
+    const el = document.querySelector('.journal .entries')
+    const wp = document.querySelector('.journal .entry.writing p')
+    const cRect = el.getBoundingClientRect()
+    const pRect = wp ? wp.getBoundingClientRect() : null
+    return {
+      overflow: el.scrollHeight - el.clientHeight,
+      bottomGap: el.scrollHeight - el.clientHeight - el.scrollTop,
+      writingVisible: pRect ? pRect.bottom <= cRect.bottom + 6 && pRect.bottom >= cRect.top : false,
+    }
+  })
+  check('the journal overflows so scrolling is required', scroll.overflow > 40, `overflow ${scroll.overflow.toFixed(0)}px`)
+  check(
+    'the view auto-scrolls down to the still-writing entry',
+    scroll.bottomGap < 10 && scroll.writingVisible,
+    `bottomGap ${scroll.bottomGap.toFixed(0)}px, writingVisible ${scroll.writingVisible}`,
+  )
+  await shot('83-handwriting-autoscroll', { element: '.journal .entry.writing', label: 'the still-writing entry the journal scrolled to' })
+}
+
+// A selected section that never executed is a FAILURE, not a quiet pass: it is
+// the one way a --section run could report green having verified nothing.
+const unrun = sections.unrun()
+if (unrun) check('the selected section actually ran', false, unrun)
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
+// Said again where the verdict is read: a green one-section run is not a green
+// suite, and nothing downstream may quote it as one.
+if (sections.banner()) console.log(sections.banner())
 await browser.close()
 process.exit(failures > 0 || errors.length > 0 ? 1 : 0)

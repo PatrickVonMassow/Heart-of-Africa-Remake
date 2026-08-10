@@ -14,15 +14,31 @@
 // Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
+import { sectionGate } from './sections.mjs'
 import { installTtsCache, markTtsCacheComplete } from './ttsCache.mjs'
 import { attributeBlocks, maxGap } from './liveness.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
+
+// SECTIONS (points 566/595). Four blocks, each owning the language it needs and
+// the first user gesture the autoplay deferral demands, so re-shooting the German
+// journal frame no longer waits out a cold TTS engine load. The cache verdict at
+// the bottom is the one thing a partial run may NOT do: see there. The names are
+// read out of THIS FILE by scripts/verify/sections.mjs, so an unknown one is
+// refused with the list of the real ones — and the run is stamped PARTIAL, never
+// suite coverage.
+const sections = sectionGate()
+const { section } = sections
+if (sections.banner()) console.log(sections.banner())
+
 let failures = 0
 const check = (name, ok, detail) => {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ' — ' + detail : ''}`)
+  // The tag goes AFTER the ' — ' separator: the check's NAME is its identity for
+  // the red ledger and the baseline classifier and must not change.
+  const tail = [detail, sections.tag().trim()].filter(Boolean).join('  ')
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${tail ? ' — ' + tail : ''}`)
   if (!ok) failures++
 }
 
@@ -76,10 +92,28 @@ await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
 await assertBackend(page) // point 204: this suite is WebGL2-only — prove the lane really is WebGL 2
 await page.waitForTimeout(4000)
 
+// SHARED STAGING (point 566). Two things every narration block needs and only
+// the first one used to establish: the game language the check reads, and the
+// TRUSTED USER GESTURE the autoplay deferral waits for. Insert is bound by
+// neither the game nor the browser (F8 would start the render benchmark, which
+// blocked the main thread inside the very measurement below). Both are no-ops
+// when they have already happened, so a whole run behaves exactly as before.
+const switchLanguage = async (lang) => {
+  if (await page.evaluate((l) => document.documentElement.lang === l, lang)) return
+  await page.evaluate((l) => window.__setLang(l), lang)
+  await page.waitForTimeout(800)
+}
+let gestured = false
+const firstGesture = async () => {
+  if (gestured) return
+  gestured = true
+  await page.keyboard.press('Insert')
+}
+
 // --- Movement continues while the journal is open (design.md §16) -----------
 // The game starts in Cairo with the departure entry and the journal open; the
 // character must still walk (the open/narrating journal no longer freezes it).
-{
+if (section('journal-movement')) {
   const jOpen = await page.evaluate(() => window.__game.getState().journalOpen)
   const before = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
   // Hold W and poll until the character has actually walked (point 200), rather
@@ -98,186 +132,197 @@ await page.waitForTimeout(4000)
 // --- German journal screenshot (clean, no visible markers) -------------------
 // The no-marker/prose/speak-button asserts moved to Vitest (JournalPanel.test.tsx);
 // the screenshot stays as §7.2 acceptance evidence. Default language is English
-// (pt. 17), so switch to German explicitly for the shot.
-await page.evaluate(() => window.__setLang('de'))
-await page.waitForTimeout(600)
-await shot('64-voice-german-journal-clean', { element: '.journal', label: 'the German journal without a visible marker' })
-
-// --- Back to English for the read-aloud (TTS) checks -------------------------
-await page.evaluate(() => window.__setLang('en'))
-await page.waitForTimeout(800)
+// (pt. 17), so switch to German explicitly for the shot — and back afterwards,
+// inside this block, so the read-aloud checks below never inherit a language.
+if (section('german-journal')) {
+  await switchLanguage('de')
+  await shot('64-voice-german-journal-clean', { element: '.journal', label: 'the German journal without a visible marker' })
+  await switchLanguage('en')
+}
 
 // --- The start entry narrates on the first user gesture (autoplay deferral) --
-// The browser profile is fresh and the pre-warm is deferred, so this first
-// narration is the COLD engine load, start to finish, inside the probe window.
-//
-// LIVENESS GATE (point 117, rebuilt by point 304). On this forced-WASM path the
-// model load must not cost the game its main thread — WASM never touches the GPU
-// process. The gate therefore runs a 50 ms TICK TRAIN and charges only the
-// stalls that the page's own animation-frame callbacks do NOT account for; see
-// liveness.mjs. The metric it replaces was the raw rAF gap, which read ~15 000 ms
-// on a quiet machine and blamed the TTS load for it — while the same 15 000 ms
-// reproduced with the TTS worker stubbed out entirely: it is the startup frame
-// awaiting the scene's shader-program links, a long FRAME with a perfectly free
-// main thread (tick gap 63 ms). Both numbers are reported below; only the
-// attributed block is binding.
-await page.evaluate(() => {
-  const S = window.__liveness
-  S.frames.length = 0
-  S.ticks.length = 0
-  S.raf.length = 0
-  S.recording = true
-  S.timer = setInterval(() => S.ticks.push(performance.now()), 50)
-})
-const probeStart = Date.now()
-// No trusted gesture has happened yet; a neutral key press is the first one.
-// It must be a key the game does NOT bind: this used to be F8, which since the
-// in-game render benchmark shipped (point 277) starts that benchmark — it swept
-// ten graphics configs, recompiled the post pipeline over and over and blocked
-// the main thread for ~15 s at a time, right inside the measurement it was
-// meant to leave alone. Insert is bound by neither the game nor the browser.
-await page.keyboard.press('Insert')
-// Self-test knob (point 304): VOICE_STALL_SELFTEST=<ms> injects a synchronous
-// main-thread busy loop into the cold-load window, which must turn the gate
-// below RED. That is how the gate is proven to still bite.
-const selfTestMs = Number(process.env.VOICE_STALL_SELFTEST ?? 0)
-if (selfTestMs > 0) {
-  await page.evaluate((ms) => {
-    setTimeout(() => {
-      const end = performance.now() + ms
-      while (performance.now() < end) {
-        /* block the main thread on purpose */
-      }
-    }, 2000)
-  }, selfTestMs)
-}
-let bootSpoke = false
-try {
-  await page.waitForFunction(
-    () => {
-      const btns = document.querySelectorAll('.journal .speak')
-      const t = btns.length > 0 ? btns[btns.length - 1].textContent : ''
-      return t === '…' || t === '■'
-    },
-    null,
-    { timeout: 300000 },
+if (section('cold-load-narration')) {
+  await switchLanguage('en')
+  // The browser profile is fresh and the pre-warm is deferred, so this first
+  // narration is the COLD engine load, start to finish, inside the probe window.
+  //
+  // LIVENESS GATE (point 117, rebuilt by point 304). On this forced-WASM path the
+  // model load must not cost the game its main thread — WASM never touches the GPU
+  // process. The gate therefore runs a 50 ms TICK TRAIN and charges only the
+  // stalls that the page's own animation-frame callbacks do NOT account for; see
+  // liveness.mjs. The metric it replaces was the raw rAF gap, which read ~15 000 ms
+  // on a quiet machine and blamed the TTS load for it — while the same 15 000 ms
+  // reproduced with the TTS worker stubbed out entirely: it is the startup frame
+  // awaiting the scene's shader-program links, a long FRAME with a perfectly free
+  // main thread (tick gap 63 ms). Both numbers are reported below; only the
+  // attributed block is binding.
+  await page.evaluate(() => {
+    const S = window.__liveness
+    S.frames.length = 0
+    S.ticks.length = 0
+    S.raf.length = 0
+    S.recording = true
+    S.timer = setInterval(() => S.ticks.push(performance.now()), 50)
+  })
+  const probeStart = Date.now()
+  // No trusted gesture has happened yet; the shared neutral key press is the
+  // first one, and it must fall INSIDE the probe window — this is the block the
+  // cold load belongs to.
+  await firstGesture()
+  // Self-test knob (point 304): VOICE_STALL_SELFTEST=<ms> injects a synchronous
+  // main-thread busy loop into the cold-load window, which must turn the gate
+  // below RED. That is how the gate is proven to still bite.
+  const selfTestMs = Number(process.env.VOICE_STALL_SELFTEST ?? 0)
+  if (selfTestMs > 0) {
+    await page.evaluate((ms) => {
+      setTimeout(() => {
+        const end = performance.now() + ms
+        while (performance.now() < end) {
+          /* block the main thread on purpose */
+        }
+      }, 2000)
+    }, selfTestMs)
+  }
+  let bootSpoke = false
+  try {
+    await page.waitForFunction(
+      () => {
+        const btns = document.querySelectorAll('.journal .speak')
+        const t = btns.length > 0 ? btns[btns.length - 1].textContent : ''
+        return t === '…' || t === '■'
+      },
+      null,
+      { timeout: 300000 },
+    )
+    bootSpoke = true
+  } catch {
+    bootSpoke = false
+  }
+  check('the start entry narrates on the first user gesture', bootSpoke, '')
+  // Let it reach the speaking state — the cold engine load runs in between, so
+  // the probe window closes on a load that provably happened inside it.
+  await page
+    .waitForFunction(() => document.querySelector('.journal .speak')?.textContent === '■', null, { timeout: 300000 })
+    .catch(() => {})
+  // KEEP RECORDING UNTIL THE MEASUREMENT IS TRUSTWORTHY (point 475). The window
+  // used to close the moment narration began, which on fast hardware already
+  // carries far more than the 30 frames the trust gate below demands — but a
+  // software-rendered container delivers ~12 fps, and under the cold load nearer
+  // one, so the same window closed on 8 frames and the gate reported "not
+  // trustworthy". That verdict was CORRECT and must not be softened by lowering
+  // the demand; the fix is to let the probe gather the samples it needs. Extending
+  // the window cannot hide a stall (the attribution takes the MAXIMUM block over
+  // it) and cannot invalidate the load-in-window test, which only asks that the
+  // model was served after probeStart.
+  // Collected WITH HEADROOM, not to the exact threshold: gathering until the gate's
+  // own minimum is met leaves a run that reaches it on the last poll one sample from
+  // red, which is how a rotating flake is born (this one showed up immediately — 30
+  // frames against a demand of more than 30, green only on the retry).
+  await page
+    .waitForFunction(() => window.__liveness.raf.length > 45 && window.__liveness.ticks.length > 30, null, { timeout: 60000 })
+    .catch(() => {})
+  const probe = await page.evaluate(() => {
+    const S = window.__liveness
+    S.recording = false
+    clearInterval(S.timer)
+    return { frames: S.frames, ticks: S.ticks, raf: S.raf }
+  })
+  const probeEnd = Date.now()
+  const blocks = attributeBlocks(probe.ticks, probe.frames)
+  const rafGapMs = Math.round(maxGap(probe.raf))
+  // The measurement must be TRUSTWORTHY before it may accuse anything: enough
+  // samples on both trains, and the model load must genuinely have happened
+  // inside the window (with the pre-warm deferred, the cache serves the model
+  // only once the narration asks for it). A window that missed the cold load
+  // proves nothing, and saying so beats a green tick.
+  const modelServed = ttsStats.served.filter((s) => /model_quantized\.onnx$/.test(s.url) && s.at >= probeStart && s.at <= probeEnd)
+  check(
+    'the cold-load liveness probe is trustworthy (spans the model load, both sample trains alive)',
+    probe.raf.length > 30 && probe.ticks.length > 20 && modelServed.length > 0,
+    `${probe.raf.length} frames, ${probe.ticks.length} ticks over ${probeEnd - probeStart} ms, model load in window: ${modelServed.length > 0}`,
   )
-  bootSpoke = true
-} catch {
-  bootSpoke = false
-}
-check('the start entry narrates on the first user gesture', bootSpoke, '')
-// Let it reach the speaking state — the cold engine load runs in between, so
-// the probe window closes on a load that provably happened inside it.
-await page
-  .waitForFunction(() => document.querySelector('.journal .speak')?.textContent === '■', null, { timeout: 300000 })
-  .catch(() => {})
-// KEEP RECORDING UNTIL THE MEASUREMENT IS TRUSTWORTHY (point 475). The window
-// used to close the moment narration began, which on fast hardware already
-// carries far more than the 30 frames the trust gate below demands — but a
-// software-rendered container delivers ~12 fps, and under the cold load nearer
-// one, so the same window closed on 8 frames and the gate reported "not
-// trustworthy". That verdict was CORRECT and must not be softened by lowering
-// the demand; the fix is to let the probe gather the samples it needs. Extending
-// the window cannot hide a stall (the attribution takes the MAXIMUM block over
-// it) and cannot invalidate the load-in-window test, which only asks that the
-// model was served after probeStart.
-// Collected WITH HEADROOM, not to the exact threshold: gathering until the gate's
-// own minimum is met leaves a run that reaches it on the last poll one sample from
-// red, which is how a rotating flake is born (this one showed up immediately — 30
-// frames against a demand of more than 30, green only on the retry).
-await page
-  .waitForFunction(() => window.__liveness.raf.length > 45 && window.__liveness.ticks.length > 30, null, { timeout: 60000 })
-  .catch(() => {})
-const probe = await page.evaluate(() => {
-  const S = window.__liveness
-  S.recording = false
-  clearInterval(S.timer)
-  return { frames: S.frames, ticks: S.ticks, raf: S.raf }
-})
-const probeEnd = Date.now()
-const blocks = attributeBlocks(probe.ticks, probe.frames)
-const rafGapMs = Math.round(maxGap(probe.raf))
-// The measurement must be TRUSTWORTHY before it may accuse anything: enough
-// samples on both trains, and the model load must genuinely have happened
-// inside the window (with the pre-warm deferred, the cache serves the model
-// only once the narration asks for it). A window that missed the cold load
-// proves nothing, and saying so beats a green tick.
-const modelServed = ttsStats.served.filter((s) => /model_quantized\.onnx$/.test(s.url) && s.at >= probeStart && s.at <= probeEnd)
-check(
-  'the cold-load liveness probe is trustworthy (spans the model load, both sample trains alive)',
-  probe.raf.length > 30 && probe.ticks.length > 20 && modelServed.length > 0,
-  `${probe.raf.length} frames, ${probe.ticks.length} ticks over ${probeEnd - probeStart} ms, model load in window: ${modelServed.length > 0}`,
-)
-// Generous bound: the defect this guards is a multi-second freeze; ordinary
-// scheduling noise on the tick train is tens of milliseconds.
-check(
-  'the WASM fallback keeps the main thread free through the cold TTS load (point 117)',
-  blocks.blockMs < 1500,
-  `attributed block ${Math.round(blocks.blockMs)} ms (raw tick gap ${Math.round(blocks.tickGapMs)} ms)`,
-)
-// Reported, NOT gated: the renderer's own synchronous frame cost and the
-// picture-level frame gap. Both belong to the scene's startup shader-program
-// compile, reproduce with the TTS worker stubbed out and are not this suite's
-// subject (point 304) — but a silent number is how the last misattribution
-// survived, so they are printed on every run.
-console.log(
-  `INFO  not gated, reported: max frame-covered stall ${Math.round(blocks.frameBlockMs)} ms, max rAF gap ${rafGapMs} ms` +
-    ' — seconds here mean the scene awaited its shader-program set, which reproduces with the TTS worker stubbed out (point 304)',
-)
-await page.locator('.journal .speak').last().click()
-await page.waitForTimeout(500)
+  // Generous bound: the defect this guards is a multi-second freeze; ordinary
+  // scheduling noise on the tick train is tens of milliseconds.
+  check(
+    'the WASM fallback keeps the main thread free through the cold TTS load (point 117)',
+    blocks.blockMs < 1500,
+    `attributed block ${Math.round(blocks.blockMs)} ms (raw tick gap ${Math.round(blocks.tickGapMs)} ms)`,
+  )
+  // Reported, NOT gated: the renderer's own synchronous frame cost and the
+  // picture-level frame gap. Both belong to the scene's startup shader-program
+  // compile, reproduce with the TTS worker stubbed out and are not this suite's
+  // subject (point 304) — but a silent number is how the last misattribution
+  // survived, so they are printed on every run.
+  console.log(
+    `INFO  not gated, reported: max frame-covered stall ${Math.round(blocks.frameBlockMs)} ms, max rAF gap ${rafGapMs} ms` +
+      ' — seconds here mean the scene awaited its shader-program set, which reproduces with the TTS worker stubbed out (point 304)',
+  )
+  await page.locator('.journal .speak').last().click()
+  await page.waitForTimeout(500)
 
-await page.locator('.journal .speak').first().click()
-let speaking = false
-try {
-  await page.waitForFunction(
-    () => document.querySelector('.journal .speak')?.textContent === '■',
-    null,
-    { timeout: 300000 },
-  )
-  speaking = true
-} catch {
-  speaking = false
+  await page.locator('.journal .speak').first().click()
+  let speaking = false
+  try {
+    await page.waitForFunction(
+      () => document.querySelector('.journal .speak')?.textContent === '■',
+      null,
+      { timeout: 300000 },
+    )
+    speaking = true
+  } catch {
+    speaking = false
+  }
+  check('English read-aloud reaches speaking state (audio playing)', speaking, '')
+  // The stop glyph on the speak control IS the narrating state this frame claims.
+  await shot('65-voice-english-readaloud', { element: '.journal .speak', label: 'the journal narrating aloud' })
+  // Stop narration via the same control.
+  await page.locator('.journal .speak').first().click()
+  await page.waitForTimeout(500)
 }
-check('English read-aloud reaches speaking state (audio playing)', speaking, '')
-// The stop glyph on the speak control IS the narrating state this frame claims.
-await shot('65-voice-english-readaloud', { element: '.journal .speak', label: 'the journal narrating aloud' })
-// Stop narration via the same control.
-await page.locator('.journal .speak').first().click()
-await page.waitForTimeout(500)
 
 // --- Auto-narration of a newly appearing entry (no click) --------------------
-await page.evaluate(() =>
-  window.__game.getState().addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' }),
-)
-let autoSpoke = false
-try {
-  // The model is already loaded, so only synthesis time remains.
-  await page.waitForFunction(
-    () => {
-      const btns = document.querySelectorAll('.journal .speak')
-      return btns.length > 0 && btns[btns.length - 1].textContent === '■'
-    },
-    null,
-    { timeout: 180000 },
+if (section('auto-narration')) {
+  await switchLanguage('en')
+  await firstGesture()
+  await page.evaluate(() =>
+    window.__game.getState().addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' }),
   )
-  autoSpoke = true
-} catch {
-  autoSpoke = false
+  let autoSpoke = false
+  try {
+    // The model is already loaded, so only synthesis time remains.
+    await page.waitForFunction(
+      () => {
+        const btns = document.querySelectorAll('.journal .speak')
+        return btns.length > 0 && btns[btns.length - 1].textContent === '■'
+      },
+      null,
+      { timeout: 180000 },
+    )
+    autoSpoke = true
+  } catch {
+    autoSpoke = false
+  }
+  check('English: new journal entry auto-narrates without a click', autoSpoke, '')
+  // The entries list ends with the scroll anchor that keeps the newest content in
+  // view (point 29), so the newest ENTRY is the second-to-last child — never the
+  // last child, and never the last of its TYPE either, since the anchor is a div
+  // as well. Counting from the back names it exactly, and names it loudly if the
+  // anchor ever goes away.
+  await shot('66-voice-auto-narration', { element: '.journal .entries > .entry:nth-last-child(2)', label: 'the new entry narrating itself' })
+  await page.locator('.journal .speak').last().click()
+  await page.waitForTimeout(400)
 }
-check('English: new journal entry auto-narrates without a click', autoSpoke, '')
-// The entries list ends with the scroll anchor that keeps the newest content in
-// view (point 29), so the newest ENTRY is the second-to-last child — never the
-// last child, and never the last of its TYPE either, since the anchor is a div
-// as well. Counting from the back names it exactly, and names it loudly if the
-// anchor ever goes away.
-await shot('66-voice-auto-narration', { element: '.journal .entries > .entry:nth-last-child(2)', label: 'the new entry narrating itself' })
-await page.locator('.journal .speak').last().click()
-await page.waitForTimeout(400)
+
+// A selected section that never executed is a FAILURE, not a quiet pass: it is
+// the one way a --section run could report green having verified nothing.
+const unrun = sections.unrun()
+if (unrun) check('the selected section actually ran', false, unrun)
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
+// Said again where the verdict is read: a green one-section run is not a green
+// suite, and nothing downstream may quote it as one.
+if (sections.banner()) console.log(sections.banner())
 await browser.close()
 // Cache verdict (point 88): once complete, the whole suite must run without
 // a single CDN request for the TTS assets; the first (recording) run instead
@@ -291,6 +336,10 @@ if (ttsStats.strict) {
   check('TTS assets served offline from the local cache', ttsStats.hits > 0 && ttsStats.misses === 0 && ttsStats.fetchErrors.length === 0, JSON.stringify({ ...ttsStats, served: ttsStats.served.length }))
 } else {
   check('TTS assets recorded into the local cache', ttsStats.hits + ttsStats.misses > 0 && ttsStats.fetchErrors.length === 0, JSON.stringify({ ...ttsStats, served: ttsStats.served.length }))
-  if (failures === 0 && errors.length === 0) markTtsCacheComplete()
+  // A PARTIAL run may never mark the cache COMPLETE (point 566). One section
+  // asks for a fraction of the assets, and a cache sealed on that fraction would
+  // make every later STRICT run abort on a gap it created itself — the one way
+  // the cheap repair rung could damage the runs that come after it.
+  if (failures === 0 && errors.length === 0 && !sections.partial) markTtsCacheComplete()
 }
 process.exit(failures > 0 || errors.length > 0 ? 1 : 0)

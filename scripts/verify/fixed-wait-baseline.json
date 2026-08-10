@@ -7,7 +7,7 @@
   "enrichments.mjs": 70,
   "events.mjs": 3,
   "flow.mjs": 30,
-  "gamepad.mjs": 8,
+  "gamepad.mjs": 7,
   "handwriting.mjs": 9,
   "health.mjs": 5,
   "i18n.mjs": 9,
@@ -17,6 +17,6 @@
   "settings.mjs": 24,
   "touch.mjs": 8,
   "visualsweep.mjs": 3,
-  "voice.mjs": 6,
+  "voice.mjs": 5,
   "world.mjs": 1
 }
