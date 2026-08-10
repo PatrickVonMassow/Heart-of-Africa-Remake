@@ -185,8 +185,8 @@ there exactly once; a new point joins a bundle when appended.
   short window) and 517 item 5 (the launcher EXTENDS the lease while evidence advances)
   pull the same `leaseUntil` arithmetic in opposite directions. ONE function must own
   the decision, or whichever lands second silently undoes the first.
-  OBSOLETE / RE-CUT — with the evidence each model recorded:
-  · 466 — DONE elsewhere. `node scripts/verify/docs.mjs` exits green at HEAD, including
+  NO LONGER VALID AS WRITTEN — with the evidence each model recorded:
+  · 466 — its work exists already. `node scripts/verify/docs.mjs` exits green at HEAD, including
     the detail-pointer checks this point asks to ADD. Tick and archive.
   · 184 / 203 / 207 / 309 / 330 — each carries internal DONE records and archived
     successors, so each reads as an unstarted 60-line block in every context that loads
@@ -207,8 +207,8 @@ there exactly once; a new point joins a bundle when appended.
   · 451 — half delivered (stdin works); what remains is the explicit flag and the loud
     refusal of an unknown one.
   · 379 and 380 — their blocking clauses name points that are archived done; strike them.
-  · 357 — its premise "§13.4 is undecided, so voices stay wordless" is superseded by the
-    delivered communication PoC; the gap is real, the clause is not.
+  · 357 — its wordless-voices clause rests on §13.4 being undecided, which the delivered
+    communication PoC settled; the gap it describes is real, the clause is not.
   PREMISE TO RE-MEASURE BEFORE ANY WORK: 506 argues from a SOFTWARE WebGPU lane at
   ~1 fps, while archived point 505 put the lane on the card and open point 498 states the
   factor is history — the work order contradicts itself, and 506/507/514/498 all hang off
