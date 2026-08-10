@@ -5473,3 +5473,32 @@ to land than a mechanism that needs a review.
   ceiling" finds no doc-budget occurrence that still routes a raise through the user;
   `node scripts/doc-budget-core.mjs` and `scripts/verify/docs.mjs` green.
   Criticality: low — a process rule, no player-visible behaviour.
+
+- [ ] 622. A VERIFY RUN THAT RAN NOTHING REPORTS GREEN, AND AN UNKNOWN FLAG RUNS
+  EVERYTHING (found 10.08.2026 while verifying point 592; bundle Prüfkosten).
+  Two shapes of the same hole in `scripts/verify/tiers.mjs`' `parseArgs`, both
+  reproduced today: `node scripts/verify/run-logged.mjs --help` sorted `--help`
+  into `flags`, left `filter` empty and therefore started a FULL both-backends
+  LARGE run (killed after it had booted); `node scripts/verify/run-all.mjs helth`
+  intersected a typo'd suite name to the EMPTY set and printed `ALL GREEN — 0
+  suites run` in under a second. The second is the dangerous one — it is a green
+  verdict for a run that proved nothing, the failure class points 375 and 574
+  exist for; the first only burns 42 minutes.
+  FINAL STATE:
+  1. An argument the runner does not know is REFUSED before anything is built or
+     booted — an unknown flag and a filter token naming no suite each exit
+     non-zero within a tenth of a second and name what does exist. The
+     `--section` path's early validation in `run-all.mjs` is the model and the
+     place to join.
+  2. `--help` / `-h` prints the usage of `run-all.mjs` and of
+     `scripts/verify/run-logged.mjs` and exits 0 WITHOUT running anything.
+  3. A run whose chosen suite set is EMPTY is never GREEN: it exits non-zero and
+     names the filter that matched nothing. "0 suites run" is a failure verdict.
+  4. `scripts/verify/tiers.test.mjs` pins all three in the fast layer, including
+     that a KNOWN flag (`--baseline`, `--section=…`, `--quiet`) still parses.
+  VERIFIABLE: `node scripts/verify/run-all.mjs helth` exits non-zero naming the
+  suites, `node scripts/verify/run-logged.mjs --help` prints usage and runs
+  nothing, `npm run test:unit` green.
+  Criticality: medium — it touches the argument path of every regression command,
+  so a mistake there silences the whole gate; the other model's mechanism review
+  applies.
