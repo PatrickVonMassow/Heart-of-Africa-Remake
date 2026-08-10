@@ -127,18 +127,16 @@ function git(args, { required = true } = {}) {
  * symlink yields its own target text (a few harmless bytes, and visible as such)
  * and nothing outside the commit can travel at all.
  */
-function gatherMaterial(sha, base = '') {
-  // THE WHOLE BRANCH, NOT THE LAST COMMIT (10.08.2026). One record covers every
+function gatherMaterial(sha, base) {
+  // THE WHOLE RANGE, NOT THE LAST COMMIT (10.08.2026). One record covers every
   // commit it CONTAINS — that is how both gates read the ledger — so a review of
   // a branch head that only saw the head's own diff would clear commits nobody
-  // looked at. A range DIFF (rather than per-commit patches) is what carries a
-  // merge commit's conflict resolution, which `git log --patch` omits.
-  const range = base ? `${base}..${sha}` : ''
-  const paths = (range
-    ? git(['diff', '--name-only', range])
-    : git(['show', '--pretty=format:', '--name-only', sha])
-  ).split('\n').map((p) => p.trim()).filter(Boolean)
-  const patch = range ? git(['diff', range]) : git(['show', sha])
+  // looked at. mergeBase() therefore never hands over an empty base; it refuses.
+  // A range DIFF (rather than per-commit patches) is what carries a merge
+  // commit's conflict resolution, which `git log --patch` omits.
+  const range = `${base}..${sha}`
+  const paths = git(['diff', '--name-only', range]).split('\n').map((p) => p.trim()).filter(Boolean)
+  const patch = git(['diff', range])
   // A file the patch ADDS whole is already there in full; sending its content
   // again only spends the budget the other files need — but only while the patch
   // itself fits, or the file would fall out of both halves.
@@ -151,48 +149,61 @@ function gatherMaterial(sha, base = '') {
     // above still shows what happened to it.
     if (text !== null) files.push({ path, text })
   }
-  return formatReviewMaterial({
-    stat: range ? git(['diff', '--stat', range]) : git(['show', '--stat', sha]),
-    patch,
-    files,
-  })
+  return formatReviewMaterial({ stat: git(['diff', '--stat', range]), patch, files })
 }
 
 /**
  * The commit the review's range starts at: where `ref` and `sha` diverged.
  *
- * An UNKNOWN ref fails loud (four-eyes finding, second round): swallowing it
- * silently reviewed the head commit alone while the record still cleared every
- * commit below it — the exact "reviewed" state nobody looked at. An empty answer
- * means only that the two do not diverge, which is an ordinary case.
+ * EVERY answer that is not a PROPER ANCESTOR fails loud (four-eyes findings,
+ * rounds two to four): an unknown ref, a ref that is the sha itself or a
+ * descendant of it, one on an unrelated history, or no divergence at all. Each
+ * of them used to shrink the material to a single commit while the record still
+ * cleared every commit below it — the exact "reviewed" state nobody looked at.
+ * This function therefore never returns an empty base; it either names the
+ * range's start or refuses.
  */
 function mergeBase(ref, sha, { explicit = false } = {}) {
   if (git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { required: false }) === null) {
     throw new Error(`--since ${ref}: no such commit in this repository`)
   }
   const base = git(['merge-base', ref, sha], { required: false })
-  if (base && base !== sha) return base
+  // THE BASE MUST BE A PROPER ANCESTOR (fourth cross-vendor round). An explicit
+  // `--since` naming the sha itself, a descendant, or an unrelated ref yields a
+  // base that shows the reviewer less than the record will clear.
+  if (base && base !== sha) {
+    const isAncestor = spawnSync('git', ['merge-base', '--is-ancestor', base, sha], {
+      cwd: REPO_ROOT,
+      windowsHide: true,
+    })
+    if (isAncestor.status !== 0) {
+      throw new Error(`--since ${ref}: ${base.slice(0, 7)} is not an ancestor of ${sha.slice(0, 7)}`)
+    }
+    return base
+  }
+  if (explicit) {
+    throw new Error(
+      `--since ${ref} names no range below ${sha.slice(0, 7)}: it is that commit or a descendant of it.\n` +
+        '  A record covers every commit it CONTAINS, so the range must start BELOW the reviewed sha\n' +
+        `    --since ${sha.slice(0, 7)}~1   (this commit alone)`,
+    )
+  }
   // NO DIVERGENCE FROM THE DEFAULT REF: the commit is already on `main`, and
   // falling back to its own diff would show the reviewer ONE commit while the
   // record it produces clears every commit below it (third cross-vendor round).
   // The range must then be named, and the operator is told how.
-  if (!explicit) {
-    throw new Error(
-      `${sha.slice(0, 7)} does not diverge from ${ref}, so there is no branch range to show.\n` +
-        '  A record covers every commit it CONTAINS, so the range must be named:\n' +
-        `    --since ${sha.slice(0, 7)}~1   (this commit alone)\n` +
-        '    --since <the last reviewed sha>',
-    )
-  }
-  return ''
+  throw new Error(
+    `${sha.slice(0, 7)} does not diverge from ${ref}, so there is no branch range to show.\n` +
+      '  A record covers every commit it CONTAINS, so the range must be named:\n' +
+      `    --since ${sha.slice(0, 7)}~1   (this commit alone)\n` +
+      '    --since <the last reviewed sha>',
+  )
 }
 
-/** Every model that authored a commit in the reviewed range (or the commit). */
-function authorsIn(sha, base = '') {
+/** Every model that authored a commit in the reviewed range. */
+function authorsIn(sha, base) {
   const field = '%(trailers:key=Co-Authored-By,valueonly,separator=;)'
-  const log = base
-    ? git(['log', `--format=${field}`, `${base}..${sha}`])
-    : git(['show', '-s', `--format=${field}`, sha])
+  const log = git(['log', `--format=${field}`, `${base}..${sha}`])
   // EVERY model on each line, not just its first: a commit naming two would
   // otherwise hide one, and the chain could hand the review to an author.
   return String(log).split('\n').flatMap((line) => modelsInTrailerField(line))
@@ -442,8 +453,8 @@ if (isMainModule(import.meta.url)) {
     const base = mergeBase(since || 'main', full, { explicit: Boolean(since) })
     const material = gatherMaterial(full, base)
     console.error(
-      `  material: ${material.length} characters of diff and file content` +
-        `${base ? ` (${base.slice(0, 7)}..${full.slice(0, 7)} — the whole branch)` : ' (this commit)'}`,
+      `  material: ${material.length} characters of diff and file content ` +
+        `(${base.slice(0, 7)}..${full.slice(0, 7)})`,
     )
     const run = runCodex({ prompt: buildReviewPrompt({ sha: full, brief, mode }), input: material, timeoutMs })
     const outcome = classifyOutcome(run)

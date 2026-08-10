@@ -157,6 +157,18 @@ describe('the guards around the run', () => {
     expect(run(['--sha', onMain, '--since', `${onMain}~1`, '--brief', 'judge it']).status).toBe(0)
   })
 
+  it('refuses an explicit --since that is not a proper ancestor of the sha', () => {
+    provenId()
+    const head = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim()
+    // The sha itself, and a descendant of the range start: both would show the
+    // reviewer less than the record clears (four-eyes finding, fourth round).
+    for (const since of [head, 'HEAD']) {
+      const r = run(['--sha', `${head}~1`, '--since', since, '--brief', 'judge it'])
+      expect(r.status).not.toBe(0)
+      expect(r.stderr).toMatch(/--since/)
+    }
+  })
+
   it('refuses a sha that is not a commit', () => {
     provenId()
     const r = run(['--sha', 'deadbeefdeadbeef', '--brief', 'judge it'])

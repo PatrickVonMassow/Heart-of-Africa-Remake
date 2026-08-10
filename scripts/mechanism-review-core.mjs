@@ -338,7 +338,7 @@ export function formatArgErrors(errors = []) {
 export const BLIND_REVIEWER = new RegExp(
   [
     // "I could not read/see/access …", "we were unable to inspect …"
-    /\b(?:i|we)\s+(?:could\s+not|couldn't|can(?:no|')t|was\s+unable\s+to|were\s+unable\s+to|did\s+not\s+(?:get|receive|have))\b[^.\n]{0,80}\b(?:read|see|inspect|access|reach|open|review|view|retrieve|fetch)\b/
+    /\b(?:i|we)\s+(?:could\s+not|couldn't|can(?:no|')t|(?:was|were)\s+(?:unable|not\s+able)\s+to|did\s+not\s+(?:get|receive|have))\b[^.\n]{0,80}\b(?:read|see|inspect|access|reach|open|review|view|retrieve|fetch)\b/
       .source,
     // "no access to the diff", "without access to the files", "had no material"
     /\b(?:no|without|lacking|denied)\s+access\b/.source,
