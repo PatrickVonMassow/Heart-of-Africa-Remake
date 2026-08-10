@@ -1,5 +1,6 @@
 // Global keyboard state: polled by scenes each frame, plus one-shot key events.
 
+import { installKeyboardLock, preventsBrowserChord } from './keyboardGuard'
 import { createEngageLatch } from './touchInput'
 
 const pressed = new Set<string>()
@@ -16,11 +17,18 @@ function isTypingTarget(e: Event): boolean {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('keydown', (e) => {
-    if (isTypingTarget(e)) return
+    const typing = isTypingTarget(e)
+    // A modifier chord on a key the game binds belongs to the game, not to the
+    // browser (work-order 601): holding the label modifier while walking must
+    // not bookmark, print or save the page. The three RESERVED chords
+    // (Ctrl+W/T/N) ignore this — the keyboard lock below is what covers them.
+    if (preventsBrowserChord(e, { typing })) e.preventDefault()
+    if (typing) return
     pressed.add(e.code)
   })
   window.addEventListener('keyup', (e) => pressed.delete(e.code))
   window.addEventListener('blur', () => pressed.clear())
+  installKeyboardLock()
 }
 
 export function isKeyDown(code: string): boolean {

@@ -995,6 +995,73 @@ if (section('debug-wheel-zoom')) {
   await page.evaluate((z) => window.__ui.getState().setTravelZoom(z), zoomBefore)
 }
 
+// --- Keyboard capture (work-order 601, design.md §17.8) ----------------------
+// Holding the label modifier while walking IS Ctrl+W, and no keydown handler
+// reaches that chord — only the Keyboard Lock API does, and only in fullscreen.
+// WHAT NEEDS A BROWSER here is the wiring alone: that the shipped bundle
+// installs the document listeners and asks for the lock exactly at the
+// fullscreen + pointer transition. The decision itself is pinned without a
+// browser in src/systems/keyboardGuard.test.ts. The API is STUBBED rather than
+// driven for real: headless grants neither fullscreen nor pointer lock
+// dependably, and a check that quietly skips proves nothing.
+if (section('keyboard-lock')) {
+  await ensureTravel()
+  await page.evaluate(() => {
+    window.__lockCalls = []
+    Object.defineProperty(navigator, 'keyboard', {
+      configurable: true,
+      value: {
+        lock: (codes) => {
+          window.__lockCalls.push({ kind: 'lock', codes: [...(codes ?? [])] })
+          return Promise.resolve()
+        },
+        unlock: () => window.__lockCalls.push({ kind: 'unlock' }),
+      },
+    })
+  })
+  // Drive the two document conditions the guard reads, then fire the event it
+  // listens for — the same path the real transitions take.
+  const drive = (state) =>
+    page.evaluate((s) => {
+      const el = document.body
+      const fake = (name, value) => Object.defineProperty(document, name, { configurable: true, get: () => value })
+      fake('fullscreenElement', s.fullscreen ? el : null)
+      fake('pointerLockElement', s.pointerLocked ? el : null)
+      fake('hidden', s.hidden === true)
+      document.dispatchEvent(new Event(s.event))
+      return window.__lockCalls
+    }, state)
+
+  const pointerOnly = await drive({ fullscreen: false, pointerLocked: true, event: 'pointerlockchange' })
+  check('the pointer alone does not lock the keyboard (the API needs fullscreen)', pointerOnly.length === 0,
+    `${pointerOnly.length} calls`)
+
+  const locked = await drive({ fullscreen: true, pointerLocked: true, event: 'fullscreenchange' })
+  const lockCall = locked.find((c) => c.kind === 'lock')
+  check('fullscreen + pointer lock requests the keyboard lock for the game keys',
+    lockCall != null && lockCall.codes.includes('KeyW') && lockCall.codes.includes('KeyT'),
+    lockCall ? `${lockCall.codes.length} codes` : 'no lock requested')
+  check('Escape stays the browser\'s, so leaving fullscreen is one press',
+    lockCall != null && !lockCall.codes.includes('Escape'))
+
+  const released = await drive({ fullscreen: true, pointerLocked: false, event: 'pointerlockchange' })
+  check('losing the pointer lock releases the keyboard', released.at(-1)?.kind === 'unlock',
+    released.map((c) => c.kind).join(','))
+
+  await drive({ fullscreen: true, pointerLocked: true, event: 'pointerlockchange' })
+  const hidden = await drive({ fullscreen: true, pointerLocked: true, hidden: true, event: 'visibilitychange' })
+  check('a hidden tab gives the keyboard back', hidden.at(-1)?.kind === 'unlock',
+    hidden.map((c) => c.kind).join(','))
+
+  // Hand the page back its own document and keyboard: nothing downstream may
+  // measure a stubbed state.
+  await page.evaluate(() => {
+    for (const name of ['fullscreenElement', 'pointerLockElement', 'hidden']) delete document[name]
+    delete navigator.keyboard
+    delete window.__lockCalls
+  })
+}
+
 // --- DEV render-resource leak invariant (point 295) --------------------------
 // The TRAA block above gates ONE transition kind at ONE moment. The invariant
 // (src/render/renderLeak.ts) watches every transition of every session, so what

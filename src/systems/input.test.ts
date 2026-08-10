@@ -85,6 +85,38 @@ describe('moveAxes (design.md §17)', () => {
   })
 })
 
+// The browser's chords, taken away where the platform allows it (work-order
+// 601). The decision itself is pinned in keyboardGuard.test.ts; what is asserted
+// here is that the global keydown listener really applies it.
+describe('modifier chords on the game keys', () => {
+  const chordDown = (code: string, ctrlKey: boolean) =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { code, ctrlKey, cancelable: true }))
+
+  it('prevents Ctrl+W (close tab) and still registers the forward key', () => {
+    expect(chordDown('KeyW', true)).toBe(false) // defaultPrevented
+    expect(moveAxes()).toEqual({ x: 0, y: 1 }) // holding the modifier steers on
+    release('KeyW')
+  })
+
+  it('leaves a chord on an unbound key alone', () => {
+    expect(chordDown('KeyR', true)).toBe(true) // Ctrl+R stays the browser's reload
+    release('KeyR')
+  })
+
+  it('leaves a plain keypress alone', () => {
+    expect(chordDown('KeyW', false)).toBe(true)
+    release('KeyW')
+  })
+
+  it('keeps the chord inside a form control (Ctrl+A in a debug field)', () => {
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    const ok = input.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA', ctrlKey: true, bubbles: true, cancelable: true }))
+    expect(ok).toBe(true)
+    input.remove()
+  })
+})
+
 // Touch state (design.md §17.5, point 84): the overlay writes it, the scenes
 // consume it — plain module state, no DOM/RAF involved, so it is jsdom-safe.
 describe('touch stick and look/pinch accumulators (design.md §17.5)', () => {

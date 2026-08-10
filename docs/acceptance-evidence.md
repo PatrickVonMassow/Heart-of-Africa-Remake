@@ -1335,6 +1335,21 @@ Verifiable, by suite:
   chunk-matched ground tone is pure-tested in
   `src/scenes/travel/farColor.test.ts`, the F3 zoom unlock in
   `src/ui/Hud.test.tsx`.
+- The keyboard capture of work-order 601 (`design.md` §17.8): the
+  chord set and the lock's state machine are pure-tested in
+  `src/systems/keyboardGuard.test.ts` — a modifier chord on a key the
+  game binds is prevented (Ctrl+W, +S, +P, +D, +A, +T) and an unbound
+  one (Ctrl+R, +I, F5) is not, none of it inside a form control; the
+  lock is requested once, only with fullscreen AND the pointer, with
+  every bound code except Escape, released with either condition, and
+  a missing or refusing API is never an error. The global keydown
+  listener really applying the rule is asserted in
+  `src/systems/input.test.ts` (Ctrl+W prevented AND still walking
+  forward), and the WIRING in the shipped bundle — the document
+  listeners and the request at the real transition — in the
+  `keyboard-lock` section of `scripts/verify/settings.mjs`. The
+  reserved chords themselves cannot be asserted from a test; the
+  request is what is proved.
 - `scripts/verify/collision.mjs`: corner clearance at box buildings
   and an inhabitant re-entering its dwelling (pt. 16).
 - `scripts/verify/voice.mjs`: the automatic narration of a new entry
