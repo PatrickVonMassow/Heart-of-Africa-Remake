@@ -22,6 +22,18 @@
 import { MONTH_KEYS } from './season'
 
 /**
+ * The calendar keys of §21.1: the month row and the year steps. The game binds
+ * them PLAIN — there is no Ctrl+digit anywhere in it — which is why they are
+ * named apart from the rest (see PREVENTED_CHORD_CODES).
+ */
+const CALENDAR_KEY_CODES: readonly string[] = [
+  ...MONTH_KEYS,
+  'BracketRight', 'Slash', 'NumpadAdd', 'NumpadSubtract',
+]
+
+const CALENDAR_KEY_SET = new Set(CALENDAR_KEY_CODES)
+
+/**
  * Every physical code the game's own controls bind (design.md §17.5/§21.1) —
  * the canonical list, and the reason a chord counts as a collision. Ordered by
  * who binds it, so a new binding is added beside its kin.
@@ -44,8 +56,7 @@ export const GAME_KEY_CODES: readonly string[] = [
   // reload, which is why the bug report sits on F6.
   'F1', 'F2', 'F3', 'F4', 'F6', 'F8', 'F9',
   // The month row and the year steps (§21.1).
-  ...MONTH_KEYS,
-  'BracketRight', 'Slash', 'NumpadAdd', 'NumpadSubtract',
+  ...CALENDAR_KEY_CODES,
 ]
 
 const GAME_KEY_SET = new Set(GAME_KEY_CODES)
@@ -54,6 +65,19 @@ const GAME_KEY_SET = new Set(GAME_KEY_CODES)
 export function isGameKeyCode(code: string): boolean {
   return GAME_KEY_SET.has(code)
 }
+
+/**
+ * The codes whose modifier chord is taken from the browser. Prevention is for
+ * keys the game binds UNDER a modifier; a plain binding does not earn it — the
+ * calendar row is bound plain, so swallowing Ctrl+1–9 and the keyboard zoom
+ * (Ctrl +/−/0) would protect nothing and cost the player two of the browser's
+ * most-used chords. They stay in the LOCK set, which takes whole keys.
+ */
+export const PREVENTED_CHORD_CODES: readonly string[] = GAME_KEY_CODES.filter(
+  (c) => !CALENDAR_KEY_SET.has(c),
+)
+
+const PREVENTED_CHORD_SET = new Set(PREVENTED_CHORD_CODES)
 
 /**
  * The codes handed to the keyboard lock: the game's keys WITHOUT Escape.
@@ -76,9 +100,10 @@ export function shouldLockKeyboard(state: { fullscreen: boolean; pointerLocked: 
 
 /**
  * Is this keydown a browser chord the game must swallow? True for a modifier
- * chord on a key the game binds, so an unbound key (Ctrl+R, Ctrl+Shift+I) keeps
- * its browser meaning. Never inside a form control: the debug fields and the
- * bug-report description keep Ctrl+A/C/V.
+ * chord on a key of PREVENTED_CHORD_CODES, so an unbound key (Ctrl+R,
+ * Ctrl+Shift+I) and the plain-bound calendar row keep their browser meaning.
+ * Never inside a form control: the debug fields and the bug-report description
+ * keep Ctrl+A/C/V.
  *
  * Meta is left alone — Cmd+W is as reserved as Ctrl+W and the key belongs to
  * the operating system, so nothing a page does reaches it.
@@ -89,7 +114,7 @@ export function preventsBrowserChord(
 ): boolean {
   if (ctx.typing) return false
   if (!e.ctrlKey && !e.altKey) return false
-  return isGameKeyCode(e.code)
+  return PREVENTED_CHORD_SET.has(e.code)
 }
 
 /** The slice of the Keyboard Lock API this module uses (not in lib.dom). */

@@ -64,6 +64,28 @@ describe('preventsBrowserChord (work-order 601)', () => {
     expect(preventsBrowserChord(chord('ArrowLeft', { altKey: true }), { typing: false })).toBe(true)
   })
 
+  // The distinction that must not silently regress: prevention is for keys the
+  // game binds UNDER a modifier. The calendar row is bound PLAIN, so its chords
+  // stay the browser's — Ctrl+1–9 switch tabs, Ctrl +/−/0 zoom, and the game
+  // wants none of them.
+  it('lets the browser keep the chords on the plain-bound calendar row', () => {
+    for (const code of [...MONTH_KEYS, 'BracketRight', 'Slash', 'NumpadAdd', 'NumpadSubtract']) {
+      expect(isGameKeyCode(code)).toBe(true) // the game DOES bind it — plain
+      expect(preventsBrowserChord(chord(code), { typing: false })).toBe(false)
+      expect(preventsBrowserChord(chord(code, { altKey: true }), { typing: false })).toBe(false)
+    }
+    // Named explicitly, because these are the chords the player would miss.
+    for (const code of ['Digit1', 'Digit9', 'Minus', 'Equal', 'Digit0']) {
+      expect(preventsBrowserChord(chord(code), { typing: false })).toBe(false)
+    }
+    // …while the load-bearing ones are untouched by the exception.
+    for (const code of ['KeyW', 'KeyU', 'KeyG', 'KeyP', 'ArrowLeft']) {
+      expect(preventsBrowserChord(chord(code), { typing: false })).toBe(true)
+    }
+    // The lock still takes the calendar keys: it captures whole keys, not chords.
+    for (const code of MONTH_KEYS) expect(KEYBOARD_LOCK_CODES).toContain(code)
+  })
+
   it('never touches a plain keypress', () => {
     expect(preventsBrowserChord(chord('KeyW', {}), { typing: false })).toBe(false)
     expect(preventsBrowserChord(chord('Space', {}), { typing: false })).toBe(false)

@@ -103,6 +103,23 @@ describe('modifier chords on the game keys', () => {
     release('KeyR')
   })
 
+  it('leaves the keyboard zoom and the tab jumps alone, and the plain key still reaches the game', () => {
+    // The month row is bound PLAIN (design.md §21.1), so Ctrl+1 and Ctrl+0 stay
+    // the browser's tab jump and zoom reset — preventing them would protect
+    // nothing.
+    expect(chordDown('Digit1', true)).toBe(true)
+    expect(chordDown('Minus', true)).toBe(true)
+    release('Digit1')
+    release('Minus')
+    // …while the plain key still drives the game handler it is bound to.
+    const cb = vi.fn()
+    const off = onKeyPress('Digit1', cb)
+    expect(chordDown('Digit1', false)).toBe(true)
+    expect(cb).toHaveBeenCalledTimes(1)
+    off()
+    release('Digit1')
+  })
+
   it('leaves a plain keypress alone', () => {
     expect(chordDown('KeyW', false)).toBe(true)
     release('KeyW')

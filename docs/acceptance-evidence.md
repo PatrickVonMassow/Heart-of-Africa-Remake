@@ -1338,8 +1338,11 @@ Verifiable, by suite:
 - The keyboard capture of work-order 601 (`design.md` §17.8): the
   chord set and the lock's state machine are pure-tested in
   `src/systems/keyboardGuard.test.ts` — a modifier chord on a key the
-  game binds is prevented (Ctrl+W, +S, +P, +D, +A, +T) and an unbound
-  one (Ctrl+R, +I, F5) is not, none of it inside a form control; the
+  game binds UNDER a modifier is prevented (Ctrl+W, +S, +P, +D, +A, +T,
+  Alt+Arrow) and an unbound one (Ctrl+R, +I, F5) is not, nor the
+  plain-bound calendar row, whose chords stay the browser's tab jumps
+  and keyboard zoom (Ctrl+1–9, Ctrl +/−/0) while the LOCK still takes
+  those keys; none of it inside a form control; the
   lock is requested once, only with fullscreen AND the pointer, with
   every bound code except Escape, released with either condition, and
   a missing or refusing API is never an error. The global keydown
