@@ -115,10 +115,14 @@ export const RESUME_PROMPT =
   'abgehakt, committet und gepusht — folgt die Punktgrenze; bei Rot wird zuerst der genannte Schritt ' +
   'repariert. ' +
   'Dashboard-Guard + ' +
-  'prep-guard gruen halten, Vorarbeit waehrend jeder Validierung. WARTEN IST SICHTBAR (28.07.2026): ' +
-  'waehrend ein delegierter Agent baut, POLLE innerhalb des Zuges (TaskOutput, Branch-Tip, Logdatei) ' +
-  'statt still zu sitzen — jeder Werkzeugaufruf frischt den Heartbeat, und eine still wartende Sitzung ' +
-  'ist von einer toten nicht zu unterscheiden; kannst du im Zug nicht weiter pollen, deklariere die ' +
+  'prep-guard gruen halten, Vorarbeit waehrend jeder Validierung. WARTEN IST SICHTBAR, ABER NICHT DURCH ' +
+  'POLLEN (28.07.2026, praezisiert 10.08.2026): laeuft eine Suite oder baut ein delegierter Agent, WARTE ' +
+  'BLOCKIEREND — `node scripts/verify/run-wait.mjs --await` ist EIN Aufruf, der mit der Quittung des Laufs ' +
+  'zurueckkommt, und `--plan <tier>` sagt vorher, ob ein blockierender Aufruf ueberhaupt reicht. Eine ' +
+  'Poll-Schleife ist verboten: gemessen 10,9 % der gewichteten Ausgabe, laengste Kette 437 Antworten fuer ' +
+  'ein Wort. Sichtbar bleibt die Wartestellung trotzdem — der PostToolUse-Hook setzt die ' +
+  'In-Flight-Markierung, solange ein Lauf nachweislich laeuft, und nimmt sie zurueck, sobald er vorbei ist. ' +
+  'Dauert der Lauf laenger, als ein blockierender Aufruf dauern darf, deklariere die ' +
   'Wartestellung mit `node scripts/batch-in-flight.mjs --waiting-on ...`. PUNKT-GRENZE (27.07.2026): der ' +
   'Kontext ist der groesste Kostenfaktor des Batches — wenn der gemergte und abgehakte Punkt fertig ist ' +
   'UND kein delegierter Agent mehr laeuft (Pool erst leerlaufen lassen), fuehre `node ' +
