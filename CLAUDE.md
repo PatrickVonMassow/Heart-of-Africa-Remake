@@ -302,14 +302,14 @@ coverage map live in `scripts/verify/README.md`.
   ARE SEPARATE ROLES.** AUTHORS: only **Opus 5**, then **Fable 5**, then **Opus
   4.8**, the chain `scripts/batch-autostart.mjs` launches. DIFFICULTY IS NO
   REASON to hand work to Fable: Opus 5 is the WORKER at any difficulty.
-  REVIEWERS (both modes): **GPT-5.6 Sol** at effort HIGH, else **Fable 5**. A
-  reviewer is bought for its DIFFERENT errors, and another VENDOR decorrelates
-  further than our own house; never "simplify" that away. Reviews run through
-  `node scripts/review-sol.mjs`, never a hand-typed `codex` line: it names the
-  cause in ONE line, HANDS the review to Fable on any failure, and RECORDS who
-  ran it. Sonnet and Haiku are NOT acceptable: a degraded session is a
-  capability breach and the batch STOPS. Every commit NAMES its author model in
-  a `Co-Authored-By` trailer the `commit-msg` hook enforces;
+  REVIEWERS (both modes): **GPT-5.6 Sol** at effort HIGH, else **Fable 5**
+  (**Opus 5** where Fable authored it). A reviewer is bought for its DIFFERENT
+  errors, and another VENDOR decorrelates further than our own house; never
+  "simplify" that away. Reviews run through `node scripts/review-sol.mjs`,
+  never a hand-typed `codex` line: it names the cause, HANDS the review on, and
+  RECORDS who ran it. Sonnet and Haiku are NOT acceptable: a degraded session
+  is a capability breach and the batch STOPS. Every commit NAMES its author
+  model in a `Co-Authored-By` trailer the `commit-msg` hook enforces;
   `scripts/model-guard-core.mjs` holds the AUTHOR allowlist (`ALLOWED`) and
   `scripts/model-guard.mjs` blocks the turn end on any commit after its
   baseline authored outside it: HARD on a NAMED forbidden model (pause),

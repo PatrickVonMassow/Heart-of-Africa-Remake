@@ -19,7 +19,11 @@
 // Side-effect free: the process spawn, the temp files and the printing belong to
 // scripts/review-sol.mjs. Pinned by review-sol-core.test.mjs.
 
-import { sameModel, VERDICTS } from './mechanism-review-core.mjs'
+import { BLIND_REVIEWER, sameModel, VERDICTS } from './mechanism-review-core.mjs'
+
+// Re-exported: the runner and the recorder refuse the same sentence, from one
+// definition (mechanism-review-core.mjs).
+export { BLIND_REVIEWER }
 
 /** The model id `codex exec -m` is given, and the name a record calls it by. */
 export const SOL_MODEL_ID = 'gpt-5.6-sol'
@@ -198,8 +202,6 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review' } = {}
  * evidence line too thin to mean anything, is NOT a verdict. Such a run has not
  * been reviewed, and the caller falls back rather than record a guess.
  */
-export const BLIND_REVIEWER = /\b(?:i|we)\s+(?:could\s+not|couldn't|can(?:no|')t|was\s+unable\s+to|were\s+unable\s+to|did\s+not\s+(?:get|receive))\b[^.\n]{0,80}\b(?:read|see|inspect|access|reach|open|review|view|retrieve|fetch|the\s+(?:diff|patch|material|repository|files?))\b|\bno\s+(?:access\s+to|material|patch|diff)\b|\bnone\s+of\s+my\s+commands\b/i
-
 export function parseVerdict(text) {
   const raw = String(text ?? '')
   const clean = raw.replace(/[*`_#>]/g, '')
@@ -281,9 +283,14 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '' } = {
  * leave a Fable-authored change with no reachable reviewer at all whenever Sol
  * is down, so the second Anthropic model in the chain takes over instead (found
  * by the cross-vendor review of this very branch, 10.08.2026).
+ *
+ * It takes EVERY author in the reviewed range, not just the head commit's: one
+ * record covers every commit it contains, so a range with one Fable commit under
+ * an Opus head must not be handed to Fable (second round of the same review).
  */
-export function fallbackReviewerFor(authorModel = '') {
-  return sameModel(FALLBACK_MODEL_NAME, authorModel) ? SECOND_FALLBACK_MODEL_NAME : FALLBACK_MODEL_NAME
+export function fallbackReviewerFor(authorModels = '') {
+  const authors = Array.isArray(authorModels) ? authorModels : [authorModels]
+  return authors.some((a) => sameModel(FALLBACK_MODEL_NAME, a)) ? SECOND_FALLBACK_MODEL_NAME : FALLBACK_MODEL_NAME
 }
 
 /** How much material one review may carry — the patch plus the changed files —
@@ -337,6 +344,29 @@ export function formatReviewMaterial({ stat = '', patch = '', files = [], budget
     left -= header.length + Math.min(text.length, room) + 80
   }
   return out.join('\n')
+}
+
+/**
+ * The paths a patch ADDS whole, whose current content would be sent twice.
+ *
+ * On this branch the duplicate cost the review its material budget: the patch
+ * already carried every added file in full, and the copies pushed the files the
+ * reviewer was asked to judge out of the ceiling (second cross-vendor round).
+ */
+export function newFilePathsIn(patch) {
+  const paths = new Set()
+  const lines = String(patch ?? '').split('\n')
+  for (let i = 0; i < lines.length; i++) {
+    if (!/^new file mode /.test(lines[i])) continue
+    for (let j = i; j >= 0 && j > i - 6; j--) {
+      const m = /^diff --git a\/(.+) b\/(.+)$/.exec(lines[j])
+      if (m) {
+        paths.add(m[2])
+        break
+      }
+    }
+  }
+  return paths
 }
 
 /** How long a passed model-id probe stands before it must be repeated. */
@@ -428,11 +458,16 @@ export function formatReviewReport({ decision = {}, sha = '', mode = 'review', p
       `  ${cmd}`,
     ].join('\n')
   }
+  // The prose names the model the DECISION picked, not the usual one: where
+  // Fable authored the change the reviewer is Opus 5, and an instruction saying
+  // "hand it to Fable" beside a command naming Opus is how a self-review gets
+  // recorded (four-eyes finding, second round, 10.08.2026).
+  const who = decision.model || FALLBACK_MODEL_NAME
   return [
     `review-sol: FALLBACK — ${SOL_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
-    `  The review is NOT done. Hand it to ${FALLBACK_MODEL_NAME} and record what IT says:`,
+    `  The review is NOT done. Hand it to ${who} and record what IT says:`,
     '',
-    `  1. give ${FALLBACK_MODEL_NAME} the commit and the brief above,`,
+    `  1. give ${who} the commit and the brief above,`,
     `  2. then record its verdict — never this command's:`,
     `     ${cmd}`,
   ].join('\n')

@@ -17,6 +17,7 @@ import {
   formatReviewMaterial,
   formatReviewReport,
   isUnknownModelRefusal,
+  newFilePathsIn,
   OUTCOME,
   parseVerdict,
   probeFreshness,
@@ -187,6 +188,26 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     expect(fallbackReviewerFor('')).toBe(FALLBACK_MODEL_NAME)
   })
 
+  it('looks at EVERY author in the reviewed range, not only the head commit', () => {
+    // One record clears every commit it contains, so a Fable commit under an
+    // Opus head must not be handed to Fable (four-eyes finding, second round).
+    expect(fallbackReviewerFor(['Claude Opus 5', 'Claude Fable 5'])).toBe(SECOND_FALLBACK_MODEL_NAME)
+    expect(fallbackReviewerFor(['Claude Opus 5', 'Claude Opus 4.8'])).toBe(FALLBACK_MODEL_NAME)
+  })
+
+  it('tells the operator to hand it to the model the record NAMES', () => {
+    const d = decideReview({
+      outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }),
+      parsed: { ok: false },
+      authorModel: 'Claude Fable 5',
+    })
+    const report = formatReviewReport({ decision: d, sha: 'a'.repeat(40), mode: 'review' })
+    expect(report).toContain(SECOND_FALLBACK_MODEL_NAME)
+    // An instruction naming Fable beside a command naming Opus is how a
+    // self-review gets recorded.
+    expect(report).not.toMatch(/Hand it to Fable/)
+  })
+
   it('never names Sol on a failed run, and never names Fable on a successful one', () => {
     expect(decideReview({ outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }), parsed: parseVerdict(solSays()) }).model).toBe(
       FALLBACK_MODEL_NAME,
@@ -320,6 +341,29 @@ describe('the material the reviewer is handed', () => {
     expect(out.length).toBeLessThan(4500)
     expect(out).toMatch(/TRUNCATED/)
     expect(out).toContain('the file the review is actually about')
+  })
+})
+
+describe('a file the patch already carries whole', () => {
+  it('is not sent a second time', () => {
+    const patch = [
+      'diff --git a/scripts/new.mjs b/scripts/new.mjs',
+      'new file mode 100644',
+      'index 0000000..1111111',
+      '--- /dev/null',
+      '+++ b/scripts/new.mjs',
+      '+export const a = 1',
+      'diff --git a/scripts/old.mjs b/scripts/old.mjs',
+      'index 2222222..3333333 100644',
+    ].join('\n')
+    const added = newFilePathsIn(patch)
+    expect(added.has('scripts/new.mjs')).toBe(true)
+    expect(added.has('scripts/old.mjs')).toBe(false)
+  })
+
+  it('finds nothing in a patch that adds nothing', () => {
+    expect(newFilePathsIn('diff --git a/a b/a\nindex 1..2 100644').size).toBe(0)
+    expect(newFilePathsIn('').size).toBe(0)
   })
 })
 

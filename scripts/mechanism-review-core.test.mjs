@@ -180,6 +180,15 @@ describe('validateRecord', () => {
     expect(validateRecord({ ...good, sha: 'not-a-sha' }).ok).toBe(false)
   })
 
+  it('refuses an evidence line that says the reviewer never saw the change', () => {
+    // The runner already falls back on such an answer; the recorder must refuse
+    // the same sentence typed by hand, or the hole reopens one line lower.
+    expect(validateRecord({ ...good, evidence: 'Repository access failed before inspection' }).ok).toBe(false)
+    expect(validateRecord({ ...good, evidence: 'I could not read the diff, so nothing was checked' }).ok).toBe(false)
+    // …while an ordinary finding that merely contains the words is a review.
+    expect(validateRecord({ ...good, evidence: 'the guard could not see a renamed file; fixed in the diff' }).ok).toBe(true)
+  })
+
   it('refuses an evidence line still in its angle brackets, however long', () => {
     // The commands that print a record command for a review still to be done
     // leave `<…>` standing; the length rule alone would wave a long one through.

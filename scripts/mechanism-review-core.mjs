@@ -319,6 +319,19 @@ export function formatArgErrors(errors = []) {
   return ['mechanism-review: refusing this command line.', '', ...errors.map((e) => `  · ${e}`)].join('\n')
 }
 
+/**
+ * An answer that ADMITS no review took place: "I could not read the diff",
+ * "none of my commands reached the repository", "no access to the patch".
+ *
+ * It lives here rather than beside the runner that first needed it because BOTH
+ * halves must refuse it: the runner when a model answers that way, and
+ * validateRecord when a hand writes the same sentence into the ledger. Kept
+ * deliberately narrow — first person about ACCESS — so that an ordinary finding
+ * ("the parser could not handle CRLF") is still a review.
+ */
+export const BLIND_REVIEWER =
+  /\b(?:i|we)\s+(?:could\s+not|couldn't|can(?:no|')t|was\s+unable\s+to|were\s+unable\s+to|did\s+not\s+(?:get|receive))\b[^.\n]{0,80}\b(?:read|see|inspect|access|reach|open|review|view|retrieve|fetch)\b|\bno\s+(?:access\s+to|material|patch|diff)\b|\bnone\s+of\s+my\s+commands\b|\b(?:repository|repo|file|material)\s+access\s+(?:failed|denied)\b|\b(?:could\s+not|unable\s+to)\s+(?:be\s+)?(?:read|inspect|access|retrieve)(?:ed)?\s+(?:the\s+)?(?:diff|patch|files?|repository|material|change)\b/i
+
 /** Shortest form a message should print a sha in. */
 const short = (sha) => String(sha ?? '').slice(0, 7)
 
@@ -387,6 +400,17 @@ export function validateRecord({ sha, model, verdict, evidence, authoredBy, mode
   const ev = String(evidence ?? '').trim()
   if (ev.length < 10) {
     errors.push('--evidence "<one line>": what was actually checked — one honest line, not a word')
+  } else if (BLIND_REVIEWER.test(ev)) {
+    // AN EVIDENCE LINE THAT ADMITS THE REVIEWER NEVER SAW THE CHANGE IS REFUSED
+    // (point 624, second cross-vendor round). The first real cross-vendor run
+    // answered `do-not-merge` because none of its commands reached the
+    // repository — a well-formed verdict for a review that never happened. The
+    // runner already falls back on such an answer; the RECORDER must refuse it
+    // too, or a hand-typed line reopens the hole the runner closed.
+    errors.push(
+      `--evidence: "${ev}" says the reviewer could not see the change — that is not a review. ` +
+        'Have it reviewed, then record what was actually read.',
+    )
   } else if (/^<.*>$/.test(ev)) {
     // A LINE STILL IN ITS ANGLE BRACKETS IS THE PLACEHOLDER, not an observation
     // (four-eyes finding on point 624). The commands that print a record command

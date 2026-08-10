@@ -1,0 +1,174 @@
+// THE COMMAND ITSELF, NOT ONLY ITS DECISION CORE (point 624, second
+// cross-vendor round).
+//
+// The reviewer's sharpest finding was about the test suite rather than the code:
+// every case ran against the pure core, so the WRAPPER — the exit codes, the
+// range gathering, the probe gate, the handover text, the login refusals — was
+// unproven, and two real defects passed a green run. So the real command is
+// spawned here against a STUB `codex` on PATH: no network, no allowance spent,
+// and every path the operator actually walks is exercised.
+//
+// All state is redirected into a temp directory (`REVIEW_SOL_STATE_DIR`,
+// `CODEX_HOME`), so this suite never touches the developer's checkout or login.
+import { describe, expect, it, beforeAll, afterAll } from 'vitest'
+import { spawnSync } from 'node:child_process'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { delimiter, join, resolve } from 'node:path'
+import { FALLBACK_MODEL_NAME, SOL_MODEL_NAME } from './review-sol-core.mjs'
+
+const SCRIPT = resolve(process.cwd(), 'scripts', 'review-sol.mjs')
+
+let dir = ''
+let stubDir = ''
+let stateDir = ''
+
+/** A `codex` that answers however the case's env asks it to. */
+const STUB = `#!/usr/bin/env node
+const { writeFileSync } = require('node:fs')
+const argv = process.argv.slice(2)
+const out = argv[argv.indexOf('-o') + 1]
+const model = argv[argv.indexOf('-m') + 1]
+require('node:fs').appendFileSync(process.env.STUB_LOG, model + '\\n')
+if (model !== 'gpt-5.6-sol') {
+  // The unknown-id probe: the real server refuses it, which is what proves -m
+  // is honoured at all.
+  process.stderr.write('The requested model is not supported when using Codex with a ChatGPT account.\\n')
+  process.exit(1)
+}
+if (process.env.STUB_MODE === 'fail') {
+  process.stderr.write('stream error: You are not logged in. Run \`codex login\`.\\n')
+  process.exit(1)
+}
+const answer = process.env.STUB_ANSWER || 'VERDICT: merge\\nEVIDENCE: read the whole range and both test files'
+if (out) writeFileSync(out, answer)
+process.stdout.write(answer)
+process.exit(0)
+`
+
+const run = (args, env = {}) =>
+  spawnSync(process.execPath, [SCRIPT, ...args], {
+    windowsHide: true,
+    encoding: 'utf8',
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      PATH: `${stubDir}${delimiter}${process.env.PATH}`,
+      REVIEW_SOL_STATE_DIR: stateDir,
+      CODEX_HOME: join(dir, 'codex-home'),
+      STUB_LOG: join(dir, 'calls.log'),
+      ...env,
+    },
+  })
+
+const calls = () => {
+  try {
+    return readFileSync(join(dir, 'calls.log'), 'utf8').split('\n').filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+/** A probe receipt that is fresh, so a case can skip the probe it is not testing. */
+const provenId = () =>
+  writeFileSync(join(stateDir, 'review-sol-probe.json'), JSON.stringify({ at: Date.now(), refused: true }))
+
+beforeAll(() => {
+  dir = mkdtempSync(join(tmpdir(), 'review-sol-cli-'))
+  stubDir = join(dir, 'bin')
+  stateDir = join(dir, 'state')
+  mkdirSync(stubDir, { recursive: true })
+  mkdirSync(stateDir, { recursive: true })
+  writeFileSync(join(stubDir, 'codex'), STUB)
+  chmodSync(join(stubDir, 'codex'), 0o755)
+  writeFileSync(join(dir, 'calls.log'), '')
+})
+
+afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+describe('a review that runs', () => {
+  it('prints the reviewer, its answer and a complete record command, and exits 0', () => {
+    provenId()
+    const r = run(['--sha', 'HEAD', '--point', '624', '--brief', 'judge the fallback path'])
+    expect(r.status).toBe(0)
+    expect(r.stdout).toContain(SOL_MODEL_NAME)
+    expect(r.stdout).toContain('read the whole range and both test files')
+    expect(r.stdout).toContain('--model "GPT-5.6 Sol"')
+    expect(r.stdout).toContain('--verdict merge')
+    expect(r.stdout).toContain('--point 624')
+    // The material really is assembled and handed over.
+    expect(r.stderr).toMatch(/material: \d+ characters/)
+  })
+})
+
+describe('a review that does not run', () => {
+  it('names the cause, hands the review on, and exits 3 — never 0', () => {
+    provenId()
+    const r = run(['--sha', 'HEAD', '--brief', 'judge the fallback path'], { STUB_MODE: 'fail' })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('FALLBACK')
+    expect(r.stdout).toMatch(/login/i)
+    expect(r.stdout).toContain(FALLBACK_MODEL_NAME)
+    expect(r.stdout).toContain('The review is NOT done')
+    // The printed record cannot be run as it stands: the verdict is a placeholder.
+    expect(r.stdout).toMatch(/--verdict <merge\|merge-with-fixes\|do-not-merge>/)
+    expect(r.stdout).not.toContain('--model "GPT-5.6 Sol"')
+  })
+
+  it('treats an answer that admits it saw nothing as no review at all', () => {
+    provenId()
+    const r = run(['--sha', 'HEAD', '--brief', 'judge it'], {
+      STUB_ANSWER: 'VERDICT: do-not-merge\nEVIDENCE: I could not read the repository, so nothing was verified',
+    })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('FALLBACK')
+  })
+})
+
+describe('the guards around the run', () => {
+  it('refuses a --since ref that does not exist instead of silently reviewing one commit', () => {
+    provenId()
+    const r = run(['--sha', 'HEAD', '--since', 'no-such-branch-here', '--brief', 'judge it'])
+    expect(r.status).not.toBe(0)
+    expect(r.stderr).toMatch(/no such commit/)
+  })
+
+  it('refuses a sha that is not a commit', () => {
+    provenId()
+    const r = run(['--sha', 'deadbeefdeadbeef', '--brief', 'judge it'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toMatch(/not a commit/)
+  })
+
+  it('PROVES the model id before attributing a review to it, and remembers the proof', () => {
+    rmSync(join(stateDir, 'review-sol-probe.json'), { force: true })
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', 'HEAD', '--brief', 'judge it'])
+    expect(r.status).toBe(0)
+    // The unknown id was tried first, then the real review ran.
+    expect(calls()[0]).not.toBe('gpt-5.6-sol')
+    expect(calls()).toContain('gpt-5.6-sol')
+    expect(JSON.parse(readFileSync(join(stateDir, 'review-sol-probe.json'), 'utf8'))).toMatchObject({ refused: true })
+    // …and the next review does not pay for the probe again.
+    writeFileSync(join(dir, 'calls.log'), '')
+    expect(run(['--sha', 'HEAD', '--brief', 'judge it']).status).toBe(0)
+    expect(calls()).toEqual(['gpt-5.6-sol'])
+  })
+})
+
+describe('the saved login', () => {
+  it('refuses to write the token where git does not ignore it', () => {
+    const r = run(['--save-login'], { CODEX_HOME: stubDir })
+    // (the stub dir doubles as a CODEX_HOME holding no auth.json → the first
+    //  refusal; with one present the ignore check is what refuses)
+    expect(r.status).toBe(1)
+    expect(r.stderr).toMatch(/no login found|does not ignore/)
+  })
+
+  it('says what to do when nothing was ever saved', () => {
+    const r = run(['--restore-login'])
+    expect(r.status).toBe(1)
+    expect(r.stderr).toMatch(/nothing saved/)
+    expect(r.stderr).toMatch(/--save-login/)
+  })
+})

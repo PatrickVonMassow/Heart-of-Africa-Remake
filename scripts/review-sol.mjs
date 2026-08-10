@@ -38,6 +38,7 @@ import {
   lstatSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -56,6 +57,7 @@ import {
   formatReviewMaterial,
   formatReviewReport,
   isUnknownModelRefusal,
+  newFilePathsIn,
   parseVerdict,
   probeFreshness,
   REVIEW_TIMEOUT_MS,
@@ -69,16 +71,26 @@ import {
 export const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), '.codex')
 export const AUTH_FILE = join(CODEX_HOME, 'auth.json')
 
-/** The MAIN checkout's `local/` — never the throwaway worktree's (see the core). */
-export const SAVED_AUTH_FILE = savedAuthPathFrom(
-  spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-    windowsHide: true,
-  }).stdout ?? '',
-  REPO_ROOT,
-  { sep: sep_ },
-)
+/**
+ * Where this command keeps its own state: the saved login and the probe receipt.
+ * The MAIN checkout's `local/` — never the throwaway worktree's (see the core).
+ * `REVIEW_SOL_STATE_DIR` redirects it, which is how the CLI suite exercises the
+ * real command without writing into the developer's checkout.
+ */
+export const STATE_DIR =
+  process.env.REVIEW_SOL_STATE_DIR ||
+  dirname(
+    savedAuthPathFrom(
+      spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        windowsHide: true,
+      }).stdout ?? '',
+      REPO_ROOT,
+      { sep: sep_ },
+    ),
+  )
+export const SAVED_AUTH_FILE = join(STATE_DIR, 'codex-auth.json')
 
 /**
  * One git read. `required` reads FAIL LOUD: an ignored exit status would send a
@@ -124,8 +136,13 @@ function gatherMaterial(sha, base = '') {
     ? git(['diff', '--name-only', range])
     : git(['show', '--pretty=format:', '--name-only', sha])
   ).split('\n').map((p) => p.trim()).filter(Boolean)
+  const patch = range ? git(['diff', range]) : git(['show', sha])
+  // A file the patch ADDS whole is already there in full; sending its content
+  // again only spends the budget the other files need.
+  const added = newFilePathsIn(patch)
   const files = []
   for (const path of [...new Set(paths)]) {
+    if (added.has(path)) continue
     const text = git(['show', `${sha}:${path}`], { required: false })
     // Null = the commit does not carry that path (it was deleted); the patch
     // above still shows what happened to it.
@@ -133,16 +150,34 @@ function gatherMaterial(sha, base = '') {
   }
   return formatReviewMaterial({
     stat: range ? git(['diff', '--stat', range]) : git(['show', '--stat', sha]),
-    patch: range ? git(['diff', range]) : git(['show', sha]),
+    patch,
     files,
   })
 }
 
-/** The commit the review's range starts at: where `ref` and `sha` diverged. */
+/**
+ * The commit the review's range starts at: where `ref` and `sha` diverged.
+ *
+ * An UNKNOWN ref fails loud (four-eyes finding, second round): swallowing it
+ * silently reviewed the head commit alone while the record still cleared every
+ * commit below it — the exact "reviewed" state nobody looked at. An empty answer
+ * means only that the two do not diverge, which is an ordinary case.
+ */
 function mergeBase(ref, sha) {
-  const res = spawnSync('git', ['merge-base', ref, sha], { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true })
-  const base = (res.stdout ?? '').trim()
-  return res.status === 0 && base && base !== sha ? base : ''
+  if (git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { required: false }) === null) {
+    throw new Error(`--since ${ref}: no such commit in this repository`)
+  }
+  const base = git(['merge-base', ref, sha], { required: false })
+  return base && base !== sha ? base : ''
+}
+
+/** Every model that authored a commit in the reviewed range (or the commit). */
+function authorsIn(sha, base = '') {
+  const field = '%(trailers:key=Co-Authored-By,valueonly,separator=;)'
+  const log = base
+    ? git(['log', `--format=${field}`, `${base}..${sha}`])
+    : git(['show', '-s', `--format=${field}`, sha])
+  return String(log).split('\n').map((line) => modelFromTrailers(line)).filter(Boolean)
 }
 
 /** Run codex once and hand back everything the classifier needs. */
@@ -182,7 +217,7 @@ function runCodex({ prompt, input = '', modelId = SOL_MODEL_ID, timeoutMs = REVI
 }
 
 /** The receipt of the last passed model-id probe (see probeFreshness). */
-export const PROBE_RECEIPT_FILE = join(dirname(SAVED_AUTH_FILE), 'review-sol-probe.json')
+export const PROBE_RECEIPT_FILE = join(STATE_DIR, 'review-sol-probe.json')
 
 function readProbeReceipt() {
   try {
@@ -216,6 +251,24 @@ function probe() {
   return 1
 }
 
+/**
+ * Does this path — or any directory on the way to it — resolve outside the
+ * directory it claims to be in? Returns the refusal sentence, or ''.
+ */
+function pathEscapes(target) {
+  const dir = dirname(target)
+  try {
+    const realDir = realpathSync(dir)
+    if (realDir !== dir) return `${dir} resolves to ${realDir}; a link on the way would write the token elsewhere`
+  } catch {
+    return '' /* the directory does not exist yet — nothing to follow */
+  }
+  if (existsSync(target) && lstatSync(target).isSymbolicLink()) {
+    return `${target} is a symlink; it would write through it`
+  }
+  return ''
+}
+
 /** `--save-login` / `--restore-login`: the container-rebuild answer. */
 function saveLogin() {
   if (!existsSync(AUTH_FILE)) {
@@ -238,8 +291,13 @@ function saveLogin() {
     )
     return 1
   }
-  if (existsSync(SAVED_AUTH_FILE) && lstatSync(SAVED_AUTH_FILE).isSymbolicLink()) {
-    console.error(`review-sol --save-login: REFUSING — ${SAVED_AUTH_FILE} is a symlink; it would write through it.`)
+  // …and no component of the path may be a link out of the checkout: a symlinked
+  // `local/` passes the LEXICAL check-ignore above and copyFileSync follows it,
+  // putting the credential somewhere else entirely (four-eyes finding, second
+  // round). realpath answers for the whole path, not just its last component.
+  const escape = pathEscapes(SAVED_AUTH_FILE)
+  if (escape) {
+    console.error(`review-sol --save-login: REFUSING — ${escape}`)
     return 1
   }
   copyFileSync(AUTH_FILE, SAVED_AUTH_FILE)
@@ -258,6 +316,15 @@ function restoreLogin() {
         '  Log in once (`codex login`), then `node scripts/review-sol.mjs --save-login`.',
     )
     return 1
+  }
+  // Both endpoints, for the same reason as on the way out: a link at either end
+  // reads the token from — or writes it to — somewhere nobody named.
+  for (const end of [SAVED_AUTH_FILE, AUTH_FILE]) {
+    const escape = pathEscapes(end)
+    if (escape) {
+      console.error(`review-sol --restore-login: REFUSING — ${escape}`)
+      return 1
+    }
   }
   mkdirSync(CODEX_HOME, { recursive: true })
   copyFileSync(SAVED_AUTH_FILE, AUTH_FILE)
@@ -322,6 +389,22 @@ if (isMainModule(import.meta.url)) {
     console.error(
       `review-sol: asking ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) to review ${full.slice(0, 7)} …`,
     )
+    // THE IDENTITY IS PROVEN BEFORE THE REVIEW, NOT MENTIONED AFTER IT (second
+    // cross-vendor round). Nothing in a run's output names the model that
+    // answered, so the whole attribution rests on the server refusing an unknown
+    // id. A note under the record was too weak: the record command naming Sol
+    // was printed either way. The probe therefore RUNS when its receipt is
+    // missing or stale, and a failed probe stops the review before a word of it
+    // can be attributed to a model that may not have written it.
+    const freshness = probeFreshness(readProbeReceipt())
+    if (!freshness.fresh) {
+      console.error(`review-sol: ${freshness.warning}\n  proving the model id first …`)
+      if (probe() !== 0) {
+        console.error('review-sol: the model id is not proven honoured — refusing to attribute a review to it.')
+        process.exit(2)
+      }
+    }
+
     const base = mergeBase(flag('--since') || 'main', full)
     const material = gatherMaterial(full, base)
     console.error(
@@ -332,11 +415,9 @@ if (isMainModule(import.meta.url)) {
     const outcome = classifyOutcome(run)
     const parsed = outcome.ok ? parseVerdict(run.finalMessage) : { ok: false }
     // WHO AUTHORED IT decides who may review it if Sol is unavailable: Fable
-    // cannot review its own commit (see fallbackReviewerFor).
-    const authorModel = modelFromTrailers(
-      git(['show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', full]) ?? '',
-    )
-    const decision = decideReview({ outcome, parsed, authorModel })
+    // cannot review its own commit (see fallbackReviewerFor), and the record
+    // covers the whole range, so every author in it counts.
+    const decision = decideReview({ outcome, parsed, authorModel: authorsIn(full, base) })
     // THE FINDINGS ARE THE POINT, not the verdict word: a `do-not-merge` whose
     // reasons were never printed cannot be acted on, and the evidence line the
     // ledger carries is one sentence by design. So the reviewer's whole answer
@@ -346,11 +427,6 @@ if (isMainModule(import.meta.url)) {
       console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end of review ---\n`)
     }
     console.log(formatReviewReport({ decision, sha: full, mode, point }))
-    // The identity of the model that answered rests on the server refusing an
-    // unknown id; nothing in a run's output names it. Say so when that has not
-    // been demonstrated here lately, rather than implying it silently.
-    const freshness = probeFreshness(readProbeReceipt())
-    if (!decision.fellBack && !freshness.fresh) console.log(`\n  NOTE: ${freshness.warning}`)
     // A fallback is not an error of THIS command — it did its job by refusing to
     // invent a review — but it must not read as a finished one either, so the
     // exit code distinguishes them for any script that chains on it.
