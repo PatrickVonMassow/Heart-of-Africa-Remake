@@ -31,6 +31,31 @@ the Playwright browser suites against the dev server → the production-preview
 smoke test. The runner itself is `scripts/verify/run-all.mjs`; the three npm
 commands above reach it through the LOGGED wrapper described next.
 
+### In a WORKTREE, bootstrap the dependencies FIRST (points 569/573/606)
+
+```
+node scripts/worktree-bootstrap.mjs      # first command in a new worktree; no-op in the main tree
+```
+
+`node_modules/` is git-ignored, so a git worktree — where CLAUDE.md §6 builds
+every point — checks out without it and **no gate can start**: npm resolves
+`vitest` and `oxlint` from `node_modules/.bin` before a script runs. The
+bootstrap derives the main checkout from git's COMMON directory
+(`git rev-parse --git-common-dir`, whose parent is the main working tree), and
+links its `node_modules` when the two `package-lock.json` files are byte
+identical — seconds instead of a per-worktree install. A branch that CHANGED the
+lockfile gets a real `npm ci` instead, because linking would silently verify
+against the wrong dependency tree. The decision table is pure in
+`scripts/worktree-bootstrap-core.mjs`.
+
+Remove such a worktree only with `scripts/worktree-cleanup.mjs`: it DETACHES the
+link first, where `git worktree remove` and `rm -rf` follow it and delete the
+main tree's dependencies.
+
+**Anything a test SPAWNS resolves through `scripts/local-bin.mjs`, never through
+`process.cwd()`.** That is the fix behind those points and the rule that keeps
+them fixed — see "A spawn that never ran is not a rejection" below.
+
 ### The run's output goes to a FILE, the caller reads a digest (point 373 e)
 
 `npm test`, `npm run test:small` and `npm run test:large` run through
