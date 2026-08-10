@@ -205,59 +205,7 @@ there exactly once; a new point joins a bundle when appended.
   thinking actually happens, and every guess he does not bother to write is a concept he
   will not remember.
 
-- [ ] 600. THE CTRL LABEL DOES NOT NAME AN ATTACKING LION — AND THE ROSTER IS RE-TESTED
-  WHOLE (user 09.08.2026, first play test of the feature: "STRG einmal getestet und direkt
-  einen Fehler gefunden: funktioniert nicht für angreifenden Löwen. Nochmal alles
-  durchtesten — ist vielleicht nicht der einzige Fehler"). Point 342 shipped the hold-Ctrl
-  overlay and its own §7.2 evidence was green; the very first hold in real play found a
-  gap. THE SPECIFIC DEFECT: a lion in its ATTACK state carries no label, while the roster
-  and point 342's predicate ("a thing is named when it can MOVE or the player can DO
-  something with it") plainly include it. Establish the cause before fixing — the two
-  candidates the code makes plausible are that the attack run swaps the actor into a
-  different entity list the overlay does not walk, and that §19.16's CONCEALED rule (a
-  submerged crocodile stays silent until it lunges) is being applied to a predator that is
-  not concealed at all. Do not guess between them: dump the overlay's actor set during a
-  staged lion attack and see which one it is.
-  THE POINT IS NOT ONE FIX. The user asked for the whole thing to be re-tested, and one
-  miss on the first hold means the roster was never exercised in its STATES. FINAL STATE:
-  every actor of point 342's roster is named in EVERY state it can be in — idle, walking,
-  fleeing, attacking, drinking, dead, and mid-staged-event — in both perspectives; the
-  §17.2 discovery gate and the §19.16 concealment exclusion still hold exactly where they
-  are meant to and nowhere else.
-  VERIFIABLE, AND AT THE LEVEL THE PLAYER EXPERIENCES IT (point 589's rule): a Vitest
-  matrix over the pure predicate covering the full cross product of kind × state, which is
-  what would have caught this one; plus a browser check that STAGES a predator attack and
-  asserts the label is drawn at the attacker while it runs — not that the predicate would
-  have returned true.
-  Criticality: medium — no crash, but the feature's promise is that holding Ctrl tells you
-  what you are looking at, and it fails hardest at the moment the player most wants it.
 
-- [ ] 610. THE ESCAPE IS REACHABLE ONLY BY KEYBOARD, AND IT REPORTS A RESCUE THAT DID NOT
-  HAPPEN (four-eyes findings on point 604, 10.08.2026). Two things the delivery left:
-  (a) `GAMEPAD_BUTTON_KEYS` (`src/systems/input.ts` ~141-150) maps NO button to `KeyU`, and
-  the stuck hint is a toast rather than the tappable prompt — so a pad-only or touch-only
-  player who is wedged still loses the expedition, which is the exact class 604 exists to
-  close, and `design.md` §17.5 already promises that the pad's buttons map onto the existing
-  key handlers. (b) In the bird's-eye view the search can report a rescue that did not
-  happen: with `found:false` nothing moves and the game still toasts "freed".
-  FINAL STATE:
-  1. A spare pad button (L3 or R3, whichever stays free of §17.5's existing map) dispatches
-     the same synthetic key as U — one input path, as the design demands — and the stuck
-     hint becomes tappable on the touch layer, dispatching the key it names like the
-     interaction prompt does.
-  2. A search that frees nobody says so: no "freed" message where nothing moved, and in the
-     travel view the traveller is told what happened instead.
-  3. THE TRAVEL SEARCH SEES WHAT IT LANDS ON: `travelObstacles` is sampled once at the
-     player while `collidableFloraNear` reaches ~4.2 u and the scaled search reaches 6.72 u,
-     so a landing spot can overlap a tree nobody looked at (the next frame pushes him out,
-     which is a papered-over hit, not a placement). The search queries obstacles over the
-     radius it actually searches.
-  4. `docs/acceptance-evidence.md` §16 stops claiming the live check "proved he was unable
-     to walk out" — the script does not prove that; it states what the check really does.
-  VERIFIABLE: Vitest for the button map, the tappable hint and the honest report; the
-  existing `unstuck` section of `scripts/verify/collision.mjs` extended by the pad path.
-  Criticality: medium — the mechanism is there; what is missing is a way to it for two of
-  the three input devices the game supports.
 
 - [ ] 509. NO INHABITANT STANDS ON THE SETTLEMENT ORIGIN (observed 05.08.2026 while
   verifying another point, bundle Dorfleben). In `maasai-village` several
@@ -412,6 +360,60 @@ there exactly once; a new point joins a bundle when appended.
   rules still hold on top of it, and the guard fails on a hand-edited divergence.
   Criticality: medium — nothing the player sees, but it is the one surface the user steers
   the batch by, and it was wrong while every check said it was fine.
+
+- [ ] 600. THE CTRL LABEL DOES NOT NAME AN ATTACKING LION — AND THE ROSTER IS RE-TESTED
+  WHOLE (user 09.08.2026, first play test of the feature: "STRG einmal getestet und direkt
+  einen Fehler gefunden: funktioniert nicht für angreifenden Löwen. Nochmal alles
+  durchtesten — ist vielleicht nicht der einzige Fehler"). Point 342 shipped the hold-Ctrl
+  overlay and its own §7.2 evidence was green; the very first hold in real play found a
+  gap. THE SPECIFIC DEFECT: a lion in its ATTACK state carries no label, while the roster
+  and point 342's predicate ("a thing is named when it can MOVE or the player can DO
+  something with it") plainly include it. Establish the cause before fixing — the two
+  candidates the code makes plausible are that the attack run swaps the actor into a
+  different entity list the overlay does not walk, and that §19.16's CONCEALED rule (a
+  submerged crocodile stays silent until it lunges) is being applied to a predator that is
+  not concealed at all. Do not guess between them: dump the overlay's actor set during a
+  staged lion attack and see which one it is.
+  THE POINT IS NOT ONE FIX. The user asked for the whole thing to be re-tested, and one
+  miss on the first hold means the roster was never exercised in its STATES. FINAL STATE:
+  every actor of point 342's roster is named in EVERY state it can be in — idle, walking,
+  fleeing, attacking, drinking, dead, and mid-staged-event — in both perspectives; the
+  §17.2 discovery gate and the §19.16 concealment exclusion still hold exactly where they
+  are meant to and nowhere else.
+  VERIFIABLE, AND AT THE LEVEL THE PLAYER EXPERIENCES IT (point 589's rule): a Vitest
+  matrix over the pure predicate covering the full cross product of kind × state, which is
+  what would have caught this one; plus a browser check that STAGES a predator attack and
+  asserts the label is drawn at the attacker while it runs — not that the predicate would
+  have returned true.
+  Criticality: medium — no crash, but the feature's promise is that holding Ctrl tells you
+  what you are looking at, and it fails hardest at the moment the player most wants it.
+
+- [ ] 610. THE ESCAPE IS REACHABLE ONLY BY KEYBOARD, AND IT REPORTS A RESCUE THAT DID NOT
+  HAPPEN (four-eyes findings on point 604, 10.08.2026). Two things the delivery left:
+  (a) `GAMEPAD_BUTTON_KEYS` (`src/systems/input.ts` ~141-150) maps NO button to `KeyU`, and
+  the stuck hint is a toast rather than the tappable prompt — so a pad-only or touch-only
+  player who is wedged still loses the expedition, which is the exact class 604 exists to
+  close, and `design.md` §17.5 already promises that the pad's buttons map onto the existing
+  key handlers. (b) In the bird's-eye view the search can report a rescue that did not
+  happen: with `found:false` nothing moves and the game still toasts "freed".
+  FINAL STATE:
+  1. A spare pad button (L3 or R3, whichever stays free of §17.5's existing map) dispatches
+     the same synthetic key as U — one input path, as the design demands — and the stuck
+     hint becomes tappable on the touch layer, dispatching the key it names like the
+     interaction prompt does.
+  2. A search that frees nobody says so: no "freed" message where nothing moved, and in the
+     travel view the traveller is told what happened instead.
+  3. THE TRAVEL SEARCH SEES WHAT IT LANDS ON: `travelObstacles` is sampled once at the
+     player while `collidableFloraNear` reaches ~4.2 u and the scaled search reaches 6.72 u,
+     so a landing spot can overlap a tree nobody looked at (the next frame pushes him out,
+     which is a papered-over hit, not a placement). The search queries obstacles over the
+     radius it actually searches.
+  4. `docs/acceptance-evidence.md` §16 stops claiming the live check "proved he was unable
+     to walk out" — the script does not prove that; it states what the check really does.
+  VERIFIABLE: Vitest for the button map, the tappable hint and the honest report; the
+  existing `unstuck` section of `scripts/verify/collision.mjs` extended by the pad path.
+  Criticality: medium — the mechanism is there; what is missing is a way to it for two of
+  the three input devices the game supports.
 
 - [ ] 614. EXECUTE THE FOUR-EYES WORK-ORDER CLEANUP (10.08.2026; the verdict of a
   BLIND-PARALLEL analysis by two models on the 148 open points — CLAUDE.md §6, divergent
