@@ -205,7 +205,13 @@ beforeAll(() => {
 
   // The fixture history: main, a feature branch above it, and a branch whose
   // commit was authored by the fallback reviewer itself.
-  spawnSync('git', ['init', '-q', '-b', 'main', repo], { windowsHide: true })
+  // `init` gets the hermetic environment too: a developer's `init.templateDir`
+  // would otherwise seed this repository's own config and hooks before the
+  // commands below ever disable the global files (four-eyes finding, 11.08.2026).
+  spawnSync('git', ['init', '-q', '-b', 'main', repo], {
+    windowsHide: true,
+    env: { ...process.env, ...HERMETIC_GIT },
+  })
   script = join(repo, 'scripts', 'review-sol.mjs')
   for (const file of SCRIPT_FILES) copyFileSync(resolve('scripts', file), join(repo, 'scripts', file))
   // `local/` is ignored here as it is in the real repository — the saved-login
@@ -447,7 +453,10 @@ describe('the saved login', () => {
     const elsewhere = join(dir, `${w.id}-elsewhere`)
     const linked = join(dir, `${w.id}-linked`)
     mkdirSync(elsewhere, { recursive: true })
-    symlinkSync(elsewhere, linked)
+    // A JUNCTION on Windows: a plain directory symlink needs Developer Mode or
+    // elevation there, and a fixture that cannot be built is not a test result
+    // (four-eyes finding, 11.08.2026).
+    symlinkSync(elsewhere, linked, process.platform === 'win32' ? 'junction' : 'dir')
     writeFileSync(join(elsewhere, 'codex-auth.json'), '{"tokens":{}}')
     const r = run(['--restore-login'], { ...w.env, REVIEW_SOL_STATE_DIR: linked })
     expect(r.status).toBe(1)
