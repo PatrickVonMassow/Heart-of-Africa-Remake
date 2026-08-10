@@ -5471,3 +5471,19 @@ to land than a mechanism that needs a review.
   directions, so removing an opt-in reds the suite.
   Criticality: medium — it takes no session down the way Ctrl+W did, but every instance is
   a silent state change the player did not ask for and cannot see the cause of.
+
+- [ ] 619. THE DRESSING PAIR NO LONGER GESTURES, AND design.md SAYS SO (user decision
+  10.08.2026, answering the card the point-580 fix raised). The village's conversing pair
+  is pure dressing that never utters anything, and since gestures were tied to speech
+  behind the earshot gate it only stands, turns and shifts its weight. `design.md` §19.10
+  still promises the older behaviour, and the user chose the simpler of the two ways
+  offered: strike the gesturing rather than give the pair a voice.
+  FINAL STATE: in `design.md` §19.10 the vignette reads "pairs stand together in
+  conversation" — the ", gesturing" is struck, and nothing else in the sentence or the
+  list around it changes. No code changes: the behaviour the line now describes is what
+  already ships. The word count drops, so no budget question arises.
+  VERIFIABLE: the phrase "in conversation, gesturing" no longer occurs in `design.md`, and
+  the existing gesture tests stay green — the delivered behaviour is untouched, this point
+  only makes the document describe it.
+  Criticality: low — it is a documentation correction, but an uncorrected line is a
+  standing invitation to "restore" a behaviour that was deliberately removed.
