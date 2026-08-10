@@ -163,26 +163,45 @@ if (!poc) {
   // now held against the terrain the WORLD reports under it, sampled independently,
   // which is the field the bird's-eye mesh is built from; the site's own value is
   // reported beside it so a divergence names which of the two moved.
+  // The quantity is the LOWEST ground under the whole footprint — the centre
+  // sample is the wrong one (Sol's re-review, 11.08.2026): a base above the
+  // footprint minimum but below the centre would have passed, and that IS the
+  // float this point was filed for. So the footprint is re-sampled here on a
+  // DENSE grid of its own, not on the site's ring pattern, and the drawn base
+  // must equal that minimum within a tolerance smaller than the smallest float a
+  // player can see (the block is ~3 world units tall; 0.02 is under 1 % of it).
   const seat = await page.evaluate(async () => {
     const t = await import('/src/world/terrain.ts')
     const r = window.__communicationRock
     const seed = window.__game.getState().seed
-    const s = t.sampleTerrain(r.lat, r.lon, seed)
-    return { drawnY: r.y, groundY: r.groundY, type: s.type, terrainH: s.height }
+    const centre = t.sampleTerrain(r.lat, r.lon, seed)
+    const rock = await import('/src/world/communicationRock.ts')
+    const rad = rock.ROCK_FOOTPRINT_UNITS / 10 // world units → degrees
+    let lo = Infinity
+    let hi = -Infinity
+    for (let i = -4; i <= 4; i++) {
+      for (let j = -4; j <= 4; j++) {
+        const dLat = (i / 4) * rad
+        const dLon = (j / 4) * rad
+        if (Math.hypot(dLat, dLon) > rad + 1e-12) continue
+        const h = t.sampleTerrain(r.lat + dLat, r.lon + dLon, seed).height
+        lo = Math.min(lo, h)
+        hi = Math.max(hi, h)
+      }
+    }
+    return { drawnY: r.y, groundY: r.groundY, type: centre.type, terrainH: centre.height, lo, hi }
   })
-  // The footprint's LOWEST ground is what the site seats the block on, so the drawn
-  // base may sit below the centre sample on a slope — never above it, which is the
-  // floating the point was filed for.
-  const above = seat.drawnY - seat.terrainH
-  const seated = above <= 1e-6 && seat.drawnY >= seat.terrainH - 1.5
+  const SEAT_TOLERANCE = 0.02
+  const seated = Math.abs(seat.drawnY - seat.lo) <= SEAT_TOLERANCE
   console.log(
-    `${seated ? 'PASS' : 'FAIL'}  the erratic is drawn at the ground the world reports under it ` +
-      `(drawn ${seat.drawnY.toFixed(4)}, terrain ${seat.terrainH.toFixed(4)}, site ${seat.groundY.toFixed(4)})`,
+    `${seated ? 'PASS' : 'FAIL'}  the erratic is drawn at the lowest ground under its footprint ` +
+      `(drawn ${seat.drawnY.toFixed(4)}, footprint ${seat.lo.toFixed(4)}–${seat.hi.toFixed(4)}, ` +
+      `site ${seat.groundY.toFixed(4)})`,
   )
   if (!seated) {
     errors.push(
-      `the erratic is drawn at y ${seat.drawnY}, the terrain under it is ${seat.terrainH} ` +
-        `(its site says ${seat.groundY})`,
+      `the erratic is drawn at y ${seat.drawnY}, the lowest ground under its footprint is ` +
+        `${seat.lo} (its site says ${seat.groundY})`,
     )
   }
   const dry = seat.type !== 'water' && seat.type !== 'ocean' && seat.groundY <= seat.terrainH + 1e-9
