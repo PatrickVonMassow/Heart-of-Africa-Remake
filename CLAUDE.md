@@ -300,24 +300,22 @@ coverage map live in `scripts/verify/README.md`.
   under a bounded claim; the launcher tick supervises it.
 - **Model policy (users 25.07./10.08.2026, points 309/624). AUTHOR AND REVIEWER
   ARE SEPARATE ROLES.** AUTHORS: only **Opus 5**, then **Fable 5**, then **Opus
-  4.8**; `scripts/batch-autostart.mjs` launches that chain. DIFFICULTY IS NOT A
-  REASON to hand work to Fable — Opus 5 is the WORKER at any difficulty.
-  REVIEWERS (both modes below): **GPT-5.6 Sol** at reasoning effort HIGH,
-  **Fable 5** when Sol is unavailable. A reviewer is bought for its DIFFERENT
-  errors, and another VENDOR decorrelates further than our own house — do not
-  "simplify" the split away. Reviews run through `node scripts/review-sol.mjs
-  --sha <sha> --brief "<…>"`, never a hand-typed `codex` line: it names the
-  cause in ONE line, falls back to Fable on any failure (host, login, allowance,
-  error exit), and RECORDS the model that actually ran. Sonnet and Haiku are NOT
-  acceptable: a session degraded to one is a capability breach and the batch
-  STOPS. Every commit NAMES its author model in the `Co-Authored-By` trailer,
-  and the `commit-msg` hook refuses one that does not.
-  `scripts/model-guard-core.mjs` holds the AUTHOR allowlist (`ALLOWED`) and the
-  Stop hook `scripts/model-guard.mjs` blocks the turn end on any commit after
-  its baseline authored outside it: HARD on a NAMED forbidden model (pause),
-  resolvably on an UNNAMED one, which the transcripts settle. (History: on
-  24.07.2026 a degraded session merged three defective Haiku deliveries in 14
-  minutes — only the trailers could have caught it.)
+  4.8**, the chain `scripts/batch-autostart.mjs` launches. DIFFICULTY IS NO
+  REASON to hand work to Fable: Opus 5 is the WORKER at any difficulty.
+  REVIEWERS (both modes): **GPT-5.6 Sol** at effort HIGH, else **Fable 5**. A
+  reviewer is bought for its DIFFERENT errors, and another VENDOR decorrelates
+  further than our own house; never "simplify" that away. Reviews run through
+  `node scripts/review-sol.mjs`, never a hand-typed `codex` line: it names the
+  cause in ONE line, HANDS the review to Fable on any failure, and RECORDS who
+  ran it. Sonnet and Haiku are NOT acceptable: a degraded session is a
+  capability breach and the batch STOPS. Every commit NAMES its author model in
+  a `Co-Authored-By` trailer the `commit-msg` hook enforces;
+  `scripts/model-guard-core.mjs` holds the AUTHOR allowlist (`ALLOWED`) and
+  `scripts/model-guard.mjs` blocks the turn end on any commit after its
+  baseline authored outside it: HARD on a NAMED forbidden model (pause),
+  resolvably on an UNNAMED one, which the transcripts settle. (History: a
+  degraded session merged three defective Haiku deliveries in 14 minutes; only
+  the trailers could have caught it.)
 - **The four-eyes principle has TWO MODES, chosen by the STAGE (user
   25.07.2026). This is its normative wording; everywhere else refers here.** A
   DIVERGENT stage — what could go wrong, which scenarios to test, which designs

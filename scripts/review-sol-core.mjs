@@ -19,7 +19,7 @@
 // Side-effect free: the process spawn, the temp files and the printing belong to
 // scripts/review-sol.mjs. Pinned by review-sol-core.test.mjs.
 
-import { VERDICTS } from './mechanism-review-core.mjs'
+import { sameModel, VERDICTS } from './mechanism-review-core.mjs'
 
 /** The model id `codex exec -m` is given, and the name a record calls it by. */
 export const SOL_MODEL_ID = 'gpt-5.6-sol'
@@ -28,8 +28,10 @@ export const SOL_MODEL_NAME = 'GPT-5.6 Sol'
 /** The reasoning effort the user's decision fixes for reviews (10.08.2026). */
 export const SOL_REASONING_EFFORT = 'high'
 
-/** The reviewer that takes over whenever Sol did not deliver a verdict. */
+/** The reviewer that takes over whenever Sol did not deliver a verdict, and the
+ *  one behind IT — needed only where Fable authored the change itself. */
 export const FALLBACK_MODEL_NAME = 'Fable 5'
+export const SECOND_FALLBACK_MODEL_NAME = 'Opus 5'
 
 /** The binary, and the ceiling a review may take before it counts as stuck. */
 export const CODEX_BIN = 'codex'
@@ -91,13 +93,17 @@ const FAILURE_PATTERNS = [
  * the normal channel.
  */
 export function classifyOutcome({ spawnError = null, exitCode = 0, stdout = '', stderr = '', timedOut = false } = {}) {
+  // THE TIMEOUT IS ASKED FIRST (four-eyes finding, 10.08.2026). `spawnSync` with
+  // a timeout sets BOTH an ETIMEDOUT error and the kill signal, so asking about
+  // the error first turned every real timeout into a nondescript "error exit".
+  if (timedOut || String(spawnError?.code ?? '') === 'ETIMEDOUT') {
+    return { ok: false, kind: OUTCOME.TIMEOUT, cause: CAUSE_TEXT[OUTCOME.TIMEOUT] }
+  }
   if (spawnError) {
     const code = String(spawnError.code ?? '')
     const kind = code === 'ENOENT' ? OUTCOME.NOT_INSTALLED : OUTCOME.ERROR_EXIT
     return { ok: false, kind, cause: `${CAUSE_TEXT[kind]}: ${spawnError.message ?? code}` }
   }
-  if (timedOut) return { ok: false, kind: OUTCOME.TIMEOUT, cause: CAUSE_TEXT[OUTCOME.TIMEOUT] }
-
   const text = `${stderr ?? ''}\n${stdout ?? ''}`
   if (Number(exitCode) === 0) return { ok: true, kind: OUTCOME.OK, cause: '' }
 
@@ -192,17 +198,33 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review' } = {}
  * evidence line too thin to mean anything, is NOT a verdict. Such a run has not
  * been reviewed, and the caller falls back rather than record a guess.
  */
+export const BLIND_REVIEWER = /\b(?:i|we)\s+(?:could\s+not|couldn't|can(?:no|')t|was\s+unable\s+to|were\s+unable\s+to|did\s+not\s+(?:get|receive))\b[^.\n]{0,80}\b(?:read|see|inspect|access|reach|open|review|view|retrieve|fetch|the\s+(?:diff|patch|material|repository|files?))\b|\bno\s+(?:access\s+to|material|patch|diff)\b|\bnone\s+of\s+my\s+commands\b/i
+
 export function parseVerdict(text) {
   const raw = String(text ?? '')
   const clean = raw.replace(/[*`_#>]/g, '')
-  // Last occurrence wins: the prompt asks for the pair at the very end, and a
-  // reviewer that quotes the instruction earlier must not shadow its own answer.
-  const verdictMatches = [...clean.matchAll(/^\s*[-*]?\s*VERDICT\s*:\s*(.+)$/gim)]
-  const evidenceMatches = [...clean.matchAll(/^\s*[-*]?\s*EVIDENCE\s*:\s*(.+)$/gim)]
-  const verdict = verdictMatches.length ? verdictMatches.at(-1)[1].trim().toLowerCase() : ''
-  const evidence = evidenceMatches.length ? evidenceMatches.at(-1)[1].trim() : ''
+  // THE PAIR MUST BE THE END OF THE MESSAGE (four-eyes finding, 10.08.2026). The
+  // prompt asks for exactly two closing lines; taking the last match of each
+  // INDEPENDENTLY would happily pair a verdict with an evidence line from some
+  // earlier paragraph, so the two final non-empty lines are what is read.
+  const tail = clean.split('\n').map((l) => l.trim()).filter(Boolean).slice(-2)
+  const verdict = (/^[-*]?\s*VERDICT\s*:\s*(.+)$/i.exec(tail[0] ?? '')?.[1] ?? '').trim().toLowerCase()
+  const evidence = (/^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1] ?? '')?.[1] ?? '').trim()
   if (!VERDICTS.includes(verdict)) {
-    return { ok: false, verdict: '', evidence: '', error: verdict ? `unusable verdict "${verdict}"` : 'no VERDICT line' }
+    return {
+      ok: false,
+      verdict: '',
+      evidence: '',
+      error: verdict ? `unusable verdict "${verdict}"` : 'the message does not end in the VERDICT/EVIDENCE pair',
+    }
+  }
+  // A REVIEWER THAT SAYS IT COULD NOT LOOK HAS NOT REVIEWED (measured: the very
+  // first run of this command answered `do-not-merge` because none of its
+  // commands reached the repository). Such an answer carries a valid verdict
+  // word and would otherwise be recorded as a review. The check errs towards the
+  // fallback, which costs a second reviewer, never a false green.
+  if (BLIND_REVIEWER.test(evidence)) {
+    return { ok: false, verdict: '', evidence: '', error: 'the reviewer says it could not see the change' }
   }
   // A line still in its angle brackets is the PLACEHOLDER echoed back, not an
   // observation. (The closing bracket is not required: the markdown strip above
@@ -222,7 +244,7 @@ export function parseVerdict(text) {
  * so with an EMPTY verdict, because at that moment no second pair of eyes has
  * seen the change yet. `ready` says whether a record may be written at all.
  */
-export function decideReview({ outcome = {}, parsed = {} } = {}) {
+export function decideReview({ outcome = {}, parsed = {}, authorModel = '' } = {}) {
   if (outcome.ok && parsed.ok) {
     return {
       model: SOL_MODEL_NAME,
@@ -240,7 +262,7 @@ export function decideReview({ outcome = {}, parsed = {} } = {}) {
     ? `${CAUSE_TEXT[OUTCOME.NO_VERDICT]}${parsed.error ? ` (${parsed.error})` : ''}`
     : outcome.cause || CAUSE_TEXT[kind] || 'codex did not deliver a review'
   return {
-    model: FALLBACK_MODEL_NAME,
+    model: fallbackReviewerFor(authorModel),
     ranBy: '',
     verdict: '',
     evidence: '',
@@ -251,8 +273,23 @@ export function decideReview({ outcome = {}, parsed = {} } = {}) {
   }
 }
 
-/** How much material one review may carry — the patch plus the changed files. */
-export const MATERIAL_BUDGET_CHARS = 120_000
+/**
+ * The fallback reviewer, given who AUTHORED the change.
+ *
+ * Normally Fable 5 — but Fable also AUTHORS here (CLAUDE.md §6), and a Fable
+ * review of Fable's own commit is the self-review both gates refuse. That would
+ * leave a Fable-authored change with no reachable reviewer at all whenever Sol
+ * is down, so the second Anthropic model in the chain takes over instead (found
+ * by the cross-vendor review of this very branch, 10.08.2026).
+ */
+export function fallbackReviewerFor(authorModel = '') {
+  return sameModel(FALLBACK_MODEL_NAME, authorModel) ? SECOND_FALLBACK_MODEL_NAME : FALLBACK_MODEL_NAME
+}
+
+/** How much material one review may carry — the patch plus the changed files —
+ *  and the share of it the patch may take before the files get their turn. */
+export const MATERIAL_BUDGET_CHARS = 200_000
+export const PATCH_SHARE = 0.5
 
 /**
  * The review MATERIAL, assembled into what codex receives on stdin.
@@ -271,7 +308,22 @@ export const MATERIAL_BUDGET_CHARS = 120_000
  * silently saw half a file would report on the half it saw.
  */
 export function formatReviewMaterial({ stat = '', patch = '', files = [], budget = MATERIAL_BUDGET_CHARS } = {}) {
-  const out = ['=== DIFFSTAT ===', String(stat).trim(), '', '=== PATCH ===', String(patch).trim(), '']
+  // THE PATCH IS CAPPED TOO (four-eyes finding, 10.08.2026). It used to be
+  // written whole and merely SUBTRACTED from the budget, so a large diff blew
+  // the ceiling and left nothing for the files — measured on this branch: the
+  // reviewer saw the patch, a truncated README and none of the six scripts. It
+  // gets a fixed share, and what it loses is cut visibly like everything else.
+  const cut = (text, room) =>
+    text.length > room ? `${text.slice(0, Math.max(0, room))}\n… [TRUNCATED: ${text.length - room} characters not shown]` : text
+  const patchRoom = Math.floor(budget * PATCH_SHARE)
+  const out = [
+    '=== DIFFSTAT ===',
+    cut(String(stat).trim(), Math.floor(budget * 0.05)),
+    '',
+    '=== PATCH ===',
+    cut(String(patch).trim(), patchRoom),
+    '',
+  ]
   let left = Math.max(0, budget - out.join('\n').length)
   for (const file of files ?? []) {
     const text = String(file?.text ?? '')
@@ -281,11 +333,36 @@ export function formatReviewMaterial({ stat = '', patch = '', files = [], budget
       continue
     }
     const room = left - header.length - 80
-    const cut = text.length > room
-    out.push(header, cut ? `${text.slice(0, room)}\n… [TRUNCATED: ${text.length - room} characters not shown]` : text, '')
+    out.push(header, cut(text, room), '')
     left -= header.length + Math.min(text.length, room) + 80
   }
   return out.join('\n')
+}
+
+/** How long a passed model-id probe stands before it must be repeated. */
+export const PROBE_MAX_AGE_MS = 30 * 86_400_000
+
+/**
+ * Has this machine PROVEN that `-m` is honoured rather than silently substituted?
+ *
+ * Nothing in a run's output names the model that answered (checked against
+ * `codex exec --json`, 10.08.2026: its events carry the thread, the items and the
+ * token usage, no model field). So the identity rests on the server REFUSING an
+ * unknown id — which `--probe` demonstrates — and the honest thing is to say
+ * when that demonstration is missing or old rather than to imply it every time.
+ * A warning, never a block: an unproven id is a reason to distrust the ledger
+ * line, not a reason to leave a change unreviewed.
+ */
+export function probeFreshness(receipt, now = Date.now(), maxAgeMs = PROBE_MAX_AGE_MS) {
+  const at = Number(receipt?.at ?? 0)
+  if (!receipt || receipt.refused !== true || !at) {
+    return { fresh: false, warning: `the model id ${SOL_MODEL_ID} has never been proven honoured on this machine — run: node scripts/review-sol.mjs --probe` }
+  }
+  const ageDays = Math.floor((now - at) / 86_400_000)
+  if (now - at > maxAgeMs) {
+    return { fresh: false, warning: `the model-id probe is ${ageDays} days old — run: node scripts/review-sol.mjs --probe` }
+  }
+  return { fresh: true, warning: '', ageDays }
 }
 
 /**

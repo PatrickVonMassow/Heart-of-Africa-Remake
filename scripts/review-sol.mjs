@@ -31,11 +31,22 @@
 // `--restore-login` puts it back — one command, no device code, and the secret
 // never reaches git (`/local/` is in .gitignore, and the file is written 0600).
 import { spawnSync } from 'node:child_process'
-import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, sep as sep_ } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
+import { modelFromTrailers } from './mechanism-review-core.mjs'
 import {
   buildReviewPrompt,
   classifyOutcome,
@@ -46,6 +57,7 @@ import {
   formatReviewReport,
   isUnknownModelRefusal,
   parseVerdict,
+  probeFreshness,
   REVIEW_TIMEOUT_MS,
   savedAuthPathFrom,
   SOL_MODEL_ID,
@@ -68,23 +80,45 @@ export const SAVED_AUTH_FILE = savedAuthPathFrom(
   { sep: sep_ },
 )
 
-/** One git read, as text. An empty answer is not fatal — the caller says so. */
-const git = (args) =>
-  (spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024 })
-    .stdout ?? '').trim()
+/**
+ * One git read. `required` reads FAIL LOUD: an ignored exit status would send a
+ * reviewer an empty patch and call the silence a review (four-eyes finding,
+ * 10.08.2026). The optional reads are the per-file ones, where "not in this
+ * commit" is an ordinary answer.
+ */
+function git(args, { required = true } = {}) {
+  const res = spawnSync('git', args, {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    windowsHide: true,
+    maxBuffer: 128 * 1024 * 1024,
+  })
+  if (res.status !== 0 || res.error) {
+    if (!required) return null
+    throw new Error(`git ${args.join(' ')} failed: ${(res.stderr || res.error?.message || '').trim()}`)
+  }
+  return (res.stdout ?? '').trim()
+}
 
 /**
- * The material one review is given: the diffstat, the patch, and the CURRENT
- * content of every file the commit touched (see formatReviewMaterial for why it
- * is fed rather than fetched). A file deleted by the commit simply has no
- * current content, and is left out rather than reported as empty.
+ * The material one review is given: the diffstat, the patch, and the content of
+ * every file the change touched (see formatReviewMaterial for why it is fed
+ * rather than fetched).
+ *
+ * THE CONTENT COMES FROM THE COMMIT, NOT FROM THE WORKING TREE (four-eyes
+ * finding, 10.08.2026). Reading the live tree would follow a symlink — a link
+ * committed at a harmless name could have posted the saved ChatGPT login to the
+ * model — and would also ship whatever uncommitted local material happens to sit
+ * in those files. `git show <sha>:<path>` reads the immutable blob instead, so a
+ * symlink yields its own target text (a few harmless bytes, and visible as such)
+ * and nothing outside the commit can travel at all.
  */
 function gatherMaterial(sha, base = '') {
   // THE WHOLE BRANCH, NOT THE LAST COMMIT (10.08.2026). One record covers every
   // commit it CONTAINS — that is how both gates read the ledger — so a review of
   // a branch head that only saw the head's own diff would clear commits nobody
-  // looked at. With a base the material is the range; without one (a commit
-  // already on the base branch) it is that commit alone.
+  // looked at. A range DIFF (rather than per-commit patches) is what carries a
+  // merge commit's conflict resolution, which `git log --patch` omits.
   const range = base ? `${base}..${sha}` : ''
   const paths = (range
     ? git(['diff', '--name-only', range])
@@ -92,22 +126,14 @@ function gatherMaterial(sha, base = '') {
   ).split('\n').map((p) => p.trim()).filter(Boolean)
   const files = []
   for (const path of [...new Set(paths)]) {
-    const full = join(REPO_ROOT, path)
-    try {
-      // A SYMLINK IS NOT READ (four-eyes finding, 10.08.2026). This content
-      // leaves the machine, and a link committed under a harmless name — say at
-      // `local/codex-auth.json`, the saved ChatGPT login — would post whatever it
-      // points at to the model. The patch still shows the link itself, which is
-      // what a reviewer needs to see anyway.
-      if (lstatSync(full).isSymbolicLink()) continue
-      files.push({ path, text: readFileSync(full, 'utf8') })
-    } catch {
-      /* deleted or binary — the patch above still shows what happened to it */
-    }
+    const text = git(['show', `${sha}:${path}`], { required: false })
+    // Null = the commit does not carry that path (it was deleted); the patch
+    // above still shows what happened to it.
+    if (text !== null) files.push({ path, text })
   }
   return formatReviewMaterial({
     stat: range ? git(['diff', '--stat', range]) : git(['show', '--stat', sha]),
-    patch: range ? git(['log', '--patch', '--reverse', range]) : git(['show', sha]),
+    patch: range ? git(['diff', range]) : git(['show', sha]),
     files,
   })
 }
@@ -148,10 +174,21 @@ function runCodex({ prompt, input = '', modelId = SOL_MODEL_ID, timeoutMs = REVI
     exitCode: res.status ?? 1,
     stdout: res.stdout ?? '',
     stderr: res.stderr ?? '',
-    // `timeout` kills with SIGTERM; the status is then null, which alone would
-    // read as an ordinary error exit.
-    timedOut: res.signal === 'SIGTERM' && res.status === null,
+    // `timeout` kills with SIGTERM AND sets an ETIMEDOUT error; either half on
+    // its own would otherwise read as an ordinary error exit.
+    timedOut: res.signal === 'SIGTERM' || String(res.error?.code ?? '') === 'ETIMEDOUT',
     finalMessage: last || res.stdout || '',
+  }
+}
+
+/** The receipt of the last passed model-id probe (see probeFreshness). */
+export const PROBE_RECEIPT_FILE = join(dirname(SAVED_AUTH_FILE), 'review-sol-probe.json')
+
+function readProbeReceipt() {
+  try {
+    return JSON.parse(readFileSync(PROBE_RECEIPT_FILE, 'utf8'))
+  } catch {
+    return null
   }
 }
 
@@ -162,6 +199,8 @@ function probe() {
   const text = `${res.stderr}\n${res.stdout}`
   const refused = res.exitCode !== 0 && isUnknownModelRefusal(text)
   if (refused) {
+    mkdirSync(dirname(PROBE_RECEIPT_FILE), { recursive: true })
+    writeFileSync(PROBE_RECEIPT_FILE, `${JSON.stringify({ at: Date.now(), refused: true, id: bogus })}\n`)
     console.log(
       `review-sol --probe: PASS — the server REFUSED the unknown id "${bogus}", so \`-m\` is honoured\n` +
         `  and a review run with -m ${SOL_MODEL_ID} really is ${SOL_MODEL_NAME}.`,
@@ -184,6 +223,25 @@ function saveLogin() {
     return 1
   }
   mkdirSync(dirname(SAVED_AUTH_FILE), { recursive: true })
+  // THE DESTINATION IS PROVEN IGNORED BEFORE A SECRET IS WRITTEN TO IT
+  // (four-eyes finding, 10.08.2026): `local/` is git-ignored today, and a token
+  // written where git can see it is one `git add -A` away from the repository.
+  // The same check refuses a destination that is a symlink pointing elsewhere.
+  const ignored = spawnSync('git', ['check-ignore', '-q', SAVED_AUTH_FILE], {
+    cwd: REPO_ROOT,
+    windowsHide: true,
+  })
+  if (ignored.status !== 0) {
+    console.error(
+      `review-sol --save-login: REFUSING — git does not ignore ${SAVED_AUTH_FILE}.\n` +
+        '  A login token written where git can see it is one `git add -A` away from the repository.',
+    )
+    return 1
+  }
+  if (existsSync(SAVED_AUTH_FILE) && lstatSync(SAVED_AUTH_FILE).isSymbolicLink()) {
+    console.error(`review-sol --save-login: REFUSING — ${SAVED_AUTH_FILE} is a symlink; it would write through it.`)
+    return 1
+  }
   copyFileSync(AUTH_FILE, SAVED_AUTH_FILE)
   chmodSync(SAVED_AUTH_FILE, 0o600)
   console.log(
@@ -273,7 +331,12 @@ if (isMainModule(import.meta.url)) {
     const run = runCodex({ prompt: buildReviewPrompt({ sha: full, brief, mode }), input: material, timeoutMs })
     const outcome = classifyOutcome(run)
     const parsed = outcome.ok ? parseVerdict(run.finalMessage) : { ok: false }
-    const decision = decideReview({ outcome, parsed })
+    // WHO AUTHORED IT decides who may review it if Sol is unavailable: Fable
+    // cannot review its own commit (see fallbackReviewerFor).
+    const authorModel = modelFromTrailers(
+      git(['show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', full]) ?? '',
+    )
+    const decision = decideReview({ outcome, parsed, authorModel })
     // THE FINDINGS ARE THE POINT, not the verdict word: a `do-not-merge` whose
     // reasons were never printed cannot be acted on, and the evidence line the
     // ledger carries is one sentence by design. So the reviewer's whole answer
@@ -283,6 +346,11 @@ if (isMainModule(import.meta.url)) {
       console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end of review ---\n`)
     }
     console.log(formatReviewReport({ decision, sha: full, mode, point }))
+    // The identity of the model that answered rests on the server refusing an
+    // unknown id; nothing in a run's output names it. Say so when that has not
+    // been demonstrated here lately, rather than implying it silently.
+    const freshness = probeFreshness(readProbeReceipt())
+    if (!decision.fellBack && !freshness.fresh) console.log(`\n  NOTE: ${freshness.warning}`)
     // A fallback is not an error of THIS command — it did its job by refusing to
     // invent a review — but it must not read as a finished one either, so the
     // exit code distinguishes them for any script that chains on it.

@@ -11,6 +11,7 @@ import {
   classifyOutcome,
   codexArgs,
   decideReview,
+  fallbackReviewerFor,
   FALLBACK_MODEL_NAME,
   formatRecordCommand,
   formatReviewMaterial,
@@ -18,7 +19,9 @@ import {
   isUnknownModelRefusal,
   OUTCOME,
   parseVerdict,
+  probeFreshness,
   savedAuthPathFrom,
+  SECOND_FALLBACK_MODEL_NAME,
   SOL_MODEL_ID,
   SOL_MODEL_NAME,
   SOL_REASONING_EFFORT,
@@ -80,6 +83,15 @@ describe('classifyOutcome — how a codex run ended', () => {
     expect(classifyOutcome({ timedOut: true, exitCode: 1 })).toMatchObject({ ok: false, kind: OUTCOME.TIMEOUT })
   })
 
+  it('reads a REAL spawnSync timeout, which arrives as an error AND a signal', () => {
+    // The shape node actually returns: `{ error: ETIMEDOUT, signal: 'SIGTERM',
+    // status: null }`. Asking about the error first classified every timeout as
+    // a nondescript error exit (four-eyes finding, 10.08.2026).
+    const err = Object.assign(new Error('spawnSync codex ETIMEDOUT'), { code: 'ETIMEDOUT' })
+    expect(classifyOutcome({ spawnError: err, exitCode: 1, timedOut: true })).toMatchObject({ kind: OUTCOME.TIMEOUT })
+    expect(classifyOutcome({ spawnError: err, exitCode: 1, timedOut: false })).toMatchObject({ kind: OUTCOME.TIMEOUT })
+  })
+
   it('the bubblewrap warning codex prints on stderr does not fail a green run', () => {
     const noise = 'warning: bubblewrap sandbox unavailable, continuing'
     expect(classifyOutcome({ exitCode: 0, stderr: noise, stdout: solSays() }).ok).toBe(true)
@@ -108,12 +120,37 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
 
   it('refuses a verdict word the recorder would not accept', () => {
     expect(parseVerdict('VERDICT: looks good\nEVIDENCE: I read the whole diff carefully')).toMatchObject({ ok: false })
-    expect(parseVerdict('no structured answer at all')).toMatchObject({ ok: false, error: 'no VERDICT line' })
+    expect(parseVerdict('no structured answer at all')).toMatchObject({ ok: false })
+    expect(parseVerdict('no structured answer at all').error).toMatch(/VERDICT/)
   })
 
   it('refuses an evidence line that says nothing, including the placeholder itself', () => {
     expect(parseVerdict('VERDICT: merge\nEVIDENCE: fine')).toMatchObject({ ok: false })
     expect(parseVerdict('VERDICT: merge\nEVIDENCE: <one line naming what you checked>')).toMatchObject({ ok: false })
+  })
+
+  it('refuses a reviewer that says it could not see the change, whatever verdict it gave', () => {
+    // The very first real run answered do-not-merge because none of its commands
+    // reached the repository — a valid verdict word for a review that never
+    // happened (four-eyes finding, 10.08.2026).
+    for (const evidence of [
+      'I could not read the diff, so no line-level review actually ran',
+      'None of my commands reached the repository, so nothing was verified',
+      'We were unable to access the files under review',
+    ]) {
+      expect(parseVerdict(`VERDICT: do-not-merge\nEVIDENCE: ${evidence}`)).toMatchObject({ ok: false })
+      expect(parseVerdict(`VERDICT: merge\nEVIDENCE: ${evidence}`)).toMatchObject({ ok: false })
+    }
+    // …but an ordinary finding that merely contains "could not" is a review.
+    expect(
+      parseVerdict('VERDICT: merge-with-fixes\nEVIDENCE: the parser could not handle a CRLF patch; everything else read clean'),
+    ).toMatchObject({ ok: true })
+  })
+
+  it('requires the pair to be the LAST two lines, not two matches from anywhere', () => {
+    const spliced = 'VERDICT: merge\n\nSome later paragraph.\n\nEVIDENCE: read the whole diff and the tests'
+    expect(parseVerdict(spliced)).toMatchObject({ ok: false })
+    expect(parseVerdict(`intro\n${solSays('merge', 'read the whole diff and the tests')}`)).toMatchObject({ ok: true })
   })
 })
 
@@ -137,6 +174,17 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
   it('a run that exits 0 but says nothing usable is also a fallback — not a green review', () => {
     const d = decideReview(okRun('I had a look and it seems fine.'))
     expect(d).toMatchObject({ model: FALLBACK_MODEL_NAME, fellBack: true, ready: false, kind: OUTCOME.NO_VERDICT })
+  })
+
+  it('does not hand a Fable-authored commit to Fable — that is the self-review both gates refuse', () => {
+    const failed = { outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }), parsed: { ok: false } }
+    expect(decideReview({ ...failed, authorModel: 'Claude Fable 5 <noreply@anthropic.com>' }).model).toBe(
+      SECOND_FALLBACK_MODEL_NAME,
+    )
+    expect(decideReview({ ...failed, authorModel: 'Claude Opus 5 <noreply@anthropic.com>' }).model).toBe(
+      FALLBACK_MODEL_NAME,
+    )
+    expect(fallbackReviewerFor('')).toBe(FALLBACK_MODEL_NAME)
   })
 
   it('never names Sol on a failed run, and never names Fable on a successful one', () => {
@@ -258,6 +306,34 @@ describe('the material the reviewer is handed', () => {
 
   it('is fine with a commit that only deleted files', () => {
     expect(material([])).toContain('=== PATCH ===')
+  })
+
+  it('CAPS THE PATCH TOO, so a large diff cannot eat every file', () => {
+    // Measured on this branch: an uncapped patch spent the whole budget and the
+    // reviewer saw none of the six scripts it was asked to judge.
+    const out = formatReviewMaterial({
+      stat: 's',
+      patch: 'p'.repeat(50_000),
+      files: [{ path: 'a.mjs', text: 'the file the review is actually about' }],
+      budget: 4000,
+    })
+    expect(out.length).toBeLessThan(4500)
+    expect(out).toMatch(/TRUNCATED/)
+    expect(out).toContain('the file the review is actually about')
+  })
+})
+
+describe('the model-id probe receipt', () => {
+  it('warns when the id has never been proven honoured here', () => {
+    expect(probeFreshness(null)).toMatchObject({ fresh: false })
+    expect(probeFreshness({ at: Date.now() })).toMatchObject({ fresh: false })
+    expect(probeFreshness(null).warning).toMatch(/--probe/)
+  })
+
+  it('accepts a recent PASS and expires an old one', () => {
+    const now = Date.parse('2026-08-10T12:00:00Z')
+    expect(probeFreshness({ at: now - 86_400_000, refused: true }, now)).toMatchObject({ fresh: true })
+    expect(probeFreshness({ at: now - 60 * 86_400_000, refused: true }, now)).toMatchObject({ fresh: false })
   })
 })
 
