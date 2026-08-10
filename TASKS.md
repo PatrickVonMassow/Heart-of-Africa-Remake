@@ -5560,3 +5560,48 @@ to land than a mechanism that needs a review.
   Criticality: HIGH — it is a guard, so `mechanism-review-guard` demands the other
   model's recorded review, and its failure mode is the user acting on a question that
   was settled hours ago.
+
+- [ ] 624. THE FOUR-EYES HALF MOVES TO A DIFFERENT HOUSE (user 10.08.2026: "Deine
+  Modell-Einschränkung soll ab jetzt auch OpenAIs 5.6 Sol zulassen" and "Verwende ab
+  jetzt 5.6 Sol mit Aufwandstufe Hoch als bevorzugtes Modell für Vier-Augen-Prüfungen
+  und Fable als Fallback", plus "falls du 5.6 Sol nicht erreichst … sollst du wieder auf
+  die bisherigen Modelle zurückfallen"). Our two reviewers were Opus 5 and Fable 5 —
+  one house, similar training, therefore CORRELATED blind spots, which is exactly what
+  the four-eyes rule is bought against. A model from a different vendor is the strongest
+  decorrelation available, and it is paid from the user's separate ChatGPT allowance.
+  ESTABLISHED 10.08.2026, so the point implements the rule, not the plumbing: codex-cli
+  0.147.0 is installed, the device login against the ChatGPT account succeeded,
+  `codex exec -m gpt-5.6-sol -c model_reasoning_effort=high` answers, and an unknown
+  model id is REFUSED by the server rather than silently substituted — so the id is
+  really honoured. The three OpenAI hosts stand in `.devcontainer/init-firewall.sh` and
+  in the running ipset.
+  FINAL STATE:
+  1. THE POLICY SEPARATES AUTHOR FROM REVIEWER. Authors are unchanged — Opus 5 → Fable 5
+     → Opus 4.8, and Sol writes no commit here. REVIEWS — the convergent review and the
+     blind-parallel half alike — go to `gpt-5.6-sol` at reasoning effort HIGH first and
+     to Fable 5 when Sol is unavailable. `CLAUDE.md` §6 says exactly that; the reason
+     stays written down, because a reviewer chosen for its DIFFERENT errors is the whole
+     point and a later reader must not "simplify" it back to one house.
+  2. `scripts/model-guard-core.mjs` keeps its author allowlist untouched, and
+     `scripts/mechanism-review.mjs --record --model` ACCEPTS "GPT-5.6 Sol": the recorder
+     must never refuse the reviewer the rule now prefers.
+  3. ONE COMMAND, NO RAW INVOCATION. `node scripts/review-sol.mjs --sha <sha> --brief
+     "<what to judge>"` runs the review through `codex exec` non-interactively in a
+     read-only sandbox and prints the verdict and evidence in the shape
+     `mechanism-review.mjs --record` expects. No session types a codex line by hand.
+  4. THE FALLBACK IS AUTOMATIC AND LOUD. An unreachable host, an expired login, an
+     exhausted allowance or any error exit makes the command name the cause in ONE line
+     and hand the review to Fable 5, and the recorded review NAMES the model that
+     actually did it. A review nobody ran is never recorded as done — that failure mode
+     is worse than having no second pair of eyes, because the gate then counts as
+     satisfied.
+  5. OPEN, and to be answered in this point: the login lives in the container's home
+     directory, so a container REBUILD loses it and the user must repeat the device
+     code. Either persist it inside the project's git-ignored `local/` or state in the
+     README how to restore it in one command.
+  VERIFIABLE: Vitest over the pure fallback decision (reachable → Sol, each failure kind
+  → Fable, and the recorded model name follows the run, never the preference); a run of
+  `review-sol.mjs` against a real sha that produces a record `mechanism-review.mjs`
+  accepts; `node scripts/mechanism-review-guard.mjs --status` green afterwards.
+  Criticality: HIGH — it changes the model policy the guards enforce, so the mechanism
+  review applies and can fittingly be its own first customer.
