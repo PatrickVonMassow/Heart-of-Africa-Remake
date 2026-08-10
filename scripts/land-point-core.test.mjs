@@ -27,6 +27,7 @@ import {
   markNotReached,
   planLanding,
   resolveBranch,
+  runSteps,
   stepLabel,
   tickAndArchive,
   tickCommitMessage,
@@ -316,6 +317,63 @@ describe('rider (c) — the concurrency interlock', () => {
   it('survives junk strays', () => {
     expect(gateConcurrency({ strays: [null, {}, { kind: 42 }], probeOk: true }).mode).toBe('parallel')
     expect(gateConcurrency({ strays: 'nope', probeOk: true }).mode).toBe('parallel')
+  })
+
+  // THE OUTCOME, NOT THE DECISION. gateConcurrency choosing "parallel" and
+  // reporting "parallel" proved nothing: the first runner wrapped a SYNCHRONOUS
+  // execFileSync in a Promise executor, so both branches ran strictly one after
+  // the other while every test passed. These cases ask whether the steps
+  // actually overlap.
+  describe('runSteps — does the work actually overlap?', () => {
+    /** A runner that starts on call and only settles when released. */
+    const deferredRunner = () => {
+      const started = []
+      const release = new Map()
+      const run = (id) => {
+        started.push(id)
+        return new Promise((res) => release.set(id, () => res({ id, ok: true })))
+      }
+      return { run, started, release }
+    }
+
+    it('parallel: every step has STARTED before any of them settles', async () => {
+      const { run, started, release } = deferredRunner()
+      const all = runSteps({ ids: ['build', 'lint', 'unit'], mode: 'parallel', run })
+      await Promise.resolve()
+      expect(started).toEqual(['build', 'lint', 'unit'])
+      for (const id of ['build', 'lint', 'unit']) release.get(id)()
+      expect((await all).map((r) => r.id)).toEqual(['build', 'lint', 'unit'])
+    })
+
+    it('serial: a step does NOT start until the previous one has settled', async () => {
+      const { run, started, release } = deferredRunner()
+      const all = runSteps({ ids: ['build', 'lint', 'unit'], mode: 'serial', run })
+      await Promise.resolve()
+      expect(started).toEqual(['build'])
+      release.get('build')()
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(started).toEqual(['build', 'lint'])
+      release.get('lint')()
+      await new Promise((r) => setTimeout(r, 0))
+      release.get('unit')()
+      expect((await all).map((r) => r.id)).toEqual(['build', 'lint', 'unit'])
+    })
+
+    it('parallel awaits ALL of them, so every red step is named at once', async () => {
+      const run = async (id) => ({ id, ok: id === 'build' })
+      const out = await runSteps({ ids: ['build', 'lint', 'unit'], mode: 'parallel', run })
+      expect(out.filter((r) => !r.ok).map((r) => r.id)).toEqual(['lint', 'unit'])
+    })
+
+    it('refuses a missing runner rather than silently doing nothing', async () => {
+      await expect(runSteps({ ids: ['build'], mode: 'parallel' })).rejects.toThrow(LandingError)
+    })
+
+    it('handles an empty step list in both modes', async () => {
+      expect(await runSteps({ ids: [], mode: 'parallel', run: async () => ({}) })).toEqual([])
+      expect(await runSteps({ ids: [], mode: 'serial', run: async () => ({}) })).toEqual([])
+    })
   })
 
   it('names the interlocking kinds and the gate commands', () => {

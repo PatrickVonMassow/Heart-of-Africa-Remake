@@ -23,7 +23,7 @@
 // IT STOPS AT THE FIRST RED. There is no --force and no --continue: a chain that
 // can be talked past its own failure is a chain that leaves half states, which is
 // the failure mode this command exists to remove.
-import { execFileSync } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -47,6 +47,7 @@ import {
   markNotReached,
   planLanding,
   resolveBranch,
+  runSteps,
   tickAndArchive,
   tickCommitMessage,
   transitionAccepted,
@@ -139,31 +140,38 @@ function probeMachine() {
 }
 
 /**
- * Run the gate steps. PARALLEL means "started together and all awaited" — every
- * step's verdict is collected even when an earlier one has already failed, so the
- * summary names ALL the red steps rather than only the first. That is the one
- * place the chain deliberately does not stop early: three gate results cost the
- * same wall clock as one, and a session that fixes one red only to meet the next
- * has spent a whole landing to learn it.
+ * Run ONE command without blocking the event loop, and never throw.
+ *
+ * `execFile`, not `execFileSync`, and that distinction is the whole of rider (c).
+ * A synchronous call inside a Promise executor cannot overlap with anything: the
+ * executor body runs to completion the moment the promise is constructed, so
+ * `map` over it is serial no matter what `Promise.all` is told afterwards. The
+ * property that proves this function is the right one is that it RETURNS before
+ * the child exits, which is what its test measures.
+ *
+ * Exported so that test can reach it: the scheduling is pure and pinned in the
+ * core, but "is the runner actually asynchronous" can only be asked of the runner.
  */
-async function runGate(steps, mode) {
-  const run = (id) =>
-    new Promise((res) => {
-      const [cmd, ...args] = GATE_COMMANDS[id]
-      try {
-        sh(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] })
-        res({ id, ok: true, output: '' })
-      } catch (e) {
-        const out = `${(e && e.stdout) || ''}\n${(e && e.stderr) || ''}`.trim()
-        res({ id, ok: false, output: out.split('\n').slice(-12).join('\n') })
-      }
+export function runCommand({ cmd, args = [], id = cmd, maxOutputLines = 12 } = {}) {
+  return new Promise((res) => {
+    execFile(cmd, args, { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true }, (err, stdout, stderr) => {
+      if (!err) return res({ id, ok: true, output: '' })
+      const out = `${stdout || ''}\n${stderr || ''}`.trim()
+      res({ id, ok: false, output: out.split('\n').slice(-maxOutputLines).join('\n') })
     })
-
-  if (mode === 'parallel') return Promise.all(steps.map(run))
-  const results = []
-  for (const id of steps) results.push(await run(id))
-  return results
+  })
 }
+
+/** The gate, scheduled by the core and run by the async runner above. */
+const runGate = (ids, mode) =>
+  runSteps({
+    ids,
+    mode,
+    run: (id) => {
+      const [cmd, ...args] = GATE_COMMANDS[id]
+      return runCommand({ cmd, args, id })
+    },
+  })
 
 async function main(argv) {
   const args = argv.slice(2)

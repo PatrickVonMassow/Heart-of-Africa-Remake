@@ -260,6 +260,33 @@ export const GATE_COMMANDS = Object.freeze({
 export const SERIALISING_STRAYS = Object.freeze(['verify-run', 'automation-browser', 'unit-run'])
 
 /**
+ * Run the gate's steps, either genuinely concurrently or strictly one after the
+ * other. `run` is injected and MUST be asynchronous — this is the half of the
+ * mechanism that a "were the functions called?" test cannot judge.
+ *
+ * THE TRAP THIS SITS IN. The first version wrapped a SYNCHRONOUS `execFileSync`
+ * in a `new Promise(...)` executor. The executor body runs immediately, so
+ * `ids.map(run)` ran each command to completion before the next promise was even
+ * created: the mode was chosen correctly, reported correctly, tested correctly —
+ * and both branches were serial. `gateConcurrency` being right proved nothing.
+ * So `runSteps` is tested on its OUTCOME (do the steps overlap?) rather than on
+ * the decision it was handed.
+ *
+ * PARALLEL AWAITS ALL OF THEM even after one has failed. That is the one place
+ * the chain deliberately does not stop early: three results cost the same wall
+ * clock as one, and a session that fixes one red only to meet the next has spent
+ * a whole landing to learn it.
+ */
+export async function runSteps({ ids = [], mode = 'serial', run } = {}) {
+  const list = Array.isArray(ids) ? ids : []
+  if (typeof run !== 'function') throw new LandingError('runSteps needs a runner', { step: 'gate' })
+  if (mode === 'parallel') return Promise.all(list.map((id) => run(id)))
+  const out = []
+  for (const id of list) out.push(await run(id))
+  return out
+}
+
+/**
  * Parallel or serial, and why.
  *
  * SERIAL IS THE SAFE SIDE, so every uncertainty resolves to it: an unreadable
