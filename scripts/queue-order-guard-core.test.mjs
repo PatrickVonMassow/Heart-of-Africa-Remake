@@ -155,8 +155,13 @@ describe('queueOrderDrift — the rendered sequence against the derived one', ()
     expect(queueOrderDrift([2, 9], [1, 2, 3])).toBeNull()
     expect(queueOrderDrift([3, 1], [1, 2, 3])).toMatchObject({ at: 0, got: 3, want: 1 })
   })
-  it('leaves a doubly listed card to the double-listing invariant', () => {
-    expect(queueOrderDrift([2, 2], [1, 2])).toBeNull()
+  // FOUR-EYES FINDING 1 (Fable 5): invariant 4b covers a now-card also sitting
+  // in the queue, and `parseQueuePoints` returns a Set — a point carded twice
+  // INSIDE the Warteschlange was caught by nothing, so delegating it here would
+  // have left a real drift unseen.
+  it('reports a point carded twice instead of delegating it', () => {
+    expect(queueOrderDrift([2, 2], [1, 2])).toMatchObject({ duplicate: 2 })
+    expect(queueOrderDrift([1, 2, 1], [1, 2])).toMatchObject({ duplicate: 1 })
   })
   it('is total on malformed input', () => {
     expect(queueOrderDrift(null, [1])).toBeNull()
@@ -323,6 +328,16 @@ describe('evaluate — end to end on the two raw files', () => {
     expect(r.reason).toContain('Board there: …, 614, 615, 616, 617, 619, 618, 620')
     expect(r.reason).toContain('work order there: …, 614, 615, 616, 617, 618, 619, 620')
     expect(r.reason).not.toContain('601')
+  })
+
+  it('blocks a hand-edited board that cards one point twice', () => {
+    const r = evaluate({
+      dashboardHtml: boardHtml({ queue: [{ n: 601 }, { n: 602 }, { n: 601 }] }),
+      tasksMd: tasksMd([601, 602]),
+    })
+    expect(r.block).toBe(true)
+    expect(r.reason).toMatch(/LISTS ONE POINT TWICE.*601/)
+    expect(r.reason).toMatch(/board-queue\.mjs/)
   })
 
   it('accepts the rank rules ON TOP of the work order, and a promoted card missing from the queue', () => {

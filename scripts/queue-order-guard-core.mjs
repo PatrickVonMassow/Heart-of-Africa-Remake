@@ -160,6 +160,13 @@ export function finderBeforeOpenFix(cardOrder, tasksOpenSet) {
  * since (staleness, and another guard's business). Judging either difference
  * here would block on something this rule cannot state a remedy for.
  *
+ * A point carded TWICE inside the queue is reported HERE, as `{ duplicate }`,
+ * rather than delegated: invariant 4b of dashboard-guard-core covers only a
+ * now-card whose point is also queued, and `parseQueuePoints` returns a Set, so
+ * a duplicate inside the Warteschlange was caught by nothing (four-eyes finding
+ * 1, Fable 5). It also makes the comparison below well-defined — with a point at
+ * two positions there is no single place the work order can agree with.
+ *
  * Returns null when they agree, else the FIRST divergence with both sequences.
  */
 export function queueOrderDrift(renderedPoints, derivedOrder) {
@@ -167,9 +174,12 @@ export function queueOrderDrift(renderedPoints, derivedOrder) {
   const derived = derivedOrder.map(Number).filter(Number.isInteger)
   const inDerived = new Set(derived)
   const got = renderedPoints.map(Number).filter((n) => inDerived.has(n))
-  const rendered = new Set(got)
+  const rendered = new Set()
+  for (const n of got) {
+    if (rendered.has(n)) return { duplicate: n, at: got.indexOf(n), rendered: got, derived }
+    rendered.add(n)
+  }
   const want = derived.filter((n) => rendered.has(n))
-  if (want.length !== got.length) return null // a card listed twice — invariant 4b's case, not this one
   for (let i = 0; i < want.length; i++) {
     if (want[i] !== got[i]) return { at: i, got: got[i], want: want[i], rendered: got, derived: want }
   }
@@ -181,7 +191,7 @@ export function queueOrderDrift(renderedPoints, derivedOrder) {
  * 140 cards that diverges at position 135 printed two identical opening runs,
  * which reads as a guard confused about its own finding.
  */
-function window(list, at, span = 4) {
+function around(list, at, span = 4) {
   const from = Math.max(0, at - span)
   const to = Math.min(list.length, at + span + 1)
   return `${from > 0 ? '…, ' : ''}${list.slice(from, to).join(', ')}${to < list.length ? ', …' : ''}`
@@ -247,12 +257,18 @@ export function evaluate({ dashboardHtml, tasksMd } = {}) {
     // renders from, so a board rebuilt from the current work order always passes
     // and only a hand-edited or unrebuilt one trips.
     const drift = queueOrderDrift(cards.map((c) => c.point), queueOrder(openPointsOf(tasksMd), tasksMd))
-    if (drift) {
+    if (drift && drift.duplicate) {
+      problems.push(
+        `THE QUEUE LISTS ONE POINT TWICE: point ${drift.duplicate} has two cards in the Warteschlange. ` +
+          `A generated queue renders every open point exactly once, so this is a hand edit. ` +
+          `Rebuild the queue (${QUEUE_REBUILD_CMD}), then ${REPUBLISH}.`,
+      )
+    } else if (drift) {
       problems.push(
         `QUEUE ORDER DRIFTED FROM THE WORK ORDER: the board shows point ${drift.got} at position ` +
           `${drift.at + 1} of the Warteschlange where the work order puts ${drift.want}. The queue's ` +
           `sequence is DERIVED from TASKS.md — the board renders it, it does not store it. ` +
-          `Board there: ${window(drift.rendered, drift.at)} | work order there: ${window(drift.derived, drift.at)}. ` +
+          `Board there: ${around(drift.rendered, drift.at)} | work order there: ${around(drift.derived, drift.at)}. ` +
           `Rebuild the queue (${QUEUE_REBUILD_CMD}), then ${REPUBLISH}.`,
       )
     }
