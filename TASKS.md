@@ -5468,7 +5468,9 @@ to land than a mechanism that needs a review.
   3. Every place that repeats the old wording says the new one: the header of
      `scripts/doc-budget-core.mjs`, `docs/analysis_de/vibe-coding-anleitung.md`,
      `docs/analysis_de/lesson-mechanisms.md` §3.30 and the rule row in
-     `docs/analysis_de/retrospektive-zusammenarbeit.md`.
+     `docs/analysis_de/retrospektive-zusammenarbeit.md`. The 102-word raise in
+     `scripts/doc-budget-core.mjs` still carries "NOT yet confirmed by the user"
+     beside its value; that note goes with the rule it belongs to.
   VERIFIABLE: a grep for "user's agreement" / "Begründung anheben" / "ESCALATES the
   ceiling" finds no doc-budget occurrence that still routes a raise through the user;
   `node scripts/doc-budget-core.mjs` and `scripts/verify/docs.mjs` green.
@@ -5502,3 +5504,59 @@ to land than a mechanism that needs a review.
   Criticality: medium — it touches the argument path of every regression command,
   so a mistake there silences the whole gate; the other model's mechanism review
   applies.
+
+- [ ] 623. AN ANSWERED CARD OUTLIVES ITS ANSWER (user 10.08.2026, in the attended
+  window: "Das ist schon ein paar mal passiert, dass eine Karte nicht gelöscht wurde,
+  die ich beantwortet habe. Etabliere einen Mechanismus dagegen."; bundle Chat & Tafel).
+  Measured the same evening: the card "design.md: 102 Wörter mehr, oder 102 anderswo
+  streichen?" was answered through the board chat around 21:00, the answer was carried
+  durably into the memory rule AND into point 621 by 21:11 — and the card still stood
+  on the board ninety minutes later, until the user asked why. `decision-card-guard`
+  covers the OPPOSITE direction only (a decision requested of the user must exist as a
+  card); nothing checks that a card the user has ANSWERED goes away, so the board keeps
+  asking what is settled and the user cannot tell an open question from a closed one.
+  FINAL STATE — both halves inside the EXISTING `decision-card-guard` (core plus
+  `.claude/decision-card-guard-state.json`; a second guard would double the surface for
+  one rule):
+  1. THE REVIEW IS DUE AT EVERY USER MESSAGE. A turn that carries a user message may
+     not END while an open VDZK card stands undecided AGAINST that message. The channel
+     does not matter and needs no integration: a typed prompt and a chat message the
+     watcher spawned a responder for both arrive as the last USER entry of the
+     transcript the Stop hook already reads. Per card
+     the session either REMOVES it (`node scripts/board.mjs vdzk-remove "<fragment>"`)
+     or records that this message did not answer it (`node scripts/board.mjs vdzk-keep
+     "<fragment>" [...]`, several fragments in one call, written to the guard state and
+     never to the board). The record is keyed to the MESSAGE (its transcript uuid), so
+     the NEXT user message arms every card again — he answers whichever he likes,
+     whenever — and a card ADDED in that same turn is never demanded, it postdates the
+     message.
+  2. A SUSPECTED HIT COSTS A REASON. Where a card's title and the user's message share
+     a distinctive term (normalised, at least 5 characters, outside the stop list),
+     `vdzk-keep` for that card REQUIRES `--why "<why the message did not answer it>"`;
+     every other card is kept by being listed. That is the two-tier loudness this
+     project already uses elsewhere: cheap where nothing points at the card, deliberate
+     where something does.
+  3. A SESSION THAT MAY NOT TOUCH THE BOARD CARRIES THE ANSWER INSTEAD. The window the
+     user writes into is usually NOT the batch owner (stand-down: no board edit) —
+     which is exactly what happened on 10.08. For it both remedies collapse into one:
+     `node scripts/vdzk-answer.mjs "<fragment>" --answer "<what the user decided>"`,
+     appended to `.claude/vdzk-answers.json`. THIS half does NOT stand down for a
+     non-owner: it demands a RECORD, not a board edit. The OWNER's turn end is then
+     blocked while an unapplied answer waits; it removes the card and clears the entry
+     (`node scripts/vdzk-answer.mjs --applied "<fragment>"`), and an entry naming a card
+     that no longer exists clears itself.
+  4. Fail-OPEN like every guard here (an internal error allows the stop), the decision
+     logic pure in `decision-card-guard-core.mjs`, and the remedy NAMES the exact
+     command per card — a guard that only says "decide" is a guard that gets
+     rubber-stamped.
+  VERIFIABLE: Vitest cases in `scripts/decision-card-guard-core.test.mjs` covering — a
+  user message with two open cards blocks; one removed plus one kept passes; the same
+  cards pass silently on a turn with NO user message; a NEW user message re-arms both;
+  a card added this turn is not demanded; a shared distinctive term forces `--why`
+  while a shared stop word ("nicht", "board", "punkt") does not; a carried answer blocks
+  the owner and passes the non-owner; an answer naming a vanished card self-clears; a
+  throwing state read allows the stop. Plus the replay of the 10.08 case: the real card
+  titles and the real user message, which must block.
+  Criticality: HIGH — it is a guard, so `mechanism-review-guard` demands the other
+  model's recorded review, and its failure mode is the user acting on a question that
+  was settled hours ago.
