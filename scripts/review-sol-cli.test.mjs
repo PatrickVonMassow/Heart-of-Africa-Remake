@@ -64,6 +64,8 @@ let mainSha = ''
 let headSha = ''
 let fableSha = ''
 let orphanSha = ''
+/** An EMPTY git template: a host `init.templateDir` must not seed the fixture. */
+let emptyTemplate = ''
 
 /** A `codex` that answers however the case's env asks it to. */
 const STUB = `#!/usr/bin/env node
@@ -117,11 +119,29 @@ const HERMETIC_GIT = Object.freeze({
   GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
 })
 
+/**
+ * The environment a fixture git call gets: EVERY inherited `GIT_*` variable is
+ * dropped first.
+ *
+ * Pointing the config FILES at /dev/null is not enough — `GIT_CONFIG_COUNT` with
+ * its `GIT_CONFIG_KEY_n`/`VALUE_n` pairs injects configuration straight from the
+ * environment, and `GIT_TEMPLATE_DIR` seeds a new repository with somebody
+ * else's `info/exclude` (a host template excluding `*.txt` would make the
+ * fixture's first commit empty and fail it). Both survive /dev/null, so the slate
+ * is wiped and only what this suite sets is put back (four-eyes finding,
+ * 11.08.2026).
+ */
+const hermeticEnv = (extra = {}) => {
+  const env = { ...process.env }
+  for (const key of Object.keys(env)) if (key.startsWith('GIT_')) delete env[key]
+  return { ...env, ...HERMETIC_GIT, GIT_TEMPLATE_DIR: emptyTemplate, ...extra }
+}
+
 const git = (...args) => {
   const r = spawnSync('git', ['-C', repo, '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
     encoding: 'utf8',
     windowsHide: true,
-    env: { ...process.env, ...HERMETIC_GIT },
+    env: hermeticEnv(),
   })
   if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr}`)
   return (r.stdout ?? '').trim()
@@ -140,16 +160,14 @@ const run = (args, env = {}) =>
     windowsHide: true,
     encoding: 'utf8',
     cwd: repo,
-    env: {
-      ...process.env,
-      ...HERMETIC_GIT,
+    env: hermeticEnv({
       PATH: `${stubDir}${delimiter}${process.env.PATH}`,
       REVIEW_SOL_STATE_DIR: stateDir,
       CODEX_HOME: join(dir, 'codex-home'),
       STUB_LOG: join(dir, 'calls.log'),
       STUB_STDIN: join(dir, 'stdin.txt'),
       ...env,
-    },
+    }),
   })
 
 /** The record command out of the command's report, as one line. */
@@ -188,6 +206,8 @@ const provenId = () => {
 
 beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), 'review-sol-cli-'))
+  emptyTemplate = join(dir, 'empty-git-template')
+  mkdirSync(emptyTemplate, { recursive: true })
   repo = join(dir, 'repo')
   stubDir = join(dir, 'bin')
   stateDir = join(repo, 'local')
@@ -208,9 +228,9 @@ beforeAll(() => {
   // `init` gets the hermetic environment too: a developer's `init.templateDir`
   // would otherwise seed this repository's own config and hooks before the
   // commands below ever disable the global files (four-eyes finding, 11.08.2026).
-  spawnSync('git', ['init', '-q', '-b', 'main', repo], {
+  spawnSync('git', ['init', '-q', '-b', 'main', '--template', emptyTemplate, repo], {
     windowsHide: true,
-    env: { ...process.env, ...HERMETIC_GIT },
+    env: hermeticEnv(),
   })
   script = join(repo, 'scripts', 'review-sol.mjs')
   for (const file of SCRIPT_FILES) copyFileSync(resolve('scripts', file), join(repo, 'scripts', file))
@@ -257,7 +277,7 @@ describe('a review that runs', () => {
       cwd: repo,
       encoding: 'utf8',
       windowsHide: true,
-      env: { ...process.env, ...HERMETIC_GIT },
+      env: hermeticEnv(),
     })
     expect(recorded.status, recorded.stderr).toBe(0)
     const ledger = readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')
