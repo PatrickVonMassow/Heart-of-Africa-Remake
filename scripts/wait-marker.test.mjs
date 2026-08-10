@@ -109,13 +109,41 @@ describe('armWaitMarker', () => {
     // would call the running LARGE over and withdraw the marker mid-wait.
     const f = fixture()
     armWaitMarker({ sid: 's1', ownsBatch: true, ...f })
-    const quick = join(f.dir, 'zz-quick.log')
-    writeFileSync(quick, 'PASS\n')
+    beside(f, { status: 'finished' })
+    expect(armWaitMarker({ sid: 's1', ownsBatch: true, ...f })).toMatchObject({ action: 'none', reason: 'already-marked' })
+    expect(existsSync(f.declarationPath)).toBe(true)
+  })
+
+  it('does not let a second LIVE run steal the marker from the one it already names', () => {
+    // Otherwise the marker follows the newer, shorter run and is withdrawn when
+    // THAT one ends — while the run it was written for is still going.
+    const f = fixture()
+    armWaitMarker({ sid: 's1', ownsBatch: true, ...f })
+    const quick = beside(f, { status: 'running' })
+    expect(armWaitMarker({ sid: 's1', ownsBatch: true, ...f }).reason).toBe('already-marked')
     writeFileSync(
       `${quick}.run.json`,
       JSON.stringify({ command: 'verify docs', log: quick, status: 'finished', exitCode: 0, startedAt: Date.now() + 1000 }),
     )
-    expect(armWaitMarker({ sid: 's1', ownsBatch: true, ...f })).toMatchObject({ action: 'none', reason: 'already-marked' })
+    expect(armWaitMarker({ sid: 's1', ownsBatch: true, ...f }).reason).toBe('already-marked')
     expect(existsSync(f.declarationPath)).toBe(true)
   })
 })
+
+/** A second, NEWER run in the same log directory. */
+function beside(f, { status }) {
+  const quick = join(f.dir, 'zz-quick.log')
+  writeFileSync(quick, 'PASS\n')
+  writeFileSync(
+    `${quick}.run.json`,
+    JSON.stringify({
+      command: 'verify docs',
+      log: quick,
+      status,
+      pid: process.pid,
+      exitCode: status === 'finished' ? 0 : null,
+      startedAt: Date.now() + 1000,
+    }),
+  )
+  return quick
+}

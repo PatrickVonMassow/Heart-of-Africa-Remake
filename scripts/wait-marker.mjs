@@ -19,23 +19,32 @@ import { existsSync, statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { repoPath } from './repo-paths.mjs'
-import { activeRecordPath, logDir, readRecord, runIsLive } from './verify/run-record.mjs'
+import { activeRecordPath, logDir, readRecord, recordPathFor, runIsLive } from './verify/run-record.mjs'
 import { clearDeclaration, readDeclaration, writeDeclaration } from './batch-in-flight.mjs'
 import { extendLease, readOwnerLock, clearDeclaredWait } from './batch-singleton.mjs'
 import { DECLARED_WAIT_LEASE_MS } from './batch-lease-core.mjs'
-import { markerDeclaration, waitMarkerDecision } from './wait-marker-core.mjs'
+import { MARKER_SOURCE, markerDeclaration, waitMarkerDecision } from './wait-marker-core.mjs'
 
 /** The newest verify run this checkout knows about, with the freshness of its
  *  log. All of it failure-tolerant: nothing readable means nothing declared. */
-export function readActiveRun({ dir = logDir() } = {}) {
+export function readActiveRun({ dir = logDir(), preferLog = null } = {}) {
+  const empty = { record: null, live: false, logMtime: null, logPath: null }
   try {
-    // The newest LIVE run, not merely the newest (four-eyes finding 2): a quick
-    // suite finishing beside a running LARGE must not make the hook believe the
-    // LARGE is over and withdraw the marker mid-wait.
-    const path = activeRecordPath(dir)
-    if (!path) return { record: null, live: false, logMtime: null, logPath: null }
+    // THE RUN THE MARKER ALREADY NAMES KEEPS PRIORITY while it lives. Without
+    // that, a quick suite started beside a running LARGE becomes "the run", the
+    // marker follows it, and when the quick one ends the marker is withdrawn
+    // although the LARGE is still going. Only when the named run is over does
+    // this fall back to the newest LIVE one, and then to the newest at all
+    // (four-eyes finding 2).
+    let path = null
+    if (preferLog) {
+      const named = recordPathFor(preferLog)
+      if (runIsLive(readRecord(named)).live) path = named
+    }
+    path = path ?? activeRecordPath(dir)
+    if (!path) return empty
     const record = readRecord(path)
-    if (!record) return { record: null, live: false, logMtime: null, logPath: null }
+    if (!record) return empty
     // ABSOLUTE, because that is what the declaration must carry: the guard's own
     // probe stats the recorded path from ITS cwd, and every hand-written
     // declaration absolutizes (`absPath` in batch-in-flight.mjs). A relative one
@@ -50,7 +59,7 @@ export function readActiveRun({ dir = logDir() } = {}) {
     }
     return { record: { ...record, log: logPath ?? record.log }, live: runIsLive(record).live, logMtime, logPath }
   } catch {
-    return { record: null, live: false, logMtime: null, logPath: null }
+    return empty
   }
 }
 
@@ -74,8 +83,11 @@ export function armWaitMarker({
     if (!sid || paused || !ownsBatch) {
       return { ...waitMarkerDecision({ sid, ownsBatch, paused, now }), written: false }
     }
-    const { record, live, logMtime } = readActiveRun(dir === undefined ? {} : { dir })
+    // The declaration is read FIRST, so a marker of our own can keep the hook
+    // pointed at the run it already names while that run lives.
     const declaration = declarationPath === undefined ? readDeclaration() : readDeclaration(declarationPath)
+    const preferLog = declaration?.source === MARKER_SOURCE ? (declaration.runLog ?? null) : null
+    const { record, live, logMtime } = readActiveRun({ ...(dir === undefined ? {} : { dir }), preferLog })
     const decision = waitMarkerDecision({ sid, ownsBatch, paused, record, recordLive: live, logMtime, declaration, now })
     if (decision.action === 'declare') {
       const lock = lockPath === undefined ? readOwnerLock() : readOwnerLock(lockPath)
