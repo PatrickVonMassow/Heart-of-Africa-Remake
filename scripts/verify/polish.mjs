@@ -2000,9 +2000,9 @@ if (section('villager-gestures')) {
     // A SHORT gesture, so the end arrives within a bounded number of FRAMES even
     // where each frame is a second long.
     await page.evaluate(() => window.__placeForceGesture(0, 'point', 0.6))
-    // Read the resting state IN the same poll that observes the end: the ambient
-    // scheduler may start the next gesture a second and a half later, and a
-    // separate read afterwards would race it.
+    // Read the resting state IN the same poll that observes the end: nothing
+    // else poses this pair since point 580, but the read stays inside the poll
+    // so the check cannot race whatever drives the arms next.
     const restHandle = await page
       .waitForFunction(
         () => {
@@ -2026,8 +2026,14 @@ if (section('villager-gestures')) {
       JSON.stringify(atRest),
     )
 
-    // --- sampled over the ambient conversation ------------------------------
+    // --- sampled over the standing conversation -----------------------------
     // A single instant proves nothing about a scheduler: sample across frames.
+    // Since point 580 the sample must find the pair QUIET — the two used to
+    // cycle the four gestures as ambient dressing, with no utterance behind any
+    // of them and at any distance, which is the mute pantomime the user
+    // reported. Every gesture in a settlement now belongs to a figure whose
+    // words the player can hear (the children's and adults' teaching paths,
+    // covered purely in src/communication/spokenGesture.test.ts).
     const samples = []
     for (let i = 0; i < 30; i++) {
       samples.push(await page.evaluate(() => window.__placeGestures()))
@@ -2041,11 +2047,15 @@ if (section('villager-gestures')) {
     const both = samples.filter((s) => s[0].kind !== null && s[1].kind !== null)
     check('the pair takes turns — the two never gesture over each other', both.length === 0, `${both.length} overlaps`)
     const seen = new Set(samples.flatMap((s) => s.map((g) => g.kind)).filter(Boolean))
-    check('the conversation actually gestures while it runs', seen.size >= 1, [...seen].join(', ') || 'none')
+    check(
+      'the standing pair mimes nothing on its own — no gesture without a word',
+      seen.size === 0,
+      [...seen].join(', ') || 'quiet',
+    )
     const restBroken = samples.filter((s) =>
       s.some((g) => g.kind === null && (g.pose.lean !== 0 || g.pose.turn !== 0 || g.pose.left.yaw !== 0)),
     )
-    check('a figure between gestures is exactly at rest', restBroken.length === 0, `${restBroken.length} samples`)
+    check('a figure that is not speaking stands exactly at rest', restBroken.length === 0, `${restBroken.length} samples`)
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })

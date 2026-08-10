@@ -123,6 +123,13 @@ The utterances carry a short distance and fall off sharply — the level falls
 with the square of the distance and is cut to silence at the hearing radius, so
 "audible" and "recorded as heard" are one and the same condition: what the
 player could not hear teaches him nothing, however plainly he saw the gesture.
+
+THE GESTURE CARRIES NO FURTHER THAN THE VOICE (point 580). A figure that
+gestures is a figure the player can hear and read, or it does not gesture:
+beyond the hearing radius the arms stay down instead of miming a concept with no
+word attached to it, which is worse for the player than plain silence. It is one
+decision for the children's situations and the adults' errands alike, and it
+lives in `src/communication/spokenGesture.ts`.
 Among the children the player hears the children; among the adults, the adults;
 in the middle of the village, no permanent babble of both. The two groups are
 placed far enough apart for that to hold: the children's play ground is DERIVED
