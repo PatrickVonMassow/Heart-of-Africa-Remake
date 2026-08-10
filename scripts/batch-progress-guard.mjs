@@ -1,7 +1,9 @@
 // Stop hook (user mandate 22.07.2026): GUARANTEE the batch never idle-stops.
 // While open, non-deferred TASKS points remain and .claude/batch-paused is absent,
 // this BLOCKS the turn from ending — the assistant must continue the next item (and
-// wait for a running validation by POLLING within the turn, never by yielding).
+// wait for a running validation by AWAITING it inside the turn, never by yielding
+// and never by a poll loop: point 592 measured 2857 poll responses in six days,
+// 10.9 % of the weighted spend, the longest chain 437 answers for one word).
 //
 // HARD SINGLETON (24.07.2026, after the e9407cae double-session incident):
 //   - It pushes ONLY the session that holds the live batch lock. A non-owner
@@ -426,8 +428,10 @@ try {
         `\`node scripts/batch-boundary.mjs ${bound.due}\` and then stop — the batch is passed to a fresh session ` +
         `that the launcher starts and batch-resume-hook re-orients, which is how the context cost stays down. ` +
         `(b) If work is still in flight (an agent pool draining, a verification running, the merge unfinished), ` +
-        `CONTINUE it in this turn — poll, never idle — and take the boundary when it is done. If you cannot ` +
-        `poll it inside this turn, DECLARE the wait instead: \`node scripts/batch-in-flight.mjs --waiting-on ` +
+        `CONTINUE it in this turn — AWAIT it, never poll and never idle (\`node scripts/verify/run-wait.mjs ` +
+        `--await\` blocks until the run is over and hands back its receipt) — and take the boundary when it is ` +
+        `done. If the run is longer than one blocking call may take, DECLARE the wait instead: \`node ` +
+        `scripts/batch-in-flight.mjs --waiting-on ` +
         `"<what>" --branch <agent branch> --pid <background run> --log <its log>\`. The stop is then allowed ` +
         `while a probe still finds that work running — and blocked again the moment it does not.` +
         claimNote,
@@ -482,8 +486,9 @@ try {
       `paused. Continue the NEXT queue item now — on its own feat/<point>-<slug> branch off main: ` +
       `implement it, commit + push the branch after every commit, merge to main only when it is ` +
       `complete + verified, and tick it in TASKS.md on main at the merge (CLAUDE.md §6). If a validation ` +
-      `is running, WAIT by POLLING within this turn (read the log file / TaskOutput), never by ending the ` +
-      `turn to idle. Keep the dashboard current as you go. The batch went idle for HOURS after silent ` +
+      `is running, AWAIT it within this turn — \`node scripts/verify/run-wait.mjs --await\` is ONE blocking ` +
+      `call that returns with the run's receipt — never a poll loop and never by ending the turn to idle. ` +
+      `Keep the dashboard current as you go. The batch went idle for HOURS after silent ` +
       `stops; that must not recur. The legitimate ways to end this turn: (a) every point is done; ` +
       `(a2) you are WAITING on work already handed out that you cannot poll further in this turn — a ` +
       `delegated agent still building, a suite occupying the machine: DECLARE it with \`node ` +

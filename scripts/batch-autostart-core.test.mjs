@@ -117,11 +117,14 @@ describe('buildSpawnArgs — print mode, the model chain, and no prompt that can
 })
 
 describe('the resume prompt', () => {
-  it('tells the session that a WAIT MUST BE VISIBLE — poll, never sit silent (point 402 (b))', () => {
-    // A silent wait is what made a working session indistinguishable from a
-    // corpse: every poll is a tool call and every tool call refreshes the
-    // heartbeat, which is what the launcher reads liveness from.
-    expect(RESUME_PROMPT).toMatch(/POLLE/)
+  it('tells the session to AWAIT a run, never to poll it (point 402 (b), narrowed by point 592)', () => {
+    // A silent wait once made a working session indistinguishable from a corpse,
+    // and polling was the answer to that. It was the wrong answer: measured, the
+    // poll loop cost 10.9 % of the weighted spend. Visibility now comes from the
+    // hook-set in-flight marker, so the wait itself may be ONE blocking call.
+    expect(RESUME_PROMPT).toMatch(/WARTE\s+BLOCKIEREND/)
+    expect(RESUME_PROMPT).toMatch(/run-wait\.mjs --await/)
+    expect(RESUME_PROMPT).toMatch(/Poll-Schleife ist verboten/)
     expect(RESUME_PROMPT).toMatch(/batch-in-flight\.mjs --waiting-on/)
   })
 

@@ -74,6 +74,69 @@ pinned by `run-digest-core.test.mjs` in the Vitest layer — including the
 asymmetry that matters: an indented block continuing a `#` heading is kept (the
 quiet-machine report), an indented failure dump following a verdict line is not.
 
+### A run is AWAITED, never polled (point 592)
+
+Measured over six days (09.08.2026): **2857 responses were polls — 10.9 % of the
+weighted spend** — and another 1189 were bare idle holders (3.6 %). The longest
+unbroken poll chain was **437 responses** for a result that is one word, and a
+42-minute LARGE run polled every 30 s costs ~1.9 M weighted **for the loop
+alone**. So the loop is gone, and three things replace it.
+
+**1. Ask what the run costs before you start it.**
+
+```
+node scripts/verify/run-wait.mjs --plan large    # or small, or a suite name
+```
+
+It answers from the measured medians of `docs/picture-check-cost.md` §1 (kept in
+lockstep by `run-wait-core.test.mjs`, which parses that table back out): how long
+the run is expected to take, how many frames it owes, and — the decision that
+matters — whether it may be **one blocking foreground call** at all, or is longer
+than a shell call may run and has to go to the **background**, where the harness'
+own completion notification announces the exit.
+
+**2. Await it.**
+
+```
+node scripts/verify/run-wait.mjs --await [<log>] [--timeout <s>]   # ONE blocking call
+node scripts/verify/run-wait.mjs --receipt [<log>]                 # a finished run, again
+```
+
+`--await` returns when the run is over and prints its receipt; neither counts as
+a poll, because nobody looked. With no `<log>` both resolve the newest run.
+
+**3. Where a look is genuinely unavoidable, it is COUNTED.**
+
+```
+node scripts/verify/run-wait.mjs --status [<log>]
+```
+
+The first wait is **0.9 × the measured median**, not 30 s; five looks are the
+whole budget; past **2.5 ×** the expectation the run is *hung*, not slow. Each
+`--status` raises the count, says how many are left, and names the two ways out.
+The count is printed in the receipt, so the rule is visible in the transcript
+rather than remembered.
+
+**The receipt.** `run-logged.mjs` writes a RUN RECORD beside the log
+(`<log>.run.json`) before it spawns anything and closes it with a structured
+receipt: exit code, the backend(s) read off the run's own banners, the suites,
+the `git HEAD` it ran on, the log path, the failing names **uncut**, the polls,
+and **frames expected against frames written**. That last pair is the half point
+375 cannot see — its shutter refuses a frame whose subject is missing, but a
+frame that was never written at all is silent, and a run that photographs 60 of
+its 93 frames exits 0 today.
+
+**The wait is still visible.** Point 402 (b) demanded polling because a silently
+waiting session was indistinguishable from a dead one. That is now the hook's
+job, not a model turn's: duty (8) of `scripts/lock-heartbeat-hook.mjs` writes the
+`batch-in-flight` declaration while a run is provably going — same file, same
+shape, same evidence `batch-progress-guard` re-probes at every turn end — and
+withdraws it the moment the run is over, so the guard blocks a stop again exactly
+when the result becomes the session's next action. The decision is pure in
+`scripts/wait-marker-core.mjs`; it never overwrites a declaration a person wrote,
+never fires for a non-owner or a paused batch, and refuses a run whose log has
+gone quiet (that is a wedge, not a wait).
+
 ### Host bring-up — once per machine (point 475)
 
 The browser suites need a browser, and `npm install` does not put one there. One

@@ -82,6 +82,9 @@ export const NON_RENDER_VERIFY = new Set([
   'run-all.mjs',
   'run-digest-core.mjs', // which of a run's OUTPUT lines the caller reads; it draws nothing
   'run-logged.mjs', // the logging wrapper around run-all; it spawns the runner, it does not render
+  'run-record.mjs', // the run's own bookkeeping file (point 592); it counts frames, it draws none
+  'run-wait-core.mjs', // the poll budget and the receipt's shape; pure arithmetic over a run
+  'run-wait.mjs', // AWAITS a run instead of polling it; it opens no page
   'sceneReady-core.mjs', // the scene-readiness verdict; frameSubject.mjs polls the page for it
   'sectionScope.mjs', // a TEXT audit of the suites' section blocks; it opens no page
   'sections.mjs', // WHICH block of a suite a --section run selects; the suite does the driving
