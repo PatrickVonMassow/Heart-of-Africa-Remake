@@ -5486,3 +5486,37 @@ Build order, chosen so no two parallel agents own the same file:
   recognisable — plus the before/after cost measurement, on both backends.
   Criticality: medium — it is the visual identity of every animal in the bird's-eye view,
   and acceptance criterion 11 (no schematic look) speaks to exactly this.
+
+- [ ] 612. THE HANDOVER WAITS FOR THE CLOCK, AND AN IDLE OWNER BLOCKS IT (10.08.2026;
+  bundle Urlaubsfestigkeit). Measured on this day: the batch stood still for 30 minutes
+  with nothing broken. The outgoing session handed over correctly at 13:20
+  (`HANDOVER point 604` in `.claude/boundary.log`, the lock released); the launcher ticks
+  every 15 minutes and would not have looked before 13:31; at 13:28 an unattended window
+  took the free lock at session start, so the 13:31 tick correctly found a live owner and
+  spawned nobody. Every part behaved as built, and the batch was idle anyway — which is
+  the failure mode this bundle exists to remove, because an absence turns 30 minutes into
+  hours.
+  FINAL STATE, two independent repairs:
+  1. THE RELEASE TRIGGERS THE SPAWN. Marking the lock handed over is an EVENT the launcher
+     reacts to, not a state it discovers on its next tick: the boundary path signals the
+     launcher (the launcher watches the lock file, or `batch-boundary.mjs` wakes it), and
+     the successor starts within seconds. The 15-minute tick REMAINS as the backstop for
+     the cases no signal covers (a killed session, a missed write) — the fast path is
+     added, the slow path is not removed.
+  2. OWNERSHIP IS BOUND TO WORK, NOT MERELY TO LIFE. Today `leaseUntil` runs an hour and
+     never asks whether the owner is doing anything, so a session that takes the lock and
+     idles holds the batch for that hour. An owner that has neither declared in-flight work
+     (`batch-in-flight.mjs`) nor produced a state change within a short IDLE WINDOW
+     (starting value 5 min, calibratable) loses the lock the same arithmetic way an expired
+     lease loses it — no process is killed, the owner simply stops owning, and the launcher
+     may spawn. An ATTENDED window is not exempt: it either works or it releases.
+  Both parts must leave the singleton property intact — no path may produce two live owners
+  — and both stand down for a paused batch as every guard here does.
+  VERIFIABLE: Vitest on the pure parts (the release-to-spawn decision from a lock state and
+  a clock; the idle verdict from declared work, last state change and the window, including
+  the boundary cases at exactly the window and with in-flight work declared); plus the real
+  proof, which this bundle already owns — the chaos drill (449) gains a case that releases
+  the lock and asserts a successor is running in seconds rather than at the next tick, and a
+  case where an idle owner is superseded while a working one is not.
+  Criticality: high — it is the failure this bundle is for, it is silent, and it costs the
+  whole absence rather than one point.
