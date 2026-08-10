@@ -2,11 +2,16 @@
 // is the thin fail-open I/O wrapper). Kept side-effect-free so the Vitest layer
 // can sweep every rule without fs/git (scripts/queue-order-guard-core.test.mjs).
 //
-// Two invariants the assistant repeatedly got wrong, now ENFORCED at turn end:
+// Three invariants the assistant repeatedly got wrong, now ENFORCED at turn end:
 //   (1) QUEUE ORDER — known-bug FIXES and user-requested extensions are worked
 //       BEFORE the big bug-FINDING / QA-framework tickets (memory
 //       queue-order-fixes-before-finders). A finder card queued ahead of open
 //       fix work blocks the turn.
+//   (1b) QUEUE AGREEMENT (point 608) — the sequence the board RENDERS is the one
+//       the work order DERIVES. Rule (1) judges completeness of a ranking, not
+//       agreement of two documents, so it stayed green through both re-sequencings
+//       of 10.08.2026 while the published board kept showing the old plan. The
+//       user found that before any check did.
 //   (2) DASHBOARD TRUTH — a queue/now card must not CLAIM its point is done
 //       ("behoben", "erledigt", …) while that point is still open ([ ]) in
 //       TASKS.md. A conservative negation/qualifier window keeps honest
@@ -17,21 +22,19 @@
 // The remedies' publish steps come from scripts/board-remedy.mjs — one copy.
 import { REPUBLISH } from './board-remedy.mjs'
 import { gatedPoints } from './user-gate-core.mjs'
+import {
+  FINDER_POINTS,
+  QUEUE_REBUILD_CMD,
+  RELEASE_TAG_POINT,
+  openPointsOf,
+  queueOrder,
+} from './board-queue-core.mjs'
 
-/** The bug-FINDING / QA-framework point numbers; every other open point is a fix. */
-// The big bug-FINDING / QA-framework block (worked after the known-bug fixes).
-// 181 is a concrete WebGPU BUG (a fix), not a finder — it is intentionally NOT
-// here, so it may sit among the fixes ahead of the finder/closing block.
-// 200 (verify-script robustness) and 285 (leak/accumulation hunt) are QA-framework
-// finders too and belong in this block (added 24.07.2026, user queue-order call).
-export const FINDER_POINTS = new Set([184, 200, 203, 204, 205, 207, 285])
-
-/** The release tag point. It keeps the POSITION the work order gives it (user
- *  10.08.2026: v0.3 ships once the communication mechanic and the critical bugs
- *  are done — the feature work and the audits follow it, they do not gate it), and
- *  it stays exempt from the fixes-before-finders rule, which orders the work that
- *  comes BEFORE the release. */
-export const RELEASE_TAG_POINT = 174
+// The rank constants moved to board-queue-core with the ranking itself (point
+// 608) — this guard is now a CONSUMER of that order, and owning them here would
+// have closed an import cycle. Re-exported so every caller that named them here
+// still finds them.
+export { FINDER_POINTS, RELEASE_TAG_POINT }
 
 /** Done-claim tokens (matched as whole words, case-insensitive). */
 export const DONE_CLAIM_TOKENS = ['behoben', 'erledigt', 'gelöst', 'fertig', 'done', 'fixed', 'solved']
@@ -124,8 +127,8 @@ export function parseNowCard(html) {
  * another guard's job), and only an OPEN non-finder point after them trips it;
  * the release tag (174) is exempt on both sides.
  */
-export function finderBeforeOpenFix(queueOrder, tasksOpenSet) {
-  if (!Array.isArray(queueOrder)) return []
+export function finderBeforeOpenFix(cardOrder, tasksOpenSet) {
+  if (!Array.isArray(cardOrder)) return []
   const open = tasksOpenSet instanceof Set ? tasksOpenSet : new Set()
   const isOpenFix = (v) => {
     const n = Number(v)
@@ -136,15 +139,62 @@ export function finderBeforeOpenFix(queueOrder, tasksOpenSet) {
   // AFTER the release tag are post-release work and order themselves freely —
   // reading them as fixes that a finder had jumped ahead of would block the
   // turn for correctly deferred work.
-  const tagAt = queueOrder.findIndex((v) => Number(v) === RELEASE_TAG_POINT)
-  if (tagAt !== -1) queueOrder = queueOrder.slice(0, tagAt + 1)
+  const tagAt = cardOrder.findIndex((v) => Number(v) === RELEASE_TAG_POINT)
+  const cards = tagAt === -1 ? cardOrder : cardOrder.slice(0, tagAt + 1)
   const offenders = []
-  for (let i = 0; i < queueOrder.length; i++) {
-    const n = Number(queueOrder[i])
+  for (let i = 0; i < cards.length; i++) {
+    const n = Number(cards[i])
     if (!FINDER_POINTS.has(n) || !open.has(n) || offenders.includes(n)) continue
-    if (queueOrder.slice(i + 1).some(isOpenFix)) offenders.push(n)
+    if (cards.slice(i + 1).some(isOpenFix)) offenders.push(n)
   }
   return offenders
+}
+
+/**
+ * Rule 1b: does the RENDERED sequence still agree with the DERIVED one?
+ *
+ * The comparison is over the points that appear in BOTH lists, because neither
+ * is a superset of the other by design: the derived order holds every open
+ * point, including those the now-section or "Von dir zu klären" has taken out of
+ * the queue, and the board may still show a card for a point that was ticked
+ * since (staleness, and another guard's business). Judging either difference
+ * here would block on something this rule cannot state a remedy for.
+ *
+ * A point carded TWICE inside the queue is reported HERE, as `{ duplicate }`,
+ * rather than delegated: invariant 4b of dashboard-guard-core covers only a
+ * now-card whose point is also queued, and `parseQueuePoints` returns a Set, so
+ * a duplicate inside the Warteschlange was caught by nothing (four-eyes finding
+ * 1, Fable 5). It also makes the comparison below well-defined — with a point at
+ * two positions there is no single place the work order can agree with.
+ *
+ * Returns null when they agree, else the FIRST divergence with both sequences.
+ */
+export function queueOrderDrift(renderedPoints, derivedOrder) {
+  if (!Array.isArray(renderedPoints) || !Array.isArray(derivedOrder)) return null
+  const derived = derivedOrder.map(Number).filter(Number.isInteger)
+  const inDerived = new Set(derived)
+  const got = renderedPoints.map(Number).filter((n) => inDerived.has(n))
+  const rendered = new Set()
+  for (const n of got) {
+    if (rendered.has(n)) return { duplicate: n, at: got.indexOf(n), rendered: got, derived }
+    rendered.add(n)
+  }
+  const want = derived.filter((n) => rendered.has(n))
+  for (let i = 0; i < want.length; i++) {
+    if (want[i] !== got[i]) return { at: i, got: got[i], want: want[i], rendered: got, derived: want }
+  }
+  return null
+}
+
+/**
+ * The stretch of a sequence AROUND the divergence — never its head. A queue of
+ * 140 cards that diverges at position 135 printed two identical opening runs,
+ * which reads as a guard confused about its own finding.
+ */
+function around(list, at, span = 4) {
+  const from = Math.max(0, at - span)
+  const to = Math.min(list.length, at + span + 1)
+  return `${from > 0 ? '…, ' : ''}${list.slice(from, to).join(', ')}${to < list.length ? ', …' : ''}`
 }
 
 /** A done-token occurrence that reads as a live claim (no negation/qualifier cue in its window). */
@@ -200,6 +250,26 @@ export function evaluate({ dashboardHtml, tasksMd } = {}) {
           `work. Known-bug fixes and user-requested extensions come BEFORE the finder/QA tickets ` +
           `(${[...FINDER_POINTS].join(', ')}); ${RELEASE_TAG_POINT} keeps its work-order position. Reorder the ` +
           `Warteschlange cards, then ${REPUBLISH}.`,
+      )
+    }
+
+    // The AGREEMENT rule (point 608). It reads the same derivation the generator
+    // renders from, so a board rebuilt from the current work order always passes
+    // and only a hand-edited or unrebuilt one trips.
+    const drift = queueOrderDrift(cards.map((c) => c.point), queueOrder(openPointsOf(tasksMd), tasksMd))
+    if (drift && drift.duplicate) {
+      problems.push(
+        `THE QUEUE LISTS ONE POINT TWICE: point ${drift.duplicate} has two cards in the Warteschlange. ` +
+          `A generated queue renders every open point exactly once, so this is a hand edit. ` +
+          `Rebuild the queue (${QUEUE_REBUILD_CMD}), then ${REPUBLISH}.`,
+      )
+    } else if (drift) {
+      problems.push(
+        `QUEUE ORDER DRIFTED FROM THE WORK ORDER: the board shows point ${drift.got} at position ` +
+          `${drift.at + 1} of the Warteschlange where the work order puts ${drift.want}. The queue's ` +
+          `sequence is DERIVED from TASKS.md — the board renders it, it does not store it. ` +
+          `Board there: ${around(drift.rendered, drift.at)} | work order there: ${around(drift.derived, drift.at)}. ` +
+          `Rebuild the queue (${QUEUE_REBUILD_CMD}), then ${REPUBLISH}.`,
       )
     }
 

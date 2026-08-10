@@ -1961,7 +1961,7 @@ raw file opened straight from disk):
 
 | property | owner | what enforces it |
 |---|---|---|
-| the queue's titles, prose, estimates and **the user's order** | `.claude/board-queue.json`, projected over the work order by `board-queue.mjs` | the data file is the only home of the order; `queueOrder` appends anything unlisted by number, which is explicitly *not* the user's prioritisation |
+| the queue's titles, prose and estimates | `.claude/board-queue.json`, projected over the work order by `board-queue.mjs` | the data file holds no sequence at all (point 608): the order is DERIVED from the open points of `TASKS.md`, and `queue-order-guard` blocks a rendered sequence that disagrees with it |
 | the 30-second self-refresh | `board-refresher-core.mjs`, embedded verbatim | `structureViolations` refuses a board without it; jsdom runs it against both page shapes |
 | the phone viewport | a `<meta name="viewport">` in the fragment itself | `structureViolations` → `viewport-missing` |
 | prose instead of placeholders | the generator's stub is a stop-gap, not a resting state | `dashboard-guard-core` → `queue-stubbed` above a quarter of the cards or three in a row |

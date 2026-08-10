@@ -11,6 +11,7 @@ import {
   parseQueueCards,
   parseNowCard,
   finderBeforeOpenFix,
+  queueOrderDrift,
   falseDoneClaims,
   parseWorkablePoints,
   evaluate,
@@ -135,6 +136,40 @@ describe('finderBeforeOpenFix', () => {
   })
 })
 
+// POINT 608: rule (1) judges the RANKING; it stayed green through both
+// re-sequencings of 10.08.2026 because neither made a finder overtake a fix.
+// This rule judges AGREEMENT — the board against the work order it renders.
+describe('queueOrderDrift — the rendered sequence against the derived one', () => {
+  it('says nothing while the board renders the derived sequence', () => {
+    expect(queueOrderDrift([1, 2, 3], [1, 2, 3])).toBeNull()
+    expect(queueOrderDrift([], [1, 2, 3])).toBeNull()
+  })
+  it('names the FIRST divergence and both sequences', () => {
+    expect(queueOrderDrift([2, 1, 3], [1, 2, 3])).toMatchObject({ at: 0, got: 2, want: 1 })
+    expect(queueOrderDrift([1, 3, 2], [1, 2, 3])).toMatchObject({ at: 1, got: 3, want: 2 })
+  })
+  it('judges only the points BOTH sides know', () => {
+    // The derived order holds every open point, including those the now-section
+    // took out of the queue; the board may still show a card for a point ticked
+    // since. Neither difference is this rule's to report.
+    expect(queueOrderDrift([2, 9], [1, 2, 3])).toBeNull()
+    expect(queueOrderDrift([3, 1], [1, 2, 3])).toMatchObject({ at: 0, got: 3, want: 1 })
+  })
+  // FOUR-EYES FINDING 1 (Fable 5): invariant 4b covers a now-card also sitting
+  // in the queue, and `parseQueuePoints` returns a Set — a point carded twice
+  // INSIDE the Warteschlange was caught by nothing, so delegating it here would
+  // have left a real drift unseen.
+  it('reports a point carded twice instead of delegating it', () => {
+    expect(queueOrderDrift([2, 2], [1, 2])).toMatchObject({ duplicate: 2 })
+    expect(queueOrderDrift([1, 2, 1], [1, 2])).toMatchObject({ duplicate: 1 })
+  })
+  it('is total on malformed input', () => {
+    expect(queueOrderDrift(null, [1])).toBeNull()
+    expect(queueOrderDrift([1], null)).toBeNull()
+    expect(queueOrderDrift(['x', {}], [1, 2])).toBeNull()
+  })
+})
+
 describe('falseDoneClaims — the negation window, both ways', () => {
   const open = new Set([210, 204, 184])
   it('flags a live done-claim on an open point', () => {
@@ -181,8 +216,10 @@ describe('evaluate — end to end on the two raw files', () => {
     expect(r.reason).toMatch(/QUEUE ORDER WRONG.*203/)
   })
   it('allows the finder once every fix ahead of it is closed', () => {
+    // The cards stand in the DERIVED sequence (point 608): the finder sinks
+    // behind the rank-0 tag, which is exactly what a rebuilt board renders.
     const r = evaluate({
-      dashboardHtml: boardHtml({ queue: [{ n: 203 }, { n: 174 }] }),
+      dashboardHtml: boardHtml({ queue: [{ n: 174 }, { n: 203 }] }),
       tasksMd: tasksMd([210, 203, 174]),
     })
     expect(r.block).toBe(false)
@@ -255,6 +292,63 @@ describe('evaluate — end to end on the two raw files', () => {
     expect(r.reason).toMatch(/QUEUE ORDER WRONG.*203/)
     expect(r.reason).toMatch(/CLAIMS DONE.*211/)
   })
+  // POINT 608, the failure itself: two re-sequencings on 10.08.2026, the board
+  // rebuilt and republished both times, and it kept showing the old plan.
+  it('blocks a board whose queue no longer follows the work order', () => {
+    const board = boardHtml({ queue: [{ n: 601 }, { n: 602 }, { n: 603 }] })
+    expect(evaluate({ dashboardHtml: board, tasksMd: tasksMd([210, 601, 602, 603]) }).block).toBe(false)
+    // The work order is re-sequenced; the board is not rebuilt.
+    const r = evaluate({ dashboardHtml: board, tasksMd: tasksMd([210, 603, 601, 602]) })
+    expect(r.block).toBe(true)
+    expect(r.reason).toMatch(/QUEUE ORDER DRIFTED/)
+    expect(r.reason).toMatch(/603/)
+    expect(r.reason).toMatch(/board-queue\.mjs/)
+  })
+
+  it('blocks a hand-edited card sequence even when the ranking stays legal', () => {
+    // Two ordinary fixes swapped by hand: no finder overtakes anything, so rule
+    // (1) is silent — this is the case that went unseen.
+    const tasks = tasksMd([601, 602])
+    expect(evaluate({ dashboardHtml: boardHtml({ queue: [{ n: 601 }, { n: 602 }] }), tasksMd: tasks }).block).toBe(false)
+    const r = evaluate({ dashboardHtml: boardHtml({ queue: [{ n: 602 }, { n: 601 }] }), tasksMd: tasks })
+    expect(r.block).toBe(true)
+    expect(r.reason).toMatch(/QUEUE ORDER DRIFTED/)
+    expect(r.reason).not.toMatch(/QUEUE ORDER WRONG/)
+  })
+
+  it('prints the stretch AROUND a late divergence, not the head of the queue', () => {
+    // The live queue is ~140 cards long; a head-only message printed two
+    // identical opening runs and read as a guard confused about its own finding.
+    const points = Array.from({ length: 20 }, (_, i) => 601 + i)
+    const swapped = [...points]
+    ;[swapped[17], swapped[18]] = [swapped[18], swapped[17]]
+    const r = evaluate({ dashboardHtml: boardHtml({ queue: swapped.map((n) => ({ n })) }), tasksMd: tasksMd(points) })
+    expect(r.block).toBe(true)
+    expect(r.reason).toContain('position 18')
+    expect(r.reason).toContain('Board there: …, 614, 615, 616, 617, 619, 618, 620')
+    expect(r.reason).toContain('work order there: …, 614, 615, 616, 617, 618, 619, 620')
+    expect(r.reason).not.toContain('601')
+  })
+
+  it('blocks a hand-edited board that cards one point twice', () => {
+    const r = evaluate({
+      dashboardHtml: boardHtml({ queue: [{ n: 601 }, { n: 602 }, { n: 601 }] }),
+      tasksMd: tasksMd([601, 602]),
+    })
+    expect(r.block).toBe(true)
+    expect(r.reason).toMatch(/LISTS ONE POINT TWICE.*601/)
+    expect(r.reason).toMatch(/board-queue\.mjs/)
+  })
+
+  it('accepts the rank rules ON TOP of the work order, and a promoted card missing from the queue', () => {
+    // 203 is a finder and sinks; 210 is the now-card and has no queue card at all.
+    const r = evaluate({
+      dashboardHtml: boardHtml({ queue: [{ n: 601 }, { n: 602 }, { n: 203 }] }),
+      tasksMd: tasksMd([210, 601, 203, 602]),
+    })
+    expect(r.block).toBe(false)
+  })
+
   it('fails open on malformed/missing input', () => {
     expect(evaluate().block).toBe(false)
     expect(evaluate({ dashboardHtml: null, tasksMd: null }).block).toBe(false)
