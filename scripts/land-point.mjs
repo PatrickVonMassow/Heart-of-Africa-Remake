@@ -356,9 +356,12 @@ async function main(argv) {
     // (which tasks-archive-guard names, and whose repair is one deletion) rather
     // than a LOST point (which nothing would name at all).
     writeTextAtomic(ARCHIVE, moved.archive)
-    step('archive', VERDICT.ok, `${moved.block.split('\n').length} lines moved`)
     writeTextAtomic(TASKS, moved.tasks)
+    // Recorded in PLAN order, which is not the write order above: the summary is
+    // read by a human against the plan, while the writes are ordered by which
+    // half-state is survivable. Both have happened by the time either is reported.
     step('tick', VERDICT.ok, `point ${number} ticked and removed from TASKS.md`)
+    step('archive', VERDICT.ok, `${moved.block.split('\n').length} lines moved`)
 
     // 5. COMMIT THE TICK AND PUSH MAIN. Until this lands, the merge commit exists
     // only locally and the tick only as an uncommitted edit — the one window in
