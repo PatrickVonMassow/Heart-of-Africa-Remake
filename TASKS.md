@@ -211,56 +211,6 @@ there exactly once; a new point joins a bundle when appended.
   Criticality: medium — it removes verification rounds that would otherwise be paid
   several times for one defect, and it stops five blocks from reading as unstarted work.
 
-- [ ] 569. THE FAST LAYER SHOWS FIVE REDS TO EVERY DELEGATED AGENT (measured 09.08.2026
-  by the agent delivering point 557, confirmed against the base commit with its own diff
-  stashed — the same five reds; bundle Testinfrastruktur). `scripts/verify/scope.test.mjs`
-  resolves `node_modules/.bin/oxlint` under `process.cwd()`. In a git WORKTREE that path
-  does not exist: Node resolves the parent tree's `node_modules` for imports, but `.bin`
-  is not linked there. So `npm run test:unit` — the one gate every point runs — is green
-  on `main` and five-red in every worktree.
-  WHY IT MATTERS: CLAUDE.md §6 delegates every point to a worktree-isolated agent, so
-  EVERY delegated agent meets these five reds, must investigate them, and must satisfy
-  itself they are pre-existing before it may report its gate green. Two agents have now
-  paid that cost. Worse is what it teaches: an agent that learns the fast layer is
-  "normally a bit red" is an agent that will wave through a real red.
-  FINAL STATE: the test resolves the binary the way the rest of the scripts do — from the
-  repository root the project already derives (`scripts/repo-paths.mjs`'s `REPO_ROOT`),
-  not from `process.cwd()` — so it passes in a worktree and on `main` alike. If the
-  binary genuinely cannot be found in a worktree, the case SKIPS with its reason printed
-  rather than failing, because a red must mean a defect.
-  VERIFIABLE: `npm run test:unit` green in a freshly created worktree AND on `main`, both
-  proven by running it in both; a Vitest case pins the resolution so it cannot silently
-  return to `process.cwd()`.
-  FOLDED IN FROM POINT 572 (measure 4, "the worktree is gate-ready in seconds"): this
-  point owns the oxlint false red and fixes its RESOLUTION; the missing DEPENDENCIES are
-  delivered here too rather than by a second owner of the same red. A fresh agent worktree
-  carries its dependencies without a per-worktree install — the bootstrap links the main
-  checkout's `node_modules` and VERIFIES the lockfile hash matches, installing for real
-  when it does not — so the delegation brief no longer tells an agent to set the link by
-  hand and the false red of a missing `node_modules/.bin/oxlint` cannot occur at all.
-  Measured target: 1–3 min per agent over ~64 points per window, plus the turns an agent
-  spends today classifying the false red. A wrong lockfile state would test against the
-  wrong tree, which the hash check prevents.
-  Criticality: medium — it hides no product defect, but it degrades the signal of the one
-  gate every delegated point runs, which is how a real red gets waved through.
-
-- [ ] 606. THE SCOPE TEST IS RED IN EVERY WORKTREE (found while delivering point 605).
-  `scripts/verify/scope.test.mjs` resolves `node_modules/.bin/oxlint` under
-  `process.cwd()`. A git worktree carries no `node_modules` of its own, so those five
-  cases fail there for a reason that has nothing to do with the change under test — and
-  since every delegated point is built in a worktree, every agent meets it and works
-  around it by hand (the last one symlinked the main tree's `.bin`). A gate that is red
-  for environmental reasons teaches the pool to discount red.
-  FINAL STATE: the test resolves the binary by walking UP from the checkout until it
-  finds a `node_modules/.bin`, so it passes in the main tree and in any worktree without
-  a symlink; if none is found it fails with a message naming what it looked for and
-  where. Every other place in `scripts/` that resolves a local binary the same way is
-  checked and fixed with it — one helper, not five copies.
-  VERIFIABLE: Vitest — the resolver finds the binary from a nested path, from a worktree
-  path whose own directory holds none, and reports honestly when there is none at all.
-  Criticality: low — it costs every agent a detour and blunts the meaning of a red run,
-  but it endangers nothing the player sees.
-
 - [ ] 456. THE TEST THAT IS ONLY GREEN IN THE SIDE TREE (retrospective §3.68, 30.07.2026;
   bundle Testinfrastruktur). Two blockers of one day shared a cause: a test passed because a
   git-ignored file is ABSENT in the agent's worktree while it exists in the main tree — it
@@ -5558,3 +5508,39 @@ to land than a mechanism that needs a review.
   VERIFIABLE: two HTTP 200s with the expected build stamp, recorded in the closing
   evidence.
   Criticality: low — bookkeeping on a delivery that already happened.
+
+- [ ] 615. THE NOT-RUN GATE IS DISARMED BY A COMMENT, AND THE BOOTSTRAP SKIPS ITS OWN
+  LOCKFILE CHECK (four-eyes review of the landed point 573 by the second model,
+  10.08.2026, verdict merge-with-fixes; both defects live-verified by the reviewer, not
+  argued). Point 573 closed the false green where a spawn that never ran was read as
+  "the linter rejected". Two holes remain in the mechanisms it delivered:
+  1. `establishesRun` (`scripts/verify/spawnAssertion.mjs`) matches its RUN_ESTABLISHERS
+     against the UNMASKED case text, while every other match in that module runs over
+     `maskCode` output — the module's own rule that a string must never be mistaken for
+     code. So a COMMENT naming the helper disarms the gate: a case that asserts a
+     non-zero exit as a rejection, with `// TODO: route this through didRun once the
+     helper lands` above it, yields zero findings. Two further spellings of the same
+     defect also slip past: `expect(r.status !== 0).toBe(true)` (the boolean wrap) and
+     `expect(r.status).toBe(1)` (the literal code).
+     FINAL STATE: run-establishment is decided over MASKED text like every other match in
+     the module, and the boolean-wrap and literal-non-zero spellings are recognised as
+     the same assertion as `not.toBe(0)`. The alias and wrapper cases
+     (`const { status: verdict } = spawnSync(…)`) stay outside the gate's reach and are
+     NAMED as its documented limit rather than silently missed.
+  2. `planBootstrap`'s `hasOwnDeps` short-circuit (`scripts/worktree-bootstrap-core.mjs`)
+     returns "this checkout already has node_modules" BEFORE the lockfile hash is
+     compared, so a worktree whose lockfile has since diverged — by its own change or by
+     merging main's — keeps running its gates against the donor's dependency tree. That
+     is precisely what the plan's own `lockDiffers` reason exists to prevent.
+     FINAL STATE: the lockfile hash is compared whenever a linked or installed
+     `node_modules` is already present, and a divergence installs for real instead of
+     proceeding. A DANGLING link (the donor's tree deleted) is relinked or installed
+     rather than throwing a bare EEXIST, and its message names the remedy.
+  VERIFIABLE: pure Vitest — the comment-disarmed snippet above, the boolean wrap and the
+  literal non-zero each produce a finding; a case that genuinely establishes the run
+  produces none; and the plan for a present-but-diverged lockfile is "install", for a
+  dangling link "relink or install", both with their reason. Plus the real proof for the
+  bootstrap half: a worktree bootstrapped, its lockfile then changed, re-bootstrapped,
+  and the resulting tree is the one its own lockfile describes.
+  Criticality: medium — both halves restore a signal the fast layer is believed to give
+  and does not, which is the same failure class point 573 was opened for.
