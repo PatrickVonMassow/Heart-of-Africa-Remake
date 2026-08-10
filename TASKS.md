@@ -131,6 +131,14 @@ there exactly once; a new point joins a bundle when appended.
      (starting value 5 min, calibratable) loses the lock the same arithmetic way an expired
      lease loses it — no process is killed, the owner simply stops owning, and the launcher
      may spawn. An ATTENDED window is not exempt: it either works or it releases.
+     A STATE CHANGE IS THE OWNER'S OWN: a heartbeat it wrote, a commit, a board write — not
+     a worktree's file timestamps, which a leaked dev server or a file watcher keeps fresh
+     while the owner does nothing (the launcher reads exactly that today as "declared work
+     advancing"). Otherwise the idle window is defeated by a process nobody is watching.
+  3. THE SPAWN EVENT FIRES ON EVERY OWNERSHIP-ENDING TRANSITION of the lock, not on the
+     handover mark alone — an idle lapse and an expired lease end ownership just as
+     definitively, and without this they wait for the next 15-minute tick, which is the
+     latency part 1 exists to remove.
   Both parts must leave the singleton property intact — no path may produce two live owners
   — and both stand down for a paused batch as every guard here does.
   VERIFIABLE: Vitest on the pure parts (the release-to-spawn decision from a lock state and
@@ -5544,3 +5552,39 @@ to land than a mechanism that needs a review.
   and the resulting tree is the one its own lockfile describes.
   Criticality: medium — both halves restore a signal the fast layer is believed to give
   and does not, which is the same failure class point 573 was opened for.
+
+- [ ] 616. THE IDLE MODES POINT 612 DOES NOT REACH (blind-parallel enumeration by both
+  models, 10.08.2026 — CLAUDE.md §6 divergent stage; merged by meaning, and every item
+  below is evidenced in `.claude/batch-launcher.log` or in the code it names). Point 612
+  binds OWNERSHIP to work. Three further channels can hold the batch still while nothing
+  is broken, each with a longer observed stall than the one 612 repairs:
+  1. A CLAIM RESERVES WITHOUT WORKING. `assessClaim` honours a takeover claim for as long
+     as its claimant's pid provably lives, and a window's pid lives for days — observed:
+     `skip: session … has CLAIMED the batch 132 min ago`. FINAL STATE: the same idle
+     arithmetic 612 applies to ownership applies to a claim — a claimant that shows no
+     owner-attributable activity within the idle window stops reserving. One decision
+     function owns both verdicts, so the two can never disagree.
+  2. NOBODY WATCHES THE LAUNCHER. The daemon has no supervisor: its only arming path is
+     the CLI `--start`, and it supervises the chat watcher rather than the other way
+     round. If it dies while a headless owner runs and that owner then crashes without a
+     boundary, no tick ever comes and the batch is orphaned until a human opens a window.
+     FINAL STATE: a second, dumb leg — the chat watcher and every session-start hook
+     re-arm a dead launcher, which `--start` already tolerates being called on a live one.
+     One process death may not orphan the batch.
+  3. AN EXTERNAL-INFRA PAUSE HAS NO CLOCK. A board page unreachable behind its CDN and a
+     starved Actions runner both escalate to a deliberate pause that no clock ever ends —
+     observed twice, and `skip: batch is paused with no restart clock` 21 times. The pause
+     is right; parking forever is not, because the cause is external and transient by
+     nature. FINAL STATE: an infrastructure pause carries a probe-and-resume clock and
+     retries hourly; a pause whose cause is a DECISION (a degraded serving model, an open
+     user question) stays clockless as it is today.
+  WHAT STAYS THE NAMED RESIDUAL, deliberately not engineered at: an exhausted usage quota,
+  a genuine user decision, and a container that is down — none is reachable from inside the
+  repository, and the first two are correct behaviour rather than a defect.
+  VERIFIABLE: pure Vitest per part (a claim without owner-attributable activity stops
+  reserving at the window boundary while a working one does not; the re-arm is idempotent
+  against a live launcher and starts a dead one; an infrastructure pause yields a next-probe
+  time while a decision pause yields none), plus the chaos drill of point 449 gaining a case
+  that kills the launcher and asserts the next session re-arms it.
+  Criticality: high for unattended operation — each of the three has already cost more
+  standing-still time than the failure 612 repairs.
