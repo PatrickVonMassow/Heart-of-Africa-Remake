@@ -133,28 +133,6 @@ there exactly once; a new point joins a bundle when appended.
   Criticality: high — it is the failure this bundle is for, it is silent, and it costs the
   whole absence rather than one point.
 
-- [ ] 613. EVERY DELEGATION LEAVES A BRANCH THE HYGIENE GUARD THEN DEMANDS (10.08.2026;
-  bundle Modell & Wächter). Creating an isolated agent worktree also creates a setup branch
-  named after the worktree (`worktree-agent-<id>`). The agent immediately switches its tree
-  to its own `feat/<point>-<slug>` branch, so that stub is abandoned within seconds, sitting
-  on whatever `main` pointed at when the worktree was cut. As soon as `main` moves, the stub
-  reads as "already contained in origin/main" and `branch-hygiene-guard` demands its deletion
-  — measured today with three agents running, three findings, each blocking the turn end while
-  the delegation was healthy. The guard's existing worktree protection does not catch it,
-  because the branch is genuinely no longer checked out anywhere; nothing is wrong except that
-  the noise arrives on every parallel turn and trains the reader to wave the guard through.
-  FINAL STATE: the stub is cleaned up where it is created rather than reported where it is
-  found — `scripts/worktree-cleanup.mjs` removes the `worktree-agent-<id>` branch together
-  with its worktree, and while that worktree still lives the guard treats the branch as
-  protected by it (the id in the branch name resolves to the worktree path). Nothing else about
-  the verdict changes: a merged, unused feature branch is still debris and still blocks.
-  VERIFIABLE: pure Vitest on the verdict core — a `worktree-agent-<id>` stub whose worktree
-  still exists yields no finding; the same stub with the worktree gone still does; an ordinary
-  merged feature branch is unaffected — plus a cleanup case proving the branch goes with the
-  tree.
-  Criticality: low — it destroys nothing, but it blocks the turn end of every delegating
-  session, and a guard that cries wolf on healthy work is how a real finding gets waved past.
-
 - [ ] 614. EXECUTE THE FOUR-EYES WORK-ORDER CLEANUP (10.08.2026; the verdict of a
   BLIND-PARALLEL analysis by two models on the 148 open points — CLAUDE.md §6, divergent
   stage). Both runs were merged by MEANING; where only one model found an item it is
