@@ -2,7 +2,7 @@
 // THE ONE COMMAND FOR A CROSS-VENDOR FOUR-EYES REVIEW (work-order point 624).
 //
 //   node scripts/review-sol.mjs --sha <sha> --brief "<what to judge>" \
-//        [--mode review|blind-parallel] [--point <N>] [--timeout <ms>]
+//        [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>]
 //   node scripts/review-sol.mjs --probe          # is the -m flag honoured at all?
 //   node scripts/review-sol.mjs --save-login     # keep the login across a rebuild
 //   node scripts/review-sol.mjs --restore-login
@@ -79,8 +79,17 @@ const git = (args) =>
  * is fed rather than fetched). A file deleted by the commit simply has no
  * current content, and is left out rather than reported as empty.
  */
-function gatherMaterial(sha) {
-  const paths = git(['show', '--pretty=format:', '--name-only', sha]).split('\n').map((p) => p.trim()).filter(Boolean)
+function gatherMaterial(sha, base = '') {
+  // THE WHOLE BRANCH, NOT THE LAST COMMIT (10.08.2026). One record covers every
+  // commit it CONTAINS — that is how both gates read the ledger — so a review of
+  // a branch head that only saw the head's own diff would clear commits nobody
+  // looked at. With a base the material is the range; without one (a commit
+  // already on the base branch) it is that commit alone.
+  const range = base ? `${base}..${sha}` : ''
+  const paths = (range
+    ? git(['diff', '--name-only', range])
+    : git(['show', '--pretty=format:', '--name-only', sha])
+  ).split('\n').map((p) => p.trim()).filter(Boolean)
   const files = []
   for (const path of [...new Set(paths)]) {
     const full = join(REPO_ROOT, path)
@@ -96,7 +105,18 @@ function gatherMaterial(sha) {
       /* deleted or binary — the patch above still shows what happened to it */
     }
   }
-  return formatReviewMaterial({ stat: git(['show', '--stat', sha]), patch: git(['show', sha]), files })
+  return formatReviewMaterial({
+    stat: range ? git(['diff', '--stat', range]) : git(['show', '--stat', sha]),
+    patch: range ? git(['log', '--patch', '--reverse', range]) : git(['show', sha]),
+    files,
+  })
+}
+
+/** The commit the review's range starts at: where `ref` and `sha` diverged. */
+function mergeBase(ref, sha) {
+  const res = spawnSync('git', ['merge-base', ref, sha], { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true })
+  const base = (res.stdout ?? '').trim()
+  return res.status === 0 && base && base !== sha ? base : ''
 }
 
 /** Run codex once and hand back everything the classifier needs. */
@@ -195,10 +215,12 @@ function restoreLogin() {
 export const usage = () =>
   [
     'usage: node scripts/review-sol.mjs --sha <sha> --brief "<what to judge>" \\',
-    '           [--mode review|blind-parallel] [--point <N>] [--timeout <ms>]',
+    '           [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>]',
     '       node scripts/review-sol.mjs --probe            (is -m honoured?)',
     '       node scripts/review-sol.mjs --save-login | --restore-login',
     '',
+    'The material is the whole range <since>..<sha> (--since defaults to main), because',
+    'one record covers every commit it contains.',
     `Reviews run on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT} (CLAUDE.md §6) and fall`,
     'back to Fable 5 when it cannot be reached — the recorded review always names the',
     'model that ACTUALLY ran.',
@@ -242,8 +264,12 @@ if (isMainModule(import.meta.url)) {
     console.error(
       `review-sol: asking ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) to review ${full.slice(0, 7)} …`,
     )
-    const material = gatherMaterial(full)
-    console.error(`  material: ${material.length} characters of diff and file content`)
+    const base = mergeBase(flag('--since') || 'main', full)
+    const material = gatherMaterial(full, base)
+    console.error(
+      `  material: ${material.length} characters of diff and file content` +
+        `${base ? ` (${base.slice(0, 7)}..${full.slice(0, 7)} — the whole branch)` : ' (this commit)'}`,
+    )
     const run = runCodex({ prompt: buildReviewPrompt({ sha: full, brief, mode }), input: material, timeoutMs })
     const outcome = classifyOutcome(run)
     const parsed = outcome.ok ? parseVerdict(run.finalMessage) : { ok: false }
