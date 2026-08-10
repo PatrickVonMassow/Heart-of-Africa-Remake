@@ -384,8 +384,16 @@ export function validateRecord({ sha, model, verdict, evidence, authoredBy, mode
   if (!VERDICTS.includes(String(verdict ?? '').trim())) {
     errors.push(`--verdict <v>: one of ${VERDICTS.join(' | ')}`)
   }
-  if (String(evidence ?? '').trim().length < 10) {
+  const ev = String(evidence ?? '').trim()
+  if (ev.length < 10) {
     errors.push('--evidence "<one line>": what was actually checked — one honest line, not a word')
+  } else if (/^<.*>$/.test(ev)) {
+    // A LINE STILL IN ITS ANGLE BRACKETS IS THE PLACEHOLDER, not an observation
+    // (four-eyes finding on point 624). The commands that print a record command
+    // for a review still to be done leave the evidence as `<…>`, and the length
+    // rule above waves a long placeholder straight through — which would put a
+    // ledger line naming nothing in front of a gate that then reads green.
+    errors.push(`--evidence: "${ev}" is still the placeholder — write what the review actually checked`)
   }
   if (String(model ?? '').trim() && String(authoredBy ?? '').trim() && sameModel(model, authoredBy)) {
     errors.push(

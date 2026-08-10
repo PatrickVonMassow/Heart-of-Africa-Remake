@@ -31,7 +31,7 @@
 // `--restore-login` puts it back — one command, no device code, and the secret
 // never reaches git (`/local/` is in .gitignore, and the file is written 0600).
 import { spawnSync } from 'node:child_process'
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, sep as sep_ } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -83,8 +83,15 @@ function gatherMaterial(sha) {
   const paths = git(['show', '--pretty=format:', '--name-only', sha]).split('\n').map((p) => p.trim()).filter(Boolean)
   const files = []
   for (const path of [...new Set(paths)]) {
+    const full = join(REPO_ROOT, path)
     try {
-      files.push({ path, text: readFileSync(join(REPO_ROOT, path), 'utf8') })
+      // A SYMLINK IS NOT READ (four-eyes finding, 10.08.2026). This content
+      // leaves the machine, and a link committed under a harmless name — say at
+      // `local/codex-auth.json`, the saved ChatGPT login — would post whatever it
+      // points at to the model. The patch still shows the link itself, which is
+      // what a reviewer needs to see anyway.
+      if (lstatSync(full).isSymbolicLink()) continue
+      files.push({ path, text: readFileSync(full, 'utf8') })
     } catch {
       /* deleted or binary — the patch above still shows what happened to it */
     }
@@ -241,6 +248,14 @@ if (isMainModule(import.meta.url)) {
     const outcome = classifyOutcome(run)
     const parsed = outcome.ok ? parseVerdict(run.finalMessage) : { ok: false }
     const decision = decideReview({ outcome, parsed })
+    // THE FINDINGS ARE THE POINT, not the verdict word: a `do-not-merge` whose
+    // reasons were never printed cannot be acted on, and the evidence line the
+    // ledger carries is one sentence by design. So the reviewer's whole answer
+    // is printed above the record command.
+    const said = String(run.finalMessage ?? '').trim()
+    if (said) {
+      console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end of review ---\n`)
+    }
     console.log(formatReviewReport({ decision, sha: full, mode, point }))
     // A fallback is not an error of THIS command — it did its job by refusing to
     // invent a review — but it must not read as a finished one either, so the

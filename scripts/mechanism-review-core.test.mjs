@@ -180,6 +180,13 @@ describe('validateRecord', () => {
     expect(validateRecord({ ...good, sha: 'not-a-sha' }).ok).toBe(false)
   })
 
+  it('refuses an evidence line still in its angle brackets, however long', () => {
+    // The commands that print a record command for a review still to be done
+    // leave `<…>` standing; the length rule alone would wave a long one through.
+    expect(validateRecord({ ...good, evidence: '<what the review actually checked>' }).ok).toBe(false)
+    expect(validateRecord({ ...good, evidence: 'the <core> was read against its spec' }).ok).toBe(true)
+  })
+
   it('accepts a record whose commit has no readable author model', () => {
     // Unknown authorship is not evidence of a self-review; refusing here would
     // make a merge commit unrecordable.

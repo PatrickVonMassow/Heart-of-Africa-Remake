@@ -176,6 +176,12 @@ describe('the record the command prints', () => {
     expect(
       validateRecord({ sha: 'b'.repeat(40), model: d.model, verdict: '', evidence: '', mode: 'review' }).ok,
     ).toBe(false)
+    // …and it stays refused if somebody fills in a verdict but leaves the
+    // evidence placeholder standing: a long placeholder must not pass for a line.
+    const placeholder = /--evidence "([^"]+)"/.exec(cmd)[1]
+    expect(
+      validateRecord({ sha: 'b'.repeat(40), model: d.model, verdict: 'merge', evidence: placeholder, mode: 'review' }).ok,
+    ).toBe(false)
   })
 
   it('the report names the cause in one loud line on a fallback', () => {
