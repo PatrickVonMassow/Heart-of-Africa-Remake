@@ -46,6 +46,62 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — the mechanic itself works; what fails is the player's ability to
   reach it, which is how the defect reached him a second time.
 
+- [x] 593. ONE TURN, SEVERAL INDEPENDENT CALLS (point 572's measure 2). The delegation
+  prompt and the batch prompt carry one binding paragraph: independent tool calls go into
+  ONE turn — several reads, several greps, `build` and `lint` — while anything whose input
+  depends on another call's output stays sequential, and a bundled shell chain never hides
+  its failing step. The paragraph NAMES its recurring candidates rather than stating the
+  principle: several reads, several greps, `build` beside `lint`, status beside branch, and
+  the screenshot reads of a picture check (small semantic groups, full resolution, judgment
+  quality before batching).
+  AND THE SAME PARAGRAPH CARRIES THE SECOND HALF: a fact that CANNOT have changed since it
+  was read is not read again — a file nobody edited, a `--help`, a config value, a spec
+  section already in the context. Mutable state stays re-read by rule: `git status`, CI
+  state, a running process, anything this session or another agent has written since.
+  MEASURED BASELINE: 5.0 % of responses issue more than one call, search/read alone is
+  25.1 % of the weighted spend, and 4036 responses — 15.2 % of all output — repeated an
+  EXACTLY identical shell command inside one session. At a quarter of that pot avoided the
+  saving is 23.1 M weighted (2.6 % of the window) and 6.8 machine-hours.
+  ONE SAVED RESPONSE IS 22.9k WEIGHTED AND 24.4 s OF MACHINE TIME — NOT of calendar time.
+  Up to three agents run in parallel (a median point spans 0.75 h of calendar against 1.39
+  machine-hours), so machine time becomes wall-clock only on the critical path. The ranking
+  table converted the two silently; the calendar effect stays UNQUANTIFIED until point 599
+  computes the critical path.
+  The point is complete when both shares — multi-call responses and exactly repeated
+  commands — have been RE-MEASURED after the change. Enforcement is by prompt and
+  measurement, not by a guard: "could have been bundled" is not machine-decidable.
+  Criticality: low — no mechanism, no guard; the risks are bundling dependent calls and
+  re-using a fact that has since changed, and the paragraph excludes both explicitly. It
+  is the ONLY member of this series with zero build cost, which is why it runs first.
+
+- [x] 594. THE LANDING COMMAND (point 572's measure 3). `scripts/land-point.mjs <N>` runs
+  the landing chain deterministically — merge, fast gate, tick, archive move, board
+  publish, worktree cleanup — and prints ONE structured summary with a verdict per step.
+  It fails LOUD at the first red step and never continues past it, so no half state is
+  left behind, and every step it performs is one a guard already governs.
+  MEASURED TARGET: bookkeeping is 26.0 % of the weighted spend and 37.5 % of the machine
+  hours; the chain runs as 8–12 main-session turns today at a median context of 164k, and
+  the main session spends 62.3 % of its own cost on bookkeeping.
+  THREE SMALL RIDERS, each below the 5.0 M a point of its own would cost, so each lands
+  here rather than owning one:
+  (a) `npm audit` runs in the chain only when the LOCKFILE changed — the verdict depends on
+      the dependency tree and on nothing else, so this is the same fact, not a proxy for it;
+      the rule texts that demand the audit are adjusted in the same commit.
+  (b) A board publish whose content is unchanged is skipped.
+  (c) The fast gate runs build, lint and the unit layer CONCURRENTLY — gates are 21.0
+      machine-hours per window, so 30–60 % of that is 2.9–5.8 % of all machine hours, while
+      the token effect is ~0.33 % and this is therefore an axis-A measure only. INTERLOCK,
+      not optional: it never runs while a browser suite runs, or it manufactures exactly the
+      load the quiet-machine gate exists to prevent. Acceptance is ten serial against ten
+      parallel runs on a quiet machine.
+  NOT A FAST-FORWARD MERGE, and the reason is not obvious: a fast-forward leaves no merge
+  commit, and `git log --first-parent main` is the only calendar measurement we have — every
+  fast-forwarded point would silently vanish from it and from the CI guard's ref accounting.
+  The case it would apply to is also the one that costs nothing today, and the fast gate
+  after the merge is mandatory either way, so nothing is skipped in exchange.
+  Criticality: medium — it bundles guard-adjacent steps, and a swallowed intermediate
+  error would advance state nobody verified, so the mechanism review is required.
+
 - [x] 587. THE SPOKEN SYLLABLES ARE A SQUAWK, AND THE PITCH — THE ONLY THING THAT MEANS
   ANYTHING — IS THE WEAKEST PART OF THEM (user 09.08.2026, listening on the deployed
   build: "nur Gequäke, das kein Bisschen nach Stimmen klingt und nicht als ba oder BA
