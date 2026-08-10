@@ -359,6 +359,10 @@ export interface Strings {
     positionReport(coords: string, region: string): string
     /** A gift unlocked the settlement orientation (design.md §17). */
     orientationGained: string
+    /** The escape from a wedge (design.md §17.5): the hint that names the key,
+     *  and the confirmation that he stands free again. */
+    stuckHint(key: string): string
+    unstuckFreed: string
   }
 
   dialogs: {
@@ -478,6 +482,11 @@ export interface Strings {
     labelOverlayMax: string
     mouseSensitivity: string
     lookPitchLimit: string
+    /** The escape from a wedge (work-order 604). */
+    unstuckStallDistance: string
+    unstuckStallSeconds: string
+    unstuckSearchRadius: string
+    unstuckSearchStep: string
     invertLook: string
     ambienceVolume: string
     footstepVolume: string

@@ -388,6 +388,8 @@ export const en: Strings = {
     campNeedsFriend: 'Only an Honored Friend of this region may leave belongings in the village.',
     positionReport: (coords, region) => `By my reckoning: ${coords} — the ${region} region.`,
     orientationGained: 'In thanks for the gift, they point out the important buildings to me.',
+    stuckHint: (key) => `Wedged in? Press ${key} to work yourself free.`,
+    unstuckFreed: 'I worked myself loose and stand on open ground again.',
   },
 
   dialogs: {
@@ -495,6 +497,10 @@ export const en: Strings = {
     labelOverlayMax: 'Ctrl labels (max.)',
     mouseSensitivity: 'Mouse sensitivity (first-person)',
     lookPitchLimit: 'Look up/down limit (°)',
+    unstuckStallDistance: 'Stuck: progress threshold (m)',
+    unstuckStallSeconds: 'Stuck: hint after (s)',
+    unstuckSearchRadius: 'Unstuck: search radius (m)',
+    unstuckSearchStep: 'Unstuck: search step (m)',
     invertLook: 'Invert mouse look',
     ambienceVolume: 'Ambience volume',
     footstepVolume: 'Footstep volume',
