@@ -129,6 +129,29 @@ The game starts in English by default; German can be selected at runtime via
 the debug menu (F1). All player-facing text lives in `src/i18n/` — adding a
 language means adding one file.
 
+### Code reviews across vendors
+
+Changes to guards, gates and other load-bearing mechanisms get a second pair of
+eyes from a model of a *different* vendor — different training, less correlated
+blind spots. That review runs through one command:
+
+```
+node scripts/review-sol.mjs --sha <sha> --brief "<what to judge>"
+```
+
+It uses the [Codex CLI](https://github.com/openai/codex) with a ChatGPT login
+and prints the result in the shape `scripts/mechanism-review.mjs --record`
+expects; if the model cannot be reached, it says so and hands the review back to
+the fallback model instead of inventing a verdict. The login lives in
+`~/.codex/auth.json` inside the dev container and is therefore lost on a
+container rebuild — so save it once and restore it in one command afterwards:
+
+```
+node scripts/review-sol.mjs --save-login     # → local/ of the main checkout (git-ignored, 0600)
+node scripts/review-sol.mjs --restore-login  # after a container rebuild
+node scripts/review-sol.mjs --probe          # is the model id really honoured?
+```
+
 ## Geodata
 
 The terrain uses real elevation data. The runtime assets in `public/geodata/`

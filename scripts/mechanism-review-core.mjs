@@ -319,6 +319,50 @@ export function formatArgErrors(errors = []) {
   return ['mechanism-review: refusing this command line.', '', ...errors.map((e) => `  · ${e}`)].join('\n')
 }
 
+/**
+ * An answer that ADMITS no review took place: "I could not read the diff",
+ * "none of my commands reached the repository", "no access to the patch".
+ *
+ * It lives here rather than beside the runner that first needed it because BOTH
+ * halves must refuse it: the runner when a model answers that way, and
+ * validateRecord when a hand writes the same sentence into the ledger. Kept
+ * deliberately narrow — about ACCESS, not about findings — so that an ordinary
+ * finding ("the parser could not handle CRLF") is still a review.
+ *
+ * It is a SAFETY NET, never a proof: no pattern list catches every way of
+ * saying "I never saw it", and each round of the cross-vendor review found one
+ * more phrasing. What keeps the gate honest is the runner falling back on any
+ * unusable answer at all; this only stops the ones that would otherwise read as
+ * a verdict.
+ */
+export const BLIND_REVIEWER = new RegExp(
+  [
+    // "I could not read/see/access …", "we were unable to inspect …"
+    /\b(?:i|we)\s+(?:could\s+not|couldn't|can(?:no|')t|(?:was|were)\s+(?:unable|not\s+able)\s+to|did\s+not\s+(?:get|receive|have))\b[^.\n]{0,80}\b(?:read|see|inspect|access|reach|open|review|view|retrieve|fetch|verify|validate|confirm|check|examine|evaluate|assess)\b/
+      .source,
+    // "…because the repository was unavailable" — the reason half of the same
+    // admission, whatever verb the first half used (fifth cross-vendor round).
+    /\b(?:repository|repo|diff|patch|material|files?|change|workspace|content)\s+(?:was|were|is|are)\s+(?:unavailable|unreachable|inaccessible|not\s+(?:available|reachable|accessible))\b/
+      .source,
+    // "no access to the diff", "without access to the files", "had no material"
+    /\b(?:no|without|lacking|denied)\s+access\b/.source,
+    /\bno\s+(?:material|patch|diff)\b/.source,
+    // "none of my commands reached …", "repository access failed"
+    /\bnone\s+of\s+my\s+commands\b/.source,
+    /\b(?:repository|repo|file|material|workspace)\s+access\s+(?:failed|denied|was\s+denied)\b/.source,
+    // "the diff could not be read", "the patch was not supplied/provided"
+    /\b(?:could\s+not|unable\s+to)\s+(?:read|inspect|access|retrieve)\s+(?:the\s+)?(?:diff|patch|files?|repository|material|change)\b/
+      .source,
+    // …and the same sentence in the passive, which the active form above does
+    // NOT match: "the diff could not be read" (third cross-vendor round).
+    /\b(?:diff|patch|files?|repository|material|change)\s+(?:could\s+not|cannot|can't)\s+be\s+(?:read|inspected|accessed|retrieved|seen)\b/
+      .source,
+    /\b(?:diff|patch|material|files?)\s+(?:was|were)\s+(?:not\s+(?:supplied|provided|available|accessible)|un(?:available|supplied|provided))\b/
+      .source,
+  ].join('|'),
+  'i',
+)
+
 /** Shortest form a message should print a sha in. */
 const short = (sha) => String(sha ?? '').slice(0, 7)
 
@@ -376,13 +420,35 @@ export function validateRecord({ sha, model, verdict, evidence, authoredBy, mode
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
   }
   if (!String(model ?? '').trim()) {
-    errors.push('--model <name>: which model performed the review (e.g. "Fable 5")')
+    // The example NAMES the reviewer the rule prefers (point 624): reviews go to
+    // GPT-5.6 Sol first and to Fable 5 when Sol is unavailable, and nothing here
+    // restricts the value — a reviewer this recorder refused could not be used.
+    errors.push('--model <name>: which model performed the review (e.g. "GPT-5.6 Sol", "Fable 5")')
   }
   if (!VERDICTS.includes(String(verdict ?? '').trim())) {
     errors.push(`--verdict <v>: one of ${VERDICTS.join(' | ')}`)
   }
-  if (String(evidence ?? '').trim().length < 10) {
+  const ev = String(evidence ?? '').trim()
+  if (ev.length < 10) {
     errors.push('--evidence "<one line>": what was actually checked — one honest line, not a word')
+  } else if (BLIND_REVIEWER.test(ev)) {
+    // AN EVIDENCE LINE THAT ADMITS THE REVIEWER NEVER SAW THE CHANGE IS REFUSED
+    // (point 624, second cross-vendor round). The first real cross-vendor run
+    // answered `do-not-merge` because none of its commands reached the
+    // repository — a well-formed verdict for a review that never happened. The
+    // runner already falls back on such an answer; the RECORDER must refuse it
+    // too, or a hand-typed line reopens the hole the runner closed.
+    errors.push(
+      `--evidence: "${ev}" says the reviewer could not see the change — that is not a review. ` +
+        'Have it reviewed, then record what was actually read.',
+    )
+  } else if (/^<.*>$/.test(ev)) {
+    // A LINE STILL IN ITS ANGLE BRACKETS IS THE PLACEHOLDER, not an observation
+    // (four-eyes finding on point 624). The commands that print a record command
+    // for a review still to be done leave the evidence as `<…>`, and the length
+    // rule above waves a long placeholder straight through — which would put a
+    // ledger line naming nothing in front of a gate that then reads green.
+    errors.push(`--evidence: "${ev}" is still the placeholder — write what the review actually checked`)
   }
   if (String(model ?? '').trim() && String(authoredBy ?? '').trim() && sameModel(model, authoredBy)) {
     errors.push(

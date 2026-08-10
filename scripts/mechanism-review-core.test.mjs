@@ -180,6 +180,29 @@ describe('validateRecord', () => {
     expect(validateRecord({ ...good, sha: 'not-a-sha' }).ok).toBe(false)
   })
 
+  it('refuses an evidence line that says the reviewer never saw the change', () => {
+    // The runner already falls back on such an answer; the recorder must refuse
+    // the same sentence typed by hand, or the hole reopens one line lower.
+    expect(validateRecord({ ...good, evidence: 'Repository access failed before inspection' }).ok).toBe(false)
+    expect(validateRecord({ ...good, evidence: 'I could not read the diff, so nothing was checked' }).ok).toBe(false)
+    expect(validateRecord({ ...good, evidence: 'I did not have access to the diff or changed files' }).ok).toBe(false)
+    expect(validateRecord({ ...good, evidence: 'the patch was not supplied, so this is not a review' }).ok).toBe(false)
+    expect(validateRecord({ ...good, evidence: 'the diff could not be read, so no review took place' }).ok).toBe(false)
+    expect(validateRecord({ ...good, evidence: 'I was not able to inspect the diff at all' }).ok).toBe(false)
+    expect(
+      validateRecord({ ...good, evidence: 'I could not verify the attached change because the repository was unavailable' }).ok,
+    ).toBe(false)
+    // …while an ordinary finding that merely contains the words is a review.
+    expect(validateRecord({ ...good, evidence: 'the guard could not see a renamed file; fixed in the diff' }).ok).toBe(true)
+  })
+
+  it('refuses an evidence line still in its angle brackets, however long', () => {
+    // The commands that print a record command for a review still to be done
+    // leave `<…>` standing; the length rule alone would wave a long one through.
+    expect(validateRecord({ ...good, evidence: '<what the review actually checked>' }).ok).toBe(false)
+    expect(validateRecord({ ...good, evidence: 'the <core> was read against its spec' }).ok).toBe(true)
+  })
+
   it('accepts a record whose commit has no readable author model', () => {
     // Unknown authorship is not evidence of a self-review; refusing here would
     // make a merge commit unrecordable.
