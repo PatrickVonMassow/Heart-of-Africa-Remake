@@ -1335,12 +1335,36 @@ Verifiable, by suite:
   chunk-matched ground tone is pure-tested in
   `src/scenes/travel/farColor.test.ts`, the F3 zoom unlock in
   `src/ui/Hud.test.tsx`.
+- The keyboard capture of work-order 601 (`design.md` §17.8): the
+  chord set and the lock's state machine are pure-tested in
+  `src/systems/keyboardGuard.test.ts` — a modifier chord on a key the
+  game binds UNDER a modifier is prevented (Ctrl+W, +S, +P, +D, +A, +T,
+  Alt+Arrow) and an unbound one (Ctrl+R, +I, F5) is not, nor the
+  plain-bound calendar row, whose chords stay the browser's tab jumps
+  and keyboard zoom (Ctrl+1–9, Ctrl +/−/0) while the LOCK still takes
+  those keys; none of it inside a form control; the
+  lock is requested once, only with fullscreen AND the pointer, with
+  every bound code except Escape, released with either condition, and
+  a missing or refusing API is never an error. The global keydown
+  listener really applying the rule is asserted in
+  `src/systems/input.test.ts` (Ctrl+W prevented AND still walking
+  forward), and the WIRING in the shipped bundle — the document
+  listeners and the request at the real transition — in the
+  `keyboard-lock` section of `scripts/verify/settings.mjs`. The
+  reserved chords themselves cannot be asserted from a test; the
+  request is what is proved. Where the lock cannot reach — a windowed
+  browser, or one without the API — the HOLD KEY is the player's:
+  `src/state/ui.test.ts` pins the Ctrl default and the offered set,
+  `src/ui/ctrlHold.test.ts` that the layer follows the rebound key,
+  ignores the old one and clears a standing label when the key changes
+  under it, and `src/ui/DebugMenu.test.tsx` the picker itself in both
+  languages (shipped on Ctrl, writing through to the store).
 - `scripts/verify/collision.mjs`: corner clearance at box buildings
   and an inhabitant re-entering its dwelling (pt. 16).
 - `scripts/verify/voice.mjs`: the automatic narration of a new entry
   (pt. 19).
 - The menu's STRUCTURE (`design.md` §21, point 393) is proved in
-  `src/ui/DebugMenu.test.tsx`: a COMPLETENESS pin names all 132
+  `src/ui/DebugMenu.test.tsx`: a COMPLETENESS pin names all 163
   controls and the group each belongs to and compares that against the
   rendered menu in BOTH directions and in both languages — a dropped
   control fails, and so does one added without being named — plus every

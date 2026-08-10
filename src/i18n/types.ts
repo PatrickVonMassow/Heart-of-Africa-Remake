@@ -478,7 +478,7 @@ export interface Strings {
     walkerUnstuck: string
     placeCollisionFactor: string
     startupFreezeBudget: string
-    /** Cap on the hold-Ctrl labels (design.md §17.8). */
+    /** Cap on the name labels of the hold layer (design.md §17.8). */
     labelOverlayMax: string
     mouseSensitivity: string
     lookPitchLimit: string
@@ -488,6 +488,11 @@ export interface Strings {
     unstuckSearchRadius: string
     unstuckSearchStep: string
     invertLook: string
+    /** The rebindable hold key of design.md §17.8 (work-order 601) and its options. */
+    labelModifier: string
+    labelModifierCtrl: string
+    labelModifierShift: string
+    labelModifierAlt: string
     ambienceVolume: string
     footstepVolume: string
     ambientVolume: string

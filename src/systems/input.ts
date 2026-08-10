@@ -1,5 +1,6 @@
 // Global keyboard state: polled by scenes each frame, plus one-shot key events.
 
+import { installKeyboardLock, preventsBrowserChord } from './keyboardGuard'
 import { createEngageLatch } from './touchInput'
 
 const pressed = new Set<string>()
@@ -16,11 +17,18 @@ function isTypingTarget(e: Event): boolean {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('keydown', (e) => {
-    if (isTypingTarget(e)) return
+    const typing = isTypingTarget(e)
+    // A modifier chord on a key the game binds belongs to the game, not to the
+    // browser (work-order 601): holding the label modifier while walking must
+    // not bookmark, print or save the page. The three RESERVED chords
+    // (Ctrl+W/T/N) ignore this — the keyboard lock below is what covers them.
+    if (preventsBrowserChord(e, { typing })) e.preventDefault()
+    if (typing) return
     pressed.add(e.code)
   })
   window.addEventListener('keyup', (e) => pressed.delete(e.code))
   window.addEventListener('blur', () => pressed.clear())
+  installKeyboardLock()
 }
 
 export function isKeyDown(code: string): boolean {
@@ -58,10 +66,23 @@ export function wheelTargetsScene(target: EventTarget | null): boolean {
   return el.closest(SCROLLABLE_OVERLAY_SELECTOR) === null
 }
 
+export interface KeyPressOptions {
+  /**
+   * Ignore a press carrying Ctrl, Alt or Meta (work-order 601). For a key whose
+   * CHORD is left to the browser — the calendar row of §21.1, see
+   * PREVENTED_CHORD_CODES — the handler must stand down, or the one press does
+   * two things at once: Ctrl+3 would switch the browser to tab 3 AND jump the
+   * expedition to March. Shift is not a chord any browser binds, so it still
+   * reaches the handler.
+   */
+  ignoreModified?: boolean
+}
+
 /** Register a keydown handler for a specific code; returns unsubscribe. */
-export function onKeyPress(code: string, cb: () => void): () => void {
+export function onKeyPress(code: string, cb: () => void, options: KeyPressOptions = {}): () => void {
   const handler = (e: KeyboardEvent) => {
     if (isTypingTarget(e)) return
+    if (options.ignoreModified && (e.ctrlKey || e.altKey || e.metaKey)) return
     if (e.code === code) cb()
   }
   window.addEventListener('keydown', handler)
