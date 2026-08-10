@@ -23,7 +23,6 @@ import {
 } from '../../render/fauna'
 import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
 import {
-  GESTURE_KINDS,
   advanceGesture,
   aimAt,
   armAim,
@@ -993,9 +992,6 @@ function Porters({
   )
 }
 
-/** Seconds of quiet between two gestures in the conversation. */
-const TALKER_GESTURE_GAP = 1.6
-
 /** Where a talker stands and which way it faces. */
 interface TalkerStance {
   x: number
@@ -1033,27 +1029,30 @@ function talkerAim(
 }
 
 /**
- * Two inhabitants standing together in conversation, gesturing (point 479).
+ * Two inhabitants standing together in conversation (point 479): they turn
+ * toward each other and shift their weight, and they say nothing the player
+ * cannot read.
  *
- * The two take turns: one beckons, points at something in the settlement,
- * refuses, or waves a direction, while the other listens. THE GESTURE EXPLAINS
- * NOTHING — there is no label and no caption; it is the body half of an exchange
- * whose other half is whatever happens next, which is the rule this project set
- * for the whole communication PoC.
+ * THEY NO LONGER GESTURE ON THEIR OWN (point 580). The pair used to cycle the
+ * four gestures as ambient dressing, with no utterance behind any of them — the
+ * mute pantomime the user reported from the picture ("they gesture, but I see
+ * no texts over their heads"), and at ANY distance, since nothing it did could
+ * ever be heard. Those four gestures are the very ones the teaching situations
+ * use for COME, GO_THERE, THERE and NO, so an ambient pair performing them
+ * showed the player concepts with no word attached to them. Gesturing now
+ * belongs to the figures that SPEAK: the children's situations and the adults'
+ * errands, which drive the same `gesture` refs through the hearing gate
+ * (`src/communication/spokenGesture.ts`).
  *
- * This scheduler is the AMBIENT driver. The speaking layer (`src/communication/`)
- * is vocabulary and audio so far — no inhabitant utters anything in the scene
- * yet. When the teaching situations put words in a figure's mouth, they drive
- * the very same `gesture` refs through `startGesture`, so a figure saying COME
- * beckons in step — the coupling point is the ref, and nothing about the figure
- * has to change for it.
+ * The dev hook below still drives the pair's arms directly — it is the rig the
+ * headless verification poses the four gestures on (point 479), and it never
+ * runs outside a dev build.
  */
 function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   const a = useRef<THREE.Group>(null)
   const b = useRef<THREE.Group>(null)
   const gestureA = useRef<GestureState>(restGesture())
   const gestureB = useRef<GestureState>(restGesture())
-  const schedule = useRef({ wait: 1.2, turn: 0, step: 0 })
 
   // The two stand half a metre apart facing each other, so figure A looks along
   // world +x and figure B along −x. Their aims are computed in each one's own
@@ -1069,10 +1068,9 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   // apart, well clear of the separation distance, so it never pushes itself.
   useStandingBodies(stances)
 
-  useFrame(({ clock }, rawDt) => {
-    const dt = Math.min(rawDt, 0.1)
+  useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    // Slight turns toward each other, as before — the conversation's idle.
+    // Slight turns toward each other — the conversation's idle, and all of it.
     if (a.current) {
       a.current.rotation.y = Math.PI / 2 + Math.sin(t * 1.15) * 0.18
       a.current.position.y = Math.max(0, Math.sin(t * 2.3)) * 0.03
@@ -1081,25 +1079,12 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
       b.current.rotation.y = -Math.PI / 2 + Math.sin(t * 1.15 + Math.PI) * 0.18
       b.current.position.y = Math.max(0, Math.sin(t * 2.3 + Math.PI)) * 0.03
     }
-    const s = schedule.current
-    // Only schedule while BOTH are at rest: a gesture is never cut short by the
-    // clock, and the pair never talks over each other.
-    if (gestureA.current.kind !== null || gestureB.current.kind !== null) return
-    s.wait -= dt
-    if (s.wait > 0) return
-    const kind = GESTURE_KINDS[s.step % GESTURE_KINDS.length]
-    const who = s.turn
-    const aim = talkerAim(stances, kind, who)
-    const next = startGesture(kind, { ...aim, phase: who * 1.7 })
-    if (who === 0) gestureA.current = next
-    else gestureB.current = next
-    s.step++
-    s.turn = 1 - who
-    s.wait = TALKER_GESTURE_GAP
   })
 
   // Dev hook for the headless verification (CLAUDE.md §7.2): the live gesture
   // state and the pose it draws, plus a way to hold one pose for a screenshot.
+  // It is the ONLY thing that poses this pair — in a real run the two stand and
+  // talk, and every gesture in the settlement belongs to a figure being heard.
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
@@ -1117,9 +1102,6 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
       const next = startGesture(kind, { ...aim, duration: seconds, phase: who * 1.7 })
       if (who === 0) gestureA.current = next
       else gestureB.current = next
-      // The scheduler already stands down while a gesture runs; this only resets
-      // the quiet gap, so the ambient conversation resumes normally afterwards.
-      schedule.current.wait = TALKER_GESTURE_GAP
     }
     w.__placeTalkers = stances
     return () => {
