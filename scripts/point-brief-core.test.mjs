@@ -20,6 +20,7 @@ import {
   BRIEF_TOKEN_CEILING,
   CALL_DISCIPLINE,
   DOC_WINDOW,
+  VERIFICATION_LADDER,
   acceptanceCriteriaFrom,
   aliasesFor,
   assembleBrief,
@@ -29,6 +30,7 @@ import {
   estimateTokens,
   extractPointRefs,
   findPoint,
+  isRenderPoint,
   parseDesignSections,
   parseWorkOrderPoints,
   pointTitle,
@@ -607,6 +609,89 @@ describe('assembleBrief', () => {
     expect(brief).not.toContain('--- CROSS-REFERENCED')
     expect(brief).not.toContain('--- REFERENCE MAP')
     expect(brief).not.toContain('--- NOTES')
+    expect(brief).not.toContain('THE VERIFICATION LADDER')
+  })
+
+  it('puts the ladder AFTER the spec — it is only readable once the point is known', () => {
+    const brief = assembleBrief({
+      point: { number: 1, done: false, body: 'the spec body' },
+      ladder: VERIFICATION_LADDER,
+    })
+    expect(brief.indexOf('the spec body')).toBeLessThan(brief.indexOf('THE VERIFICATION LADDER'))
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The verification ladder (point 595): the cheap rung is only worth anything
+// BEFORE the run, so the brief carries it for every point that can move a
+// picture — and says in the same breath what it does NOT prove.
+// ---------------------------------------------------------------------------
+describe('the verification ladder', () => {
+  it('classifies a point that names the picture, a backend or a browser suite as a render point', () => {
+    for (const spec of [
+      'the rendered coast still steps on WebGPU',
+      'a screenshot of the chief hut',
+      'the enrichments.mjs staging pins the wrong cell',
+      'the herds pop in at zoom 0.5',
+      'the shader builds off the critical path',
+    ]) {
+      expect(isRenderPoint(spec), spec).toBe(true)
+    }
+  })
+
+  it('leaves a point that touches no picture alone', () => {
+    for (const spec of [
+      'the commit-msg hook refuses a trailer naming no model',
+      'TASKS.md is split into open points and an archive',
+      'the chat inbox hands untrusted input on as input, not authorization',
+    ]) {
+      expect(isRenderPoint(spec), spec).toBe(false)
+    }
+  })
+
+  it('carries the ladder in a render point’s brief and not in another’s', () => {
+    const tasks = ALL.replace('AN OPEN POINT', 'A RENDER POINT — the rendered river shows steps')
+    const rendered = buildBrief({ ...args, tasksText: tasks, number: 400 })
+    expect(rendered.render).toBe(true)
+    expect(rendered.brief).toContain('THE VERIFICATION LADDER')
+    const plain = buildBrief({ ...args, number: 401 })
+    expect(plain.render).toBe(false)
+    expect(plain.brief).not.toContain('THE VERIFICATION LADDER')
+  })
+
+  it('names the cheapest rung AND refuses to let it count as the proof', () => {
+    const text = VERIFICATION_LADDER.join('\n')
+    // The rung nobody was routed to (point 566, unused until 09.08.2026) …
+    expect(text).toMatch(/--section=<name>/)
+    expect(text).toMatch(/run-all\.mjs <suite> --section=/)
+    // … the unit layer's half of the SAME rule, not a second one …
+    expect(text).toMatch(/vitest run <path>/)
+    expect(text).toMatch(/--changed/)
+    expect(text).toMatch(/tsc --incremental/)
+    // … and what none of it proves.
+    expect(text).toMatch(/NEVER AN ACCEPTANCE/)
+    expect(text).toMatch(/PARTIAL/)
+    expect(text).toMatch(/WHOLE suite/)
+  })
+
+  it('binds the final proof to the merge candidate and to a reported git HEAD', () => {
+    const text = VERIFICATION_LADDER.join('\n')
+    expect(text).toMatch(/EXACTLY ONCE/)
+    expect(text).toMatch(/Merge `main` INTO your/)
+    expect(text).toMatch(/git rev-parse HEAD/)
+    // The shared final regression must not be read as licence to merge first and
+    // photograph afterwards — that block-loop cost ~30 turns on 24.07.2026.
+    expect(text).toMatch(/PICTURE proof stays ON THE BRANCH/)
+  })
+
+  it('states that a red is a red, with no cosmetic class to wave one through', () => {
+    const text = VERIFICATION_LADDER.join('\n')
+    expect(text).toMatch(/A RED IS A RED/)
+    expect(text).toMatch(/cosmetic/)
+  })
+
+  it('stays inside the brief’s width, like every other carried block', () => {
+    for (const line of VERIFICATION_LADDER) expect(line.length, line).toBeLessThanOrEqual(100)
   })
 })
 

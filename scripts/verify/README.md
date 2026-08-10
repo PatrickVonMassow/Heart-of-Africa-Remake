@@ -372,6 +372,16 @@ front of each turns one into a declaration.
   carry `page.evaluate` callbacks), so `npm run lint` refuses it in a tenth of a
   second, and `scope.test.mjs` keeps the rule armed by running the real config
   over a fixture of exactly that shape.
+- **The delegation brief ROUTES a render point here (point 595).** The rung
+  existed and was unused: checked 09.08.2026, `--section` appeared in this file
+  and in `tiers.mjs` and nowhere else — in no brief, no agent prompt, no rule
+  text — and not one recorded render-verify run was partial. So
+  `scripts/point-brief-core.mjs` carries the VERIFICATION LADDER in the brief of
+  every point whose spec can move a picture: section → suite → whole set while
+  repairing, the full fast gate and the whole suite as the proof, the both-backend
+  picture proof once, on `main`-merged-into-the-branch, with the verified
+  `git HEAD` reported. It is a building block of the brief, not a paragraph
+  somebody has to remember.
 - **The one recurring defect is a section that does NOT own its setup**: it
   reads a scene the block before it staged, so it passes in the whole run and
   fails standalone. Where blocks genuinely share one staging they belong in ONE

@@ -538,6 +538,82 @@ export const CALL_DISCIPLINE = [
   '  session or another agent has written since.',
 ]
 
+/**
+ * WHAT MAKES A POINT A RENDER POINT — the trigger for the verification ladder
+ * below (point 595). Read off the SPEC's own wording, because that is all a
+ * brief has: the files a point will touch are not known until it is worked.
+ *
+ * DELIBERATELY GENEROUS. The two errors are not symmetric: a missed render
+ * point is an agent replaying whole suites because nobody told it about the
+ * cheap rung — the exact cost this point exists to remove — while a false
+ * positive costs ~250 tokens of advice that is merely irrelevant. So a browser
+ * suite named by name counts, and so does any word that means the rendered
+ * picture, the renderer, or a backend.
+ */
+const RENDER_WORDS =
+  /\b(?:render(?:s|ed|er|ing)?|re-render|shader|tsl|screenshot|frame|picture|pixel|backend|webgpu|webgl|graphic|visual|camera|zoom|texture|material|lighting|shadow|terrain|water|river|wildlife|animal|herd|geometry|mesh|scene|sky|fog|hud|overlay|settlement|village|panorama|silhouette|animation|animated|draw|drawn|paint(?:s|ed)?)\w*/i
+/** The browser suites (scripts/verify/*.mjs that drive a page). `docs` is the
+ *  one pure-Node check and is not one, so naming it is no render signal. */
+const RENDER_SUITE =
+  /\b(?:startup|world|i18n|flow|health|events|collision|handwriting|polish|gamepad|touch|voice|settings|enrichments|invariants|benchmark|report)\.mjs\b/i
+
+/** Does this spec describe work that can move the rendered picture? Total. */
+export function isRenderPoint(spec) {
+  const text = String(spec ?? '')
+  return RENDER_WORDS.test(text) || RENDER_SUITE.test(text)
+}
+
+/**
+ * THE VERIFICATION LADDER (point 595, measure 5 of point 572). Carried by the
+ * BRIEF rather than by a guard, for the same reason as the call discipline
+ * above: "you replayed a whole suite where one section would have done" is not
+ * decidable after the fact, and the rule is only worth anything BEFORE the run.
+ *
+ * WHY IT IS OWED AT ALL. Verification is 47.0 % of the weighted spend and 37.4 %
+ * of the machine hours; the ten costliest points hold 64.4 % of all
+ * point-assigned verification tokens; eight of ten recorded `enrichments` runs
+ * FAILED while still writing all 37 frames at 951–1029 s each. And the cheapest
+ * rung already existed and was unused: point 566 built `--section`, `enrichments`
+ * declares nine of them, and on 09.08.2026 nothing routed anyone to it — not one
+ * recorded run was partial, and the three agents commissioned that evening were
+ * not told it exists. This block is that routing.
+ *
+ * IT MUST NOT READ AS A DISCOUNT ON THE PROOF, which is why every rung says what
+ * it does NOT prove, why the whole-suite/both-backend picture proof is stated in
+ * the same breath, and why "a red is a red" stands here rather than a
+ * critical-versus-cosmetic class nobody could apply honestly.
+ */
+export const VERIFICATION_LADDER = [
+  'THE VERIFICATION LADDER — THIS POINT CAN MOVE THE PICTURE (point 595). Climb it; do not',
+  'start at the top:',
+  '- WHILE YOU ARE STILL FIXING, run the CHEAPEST rung that covers what you changed, on the',
+  '  everyday WebGPU lane (unpinned `VERIFY_GL`):',
+  '  1. ONE SECTION of one suite — `npm test -- <suite> --section=<name>` (point 566). It runs',
+  '     that block\'s setup and its checks and nothing else. The names come from the suite\'s own',
+  '     source: `node scripts/verify/run-all.mjs <suite> --section=nope` refuses the unknown name',
+  '     and PRINTS every real one, in a tenth of a second and without booting a browser.',
+  '  2. then the ONE suite that covers the change — `npm test -- <suite>`;',
+  '  3. the whole set only for the final proof.',
+  '  The unit layer has the SAME ladder, not a second rule: a path filter',
+  '  (`npx vitest run <path>`), `vitest --changed` and `tsc --incremental` are legal while you',
+  '  are repairing.',
+  '  An iteration run is never CREDITED as coverage, so let an expensive suite STOP at its',
+  '  first failure while you iterate; run it to completion only for the final proof.',
+  '- AN INCREMENTAL GREEN IS NEVER AN ACCEPTANCE. A `--section` run is recorded PARTIAL and',
+  '  `runVerdict` refuses it as coverage whatever its exit code; a path-filtered unit run',
+  '  proves that path and nothing around it. The proof is the FULL fast gate (`npm run build`,',
+  '  `npm run lint`, `npm run test:unit`) plus the WHOLE suite, unfiltered.',
+  '- THE FULL PROOF RUNS EXACTLY ONCE, ON THE EXACT MERGE CANDIDATE. Merge `main` INTO your',
+  '  branch FIRST, then verify that tree — the one that will land — and REPORT the `git HEAD`',
+  '  you verified (`git rev-parse HEAD`), which is the evidence that the verified tree is the',
+  '  merged one. Verifying before the sync proves a tree nobody merges; merging FIRST and',
+  '  verifying afterwards cost ~30 turns of a block-loop on 24.07.2026, so the both-backend',
+  '  PICTURE proof stays ON THE BRANCH, before the merge — a shared final regression over',
+  '  several finished branches may replace the repeated REGRESSION, never that picture.',
+  '- A RED IS A RED. There is no "cosmetic" class that may be waved through: an iteration run',
+  '  is not credited either way, so the distinction buys nothing and only opens a door.',
+]
+
 const HEADER = [
   'HOW TO USE THIS BRIEF — READ THIS FIRST',
   '- This brief IS your spec. Do NOT read TASKS.md or docs/tasks-archive.md or design.md',
@@ -633,7 +709,7 @@ export function formatRevisionLine({ head = null, dirty = null, workOrder = null
 }
 
 /** Assemble the brief text from already-resolved parts (pure, no lookups). */
-export function assembleBrief({ point, sections = [], referenced = [], notes = [], referenceMap = [], revision }) {
+export function assembleBrief({ point, sections = [], referenced = [], notes = [], referenceMap = [], ladder = [], revision }) {
   const out = [
     `=== DELEGATION BRIEF — WORK-ORDER POINT ${point.number} (${point.done ? 'DONE/ARCHIVED' : 'OPEN'}) ===`,
     'Assembled by scripts/point-brief.mjs from the work order, design.md and the research docs.',
@@ -645,6 +721,9 @@ export function assembleBrief({ point, sections = [], referenced = [], notes = [
     point.body,
     '',
   ]
+  // AFTER the spec, never before it: the ladder is how this point is proven, and
+  // it is only readable once the reader knows what the point is.
+  if (ladder.length) out.push(...ladder, '')
   if (sections.length) {
     out.push('--- SECTIONS THE SPEC REFERENCES (verbatim) ---')
     for (const s of sections) {
@@ -821,10 +900,20 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
   // The caller supplies the git half (it needs I/O); the content half is computed
   // here, so a brief built through the library can never lack its fingerprint.
   const stamp = { head: null, dirty: null, ...revision, workOrder: workOrderFingerprint(tasksText) }
-  const brief = assembleBrief({ point, sections: carried, referenced, notes, referenceMap, revision: stamp })
+  const render = isRenderPoint(point.body)
+  const brief = assembleBrief({
+    point,
+    sections: carried,
+    referenced,
+    notes,
+    referenceMap,
+    ladder: render ? VERIFICATION_LADDER : [],
+    revision: stamp,
+  })
   return {
     brief,
     revision: stamp,
+    render,
     point,
     refs,
     sections: carried,
