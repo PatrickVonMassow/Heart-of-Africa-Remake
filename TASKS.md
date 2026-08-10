@@ -189,24 +189,27 @@ there exactly once; a new point joins a bundle when appended.
   Vitest for its pure parts (the kill-moment plan, the verdict assembly). A drill that cannot
   produce a verdict FAILS rather than passing quietly.
 
-- [ ] 613. THE BRANCH HYGIENE REPORTS A WORKING AGENT'S WORKTREE AS DEBRIS (10.08.2026;
-  bundle Modell & Wächter). With three delegated agents building in their worktrees,
-  `branch-hygiene-guard` listed their `worktree-agent-<id>` branches as "already contained
-  in origin/main" and demanded `git branch -d` on each. Both halves are wrong: the branch is
-  CHECKED OUT in a live worktree, so git refuses the delete anyway — the guard demands an
-  action that cannot be performed — and had it succeeded it would have destroyed running
-  agent work. The "contained in main" reading is harmless in origin: a fresh agent worktree
-  sits on the main commit until the agent's first commit, which is exactly the start of
-  every delegation, so this fires on every parallel turn.
-  FINAL STATE: the guard skips any branch that is checked out in a worktree
-  (`git worktree list --porcelain` is the source), and additionally any worktree named by
-  the session's live in-flight declaration (`batch-in-flight.mjs`). Nothing else about its
-  verdict changes — a merged, unused feature branch is still debris and still blocks.
-  VERIFIABLE: pure Vitest on the verdict core — a contained branch checked out in a worktree
-  yields no finding; the same branch with no worktree still does; a declared worktree is
-  skipped; an undeclared, unchecked-out leftover is unaffected.
-  Criticality: medium — it does not corrupt anything, but it blocks the turn end of every
-  delegating session with an instruction that would be destructive if it worked.
+- [ ] 613. EVERY DELEGATION LEAVES A BRANCH THE HYGIENE GUARD THEN DEMANDS (10.08.2026;
+  bundle Modell & Wächter). Creating an isolated agent worktree also creates a setup branch
+  named after the worktree (`worktree-agent-<id>`). The agent immediately switches its tree
+  to its own `feat/<point>-<slug>` branch, so that stub is abandoned within seconds, sitting
+  on whatever `main` pointed at when the worktree was cut. As soon as `main` moves, the stub
+  reads as "already contained in origin/main" and `branch-hygiene-guard` demands its deletion
+  — measured today with three agents running, three findings, each blocking the turn end while
+  the delegation was healthy. The guard's existing worktree protection does not catch it,
+  because the branch is genuinely no longer checked out anywhere; nothing is wrong except that
+  the noise arrives on every parallel turn and trains the reader to wave the guard through.
+  FINAL STATE: the stub is cleaned up where it is created rather than reported where it is
+  found — `scripts/worktree-cleanup.mjs` removes the `worktree-agent-<id>` branch together
+  with its worktree, and while that worktree still lives the guard treats the branch as
+  protected by it (the id in the branch name resolves to the worktree path). Nothing else about
+  the verdict changes: a merged, unused feature branch is still debris and still blocks.
+  VERIFIABLE: pure Vitest on the verdict core — a `worktree-agent-<id>` stub whose worktree
+  still exists yields no finding; the same stub with the worktree gone still does; an ordinary
+  merged feature branch is unaffected — plus a cleanup case proving the branch goes with the
+  tree.
+  Criticality: low — it destroys nothing, but it blocks the turn end of every delegating
+  session, and a guard that cries wolf on healthy work is how a real finding gets waved past.
 
 - [ ] 592. STOP PAYING FOR THE WAIT (point 572's measure 1, the largest measured lever).
   A long-running command is AWAITED, not polled. The verify wrapper and every background
@@ -1189,118 +1192,6 @@ there exactly once; a new point joins a bundle when appended.
   section. Do NOT touch the v0.1 tag; 174 (v0.3, at /v0.3/) is a separate later
   release.
 
-- [ ] 265. ELDERLY (GERIATRIC) ANIMAL VARIANTS — an OLD version of each suitable
-  species, visibly aged AND behaviourally distinct, plus natural death of old age
-  (user 23.07.2026). PRIORITY/POSITION: queued BEFORE point 203 (do this content
-  feature before the 203 visual bug-finder). RESEARCH FIRST (a standalone Fable pass,
-  no code, safe to run in parallel): realistic geriatric APPEARANCE and BEHAVIOUR for
-  the game's fauna (the savanna grazers, elephants, the predators) and a realistic
-  natural-DEATH process — recorded, cited, in a new `docs/fauna-behaviour-1890.md`
-  (matching the citation/marker discipline of `docs/peoples-1890.md`; if a fauna doc
-  already exists, extend it). What to establish: the visible senescence cues (thinner/
-  sway-backed body, duller/greyer or worn coat, prominent shoulder/hip bones, worn or
-  broken tusks and sunken temples on old elephants, a stiffer/limping gait); the
-  behavioural shifts (moves slower; old males ousted from the herd and turning
-  SOLITARY — the classic old buffalo/elephant bull; withdrawal from intraspecies
-  contests: an elder no longer INITIATES a §264 fight and always LOSES to a younger
-  adult, fleeing an impending conspecific conflict); and the real basis for a
-  "dying" pattern (an old elephant's last molars wear out, so it seeks soft forage
-  near water/marsh and dies there — the grounded kernel the §4.4 "elephant graveyard"
-  folklore romanticizes; vultures do gather around a visibly dying/weak animal). Add
-  any further fitting, game-appropriate geriatric traits the research turns up. BUILD
-  (per the research): (a) APPEARANCE — an elderly-adult build schema analogous to the
-  point-169 baby schema (`buildLionCub`/the grazer calves) in `src/render/fauna.ts`
-  (`buildElderly*`/an age flag on the adult build): clearly-old cues per the research,
-  pure-tested for its proportions/part markers like the calf schema. (b) BEHAVIOUR —
-  pure helpers in `src/scenes/travel/wildlifeBehavior.ts`: an elderly adult moves at a
-  calibratable reduced speed factor, never initiates §264 intraspecies combat and
-  ALWAYS loses to a younger adult (the §264/§125 outcome matrix returns the elder as
-  loser; the elder flees an impending conspecific conflict), and — for GRAZERS and
-  the big cats (NOT elephants) — an ousted old male withdraws from the herd/pride and
-  turns solitary (per `docs/fauna-behaviour-1890.md`: old elephant BULLS keep high
-  status, so no ostracism for them; the crocodile gets NO elderly variant — no legible
-  aged cues). (c) NATURAL DEATH — an elderly animal occasionally dies with NO external
-  cause, at a calibratable low rate; the DYING PROCESS is depicted (`Wildlife.tsx` + a
-  pure state helper): the animal slows progressively, the §19.6/§22 poor-condition
-  vultures GATHER over it and descend as it collapses (the ground-truth reuse of the
-  pt-22 omen — the "patient circling of a doomed animal" is embellished, so key the
-  flock on the distressed/downed animal, not a long pre-death circle), it falls dead,
-  and the vultures consume it through the existing carcass system. An ELEPHANT that
-  begins dying instead drifts toward WATER (its worn last molars can no longer grind
-  coarse forage, so it seeks soft riverside/aquatic vegetation) and dies THERE — the
-  REAL mechanic per the research; the §4.4 elephant graveyard is framed as WHERE these
-  water-side deaths accumulate (folklore landmark + accurate mechanic coexisting), and
-  the mass death-pilgrimage is MYTH and is NOT built. (d) CALIBRATION — the elderly fraction of adults, the elderly speed
-  factor, the natural-death rate, and the dying-slowdown duration are `balance.ts`
-  values, debug-editable (§21). Ties to point 264 (the elder always loses a fight),
-  point 169 (the analogous age schema), §4.4 (the graveyard death) and §19.6 (the
-  vultures). VERIFIABLE: pure tests (`src/render/fauna.test.ts` — the elderly schema's
-  aged proportions/markers, built alongside the calves; `src/scenes/travel/
-  wildlifeBehavior.test.ts` — elderly speed factor strictly below the adult, elder
-  never initiates and always loses §264 combat, the natural-death roll boundaries, the
-  dying-slowdown curve, and the elephant-dying-target picking the graveyard); a live
-  check in `scripts/verify/enrichments.mjs` (a forced elderly natural death: slows →
-  vultures circle → falls → consumed; a dying elephant heads to the graveyard) with a
-  screenshot, picture-verified on BOTH backends. DOCS: `docs/fauna-behaviour-1890.md`
-  (research, in the SAME branch/commit as the build it informs), design.md §19 (a new
-  subsection: elderly variants, their behaviour, natural death and the elephant
-  graveyard death), the balance values. Any new sighting/death journal text in BOTH
-  languages with voice markup. NOTE: heavy `wildlifeBehavior.ts`/`Wildlife.tsx`/
-  `fauna.ts`/`balance` overlap — do NOT delegate the BUILD concurrently with another
-  wildlife point; the RESEARCH half and the pure schema/behaviour helpers (in new
-  files) can start in parallel, the scene wiring waits for the wildlife cluster to be
-  free. Implementation-ready.
-
-- [ ] 269. BIRDS FLEE BY FLYING + REGION-APPROPRIATE AERIAL PREDATORS (research-gated)
-  (user 23.07.2026). Two linked additions, BOTH gated on a Fable research pass first.
-  (A) FLIGHT-CAPABLE BIRDS ESCAPE BY FLYING: every bird species that can fly gets a
-  GROUND (perched/sitting/feeding) state and an IN-AIR (flying) state; when it flees a
-  ground predator (or an approaching elephant) it TAKES OFF and flies, which puts it
-  OUT OF REACH of ground predators and elephants (they can no longer catch it in the
-  air). A ground predator can catch a bird ONLY if it SURPRISES it while the bird is
-  still ON THE GROUND (took off too late) — an airborne bird is safe from ground
-  hunters. So the existing bird fauna (the shore/scavenger birds, the plover, vultures,
-  etc.) needs the ground↔air state and a takeoff-on-flee transition.
-  (B) AERIAL PREDATORS (research settled — docs/fauna-behaviour-1890.md §B): add
-  region-appropriate FLYING predators (raptors) that hunt prey birds and catch them IN
-  THE AIR, per the researched per-region table (§B2.1): falcons (peregrine/lanner/
-  barbary) and the two hawk-eagles (African, Ayres's) attack by a STOOP/DESCEND, while
-  the accipiter/harrier/fish-eagle majority use an air-catch tail-chase or an ambush
-  from cover (no height). The stoop is BUILT — but as a SCRIPTED "descend-and-strike"
-  EVENT (the raptor enters high, plunges onto a flying bird, strikes, resolves), NOT a
-  persistent 3D flight-height simulation (the research explicitly warns against a full
-  altitude-band layer, since most raptors don't use height). So there is at most a
-  simple two-state high/low for the stoop event itself, not a per-bird altitude field.
-  RESEARCH FIRST (Fable pass, docs-only, extend `docs/fauna-behaviour-1890.md`): which
-  African raptors/aerial hunters (~1890, by region) take BIRDS as prey; their hunting
-  mode (stoop/dive vs. tail-chase), typical prey birds, whether flight-height layering
-  and a surprise-from-above are realistic, and whether "a ground predator only gets a
-  bird caught on the ground" matches real behaviour. Produce a cited per-region aerial-
-  predator + prey-bird table with the same PERIOD/INFERRED/MYTH markers, and a short
-  "Implementation brief" (§B4 — already delivered; the research half is DONE). BUILD
-  (after the wildlife cluster is free): the bird ground/air state machine +
-  takeoff-on-flee (pure flee helpers in `src/scenes/travel/wildlifeBehavior.ts`, wired
-  in `src/scenes/travel/Wildlife.tsx`) — with the researched fly/no-fly split (small
-  birds and flamingos fly to escape, the flamingo with a laborious running take-off as
-  a vulnerable window; plover CHICKS crouch/freeze and can be caught, the adult flies
-  and does the broken-wing distraction); the aerial-predator species (build in
-  `src/render/fauna.ts`, seeded from a new region-keyed aerial-predator pool per §B2.1)
-  with an air-catch tail-chase for the ambush guild and the SCRIPTED descend-and-strike
-  for the falcon/hawk-eagle guild; ground predators lose the airborne target. Reuse the
-  existing hunt/flee/carcass machinery; every started drama resolves (I4). All
-  calibratable (takeoff trigger distance, the stoop's high/low band, dive chance/speed,
-  aerial-hunt rate) and debug-editable. VERIFIABLE: pure tests — a fleeing bird
-  transitions to air and a ground predator's reach excludes an airborne bird while a
-  still-grounded (surprised) one is catchable; the aerial predator's air-catch and (if
-  built) the height-gated dive; region pools sane. Live check / screenshot: a forced
-  ground-predator approach makes birds take off and escape, and (if built) an aerial
-  predator stoops on a flying bird — on BOTH backends. DOCS: `docs/fauna-behaviour-1890.md`
-  (research); design.md §19 (bird flight escape + aerial predators). Any new
-  sighting/journal text both languages with voice markup. NOTE: wildlife-render/behaviour
-  cluster (Wildlife.tsx/wildlifeBehavior.ts/fauna.ts) — the RESEARCH runs in parallel
-  now; the BUILD waits for the cluster to be free and does NOT run concurrently with
-  another Wildlife.tsx point. Implementation-ready once the research lands.
-
 - [ ] 285. HUNT ACCUMULATION BUGS AND MEMORY LEAKS — A REPEATABLE FABLE ANALYSIS
   (user 24.07.2026, learning from point 278: a fixed anchor drew ever more animals
   because streamed wildlife re-seeded on every return without releasing the
@@ -1397,82 +1288,6 @@ there exactly once; a new point joins a bundle when appended.
   not a product defect. So take this proof either after 506 lands, or with that one red
   recorded as the charge it is — never as a clean both-backend LARGE.
 
-- [ ] 310. LOW-PRESET PERFORMANCE PASS FOR TWO OPPOSITE DEVICES (user 25.07.2026,
-  recalibrated 06.08.2026). LOW must run WELL on a weak Windows desktop AND on the
-  Galaxy S25 — one preset, two opposite bottlenecks, which is the whole difficulty
-  of this point.
-  INPUTS — REAL F8 REPORTS. `local/hoa-bench-2026-08-03-webgpu-kohler.json` (WEAK
-  Windows desktop, AMD RDNA-3, WebGPU with real GPU timestamps, production build
-  2b6b417, 2195x1235 at dpr 1.75, deposited by the user 06.08.2026) is what this
-  point is CALIBRATED against, being the slowest machine measured. It is NOT the
-  user's own PC — that one runs MEDIUM acceptably, and its occasional stutter is
-  explicitly not part of this point. `local/samsung-s25-bench.json` (Galaxy S25,
-  Adreno 8xx) is the second target. `local/m1pro-bench.json` is CONTEXT ONLY: it
-  predates the LOW preset and its absolute GPU milliseconds aggregate passes — judge
-  that machine on its FRAME series and on ratios between its own configs.
-  NO SECOND RUN IS AVAILABLE (user 06.08.2026): the weak PC is a third party's and
-  cannot be re-measured, so plan no step that needs a fresh run on a user machine.
-  Everything needed is in the deposited report — real GPU timestamps, eleven
-  ablation configs, per-system triangle and mesh counts per phase.
-  WHAT THE TWO DEVICES SAY.
-  - DESKTOP: the default (medium) preset is unplayable — 17.9 / 12.7 / 13.1 fps at a
-    GPU median of 45.22 / 68.35 / 65.93 ms. LOW holds 60 fps with almost no headroom
-    in the desert: GPU median 14.81 ms of the 16.70 ms budget (89 %), 95th-percentile
-    frame 33.7 ms — every twentieth frame is dropped. Savanna 8.65 ms, driving
-    9.63 ms (p95 frame 33.1 ms); CPU 5.20 / 7.70 / 6.80 ms.
-  - S25: LOW GPU 9.83 / 8.72 / 6.95 ms against a CPU of 8.70 / 7.50 / 7.60 ms. The
-    CPU sits AS HIGH AS the GPU, so a pixel cut alone buys the phone little — this is
-    where the behaviour-throttling and instance-count levers pay.
-  THE DECISIVE READING — THE LOW FRAME IS PIXEL-BOUND, NOT TRIANGLE-BOUND. At LOW the
-  desert draws 542,748 triangles in 55 calls for 14.81 ms while the savanna draws
-  1,008,904 triangles in 58 calls for 8.65 ms: nearly double the geometry at 58 % of
-  the cost. The ablations agree — from dpr 1.75 to dpr 1 the pixel count falls 3.06x
-  and the GPU time 2.77x / 2.91x / 3.10x, almost exactly in step. This governs the
-  ORDER of the delivery: the dpr cap is the primary lever, and the triangle levers
-  below must never be reported as the fix for the desert phase, whose share figures
-  are shares of TRIANGLES, never of milliseconds. The constant 425,118-triangle /
-  180-mesh system is 78 % of the desert frame at LOW on this second device and
-  backend too, and travel-dressing is 53 % of the savanna frame (531,058 tris),
-  matching the S25.
-  SALVAGED IDEA (25.07, from the retired `feat/276-wildlife-lod` branch — see point
-  329): throttling the BEHAVIOUR updates of off-screen animals cuts the driving
-  frame cost. The branch itself was retired unmerged (219 commits behind main, its
-  three files moved on 16/9/1 commits since), but the lever is sound and belongs
-  here: update animals outside the rendered frame at a reduced rate (projected via
-  the shared `isOnScreen`, never an assumed radius — the point-172 rule), keeping
-  every §19 drama deadline in sim time so no drama stalls. Judge it on the CPU
-  series, where both devices sit at 5-9 ms at LOW.
-  DIAGNOSIS DONE (25.07, main session): the unnamed 425k system IS the river/lake
-  water geometry — `src/scenes/travel/Rivers.tsx` mounts the ribbon mesh and every
-  lake sheet with NO `name` prop (around the `<mesh geometry={geometry}
-  material={riverMat}>` / lake map), so `groupKey` in src/systems/benchmark.ts falls
-  back to the material name `MeshStandardNodeMaterial`; the courses are global and
-  biome-independent, which explains the constant count in every phase. Deliver:
-  (a) NAME those groups (and any other unnamed one) so the F8 report attributes
-  every system, (b) a LOW flora/dressing DENSITY lever (calibratable
-  instance-count factor on top of the existing floraFogFactor radius cut — the §19.9
-  dressing keeps reading as savanna, only thinner), (c) a LOW geometry lever for the
-  identified 425k-tris system (e.g. coarser river-ribbon tessellation on LOW if it is
-  the water — every §11.3 continuity/never-buried invariant must keep passing), (d) a
-  calibratable `dprCap` BELOW 1 on LOW itself (starting value 0.8 = 0.64x the pixels,
-  which projects the desert's 14.81 ms near 9.5 ms) — the primary lever, not a
-  last resort, and the touch preset stays a SUBSET of low. EVERY new lever gets
-  entries in ALL THREE QUALITY_PRESETS levels (the src/config/quality.test.ts
-  completeness gate and the docs/graphics-detail-levels.md sync test enforce this),
-  stays debug-tunable within its level, and reads through the point-276
-  effective-selector pattern. The delivery must move BOTH the pixel cost and the
-  CPU/instance cost: a LOW that only cuts dpr fixes the desktop and leaves the phone
-  where it is. VERIFIABLE: pure tests for each new preset key; the §11.3/§19 suites
-  stay green at LOW (ribbon continuity, dressing-streaming no-pop projection checks);
-  picture checked on BOTH backends at LOW; and the price check in this order —
-  FIRST hardware-independent arithmetic against the deposited numbers (the rendered
-  pixel count and the per-system triangles the new levers remove, with the desert's
-  14.81 ms projected to 10 ms or below by the measured pixel-to-time
-  proportionality), THEN a before/after F8 run of the SAME three phases at LOW on the
-  project's own verification host, whose absolute milliseconds mean nothing but whose
-  RELATIVE drop must confirm the projection rather than contradict it — without a
-  visual regression the user rejects.
-
 - [ ] 312. ANIMALS ARE WATER-SHY, NOT WATER-BARRED (user 25.07.2026, revising the
   point-192 rule; former point 324 is folded in here). The rule was read far too
   strictly: "animals must not stand around in water" — so that a canoe passage stays
@@ -1529,132 +1344,6 @@ there exactly once; a new point joins a bundle when appended.
   drama resolves; and across a driven pass no animal is found standing in a channel, so
   the canoe lane stays clear.
 
-- [ ] 314. DRIFTING PALE PATCHES ON WATER (user 25.07.2026, screenshot: bird's-eye at
-  a river mouth near the ocean — two elongated pale/greenish patches ON the water
-  surface near the shore, which MOVE/CHANGE as the traveller walks; "immer noch
-  gelegentlich", i.e. the class was seen before). DIAGNOSE BY THE PICTURE first
-  (drive the reported shore on both backends, screenshot series), then root-cause —
-  candidate hypotheses to check, not to assume: (1) shore/crest foam sampled in a
-  non-world-anchored space so the mask swims with the camera; (2) the far-sheet vs
-  near-water overlap at the coast (zoom-gated far sheet showing through); (3) the
-  point-211 ribbon-row lift re-evaluating per terrain-chunk LOD so lifted rows pop
-  as chunks stream (matches "changes while walking"); (4) foam from the river mouth
-  bridge (MOUTH_BRIDGE) rows extending into the shelf. FIX the identified cause; the
-  §11.3 continuity/never-buried/mouth-bridge invariants stay green. VERIFIABLE: a
-  driven enrichments check at the reported spot asserts the water pixels stay
-  stable while the traveller moves (frame-diff over the water region bounded, on
-  BOTH backends), plus the screenshot pair before/after; pure test for whichever
-  sampling rule was wrong.
-
-- [ ] 315. THE SPHINX IS REBUILT FROM SCRATCH, FAR MORE ELABORATE (user 28.07.2026,
-  superseding every earlier display report about it — the flicker, the shape and the
-  half-buried read are all answered by the new model, not by patching the old one). The
-  user's verdict on the deployed build: "die Darstellung der Sphinx gefällt mir allgemein
-  nicht … man kann sie kaum als Sphinx erkennen", and the screenshot shows why — a stack
-  of plain boxes with a slab on top, reading as a gate or a table, at a monument every
-  player recognises on sight. The FIRST-PERSON view is what matters most; the bird's-eye
-  landmark and the §2.5 skyline silhouette are named as "auch nicht schön" and are part of
-  the same job.
-  THE TARGET: a Great Sphinx that is recognisable at a glance from any standpoint a player
-  can reach, and worth walking up to — a couchant lion body with the forepaws stretched
-  forward, a human head in the nemes headdress with its brow band and the folded lappets
-  falling to the chest, the broken nose and the missing beard of the real monument, the
-  chest between the paws, and the weathered horizontal banding of the limestone courses.
-  It is the one built landmark in the game with a FACE; it must not be the crudest.
-  ACCURACY AND RECOGNISABILITY, and how to hold both: `docs/giza-1890.md` records the
-  ~1890 state — the body buried to the shoulders, only head, neck and upper back standing
-  clear, which is exactly what makes the current model unreadable. Do NOT dig it out; the
-  period state is researched and stands. Buy the recognisability from DETAIL and from the
-  drift's own shape instead: the emergent head carries the nemes, the face and the neck at
-  a resolution that reads from across the site, and the sand mound is modelled as a body
-  UNDER sand — a long couchant swell with the shoulders' shape showing through and the
-  back ridge breaking the surface — rather than a heap beside a box. A player who has
-  never seen the site must be able to say "that is the Sphinx"; a player who knows it must
-  find the 1890 burial line where the photographs put it. If, once built, those two
-  genuinely cannot be reconciled, say so with the pictures rather than quietly abandoning
-  either — the choice is then the user's.
-  ALL THREE SCALES, one model, three levels of detail: (a) FIRST-PERSON at the site, the
-  full model; (b) the BIRD'S-EYE landmark, seen from above and far — the silhouette from
-  that angle is what carries it, so the paws, the body swell and the head must be
-  distinguishable at the travel scale rather than a lump; (c) the §2.5 SKYLINE silhouette
-  from Cairo (point 82), where only the outline exists and it must still read as a
-  crouching figure with a raised head. Derive them from ONE definition so the three cannot
-  drift apart, the way the Giza plateau's two records did (point 338).
-  COST IS PART OF THE JOB: the site model may be elaborate, but it is drawn every frame at
-  a place the player stands in. Sort it into the quality levels like every other optical
-  feature (§21, `QUALITY_PRESETS` in `src/config/quality.ts`) — a fuller mesh on high, a
-  reduced one on low — and report the measured frame cost at the site on BOTH backends at
-  LOW and at MEDIUM. A level that cannot afford the full mesh gets the reduced one, named
-  and tested, never a silent downgrade.
-  WHAT THIS REPLACES: the old spec asked for a mound envelope and blamed a coplanar sheet
-  for a flicker at the body's base. Both die with the old geometry — but the flicker is
-  still the sharpest acceptance signal available, so the live check MOVES the camera
-  rather than taking one still, and no z-offset may be used to hide a fight that the new
-  model should not have.
-  VERIFIABLE: pure Vitest on the shared definition — the three levels of detail come from
-  one source, the burial line matches the documented ~1890 state, head and upper back
-  stand clear of the drift while every other body part sits below it, the drift's
-  footprint does not exceed the body's by more than its skirt, and the collidable mass
-  still matches the drawn body (point 378's rule). Live on BOTH backends: a screenshot SET
-  from several standpoints inside the site — face on, in profile, from behind, and one low
-  enough to look along the drift — plus the bird's-eye landmark and the Cairo skyline
-  frame, judged by the picture; and a moving-camera pass that shows no flicker anywhere on
-  the model.
-  DOCS in the same commit: `docs/acceptance-evidence.md` §15/§25 gain the chain, and
-  `docs/graphics-detail-levels.md` the new per-level entries.
-- [ ] 391. THE GIZA MONUMENTS STAND AT A MONUMENTAL SCALE IN THE FIRST-PERSON VIEW (user
-  28.07.2026). Standing on the plateau, the pyramids and the Sphinx must read as GIANTS —
-  markedly larger than today, so that a person at their foot is a speck against them. The
-  stated reason is a planned later feature and belongs in the record: the user intends a
-  secret entrance, found by deciphering hints from inhabitants, that leads into a further
-  first-person scene INSIDE the monument, where more clues to the treasure wait. Entering
-  is only plausible if the outside is big enough to hold an inside. THAT FEATURE IS NOT
-  BUILT HERE — this point delivers the scale it needs, nothing more; no entrance, no
-  interior scene, no hint chain.
-  WHAT TO CHANGE: the site-scale geometry in `src/scenes/place/gizaSite.ts` (the pyramid
-  cones and the Sphinx). Take the REAL proportions as the yardstick — the Great Pyramid
-  stood ~146 m tall on a ~230 m base, the Sphinx ~20 m tall and ~73 m long — and state in
-  the commit what fraction of real scale the site now uses and why. The eye height is
-  1.5 m (§20), so the numbers decide the feeling: from the base, the apex must be far
-  above the top of the frame at the default field of view.
-  WHAT IT COLLIDES WITH, and none of it may be broken quietly:
-  · the WALKABLE RADIUS (point 390) — bigger monuments need more ground to be seen from,
-    and both points touch the same site. Work them on ONE branch, 390 first: the radius is
-    measured against what the picture offers, and the picture changes here.
-  · the SPHINX MODEL (point 315) — same file, same monument. Whichever lands second
-    rebases on the first; do not build the new Sphinx twice at two sizes.
-  · the COLLIDERS must follow the drawn masses, not the old ones (point 378's rule: the
-    collider is derived from the placement the renderer draws). This is a REPORTED bug the
-    user ruled belongs here rather than in a point of its own (dump
-    `hoa-state-2026-07-29-4196407680`, Giza, WebGPU, medium: the traveller walks into the
-    pyramid). Root cause, already measured — do not re-analyse: `gizaColliders`
-    (`src/scenes/place/gizaSite.ts`) uses only the cone footprint
-    (`pyramidFootprint` = base/√2), while the DRAWN masses reach further —
-    Khafre's bedrock plinth to 1.14·base and Menkaure's granite skirt to 1.02·base
-    (`gizaSitePyramidParts` in `src/render/landmarks.ts`).
-  · the PLACE MAP inside Giza is EMPTY (second dump, same seed, `mapOpen: true`,
-    `mode: place (giza)`), and it is fixed here. Measured cause: `MapOverlay`'s `PlacePlan`
-    (`src/ui/MapOverlay.tsx`) draws the layout's buildings, dwellings and lanes, but
-    `buildGizaLayout` leaves `interactives`/`dwellings`/`paths`/`rocks` empty — the
-    monuments exist ONLY as colliders, which the plan does not read. Fix it GENERICALLY
-    over `layout.colliders`, so a future monument-like place inherits a drawn plan instead
-    of the same blank sheet, with a Vitest case that the Giza plan is non-empty.
-  · the BACKDROP and panorama (points 181/381) — a taller monument may now rise past the
-    ground line the silhouettes stand on; the seam checks in
-    `src/scenes/place/backdrop.test.ts` must still hold.
-  · the BIRD'S-EYE landmark and the Cairo SKYLINE (point 82) are a DIFFERENT scale and are
-    NOT enlarged by this point — check that they are unchanged, and say so.
-  VERIFIABLE: pure Vitest on the site geometry — the pyramid height and base, and the
-  Sphinx length, sit at the stated fraction of the real proportions, and the collider set
-  matches the drawn masses. Live on BOTH backends: a first-person frame from the base of
-  the great pyramid looking up (the apex out of frame is the point), one from the site
-  centre showing all three, and one at the Sphinx — judged by the picture, plus the
-  measured frame cost at LOW and MEDIUM.
-  DOCS in the same commit: design.md §4.4 states the monumental first-person scale and
-  names the planned interior as an OPEN idea, not a promise. design.md sits at its
-  measured ceiling, so the sentence is paid for by a measured raise with its justification
-  in `scripts/doc-budget-core.mjs`, or by shortening elsewhere — the guard decides, not a
-  round number.
 - [ ] 319. CROCODILE KILL AFTERMATH: PREY DISSOLVES WITHOUT SINK OR VISIBLE SCAVENGER
   (user 25.07.2026: a crocodile seized an animal, the crocodile disappeared at some
   point, and the prey then kept slowly dissolving — possibly "eaten" with no vulture
@@ -1675,27 +1364,6 @@ there exactly once; a new point joins a bundle when appended.
   add a dev-assert for "shrinking carcass has no feeder" so every session detects
   it); both backends.
 
-- [ ] 320. SPRINGS AS REAL 3D BUBBLING WATER (user 25.07.2026: the springs still
-  read as a mere symbol — animated now, but flat; they should LOOK like a spring
-  with water bubbling three-dimensionally). Rework the §11.3 spring depiction at
-  travel scale into a small 3D water feature. ANCHOR (25.07, main session): the
-  current spring is built in `src/scenes/travel/Rivers.tsx` as a stack of FLAT discs
-  — circle meshes rotated `-Math.PI / 2` (the pool, a damp-ground ring and the
-  animated ripple), which is exactly why it reads as a symbol however it animates.
-  Replace that stack with: a low dome/upwelling mesh whose
-  surface visibly bubbles (TSL displacement/normal animation — renderer-agnostic,
-  both backends), a bright welling centre with concentric ripple rings, a small
-  wet pool/outflow meeting the terrain (no floating disc, no billboard), sized to
-  read at the default zoom 0.5 without dominating. Calibratable size/intensity
-  under balance (debug-editable); quality-level entries for ALL THREE
-  QUALITY_PRESETS (the completeness gate enforces this) — LOW may use a cheaper
-  variant but the feature stays visible. VERIFIABLE: the existing "at least one
-  spring" check extended: the spring mesh is 3D (non-flat bounding box), its
-  surface animates over sim time (vertex/pixel delta between two sampled frames at
-  the spring, both backends), and it sits ON the terrain (no gap/clip at the rim —
-  ray/heights check); screenshot pair added to the §7.2 evidence set; the picture
-  judged on BOTH backends per the render rule.
-
 - [ ] 321. GRASS FIRE READS WRONG ON EVERY COUNT (user 25.07.2026 with screenshot:
   the burning-grass event shows a column of flat orange blocks — no recognizable
   FIRE FRONT, "strange waves" that make no sense, and the burn SCARS do not read as
@@ -1712,19 +1380,6 @@ there exactly once; a new point joins a bundle when appended.
   brighter/warmer than the trailing scar and the scar clearly DARKER than unburnt
   savanna; screenshot 131 refreshed and judged on BOTH backends.
 
-- [ ] 322. STAGED-EVENT FAILURES ARE EASY TO MISS (user 25.07.2026: staging "calf
-  mired at waterfall" appeared to do nothing; the user later suspected an unseen
-  error message). Make every debug stage/trigger outcome UNMISSABLE: a persistent,
-  clearly styled result banner — success names what was staged and where, failure
-  names the missing precondition in plain language ("no waterfall within reach —
-  jump to a waterfall first") — staying until dismissed or superseded, both
-  languages. Also RE-CHECK the mired-at-waterfall staging itself against a
-  realistic debug session: if its precondition search radius is too small, widen it
-  or teleport-stage like the other dramas. VERIFIABLE: pure test of the
-  outcome→message mapping (every stageable event has success AND failure text in
-  both languages, no silent path); settings.mjs live-checks the banner on an unmet
-  precondition and a successful stage; both languages.
-
 - [ ] 326. A PARENT DIES WITH NO VISIBLE CAUSE AFTER A CROCODILE KILL (user
   25.07.2026: crocodile took a calf, crocodile gone, the parent stood at the death
   spot and simply fell over dead — reading as suicide). Every §19.8 death must have
@@ -1737,29 +1392,6 @@ there exactly once; a new point joins a bundle when appended.
   point 319. VERIFIABLE: pure test enumerating the death causes, each setting a
   cause field; the assert fires on a synthetic causeless death; a staged
   croc-kill-then-vigil ends in one of the two legitimate outcomes; both backends.
-
-- [ ] 327. TWO NEARBY CARCASSES MUST SHARE ONE VULTURE FLOCK (user 25.07.2026: a
-  second flock spawns and the two overlap). Give the §19.6 flock a claim over a
-  carcass CLUSTER: a new carcass within a calibratable radius of a flock's current
-  target joins that flock's queue instead of drawing a second flock, and the flock
-  works them in turn, leaving only when the cluster is done. No two flocks may be
-  active within the cluster radius. VERIFIABLE: pure test of the cluster claim (a
-  carcass inside joins, one outside draws its own flock; boundary exact); live
-  check with two staged carcasses close together — exactly one flock, both eaten,
-  no overlap; both backends.
-
-- [ ] 328. VULTURES DO NOT VISIBLY LAND (user 25.07.2026: "they seem to fly one
-  moment and stand the next — is there a landing at all?"). Add a real landing
-  approach to the §19.6 flock AND the lone ground scavenger: a descending glide
-  along the approach heading with slowing forward speed, a flare with raised wings
-  just before touchdown, then the standing pose — over a calibratable window long
-  enough to read at bird's-eye distance; likewise a visible take-off (run/flap into
-  the climb) instead of an instant switch to flight. VERIFIABLE: pure test of the
-  landing profile (height decreases monotonically to the landed height across the
-  window, forward speed decreases, the flare pose fires in the last phase); live
-  check that a landing bird's sampled height passes through intermediate values (no
-  single-frame snap) while the point-128 "stands on its own ground" clearance still
-  holds; screenshot of the flare; both backends.
 
 - [ ] 330. FULL POST-DEGRADATION ASSURANCE PASS — nothing new starts until this is
   100 % green (user 25.07.2026, after three separate leftovers were found by chance:
@@ -1931,206 +1563,6 @@ there exactly once; a new point joins a bundle when appended.
   200's flake work, and point 294's auto-classification would have labelled all four
   reds "staging, not product" without a manual repeat each time.
 
-- [ ] 343. THE SUN STANDS WHERE IT REALLY STOOD — ELEVATION FROM DATE AND LATITUDE
-  (user 25.07.2026; design.md §2.7 states the target). Today `SUN_DIR` is a hard
-  constant in BOTH scenes — `[0.5, 0.62, 0.38]` in `src/scenes/travel/TravelScene.tsx`
-  and `[0.52, 0.68, 0.34]` in `src/scenes/place/PlaceScene.tsx`, an elevation of ~45°
-  for the whole continent and the whole five-year window. The season only dims and
-  reddens it. That is why the relief reads flat: at that angle a 3000 m massif throws
-  ~3 km of shadow, about ONE DEM texel.
-  TARGET: derive the sun's elevation and azimuth from the real solar geometry —
-  declination from the DATE (the same date that drives §19.13) and the traveller's own
-  LATITUDE — at a FIXED local solar hour. There is no time of day in this game and
-  none is being added; the hour is a calibratable constant, `balance.sun.hour`,
-  DEFAULT 16:00. That default is load-bearing and must not be "tidied" to noon: at
-  local noon the sun stands 90° over the equator in March and 83° over Cairo in June,
-  which casts no usable shadow at all, while at 16:00 the elevation runs about 7°-37°
-  across the entire map and year (Cairo 37° June / 11° December, Cape Town 9° in its
-  June winter). One hour later breaks it — at 17:00 the Cape sun in June is BELOW the
-  horizon, and a fixed hour must never put the sun under the horizon anywhere in the
-  world window (lat -37..38, all 365 days).
-  ONE DEFINITION, READ BY BOTH SCENES. The two constants above are not merely stale,
-  they DISAGREE (~45° against ~48°) — the same sun stands at two heights depending on
-  which view holds the camera. The derivation therefore lands in ONE place that travel
-  and settlement both read; neither scene keeps a sun of its own, or they drift apart
-  again the first time one of them is touched.
-  EVERYTHING THE SUN FEEDS MUST FOLLOW IT, or the picture contradicts itself: the
-  directional light AND its shadow camera in both scenes, the sky dome's disc and halo
-  (`src/render/sky.tsx`, whose `sunDirection` must keep agreeing with the light — its
-  own comment says so), and the baked environment light
-  (`createEnvironmentTexture`/`IBL_SUN` in `src/render/Effects.tsx`), re-derived when
-  the date or the position changes and NEVER per frame.
-  THE SETTLEMENT IS THE STRICTER OF THE TWO (user 28.07.2026). Point 344's eye
-  adaptation and sun glare build DIRECTLY on this angle, and at eye height a wrong sun
-  is not a subtlety — it decides whether the traveller is dazzled turning west, and
-  where every wall's shadow falls in a lane he walks through. The settlement sun is
-  therefore derived from the SETTLEMENT's own latitude and the current date, never from
-  a scene default, and the acceptance below judges it at eye height.
-  AND THE JOURNEY MUST SHOW IT (user 28.07.2026). The bird's-eye view is where the
-  change becomes legible: walking the continent from the Mediterranean to the Cape at
-  one date, the shadows must visibly turn and lengthen as the latitude runs out — and
-  the same place in June and in December must not look alike. A sun that is merely
-  CORRECT per frame but whose change no traveller notices misses the point of this
-  ticket; the live acceptance therefore measures a TRAVERSE, not only a single spot.
-  THE SKY PRESETS ARE THE REAL WORK, not the arithmetic. They are authored for a high
-  sun; a low sun under an unchanged noon-blue dome reads as a bug — the same failure
-  the overcast handling already guards against (a dimmed sun under a bright blue sky,
-  sky.tsx). The horizon must warm and redden as the sun drops. Judge this by the
-  PICTURE on both backends, not by the uniform.
-  WATCH THE SHADOW QUALITY at the low end: cascaded shadow maps degrade at grazing sun
-  angles (long shadows, peter-panning, cascade seams). If the 7° end proves ugly, clamp
-  the elevation used for the SHADOW camera to a calibratable floor while the visible
-  sun keeps its true angle — and record that as a deliberate divergence, never silently.
-  NOT A QUALITY LEVER: this is world model like the seasons and applies at EVERY
-  graphics level. It adds no per-frame cost and gets no `QUALITY_PRESETS` key.
-  DEBUG: the sun direction stays inspectable and the hour editable in the debug menu
-  (§21.2), so a tester can walk the whole range without waiting for a date.
-  VERIFIABLE: pure (`src/systems/`) — declination and hour angle produce the known
-  elevations above (Cairo June/December, the equator at equinox, Cape Town June), the
-  hemispheres invert across the year, and a SWEEP over the full world bounds × all 365
-  days asserts the sun never falls to or below the horizon at the default hour (the
-  17:00 counter-case is pinned as the witness that the bound is real); the azimuth is
-  westerly in the afternoon for both hemispheres; and a NORTH-SOUTH SWEEP at one date
-  returns a monotonically changing elevation, so the traverse below has something to
-  show. Live (`scripts/verify/enrichments.mjs` + `polish.mjs`, BOTH backends,
-  screenshots): the same place rendered in June and in December differs measurably in
-  pixels and in shadow direction; a TRAVERSE of at least three widely separated
-  latitudes at one date yields shadows whose measured direction and length differ
-  between the stops — the check the user's "you should notice it while walking" asks
-  for; inside a settlement, at EYE HEIGHT, the shadows agree with the sky-dome sun disc
-  rather than pointing elsewhere; no console errors.
-  DOCS: design.md §2.7 already states it; CLAUDE.md §7.1 point 14 gains the built
-  behaviour when this lands.
-
-- [ ] 344. EYE ADAPTATION AND SUN GLARE, HIGHEST QUALITY LEVEL (user 25.07.2026;
-  design.md §2.7 states the target). BUILDS ON POINT 343 — before the sun is low there
-  is nothing to be dazzled by, and with a 50° vertical field of view the first-person
-  camera sees roughly -25°..+25°, so the 16:00 sun (6.7°..37°) sits IN FRAME whenever
-  the traveller turns west over most of the map and year. Both halves belong in ONE
-  point: they share the same tuning pass over the same image, and building them apart
-  would mean turning the same dial twice.
-  (a) EYE ADAPTATION — the effect the player reads as high dynamic range. The exposure
-  follows the frame's mean luminance (from the HDR buffer's mip chain, not a CPU
-  readback): facing the sun darkens the scene, turning into a lane's shade opens it up
-  again. The range is BOUNDED and calibratable around today's fixed
-  `toneMappingExposure` of 1.05 (`src/App.tsx`) — `balance.exposure.*`,
-  debug-editable — and the two directions have their own time constants (brightening
-  fast, darkening slow, as an eye does). A bounded controller, never free-running.
-  FIRST PERSON ONLY. The bird's-eye view keeps its fixed exposure: design.md §2.7
-  forbids post-processing that costs the map view its readability, and a map whose
-  brightness breathes while driving is precisely that. This is a rule, not a
-  performance choice — do not "unify" the two scenes.
-  (b) GLARE. The sun disc in `src/render/sky.tsx` (`disc = pow(s, 1200) * 3.0`) must
-  sit clearly above the bloom threshold so it blooms on its own, plus the upstream
-  `three/addons/tsl/display/LensflareNode.js` WITH an occlusion test: a hut wall or
-  roof edge moving in front of the sun kills the glare in the same frame. Without that
-  test the flare survives its occluder and reads as a sticker on the lens — the single
-  detail that separates a convincing glare from a cheap one.
-  QUALITY: highest level only, with entries for all three levels in `QUALITY_PRESETS`
-  (`src/config/quality.ts`) and `docs/graphics-detail-levels.md` updated in the same
-  commit — the completeness gate and the doc-sync test both fail otherwise.
-  ESTIMATED COST ~0.3-0.8 ms; the real number comes from F8 on the user's hardware.
-  VERIFIABLE: pure — the exposure controller maps luminance to a target within its
-  clamp, converges from both directions, honours its asymmetric time constants and
-  cannot run away from a black or a blown-out frame; the preset completeness and doc
-  sync cover the new keys. Live (BOTH backends, screenshots): in a settlement facing
-  the sun the rendered frame's mean brightness FALLS within a bounded number of frames
-  and recovers when the traveller turns away — measured in PIXELS, never in the
-  uniform (the §7.2 lesson that three rounds of uniform-level checks once passed while
-  the player saw nothing); the glare is present with the sun in the open and gone with
-  a building between; and in the bird's-eye view a driven pass leaves the exposure
-  UNCHANGED, which is the readability guard's own witness.
-  DOCS: design.md §2.7 already states it; CLAUDE.md §7.1 point 14 gains the built
-  behaviour when this lands.
-
-- [ ] 345. SUN SHAFTS THROUGH WHAT STANDS IN THE WAY, HIGHEST QUALITY LEVEL (user
-  25.07.2026). With the low afternoon sun of point 343, a palm crown, a roof edge, the
-  Djinguereber minaret or the Giza pyramids finally have something to cast shafts
-  through. Wire the upstream `three/addons/tsl/display/GodraysNode.js`
-  (`godrays(depthNode, camera, light)`) into the post chain in `src/render/Effects.tsx`
-  beside the existing GTAO/bloom/TRAA nodes.
-  FIRST PERSON ONLY, and for a reason worth writing down: screen-space godrays need
-  the light IN the frame, and the bird's-eye camera looks ~60° down while the sun
-  stands at most 37° up — it is never in that frame. Wiring the pass there would cost
-  milliseconds for an effect nobody can see. Do not enable it in the travel scene.
-  QUALITY: highest level only, entries for all three levels in `QUALITY_PRESETS` plus
-  `docs/graphics-detail-levels.md` in the same commit.
-  THIS ONE IS PRICED BEFORE IT IS KEPT. It is the only effect in this family with a
-  real per-pixel cost (estimated +1.5-3 ms; on the measured S25 baseline of ~12.6 ms
-  GPU that is +12-25 %). Run F8 on the user's hardware BEFORE and AFTER on the same
-  build and record both digests in the commit. If the cost is not worth the picture,
-  the point is closed by REMOVING the pass and recording the measurement — that is a
-  legitimate outcome, exactly as the SSR removal was, and it must not drag point 344
-  with it.
-  VERIFIABLE: pure — the preset completeness gate and the doc-sync test cover the new
-  key; the pass is absent from the travel scene's chain by construction. Live (BOTH
-  backends, screenshots): in a settlement with the sun behind a roof edge, the pixels
-  along the sun direction brighten measurably against the same frame with the level
-  stepped down — judged on the image, not on the flag; no console errors; the F8
-  before/after numbers are recorded.
-
-- [ ] 346. HORIZON MAPS BAKED FROM THE DEM — SELF-SHADOWING AND SKY OCCLUSION AT
-  PLANETARY RANGE (user 25.07.2026; design.md §2.7 states the target). A new offline
-  step beside `scripts/build-geodata.mjs` measures, per DEM texel, the HORIZON ANGLE —
-  how high the land rises around that point — and the terrain shader reads it. Two
-  effects out of one bake: the land SHADES ITSELF far beyond any shadow map's reach,
-  and every hollow sees less sky than the ridge above it and is lit accordingly.
-  IT ONLY PAYS BECAUSE OF POINT 343, and depends on it: at the old fixed ~45° sun a
-  3000 m massif threw ~3 km of shadow, about one DEM texel. At the 16:00 sun's low end
-  (~9°) the same massif throws ~19 km — nearly seven texels, visible terrain shading
-  across the view.
-  THE ALGORITHM IS THE WHOLE FEASIBILITY QUESTION. Naive ray marching is 8.8 M texels ×
-  directions × ~100 steps ≈ billions of samples and is not an option in Node. Use the
-  standard horizon SWEEP (per direction, march the grid line by line keeping a monotone
-  stack of candidate horizons), which is linear in texels — seconds, not hours. Pin the
-  sweep against a brute-force reference on a SMALL patch in the tests: that comparison
-  is what proves the fast path correct.
-  ONLY SIX DIRECTIONS ARE NEEDED, and the reason is worth keeping: because the hour is
-  FIXED (point 343), the sun's azimuth never leaves a 74° westerly arc — 233°..307°
-  over the entire map and every day of the year. Bake that arc at ~15° steps (6 slices)
-  plus ONE direction-averaged sky-occlusion channel; a full circle would be wasted
-  storage. The fragment interpolates between the two slices bracketing the current
-  azimuth.
-  IF THE DEBUG HOUR LEAVES THE ARC (the `balance.sun.hour` field of point 343 is
-  editable), the shading must CLAMP to the nearest baked slice and say so through the
-  dev channel — never silently shade from the wrong direction. Pure-test that clamp.
-  ASSET BUDGET, to be settled by the PICTURE and recorded: 7 channels (6 + occlusion)
-  in two RGBA textures. At half DEM resolution (1460×1500, ~6 km per texel) that is
-  ~17.5 MB raw, roughly 5-9 MB as PNG; at quarter resolution ~4.4 MB raw, ~1.3-2.2 MB.
-  Start at half, and drop to quarter if the download budget bites — today's whole
-  `dem.png` is 6 MB, so this may not dwarf it. Horizon angles are low-frequency and a
-  soft, kilometre-scale shadow edge is physically right, so a coarse map is not a
-  compromise in the way a coarse shadow map would be.
-  SCOPE: the bird's-eye TERRAIN only. Settlements have their own local scene and ground
-  and are untouched.
-  QUALITY: on at MEDIUM and HIGH, off at LOW — and at low the extra textures are NOT
-  FETCHED at all, since the runtime cost is one texture lookup but the download and
-  video memory are what a weak device actually cannot afford. Entries for all three
-  levels in `QUALITY_PRESETS` plus `docs/graphics-detail-levels.md` in the same commit.
-  THE FETCH IS GATED ON THE EFFECTIVE LEVEL, not merely the use of the result: at low
-  the request is never issued, so a `?quality=low` link (point 347) costs the player
-  those megabytes NOTHING — the whole reason that link exists. The gate must therefore
-  sit at the request, never at "load it and ignore it". Two consequences to build for:
-  the load is LAZY and keyed on the level, and RAISING the level at runtime (F9, the
-  debug picker) fetches the maps then and applies them when they arrive, without
-  blocking the frame or stalling the level switch. Pure-test both directions — no
-  request at low, exactly one request when the level rises, and none again on a second
-  rise.
-  DOCS: design.md §2.7 already states it; the preprocessing must be documented
-  reproducibly like the existing geodata pipeline (§7.1 point 13), and CLAUDE.md §7.1
-  point 14 gains the built behaviour when this lands.
-  VERIFIABLE: pure — the sweep matches a brute-force horizon reference on a small
-  synthetic patch (a cone, a ridge, a flat plain: a flat plain yields horizon 0 in
-  every direction, a wall yields the analytic angle); the azimuth arc actually covers
-  every (latitude, day) the game can produce, with a case just outside it clamping and
-  reporting; sky occlusion is monotone (a pit is more occluded than the ridge beside
-  it); the preset completeness and doc-sync gates cover the new keys. Live
-  (`scripts/verify/enrichments.mjs`, BOTH backends, screenshots): at a massif with the
-  low-sun date, the ground on the sun-facing side reads measurably brighter in PIXELS
-  than the ground in its lee at the same elevation band, and that contrast is FLAT with
-  the quality level stepped to low — the effect is judged on the image, never on the
-  flag; no console errors; the build step is reproducible from a clean checkout.
-
 - [ ] 347. THE STARTING QUALITY LEVEL FROM THE URL (user 25.07.2026; design.md §21.1
   states the target). `?quality=low|medium|high` on any deployment URL — the GH-Pages
   root, `/poc/`, a `/vX.Y/` folder — opens the session at that level, so a link handed
@@ -2166,637 +1598,6 @@ there exactly once; a new point joins a bundle when appended.
   DOCS: design.md §21.1 already states it; name the parameter in the README's play
   links if that file lists them, so the shareable form is discoverable.
 
-- [ ] 348. THE VILLAGE FIRE IN THE RAIN (user 25.07.2026, screenshot: the Zulu village
-  under visible rain, the §19.10 fire burning uncovered in the open with the
-  inhabitants standing around it as if the weather were not happening). Point 142
-  already made the fire answer to a place's own COLD, harmattan and karif; RAIN is the
-  driver it never got, and rain is the one that contradicts the picture outright — an
-  open fire in the open does not burn through a downpour.
-  TWO MORE FAULTS IN THE SAME OBJECT, reported 27.07.2026 with a screenshot of the
-  Mbuti village under rain, and they must be fixed WITH the rain behaviour rather than
-  after it — a shrinking flame that keeps them would only shrink the fault:
-  (a) THE FLAME FLOATS. A fire reduced by the weather still stands ON the ground: its
-  base sits in the hearth, on the fire pit's own surface, at every size the rain rule
-  produces. Whatever scales it must scale it about its base, not its centre — check the
-  full range the rule can reach, including the smallest, because the gap grows as the
-  flame shrinks.
-  (b) THE VILLAGERS WALK THROUGH IT. The fire needs a collider — the user's own
-  suggestion, and the right one: the hearth plus a calibratable clearance radius
-  (a `balance` value, debug-editable) joins the settlement's collider set, so inhabitants
-  path AROUND it and the player cannot stand in the flames either. The §2.6 rule that no
-  walker may be trapped applies: adding an obstacle in the middle of a yard must not
-  strand anyone, so the errand-target validation runs against the widened set.
-  VERIFIABLE for both: pure Vitest — the flame's base stays at hearth height across the
-  whole scale range (the floating case fails before the fix), and the hearth collider is
-  in the set every walker path is validated against, with no walker target left inside
-  it; live, one first-person frame in the rain showing flame on ground, and a walker
-  observed pathing around the hearth rather than through it.
-  RESEARCH FIRST, then build — this is a people question, not a graphics question.
-  Establish from `docs/peoples-1890.md` (extending it where it is silent) where each
-  people's cooking fire actually SAT around 1890: a hearth inside the dwelling, a
-  roofed cooking shelter beside it, or an open yard fire. The Zulu case in the
-  screenshot is the likely "hearth inside the hut" reading, but it must be confirmed
-  rather than assumed, and the answer will differ by people.
-  THEN THE BEHAVIOUR, decided per people from that evidence — the §19.13 dress rule is
-  the model to follow (six peoples change their dress on real evidence, sixteen do not;
-  a blanket rule for all would be the invention this project refuses): under rain past
-  a calibratable intensity, a village either shelters its fire under a structure that
-  people REALLY built there, or the yard fire is out and the life vignette moves under
-  cover — inhabitants inside or under the eaves, the fire relit when the rain passes.
-  DO NOT put a generic canopy over every village fire. A shelter that no one there
-  built is the same class of error as a garment no one there wore.
-  KEEP: the point-142 cold/harmattan/karif behaviour, and the §19.10 vignette's normal
-  dry-weather life, entirely unchanged.
-  DOCS in the same commit: design.md §19.10 and §19.13 gain the rain driver;
-  `docs/peoples-1890.md` gains the hearth/shelter evidence AND its implementation
-  section is updated in the same commit (the standing rule that research and the game
-  table never drift apart).
-  VERIFIABLE: pure — every people in the roster has a DECIDED rain behaviour (the sweep
-  fails on a people nobody decided about, exactly as the dress sweep does); the rain
-  threshold is a calibratable, debug-editable value and the transition is deterministic;
-  a village whose people keep an indoor hearth shows no yard fire under rain, and lights
-  it again when the rain stops. Live (`scripts/verify/polish.mjs`, BOTH backends,
-  screenshot): the Zulu village forced into heavy rain shows the decided state rather
-  than an uncovered burning fire, and the same village in dry weather is unchanged from
-  today.
-
-- [ ] 350. THE KNEELING VILLAGER IS A SQUASHED VILLAGER (user 25.07.2026, deployed
-  build: a figure in the Zulu village alternates between normal and visibly FLATTENED).
-  ROOT CAUSE, already located: `Figure` in `src/scenes/place/PlaceLife.tsx` fakes
-  kneeling with a NON-UNIFORM vertical squash — `scale={[scale, scale * (kneel ? 0.75 :
-  1), scale]}` (line ~60) on top of a shortened body cone (`bodyH = kneel ? 0.55 : 1.0`).
-  The squash applies to the WHOLE figure, the head included, so the head reads as a
-  flattened ellipsoid: kneeling shortens the legs, it does not compress the skull. And
-  the alternation the user sees is `TaskWalker` (line ~496) swapping the standing and
-  kneeling groups by VISIBILITY when it starts and ends its work at the well — an
-  instant pop between two different-looking figures.
-  TARGET: a kneeling pose built from PROPORTIONS, not from a vertical scale. The lower
-  body folds (a shorter, wider base) and the whole figure sits lower, while the head and
-  every other part keep their true shape — the group's scale stays UNIFORM. And the
-  transition reads as a movement rather than a swap: the figure lowers into the pose and
-  rises out of it over a short, calibratable time, so no frame shows one figure replaced
-  by another. Every user of `kneel` gets it — the cook, the fire tender and the errand
-  walker at the well.
-  VERIFIABLE: pure (`src/render/figures.test.ts` or a test beside it) — the kneeling
-  build applies no non-uniform scale (x, y and z factors equal) and its head radius
-  matches the standing figure's, while the pose is genuinely lower (a bounded overall
-  height reduction); the standing build is unchanged. Live
-  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): across the frames in which a
-  task walker starts and finishes its work, no single frame changes the figure's
-  rendered height by more than the transition's per-frame step — the pop is what the
-  check is for.
-
-- [ ] 353. SHELTERED GROUND STAYS LESS WET (user 25.07.2026). In the rain the whole
-  settlement floor darkens uniformly, so the earth under a roof overhang or a tree crown
-  soaks exactly like the open yard. Make wetness SPATIAL — and less, not none: ground
-  under cover reads drier than the open ground around it, but never bone dry, because
-  wind-blown rain and splash reach under every eave (the user's own correction, and the
-  realistic reading).
-  WHY IT IS CHEAP, and the reason to build it this way: a settlement's roofs and trees
-  do not move. The coverage is therefore computed ONCE when the place is built — a
-  shelter mask over the ground disc, derived from the layout's known building footprints
-  with their roof overhangs and the tree crown radii — not per frame and not per fragment
-  against a list of obstacles. Prefer that CPU bake over a top-down depth pass: it needs
-  no extra render target, and it is pure-testable, which a GPU pass is not.
-  THE COMBINATION: the existing global ground wetness (`setGroundWetness` /
-  `groundWetnessFactor`, wired through `src/render/seasonTint.ts` and the season module)
-  is multiplied by the mask through a calibratable `balance.rain.shelterStrength` that is
-  strictly BELOW full, so full cover reduces the wetness without ever reaching zero.
-  Edges are soft — a hard-edged dry disc under a tree would look worse than the uniform
-  wetness it replaces.
-  THE DRIP LINE, if it comes cheap: just OUTSIDE the eaves the runoff makes a band
-  WETTER than the open ground. It is the detail that sells the whole effect, and it is
-  the same mask read at its gradient. Calibratable; drop it rather than fake it.
-  KEEP: dry weather completely unchanged — with no rain the mask must make NO visible
-  difference anywhere.
-  A USEFUL BY-PRODUCT to note in the commit: this same mask answers "is this spot under
-  cover", which is what point 348 needs to move village life under a roof.
-  NO QUALITY KEY: a one-time bake plus a texture lookup in a material already drawn, like
-  point 352 — record the reasoning rather than adding a lever for nothing.
-  VERIFIABLE: pure — the mask built from a layout with one hut is high under the roof
-  footprint, falls off across a soft margin and is zero well outside it; a tree crown
-  produces the same under its radius; the combined wetness at full shelter is strictly
-  between zero and the open-ground value (the "less wet, not dry" rule, boundary-tested),
-  and equals the open value everywhere when the shelter strength is zero. Live
-  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): in a village forced into
-  rain, a ground crop under a hut's eaves reads measurably lighter in PIXELS than a crop
-  in the open yard, while in dry weather the two crops match — judged on the image, not
-  on the uniform.
-
-- [ ] 354. RAIN FALLS FROM A BRIGHT BLUE SKY IN THE SETTLEMENT (user 25.07.2026,
-  deployed build: the Zulu village on 03.01.1890 — high summer rains — with clear rain
-  streaks against an almost cloudless blue dome). Under rain the sky must read heavy.
-  THE MECHANISM EXISTS AND IS WIRED, which is what makes this worth a careful look
-  rather than a quick tint: `PlaceScene.tsx` computes `skyOvercastParams(wet, strength)`
-  each frame and calls `setSkyOvercast(grayMix, cloudBoost)`, and the parameters are
-  substantial at that date — `grayMix = 0.75 × wetness × weatherStrength`, with the same
-  wetness that is visibly producing the rain streaks. So the numbers say overcast while
-  the picture says blue. DIAGNOSE WHERE THE VALUE IS LOST before changing any constant:
-  candidates are the uniform not reaching the PLACE dome's material instance (the travel
-  dome and the settlement dome are separate mounts), `balance.season.weatherStrength`
-  sitting low, the gray being mixed under a base colour that dominates it, or the cloud
-  deck not thickening at all — the screenshot shows essentially no cloud despite a
-  `cloudBoost` of the same magnitude. Name the actual cause in the commit.
-  THE TEST DID NOT CATCH IT, AND THAT IS THE SECOND HALF OF THIS POINT. The settlement
-  season checks in `scripts/verify/polish.mjs` assert on the VALUES behind
-  `__placeSeason()` — "the rains gray the settlement dome and thicken its cloud deck"
-  compares numbers, not pixels. They are green while the player sees a blue sky. This is
-  the exact failure the project already recorded once for the seasons (point 147: three
-  rounds of uniform-level checks passed while the player saw nothing), and the remedy is
-  the one that worked there — MEASURE THE PICTURE. Replace or supplement those
-  assertions with a pixel comparison of the same sky region in a dry month and in a wet
-  month at the SAME settlement, the way the travel ground already proves its season
-  (screenshots 115/116). A parameter assertion may stay as a supporting check; it may not
-  be the evidence.
-  KEEP: the dry-season sky unchanged, the §19.13 thunderstorm flash and the harmattan
-  dust dome (their own axis, not the wet gray) untouched, and the rain streaks as they
-  are — the streaks are not the complaint.
-  VERIFIABLE: pure — `skyOvercastParams` keeps its curve (already tested); a new test
-  pins whatever wiring turns out to be broken, so it cannot silently return. Live
-  (`scripts/verify/polish.mjs`, BOTH backends, screenshots): a crop of the SKY above the
-  horizon at one settlement is measurably darker and less saturated in its wet month
-  than in its dry month, and the difference is large enough that a person would call it
-  overcast; the existing dry-month picture is unchanged.
-
-- [ ] 356. THE INHABITANTS NOTICE THE TRAVELLER (user 25.07.2026). Today they do not:
-  in `src/scenes/place/PlaceLife.tsx` the player appears ONLY as a collision radius, so
-  a settlement is a diorama that happens to be occupied. Being SEEN is the strongest
-  signal that a place is inhabited, and for a European walking into an African village
-  in 1890 it is also the historically obvious reaction.
-  TARGET: within a calibratable notice radius an inhabitant turns its head — the whole
-  figure's facing, since these figures have no separate head — toward the traveller for
-  a few seconds, then returns to its errand. Children break off what they are doing and
-  stare a moment longer; the goats shy a step away. Everyone keeps their task: this is a
-  glance, never a state that stops the village.
-  RULES THAT KEEP IT FROM BECOMING CREEPY OR MECHANICAL: a cooldown per inhabitant so
-  the same figure does not track the player continuously; a cap on how many notice at
-  once (a whole village turning in unison reads as a horror film, not a place); the turn
-  rides the existing capped turn rate rather than snapping; and a drama or errand that
-  must not be interrupted (the elder in an audience, a walker inside a building) is
-  exempt. Values in `balance.villageLife.*`, debug-editable.
-  VERIFIABLE: pure — the notice predicate fires inside the radius and not outside,
-  respects the cooldown, and never selects more than the cap; the resulting facing is a
-  bounded step toward the player, never a snap. Live (`scripts/verify/polish.mjs`, BOTH
-  backends, screenshot): walking past a group, at least one inhabitant's yaw turns
-  measurably toward the player and returns afterwards, while the errands continue.
-  DOCS: design.md §19.10 gains the glance beside the existing village vignettes.
-
-- [ ] 357. THE VILLAGE SOUNDS INHABITED (user 25.07.2026). Checked: the settlement
-  soundscape in `src/systems/ambience.ts` runs exactly ONE layer for a village —
-  `setTarget('drums', 0.5)`. No voices, no pestle, no goats, no fire. Sound carries
-  "inhabited" further than any visual, and its absence is not noticed until it is there.
-  TARGET, as layers over the existing master ambience volume (§20), each with its own
-  calibratable level like `balance.birdsongVolume`: a low murmur of VOICES at
-  conversational distance; the thud of the mortar, timed to the pestle that is already
-  animated rather than looping free; goats; and the fire's crackle rising as the
-  traveller nears the fire ring (the §19.1 proximity model already exists for animal
-  calls — reuse it, do not build a second one).
-  THE VOICES STAY WORDLESS, and that is a decision, not a shortcut: the language
-  mechanic of §13.4 is explicitly undecided and under review, so anything resembling
-  speech would commit the game to an answer this point has no business giving. A murmur
-  commits to nothing and can be replaced when §13 is settled.
-  KEEP: the drums as they are, the port and travel soundscapes untouched, and the single
-  master volume in charge of everything (§20).
-  VERIFIABLE: pure (`src/systems/ambience.test.ts`) — each new layer's gain follows its
-  own slider and the master, is zero outside a village, and the fire layer rises and
-  falls with distance across a swept range. Live (`scripts/verify/settings.mjs`): inside
-  a village the new layers are audible in the graph's gain values and fall silent when
-  the master is muted; no console errors.
-  DOCS: design.md §19.10/§20 name the village layers.
-
-- [ ] 358. SMOKE OVER THE FIRE, DUST UNDER THE FEET (user 25.07.2026). A thin smoke
-  column drifting from the §19.10 fire reads as "someone lives here" from further away
-  than any figure does, and dust kicked up where a walker crosses dry ground makes the
-  ground feel walked on rather than walked over.
-  TARGET: a slow, thin smoke plume above the fire that leans with a calibratable drift
-  and thins with height; and a small, short-lived dust puff at a walker's feet on DRY
-  ground only. Both tie into what already exists: the smoke thins or gutters under rain
-  the way the fire itself already answers to weather (point 142), and the dust is
-  suppressed once the ground is wet (the wetness the season already drives, and the
-  sheltered-ground mask of point 353 where that lands first).
-  QUALITY: declare all three levels in `QUALITY_PRESETS` with the doc kept in sync —
-  this is the kind of small optical addition the §21 convention exists for. Keep it
-  cheap: a handful of soft billboards, not a particle system with a budget.
-  VERIFIABLE: pure — the plume's drift and thinning are a function of height and the
-  weather factor, and the dust predicate is false on wet ground and true on dry; the
-  preset completeness and doc-sync gates cover the new keys. Live
-  (`scripts/verify/polish.mjs`, BOTH backends, screenshots): above the fire the pixels
-  differ from the same crop with the effect disabled, in dry weather a walking
-  inhabitant raises visible dust and in rain it does not.
-  DOCS: design.md §19.10.
-
-- [ ] 359. THE CATTLE PEOPLES' KRAAL IS EMPTY (user 25.07.2026, from the Zulu village
-  screenshot: the enclosure stands there with nothing in it — `PlaceLife.tsx` puts GOATS
-  in a pen, cattle do not exist). For a Zulu umuzi the cattle enclosure is not scenery
-  but the centre of the homestead, and an empty one is a conspicuous absence.
-  EVIDENCE FIRST, as with every people question here: establish from
-  `docs/peoples-1890.md` which of the 22 peoples kept CATTLE around 1890 and in what
-  arrangement — a central kraal, a herd out at pasture, none at all — and extend the
-  research section where it is silent. The cattle-less peoples (the Bemba among them,
-  per the existing rinderpest text) get NO cattle; the camel peoples keep camels.
-  THEN THE HERD, and this is what makes it more than decoration: the game already models
-  the great rinderpest panzootic of 1888-1897 (`rinderpestPhase`, docs/peoples-1890.md
-  §5) and already tells it in the first-visit vignettes. The kraal must agree with that
-  text — full in 1890, devastated from 1891/92, slowly recovering afterwards, with the
-  phase read from the VISIT DATE exactly as the vignette reads it. A village whose
-  journal entry speaks of the emutai while its kraal stands full would contradict itself.
-  KEEP: the goats and their pen as they are; the §19.10 life, the layout and the
-  colliders otherwise untouched; cattle are collidable like any other solid body.
-  VERIFIABLE: pure — every people resolves to a decided cattle arrangement (the sweep
-  fails on an undecided one, as the dress sweep does); the herd size falls across the
-  rinderpest phases for a cattle people and stays zero for a cattle-less one, boundary-
-  tested at the phase dates; the animals stay inside the pen and out of its fence. Live
-  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): the Zulu kraal holds cattle
-  in 1890 and visibly fewer in 1893, and the Bemba village has none in either year.
-  DOCS in the same commit: design.md §19.10 and the implementation section of
-  `docs/peoples-1890.md` (the standing rule that research and game table never drift).
-
-- [ ] 360. THE INHABITANTS TAKE NOTICE OF EACH OTHER (user 25.07.2026). Every villager
-  runs its errand alone: they pass within a metre of one another and nothing happens.
-  A place where nobody acknowledges anybody reads as a set of independent machines
-  sharing a courtyard.
-  TARGET, three encounters built on what already exists in `src/scenes/place/
-  PlaceLife.tsx`:
-  (a) A MEETING. Two walkers whose paths cross stop for a few seconds, turn to face each
-  other, exchange a small lean — the figures have no arms to raise, so the greeting is
-  carried by facing, a brief bow-like lean and the pause itself — and then go on.
-  (b) A HANDOVER. The errand walkers already carry a `bundle` or a `jar`; sometimes a
-  meeting passes that load to the other, who carries it onward to ITS destination. The
-  object must visibly change owner — one carrier, then the other, never two or none.
-  (c) A GATHERING. More than one figure at the fire at the same time rather than the
-  lone tender: two or three around it, one of them kneeling. This DEPENDS ON POINT 350 —
-  the kneeling pose must be a real pose before several figures use it, or the gathering
-  multiplies a visibly squashed figure.
-  RULES: a meeting always ends (a window, then both resume — the house rule that nothing
-  started runs forever); a pair that has just met is not eligible again for a cooldown,
-  or two figures will greet each other in a loop; a meeting never begins where the pair
-  would stand inside a collider or block a doorway; and the errands still COMPLETE — the
-  village must not become a place where everyone chats and nothing arrives.
-  KEEP: the point-155 guarantees (clear standing circle, escape direction, the pinned-
-  walker nudge) and the ordinary errand rhythm as the backbone.
-  VERIFIABLE: pure — the partner choice takes an available walker within the radius and
-  never one already in an encounter or inside a building; the handover moves the load
-  exactly once (source empty, target carrying); the meeting window expires
-  deterministically and the cooldown blocks an immediate repeat. Live
-  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): over a sampled interval at
-  least one pair meets, both yaws turn toward each other, they part, and the errand
-  targets are still reached afterwards; no walker is left standing past its window.
-  DOCS: design.md §19.10 beside the existing village vignettes.
-
-- [ ] 362. THE CROSSING TURNED BACK — the crocodile takes a calf mid-channel
-  (user 26.07.2026; design.md §19.8 states the target). Two systems exist and have
-  never met: the purposeful water crossing (`crossingTarget`/`shouldStartCrossing`
-  in `src/scenes/travel/wildlifeBehavior.ts`, point 192) and the crocodile ambush
-  (§19.16, `crocodileTargetWeight` and the hunt core). Join them into the one scene
-  §19.8 is missing — a family in open water.
-  A CROSSING TAKES THE FAMILY. When a parent with a living calf starts a crossing,
-  the calf enters with it and swims at its flank (the existing leash, at the wade
-  speed both already use); the pair is one crossing, not two. A calf alone never
-  starts one.
-  THE AMBUSH FIRES MID-CHANNEL. The crocodile's target weighting, today biased to
-  drinkers and juveniles AT the bank, gains the swimming calf as its strongest
-  case — a calibratable weight beside the existing ones (§21.2, debug-editable).
-  THE REVERSAL IS THE PICTURE. On the seizure the parent turns round — against the
-  direction the rest of the herd is taking — and swims back. Its heading reversal
-  goes through the ordinary capped turn rate (§19.5: no body ever whips round), and
-  the rest of the herd does NOT turn: it completes the crossing and walks up the far
-  bank. That contrast is what the scene is for; a verification that cannot see it is
-  not passing.
-  THE ENDINGS ARE THE EXISTING ONES, not new: the return is a RESCUE, so it takes
-  the rescue burst braked by `seasonFlowFactor` (`wadeSpeed`) and rolls the SAME
-  §19.8 defence matrix used at the waterline — drive-off, taken-in-the-calf's-place,
-  or too late. NO vigil exists here (the water takes the body, §19.8); a too-late
-  parent makes the NEAREST bank and rejoins its herd. Every branch resolves on a
-  bank — reuse the crossing deadline so nothing is left swimming (§19.5).
-  ANCHORS: `src/scenes/travel/wildlifeBehavior.ts` (crossing, crocodile weighting,
-  defence resolution, `wadeSpeed`), `src/scenes/travel/Wildlife.tsx` ~2373–2500
-  (the water-drama frame code and its `seasonFlowFactor` calls) and ~3855 (the
-  crossing swim speed), `src/config/balance.ts` `waterDrama`, `src/i18n/{de,en}.ts`
-  for the debug label.
-  VERIFIABLE: pure (`wildlifeBehavior.test.ts`) — a parent's crossing takes its calf
-  and only its calf; the mid-channel weight beats the bank cases; the reversal
-  respects the turn cap; each defence outcome reaches a terminal state and a
-  too-late parent ends on a bank, never in the channel; no branch can leave the
-  water-drama state set past the deadline. Live (`scripts/verify/wildlife.mjs`, ONE
-  backend — this is behaviour, not shading; the reversal is judged on the recorded
-  positions plus one screenshot): a seeded crossing produces a herd that finishes
-  while one animal reverses.
-  DOCS: design.md §19.8 + §21.2 already state it; add the balance value's comment
-  and the acceptance-evidence line under §12.
-
-- [ ] 363. THE STRAGGLER — a lame calf the herd leaves behind (user 26.07.2026;
-  design.md §19.8 states the target). Every §19 drama is fast: a charge, a seizure,
-  a plunge. This one is slow, and nothing is scripted to kill — it is the only
-  scene in the game whose tension is WAITING.
-  THE LAMENESS. With a calibratable chance (§21.2, debug-editable) a calf that
-  SURVIVES a hunt — the parent drove the predator off (points 124/125/145c), or the
-  chase simply broke off — is left lame: a calibratable speed penalty for a
-  calibratable healing window. Keep the chance low; a drive-off that always cost
-  something would turn the successful defence into a second sacrifice.
-  THE HERD DRAWS AWAY. A lame calf cannot hold the group pace, and its parent does
-  not leave it (the §19.8 constant, already implemented for the mire vigil of point
-  123 — reuse that stay-behind, do not write a second one). The herd keeps its
-  ordinary roaming; the pair simply falls behind and stands alone in the open.
-  NO PREDATOR IS SENT. Do not spawn or steer one. The existing juvenile hunt bias
-  now has an easier target because the pair is isolated and slow; that is the whole
-  mechanism. If a hunt does find them the ORDINARY grammar runs (shield, charge,
-  roll) — the parent does not surrender, because nothing has died.
-  IT ALWAYS RESOLVES (the point-118 lesson): on the healing window the limp ends and
-  the pair rejoins the herd; a streamed-away herd is the adoption/regroup case that
-  already exists. A lame calf must never be left permanently detached.
-  ANCHORS: `src/scenes/travel/wildlifeBehavior.ts` (the hunt outcome/drive-off
-  resolution, the mire stay-behind, the leash and group pacing), `Wildlife.tsx` for
-  the per-frame speed, `src/config/balance.ts` `waterDrama`'s neighbourhood (add the
-  values beside the family-drama block), `src/i18n/{de,en}.ts` labels.
-  VERIFIABLE: pure — the lameness fires only after a SURVIVED hunt and only on its
-  chance; the penalty applies to the calf and the parent's stay-behind mirrors it;
-  the pair falls measurably behind a roaming herd; the window heals and the pair
-  rejoins; no state leaves a calf detached past the window. Live
-  (`scripts/verify/wildlife.mjs`, ONE backend): with the chance forced to 1 a
-  post-hunt pair is measurably behind the herd's centroid and later back with it.
-  DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
-  acceptance-evidence line under §12.
-
-- [ ] 364. THE FLOOD SWELLS THE DRAMA CURRENT — and can take a calf at the crest
-  (user 26.07.2026; design.md §19.8 states the target). This point fixes a real
-  inconsistency first and adds a drama second; both land together.
-  THE BUG. `seasonFlowFactor(CURRENT_WEATHER.wetness, dryFlowFactor, wetFlowFactor)`
-  (Wildlife.tsx ~2373/2466/2485/3855) keys the drama current on LOCAL wetness alone.
-  The game's own flood model is deliberately REMOTE-fed (design.md §19.9, points
-  138/139): the Nile crests at Cairo in October where it never rains, and the
-  Okavango peaks in July inside Botswana's dry season. So today the water dramas run
-  at their dry-season gentlest exactly when the modelled river is at its most
-  dangerous. THE FIX: the effective factor is the HIGHER of the wetness-fed factor
-  and a flood-fed one — `nileFloodAt`/`okavangoFloodAt` (`src/systems/season.ts`)
-  scaled by a calibratable balance value (§21.2, debug-editable) — so the crest
-  swells the current, shortens the self-rescue and brakes the rescue burst through
-  the paths that already read the factor. Wire it in ONE place (a helper beside
-  `seasonFlowFactor`) so no call site can be forgotten.
-  THE DRAMA. At a swollen crest a crossing (point 362) can lose the calf to the
-  CURRENT rather than to a crocodile: it is carried downstream past its parent's
-  reach, and the parent turns downstream after it — a rescue on the same rolls and
-  the same brake, which the point-122 drowning window may end for BOTH. This is the
-  existing drowning drama reached by a new road, not a new death: reuse
-  `drownSeconds`/`drownFlowThreshold` unchanged.
-  WHAT MUST NOT CHANGE: the flood stays VERTICAL (§19.9) — no ground becomes water,
-  no §4.2 village clearance moves, the ribbon keeps its width. Only the force
-  changes. A test must pin that.
-  SEQUENCING: 362 lands first (this point's drama rides its crossing); the flow-factor
-  fix is independent and may land even if 362 slips.
-  ANCHORS: `src/systems/season.ts` (`nileFloodAt`, `okavangoFloodAt`),
-  `src/scenes/travel/wildlifeBehavior.ts` (`seasonFlowFactor`, `wadeSpeed`, the
-  drowning core ~1745), `Wildlife.tsx` at the four call sites above,
-  `src/config/balance.ts` `waterDrama`, `src/i18n/{de,en}.ts`.
-  VERIFIABLE: pure — at Cairo in October (wetness 0) the effective factor is
-  significantly above the dry floor and near the wet case, while a rainless
-  non-flood day stays at the floor; the Okavango does the same in July; the factor
-  is never LOWER than today's wetness-fed value anywhere (a pure sweep over the
-  year × both systems); the drowning window and threshold are untouched; the flood
-  changes no water mask, ribbon width or clearance (assert against the existing
-  world sweep). Live (`scripts/verify/wildlife.mjs`, ONE backend): at the October
-  crest a seeded crossing is visibly carried downstream and its rescue is slower
-  than the same seed in the dry season.
-  DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
-  acceptance-evidence line under §12.
-
-- [ ] 379. ABU SIMBEL BECOMES A WALKABLE SITE (user 27.07.2026; a FEATURE, and the user's
-  own instruction is that the open DEFECTS come first — it waits behind them). The world carries
-  eight built cultural landmarks (Meroë, Giza, Great Zimbabwe, Lalibela, Kilwa, Aksum,
-  Gondar, Bandiagara) and four natural ones; the rock temples of Abu Simbel are absent,
-  and they belong: in 1890 they stood — cleared of sand by Belzoni in 1817 and a fixed
-  point of every Nile journey — at the Nubian reach the traveller passes on the way
-  south, in their ORIGINAL place beside the river (the 1960s relocation is far outside
-  this game's window, so the site sits at the historical coordinates, not the modern
-  ones).
-  IT IS ENTERABLE, LIKE THE PYRAMIDS (user 27.07.2026): the traveller walks up to it in
-  the bird's-eye view and enters with SPACE, exactly as point 273 made the Giza monument
-  site walkable — the same enter radius, the same discovery gate, the same non-overlap
-  rule against every other place's enter disc, and a first-person site the player can
-  cross. Point 273 is the pattern to follow rather than a second mechanism to invent;
-  read what it built before designing anything.
-  ONE PLACE, ONE LABEL — do not repeat the Giza mistake (user 27.07.2026). Making the
-  pyramids walkable left the site defined TWICE, as a cultural landmark AND as a map
-  point, so the bird's-eye view carries two overlapping names for one thing (that is
-  work-order point 338, still open). Abu Simbel is entered into the world ONCE, in
-  whichever of the two forms carries an enterable site, and it must NOT also stand as a
-  second definition. Point 338 decides which form survives for Giza; this point follows
-  that decision rather than inventing a third arrangement — and if 338 is still open
-  when this is built, it is fixed FIRST, because building a second double label while
-  the first is being removed is the same defect twice.
-  VERIFIABLE for that half: a pure test asserting the site appears EXACTLY ONCE across
-  the landmark and map-point definitions, and one bird's-eye frame at in-game zoom
-  showing a single label.
-  BUILD THE REST AS THE OTHER EIGHT ARE BUILT, not as a special case: an entry in
-  `src/world/data/landmarks.ts` with its ~1890-correct coordinates, the field radius and
-  water clearance the §4.2 sweep in `src/world/world.test.ts` applies to every landmark,
-  a localized name in BOTH language files, a first-sighting journal entry in the §10
-  kind-flavoured shape (both languages, §15 voice markup, once per landmark), the
-  discovery bounty, and the debug-menu jump-to entry in its alphabetical place.
-  THE FRAMING IS THE §4.4 ONE: an African achievement seen by a traveller, not a
-  curiosity. Four colossal seated figures cut from the cliff face, a smaller temple
-  beside them, the river below — the entry says what the traveller SEES and what it
-  meant, in the register the other seven use.
-  RESEARCH BEFORE PLACING: confirm the coordinates and the 1890 state against
-  `docs/peoples-1890.md` (it already mentions the site) and the sources that document
-  the other landmarks; if the research contradicts anything here, the research wins and
-  the point is corrected rather than forced.
-  VERIFIABLE: the existing landmark sweeps in `src/world/world.test.ts` cover it
-  automatically once it is in the data (clearance, no overlap, the label rules); add the
-  i18n completeness case both languages already have, and the first-sighting entry test
-  beside the other landmarks'. One bird's-eye screenshot at in-game zoom showing the
-  site labelled where it belongs on the Nile.
-  DOCS in the same commit: `design.md` §4.4 (the landmark list is design content — this
-  is a genuine addition and pays its measured words), CLAUDE.md §7.1 pt 25 where the
-  eight are enumerated, and the evidence section.
-
-- [ ] 380. THE SURROUNDINGS SHOW THE NEIGHBOUR THAT IS REALLY THERE (user 27.07.2026,
-  reported from the deployed build). Standing at the Giza monument site the traveller
-  does NOT see Cairo on the horizon, while standing in Cairo he does see the pyramids —
-  and in 1890 the two are barely fifteen kilometres apart, in flat desert, in plain
-  view of each other. The asymmetry is the report; the rule it breaks is §2.5, which
-  promises the surroundings panorama of the real map landscape.
-  DIAGNOSE BEFORE BUILDING, because the two directions probably have DIFFERENT causes:
-  the backdrop band (`src/scenes/place/backdrop.ts`) is built from `sampleTerrain`
-  alone — relief, no settlements and no monuments — so it cannot be what shows the
-  pyramids from Cairo; that view is far more likely Cairo's own local dressing. Confirm
-  which mechanism draws each side before deciding where the fix belongs. A fix in the
-  wrong one produces a pyramid that hangs in the sky, which is exactly the class points
-  92/94/181 already paid for.
-  THE TARGET: a settlement or monument that is genuinely within sight distance reads on
-  the horizon from the other, at the right BEARING and the right apparent size, sitting
-  on the ground the backdrop draws (`panoramaStandY`/`discHorizonY`, the point-181
-  footing rule) — never floating, never a black sliver. Sight distance is a
-  calibratable balance value, debug-editable, and the rule is symmetric by construction
-  rather than by two hand-written cases.
-  SCOPE HONESTLY: if the research shows the general case (every neighbouring place
-  within sight) costs far more than the Giza↔Cairo pair the user reported, say so with
-  the measured reason and deliver the general mechanism only if it is affordable —
-  a hard-coded pair is NOT an acceptable substitute, because the next pair reopens it.
-  VERIFIABLE: pure Vitest on the bearing/size/footing computation for a neighbour at a
-  given distance (present within sight, absent beyond it, correct bearing on both
-  sides — the symmetry pinned as a property, not as two examples); plus one Playwright
-  frame from each side, judged by PROJECTING the neighbour into the picture per §7.2,
-  never by an assumed radius.
-  ORDER: point 381 (the torn seam at that very site) is FIXED FIRST — adding a
-  neighbour to a horizon that is itself broken would build on sand.
-  DOCS in the same commit: `design.md` §2.5 (what the panorama shows is design content)
-  and CLAUDE.md §7.1 pt 31 with its evidence section.
-
-- [ ] 384. RAIN THAT TOUCHES THE WORLD — WET GROUND, IMPACTS, LIT DROPS (user 27.07.2026,
-  after looking at the settlement rain on the deployed build: "the rain is simply painted
-  over the picture — it has no effect on the optics at all"). Measured against the code,
-  that reading is nearly right: `src/scenes/place/PlaceRain.tsx` draws 700 instanced
-  quads in an UNLIT `MeshBasicNodeMaterial` of one constant colour (0.66/0.72/0.8), fog
-  off, depth-write off, inside a 15-unit column centred on the eye. The streaks do stand
-  in the world and are occluded by huts — but nothing else in the scene knows it is
-  raining. This point closes that gap with the three cheapest steps, in the order of
-  effect per cost; point 385 carries the two dearer ones.
-  (1) WET SURFACES — the biggest gain for the least work, and it needs no new particle.
-  A single scene-wide wetness value (the place's own `rainAmount`, already computed)
-  drives the existing materials: roughness down, albedo slightly darkened, specular
-  response up, so ground, roofs and walls go dark and glossy and the village fire
-  reflects in the wet earth. Sheltered ground is EXEMPT — work-order point 353 owns that
-  rule; this point must not fight it, so read it first and drive both from one value.
-  (2) THE RAIN REACHES THE GROUND, AND ARRIVES. Today the column is a fixed box around
-  the head and drops recycle at its lower edge — which is why the player sees them stop
-  in mid-air. A drop ends at the GROUND under it (the terrain/settlement height at its
-  own x/z), and its end is an IMPACT: a short-lived, small ring or splash quad at that
-  spot, alpha-fading, instanced like the drops themselves. On water the impact is a
-  ring; on dust it is a puff — one shape parameterised, not two systems.
-  (3) LIT DROPS INSTEAD OF ONE FLAT COLOUR. A streak's brightness follows the sun/sky
-  direction and the view angle, so it reads bright against a dark hut and nearly
-  vanishes against a bright sky, and the drops of one gust no longer look identical.
-  QUALITY LEVELS ARE PART OF THE POINT, not an afterthought (§21 convention): every new
-  lever gets a low/medium/high entry in `QUALITY_PRESETS` (`src/config/quality.ts`) and a
-  row in `docs/graphics-detail-levels.md` — the completeness gate in
-  `src/config/quality.test.ts` fails otherwise. Rain that costs frames on LOW is a
-  regression, so low keeps the plain streaks and the wetness value at most; impacts and
-  lit drops are medium/high.
-  BOTH BACKENDS, ONE PATH: TSL only, no WebGPU-only branch (CLAUDE.md §3) — the
-  reverted TRAA attempt is the precedent for what a second code path costs.
-  VERIFIABLE: pure Vitest on the wetness mapping (dry → today's values, wet → the
-  darkened/glossier set, sheltered ground unchanged) and on the impact placement (a
-  drop's end equals the ground height under it, never the column's lower edge); the
-  quality-preset completeness and doc-sync gates green; live, one first-person frame in
-  the rain on BOTH backends showing wet ground and drops that arrive, judged by the
-  picture, plus the §21 detail levels stepped through without a red.
-  DOCS in the same commit: design.md §19.13 (what rain does to the picture is design
-  content), `docs/graphics-detail-levels.md`, and CLAUDE.md §7.1 pt 12 with its evidence
-  section.
-
-- [ ] 385. RAIN WITH DEPTH AND WEATHER — LAYERS, STREAK SHAPE, DIMMED SUN (user
-  27.07.2026; the second half of the rain work, deliberately LAST in the queue, after
-  point 379). Point 384 makes the rain touch the world; this makes the rain itself read
-  as weather rather than as particles.
-  (4) DEPTH INSTEAD OF ONE CURTAIN: two or three layers at different distances and
-  speeds, with the streak LENGTH following the drop's velocity relative to the camera
-  and soft, faded ends rather than hard rectangles. That is the classic way volume is
-  suggested without more particles — the count stays where it is or falls.
-  (5) THE WEATHER CHANGES THE LIGHT: while it rains the sun is damped, the haze rises
-  and the view distance shortens, so a downpour looks like one from inside a hut as well
-  as from the open. This is where the rain stops being an overlay: the scene gets darker
-  and flatter, and the fire is suddenly the brightest thing in the village.
-  BOUNDARY: the blue sky under rain is work-order point 354 and stays there — this point
-  changes the LIGHT, not the sky dome, and the two must be built so neither undoes the
-  other. Read 354 before starting; if it is still open when this begins, say in the
-  commit how the two interact.
-  QUALITY LEVELS, as in 384: every lever gets its low/medium/high entry and its doc row;
-  the layered rain and the light damping are medium/high, low keeps one layer and the
-  undimmed sun.
-  BOTH BACKENDS, ONE PATH: TSL only, no backend branch.
-  VERIFIABLE: pure Vitest on the layer/velocity mapping (streak length follows relative
-  speed; a stalled camera does not stretch a drop) and on the light damping (rain 0 →
-  today's sun and haze exactly; rain 1 → the damped set; monotone in between); live, one
-  first-person frame per backend in the open and one from under a roof, judged by the
-  picture, at each detail level.
-  DOCS in the same commit: design.md §19.13, `docs/graphics-detail-levels.md`, CLAUDE.md
-  §7.1 pt 12 and its evidence section.
-
-- [ ] 414. THE BIRD'S-EYE ANIMALS GET THE WALK THE SETTLEMENT ONES HAVE (29.07.2026,
-  user asked after seeing the settlement gait: "could this walk be carried over to the
-  bird's-eye view?"). Yes — and the hard part is already built and tested. `src/render/
-  fauna.ts` carries the whole derivation as pure functions: `footReach`, `strideLength`,
-  `gaitCadence`, `isStance`, `gaitFootFraction`, `gaitPhase`, `legSwingAngle`,
-  `gaitBodyLift`, `groundPitch`, `footBodyOffset`, `seatFootOnGround`. The settlement
-  walkers, the panorama silhouettes and the goats all read it. `src/scenes/travel/
-  Wildlife.tsx` reads NONE of it — measured: no reference to any of those names. Its
-  animals carry only a grazing-shuffle phase, so a walking herd slides.
-  WHAT IS ACTUALLY MISSING is not the maths but the BODY: the travel animals are drawn
-  from `animalBodies.ts` without pivoted legs, and they are INSTANCED (19 instanced
-  meshes in `Wildlife.tsx`) because a bird's-eye frame holds far more animals than a
-  settlement. So this point is a rendering-cost question wearing an animation costume,
-  and it must be answered in that order:
-  1. Give the travel bodies pivoted legs from the SAME part description the settlement
-     bodies use, so one definition drives both and they cannot drift apart (the §300
-     lesson, and the reason the panorama and the village already agree).
-  2. Drive them from the SAME distance-driven phase — the animal's own travelled arc,
-     never a wall clock — so a faster animal steps faster and a standing one stands
-     still, exactly as the settlement does today.
-  3. MEASURE before deciding the scope: extra per-leg instance matrices at herd scale
-     are the cost, and this project has the instrument for it (F8, the in-game
-     benchmark, on the user's own hardware — the headless machine's numbers are not the
-     player's). If the full articulation is too dear at distance, degrade by DISTANCE
-     rather than by dropping the feature: articulated near the traveller, the cheaper
-     body-lift-only cue further out, nothing at the horizon — and say where each band
-     begins.
-  4. SORT IT INTO THE THREE QUALITY LEVELS (`QUALITY_PRESETS`, the §21 convention): the
-     completeness gate fails a new optical feature that lacks low/medium/high entries,
-     and `docs/graphics-detail-levels.md` is updated in the same commit.
-     THE LEVEL IS THE PRIMARY AXIS, decided by the user 29.07.2026: HIGH always carries
-     the walk, LOW never does, and MEDIUM is decided BY THE MEASUREMENT of step 3 — it
-     gets the walk if the F8 numbers on the user's own hardware show it comfortably
-     inside the frame budget, and stays without it if they do not. Do not guess that
-     value: run the benchmark, put the two rows (medium with and without) in the point's
-     record, and let them decide. The distance banding of step 3 is then a refinement
-     INSIDE a level that carries the feature, not a substitute for the level split.
-  NOT IN SCOPE: foot-on-ground seating for bird's-eye animals. The settlement needed it
-  because a silhouette stands on compressed backdrop relief; at travel distance the
-  terrain under a walking animal is near-flat per stride, and seating every foot of a
-  herd is exactly the cost this point is trying to contain. Revisit only if the picture
-  shows floating feet.
-  VERIFIABLE: pure Vitest — a travel animal's stride advances with the distance it
-  covered (not with elapsed time), a standing animal's phase does not move, and the
-  cadence differs between a long-legged and a short-legged species; plus the
-  `QUALITY_PRESETS` completeness test and the doc-sync test. Live (`scripts/verify/`,
-  BOTH backends): a herd photographed twice a stride apart shows moved legs, and the F8
-  report's per-system triangle/draw-call rows are attached to the point so the cost is
-  on the record.
-  DOCS in the same commit: design.md §19 where the wildlife is described, and
-  `docs/graphics-detail-levels.md`.
-
-- [ ] 415. THE TUAREG TENT READS AS A HEAP OF SAND (29.07.2026, user in the Tuareg
-  village, North: "what are these cones supposed to be? Sand piles? They look more like
-  mini tents"). They ARE tents — `Tent` in `PlaceScene.tsx` is a single
-  `coneGeometry(r·1.25, h)` in the cloth material, a 0.45-unit pole and a small dark
-  entrance flap. Standing on pale sand in the pale cloth colour, a smooth tall cone
-  reads as a dune, and the flap is far too small to say otherwise. The user's reaction
-  is the correct one: nothing in the shape says "someone lives here".
-  THE REAL FORM IS ALMOST THE OPPOSITE, and it is what makes it readable: a Tuareg tent
-  (ehen) of that period is LOW and WIDE, not tall and pointed — mats or hides stretched
-  over an arched wooden frame, dark against the sand, with the long side open toward the
-  lee and the frame's poles and guy lines visible. Height well under a standing person,
-  width several times the height. RESEARCH IT FIRST against `docs/peoples-1890.md`
-  (Tuareg material is in §2.4 and §7.2) and record what the sources support before
-  modelling; where the evidence is thin, say so in the point rather than inventing
-  detail — the accuracy principle of this project applies to dwellings as much as to
-  clothing, and the guide's own rule is that a real system is never faked.
-  WHAT TO BUILD: replace the cone for the NORTH dwelling kind with the arched form —
-  a low curved shell, dark mat/hide colouring against the light ground, an open side,
-  and the frame legible at eye height (design.md §2.6 asks for structure and weathering
-  at eye height, which a smooth cone cannot carry). Keep it cheap: this is a village
-  dressing element and appears many times.
-  CHECK THE OTHER PEOPLES' TENTS at the same time: the `tent` kind is also used to dress
-  the market in other regions. Those are trade awnings, not dwellings, and must not
-  inherit the desert form — say which shape each use gets.
-  VERIFIABLE: pure Vitest on the geometry description (the north dwelling is wider than
-  it is tall, and the market awning is not the same part), plus the existing layout
-  tests. Live (`scripts/verify/polish.mjs`, BOTH backends, screenshot): the Tuareg
-  village photographed at eye height — the tents must be distinguishable from the ground
-  by colour as well as by shape, which is exactly what fails today.
-  DOCS in the same commit: `docs/peoples-1890.md` §8 (the research-to-game table) gains
-  the dwelling row for the Tuareg, per the standing rule that the implementation
-  sections move with the rendering.
-
 - [ ] 422. THE BEGINNER GUIDE IS FULL, AND TODAY'S LESSON HAS NOWHERE TO GO
   (29.07.2026, found while doing the guide review the currency guard demands).
   `docs/analysis_de/vibe-coding-anleitung.md` sits at EXACTLY its budget — 401 lines of
@@ -2821,40 +1622,6 @@ there exactly once; a new point joins a bundle when appended.
   --guide-reviewed` is re-attested afterwards.
   NOTE: the guide currency was attested on 29.07. against the sources of that day; the
   review found this gap and could not close it, which is what this point exists for.
-
-- [ ] 428. THE WALKABLE GROUND MEETS THE PANORAMA AT A VISIBLE STEP (29.07.2026, found by
-  the picture check of the vertical look, on BOTH backends). Standing at the settlement's
-  walkable edge and looking DOWN over it — a view the game only gained with the vertical
-  look — the walkable disc and the backdrop relief behind it read as TWO surfaces, not one
-  ground: a straight horizontal brightness step runs across the whole frame where they
-  meet, the backdrop side markedly darker, and the seam itself is faintly stepped in
-  short straight segments rather than following the terrain. Evidence:
-  `verification/145-look-down-disc-edge.png`, recorded on WebGL 2 and on WebGPU (the step
-  is on both, the shading difference is larger on WebGPU).
-  WHAT IS ALREADY TRUE AND MUST STAY: point 381 closed the HOLE at that edge — outside the
-  disc the backdrop never sinks below the ground plane and a ring is pinned on the disc
-  edge — and CLAUDE.md §7.1 pt 31 states the ground meets the panorama "with no edge, no
-  unlit face and no hole". That criterion was verified from an eye-level horizon, where
-  the seam sits at the vanishing line and cannot be seen; the pitch put it in frame. So
-  this is not a regression of 381 but the rest of its own criterion, and 381's geometry
-  fix is not to be undone.
-  TARGET: from any position and any pitch the walkable ground and the backdrop read as ONE
-  continuous ground — no tonal step at the seam beyond what the terrain itself explains,
-  and no straight-segment rim. Find WHICH of the two the step belongs to before changing
-  either: compare the two surfaces' shading inputs (do both take the same sun direction,
-  the same IBL/ambient term, the same tone mapping stage, and does the backdrop get the
-  biome splat the disc gets, or a flat fallback colour?), and check whether the point-381
-  ring is drawn in its own tone rather than the disc's. A material/lighting mismatch is
-  the likely cause; a geometry gap is not — the picture shows contact, not a crack.
-  VERIFIABLE: Vitest in `src/scenes/place/backdrop.test.ts` — the disc and the backdrop
-  resolve the same lighting inputs at coincident points on the seam, so a future change
-  that gives one of them its own term FAILS. Live in `scripts/verify/polish.mjs`: from the
-  disc edge looking down, scan a vertical pixel column across the seam IN THE ONE FRAME
-  and assert the luminance step at the contact stays under a calibratable threshold — a
-  within-frame measure, never a cross-run image diff (point 361 forbids the latter). Both
-  backends, judged by the picture: the same frame must show one ground.
-  DOCS in the same commit: the evidence section `docs/acceptance-evidence.md` §31 records
-  the pitched-view check beside the existing eye-level one.
 
 - [ ] 438. THE PROJECT HOOKS CANNOT FIRE OUTSIDE THE REPO ROOT (29.07.2026, measured in a
   `/doctor` run and reviewed by the second model; bundle Modell & Wächter). All 31 project hooks in
@@ -3683,58 +2450,6 @@ to land than a mechanism that needs a review.
   proved, and the user's own play is the acceptance.
   Criticality: HIGH — it destroys the player's session without a prompt, and it is
   triggered by the feature's ordinary use, not by an unusual one.
-
-- [ ] 600. THE CTRL LABEL DOES NOT NAME AN ATTACKING LION — AND THE ROSTER IS RE-TESTED
-  WHOLE (user 09.08.2026, first play test of the feature: "STRG einmal getestet und direkt
-  einen Fehler gefunden: funktioniert nicht für angreifenden Löwen. Nochmal alles
-  durchtesten — ist vielleicht nicht der einzige Fehler"). Point 342 shipped the hold-Ctrl
-  overlay and its own §7.2 evidence was green; the very first hold in real play found a
-  gap. THE SPECIFIC DEFECT: a lion in its ATTACK state carries no label, while the roster
-  and point 342's predicate ("a thing is named when it can MOVE or the player can DO
-  something with it") plainly include it. Establish the cause before fixing — the two
-  candidates the code makes plausible are that the attack run swaps the actor into a
-  different entity list the overlay does not walk, and that §19.16's CONCEALED rule (a
-  submerged crocodile stays silent until it lunges) is being applied to a predator that is
-  not concealed at all. Do not guess between them: dump the overlay's actor set during a
-  staged lion attack and see which one it is.
-  THE POINT IS NOT ONE FIX. The user asked for the whole thing to be re-tested, and one
-  miss on the first hold means the roster was never exercised in its STATES. FINAL STATE:
-  every actor of point 342's roster is named in EVERY state it can be in — idle, walking,
-  fleeing, attacking, drinking, dead, and mid-staged-event — in both perspectives; the
-  §17.2 discovery gate and the §19.16 concealment exclusion still hold exactly where they
-  are meant to and nowhere else.
-  VERIFIABLE, AND AT THE LEVEL THE PLAYER EXPERIENCES IT (point 589's rule): a Vitest
-  matrix over the pure predicate covering the full cross product of kind × state, which is
-  what would have caught this one; plus a browser check that STAGES a predator attack and
-  asserts the label is drawn at the attacker while it runs — not that the predicate would
-  have returned true.
-  Criticality: medium — no crash, but the feature's promise is that holding Ctrl tells you
-  what you are looking at, and it fails hardest at the moment the player most wants it.
-
-- [ ] 603. THE GROUND'S MICRO-DETAIL SITS JUST UNDER ITS OWN BAR, AND NOBODY OWNS IT
-  (measured 10.08.2026 during the acceptance of the play-session packages; the triage point
-  of 04.08.2026 named this failure and closed without giving it an owner). The `settings`
-  check `first-person ground shows micro-detail (edge energy)` reads a Laplacian mean of
-  1.08–1.09 against a bar of 1.1 — red twice in a row on a QUIET machine, and
-  `baseline-classify` against the pre-merge commit calls it PRE-EXISTING / stale
-  assumption. It has therefore been red for days while every run charged it to "known",
-  which is precisely how a check stops being evidence.
-  WHAT MAKES IT WORTH A POINT rather than a threshold nudge: 1.08 against 1.1 is not a
-  wrong number, it is a number without a verdict. Either the ground genuinely lost the
-  grain that acceptance criterion 15 demands at eye height, or the crop the check measures
-  no longer contains the surface it was written for. On 04.08.2026 the same check read 0.00
-  with AND without the graphics card, which proved it was not the hardware and left the
-  question open.
-  FINAL STATE, decided BY THE PICTURE and never by the number (the triage point's own
-  rule): take the frame the check measures at the current head, look at it, and say which
-  of the two it is. If the ground lost its relief, that is a render defect and is fixed. If
-  the check crops somewhere the relief never was, the CHECK is corrected — with the reason
-  written into it — and never by lowering the bar until it passes. Whichever it is, the
-  check goes green on a quiet machine twice in a row, or it is deleted with its reason.
-  UNTIL THEN this point is where that red is charged, so an acceptance run can state its
-  reds honestly instead of carrying an unowned one.
-  Criticality: medium — no crash and nothing the player reports, but an unowned red inside
-  the everyday gate is a hole in the one signal every other point is judged by.
 
 - [ ] 606. THE SCOPE TEST IS RED IN EVERY WORKTREE (found while delivering point 605).
   `scripts/verify/scope.test.mjs` resolves `node_modules/.bin/oxlint` under
@@ -4857,24 +3572,6 @@ Build order, chosen so no two parallel agents own the same file:
   `docs/picture-check-levers.md`, which is a result, not a failure. Nothing diff-based is
   enabled by this point itself.
 
-- [ ] 522. THE BURNING GRASS DOES NOT BURN (observed 05.08.2026 while closing point
-  323). `verification/131-burning-grass.png` is the frame that proves the §19.9
-  bush fire, and no fire is visible in it to the eye — the frame passes its checks
-  and shows dry grass. Either the dressing does not draw at the moment the shutter
-  opens (the fire is a moving effect and the frame may catch it between states), or
-  it draws too faintly to read at that distance and zoom, or the check measures
-  something the picture does not show. This is exactly the "looks-wrong-but-passes"
-  class: a green check standing in front of an invisible feature.
-  FINAL STATE: the fire READS in the frame a human looks at — flame and smoke
-  visible at the zoom the criterion is judged at — and the check that guards it
-  measures the drawn fire (pixels of flame/smoke in the frame region), not a state
-  flag beside it. If the effect turns out to be drawing correctly and only the
-  frame's aim or moment is wrong, the aim is fixed and the finding recorded as
-  such; a feature that cannot be seen is not delivered either way.
-  VERIFIABLE: the refreshed frame 131 shows the fire to a human on both backends,
-  and its check fails when the fire is switched off in the debug menu — proving the
-  check reads the picture rather than the intent.
-
 - [ ] 523. THE PANORAMA LEAVE-CAPTURE COMES OUT EMPTY, AND TWO CHECKS ON `main`
   HAVE BEEN RED FOR IT (measured 05.08.2026 while closing point 480, on BOTH
   backends, and classified PRE-EXISTING on `main` by
@@ -5371,36 +4068,6 @@ Build order, chosen so no two parallel agents own the same file:
   loaded one; a rate-marked check is named as rate-sensitive in the verdict; and the
   diff-word list is absent from an UNDECIDED verdict.
 
-- [ ] 565. A DRINKING WILDEBEEST CALF STANDS BURIED IN THE GROUND
-  (caught 08.08.2026, 19:xx, by the in-game anchoring tripwire on the `enrichments`
-  WebGL 2 lane). The dev-mode assert fired: `animal-buried — wildebeest bodyY=1.09
-  ground=1.82 y=1.82 young=false bathe=false drink=true dodge=false hop=false
-  chunk=14,1 shoreSeed=false parent=false child=true dPlayer=14`. The body sits 0.73
-  BELOW the terrain the same frame samples under it, and it is not a one-frame
-  transient: the assert only speaks on the SECOND consecutive violating visit
-  (`floatStrike >= 2`, ~13 frames apart), so this animal stood buried for at least two
-  assert visits while the player was 14 units away — in view.
-  IT IS NOT THE LABEL LAYER'S DOING: the run that caught it carried point 342's change
-  to `Wildlife.tsx`, but that change only READS `a.drawn` and pushes to an array; the
-  assert dates from 21.07.2026 and the anchoring code it watches is untouched. Treat it
-  as a pre-existing defect the tripwire surfaced, not a regression — but CONFIRM that on
-  `main` before fixing, because a confirmation is one run and a wrong assumption is a
-  rebuild.
-  THE LEAD THE DUMP GIVES: `drink=true` and `child=true` with `bathe=false`. The drink
-  cycle lowers the body toward the water, and a CALF carries a smaller `scale`, which
-  shrinks the assert's own tolerance (`ground - 0.75 * a.scale`) at the same time as the
-  drink pose lowers the body — so the pair is the suspect, not either alone. `y` equals
-  `ground` exactly (1.82), so the ANCHOR is right and it is the body offset below it
-  that is wrong.
-  FINAL STATE: a drinking animal of any age keeps its body above its own ground sample
-  for the whole drink cycle, at every scale the herds spawn; the tripwire stays armed and
-  unchanged (it is the detector, not the thing to tune away); and if the drink pose
-  legitimately needs to dip lower than the current tolerance, the tolerance is derived
-  from the pose rather than widened flat.
-  VERIFIABLE: a Vitest case over the drink-pose body offset sweeps the full scale range
-  the herds use, at both ages, and asserts the offset never falls below the ground
-  sample; `enrichments` runs on both backends without the `animal-buried` assert firing.
-
 - [ ] 568. THE POLISH WATER-SAMENESS CHECK ROTATES ITS VERDICT (measured 09.08.2026 by
   the agent delivering point 557, on WebGL 2, with the world seed pinned to 42 at the
   launcher; bundle Testinfrastruktur). Step 13.8 of `polish` — "the water beyond the
@@ -5516,6 +4183,1344 @@ Build order, chosen so no two parallel agents own the same file:
   where today it passes green.
   Criticality: high — it does not break the game, but it silently voids the picture
   proof, which is the one check this project cannot replace with a test.
+
+- [ ] 265. ELDERLY (GERIATRIC) ANIMAL VARIANTS — an OLD version of each suitable
+  species, visibly aged AND behaviourally distinct, plus natural death of old age
+  (user 23.07.2026). PRIORITY/POSITION: queued BEFORE point 203 (do this content
+  feature before the 203 visual bug-finder). RESEARCH FIRST (a standalone Fable pass,
+  no code, safe to run in parallel): realistic geriatric APPEARANCE and BEHAVIOUR for
+  the game's fauna (the savanna grazers, elephants, the predators) and a realistic
+  natural-DEATH process — recorded, cited, in a new `docs/fauna-behaviour-1890.md`
+  (matching the citation/marker discipline of `docs/peoples-1890.md`; if a fauna doc
+  already exists, extend it). What to establish: the visible senescence cues (thinner/
+  sway-backed body, duller/greyer or worn coat, prominent shoulder/hip bones, worn or
+  broken tusks and sunken temples on old elephants, a stiffer/limping gait); the
+  behavioural shifts (moves slower; old males ousted from the herd and turning
+  SOLITARY — the classic old buffalo/elephant bull; withdrawal from intraspecies
+  contests: an elder no longer INITIATES a §264 fight and always LOSES to a younger
+  adult, fleeing an impending conspecific conflict); and the real basis for a
+  "dying" pattern (an old elephant's last molars wear out, so it seeks soft forage
+  near water/marsh and dies there — the grounded kernel the §4.4 "elephant graveyard"
+  folklore romanticizes; vultures do gather around a visibly dying/weak animal). Add
+  any further fitting, game-appropriate geriatric traits the research turns up. BUILD
+  (per the research): (a) APPEARANCE — an elderly-adult build schema analogous to the
+  point-169 baby schema (`buildLionCub`/the grazer calves) in `src/render/fauna.ts`
+  (`buildElderly*`/an age flag on the adult build): clearly-old cues per the research,
+  pure-tested for its proportions/part markers like the calf schema. (b) BEHAVIOUR —
+  pure helpers in `src/scenes/travel/wildlifeBehavior.ts`: an elderly adult moves at a
+  calibratable reduced speed factor, never initiates §264 intraspecies combat and
+  ALWAYS loses to a younger adult (the §264/§125 outcome matrix returns the elder as
+  loser; the elder flees an impending conspecific conflict), and — for GRAZERS and
+  the big cats (NOT elephants) — an ousted old male withdraws from the herd/pride and
+  turns solitary (per `docs/fauna-behaviour-1890.md`: old elephant BULLS keep high
+  status, so no ostracism for them; the crocodile gets NO elderly variant — no legible
+  aged cues). (c) NATURAL DEATH — an elderly animal occasionally dies with NO external
+  cause, at a calibratable low rate; the DYING PROCESS is depicted (`Wildlife.tsx` + a
+  pure state helper): the animal slows progressively, the §19.6/§22 poor-condition
+  vultures GATHER over it and descend as it collapses (the ground-truth reuse of the
+  pt-22 omen — the "patient circling of a doomed animal" is embellished, so key the
+  flock on the distressed/downed animal, not a long pre-death circle), it falls dead,
+  and the vultures consume it through the existing carcass system. An ELEPHANT that
+  begins dying instead drifts toward WATER (its worn last molars can no longer grind
+  coarse forage, so it seeks soft riverside/aquatic vegetation) and dies THERE — the
+  REAL mechanic per the research; the §4.4 elephant graveyard is framed as WHERE these
+  water-side deaths accumulate (folklore landmark + accurate mechanic coexisting), and
+  the mass death-pilgrimage is MYTH and is NOT built. (d) CALIBRATION — the elderly fraction of adults, the elderly speed
+  factor, the natural-death rate, and the dying-slowdown duration are `balance.ts`
+  values, debug-editable (§21). Ties to point 264 (the elder always loses a fight),
+  point 169 (the analogous age schema), §4.4 (the graveyard death) and §19.6 (the
+  vultures). VERIFIABLE: pure tests (`src/render/fauna.test.ts` — the elderly schema's
+  aged proportions/markers, built alongside the calves; `src/scenes/travel/
+  wildlifeBehavior.test.ts` — elderly speed factor strictly below the adult, elder
+  never initiates and always loses §264 combat, the natural-death roll boundaries, the
+  dying-slowdown curve, and the elephant-dying-target picking the graveyard); a live
+  check in `scripts/verify/enrichments.mjs` (a forced elderly natural death: slows →
+  vultures circle → falls → consumed; a dying elephant heads to the graveyard) with a
+  screenshot, picture-verified on BOTH backends. DOCS: `docs/fauna-behaviour-1890.md`
+  (research, in the SAME branch/commit as the build it informs), design.md §19 (a new
+  subsection: elderly variants, their behaviour, natural death and the elephant
+  graveyard death), the balance values. Any new sighting/death journal text in BOTH
+  languages with voice markup. NOTE: heavy `wildlifeBehavior.ts`/`Wildlife.tsx`/
+  `fauna.ts`/`balance` overlap — do NOT delegate the BUILD concurrently with another
+  wildlife point; the RESEARCH half and the pure schema/behaviour helpers (in new
+  files) can start in parallel, the scene wiring waits for the wildlife cluster to be
+  free. Implementation-ready.
+
+- [ ] 269. BIRDS FLEE BY FLYING + REGION-APPROPRIATE AERIAL PREDATORS (research-gated)
+  (user 23.07.2026). Two linked additions, BOTH gated on a Fable research pass first.
+  (A) FLIGHT-CAPABLE BIRDS ESCAPE BY FLYING: every bird species that can fly gets a
+  GROUND (perched/sitting/feeding) state and an IN-AIR (flying) state; when it flees a
+  ground predator (or an approaching elephant) it TAKES OFF and flies, which puts it
+  OUT OF REACH of ground predators and elephants (they can no longer catch it in the
+  air). A ground predator can catch a bird ONLY if it SURPRISES it while the bird is
+  still ON THE GROUND (took off too late) — an airborne bird is safe from ground
+  hunters. So the existing bird fauna (the shore/scavenger birds, the plover, vultures,
+  etc.) needs the ground↔air state and a takeoff-on-flee transition.
+  (B) AERIAL PREDATORS (research settled — docs/fauna-behaviour-1890.md §B): add
+  region-appropriate FLYING predators (raptors) that hunt prey birds and catch them IN
+  THE AIR, per the researched per-region table (§B2.1): falcons (peregrine/lanner/
+  barbary) and the two hawk-eagles (African, Ayres's) attack by a STOOP/DESCEND, while
+  the accipiter/harrier/fish-eagle majority use an air-catch tail-chase or an ambush
+  from cover (no height). The stoop is BUILT — but as a SCRIPTED "descend-and-strike"
+  EVENT (the raptor enters high, plunges onto a flying bird, strikes, resolves), NOT a
+  persistent 3D flight-height simulation (the research explicitly warns against a full
+  altitude-band layer, since most raptors don't use height). So there is at most a
+  simple two-state high/low for the stoop event itself, not a per-bird altitude field.
+  RESEARCH FIRST (Fable pass, docs-only, extend `docs/fauna-behaviour-1890.md`): which
+  African raptors/aerial hunters (~1890, by region) take BIRDS as prey; their hunting
+  mode (stoop/dive vs. tail-chase), typical prey birds, whether flight-height layering
+  and a surprise-from-above are realistic, and whether "a ground predator only gets a
+  bird caught on the ground" matches real behaviour. Produce a cited per-region aerial-
+  predator + prey-bird table with the same PERIOD/INFERRED/MYTH markers, and a short
+  "Implementation brief" (§B4 — already delivered; the research half is DONE). BUILD
+  (after the wildlife cluster is free): the bird ground/air state machine +
+  takeoff-on-flee (pure flee helpers in `src/scenes/travel/wildlifeBehavior.ts`, wired
+  in `src/scenes/travel/Wildlife.tsx`) — with the researched fly/no-fly split (small
+  birds and flamingos fly to escape, the flamingo with a laborious running take-off as
+  a vulnerable window; plover CHICKS crouch/freeze and can be caught, the adult flies
+  and does the broken-wing distraction); the aerial-predator species (build in
+  `src/render/fauna.ts`, seeded from a new region-keyed aerial-predator pool per §B2.1)
+  with an air-catch tail-chase for the ambush guild and the SCRIPTED descend-and-strike
+  for the falcon/hawk-eagle guild; ground predators lose the airborne target. Reuse the
+  existing hunt/flee/carcass machinery; every started drama resolves (I4). All
+  calibratable (takeoff trigger distance, the stoop's high/low band, dive chance/speed,
+  aerial-hunt rate) and debug-editable. VERIFIABLE: pure tests — a fleeing bird
+  transitions to air and a ground predator's reach excludes an airborne bird while a
+  still-grounded (surprised) one is catchable; the aerial predator's air-catch and (if
+  built) the height-gated dive; region pools sane. Live check / screenshot: a forced
+  ground-predator approach makes birds take off and escape, and (if built) an aerial
+  predator stoops on a flying bird — on BOTH backends. DOCS: `docs/fauna-behaviour-1890.md`
+  (research); design.md §19 (bird flight escape + aerial predators). Any new
+  sighting/journal text both languages with voice markup. NOTE: wildlife-render/behaviour
+  cluster (Wildlife.tsx/wildlifeBehavior.ts/fauna.ts) — the RESEARCH runs in parallel
+  now; the BUILD waits for the cluster to be free and does NOT run concurrently with
+  another Wildlife.tsx point. Implementation-ready once the research lands.
+
+- [ ] 310. LOW-PRESET PERFORMANCE PASS FOR TWO OPPOSITE DEVICES (user 25.07.2026,
+  recalibrated 06.08.2026). LOW must run WELL on a weak Windows desktop AND on the
+  Galaxy S25 — one preset, two opposite bottlenecks, which is the whole difficulty
+  of this point.
+  INPUTS — REAL F8 REPORTS. `local/hoa-bench-2026-08-03-webgpu-kohler.json` (WEAK
+  Windows desktop, AMD RDNA-3, WebGPU with real GPU timestamps, production build
+  2b6b417, 2195x1235 at dpr 1.75, deposited by the user 06.08.2026) is what this
+  point is CALIBRATED against, being the slowest machine measured. It is NOT the
+  user's own PC — that one runs MEDIUM acceptably, and its occasional stutter is
+  explicitly not part of this point. `local/samsung-s25-bench.json` (Galaxy S25,
+  Adreno 8xx) is the second target. `local/m1pro-bench.json` is CONTEXT ONLY: it
+  predates the LOW preset and its absolute GPU milliseconds aggregate passes — judge
+  that machine on its FRAME series and on ratios between its own configs.
+  NO SECOND RUN IS AVAILABLE (user 06.08.2026): the weak PC is a third party's and
+  cannot be re-measured, so plan no step that needs a fresh run on a user machine.
+  Everything needed is in the deposited report — real GPU timestamps, eleven
+  ablation configs, per-system triangle and mesh counts per phase.
+  WHAT THE TWO DEVICES SAY.
+  - DESKTOP: the default (medium) preset is unplayable — 17.9 / 12.7 / 13.1 fps at a
+    GPU median of 45.22 / 68.35 / 65.93 ms. LOW holds 60 fps with almost no headroom
+    in the desert: GPU median 14.81 ms of the 16.70 ms budget (89 %), 95th-percentile
+    frame 33.7 ms — every twentieth frame is dropped. Savanna 8.65 ms, driving
+    9.63 ms (p95 frame 33.1 ms); CPU 5.20 / 7.70 / 6.80 ms.
+  - S25: LOW GPU 9.83 / 8.72 / 6.95 ms against a CPU of 8.70 / 7.50 / 7.60 ms. The
+    CPU sits AS HIGH AS the GPU, so a pixel cut alone buys the phone little — this is
+    where the behaviour-throttling and instance-count levers pay.
+  THE DECISIVE READING — THE LOW FRAME IS PIXEL-BOUND, NOT TRIANGLE-BOUND. At LOW the
+  desert draws 542,748 triangles in 55 calls for 14.81 ms while the savanna draws
+  1,008,904 triangles in 58 calls for 8.65 ms: nearly double the geometry at 58 % of
+  the cost. The ablations agree — from dpr 1.75 to dpr 1 the pixel count falls 3.06x
+  and the GPU time 2.77x / 2.91x / 3.10x, almost exactly in step. This governs the
+  ORDER of the delivery: the dpr cap is the primary lever, and the triangle levers
+  below must never be reported as the fix for the desert phase, whose share figures
+  are shares of TRIANGLES, never of milliseconds. The constant 425,118-triangle /
+  180-mesh system is 78 % of the desert frame at LOW on this second device and
+  backend too, and travel-dressing is 53 % of the savanna frame (531,058 tris),
+  matching the S25.
+  SALVAGED IDEA (25.07, from the retired `feat/276-wildlife-lod` branch — see point
+  329): throttling the BEHAVIOUR updates of off-screen animals cuts the driving
+  frame cost. The branch itself was retired unmerged (219 commits behind main, its
+  three files moved on 16/9/1 commits since), but the lever is sound and belongs
+  here: update animals outside the rendered frame at a reduced rate (projected via
+  the shared `isOnScreen`, never an assumed radius — the point-172 rule), keeping
+  every §19 drama deadline in sim time so no drama stalls. Judge it on the CPU
+  series, where both devices sit at 5-9 ms at LOW.
+  DIAGNOSIS DONE (25.07, main session): the unnamed 425k system IS the river/lake
+  water geometry — `src/scenes/travel/Rivers.tsx` mounts the ribbon mesh and every
+  lake sheet with NO `name` prop (around the `<mesh geometry={geometry}
+  material={riverMat}>` / lake map), so `groupKey` in src/systems/benchmark.ts falls
+  back to the material name `MeshStandardNodeMaterial`; the courses are global and
+  biome-independent, which explains the constant count in every phase. Deliver:
+  (a) NAME those groups (and any other unnamed one) so the F8 report attributes
+  every system, (b) a LOW flora/dressing DENSITY lever (calibratable
+  instance-count factor on top of the existing floraFogFactor radius cut — the §19.9
+  dressing keeps reading as savanna, only thinner), (c) a LOW geometry lever for the
+  identified 425k-tris system (e.g. coarser river-ribbon tessellation on LOW if it is
+  the water — every §11.3 continuity/never-buried invariant must keep passing), (d) a
+  calibratable `dprCap` BELOW 1 on LOW itself (starting value 0.8 = 0.64x the pixels,
+  which projects the desert's 14.81 ms near 9.5 ms) — the primary lever, not a
+  last resort, and the touch preset stays a SUBSET of low. EVERY new lever gets
+  entries in ALL THREE QUALITY_PRESETS levels (the src/config/quality.test.ts
+  completeness gate and the docs/graphics-detail-levels.md sync test enforce this),
+  stays debug-tunable within its level, and reads through the point-276
+  effective-selector pattern. The delivery must move BOTH the pixel cost and the
+  CPU/instance cost: a LOW that only cuts dpr fixes the desktop and leaves the phone
+  where it is. VERIFIABLE: pure tests for each new preset key; the §11.3/§19 suites
+  stay green at LOW (ribbon continuity, dressing-streaming no-pop projection checks);
+  picture checked on BOTH backends at LOW; and the price check in this order —
+  FIRST hardware-independent arithmetic against the deposited numbers (the rendered
+  pixel count and the per-system triangles the new levers remove, with the desert's
+  14.81 ms projected to 10 ms or below by the measured pixel-to-time
+  proportionality), THEN a before/after F8 run of the SAME three phases at LOW on the
+  project's own verification host, whose absolute milliseconds mean nothing but whose
+  RELATIVE drop must confirm the projection rather than contradict it — without a
+  visual regression the user rejects.
+
+- [ ] 314. DRIFTING PALE PATCHES ON WATER (user 25.07.2026, screenshot: bird's-eye at
+  a river mouth near the ocean — two elongated pale/greenish patches ON the water
+  surface near the shore, which MOVE/CHANGE as the traveller walks; "immer noch
+  gelegentlich", i.e. the class was seen before). DIAGNOSE BY THE PICTURE first
+  (drive the reported shore on both backends, screenshot series), then root-cause —
+  candidate hypotheses to check, not to assume: (1) shore/crest foam sampled in a
+  non-world-anchored space so the mask swims with the camera; (2) the far-sheet vs
+  near-water overlap at the coast (zoom-gated far sheet showing through); (3) the
+  point-211 ribbon-row lift re-evaluating per terrain-chunk LOD so lifted rows pop
+  as chunks stream (matches "changes while walking"); (4) foam from the river mouth
+  bridge (MOUTH_BRIDGE) rows extending into the shelf. FIX the identified cause; the
+  §11.3 continuity/never-buried/mouth-bridge invariants stay green. VERIFIABLE: a
+  driven enrichments check at the reported spot asserts the water pixels stay
+  stable while the traveller moves (frame-diff over the water region bounded, on
+  BOTH backends), plus the screenshot pair before/after; pure test for whichever
+  sampling rule was wrong.
+
+- [ ] 315. THE SPHINX IS REBUILT FROM SCRATCH, FAR MORE ELABORATE (user 28.07.2026,
+  superseding every earlier display report about it — the flicker, the shape and the
+  half-buried read are all answered by the new model, not by patching the old one). The
+  user's verdict on the deployed build: "die Darstellung der Sphinx gefällt mir allgemein
+  nicht … man kann sie kaum als Sphinx erkennen", and the screenshot shows why — a stack
+  of plain boxes with a slab on top, reading as a gate or a table, at a monument every
+  player recognises on sight. The FIRST-PERSON view is what matters most; the bird's-eye
+  landmark and the §2.5 skyline silhouette are named as "auch nicht schön" and are part of
+  the same job.
+  THE TARGET: a Great Sphinx that is recognisable at a glance from any standpoint a player
+  can reach, and worth walking up to — a couchant lion body with the forepaws stretched
+  forward, a human head in the nemes headdress with its brow band and the folded lappets
+  falling to the chest, the broken nose and the missing beard of the real monument, the
+  chest between the paws, and the weathered horizontal banding of the limestone courses.
+  It is the one built landmark in the game with a FACE; it must not be the crudest.
+  ACCURACY AND RECOGNISABILITY, and how to hold both: `docs/giza-1890.md` records the
+  ~1890 state — the body buried to the shoulders, only head, neck and upper back standing
+  clear, which is exactly what makes the current model unreadable. Do NOT dig it out; the
+  period state is researched and stands. Buy the recognisability from DETAIL and from the
+  drift's own shape instead: the emergent head carries the nemes, the face and the neck at
+  a resolution that reads from across the site, and the sand mound is modelled as a body
+  UNDER sand — a long couchant swell with the shoulders' shape showing through and the
+  back ridge breaking the surface — rather than a heap beside a box. A player who has
+  never seen the site must be able to say "that is the Sphinx"; a player who knows it must
+  find the 1890 burial line where the photographs put it. If, once built, those two
+  genuinely cannot be reconciled, say so with the pictures rather than quietly abandoning
+  either — the choice is then the user's.
+  ALL THREE SCALES, one model, three levels of detail: (a) FIRST-PERSON at the site, the
+  full model; (b) the BIRD'S-EYE landmark, seen from above and far — the silhouette from
+  that angle is what carries it, so the paws, the body swell and the head must be
+  distinguishable at the travel scale rather than a lump; (c) the §2.5 SKYLINE silhouette
+  from Cairo (point 82), where only the outline exists and it must still read as a
+  crouching figure with a raised head. Derive them from ONE definition so the three cannot
+  drift apart, the way the Giza plateau's two records did (point 338).
+  COST IS PART OF THE JOB: the site model may be elaborate, but it is drawn every frame at
+  a place the player stands in. Sort it into the quality levels like every other optical
+  feature (§21, `QUALITY_PRESETS` in `src/config/quality.ts`) — a fuller mesh on high, a
+  reduced one on low — and report the measured frame cost at the site on BOTH backends at
+  LOW and at MEDIUM. A level that cannot afford the full mesh gets the reduced one, named
+  and tested, never a silent downgrade.
+  WHAT THIS REPLACES: the old spec asked for a mound envelope and blamed a coplanar sheet
+  for a flicker at the body's base. Both die with the old geometry — but the flicker is
+  still the sharpest acceptance signal available, so the live check MOVES the camera
+  rather than taking one still, and no z-offset may be used to hide a fight that the new
+  model should not have.
+  VERIFIABLE: pure Vitest on the shared definition — the three levels of detail come from
+  one source, the burial line matches the documented ~1890 state, head and upper back
+  stand clear of the drift while every other body part sits below it, the drift's
+  footprint does not exceed the body's by more than its skirt, and the collidable mass
+  still matches the drawn body (point 378's rule). Live on BOTH backends: a screenshot SET
+  from several standpoints inside the site — face on, in profile, from behind, and one low
+  enough to look along the drift — plus the bird's-eye landmark and the Cairo skyline
+  frame, judged by the picture; and a moving-camera pass that shows no flicker anywhere on
+  the model.
+  DOCS in the same commit: `docs/acceptance-evidence.md` §15/§25 gain the chain, and
+  `docs/graphics-detail-levels.md` the new per-level entries.
+
+- [ ] 391. THE GIZA MONUMENTS STAND AT A MONUMENTAL SCALE IN THE FIRST-PERSON VIEW (user
+  28.07.2026). Standing on the plateau, the pyramids and the Sphinx must read as GIANTS —
+  markedly larger than today, so that a person at their foot is a speck against them. The
+  stated reason is a planned later feature and belongs in the record: the user intends a
+  secret entrance, found by deciphering hints from inhabitants, that leads into a further
+  first-person scene INSIDE the monument, where more clues to the treasure wait. Entering
+  is only plausible if the outside is big enough to hold an inside. THAT FEATURE IS NOT
+  BUILT HERE — this point delivers the scale it needs, nothing more; no entrance, no
+  interior scene, no hint chain.
+  WHAT TO CHANGE: the site-scale geometry in `src/scenes/place/gizaSite.ts` (the pyramid
+  cones and the Sphinx). Take the REAL proportions as the yardstick — the Great Pyramid
+  stood ~146 m tall on a ~230 m base, the Sphinx ~20 m tall and ~73 m long — and state in
+  the commit what fraction of real scale the site now uses and why. The eye height is
+  1.5 m (§20), so the numbers decide the feeling: from the base, the apex must be far
+  above the top of the frame at the default field of view.
+  WHAT IT COLLIDES WITH, and none of it may be broken quietly:
+  · the WALKABLE RADIUS (point 390) — bigger monuments need more ground to be seen from,
+    and both points touch the same site. Work them on ONE branch, 390 first: the radius is
+    measured against what the picture offers, and the picture changes here.
+  · the SPHINX MODEL (point 315) — same file, same monument. Whichever lands second
+    rebases on the first; do not build the new Sphinx twice at two sizes.
+  · the COLLIDERS must follow the drawn masses, not the old ones (point 378's rule: the
+    collider is derived from the placement the renderer draws). This is a REPORTED bug the
+    user ruled belongs here rather than in a point of its own (dump
+    `hoa-state-2026-07-29-4196407680`, Giza, WebGPU, medium: the traveller walks into the
+    pyramid). Root cause, already measured — do not re-analyse: `gizaColliders`
+    (`src/scenes/place/gizaSite.ts`) uses only the cone footprint
+    (`pyramidFootprint` = base/√2), while the DRAWN masses reach further —
+    Khafre's bedrock plinth to 1.14·base and Menkaure's granite skirt to 1.02·base
+    (`gizaSitePyramidParts` in `src/render/landmarks.ts`).
+  · the PLACE MAP inside Giza is EMPTY (second dump, same seed, `mapOpen: true`,
+    `mode: place (giza)`), and it is fixed here. Measured cause: `MapOverlay`'s `PlacePlan`
+    (`src/ui/MapOverlay.tsx`) draws the layout's buildings, dwellings and lanes, but
+    `buildGizaLayout` leaves `interactives`/`dwellings`/`paths`/`rocks` empty — the
+    monuments exist ONLY as colliders, which the plan does not read. Fix it GENERICALLY
+    over `layout.colliders`, so a future monument-like place inherits a drawn plan instead
+    of the same blank sheet, with a Vitest case that the Giza plan is non-empty.
+  · the BACKDROP and panorama (points 181/381) — a taller monument may now rise past the
+    ground line the silhouettes stand on; the seam checks in
+    `src/scenes/place/backdrop.test.ts` must still hold.
+  · the BIRD'S-EYE landmark and the Cairo SKYLINE (point 82) are a DIFFERENT scale and are
+    NOT enlarged by this point — check that they are unchanged, and say so.
+  VERIFIABLE: pure Vitest on the site geometry — the pyramid height and base, and the
+  Sphinx length, sit at the stated fraction of the real proportions, and the collider set
+  matches the drawn masses. Live on BOTH backends: a first-person frame from the base of
+  the great pyramid looking up (the apex out of frame is the point), one from the site
+  centre showing all three, and one at the Sphinx — judged by the picture, plus the
+  measured frame cost at LOW and MEDIUM.
+  DOCS in the same commit: design.md §4.4 states the monumental first-person scale and
+  names the planned interior as an OPEN idea, not a promise. design.md sits at its
+  measured ceiling, so the sentence is paid for by a measured raise with its justification
+  in `scripts/doc-budget-core.mjs`, or by shortening elsewhere — the guard decides, not a
+  round number.
+
+- [ ] 320. SPRINGS AS REAL 3D BUBBLING WATER (user 25.07.2026: the springs still
+  read as a mere symbol — animated now, but flat; they should LOOK like a spring
+  with water bubbling three-dimensionally). Rework the §11.3 spring depiction at
+  travel scale into a small 3D water feature. ANCHOR (25.07, main session): the
+  current spring is built in `src/scenes/travel/Rivers.tsx` as a stack of FLAT discs
+  — circle meshes rotated `-Math.PI / 2` (the pool, a damp-ground ring and the
+  animated ripple), which is exactly why it reads as a symbol however it animates.
+  Replace that stack with: a low dome/upwelling mesh whose
+  surface visibly bubbles (TSL displacement/normal animation — renderer-agnostic,
+  both backends), a bright welling centre with concentric ripple rings, a small
+  wet pool/outflow meeting the terrain (no floating disc, no billboard), sized to
+  read at the default zoom 0.5 without dominating. Calibratable size/intensity
+  under balance (debug-editable); quality-level entries for ALL THREE
+  QUALITY_PRESETS (the completeness gate enforces this) — LOW may use a cheaper
+  variant but the feature stays visible. VERIFIABLE: the existing "at least one
+  spring" check extended: the spring mesh is 3D (non-flat bounding box), its
+  surface animates over sim time (vertex/pixel delta between two sampled frames at
+  the spring, both backends), and it sits ON the terrain (no gap/clip at the rim —
+  ray/heights check); screenshot pair added to the §7.2 evidence set; the picture
+  judged on BOTH backends per the render rule.
+
+- [ ] 322. STAGED-EVENT FAILURES ARE EASY TO MISS (user 25.07.2026: staging "calf
+  mired at waterfall" appeared to do nothing; the user later suspected an unseen
+  error message). Make every debug stage/trigger outcome UNMISSABLE: a persistent,
+  clearly styled result banner — success names what was staged and where, failure
+  names the missing precondition in plain language ("no waterfall within reach —
+  jump to a waterfall first") — staying until dismissed or superseded, both
+  languages. Also RE-CHECK the mired-at-waterfall staging itself against a
+  realistic debug session: if its precondition search radius is too small, widen it
+  or teleport-stage like the other dramas. VERIFIABLE: pure test of the
+  outcome→message mapping (every stageable event has success AND failure text in
+  both languages, no silent path); settings.mjs live-checks the banner on an unmet
+  precondition and a successful stage; both languages.
+
+- [ ] 327. TWO NEARBY CARCASSES MUST SHARE ONE VULTURE FLOCK (user 25.07.2026: a
+  second flock spawns and the two overlap). Give the §19.6 flock a claim over a
+  carcass CLUSTER: a new carcass within a calibratable radius of a flock's current
+  target joins that flock's queue instead of drawing a second flock, and the flock
+  works them in turn, leaving only when the cluster is done. No two flocks may be
+  active within the cluster radius. VERIFIABLE: pure test of the cluster claim (a
+  carcass inside joins, one outside draws its own flock; boundary exact); live
+  check with two staged carcasses close together — exactly one flock, both eaten,
+  no overlap; both backends.
+
+- [ ] 328. VULTURES DO NOT VISIBLY LAND (user 25.07.2026: "they seem to fly one
+  moment and stand the next — is there a landing at all?"). Add a real landing
+  approach to the §19.6 flock AND the lone ground scavenger: a descending glide
+  along the approach heading with slowing forward speed, a flare with raised wings
+  just before touchdown, then the standing pose — over a calibratable window long
+  enough to read at bird's-eye distance; likewise a visible take-off (run/flap into
+  the climb) instead of an instant switch to flight. VERIFIABLE: pure test of the
+  landing profile (height decreases monotonically to the landed height across the
+  window, forward speed decreases, the flare pose fires in the last phase); live
+  check that a landing bird's sampled height passes through intermediate values (no
+  single-frame snap) while the point-128 "stands on its own ground" clearance still
+  holds; screenshot of the flare; both backends.
+
+- [ ] 343. THE SUN STANDS WHERE IT REALLY STOOD — ELEVATION FROM DATE AND LATITUDE
+  (user 25.07.2026; design.md §2.7 states the target). Today `SUN_DIR` is a hard
+  constant in BOTH scenes — `[0.5, 0.62, 0.38]` in `src/scenes/travel/TravelScene.tsx`
+  and `[0.52, 0.68, 0.34]` in `src/scenes/place/PlaceScene.tsx`, an elevation of ~45°
+  for the whole continent and the whole five-year window. The season only dims and
+  reddens it. That is why the relief reads flat: at that angle a 3000 m massif throws
+  ~3 km of shadow, about ONE DEM texel.
+  TARGET: derive the sun's elevation and azimuth from the real solar geometry —
+  declination from the DATE (the same date that drives §19.13) and the traveller's own
+  LATITUDE — at a FIXED local solar hour. There is no time of day in this game and
+  none is being added; the hour is a calibratable constant, `balance.sun.hour`,
+  DEFAULT 16:00. That default is load-bearing and must not be "tidied" to noon: at
+  local noon the sun stands 90° over the equator in March and 83° over Cairo in June,
+  which casts no usable shadow at all, while at 16:00 the elevation runs about 7°-37°
+  across the entire map and year (Cairo 37° June / 11° December, Cape Town 9° in its
+  June winter). One hour later breaks it — at 17:00 the Cape sun in June is BELOW the
+  horizon, and a fixed hour must never put the sun under the horizon anywhere in the
+  world window (lat -37..38, all 365 days).
+  ONE DEFINITION, READ BY BOTH SCENES. The two constants above are not merely stale,
+  they DISAGREE (~45° against ~48°) — the same sun stands at two heights depending on
+  which view holds the camera. The derivation therefore lands in ONE place that travel
+  and settlement both read; neither scene keeps a sun of its own, or they drift apart
+  again the first time one of them is touched.
+  EVERYTHING THE SUN FEEDS MUST FOLLOW IT, or the picture contradicts itself: the
+  directional light AND its shadow camera in both scenes, the sky dome's disc and halo
+  (`src/render/sky.tsx`, whose `sunDirection` must keep agreeing with the light — its
+  own comment says so), and the baked environment light
+  (`createEnvironmentTexture`/`IBL_SUN` in `src/render/Effects.tsx`), re-derived when
+  the date or the position changes and NEVER per frame.
+  THE SETTLEMENT IS THE STRICTER OF THE TWO (user 28.07.2026). Point 344's eye
+  adaptation and sun glare build DIRECTLY on this angle, and at eye height a wrong sun
+  is not a subtlety — it decides whether the traveller is dazzled turning west, and
+  where every wall's shadow falls in a lane he walks through. The settlement sun is
+  therefore derived from the SETTLEMENT's own latitude and the current date, never from
+  a scene default, and the acceptance below judges it at eye height.
+  AND THE JOURNEY MUST SHOW IT (user 28.07.2026). The bird's-eye view is where the
+  change becomes legible: walking the continent from the Mediterranean to the Cape at
+  one date, the shadows must visibly turn and lengthen as the latitude runs out — and
+  the same place in June and in December must not look alike. A sun that is merely
+  CORRECT per frame but whose change no traveller notices misses the point of this
+  ticket; the live acceptance therefore measures a TRAVERSE, not only a single spot.
+  THE SKY PRESETS ARE THE REAL WORK, not the arithmetic. They are authored for a high
+  sun; a low sun under an unchanged noon-blue dome reads as a bug — the same failure
+  the overcast handling already guards against (a dimmed sun under a bright blue sky,
+  sky.tsx). The horizon must warm and redden as the sun drops. Judge this by the
+  PICTURE on both backends, not by the uniform.
+  WATCH THE SHADOW QUALITY at the low end: cascaded shadow maps degrade at grazing sun
+  angles (long shadows, peter-panning, cascade seams). If the 7° end proves ugly, clamp
+  the elevation used for the SHADOW camera to a calibratable floor while the visible
+  sun keeps its true angle — and record that as a deliberate divergence, never silently.
+  NOT A QUALITY LEVER: this is world model like the seasons and applies at EVERY
+  graphics level. It adds no per-frame cost and gets no `QUALITY_PRESETS` key.
+  DEBUG: the sun direction stays inspectable and the hour editable in the debug menu
+  (§21.2), so a tester can walk the whole range without waiting for a date.
+  VERIFIABLE: pure (`src/systems/`) — declination and hour angle produce the known
+  elevations above (Cairo June/December, the equator at equinox, Cape Town June), the
+  hemispheres invert across the year, and a SWEEP over the full world bounds × all 365
+  days asserts the sun never falls to or below the horizon at the default hour (the
+  17:00 counter-case is pinned as the witness that the bound is real); the azimuth is
+  westerly in the afternoon for both hemispheres; and a NORTH-SOUTH SWEEP at one date
+  returns a monotonically changing elevation, so the traverse below has something to
+  show. Live (`scripts/verify/enrichments.mjs` + `polish.mjs`, BOTH backends,
+  screenshots): the same place rendered in June and in December differs measurably in
+  pixels and in shadow direction; a TRAVERSE of at least three widely separated
+  latitudes at one date yields shadows whose measured direction and length differ
+  between the stops — the check the user's "you should notice it while walking" asks
+  for; inside a settlement, at EYE HEIGHT, the shadows agree with the sky-dome sun disc
+  rather than pointing elsewhere; no console errors.
+  DOCS: design.md §2.7 already states it; CLAUDE.md §7.1 point 14 gains the built
+  behaviour when this lands.
+
+- [ ] 344. EYE ADAPTATION AND SUN GLARE, HIGHEST QUALITY LEVEL (user 25.07.2026;
+  design.md §2.7 states the target). BUILDS ON POINT 343 — before the sun is low there
+  is nothing to be dazzled by, and with a 50° vertical field of view the first-person
+  camera sees roughly -25°..+25°, so the 16:00 sun (6.7°..37°) sits IN FRAME whenever
+  the traveller turns west over most of the map and year. Both halves belong in ONE
+  point: they share the same tuning pass over the same image, and building them apart
+  would mean turning the same dial twice.
+  (a) EYE ADAPTATION — the effect the player reads as high dynamic range. The exposure
+  follows the frame's mean luminance (from the HDR buffer's mip chain, not a CPU
+  readback): facing the sun darkens the scene, turning into a lane's shade opens it up
+  again. The range is BOUNDED and calibratable around today's fixed
+  `toneMappingExposure` of 1.05 (`src/App.tsx`) — `balance.exposure.*`,
+  debug-editable — and the two directions have their own time constants (brightening
+  fast, darkening slow, as an eye does). A bounded controller, never free-running.
+  FIRST PERSON ONLY. The bird's-eye view keeps its fixed exposure: design.md §2.7
+  forbids post-processing that costs the map view its readability, and a map whose
+  brightness breathes while driving is precisely that. This is a rule, not a
+  performance choice — do not "unify" the two scenes.
+  (b) GLARE. The sun disc in `src/render/sky.tsx` (`disc = pow(s, 1200) * 3.0`) must
+  sit clearly above the bloom threshold so it blooms on its own, plus the upstream
+  `three/addons/tsl/display/LensflareNode.js` WITH an occlusion test: a hut wall or
+  roof edge moving in front of the sun kills the glare in the same frame. Without that
+  test the flare survives its occluder and reads as a sticker on the lens — the single
+  detail that separates a convincing glare from a cheap one.
+  QUALITY: highest level only, with entries for all three levels in `QUALITY_PRESETS`
+  (`src/config/quality.ts`) and `docs/graphics-detail-levels.md` updated in the same
+  commit — the completeness gate and the doc-sync test both fail otherwise.
+  ESTIMATED COST ~0.3-0.8 ms; the real number comes from F8 on the user's hardware.
+  VERIFIABLE: pure — the exposure controller maps luminance to a target within its
+  clamp, converges from both directions, honours its asymmetric time constants and
+  cannot run away from a black or a blown-out frame; the preset completeness and doc
+  sync cover the new keys. Live (BOTH backends, screenshots): in a settlement facing
+  the sun the rendered frame's mean brightness FALLS within a bounded number of frames
+  and recovers when the traveller turns away — measured in PIXELS, never in the
+  uniform (the §7.2 lesson that three rounds of uniform-level checks once passed while
+  the player saw nothing); the glare is present with the sun in the open and gone with
+  a building between; and in the bird's-eye view a driven pass leaves the exposure
+  UNCHANGED, which is the readability guard's own witness.
+  DOCS: design.md §2.7 already states it; CLAUDE.md §7.1 point 14 gains the built
+  behaviour when this lands.
+
+- [ ] 345. SUN SHAFTS THROUGH WHAT STANDS IN THE WAY, HIGHEST QUALITY LEVEL (user
+  25.07.2026). With the low afternoon sun of point 343, a palm crown, a roof edge, the
+  Djinguereber minaret or the Giza pyramids finally have something to cast shafts
+  through. Wire the upstream `three/addons/tsl/display/GodraysNode.js`
+  (`godrays(depthNode, camera, light)`) into the post chain in `src/render/Effects.tsx`
+  beside the existing GTAO/bloom/TRAA nodes.
+  FIRST PERSON ONLY, and for a reason worth writing down: screen-space godrays need
+  the light IN the frame, and the bird's-eye camera looks ~60° down while the sun
+  stands at most 37° up — it is never in that frame. Wiring the pass there would cost
+  milliseconds for an effect nobody can see. Do not enable it in the travel scene.
+  QUALITY: highest level only, entries for all three levels in `QUALITY_PRESETS` plus
+  `docs/graphics-detail-levels.md` in the same commit.
+  THIS ONE IS PRICED BEFORE IT IS KEPT. It is the only effect in this family with a
+  real per-pixel cost (estimated +1.5-3 ms; on the measured S25 baseline of ~12.6 ms
+  GPU that is +12-25 %). Run F8 on the user's hardware BEFORE and AFTER on the same
+  build and record both digests in the commit. If the cost is not worth the picture,
+  the point is closed by REMOVING the pass and recording the measurement — that is a
+  legitimate outcome, exactly as the SSR removal was, and it must not drag point 344
+  with it.
+  VERIFIABLE: pure — the preset completeness gate and the doc-sync test cover the new
+  key; the pass is absent from the travel scene's chain by construction. Live (BOTH
+  backends, screenshots): in a settlement with the sun behind a roof edge, the pixels
+  along the sun direction brighten measurably against the same frame with the level
+  stepped down — judged on the image, not on the flag; no console errors; the F8
+  before/after numbers are recorded.
+
+- [ ] 346. HORIZON MAPS BAKED FROM THE DEM — SELF-SHADOWING AND SKY OCCLUSION AT
+  PLANETARY RANGE (user 25.07.2026; design.md §2.7 states the target). A new offline
+  step beside `scripts/build-geodata.mjs` measures, per DEM texel, the HORIZON ANGLE —
+  how high the land rises around that point — and the terrain shader reads it. Two
+  effects out of one bake: the land SHADES ITSELF far beyond any shadow map's reach,
+  and every hollow sees less sky than the ridge above it and is lit accordingly.
+  IT ONLY PAYS BECAUSE OF POINT 343, and depends on it: at the old fixed ~45° sun a
+  3000 m massif threw ~3 km of shadow, about one DEM texel. At the 16:00 sun's low end
+  (~9°) the same massif throws ~19 km — nearly seven texels, visible terrain shading
+  across the view.
+  THE ALGORITHM IS THE WHOLE FEASIBILITY QUESTION. Naive ray marching is 8.8 M texels ×
+  directions × ~100 steps ≈ billions of samples and is not an option in Node. Use the
+  standard horizon SWEEP (per direction, march the grid line by line keeping a monotone
+  stack of candidate horizons), which is linear in texels — seconds, not hours. Pin the
+  sweep against a brute-force reference on a SMALL patch in the tests: that comparison
+  is what proves the fast path correct.
+  ONLY SIX DIRECTIONS ARE NEEDED, and the reason is worth keeping: because the hour is
+  FIXED (point 343), the sun's azimuth never leaves a 74° westerly arc — 233°..307°
+  over the entire map and every day of the year. Bake that arc at ~15° steps (6 slices)
+  plus ONE direction-averaged sky-occlusion channel; a full circle would be wasted
+  storage. The fragment interpolates between the two slices bracketing the current
+  azimuth.
+  IF THE DEBUG HOUR LEAVES THE ARC (the `balance.sun.hour` field of point 343 is
+  editable), the shading must CLAMP to the nearest baked slice and say so through the
+  dev channel — never silently shade from the wrong direction. Pure-test that clamp.
+  ASSET BUDGET, to be settled by the PICTURE and recorded: 7 channels (6 + occlusion)
+  in two RGBA textures. At half DEM resolution (1460×1500, ~6 km per texel) that is
+  ~17.5 MB raw, roughly 5-9 MB as PNG; at quarter resolution ~4.4 MB raw, ~1.3-2.2 MB.
+  Start at half, and drop to quarter if the download budget bites — today's whole
+  `dem.png` is 6 MB, so this may not dwarf it. Horizon angles are low-frequency and a
+  soft, kilometre-scale shadow edge is physically right, so a coarse map is not a
+  compromise in the way a coarse shadow map would be.
+  SCOPE: the bird's-eye TERRAIN only. Settlements have their own local scene and ground
+  and are untouched.
+  QUALITY: on at MEDIUM and HIGH, off at LOW — and at low the extra textures are NOT
+  FETCHED at all, since the runtime cost is one texture lookup but the download and
+  video memory are what a weak device actually cannot afford. Entries for all three
+  levels in `QUALITY_PRESETS` plus `docs/graphics-detail-levels.md` in the same commit.
+  THE FETCH IS GATED ON THE EFFECTIVE LEVEL, not merely the use of the result: at low
+  the request is never issued, so a `?quality=low` link (point 347) costs the player
+  those megabytes NOTHING — the whole reason that link exists. The gate must therefore
+  sit at the request, never at "load it and ignore it". Two consequences to build for:
+  the load is LAZY and keyed on the level, and RAISING the level at runtime (F9, the
+  debug picker) fetches the maps then and applies them when they arrive, without
+  blocking the frame or stalling the level switch. Pure-test both directions — no
+  request at low, exactly one request when the level rises, and none again on a second
+  rise.
+  DOCS: design.md §2.7 already states it; the preprocessing must be documented
+  reproducibly like the existing geodata pipeline (§7.1 point 13), and CLAUDE.md §7.1
+  point 14 gains the built behaviour when this lands.
+  VERIFIABLE: pure — the sweep matches a brute-force horizon reference on a small
+  synthetic patch (a cone, a ridge, a flat plain: a flat plain yields horizon 0 in
+  every direction, a wall yields the analytic angle); the azimuth arc actually covers
+  every (latitude, day) the game can produce, with a case just outside it clamping and
+  reporting; sky occlusion is monotone (a pit is more occluded than the ridge beside
+  it); the preset completeness and doc-sync gates cover the new keys. Live
+  (`scripts/verify/enrichments.mjs`, BOTH backends, screenshots): at a massif with the
+  low-sun date, the ground on the sun-facing side reads measurably brighter in PIXELS
+  than the ground in its lee at the same elevation band, and that contrast is FLAT with
+  the quality level stepped to low — the effect is judged on the image, never on the
+  flag; no console errors; the build step is reproducible from a clean checkout.
+
+- [ ] 348. THE VILLAGE FIRE IN THE RAIN (user 25.07.2026, screenshot: the Zulu village
+  under visible rain, the §19.10 fire burning uncovered in the open with the
+  inhabitants standing around it as if the weather were not happening). Point 142
+  already made the fire answer to a place's own COLD, harmattan and karif; RAIN is the
+  driver it never got, and rain is the one that contradicts the picture outright — an
+  open fire in the open does not burn through a downpour.
+  TWO MORE FAULTS IN THE SAME OBJECT, reported 27.07.2026 with a screenshot of the
+  Mbuti village under rain, and they must be fixed WITH the rain behaviour rather than
+  after it — a shrinking flame that keeps them would only shrink the fault:
+  (a) THE FLAME FLOATS. A fire reduced by the weather still stands ON the ground: its
+  base sits in the hearth, on the fire pit's own surface, at every size the rain rule
+  produces. Whatever scales it must scale it about its base, not its centre — check the
+  full range the rule can reach, including the smallest, because the gap grows as the
+  flame shrinks.
+  (b) THE VILLAGERS WALK THROUGH IT. The fire needs a collider — the user's own
+  suggestion, and the right one: the hearth plus a calibratable clearance radius
+  (a `balance` value, debug-editable) joins the settlement's collider set, so inhabitants
+  path AROUND it and the player cannot stand in the flames either. The §2.6 rule that no
+  walker may be trapped applies: adding an obstacle in the middle of a yard must not
+  strand anyone, so the errand-target validation runs against the widened set.
+  VERIFIABLE for both: pure Vitest — the flame's base stays at hearth height across the
+  whole scale range (the floating case fails before the fix), and the hearth collider is
+  in the set every walker path is validated against, with no walker target left inside
+  it; live, one first-person frame in the rain showing flame on ground, and a walker
+  observed pathing around the hearth rather than through it.
+  RESEARCH FIRST, then build — this is a people question, not a graphics question.
+  Establish from `docs/peoples-1890.md` (extending it where it is silent) where each
+  people's cooking fire actually SAT around 1890: a hearth inside the dwelling, a
+  roofed cooking shelter beside it, or an open yard fire. The Zulu case in the
+  screenshot is the likely "hearth inside the hut" reading, but it must be confirmed
+  rather than assumed, and the answer will differ by people.
+  THEN THE BEHAVIOUR, decided per people from that evidence — the §19.13 dress rule is
+  the model to follow (six peoples change their dress on real evidence, sixteen do not;
+  a blanket rule for all would be the invention this project refuses): under rain past
+  a calibratable intensity, a village either shelters its fire under a structure that
+  people REALLY built there, or the yard fire is out and the life vignette moves under
+  cover — inhabitants inside or under the eaves, the fire relit when the rain passes.
+  DO NOT put a generic canopy over every village fire. A shelter that no one there
+  built is the same class of error as a garment no one there wore.
+  KEEP: the point-142 cold/harmattan/karif behaviour, and the §19.10 vignette's normal
+  dry-weather life, entirely unchanged.
+  DOCS in the same commit: design.md §19.10 and §19.13 gain the rain driver;
+  `docs/peoples-1890.md` gains the hearth/shelter evidence AND its implementation
+  section is updated in the same commit (the standing rule that research and the game
+  table never drift apart).
+  VERIFIABLE: pure — every people in the roster has a DECIDED rain behaviour (the sweep
+  fails on a people nobody decided about, exactly as the dress sweep does); the rain
+  threshold is a calibratable, debug-editable value and the transition is deterministic;
+  a village whose people keep an indoor hearth shows no yard fire under rain, and lights
+  it again when the rain stops. Live (`scripts/verify/polish.mjs`, BOTH backends,
+  screenshot): the Zulu village forced into heavy rain shows the decided state rather
+  than an uncovered burning fire, and the same village in dry weather is unchanged from
+  today.
+
+- [ ] 350. THE KNEELING VILLAGER IS A SQUASHED VILLAGER (user 25.07.2026, deployed
+  build: a figure in the Zulu village alternates between normal and visibly FLATTENED).
+  ROOT CAUSE, already located: `Figure` in `src/scenes/place/PlaceLife.tsx` fakes
+  kneeling with a NON-UNIFORM vertical squash — `scale={[scale, scale * (kneel ? 0.75 :
+  1), scale]}` (line ~60) on top of a shortened body cone (`bodyH = kneel ? 0.55 : 1.0`).
+  The squash applies to the WHOLE figure, the head included, so the head reads as a
+  flattened ellipsoid: kneeling shortens the legs, it does not compress the skull. And
+  the alternation the user sees is `TaskWalker` (line ~496) swapping the standing and
+  kneeling groups by VISIBILITY when it starts and ends its work at the well — an
+  instant pop between two different-looking figures.
+  TARGET: a kneeling pose built from PROPORTIONS, not from a vertical scale. The lower
+  body folds (a shorter, wider base) and the whole figure sits lower, while the head and
+  every other part keep their true shape — the group's scale stays UNIFORM. And the
+  transition reads as a movement rather than a swap: the figure lowers into the pose and
+  rises out of it over a short, calibratable time, so no frame shows one figure replaced
+  by another. Every user of `kneel` gets it — the cook, the fire tender and the errand
+  walker at the well.
+  VERIFIABLE: pure (`src/render/figures.test.ts` or a test beside it) — the kneeling
+  build applies no non-uniform scale (x, y and z factors equal) and its head radius
+  matches the standing figure's, while the pose is genuinely lower (a bounded overall
+  height reduction); the standing build is unchanged. Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): across the frames in which a
+  task walker starts and finishes its work, no single frame changes the figure's
+  rendered height by more than the transition's per-frame step — the pop is what the
+  check is for.
+
+- [ ] 353. SHELTERED GROUND STAYS LESS WET (user 25.07.2026). In the rain the whole
+  settlement floor darkens uniformly, so the earth under a roof overhang or a tree crown
+  soaks exactly like the open yard. Make wetness SPATIAL — and less, not none: ground
+  under cover reads drier than the open ground around it, but never bone dry, because
+  wind-blown rain and splash reach under every eave (the user's own correction, and the
+  realistic reading).
+  WHY IT IS CHEAP, and the reason to build it this way: a settlement's roofs and trees
+  do not move. The coverage is therefore computed ONCE when the place is built — a
+  shelter mask over the ground disc, derived from the layout's known building footprints
+  with their roof overhangs and the tree crown radii — not per frame and not per fragment
+  against a list of obstacles. Prefer that CPU bake over a top-down depth pass: it needs
+  no extra render target, and it is pure-testable, which a GPU pass is not.
+  THE COMBINATION: the existing global ground wetness (`setGroundWetness` /
+  `groundWetnessFactor`, wired through `src/render/seasonTint.ts` and the season module)
+  is multiplied by the mask through a calibratable `balance.rain.shelterStrength` that is
+  strictly BELOW full, so full cover reduces the wetness without ever reaching zero.
+  Edges are soft — a hard-edged dry disc under a tree would look worse than the uniform
+  wetness it replaces.
+  THE DRIP LINE, if it comes cheap: just OUTSIDE the eaves the runoff makes a band
+  WETTER than the open ground. It is the detail that sells the whole effect, and it is
+  the same mask read at its gradient. Calibratable; drop it rather than fake it.
+  KEEP: dry weather completely unchanged — with no rain the mask must make NO visible
+  difference anywhere.
+  A USEFUL BY-PRODUCT to note in the commit: this same mask answers "is this spot under
+  cover", which is what point 348 needs to move village life under a roof.
+  NO QUALITY KEY: a one-time bake plus a texture lookup in a material already drawn, like
+  point 352 — record the reasoning rather than adding a lever for nothing.
+  VERIFIABLE: pure — the mask built from a layout with one hut is high under the roof
+  footprint, falls off across a soft margin and is zero well outside it; a tree crown
+  produces the same under its radius; the combined wetness at full shelter is strictly
+  between zero and the open-ground value (the "less wet, not dry" rule, boundary-tested),
+  and equals the open value everywhere when the shelter strength is zero. Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): in a village forced into
+  rain, a ground crop under a hut's eaves reads measurably lighter in PIXELS than a crop
+  in the open yard, while in dry weather the two crops match — judged on the image, not
+  on the uniform.
+
+- [ ] 354. RAIN FALLS FROM A BRIGHT BLUE SKY IN THE SETTLEMENT (user 25.07.2026,
+  deployed build: the Zulu village on 03.01.1890 — high summer rains — with clear rain
+  streaks against an almost cloudless blue dome). Under rain the sky must read heavy.
+  THE MECHANISM EXISTS AND IS WIRED, which is what makes this worth a careful look
+  rather than a quick tint: `PlaceScene.tsx` computes `skyOvercastParams(wet, strength)`
+  each frame and calls `setSkyOvercast(grayMix, cloudBoost)`, and the parameters are
+  substantial at that date — `grayMix = 0.75 × wetness × weatherStrength`, with the same
+  wetness that is visibly producing the rain streaks. So the numbers say overcast while
+  the picture says blue. DIAGNOSE WHERE THE VALUE IS LOST before changing any constant:
+  candidates are the uniform not reaching the PLACE dome's material instance (the travel
+  dome and the settlement dome are separate mounts), `balance.season.weatherStrength`
+  sitting low, the gray being mixed under a base colour that dominates it, or the cloud
+  deck not thickening at all — the screenshot shows essentially no cloud despite a
+  `cloudBoost` of the same magnitude. Name the actual cause in the commit.
+  THE TEST DID NOT CATCH IT, AND THAT IS THE SECOND HALF OF THIS POINT. The settlement
+  season checks in `scripts/verify/polish.mjs` assert on the VALUES behind
+  `__placeSeason()` — "the rains gray the settlement dome and thicken its cloud deck"
+  compares numbers, not pixels. They are green while the player sees a blue sky. This is
+  the exact failure the project already recorded once for the seasons (point 147: three
+  rounds of uniform-level checks passed while the player saw nothing), and the remedy is
+  the one that worked there — MEASURE THE PICTURE. Replace or supplement those
+  assertions with a pixel comparison of the same sky region in a dry month and in a wet
+  month at the SAME settlement, the way the travel ground already proves its season
+  (screenshots 115/116). A parameter assertion may stay as a supporting check; it may not
+  be the evidence.
+  KEEP: the dry-season sky unchanged, the §19.13 thunderstorm flash and the harmattan
+  dust dome (their own axis, not the wet gray) untouched, and the rain streaks as they
+  are — the streaks are not the complaint.
+  VERIFIABLE: pure — `skyOvercastParams` keeps its curve (already tested); a new test
+  pins whatever wiring turns out to be broken, so it cannot silently return. Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshots): a crop of the SKY above the
+  horizon at one settlement is measurably darker and less saturated in its wet month
+  than in its dry month, and the difference is large enough that a person would call it
+  overcast; the existing dry-month picture is unchanged.
+
+- [ ] 356. THE INHABITANTS NOTICE THE TRAVELLER (user 25.07.2026). Today they do not:
+  in `src/scenes/place/PlaceLife.tsx` the player appears ONLY as a collision radius, so
+  a settlement is a diorama that happens to be occupied. Being SEEN is the strongest
+  signal that a place is inhabited, and for a European walking into an African village
+  in 1890 it is also the historically obvious reaction.
+  TARGET: within a calibratable notice radius an inhabitant turns its head — the whole
+  figure's facing, since these figures have no separate head — toward the traveller for
+  a few seconds, then returns to its errand. Children break off what they are doing and
+  stare a moment longer; the goats shy a step away. Everyone keeps their task: this is a
+  glance, never a state that stops the village.
+  RULES THAT KEEP IT FROM BECOMING CREEPY OR MECHANICAL: a cooldown per inhabitant so
+  the same figure does not track the player continuously; a cap on how many notice at
+  once (a whole village turning in unison reads as a horror film, not a place); the turn
+  rides the existing capped turn rate rather than snapping; and a drama or errand that
+  must not be interrupted (the elder in an audience, a walker inside a building) is
+  exempt. Values in `balance.villageLife.*`, debug-editable.
+  VERIFIABLE: pure — the notice predicate fires inside the radius and not outside,
+  respects the cooldown, and never selects more than the cap; the resulting facing is a
+  bounded step toward the player, never a snap. Live (`scripts/verify/polish.mjs`, BOTH
+  backends, screenshot): walking past a group, at least one inhabitant's yaw turns
+  measurably toward the player and returns afterwards, while the errands continue.
+  DOCS: design.md §19.10 gains the glance beside the existing village vignettes.
+
+- [ ] 357. THE VILLAGE SOUNDS INHABITED (user 25.07.2026). Checked: the settlement
+  soundscape in `src/systems/ambience.ts` runs exactly ONE layer for a village —
+  `setTarget('drums', 0.5)`. No voices, no pestle, no goats, no fire. Sound carries
+  "inhabited" further than any visual, and its absence is not noticed until it is there.
+  TARGET, as layers over the existing master ambience volume (§20), each with its own
+  calibratable level like `balance.birdsongVolume`: a low murmur of VOICES at
+  conversational distance; the thud of the mortar, timed to the pestle that is already
+  animated rather than looping free; goats; and the fire's crackle rising as the
+  traveller nears the fire ring (the §19.1 proximity model already exists for animal
+  calls — reuse it, do not build a second one).
+  THE VOICES STAY WORDLESS, and that is a decision, not a shortcut: the language
+  mechanic of §13.4 is explicitly undecided and under review, so anything resembling
+  speech would commit the game to an answer this point has no business giving. A murmur
+  commits to nothing and can be replaced when §13 is settled.
+  KEEP: the drums as they are, the port and travel soundscapes untouched, and the single
+  master volume in charge of everything (§20).
+  VERIFIABLE: pure (`src/systems/ambience.test.ts`) — each new layer's gain follows its
+  own slider and the master, is zero outside a village, and the fire layer rises and
+  falls with distance across a swept range. Live (`scripts/verify/settings.mjs`): inside
+  a village the new layers are audible in the graph's gain values and fall silent when
+  the master is muted; no console errors.
+  DOCS: design.md §19.10/§20 name the village layers.
+
+- [ ] 358. SMOKE OVER THE FIRE, DUST UNDER THE FEET (user 25.07.2026). A thin smoke
+  column drifting from the §19.10 fire reads as "someone lives here" from further away
+  than any figure does, and dust kicked up where a walker crosses dry ground makes the
+  ground feel walked on rather than walked over.
+  TARGET: a slow, thin smoke plume above the fire that leans with a calibratable drift
+  and thins with height; and a small, short-lived dust puff at a walker's feet on DRY
+  ground only. Both tie into what already exists: the smoke thins or gutters under rain
+  the way the fire itself already answers to weather (point 142), and the dust is
+  suppressed once the ground is wet (the wetness the season already drives, and the
+  sheltered-ground mask of point 353 where that lands first).
+  QUALITY: declare all three levels in `QUALITY_PRESETS` with the doc kept in sync —
+  this is the kind of small optical addition the §21 convention exists for. Keep it
+  cheap: a handful of soft billboards, not a particle system with a budget.
+  VERIFIABLE: pure — the plume's drift and thinning are a function of height and the
+  weather factor, and the dust predicate is false on wet ground and true on dry; the
+  preset completeness and doc-sync gates cover the new keys. Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshots): above the fire the pixels
+  differ from the same crop with the effect disabled, in dry weather a walking
+  inhabitant raises visible dust and in rain it does not.
+  DOCS: design.md §19.10.
+
+- [ ] 359. THE CATTLE PEOPLES' KRAAL IS EMPTY (user 25.07.2026, from the Zulu village
+  screenshot: the enclosure stands there with nothing in it — `PlaceLife.tsx` puts GOATS
+  in a pen, cattle do not exist). For a Zulu umuzi the cattle enclosure is not scenery
+  but the centre of the homestead, and an empty one is a conspicuous absence.
+  EVIDENCE FIRST, as with every people question here: establish from
+  `docs/peoples-1890.md` which of the 22 peoples kept CATTLE around 1890 and in what
+  arrangement — a central kraal, a herd out at pasture, none at all — and extend the
+  research section where it is silent. The cattle-less peoples (the Bemba among them,
+  per the existing rinderpest text) get NO cattle; the camel peoples keep camels.
+  THEN THE HERD, and this is what makes it more than decoration: the game already models
+  the great rinderpest panzootic of 1888-1897 (`rinderpestPhase`, docs/peoples-1890.md
+  §5) and already tells it in the first-visit vignettes. The kraal must agree with that
+  text — full in 1890, devastated from 1891/92, slowly recovering afterwards, with the
+  phase read from the VISIT DATE exactly as the vignette reads it. A village whose
+  journal entry speaks of the emutai while its kraal stands full would contradict itself.
+  KEEP: the goats and their pen as they are; the §19.10 life, the layout and the
+  colliders otherwise untouched; cattle are collidable like any other solid body.
+  VERIFIABLE: pure — every people resolves to a decided cattle arrangement (the sweep
+  fails on an undecided one, as the dress sweep does); the herd size falls across the
+  rinderpest phases for a cattle people and stays zero for a cattle-less one, boundary-
+  tested at the phase dates; the animals stay inside the pen and out of its fence. Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): the Zulu kraal holds cattle
+  in 1890 and visibly fewer in 1893, and the Bemba village has none in either year.
+  DOCS in the same commit: design.md §19.10 and the implementation section of
+  `docs/peoples-1890.md` (the standing rule that research and game table never drift).
+
+- [ ] 360. THE INHABITANTS TAKE NOTICE OF EACH OTHER (user 25.07.2026). Every villager
+  runs its errand alone: they pass within a metre of one another and nothing happens.
+  A place where nobody acknowledges anybody reads as a set of independent machines
+  sharing a courtyard.
+  TARGET, three encounters built on what already exists in `src/scenes/place/
+  PlaceLife.tsx`:
+  (a) A MEETING. Two walkers whose paths cross stop for a few seconds, turn to face each
+  other, exchange a small lean — the figures have no arms to raise, so the greeting is
+  carried by facing, a brief bow-like lean and the pause itself — and then go on.
+  (b) A HANDOVER. The errand walkers already carry a `bundle` or a `jar`; sometimes a
+  meeting passes that load to the other, who carries it onward to ITS destination. The
+  object must visibly change owner — one carrier, then the other, never two or none.
+  (c) A GATHERING. More than one figure at the fire at the same time rather than the
+  lone tender: two or three around it, one of them kneeling. This DEPENDS ON POINT 350 —
+  the kneeling pose must be a real pose before several figures use it, or the gathering
+  multiplies a visibly squashed figure.
+  RULES: a meeting always ends (a window, then both resume — the house rule that nothing
+  started runs forever); a pair that has just met is not eligible again for a cooldown,
+  or two figures will greet each other in a loop; a meeting never begins where the pair
+  would stand inside a collider or block a doorway; and the errands still COMPLETE — the
+  village must not become a place where everyone chats and nothing arrives.
+  KEEP: the point-155 guarantees (clear standing circle, escape direction, the pinned-
+  walker nudge) and the ordinary errand rhythm as the backbone.
+  VERIFIABLE: pure — the partner choice takes an available walker within the radius and
+  never one already in an encounter or inside a building; the handover moves the load
+  exactly once (source empty, target carrying); the meeting window expires
+  deterministically and the cooldown blocks an immediate repeat. Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): over a sampled interval at
+  least one pair meets, both yaws turn toward each other, they part, and the errand
+  targets are still reached afterwards; no walker is left standing past its window.
+  DOCS: design.md §19.10 beside the existing village vignettes.
+
+- [ ] 362. THE CROSSING TURNED BACK — the crocodile takes a calf mid-channel
+  (user 26.07.2026; design.md §19.8 states the target). Two systems exist and have
+  never met: the purposeful water crossing (`crossingTarget`/`shouldStartCrossing`
+  in `src/scenes/travel/wildlifeBehavior.ts`, point 192) and the crocodile ambush
+  (§19.16, `crocodileTargetWeight` and the hunt core). Join them into the one scene
+  §19.8 is missing — a family in open water.
+  A CROSSING TAKES THE FAMILY. When a parent with a living calf starts a crossing,
+  the calf enters with it and swims at its flank (the existing leash, at the wade
+  speed both already use); the pair is one crossing, not two. A calf alone never
+  starts one.
+  THE AMBUSH FIRES MID-CHANNEL. The crocodile's target weighting, today biased to
+  drinkers and juveniles AT the bank, gains the swimming calf as its strongest
+  case — a calibratable weight beside the existing ones (§21.2, debug-editable).
+  THE REVERSAL IS THE PICTURE. On the seizure the parent turns round — against the
+  direction the rest of the herd is taking — and swims back. Its heading reversal
+  goes through the ordinary capped turn rate (§19.5: no body ever whips round), and
+  the rest of the herd does NOT turn: it completes the crossing and walks up the far
+  bank. That contrast is what the scene is for; a verification that cannot see it is
+  not passing.
+  THE ENDINGS ARE THE EXISTING ONES, not new: the return is a RESCUE, so it takes
+  the rescue burst braked by `seasonFlowFactor` (`wadeSpeed`) and rolls the SAME
+  §19.8 defence matrix used at the waterline — drive-off, taken-in-the-calf's-place,
+  or too late. NO vigil exists here (the water takes the body, §19.8); a too-late
+  parent makes the NEAREST bank and rejoins its herd. Every branch resolves on a
+  bank — reuse the crossing deadline so nothing is left swimming (§19.5).
+  ANCHORS: `src/scenes/travel/wildlifeBehavior.ts` (crossing, crocodile weighting,
+  defence resolution, `wadeSpeed`), `src/scenes/travel/Wildlife.tsx` ~2373–2500
+  (the water-drama frame code and its `seasonFlowFactor` calls) and ~3855 (the
+  crossing swim speed), `src/config/balance.ts` `waterDrama`, `src/i18n/{de,en}.ts`
+  for the debug label.
+  VERIFIABLE: pure (`wildlifeBehavior.test.ts`) — a parent's crossing takes its calf
+  and only its calf; the mid-channel weight beats the bank cases; the reversal
+  respects the turn cap; each defence outcome reaches a terminal state and a
+  too-late parent ends on a bank, never in the channel; no branch can leave the
+  water-drama state set past the deadline. Live (`scripts/verify/wildlife.mjs`, ONE
+  backend — this is behaviour, not shading; the reversal is judged on the recorded
+  positions plus one screenshot): a seeded crossing produces a herd that finishes
+  while one animal reverses.
+  DOCS: design.md §19.8 + §21.2 already state it; add the balance value's comment
+  and the acceptance-evidence line under §12.
+
+- [ ] 363. THE STRAGGLER — a lame calf the herd leaves behind (user 26.07.2026;
+  design.md §19.8 states the target). Every §19 drama is fast: a charge, a seizure,
+  a plunge. This one is slow, and nothing is scripted to kill — it is the only
+  scene in the game whose tension is WAITING.
+  THE LAMENESS. With a calibratable chance (§21.2, debug-editable) a calf that
+  SURVIVES a hunt — the parent drove the predator off (points 124/125/145c), or the
+  chase simply broke off — is left lame: a calibratable speed penalty for a
+  calibratable healing window. Keep the chance low; a drive-off that always cost
+  something would turn the successful defence into a second sacrifice.
+  THE HERD DRAWS AWAY. A lame calf cannot hold the group pace, and its parent does
+  not leave it (the §19.8 constant, already implemented for the mire vigil of point
+  123 — reuse that stay-behind, do not write a second one). The herd keeps its
+  ordinary roaming; the pair simply falls behind and stands alone in the open.
+  NO PREDATOR IS SENT. Do not spawn or steer one. The existing juvenile hunt bias
+  now has an easier target because the pair is isolated and slow; that is the whole
+  mechanism. If a hunt does find them the ORDINARY grammar runs (shield, charge,
+  roll) — the parent does not surrender, because nothing has died.
+  IT ALWAYS RESOLVES (the point-118 lesson): on the healing window the limp ends and
+  the pair rejoins the herd; a streamed-away herd is the adoption/regroup case that
+  already exists. A lame calf must never be left permanently detached.
+  ANCHORS: `src/scenes/travel/wildlifeBehavior.ts` (the hunt outcome/drive-off
+  resolution, the mire stay-behind, the leash and group pacing), `Wildlife.tsx` for
+  the per-frame speed, `src/config/balance.ts` `waterDrama`'s neighbourhood (add the
+  values beside the family-drama block), `src/i18n/{de,en}.ts` labels.
+  VERIFIABLE: pure — the lameness fires only after a SURVIVED hunt and only on its
+  chance; the penalty applies to the calf and the parent's stay-behind mirrors it;
+  the pair falls measurably behind a roaming herd; the window heals and the pair
+  rejoins; no state leaves a calf detached past the window. Live
+  (`scripts/verify/wildlife.mjs`, ONE backend): with the chance forced to 1 a
+  post-hunt pair is measurably behind the herd's centroid and later back with it.
+  DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
+  acceptance-evidence line under §12.
+
+- [ ] 364. THE FLOOD SWELLS THE DRAMA CURRENT — and can take a calf at the crest
+  (user 26.07.2026; design.md §19.8 states the target). This point fixes a real
+  inconsistency first and adds a drama second; both land together.
+  THE BUG. `seasonFlowFactor(CURRENT_WEATHER.wetness, dryFlowFactor, wetFlowFactor)`
+  (Wildlife.tsx ~2373/2466/2485/3855) keys the drama current on LOCAL wetness alone.
+  The game's own flood model is deliberately REMOTE-fed (design.md §19.9, points
+  138/139): the Nile crests at Cairo in October where it never rains, and the
+  Okavango peaks in July inside Botswana's dry season. So today the water dramas run
+  at their dry-season gentlest exactly when the modelled river is at its most
+  dangerous. THE FIX: the effective factor is the HIGHER of the wetness-fed factor
+  and a flood-fed one — `nileFloodAt`/`okavangoFloodAt` (`src/systems/season.ts`)
+  scaled by a calibratable balance value (§21.2, debug-editable) — so the crest
+  swells the current, shortens the self-rescue and brakes the rescue burst through
+  the paths that already read the factor. Wire it in ONE place (a helper beside
+  `seasonFlowFactor`) so no call site can be forgotten.
+  THE DRAMA. At a swollen crest a crossing (point 362) can lose the calf to the
+  CURRENT rather than to a crocodile: it is carried downstream past its parent's
+  reach, and the parent turns downstream after it — a rescue on the same rolls and
+  the same brake, which the point-122 drowning window may end for BOTH. This is the
+  existing drowning drama reached by a new road, not a new death: reuse
+  `drownSeconds`/`drownFlowThreshold` unchanged.
+  WHAT MUST NOT CHANGE: the flood stays VERTICAL (§19.9) — no ground becomes water,
+  no §4.2 village clearance moves, the ribbon keeps its width. Only the force
+  changes. A test must pin that.
+  SEQUENCING: 362 lands first (this point's drama rides its crossing); the flow-factor
+  fix is independent and may land even if 362 slips.
+  ANCHORS: `src/systems/season.ts` (`nileFloodAt`, `okavangoFloodAt`),
+  `src/scenes/travel/wildlifeBehavior.ts` (`seasonFlowFactor`, `wadeSpeed`, the
+  drowning core ~1745), `Wildlife.tsx` at the four call sites above,
+  `src/config/balance.ts` `waterDrama`, `src/i18n/{de,en}.ts`.
+  VERIFIABLE: pure — at Cairo in October (wetness 0) the effective factor is
+  significantly above the dry floor and near the wet case, while a rainless
+  non-flood day stays at the floor; the Okavango does the same in July; the factor
+  is never LOWER than today's wetness-fed value anywhere (a pure sweep over the
+  year × both systems); the drowning window and threshold are untouched; the flood
+  changes no water mask, ribbon width or clearance (assert against the existing
+  world sweep). Live (`scripts/verify/wildlife.mjs`, ONE backend): at the October
+  crest a seeded crossing is visibly carried downstream and its rescue is slower
+  than the same seed in the dry season.
+  DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
+  acceptance-evidence line under §12.
+
+- [ ] 379. ABU SIMBEL BECOMES A WALKABLE SITE (user 27.07.2026; a FEATURE, and the user's
+  own instruction is that the open DEFECTS come first — it waits behind them). The world carries
+  eight built cultural landmarks (Meroë, Giza, Great Zimbabwe, Lalibela, Kilwa, Aksum,
+  Gondar, Bandiagara) and four natural ones; the rock temples of Abu Simbel are absent,
+  and they belong: in 1890 they stood — cleared of sand by Belzoni in 1817 and a fixed
+  point of every Nile journey — at the Nubian reach the traveller passes on the way
+  south, in their ORIGINAL place beside the river (the 1960s relocation is far outside
+  this game's window, so the site sits at the historical coordinates, not the modern
+  ones).
+  IT IS ENTERABLE, LIKE THE PYRAMIDS (user 27.07.2026): the traveller walks up to it in
+  the bird's-eye view and enters with SPACE, exactly as point 273 made the Giza monument
+  site walkable — the same enter radius, the same discovery gate, the same non-overlap
+  rule against every other place's enter disc, and a first-person site the player can
+  cross. Point 273 is the pattern to follow rather than a second mechanism to invent;
+  read what it built before designing anything.
+  ONE PLACE, ONE LABEL — do not repeat the Giza mistake (user 27.07.2026). Making the
+  pyramids walkable left the site defined TWICE, as a cultural landmark AND as a map
+  point, so the bird's-eye view carries two overlapping names for one thing (that is
+  work-order point 338, still open). Abu Simbel is entered into the world ONCE, in
+  whichever of the two forms carries an enterable site, and it must NOT also stand as a
+  second definition. Point 338 decides which form survives for Giza; this point follows
+  that decision rather than inventing a third arrangement — and if 338 is still open
+  when this is built, it is fixed FIRST, because building a second double label while
+  the first is being removed is the same defect twice.
+  VERIFIABLE for that half: a pure test asserting the site appears EXACTLY ONCE across
+  the landmark and map-point definitions, and one bird's-eye frame at in-game zoom
+  showing a single label.
+  BUILD THE REST AS THE OTHER EIGHT ARE BUILT, not as a special case: an entry in
+  `src/world/data/landmarks.ts` with its ~1890-correct coordinates, the field radius and
+  water clearance the §4.2 sweep in `src/world/world.test.ts` applies to every landmark,
+  a localized name in BOTH language files, a first-sighting journal entry in the §10
+  kind-flavoured shape (both languages, §15 voice markup, once per landmark), the
+  discovery bounty, and the debug-menu jump-to entry in its alphabetical place.
+  THE FRAMING IS THE §4.4 ONE: an African achievement seen by a traveller, not a
+  curiosity. Four colossal seated figures cut from the cliff face, a smaller temple
+  beside them, the river below — the entry says what the traveller SEES and what it
+  meant, in the register the other seven use.
+  RESEARCH BEFORE PLACING: confirm the coordinates and the 1890 state against
+  `docs/peoples-1890.md` (it already mentions the site) and the sources that document
+  the other landmarks; if the research contradicts anything here, the research wins and
+  the point is corrected rather than forced.
+  VERIFIABLE: the existing landmark sweeps in `src/world/world.test.ts` cover it
+  automatically once it is in the data (clearance, no overlap, the label rules); add the
+  i18n completeness case both languages already have, and the first-sighting entry test
+  beside the other landmarks'. One bird's-eye screenshot at in-game zoom showing the
+  site labelled where it belongs on the Nile.
+  DOCS in the same commit: `design.md` §4.4 (the landmark list is design content — this
+  is a genuine addition and pays its measured words), CLAUDE.md §7.1 pt 25 where the
+  eight are enumerated, and the evidence section.
+
+- [ ] 380. THE SURROUNDINGS SHOW THE NEIGHBOUR THAT IS REALLY THERE (user 27.07.2026,
+  reported from the deployed build). Standing at the Giza monument site the traveller
+  does NOT see Cairo on the horizon, while standing in Cairo he does see the pyramids —
+  and in 1890 the two are barely fifteen kilometres apart, in flat desert, in plain
+  view of each other. The asymmetry is the report; the rule it breaks is §2.5, which
+  promises the surroundings panorama of the real map landscape.
+  DIAGNOSE BEFORE BUILDING, because the two directions probably have DIFFERENT causes:
+  the backdrop band (`src/scenes/place/backdrop.ts`) is built from `sampleTerrain`
+  alone — relief, no settlements and no monuments — so it cannot be what shows the
+  pyramids from Cairo; that view is far more likely Cairo's own local dressing. Confirm
+  which mechanism draws each side before deciding where the fix belongs. A fix in the
+  wrong one produces a pyramid that hangs in the sky, which is exactly the class points
+  92/94/181 already paid for.
+  THE TARGET: a settlement or monument that is genuinely within sight distance reads on
+  the horizon from the other, at the right BEARING and the right apparent size, sitting
+  on the ground the backdrop draws (`panoramaStandY`/`discHorizonY`, the point-181
+  footing rule) — never floating, never a black sliver. Sight distance is a
+  calibratable balance value, debug-editable, and the rule is symmetric by construction
+  rather than by two hand-written cases.
+  SCOPE HONESTLY: if the research shows the general case (every neighbouring place
+  within sight) costs far more than the Giza↔Cairo pair the user reported, say so with
+  the measured reason and deliver the general mechanism only if it is affordable —
+  a hard-coded pair is NOT an acceptable substitute, because the next pair reopens it.
+  VERIFIABLE: pure Vitest on the bearing/size/footing computation for a neighbour at a
+  given distance (present within sight, absent beyond it, correct bearing on both
+  sides — the symmetry pinned as a property, not as two examples); plus one Playwright
+  frame from each side, judged by PROJECTING the neighbour into the picture per §7.2,
+  never by an assumed radius.
+  ORDER: point 381 (the torn seam at that very site) is FIXED FIRST — adding a
+  neighbour to a horizon that is itself broken would build on sand.
+  DOCS in the same commit: `design.md` §2.5 (what the panorama shows is design content)
+  and CLAUDE.md §7.1 pt 31 with its evidence section.
+
+- [ ] 384. RAIN THAT TOUCHES THE WORLD — WET GROUND, IMPACTS, LIT DROPS (user 27.07.2026,
+  after looking at the settlement rain on the deployed build: "the rain is simply painted
+  over the picture — it has no effect on the optics at all"). Measured against the code,
+  that reading is nearly right: `src/scenes/place/PlaceRain.tsx` draws 700 instanced
+  quads in an UNLIT `MeshBasicNodeMaterial` of one constant colour (0.66/0.72/0.8), fog
+  off, depth-write off, inside a 15-unit column centred on the eye. The streaks do stand
+  in the world and are occluded by huts — but nothing else in the scene knows it is
+  raining. This point closes that gap with the three cheapest steps, in the order of
+  effect per cost; point 385 carries the two dearer ones.
+  (1) WET SURFACES — the biggest gain for the least work, and it needs no new particle.
+  A single scene-wide wetness value (the place's own `rainAmount`, already computed)
+  drives the existing materials: roughness down, albedo slightly darkened, specular
+  response up, so ground, roofs and walls go dark and glossy and the village fire
+  reflects in the wet earth. Sheltered ground is EXEMPT — work-order point 353 owns that
+  rule; this point must not fight it, so read it first and drive both from one value.
+  (2) THE RAIN REACHES THE GROUND, AND ARRIVES. Today the column is a fixed box around
+  the head and drops recycle at its lower edge — which is why the player sees them stop
+  in mid-air. A drop ends at the GROUND under it (the terrain/settlement height at its
+  own x/z), and its end is an IMPACT: a short-lived, small ring or splash quad at that
+  spot, alpha-fading, instanced like the drops themselves. On water the impact is a
+  ring; on dust it is a puff — one shape parameterised, not two systems.
+  (3) LIT DROPS INSTEAD OF ONE FLAT COLOUR. A streak's brightness follows the sun/sky
+  direction and the view angle, so it reads bright against a dark hut and nearly
+  vanishes against a bright sky, and the drops of one gust no longer look identical.
+  QUALITY LEVELS ARE PART OF THE POINT, not an afterthought (§21 convention): every new
+  lever gets a low/medium/high entry in `QUALITY_PRESETS` (`src/config/quality.ts`) and a
+  row in `docs/graphics-detail-levels.md` — the completeness gate in
+  `src/config/quality.test.ts` fails otherwise. Rain that costs frames on LOW is a
+  regression, so low keeps the plain streaks and the wetness value at most; impacts and
+  lit drops are medium/high.
+  BOTH BACKENDS, ONE PATH: TSL only, no WebGPU-only branch (CLAUDE.md §3) — the
+  reverted TRAA attempt is the precedent for what a second code path costs.
+  VERIFIABLE: pure Vitest on the wetness mapping (dry → today's values, wet → the
+  darkened/glossier set, sheltered ground unchanged) and on the impact placement (a
+  drop's end equals the ground height under it, never the column's lower edge); the
+  quality-preset completeness and doc-sync gates green; live, one first-person frame in
+  the rain on BOTH backends showing wet ground and drops that arrive, judged by the
+  picture, plus the §21 detail levels stepped through without a red.
+  DOCS in the same commit: design.md §19.13 (what rain does to the picture is design
+  content), `docs/graphics-detail-levels.md`, and CLAUDE.md §7.1 pt 12 with its evidence
+  section.
+
+- [ ] 385. RAIN WITH DEPTH AND WEATHER — LAYERS, STREAK SHAPE, DIMMED SUN (user
+  27.07.2026; the second half of the rain work, deliberately LAST in the queue, after
+  point 379). Point 384 makes the rain touch the world; this makes the rain itself read
+  as weather rather than as particles.
+  (4) DEPTH INSTEAD OF ONE CURTAIN: two or three layers at different distances and
+  speeds, with the streak LENGTH following the drop's velocity relative to the camera
+  and soft, faded ends rather than hard rectangles. That is the classic way volume is
+  suggested without more particles — the count stays where it is or falls.
+  (5) THE WEATHER CHANGES THE LIGHT: while it rains the sun is damped, the haze rises
+  and the view distance shortens, so a downpour looks like one from inside a hut as well
+  as from the open. This is where the rain stops being an overlay: the scene gets darker
+  and flatter, and the fire is suddenly the brightest thing in the village.
+  BOUNDARY: the blue sky under rain is work-order point 354 and stays there — this point
+  changes the LIGHT, not the sky dome, and the two must be built so neither undoes the
+  other. Read 354 before starting; if it is still open when this begins, say in the
+  commit how the two interact.
+  QUALITY LEVELS, as in 384: every lever gets its low/medium/high entry and its doc row;
+  the layered rain and the light damping are medium/high, low keeps one layer and the
+  undimmed sun.
+  BOTH BACKENDS, ONE PATH: TSL only, no backend branch.
+  VERIFIABLE: pure Vitest on the layer/velocity mapping (streak length follows relative
+  speed; a stalled camera does not stretch a drop) and on the light damping (rain 0 →
+  today's sun and haze exactly; rain 1 → the damped set; monotone in between); live, one
+  first-person frame per backend in the open and one from under a roof, judged by the
+  picture, at each detail level.
+  DOCS in the same commit: design.md §19.13, `docs/graphics-detail-levels.md`, CLAUDE.md
+  §7.1 pt 12 and its evidence section.
+
+- [ ] 414. THE BIRD'S-EYE ANIMALS GET THE WALK THE SETTLEMENT ONES HAVE (29.07.2026,
+  user asked after seeing the settlement gait: "could this walk be carried over to the
+  bird's-eye view?"). Yes — and the hard part is already built and tested. `src/render/
+  fauna.ts` carries the whole derivation as pure functions: `footReach`, `strideLength`,
+  `gaitCadence`, `isStance`, `gaitFootFraction`, `gaitPhase`, `legSwingAngle`,
+  `gaitBodyLift`, `groundPitch`, `footBodyOffset`, `seatFootOnGround`. The settlement
+  walkers, the panorama silhouettes and the goats all read it. `src/scenes/travel/
+  Wildlife.tsx` reads NONE of it — measured: no reference to any of those names. Its
+  animals carry only a grazing-shuffle phase, so a walking herd slides.
+  WHAT IS ACTUALLY MISSING is not the maths but the BODY: the travel animals are drawn
+  from `animalBodies.ts` without pivoted legs, and they are INSTANCED (19 instanced
+  meshes in `Wildlife.tsx`) because a bird's-eye frame holds far more animals than a
+  settlement. So this point is a rendering-cost question wearing an animation costume,
+  and it must be answered in that order:
+  1. Give the travel bodies pivoted legs from the SAME part description the settlement
+     bodies use, so one definition drives both and they cannot drift apart (the §300
+     lesson, and the reason the panorama and the village already agree).
+  2. Drive them from the SAME distance-driven phase — the animal's own travelled arc,
+     never a wall clock — so a faster animal steps faster and a standing one stands
+     still, exactly as the settlement does today.
+  3. MEASURE before deciding the scope: extra per-leg instance matrices at herd scale
+     are the cost, and this project has the instrument for it (F8, the in-game
+     benchmark, on the user's own hardware — the headless machine's numbers are not the
+     player's). If the full articulation is too dear at distance, degrade by DISTANCE
+     rather than by dropping the feature: articulated near the traveller, the cheaper
+     body-lift-only cue further out, nothing at the horizon — and say where each band
+     begins.
+  4. SORT IT INTO THE THREE QUALITY LEVELS (`QUALITY_PRESETS`, the §21 convention): the
+     completeness gate fails a new optical feature that lacks low/medium/high entries,
+     and `docs/graphics-detail-levels.md` is updated in the same commit.
+     THE LEVEL IS THE PRIMARY AXIS, decided by the user 29.07.2026: HIGH always carries
+     the walk, LOW never does, and MEDIUM is decided BY THE MEASUREMENT of step 3 — it
+     gets the walk if the F8 numbers on the user's own hardware show it comfortably
+     inside the frame budget, and stays without it if they do not. Do not guess that
+     value: run the benchmark, put the two rows (medium with and without) in the point's
+     record, and let them decide. The distance banding of step 3 is then a refinement
+     INSIDE a level that carries the feature, not a substitute for the level split.
+  NOT IN SCOPE: foot-on-ground seating for bird's-eye animals. The settlement needed it
+  because a silhouette stands on compressed backdrop relief; at travel distance the
+  terrain under a walking animal is near-flat per stride, and seating every foot of a
+  herd is exactly the cost this point is trying to contain. Revisit only if the picture
+  shows floating feet.
+  VERIFIABLE: pure Vitest — a travel animal's stride advances with the distance it
+  covered (not with elapsed time), a standing animal's phase does not move, and the
+  cadence differs between a long-legged and a short-legged species; plus the
+  `QUALITY_PRESETS` completeness test and the doc-sync test. Live (`scripts/verify/`,
+  BOTH backends): a herd photographed twice a stride apart shows moved legs, and the F8
+  report's per-system triangle/draw-call rows are attached to the point so the cost is
+  on the record.
+  DOCS in the same commit: design.md §19 where the wildlife is described, and
+  `docs/graphics-detail-levels.md`.
+
+- [ ] 415. THE TUAREG TENT READS AS A HEAP OF SAND (29.07.2026, user in the Tuareg
+  village, North: "what are these cones supposed to be? Sand piles? They look more like
+  mini tents"). They ARE tents — `Tent` in `PlaceScene.tsx` is a single
+  `coneGeometry(r·1.25, h)` in the cloth material, a 0.45-unit pole and a small dark
+  entrance flap. Standing on pale sand in the pale cloth colour, a smooth tall cone
+  reads as a dune, and the flap is far too small to say otherwise. The user's reaction
+  is the correct one: nothing in the shape says "someone lives here".
+  THE REAL FORM IS ALMOST THE OPPOSITE, and it is what makes it readable: a Tuareg tent
+  (ehen) of that period is LOW and WIDE, not tall and pointed — mats or hides stretched
+  over an arched wooden frame, dark against the sand, with the long side open toward the
+  lee and the frame's poles and guy lines visible. Height well under a standing person,
+  width several times the height. RESEARCH IT FIRST against `docs/peoples-1890.md`
+  (Tuareg material is in §2.4 and §7.2) and record what the sources support before
+  modelling; where the evidence is thin, say so in the point rather than inventing
+  detail — the accuracy principle of this project applies to dwellings as much as to
+  clothing, and the guide's own rule is that a real system is never faked.
+  WHAT TO BUILD: replace the cone for the NORTH dwelling kind with the arched form —
+  a low curved shell, dark mat/hide colouring against the light ground, an open side,
+  and the frame legible at eye height (design.md §2.6 asks for structure and weathering
+  at eye height, which a smooth cone cannot carry). Keep it cheap: this is a village
+  dressing element and appears many times.
+  CHECK THE OTHER PEOPLES' TENTS at the same time: the `tent` kind is also used to dress
+  the market in other regions. Those are trade awnings, not dwellings, and must not
+  inherit the desert form — say which shape each use gets.
+  VERIFIABLE: pure Vitest on the geometry description (the north dwelling is wider than
+  it is tall, and the market awning is not the same part), plus the existing layout
+  tests. Live (`scripts/verify/polish.mjs`, BOTH backends, screenshot): the Tuareg
+  village photographed at eye height — the tents must be distinguishable from the ground
+  by colour as well as by shape, which is exactly what fails today.
+  DOCS in the same commit: `docs/peoples-1890.md` §8 (the research-to-game table) gains
+  the dwelling row for the Tuareg, per the standing rule that the implementation
+  sections move with the rendering.
+
+- [ ] 428. THE WALKABLE GROUND MEETS THE PANORAMA AT A VISIBLE STEP (29.07.2026, found by
+  the picture check of the vertical look, on BOTH backends). Standing at the settlement's
+  walkable edge and looking DOWN over it — a view the game only gained with the vertical
+  look — the walkable disc and the backdrop relief behind it read as TWO surfaces, not one
+  ground: a straight horizontal brightness step runs across the whole frame where they
+  meet, the backdrop side markedly darker, and the seam itself is faintly stepped in
+  short straight segments rather than following the terrain. Evidence:
+  `verification/145-look-down-disc-edge.png`, recorded on WebGL 2 and on WebGPU (the step
+  is on both, the shading difference is larger on WebGPU).
+  WHAT IS ALREADY TRUE AND MUST STAY: point 381 closed the HOLE at that edge — outside the
+  disc the backdrop never sinks below the ground plane and a ring is pinned on the disc
+  edge — and CLAUDE.md §7.1 pt 31 states the ground meets the panorama "with no edge, no
+  unlit face and no hole". That criterion was verified from an eye-level horizon, where
+  the seam sits at the vanishing line and cannot be seen; the pitch put it in frame. So
+  this is not a regression of 381 but the rest of its own criterion, and 381's geometry
+  fix is not to be undone.
+  TARGET: from any position and any pitch the walkable ground and the backdrop read as ONE
+  continuous ground — no tonal step at the seam beyond what the terrain itself explains,
+  and no straight-segment rim. Find WHICH of the two the step belongs to before changing
+  either: compare the two surfaces' shading inputs (do both take the same sun direction,
+  the same IBL/ambient term, the same tone mapping stage, and does the backdrop get the
+  biome splat the disc gets, or a flat fallback colour?), and check whether the point-381
+  ring is drawn in its own tone rather than the disc's. A material/lighting mismatch is
+  the likely cause; a geometry gap is not — the picture shows contact, not a crack.
+  VERIFIABLE: Vitest in `src/scenes/place/backdrop.test.ts` — the disc and the backdrop
+  resolve the same lighting inputs at coincident points on the seam, so a future change
+  that gives one of them its own term FAILS. Live in `scripts/verify/polish.mjs`: from the
+  disc edge looking down, scan a vertical pixel column across the seam IN THE ONE FRAME
+  and assert the luminance step at the contact stays under a calibratable threshold — a
+  within-frame measure, never a cross-run image diff (point 361 forbids the latter). Both
+  backends, judged by the picture: the same frame must show one ground.
+  DOCS in the same commit: the evidence section `docs/acceptance-evidence.md` §31 records
+  the pitched-view check beside the existing eye-level one.
+
+- [ ] 600. THE CTRL LABEL DOES NOT NAME AN ATTACKING LION — AND THE ROSTER IS RE-TESTED
+  WHOLE (user 09.08.2026, first play test of the feature: "STRG einmal getestet und direkt
+  einen Fehler gefunden: funktioniert nicht für angreifenden Löwen. Nochmal alles
+  durchtesten — ist vielleicht nicht der einzige Fehler"). Point 342 shipped the hold-Ctrl
+  overlay and its own §7.2 evidence was green; the very first hold in real play found a
+  gap. THE SPECIFIC DEFECT: a lion in its ATTACK state carries no label, while the roster
+  and point 342's predicate ("a thing is named when it can MOVE or the player can DO
+  something with it") plainly include it. Establish the cause before fixing — the two
+  candidates the code makes plausible are that the attack run swaps the actor into a
+  different entity list the overlay does not walk, and that §19.16's CONCEALED rule (a
+  submerged crocodile stays silent until it lunges) is being applied to a predator that is
+  not concealed at all. Do not guess between them: dump the overlay's actor set during a
+  staged lion attack and see which one it is.
+  THE POINT IS NOT ONE FIX. The user asked for the whole thing to be re-tested, and one
+  miss on the first hold means the roster was never exercised in its STATES. FINAL STATE:
+  every actor of point 342's roster is named in EVERY state it can be in — idle, walking,
+  fleeing, attacking, drinking, dead, and mid-staged-event — in both perspectives; the
+  §17.2 discovery gate and the §19.16 concealment exclusion still hold exactly where they
+  are meant to and nowhere else.
+  VERIFIABLE, AND AT THE LEVEL THE PLAYER EXPERIENCES IT (point 589's rule): a Vitest
+  matrix over the pure predicate covering the full cross product of kind × state, which is
+  what would have caught this one; plus a browser check that STAGES a predator attack and
+  asserts the label is drawn at the attacker while it runs — not that the predicate would
+  have returned true.
+  Criticality: medium — no crash, but the feature's promise is that holding Ctrl tells you
+  what you are looking at, and it fails hardest at the moment the player most wants it.
+
+- [ ] 603. THE GROUND'S MICRO-DETAIL SITS JUST UNDER ITS OWN BAR, AND NOBODY OWNS IT
+  (measured 10.08.2026 during the acceptance of the play-session packages; the triage point
+  of 04.08.2026 named this failure and closed without giving it an owner). The `settings`
+  check `first-person ground shows micro-detail (edge energy)` reads a Laplacian mean of
+  1.08–1.09 against a bar of 1.1 — red twice in a row on a QUIET machine, and
+  `baseline-classify` against the pre-merge commit calls it PRE-EXISTING / stale
+  assumption. It has therefore been red for days while every run charged it to "known",
+  which is precisely how a check stops being evidence.
+  WHAT MAKES IT WORTH A POINT rather than a threshold nudge: 1.08 against 1.1 is not a
+  wrong number, it is a number without a verdict. Either the ground genuinely lost the
+  grain that acceptance criterion 15 demands at eye height, or the crop the check measures
+  no longer contains the surface it was written for. On 04.08.2026 the same check read 0.00
+  with AND without the graphics card, which proved it was not the hardware and left the
+  question open.
+  FINAL STATE, decided BY THE PICTURE and never by the number (the triage point's own
+  rule): take the frame the check measures at the current head, look at it, and say which
+  of the two it is. If the ground lost its relief, that is a render defect and is fixed. If
+  the check crops somewhere the relief never was, the CHECK is corrected — with the reason
+  written into it — and never by lowering the bar until it passes. Whichever it is, the
+  check goes green on a quiet machine twice in a row, or it is deleted with its reason.
+  UNTIL THEN this point is where that red is charged, so an acceptance run can state its
+  reds honestly instead of carrying an unowned one.
+  Criticality: medium — no crash and nothing the player reports, but an unowned red inside
+  the everyday gate is a hole in the one signal every other point is judged by.
+
+- [ ] 522. THE BURNING GRASS DOES NOT BURN (observed 05.08.2026 while closing point
+  323). `verification/131-burning-grass.png` is the frame that proves the §19.9
+  bush fire, and no fire is visible in it to the eye — the frame passes its checks
+  and shows dry grass. Either the dressing does not draw at the moment the shutter
+  opens (the fire is a moving effect and the frame may catch it between states), or
+  it draws too faintly to read at that distance and zoom, or the check measures
+  something the picture does not show. This is exactly the "looks-wrong-but-passes"
+  class: a green check standing in front of an invisible feature.
+  FINAL STATE: the fire READS in the frame a human looks at — flame and smoke
+  visible at the zoom the criterion is judged at — and the check that guards it
+  measures the drawn fire (pixels of flame/smoke in the frame region), not a state
+  flag beside it. If the effect turns out to be drawing correctly and only the
+  frame's aim or moment is wrong, the aim is fixed and the finding recorded as
+  such; a feature that cannot be seen is not delivered either way.
+  VERIFIABLE: the refreshed frame 131 shows the fire to a human on both backends,
+  and its check fails when the fire is switched off in the debug menu — proving the
+  check reads the picture rather than the intent.
+
+- [ ] 565. A DRINKING WILDEBEEST CALF STANDS BURIED IN THE GROUND
+  (caught 08.08.2026, 19:xx, by the in-game anchoring tripwire on the `enrichments`
+  WebGL 2 lane). The dev-mode assert fired: `animal-buried — wildebeest bodyY=1.09
+  ground=1.82 y=1.82 young=false bathe=false drink=true dodge=false hop=false
+  chunk=14,1 shoreSeed=false parent=false child=true dPlayer=14`. The body sits 0.73
+  BELOW the terrain the same frame samples under it, and it is not a one-frame
+  transient: the assert only speaks on the SECOND consecutive violating visit
+  (`floatStrike >= 2`, ~13 frames apart), so this animal stood buried for at least two
+  assert visits while the player was 14 units away — in view.
+  IT IS NOT THE LABEL LAYER'S DOING: the run that caught it carried point 342's change
+  to `Wildlife.tsx`, but that change only READS `a.drawn` and pushes to an array; the
+  assert dates from 21.07.2026 and the anchoring code it watches is untouched. Treat it
+  as a pre-existing defect the tripwire surfaced, not a regression — but CONFIRM that on
+  `main` before fixing, because a confirmation is one run and a wrong assumption is a
+  rebuild.
+  THE LEAD THE DUMP GIVES: `drink=true` and `child=true` with `bathe=false`. The drink
+  cycle lowers the body toward the water, and a CALF carries a smaller `scale`, which
+  shrinks the assert's own tolerance (`ground - 0.75 * a.scale`) at the same time as the
+  drink pose lowers the body — so the pair is the suspect, not either alone. `y` equals
+  `ground` exactly (1.82), so the ANCHOR is right and it is the body offset below it
+  that is wrong.
+  FINAL STATE: a drinking animal of any age keeps its body above its own ground sample
+  for the whole drink cycle, at every scale the herds spawn; the tripwire stays armed and
+  unchanged (it is the detector, not the thing to tune away); and if the drink pose
+  legitimately needs to dip lower than the current tolerance, the tolerance is derived
+  from the pose rather than widened flat.
+  VERIFIABLE: a Vitest case over the drink-pose body offset sweeps the full scale range
+  the herds use, at both ages, and asserts the offset never falls below the ground
+  sample; `enrichments` runs on both backends without the `animal-buried` assert firing.
 
 - [ ] 575. THE ANIMALS CARRY NO PELT PATTERN AND NO FACE (found 09.08.2026 by the
   point-264 control frame, which photographed two zebras at the player's own zoom).
