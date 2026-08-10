@@ -205,7 +205,10 @@ function buildSite(seed: number): CommunicationRockSite {
     yaw,
     upstreamDeg: 0,
     downstream: { lat: 0, lon: 1 },
-    unvouched: !standsVouched,
+    // Present only when it is true: an `unvouched: false` on every ordinary site
+    // would invite a reader to treat the flag's ABSENCE as unknown rather than as
+    // vouched (Sol's fourth pass).
+    ...(standsVouched ? {} : { unvouched: true as const }),
   }
 }
 
@@ -213,9 +216,17 @@ function buildSite(seed: number): CommunicationRockSite {
  *  rings out to its rim, each ring offset by half a step against the one inside
  *  it. Two rings left a gap the width of a probe spacing between them, and a
  *  waterline is a LINE — it can cross a footprint through such a gap and be
- *  missed (four-eyes review by GPT-5.6 Sol, 11.08.2026). Three staggered rings
- *  leave no straight path across the disc that misses every probe by more than
- *  a fifth of the footprint. */
+ *  missed (four-eyes review by GPT-5.6 Sol, 11.08.2026).
+ *
+ *  WHAT THIS DOES AND DOES NOT PROMISE, measured rather than hoped: finite point
+ *  probes CANNOT prove a whole disc dry. With three staggered rings the worst
+ *  chord still slips through with about 0.12 of the radius to spare, and a
+ *  half-plane of water can hide in a rim cap of depth 1−cos(15°) ≈ 0.034 of the
+ *  radius. At this footprint (0.9 world units) that cap is ~0.03 units — a
+ *  hundredth of the block's height, below anything the picture shows. The
+ *  guarantee is therefore "no probe stands in water", not "the disc is dry", and
+ *  the residual is a sliver the player cannot see. A stronger promise needs a
+ *  polygon test against the waterline, not more probes. */
 function footprintProbes(lat: number, lon: number): Array<{ lat: number; lon: number }> {
   const r = ROCK_FOOTPRINT_UNITS / 10 // world units → degrees
   const out = [{ lat, lon }]
