@@ -407,6 +407,24 @@ export function modelsInTrailerField(field) {
     .filter(Boolean)
 }
 
+/**
+ * Does this review cover everything a record at that sha would clear?
+ *
+ * Returns null when it does, and the `partial` description when it does not —
+ * which is what stops the record command being printed (formatReviewReport).
+ * ONLY an answer EQUAL to the reviewed base counts as full coverage: an
+ * unanswerable merge-base is not an answer of "everything", and defaulting it to
+ * one switched the whole check off (fourth cross-vendor round). It lives here,
+ * pure, because the wrapper's own version could be reverted without a test
+ * noticing (same round).
+ */
+export function coverageDecision({ reviewedBase = '', coverageBase = '' } = {}) {
+  const reviewed = String(reviewedBase ?? '')
+  const coverage = String(coverageBase ?? '')
+  if (coverage && coverage === reviewed) return null
+  return { reviewedBase: reviewed, coverageBase: coverage || 'an unknown commit' }
+}
+
 /** How long a passed model-id probe stands before it must be repeated. */
 export const PROBE_MAX_AGE_MS = 30 * 86_400_000
 

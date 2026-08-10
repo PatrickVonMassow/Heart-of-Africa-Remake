@@ -11,6 +11,7 @@ import {
   buildReviewPrompt,
   classifyOutcome,
   codexArgs,
+  coverageDecision,
   decideReview,
   fallbackReviewerFor,
   FALLBACK_MODEL_NAME,
@@ -293,6 +294,19 @@ describe('the record the command prints', () => {
     // The verdict itself is still reported — the review happened, it just does
     // not cover what a record at this sha would clear.
     expect(report).toContain('merge')
+  })
+
+  it('decides coverage strictly: only an EQUAL base is full coverage', () => {
+    // The deciding line itself, not just the report it feeds: reverting it must
+    // redden a test (four-eyes finding, fifth round).
+    const b = 'b'.repeat(40)
+    expect(coverageDecision({ reviewedBase: b, coverageBase: b })).toBeNull()
+    expect(coverageDecision({ reviewedBase: b, coverageBase: 'c'.repeat(40) })).toMatchObject({ reviewedBase: b })
+    // An unanswerable merge-base is NOT an answer of "everything".
+    expect(coverageDecision({ reviewedBase: b, coverageBase: '' })).toMatchObject({
+      coverageBase: 'an unknown commit',
+    })
+    expect(coverageDecision({ reviewedBase: '', coverageBase: '' })).not.toBeNull()
   })
 
   it('is not printed either when the coverage could not be determined at all', () => {

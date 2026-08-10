@@ -53,6 +53,7 @@ import {
   classifyOutcome,
   codexArgs,
   CODEX_BIN,
+  coverageDecision,
   decideReview,
   FALLBACK_CHAIN,
   formatReviewMaterial,
@@ -456,9 +457,9 @@ if (isMainModule(import.meta.url)) {
     // FAILING TO ANSWER IS NOT AN ANSWER OF "FULL COVERAGE" (fourth round): a
     // sha with no merge base against `main` used to leave this empty, which
     // switched the check OFF and printed a record for a range nobody bounded.
+    // The decision itself is pure and tested (coverageDecision).
     const coverageBase = since ? git(['merge-base', 'main', full], { required: false }) : base
-    const partial =
-      coverageBase === base ? null : { reviewedBase: base, coverageBase: coverageBase || 'an unknown commit' }
+    const partial = coverageDecision({ reviewedBase: base, coverageBase })
     const material = gatherMaterial(full, base)
     console.error(
       `  material: ${material.length} characters of diff and file content ` +
