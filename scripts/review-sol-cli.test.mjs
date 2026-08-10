@@ -133,7 +133,10 @@ const HERMETIC_GIT = Object.freeze({
  */
 const hermeticEnv = (extra = {}) => {
   const env = { ...process.env }
-  for (const key of Object.keys(env)) if (key.startsWith('GIT_')) delete env[key]
+  // Case-INSENSITIVELY: Windows environment names are, so an inherited
+  // `git_config_count` would survive a `startsWith('GIT_')` filter and git would
+  // read it as the uppercase name (four-eyes finding, 11.08.2026).
+  for (const key of Object.keys(env)) if (key.toUpperCase().startsWith('GIT_')) delete env[key]
   return { ...env, ...HERMETIC_GIT, GIT_TEMPLATE_DIR: emptyTemplate, ...extra }
 }
 
@@ -256,6 +259,28 @@ beforeAll(() => {
 })
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+describe('the fixture is hermetic', () => {
+  it('drops an inherited GIT_* variable whatever its case, and seeds no host template', () => {
+    // Measured on the way in: a host template whose info/exclude holds `*.txt`
+    // makes the fixture's first commit fail and skips every case below. The
+    // variable names are case-insensitive on Windows, so the filter is too.
+    const injected = { GIT_CONFIG_COUNT: '1', git_config_key_0: 'core.excludesFile', Git_Template_Dir: '/somewhere' }
+    Object.assign(process.env, injected)
+    try {
+      const env = hermeticEnv()
+      expect(env.GIT_CONFIG_COUNT).toBeUndefined()
+      expect(env.git_config_key_0).toBeUndefined()
+      expect(env.Git_Template_Dir).toBeUndefined()
+      expect(env.GIT_TEMPLATE_DIR).toBe(emptyTemplate)
+      expect(env.GIT_CONFIG_GLOBAL).toBe('/dev/null')
+      // …and nothing outside git's namespace is thrown away with it.
+      expect(env.PATH).toBe(process.env.PATH)
+    } finally {
+      for (const key of Object.keys(injected)) delete process.env[key]
+    }
+  })
+})
 
 describe('a review that runs', () => {
   it('prints the reviewer, its answer and a complete record command, and exits 0', () => {
