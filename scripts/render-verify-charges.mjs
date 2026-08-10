@@ -80,4 +80,15 @@ export const RED_CHARGES = [
       'CLOSED, so the red is owned by point 570 until that point establishes whether the ' +
       'children genuinely regressed or the check rotates.',
   },
+  {
+    point: 627,
+    suite: 'world',
+    kind: 'check',
+    match: /15-worldmodel-victoria-falls/i,
+    why:
+      'Measured 11.08.2026 on main at 3f639f0d: the falls frame reds as "subject not in the ' +
+      'rendered picture", twice including the suite own retry, while the six other landmark ' +
+      'frames of the same run pass. Point 627 owns it until the cause — an unsettled jump or a ' +
+      'real placement change — is named.',
+  },
 ]

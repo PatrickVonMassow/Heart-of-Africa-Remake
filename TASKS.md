@@ -5624,3 +5624,25 @@ to land than a mechanism that needs a review.
   `groundScatter.test.ts` green with the geodata loaded; and a stated verdict per edge in 3.
   Criticality: HIGH — this is the landmark the communication goal is dug up at, and the
   check that was supposed to protect it does not.
+
+- [ ] 627. THE VICTORIA FALLS FRAME PHOTOGRAPHS SOMEWHERE ELSE (measured 11.08.2026 on
+  `main` at 3f639f0d, after the point-585 landing; bundle Testinfrastruktur). `world`
+  reds on ONE of its seven landmark frames: `15-worldmodel-victoria-falls — its subject is
+  not in the rendered picture: off the left and bottom edge of the frame`. It survived the
+  suite's own retry, and it reds on the WebGPU lane where the same suite passed on the 585
+  branch minutes earlier — so it is either a genuine regression of the jump or a rotating
+  timing failure, and which of the two is exactly what this point must settle. The six
+  other landmarks (Khartoum, Lake Victoria, Kilimanjaro, the Congo mouth, Cape Town, Lake
+  Chad) pass in the same run, so it is not the shutter and not the projection: those refuse
+  correctly, which is why this was caught at all.
+  FINAL STATE: the cause is NAMED with evidence — the jump to (-17.9, 25.9) not settling
+  before the shutter opens, a camera clamp at that latitude, or a real placement change —
+  and fixed at that cause. If it is timing, the frame waits on the STATE the jump reaches,
+  never on a wall-clock; a fixed sleep is not an answer here (CLAUDE.md §7.2). The charge
+  entry in `scripts/render-verify-charges.mjs` that currently accounts for this red goes
+  when the point is ticked.
+  VERIFIABLE: `world` green on BOTH backends, three runs each, the falls frame written and
+  showing the falls; and the deliberate regression (a jump that does not settle) must make
+  the check red again.
+  Criticality: medium — it blocks no player, but an unaccounted red on `main` blinds the
+  render gate for every later change.
