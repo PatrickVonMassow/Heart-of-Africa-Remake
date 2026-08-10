@@ -150,6 +150,30 @@ decision.
 The packages, cut by what ONE acceptance run can judge — re-cut them as further
 reports arrive rather than letting a package grow past its own acceptance:
 
+**FIVE THROUGHPUT POINTS OVERTAKE THE COMMUNICATION BUGS** (user 10.08.2026, his
+reasoning: a lever that makes every following point cheaper may well deliver the deferred
+bugs EARLIER, not later). Ranked by their own measured shares, the head of the queue is
+now 604 (the fatal one, already in flight), then **593 → 594 → 592 → 595 → 598**, and the
+09.08. bugs follow.
+
+- **593** first because it is the cheapest thing on the list — one binding paragraph in
+  two prompts — and it pays from the next agent onwards: search and read alone are 25.1 %
+  of the weighted spend, and 15.2 % of all output re-read what could not have changed.
+- **594** because bookkeeping is 26.0 % of the weighted spend and 37.5 % of the machine
+  hours, and it falls on the MAIN session — the one serial point every other point passes
+  through, which spends 62.3 % of its own cost on it.
+- **592** because waiting is the largest single lever measured: 10.9 % polling plus 3.6 %
+  idling, ≈ 18.7 machine-hours in the measured window.
+- **595** because verification is 47 % of the cost and the ladder bites exactly where the
+  deferred bugs bleed — the render points that need a picture on both backends.
+- **598** immediately after 595, not on its own merit (≈ 2 % of a median point) but
+  because it is what ROUTES the ladder to the agents: 595's cheapest rung exists today and
+  no brief mentions it, which is how it stayed unused for a month.
+
+Left where they are: **597** (bounded output — real and compounding, the next candidate
+if this batch pays off), **596** (it reduces the variance of the tail, not the average)
+and **599** (pure measurement — it judges the others, it saves nothing itself).
+
 **FOUR OF THE 09.08. POINTS DROP BEHIND 602** (user 10.08.2026): 581 (the faint
 settlement boundary), 601 (Ctrl+W closing the browser), 600 (the unlabelled attacking
 lion) and 603 (the ground's micro-detail) now sit AFTER 602. His reason, and it is the

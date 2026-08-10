@@ -120,6 +120,158 @@ there exactly once; a new point joins a bundle when appended.
   free and can walk, with a frame of the freed position through the shutter.
   Criticality: high — it is the difference between a lost expedition and a lost second.
 
+- [ ] 593. ONE TURN, SEVERAL INDEPENDENT CALLS (point 572's measure 2). The delegation
+  prompt and the batch prompt carry one binding paragraph: independent tool calls go into
+  ONE turn — several reads, several greps, `build` and `lint` — while anything whose input
+  depends on another call's output stays sequential, and a bundled shell chain never hides
+  its failing step. The paragraph NAMES its recurring candidates rather than stating the
+  principle: several reads, several greps, `build` beside `lint`, status beside branch, and
+  the screenshot reads of a picture check (small semantic groups, full resolution, judgment
+  quality before batching).
+  AND THE SAME PARAGRAPH CARRIES THE SECOND HALF: a fact that CANNOT have changed since it
+  was read is not read again — a file nobody edited, a `--help`, a config value, a spec
+  section already in the context. Mutable state stays re-read by rule: `git status`, CI
+  state, a running process, anything this session or another agent has written since.
+  MEASURED BASELINE: 5.0 % of responses issue more than one call, search/read alone is
+  25.1 % of the weighted spend, and 4036 responses — 15.2 % of all output — repeated an
+  EXACTLY identical shell command inside one session. At a quarter of that pot avoided the
+  saving is 23.1 M weighted (2.6 % of the window) and 6.8 machine-hours.
+  ONE SAVED RESPONSE IS 22.9k WEIGHTED AND 24.4 s OF MACHINE TIME — NOT of calendar time.
+  Up to three agents run in parallel (a median point spans 0.75 h of calendar against 1.39
+  machine-hours), so machine time becomes wall-clock only on the critical path. The ranking
+  table converted the two silently; the calendar effect stays UNQUANTIFIED until point 599
+  computes the critical path.
+  The point is complete when both shares — multi-call responses and exactly repeated
+  commands — have been RE-MEASURED after the change. Enforcement is by prompt and
+  measurement, not by a guard: "could have been bundled" is not machine-decidable.
+  Criticality: low — no mechanism, no guard; the risks are bundling dependent calls and
+  re-using a fact that has since changed, and the paragraph excludes both explicitly. It
+  is the ONLY member of this series with zero build cost, which is why it runs first.
+
+- [ ] 594. THE LANDING COMMAND (point 572's measure 3). `scripts/land-point.mjs <N>` runs
+  the landing chain deterministically — merge, fast gate, tick, archive move, board
+  publish, worktree cleanup — and prints ONE structured summary with a verdict per step.
+  It fails LOUD at the first red step and never continues past it, so no half state is
+  left behind, and every step it performs is one a guard already governs.
+  MEASURED TARGET: bookkeeping is 26.0 % of the weighted spend and 37.5 % of the machine
+  hours; the chain runs as 8–12 main-session turns today at a median context of 164k, and
+  the main session spends 62.3 % of its own cost on bookkeeping.
+  THREE SMALL RIDERS, each below the 5.0 M a point of its own would cost, so each lands
+  here rather than owning one:
+  (a) `npm audit` runs in the chain only when the LOCKFILE changed — the verdict depends on
+      the dependency tree and on nothing else, so this is the same fact, not a proxy for it;
+      the rule texts that demand the audit are adjusted in the same commit.
+  (b) A board publish whose content is unchanged is skipped.
+  (c) The fast gate runs build, lint and the unit layer CONCURRENTLY — gates are 21.0
+      machine-hours per window, so 30–60 % of that is 2.9–5.8 % of all machine hours, while
+      the token effect is ~0.33 % and this is therefore an axis-A measure only. INTERLOCK,
+      not optional: it never runs while a browser suite runs, or it manufactures exactly the
+      load the quiet-machine gate exists to prevent. Acceptance is ten serial against ten
+      parallel runs on a quiet machine.
+  NOT A FAST-FORWARD MERGE, and the reason is not obvious: a fast-forward leaves no merge
+  commit, and `git log --first-parent main` is the only calendar measurement we have — every
+  fast-forwarded point would silently vanish from it and from the CI guard's ref accounting.
+  The case it would apply to is also the one that costs nothing today, and the fast gate
+  after the merge is mandatory either way, so nothing is skipped in exchange.
+  Criticality: medium — it bundles guard-adjacent steps, and a swallowed intermediate
+  error would advance state nobody verified, so the mechanism review is required.
+
+- [ ] 592. STOP PAYING FOR THE WAIT (point 572's measure 1, the largest measured lever).
+  A long-running command is AWAITED, not polled. The verify wrapper and every background
+  run report their completion through the harness notification or through a single
+  blocking call with a timeout; where a poll is genuinely unavoidable, the FIRST wait is
+  0.9 × the suite's measured median runtime (`docs/picture-check-cost.md` §1), and after
+  five polls the run is either awaited blocking or treated as hung. The idle marker the
+  no-idle-stop guard reads is set by a HOOK, not by a model turn — `echo idle` disappears
+  from the transcripts and the guard accepts the hook's marker exactly as it accepts
+  today's turn. The verify wrapper COUNTS the polls of a run and prints the count, so the
+  rule is visible rather than remembered.
+  MEASURED TARGET: polling is 10.9 % of the weighted spend and bare idling another 3.6 %
+  (2857 + 1189 responses, 09.08.2026); the longest unbroken poll chain in the window was
+  437 responses ≈ 11.5 M weighted; the upper bound on removed model time is 2755 real poll
+  responses × 24.4 s ≈ 18.7 machine-hours in that window, and one 42-minute run polled every
+  30 s costs ≈ 1.9 M for the loop alone. Re-measure after the change with
+  `node scripts/measure-task-cost.mjs`.
+  THE COMPLETION MESSAGE IS A STRUCTURED RECEIPT, not prose: exit code, backend, suite, the
+  `git HEAD` it ran on, the log path, the failing test names UNCUT, and the frames EXPECTED
+  against the frames WRITTEN. The last pair is invisible today — point 375's shutter refuses
+  a frame whose subject is missing, but a frame that was never written at all goes unnoticed,
+  and awaiting instead of polling is exactly the moment to make the run state one checkable
+  object.
+  THE MAIN SESSION SEES THE FRAMES, NOT THE RUNNING PROCESS. A picture check today spends
+  1 to 1.8 M weighted on watching a run in the scarcest context there is (the main session's
+  median is 164k against an agent's 207k). It waits, then looks at the result.
+  The primitive already exists and is NOT to be re-derived: `docs/harness-primitives-evaluation.md`
+  §5 records that a background run plus its completion notification replaces log polling, and
+  names `Monitor` for the per-occurrence case.
+  Criticality: HIGH — it touches the idle guard, and a guard that goes blind stops
+  catching an idle stop, so the other model's mechanism review applies.
+
+- [ ] 595. THE VERIFICATION LADDER (point 572's measure 5). While a render point is still
+  being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
+  full proof — both backends where they can differ, LARGE where the change warrants it —
+  runs exactly ONCE, on the EXACT MERGE CANDIDATE — `main` merged into the branch, the tree
+  that will land — with the recorded `git HEAD` of that run as the evidence that the verified
+  tree IS the merged one. Nothing enforces or measures that today. The expensive browser
+  suites abort at the FIRST failure during that iteration (a red run is never credited
+  anyway) and run to completion only for the final proof. The rule is a brief building block
+  for render points, so it is applied rather than remembered.
+  A RED IS A RED. No "critical versus cosmetic" class is introduced to decide what may be
+  aborted on — the classification buys nothing here, because an iteration run is not credited
+  either way, and it would open the door to waving a red through.
+  THE SHARED FINAL RUN IS ALREADY DECIDED, and this point must not be read as contradicting
+  it: `docs/work-packages.md` settled that several FINISHED per-point branches may be merged
+  together and ONE regression run over the merged result — "the only sizeable saving left".
+  What that shared run may replace is the repeated full REGRESSION. The both-backend PICTURE
+  proof stays on the branch, BEFORE the merge, exactly as it is today; merging first to
+  verify afterwards cost about thirty turns of a block-loop on 24.07.2026.
+  THE UNIT LAYER HAS THE SAME LADDER: `vitest --changed` or a path filter and
+  `tsc --incremental` are legal WHILE REPAIRING, and an incremental green is never an
+  acceptance — the full fast gate stays the proof. One rule covering both layers, not two
+  half-rules.
+  MEASURED TARGET: verification is 47.0 % of the weighted spend and 37.4 % of the machine
+  hours, the ten costliest points hold 64.4 % of all point-assigned verification tokens,
+  and eight of ten recorded `enrichments` runs failed while still writing all 37 frames at
+  951–1029 s each.
+  THE LADDER'S CHEAPEST RUNG ALREADY EXISTS AND IS UNUSED (user question 09.08.2026: "Und
+  die neuen Möglichkeiten für differenziertes Testen durch 566 werden auch inzwischen bei
+  den Feature- und Bugtests eingesetzt?"). Point 566 built `--section=<name>`, and
+  `enrichments` declares nine of them; the resolver, the PARTIAL marking and the refusal to
+  count a partial run as coverage all work. CHECKED 09.08.2026: nothing routes anyone to
+  it. It appears in `scripts/verify/README.md` and in `tiers.mjs`, in no delegation brief,
+  in no agent prompt and in no rule text — the three agents commissioned that same evening
+  were not told about it either — and the recorded render-verify runs contain no partial
+  run at all. So the ladder's bottom rung is not a thing to invent here; it is a built
+  tool to PUT IN THE PATH. This point therefore also: (a) makes `--section` the stated
+  iteration rung for a render point in the delegation brief's building block, so an agent
+  reaches for it before replaying a whole pass; (b) SECTIONS the remaining render suites,
+  which 566 deferred ("enrichments first, then the other render suites"); and (c) states
+  in the same building block that the final proof is whole-suite, so the cheap rung can
+  never be mistaken for the acceptance.
+  Criticality: medium — it reorders the proof but must not dilute it; the both-backend
+  picture proof stays exactly as binding as it is today.
+
+- [ ] 598. THE BRIEF ORIENTS IN THE CODE, NOT ONLY IN THE SPEC (point 572's measure 8).
+  The delegation brief carries a GENERATED orientation: the paths the specification itself
+  names, and a per-directory line of responsibility derived from the tree and its file
+  headers. It is marked as a HINT, never as an instruction ("the specification names these
+  paths", not "change these files"), and it is generated on every run so it cannot go
+  stale.
+  AND IT NAMES THE PLANNED CHECK: which suite, and which `--section` of it, will verify this
+  point — derived from the diff→suite mapping and the ladder rung, generated like the rest so
+  it cannot go stale, and marked as a hint like the path list. This is the cheapest possible
+  answer to what the ladder point found: a rung that is built and routed to nobody gets used
+  when it stands in the artefact the agent reads FIRST, not in a rule it must remember.
+  MEASURED TARGET: search/read is 25.2 % of the weighted spend and the first responses of
+  a delegated agent are almost always search; five saved responses per point is ~2 % of a
+  median point.
+  NOT THE OPPOSITE DIRECTION: shrinking the brief was weighed and rejected on the arithmetic.
+  Removing 1.5k tokens saves ~35.7k weighted per point, while a single reference the agent
+  must then look up costs 22.9k — it breaks even at 1.5 extra lookups and goes negative
+  after. The brief is 1.9 % of the spend and exists to avoid the ~108k wholesale read.
+  Criticality: low — a wrong list would misdirect, which generation-from-the-tree and the
+  hint framing address.
+
 - [ ] 588. GUESS A MEANING WHERE IT IS SPOKEN, NOT ONLY IN THE JOURNAL (user
   09.08.2026). Today a reading is written only in the journal (`src/ui/JournalPanel.tsx`
   → `setUtteranceHypothesis`), so the player must break off watching, open the journal
@@ -3357,137 +3509,6 @@ later decisions wait on its readings, and the ladder (595) now precedes the land
 (594) — verification is 47 % of the spend against bookkeeping's 26 %, and a rule is cheaper
 to land than a mechanism that needs a review.
 
-- [ ] 592. STOP PAYING FOR THE WAIT (point 572's measure 1, the largest measured lever).
-  A long-running command is AWAITED, not polled. The verify wrapper and every background
-  run report their completion through the harness notification or through a single
-  blocking call with a timeout; where a poll is genuinely unavoidable, the FIRST wait is
-  0.9 × the suite's measured median runtime (`docs/picture-check-cost.md` §1), and after
-  five polls the run is either awaited blocking or treated as hung. The idle marker the
-  no-idle-stop guard reads is set by a HOOK, not by a model turn — `echo idle` disappears
-  from the transcripts and the guard accepts the hook's marker exactly as it accepts
-  today's turn. The verify wrapper COUNTS the polls of a run and prints the count, so the
-  rule is visible rather than remembered.
-  MEASURED TARGET: polling is 10.9 % of the weighted spend and bare idling another 3.6 %
-  (2857 + 1189 responses, 09.08.2026); the longest unbroken poll chain in the window was
-  437 responses ≈ 11.5 M weighted; the upper bound on removed model time is 2755 real poll
-  responses × 24.4 s ≈ 18.7 machine-hours in that window, and one 42-minute run polled every
-  30 s costs ≈ 1.9 M for the loop alone. Re-measure after the change with
-  `node scripts/measure-task-cost.mjs`.
-  THE COMPLETION MESSAGE IS A STRUCTURED RECEIPT, not prose: exit code, backend, suite, the
-  `git HEAD` it ran on, the log path, the failing test names UNCUT, and the frames EXPECTED
-  against the frames WRITTEN. The last pair is invisible today — point 375's shutter refuses
-  a frame whose subject is missing, but a frame that was never written at all goes unnoticed,
-  and awaiting instead of polling is exactly the moment to make the run state one checkable
-  object.
-  THE MAIN SESSION SEES THE FRAMES, NOT THE RUNNING PROCESS. A picture check today spends
-  1 to 1.8 M weighted on watching a run in the scarcest context there is (the main session's
-  median is 164k against an agent's 207k). It waits, then looks at the result.
-  The primitive already exists and is NOT to be re-derived: `docs/harness-primitives-evaluation.md`
-  §5 records that a background run plus its completion notification replaces log polling, and
-  names `Monitor` for the per-occurrence case.
-  Criticality: HIGH — it touches the idle guard, and a guard that goes blind stops
-  catching an idle stop, so the other model's mechanism review applies.
-
-- [ ] 593. ONE TURN, SEVERAL INDEPENDENT CALLS (point 572's measure 2). The delegation
-  prompt and the batch prompt carry one binding paragraph: independent tool calls go into
-  ONE turn — several reads, several greps, `build` and `lint` — while anything whose input
-  depends on another call's output stays sequential, and a bundled shell chain never hides
-  its failing step. The paragraph NAMES its recurring candidates rather than stating the
-  principle: several reads, several greps, `build` beside `lint`, status beside branch, and
-  the screenshot reads of a picture check (small semantic groups, full resolution, judgment
-  quality before batching).
-  AND THE SAME PARAGRAPH CARRIES THE SECOND HALF: a fact that CANNOT have changed since it
-  was read is not read again — a file nobody edited, a `--help`, a config value, a spec
-  section already in the context. Mutable state stays re-read by rule: `git status`, CI
-  state, a running process, anything this session or another agent has written since.
-  MEASURED BASELINE: 5.0 % of responses issue more than one call, search/read alone is
-  25.1 % of the weighted spend, and 4036 responses — 15.2 % of all output — repeated an
-  EXACTLY identical shell command inside one session. At a quarter of that pot avoided the
-  saving is 23.1 M weighted (2.6 % of the window) and 6.8 machine-hours.
-  ONE SAVED RESPONSE IS 22.9k WEIGHTED AND 24.4 s OF MACHINE TIME — NOT of calendar time.
-  Up to three agents run in parallel (a median point spans 0.75 h of calendar against 1.39
-  machine-hours), so machine time becomes wall-clock only on the critical path. The ranking
-  table converted the two silently; the calendar effect stays UNQUANTIFIED until point 599
-  computes the critical path.
-  The point is complete when both shares — multi-call responses and exactly repeated
-  commands — have been RE-MEASURED after the change. Enforcement is by prompt and
-  measurement, not by a guard: "could have been bundled" is not machine-decidable.
-  Criticality: low — no mechanism, no guard; the risks are bundling dependent calls and
-  re-using a fact that has since changed, and the paragraph excludes both explicitly. It
-  is the ONLY member of this series with zero build cost, which is why it runs first.
-
-- [ ] 594. THE LANDING COMMAND (point 572's measure 3). `scripts/land-point.mjs <N>` runs
-  the landing chain deterministically — merge, fast gate, tick, archive move, board
-  publish, worktree cleanup — and prints ONE structured summary with a verdict per step.
-  It fails LOUD at the first red step and never continues past it, so no half state is
-  left behind, and every step it performs is one a guard already governs.
-  MEASURED TARGET: bookkeeping is 26.0 % of the weighted spend and 37.5 % of the machine
-  hours; the chain runs as 8–12 main-session turns today at a median context of 164k, and
-  the main session spends 62.3 % of its own cost on bookkeeping.
-  THREE SMALL RIDERS, each below the 5.0 M a point of its own would cost, so each lands
-  here rather than owning one:
-  (a) `npm audit` runs in the chain only when the LOCKFILE changed — the verdict depends on
-      the dependency tree and on nothing else, so this is the same fact, not a proxy for it;
-      the rule texts that demand the audit are adjusted in the same commit.
-  (b) A board publish whose content is unchanged is skipped.
-  (c) The fast gate runs build, lint and the unit layer CONCURRENTLY — gates are 21.0
-      machine-hours per window, so 30–60 % of that is 2.9–5.8 % of all machine hours, while
-      the token effect is ~0.33 % and this is therefore an axis-A measure only. INTERLOCK,
-      not optional: it never runs while a browser suite runs, or it manufactures exactly the
-      load the quiet-machine gate exists to prevent. Acceptance is ten serial against ten
-      parallel runs on a quiet machine.
-  NOT A FAST-FORWARD MERGE, and the reason is not obvious: a fast-forward leaves no merge
-  commit, and `git log --first-parent main` is the only calendar measurement we have — every
-  fast-forwarded point would silently vanish from it and from the CI guard's ref accounting.
-  The case it would apply to is also the one that costs nothing today, and the fast gate
-  after the merge is mandatory either way, so nothing is skipped in exchange.
-  Criticality: medium — it bundles guard-adjacent steps, and a swallowed intermediate
-  error would advance state nobody verified, so the mechanism review is required.
-
-- [ ] 595. THE VERIFICATION LADDER (point 572's measure 5). While a render point is still
-  being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
-  full proof — both backends where they can differ, LARGE where the change warrants it —
-  runs exactly ONCE, on the EXACT MERGE CANDIDATE — `main` merged into the branch, the tree
-  that will land — with the recorded `git HEAD` of that run as the evidence that the verified
-  tree IS the merged one. Nothing enforces or measures that today. The expensive browser
-  suites abort at the FIRST failure during that iteration (a red run is never credited
-  anyway) and run to completion only for the final proof. The rule is a brief building block
-  for render points, so it is applied rather than remembered.
-  A RED IS A RED. No "critical versus cosmetic" class is introduced to decide what may be
-  aborted on — the classification buys nothing here, because an iteration run is not credited
-  either way, and it would open the door to waving a red through.
-  THE SHARED FINAL RUN IS ALREADY DECIDED, and this point must not be read as contradicting
-  it: `docs/work-packages.md` settled that several FINISHED per-point branches may be merged
-  together and ONE regression run over the merged result — "the only sizeable saving left".
-  What that shared run may replace is the repeated full REGRESSION. The both-backend PICTURE
-  proof stays on the branch, BEFORE the merge, exactly as it is today; merging first to
-  verify afterwards cost about thirty turns of a block-loop on 24.07.2026.
-  THE UNIT LAYER HAS THE SAME LADDER: `vitest --changed` or a path filter and
-  `tsc --incremental` are legal WHILE REPAIRING, and an incremental green is never an
-  acceptance — the full fast gate stays the proof. One rule covering both layers, not two
-  half-rules.
-  MEASURED TARGET: verification is 47.0 % of the weighted spend and 37.4 % of the machine
-  hours, the ten costliest points hold 64.4 % of all point-assigned verification tokens,
-  and eight of ten recorded `enrichments` runs failed while still writing all 37 frames at
-  951–1029 s each.
-  THE LADDER'S CHEAPEST RUNG ALREADY EXISTS AND IS UNUSED (user question 09.08.2026: "Und
-  die neuen Möglichkeiten für differenziertes Testen durch 566 werden auch inzwischen bei
-  den Feature- und Bugtests eingesetzt?"). Point 566 built `--section=<name>`, and
-  `enrichments` declares nine of them; the resolver, the PARTIAL marking and the refusal to
-  count a partial run as coverage all work. CHECKED 09.08.2026: nothing routes anyone to
-  it. It appears in `scripts/verify/README.md` and in `tiers.mjs`, in no delegation brief,
-  in no agent prompt and in no rule text — the three agents commissioned that same evening
-  were not told about it either — and the recorded render-verify runs contain no partial
-  run at all. So the ladder's bottom rung is not a thing to invent here; it is a built
-  tool to PUT IN THE PATH. This point therefore also: (a) makes `--section` the stated
-  iteration rung for a render point in the delegation brief's building block, so an agent
-  reaches for it before replaying a whole pass; (b) SECTIONS the remaining render suites,
-  which 566 deferred ("enrichments first, then the other render suites"); and (c) states
-  in the same building block that the final proof is whole-suite, so the cheap rung can
-  never be mistaken for the acceptance.
-  Criticality: medium — it reorders the proof but must not dilute it; the both-backend
-  picture proof stays exactly as binding as it is today.
-
 - [ ] 596. THE TAIL IS VISIBLE WHILE IT RUNS (point 572's measure 6). A point's running
   cost is measurable DURING the point, not only after it: a hook reports when a branch
   passes three times the median (≈ 17 M weighted), and that report is a DECISION point —
@@ -3530,27 +3551,6 @@ to land than a mechanism that needs a review.
   remembered.
   Criticality: low — the one real risk is cutting an error message, which the rule
   excludes.
-
-- [ ] 598. THE BRIEF ORIENTS IN THE CODE, NOT ONLY IN THE SPEC (point 572's measure 8).
-  The delegation brief carries a GENERATED orientation: the paths the specification itself
-  names, and a per-directory line of responsibility derived from the tree and its file
-  headers. It is marked as a HINT, never as an instruction ("the specification names these
-  paths", not "change these files"), and it is generated on every run so it cannot go
-  stale.
-  AND IT NAMES THE PLANNED CHECK: which suite, and which `--section` of it, will verify this
-  point — derived from the diff→suite mapping and the ladder rung, generated like the rest so
-  it cannot go stale, and marked as a hint like the path list. This is the cheapest possible
-  answer to what the ladder point found: a rung that is built and routed to nobody gets used
-  when it stands in the artefact the agent reads FIRST, not in a rule it must remember.
-  MEASURED TARGET: search/read is 25.2 % of the weighted spend and the first responses of
-  a delegated agent are almost always search; five saved responses per point is ~2 % of a
-  median point.
-  NOT THE OPPOSITE DIRECTION: shrinking the brief was weighed and rejected on the arithmetic.
-  Removing 1.5k tokens saves ~35.7k weighted per point, while a single reference the agent
-  must then look up costs 22.9k — it breaks even at 1.5 extra lookups and goes negative
-  after. The brief is 1.9 % of the spend and exists to avoid the ~108k wholesale read.
-  Criticality: low — a wrong list would misdirect, which generation-from-the-tree and the
-  hint framing address.
 
 - [ ] 599. MEASURE WHAT THE CACHE AND THE CALENDAR HIDE (point 572's measure 9). Two
   measurements the throughput analysis needed and did not have, delivered together because
