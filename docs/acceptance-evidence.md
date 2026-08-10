@@ -1226,7 +1226,11 @@ proves the eaves were not simply fenced off — it is still standable and still 
 solid surface from below — and every thatch roof mesh draws both faces, so an
 open dome hemisphere is no longer a back face one can see through.
 
-AND NO WEDGE IS FATAL (work-order 604). The collision rules keep him out of the
+AND NO WEDGE IS FATAL (work-order 604). OPEN — the control is NOT yet written into
+design.md §2.2/§17.5: the file stands at 28 385 of its 28 386 measured words, and the
+tightest wording of the new rule costs 38 more. Compressing elsewhere or raising the
+ceiling is the user's decision (`scripts/doc-budget-core.mjs`), not one to take in
+passing; the prepared sentences are in the delivery report. The collision rules keep him out of the
 walls; the escape keeps him out of the gaps BETWEEN them, because the game saves
 only on entering a port (design.md §18) and a traveller stuck in a village would
 lose everything since the last harbour. The reported case (F6 report
