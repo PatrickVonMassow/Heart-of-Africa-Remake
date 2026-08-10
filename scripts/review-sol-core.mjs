@@ -439,10 +439,25 @@ export const PROBE_MAX_AGE_MS = 30 * 86_400_000
  * A warning, never a block: an unproven id is a reason to distrust the ledger
  * line, not a reason to leave a change unreviewed.
  */
-export function probeFreshness(receipt, now = Date.now(), maxAgeMs = PROBE_MAX_AGE_MS) {
+export function probeFreshness(receipt, now = Date.now(), maxAgeMs = PROBE_MAX_AGE_MS, fingerprint = '') {
   const at = Number(receipt?.at ?? 0)
   if (!receipt || receipt.refused !== true || !at) {
     return { fresh: false, warning: `the model id ${SOL_MODEL_ID} has never been proven honoured on this machine — run: node scripts/review-sol.mjs --probe` }
+  }
+  // THE PROOF IS BOUND TO WHAT PRODUCED IT (fifth cross-vendor round). The
+  // receipt outlives container rebuilds, so a proof taken with another codex
+  // version, another binary or another account says nothing about the run being
+  // attributed now: a changed fingerprint expires it immediately, whatever its
+  // age. An empty fingerprint on either side only means "cannot tell", and time
+  // alone decides then.
+  if (fingerprint && receipt.fingerprint && receipt.fingerprint !== fingerprint) {
+    return {
+      fresh: false,
+      warning: 'the codex binary, its version or the logged-in account changed since the model id was proven — re-proving it',
+    }
+  }
+  if (fingerprint && !receipt.fingerprint) {
+    return { fresh: false, warning: 'the model-id proof predates fingerprinting and cannot be tied to this codex — re-proving it' }
   }
   const ageDays = Math.floor((now - at) / 86_400_000)
   if (now - at > maxAgeMs) {

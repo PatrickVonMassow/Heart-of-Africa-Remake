@@ -23,6 +23,7 @@ import {
   newFilePathsIn,
   OUTCOME,
   parseVerdict,
+  PROBE_MAX_AGE_MS,
   probeFreshness,
   savedAuthPathFrom,
   SECOND_FALLBACK_MODEL_NAME,
@@ -452,6 +453,20 @@ describe('the model-id probe receipt', () => {
     const now = Date.parse('2026-08-10T12:00:00Z')
     expect(probeFreshness({ at: now - 86_400_000, refused: true }, now)).toMatchObject({ fresh: true })
     expect(probeFreshness({ at: now - 60 * 86_400_000, refused: true }, now)).toMatchObject({ fresh: false })
+  })
+
+  it('expires the moment the codex it was taken with changes, whatever its age', () => {
+    // The receipt survives container rebuilds, so a proof taken with another
+    // binary, version or account says nothing about the run being attributed
+    // now (fifth cross-vendor round).
+    const now = Date.parse('2026-08-10T12:00:00Z')
+    const fresh = { at: now - 60_000, refused: true, fingerprint: 'abc123' }
+    expect(probeFreshness(fresh, now, PROBE_MAX_AGE_MS, 'abc123')).toMatchObject({ fresh: true })
+    expect(probeFreshness(fresh, now, PROBE_MAX_AGE_MS, 'deadbeef')).toMatchObject({ fresh: false })
+    // A receipt from before fingerprinting cannot be tied to this codex either.
+    expect(probeFreshness({ at: now - 60_000, refused: true }, now, PROBE_MAX_AGE_MS, 'abc123')).toMatchObject({
+      fresh: false,
+    })
   })
 })
 

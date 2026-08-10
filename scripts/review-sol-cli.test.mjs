@@ -27,6 +27,11 @@ let stateDir = ''
 const STUB = `#!/usr/bin/env node
 const { readFileSync, writeFileSync, appendFileSync } = require('node:fs')
 const argv = process.argv.slice(2)
+if (argv[0] === '--version') {
+  // The fingerprint the probe receipt is bound to reads this.
+  process.stdout.write((process.env.STUB_VERSION || 'codex-cli 0.147.0') + '\\n')
+  process.exit(0)
+}
 const out = argv[argv.indexOf('-o') + 1]
 const model = argv[argv.indexOf('-m') + 1]
 // What arrived on stdin is recorded: the material travels that way, and an
@@ -194,6 +199,16 @@ describe('the guards around the run', () => {
     writeFileSync(join(dir, 'calls.log'), '')
     expect(run(['--sha', 'HEAD', '--brief', 'judge it']).status).toBe(0)
     expect(calls()).toEqual(['gpt-5.6-sol'])
+  })
+
+  it('re-proves it the moment the codex it was proven with changes', () => {
+    // A cached proof is tied to the binary, its version and the account: it
+    // outlives container rebuilds, and an unbound one would let another model's
+    // answer be recorded as Sol's (four-eyes finding, fifth round).
+    writeFileSync(join(dir, 'calls.log'), '')
+    expect(run(['--sha', 'HEAD', '--brief', 'judge it'], { STUB_VERSION: 'codex-cli 9.9.9' }).status).toBe(0)
+    expect(calls()).toHaveLength(2)
+    expect(calls()[0]).not.toBe('gpt-5.6-sol')
   })
 })
 

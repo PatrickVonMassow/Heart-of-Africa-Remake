@@ -45,6 +45,7 @@ import {
 } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, sep as sep_ } from 'node:path'
+import { createHash } from 'node:crypto'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import {
@@ -63,6 +64,7 @@ import {
   newFilePathsIn,
   parseVerdict,
   probeFreshness,
+  PROBE_MAX_AGE_MS,
   REVIEW_TIMEOUT_MS,
   savedAuthPathFrom,
   SOL_MODEL_ID,
@@ -249,6 +251,25 @@ function runCodex({ prompt, input = '', modelId = SOL_MODEL_ID, timeoutMs = REVI
 /** The receipt of the last passed model-id probe (see probeFreshness). */
 export const PROBE_RECEIPT_FILE = join(STATE_DIR, 'review-sol-probe.json')
 
+/**
+ * What the model-id proof is TIED TO: the codex binary, its version and the
+ * logged-in account. The receipt survives container rebuilds, so a proof taken
+ * with a different one of those says nothing about the run being attributed now
+ * (fifth cross-vendor round). Hashed, because the account id is not ours to
+ * scatter through a repository's state files.
+ */
+function codexFingerprint() {
+  const version = spawnSync(CODEX_BIN, ['--version'], { encoding: 'utf8', windowsHide: true }).stdout ?? ''
+  const which = spawnSync('sh', ['-c', `command -v ${CODEX_BIN}`], { encoding: 'utf8', windowsHide: true }).stdout ?? ''
+  let account = ''
+  try {
+    account = String(JSON.parse(readFileSync(AUTH_FILE, 'utf8'))?.tokens?.account_id ?? '')
+  } catch {
+    /* no login yet — the probe will fail on its own and say so */
+  }
+  return createHash('sha256').update(`${version.trim()}|${which.trim()}|${account}`).digest('hex').slice(0, 16)
+}
+
 function readProbeReceipt() {
   try {
     return JSON.parse(readFileSync(PROBE_RECEIPT_FILE, 'utf8'))
@@ -265,7 +286,10 @@ function probe() {
   const refused = res.exitCode !== 0 && isUnknownModelRefusal(text)
   if (refused) {
     mkdirSync(dirname(PROBE_RECEIPT_FILE), { recursive: true })
-    writeFileSync(PROBE_RECEIPT_FILE, `${JSON.stringify({ at: Date.now(), refused: true, id: bogus })}\n`)
+    writeFileSync(
+      PROBE_RECEIPT_FILE,
+      `${JSON.stringify({ at: Date.now(), refused: true, id: bogus, fingerprint: codexFingerprint() })}\n`,
+    )
     console.log(
       `review-sol --probe: PASS — the server REFUSED the unknown id "${bogus}", so \`-m\` is honoured\n` +
         `  and a review run with -m ${SOL_MODEL_ID} really is ${SOL_MODEL_NAME}.`,
@@ -441,7 +465,7 @@ if (isMainModule(import.meta.url)) {
     // was printed either way. The probe therefore RUNS when its receipt is
     // missing or stale, and a failed probe stops the review before a word of it
     // can be attributed to a model that may not have written it.
-    const freshness = probeFreshness(readProbeReceipt())
+    const freshness = probeFreshness(readProbeReceipt(), Date.now(), PROBE_MAX_AGE_MS, codexFingerprint())
     if (!freshness.fresh) {
       console.error(`review-sol: ${freshness.warning}\n  proving the model id first …`)
       if (probe() !== 0) {
