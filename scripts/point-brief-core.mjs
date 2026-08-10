@@ -482,6 +482,211 @@ export function resolveSectionRefs(spec, registry, { pointNumbers = new Set() } 
   return { refs, ranges, namedDocs: namedDocs.map((d) => d.path) }
 }
 
+/**
+ * HOW DEEP ADOPTION IS FOLLOWED (point 516). 1 would carry the point whose
+ * specification the brief's point declares binding; 2 also carries what THAT
+ * point declares binding, which is where the real chains end — 488 adopts 352,
+ * and 352 adopts nothing. Deeper is not dropped, it is NAMED, and the cap is
+ * PRINTED in the brief: a reader who cannot see the cap cannot tell a spec that
+ * adopts nothing from one whose adoption was silently cut off.
+ *
+ * It is also the size brake. Inlining a point verbatim costs its whole body
+ * (352 is 2.5k characters), and an uncapped walk would pull a chain of them into
+ * every brief that starts one — the brief's entire value is that it is ~1.8k
+ * tokens rather than ~108k.
+ */
+export const ADOPTION_DEPTH_CAP = 2
+
+/**
+ * The point reference itself: `point 352`, `points 175/177`, `pt. 30`,
+ * `work-order point 434`. The lookbehind keeps `viewpoints 3` out.
+ *
+ * The sloppy `§352` form the queue also writes for a point is DELIBERATELY not
+ * here. Adoption carries a whole body, and `§16` is the one reference this
+ * corpus cannot pin down: measured, "per §16" and "per §21" in the queue mean a
+ * CLAUDE.md §7.1 acceptance criterion, not the work-order points of those
+ * numbers. Inlining point 16 there would put a wrong specification under a
+ * heading that says it governs — the single failure this tool must not produce.
+ * A `§N` therefore stays what it already was: resolved by the cascade and named
+ * on the reference map, with the criterion reading spelled out beside it.
+ */
+const POINT_REF_SRC = String.raw`(?<![\w-])(?:work-order\s+)?(?:points?|pts?\.?)\s+(\d+(?:\s*[/,]\s*\d+)*)`
+
+/**
+ * ADOPTING WORDINGS — the whole distinction of point 516, made by the
+ * REFERENCING WORDING and never by a hand-kept list (a list would need editing
+ * for every new point, and the one nobody edited is the one that starves its
+ * reader).
+ *
+ * WHY BY WORDING. Point 488's text says "Point 352's specification is binding
+ * with one amendment from point 482". The brief carried one identifying line per
+ * cross-referenced point, so the part declared BINDING was exactly the part
+ * missing, and the building agent had to cut point 352's brief for itself before
+ * it could start. A point merely named for orientation — "one amendment from
+ * point 482", whose amendment the sentence then states — needs no such thing.
+ *
+ * The set is deliberately narrow: each entry names a construction that says the
+ * OTHER point's text governs here, not one that merely points at it. A missed
+ * adoption costs one extra `point-brief.mjs N` run, exactly today's cost; a
+ * false one inlines a whole body into every brief that mentions the point, so
+ * the errors are not symmetric and the conservative side is the right one.
+ */
+export const ADOPTING_PATTERNS = [
+  {
+    id: 'possessive-spec',
+    why: "\"point N's specification/spec\" — the other point's own text is what governs",
+    re: new RegExp(`${POINT_REF_SRC}(?:'s|’s)\\s+(?:specification|spec)\\b`, 'gi'),
+  },
+  {
+    id: 'binding',
+    why: '"point N is binding", "point N\'s rules remain binding"',
+    re: new RegExp(`${POINT_REF_SRC}(?:'s|’s)?(?:\\s+\\w+){0,3}\\s+(?:is|are|remains?|stays?)\\s+binding\\b`, 'gi'),
+  },
+  { id: 'per', why: '"per point N"', re: new RegExp(`\\bper\\s+${POINT_REF_SRC}`, 'gi') },
+  {
+    id: 'as-specified-in',
+    why: '"as specified/defined/described/stated in point N"',
+    re: new RegExp(
+      `\\b(?:as\\s+)?(?:specified|defined|described|stated|set\\s+out|laid\\s+out|written)\\s+in\\s+${POINT_REF_SRC}`,
+      'gi',
+    ),
+  },
+  {
+    id: 'spec-of',
+    why: '"the specification/rules/requirements of point N"',
+    re: new RegExp(
+      `\\b(?:the\\s+)?(?:specification|spec|rules?|requirements?)\\s+of\\s+${POINT_REF_SRC}`,
+      'gi',
+    ),
+  },
+  { id: 'according-to', why: '"according to point N"', re: new RegExp(`\\baccording\\s+to\\s+${POINT_REF_SRC}`, 'gi') },
+  { id: 'governed-by', why: '"governed by point N"', re: new RegExp(`\\bgoverned\\s+by\\s+${POINT_REF_SRC}`, 'gi') },
+  {
+    id: 'unchanged-from',
+    why: '"unchanged from point N" — the same specification, carried forward',
+    re: new RegExp(`\\bunchanged\\s+from\\s+${POINT_REF_SRC}`, 'gi'),
+  },
+  { id: 'implements', why: '"implements point N"', re: new RegExp(`\\bimplements?\\s+${POINT_REF_SRC}`, 'gi') },
+  { id: 'follows', why: '"follows point N"', re: new RegExp(`\\bfollows?\\s+${POINT_REF_SRC}`, 'gi') },
+]
+
+/**
+ * Quotation spans — where the spec QUOTES a wording rather than using it.
+ *
+ * Point 516's own text reads: Point 488's text reads "point 352's specification
+ * is binding …". That is a citation of a phrase, not an adoption of point 352,
+ * and inlining 352 there would carry a body nobody asked for. Same treatment as
+ * the backticked `§B` notation the resolver already knows: not skipped (that
+ * would be a silent omission) but DOWNGRADED to a mention, and said so on the
+ * reference map.
+ *
+ * A quote may wrap across lines in the work order's hard-wrapped prose, so the
+ * newline is allowed; a blank line inside is not, which is what keeps an
+ * unpaired quote from swallowing the rest of a spec.
+ */
+export function quotedSpans(text) {
+  const spans = []
+  for (const m of normalise(text).matchAll(/"([^"]{0,600})"|“([^”]{0,600})”/g)) {
+    if (/\n[ \t]*\n/.test(m[0])) continue
+    spans.push([m.index, m.index + m[0].length])
+  }
+  return spans
+}
+
+/**
+ * Split a spec's point references into the ones whose SPECIFICATION it adopts
+ * and the ones it merely quotes an adopting phrase about. Everything else stays
+ * an ordinary cross-reference (extractPointRefs finds those).
+ */
+export function classifyPointRefs(spec, { selfNumber = null } = {}) {
+  const text = normalise(spec)
+  const quoted = quotedSpans(text)
+  const inQuote = (at, end) => quoted.some(([from, to]) => at >= from && end <= to)
+  const adopted = new Map()
+  const quotedOnly = new Map()
+  for (const pattern of ADOPTING_PATTERNS) {
+    for (const m of text.matchAll(pattern.re)) {
+      const phrase = m[0].replace(/\s+/g, ' ').trim()
+      const cited = inQuote(m.index, m.index + m[0].length)
+      for (const part of m[1].split(/[/,]/)) {
+        const n = Number(part.trim())
+        if (!Number.isFinite(n) || n <= 0 || n === Number(selfNumber)) continue
+        const record = { number: n, at: m.index, phrase, pattern: pattern.id }
+        if (cited) {
+          if (!adopted.has(n) && !quotedOnly.has(n)) quotedOnly.set(n, record)
+        } else {
+          if (!adopted.has(n)) adopted.set(n, record)
+          quotedOnly.delete(n)
+        }
+      }
+    }
+  }
+  const byNumber = (a, b) => a.number - b.number
+  return { adopted: [...adopted.values()].sort(byNumber), quoted: [...quotedOnly.values()].sort(byNumber) }
+}
+
+/**
+ * Walk the adoption chain breadth-first from `root`, to `cap` levels.
+ *
+ * An adopted point that resolves NOWHERE is the hard failure of point 516's
+ * item 3, on the same reasoning as a dangling `§`: the brief promised the text
+ * that governs and cannot deliver it. Only the levels the brief CARRIES throw —
+ * a reference past the cap is named, not carried, so a stale one there is
+ * reported on its line the way an unknown cross-reference already is.
+ */
+export function collectAdoptedSpecs({
+  points = [],
+  root,
+  cap = ADOPTION_DEPTH_CAP,
+  mayBeCriterion = () => false,
+} = {}) {
+  const byNumber = new Map(points.map((p) => [p.number, p]))
+  const chain = []
+  const beyond = []
+  const ambiguous = []
+  const seen = new Set([root.number])
+  let frontier = [{ point: root, depth: 0 }]
+  while (frontier.length) {
+    const next = []
+    for (const { point, depth } of frontier) {
+      for (const ref of classifyPointRefs(point.body, { selfNumber: point.number }).adopted) {
+        if (seen.has(ref.number)) continue
+        // A LOW number the queue writes as "per pt. 32" is the one reading this
+        // resolver cannot settle: CLAUDE.md §7.1's criteria are list items with
+        // the same numbers, and point 84's "per pt. 32" means CRITERION 32 (the
+        // render pipeline), not the work-order point of that number. Inlining a
+        // body under a heading that says it is binding would be the worst error
+        // this tool can make, so an ambiguous number is NAMED and not carried —
+        // unless the spec wrote "work-order point N", which decides it.
+        if (mayBeCriterion(ref.number) && !/work-order/i.test(ref.phrase)) {
+          if (!ambiguous.some((a) => a.number === ref.number)) ambiguous.push({ ...ref, via: point.number })
+          continue
+        }
+        if (depth + 1 > cap) {
+          if (!beyond.some((b) => b.number === ref.number)) {
+            beyond.push({ ...ref, via: point.number, found: byNumber.has(ref.number) })
+          }
+          continue
+        }
+        const target = byNumber.get(ref.number)
+        if (!target) {
+          throw new BriefError(
+            `point ${point.number} adopts the specification of point ${ref.number} ("${ref.phrase}"), ` +
+              'which exists in neither TASKS.md nor docs/tasks-archive.md. The brief must carry an adopted ' +
+              'specification in full, so this is a dead reference, not a detail: fix the number in the work ' +
+              'order — a reader told a missing specification is binding is worse off than one told nothing.',
+          )
+        }
+        seen.add(ref.number)
+        chain.push({ ...ref, via: point.number, depth: depth + 1, point: target })
+        next.push({ point: target, depth: depth + 1 })
+      }
+    }
+    frontier = next
+  }
+  return { chain, beyond, ambiguous }
+}
+
 /** Other work-order points a spec names ("per point 288", "pt. 30", "points 175/177"). */
 export function extractPointRefs(spec, selfNumber = null) {
   const text = normalise(spec)
@@ -632,8 +837,33 @@ export function formatRevisionLine({ head = null, dirty = null, workOrder = null
   )
 }
 
+/**
+ * The header of the adopted-specification block. The DEPTH CAP is stated here
+ * rather than applied silently (point 516 item 2): the reader must be able to
+ * tell "this point adopts nothing further" from "the walk stopped here".
+ */
+export function adoptionHeaderLines(cap = ADOPTION_DEPTH_CAP) {
+  return [
+    '--- ADOPTED SPECIFICATIONS (carried in full — this point declares them binding) ---',
+    `DEPTH CAP ${cap}: adoption is followed ${cap} level(s) — the points this one adopts, and the ones`,
+    'THEY adopt. Anything deeper is NAMED below rather than carried, so run',
+    '`node scripts/point-brief.mjs <N>` for it. A `§` cited INSIDE an adopted point is named on the',
+    'reference map, not carried: it belongs to that point, and its section is one targeted read away.',
+  ]
+}
+
 /** Assemble the brief text from already-resolved parts (pure, no lookups). */
-export function assembleBrief({ point, sections = [], referenced = [], notes = [], referenceMap = [], revision }) {
+export function assembleBrief({
+  point,
+  sections = [],
+  referenced = [],
+  notes = [],
+  referenceMap = [],
+  revision,
+  adopted = [],
+  adoptionBeyond = [],
+  adoptionCap = ADOPTION_DEPTH_CAP,
+}) {
   const out = [
     `=== DELEGATION BRIEF — WORK-ORDER POINT ${point.number} (${point.done ? 'DONE/ARCHIVED' : 'OPEN'}) ===`,
     'Assembled by scripts/point-brief.mjs from the work order, design.md and the research docs.',
@@ -645,6 +875,29 @@ export function assembleBrief({ point, sections = [], referenced = [], notes = [
     point.body,
     '',
   ]
+  if (adopted.length || adoptionBeyond.length) {
+    out.push(...adoptionHeaderLines(adoptionCap))
+    for (const a of adopted) {
+      out.push(
+        '',
+        `[work-order point ${a.number} (${a.point.done ? 'done' : 'open'}), ADOPTED by point ${a.via} ` +
+          `via "${a.phrase}" — depth ${a.depth}]`,
+        a.point.body,
+      )
+    }
+    if (adoptionBeyond.length) {
+      out.push('', `DEEPER THAN THE CAP — named, not carried (run the brief for each):`)
+      for (const b of adoptionBeyond) {
+        out.push(
+          b.found
+            ? `- point ${b.number}, adopted by point ${b.via} via "${b.phrase}" — node scripts/point-brief.mjs ${b.number}`
+            : `- point ${b.number}, adopted by point ${b.via} via "${b.phrase}" — NOT FOUND in the work order; ` +
+              'treat as suspect and say so.',
+        )
+      }
+    }
+    out.push('')
+  }
   if (sections.length) {
     out.push('--- SECTIONS THE SPEC REFERENCES (verbatim) ---')
     for (const s of sections) {
@@ -749,6 +1002,18 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
       'resolver can tell them apart — decide from what the sentence is about.'
     )
   }
+  // The specifications this point declares binding, carried in full (point 516).
+  // It runs here because the §7.1 criterion numbers decide which adopted number
+  // may be carried at all, and an unknown one throws — a brief that says a
+  // specification is binding and then does not carry it is the bug this closes.
+  const {
+    chain: adopted,
+    beyond: adoptionBeyond,
+    ambiguous: adoptionAmbiguous,
+  } = collectAdoptedSpecs({ points: all, root: point, mayBeCriterion: (n) => criterionTitle(n) !== null })
+  const { quoted: adoptionQuoted } = classifyPointRefs(point.body, { selfNumber: point.number })
+  const adoptedNumbers = new Set(adopted.map((a) => a.number))
+
   const alsoNote = (r) => {
     if (!r.alsoIn?.length) return ''
     const each = r.alsoIn.map((a) =>
@@ -780,14 +1045,68 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
     const title = r.section?.title ? ` "${r.section.title}"` : ''
     return `§${r.id} → ${r.docPath} §${r.id}${title} — ${where} [${r.how}]${alsoNote(r)}`
   }
-  const referenceMap = refs
-    .slice()
-    .sort((a, b) => a.at - b.at)
-    .map(describe)
+  // The § an ADOPTED point cites: named on the map, never carried. The reader has
+  // that point's text in front of him, so an unexplained § in it would be exactly
+  // the gap this point closes — one line each, and one targeted read away.
+  const ownIds = new Set(refs.map((r) => `${r.docPath ?? r.how}|${r.id}`))
+  const adoptedRefs = []
+  for (const a of adopted) {
+    for (const r of resolveSectionRefs(a.point.body, reg, { pointNumbers }).refs) {
+      const key = `${r.docPath ?? r.how}|${r.id}`
+      if (ownIds.has(key)) continue
+      ownIds.add(key)
+      adoptedRefs.push({ ...r, viaPoint: a.number })
+    }
+  }
+  const describeAdoptedRef = (r) => {
+    const via = `cited by ADOPTED point ${r.viaPoint}`
+    if (r.how === 'dangling') {
+      return (
+        `§${r.id} → ${via}, and it resolves in NO document searched — a stale reference in that point's ` +
+        'own text. Report it; do not guess what it meant.'
+      )
+    }
+    if (r.how === 'work-order-point') return `§${r.id} → WORK-ORDER POINT ${r.id} — ${via}`
+    if (r.how === 'notation') return `§${r.id} → the NOTATION itself, quoted in backticks — ${via}`
+    if (r.kind === 'part') return `§${r.id} → ${r.docPath}, the whole §${r.id} part — ${via}; read on demand`
+    const title = r.section?.title ? ` "${r.section.title}"` : ''
+    return `§${r.id} → ${r.docPath} §${r.id}${title} — ${via}; read on demand (not carried)`
+  }
+  const referenceMap = [
+    ...refs
+      .slice()
+      .sort((a, b) => a.at - b.at)
+      .map(describe),
+    ...adopted.map(
+      (a) =>
+        `point ${a.number} → ADOPTED: its specification is binding here ("${a.phrase}") — carried in full ` +
+        `above, depth ${a.depth} [${a.pattern}]`,
+    ),
+    ...adoptionBeyond.map(
+      (b) =>
+        `point ${b.number} → ADOPTED by point ${b.via} ("${b.phrase}") — past the depth cap ` +
+        `${ADOPTION_DEPTH_CAP}, so NAMED, not carried`,
+    ),
+    ...adoptionAmbiguous.map((a) => {
+      const title = criterionTitle(a.number)
+      return (
+        `point ${a.number} → adopting wording "${a.phrase}", but ${a.number} is ALSO CLAUDE.md §7.1 ` +
+        `ACCEPTANCE CRITERION ${a.number}${title ? ` "${title}"` : ''}, which no resolver can tell from a ` +
+        'point number. The specification is therefore NOT carried; if the sentence means the point, run: ' +
+        `node scripts/point-brief.mjs ${a.number}`
+      )
+    }),
+    ...adoptionQuoted.map(
+      (q) =>
+        `point ${q.number} → mentioned only: the adopting wording "${q.phrase}" stands inside a QUOTATION, ` +
+        'so the spec talks ABOUT that wording instead of adopting it — identification line only',
+    ),
+    ...adoptedRefs.map(describeAdoptedRef),
+  ]
 
   const pointRefIds = refs.filter((r) => r.how === 'work-order-point').map((r) => Number(r.id))
   const crossRefs = [...new Set([...extractPointRefs(point.body, point.number), ...pointRefIds])]
-    .filter((n) => n !== point.number)
+    .filter((n) => n !== point.number && !adoptedNumbers.has(n))
     .sort((a, b) => a - b)
   const referenced = crossRefs.map((n) => {
     const p = all.find((q) => q.number === n)
@@ -821,7 +1140,16 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
   // The caller supplies the git half (it needs I/O); the content half is computed
   // here, so a brief built through the library can never lack its fingerprint.
   const stamp = { head: null, dirty: null, ...revision, workOrder: workOrderFingerprint(tasksText) }
-  const brief = assembleBrief({ point, sections: carried, referenced, notes, referenceMap, revision: stamp })
+  const brief = assembleBrief({
+    point,
+    sections: carried,
+    referenced,
+    notes,
+    referenceMap,
+    revision: stamp,
+    adopted,
+    adoptionBeyond,
+  })
   return {
     brief,
     revision: stamp,
@@ -829,6 +1157,11 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
     refs,
     sections: carried,
     referenced,
+    adopted,
+    adoptionBeyond,
+    adoptionAmbiguous,
+    adoptionQuoted,
+    adoptedRefs,
     designRefs: carried.map((s) => s.id),
     claudeRefs: refs.filter((r) => r.docPath === 'CLAUDE.md').map((r) => r.id),
     otherDocRefs: refs.filter((r) => r.docPath && r.docPath !== 'design.md' && r.docPath !== 'CLAUDE.md'),

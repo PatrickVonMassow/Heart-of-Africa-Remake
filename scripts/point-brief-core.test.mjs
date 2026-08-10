@@ -16,10 +16,13 @@ import { readTasksAll } from './tasks-source.mjs'
 import { readDocCorpus } from './doc-corpus.mjs'
 import { CALL_DISCIPLINE_DE, callDisciplineTopics } from './batch-autostart-core.mjs'
 import {
+  ACCEPTANCE_CRITERION_FALLBACK_MAX,
+  ADOPTION_DEPTH_CAP,
   BriefError,
   BRIEF_TOKEN_CEILING,
   CALL_DISCIPLINE,
   DOC_WINDOW,
+  classifyPointRefs,
   acceptanceCriteriaFrom,
   aliasesFor,
   assembleBrief,
@@ -44,7 +47,7 @@ const TASKS = [
   '## Checklist',
   '',
   '- [ ] 400. AN OPEN POINT — it references design.md §4.2 and, later, §19.8.',
-  '  It also says: per point 288 the ports are known from the start.',
+  '  It also says: the ports of point 288 are known from the start.',
   '',
   '- [ ] 401. ANOTHER OPEN POINT with no references at all.',
   '',
@@ -156,7 +159,7 @@ describe('parseWorkOrderPoints', () => {
   it('keeps the whole continuation body and stops at the next point', () => {
     const p = findPoint(ALL, 400)
     expect(p.body).toContain('AN OPEN POINT')
-    expect(p.body).toContain('per point 288')
+    expect(p.body).toContain('the ports of point 288')
     expect(p.body).not.toContain('ANOTHER OPEN POINT')
   })
 
@@ -530,7 +533,7 @@ describe('buildBrief', () => {
 
   it('lists EVERY § of the spec in the reference map, with where it went', () => {
     const tasks = ALL.replace(
-      'It also says: per point 288 the ports are known from the start.',
+      'It also says: the ports of point 288 are known from the start.',
       'It also says: peoples-1890 §3.1 and CLAUDE.md §7.1 and §288 combat apply.',
     )
     const { brief } = buildBrief({ ...args, tasksText: tasks, number: 400 })
@@ -597,6 +600,189 @@ describe('buildBrief', () => {
   it('says plainly when it carries no design section, instead of leaving a gap', () => {
     const { brief } = buildBrief({ ...args, number: 401 })
     expect(brief).toMatch(/no design\.md section is carried/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// ADOPTION (point 516): a point that declares ANOTHER point's specification
+// binding must carry it, not name it. Measured on point 488, whose brief named
+// the very specification it called binding and sent its agent to cut a second
+// brief before it could start.
+// ---------------------------------------------------------------------------
+describe('adoption — the specification a point declares binding', () => {
+  const ADOPTION_TASKS = [
+    '# TASKS',
+    '',
+    "- [ ] 700. THE ADOPTING POINT. Point 701's specification is binding with one",
+    '  amendment from point 702: the band follows the walkable boundary.',
+    '',
+    '- [ ] 703. THE CHAIN HEAD — per point 700 the whole arrangement holds here too.',
+    '',
+    '- [ ] 704. A MERE MENTION: the fragile family of point 701 is the reason, and',
+    '  point 702 moved the village.',
+    '',
+    '- [ ] 705. A DEAD ADOPTION — per point 999, which no work order has.',
+    '',
+    '- [ ] 706. TALKS ABOUT THE WORDING: point 700 reads "per point 701", which is a',
+    '  quotation of an adopting phrase, not an adoption.',
+    '',
+    '- [ ] 707. THE CRITERION COLLISION — per pt. 22 the health bar keeps its badges.',
+    '',
+    '- [ ] 708. A CYCLE — per point 709.',
+    '',
+    '- [ ] 709. THE OTHER HALF OF THE CYCLE — per point 708.',
+    '',
+    '- [ ] 710. THE EXPLICIT FORM — per work-order point 22, the ocean point.',
+    '',
+    '## Archive',
+    '',
+    '- [x] 701. THE ADOPTED SPECIFICATION. It cites design.md §4.2, demands the band',
+    '  sit at the same radius the leave check uses, and per point 702 reads the',
+    '  boundary shape from one source.',
+    '',
+    '- [x] 702. THE AMENDING POINT — the walkable region is no longer a plain circle.',
+    '',
+    '- [x] 22. AN ARCHIVED POINT about the ocean at full zoom-out.',
+  ].join('\n')
+
+  const adoptArgs = { tasksText: ADOPTION_TASKS, designText: DESIGN, claudeText: CLAUDE, docs: DOCS }
+  const build = (n) => buildBrief({ ...adoptArgs, number: n })
+  const bodyOf = (n) => findPoint(ADOPTION_TASKS, n).body
+
+  it('reads an ADOPTING wording as adoption and a MENTIONING one as a mention', () => {
+    const adopting = classifyPointRefs(bodyOf(700), { selfNumber: 700 })
+    expect(adopting.adopted.map((a) => a.number)).toEqual([701])
+    expect(adopting.adopted[0].pattern).toBe('possessive-spec')
+    // 702 is named for orientation — the amendment is stated in the sentence.
+    expect(classifyPointRefs(bodyOf(704), { selfNumber: 704 }).adopted).toEqual([])
+  })
+
+  it('recognises every adopting construction the queue writes', () => {
+    const forms = [
+      ['per point 701', 'per'],
+      ['as specified in point 701', 'as-specified-in'],
+      ['the rules of point 701 hold', 'spec-of'],
+      ['according to point 701', 'according-to'],
+      ['governed by point 701', 'governed-by'],
+      ['unchanged from point 701', 'unchanged-from'],
+      ['it implements point 701', 'implements'],
+      ['it follows point 701', 'follows'],
+      ['point 701 is binding', 'binding'],
+      ["point 701's specification", 'possessive-spec'],
+    ]
+    for (const [text, pattern] of forms) {
+      const { adopted } = classifyPointRefs(`Something, ${text}, and then more.`)
+      expect(adopted.map((a) => a.number), text).toEqual([701])
+      expect(adopted[0].pattern, text).toBe(pattern)
+    }
+  })
+
+  it('does NOT read an ordinary reference as adoption', () => {
+    for (const text of [
+      'the fragile family of point 701',
+      'one amendment from point 701',
+      'point 701 moved the village',
+      'delivered under point 701, which closed it',
+    ]) {
+      expect(classifyPointRefs(`A sentence: ${text}.`).adopted, text).toEqual([])
+    }
+  })
+
+  it('carries the adopted specification VERBATIM, under its number', () => {
+    const { brief, adopted } = build(700)
+    expect(adopted.map((a) => a.number)).toEqual([701, 702])
+    expect(brief).toContain('--- ADOPTED SPECIFICATIONS')
+    expect(brief).toContain(bodyOf(701))
+    expect(brief).toContain('[work-order point 701 (done), ADOPTED by point 700')
+  })
+
+  it('leaves a merely mentioned point at its ONE identifying line', () => {
+    const { brief } = build(704)
+    expect(brief).not.toContain('--- ADOPTED SPECIFICATIONS')
+    expect(brief).not.toContain(bodyOf(701))
+    expect(brief).toContain('point 701 [done]:')
+  })
+
+  it('adds NOTHING to a brief that adopts nothing — the whole value is the size', () => {
+    // Not one line: the brief is worth ~1.8k tokens against ~108k of wholesale
+    // reading, and a block printed for every point would spend that saving on
+    // points the change does not concern.
+    const { brief } = build(704)
+    for (const marker of ['--- ADOPTED SPECIFICATIONS', 'DEPTH CAP', 'DEEPER THAN THE CAP', '→ ADOPTED']) {
+      expect(brief, marker).not.toContain(marker)
+    }
+  })
+
+  it('resolves ONE further level and STATES the cap instead of applying it silently', () => {
+    const { brief, adopted, adoptionBeyond } = build(703)
+    expect(adopted.map((a) => `${a.number}@${a.depth}`)).toEqual(['700@1', '701@2'])
+    expect(brief).toContain(`DEPTH CAP ${ADOPTION_DEPTH_CAP}:`)
+    // 702 is adopted by 701, which already sits at the cap — named, never dropped.
+    expect(adoptionBeyond.map((b) => b.number)).toEqual([702])
+    expect(brief).toContain('DEEPER THAN THE CAP')
+    expect(brief).toContain('node scripts/point-brief.mjs 702')
+    expect(brief).not.toContain(bodyOf(702))
+  })
+
+  it('FAILS LOUDLY on an adopted point that resolves nowhere', () => {
+    expect(() => build(705)).toThrow(BriefError)
+    expect(() => build(705)).toThrow(/adopts the specification of point 999/)
+  })
+
+  it('names each adopted point AS ADOPTED on the reference map', () => {
+    const map = build(700)
+      .brief.split('\n')
+      .filter((l) => l.startsWith('- point '))
+    expect(map.some((l) => /^- point 701 → ADOPTED: its specification is binding here/.test(l))).toBe(true)
+    expect(map.some((l) => l.includes('carried in full above, depth 1'))).toBe(true)
+    expect(map.some((l) => /^- point 702 → ADOPTED: /.test(l) && l.includes('depth 2'))).toBe(true)
+  })
+
+  it('names a § the ADOPTED point cites — without carrying that section', () => {
+    const { brief } = build(700)
+    expect(brief).toContain('§4.2 → design.md §4.2 "Peoples (22)" — cited by ADOPTED point 701')
+    expect(brief).not.toContain('[from design.md §4.2]')
+  })
+
+  it('treats an adopting phrase inside a QUOTATION as a mention, and says so', () => {
+    const { brief, adopted, adoptionQuoted } = build(706)
+    expect(adopted).toEqual([])
+    expect(adoptionQuoted.map((q) => q.number)).toEqual([701])
+    expect(brief).toContain('stands inside a QUOTATION')
+    expect(brief).not.toContain(bodyOf(701))
+  })
+
+  it('refuses to inline a number that may be a §7.1 CRITERION instead', () => {
+    // "per pt. 22" in this corpus means the health CRITERION, not the archived
+    // point 22 about the ocean. Carrying the wrong body under a heading that
+    // says it is binding is the one error the brief must not make.
+    const { brief, adopted, adoptionAmbiguous } = build(707)
+    expect(adopted).toEqual([])
+    expect(adoptionAmbiguous.map((a) => a.number)).toEqual([22])
+    expect(brief).toContain('ACCEPTANCE CRITERION 22 "Health and afflictions"')
+    expect(brief).toContain('node scripts/point-brief.mjs 22')
+    expect(brief).not.toContain('--- ADOPTED SPECIFICATIONS')
+    // It stays an ordinary cross-reference, with the criterion warning it always had.
+    expect(brief).toContain('point 22 [done]:')
+  })
+
+  it('carries it anyway when the spec writes "work-order point", which decides it', () => {
+    const { brief, adopted } = build(710)
+    expect(adopted.map((a) => a.number)).toEqual([22])
+    expect(brief).toContain(bodyOf(22))
+  })
+
+  it('survives a CYCLE instead of walking it forever', () => {
+    const { adopted } = build(708)
+    expect(adopted.map((a) => a.number)).toEqual([709])
+  })
+
+  it('drops the adopted point from the identification list — it is carried, not named', () => {
+    // 701 is adopted directly, 702 through 701: both are in the brief in full,
+    // so an identification line for either would only repeat their first words.
+    const { brief, referenced } = build(700)
+    expect(referenced).toEqual([])
+    expect(brief).not.toContain('--- CROSS-REFERENCED POINTS')
   })
 })
 
@@ -929,6 +1115,53 @@ describe('faithfulness over the WHOLE work order', () => {
       }
     }
     expect(off).toEqual([])
+  })
+
+  // ADOPTION over the REAL corpus (point 516). The synthetic cases above pin the
+  // classifier; these pin the two things only the real work order can show —
+  // that the measured case is fixed, and that the classifier stayed off the
+  // hundreds of points it must not touch.
+  it('carries point 352’s specification in full into the brief for 488 — the measured case', () => {
+    const p352 = points.find((p) => p.number === 352)
+    expect(p352, 'point 352 must be in the corpus for this check to mean anything').toBeTruthy()
+    const brief = briefOf(488)
+    expect(brief).toContain('--- ADOPTED SPECIFICATIONS')
+    expect(brief).toContain(p352.body)
+    expect(brief).toMatch(/- point 352 → ADOPTED: its specification is binding here/)
+  })
+
+  it('carries EVERY adopted body verbatim, and only where a point really adopts', () => {
+    const off = []
+    let adopting = 0
+    for (const { point, result } of built) {
+      if (result.adopted.length) adopting++
+      for (const a of result.adopted) {
+        if (!result.brief.includes(a.point.body)) off.push(`${point.number}: adopted ${a.number} not carried`)
+        if (!result.brief.includes(`point ${a.number} → ADOPTED`)) off.push(`${point.number}: ${a.number} unmapped`)
+      }
+      if (!result.adopted.length && !result.adoptionBeyond.length) {
+        if (result.brief.includes('--- ADOPTED SPECIFICATIONS')) off.push(`${point.number}: empty adoption block`)
+      }
+    }
+    expect(off).toEqual([])
+    // The corpus really does adopt — a classifier that matched nothing would
+    // pass every assertion above while delivering the old, starving brief.
+    expect(adopting).toBeGreaterThan(0)
+    // …and it stays the exception: adoption is a wording a handful of points
+    // use, so a match on a large share of the queue means the patterns drifted
+    // into ordinary reference prose.
+    expect(adopting).toBeLessThan(points.length / 10)
+  })
+
+  it('never inlines a point number that could be a §7.1 criterion instead', () => {
+    // Point 84's "per pt. 32" means the RENDER-PIPELINE criterion, not the
+    // work-order point 32 about design.md's prose.
+    const off = built.flatMap(({ point, result }) =>
+      result.adopted.filter((a) => a.number <= ACCEPTANCE_CRITERION_FALLBACK_MAX && !/work-order/i.test(a.phrase))
+        .map((a) => `${point.number}: inlined the ambiguous ${a.number}`),
+    )
+    expect(off).toEqual([])
+    expect(briefOf(84)).toMatch(/point 32 → adopting wording .* ACCEPTANCE CRITERION 32/)
   })
 
   it('keeps EVERY brief — archived ones too — under the measured ceiling', () => {
