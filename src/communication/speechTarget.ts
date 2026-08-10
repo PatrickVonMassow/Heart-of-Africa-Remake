@@ -47,3 +47,31 @@ export function pickSpeechTarget(
   if (held && held.distance <= best.distance + TARGET_HOLD) return held.speakerId
   return best.speakerId
 }
+
+/** What the notes show while a dialog stands open. */
+export interface LabelPresentation {
+  /** The speaker whose note carries the highlight and the invitation, if any. */
+  targetedId: string | null
+  /** The speaker whose note is not drawn at all, because a dialog says it. */
+  hiddenId: string | null
+}
+
+/**
+ * How the notes are drawn while a modal stands open (point 588). A click is
+ * ignored while ANY dialog is open, so a highlight and its invitation would
+ * promise something the game will not do — no dialog, no target.
+ *
+ * The guess dialog additionally REPLACES the note it was opened from: it shows
+ * the same syllables, larger and in the middle of the screen, and the note
+ * behind it would only frame it with an invitation to open what is already open.
+ */
+export function labelPresentation(
+  dialog: { kind: string; speakerId?: string } | null | undefined,
+  targetId: string | null,
+): LabelPresentation {
+  if (!dialog) return { targetedId: targetId, hiddenId: null }
+  return {
+    targetedId: null,
+    hiddenId: dialog.kind === 'speechGuess' ? (dialog.speakerId ?? null) : null,
+  }
+}

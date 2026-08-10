@@ -22,6 +22,7 @@ import { useUi } from '../../state/ui'
 import type { CommunicationMemory } from '../../communication/heard'
 import { type Phrase } from '../../communication/lexicon'
 import { isSpeechLabelVisible, type SpeechLabel } from '../../communication/speechLabel'
+import { labelPresentation } from '../../communication/speechTarget'
 import { SpeechLabelCard } from '../../ui/SpeechLabelCard'
 import { releasePointerLock } from './pointerLock'
 import {
@@ -94,6 +95,7 @@ export function SpeechLabels() {
   // concept it meant to, and that question is asked about the utterances the
   // run has NOT taught yet as much as about the others.
   const conceptLabels = useUi((s) => s.speechConceptLabels)
+  const dialog = useUi((s) => s.dialog)
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
@@ -177,16 +179,22 @@ export function SpeechLabels() {
     }
   }, [scene, camera, size])
 
+  // While a modal stands open the click handler above ignores every click, so
+  // no note may still invite one — and the guess dialog shows its own utterance,
+  // so the note it was opened from is not drawn a second time behind it.
+  const { targetedId, hiddenId } = labelPresentation(dialog, labels.targetId)
+
   return (
     <>
       {labels.labels
         .filter(visible)
+        .filter((label) => label.speakerId !== hiddenId)
         .map((label) => (
           <SpeechLabelView
             key={label.speakerId}
             label={label}
             memory={memory}
-            targeted={label.speakerId === labels.targetId}
+            targeted={label.speakerId === targetedId}
           />
         ))}
     </>

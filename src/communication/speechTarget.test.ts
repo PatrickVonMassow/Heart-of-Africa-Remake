@@ -2,7 +2,7 @@
 // the nearest one in reach, and a tie that keeps the standing pick rather than
 // flickering between two figures walking abreast.
 import { describe, it, expect } from 'vitest'
-import { TARGET_HOLD, pickSpeechTarget } from './speechTarget'
+import { TARGET_HOLD, labelPresentation, pickSpeechTarget } from './speechTarget'
 
 const REACH = 10
 
@@ -100,5 +100,32 @@ describe('picking the speaker a click takes (design.md §13.4)', () => {
 
   it('ignores a distance that is not a number at all', () => {
     expect(pickSpeechTarget([{ speakerId: 'kid-1', distance: Number.NaN }], null, REACH)).toBeNull()
+  })
+})
+
+describe('what the notes show while a dialog stands open (point 588)', () => {
+  it('highlights the picked speaker while nothing is open', () => {
+    expect(labelPresentation(null, 'kid-2')).toEqual({ targetedId: 'kid-2', hiddenId: null })
+    expect(labelPresentation(undefined, null)).toEqual({ targetedId: null, hiddenId: null })
+  })
+
+  it('invites no click while any dialog is open, since none would be taken', () => {
+    expect(labelPresentation({ kind: 'trade' }, 'kid-2')).toEqual({
+      targetedId: null,
+      hiddenId: null,
+    })
+  })
+
+  it('hides the note the open guess was opened from, and only that one', () => {
+    expect(labelPresentation({ kind: 'speechGuess', speakerId: 'kid-2' }, 'kid-2')).toEqual({
+      targetedId: null,
+      hiddenId: 'kid-2',
+    })
+    // The player walked on: the guess still stands for the speaker it was
+    // opened for, so it is HIS note that stays hidden, not the nearest one's.
+    expect(labelPresentation({ kind: 'speechGuess', speakerId: 'kid-2' }, 'villager-1')).toEqual({
+      targetedId: null,
+      hiddenId: 'kid-2',
+    })
   })
 })
