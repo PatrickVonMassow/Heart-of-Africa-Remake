@@ -16806,3 +16806,42 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   tree.
   Criticality: low — it destroys nothing, but it blocks the turn end of every delegating
   session, and a guard that cries wolf on healthy work is how a real finding gets waved past.
+
+- [x] 573. THE LINT-RULE SUITE NEITHER RUNS NOR ADMITS IT INSIDE A WORKTREE (found
+  09.08.2026 while measuring point 572; every delegated agent has been paying for it).
+  `scripts/verify/scope.test.mjs` resolves the linter as
+  `resolve(process.cwd(), 'node_modules/.bin/oxlint')`. A git WORKTREE has no
+  `node_modules`, so in the worktree every delegated agent works in, that binary does not
+  exist and the spawn returns code 1 with empty output. BOTH halves of the suite then lie,
+  and the second half is the dangerous one:
+  1. The cases that expect the linter to ACCEPT clean code fail — 5 red in every
+     worktree run of `npm run test:unit`. Cheap and loud: the agent disproves them by
+     hand and reports around them, which is wasted work but caught.
+  2. The cases that expect the linter to REJECT bad code PASS — because "did not run"
+     also produces a non-zero code. A lint rule this suite is meant to guard could rot
+     away and the suite would stay green in exactly the environment most of our work
+     happens in. That is a false GREEN, and it is why this point is not cosmetic.
+  FINAL STATE: (a) the suite resolves the linter so it is found from a worktree as well
+  as from the main checkout — the main working tree's `node_modules` is reachable from a
+  worktree via the repository's common git directory, and the resolution falls back to
+  the runner on `PATH`; (b) a spawn that did NOT run the linter is its own explicit
+  failure, named as "the linter did not run" and never counted as a rejection: the
+  helper distinguishes "ran and rejected" from "never started" by the presence of real
+  linter output, and every negative assertion goes through that distinction; (c) the
+  same resolution is applied wherever else a test spawns a tool from
+  `node_modules/.bin` — this suite is the one that was caught, not necessarily the only
+  one, so the sweep is part of the point and its result is reported even if it is "no
+  other place"; (d) a PURE GATE in the fast layer keeps the pattern from coming back:
+  `scripts/verify/spawn-assertion-gate.test.mjs` reads the test files, finds a negative
+  assertion about a spawned process that concludes "it rejected" from a non-zero exit
+  WITHOUT establishing that the process ran at all, and goes red — the same build as the
+  frame-subject gate, not another Stop hook.
+  Repairing the one find without catching the pattern would only mean waiting for the
+  next place, and this defect's silent half never announces itself.
+  VERIFIABLE: pure Vitest for the not-run detection (a helper pointed at a
+  deliberately absent binary must fail with the not-run message, not pass as a
+  rejection), plus the real proof that the bug is gone — `npm run test:unit` run FROM A
+  GIT WORKTREE is green, which is the environment the defect lives in and the one no
+  previous run used.
+  Criticality: medium — no player ever sees it, but it costs every delegated agent time
+  and it can hide a rotted lint rule behind a green suite.
