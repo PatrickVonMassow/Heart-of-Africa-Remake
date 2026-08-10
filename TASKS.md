@@ -5629,9 +5629,11 @@ to land than a mechanism that needs a review.
   `main` at 3f639f0d, after the point-585 landing; bundle Testinfrastruktur). `world`
   reds on ONE of its seven landmark frames: `15-worldmodel-victoria-falls — its subject is
   not in the rendered picture: off the left and bottom edge of the frame`. It survived the
-  suite's own retry, and it reds on the WebGPU lane where the same suite passed on the 585
-  branch minutes earlier — so it is either a genuine regression of the jump or a rotating
-  timing failure, and which of the two is exactly what this point must settle. The six
+  suite's own retry, and it is WEBGPU-ONLY: the same suite on WebGL 2, in the same sitting,
+  writes all seven frames green — which is why the charge that accounts for it is scoped to
+  that lane and a WebGL 2 red stays a real red. On the 585 branch the WebGPU run had passed
+  minutes earlier, so it is either a genuine regression of the jump or a rotating timing
+  failure, and which of the two is exactly what this point must settle. The six
   other landmarks (Khartoum, Lake Victoria, Kilimanjaro, the Congo mouth, Cape Town, Lake
   Chad) pass in the same run, so it is not the shutter and not the projection: those refuse
   correctly, which is why this was caught at all.
