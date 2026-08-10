@@ -147,15 +147,29 @@ export function probeVerdict({
     // WHICH host blipped is the whole information content of this alert, so it is
     // said rather than summarised: the reader has to be able to tell "our checker
     // could not reach raw" from "the page the phone opens is down".
-    const failed = isOk(currency) ? 'the board VIEWER' : 'the CURRENCY transport'
-    const answered = isOk(currency) ? 'the currency check' : 'the viewer'
-    const why = isOk(currency) ? viewer?.error : currency?.error
+    //
+    // AND THE CLOSING SENTENCE IS NOT THE SAME ON BOTH SIDES (four-eyes review of
+    // this point). Only the CURRENCY host carries the fingerprint, so when IT is
+    // the one that failed, this tick did not read the board's currency at all —
+    // saying "the currency is known and unaffected" there would be an alert
+    // asserting something untrue, which is the exact sin point 562 was opened on.
+    // Both branches are still "not a stale board", because a stale board is a
+    // claim about CONTENT and nothing here observed any; what differs is whether
+    // the currency was READ this tick or is simply unknown until the next probe.
+    const currencyAnswered = isOk(currency)
+    const failed = currencyAnswered ? 'the board VIEWER' : 'the CURRENCY transport'
+    const answered = currencyAnswered ? 'the currency check' : 'the viewer host'
+    const why = currencyAnswered ? viewer?.error : currency?.error
+    const closing = currencyAnswered
+      ? 'This is a transport failure, NOT a stale board — the currency check DID read the board this tick, ' +
+        'and what it read is unaffected.'
+      : 'This is a transport failure, NOT a stale board — the board is demonstrably reachable. But its ' +
+        'CURRENCY IS UNKNOWN this tick: only the currency host carries the fingerprint, and that is the one ' +
+        'that did not answer. The next probe decides it.'
     return {
       verdict: 'transport',
       streak: n,
-      reason:
-        `${failed} could not be fetched (${why || 'fetch failed'}), while ${answered} answered normally. ` +
-        'This is a transport failure, NOT a stale board — the board\'s currency is known and unaffected.',
+      reason: `${failed} could not be fetched (${why || 'fetch failed'}), while ${answered} answered normally. ${closing}`,
     }
   }
   if (n < min) {

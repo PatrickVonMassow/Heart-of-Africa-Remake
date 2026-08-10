@@ -60,12 +60,22 @@ import { LEASE_MS, declaredWaitStale, leaseTakeoverDecision, leaseUntilOf } from
  * the owner is stuck; it asks whether the owner has said anything. The escape is
  * explicit and cheap: DECLARE the wait (`node scripts/batch-in-flight.mjs
  * --waiting-on …`) and the window does not apply at all, because a declaration is
- * the owner stating in advance that a long silence is expected. A session that
- * enters a 30-40 minute regression inside ONE tool call without declaring it will
- * lose the batch here — that is the price of the rule, it is the house rule for
- * any wait long enough to matter, and nothing is killed by it: the dispossessed
- * session keeps running, keeps its work, and is refused only merge, push, the
- * tick and the board publish (the fence).
+ * the owner stating in advance that a long silence is expected.
+ *
+ * WHO CAN ACTUALLY LOSE THE BATCH TO IT — precisely, because the third clause of
+ * `idleVerdict` narrows this a long way and the sentence that used to stand here
+ * over-claimed. ONLY a session whose FIRST call since taking the lock is the long
+ * one: a 30-40 minute regression entered before any other tool call has completed,
+ * undeclared. Once ANY call has completed, `claimedAt` has moved past `acquiredAt`
+ * and this window no longer applies at all — what bounds such a session from there
+ * is the ordinary lease, unchanged. Nothing is killed either way: the dispossessed
+ * session keeps running, keeps its work, and is refused only merge, push, the tick
+ * and the board publish (the fence).
+ *
+ * The remaining gap is deliberate and filed separately: an owner that works ONCE
+ * and then idles holds the batch for the whole lease. Closing that needs a middle
+ * rule with a renewal stamp of its own — `leaseUntil` cannot serve, being polluted
+ * by the ±4 h declared-wait extensions — and it is not this window's job.
  *
  * It coincides with `DEAD_CONFIRM_MS` on purpose: a state change inside the
  * window is what "fresh heartbeat" already meant, so the two are one rule read

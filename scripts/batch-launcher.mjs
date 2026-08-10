@@ -205,6 +205,18 @@ export async function runDaemon({
   // The probe is two `/proc` reads on Linux, which is the only host this daemon
   // runs on (`--daemon` refuses win32, where the same call is a PowerShell round
   // trip) — cheap enough for a five-second poll.
+  //
+  // IT PASSES NO `work`, and the cost of that is bounded to ONE tick. Building it
+  // means `assessOwnerWork`, which runs pid probes and git queries — far too heavy
+  // for a five-second poll. Without it an expired lease reads as ended here even
+  // where the owner's declared work is still producing (point 556's protection),
+  // so the sleep is cut short once; the TICK then builds the real `work` and skips
+  // correctly. It cannot repeat: the wake fires on a CHANGE of signal, and the
+  // signal is stable across that skip. The lock-recorded `declaredWait` IS honoured
+  // (`ownershipVerdict` reads it off the lock), so the sanctioned long wait costs
+  // nothing at all; only a declaration living solely in `batch-in-flight.json` can
+  // buy that single spurious tick — and declaring is itself a tool call, which
+  // moves `claimedAt` and takes the owner out of the idle branch anyway.
   readLock = () => readOwnerLock(LOCK_PATH),
   assess = (lock) =>
     assessOwner(lock, { now: Date.now(), bootTime: bootTimeMs(), probe: probePid(lock?.pid ?? 0) }),

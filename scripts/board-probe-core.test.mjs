@@ -150,7 +150,26 @@ describe('the verdict names WHICH of the two happened', () => {
     expect(v.reason).toMatch(/NOT a stale board/)
   })
 
-  it('names the VIEWER when that is the side that blipped', () => {
+  it('…and where the CURRENCY host is the one that failed, it says the currency is UNKNOWN', () => {
+    // Four-eyes review of this point. Only the currency host carries the
+    // fingerprint, so a tick that could not reach it did not read the board's
+    // currency at all. Claiming otherwise would be an alert asserting something
+    // untrue — which is the exact sin point 562 was opened on.
+    const v = probeVerdict({
+      kind: 'transport',
+      streak: 0,
+      currency: probeResult([bad('ENOTFOUND'), bad('ENOTFOUND')]),
+      viewer: probeResult([ok()]),
+    })
+    expect(v.reason).toMatch(/CURRENCY IS UNKNOWN this tick/)
+    expect(v.reason).toMatch(/only the currency host carries the fingerprint/)
+    expect(v.reason).toMatch(/reachable/)
+    // The claim that would be false here must not appear on this side at all.
+    expect(v.reason).not.toMatch(/currency is known/i)
+    expect(v.reason).not.toMatch(/DID read the board/)
+  })
+
+  it('names the VIEWER when that is the side that blipped, and then the currency WAS read', () => {
     const v = probeVerdict({
       kind: 'transport',
       streak: 0,
@@ -159,6 +178,21 @@ describe('the verdict names WHICH of the two happened', () => {
     })
     expect(v.reason).toMatch(/board VIEWER/)
     expect(v.reason).toMatch(/503/)
+    // On THIS side the currency really was read, so it may say so — and must not
+    // borrow the other side's "unknown".
+    expect(v.reason).toMatch(/DID read the board this tick/)
+    expect(v.reason).not.toMatch(/UNKNOWN/)
+  })
+
+  it('neither side ever claims the board is stale — no content was observed either way', () => {
+    for (const [currency, viewer] of [
+      [probeResult([bad()]), probeResult([ok()])],
+      [probeResult([ok()]), probeResult([bad()])],
+    ]) {
+      const v = probeVerdict({ kind: 'transport', streak: 0, currency, viewer })
+      expect(v.reason).toMatch(/NOT a stale board/)
+      expect(v.reason).toMatch(/transport failure/)
+    }
   })
 
   it('a sub-threshold failure explains itself as a flicker, not an outage', () => {
