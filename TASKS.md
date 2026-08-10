@@ -388,6 +388,18 @@ there exactly once; a new point joins a bundle when appended.
   so the gate starts green and cannot be "fixed" by growing that list silently.
   VERIFIABLE: the gate's own tests (a compliant file passes, each forbidden shape fails, an
   allowlisted file passes with its reason present); `npm run test:unit` stays green.
+  THE SAME CLASS FROM THE OTHER SIDE (measured 10.08.2026): `scripts/worktree-bootstrap.mjs`
+  answered "NONE — this checkout already has node_modules" for a `node_modules/` that held
+  exactly `.tmp`, `.vite` and `.vite-temp` — no package, no `.bin`. The brief calls that
+  script the FIRST command in a new worktree, so its verdict is read as "set up". Commands
+  still ran, but only because the worktrees sit INSIDE the main checkout and Node resolution
+  walks up into it; anything that probes a PATH instead of resolving — the
+  `<root>/node_modules/.bin/oxlint` shape point 606 replaced in `scope.test.mjs` — missed,
+  and its red read as a defect in the change under test.
+  ALSO IN FINAL STATE: the presence check requires a real dependency (a package directory or
+  `.bin`), never a directory Vite created, and the verdict NAMES where the resolution
+  actually lands. VERIFIABLE additionally: a fixture worktree whose `node_modules` holds only
+  cache directories is reported as NOT bootstrapped and is linked.
 
 - [ ] 558. A VERIFY RUN TAKEN IN A WORKTREE IS DESTROYED WITH THE WORKTREE (measured
   08.08.2026 at the merge of point 549; bundle Testinfrastruktur). The render-verify
@@ -5438,3 +5450,32 @@ to land than a mechanism that needs a review.
   only makes the document describe it.
   Criticality: low — it is a documentation correction, but an uncorrected line is a
   standing invitation to "restore" a behaviour that was deliberately removed.
+
+- [ ] 620. A FRAME PASSES ITS CHECKS WHILE SHOWING NOTHING AT ALL (measured 10.08.2026
+  while landing point 588; bundle Testinfrastruktur). `VERIFY_GL=webgl node
+  scripts/verify/run-all.mjs polish --section=speech-guess` passes all 11 checks and writes
+  `148-speech-guess-invitation.png` / `149-speech-guess-dialog.png` showing the note and the
+  dialog over PURE BLACK — no village, no sky. It is neither the host nor the change: the
+  `villager-gestures` section on the SAME tree and the SAME backend draws the settlement in
+  full, and `speech-guess` on WebGPU draws it in full. The section stages itself onto
+  whichever object named `inhabitant` `scene.traverse` finds FIRST and teleports the player
+  four units beside it; on the slower WebGL 2 lane (1–2 FPS) that pick is taken before the
+  scene has settled, so the camera lands where it sees nothing. The frame-subject shutter
+  (point 375) passed it, correctly by its own rule: the label's anchor DOES project into the
+  frame. The subject was present; the world behind it was not.
+  FINAL STATE:
+  1. The `speech-guess` section stages only once the scene has SETTLED — the same
+     "triangle count still moving" settle the worldmodel frames already use — and picks its
+     figure deterministically rather than by traverse order, so the frame is the same
+     picture on either backend.
+  2. The shutter learns the second half of point 375's promise: a frame whose subject is in
+     view but whose PICTURE is empty is refused, naming what it found. "Empty" is judged by
+     the scene the frame claims (a `local`/`place` frame must have the settlement drawn),
+     not by a pixel threshold — point 361 rejected pixel metrics as a gate, and this is a
+     question about the scene graph, which the page can answer directly.
+  VERIFIABLE: the section's two frames show the settlement on BOTH backends; a unit case
+  over the shutter's pure core refuses a frame whose declared subject projects into an
+  otherwise undrawn scene and accepts the same frame once the scene is drawn.
+  Criticality: medium — nothing the player sees is broken, but a real regression in that
+  view is invisible on the WebGL 2 lane for as long as this stands, which is the exact harm
+  the picture check exists to prevent.
