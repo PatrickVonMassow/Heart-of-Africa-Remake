@@ -128,6 +128,7 @@ const POSITIONAL: Record<string, unknown[]> = {
   'toasts.soldForGifts': ['Machete', 2],
   'toasts.bazaarRejected': ['Silver'],
   'toasts.positionReport': ['30 N', 'North'],
+  'toasts.stuckHint': ['U'],
   'journalPanel.firstHeard': ['1 January 1890'],
   'journalPanel.firstHeardIn': ['1 January 1890', 'Cairo'],
   'journalPanel.hypothesisFor': ['ba-BA'],
@@ -179,9 +180,10 @@ describe('template-function callability (de and en behave alike)', () => {
     // tab's field label and its two first-heard lines, with and without the
     // village of point 579; the +7 the point-394 arrival set — the port/monument
     // first-visit and return templates with their four titles; the +1 the
-    // point-486 drum-message reading label). A drift here means a template was
-    // added/removed and this suite should follow.
-    expect(FUNCTION_PATHS.length).toBe(79)
+    // point-486 drum-message reading label; the +1 the work-order 604 hint that
+    // names the escape key). A drift here means a template was added/removed and
+    // this suite should follow.
+    expect(FUNCTION_PATHS.length).toBe(80)
   })
 
   it.each(FUNCTION_PATHS)('%s: renders in both languages (or throws in both)', (path) => {

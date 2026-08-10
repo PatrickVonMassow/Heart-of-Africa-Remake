@@ -16,6 +16,11 @@
  *  is sampled proportionally denser, so the angular resolution stays even. */
 const RING_DIRECTIONS = 12
 
+/** The escape key (design.md §2.2/§17.5), as the PHYSICAL code the input layer
+ *  polls and as the letter the toast shows — the same key on either layout. */
+export const UNSTUCK_KEY_CODE = 'KeyU'
+export const UNSTUCK_KEY_LABEL = 'U'
+
 export interface StallState {
   /** Where he stood when the current stall window opened. */
   anchorX: number
