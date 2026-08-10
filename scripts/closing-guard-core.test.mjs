@@ -10,6 +10,7 @@ import {
   isWorkOrderPath,
   closingPointNumbers,
   closingTickClaim,
+  landingTickNumber,
   mayTickPoint,
   parsePoints,
   tickedPointNumbers,
@@ -419,5 +420,65 @@ describe('evaluate — the tick gate', () => {
   it('fails OPEN when the work order cannot be read', () => {
     expect(evaluate({ ...tick(), tasksText: '', state: null }).block).toBe(false)
     expect(evaluate({ ...tick(), tasksText: null, state: null }).block).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE LANDING CHAIN IS A TICK (point 594). `node scripts/land-point.mjs <N>`
+// writes the tick from inside a process: the command names no work-order file and
+// performs no visible write, so the shell backstop above missed it entirely.
+// Both gates that read `mayTickPoint` were blind to it — closing-guard would not
+// deny the tick of a closing-delivering point, and point-proof-guard (PreToolUse
+// and CLI only, no Stop backstop) would not run at all.
+describe('landingTickNumber — the tick that hides inside a command', () => {
+  it('reads the point number out of a landing command', () => {
+    expect(landingTickNumber('node scripts/land-point.mjs 594')).toBe(594)
+    expect(landingTickNumber('node scripts/land-point.mjs 594 --model "Claude Opus 5"')).toBe(594)
+    expect(landingTickNumber('node scripts/land-point.mjs 594 --serial --branch feat/594-x')).toBe(594)
+  })
+
+  it('is not fooled by a number inside a quoted value', () => {
+    // `--model "Claude Opus 5"` must never read as point 5.
+    expect(landingTickNumber('node scripts/land-point.mjs --model "Claude Opus 5" 594')).toBe(594)
+    expect(landingTickNumber("node scripts/land-point.mjs --model 'Claude Opus 4.8' 594")).toBe(594)
+  })
+
+  it('takes the number from the SEGMENT that invokes it, not from a sibling', () => {
+    expect(landingTickNumber('echo 42 && node scripts/land-point.mjs 594')).toBe(594)
+    expect(landingTickNumber('node scripts/land-point.mjs 594 && echo 42')).toBe(594)
+  })
+
+  it('treats --dry as no tick — it writes nothing', () => {
+    // Denying the dry run would block the very command used to find out what a
+    // landing would do.
+    expect(landingTickNumber('node scripts/land-point.mjs 594 --dry')).toBe(null)
+    expect(mayTickPoint('Bash', { command: 'node scripts/land-point.mjs 594 --dry' })).toBe(false)
+  })
+
+  it('ignores a command that merely mentions the script', () => {
+    expect(landingTickNumber('git log scripts/land-point.mjs')).toBe(null)
+    expect(landingTickNumber('cat scripts/land-point.mjs')).toBe(null)
+    expect(landingTickNumber('node scripts/land-point.mjs')).toBe(null)
+  })
+
+  it('is total on junk', () => {
+    for (const c of [null, undefined, 42, '', 'git status']) expect(landingTickNumber(c)).toBe(null)
+  })
+
+  it('makes mayTickPoint see the landing, which is what both gates ask first', () => {
+    expect(mayTickPoint('Bash', { command: 'node scripts/land-point.mjs 594' })).toBe(true)
+    expect(mayTickPoint('PowerShell', { command: 'node scripts/land-point.mjs 594' })).toBe(true)
+  })
+
+  it('makes closing-guard deny a landing that would tick a closing-delivering point', () => {
+    const tasksText = ['- [ ] 594. A POINT THAT DELIVERS A CLOSING', '  Closing: run the full cycle.'].join('\n')
+    const claim = closingTickClaim({
+      toolName: 'Bash',
+      toolInput: { command: 'node scripts/land-point.mjs 594 --model "Claude Opus 5"' },
+      tasksText,
+    })
+    // The point is still IN the work order at PreToolUse time, spec and all, so
+    // the claim has everything it needs from the file it already reads.
+    expect(claim).toEqual(closingPointNumbers(tasksText).has(594) ? [594] : [])
   })
 })
