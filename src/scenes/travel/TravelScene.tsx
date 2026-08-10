@@ -123,6 +123,9 @@ import { Wildlife } from './Wildlife'
 import { collidableAnimalsNear } from './wildlifeCollision'
 import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, findFreeSpot, newStallState, updateStall } from '../../systems/unstuck'
 
+import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js'
+import { releaseCascadeShadowMaps, type CascadedShadowNode } from '../../render/shadowRelease'
+
 /** The bird's-eye traveller's own collision radius, in world units. */
 const TRAVEL_PLAYER_RADIUS = 0.5
 
@@ -156,8 +159,6 @@ function travelObstacles(x: number, z: number, seed: number): Array<[number, num
   for (const c of places) out.push(c)
   return out
 }
-import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js'
-import { releaseCascadeShadowMaps, type CascadedShadowNode } from '../../render/shadowRelease'
 
 const CHUNK_SIZE = 24 // world units
 const CHUNK_RADIUS = 6 // chunks kept around the player in each direction (terrain LOD)
