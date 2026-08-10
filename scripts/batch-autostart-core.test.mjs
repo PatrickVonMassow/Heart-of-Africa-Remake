@@ -21,6 +21,8 @@ import {
   reapableSpawns,
   pruneSpawns,
   RESUME_PROMPT,
+  CALL_DISCIPLINE_DE,
+  callDisciplineTopics,
   SPAWN_MODEL,
   SPAWN_FALLBACK_MODEL,
   BG_WAIT_CEILING_ENV,
@@ -941,5 +943,69 @@ describe('the resolver may only return something spawn can execute', () => {
     )
     const n = Number(cliSearchSummary({ env: { PATH: '/usr/bin' }, platform: 'linux' }).match(/(\d+) director/)[1])
     expect(n).toBe(new Set(['/usr/bin', ...cliFallbackDirs({})]).size)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// ONE TURN, SEVERAL CALLS (point 593). The rule is carried by the two PROMPTS —
+// this one and the delegation brief — because "these two calls could have been
+// bundled" is not machine-decidable, so no guard can check it after the fact.
+// What CAN be checked is that neither prompt quietly loses it, and that the
+// German and English renderings keep saying the same thing: they are different
+// languages, so nothing but the shared topic table can compare them.
+describe('the call-discipline paragraph (point 593)', () => {
+  const de = CALL_DISCIPLINE_DE
+
+  it('is actually IN the resume prompt — an unreachable rule is no rule', () => {
+    expect(RESUME_PROMPT).toContain(de)
+  })
+
+  it('covers every named topic in German', () => {
+    const missing = callDisciplineTopics()
+      .filter((t) => !t.de.test(de))
+      .map((t) => t.id)
+    expect(missing).toEqual([])
+  })
+
+  it('names the recurring candidates rather than only the principle', () => {
+    // The point's own wording: the paragraph NAMES its candidates, because the
+    // principle alone was already obvious and still was not followed.
+    expect(de).toMatch(/mehrere Reads/i)
+    expect(de).toMatch(/mehrere Greps/i)
+    expect(de).toMatch(/npm run build` neben `npm run lint/)
+    expect(de).toMatch(/git status neben dem Branchnamen/)
+    expect(de).toMatch(/Screenshot-Reads/)
+  })
+
+  it('excludes both ways the shortcut goes wrong', () => {
+    // Without these two exclusions the paragraph reads as "batch everything,
+    // read nothing twice" — which is how a dependent call gets fired on a value
+    // nobody has seen, and how a fact that has since changed gets re-used.
+    expect(de).toMatch(/AUSGABEWERT/)
+    expect(de).toMatch(/SEQUENZIELL/)
+    expect(de).toMatch(/VERAENDERLICHER Zustand/)
+    expect(de).toMatch(/per Regel neu gelesen/)
+  })
+
+  it('demands that a bundled shell chain never hide its failing step', () => {
+    expect(de).toMatch(/fehlschlagenden Schritt nie verstecken/)
+    expect(de).toMatch(/&&/)
+  })
+
+  it('writes its umlauts as digraphs, like the rest of the spawned prompt', () => {
+    // The argv goes through a Windows spawn; the surrounding prompt has used
+    // ae/oe/ue since it was written, and a lone real umlaut here would be the
+    // one character that mangles.
+    expect(de).not.toMatch(/[äöüÄÖÜß]/)
+  })
+
+  it('keeps the topic table honest — unique ids, both renderings present', () => {
+    for (const t of callDisciplineTopics()) {
+      expect(typeof t.id).toBe('string')
+      expect(t.de).toBeInstanceOf(RegExp)
+      expect(t.en).toBeInstanceOf(RegExp)
+    }
+    const ids = callDisciplineTopics().map((t) => t.id)
+    expect(new Set(ids).size).toBe(ids.length)
   })
 })

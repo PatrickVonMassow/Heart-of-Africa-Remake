@@ -499,6 +499,45 @@ export function extractPointRefs(spec, selfNumber = null) {
   return found.sort((a, b) => a - b)
 }
 
+/**
+ * HOW TO SPEND A TURN (point 593). Binding, and deliberately carried by the
+ * PROMPT rather than by a guard: "these two calls could have been bundled" is
+ * not machine-decidable, so nothing can check it after the fact.
+ *
+ * WHY IT IS WORTH THE LINES IT COSTS. Measured over this project's own
+ * transcripts: only 5.0 % of responses issue more than one tool call, while
+ * search/read alone is 25.1 % of the weighted spend, and 4036 responses —
+ * 15.2 % of all output — repeated an EXACTLY identical shell command inside a
+ * single session. One saved response is ~22.9k weighted tokens and 24.4 s of
+ * MACHINE time (not calendar time: up to three agents run in parallel, so this
+ * only becomes wall clock on the critical path).
+ *
+ * The paragraph NAMES its recurring candidates instead of stating the
+ * principle, because the principle was already obvious and still was not
+ * followed. It also names both ways the shortcut goes wrong — bundling a call
+ * that needs another's OUTPUT, and re-using a fact that has since changed — so
+ * the rule cannot be read as "batch everything, read nothing twice".
+ *
+ * Shared verbatim with the batch resume prompt's German rendering in
+ * scripts/batch-autostart-core.mjs; change the two together.
+ */
+export const CALL_DISCIPLINE = [
+  'HOW TO SPEND A TURN — BUNDLE THE INDEPENDENT CALLS, AND READ NOTHING TWICE:',
+  '- INDEPENDENT CALLS GO IN ONE TURN. Anything that does not need another call\'s OUTPUT',
+  '  belongs in the SAME turn: several reads, several greps, `npm run build` beside',
+  '  `npm run lint`, `git status` beside the branch name, the screenshot reads of a picture',
+  '  check. A call that DOES consume a previous result stays SEQUENTIAL — bundling it means',
+  '  acting on a value you have not seen yet. Screenshots go in SMALL semantic groups at',
+  '  full resolution: judgment quality outranks batching, so never shrink or lump frames to',
+  '  fit more in. And a bundled SHELL chain must never HIDE its failing step — join with',
+  '  `&&` so it stops, or label each part in the output; an `a; b` that swallows a red exit',
+  '  code is worse than two turns.',
+  '- A FACT THAT CANNOT HAVE CHANGED IS NOT READ AGAIN: a file nobody edited since you read',
+  '  it, a `--help`, a config value, a spec section already in this context. MUTABLE state',
+  '  stays re-read BY RULE — `git status`, CI state, a running process, and anything this',
+  '  session or another agent has written since.',
+]
+
 const HEADER = [
   'HOW TO USE THIS BRIEF — READ THIS FIRST',
   '- This brief IS your spec. Do NOT read TASKS.md or docs/tasks-archive.md or design.md',
@@ -532,6 +571,8 @@ const HEADER = [
   '  `Co-Authored-By: Claude <noreply@anthropic.com>` names no model and trips the tripwire,',
   '  which STOPS the batch. Write your own model:',
   '  `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.',
+  '',
+  ...CALL_DISCIPLINE,
 ]
 
 /**
