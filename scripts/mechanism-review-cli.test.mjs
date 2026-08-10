@@ -83,6 +83,12 @@ describe('the paths that must stay untouched', () => {
     // The sha is deliberately nonsense, so nothing is ever appended: what is
     // asserted is only that the recognised flags reached the record path.
     const r = run('--record', 'not-a-commit', '--model', 'Fable 5', '--verdict', 'merge', '--evidence', 'x')
+    // THE ORDER MATTERS (point 573). `not.toContain` is satisfied by the EMPTY
+    // output of a script that never started, and so is a non-zero exit — this
+    // case would have stayed green with the CLI deleted. What it must establish
+    // first is that the tool ran at all, and only git's own complaint about the
+    // nonsense sha proves that.
+    expect(r.stderr).toMatch(/not-a-commit|ambiguous argument|unknown revision|fatal:/)
     expect(r.status).not.toBe(0)
     expect(r.stderr).not.toContain('unknown flag')
   })

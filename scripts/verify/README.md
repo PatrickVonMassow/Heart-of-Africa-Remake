@@ -31,6 +31,31 @@ the Playwright browser suites against the dev server → the production-preview
 smoke test. The runner itself is `scripts/verify/run-all.mjs`; the three npm
 commands above reach it through the LOGGED wrapper described next.
 
+### In a WORKTREE, bootstrap the dependencies FIRST (points 569/573/606)
+
+```
+node scripts/worktree-bootstrap.mjs      # first command in a new worktree; no-op in the main tree
+```
+
+`node_modules/` is git-ignored, so a git worktree — where CLAUDE.md §6 builds
+every point — checks out without it and **no gate can start**: npm resolves
+`vitest` and `oxlint` from `node_modules/.bin` before a script runs. The
+bootstrap derives the main checkout from git's COMMON directory
+(`git rev-parse --git-common-dir`, whose parent is the main working tree), and
+links its `node_modules` when the two `package-lock.json` files are byte
+identical — seconds instead of a per-worktree install. A branch that CHANGED the
+lockfile gets a real `npm ci` instead, because linking would silently verify
+against the wrong dependency tree. The decision table is pure in
+`scripts/worktree-bootstrap-core.mjs`.
+
+Remove such a worktree only with `scripts/worktree-cleanup.mjs`: it DETACHES the
+link first, where `git worktree remove` and `rm -rf` follow it and delete the
+main tree's dependencies.
+
+**Anything a test SPAWNS resolves through `scripts/local-bin.mjs`, never through
+`process.cwd()`.** That is the fix behind those points and the rule that keeps
+them fixed — see "A spawn that never ran is not a rejection" below.
+
 ### The run's output goes to a FILE, the caller reads a digest (point 373 e)
 
 `npm test`, `npm run test:small` and `npm run test:large` run through
@@ -378,6 +403,38 @@ front of each turns one into a declaration.
   section; where they do not, the section repeats the jump itself. Prove it by
   running every section alone once and diffing its checks against the whole
   run's — that sweep is how `calf-jitter` and `elephant-trampling` were caught.
+
+## A spawn that never ran is not a rejection (points 573/606)
+
+Two rules, both from one defect. `scope.test.mjs` resolved its linter as
+`resolve(process.cwd(), 'node_modules/.bin/oxlint')`, which does not exist in a
+worktree — and the suite lied in **both** directions: its ACCEPT cases went red
+for the environment (five per worktree run, which teaches the pool to discount
+red), while its REJECT cases stayed **green**, because a spawn that never started
+exits non-zero exactly like a tool that ran and refused. A lint rule the suite
+exists to keep armed could have rotted away unnoticed.
+
+1. **Resolve through `scripts/local-bin.mjs`**, never through `process.cwd()`.
+   `findLocalBin(name)` walks up from the checkout, then reaches the MAIN working
+   tree via git's common directory (a worktree outside the main checkout has no
+   ancestor holding `node_modules`), then falls back to PATH; nothing found is
+   REPORTED by `describeMissing` — the tool and every directory searched — not
+   guessed. Where a red would only mean "this machine has no linter", the case
+   SKIPS with that reason printed: a red must mean a defect.
+2. **Establish that the process RAN before reading its exit code.** `didRun()`
+   takes a spawn result and an optional `expect` shape for the tool's OUTPUT
+   (never its NAME — the shell says `oxlint: not found` too), and `NOT_RUN()`
+   words the failure identically everywhere. Any "it rejected" assertion goes
+   through a helper that checks the run FIRST, so a missing binary reports itself
+   instead of being counted as a verdict.
+
+`scripts/verify/spawn-assertion-gate.test.mjs` keeps rule 2 from coming back: it
+reads the test files, and a negative exit-code assertion about a spawned process
+that nothing in its case establishes as having RUN turns it red. It is a pure
+gate in the fast layer — the same build as the frame-subject gate, not another
+Stop hook. Satisfy it by asserting something POSITIVE about that spawn's output
+(`toContain` on its stdout/stderr) or by going through `didRun`; a `.not.toContain`
+proves nothing, because empty output satisfies it.
 
 ## Is the machine QUIET? — before the run (point 296)
 
