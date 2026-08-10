@@ -70,6 +70,125 @@ there exactly once; a new point joins a bundle when appended.
 
 ## Checklist
 
+- [ ] 562. A FLICKERING REACHABILITY PROBE STOPS THE WHOLE BATCH (measured 08.08.2026;
+  bundle Urlaubsfestigkeit). The launcher probes the published board each tick and
+  escalates when it cannot read it: five alerts with growing spacing, then a deliberate
+  pause of the batch (`.claude/batch-paused`, the point-445 escalation). On 08.08.2026 at
+  13:39 that chain fired and stopped the work; it only resumed because the restart clock
+  ran out. The board was never gone. `.claude/batch-launcher.log` shows
+  `board: unreachable — fetch failed` INTERLEAVED with successful probes of the same URL
+  (lines 1114 and 1136 sit after already-green ones), and a counter-probe from the same
+  container at the same time returns HTTP 200 — with and without `--dns-result-order=
+  ipv4first` — while `board-publish.mjs --check` reports CURRENT. So a sporadic network
+  hiccup halts every point in the queue, and the alert that fetches the user out of his
+  weekend reports something untrue.
+  FINAL STATE: a transport failure and a STALE board are told apart, because they are not
+  the same claim — a failed fetch says nothing about the board's currency, and only
+  staleness is worth waking anybody for. A probe that fails is RETRIED at once (a second
+  attempt, briefly spaced) before it counts as anything, and the escalation counts only
+  CONSECUTIVE failures: one success anywhere in the chain resets it. The pause stays the
+  last stage for a genuinely unreachable board — it is the right instrument for a real
+  outage — but a transport failure alone never reaches it while the currency check still
+  answers over its own transport (`--check` reads raw.githubusercontent.com, a different
+  host from the Pages viewer, and the two failing together is what an outage looks like).
+  The alert text names WHICH of the two happened.
+  VERIFIABLE: pure Vitest over the probe's decision function — an alternating
+  failure/success sequence never escalates; N consecutive failures do; a single failure
+  followed by a successful retry is not counted; and a fetch failure while the currency
+  check still answers is reported as a transport failure, not as a stale board.
+  Criticality: high for unattended operation — this is the one failure mode that stops
+  every other point, and it fired on a false positive.
+
+- [ ] 533. WHAT BRINGS THE CONTAINER BACK AFTER A HOST REBOOT (found 07.08.2026 while
+  merging point 447; bundle Urlaubsfestigkeit). Point 447 hardened the WINDOWS boot path —
+  `HoA-Batch-Autostart` with an at-logon trigger, plus `HoA-Batch-Watchdog` watching it —
+  and its measurements date from 30.07.2026, when the batch still ran on that host. Since
+  03.08.2026 it runs inside the LINUX container (`docs/host-environment.md`), where the
+  launcher is the daemon `scripts/batch-launcher.mjs`, which lives and dies with the
+  container. A Windows reboot therefore takes the batch down, and the hardened task then
+  starts a launcher on a host the work no longer runs on: a GREEN boot path over a dead
+  batch, which is exactly the silent failure the bundle exists to remove.
+  ESTABLISH FIRST, DO NOT ASSUME: what starts the container today (Docker Desktop autostart,
+  a WSL distro, the devcontainer CLI, a task) and whether the launcher daemon comes up with
+  it. The answer is RECORDED in `docs/host-environment.md` under the launcher row, which
+  today names the two launchers side by side without saying which one is live.
+  DELIVER: (a) the Windows setup script of point 447 gains an idempotent, dry-runnable step
+  that brings the CONTAINER up at logon/boot and starts the launcher daemon inside it —
+  same conventions as `scripts/windows/setup-boot-path.ps1` (elevated once, "Nothing
+  changed" on a second run, definitions exported to `local/`); (b) `windows-task-watch.mjs`
+  checks the CONTAINER and the daemon, not only the two tasks, because a task that runs and
+  starts nothing must not report green; (c) the readiness command of point 448 gains that
+  line with its remedy.
+  VERIFIABLE: Vitest on the pure parts (the probe verdicts, the idempotency decision, the
+  green-over-dead case failing). The live acceptance is one elevated run on the Windows host
+  and one real reboot, recorded as evidence — the container path cannot be proven from
+  inside the container, and point 449's drill is where it is exercised afterwards.
+
+- [ ] 612. THE HANDOVER WAITS FOR THE CLOCK, AND AN IDLE OWNER BLOCKS IT (10.08.2026;
+  bundle Urlaubsfestigkeit). Measured on this day: the batch stood still for 30 minutes
+  with nothing broken. The outgoing session handed over correctly at 13:20
+  (`HANDOVER point 604` in `.claude/boundary.log`, the lock released); the launcher ticks
+  every 15 minutes and would not have looked before 13:31; at 13:28 an unattended window
+  took the free lock at session start, so the 13:31 tick correctly found a live owner and
+  spawned nobody. Every part behaved as built, and the batch was idle anyway — which is
+  the failure mode this bundle exists to remove, because an absence turns 30 minutes into
+  hours.
+  FINAL STATE, two independent repairs:
+  1. THE RELEASE TRIGGERS THE SPAWN. Marking the lock handed over is an EVENT the launcher
+     reacts to, not a state it discovers on its next tick: the boundary path signals the
+     launcher (the launcher watches the lock file, or `batch-boundary.mjs` wakes it), and
+     the successor starts within seconds. The 15-minute tick REMAINS as the backstop for
+     the cases no signal covers (a killed session, a missed write) — the fast path is
+     added, the slow path is not removed.
+  2. OWNERSHIP IS BOUND TO WORK, NOT MERELY TO LIFE. Today `leaseUntil` runs an hour and
+     never asks whether the owner is doing anything, so a session that takes the lock and
+     idles holds the batch for that hour. An owner that has neither declared in-flight work
+     (`batch-in-flight.mjs`) nor produced a state change within a short IDLE WINDOW
+     (starting value 5 min, calibratable) loses the lock the same arithmetic way an expired
+     lease loses it — no process is killed, the owner simply stops owning, and the launcher
+     may spawn. An ATTENDED window is not exempt: it either works or it releases.
+  Both parts must leave the singleton property intact — no path may produce two live owners
+  — and both stand down for a paused batch as every guard here does.
+  VERIFIABLE: Vitest on the pure parts (the release-to-spawn decision from a lock state and
+  a clock; the idle verdict from declared work, last state change and the window, including
+  the boundary cases at exactly the window and with in-flight work declared); plus the real
+  proof, which this bundle already owns — the chaos drill (449) gains a case that releases
+  the lock and asserts a successor is running in seconds rather than at the next tick, and a
+  case where an idle owner is superseded while a working one is not.
+  Criticality: high — it is the failure this bundle is for, it is silent, and it costs the
+  whole absence rather than one point.
+
+- [ ] 448. ONE COMMAND THAT SAYS "READY FOR A FORTNIGHT ALONE" (30.07.2026; bundle
+  Urlaubsfestigkeit). Before an absence, nothing today reports whether the chain is intact —
+  and the failures that hurt most are the silent ones. `scripts/vacation-ready.mjs` answers it
+  in one read-only run, each line PASS/WARN/FAIL with the remedy: both scheduled tasks present,
+  enabled, last result 0; `AutoAdminLogon` set; free disk space above a threshold; the GitHub
+  PAT valid with its REMAINING LIFETIME (a token that expires mid-absence fails every push
+  from then on, silently — warn below 30 days); the Claude authentication present and not due
+  to expire; the guard chain answering (`guard-preflight` clean); the GitHub watchdog workflow
+  enabled and its last run green; no stale park file; the doctor's verdict consistent; no
+  worktree debris; and the date of the last chaos drill (449) with a warning when it predates
+  the last change to the resilience layers.
+  VERIFIABLE: Vitest on the pure verdict assembly (one case per line, PASS/WARN/FAIL and the
+  overall exit code — 0 only when nothing is FAIL) with every probe injected; one live run
+  against the real machine as the acceptance evidence.
+
+- [ ] 449. THE CHAOS DRILL — KILLS AT RANDOM MOMENTS (user 30.07.2026: "Beachte, dass ein
+  Ausfall eines Elements zu jedem beliebigen Zeitpunkt passieren kann - auch mitten in einer
+  kritischen Aktion von dir"; bundle Urlaubsfestigkeit). Everything in this bundle is a claim
+  until an outage has been survived under observation, and the lesson of 30.07.2026 is exactly
+  that a designed handover still failed in practice. `scripts/chaos-drill.mjs` kills the batch
+  owner at a RANDOM moment inside a chosen critical action — during a merge, during a push,
+  during a browser verification, during the tick in TASKS.md, during a board publish — and
+  then asserts, without human help: the tree returns to a consistent state, the launcher
+  starts a successor, the successor works, and the interrupted point is correctly still OPEN
+  (the transaction property: the tick on `main` is the commit point, so nothing half-done can
+  count as done). It runs each action several times with different timings, writes a report per
+  run to `local/`, and records the date the readiness check (448) reads.
+  VERIFIABLE: the drill itself is the verification — one green report per critical action, plus
+  Vitest for its pure parts (the kill-moment plan, the verdict assembly). A drill that cannot
+  produce a verdict FAILS rather than passing quietly.
+
 - [ ] 592. STOP PAYING FOR THE WAIT (point 572's measure 1, the largest measured lever).
   A long-running command is AWAITED, not polled. The verify wrapper and every background
   run report their completion through the harness notification or through a single
@@ -2766,37 +2885,6 @@ there exactly once; a new point joins a bundle when appended.
   DOCS in the same commit: `docs/batch-autonomy.md` where the guard chain is described, and
   CLAUDE.md §7.2 only if the families it names change.
 
-- [ ] 448. ONE COMMAND THAT SAYS "READY FOR A FORTNIGHT ALONE" (30.07.2026; bundle
-  Urlaubsfestigkeit). Before an absence, nothing today reports whether the chain is intact —
-  and the failures that hurt most are the silent ones. `scripts/vacation-ready.mjs` answers it
-  in one read-only run, each line PASS/WARN/FAIL with the remedy: both scheduled tasks present,
-  enabled, last result 0; `AutoAdminLogon` set; free disk space above a threshold; the GitHub
-  PAT valid with its REMAINING LIFETIME (a token that expires mid-absence fails every push
-  from then on, silently — warn below 30 days); the Claude authentication present and not due
-  to expire; the guard chain answering (`guard-preflight` clean); the GitHub watchdog workflow
-  enabled and its last run green; no stale park file; the doctor's verdict consistent; no
-  worktree debris; and the date of the last chaos drill (449) with a warning when it predates
-  the last change to the resilience layers.
-  VERIFIABLE: Vitest on the pure verdict assembly (one case per line, PASS/WARN/FAIL and the
-  overall exit code — 0 only when nothing is FAIL) with every probe injected; one live run
-  against the real machine as the acceptance evidence.
-
-- [ ] 449. THE CHAOS DRILL — KILLS AT RANDOM MOMENTS (user 30.07.2026: "Beachte, dass ein
-  Ausfall eines Elements zu jedem beliebigen Zeitpunkt passieren kann - auch mitten in einer
-  kritischen Aktion von dir"; bundle Urlaubsfestigkeit). Everything in this bundle is a claim
-  until an outage has been survived under observation, and the lesson of 30.07.2026 is exactly
-  that a designed handover still failed in practice. `scripts/chaos-drill.mjs` kills the batch
-  owner at a RANDOM moment inside a chosen critical action — during a merge, during a push,
-  during a browser verification, during the tick in TASKS.md, during a board publish — and
-  then asserts, without human help: the tree returns to a consistent state, the launcher
-  starts a successor, the successor works, and the interrupted point is correctly still OPEN
-  (the transaction property: the tick on `main` is the commit point, so nothing half-done can
-  count as done). It runs each action several times with different timings, writes a report per
-  run to `local/`, and records the date the readiness check (448) reads.
-  VERIFIABLE: the drill itself is the verification — one green report per critical action, plus
-  Vitest for its pure parts (the kill-moment plan, the verdict assembly). A drill that cannot
-  produce a verdict FAILS rather than passing quietly.
-
 - [ ] 451. THE REPLY THAT SENT ITS OWN FLAG (user 30.07.2026: "Was ist mit dem Chat los?" —
   two agent messages on the board read literally `--text-stdin`; bundle Chat & Tafel).
   `scripts/board.mjs` accepts `--text-stdin` for German prose; `scripts/chat-reply.mjs` does
@@ -3032,31 +3120,6 @@ there exactly once; a new point joins a bundle when appended.
   derivable, plus three consecutive `collision` runs on a quiet machine — WebGL 2 and
   WebGPU — reporting the SAME check count, and a deliberately removed check turning
   the run red instead of shrinking it.
-
-- [ ] 533. WHAT BRINGS THE CONTAINER BACK AFTER A HOST REBOOT (found 07.08.2026 while
-  merging point 447; bundle Urlaubsfestigkeit). Point 447 hardened the WINDOWS boot path —
-  `HoA-Batch-Autostart` with an at-logon trigger, plus `HoA-Batch-Watchdog` watching it —
-  and its measurements date from 30.07.2026, when the batch still ran on that host. Since
-  03.08.2026 it runs inside the LINUX container (`docs/host-environment.md`), where the
-  launcher is the daemon `scripts/batch-launcher.mjs`, which lives and dies with the
-  container. A Windows reboot therefore takes the batch down, and the hardened task then
-  starts a launcher on a host the work no longer runs on: a GREEN boot path over a dead
-  batch, which is exactly the silent failure the bundle exists to remove.
-  ESTABLISH FIRST, DO NOT ASSUME: what starts the container today (Docker Desktop autostart,
-  a WSL distro, the devcontainer CLI, a task) and whether the launcher daemon comes up with
-  it. The answer is RECORDED in `docs/host-environment.md` under the launcher row, which
-  today names the two launchers side by side without saying which one is live.
-  DELIVER: (a) the Windows setup script of point 447 gains an idempotent, dry-runnable step
-  that brings the CONTAINER up at logon/boot and starts the launcher daemon inside it —
-  same conventions as `scripts/windows/setup-boot-path.ps1` (elevated once, "Nothing
-  changed" on a second run, definitions exported to `local/`); (b) `windows-task-watch.mjs`
-  checks the CONTAINER and the daemon, not only the two tasks, because a task that runs and
-  starts nothing must not report green; (c) the readiness command of point 448 gains that
-  line with its remedy.
-  VERIFIABLE: Vitest on the pure parts (the probe verdicts, the idempotency decision, the
-  green-over-dead case failing). The live acceptance is one elevated run on the Windows host
-  and one real reboot, recorded as evidence — the container path cannot be proven from
-  inside the container, and point 449's drill is where it is exercised afterwards.
 
 - [ ] 534. ONE PROJECT-SLUG RESOLVER, AND A FINDING RECORDED FROM A WORKTREE SURVIVES
   (guard/memory audit 07.08.2026, findings 1/3/6 — `docs/guard-memory-audit.md`).
@@ -5224,35 +5287,6 @@ Build order, chosen so no two parallel agents own the same file:
   `protectedRef`. Pure Vitest for each.
   Criticality: medium — (a) is the one that can let a real regression reach `main`.
 
-- [ ] 562. A FLICKERING REACHABILITY PROBE STOPS THE WHOLE BATCH (measured 08.08.2026;
-  bundle Urlaubsfestigkeit). The launcher probes the published board each tick and
-  escalates when it cannot read it: five alerts with growing spacing, then a deliberate
-  pause of the batch (`.claude/batch-paused`, the point-445 escalation). On 08.08.2026 at
-  13:39 that chain fired and stopped the work; it only resumed because the restart clock
-  ran out. The board was never gone. `.claude/batch-launcher.log` shows
-  `board: unreachable — fetch failed` INTERLEAVED with successful probes of the same URL
-  (lines 1114 and 1136 sit after already-green ones), and a counter-probe from the same
-  container at the same time returns HTTP 200 — with and without `--dns-result-order=
-  ipv4first` — while `board-publish.mjs --check` reports CURRENT. So a sporadic network
-  hiccup halts every point in the queue, and the alert that fetches the user out of his
-  weekend reports something untrue.
-  FINAL STATE: a transport failure and a STALE board are told apart, because they are not
-  the same claim — a failed fetch says nothing about the board's currency, and only
-  staleness is worth waking anybody for. A probe that fails is RETRIED at once (a second
-  attempt, briefly spaced) before it counts as anything, and the escalation counts only
-  CONSECUTIVE failures: one success anywhere in the chain resets it. The pause stays the
-  last stage for a genuinely unreachable board — it is the right instrument for a real
-  outage — but a transport failure alone never reaches it while the currency check still
-  answers over its own transport (`--check` reads raw.githubusercontent.com, a different
-  host from the Pages viewer, and the two failing together is what an outage looks like).
-  The alert text names WHICH of the two happened.
-  VERIFIABLE: pure Vitest over the probe's decision function — an alternating
-  failure/success sequence never escalates; N consecutive failures do; a single failure
-  followed by a successful retry is not counted; and a fetch failure while the currency
-  check still answers is reported as a transport failure, not as a stale board.
-  Criticality: high for unattended operation — this is the one failure mode that stops
-  every other point, and it fired on a false positive.
-
 - [ ] 563. THE TAG FRAME'S NEW READABILITY JUDGE HAS THREE SOFT SPOTS (four-eyes
   review of point 524 by the second model, 08.08.2026, verdict merge; bundle
   Testinfrastruktur). `scripts/verify/tagFrameReading.mjs` decides whether the
@@ -5486,37 +5520,3 @@ Build order, chosen so no two parallel agents own the same file:
   recognisable — plus the before/after cost measurement, on both backends.
   Criticality: medium — it is the visual identity of every animal in the bird's-eye view,
   and acceptance criterion 11 (no schematic look) speaks to exactly this.
-
-- [ ] 612. THE HANDOVER WAITS FOR THE CLOCK, AND AN IDLE OWNER BLOCKS IT (10.08.2026;
-  bundle Urlaubsfestigkeit). Measured on this day: the batch stood still for 30 minutes
-  with nothing broken. The outgoing session handed over correctly at 13:20
-  (`HANDOVER point 604` in `.claude/boundary.log`, the lock released); the launcher ticks
-  every 15 minutes and would not have looked before 13:31; at 13:28 an unattended window
-  took the free lock at session start, so the 13:31 tick correctly found a live owner and
-  spawned nobody. Every part behaved as built, and the batch was idle anyway — which is
-  the failure mode this bundle exists to remove, because an absence turns 30 minutes into
-  hours.
-  FINAL STATE, two independent repairs:
-  1. THE RELEASE TRIGGERS THE SPAWN. Marking the lock handed over is an EVENT the launcher
-     reacts to, not a state it discovers on its next tick: the boundary path signals the
-     launcher (the launcher watches the lock file, or `batch-boundary.mjs` wakes it), and
-     the successor starts within seconds. The 15-minute tick REMAINS as the backstop for
-     the cases no signal covers (a killed session, a missed write) — the fast path is
-     added, the slow path is not removed.
-  2. OWNERSHIP IS BOUND TO WORK, NOT MERELY TO LIFE. Today `leaseUntil` runs an hour and
-     never asks whether the owner is doing anything, so a session that takes the lock and
-     idles holds the batch for that hour. An owner that has neither declared in-flight work
-     (`batch-in-flight.mjs`) nor produced a state change within a short IDLE WINDOW
-     (starting value 5 min, calibratable) loses the lock the same arithmetic way an expired
-     lease loses it — no process is killed, the owner simply stops owning, and the launcher
-     may spawn. An ATTENDED window is not exempt: it either works or it releases.
-  Both parts must leave the singleton property intact — no path may produce two live owners
-  — and both stand down for a paused batch as every guard here does.
-  VERIFIABLE: Vitest on the pure parts (the release-to-spawn decision from a lock state and
-  a clock; the idle verdict from declared work, last state change and the window, including
-  the boundary cases at exactly the window and with in-flight work declared); plus the real
-  proof, which this bundle already owns — the chaos drill (449) gains a case that releases
-  the lock and asserts a successor is running in seconds rather than at the next tick, and a
-  case where an idle owner is superseded while a working one is not.
-  Criticality: high — it is the failure this bundle is for, it is silent, and it costs the
-  whole absence rather than one point.
