@@ -147,6 +147,33 @@ if (!poc) {
   })
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
 
+  // Work-order 585: the erratic stands ON the ground, and on dry ground. The
+  // report was a boulder out in the river with daylight under it, and the two
+  // halves of that live in different places — the SITE decides where the block
+  // stands, the SCENE decides how high it is drawn, and the defect was the
+  // scene lifting it off the site's ground with a floor value of its own. So
+  // both are read here from the live run: the height the mesh was given against
+  // the height the site says the ground is, and the terrain under the block
+  // against the water.
+  const seat = await page.evaluate(async () => {
+    const t = await import('/src/world/terrain.ts')
+    const r = window.__communicationRock
+    const seed = window.__game.getState().seed
+    const s = t.sampleTerrain(r.lat, r.lon, seed)
+    return { drawnY: r.y, groundY: r.groundY, type: s.type, terrainH: s.height }
+  })
+  const seated = Math.abs(seat.drawnY - seat.groundY) < 1e-9
+  console.log(
+    `${seated ? 'PASS' : 'FAIL'}  the erratic is drawn at the ground its site names ` +
+      `(drawn ${seat.drawnY.toFixed(4)}, ground ${seat.groundY.toFixed(4)})`,
+  )
+  if (!seated) errors.push(`the erratic is drawn at y ${seat.drawnY}, its ground is ${seat.groundY}`)
+  const dry = seat.type !== 'water' && seat.type !== 'ocean' && seat.groundY <= seat.terrainH + 1e-9
+  console.log(
+    `${dry ? 'PASS' : 'FAIL'}  the erratic stands on dry ground, its base not above it (${seat.type})`,
+  )
+  if (!dry) errors.push(`the erratic stands on ${seat.type} with its base at ${seat.groundY}`)
+
   // Point 487, the errand's end, driven in the REAL browser against the
   // placement the scene drew (window.__communicationRock, not a coordinate this
   // script computed): digging away from the block finds nothing, digging at it

@@ -2131,7 +2131,11 @@ function CommunicationRock() {
   const site = useMemo(() => {
     const s = communicationRockSite(seed)
     const p = latLonToWorld(s.lat, s.lon)
-    return { ...s, x: p.x, z: p.z, y: Math.max(0.2, sampleTerrain(s.lat, s.lon, seed).height) }
+    // The block's base sits AT the ground the terrain mesh draws — the site's
+    // own `groundY`, not a clamped height (work-order 585). The floor of 0.2
+    // this used to carry lifted the boulder off every stretch of bank lying
+    // below it, and the player looked under a rock that stood on nothing.
+    return { ...s, x: p.x, z: p.z, y: s.groundY }
   }, [seed])
 
   useEffect(() => {
@@ -2147,6 +2151,10 @@ function CommunicationRock() {
       x: site.x,
       z: site.z,
       y: site.y,
+      // What the ground under the block is, so a verification can ask whether
+      // the drawn base and the drawn ground are the same height (work-order 585)
+      // instead of trusting that they are.
+      groundY: site.groundY,
       radius: site.radius,
       height: site.height,
       upstreamDeg: site.upstreamDeg,

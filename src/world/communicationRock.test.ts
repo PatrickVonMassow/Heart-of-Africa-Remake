@@ -3,7 +3,7 @@
 // the village, at the Niger, genuinely UPSTREAM (measured against the flow the
 // world model reports, never assumed), in travel reach, on dry ground, and its
 // dig spot is exactly the coordinate the renderer is handed.
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
 import {
   communicationRockSite,
   communicationRockDigSpot,
@@ -130,6 +130,96 @@ describe('the communication rock stands at the river, upstream of the village', 
     })
     expect(other).toBeDefined()
     expect(isAtCommunicationRock(a.lat, a.lon, other as number, reach)).toBe(false)
+  })
+
+  // === Work-order 585: never in the water, and always ON the ground ==========
+  // The report was a boulder standing out in the river with its underside clear
+  // of the surface. Both halves of that are checked here over a WIDE seed sweep,
+  // because a placement that is right at ten seeds and wrong at the eleventh is
+  // what the player meets: the whole drawn footprint has to be dry, and the base
+  // has to meet the ground the terrain mesh draws under it.
+  const SWEEP = Array.from({ length: 120 }, (_, i) => (i + 1) * 7919)
+  /** Probe points over the footprint disc — deliberately at other angles and
+   *  radii than the placement's own, so this is a check and not an echo. */
+  const footprintDisc = (lat: number, lon: number) => {
+    const r = ROCK_FOOTPRINT_UNITS / 10
+    const out: Array<{ lat: number; lon: number }> = [{ lat, lon }]
+    for (const f of [0.3, 0.65, 1]) {
+      for (let i = 0; i < 17; i++) {
+        const a = ((i + 0.37) / 17) * Math.PI * 2
+        out.push({ lat: lat + Math.cos(a) * r * f, lon: lon + Math.sin(a) * r * f })
+      }
+    }
+    return out
+  }
+
+  it('stands on dry, unblocked ground over its whole footprint, at every seed', () => {
+    for (const seed of SWEEP) {
+      const rock = communicationRockSite(seed)
+      // Never the last-resort placement: the search really found a bank spot.
+      expect(rock.upstreamDeg, `seed ${seed}`).toBeGreaterThanOrEqual(1.6)
+      for (const p of footprintDisc(rock.lat, rock.lon)) {
+        const t = sampleTerrain(p.lat, p.lon, seed)
+        expect(t.type, `seed ${seed} at ${p.lat.toFixed(3)}/${p.lon.toFixed(3)}`).not.toBe('water')
+        expect(t.type, `seed ${seed} at ${p.lat.toFixed(3)}/${p.lon.toFixed(3)}`).not.toBe('ocean')
+        expect(isBlocked(t.type, p.lat, p.lon), `seed ${seed}`).toBe(false)
+      }
+    }
+  })
+
+  it('its base meets the drawn ground — no gap under the block, at every seed', () => {
+    // The tolerance is the residual between the placement's probe ring and this
+    // denser one, measured at 0.011 world units over the sweep — a third of a
+    // percent of the block's own height, where a hovering block in the report's
+    // picture stood clear of the water by a visible fraction of itself.
+    const GAP_TOLERANCE = 0.03
+    for (const seed of SWEEP) {
+      const rock = communicationRockSite(seed)
+      let lowest = Infinity
+      for (const p of footprintDisc(rock.lat, rock.lon)) {
+        const h = sampleTerrain(p.lat, p.lon, seed).height
+        lowest = Math.min(lowest, h)
+        // Nowhere under the block does the ground lie BELOW its base by more
+        // than the tolerance: that difference is the gap the player sees.
+        expect(rock.groundY - h, `seed ${seed} gap`).toBeLessThanOrEqual(GAP_TOLERANCE)
+      }
+      // ... and it is not buried deeper than it has to be: the base sits at the
+      // lowest ground it covers (within the same residual — this grid's lowest
+      // point and the placement's are not the same point).
+      expect(rock.groundY, `seed ${seed} sunk`).toBeGreaterThanOrEqual(lowest - GAP_TOLERANCE)
+      // The drawn base is a real height of the terrain field, never a floor
+      // value: the block stands on the bank, not at a constant altitude.
+      expect(rock.groundY).toBeLessThan(sampleTerrain(rock.lat, rock.lon, seed).height + 1e-9)
+    }
+  })
+
+  it('REFUSES a wet spot rather than settling for one when the bank is all water', async () => {
+    // The defect this point was reported for was not a missing water test — it
+    // was the search REMEMBERING its first candidate and handing that back, wet
+    // or dry, once the tries ran out. Drown the whole world and the placement
+    // must still refuse every one of them.
+    vi.resetModules()
+    vi.doMock('./terrain', async (importOriginal) => {
+      const real = await importOriginal<typeof import('./terrain')>()
+      return {
+        ...real,
+        sampleTerrain: (lat: number, lon: number, seed: number) => ({
+          ...real.sampleTerrain(lat, lon, seed),
+          type: 'water' as const,
+          height: -0.12,
+        }),
+      }
+    })
+    const drowned = await import('./communicationRock')
+    const site = drowned.communicationRockSite(4242)
+    const village = placeById(ROCK_VILLAGE_ID)
+    // Nothing was accepted at the river: the site fell back to the village
+    // coordinate, which the §4.2 clearance keeps out of the water for real.
+    expect(site.upstreamDeg).toBe(0)
+    expect(site.lat).toBe(village.lat)
+    expect(site.lon).toBe(village.lon)
+    vi.doUnmock('./terrain')
+    vi.resetModules()
   })
 
   it('is an upright block, taller than the tallest rock dressing around it', () => {
