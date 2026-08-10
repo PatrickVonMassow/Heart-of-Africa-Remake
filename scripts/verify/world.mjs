@@ -155,6 +155,14 @@ if (!poc) {
   // both are read here from the live run: the height the mesh was given against
   // the height the site says the ground is, and the terrain under the block
   // against the water.
+  // AND THE COMPARISON IS AGAINST A SECOND SOURCE, not against itself (four-eyes
+  // review by GPT-5.6 Sol, 11.08.2026). This check used to read `r.y` against
+  // `r.groundY` — BOTH fields of the same site object — so it proved only that the
+  // scene copied the number it was handed. A block drawn a metre high on a site
+  // that also said a metre would have passed. The height the block is drawn at is
+  // now held against the terrain the WORLD reports under it, sampled independently,
+  // which is the field the bird's-eye mesh is built from; the site's own value is
+  // reported beside it so a divergence names which of the two moved.
   const seat = await page.evaluate(async () => {
     const t = await import('/src/world/terrain.ts')
     const r = window.__communicationRock
@@ -162,12 +170,21 @@ if (!poc) {
     const s = t.sampleTerrain(r.lat, r.lon, seed)
     return { drawnY: r.y, groundY: r.groundY, type: s.type, terrainH: s.height }
   })
-  const seated = Math.abs(seat.drawnY - seat.groundY) < 1e-9
+  // The footprint's LOWEST ground is what the site seats the block on, so the drawn
+  // base may sit below the centre sample on a slope — never above it, which is the
+  // floating the point was filed for.
+  const above = seat.drawnY - seat.terrainH
+  const seated = above <= 1e-6 && seat.drawnY >= seat.terrainH - 1.5
   console.log(
-    `${seated ? 'PASS' : 'FAIL'}  the erratic is drawn at the ground its site names ` +
-      `(drawn ${seat.drawnY.toFixed(4)}, ground ${seat.groundY.toFixed(4)})`,
+    `${seated ? 'PASS' : 'FAIL'}  the erratic is drawn at the ground the world reports under it ` +
+      `(drawn ${seat.drawnY.toFixed(4)}, terrain ${seat.terrainH.toFixed(4)}, site ${seat.groundY.toFixed(4)})`,
   )
-  if (!seated) errors.push(`the erratic is drawn at y ${seat.drawnY}, its ground is ${seat.groundY}`)
+  if (!seated) {
+    errors.push(
+      `the erratic is drawn at y ${seat.drawnY}, the terrain under it is ${seat.terrainH} ` +
+        `(its site says ${seat.groundY})`,
+    )
+  }
   const dry = seat.type !== 'water' && seat.type !== 'ocean' && seat.groundY <= seat.terrainH + 1e-9
   console.log(
     `${dry ? 'PASS' : 'FAIL'}  the erratic stands on dry ground, its base not above it (${seat.type})`,

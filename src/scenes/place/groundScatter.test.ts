@@ -3,7 +3,12 @@
 // seed two tufts of the Bambara village stood out over the Niger — drawn on the
 // flat plate while the ground under them had already sloped into the water — so
 // the scatter is checked against the bank the settlement actually has.
-import { describe, it, expect } from 'vitest'
+// THE DATASET IS LOADED FIRST, and that is not ceremony (four-eyes review by
+// GPT-5.6 Sol, 11.08.2026): without `setupGeodata()` the terrain reads as OCEAN
+// EVERYWHERE in this layer, so a shore rule checked against it is checked against
+// a world with no shore — the file would pass with the bug it was written for.
+import { describe, it, expect, beforeAll } from 'vitest'
+import { setupGeodata } from '../../test/geodata'
 import { scatterGrassTufts } from './groundScatter'
 import { buildLayout, PLACE_RADIUS } from './layout'
 import { standsOnGroundPlate, BANK_DRESSING_CLEARANCE } from './riverBank'
@@ -13,6 +18,10 @@ import { PLACES } from '../../world/geo'
 /** The world of the F6 report the point was filed from. */
 const REPORTED_SEED = 1425108822
 const SEEDS = [7, 42, 1337, REPORTED_SEED]
+
+beforeAll(async () => {
+  await setupGeodata()
+})
 
 describe('the grass scatter keeps off the shore', () => {
   it.each(SEEDS)('seed %i: no tuft of the river village stands past the top of the bank', (seed) => {
