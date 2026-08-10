@@ -3762,6 +3762,31 @@ to land than a mechanism that needs a review.
   Criticality: medium — nothing the player sees, but it is the one surface the user steers
   the batch by, and it was wrong while every check said it was fine.
 
+- [ ] 609. THE PROOF GUARD IS BUILT, TAUGHT AND WIRED TO NOTHING (found 10.08.2026 by the
+  second model while clearing point 594). `scripts/point-proof-guard.mjs` refuses the tick of
+  a point whose `PROOF:` line has not run at the current HEAD — the mechanism exists, has a
+  register, a `--status` and a CLI, and point 594 just taught it to recognise the landing
+  command. It has NO hook entry in `.claude/settings.json`. Its PreToolUse mode therefore
+  never runs: no `PROOF:` line has ever been demanded of anyone, and 594's teaching bites
+  only once somebody arms it. This is the retrospective's lesson "built, tested, documented — and
+  put in nobody's way" again, in the one family whose whole purpose is to be in the way.
+  FINAL STATE:
+  1. The guard is ARMED in `.claude/settings.json`, in the PreToolUse chain beside the other
+     tick gates, and a run proves it fires: a point carrying a `PROOF:` line cannot be ticked
+     until its command has run at HEAD, and one without such a line is untouched.
+  2. WIRING IS ATTENDED WORK — `.claude/settings.json` prompts on every edit, so this point is
+     done in a session with the user present, not by a delegated agent.
+  3. THE CLASS, NOT THE CASE: every guard the repository ships is checked for the same gap.
+     `scripts/guard-inventory-core.mjs` already knows the inventory — it gains the question
+     "is this guard reachable from the settings chain at all?", and an unwired guard is named
+     loudly rather than counted as present. `guard-health-guard` carries the verdict, so the
+     next one cannot sit unwired for a month.
+  VERIFIABLE: Vitest — the inventory check fails on a fixture whose guard has no hook entry
+  and passes when it has one; plus the recorded live proof of 1, since an armed hook is the
+  one thing the unit layer cannot demonstrate about the real settings file.
+  Criticality: medium — nothing the player sees, but it is a gate everyone believed was
+  closed, and the belief is what made it worth nothing.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
