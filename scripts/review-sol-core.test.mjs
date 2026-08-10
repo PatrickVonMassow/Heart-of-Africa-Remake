@@ -295,6 +295,19 @@ describe('the record the command prints', () => {
     expect(report).toContain('merge')
   })
 
+  it('is not printed either when the coverage could not be determined at all', () => {
+    // An unanswerable merge-base is not an answer of "full coverage": that
+    // fail-open printed a record for a range nobody had bounded (fourth round).
+    const report = formatReviewReport({
+      decision: decideReview(okRun()),
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      partial: { reviewedBase: 'b'.repeat(40), coverageBase: 'an unknown commit' },
+    })
+    expect(report).toMatch(/NO RECORD COMMAND IS PRINTED/)
+    expect(report).toContain('an unknown commit')
+  })
+
   it('the report names the cause in one loud line on a fallback', () => {
     const d = decideReview({ outcome: classifyOutcome({ exitCode: 1, stderr: 'usage limit' }), parsed: { ok: false } })
     const report = formatReviewReport({ decision: d, sha: 'c'.repeat(40), mode: 'review' })

@@ -452,6 +452,9 @@ export function savedAuthPathFrom(gitCommonDir, repoRoot, { sep = '/' } = {}) {
 /** Shell-quote one value for the record command line we print. */
 const q = (s) => `"${String(s ?? '').replace(/(["\\$`])/g, '\\$1')}"`
 
+/** Shortest readable form of a sha — and unchanged for anything that is not one. */
+const short = (s) => (/^[0-9a-f]{7,40}$/i.test(String(s ?? '')) ? String(s).slice(0, 7) : String(s ?? ''))
+
 /**
  * The record command, in the shape `mechanism-review.mjs --record` expects.
  *
@@ -492,7 +495,7 @@ export function formatReviewReport({ decision = {}, sha = '', mode = 'review', p
       `review-sol: ${said}`,
       '',
       `  NO RECORD COMMAND IS PRINTED. A record at ${String(sha).slice(0, 7)} clears every commit it contains,`,
-      `  back to ${partial.coverageBase.slice(0, 7)}, and this review only saw back to ${partial.reviewedBase.slice(0, 7)}.`,
+      `  back to ${short(partial.coverageBase)}, and this review only saw back to ${short(partial.reviewedBase)}.`,
       '  Re-run without --since to review the whole range, then record that.',
     ].join('\n')
   }

@@ -453,8 +453,12 @@ if (isMainModule(import.meta.url)) {
     const base = mergeBase(since || 'main', full, { explicit: Boolean(since) })
     // What a record at this sha would CLEAR: everything back to where the branch
     // left `main`. A narrower review is allowed, but it may not be recorded.
-    const coverageBase = since ? git(['merge-base', 'main', full], { required: false }) || '' : base
-    const partial = coverageBase && coverageBase !== base ? { reviewedBase: base, coverageBase } : null
+    // FAILING TO ANSWER IS NOT AN ANSWER OF "FULL COVERAGE" (fourth round): a
+    // sha with no merge base against `main` used to leave this empty, which
+    // switched the check OFF and printed a record for a range nobody bounded.
+    const coverageBase = since ? git(['merge-base', 'main', full], { required: false }) : base
+    const partial =
+      coverageBase === base ? null : { reviewedBase: base, coverageBase: coverageBase || 'an unknown commit' }
     const material = gatherMaterial(full, base)
     console.error(
       `  material: ${material.length} characters of diff and file content ` +
