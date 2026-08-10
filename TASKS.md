@@ -540,37 +540,6 @@ there exactly once; a new point joins a bundle when appended.
   Criticality: low — pure measurement; it changes no behaviour, and it is the precondition
   for judging the remaining structural levers.
 
-- [ ] 592. STOP PAYING FOR THE WAIT (point 572's measure 1, the largest measured lever).
-  A long-running command is AWAITED, not polled. The verify wrapper and every background
-  run report their completion through the harness notification or through a single
-  blocking call with a timeout; where a poll is genuinely unavoidable, the FIRST wait is
-  0.9 × the suite's measured median runtime (`docs/picture-check-cost.md` §1), and after
-  five polls the run is either awaited blocking or treated as hung. The idle marker the
-  no-idle-stop guard reads is set by a HOOK, not by a model turn — `echo idle` disappears
-  from the transcripts and the guard accepts the hook's marker exactly as it accepts
-  today's turn. The verify wrapper COUNTS the polls of a run and prints the count, so the
-  rule is visible rather than remembered.
-  MEASURED TARGET: polling is 10.9 % of the weighted spend and bare idling another 3.6 %
-  (2857 + 1189 responses, 09.08.2026); the longest unbroken poll chain in the window was
-  437 responses ≈ 11.5 M weighted; the upper bound on removed model time is 2755 real poll
-  responses × 24.4 s ≈ 18.7 machine-hours in that window, and one 42-minute run polled every
-  30 s costs ≈ 1.9 M for the loop alone. Re-measure after the change with
-  `node scripts/measure-task-cost.mjs`.
-  THE COMPLETION MESSAGE IS A STRUCTURED RECEIPT, not prose: exit code, backend, suite, the
-  `git HEAD` it ran on, the log path, the failing test names UNCUT, and the frames EXPECTED
-  against the frames WRITTEN. The last pair is invisible today — point 375's shutter refuses
-  a frame whose subject is missing, but a frame that was never written at all goes unnoticed,
-  and awaiting instead of polling is exactly the moment to make the run state one checkable
-  object.
-  THE MAIN SESSION SEES THE FRAMES, NOT THE RUNNING PROCESS. A picture check today spends
-  1 to 1.8 M weighted on watching a run in the scarcest context there is (the main session's
-  median is 164k against an agent's 207k). It waits, then looks at the result.
-  The primitive already exists and is NOT to be re-derived: `docs/harness-primitives-evaluation.md`
-  §5 records that a background run plus its completion notification replaces log polling, and
-  names `Monitor` for the per-occurrence case.
-  Criticality: HIGH — it touches the idle guard, and a guard that goes blind stops
-  catching an idle stop, so the other model's mechanism review applies.
-
 - [ ] 595. THE VERIFICATION LADDER (point 572's measure 5). While a render point is still
   being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
   full proof — both backends where they can differ, LARGE where the change warrants it —
