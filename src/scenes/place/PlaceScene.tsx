@@ -85,6 +85,7 @@ import {
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { SpeechLabels } from './SpeechLabels'
+import { releasePointerLock, requestPlacePointerLock } from './pointerLock'
 import { ActorLabels } from '../ActorLabels'
 import { markActor } from '../actorLabelSource'
 import { resolveMove, standingClear, PLAYER_RADIUS } from './collision'
@@ -2402,31 +2403,34 @@ export function PlaceScene() {
   useEffect(() => {
     const el = gl.domElement
     ;(document.activeElement as HTMLElement | null)?.blur?.()
-    const grab = () => {
-      // Never grab the pointer while a full-screen overlay is up (the initial
-      // checkpoint-load choice, defeat or victory): the cursor is needed to
-      // click it. The DOM is committed before this effect runs, so the overlay
-      // is already present on the start-of-game grab.
-      if (document.querySelector('.overlay')) return
-      // Never engage pointer lock under browser automation (navigator.webdriver
-      // is set by Playwright/CDP): the verify captures enter this first-person
-      // scene headless, and system-Chrome --headless=new (the WebGPU lane) grabs
-      // the REAL OS cursor on requestPointerLock, dragging the user's Windows
-      // mouse into a corner. Real players never set webdriver, so mouse-look is
-      // unaffected; the headless suites drive yaw via synthetic events anyway.
-      if (navigator.webdriver) return
-      if (!useUi.getState().dialog && document.pointerLockElement !== el) {
-        try {
-          const r = el.requestPointerLock() as unknown as Promise<void> | undefined
-          if (r && typeof r.catch === 'function') r.catch(() => {})
-        } catch {
-          /* pointer lock unavailable — the game stays playable via keyboard */
-        }
-      }
-    }
+    // The rules of who owns the cursor — the overlay and dialog exceptions, and
+    // the deliberate skip under browser automation — live in ./pointerLock.
+    const grab = () => requestPlacePointerLock(el)
     grab() // engage immediately on entry (activation from the walk-in keypress)
     const onClick = () => grab()
+    // The lock comes back when the guess dialog closes (point 588): the button
+    // click carries the user activation the request needs, so the player is not
+    // left having to click the ground again to walk on.
+    const offDialog = useUi.subscribe((s, prev) => {
+      if (prev.dialog?.kind === 'speechGuess' && s.dialog === null) grab()
+    })
+    // The FIRST movement after the lock returns is dropped: the browser reports
+    // the jump from wherever the cursor sat as a movement, and the view would
+    // swing round the moment the dialog closes.
+    let settling = false
+    const onLockChange = () => {
+      if (document.pointerLockElement === el) settling = true
+    }
+    document.addEventListener('pointerlockchange', onLockChange)
     const onMove = (e: MouseEvent) => {
+      // A modal dialog freezes looking as it freezes walking (design.md §16.1):
+      // without the lock there is no look anyway, but under automation the raw
+      // movement below would still turn the head.
+      if (useUi.getState().dialog) return
+      if (settling) {
+        settling = false
+        return
+      }
       // Under automation we deliberately skip the real pointer lock (above), so
       // apply mouse-look from the raw movement instead — the verify suites still
       // drive and assert first-person yaw, without the OS cursor being grabbed.
@@ -2448,6 +2452,8 @@ export function PlaceScene() {
     return () => {
       el.removeEventListener('click', onClick)
       window.removeEventListener('mousemove', onMove)
+      document.removeEventListener('pointerlockchange', onLockChange)
+      offDialog()
       if (document.pointerLockElement === el) document.exitPointerLock()
     }
   }, [gl])
@@ -2472,14 +2478,14 @@ export function PlaceScene() {
         game.setToast(strings.toasts.chiefHostile)
       } else {
         setDialog({ kind: 'audience' })
-        if (document.pointerLockElement) document.exitPointerLock()
+        releasePointerLock()
       }
     } else if (near.type === 'bazaar' || near.type === 'agency') {
       setDialog({ kind: near.type })
-      if (document.pointerLockElement) document.exitPointerLock()
+      releasePointerLock()
     } else {
       setDialog({ kind: 'trade', building: near.type })
-      if (document.pointerLockElement) document.exitPointerLock()
+      releasePointerLock()
     }
   }
 

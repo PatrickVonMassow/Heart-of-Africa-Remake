@@ -264,6 +264,16 @@ export const en: Strings = {
     reopenDrumMessage: "Read the chief's drum message again",
   },
 
+  speechGuess: {
+    invite: 'Click to guess meaning',
+    title: 'What did he mean?',
+    hint: 'What I take his words to mean. My own note — nobody here can tell me whether it is right.',
+    readingFor: (utterance: string) => `My reading of ${utterance}`,
+    notePlaceholder: 'My reading',
+    save: 'Write it down (Enter)',
+    cancel: 'Let it be (Esc)',
+  },
+
   drumMessage: {
     title: "The Chief's Message on the Drums",
     hint: 'Seven words, one after another. Above each stands my own reading — click one to change it; it is the same note my book holds.',

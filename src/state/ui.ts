@@ -1,6 +1,7 @@
 // Transient UI state (dialogs, interaction prompt, debug menu visibility).
 
 import { create } from 'zustand'
+import type { UtteranceId } from '../communication/lexicon'
 import type { TreasureId } from '../systems/economy'
 import { QUALITY_PRESETS, nextDetailLevel, type DetailLevel } from '../config/quality'
 
@@ -51,6 +52,10 @@ export type Dialog =
   // The chief's drum message, shown after the drums and reopenable at any time
   // from the journal (design.md §13.4, point 486).
   | { kind: 'drumMessage' }
+  // A guess at what a speaker just said, opened by clicking him (design.md
+  // §13.4, point 588). It carries the atoms it was opened FOR, so it outlives
+  // the label over the speaker's head.
+  | { kind: 'speechGuess'; speakerId: string; atoms: readonly UtteranceId[] }
   // Camp caches (design.md §6): a free camp by id, or a village cache.
   | { kind: 'camp'; scope: 'free'; campId: number }
   | { kind: 'camp'; scope: 'village'; placeId: string }

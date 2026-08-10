@@ -17,6 +17,7 @@ import {
   showSpeechLabel,
   speechLabelHeight,
   speechLabelSeconds,
+  withSpeechTarget,
 } from './speechLabel'
 
 const COME = utteranceOf('COME')
@@ -158,6 +159,48 @@ describe('how long a label stands (design.md §13.4)', () => {
     const state = showSpeechLabel(noSpeechLabels(), 'kid-1', [COME], 0, { seconds: 10 })
     expect(expireSpeechLabels(state, 1)).toBe(state)
     expect(dropSpeechLabel(state, 'kid-9')).toBe(state)
+  })
+})
+
+/**
+ * THE CLICK TARGET MUST LIVE LONG ENOUGH TO BE CLICKED (work-order point 588).
+ * A label stands 2.6 s, which is shorter than reaching for the mouse — so the
+ * one label the player is invited to click is held against the sweep for as
+ * long as it is that target, and goes the moment it stops being one.
+ */
+describe('the note a click would take (design.md §13.4)', () => {
+  it('names the target and keeps the same state object when it does not change', () => {
+    const state = showSpeechLabel(noSpeechLabels(), 'kid-1', [COME], 0, { seconds: 2 })
+    expect(state.targetId).toBeNull()
+    const targeted = withSpeechTarget(state, 'kid-1')
+    expect(targeted.targetId).toBe('kid-1')
+    expect(withSpeechTarget(targeted, 'kid-1')).toBe(targeted)
+  })
+
+  it('holds the targeted label past its time, and lets it go once it is not the target', () => {
+    let state = showSpeechLabel(noSpeechLabels(), 'kid-1', [COME], 0, { seconds: 2 })
+    state = showSpeechLabel(state, 'kid-2', [DIG], 0, { seconds: 2 })
+    state = withSpeechTarget(state, 'kid-1')
+    // Long past both lifetimes: only the target still stands.
+    state = expireSpeechLabels(state, 30)
+    expect(state.labels.map((l) => l.speakerId)).toEqual(['kid-1'])
+    // Another speaker takes the highlight — the held note goes with the next sweep.
+    state = withSpeechTarget(state, null)
+    expect(expireSpeechLabels(state, 30).labels).toHaveLength(0)
+  })
+
+  it('keeps the target while another speaker speaks over him', () => {
+    let state = showSpeechLabel(noSpeechLabels(), 'kid-1', [COME], 0, { seconds: 2 })
+    state = withSpeechTarget(state, 'kid-1')
+    state = showSpeechLabel(state, 'kid-2', [DIG], 30, { seconds: 2 })
+    expect(state.targetId).toBe('kid-1')
+    expect(state.labels.map((l) => l.speakerId).sort()).toEqual(['kid-1', 'kid-2'])
+  })
+
+  it('takes the highlight with the figure when that leaves the scene', () => {
+    let state = showSpeechLabel(noSpeechLabels(), 'kid-1', [COME], 0, { seconds: 10 })
+    state = withSpeechTarget(state, 'kid-1')
+    expect(dropSpeechLabel(state, 'kid-1').targetId).toBeNull()
   })
 })
 
