@@ -154,7 +154,7 @@ describe('the guards around the run', () => {
     // commit while clearing its ancestors is the hole (third round). Naming the
     // range explicitly is accepted.
     provenId()
-    const onMain = spawnSync('git', ['rev-parse', 'main'], { encoding: 'utf8' }).stdout.trim()
+    const onMain = spawnSync('git', ['rev-parse', 'main'], { encoding: 'utf8', windowsHide: true }).stdout.trim()
     const r = run(['--sha', onMain, '--brief', 'judge it'])
     expect(r.status).not.toBe(0)
     expect(r.stderr).toMatch(/does not diverge/)
@@ -169,7 +169,7 @@ describe('the guards around the run', () => {
 
   it('refuses an explicit --since that is not a proper ancestor of the sha', () => {
     provenId()
-    const head = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim()
+    const head = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true }).stdout.trim()
     // The sha itself, and a descendant of the range start: both would show the
     // reviewer less than the record clears (four-eyes finding, fourth round).
     for (const since of [head, 'HEAD']) {
