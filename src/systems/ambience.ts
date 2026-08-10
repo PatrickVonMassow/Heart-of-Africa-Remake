@@ -865,8 +865,8 @@ const DRUM_TONE: Record<DrumId, { head: number; body: number; ring: number }> = 
 /**
  * Beats the chief's message out (src/communication/drumMessage.ts): every strike
  * of the plan on the AudioContext clock, so a re-render or a scene change cannot
- * cut the message short once the chief has sent it. Like the voices it runs
- * through the ambient bus, under the single §21 ambience volume.
+ * cut the message short once the chief has sent it. It runs through the AMBIENT
+ * bus — the voices left it for their own — under the single §21 ambience volume.
  */
 export function playDrumMessage(plan: DrumMessagePlan): void {
   if (plan.strikes.length === 0) return
