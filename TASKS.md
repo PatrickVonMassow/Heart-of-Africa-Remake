@@ -114,7 +114,16 @@ there exactly once; a new point joins a bundle when appended.
      launcher (the launcher watches the lock file, or `batch-boundary.mjs` wakes it), and
      the successor starts within seconds. The 15-minute tick REMAINS as the backstop for
      the cases no signal covers (a killed session, a missed write) — the fast path is
-     added, the slow path is not removed.
+     added, the slow path is not removed. The mark also OUTRANKS every liveness heuristic,
+     at any grace age: an owner that has declared itself finished is finished, and liveness
+     answers a question nobody asked. Measured 10.08.2026 — the handover was written at
+     13:57:46Z and the ticks at 14:01, 14:16 and 14:31 each logged `skip: owner alive
+     (pid-alive; heartbeat 5..20 min old, pid 939)` and spawned nobody, because the handover
+     grace had elapsed one tick earlier and the verdict fell back to the pid. That pid is the
+     attended window's `claude` process, which survives a `/clear` and hosts every session in
+     that window, so successive owners write the SAME pid and the pid-alive branch can never
+     observe a dead one. Ownership liveness therefore keys on the SESSION — its identity,
+     heartbeat and lease — never on the bare existence of a hosting process.
   2. OWNERSHIP IS BOUND TO WORK, NOT MERELY TO LIFE. Today `leaseUntil` runs an hour and
      never asks whether the owner is doing anything, so a session that takes the lock and
      idles holds the batch for that hour. An owner that has neither declared in-flight work
