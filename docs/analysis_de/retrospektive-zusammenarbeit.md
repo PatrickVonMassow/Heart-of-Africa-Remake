@@ -974,6 +974,14 @@ Das ist nicht 3.100 in klein. Dort erfuhr niemand von einer Fähigkeit; hier war
 
 **Lehre:** Bei allem, was der Spieler *finden* muss, gehört neben die Wirkungsprüfung eine **Nachbarschaftsprüfung** — steht das Neue bei seinesgleichen? Sie ist billig und maschinell haltbar: Die Regel „jede Lautstärke sitzt in der Tongruppe" ist als Test formulierbar und gilt dann auch für die nächste, die jemand anlegt. Und wenn ein Nutzer eine schon reparierte Sache erneut meldet, ist die erste Vermutung nicht „er irrt sich" und nicht „der alte Stand", sondern: Wir haben etwas gebaut, das er nicht erreicht.
 
+### 3.102 Der Sammelbefehl erbt die Pflichten der Befehle, die er ersetzt
+
+Der Landebefehl fasst zusammen, was bisher acht bis zwölf Züge von Hand waren: zusammenführen, prüfen, haken, archivieren, veröffentlichen, aufräumen. Die Gegenprüfung wies ihn zurück, und beide schweren Befunde hatten dieselbe Form. Unsere Wächter greifen auf **Befehlsmuster**: Ein blankes `git merge` wird abgefangen, ein Skript, das dasselbe tut, nicht. Der eine Befehl, der zusammenführt, hakt, committet, pusht und Zweige löscht, galt einem Wächter als reines *Lesen*. Und die erste Fassung löschte den Fernzweig, während der Haken noch uncommittet und `main` ungepusht war — ein Maschinenausfall in diesem Fenster hätte den Punkt vollständig verloren, gegen genau diesen Verlust ist der ganze Zweig-Ablauf gebaut.
+
+Beides ist nicht Nachlässigkeit, sondern die Bauform: Wer n Schritte zu einem zusammenfasst, erbt **jede** Kontrolle, die an einem der n hing — und erbt sie stillschweigend, weil das Bündel neu ist und keine Regel es kennt. Der Autor hatte die Wächterfamilie bis zur Zugriffssperre durchgesehen und dort aufgehört; die zweite Runde, in der er sie zu Ende kämmte, fand ein fünftes Loch derselben Art. Eine halbe Durchsicht ist hier keine halbe Sicherheit, sondern gar keine.
+
+**Lehre:** Ein neuer Befehl, der bestehende ersetzt, wird gegen die **vollständige** Liste der Kontrollen geprüft, die auf die ersetzten Befehle greifen — namentlich, nicht nach Gefühl, und die Prüfung ist ausführbar (jeden Klassifizierer einmal mit dem neuen Befehl aufrufen und das Urteil lesen). Und die Reihenfolge seiner Schritte ist eine Eigenschaft, kein Detail: Was Arbeit dauerhaft macht, steht **vor** dem, was etwas löscht, und diese Reihenfolge wird per Test festgehalten.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -1063,7 +1071,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 10.08.2026, 10:50 · Quellen-Fingerprint: `f9091f10c4c5…`
+Zuletzt aktualisiert: Montag, 10.08.2026, 13:03 · Quellen-Fingerprint: `cccf60019a1d…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1143,8 +1151,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 45 Prozess-/Meta-TASKS-Punkte (davon 20 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 46 Prozess-/Meta-TASKS-Punkte (davon 20 offen).
 
-<!-- RETRO-FINGERPRINT: f9091f10c4c500ca43d4cbc6ccc2ec48e28f1f770b56a87a1aec94d84e4fe224 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-10T08:50:40.856Z -->
+<!-- RETRO-FINGERPRINT: cccf60019a1df8c9bdfecb2462555ea1a152896cbf8eaed613ed8bf2d964a546 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-10T11:03:17.885Z -->
 <!-- AUTO-GENERATED:END -->
