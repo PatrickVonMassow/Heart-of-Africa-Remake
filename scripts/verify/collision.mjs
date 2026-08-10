@@ -787,6 +787,76 @@ if (section('unstuck')) {
   }
 }
 
+// === No inhabitant at an unplaced transform (work-order 509) =================
+// The other failure of the layer point 155 closed: not a figure that walked
+// itself into a corner but one that was never placed at all. A vignette writing
+// its figures' transforms only from its frame callback leaves them at React's
+// identity transform — the settlement origin — for as long as they do not move,
+// and the walkers spend most of their day at home. Invisible to the eye, solid
+// to a ray probe, and an EXACT zero, which is the signature of a placement that
+// never happened.
+//
+// Swept over EVERY settlement, from the world model's own list, because the
+// defect belongs to the shared life layer rather than to one village.
+if (section('inhabitant-placement')) {
+  const ids = await page.evaluate(() => window.__settlementIds ?? [])
+  check(
+    'the sweep reads every settlement from the world model',
+    ids.length >= 30,
+    `${ids.length} settlements`,
+  )
+  const offenders = []
+  let figuresSeen = 0
+  const emptyOf = []
+  for (const id of ids) {
+    await enterSettlement(id)
+    const res = await page.evaluate((placeId) => {
+      const scene = window.__placeScene
+      const layout = window.__placeLayout
+      if (!scene || !layout) return { placeId, error: 'scene or layout missing' }
+      // The tolerance is float NOISE, not a zone: a transform nothing wrote is
+      // exactly (0,0,0), while a villager may legitimately walk over the middle
+      // of its own village and must not be reported for it (src/scenes/place/
+      // placement.ts, UNPLACED_EPS).
+      const EPS = 0.01
+      // The settlement's own placement set: a settlement that genuinely puts
+      // someone at its origin is not an offender.
+      const anchors = [...layout.dwellings.map((d) => [d.x, d.z]), ...layout.errands]
+      const originIsASpot = anchors.some(([x, z]) => Math.abs(x) <= EPS && Math.abs(z) <= EPS)
+      let seen = 0
+      let atOrigin = 0
+      scene.traverse((o) => {
+        if (o.name !== 'inhabitant') return
+        seen++
+        // The figure group always sits at its parent's origin — the PARENT is
+        // the placement, so the world matrix is what has to be read.
+        o.updateWorldMatrix(true, false)
+        const e = o.matrixWorld.elements
+        if (Math.abs(e[12]) <= EPS && Math.abs(e[13]) <= EPS && Math.abs(e[14]) <= EPS) atOrigin++
+      })
+      return { placeId, seen, atOrigin, originIsASpot }
+    }, id)
+    if (res.error) {
+      offenders.push(`${id}(${res.error})`)
+      continue
+    }
+    figuresSeen += res.seen
+    if (res.seen === 0) emptyOf.push(id)
+    if (res.atOrigin > 0 && !res.originIsASpot) offenders.push(`${id}:${res.atOrigin}`)
+  }
+  check(
+    'no inhabitant of any settlement stands at the settlement origin (point 509)',
+    offenders.length === 0,
+    offenders.length ? `at the origin: ${offenders.join(',')}` : `${figuresSeen} figures over ${ids.length} settlements`,
+  )
+  // Non-vacuous: a sweep that found no figures would have proved nothing.
+  check(
+    'every settlement of the sweep actually drew inhabitants',
+    emptyOf.length === 0 && figuresSeen > 0,
+    emptyOf.length ? `no figures in: ${emptyOf.join(',')}` : `${figuresSeen} figures`,
+  )
+}
+
 // A selected section that never executed is a FAILURE, not a quiet pass: it is
 // the one way a --section run could report green having verified nothing.
 const unrun = sections.unrun()

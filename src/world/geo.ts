@@ -307,3 +307,17 @@ export function landmarkLabelHiddenByMapPoint(landmarkId: string): boolean {
 export const KNOWN_FROM_START_PLACES: readonly string[] = PLACES.filter(
   (p) => p.kind === 'port' || p.kind === 'monument',
 ).map((p) => p.id)
+
+/** Every settlement the player can walk into — the ports and the villages, not
+ *  the monument sites, which carry their own sparse crowd instead of the §19.10
+ *  bustle. */
+export const SETTLEMENT_IDS: readonly string[] = PLACES.filter(
+  (p) => p.kind === 'port' || p.kind === 'village',
+).map((p) => p.id)
+
+// Dev-only hook for the headless verification (CLAUDE.md §7.2): a sweep over
+// ALL settlements reads the list from the world model rather than repeating it,
+// so a new village can never be missed by the check that covers every one.
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  ;(window as unknown as Record<string, unknown>).__settlementIds = SETTLEMENT_IDS
+}
