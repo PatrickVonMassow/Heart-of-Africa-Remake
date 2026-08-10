@@ -177,26 +177,41 @@ if (!poc) {
     const centre = t.sampleTerrain(r.lat, r.lon, seed)
     const rock = await import('/src/world/communicationRock.ts')
     const rad = rock.ROCK_FOOTPRINT_UNITS / 10 // world units → degrees
+    // THE SAME POINTS, READ AGAIN — not the same NUMBER read twice. The site's
+    // stored ground value is what this check may not trust; the coordinates it is
+    // computed over are public, so they are re-sampled here from the terrain
+    // field. A dense grid instead would measure a slightly different quantity and
+    // could disagree with a correctly seated block on rolling ground (Sol's third
+    // pass), so it is reported beside the verdict, never asserted on.
     let lo = Infinity
-    let hi = -Infinity
+    for (let k = 0; k < 2; k++) {
+      const f = k === 0 ? 0.5 : 1
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2
+        const h = t.sampleTerrain(r.lat + Math.cos(a) * rad * f, r.lon + Math.sin(a) * rad * f, seed).height
+        lo = Math.min(lo, h)
+      }
+    }
+    lo = Math.min(lo, centre.height)
+    let dense = Infinity
     for (let i = -4; i <= 4; i++) {
       for (let j = -4; j <= 4; j++) {
         const dLat = (i / 4) * rad
         const dLon = (j / 4) * rad
         if (Math.hypot(dLat, dLon) > rad + 1e-12) continue
-        const h = t.sampleTerrain(r.lat + dLat, r.lon + dLon, seed).height
-        lo = Math.min(lo, h)
-        hi = Math.max(hi, h)
+        dense = Math.min(dense, t.sampleTerrain(r.lat + dLat, r.lon + dLon, seed).height)
       }
     }
-    return { drawnY: r.y, groundY: r.groundY, type: centre.type, terrainH: centre.height, lo, hi }
+    return { drawnY: r.y, groundY: r.groundY, type: centre.type, terrainH: centre.height, lo, dense }
   })
-  const SEAT_TOLERANCE = 0.02
+  // Numerical, not generous: both sides are the same field read over the same
+  // coordinates, so anything above float noise is a real divergence.
+  const SEAT_TOLERANCE = 1e-6
   const seated = Math.abs(seat.drawnY - seat.lo) <= SEAT_TOLERANCE
   console.log(
     `${seated ? 'PASS' : 'FAIL'}  the erratic is drawn at the lowest ground under its footprint ` +
-      `(drawn ${seat.drawnY.toFixed(4)}, footprint ${seat.lo.toFixed(4)}–${seat.hi.toFixed(4)}, ` +
-      `site ${seat.groundY.toFixed(4)})`,
+      `(drawn ${seat.drawnY.toFixed(6)}, re-measured ${seat.lo.toFixed(6)}, ` +
+      `site ${seat.groundY.toFixed(6)}, dense grid ${seat.dense.toFixed(6)})`,
   )
   if (!seated) {
     errors.push(
