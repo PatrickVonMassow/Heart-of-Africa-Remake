@@ -8,6 +8,7 @@ import {
   formatBranchHygiene,
   isBaselineCheckout,
   normBranch,
+  stubBranchTree,
   DEFAULT_GRACE_MS,
 } from './branch-hygiene-core.mjs'
 
@@ -303,5 +304,104 @@ describe('assessBranchHygiene — a branch on main\'s own tip', () => {
       mainTip: null,
     })
     expect(r.block).toBe(true)
+  })
+})
+
+describe("the setup branch an agent worktree is cut with (point 613)", () => {
+  const ID = 'agent-af3912c7e49224502'
+  const STUB = `worktree-${ID}`
+  const TREE = `${ROOT}/.claude/worktrees/${ID}`
+  const MAIN_TIP = 'a'.repeat(40)
+  // Deliberately BEHIND main: the stub sits on the commit main had when the
+  // tree was cut, so the on-main-tip exemption has already expired. That is the
+  // exact state that produced a finding on every turn of a healthy delegation.
+  const STALE = { tipAt: OLD, tipSha: 'b'.repeat(40) }
+
+  // The real shape: the agent switched to its feat branch seconds after the cut,
+  // so the tree holds THAT branch and the stub is checked out nowhere.
+  const withTree = (over = {}) =>
+    assessBranchHygiene({
+      readable: true,
+      now: NOW,
+      repoRoot: ROOT,
+      mainTip: MAIN_TIP,
+      worktrees: [
+        { path: ROOT, branch: 'refs/heads/main', tipAt: OLD, tipSha: MAIN_TIP },
+        { path: TREE, branch: 'refs/heads/feat/613-x', locked: true, tipAt: OLD, tipSha: 'c'.repeat(40) },
+      ],
+      ...over,
+    })
+
+  it('a stub whose worktree still exists yields NO finding', () => {
+    const r = withTree({ localMerged: [{ name: STUB, ...STALE }] })
+    expect(r.block).toBe(false)
+    expect(r.findings).toEqual([])
+  })
+
+  it('the same stub with the worktree GONE is still debris', () => {
+    const r = assessBranchHygiene({
+      readable: true,
+      now: NOW,
+      repoRoot: ROOT,
+      mainTip: MAIN_TIP,
+      worktrees: [{ path: ROOT, branch: 'refs/heads/main', tipAt: OLD, tipSha: MAIN_TIP }],
+      localMerged: [{ name: STUB, ...STALE }],
+    })
+    expect(r.block).toBe(true)
+    expect(r.findings).toHaveLength(1)
+    expect(r.findings[0]).toMatchObject({ kind: 'local', name: STUB, command: `git branch -d ${STUB}` })
+  })
+
+  it('an ordinary merged feature branch is unaffected by the carve-out', () => {
+    const r = withTree({ localMerged: [{ name: 'feat/12-done', ...STALE }] })
+    expect(r.block).toBe(true)
+    expect(r.findings.map((f) => f.name)).toEqual(['feat/12-done'])
+  })
+
+  it('the remote twin of a stub is exempt while the tree stands, and reported once it is gone', () => {
+    const held = withTree({ remoteMerged: [{ name: `origin/${STUB}`, ...STALE }] })
+    expect(held.findings).toEqual([])
+
+    const gone = assessBranchHygiene({
+      readable: true,
+      now: NOW,
+      repoRoot: ROOT,
+      mainTip: MAIN_TIP,
+      worktrees: [{ path: ROOT, branch: 'refs/heads/main', tipAt: OLD, tipSha: MAIN_TIP }],
+      remoteMerged: [{ name: `origin/${STUB}`, ...STALE }],
+    })
+    expect(gone.findings.map((f) => f.name)).toEqual([`origin/${STUB}`])
+  })
+
+  it('the tree it names is the one that protects it — another agent tree does not', () => {
+    const r = withTree({
+      localMerged: [{ name: 'worktree-agent-someoneelse', ...STALE }],
+    })
+    expect(r.findings.map((f) => f.name)).toEqual(['worktree-agent-someoneelse'])
+  })
+
+  it('a stub still checked out by its own tree stays protected the way it always was', () => {
+    const r = assessBranchHygiene({
+      readable: true,
+      now: NOW,
+      repoRoot: ROOT,
+      mainTip: MAIN_TIP,
+      worktrees: [
+        { path: ROOT, branch: 'refs/heads/main', tipAt: OLD, tipSha: MAIN_TIP },
+        { path: TREE, branch: `refs/heads/${STUB}`, locked: true, ...STALE },
+      ],
+      localMerged: [{ name: STUB, ...STALE }],
+    })
+    expect(r.findings).toEqual([])
+  })
+
+  it('stubBranchTree names the tree, and nothing else', () => {
+    expect(stubBranchTree(STUB)).toBe(ID)
+    expect(stubBranchTree(`refs/heads/${STUB}`)).toBe(ID)
+    expect(stubBranchTree(`origin/${STUB}`)).toBe(ID)
+    expect(stubBranchTree('feat/613-worktree-stub')).toBe(null)
+    expect(stubBranchTree('worktree-agent-')).toBe(null)
+    expect(stubBranchTree('main')).toBe(null)
+    expect(stubBranchTree(null)).toBe(null)
   })
 })
