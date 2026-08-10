@@ -189,6 +189,25 @@ there exactly once; a new point joins a bundle when appended.
   Vitest for its pure parts (the kill-moment plan, the verdict assembly). A drill that cannot
   produce a verdict FAILS rather than passing quietly.
 
+- [ ] 613. THE BRANCH HYGIENE REPORTS A WORKING AGENT'S WORKTREE AS DEBRIS (10.08.2026;
+  bundle Modell & Wächter). With three delegated agents building in their worktrees,
+  `branch-hygiene-guard` listed their `worktree-agent-<id>` branches as "already contained
+  in origin/main" and demanded `git branch -d` on each. Both halves are wrong: the branch is
+  CHECKED OUT in a live worktree, so git refuses the delete anyway — the guard demands an
+  action that cannot be performed — and had it succeeded it would have destroyed running
+  agent work. The "contained in main" reading is harmless in origin: a fresh agent worktree
+  sits on the main commit until the agent's first commit, which is exactly the start of
+  every delegation, so this fires on every parallel turn.
+  FINAL STATE: the guard skips any branch that is checked out in a worktree
+  (`git worktree list --porcelain` is the source), and additionally any worktree named by
+  the session's live in-flight declaration (`batch-in-flight.mjs`). Nothing else about its
+  verdict changes — a merged, unused feature branch is still debris and still blocks.
+  VERIFIABLE: pure Vitest on the verdict core — a contained branch checked out in a worktree
+  yields no finding; the same branch with no worktree still does; a declared worktree is
+  skipped; an undeclared, unchecked-out leftover is unaffected.
+  Criticality: medium — it does not corrupt anything, but it blocks the turn end of every
+  delegating session with an instruction that would be destructive if it worked.
+
 - [ ] 592. STOP PAYING FOR THE WAIT (point 572's measure 1, the largest measured lever).
   A long-running command is AWAITED, not polled. The verify wrapper and every background
   run report their completion through the harness notification or through a single
