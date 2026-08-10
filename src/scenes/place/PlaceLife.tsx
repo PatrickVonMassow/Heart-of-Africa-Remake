@@ -1047,6 +1047,12 @@ function talkerAim(
  * The dev hook below still drives the pair's arms directly — it is the rig the
  * headless verification poses the four gestures on (point 479), and it never
  * runs outside a dev build.
+ *
+ * OPEN: design.md §19.10 still lists this vignette as "pairs stand together in
+ * conversation, GESTURING", which point 580's rule contradicts for a pair that
+ * says nothing. design.md is not changed unilaterally, so the wording is left to
+ * the user's decision: either it drops the gesturing here, or the pair is given
+ * real utterances and gestures again behind the hearing gate.
  */
 function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   const a = useRef<THREE.Group>(null)
