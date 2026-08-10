@@ -437,14 +437,32 @@ if (batchParked) {
 // Bounded by a timeout and wrapped fail-open on top, because the launcher's job
 // is bringing the batch back and a board check may never be a reason it does not.
 try {
-  const out = execFileSync(process.execPath, [R('board-watchdog.mjs'), '--last-key', state.boardWatchKey ?? ''], {
-    windowsHide: true,
-    cwd: REPO,
-    encoding: 'utf8',
-    timeout: 60000,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
+  const out = execFileSync(
+    process.execPath,
+    [
+      R('board-watchdog.mjs'),
+      '--last-key',
+      state.boardWatchKey ?? '',
+      // THE CONSECUTIVE-FAILURE COUNT lives here, between ticks (point 562): the
+      // child is a fresh process every quarter of an hour and can hold no memory
+      // of its own, and only consecutive failures may escalate — one success
+      // anywhere resets it to zero.
+      '--streak',
+      String(state.boardProbeStreak ?? 0),
+    ],
+    {
+      windowsHide: true,
+      cwd: REPO,
+      encoding: 'utf8',
+      // Two probes of two attempts with a brief pause between them (point 562)
+      // fit far inside this; the child bounds every attempt at 15 s itself.
+      timeout: 90000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  )
   const r = JSON.parse(out.trim().split('\n').filter(Boolean).pop())
+  state.boardProbeStreak = Number(r.streak) || 0
+  if (r.rescued) log('board: a probe failed and its immediate retry succeeded — a flicker, not a fault')
   if (r.verdict !== 'current') log(`board: ${r.verdict}${r.reason ? ` — ${r.reason}` : ''} (${BOARD_PAGE_URL})`)
   if (r.notified) {
     log(`BOARD ALERT: ${r.message}`)
