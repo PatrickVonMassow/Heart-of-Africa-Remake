@@ -5480,3 +5480,26 @@ to land than a mechanism that needs a review.
   that kills the launcher and asserts the next session re-arms it.
   Criticality: high for unattended operation — each of the three has already cost more
   standing-still time than the failure 612 repairs.
+
+- [ ] 617. AN OWNER THAT WORKS ONCE AND THEN IDLES STILL HOLDS THE BATCH FOR AN HOUR
+  (four-eyes finding on point 612, 10.08.2026, recorded with its merge verdict). Point 612
+  binds ownership to work, but its idle window only reaches a session that has completed
+  NO call since taking the lock (`workedSinceClaim === false`). That restriction is right
+  as far as it goes — the literal rule would dispossess a session in the middle of a
+  30–40-minute regression, and each dispossession spawns a successor beside a working
+  owner, which is the 24.07.2026 double-spawn as an everyday event. What it leaves open is
+  the point's own sentence, "it either works or it releases": an owner that completes one
+  call and then goes quiet keeps the batch for the full lease.
+  FINAL STATE: idleness is decided by two facts instead of one — silence longer than the
+  window AND no call in flight. The second needs its own stamp: `leaseUntil` cannot serve,
+  because a declared wait extends it by up to four hours, so a renewal timestamp is written
+  where the call actually renews and the idle verdict reads THAT. A session inside a long
+  call is never dispossessed; a session that finished its last call and went quiet is, at
+  the window. The decision stays in the one ownership function point 612 built, so no
+  second arithmetic can disagree with it.
+  VERIFIABLE: pure Vitest — a long call in flight holds the lock past the window; the same
+  session with the call finished loses it at the window; a declared wait still holds; the
+  boundary cases exactly at the window; and the renewal stamp is written by the real hook
+  path, not only by the test.
+  Criticality: high — it is the batch's ownership arithmetic, and getting it wrong either
+  strands the queue or produces two live owners.
