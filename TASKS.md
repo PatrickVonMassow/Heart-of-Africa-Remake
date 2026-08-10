@@ -70,36 +70,6 @@ there exactly once; a new point joins a bundle when appended.
 
 ## Checklist
 
-- [ ] 585. THE LEARNING BOULDER FLOATS IN THE RIVER (user 09.08.2026, F6 report
-  `local/bugreports/SchwebenderFindling.zip`: "Ist das der Findling zum Lernen? Der
-  schwebt in der Luft über der Wasseroberfläche"; seed 1425108822, Bambara village,
-  x/z -60.55 / -130.01). The frame shows a single dark boulder standing OUT IN THE WATER,
-  its underside clear of the surface — on no ground at all.
-  FIRST, IDENTIFY WHICH BOULDER IT IS, because the two have different rules and the answer
-  decides the fix: point 482 item 7 puts a SMALL boulder INSIDE the village, visible from
-  it, and BIG_ROCK is taught on that one; item 6 puts the LARGE target erratic OUTSIDE the
-  settlement, on the Niger's bank at least 1.6° upstream (`src/world/communicationRock.ts`).
-  Neither may stand in the river, and the report is inside the settlement, so the small one
-  is the first suspect — but the seeded placement of the large one must be checked at this
-  seed as well before either is called innocent.
-  ROOT CAUSE TO ESTABLISH, not to guess: the placement samples the terrain
-  (`sampleTerrain`/`isBlocked`) and a boulder both IN the water and ABOVE it means the
-  ground query and the drawn surface disagree — the same class the project already wrote a
-  rule for (points 129/378: derive from what the picture draws). Report which of the two
-  queries was wrong.
-  FINAL STATE:
-  1. Neither boulder is ever placed in water. The placement REJECTS a wet spot instead of
-     accepting it, at every seed.
-  2. Every boulder SITS on the ground it is placed on — its base meets the drawn surface,
-     with no gap and no sinking, at the exact coordinate the digging spot uses.
-  3. The teaching pair still reads as the point intends: the small one visible from inside
-     the village, the large one unmistakably bigger and further away upstream.
-  VERIFIABLE: pure Vitest over MANY seeds — no boulder lands on water, and each one's base
-  height equals the terrain height at its own coordinate within a tight tolerance. Then a
-  picture at the reported seed on one backend: the boulder stands on ground.
-  Criticality: HIGH — the goal of the whole communication PoC is dug up at this boulder,
-  and a rock floating in a river teaches the player that the world is not to be trusted.
-
 - [ ] 509. NO INHABITANT STANDS ON THE SETTLEMENT ORIGIN (observed 05.08.2026 while
   verifying another point, bundle Dorfleben). In `maasai-village` several
   `inhabitant` groups report the world position exactly `(0,0,0)`. A ray probe finds
