@@ -11,9 +11,20 @@
 //
 // So the queue becomes a PROJECTION, not a document:
 //
-//     TASKS.md (which points are open)  +  board-queue.json (prose and order)
+//     TASKS.md (which points are open, and in which order)  +  board-queue.json
+//     (title, body and estimate per point)
 //                              ↓  buildQueueSection
 //                        the Warteschlange HTML
+//
+// THE ORDER IS THE WORK ORDER'S, AND IS STORED NOWHERE (point 608, 10.08.2026).
+// Until then the data file carried its own `order` list, and the two drifted: on
+// 10.08.2026 the work order was re-sequenced TWICE — four points pushed behind
+// 602, five throughput levers pulled to the head — the board was rebuilt and
+// republished both times, and it kept showing the old sequence, because the
+// generator read that stored list. The user found it before any check did; the
+// board is the one surface he steers the batch by. One fact, one home: the
+// sequence of open points in TASKS.md IS the queue order, and the data file
+// keeps only what is genuinely its own — title, body, estimate.
 //
 // TWO WRITERS ON ONE HTML IS THE TRAP. A generator that re-adds a card for a
 // point already promoted to the now-section trips the double-listing invariant
@@ -40,7 +51,6 @@ import {
   TRANSLITERATION_STEMS,
 } from './dashboard-guard-core.mjs'
 import { normaliseLineEndings } from './board-core.mjs'
-import { FINDER_POINTS } from './queue-order-guard-core.mjs'
 import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
 
@@ -49,8 +59,34 @@ import { gateSets } from './user-gate-core.mjs'
 // gated meta (point 450) travels the same way.
 export { QUEUE_GATED_META, QUEUE_STUB_BODY, QUEUE_STUB_META }
 
-/** Where the queue's prose and order live (git-ignored, like the board itself). */
+/** Where the queue's prose lives (git-ignored, like the board itself). */
 export const QUEUE_DATA_PATH = '.claude/board-queue.json'
+
+/** Rebuild the Warteschlange from the work order — the remedy for any drift. */
+export const QUEUE_REBUILD_CMD = 'node scripts/board-queue.mjs'
+
+/**
+ * The bug-FINDING / QA-framework point numbers; every other open point is a fix.
+ *
+ * They live HERE, with the ranking that uses them (point 608). They were the
+ * queue-order guard's until the guard had to compare the rendered sequence
+ * against the derived one — that made the guard a consumer of `queueOrder`, and
+ * a constant owned by the consumer would have closed an import cycle. The guard
+ * re-exports both, so every caller that named them there still finds them.
+ *
+ * 181 is a concrete WebGPU BUG (a fix), not a finder — it is intentionally NOT
+ * here, so it may sit among the fixes ahead of the finder/closing block. 200
+ * (verify-script robustness) and 285 (leak/accumulation hunt) are QA-framework
+ * finders too and belong in this block (added 24.07.2026, user queue-order call).
+ */
+export const FINDER_POINTS = new Set([184, 200, 203, 204, 205, 207, 285])
+
+/** The release tag point. It keeps the POSITION the work order gives it (user
+ *  10.08.2026: v0.3 ships once the communication mechanic and the critical bugs
+ *  are done — the feature work and the audits follow it, they do not gate it), and
+ *  it stays exempt from the fixes-before-finders rule, which orders the work that
+ *  comes BEFORE the release. */
+export const RELEASE_TAG_POINT = 174
 
 /** The command that gives a card a German title — named by every report below. */
 export const TITLE_CMD = 'node scripts/board-queue.mjs set <N> --title --text-stdin'
@@ -227,11 +263,9 @@ export function paragraphs(value) {
  */
 export function normaliseQueueData(raw) {
   const src = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
-  const order = []
-  for (const n of Array.isArray(src.order) ? src.order : []) {
-    const v = Number(n)
-    if (Number.isInteger(v) && v > 0 && !order.includes(v)) order.push(v)
-  }
+  // A stored `order` from before point 608 is DROPPED here rather than migrated:
+  // the work order is the sequence now, so keeping the list would only give a
+  // second home to a fact that has one. The next write leaves it out of the file.
   const points = {}
   const entries = src.points && typeof src.points === 'object' ? src.points : {}
   for (const [key, value] of Object.entries(entries)) {
@@ -240,42 +274,38 @@ export function normaliseQueueData(raw) {
     const str = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null)
     points[n] = { title: str(value.title), body: paragraphs(value.body), estimate: str(value.estimate) }
   }
-  return { order, points }
+  return { points }
 }
 
 /**
- * The order the cards are rendered in.
+ * The order the cards are rendered in — DERIVED from the work order (point 608).
  *
- * Three rules, applied in this order:
- *   1. points the data lists explicitly keep that order (the queue order is a
- *      judgment, and the work order's numbering is not it);
- *   2. anything unlisted is APPENDED, ascending — a new point joins at the end,
- *      which is where the append-and-defer rule puts it anyway;
- *   3. the bug-FINDING / QA points, and the release tag last of all, are moved
- *      to the BACK. That rule (memory queue-order-fixes-before-finders) is
- *      enforced by queue-order-guard at turn end; satisfying it by CONSTRUCTION
- *      means a newly appended fix can never trip it.
- *   4. the USER GATE (point 450), at both ends: a point ANSWERED by the user
+ * `open` is the sequence of open points as TASKS.md lists them, read through
+ * `scripts/tasks-source.mjs`; that sequence IS the plan, and re-sequencing the
+ * work order is how the plan is changed. Nothing here stores a second one.
+ *
+ * The rank rules stay exactly what they were — they are a VIEW on that order,
+ * not a competing order, and each is stable, so two points of equal rank keep
+ * the work order's sequence between them:
+ *   1. the bug-FINDING / QA points sink to the BACK. That rule (memory
+ *      queue-order-fixes-before-finders) is enforced by queue-order-guard at
+ *      turn end; satisfying it by CONSTRUCTION means a newly appended fix can
+ *      never trip it. The release tag is NOT sunk (user 10.08.2026): it sits
+ *      where the work order puts it, right behind the work that gates it.
+ *   2. the USER GATE (point 450), at both ends: a point ANSWERED by the user
  *      goes to the very HEAD — it waited on him, so it does not queue behind
  *      work appended while it waited — and a point still WAITING on him goes
  *      behind everything, because it cannot be worked at all. That is the whole
  *      "vacation mode": a fortnight of silence moves the gated cards out of the
  *      way instead of jamming the queue at its head.
  */
-export function queueOrder(open, data, gates) {
-  const { order } = normaliseQueueData(data)
+export function queueOrder(open, gates) {
   const { gated, answered } = normaliseGates(gates)
   const wanted = (Array.isArray(open) ? open : []).map(Number).filter((n) => Number.isInteger(n) && n > 0)
-  const set = new Set(wanted)
-  const listed = order.filter((n) => set.has(n))
-  const unlisted = wanted.filter((n) => !listed.includes(n)).sort((a, b) => a - b)
-  const all = [...new Set([...listed, ...unlisted])]
+  const all = [...new Set(wanted)]
   const rank = (n) => {
     if (gated.has(n)) return 3
     if (answered.has(n)) return -1
-    // The release tag is NOT pushed to the back any more (user 10.08.2026): it
-    // sits where the work order puts it, right behind the work that gates it.
-    // The finder/audit block still sinks — that block is post-release work.
     return FINDER_POINTS.has(n) ? 1 : 0
   }
   return all
@@ -328,7 +358,7 @@ export function queueEntries({ open = [], data = null, exclude = [], titles = {}
   const g = normaliseGates(gates)
   const skip = new Set((Array.isArray(exclude) ? exclude : [...exclude]).map(Number))
   const out = []
-  for (const point of queueOrder(open, data, g)) {
+  for (const point of queueOrder(open, g)) {
     if (skip.has(point)) continue
     const entry = points[point] ?? { title: null, body: null, estimate: null }
     const stub = !entry.body
@@ -539,9 +569,8 @@ export function importQueueFromHtml(html) {
     const { from, end } = queueSectionBounds(doc)
     section = doc.slice(from, end)
   } catch {
-    return { order: [], points: {} }
+    return { points: {} }
   }
-  const order = []
   const points = {}
   for (const chunk of section.split(/<details\b/).slice(1)) {
     const summary = (chunk.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
@@ -554,7 +583,9 @@ export function importQueueFromHtml(html) {
     const paras = [...bodyHtml.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map((m) => cardText(m[1])).filter(Boolean)
     // A card with no <p> at all (a hand-written board) still yields its text.
     const body = paras.length ? paras : [cardText(bodyHtml)].filter(Boolean)
-    if (!order.includes(point)) order.push(point)
+    // THE CARD SEQUENCE IS NOT IMPORTED (point 608): the board's order is a
+    // rendering of the work order, so reading it back would only re-create the
+    // second home this point removed.
     // THE GATED META IS NOT AN ESTIMATE (point 450). Importing it would store
     // "wartet auf deine Entscheidung" as the point's duration, and one rebuild
     // later the card would carry that string for ever — even after the answer.
@@ -573,7 +604,7 @@ export function importQueueFromHtml(html) {
       estimate: metaRaw.trim() && metaRaw.trim() !== QUEUE_STUB_META && !isGated ? metaRaw.trim() : null,
     }
   }
-  return { order, points }
+  return { points }
 }
 
 /**
@@ -615,8 +646,8 @@ export function parseQueueDataFile(text, { path = QUEUE_DATA_PATH } = {}) {
  *
  * So the merge is strictly additive: a point the data already knows keeps every
  * field it stores, and only a field it has NOTHING for is filled from the board.
- * A point the data does not know yet is taken over whole. The stored order wins;
- * points only the board knows are appended behind it.
+ * A point the data does not know yet is taken over whole. No sequence is merged
+ * — since point 608 the work order alone decides it.
  */
 export function mergeQueueImport(existing, imported, { titles = {} } = {}) {
   const base = normaliseQueueData(existing)
@@ -645,9 +676,7 @@ export function mergeQueueImport(existing, imported, { titles = {} } = {}) {
       estimate: prev.estimate ?? entry.estimate,
     }
   }
-  const order = [...base.order]
-  for (const n of add.order) if (!order.includes(n)) order.push(n)
-  return { data: { order, points }, added: added.sort((a, b) => a - b), kept: Object.keys(base.points).length }
+  return { data: { points }, added: added.sort((a, b) => a - b), kept: Object.keys(base.points).length }
 }
 
 /**
@@ -683,11 +712,10 @@ export function setQueueEntry(data, point, { title, body, estimate } = {}) {
   assertNotFlagValue(title, 'title')
   assertNotFlagValue(Array.isArray(body) ? body[0] : body, 'body')
   assertNotFlagValue(estimate, 'estimate')
-  const { order, points } = normaliseQueueData(data)
+  const { points } = normaliseQueueData(data)
   const prev = points[n] ?? { title: null, body: null, estimate: null }
   const pick = (next, old) => (typeof next === 'string' && next.trim() ? next.trim() : old)
   return {
-    order: order.includes(n) ? order : [...order, n],
     points: {
       ...points,
       [n]: { title: pick(title, prev.title), body: pick(body, prev.body), estimate: pick(estimate, prev.estimate) },
