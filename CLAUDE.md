@@ -220,11 +220,11 @@ coverage map live in `scripts/verify/README.md`.
     (`readTasksAll`). The split is enforced by `tasks-archive-guard` — a tick left
     in place, an open point stranded in the archive, or a point present in both
     files blocks the turn end.
-  - **The landing is ONE command.** `node scripts/land-point.mjs <N>` drives merge
-    (`--no-ff` always), fast gate, tick, archive move, board publish and worktree
-    cleanup — one verdict per step. It STOPS at the first red, leaves no half state
-    and bypasses no guard. That gate stays mandatory after EVERY merge: two points
-    that auto-merge cleanly can still break together.
+  - **The landing is ONE command.** `node scripts/land-point.mjs <N> --model <m>`
+    drives merge (`--no-ff`), fast gate, tick, archive move, the tick COMMIT and the
+    push of main, board publish and worktree cleanup — one verdict per step. It
+    STOPS at the first red, leaves no half state and bypasses no guard. The gate is
+    mandatory after EVERY merge — clean auto-merges still break together.
   - Keep branches SHORT. If `main` moved substantially, merge `main` INTO the
     branch before the final verify, and run that verify on the synced state, so
     what is verified is what lands.
@@ -621,8 +621,8 @@ After completion and after every major system:
 
 - Run `npm run build` and confirm it passes without errors.
 - Run `npm run lint` always, and `node scripts/audit-check.mjs` whenever the
-  lockfile moved (nothing else moves the tree it reads); both clean — zero lint
-  errors/warnings, zero vulnerabilities — per §7.1 point 18.
+  lockfile moved (nothing else moves the tree it reads); both clean, per §7.1
+  point 18.
 - Run `npm run test:unit` (the fast Vitest layer) and confirm it is green;
   add or extend a test there for the changed logic/store/HUD when applicable.
 - Start the dev server and verify via headless screenshot (e.g. Playwright)

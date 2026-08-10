@@ -7,6 +7,7 @@
 // happen — rather than towards the happy chain, which is the cheap half.
 import { describe, it, expect } from 'vitest'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
+import { evaluateCommitTrailers } from './model-guard-core.mjs'
 import {
   AUDIT_TRIGGER_FILES,
   GATE_COMMANDS,
@@ -27,19 +28,32 @@ import {
   resolveBranch,
   stepLabel,
   tickAndArchive,
+  tickCommitMessage,
   transitionAccepted,
   worktreesForBranch,
 } from './land-point-core.mjs'
 
 // ---------------------------------------------------------------------------
 describe('the chain itself', () => {
-  it('runs the six steps in the order the guards need', () => {
+  it('runs the seven steps in the order the guards need', () => {
     // The gate is AFTER the merge (two points that auto-merge cleanly can still
     // break together) and the cleanup is LAST (a branch deleted before the tick
     // is one nobody can go back to when the tick fails).
-    expect(STEP_IDS).toEqual(['merge', 'gate', 'tick', 'archive', 'board', 'cleanup'])
+    expect(STEP_IDS).toEqual(['merge', 'gate', 'tick', 'archive', 'push', 'board', 'cleanup'])
     expect(STEP_IDS.indexOf('gate')).toBeGreaterThan(STEP_IDS.indexOf('merge'))
     expect(STEP_IDS.indexOf('cleanup')).toBe(STEP_IDS.length - 1)
+  })
+
+  it('makes the work DURABLE before it deletes anything', () => {
+    // THE HALF STATE THAT LOSES WORK. Between the merge and the push, the merge
+    // commit exists only in local main and the tick only as an uncommitted file
+    // edit. Deleting the remote branch in that window removes the last remote
+    // copy of the work, batch-boundary cannot see a tick that is not in
+    // `git log main -- TASKS.md docs/tasks-archive.md`, and a stray
+    // `git checkout TASKS.md` erases it. So: push before cleanup, always.
+    expect(STEP_IDS.indexOf('push')).toBeGreaterThan(STEP_IDS.indexOf('tick'))
+    expect(STEP_IDS.indexOf('push')).toBeGreaterThan(STEP_IDS.indexOf('archive'))
+    expect(STEP_IDS.indexOf('push')).toBeLessThan(STEP_IDS.indexOf('cleanup'))
   })
 
   it('never fast-forwards', () => {
@@ -56,6 +70,41 @@ describe('the chain itself', () => {
 })
 
 // ---------------------------------------------------------------------------
+describe('the tick commit message', () => {
+  it('carries a co-author trailer naming the model it was given', () => {
+    const msg = tickCommitMessage({ number: 594, model: 'Claude Opus 5' })
+    expect(msg).toMatch(/^Co-Authored-By: Claude Opus 5 <noreply@anthropic\.com>$/m)
+    expect(evaluateCommitTrailers(msg).block).toBe(false)
+  })
+
+  it('REFUSES to invent a model when none is given', () => {
+    // The trailer is model-guard's only machine-readable evidence of who authored
+    // a commit. A script that filled in a plausible name would defeat exactly the
+    // tripwire that caught three defective deliveries on 24.07.2026.
+    for (const model of [undefined, null, '', '   ']) {
+      expect(() => tickCommitMessage({ number: 594, model })).toThrow(LandingError)
+      expect(() => tickCommitMessage({ number: 594, model })).toThrow(/no authoring model/)
+    }
+  })
+
+  it('produces a message the model gate REJECTS for a forbidden model', () => {
+    // The wrapper checks this before the merge, so a wrong --model costs nothing.
+    expect(evaluateCommitTrailers(tickCommitMessage({ number: 1, model: 'Claude Haiku 4.5' })).block).toBe(true)
+    expect(evaluateCommitTrailers(tickCommitMessage({ number: 1, model: 'Claude Sonnet 5' })).block).toBe(true)
+  })
+
+  it('accepts every model the policy allows', () => {
+    for (const m of ['Claude Opus 5', 'Claude Fable 5', 'Claude Opus 4.8']) {
+      expect(evaluateCommitTrailers(tickCommitMessage({ number: 1, model: m })).block).toBe(false)
+    }
+  })
+
+  it('names no point number in the subject, per the commit convention', () => {
+    const subject = tickCommitMessage({ number: 594, model: 'Claude Opus 5' }).split('\n')[0]
+    expect(subject).not.toMatch(/594|\bPoint\b/)
+  })
+})
+
 describe('resolveBranch', () => {
   const branches = ['main', 'feat/59-old', 'feat/594-landing-command', 'feat/5940-nope']
 

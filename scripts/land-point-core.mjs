@@ -45,16 +45,27 @@ export class LandingError extends Error {
 // ── The steps ────────────────────────────────────────────────────────────────
 
 /**
- * The chain, in order. Order is load-bearing twice over: the gate runs AFTER the
- * merge because two points that auto-merge cleanly can still break together
- * (CLAUDE.md §6), and the worktree cleanup runs LAST because a branch deleted
- * before the tick is a branch nobody can go back to when the tick fails.
+ * The chain, in order. Every adjacency here is load-bearing:
+ *
+ *   - the GATE runs after the MERGE, because two points that auto-merge cleanly
+ *     can still break together (CLAUDE.md §6);
+ *   - the PUSH runs after the tick and BEFORE the cleanup, and that ordering is
+ *     what keeps the chain from losing work. Until the tick is committed and main
+ *     is pushed, the merge commit exists only in a local branch and the tick only
+ *     as an uncommitted file edit: a machine loss in that window loses the point
+ *     outright, `scripts/batch-boundary.mjs` cannot see a tick that is not in
+ *     `git log main -- TASKS.md docs/tasks-archive.md`, and a stray
+ *     `git checkout TASKS.md` erases it. Deleting the remote branch before that
+ *     push would remove the last remote copy of the work as well;
+ *   - the CLEANUP runs LAST, because a branch deleted before the tick is a branch
+ *     nobody can go back to when the tick fails.
  */
 export const LANDING_STEPS = Object.freeze([
   { id: 'merge', label: 'merge the branch into main (--no-ff)' },
   { id: 'gate', label: 'fast gate (build, lint, unit; audit on a lockfile change)' },
   { id: 'tick', label: 'tick the point in the work order' },
   { id: 'archive', label: 'move the block into docs/tasks-archive.md' },
+  { id: 'push', label: 'commit the tick and push main' },
   { id: 'board', label: 'publish the board' },
   { id: 'cleanup', label: 'delete branch, remote branch and worktree' },
 ])
@@ -81,6 +92,42 @@ export const VERDICT = Object.freeze({
  * merge is mandatory either way, so nothing is traded away for it.
  */
 export const MERGE_ARGS = Object.freeze(['merge', '--no-ff', '--no-edit'])
+
+// ── The commit that makes the tick durable ───────────────────────────────────
+
+/**
+ * The message for the tick commit, trailer included.
+ *
+ * THE MODEL CANNOT BE GUESSED, so it is demanded. That trailer is the only
+ * machine-readable evidence `scripts/model-guard.mjs` has of which model authored
+ * a commit, and a script that filled in a plausible name would defeat exactly the
+ * tripwire that caught three defective deliveries on 24.07.2026. The landing
+ * session knows its own model and nothing else in the repository does, so it
+ * passes `--model`; an absent or unparseable one fails the chain BEFORE the merge
+ * rather than after it.
+ *
+ * The subject describes the CHANGE and names no point number, per the project's
+ * commit convention; the point is identified in the body, where the work order
+ * itself already carries it.
+ */
+export function tickCommitMessage({ number, model } = {}) {
+  const name = String(model ?? '').trim()
+  if (!name) {
+    throw new LandingError('no authoring model given for the tick commit', {
+      step: 'push',
+      repair: 'pass --model "Claude Opus 5" (the model running this landing) — the trailer is model-guard\'s only evidence',
+    })
+  }
+  return [
+    'Move the finished point out of the open work order',
+    '',
+    `Point ${number} is verified and merged; its block moves verbatim into`,
+    'docs/tasks-archive.md so TASKS.md keeps only the open work.',
+    '',
+    `Co-Authored-By: ${name} <noreply@anthropic.com>`,
+    '',
+  ].join('\n')
+}
 
 // ── Which branch, and which worktree ─────────────────────────────────────────
 
@@ -362,6 +409,7 @@ export function planLanding({ number, branch, audit, board, gate, worktrees = []
     : 'build, lint, unit'
   at('tick').reason = `point ${number}`
   at('archive').reason = 'docs/tasks-archive.md'
+  at('push').reason = 'commit the tick, push main — nothing may be deleted before this'
 
   const b = at('board')
   b.run = board?.run !== false

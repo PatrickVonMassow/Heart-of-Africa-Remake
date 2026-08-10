@@ -1,13 +1,20 @@
 // LAND A FINISHED POINT — the whole chain, one command (point 594).
 //
-//   node scripts/land-point.mjs 594            land it
+//   node scripts/land-point.mjs 594 --model "Claude Opus 5"   land it
 //   node scripts/land-point.mjs 594 --dry      print the plan, touch nothing
 //   node scripts/land-point.mjs 594 --serial   force the gate serial
 //   node scripts/land-point.mjs 594 --branch feat/594-x   name the branch yourself
 //
 // It runs on `main`, in the MAIN tree, and it does what CLAUDE.md §6 already
-// demands by hand: merge (--no-ff), fast gate, tick, archive move, board publish,
-// worktree cleanup — printing ONE summary with a verdict per step.
+// demands by hand: merge (--no-ff), fast gate, tick, archive move, COMMIT AND
+// PUSH MAIN, board publish, worktree cleanup — printing ONE summary with a
+// verdict per step.
+//
+// `--model` names the model running the landing, and is required for any real
+// run: the tick commit's co-author trailer is model-guard's only evidence of who
+// authored it, and nothing in the repository can tell the script which model it
+// is. It is validated against the allowlist BEFORE the merge, so a wrong one
+// costs nothing.
 //
 // EVERY DECISION IS IN scripts/land-point-core.mjs AND PINNED BY VITEST. This
 // file is the I/O half only: git, npm, the two file writes, the two sub-scripts.
@@ -25,6 +32,7 @@ import { isMainModule } from './is-main.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
+import { evaluateCommitTrailers } from './model-guard-core.mjs'
 import {
   GATE_COMMANDS,
   LandingError,
@@ -40,6 +48,7 @@ import {
   planLanding,
   resolveBranch,
   tickAndArchive,
+  tickCommitMessage,
   transitionAccepted,
   worktreesForBranch,
 } from './land-point-core.mjs'
@@ -142,10 +151,36 @@ async function main(argv) {
   const force = args.includes('--serial') ? 'serial' : args.includes('--parallel') ? 'parallel' : null
   const namedBranch = args[args.indexOf('--branch') + 1]
   const branchArg = args.includes('--branch') ? namedBranch : null
+  const model = args.includes('--model') ? args[args.indexOf('--model') + 1] : ''
 
   if (!Number.isInteger(number) || number <= 0) {
-    console.error('usage: node scripts/land-point.mjs <point> [--dry] [--serial|--parallel] [--branch <name>]')
+    console.error(
+      'usage: node scripts/land-point.mjs <point> --model "<authoring model>"\n' +
+        '                                   [--dry] [--serial|--parallel] [--branch <name>]',
+    )
     return 2
+  }
+
+  // THE AUTHORING MODEL, CHECKED BEFORE ANYTHING MOVES. The tick commit carries
+  // it, model-guard reads it, and a landing that discovered the problem after the
+  // merge would have to be unwound. `--dry` is exempt: it commits nothing.
+  if (!dry) {
+    let message = ''
+    try {
+      message = tickCommitMessage({ number, model })
+    } catch (e) {
+      console.error(`land-point: ${e.message}`)
+      if (e.repair) console.error(`  repair: ${e.repair}`)
+      return 2
+    }
+    const trailers = evaluateCommitTrailers(message)
+    if (trailers.block) {
+      console.error(
+        `land-point: --model "${model}" is not an allowed authoring model (CLAUDE.md §6).\n` +
+          '  The chain is Opus 5 -> Fable 5 -> Opus 4.8; name the model actually running this landing.',
+      )
+      return 2
+    }
   }
 
   // WHERE IT MAY RUN. The tick is main-only (CLAUDE.md §6) and the merge target is
@@ -292,7 +327,36 @@ async function main(argv) {
     writeTextAtomic(TASKS, moved.tasks)
     step('tick', VERDICT.ok, `point ${number} ticked and removed from TASKS.md`)
 
-    // 5. BOARD PUBLISH (rider b: skipped when nothing changed).
+    // 5. COMMIT THE TICK AND PUSH MAIN. Until this lands, the merge commit exists
+    // only locally and the tick only as an uncommitted edit — the one window in
+    // which a machine loss loses the point outright, and the reason nothing may
+    // be deleted before it. The push runs the pre-push gate, which re-runs the
+    // full gate on main; that duplication is the price of not bypassing a guard,
+    // and it is what the manual chain paid too.
+    try {
+      git(['add', '--', 'TASKS.md', 'docs/tasks-archive.md'])
+      git(['commit', '-m', tickCommitMessage({ number, model })], { stdio: ['ignore', 'pipe', 'pipe'] })
+    } catch (e) {
+      error = new LandingError('the tick could not be committed', {
+        step: 'push',
+        repair: 'commit TASKS.md + docs/tasks-archive.md by hand and push main — the tick is written but NOT durable',
+      })
+      step('push', VERDICT.failed, `${(e && (e.stderr || e.message)) || e}`.split('\n').slice(-1)[0])
+      throw error
+    }
+    try {
+      git(['push', 'origin', 'main'], { stdio: ['ignore', 'pipe', 'pipe'] })
+      step('push', VERDICT.ok, 'tick committed, main pushed')
+    } catch (e) {
+      error = new LandingError('main could not be pushed', {
+        step: 'push',
+        repair: 'git push origin main — the tick IS committed locally, and the feature branch is still intact',
+      })
+      step('push', VERDICT.failed, `${(e && (e.stderr || e.message)) || e}`.split('\n').slice(-1)[0])
+      throw error
+    }
+
+    // 6. BOARD PUBLISH (rider b: skipped when nothing changed).
     if (board.run) {
       try {
         sh('node', [join('scripts', 'board-publish.mjs')], { stdio: ['ignore', 'pipe', 'pipe'] })
@@ -309,7 +373,7 @@ async function main(argv) {
       step('board', VERDICT.skipped, board.reason)
     }
 
-    // 6. CLEANUP: worktrees first (a tree holding the branch blocks its deletion),
+    // 7. CLEANUP: worktrees first (a tree holding the branch blocks its deletion),
     // then the local branch, then the remote.
     const problems = []
     for (const path of worktrees) {
@@ -351,9 +415,15 @@ async function main(argv) {
   const full = markNotReached({ plan, results })
   console.log(formatLandingVerdict({ number, branch, results: full, error }).join('\n'))
   if (error) console.error(`\nland-point: ${error.message}`)
+  // WHAT IT DID AND DID NOT DO, stated so the reader never has to assume. The
+  // first version of this epilogue listed only the picture verify and the
+  // boundary, which read as "everything else is handled" while the tick was in
+  // fact left uncommitted — the omission was the bug's cover.
   console.log(
-    '\nNOT DONE BY THIS COMMAND: the picture verification on both backends (it belongs\n' +
-      'BEFORE the merge, on the branch), and the point boundary — run\n' +
+    '\nDONE BY THIS COMMAND: the merge, the gate, the tick, the archive move, the tick\n' +
+      'COMMIT and the push of main, the board publish and the branch/worktree cleanup.\n' +
+      'NOT DONE: the picture verification on both backends (it belongs BEFORE the merge,\n' +
+      'on the branch), and the point boundary — run\n' +
       `  node scripts/batch-boundary.mjs ${number}\n` +
       'and end the session.',
   )

@@ -108,9 +108,12 @@ export const RESUME_PROMPT =
   'auf BEIDEN Backends am Bild geprueft); TASKS.md nur auf main abhaken (beim Merge); ' +
   'Querschnitts-Aenderungen (Guards, Docs, Dashboard, Prozessdateien) direkt auf main. DIE LANDUNG IST ' +
   'EIN BEFEHL: steht der Punkt fertig und am Bild verifiziert, fuehrt `node scripts/land-point.mjs ' +
-  '<punkt>` die ganze Kette aus — Merge (--no-ff), Fast-Gate, Abhaken, Archiv-Umzug, Board-Publish, ' +
-  'Worktree-Aufraeumen — und druckt EIN Urteil je Schritt. Sie haelt beim ersten Rot an und laesst ' +
-  'keinen Halbzustand zurueck; `--dry` zeigt den Plan, ohne etwas anzufassen. Danach die Punktgrenze. ' +
+  '<punkt> --model "<dein Modell>"` die ganze Kette aus — Merge (--no-ff), Fast-Gate, Abhaken, ' +
+  'Archiv-Umzug, COMMIT DES ABHAKENS UND PUSH VON MAIN, Board-Publish, Worktree-Aufraeumen — und ' +
+  'druckt EIN Urteil je Schritt. Sie haelt beim ersten Rot an und laesst keinen Halbzustand zurueck; ' +
+  '`--dry` zeigt den Plan, ohne etwas anzufassen. Erst wenn sie GRUEN gemeldet hat — Punkt gemergt, ' +
+  'abgehakt, committet und gepusht — folgt die Punktgrenze; bei Rot wird zuerst der genannte Schritt ' +
+  'repariert. ' +
   'Dashboard-Guard + ' +
   'prep-guard gruen halten, Vorarbeit waehrend jeder Validierung. WARTEN IST SICHTBAR (28.07.2026): ' +
   'waehrend ein delegierter Agent baut, POLLE innerhalb des Zuges (TaskOutput, Branch-Tip, Logdatei) ' +
