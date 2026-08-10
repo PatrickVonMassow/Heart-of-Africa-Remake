@@ -355,6 +355,24 @@ describe('the spoken syllable is a VOICE, measured on the rendered signal (point
     expect(Math.abs(peaksLow[1] - 1090)).toBeLessThan(150)
   })
 
+  // Point 605: the speech default is calibrated against the drums, and that
+  // arithmetic needs the ONE number the node graph does not carry — how much
+  // signal a syllable's own synthesis puts out per unit of envelope peak. The
+  // vowel's three peaking filters (+15/+13/+9 dB) sit BEFORE the envelope, so
+  // the rendered wave is louder than the peak the plan schedules. Measured on
+  // the shipped chain and pinned here; src/systems/ambience.test.ts names the
+  // same number as SYLLABLE_SYNTHESIS_GAIN when it weighs the speech bus
+  // against the drums, and a synthesis change that moves the loudness fails
+  // here instead of quietly re-burying the voices.
+  it('puts out ~2× its scheduled envelope peak — the vowel formants are a gain (point 605)', () => {
+    const peakOf = (buf: Float64Array) => buf.reduce((m, v) => Math.max(m, Math.abs(v)), 0)
+    // MEASURED: 1.99 (low), 2.07 (high) at an envelope peak of 1.
+    for (const [name, buf] of [['low', low], ['high', high]] as const) {
+      expect(peakOf(buf), `${name}: output per unit envelope peak`).toBeGreaterThan(1.7)
+      expect(peakOf(buf), `${name}: output per unit envelope peak`).toBeLessThan(2.4)
+    }
+  })
+
   it('is PITCHED: an estimate over the rendered buffer returns the two carriers', () => {
     expect(pitchHz(low) / carrierLow).toBeGreaterThan(0.92)
     expect(pitchHz(low) / carrierLow).toBeLessThan(1.08)

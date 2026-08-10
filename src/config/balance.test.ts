@@ -190,7 +190,7 @@ describe('village speech (design.md §13.4)', () => {
       labelSeconds: 2.6,
       speechPitchHz: 140,
       speechPitchInterval: 1.68,
-      speechVolume: 0.5,
+      speechVolume: 1.5,
       labelHeadroom: 0.25,
     })
     // A five-syllable atom stays well under two seconds, so a seven-atom
@@ -226,10 +226,15 @@ describe('village speech (design.md §13.4)', () => {
     // The syllables must be audible with NOTHING else configured — the whole
     // communication PoC is learned from them.
     expect(balance.communication.speechVolume).toBeGreaterThan(0)
-    // It is exactly the level the speech had while it still rode the ambient
-    // bus: the fix moved the ROUTING, not the mix. Pinned so a future edit that
-    // makes the speech louder has to say so.
-    expect(balance.communication.speechVolume).toBe(0.5)
+    // Point 605: it inherited 0.5 from the ambient bus, and at 0.5 it sat UNDER
+    // the village drums — the reported "too quiet". The relation that justifies
+    // the value is measured on the live buses in src/systems/ambience.test.ts;
+    // this pins the number, so a future edit has to say what it is doing.
+    expect(balance.communication.speechVolume).toBe(1.5)
+    // It is the ONE level allowed above the drums it must carry through: louder
+    // than "everything else", quieter than the footsteps right at the ear.
+    expect(balance.communication.speechVolume).toBeGreaterThan(balance.ambientVolume)
+    expect(balance.communication.speechVolume).toBeLessThanOrEqual(balance.footstepVolume)
     // …and the three sliders that existed before are untouched (point 577 §3).
     expect(balance.ambienceVolume).toBe(0.1)
     expect(balance.ambientVolume).toBe(0.5)

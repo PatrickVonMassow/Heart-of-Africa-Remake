@@ -199,6 +199,12 @@ function emitMonkey(dest: GainNode) {
   }
 }
 
+/** Envelope peak of the LOUDEST beat of the village drum bed, before its layer
+ *  gain and the ambient bus. Exported because it is the level the village
+ *  speech has to carry through: the mix check measures the speech bus against
+ *  it (point 605). */
+export const DRUM_BEAT_PEAK = 0.9
+
 /** One drum bar: low hits with a lighter off-beat (design.md §19 drums). */
 function emitDrums(dest: GainNode) {
   if (!ctx) return
@@ -208,7 +214,7 @@ function emitDrums(dest: GainNode) {
   pattern.forEach((v, i) => {
     if (v === 0) return
     const t = t0 + i * step
-    envOsc(dest, 'sine', 130, 55, t, 0.22, 0.9 * v)
+    envOsc(dest, 'sine', 130, 55, t, 0.22, DRUM_BEAT_PEAK * v)
     if (v < 1) envOsc(dest, 'triangle', 320, 180, t, 0.08, 0.25)
   })
 }
