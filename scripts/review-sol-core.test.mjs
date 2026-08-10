@@ -13,6 +13,7 @@ import {
   decideReview,
   FALLBACK_MODEL_NAME,
   formatRecordCommand,
+  formatReviewMaterial,
   formatReviewReport,
   isUnknownModelRefusal,
   OUTCOME,
@@ -226,6 +227,34 @@ describe('the recorder accepts the reviewer the rule now prefers (point 624)', (
   })
 })
 
+describe('the material the reviewer is handed', () => {
+  const material = (files, budget) =>
+    formatReviewMaterial({ stat: ' a | 2 +-', patch: 'diff --git a/a b/a', files, budget })
+
+  it('carries the diffstat, the patch and each file with its path', () => {
+    const out = material([{ path: 'scripts/a.mjs', text: 'export const a = 1' }])
+    expect(out).toContain('=== DIFFSTAT ===')
+    expect(out).toContain('diff --git a/a b/a')
+    expect(out).toContain('=== FILE (current content): scripts/a.mjs ===')
+    expect(out).toContain('export const a = 1')
+  })
+
+  it('CUTS VISIBLY rather than quietly, so a review never reports on half a file', () => {
+    const out = material([{ path: 'big.md', text: 'x'.repeat(5000) }], 1500)
+    expect(out).toMatch(/TRUNCATED: \d+ characters not shown/)
+    expect(out.length).toBeLessThan(3000)
+  })
+
+  it('names a file it had no budget left for instead of dropping it silently', () => {
+    const out = material([{ path: 'first.md', text: 'y'.repeat(4000) }, { path: 'second.md', text: 'z' }], 1200)
+    expect(out).toContain('=== FILE OMITTED ENTIRELY (material budget spent): second.md ===')
+  })
+
+  it('is fine with a commit that only deleted files', () => {
+    expect(material([])).toContain('=== PATCH ===')
+  })
+})
+
 describe('the saved login survives what it has to survive', () => {
   it('is kept in the MAIN checkout, not in a worktree that gets deleted', () => {
     expect(savedAuthPathFrom('/workspace/hoa/.git', '/workspace/hoa/.claude/worktrees/agent-1')).toBe(
@@ -259,8 +288,9 @@ describe('the codex command line is the rule, not a preference of the caller', (
 
   it('the prompt puts the artefact before any rationale, and fixes the answer shape', () => {
     const prompt = buildReviewPrompt({ sha: '1234567', brief: 'does the fallback ever invent a verdict?' })
-    expect(prompt).toContain('git show 1234567')
-    expect(prompt.indexOf('git show')).toBeLessThan(prompt.indexOf('WHAT TO JUDGE'))
+    expect(prompt).toContain('COMMIT UNDER REVIEW: 1234567')
+    // The artefact is named before the brief, so the ask cannot anchor the read.
+    expect(prompt.indexOf('MATERIAL IS ATTACHED')).toBeLessThan(prompt.indexOf('WHAT TO JUDGE'))
     expect(prompt).toContain(`VERDICT: <${VERDICTS.join('|')}>`)
     expect(prompt).toMatch(/CONVERGENT review/)
     expect(buildReviewPrompt({ sha: 'abc', brief: 'x', mode: 'blind-parallel' })).toMatch(/DIVERGENT step/)

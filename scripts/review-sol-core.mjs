@@ -163,10 +163,11 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review' } = {}
     'artefact itself and do not assume it is correct.',
     '',
     `COMMIT UNDER REVIEW: ${sha}`,
-    'Read it first, with your own commands, before anything else:',
-    `  git show --stat ${sha}`,
-    `  git show ${sha}`,
-    'Then read the files it touches in their current state, and the tests beside them.',
+    'THE MATERIAL IS ATTACHED BELOW (the diffstat, the full patch, and the current',
+    'content of the files it touches). Judge THAT — this container cannot create user',
+    'namespaces, so a shell command of yours would fail before it ran, and a review',
+    'that only reports it could not look at anything is worth nothing. If a file below',
+    'is marked TRUNCATED, say so in your evidence rather than guessing past the cut.',
     '',
     `WHAT TO JUDGE: ${brief}`,
     '',
@@ -248,6 +249,43 @@ export function decideReview({ outcome = {}, parsed = {} } = {}) {
     kind,
     cause,
   }
+}
+
+/** How much material one review may carry — the patch plus the changed files. */
+export const MATERIAL_BUDGET_CHARS = 120_000
+
+/**
+ * The review MATERIAL, assembled into what codex receives on stdin.
+ *
+ * WHY IT IS FED RATHER THAN FETCHED (measured 10.08.2026): this dev container
+ * cannot create unprivileged user namespaces, so codex's sandbox launcher
+ * (bubblewrap) fails before ANY command of the reviewer's runs — `git show`
+ * included. The first real run came back `do-not-merge` with the evidence "none
+ * of my commands reached the repository", which is an honest answer to a useless
+ * question: a reviewer that cannot see the artefact is not a second pair of
+ * eyes. So the artefact travels WITH the request. The read-only sandbox stays on
+ * regardless, for the machine where the launcher does work.
+ *
+ * The budget is spent in the order that matters — the patch first, then each
+ * changed file — and what does not fit is CUT VISIBLY, because a reviewer that
+ * silently saw half a file would report on the half it saw.
+ */
+export function formatReviewMaterial({ stat = '', patch = '', files = [], budget = MATERIAL_BUDGET_CHARS } = {}) {
+  const out = ['=== DIFFSTAT ===', String(stat).trim(), '', '=== PATCH ===', String(patch).trim(), '']
+  let left = Math.max(0, budget - out.join('\n').length)
+  for (const file of files ?? []) {
+    const text = String(file?.text ?? '')
+    const header = `=== FILE (current content): ${file?.path ?? '?'} ===`
+    if (left <= header.length + 200) {
+      out.push(`=== FILE OMITTED ENTIRELY (material budget spent): ${file?.path ?? '?'} ===`, '')
+      continue
+    }
+    const room = left - header.length - 80
+    const cut = text.length > room
+    out.push(header, cut ? `${text.slice(0, room)}\n… [TRUNCATED: ${text.length - room} characters not shown]` : text, '')
+    left -= header.length + Math.min(text.length, room) + 80
+  }
+  return out.join('\n')
 }
 
 /**

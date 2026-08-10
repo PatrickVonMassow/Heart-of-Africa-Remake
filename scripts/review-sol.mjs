@@ -13,6 +13,11 @@
 // hand: the model id, the reasoning effort and the sandbox are decisions of the
 // rule (CLAUDE.md §6), not of whoever is at the keyboard.
 //
+// The ARTEFACT TRAVELS WITH THE REQUEST — the diffstat, the patch and the
+// current content of every touched file go in on stdin — because this container
+// cannot create user namespaces and codex's sandbox launcher therefore kills
+// every command the reviewer would run (see formatReviewMaterial).
+//
 // WHEN SOL IS NOT AVAILABLE the command says so in ONE line, names the cause,
 // and hands the review to Fable 5 — and the record it prints then carries
 // Fable's name with an EMPTY verdict, so nothing can be recorded as reviewed
@@ -37,6 +42,7 @@ import {
   codexArgs,
   CODEX_BIN,
   decideReview,
+  formatReviewMaterial,
   formatReviewReport,
   isUnknownModelRefusal,
   parseVerdict,
@@ -62,12 +68,39 @@ export const SAVED_AUTH_FILE = savedAuthPathFrom(
   { sep: sep_ },
 )
 
+/** One git read, as text. An empty answer is not fatal — the caller says so. */
+const git = (args) =>
+  (spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024 })
+    .stdout ?? '').trim()
+
+/**
+ * The material one review is given: the diffstat, the patch, and the CURRENT
+ * content of every file the commit touched (see formatReviewMaterial for why it
+ * is fed rather than fetched). A file deleted by the commit simply has no
+ * current content, and is left out rather than reported as empty.
+ */
+function gatherMaterial(sha) {
+  const paths = git(['show', '--pretty=format:', '--name-only', sha]).split('\n').map((p) => p.trim()).filter(Boolean)
+  const files = []
+  for (const path of [...new Set(paths)]) {
+    try {
+      files.push({ path, text: readFileSync(join(REPO_ROOT, path), 'utf8') })
+    } catch {
+      /* deleted or binary — the patch above still shows what happened to it */
+    }
+  }
+  return formatReviewMaterial({ stat: git(['show', '--stat', sha]), patch: git(['show', sha]), files })
+}
+
 /** Run codex once and hand back everything the classifier needs. */
-function runCodex({ prompt, modelId = SOL_MODEL_ID, timeoutMs = REVIEW_TIMEOUT_MS }) {
+function runCodex({ prompt, input = '', modelId = SOL_MODEL_ID, timeoutMs = REVIEW_TIMEOUT_MS }) {
   const outFile = join(tmpdir(), `review-sol-${process.pid}-${Date.now()}.txt`)
   const args = codexArgs({ modelId, effort: SOL_REASONING_EFFORT, cwd: REPO_ROOT, outputFile: outFile, prompt })
   const res = spawnSync(CODEX_BIN, args, {
     encoding: 'utf8',
+    // codex appends piped stdin to the prompt as a <stdin> block; that is how
+    // the artefact reaches a reviewer whose own shell cannot run here.
+    input,
     timeout: timeoutMs,
     windowsHide: true,
     maxBuffer: 32 * 1024 * 1024,
@@ -202,7 +235,9 @@ if (isMainModule(import.meta.url)) {
     console.error(
       `review-sol: asking ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) to review ${full.slice(0, 7)} …`,
     )
-    const run = runCodex({ prompt: buildReviewPrompt({ sha: full, brief, mode }), timeoutMs })
+    const material = gatherMaterial(full)
+    console.error(`  material: ${material.length} characters of diff and file content`)
+    const run = runCodex({ prompt: buildReviewPrompt({ sha: full, brief, mode }), input: material, timeoutMs })
     const outcome = classifyOutcome(run)
     const parsed = outcome.ok ? parseVerdict(run.finalMessage) : { ok: false }
     const decision = decideReview({ outcome, parsed })
