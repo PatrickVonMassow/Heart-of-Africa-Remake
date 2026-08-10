@@ -7,7 +7,7 @@
 // Pure animation, no mechanics.
 
 import { createContext, useContext, useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
 import {
@@ -103,6 +103,7 @@ import {
   type DrumGeometry,
 } from './drummerPose'
 import { childPlayGround, PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations } from './lifeSpots'
+import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
 
 /** Collision radius of inhabitants (matches the player's). */
 const NPC_RADIUS = WALKER_RADIUS
@@ -728,9 +729,12 @@ function Kids({
 
   return (
     <>
-      {game.children.map((_, i) => (
+      {game.children.map((c, i) => (
         <group
           key={i}
+          // Born on its play spot (point 509), not at the settlement origin the
+          // frame callback would only move it off from.
+          position={figureStance(c)}
           ref={(el) => {
             refs.current[i] = el
           }}
@@ -870,9 +874,11 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
   }, [])
   return (
     <>
-      {anchors.map((_, i) => (
+      {anchors.map((a, i) => (
         <group
           key={i}
+          // Born on its grazing spot (point 509).
+          position={figureStance(a)}
           ref={(el) => {
             refs.current[i] = el
           }}
@@ -973,9 +979,11 @@ function Porters({
   })
   return (
     <>
-      {routes.map((_, i) => (
+      {routes.map((r, i) => (
         <group
           key={i}
+          // Born at the end of its route it starts from (point 509).
+          position={figureStance({ x: r.ax, z: r.az })}
           ref={(el) => {
             refs.current[i] = el
           }}
@@ -1379,6 +1387,11 @@ function TaskWalker({
     if (s.mode === 'inside') {
       stand.visible = false
       kneel.visible = false
+      // Both bodies follow the state while it is at home (point 509): neither
+      // may keep the identity transform that would park it at the settlement
+      // origin until its first outing writes one.
+      stand.position.set(s.x, 0, s.z)
+      kneel.position.set(s.x, 0, s.z)
       s.timer -= dt
       if (s.timer <= 0) {
         s.mode = 'go'
@@ -1449,7 +1462,7 @@ function TaskWalker({
 
   return (
     <>
-      <group ref={standing} visible={false}>
+      <group ref={standing} visible={false} position={figureStance(home)}>
         <Figure cloth={cloth} pose={HEAD_CARRY_POSE} />
         {carry === 'bundle' ? (
           <mesh position={[0, 1.42, 0]} castShadow>
@@ -1463,7 +1476,7 @@ function TaskWalker({
           </mesh>
         )}
       </group>
-      <group ref={kneeling} visible={false}>
+      <group ref={kneeling} visible={false} position={figureStance(home)}>
         <Figure cloth={cloth} kneel />
       </group>
     </>
@@ -1604,8 +1617,13 @@ function Walkers({
 
       if (s.mode === 'inside') {
         settleBody(i, s, false)
-        // Invisible while at home; step out through the door when done.
+        // Invisible while at home; step out through the door when done. The
+        // transform follows the state HERE too (point 509): this branch used to
+        // return without writing it, so a walker that had not been out yet kept
+        // the identity transform — a figure standing at the settlement origin
+        // for its whole first stay indoors, and several of them on one spot.
         g.visible = false
+        g.position.set(s.x, 0, s.z)
         s.timer -= dt
         if (s.timer <= 0) {
           const e = errands.length > 0 ? errands[Math.floor(Math.random() * errands.length)] : ([0, 2] as [number, number])
@@ -1717,6 +1735,9 @@ function Walkers({
         <group
           key={i}
           visible={false}
+          // Born inside its own dwelling (point 509) — where it actually is
+          // while it is at home, and never at the settlement origin.
+          position={figureStance(def.home)}
           ref={(el) => {
             refs.current[i] = el
           }}
@@ -2106,9 +2127,11 @@ function ErrandVillagers({
 
   return (
     <>
-      {people.map((_, i) => (
+      {people.map((p, i) => (
         <group
           key={i}
+          // Born on its spawn spot (point 509).
+          position={figureStance(p)}
           ref={(el) => {
             refs.current[i] = el
           }}
@@ -2193,6 +2216,42 @@ function Traders({ seed, cloth }: { seed: number; cloth: string[] }) {
       ))}
     </>
   )
+}
+
+/**
+ * The dev-mode watch of point 509.3: NO inhabitant may stand at a transform no
+ * placement ever wrote. It reads the drawn scene rather than any one vignette's
+ * state, so it catches the next occurrence wherever it is born — a new vignette
+ * that forgets to place its figures is reported by any run, headless or manual,
+ * instead of by a passing observation.
+ *
+ * The world position is what it judges, because the figure group itself always
+ * sits at its parent's origin: the parent IS the placement. Sampled about once
+ * a second — a transform nothing wrote does not heal between frames, and a full
+ * scene traverse per frame would cost the settlement real time.
+ */
+function useUnplacedInhabitantWatch(placeId: string, anchors: readonly PlaceSpot[]): void {
+  const scene = useThree((s) => s.scene)
+  const probe = useMemo(() => new THREE.Vector3(), [])
+  const nextCheck = useRef(0)
+  useFrame(({ clock }) => {
+    if (!import.meta.env.DEV) return
+    if (clock.elapsedTime < nextCheck.current) return
+    nextCheck.current = clock.elapsedTime + 1
+    let unplaced = 0
+    scene.traverse((o) => {
+      if (o.name !== 'inhabitant') return
+      o.getWorldPosition(probe)
+      if (unplacedInhabitant(probe, anchors)) unplaced++
+    })
+    devAssert(
+      unplaced === 0,
+      'inhabitant-unplaced',
+      () =>
+        `${placeId}: ${unplaced} inhabitant(s) stand at the settlement origin — ` +
+        'a transform no placement ever wrote',
+    )
+  })
 }
 
 export function PlaceLife({
@@ -2324,6 +2383,18 @@ export function PlaceLife({
       `${placeId}: the play ground clears the adults by only ${playGround.clearance.toFixed(1)} m ` +
       `(fabric ${playGround.fabric.toFixed(2)}) — the two teaching voices need another means of being told apart`,
   )
+
+  // Every spot this settlement hands out (point 509): what tells an inhabitant
+  // standing at the middle of a village apart from one that was never placed —
+  // a settlement whose own layout puts a figure at its origin is not reported.
+  const placementAnchors = useMemo<PlaceSpot[]>(() => {
+    const out: PlaceSpot[] = homes.map((h) => ({ x: h.x, z: h.z }))
+    for (const [ax, az] of villageAdultStations(firePos)) out.push({ x: ax, z: az })
+    for (const [ex, ez] of errands) out.push({ x: ex, z: ez })
+    for (const [bx, bz] of buildings) out.push({ x: bx, z: bz })
+    return out
+  }, [homes, firePos, errands, buildings])
+  useUnplacedInhabitantWatch(placeId, placementAnchors)
 
   if (kind === 'port') {
     return (
