@@ -266,6 +266,16 @@ export const de: Strings = {
     reopenDrumMessage: 'Die Trommelbotschaft noch einmal lesen',
   },
 
+  speechGuess: {
+    invite: 'Klicken und Bedeutung raten',
+    title: 'Was hat er gemeint?',
+    hint: 'Wofür ich seine Worte halte. Meine eigene Notiz – niemand hier sagt mir, ob sie stimmt.',
+    readingFor: (utterance: string) => `Meine Deutung von ${utterance}`,
+    notePlaceholder: 'Meine Deutung',
+    save: 'Notieren (Enter)',
+    cancel: 'Lassen (Esc)',
+  },
+
   drumMessage: {
     title: 'Die Botschaft des Oberhaupts auf den Trommeln',
     hint: 'Sieben Wörter, eines nach dem anderen. Über jedem steht meine eigene Deutung – ein Klick darauf ändert sie; es ist dieselbe Notiz, die auch mein Buch führt.',

@@ -927,6 +927,12 @@ textarea {
   max-width: 640px;
 }
 
+/* The guess at what one speaker just said (point 588): a single utterance most
+   of the time, so the box stays narrow. */
+.dialog.speech-guess {
+  max-width: 460px;
+}
+
 /* The chief's answer inside the audience (point 487). */
 .dialog .chief-acknowledge {
   margin: 6px 0 2px;
@@ -1472,7 +1478,9 @@ textarea {
    (§17.4). */
 .speech-label {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   padding: 3px 8px;
   border: 1px solid var(--hud-border);
   border-radius: 4px;
@@ -1481,6 +1489,28 @@ textarea {
   white-space: nowrap;
   pointer-events: none;
   transform: translateY(-8px);
+}
+
+/* The atoms of a phrase stand side by side, in the order they are spoken. */
+.speech-label .speech-atoms {
+  display: flex;
+  gap: 8px;
+}
+
+/* The note a click would take (point 588): unmistakably the one in front, so
+   the invitation under it can only be read as being about this speaker. */
+.speech-label.targeted {
+  border-color: #d8b45a;
+  background: rgba(40, 30, 14, 0.86);
+  box-shadow: 0 0 6px rgba(216, 180, 90, 0.45);
+}
+
+/* Spoken to the player, not shouted at him — no text-transform here. */
+.speech-label .speech-invite {
+  margin-top: 1px;
+  font-size: 11px;
+  color: #d8b45a;
+  letter-spacing: 0.3px;
 }
 
 .speech-label .speech-atom {

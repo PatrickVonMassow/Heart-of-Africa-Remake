@@ -181,9 +181,10 @@ describe('template-function callability (de and en behave alike)', () => {
     // village of point 579; the +7 the point-394 arrival set — the port/monument
     // first-visit and return templates with their four titles; the +1 the
     // point-486 drum-message reading label; the +1 the work-order 604 hint that
-    // names the escape key). A drift here means a template was added/removed and
-    // this suite should follow.
-    expect(FUNCTION_PATHS.length).toBe(80)
+    // names the escape key; the +1 the point-588 field label of the guess taken
+    // where the word was spoken). A drift here means a template was added/removed
+    // and this suite should follow.
+    expect(FUNCTION_PATHS.length).toBe(81)
   })
 
   it.each(FUNCTION_PATHS)('%s: renders in both languages (or throws in both)', (path) => {

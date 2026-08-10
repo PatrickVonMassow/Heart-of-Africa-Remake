@@ -184,6 +184,23 @@ export interface Strings {
     reopenDrumMessage: string
   }
 
+  /** Guessing a meaning where it is spoken (design.md §13.4, point 588): the
+   *  invitation under the highlighted speaker's note, and the dialog it opens. */
+  speechGuess: {
+    /** Invitation under the note of the speaker a click would take. Never in
+     *  upper case — it is spoken to the player, not shouted at him. */
+    invite: string
+    title: string
+    /** Line above the fields: the reading is his own and nothing checks it. */
+    hint: string
+    /** Accessible label of one utterance's field, naming its syllables. */
+    readingFor(utterance: string): string
+    /** Placeholder in an empty field. */
+    notePlaceholder: string
+    save: string
+    cancel: string
+  }
+
   /** The chief's drum message and its reopenable display (design.md §13.4,
    *  docs/communication-poc-spec.md, point 486). */
   drumMessage: {

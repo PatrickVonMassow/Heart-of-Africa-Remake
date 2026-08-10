@@ -15,6 +15,7 @@ import { balance } from '../config/balance'
 import { drumMessagePlan } from '../communication/drumMessage'
 import { playDrumMessage } from '../systems/ambience'
 import { DrumMessageDialog, Syllables } from './DrumMessage'
+import { SpeechGuessDialog } from './SpeechGuess'
 import { chiefAcknowledgePhrase } from '../communication/chiefReply'
 import { labelReadings, NO_READING } from '../communication/speechLabel'
 import { useStrings } from '../i18n'
@@ -397,6 +398,7 @@ export function Dialogs() {
   if (!dialog) return null
   if (dialog.kind === 'audience') return <AudienceDialog />
   if (dialog.kind === 'drumMessage') return <DrumMessageDialog />
+  if (dialog.kind === 'speechGuess') return <SpeechGuessDialog atoms={dialog.atoms} />
   if (dialog.kind === 'bazaar') return <BazaarDialog />
   if (dialog.kind === 'agency') return <AgencyDialog />
   if (dialog.kind === 'camp') {
