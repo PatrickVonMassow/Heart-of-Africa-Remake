@@ -326,11 +326,34 @@ export function formatArgErrors(errors = []) {
  * It lives here rather than beside the runner that first needed it because BOTH
  * halves must refuse it: the runner when a model answers that way, and
  * validateRecord when a hand writes the same sentence into the ledger. Kept
- * deliberately narrow — first person about ACCESS — so that an ordinary finding
- * ("the parser could not handle CRLF") is still a review.
+ * deliberately narrow — about ACCESS, not about findings — so that an ordinary
+ * finding ("the parser could not handle CRLF") is still a review.
+ *
+ * It is a SAFETY NET, never a proof: no pattern list catches every way of
+ * saying "I never saw it", and each round of the cross-vendor review found one
+ * more phrasing. What keeps the gate honest is the runner falling back on any
+ * unusable answer at all; this only stops the ones that would otherwise read as
+ * a verdict.
  */
-export const BLIND_REVIEWER =
-  /\b(?:i|we)\s+(?:could\s+not|couldn't|can(?:no|')t|was\s+unable\s+to|were\s+unable\s+to|did\s+not\s+(?:get|receive))\b[^.\n]{0,80}\b(?:read|see|inspect|access|reach|open|review|view|retrieve|fetch)\b|\bno\s+(?:access\s+to|material|patch|diff)\b|\bnone\s+of\s+my\s+commands\b|\b(?:repository|repo|file|material)\s+access\s+(?:failed|denied)\b|\b(?:could\s+not|unable\s+to)\s+(?:be\s+)?(?:read|inspect|access|retrieve)(?:ed)?\s+(?:the\s+)?(?:diff|patch|files?|repository|material|change)\b/i
+export const BLIND_REVIEWER = new RegExp(
+  [
+    // "I could not read/see/access …", "we were unable to inspect …"
+    /\b(?:i|we)\s+(?:could\s+not|couldn't|can(?:no|')t|was\s+unable\s+to|were\s+unable\s+to|did\s+not\s+(?:get|receive|have))\b[^.\n]{0,80}\b(?:read|see|inspect|access|reach|open|review|view|retrieve|fetch)\b/
+      .source,
+    // "no access to the diff", "without access to the files", "had no material"
+    /\b(?:no|without|lacking|denied)\s+access\b/.source,
+    /\bno\s+(?:material|patch|diff)\b/.source,
+    // "none of my commands reached …", "repository access failed"
+    /\bnone\s+of\s+my\s+commands\b/.source,
+    /\b(?:repository|repo|file|material|workspace)\s+access\s+(?:failed|denied|was\s+denied)\b/.source,
+    // "the diff could not be read", "the patch was not supplied/provided"
+    /\b(?:could\s+not|unable\s+to)\s+(?:be\s+)?(?:read|inspect|access|retrieve)(?:ed)?\s+(?:the\s+)?(?:diff|patch|files?|repository|material|change)\b/
+      .source,
+    /\b(?:diff|patch|material|files?)\s+(?:was|were)\s+(?:not\s+(?:supplied|provided|available|accessible)|un(?:available|supplied|provided))\b/
+      .source,
+  ].join('|'),
+  'i',
+)
 
 /** Shortest form a message should print a sha in. */
 const short = (sha) => String(sha ?? '').slice(0, 7)

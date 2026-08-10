@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import { validateRecord, VERDICTS } from './mechanism-review-core.mjs'
 import {
+  addedFilesAreCoveredByPatch,
   buildReviewPrompt,
   classifyOutcome,
   codexArgs,
@@ -188,11 +189,27 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     expect(fallbackReviewerFor('')).toBe(FALLBACK_MODEL_NAME)
   })
 
-  it('looks at EVERY author in the reviewed range, not only the head commit', () => {
-    // One record clears every commit it contains, so a Fable commit under an
-    // Opus head must not be handed to Fable (four-eyes finding, second round).
-    expect(fallbackReviewerFor(['Claude Opus 5', 'Claude Fable 5'])).toBe(SECOND_FALLBACK_MODEL_NAME)
+  it('looks at EVERY author in the reviewed range, and picks one that wrote none of it', () => {
+    // One record clears every commit it contains, so the reviewer must have
+    // authored NO part of the range — picking Opus 5 for an Opus+Fable range
+    // (the second round's fix) is a self-review of half of it (third round).
+    expect(fallbackReviewerFor(['Claude Opus 5', 'Claude Fable 5'])).toBe('Opus 4.8')
     expect(fallbackReviewerFor(['Claude Opus 5', 'Claude Opus 4.8'])).toBe(FALLBACK_MODEL_NAME)
+    expect(fallbackReviewerFor(['Claude Fable 5'])).toBe(SECOND_FALLBACK_MODEL_NAME)
+  })
+
+  it('names NOBODY when every model in the chain authored part of the range', () => {
+    const none = fallbackReviewerFor(['Claude Opus 5', 'Claude Fable 5', 'Claude Opus 4.8'])
+    expect(none).toBe('')
+    const d = decideReview({
+      outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }),
+      parsed: { ok: false },
+      authorModel: ['Claude Opus 5', 'Claude Fable 5', 'Claude Opus 4.8'],
+    })
+    const report = formatReviewReport({ decision: d, sha: 'a'.repeat(40), mode: 'review' })
+    expect(report).toMatch(/cannot be recorded/)
+    // No record command at all: there is nobody to record.
+    expect(report).not.toContain('mechanism-review.mjs --record')
   })
 
   it('tells the operator to hand it to the model the record NAMES', () => {
@@ -365,6 +382,11 @@ describe('a file the patch already carries whole', () => {
     expect(newFilePathsIn('diff --git a/a b/a\nindex 1..2 100644').size).toBe(0)
     expect(newFilePathsIn('').size).toBe(0)
   })
+
+  it('is sent after all once the patch no longer fits, or it would be in neither half', () => {
+    expect(addedFilesAreCoveredByPatch(100, 1000, 0.5)).toBe(true)
+    expect(addedFilesAreCoveredByPatch(900, 1000, 0.5)).toBe(false)
+  })
 })
 
 describe('the model-id probe receipt', () => {
@@ -415,8 +437,11 @@ describe('the codex command line is the rule, not a preference of the caller', (
   it('the prompt puts the artefact before any rationale, and fixes the answer shape', () => {
     const prompt = buildReviewPrompt({ sha: '1234567', brief: 'does the fallback ever invent a verdict?' })
     expect(prompt).toContain('COMMIT UNDER REVIEW: 1234567')
-    // The artefact is named before the brief, so the ask cannot anchor the read.
+    // The material is named, and demanded READ FIRST, before the question — the
+    // transport appends it after the prompt, so the ordering has to be said.
     expect(prompt.indexOf('MATERIAL IS ATTACHED')).toBeLessThan(prompt.indexOf('WHAT TO JUDGE'))
+    expect(prompt).toMatch(/READ IT IN FULL FIRST/)
+    expect(prompt).toMatch(/no rationale from the author is included/)
     expect(prompt).toContain(`VERDICT: <${VERDICTS.join('|')}>`)
     expect(prompt).toMatch(/CONVERGENT review/)
     expect(buildReviewPrompt({ sha: 'abc', brief: 'x', mode: 'blind-parallel' })).toMatch(/DIVERGENT step/)

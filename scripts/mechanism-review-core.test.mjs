@@ -185,6 +185,8 @@ describe('validateRecord', () => {
     // the same sentence typed by hand, or the hole reopens one line lower.
     expect(validateRecord({ ...good, evidence: 'Repository access failed before inspection' }).ok).toBe(false)
     expect(validateRecord({ ...good, evidence: 'I could not read the diff, so nothing was checked' }).ok).toBe(false)
+    expect(validateRecord({ ...good, evidence: 'I did not have access to the diff or changed files' }).ok).toBe(false)
+    expect(validateRecord({ ...good, evidence: 'the patch was not supplied, so this is not a review' }).ok).toBe(false)
     // …while an ordinary finding that merely contains the words is a review.
     expect(validateRecord({ ...good, evidence: 'the guard could not see a renamed file; fixed in the diff' }).ok).toBe(true)
   })

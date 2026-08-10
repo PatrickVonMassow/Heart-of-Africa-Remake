@@ -299,23 +299,23 @@ coverage map live in `scripts/verify/README.md`.
   responder from the chat inbox — only with no live owner and no honoured claim,
   under a bounded claim; the launcher tick supervises it.
 - **Model policy (users 25.07./10.08.2026, points 309/624). AUTHOR AND REVIEWER
-  ARE SEPARATE ROLES.** AUTHORS: only **Opus 5**, then **Fable 5**, then **Opus
-  4.8**, the chain `scripts/batch-autostart.mjs` launches. DIFFICULTY IS NO
-  REASON to hand work to Fable: Opus 5 is the WORKER at any difficulty.
-  REVIEWERS (both modes): **GPT-5.6 Sol** at effort HIGH, else **Fable 5**
-  (**Opus 5** where Fable authored it). A reviewer is bought for its DIFFERENT
-  errors, and another VENDOR decorrelates further than our own house; never
+  ARE SEPARATE ROLES.** AUTHORS: **Opus 5**, then **Fable 5**, then **Opus
+  4.8** — the chain `scripts/batch-autostart.mjs` launches. DIFFICULTY IS NO
+  REASON to hand work to Fable: Opus 5 works at any difficulty. REVIEWERS (both
+  modes): **GPT-5.6 Sol** at effort HIGH, else the first of **Fable 5**, **Opus
+  5**, **Opus 4.8** that authored none of it. A reviewer is bought for its
+  DIFFERENT errors, and another VENDOR decorrelates further than our own; never
   "simplify" that away. Reviews run through `node scripts/review-sol.mjs`,
   never a hand-typed `codex` line: it names the cause, HANDS the review on, and
   RECORDS who ran it. Sonnet and Haiku are NOT acceptable: a degraded session
-  is a capability breach and the batch STOPS. Every commit NAMES its author
-  model in a `Co-Authored-By` trailer the `commit-msg` hook enforces;
+  is a capability breach; the batch STOPS. Every commit NAMES its author model
+  in a `Co-Authored-By` trailer the `commit-msg` hook enforces;
   `scripts/model-guard-core.mjs` holds the AUTHOR allowlist (`ALLOWED`) and
   `scripts/model-guard.mjs` blocks the turn end on any commit after its
   baseline authored outside it: HARD on a NAMED forbidden model (pause),
-  resolvably on an UNNAMED one, which the transcripts settle. (History: a
-  degraded session merged three defective Haiku deliveries in 14 minutes; only
-  the trailers could have caught it.)
+  resolvably on an UNNAMED one, which transcripts settle. (History: a degraded
+  session merged three defective Haiku deliveries in 14 minutes; only the
+  trailers could have caught it.)
 - **The four-eyes principle has TWO MODES, chosen by the STAGE (user
   25.07.2026). This is its normative wording; everywhere else refers here.** A
   DIVERGENT stage — what could go wrong, which scenarios to test, which designs

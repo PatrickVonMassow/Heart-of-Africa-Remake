@@ -12,7 +12,7 @@
 // `CODEX_HOME`), so this suite never touches the developer's checkout or login.
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 import { FALLBACK_MODEL_NAME, SOL_MODEL_NAME } from './review-sol-core.mjs'
@@ -25,11 +25,16 @@ let stateDir = ''
 
 /** A `codex` that answers however the case's env asks it to. */
 const STUB = `#!/usr/bin/env node
-const { writeFileSync } = require('node:fs')
+const { readFileSync, writeFileSync, appendFileSync } = require('node:fs')
 const argv = process.argv.slice(2)
 const out = argv[argv.indexOf('-o') + 1]
 const model = argv[argv.indexOf('-m') + 1]
-require('node:fs').appendFileSync(process.env.STUB_LOG, model + '\\n')
+// What arrived on stdin is recorded: the material travels that way, and an
+// assertion on the caller's own log message would stay green without it.
+let stdin = ''
+try { stdin = readFileSync(0, 'utf8') } catch {}
+writeFileSync(process.env.STUB_STDIN, stdin)
+appendFileSync(process.env.STUB_LOG, model + '\\n')
 if (model !== 'gpt-5.6-sol') {
   // The unknown-id probe: the real server refuses it, which is what proves -m
   // is honoured at all.
@@ -57,6 +62,7 @@ const run = (args, env = {}) =>
       REVIEW_SOL_STATE_DIR: stateDir,
       CODEX_HOME: join(dir, 'codex-home'),
       STUB_LOG: join(dir, 'calls.log'),
+      STUB_STDIN: join(dir, 'stdin.txt'),
       ...env,
     },
   })
@@ -96,7 +102,12 @@ describe('a review that runs', () => {
     expect(r.stdout).toContain('--model "GPT-5.6 Sol"')
     expect(r.stdout).toContain('--verdict merge')
     expect(r.stdout).toContain('--point 624')
-    // The material really is assembled and handed over.
+    // The material really REACHES the model — asserted on what the process
+    // received, not on the caller's own log line.
+    const received = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(received).toContain('=== DIFFSTAT ===')
+    expect(received).toContain('=== PATCH ===')
+    expect(received).toContain('diff --git')
     expect(r.stderr).toMatch(/material: \d+ characters/)
   })
 })
@@ -157,12 +168,37 @@ describe('the guards around the run', () => {
 })
 
 describe('the saved login', () => {
-  it('refuses to write the token where git does not ignore it', () => {
-    const r = run(['--save-login'], { CODEX_HOME: stubDir })
-    // (the stub dir doubles as a CODEX_HOME holding no auth.json → the first
-    //  refusal; with one present the ignore check is what refuses)
+  it('says so when there is no login to save', () => {
+    const r = run(['--save-login'], { CODEX_HOME: join(dir, 'empty-home') })
     expect(r.status).toBe(1)
-    expect(r.stderr).toMatch(/no login found|does not ignore/)
+    expect(r.stderr).toMatch(/no login found/)
+  })
+
+  it('REFUSES to write the token where git does not ignore it', () => {
+    // A real token file is placed, so the run reaches the ignore check rather
+    // than stopping one step earlier (four-eyes finding, third round).
+    const home = join(dir, 'home-with-token')
+    mkdirSync(home, { recursive: true })
+    writeFileSync(join(home, 'auth.json'), '{"tokens":{"access_token":"secret"}}')
+    const r = run(['--save-login'], { CODEX_HOME: home })
+    expect(r.status).toBe(1)
+    expect(r.stderr).toMatch(/does not ignore/)
+    // …and nothing was written to the destination.
+    expect(existsSync(join(stateDir, 'codex-auth.json'))).toBe(false)
+  })
+
+  it('REFUSES a state directory that is a link out of where it claims to be', () => {
+    // The lexical ignore check passes for a symlinked `local/`, and the copy
+    // then follows the link (four-eyes finding, third round).
+    const elsewhere = join(dir, 'elsewhere')
+    const linked = join(dir, 'linked-state')
+    mkdirSync(elsewhere, { recursive: true })
+    symlinkSync(elsewhere, linked)
+    writeFileSync(join(elsewhere, 'codex-auth.json'), '{"tokens":{}}')
+    const r = run(['--restore-login'], { REVIEW_SOL_STATE_DIR: linked })
+    expect(r.status).toBe(1)
+    expect(r.stderr).toMatch(/REFUSING/)
+    expect(r.stderr).toMatch(/resolves to/)
   })
 
   it('says what to do when nothing was ever saved', () => {

@@ -49,11 +49,13 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { modelFromTrailers } from './mechanism-review-core.mjs'
 import {
+  addedFilesAreCoveredByPatch,
   buildReviewPrompt,
   classifyOutcome,
   codexArgs,
   CODEX_BIN,
   decideReview,
+  FALLBACK_CHAIN,
   formatReviewMaterial,
   formatReviewReport,
   isUnknownModelRefusal,
@@ -138,8 +140,9 @@ function gatherMaterial(sha, base = '') {
   ).split('\n').map((p) => p.trim()).filter(Boolean)
   const patch = range ? git(['diff', range]) : git(['show', sha])
   // A file the patch ADDS whole is already there in full; sending its content
-  // again only spends the budget the other files need.
-  const added = newFilePathsIn(patch)
+  // again only spends the budget the other files need — but only while the patch
+  // itself fits, or the file would fall out of both halves.
+  const added = addedFilesAreCoveredByPatch(patch.length) ? newFilePathsIn(patch) : new Set()
   const files = []
   for (const path of [...new Set(paths)]) {
     if (added.has(path)) continue
@@ -256,15 +259,26 @@ function probe() {
  * directory it claims to be in? Returns the refusal sentence, or ''.
  */
 function pathEscapes(target) {
-  const dir = dirname(target)
+  // The NEAREST EXISTING ancestor is what gets resolved (third cross-vendor
+  // round): asking only about the parent answered '' whenever the parent did not
+  // exist yet, so a not-yet-created directory under a symlinked ancestor passed
+  // inspection and was then created somewhere else entirely.
+  let existing = dirname(target)
+  while (!existsSync(existing)) {
+    const up = dirname(existing)
+    if (up === existing) return ''
+    existing = up
+  }
   try {
-    const realDir = realpathSync(dir)
-    if (realDir !== dir) return `${dir} resolves to ${realDir}; a link on the way would write the token elsewhere`
+    const real = realpathSync(existing)
+    if (real !== existing) {
+      return `${existing} resolves to ${real}; a link on the way would put the token somewhere else`
+    }
   } catch {
-    return '' /* the directory does not exist yet — nothing to follow */
+    return `${existing} cannot be resolved`
   }
   if (existsSync(target) && lstatSync(target).isSymbolicLink()) {
-    return `${target} is a symlink; it would write through it`
+    return `${target} is a symlink; it would be followed`
   }
   return ''
 }
@@ -295,10 +309,13 @@ function saveLogin() {
   // `local/` passes the LEXICAL check-ignore above and copyFileSync follows it,
   // putting the credential somewhere else entirely (four-eyes finding, second
   // round). realpath answers for the whole path, not just its last component.
-  const escape = pathEscapes(SAVED_AUTH_FILE)
-  if (escape) {
-    console.error(`review-sol --save-login: REFUSING — ${escape}`)
-    return 1
+  // Both endpoints: a link at the SOURCE reads a token from wherever it points.
+  for (const end of [SAVED_AUTH_FILE, AUTH_FILE]) {
+    const escape = pathEscapes(end)
+    if (escape) {
+      console.error(`review-sol --save-login: REFUSING — ${escape}`)
+      return 1
+    }
   }
   copyFileSync(AUTH_FILE, SAVED_AUTH_FILE)
   chmodSync(SAVED_AUTH_FILE, 0o600)
@@ -346,9 +363,10 @@ export const usage = () =>
     '',
     'The material is the whole range <since>..<sha> (--since defaults to main), because',
     'one record covers every commit it contains.',
-    `Reviews run on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT} (CLAUDE.md §6) and fall`,
-    'back to Fable 5 when it cannot be reached — the recorded review always names the',
-    'model that ACTUALLY ran.',
+    `Reviews run on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT} (CLAUDE.md §6). When it`,
+    `cannot be reached the review is HANDED OVER to the first model of ${FALLBACK_CHAIN.join(' → ')}`,
+    'that authored no part of the reviewed range — the recorded review always names the',
+    'model that ACTUALLY ran, and none of them may review its own work.',
   ].join('\n')
 
 if (isMainModule(import.meta.url)) {

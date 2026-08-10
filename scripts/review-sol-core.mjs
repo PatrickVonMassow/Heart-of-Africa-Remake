@@ -32,10 +32,12 @@ export const SOL_MODEL_NAME = 'GPT-5.6 Sol'
 /** The reasoning effort the user's decision fixes for reviews (10.08.2026). */
 export const SOL_REASONING_EFFORT = 'high'
 
-/** The reviewer that takes over whenever Sol did not deliver a verdict, and the
- *  one behind IT — needed only where Fable authored the change itself. */
+/** The reviewers that take over whenever Sol did not deliver a verdict, in
+ *  order. The ones behind Fable exist because Fable and Opus also AUTHOR here,
+ *  and no model may review its own work (CLAUDE.md §6). */
 export const FALLBACK_MODEL_NAME = 'Fable 5'
 export const SECOND_FALLBACK_MODEL_NAME = 'Opus 5'
+export const FALLBACK_CHAIN = Object.freeze([FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, 'Opus 4.8'])
 
 /** The binary, and the ceiling a review may take before it counts as stuck. */
 export const CODEX_BIN = 'codex'
@@ -173,11 +175,13 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review' } = {}
     'artefact itself and do not assume it is correct.',
     '',
     `COMMIT UNDER REVIEW: ${sha}`,
-    'THE MATERIAL IS ATTACHED BELOW (the diffstat, the full patch, and the current',
-    'content of the files it touches). Judge THAT — this container cannot create user',
-    'namespaces, so a shell command of yours would fail before it ran, and a review',
-    'that only reports it could not look at anything is worth nothing. If a file below',
-    'is marked TRUNCATED, say so in your evidence rather than guessing past the cut.',
+    'THE MATERIAL IS ATTACHED (the diffstat, the patch, and the content of the files it',
+    'touches). READ IT IN FULL FIRST, before the question below and before forming any',
+    'view: the question is a checklist of what to look at, never a conclusion to check',
+    'against, and no rationale from the author is included on purpose. This container',
+    'cannot create user namespaces, so a shell command of yours would fail before it',
+    'ran — judge the attached material, and if a part of it is marked TRUNCATED, say so',
+    'in your evidence rather than guessing past the cut.',
     '',
     `WHAT TO JUDGE: ${brief}`,
     '',
@@ -286,11 +290,17 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '' } = {
  *
  * It takes EVERY author in the reviewed range, not just the head commit's: one
  * record covers every commit it contains, so a range with one Fable commit under
- * an Opus head must not be handed to Fable (second round of the same review).
+ * an Opus head must be handed to a model that authored NEITHER (second and third
+ * rounds of the same review — the first fix picked Opus 5 for exactly that
+ * range, which is a self-review of half of it).
+ *
+ * With every model in the chain among the authors it returns '' : there is then
+ * no valid Anthropic reviewer at all, and saying so is the only honest answer —
+ * the review waits for Sol rather than being recorded by an author of the work.
  */
 export function fallbackReviewerFor(authorModels = '') {
-  const authors = Array.isArray(authorModels) ? authorModels : [authorModels]
-  return authors.some((a) => sameModel(FALLBACK_MODEL_NAME, a)) ? SECOND_FALLBACK_MODEL_NAME : FALLBACK_MODEL_NAME
+  const authors = (Array.isArray(authorModels) ? authorModels : [authorModels]).filter(Boolean)
+  return FALLBACK_CHAIN.find((candidate) => !authors.some((a) => sameModel(candidate, a))) ?? ''
 }
 
 /** How much material one review may carry — the patch plus the changed files —
@@ -353,6 +363,18 @@ export function formatReviewMaterial({ stat = '', patch = '', files = [], budget
  * already carried every added file in full, and the copies pushed the files the
  * reviewer was asked to judge out of the ceiling (second cross-vendor round).
  */
+/**
+ * May the added files' content be left out because the patch carries it?
+ *
+ * ONLY while the patch fits whole. Once it is capped, its tail is cut — and an
+ * added file living in that tail would be in neither half of the material, which
+ * is a file the reviewer was asked about and never saw (third cross-vendor
+ * round). The duplicate is the cheaper mistake, so the skip is dropped.
+ */
+export function addedFilesAreCoveredByPatch(patchLength, budget = MATERIAL_BUDGET_CHARS, share = PATCH_SHARE) {
+  return Number(patchLength) <= Math.floor(Number(budget) * Number(share))
+}
+
 export function newFilePathsIn(patch) {
   const paths = new Set()
   const lines = String(patch ?? '').split('\n')
@@ -462,7 +484,15 @@ export function formatReviewReport({ decision = {}, sha = '', mode = 'review', p
   // Fable authored the change the reviewer is Opus 5, and an instruction saying
   // "hand it to Fable" beside a command naming Opus is how a self-review gets
   // recorded (four-eyes finding, second round, 10.08.2026).
-  const who = decision.model || FALLBACK_MODEL_NAME
+  const who = decision.model
+  if (!who) {
+    return [
+      `review-sol: FALLBACK — ${SOL_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
+      `  And EVERY model in the fallback chain (${FALLBACK_CHAIN.join(', ')}) authored part of this`,
+      '  range, so none of them may review it. The review is NOT done and cannot be recorded:',
+      `  fix the ${SOL_MODEL_NAME} run, or review a narrower range one of them did not write.`,
+    ].join('\n')
+  }
   return [
     `review-sol: FALLBACK — ${SOL_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
     `  The review is NOT done. Hand it to ${who} and record what IT says:`,
