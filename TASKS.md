@@ -326,41 +326,6 @@ there exactly once; a new point joins a bundle when appended.
   machine, and PROCEED-MARKED under the override, with the pids named in every case.
   Criticality: medium, frequency HIGH (every killed session can leave one behind).
 
-- [ ] 516. A BRIEF DOES NOT CARRY THE SPECIFICATION IT DECLARES BINDING (measured
-  05.08.2026 while point 488 was built). Point 488's text reads "point 352's
-  specification is binding with one amendment from point 482", and the brief cut for
-  488 carried — per its own design — only the ONE identifying line of each
-  cross-referenced point. So the part that was declared binding was exactly the part
-  missing, and the building agent had to run `point-brief.mjs 352` for itself before
-  it could start. The one-line identification is right for a point merely MENTIONED;
-  it is wrong for one whose specification the reading point adopts.
-  FINAL STATE:
-  1. Where a point ADOPTS another point's specification — "X's specification is
-     binding", "per point X", "as specified in X" and the like — the brief inlines
-     that point VERBATIM, under its number, the way it inlines the design.md
-     sections it cites. A point that is merely referenced for orientation keeps its
-     one identifying line.
-  2. The distinction is made by the referencing WORDING, not by a hand-kept list, and
-     an adopted point's own adopted references resolve one further level, with a
-     depth cap that is stated in the brief rather than silently applied.
-  3. An adopted point that resolves nowhere fails the brief LOUDLY, like every other
-     unresolvable reference.
-  4. The reference map names each adopted point as adopted, so the reader sees why the
-     full text is there.
-  5. The same gap exists one level out, at the DOCUMENTS a slice is specified in
-     (measured 06.08.2026 while point 487 was built): the brief names design.md
-     sections but knows no other spec document, so the agent found
-     `docs/communication-poc-spec.md` — which pins the five-step loop verbatim and
-     decided the journal wording — only through a code comment. A brief therefore
-     names the spec DOCUMENT its point's slice belongs to, the way it names a
-     design.md section, and an unnamed slice document is a finding, not a search
-     task for the reader.
-  VERIFIABLE: pure Vitest on the reference classifier (an adopting phrase yields the
-  full text, a mentioning one the single line, an unknown number fails); the brief for
-  488 contains point 352's specification in full, the brief for a communication-slice
-  point names `docs/communication-poc-spec.md`, and the brief's size for a point with
-  no adopted reference is unchanged.
-
 - [ ] 599. MEASURE WHAT THE CACHE AND THE CALENDAR HIDE (point 572's measure 9). Two
   measurements the throughput analysis needed and did not have, delivered together because
   both are pure readings of data we already keep.
