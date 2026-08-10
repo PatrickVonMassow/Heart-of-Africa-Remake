@@ -982,6 +982,40 @@ Beides ist nicht Nachlässigkeit, sondern die Bauform: Wer n Schritte zu einem z
 
 **Lehre:** Ein neuer Befehl, der bestehende ersetzt, wird gegen die **vollständige** Liste der Kontrollen geprüft, die auf die ersetzten Befehle greifen — namentlich, nicht nach Gefühl, und die Prüfung ist ausführbar (jeden Klassifizierer einmal mit dem neuen Befehl aufrufen und das Urteil lesen). Und die Reihenfolge seiner Schritte ist eine Eigenschaft, kein Detail: Was Arbeit dauerhaft macht, steht **vor** dem, was etwas löscht, und diese Reihenfolge wird per Test festgehalten.
 
+### 3.103 Eine korrekte Übergabe, die niemand aufnimmt, ist ein Stillstand
+
+Der Stapel stand eine halbe Stunde still, und keines der beteiligten Teile war
+kaputt. Die abgebende Sitzung hatte den Grenzstein sauber gesetzt und die Sperre
+freigegeben; der Starter schaut alle 15 Minuten nach, hätte also frühestens elf
+Minuten später gestartet; drei Minuten vor diesem Blick nahm ein unbeaufsichtigtes
+Fenster die freie Sperre beim Sitzungsstart, worauf der Blick korrekt einen lebenden
+Besitzer sah und nichts tat. Jede Regel griff, jede für sich richtig — und die Kette
+als ganze arbeitete nicht.
+
+Zwei Bauformen stecken darin. Die eine: **Ein Übergabepunkt, der auf eine Uhr
+wartet statt auf das Ereignis**, verschenkt bei jedem Wechsel das halbe Intervall;
+das ist kein Fehler, den man findet, sondern einer, den man erst bemerkt, wenn
+jemand hinsieht. Die andere: **Besitz war an Leben gebunden, nicht an Arbeit.** Die
+Pacht fragt, ob der Besitzer noch atmet, nie, ob er etwas tut — und ein Fenster, das
+nichts tut, atmet perfekt. Der Nutzer hat es zugespitzt: Er muss mehrere Tage weg
+sein dürfen. Gegen genau das war das Bündel Urlaubsfestigkeit geschnitten, und es
+stand unbearbeitet hinter allem anderen.
+
+Das ist der dritte Teil, und der unangenehmste: **Die Priorität stand da, nur las
+sie keine Maschine.** Die dokumentierte Arbeitsreihenfolge begann seit jeher mit der
+Urlaubsfestigkeit; die flache Liste, aus der sich jede Nachfolgesitzung orientiert,
+begann mit etwas anderem — und eine dritte, handgeführte Reihenfolge in den
+Tafeldaten begann mit einer vierten. Drei Orte, drei Antworten auf dieselbe Frage.
+Als der Nutzer die Neusortierung auf der Tafel nicht sah, war das kein
+Anzeigefehler, sondern dieselbe Spaltung eine Ebene tiefer.
+
+**Lehre:** Eine erklärte Reihenfolge ist erst dann eine, wenn genau EIN Ort sie
+hält und alle Leser aus ihm ableiten; und eine Übergabe wird an ihrem WORST CASE
+gemessen, nicht daran, dass jeder Schritt für sich korrekt war. Wo ein Recht (hier:
+der Besitz des Stapels) nur an ein Lebenszeichen gebunden ist, gehört es an einen
+FORTSCHRITT gebunden — sonst blockiert der Untätige den Fleißigen, ohne dass eine
+Regel verletzt wäre.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -1071,7 +1105,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 10.08.2026, 13:03 · Quellen-Fingerprint: `cccf60019a1d…`
+Zuletzt aktualisiert: Montag, 10.08.2026, 14:17 · Quellen-Fingerprint: `134955f9abb1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1151,8 +1185,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 46 Prozess-/Meta-TASKS-Punkte (davon 20 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 47 Prozess-/Meta-TASKS-Punkte (davon 21 offen).
 
-<!-- RETRO-FINGERPRINT: cccf60019a1df8c9bdfecb2462555ea1a152896cbf8eaed613ed8bf2d964a546 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-10T11:03:17.885Z -->
+<!-- RETRO-FINGERPRINT: 134955f9abb1d21d89f1aa0df20e0f6016fc3ef1f0f14afba7dbc226db7991c7 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-10T12:17:59.580Z -->
 <!-- AUTO-GENERATED:END -->
