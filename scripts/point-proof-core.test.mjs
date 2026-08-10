@@ -246,3 +246,42 @@ describe('formatProofVerdict', () => {
     expect(text).toContain(HEAD.slice(0, 12))
   })
 })
+
+// ---------------------------------------------------------------------------
+// THE LANDING CHAIN TICKS TOO (point 594). This gate is PreToolUse and CLI only —
+// it has no Stop backstop — so a tick it cannot see is a tick that is never
+// gated at all. `node scripts/land-point.mjs <N>` ticks from inside a process,
+// naming no work-order file, and went straight past it until `landingTickNumber`
+// taught the shared tick accounting about the command.
+describe('a landing command is a tick this gate must judge', () => {
+  const tasksText = ['# TASKS', '', '- [ ] 594. A POINT WITH A PROOF', '  body.', `  PROOF: ${MEASURE}`, ''].join('\n')
+  const judge = (command) =>
+    evaluate({ toolName: 'Bash', toolInput: { command }, tasksText, runs: [], ledgerReadable: true, headSha: HEAD })
+
+  it('blocks a landing whose point has an unproven PROOF line', () => {
+    const d = judge('node scripts/land-point.mjs 594 --model "Claude Opus 5"')
+    expect(d.block).toBe(true)
+    expect(d.reason).toContain('594')
+  })
+
+  it('lets the landing through once the proof is recorded', () => {
+    const d = evaluate({
+      toolName: 'Bash',
+      toolInput: { command: 'node scripts/land-point.mjs 594 --model "Claude Opus 5"' },
+      tasksText,
+      runs: { 594: { evidence: 'measured', commit: HEAD, commands: [MEASURE] } },
+      ledgerReadable: true,
+      headSha: HEAD,
+    })
+    expect(d.block).toBe(false)
+  })
+
+  it('never blocks a --dry run, which writes nothing', () => {
+    expect(judge('node scripts/land-point.mjs 594 --dry').block).toBe(false)
+  })
+
+  it('leaves unrelated commands alone', () => {
+    expect(judge('git status').block).toBe(false)
+    expect(judge('cat scripts/land-point.mjs').block).toBe(false)
+  })
+})

@@ -14,9 +14,11 @@ import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { readTasksAll } from './tasks-source.mjs'
 import { readDocCorpus } from './doc-corpus.mjs'
+import { CALL_DISCIPLINE_DE, callDisciplineTopics } from './batch-autostart-core.mjs'
 import {
   BriefError,
   BRIEF_TOKEN_CEILING,
+  CALL_DISCIPLINE,
   DOC_WINDOW,
   acceptanceCriteriaFrom,
   aliasesFor,
@@ -940,5 +942,48 @@ describe('faithfulness over the WHOLE work order', () => {
     const wholesale = estimateTokens(tasksText) + estimateTokens(designText)
     const median = built.map((b) => b.result.tokens).sort((a, b) => a - b)[Math.floor(built.length / 2)]
     expect(median * 20).toBeLessThan(wholesale)
+  })
+
+  // ONE TURN, SEVERAL CALLS (point 593). Enforcement is by prompt, so the only
+  // thing a test can hold is DELIVERY: the paragraph must reach every delegated
+  // agent, and it must not drift apart from the German rendering the batch
+  // resume prompt carries.
+  it('hands every brief the call-discipline paragraph', () => {
+    const off = built.filter(({ result }) => !result.brief.includes(CALL_DISCIPLINE.join('\n')))
+    expect(off.map((b) => b.point.number)).toEqual([])
+  })
+})
+
+describe('the call-discipline paragraph, English side (point 593)', () => {
+  const en = CALL_DISCIPLINE.join('\n')
+
+  it('covers every named topic', () => {
+    const missing = callDisciplineTopics()
+      .filter((t) => !t.en.test(en))
+      .map((t) => t.id)
+    expect(missing).toEqual([])
+  })
+
+  it('says the same thing as the German rendering in the batch prompt', () => {
+    // The two prompts are in different languages, so the shared topic table is
+    // the only thing that can compare them. An edit that drops "screenshots in
+    // small groups" from ONE of the two fails here rather than drifting.
+    const drifted = callDisciplineTopics()
+      .filter((t) => t.en.test(en) !== t.de.test(CALL_DISCIPLINE_DE))
+      .map((t) => t.id)
+    expect(drifted).toEqual([])
+  })
+
+  it('excludes both ways the shortcut goes wrong', () => {
+    expect(en).toMatch(/stays SEQUENTIAL/)
+    expect(en).toMatch(/acting on a value you have not seen/)
+    expect(en).toMatch(/MUTABLE state/)
+  })
+
+  it('keeps judgment quality ahead of batching for the picture check', () => {
+    // Point 375's shutter is worth nothing if a frame is shrunk to fit more
+    // reads into one turn, so the paragraph says so explicitly.
+    expect(en).toMatch(/judgment quality outranks batching/)
+    expect(en).toMatch(/full resolution/)
   })
 })

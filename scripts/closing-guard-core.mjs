@@ -224,6 +224,41 @@ const WORK_ORDER_WRITE = new RegExp(
   `\\b(sed|perl|ruby|gawk)\\b[^|\\n]*(\\s-[A-Za-z]*i\\b|--in-place)|\\bpatch\\b|\\bgit\\s+apply\\b|\\b(mv|cp|tee)\\b|${REDIRECTS_INTO_WORK_ORDER.source}`,
 )
 
+/**
+ * THE LANDING CHAIN TICKS WITHOUT NAMING THE WORK ORDER (point 594).
+ *
+ * `node scripts/land-point.mjs <N>` writes the tick from inside a process, so the
+ * command mentions no `TASKS.md` and performs no visible write — the two things
+ * the shell backstop above looks for. Both gates that read `mayTickPoint` were
+ * therefore blind to it: `closing-guard` would not deny the tick of a
+ * closing-delivering point, and `point-proof-guard` (PreToolUse and CLI only,
+ * with no Stop backstop) would not run at all. A convenience command must not be
+ * a way past the gates its steps are governed by.
+ *
+ * `--dry` is deliberately NOT a tick: it prints the plan and writes nothing, and
+ * denying it would block the very command a session uses to find out what a
+ * landing would do.
+ */
+// Scanned LINEARLY, with no nested quantifier: this runs inside a PreToolUse
+// hook, and a hook that HANGS is not covered by the wrapper's fail-open, which
+// only catches throws (the same reasoning as the bounded option runs above).
+const LANDING_SCRIPT = 'land-point.mjs'
+
+/** The point number a landing command would tick, or null for "no tick here". */
+export function landingTickNumber(command) {
+  const c = String(command ?? '')
+  if (!c.includes(LANDING_SCRIPT)) return null
+  // Only the SEGMENT that invokes it, so a sibling command's number cannot leak
+  // in — `echo 42 && node scripts/land-point.mjs 594` ticks 594, not 42.
+  const seg = c.split(/&&|\|\||;|\||\n/).find((s) => s.includes(LANDING_SCRIPT))
+  if (!seg || /\s--dry\b/.test(seg)) return null
+  const after = seg.slice(seg.indexOf(LANDING_SCRIPT) + LANDING_SCRIPT.length)
+  // A quoted value is not a place to read a point number from: `--model
+  // "Claude Opus 5"` must never be mistaken for point 5.
+  const m = after.replace(/"[^"]*"|'[^']*'/g, ' ').match(/(?:^|\s)(\d+)(?=\s|$)/)
+  return m ? Number(m[1]) : null
+}
+
 /** The text a tool call WRITES, and the text it REPLACES, for tick accounting. */
 function tickTexts(toolName, toolInput) {
   const input = toolInput && typeof toolInput === 'object' ? toolInput : {}
@@ -243,6 +278,11 @@ function tickTexts(toolName, toolInput) {
     // during a closing is obstruction, not enforcement (four-eyes review
     // 07.08.2026).
     const raw = typeof input.command === 'string' ? input.command : ''
+    // THE LANDING CHAIN FIRST: it ticks from inside a process, so it names no
+    // work-order file and performs no visible write, and the three demands below
+    // would all miss it. Synthesised into the tick form the callers already read.
+    const landing = landingTickNumber(raw)
+    if (landing !== null) return { added: `- [x] ${landing}.`, removed: '' }
     // A heredoc is prose in `git commit -F - <<MSG`, but it is the CONTENT in
     // `cat > TASKS.md <<EOF` — so its body survives exactly when the command
     // redirects into a work-order file, and the tick inside it counts.

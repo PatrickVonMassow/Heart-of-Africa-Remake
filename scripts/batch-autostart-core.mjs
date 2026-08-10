@@ -47,6 +47,55 @@ export const BG_WAIT_CEILING_DEFAULT = '0'
 export const SPAWN_MODEL = 'claude-opus-5[1m]'
 export const SPAWN_FALLBACK_MODEL = 'claude-fable-5'
 
+/**
+ * ONE TURN, SEVERAL CALLS (point 593) — the German rendering of the paragraph the
+ * delegation brief carries in English (`CALL_DISCIPLINE` in
+ * scripts/point-brief-core.mjs). Both prompts must say the same thing; change the
+ * two together. `callDisciplineTopics()` below is what the tests hold them to.
+ *
+ * PROMPT, NOT GUARD, and by decision: "these two calls could have been bundled" is
+ * not machine-decidable, so nothing can check it after the fact. Measured over this
+ * project's own transcripts: only 5.0 % of responses issue more than one tool call,
+ * search/read alone is 25.1 % of the weighted spend, and 15.2 % of all responses
+ * repeated an EXACTLY identical shell command inside one session.
+ *
+ * Umlauts as digraphs (ae/oe/ue), like the rest of RESUME_PROMPT: the argv goes
+ * through a Windows spawn.
+ */
+export const CALL_DISCIPLINE_DE =
+  'EIN ZUG, MEHRERE AUFRUFE: unabhaengige Werkzeugaufrufe gehoeren in EINEN Zug — mehrere Reads, ' +
+  'mehrere Greps, `npm run build` neben `npm run lint`, git status neben dem Branchnamen, die ' +
+  'Screenshot-Reads einer Bildpruefung (kleine semantische Gruppen, volle Aufloesung — ' +
+  'Urteilsqualitaet geht vor Buendelung). Was den AUSGABEWERT eines anderen Aufrufs braucht, bleibt ' +
+  'SEQUENZIELL, und eine gebuendelte Shell-Kette darf ihren fehlschlagenden Schritt nie verstecken ' +
+  '(mit && verketten oder jeden Teil in der Ausgabe beschriften). ZWEITENS: was sich seit dem Lesen ' +
+  'NICHT geaendert haben kann, wird nicht neu gelesen — eine Datei, die niemand editiert hat, ein ' +
+  '--help, ein Konfigwert, ein Spec-Abschnitt, der schon im Kontext steht. VERAENDERLICHER Zustand ' +
+  'wird per Regel neu gelesen: git status, CI-Status, ein laufender Prozess, alles was diese Sitzung ' +
+  'oder ein anderer Agent seither geschrieben hat.'
+
+/**
+ * The topics BOTH renderings of the call-discipline paragraph must cover, as
+ * {id, de, en} matcher pairs. Kept here, beside the German text, so a future edit
+ * that drops "screenshots in small groups" from ONE of the two prompts fails the
+ * unit layer instead of drifting silently — the two texts are in different
+ * languages, so nothing else can compare them.
+ */
+export function callDisciplineTopics() {
+  return [
+    { id: 'bundle-independent', de: /EINEN Zug/, en: /ONE TURN/i },
+    { id: 'reads-and-greps', de: /mehrere Reads/i, en: /several reads/i },
+    { id: 'build-beside-lint', de: /npm run build` neben `npm run lint/, en: /npm run build` beside\s+`?\s*`?npm run lint/ },
+    { id: 'status-beside-branch', de: /git status neben dem Branchnamen/, en: /`git status` beside the branch name/ },
+    { id: 'picture-check-reads', de: /Screenshot-Reads einer Bildpruefung/, en: /screenshot reads of a picture/i },
+    { id: 'small-groups-full-res', de: /kleine semantische Gruppen, volle Aufloesung/, en: /SMALL semantic groups at\s+full resolution/i },
+    { id: 'dependent-stays-sequential', de: /AUSGABEWERT[\s\S]*bleibt \s*SEQUENZIELL|AUSGABEWERT[\s\S]*SEQUENZIELL/, en: /OUTPUT[\s\S]*stays SEQUENTIAL/ },
+    { id: 'chain-never-hides-failure', de: /fehlschlagenden Schritt nie verstecken/, en: /never HIDE its failing step/ },
+    { id: 'no-reread-immutable', de: /NICHT geaendert haben kann, wird nicht neu gelesen/, en: /CANNOT HAVE CHANGED IS NOT READ AGAIN/ },
+    { id: 'mutable-reread-by-rule', de: /VERAENDERLICHER Zustand[\s\S]*wird per Regel neu gelesen/, en: /MUTABLE state[\s\S]*re-read BY RULE/ },
+  ]
+}
+
 export const RESUME_PROMPT =
   'Autonome Batch-Wiederaufnahme (vom OS-Scheduler gestartet, weil keine Claude-Session aktiv war). ' +
   'Setze den "Heart of Africa"-Batch fort. Orientiere dich am Board (scripts/focus.mjs show plus die ' +
@@ -57,7 +106,15 @@ export const RESUME_PROMPT =
   'EIGENEN feat/<punkt>-<slug>-Branch von main, atomare Commits, den BRANCH nach jedem Commit pushen, ' +
   'Merge nach main NUR wenn der Punkt fertig und verifiziert ist (Tests gruen; Render-/GUI-Aenderungen ' +
   'auf BEIDEN Backends am Bild geprueft); TASKS.md nur auf main abhaken (beim Merge); ' +
-  'Querschnitts-Aenderungen (Guards, Docs, Dashboard, Prozessdateien) direkt auf main. Dashboard-Guard + ' +
+  'Querschnitts-Aenderungen (Guards, Docs, Dashboard, Prozessdateien) direkt auf main. DIE LANDUNG IST ' +
+  'EIN BEFEHL: steht der Punkt fertig und am Bild verifiziert, fuehrt `node scripts/land-point.mjs ' +
+  '<punkt> --model "<dein Modell>"` die ganze Kette aus — Merge (--no-ff), Fast-Gate, Abhaken, ' +
+  'Archiv-Umzug, COMMIT DES ABHAKENS UND PUSH VON MAIN, Board-Publish, Worktree-Aufraeumen — und ' +
+  'druckt EIN Urteil je Schritt. Sie haelt beim ersten Rot an und laesst keinen Halbzustand zurueck; ' +
+  '`--dry` zeigt den Plan, ohne etwas anzufassen. Erst wenn sie GRUEN gemeldet hat — Punkt gemergt, ' +
+  'abgehakt, committet und gepusht — folgt die Punktgrenze; bei Rot wird zuerst der genannte Schritt ' +
+  'repariert. ' +
+  'Dashboard-Guard + ' +
   'prep-guard gruen halten, Vorarbeit waehrend jeder Validierung. WARTEN IST SICHTBAR (28.07.2026): ' +
   'waehrend ein delegierter Agent baut, POLLE innerhalb des Zuges (TaskOutput, Branch-Tip, Logdatei) ' +
   'statt still zu sitzen — jeder Werkzeugaufruf frischt den Heartbeat, und eine still wartende Sitzung ' +
@@ -69,7 +126,8 @@ export const RESUME_PROMPT =
   'Kontext zu ziehen; der OS-Task startet die naechste Session. Halte sonst NICHT still an. Wenn ein git ' +
   'push scheitert, schreibe .claude/push-failed und benachrichtige via scripts/notify.mjs. WICHTIG: Wenn ' +
   'der SessionStart-Hook meldet, dass eine ANDERE Session den Batch-Lock haelt (STAND DOWN), dann arbeite ' +
-  'NICHT am Batch und beende dich sofort. Wenn alles erledigt ist: Closing fahren.'
+  'NICHT am Batch und beende dich sofort. Wenn alles erledigt ist: Closing fahren. ' +
+  CALL_DISCIPLINE_DE
 
 // --- THE USER'S OWN WORDS, CARRIED INTO THE SPAWN -----------------------------
 //

@@ -572,6 +572,19 @@ export function renewalDecision({
 /** Scripts whose whole job is to publish the board the user reads. */
 const BOARD_PUBLISH_SCRIPTS = ['board-publish.mjs', 'dashboard-publish.mjs', 'board.mjs']
 
+/**
+ * The LANDING CHAIN (point 594). One command that merges, ticks, archives,
+ * publishes the board and deletes the branch — i.e. every family this chokepoint
+ * guards, wrapped in a process where none of them is visible as a `git merge`, a
+ * TASKS.md write or a board publish.
+ *
+ * It is named here for exactly that reason. A convenience command that let a
+ * dispossessed session do in one call what it is refused in six would not be a
+ * convenience, it would be the hole. Classified `git-main` because that is the
+ * widest thing it does and the one whose damage is not local.
+ */
+const LANDING_SCRIPTS = ['land-point.mjs']
+
 /** Scripts that MERGE `.claude/dashboard-state.json` as their normal operation. */
 const DASHBOARD_STATE_SCRIPTS = ['focus.mjs', 'dashboard-sync.mjs', 'board-queue.mjs']
 
@@ -619,6 +632,9 @@ export function fenceGuardedAction({ toolName, command, filePath } = {}) {
   let tooDeep = false
   const segments = expandSegments(command, { onTruncate: () => (tooDeep = true) })
   for (const segment of segments) {
+    if (segmentInvokesScript(segment, LANDING_SCRIPTS)) {
+      return { kind: 'git-main', what: 'the landing chain (merge, tick, archive, board publish, cleanup)' }
+    }
     if (GIT_SHARED_HISTORY.has(gitSubcommand(segment))) {
       // A dispossessed session may still commit locally; what it may not do is
       // move shared history. `git push` is matched in every form rather than only

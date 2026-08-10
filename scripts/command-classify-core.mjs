@@ -564,11 +564,32 @@ function intentOfParsed(seg, depth = 0) {
     return argsOf(seg).some((a) => !a.quoted && /^-[A-Za-z]*i/.test(a.text)) ? 'write' : 'read'
   }
   if (WRITING_HEADS.has(head)) return 'write'
+  // A script of THIS repository that we can NAME is decidable, and the fallback's
+  // reasoning does not cover it.
+  if (argsOf(seg).some((a) => MUTATING_SCRIPTS.has(baseOf(a.text)))) return 'write'
   // Everything else — `node scripts/x.mjs --status`, `grep`, `cat`, an unknown
   // tool — reads. A script's own flags are not decidable from outside, and this
   // gate under-blocks by design.
   return 'read'
 }
+
+/**
+ * Scripts of THIS repository whose whole job is to change SHARED state (point
+ * 594).
+ *
+ * The fallback above reads an unknown `node scripts/x.mjs` as a READ, and that is
+ * a considered under-block: a script's flags are not decidable from outside. The
+ * reasoning stops applying the moment the script is one we wrote and can name.
+ * `land-point.mjs` merges into main, ticks the work order, commits, pushes main
+ * and deletes branches — every one of which is `write` when spelled out as a bare
+ * git command. Classified as a read, it walked past `board-first-guard`, which
+ * fires on a bare `git merge`: wrapping guarded steps in a script must not be a
+ * way out of the gates that govern them.
+ *
+ * Judged by NAME, not by flags — including `--dry`, for the same reason the
+ * fallback exists. Over-blocking here costs a board publish that was due anyway.
+ */
+const MUTATING_SCRIPTS = new Set(['land-point.mjs'])
 
 /** An already-parsed segment passes straight through; a string is parsed. */
 function asSegments(input) {

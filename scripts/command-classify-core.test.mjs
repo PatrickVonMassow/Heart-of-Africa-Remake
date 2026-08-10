@@ -358,3 +358,44 @@ describe('segmentMentionsFile', () => {
     expect(segmentMentionsFile('git status', ['TASKS.md'])).toBe(false)
   })
 })
+
+// ---------------------------------------------------------------------------
+// A NAMED SCRIPT OF THIS REPOSITORY IS DECIDABLE (point 594). The fallback reads
+// an unknown `node scripts/x.mjs` as a READ by design — its flags cannot be
+// judged from outside. That stops applying for a script we wrote: the landing
+// chain merges, ticks, commits, pushes main and deletes branches, and was still
+// classified read-only, which walked it straight past board-first-guard while a
+// bare `git merge` is caught.
+describe('scripts whose whole job is to change shared state', () => {
+  it('reads the landing chain as MUTATING, in every invocation form', () => {
+    for (const c of [
+      'node scripts/land-point.mjs 594',
+      'node scripts/land-point.mjs 594 --model "Claude Opus 5"',
+      'cd /repo && node scripts/land-point.mjs 594',
+      'node ./scripts/land-point.mjs 594',
+    ]) {
+      expect(isMutatingSegment(c)).toBe(true)
+    }
+  })
+
+  it('judges it by NAME, not by flags — a dry run counts too', () => {
+    // Same reasoning as the fallback: flags are not decidable from outside.
+    // Over-blocking here costs a board publish that was due anyway.
+    expect(isMutatingSegment('node scripts/land-point.mjs 594 --dry')).toBe(true)
+  })
+
+  it('leaves every OTHER script on the read-only fallback', () => {
+    for (const c of [
+      'node scripts/point-brief.mjs 594',
+      'node scripts/guard-preflight.mjs --for answer',
+      'node scripts/closing-guard-core.mjs --status',
+      'git status',
+    ]) {
+      expect(isMutatingSegment(c)).toBe(false)
+    }
+  })
+
+  it('is not fooled by a mere mention of the script name', () => {
+    expect(isMutatingSegment('grep land-point scripts/README.md')).toBe(false)
+  })
+})
