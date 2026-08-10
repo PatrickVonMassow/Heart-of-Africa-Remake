@@ -294,6 +294,20 @@ describe('the incident, replayed on a THROWAWAY repository', () => {
     expect(branches()).toContain('worktree-agent-98') // work is not debris
   })
 
+  it('drops the stub of a tree a half-finished removal already took', () => {
+    // The state the guard used to find and report: the directory is gone, git's
+    // record is stale, and the branch is the only thing left.
+    const path = addAgentTree('agent-96')
+    rmSync(path, { recursive: true, force: true })
+
+    const result = cleanupWorktree(path, { git })
+
+    expect(result.ok).toBe(true)
+    expect(result.note).toContain('already gone')
+    expect(result.stub).toMatchObject({ branch: 'worktree-agent-96', deleted: true })
+    expect(branches()).not.toContain('worktree-agent-96')
+  })
+
   it('--dry deletes no branch either', () => {
     const path = addAgentTree('agent-97')
     const result = cleanupWorktree(path, { git, dry: true })
