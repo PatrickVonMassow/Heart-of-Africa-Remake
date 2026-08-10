@@ -338,7 +338,11 @@ export function formatArgErrors(errors = []) {
 export const BLIND_REVIEWER = new RegExp(
   [
     // "I could not read/see/access …", "we were unable to inspect …"
-    /\b(?:i|we)\s+(?:could\s+not|couldn't|can(?:no|')t|(?:was|were)\s+(?:unable|not\s+able)\s+to|did\s+not\s+(?:get|receive|have))\b[^.\n]{0,80}\b(?:read|see|inspect|access|reach|open|review|view|retrieve|fetch)\b/
+    /\b(?:i|we)\s+(?:could\s+not|couldn't|can(?:no|')t|(?:was|were)\s+(?:unable|not\s+able)\s+to|did\s+not\s+(?:get|receive|have))\b[^.\n]{0,80}\b(?:read|see|inspect|access|reach|open|review|view|retrieve|fetch|verify|validate|confirm|check|examine|evaluate|assess)\b/
+      .source,
+    // "…because the repository was unavailable" — the reason half of the same
+    // admission, whatever verb the first half used (fifth cross-vendor round).
+    /\b(?:repository|repo|diff|patch|material|files?|change|workspace|content)\s+(?:was|were|is|are)\s+(?:unavailable|unreachable|inaccessible|not\s+(?:available|reachable|accessible))\b/
       .source,
     // "no access to the diff", "without access to the files", "had no material"
     /\b(?:no|without|lacking|denied)\s+access\b/.source,

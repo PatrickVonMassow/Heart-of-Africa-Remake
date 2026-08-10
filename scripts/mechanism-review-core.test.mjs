@@ -189,6 +189,9 @@ describe('validateRecord', () => {
     expect(validateRecord({ ...good, evidence: 'the patch was not supplied, so this is not a review' }).ok).toBe(false)
     expect(validateRecord({ ...good, evidence: 'the diff could not be read, so no review took place' }).ok).toBe(false)
     expect(validateRecord({ ...good, evidence: 'I was not able to inspect the diff at all' }).ok).toBe(false)
+    expect(
+      validateRecord({ ...good, evidence: 'I could not verify the attached change because the repository was unavailable' }).ok,
+    ).toBe(false)
     // …while an ordinary finding that merely contains the words is a review.
     expect(validateRecord({ ...good, evidence: 'the guard could not see a renamed file; fixed in the diff' }).ok).toBe(true)
   })
