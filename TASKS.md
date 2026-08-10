@@ -3760,6 +3760,40 @@ to land than a mechanism that needs a review.
   Criticality: HIGH — every unused mechanism was paid for twice: once when it was built,
   and again in every hour it would have saved and did not.
 
+- [ ] 606. THE SCOPE TEST IS RED IN EVERY WORKTREE (found while delivering point 605).
+  `scripts/verify/scope.test.mjs` resolves `node_modules/.bin/oxlint` under
+  `process.cwd()`. A git worktree carries no `node_modules` of its own, so those five
+  cases fail there for a reason that has nothing to do with the change under test — and
+  since every delegated point is built in a worktree, every agent meets it and works
+  around it by hand (the last one symlinked the main tree's `.bin`). A gate that is red
+  for environmental reasons teaches the pool to discount red.
+  FINAL STATE: the test resolves the binary by walking UP from the checkout until it
+  finds a `node_modules/.bin`, so it passes in the main tree and in any worktree without
+  a symlink; if none is found it fails with a message naming what it looked for and
+  where. Every other place in `scripts/` that resolves a local binary the same way is
+  checked and fixed with it — one helper, not five copies.
+  VERIFIABLE: Vitest — the resolver finds the binary from a nested path, from a worktree
+  path whose own directory holds none, and reports honestly when there is none at all.
+  Criticality: low — it costs every agent a detour and blunts the meaning of a red run,
+  but it endangers nothing the player sees.
+
+- [ ] 607. THE EVIDENCE FOR CRITERION 20 NAMES A CONTROL COUNT THAT IS TWO DOZEN SHORT
+  (found while delivering point 605). `docs/acceptance-evidence.md` §20 states that the
+  completeness test pins "132 controls"; the debug menu now carries 158. The number was
+  right when it was written and has not been maintained since, which makes the evidence
+  chain read as current while it is not.
+  FINAL STATE: the count is not written in prose at all. §20 names the TEST that pins the
+  completeness (which is what actually holds the property) and states the count only
+  where a machine keeps it true — or, if the number stays in the document, the sync test
+  that already guards `docs/graphics-detail-levels.md` gains the same duty for this
+  figure, so a drifted count fails the unit layer instead of quietly aging. The rest of
+  `docs/acceptance-evidence.md` is swept for the same class of hand-maintained number in
+  the same commit.
+  VERIFIABLE: Vitest — the guard fails on a deliberately wrong count and passes on the
+  real one; `npm run test:unit` green.
+  Criticality: low — a documentation defect, but in the file the closing run reads as
+  proof.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
