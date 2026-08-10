@@ -43,7 +43,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
-import { didRun, findLocalBin, describeMissing, NOT_RUN } from '../local-bin.mjs'
+import { didRun, findLocalBin, describeMissing, NOT_RUN, OXLINT_OUTPUT } from '../local-bin.mjs'
 import { REPO_ROOT } from '../repo-paths.mjs'
 import {
   crossSectionGlobals,
@@ -58,10 +58,10 @@ const ROOT = REPO_ROOT
 const FOUND = findLocalBin('oxlint', { start: ROOT })
 const OXLINT = FOUND?.path ?? null
 
-// What oxlint's own output looks like — `file:line:col: warning eslint(rule):`.
-// A shell saying "oxlint: not found" is non-zero WITH output, so the shape is
-// what separates the tool's verdict from a complaint about the tool.
-const OXLINT_OUTPUT = /:\d+:\d+: (error|warning) |Found \d+ (warning|error)/
+// What oxlint's own output looks like — the shape is what separates the tool's
+// verdict from a shell complaining "oxlint: not found", which is also non-zero
+// WITH output. Defined beside `didRun` so no caller can pin a narrower shape
+// than the tool prints.
 
 // A red must mean a defect (point 569). With no linter anywhere — no worktree
 // link, no install, nothing on PATH — these cases have nothing to say, so they

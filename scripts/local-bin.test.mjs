@@ -1,7 +1,7 @@
 // The resolver behind every spawned tool, and the not-run distinction.
 import { describe, it, expect } from 'vitest'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
@@ -12,6 +12,7 @@ import {
   findLocalBin,
   mainWorkingTree,
   NOT_RUN,
+  OXLINT_OUTPUT,
   pathEntries,
   requireLocalBin,
   searchRoots,
@@ -256,7 +257,7 @@ describe('a spawn that never started', () => {
     const r = spawnSync('sh', ['-c', 'hoa-no-such-binary-573 --anything'], { encoding: 'utf8', windowsHide: true })
     if (r.error) return // no POSIX shell (Windows) — the case above already covers it
     expect(r.status).not.toBe(0)
-    expect(didRun(r, { expect: /:\d+:\d+: (error|warning) |Found \d+ (warning|error)/ })).toBe(false)
+    expect(didRun(r, { expect: OXLINT_OUTPUT })).toBe(false)
   })
 
   it('lets a REAL rejection through, or the distinction would just be a blanket refusal', () => {
@@ -266,15 +267,22 @@ describe('a spawn that never started', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-realreject-'))
     try {
       mkdirSync(join(dir, 'scripts', 'verify'), { recursive: true })
-      writeFileSync(join(dir, '.oxlintrc.json'), readFileSync(join(REPO_ROOT, '.oxlintrc.json'), 'utf8'))
       writeFileSync(join(dir, 'scripts', 'verify', 'bad.mjs'), 'export const f = () => neverDeclared()\n')
-      const r = spawnSync(requireLocalBin('oxlint'), ['scripts/verify/bad.mjs'], {
+      // The rule is armed ON THE COMMAND LINE, so this case does not depend on
+      // oxlint discovering a config file: the subject here is the not-run
+      // distinction, and a machine whose config discovery differs must not turn a
+      // real rejection into "it never ran" (that made CI red on 10.08.2026).
+      const bin = requireLocalBin('oxlint')
+      const r = spawnSync(bin, ['-D', 'no-undef', 'scripts/verify/bad.mjs'], {
         cwd: dir,
         encoding: 'utf8',
         windowsHide: true,
       })
-      expect(didRun({ ...r, out: `${r.stdout}${r.stderr}` }, { expect: /:\d+:\d+: (error|warning) / })).toBe(true)
-      expect(r.status).not.toBe(0)
+      // A failure here must SAY what the linter did, or the next reader is left
+      // guessing on a machine he cannot reach.
+      const evidence = `oxlint at ${bin}\n  exit:   ${r.status}\n  error:  ${r.error?.message ?? '(none)'}\n  output: ${JSON.stringify(`${r.stdout ?? ''}${r.stderr ?? ''}`)}`
+      expect(didRun(r, { expect: OXLINT_OUTPUT }), evidence).toBe(true)
+      expect(r.status, evidence).not.toBe(0)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

@@ -165,6 +165,16 @@ export function didRun(result, { expect: shape } = {}) {
   return true
 }
 
+/**
+ * WHAT OXLINT'S OUTPUT LOOKS LIKE — one definition, because a caller that demands
+ * a NARROWER shape than the tool actually prints turns a real rejection into
+ * "it never ran". That happened: a test pinned only the compact
+ * `file:line:col: error …` line while the runner printed the summary form, so the
+ * suite went red on a machine where nothing was wrong (CI, 10.08.2026). Both
+ * spellings belong to a linter that ran.
+ */
+export const OXLINT_OUTPUT = /:\d+:\d+: (error|warning) |Found \d+ (warning|error)/
+
 /** The message for a spawn that never ran, so every caller words it the same and
  *  a reader never mistakes it for the tool's verdict. */
 export const NOT_RUN = (name, result = {}) =>
