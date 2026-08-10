@@ -16970,3 +16970,63 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   check still answers is reported as a transport failure, not as a stale board.
   Criticality: high for unattended operation — this is the one failure mode that stops
   every other point, and it fired on a false positive.
+
+- [x] 612. THE HANDOVER WAITS FOR THE CLOCK, AND AN IDLE OWNER BLOCKS IT (10.08.2026;
+  bundle Urlaubsfestigkeit). Measured on this day: the batch stood still for 30 minutes
+  with nothing broken. The outgoing session handed over correctly at 13:20
+  (`HANDOVER point 604` in `.claude/boundary.log`, the lock released); the launcher ticks
+  every 15 minutes and would not have looked before 13:31; at 13:28 an unattended window
+  took the free lock at session start, so the 13:31 tick correctly found a live owner and
+  spawned nobody. Every part behaved as built, and the batch was idle anyway — which is
+  the failure mode this bundle exists to remove, because an absence turns 30 minutes into
+  hours.
+  FINAL STATE, two independent repairs:
+  1. THE RELEASE TRIGGERS THE SPAWN. Marking the lock handed over is an EVENT the launcher
+     reacts to, not a state it discovers on its next tick: the boundary path signals the
+     launcher (the launcher watches the lock file, or `batch-boundary.mjs` wakes it), and
+     the successor starts within seconds. The 15-minute tick REMAINS as the backstop for
+     the cases no signal covers (a killed session, a missed write) — the fast path is
+     added, the slow path is not removed. The mark also OUTRANKS every liveness heuristic,
+     at any grace age: an owner that has declared itself finished is finished, and liveness
+     answers a question nobody asked. Measured 10.08.2026 — the handover was written at
+     13:57:46Z and the ticks at 14:01, 14:16 and 14:31 each logged `skip: owner alive
+     (pid-alive; heartbeat 5..20 min old, pid 939)` and spawned nobody, because the handover
+     grace had elapsed one tick earlier and the verdict fell back to the pid. That pid is the
+     attended window's `claude` process, which survives a `/clear` and hosts every session in
+     that window, so successive owners write the SAME pid and the pid-alive branch can never
+     observe a dead one. Ownership liveness therefore keys on the SESSION — its identity,
+     heartbeat and lease — never on the bare existence of a hosting process.
+  2. OWNERSHIP IS BOUND TO WORK, NOT MERELY TO LIFE. Today `leaseUntil` runs an hour and
+     never asks whether the owner is doing anything, so a session that takes the lock and
+     idles holds the batch for that hour. An owner that has neither declared in-flight work
+     (`batch-in-flight.mjs`) nor produced a state change within a short IDLE WINDOW
+     (starting value 5 min, calibratable) loses the lock the same arithmetic way an expired
+     lease loses it — no process is killed, the owner simply stops owning, and the launcher
+     may spawn. An ATTENDED window is not exempt: it either works or it releases.
+     A STATE CHANGE IS THE OWNER'S OWN: a heartbeat it wrote, a commit, a board write — not
+     a worktree's file timestamps, which a leaked dev server or a file watcher keeps fresh
+     while the owner does nothing (the launcher reads exactly that today as "declared work
+     advancing"). Otherwise the idle window is defeated by a process nobody is watching.
+  3. THE SPAWN EVENT FIRES ON EVERY OWNERSHIP-ENDING TRANSITION of the lock, not on the
+     handover mark alone — an idle lapse and an expired lease end ownership just as
+     definitively, and without this they wait for the next 15-minute tick, which is the
+     latency part 1 exists to remove.
+  Both parts must leave the singleton property intact — no path may produce two live owners
+  — and both stand down for a paused batch as every guard here does.
+  VERIFIABLE: Vitest on the pure parts (the release-to-spawn decision from a lock state and
+  a clock; the idle verdict from declared work, last state change and the window, including
+  the boundary cases at exactly the window and with in-flight work declared); plus the real
+  proof, which this bundle already owns — the chaos drill (449) gains a case that releases
+  the lock and asserts a successor is running in seconds rather than at the next tick, and a
+  case where an idle owner is superseded while a working one is not.
+  Criticality: high — it is the failure this bundle is for, it is silent, and it costs the
+  whole absence rather than one point.
+  DELIVERED 10.08.2026 on the same branch as point 562 (`feat/562-probe-and-handover`,
+  merged as `5091c748`), reviewed by the second model (merge-with-fixes; the one named
+  defect — a transport alert claiming a currency it had not read — was fixed before the
+  merge). Ownership now lives in one decision chain (`scripts/batch-ownership-core.mjs`):
+  the handover mark frees the lock at any age, liveness keys on the session, the idle
+  window dispossesses an owner that never worked, and the launcher wakes on every
+  ownership-ending transition. The chaos-drill cases the spec names could not be added —
+  point 449 is open and its drill script does not exist — and the daemon tests that prove
+  the same properties stand in their place.
