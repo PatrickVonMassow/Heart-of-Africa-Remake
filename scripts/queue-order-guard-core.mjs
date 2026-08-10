@@ -26,7 +26,11 @@ import { gatedPoints } from './user-gate-core.mjs'
 // finders too and belong in this block (added 24.07.2026, user queue-order call).
 export const FINDER_POINTS = new Set([184, 200, 203, 204, 205, 207, 285])
 
-/** The release tag is always last and exempt from the order rule. */
+/** The release tag point. It keeps the POSITION the work order gives it (user
+ *  10.08.2026: v0.3 ships once the communication mechanic and the critical bugs
+ *  are done — the feature work and the audits follow it, they do not gate it), and
+ *  it stays exempt from the fixes-before-finders rule, which orders the work that
+ *  comes BEFORE the release. */
 export const RELEASE_TAG_POINT = 174
 
 /** Done-claim tokens (matched as whole words, case-insensitive). */
@@ -194,7 +198,7 @@ export function evaluate({ dashboardHtml, tasksMd } = {}) {
       problems.push(
         `QUEUE ORDER WRONG: finder/QA point(s) ${misordered.join(', ')} are queued AHEAD of open fix ` +
           `work. Known-bug fixes and user-requested extensions come BEFORE the finder/QA tickets ` +
-          `(${[...FINDER_POINTS].join(', ')}); ${RELEASE_TAG_POINT} stays last. Reorder the ` +
+          `(${[...FINDER_POINTS].join(', ')}); ${RELEASE_TAG_POINT} keeps its work-order position. Reorder the ` +
           `Warteschlange cards, then ${REPUBLISH}.`,
       )
     }

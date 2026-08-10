@@ -213,14 +213,21 @@ Festhängen leads, then Ton: a session that cannot be continued makes every othe
 judgment moot, and after it, while the syllables are a squawk and the speech sits behind
 a control nobody finds, nothing about the language can be judged at all.
 
-Then **Urlaubsfestigkeit** (30.07.2026): the user must be able to leave for two
-weeks and rely on the batch being worked without them, so the layer that keeps it
-running outranks everything it would keep running. Then **Chat & Tafel →
-Session- & Repo-Hygiene → Modell & Wächter → Testinfrastruktur**, then the visible
-defects **Siedlungsgeometrie → Monumente → Dorfleben → Wetter & Wasser →
-Kadaver & Geier**, then **v0.3 with the full closing** (dead code, stale docs and the
-`.md` audit included), then **Tierverhalten → Sonne & Himmel →
-Steuerung & Performance → Dokumentation**, and the big audits last.
+**THE RANKING AS IT STANDS (user 10.08.2026).** The goal is the communication PoC in
+a usable state and then **v0.3**, and the order serves that goal:
+
+1. **Throughput and token cost first** — anything that measurably lowers what a point
+   costs or raises the rate at which the queue is worked, including the measured batch
+   STALLS out of Urlaubsfestigkeit (a batch that stands still has throughput zero).
+   The remaining absence-hardening is insurance rather than a lever and follows later.
+2. **The communication mechanic**, until the PoC is usable — that is what the release
+   is for.
+3. **The critical bugs**: anything that ends the player's session, loses the
+   expedition, or voids a verification.
+4. **v0.3 with the full closing** (dead code, stale docs and the `.md` audit included).
+   It is gated on 2 and 3 ONLY. Features do not gate it.
+5. **Everything else** — the visible-defect bundles, **Tierverhalten → Sonne & Himmel →
+   Steuerung & Performance → Dokumentation** — and the big audits last.
 
 Infrastructure leads because every later bundle is verified through it: the board
 must tell the truth, the session handover must hold, the guard chain must actually

@@ -91,10 +91,17 @@ describe('queueOrder — judgment first, work order second, finders last', () =>
     const out = queueOrder([finder, 999], { order: [finder, 999] })
     expect(out.indexOf(finder)).toBeGreaterThan(out.indexOf(999))
   })
-  it('puts the release tag last of all', () => {
+  it('keeps the release tag where the work order put it, ahead of the finder block', () => {
+    // User 10.08.2026: v0.3 ships once the communication mechanic and the critical
+    // bugs are done. The finders and audits are POST-release work, so they sink
+    // past the tag instead of gating it — while an ordinary fix keeps whatever
+    // position the work order gave it. (An EXPLICITLY listed order is pinned by
+    // the flat-list test below; this case has no listed order, so the two rank-0
+    // points fall back to the ascending append and only the sink is assertable.)
     const finder = [...FINDER_POINTS][0]
-    const out = queueOrder([RELEASE_TAG_POINT, finder, 999], null)
-    expect(out[out.length - 1]).toBe(RELEASE_TAG_POINT)
+    const out = queueOrder([999, RELEASE_TAG_POINT, finder], null)
+    expect(out[out.length - 1]).toBe(finder)
+    expect(out.indexOf(RELEASE_TAG_POINT)).toBeLessThan(out.indexOf(finder))
   })
 })
 
@@ -686,8 +693,8 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
     expect(new Set(rendered).size).toBe(rendered.length)
     expect(rendered.slice().sort((a, b) => a - b)).toEqual(open.slice().sort((a, b) => a - b))
     // The order is the queue's own judgment, undisturbed: the fixes first, the
-    // bug-FINDING point behind them, the release tag last of all.
-    expect(rendered).toEqual([295, 439, 465, 184, RELEASE_TAG_POINT])
+    // release tag where the work order put it, the bug-FINDING point last of all.
+    expect(rendered).toEqual([RELEASE_TAG_POINT, 295, 439, 465, 184])
     expect(FINDER_POINTS.has(184)).toBe(true)
   })
 

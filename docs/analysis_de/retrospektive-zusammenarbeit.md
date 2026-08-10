@@ -1016,6 +1016,30 @@ der Besitz des Stapels) nur an ein Lebenszeichen gebunden ist, gehört es an ein
 FORTSCHRITT gebunden — sonst blockiert der Untätige den Fleißigen, ohne dass eine
 Regel verletzt wäre.
 
+### 3.104 Eine Sitzung wächst an Anliegen, nicht an Punkten
+
+Die Regel gegen aufgeblähten Kontext ist geschrieben für einen delegierten Punkt: Ein
+Auftrag, eine Sitzung, dann der Grenzstein. Am 10.08.2026 nahm eine begleitete Sitzung
+sechs getrennte Anliegen des Nutzers hintereinander auf — eine Frage zur Tafel, die zu
+einer Neusortierung wurde, dazu die Neufassung des Release-Tors, das Aufräumen der
+Arbeitsordnung, die Ergebnisse einer Vier-Augen-Analyse über 148 Punkte und fünf
+Zweig-Landungen. Nichts hielt das auf, und zwar aus einem strukturellen Grund: **Der
+Grenzstein hängt an einem ABGESCHLOSSENEN Punkt**, und eine begleitete Sitzung mitten
+im Gespräch erreicht diesen Zustand nie. Sie kann also beliebig wachsen, ohne eine
+einzige Regel zu verletzen.
+
+Der Nutzer hat die richtige Konsequenz benannt: Die Einsicht allein ändert nichts.
+Sie hätte in jeder der sechs Übernahmen genauso richtig danebengestanden.
+
+**Lehre:** Eine Obergrenze, die nur einen Arbeitstyp kennt, ist keine Obergrenze,
+sondern eine Einladung, in den anderen auszuweichen. Was den Verbrauch treibt, ist
+nicht die Art der Arbeit, sondern die ZAHL DER THEMEN in einem Fenster — und die
+wächst bei einer begleiteten Sitzung am schnellsten, weil jede Rückfrage des Nutzers
+wie eine Fortsetzung aussieht und keine ist. Der Durchsetzer muss deshalb den
+Verbrauch der begleiteten Sitzung genauso zählen, und ein NEUES Thema jenseits der
+Grenze wird angehängt statt begonnen. Das ist zugleich die billigste Bauform: Der
+Zähler existiert bereits, ihm fehlte nur der zweite Fall.
+
 ---
 
 ## 4. Die Guards als Immunsystem

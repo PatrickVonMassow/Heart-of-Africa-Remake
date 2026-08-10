@@ -677,6 +677,19 @@ there exactly once; a new point joins a bundle when appended.
   Criticality: high — this is the batch's dominant running cost, and a lever that reports
   a saving it did not make is worse than none: it retires the question. The measurement is
   therefore part of the delivery, not a follow-up.
+  AND IT BINDS THE ATTENDED SESSION, NOT ONLY A DELEGATED POINT (measured 10.08.2026).
+  One attended session absorbed SIX separate user requests plus the two full reports of a
+  blind-parallel analysis in a SINGLE stretch — a dashboard question that grew into a
+  re-ranking, a release re-gating, a work-order cleanup and five branch landings. Nothing
+  stopped it, because every existing ceiling is written for a delegated point and the
+  boundary rule fires only at a CLOSED point, which an attended session in the middle of a
+  conversation never reaches. FINAL STATE: the same budget mechanism counts an attended
+  session's spend, and on crossing the ceiling the Stop chain requires ONE of two answers
+  before the turn may end — the written handoff and a boundary, or a stated reason why this
+  stretch must continue (a merge in flight, a user waiting on this very answer). A NEW topic
+  that is not a continuation of the current one may not be started past the ceiling; it is
+  APPENDED to the work order and taken by the next session. The ceiling is measured, not
+  guessed: it is derived from the same recorded spend this point already reads.
 
 - [ ] 512. THE BUILD ORDER IS PAID AGAIN BY EVERY SUBAGENT (user decision
   05.08.2026 on the card "Bauanleitung für Subagenten aufteilen?"). Measured:
@@ -1946,6 +1959,29 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: the `polish` compass check passes three consecutive runs and fails
   when the panorama orientation is deliberately inverted — a check that cannot
   fail proves nothing.
+
+- [ ] 174. Tag the demo build `v0.3` and publish it at
+  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3/.
+  GATE (user 10.08.2026, replacing the 19.07.2026 wording): v0.3 no longer waits for
+  EVERY open bugfix — that gate was unreachable and pushed the release out
+  indefinitely. What must be closed is exactly two classes:
+  1. the CRITICAL bugs (the tier-c block at the head of the work order — anything that
+     ends the player's session, loses the expedition, or voids a verification), and
+  2. everything on the COMMUNICATION MECHANIC, until the PoC is in a usable state —
+     that is the release's purpose.
+  Everything else — visuals, ambience, wildlife, the big audits — ships AFTER v0.3.
+  A final closing run (CLAUDE.md §9: Vitest + LARGE regression on both backends,
+  dead-code and `.md` audit, lint and CVE clean) at the exact HEAD to be tagged
+  remains mandatory; the closing is what the tag certifies, and no tag is cut on an
+  unclosed state.
+  FINAL TAG HELD FOR THE USER. The tag and the /v0.3/ publish are the one
+  irreversible, outward-facing step: do ALL the work up to it, then report "ready to
+  tag" and WAIT for the user's explicit go for that tag (`tags-only-on-request`).
+  When it comes, tag `v0.3` at that HEAD, MOVE the `poc` tag to the same commit, and
+  run the deploy via `workflow_dispatch` — the Pages workflow enumerates every `v*`
+  tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
+  that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
+  re-pointed.
 
 - [ ] 453. WHAT IS THE LION EATING? (user bug report 30.07.2026,
   `local/WasFrisstDerLoewe.zip`, seed 1608676381, east region at the river, WebGPU/high:
@@ -5552,26 +5588,3 @@ to land than a mechanism that needs a review.
   VERIFIABLE: two HTTP 200s with the expected build stamp, recorded in the closing
   evidence.
   Criticality: low — bookkeeping on a delivery that already happened.
-
-- [ ] 174. Tag the demo build `v0.3` and publish it at
-  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3/.
-  GATE (user 10.08.2026, replacing the 19.07.2026 wording): v0.3 no longer waits for
-  EVERY open bugfix — that gate was unreachable and pushed the release out
-  indefinitely. What must be closed is exactly two classes:
-  1. the CRITICAL bugs (the tier-c block at the head of the work order — anything that
-     ends the player's session, loses the expedition, or voids a verification), and
-  2. everything on the COMMUNICATION MECHANIC, until the PoC is in a usable state —
-     that is the release's purpose.
-  Everything else — visuals, ambience, wildlife, the big audits — ships AFTER v0.3.
-  A final closing run (CLAUDE.md §9: Vitest + LARGE regression on both backends,
-  dead-code and `.md` audit, lint and CVE clean) at the exact HEAD to be tagged
-  remains mandatory; the closing is what the tag certifies, and no tag is cut on an
-  unclosed state.
-  FINAL TAG HELD FOR THE USER. The tag and the /v0.3/ publish are the one
-  irreversible, outward-facing step: do ALL the work up to it, then report "ready to
-  tag" and WAIT for the user's explicit go for that tag (`tags-only-on-request`).
-  When it comes, tag `v0.3` at that HEAD, MOVE the `poc` tag to the same commit, and
-  run the deploy via `workflow_dispatch` — the Pages workflow enumerates every `v*`
-  tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
-  that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
-  re-pointed.
