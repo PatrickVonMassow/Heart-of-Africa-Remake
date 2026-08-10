@@ -16784,3 +16784,354 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   cluster; do NOT delegate the BUILD concurrently with another Wildlife.tsx point. The
   RESEARCH half (the docs file + the species table) is a standalone Fable pass with no
   code, safe to run in parallel; the build follows on the researched species.
+
+- [x] 613. EVERY DELEGATION LEAVES A BRANCH THE HYGIENE GUARD THEN DEMANDS (10.08.2026;
+  bundle Modell & Wächter). Creating an isolated agent worktree also creates a setup branch
+  named after the worktree (`worktree-agent-<id>`). The agent immediately switches its tree
+  to its own `feat/<point>-<slug>` branch, so that stub is abandoned within seconds, sitting
+  on whatever `main` pointed at when the worktree was cut. As soon as `main` moves, the stub
+  reads as "already contained in origin/main" and `branch-hygiene-guard` demands its deletion
+  — measured today with three agents running, three findings, each blocking the turn end while
+  the delegation was healthy. The guard's existing worktree protection does not catch it,
+  because the branch is genuinely no longer checked out anywhere; nothing is wrong except that
+  the noise arrives on every parallel turn and trains the reader to wave the guard through.
+  FINAL STATE: the stub is cleaned up where it is created rather than reported where it is
+  found — `scripts/worktree-cleanup.mjs` removes the `worktree-agent-<id>` branch together
+  with its worktree, and while that worktree still lives the guard treats the branch as
+  protected by it (the id in the branch name resolves to the worktree path). Nothing else about
+  the verdict changes: a merged, unused feature branch is still debris and still blocks.
+  VERIFIABLE: pure Vitest on the verdict core — a `worktree-agent-<id>` stub whose worktree
+  still exists yields no finding; the same stub with the worktree gone still does; an ordinary
+  merged feature branch is unaffected — plus a cleanup case proving the branch goes with the
+  tree.
+  Criticality: low — it destroys nothing, but it blocks the turn end of every delegating
+  session, and a guard that cries wolf on healthy work is how a real finding gets waved past.
+
+- [x] 573. THE LINT-RULE SUITE NEITHER RUNS NOR ADMITS IT INSIDE A WORKTREE (found
+  09.08.2026 while measuring point 572; every delegated agent has been paying for it).
+  `scripts/verify/scope.test.mjs` resolves the linter as
+  `resolve(process.cwd(), 'node_modules/.bin/oxlint')`. A git WORKTREE has no
+  `node_modules`, so in the worktree every delegated agent works in, that binary does not
+  exist and the spawn returns code 1 with empty output. BOTH halves of the suite then lie,
+  and the second half is the dangerous one:
+  1. The cases that expect the linter to ACCEPT clean code fail — 5 red in every
+     worktree run of `npm run test:unit`. Cheap and loud: the agent disproves them by
+     hand and reports around them, which is wasted work but caught.
+  2. The cases that expect the linter to REJECT bad code PASS — because "did not run"
+     also produces a non-zero code. A lint rule this suite is meant to guard could rot
+     away and the suite would stay green in exactly the environment most of our work
+     happens in. That is a false GREEN, and it is why this point is not cosmetic.
+  FINAL STATE: (a) the suite resolves the linter so it is found from a worktree as well
+  as from the main checkout — the main working tree's `node_modules` is reachable from a
+  worktree via the repository's common git directory, and the resolution falls back to
+  the runner on `PATH`; (b) a spawn that did NOT run the linter is its own explicit
+  failure, named as "the linter did not run" and never counted as a rejection: the
+  helper distinguishes "ran and rejected" from "never started" by the presence of real
+  linter output, and every negative assertion goes through that distinction; (c) the
+  same resolution is applied wherever else a test spawns a tool from
+  `node_modules/.bin` — this suite is the one that was caught, not necessarily the only
+  one, so the sweep is part of the point and its result is reported even if it is "no
+  other place"; (d) a PURE GATE in the fast layer keeps the pattern from coming back:
+  `scripts/verify/spawn-assertion-gate.test.mjs` reads the test files, finds a negative
+  assertion about a spawned process that concludes "it rejected" from a non-zero exit
+  WITHOUT establishing that the process ran at all, and goes red — the same build as the
+  frame-subject gate, not another Stop hook.
+  Repairing the one find without catching the pattern would only mean waiting for the
+  next place, and this defect's silent half never announces itself.
+  VERIFIABLE: pure Vitest for the not-run detection (a helper pointed at a
+  deliberately absent binary must fail with the not-run message, not pass as a
+  rejection), plus the real proof that the bug is gone — `npm run test:unit` run FROM A
+  GIT WORKTREE is green, which is the environment the defect lives in and the one no
+  previous run used.
+  Criticality: medium — no player ever sees it, but it costs every delegated agent time
+  and it can hide a rotted lint rule behind a green suite.
+
+- [x] 569. THE FAST LAYER SHOWS FIVE REDS TO EVERY DELEGATED AGENT (measured 09.08.2026
+  by the agent delivering point 557, confirmed against the base commit with its own diff
+  stashed — the same five reds; bundle Testinfrastruktur). `scripts/verify/scope.test.mjs`
+  resolves `node_modules/.bin/oxlint` under `process.cwd()`. In a git WORKTREE that path
+  does not exist: Node resolves the parent tree's `node_modules` for imports, but `.bin`
+  is not linked there. So `npm run test:unit` — the one gate every point runs — is green
+  on `main` and five-red in every worktree.
+  WHY IT MATTERS: CLAUDE.md §6 delegates every point to a worktree-isolated agent, so
+  EVERY delegated agent meets these five reds, must investigate them, and must satisfy
+  itself they are pre-existing before it may report its gate green. Two agents have now
+  paid that cost. Worse is what it teaches: an agent that learns the fast layer is
+  "normally a bit red" is an agent that will wave through a real red.
+  FINAL STATE: the test resolves the binary the way the rest of the scripts do — from the
+  repository root the project already derives (`scripts/repo-paths.mjs`'s `REPO_ROOT`),
+  not from `process.cwd()` — so it passes in a worktree and on `main` alike. If the
+  binary genuinely cannot be found in a worktree, the case SKIPS with its reason printed
+  rather than failing, because a red must mean a defect.
+  VERIFIABLE: `npm run test:unit` green in a freshly created worktree AND on `main`, both
+  proven by running it in both; a Vitest case pins the resolution so it cannot silently
+  return to `process.cwd()`.
+  FOLDED IN FROM POINT 572 (measure 4, "the worktree is gate-ready in seconds"): this
+  point owns the oxlint false red and fixes its RESOLUTION; the missing DEPENDENCIES are
+  delivered here too rather than by a second owner of the same red. A fresh agent worktree
+  carries its dependencies without a per-worktree install — the bootstrap links the main
+  checkout's `node_modules` and VERIFIES the lockfile hash matches, installing for real
+  when it does not — so the delegation brief no longer tells an agent to set the link by
+  hand and the false red of a missing `node_modules/.bin/oxlint` cannot occur at all.
+  Measured target: 1–3 min per agent over ~64 points per window, plus the turns an agent
+  spends today classifying the false red. A wrong lockfile state would test against the
+  wrong tree, which the hash check prevents.
+  Criticality: medium — it hides no product defect, but it degrades the signal of the one
+  gate every delegated point runs, which is how a real red gets waved through.
+  DELIVERED BY POINT 573 (landed 10.08.2026): the four-eyes verdict of point 614
+  merged this report into 573 — one defect, one fix. `scripts/local-bin.mjs` resolves the
+  binary from the repository root and the main checkout instead of `process.cwd()`, and
+  `scripts/worktree-bootstrap.mjs` gives a fresh worktree its dependencies by linking the
+  main checkout once the lockfile hash matches. Proven: the suite is green in a freshly
+  created worktree.
+
+- [x] 606. THE SCOPE TEST IS RED IN EVERY WORKTREE (found while delivering point 605).
+  `scripts/verify/scope.test.mjs` resolves `node_modules/.bin/oxlint` under
+  `process.cwd()`. A git worktree carries no `node_modules` of its own, so those five
+  cases fail there for a reason that has nothing to do with the change under test — and
+  since every delegated point is built in a worktree, every agent meets it and works
+  around it by hand (the last one symlinked the main tree's `.bin`). A gate that is red
+  for environmental reasons teaches the pool to discount red.
+  FINAL STATE: the test resolves the binary by walking UP from the checkout until it
+  finds a `node_modules/.bin`, so it passes in the main tree and in any worktree without
+  a symlink; if none is found it fails with a message naming what it looked for and
+  where. Every other place in `scripts/` that resolves a local binary the same way is
+  checked and fixed with it — one helper, not five copies.
+  VERIFIABLE: Vitest — the resolver finds the binary from a nested path, from a worktree
+  path whose own directory holds none, and reports honestly when there is none at all.
+  Criticality: low — it costs every agent a detour and blunts the meaning of a red run,
+  but it endangers nothing the player sees.
+  DELIVERED BY POINT 573 (landed 10.08.2026): the four-eyes verdict of point 614
+  merged this report into 573 — one defect, one fix. The resolution walks up from the
+  checkout and reports honestly when nothing is found (`scripts/local-bin.mjs`,
+  `describeMissing`), and the sweep of the other local-binary resolutions found no second
+  place — the remaining matches are test fixtures, not resolutions.
+
+- [x] 516. A BRIEF DOES NOT CARRY THE SPECIFICATION IT DECLARES BINDING (measured
+  05.08.2026 while point 488 was built). Point 488's text reads "point 352's
+  specification is binding with one amendment from point 482", and the brief cut for
+  488 carried — per its own design — only the ONE identifying line of each
+  cross-referenced point. So the part that was declared binding was exactly the part
+  missing, and the building agent had to run `point-brief.mjs 352` for itself before
+  it could start. The one-line identification is right for a point merely MENTIONED;
+  it is wrong for one whose specification the reading point adopts.
+  FINAL STATE:
+  1. Where a point ADOPTS another point's specification — "X's specification is
+     binding", "per point X", "as specified in X" and the like — the brief inlines
+     that point VERBATIM, under its number, the way it inlines the design.md
+     sections it cites. A point that is merely referenced for orientation keeps its
+     one identifying line.
+  2. The distinction is made by the referencing WORDING, not by a hand-kept list, and
+     an adopted point's own adopted references resolve one further level, with a
+     depth cap that is stated in the brief rather than silently applied.
+  3. An adopted point that resolves nowhere fails the brief LOUDLY, like every other
+     unresolvable reference.
+  4. The reference map names each adopted point as adopted, so the reader sees why the
+     full text is there.
+  5. The same gap exists one level out, at the DOCUMENTS a slice is specified in
+     (measured 06.08.2026 while point 487 was built): the brief names design.md
+     sections but knows no other spec document, so the agent found
+     `docs/communication-poc-spec.md` — which pins the five-step loop verbatim and
+     decided the journal wording — only through a code comment. A brief therefore
+     names the spec DOCUMENT its point's slice belongs to, the way it names a
+     design.md section, and an unnamed slice document is a finding, not a search
+     task for the reader.
+  VERIFIABLE: pure Vitest on the reference classifier (an adopting phrase yields the
+  full text, a mentioning one the single line, an unknown number fails); the brief for
+  488 contains point 352's specification in full, the brief for a communication-slice
+  point names `docs/communication-poc-spec.md`, and the brief's size for a point with
+  no adopted reference is unchanged.
+
+- [x] 562. A FLICKERING REACHABILITY PROBE STOPS THE WHOLE BATCH (measured 08.08.2026;
+  bundle Urlaubsfestigkeit). The launcher probes the published board each tick and
+  escalates when it cannot read it: five alerts with growing spacing, then a deliberate
+  pause of the batch (`.claude/batch-paused`, the point-445 escalation). On 08.08.2026 at
+  13:39 that chain fired and stopped the work; it only resumed because the restart clock
+  ran out. The board was never gone. `.claude/batch-launcher.log` shows
+  `board: unreachable — fetch failed` INTERLEAVED with successful probes of the same URL
+  (lines 1114 and 1136 sit after already-green ones), and a counter-probe from the same
+  container at the same time returns HTTP 200 — with and without `--dns-result-order=
+  ipv4first` — while `board-publish.mjs --check` reports CURRENT. So a sporadic network
+  hiccup halts every point in the queue, and the alert that fetches the user out of his
+  weekend reports something untrue.
+  FINAL STATE: a transport failure and a STALE board are told apart, because they are not
+  the same claim — a failed fetch says nothing about the board's currency, and only
+  staleness is worth waking anybody for. A probe that fails is RETRIED at once (a second
+  attempt, briefly spaced) before it counts as anything, and the escalation counts only
+  CONSECUTIVE failures: one success anywhere in the chain resets it. The pause stays the
+  last stage for a genuinely unreachable board — it is the right instrument for a real
+  outage — but a transport failure alone never reaches it while the currency check still
+  answers over its own transport (`--check` reads raw.githubusercontent.com, a different
+  host from the Pages viewer, and the two failing together is what an outage looks like).
+  The alert text names WHICH of the two happened.
+  VERIFIABLE: pure Vitest over the probe's decision function — an alternating
+  failure/success sequence never escalates; N consecutive failures do; a single failure
+  followed by a successful retry is not counted; and a fetch failure while the currency
+  check still answers is reported as a transport failure, not as a stale board.
+  Criticality: high for unattended operation — this is the one failure mode that stops
+  every other point, and it fired on a false positive.
+
+- [x] 612. THE HANDOVER WAITS FOR THE CLOCK, AND AN IDLE OWNER BLOCKS IT (10.08.2026;
+  bundle Urlaubsfestigkeit). Measured on this day: the batch stood still for 30 minutes
+  with nothing broken. The outgoing session handed over correctly at 13:20
+  (`HANDOVER point 604` in `.claude/boundary.log`, the lock released); the launcher ticks
+  every 15 minutes and would not have looked before 13:31; at 13:28 an unattended window
+  took the free lock at session start, so the 13:31 tick correctly found a live owner and
+  spawned nobody. Every part behaved as built, and the batch was idle anyway — which is
+  the failure mode this bundle exists to remove, because an absence turns 30 minutes into
+  hours.
+  FINAL STATE, two independent repairs:
+  1. THE RELEASE TRIGGERS THE SPAWN. Marking the lock handed over is an EVENT the launcher
+     reacts to, not a state it discovers on its next tick: the boundary path signals the
+     launcher (the launcher watches the lock file, or `batch-boundary.mjs` wakes it), and
+     the successor starts within seconds. The 15-minute tick REMAINS as the backstop for
+     the cases no signal covers (a killed session, a missed write) — the fast path is
+     added, the slow path is not removed. The mark also OUTRANKS every liveness heuristic,
+     at any grace age: an owner that has declared itself finished is finished, and liveness
+     answers a question nobody asked. Measured 10.08.2026 — the handover was written at
+     13:57:46Z and the ticks at 14:01, 14:16 and 14:31 each logged `skip: owner alive
+     (pid-alive; heartbeat 5..20 min old, pid 939)` and spawned nobody, because the handover
+     grace had elapsed one tick earlier and the verdict fell back to the pid. That pid is the
+     attended window's `claude` process, which survives a `/clear` and hosts every session in
+     that window, so successive owners write the SAME pid and the pid-alive branch can never
+     observe a dead one. Ownership liveness therefore keys on the SESSION — its identity,
+     heartbeat and lease — never on the bare existence of a hosting process.
+  2. OWNERSHIP IS BOUND TO WORK, NOT MERELY TO LIFE. Today `leaseUntil` runs an hour and
+     never asks whether the owner is doing anything, so a session that takes the lock and
+     idles holds the batch for that hour. An owner that has neither declared in-flight work
+     (`batch-in-flight.mjs`) nor produced a state change within a short IDLE WINDOW
+     (starting value 5 min, calibratable) loses the lock the same arithmetic way an expired
+     lease loses it — no process is killed, the owner simply stops owning, and the launcher
+     may spawn. An ATTENDED window is not exempt: it either works or it releases.
+     A STATE CHANGE IS THE OWNER'S OWN: a heartbeat it wrote, a commit, a board write — not
+     a worktree's file timestamps, which a leaked dev server or a file watcher keeps fresh
+     while the owner does nothing (the launcher reads exactly that today as "declared work
+     advancing"). Otherwise the idle window is defeated by a process nobody is watching.
+  3. THE SPAWN EVENT FIRES ON EVERY OWNERSHIP-ENDING TRANSITION of the lock, not on the
+     handover mark alone — an idle lapse and an expired lease end ownership just as
+     definitively, and without this they wait for the next 15-minute tick, which is the
+     latency part 1 exists to remove.
+  Both parts must leave the singleton property intact — no path may produce two live owners
+  — and both stand down for a paused batch as every guard here does.
+  VERIFIABLE: Vitest on the pure parts (the release-to-spawn decision from a lock state and
+  a clock; the idle verdict from declared work, last state change and the window, including
+  the boundary cases at exactly the window and with in-flight work declared); plus the real
+  proof, which this bundle already owns — the chaos drill (449) gains a case that releases
+  the lock and asserts a successor is running in seconds rather than at the next tick, and a
+  case where an idle owner is superseded while a working one is not.
+  Criticality: high — it is the failure this bundle is for, it is silent, and it costs the
+  whole absence rather than one point.
+  DELIVERED 10.08.2026 on the same branch as point 562 (`feat/562-probe-and-handover`,
+  merged as `5091c748`), reviewed by the second model (merge-with-fixes; the one named
+  defect — a transport alert claiming a currency it had not read — was fixed before the
+  merge). Ownership now lives in one decision chain (`scripts/batch-ownership-core.mjs`):
+  the handover mark frees the lock at any age, liveness keys on the session, the idle
+  window dispossesses an owner that never worked, and the launcher wakes on every
+  ownership-ending transition. The chaos-drill cases the spec names could not be added —
+  point 449 is open and its drill script does not exist — and the daemon tests that prove
+  the same properties stand in their place.
+
+- [x] 580. THE FIGURES PANTOMIME OUT OF EARSHOT (user 09.08.2026, F6 report
+  `local/bugreports/GestenOhneSprache.zip`: "Die beiden gestikulieren herum, aber ich
+  sehe keine Texte über ihren Köpfen"). ESTABLISHED: the overlay dump of that moment
+  contains no speech label at all, while the journal in the same dump already holds eight
+  overheard utterances — so the label machinery works and simply did not fire here. The
+  gate is distance: both speaking paths (`PlaceLife.tsx` ~line 388 for the children,
+  ~line 1940 for the adults) hear the utterance, record it and raise the overhead label
+  ONLY inside `isWithinHearing(distance)` — `balance.communication.hearingRadius`, 10 m.
+  The GESTURE has no such range: a figure gestures wherever it is drawn, across the whole
+  village. Beyond ten metres the player therefore watches a mute pantomime, which is
+  exactly what he reported — and worse for the PoC than plain silence, because a gesture
+  without its utterance teaches a concept with no word attached to it.
+  FINAL STATE: a figure that GESTURES is a figure the player can hear and read, or it does
+  not gesture. Either the gesture is gated on the same range as the utterance, or the
+  utterance's range is what the gesture reaches — one decision, applied to BOTH the
+  children's and the adults' paths, with the chosen rule written where the range is
+  defined. The hearing radius itself stays calibratable and the label keeps its own
+  lifetime.
+  VERIFIABLE: pure Vitest — across the range there is no distance at which a figure
+  gestures while neither the utterance nor its label is raised; the existing hearing and
+  label tests keep passing.
+  Criticality: medium — it is the teaching loop of the communication PoC, and it fails
+  quietly.
+
+- [x] 601. HOLDING CTRL WHILE WALKING CLOSES THE BROWSER (user 09.08.2026: "Wenn ich STRG
+  gedrückt halte und dabei WASD benutze, passieren fatale Dinge — z. B. schließt STRG-W
+  Chrome ohne Rückfrage"). The label overlay is a HOLD, and W is the forward key, so the
+  feature's normal use IS the browser's close-tab chord. Point 342 decided this
+  deliberately — "Do NOT preventDefault: the browser's own Ctrl combinations stay the
+  browser's" — and that decision is what the user has now hit; it is SUPERSEDED here.
+  ESTABLISHED ABOUT THE PLATFORM, so nobody re-researches it: `preventDefault` on keydown
+  does NOT stop Ctrl+W, Ctrl+T or Ctrl+N — those are reserved. The ONE mechanism that
+  captures them is the Keyboard Lock API (`navigator.keyboard.lock([...])`), which works
+  only while the document is in FULLSCREEN and only on Chromium.
+  FINAL STATE:
+  1. While the game holds the pointer (the first-person view) AND the document is
+     fullscreen, the game holds a keyboard lock for the codes the controls actually use,
+     so no Ctrl chord reaches the browser. The lock is released with the pointer lock and
+     on `visibilitychange`, and its absence is never an error — a browser without the API
+     simply does not get this protection.
+  2. WHERE THE LOCK IS UNAVAILABLE the danger must not simply remain. The label modifier
+     becomes REBINDABLE in the settings (§21, in both languages), with at least one
+     default-safe alternative that no browser claims, so a player in a window can take the
+     trap out of his own hands. Ctrl stays the shipped default — it is what design.md
+     §17.8 states and what the player already knows.
+  3. Every Ctrl combination that IS preventable and collides with a game control is
+     prevented while the game has the pointer, so the set of dangerous chords shrinks to
+     the three reserved ones the lock covers.
+  DOCS: design.md §17.8 and §17.5 gain the fullscreen note and the rebind in the same
+  commit, and CLAUDE.md §7.1 criterion 20 is where the setting is proved.
+  VERIFIABLE: Vitest for the rebinding and for the preventable-chord set (a bound game key
+  under Ctrl is prevented, an unbound one is not); a Playwright check that the lock is
+  requested exactly when fullscreen + pointer lock hold and released with either — the
+  reserved chords themselves cannot be asserted from a test, so the request is what is
+  proved, and the user's own play is the acceptance.
+  Criticality: HIGH — it destroys the player's session without a prompt, and it is
+  triggered by the feature's ordinary use, not by an unusual one.
+
+- [x] 588. GUESS A MEANING WHERE IT IS SPOKEN, NOT ONLY IN THE JOURNAL (user
+  09.08.2026). Today a reading is written only in the journal (`src/ui/JournalPanel.tsx`
+  → `setUtteranceHypothesis`), so the player must break off watching, open the journal
+  and find the utterance among the others — at the very moment he saw what it MEANT. The
+  guess belongs where the guess is formed.
+  FINAL STATE:
+  1. While one or more inhabitants are speaking, the label of the NEAREST speaker is
+     visibly HIGHLIGHTED against the others, so it is unambiguous which one a click will
+     take. Nearest = by distance to the player; a tie keeps the current pick rather than
+     flickering between two.
+  2. Under that label stands a short invitation, from the language files in German and
+     English, in the sense of "Click to guess meaning" — and NOT in upper case
+     (user 09.08.2026, same rule as point 579).
+  3. A LEFT CLICK on it opens a dialog for exactly that utterance: the syllables as
+     spoken, a text field carrying any reading already written, save and cancel. Enter
+     saves, Escape cancels. It writes the SAME store field the journal writes
+     (`setUtteranceHypothesis`), so a reading entered here appears in the journal and over
+     the speaker's head at once, and one entered in the journal shows up here.
+  4. The dialog is PART OF THE APPLICATION and looks like the game (the existing in-game
+     dialog look, `src/ui/Dialogs.tsx`) — never a browser prompt, never an OS window
+     (user's explicit requirement). It is MODAL, also his decision, and therefore the one
+     deliberate exception to the non-modal rule §16.1 keeps for the journal.
+  5. POINTER LOCK IS RELEASED while it is open and restored on close. Without that the
+     click never reaches the dialog and no key reaches the field — the first-person view
+     holds the pointer (`src/scenes/place/PlaceScene.tsx`). Movement and looking are
+     inert while it stands open, and the view does not jump when the lock returns.
+  6. THE CLICK TARGET MUST LIVE LONG ENOUGH TO BE CLICKED. A label expires after
+     `labelSeconds` (2.6 s today), which is shorter than reaching for the mouse: while a
+     label is the highlighted target it does not expire under the pointer, and the dialog
+     keeps the utterance it was opened for even once the label is gone.
+  7. The game still never interprets the text — it is the player's note, unchecked, as
+     everywhere else. This is an input comfort for a mechanic that exists, NOT a
+     translation aid and not an onboarding layer (CLAUDE.md §2).
+  DOCS: this is new player-visible design, so `design.md` §13.4 gains its description in
+  the SAME commit as the code. The document stands at its ceiling, so the addition is
+  written tight and, if it still does not fit, the choice between compressing elsewhere
+  and raising the budget goes to the user — it is not decided in passing.
+  VERIFIABLE: Vitest in the HUD/unit layer — with several speakers the highlight and the
+  invitation sit on the nearest one and move when he does; a click opens the dialog for
+  THAT utterance; saving writes the store field and the journal shows it; Escape and
+  cancel leave it unchanged; the invitation renders in both languages and in no
+  upper-case form. Plus one Playwright check for what only a browser proves: the pointer
+  lock is released on open and re-acquired on close, and typing reaches the field.
+  Criticality: medium — the mechanic works without it, but this is where the player's
+  thinking actually happens, and every guess he does not bother to write is a concept he
+  will not remember.

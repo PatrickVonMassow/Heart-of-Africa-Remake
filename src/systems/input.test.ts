@@ -42,6 +42,31 @@ describe('onKeyPress (design.md §17)', () => {
     expect(cb).toHaveBeenCalledTimes(2)
   })
 
+  // Work-order 601: a key whose CHORD is left to the browser must not act on
+  // the chord as well, or one press does two things — Ctrl+3 switching the tab
+  // AND jumping the date.
+  it('stands down on a Ctrl/Alt/Meta press when registered ignoreModified — and only then', () => {
+    const guarded = vi.fn()
+    const plain = vi.fn()
+    const offGuarded = onKeyPress('Digit3', guarded, { ignoreModified: true })
+    const offPlain = onKeyPress('KeyM', plain) // the default is unchanged
+    for (const mod of [{ ctrlKey: true }, { altKey: true }, { metaKey: true }]) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit3', ...mod }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', ...mod }))
+    }
+    expect(guarded).not.toHaveBeenCalled()
+    expect(plain).toHaveBeenCalledTimes(3) // a prevented chord still reaches its handler
+    // Shift is no browser chord, so it is not "modified" for this purpose.
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit3', shiftKey: true }))
+    expect(guarded).toHaveBeenCalledTimes(1)
+    press('Digit3')
+    expect(guarded).toHaveBeenCalledTimes(2)
+    offGuarded()
+    offPlain()
+    release('Digit3')
+    release('KeyM')
+  })
+
   it('ignores keydowns originating from a text input (debug-field guard)', () => {
     // input.ts guards only INPUT targets (the debug-menu fields); TEXTAREA and
     // SELECT are not handled by the source, so only INPUT is asserted here.
@@ -82,6 +107,55 @@ describe('moveAxes (design.md §17)', () => {
     expect(moveAxes()).toEqual({ x: 0, y: 0 })
     release('ArrowUp')
     release('ArrowDown')
+  })
+})
+
+// The browser's chords, taken away where the platform allows it (work-order
+// 601). The decision itself is pinned in keyboardGuard.test.ts; what is asserted
+// here is that the global keydown listener really applies it.
+describe('modifier chords on the game keys', () => {
+  const chordDown = (code: string, ctrlKey: boolean) =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { code, ctrlKey, cancelable: true }))
+
+  it('prevents Ctrl+W (close tab) and still registers the forward key', () => {
+    expect(chordDown('KeyW', true)).toBe(false) // defaultPrevented
+    expect(moveAxes()).toEqual({ x: 0, y: 1 }) // holding the modifier steers on
+    release('KeyW')
+  })
+
+  it('leaves a chord on an unbound key alone', () => {
+    expect(chordDown('KeyR', true)).toBe(true) // Ctrl+R stays the browser's reload
+    release('KeyR')
+  })
+
+  it('leaves the keyboard zoom and the tab jumps alone, and the plain key still reaches the game', () => {
+    // The month row is bound PLAIN (design.md §21.1), so Ctrl+1 and Ctrl+0 stay
+    // the browser's tab jump and zoom reset — preventing them would protect
+    // nothing.
+    expect(chordDown('Digit1', true)).toBe(true)
+    expect(chordDown('Minus', true)).toBe(true)
+    release('Digit1')
+    release('Minus')
+    // …while the plain key still drives the game handler it is bound to.
+    const cb = vi.fn()
+    const off = onKeyPress('Digit1', cb)
+    expect(chordDown('Digit1', false)).toBe(true)
+    expect(cb).toHaveBeenCalledTimes(1)
+    off()
+    release('Digit1')
+  })
+
+  it('leaves a plain keypress alone', () => {
+    expect(chordDown('KeyW', false)).toBe(true)
+    release('KeyW')
+  })
+
+  it('keeps the chord inside a form control (Ctrl+A in a debug field)', () => {
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    const ok = input.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA', ctrlKey: true, bubbles: true, cancelable: true }))
+    expect(ok).toBe(true)
+    input.remove()
   })
 })
 

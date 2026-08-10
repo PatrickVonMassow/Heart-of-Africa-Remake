@@ -596,6 +596,10 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
     commit(`ordinary work on the trunk\n\n${AUTHOR}`)
 
     const merge = git('merge', '--no-ff', '--no-commit', 'side')
+    // The non-zero exit ALONE would be satisfied by a git that never ran at all
+    // (point 573), and this whole case rests on the conflict being real — so the
+    // claim is git's own word for it, not its exit code.
+    expect(`${merge.stdout}${merge.stderr}`, 'the fixture needs a real conflict to resolve').toContain('CONFLICT')
     expect(merge.status, 'the fixture needs a real conflict to resolve').not.toBe(0)
     write('conflict.txt', 'resolved\n')
     write('scripts/demo3-guard.mjs', '// rewritten while resolving the conflict\n')

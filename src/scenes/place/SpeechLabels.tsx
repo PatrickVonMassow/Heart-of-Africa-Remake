@@ -19,29 +19,36 @@ import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
-import { useStrings } from '../../i18n'
 import type { CommunicationMemory } from '../../communication/heard'
-import { conceptOf, type Phrase } from '../../communication/lexicon'
-import {
-  isSpeechLabelVisible,
-  labelReadings,
-  type SpeechLabel,
-} from '../../communication/speechLabel'
+import { type Phrase } from '../../communication/lexicon'
+import { isSpeechLabelVisible, type SpeechLabel } from '../../communication/speechLabel'
+import { labelPresentation } from '../../communication/speechTarget'
+import { SpeechLabelCard } from '../../ui/SpeechLabelCard'
+import { releasePointerLock } from './pointerLock'
 import {
   clearSpeechLabels,
   pruneSpeechLabels,
   speakOverhead,
   speechAnchor,
   speechLabelState,
+  speechTargetLabel,
   subscribeSpeechLabels,
+  updateSpeechTarget,
 } from './speechChannel'
 
 /** Scratch vector — the label positions are sampled every frame. */
 const WORLD = new THREE.Vector3()
 
 /** One speaker's note, following its figure. */
-function SpeechLabelView({ label, memory }: { label: SpeechLabel; memory: CommunicationMemory }) {
-  const t = useStrings()
+function SpeechLabelView({
+  label,
+  memory,
+  targeted,
+}: {
+  label: SpeechLabel
+  memory: CommunicationMemory
+  targeted: boolean
+}) {
   const group = useRef<THREE.Group>(null)
   // DEBUG (user 09.08.2026): the concept behind the utterance instead of the
   // syllables and the player's guess. Never on in a real run — it hands the
@@ -64,26 +71,13 @@ function SpeechLabelView({ label, memory }: { label: SpeechLabel; memory: Commun
   return (
     <group ref={group}>
       <Html center distanceFactor={14}>
-        {/* The note carries WHOSE it is: since the children speak on their own
-            (point 481) a settlement can hold several notes at once, and a
-            check that grabbed "the" label measured whichever one the DOM
-            listed first. */}
-        <div className="speech-label" data-speaker={label.speakerId}>
-          {conceptLabels
-            ? label.atoms.map((utterance, i) => (
-                <div className="speech-atom" key={`${utterance}-${i}`}>
-                  <span className="syllables">{conceptOf(utterance) ?? utterance}</span>
-                </div>
-              ))
-            : labelReadings(memory, label.atoms).map((atom, i) => (
-                <div className="speech-atom" key={`${atom.utterance}-${i}`}>
-                  <span className="syllables">{atom.utterance}</span>
-                  <span className="reading" aria-label={t.journalPanel.hypothesisFor(atom.utterance)}>
-                    {atom.reading}
-                  </span>
-                </div>
-              ))}
-        </div>
+        <SpeechLabelCard
+          speakerId={label.speakerId}
+          atoms={label.atoms}
+          memory={memory}
+          conceptLabels={conceptLabels}
+          targeted={targeted}
+        />
       </Html>
     </group>
   )
@@ -101,16 +95,54 @@ export function SpeechLabels() {
   // concept it meant to, and that question is asked about the utterances the
   // run has NOT taught yet as much as about the others.
   const conceptLabels = useUi((s) => s.speechConceptLabels)
+  const dialog = useUi((s) => s.dialog)
   const scene = useThree((s) => s.scene)
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
+  const gl = useThree((s) => s.gl)
 
   // Leaving the settlement takes every label with it.
   useEffect(() => clearSpeechLabels, [])
 
-  // Expiry runs on the frame loop: a label that has stood its time, or whose
-  // figure has left the scene graph, disappears here.
-  useFrame(() => pruneSpeechLabels())
+  // Which label a drawn label IS — the same gate the render below applies, so
+  // the click target and the highlighted note can never be two different things.
+  const visible = (label: SpeechLabel) => conceptLabels || isSpeechLabelVisible(memory, label.atoms)
+  const visibleRef = useRef(visible)
+  visibleRef.current = visible
+
+  // The click target is picked first, then the sweep runs: the target is what
+  // holds its label against expiry (point 588), so deciding it after the sweep
+  // would drop the very note the player is reaching for.
+  useFrame(() => {
+    updateSpeechTarget((label) => visibleRef.current(label))
+    pruneSpeechLabels()
+  })
+
+  // A LEFT CLICK guesses at what the highlighted speaker just said (point 588).
+  // It is taken on the CANVAS: in the first-person view the pointer is locked,
+  // so there is no cursor to hit the note itself with — the highlight is what
+  // makes the click unambiguous. The dialog keeps the utterance it was opened
+  // for, so it survives the label it came from.
+  useEffect(() => {
+    const el = gl.domElement
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return
+      if (useUi.getState().dialog) return
+      const target = speechTargetLabel()
+      if (!target) return
+      e.preventDefault()
+      // The pointer goes back to the player, or the click never reaches the
+      // dialog and no key reaches its field.
+      releasePointerLock()
+      useUi.getState().setDialog({
+        kind: 'speechGuess',
+        speakerId: target.speakerId,
+        atoms: [...target.atoms],
+      })
+    }
+    el.addEventListener('mousedown', onMouseDown)
+    return () => el.removeEventListener('mousedown', onMouseDown)
+  }, [gl])
 
   // Dev hook for the headless verification and manual checks (CLAUDE.md §7.2):
   // speak over any named object of the scene — the villager behaviour that will
@@ -147,12 +179,23 @@ export function SpeechLabels() {
     }
   }, [scene, camera, size])
 
+  // While a modal stands open the click handler above ignores every click, so
+  // no note may still invite one — and the guess dialog shows its own utterance,
+  // so the note it was opened from is not drawn a second time behind it.
+  const { targetedId, hiddenId } = labelPresentation(dialog, labels.targetId)
+
   return (
     <>
       {labels.labels
-        .filter((label) => conceptLabels || isSpeechLabelVisible(memory, label.atoms))
+        .filter(visible)
+        .filter((label) => label.speakerId !== hiddenId)
         .map((label) => (
-          <SpeechLabelView key={label.speakerId} label={label} memory={memory} />
+          <SpeechLabelView
+            key={label.speakerId}
+            label={label}
+            memory={memory}
+            targeted={label.speakerId === targetedId}
+          />
         ))}
     </>
   )

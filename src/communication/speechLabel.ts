@@ -65,10 +65,23 @@ export interface SpeechLabel {
 /** Every label standing right now. Nothing here is saved. */
 export interface SpeechLabelState {
   readonly labels: readonly SpeechLabel[]
+  /**
+   * The speaker a click would take (point 588): the nearest one in reach, whose
+   * label is highlighted and carries the invitation. null while none is.
+   */
+  readonly targetId: string | null
 }
 
 export function noSpeechLabels(): SpeechLabelState {
-  return { labels: [] }
+  return { labels: [], targetId: null }
+}
+
+/**
+ * Names the speaker a click would take. Unchanged input returns the SAME state
+ * object, so the label layer does not re-render on a frame that decided nothing.
+ */
+export function withSpeechTarget(state: SpeechLabelState, targetId: string | null): SpeechLabelState {
+  return targetId === state.targetId ? state : { ...state, targetId }
 }
 
 /**
@@ -96,8 +109,11 @@ export function showSpeechLabel(
 ): SpeechLabelState {
   if (speakerId === '' || atoms.length === 0) return state
   const seconds = Math.max(0, options.seconds ?? speechLabelSeconds(atoms.length))
-  const kept = state.labels.filter((l) => l.speakerId !== speakerId && l.hideAt > now)
+  const kept = state.labels.filter(
+    (l) => l.speakerId !== speakerId && (l.hideAt > now || l.speakerId === state.targetId),
+  )
   return {
+    ...state,
     labels: [
       ...kept,
       {
@@ -111,16 +127,25 @@ export function showSpeechLabel(
   }
 }
 
-/** Drops every label whose time has run out. */
+/**
+ * Drops every label whose time has run out — EXCEPT the one a click would take
+ * (point 588). A label stands 2.6 s, which is shorter than reaching for the
+ * mouse, so the click target the player is invited to click keeps standing for
+ * as long as it stays the target; the moment another speaker takes the
+ * highlight, or the player walks out of reach, it goes with the next sweep.
+ */
 export function expireSpeechLabels(state: SpeechLabelState, now: number): SpeechLabelState {
-  const labels = state.labels.filter((l) => l.hideAt > now)
-  return labels.length === state.labels.length ? state : { labels }
+  const labels = state.labels.filter((l) => l.hideAt > now || l.speakerId === state.targetId)
+  return labels.length === state.labels.length ? state : { ...state, labels }
 }
 
 /** Drops one speaker's label — used when its figure leaves the scene. */
 export function dropSpeechLabel(state: SpeechLabelState, speakerId: string): SpeechLabelState {
   const labels = state.labels.filter((l) => l.speakerId !== speakerId)
-  return labels.length === state.labels.length ? state : { labels }
+  if (labels.length === state.labels.length) return state
+  // A speaker whose label is gone can no longer be clicked: the highlight goes
+  // with it rather than dangling on a figure that has left the scene.
+  return { labels, targetId: state.targetId === speakerId ? null : state.targetId }
 }
 
 /** One atom as the label shows it: what was said, and what the player makes of it. */

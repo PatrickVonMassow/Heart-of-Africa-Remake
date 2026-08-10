@@ -31,6 +31,31 @@ the Playwright browser suites against the dev server → the production-preview
 smoke test. The runner itself is `scripts/verify/run-all.mjs`; the three npm
 commands above reach it through the LOGGED wrapper described next.
 
+### In a WORKTREE, bootstrap the dependencies FIRST (points 569/573/606)
+
+```
+node scripts/worktree-bootstrap.mjs      # first command in a new worktree; no-op in the main tree
+```
+
+`node_modules/` is git-ignored, so a git worktree — where CLAUDE.md §6 builds
+every point — checks out without it and **no gate can start**: npm resolves
+`vitest` and `oxlint` from `node_modules/.bin` before a script runs. The
+bootstrap derives the main checkout from git's COMMON directory
+(`git rev-parse --git-common-dir`, whose parent is the main working tree), and
+links its `node_modules` when the two `package-lock.json` files are byte
+identical — seconds instead of a per-worktree install. A branch that CHANGED the
+lockfile gets a real `npm ci` instead, because linking would silently verify
+against the wrong dependency tree. The decision table is pure in
+`scripts/worktree-bootstrap-core.mjs`.
+
+Remove such a worktree only with `scripts/worktree-cleanup.mjs`: it DETACHES the
+link first, where `git worktree remove` and `rm -rf` follow it and delete the
+main tree's dependencies.
+
+**Anything a test SPAWNS resolves through `scripts/local-bin.mjs`, never through
+`process.cwd()`.** That is the fix behind those points and the rule that keeps
+them fixed — see "A spawn that never ran is not a rejection" below.
+
 ### The run's output goes to a FILE, the caller reads a digest (point 373 e)
 
 `npm test`, `npm run test:small` and `npm run test:large` run through
@@ -447,6 +472,38 @@ front of each turns one into a declaration.
   section; where they do not, the section repeats the jump itself. Prove it by
   running every section alone once and diffing its checks against the whole
   run's — that sweep is how `calf-jitter` and `elephant-trampling` were caught.
+
+## A spawn that never ran is not a rejection (points 573/606)
+
+Two rules, both from one defect. `scope.test.mjs` resolved its linter as
+`resolve(process.cwd(), 'node_modules/.bin/oxlint')`, which does not exist in a
+worktree — and the suite lied in **both** directions: its ACCEPT cases went red
+for the environment (five per worktree run, which teaches the pool to discount
+red), while its REJECT cases stayed **green**, because a spawn that never started
+exits non-zero exactly like a tool that ran and refused. A lint rule the suite
+exists to keep armed could have rotted away unnoticed.
+
+1. **Resolve through `scripts/local-bin.mjs`**, never through `process.cwd()`.
+   `findLocalBin(name)` walks up from the checkout, then reaches the MAIN working
+   tree via git's common directory (a worktree outside the main checkout has no
+   ancestor holding `node_modules`), then falls back to PATH; nothing found is
+   REPORTED by `describeMissing` — the tool and every directory searched — not
+   guessed. Where a red would only mean "this machine has no linter", the case
+   SKIPS with that reason printed: a red must mean a defect.
+2. **Establish that the process RAN before reading its exit code.** `didRun()`
+   takes a spawn result and an optional `expect` shape for the tool's OUTPUT
+   (never its NAME — the shell says `oxlint: not found` too), and `NOT_RUN()`
+   words the failure identically everywhere. Any "it rejected" assertion goes
+   through a helper that checks the run FIRST, so a missing binary reports itself
+   instead of being counted as a verdict.
+
+`scripts/verify/spawn-assertion-gate.test.mjs` keeps rule 2 from coming back: it
+reads the test files, and a negative exit-code assertion about a spawned process
+that nothing in its case establishes as having RUN turns it red. It is a pure
+gate in the fast layer — the same build as the frame-subject gate, not another
+Stop hook. Satisfy it by asserting something POSITIVE about that spawn's output
+(`toContain` on its stdout/stderr) or by going through `didRun`; a `.not.toContain`
+proves nothing, because empty output satisfies it.
 
 ## Is the machine QUIET? — before the run (point 296)
 
@@ -906,7 +963,7 @@ ported asserts now live in Vitest:
 | `i18n.mjs` | 5 localization screenshots + console gate | `src/i18n/i18n.test.ts`, `src/ui/{StatusBar,JournalPanel,Dialogs,DebugMenu}.test.tsx` |
 | `health.mjs` | vultures at poor condition (RAF) + console gate | `src/state/store.health.test.ts`, `src/ui/Hud.test.tsx` (veil, defeat) |
 | `events.mjs` | touch-a-lion / touch-a-hyena contact (RAF scene) | `src/systems/events.test.ts`, `src/state/store.events.test.ts` |
-| `settings.mjs` | eye-height, in-scene walk measures, `user-select` CSS, lion-feed, ambience/proximity audio, village speech really scheduling audio (§13.4: near vs. out of earshot vs. phrase) and the live sub-bus gains behind it (point 577: the syllables survive `ambientVolume` 0, and only their own slider silences them), Tab focus, TRAA pipeline toggle (rebuild + non-black frame + leak gate, WebGL 2 path), the DEV render-resource leak invariant across scene switches / detail levels / effect toggles incl. a forced real leak (point 295) | `src/config/balance.test.ts`, `src/systems/movement.test.ts`, `src/systems/ambience.test.ts` (the speech scheduling and its bus routing), `src/communication/speaking.test.ts` (pace, pause, attenuation, hearing), `src/state/store.debug.test.ts`, `src/ui/DebugMenu.test.tsx` (incl. the TRAA checkbox) |
+| `settings.mjs` | eye-height, in-scene walk measures, `user-select` CSS, lion-feed, ambience/proximity audio, village speech really scheduling audio (§13.4: near vs. out of earshot vs. phrase) and the live sub-bus gains behind it (point 577: the syllables survive `ambientVolume` 0, and only their own slider silences them), Tab focus, TRAA pipeline toggle (rebuild + non-black frame + leak gate, WebGL 2 path), the DEV render-resource leak invariant across scene switches / detail levels / effect toggles incl. a forced real leak (point 295), the keyboard-lock WIRING (work-order 601: the shipped bundle asks for the lock at the fullscreen + pointer-lock transition and gives it back with either or a hidden tab) | `src/config/balance.test.ts`, `src/systems/keyboardGuard.test.ts` (the chord set and the lock's state machine), `src/systems/movement.test.ts`, `src/systems/ambience.test.ts` (the speech scheduling and its bus routing), `src/communication/speaking.test.ts` (pace, pause, attenuation, hearing), `src/state/store.debug.test.ts`, `src/ui/DebugMenu.test.tsx` (incl. the TRAA checkbox) |
 | `enrichments.mjs` | all wildlife/RAF, drei map/region labels, river/graveyard scene, layout geometry, real WheelEvent, screenshots | `src/systems/movement.test.ts`, `src/state/store.*.test.ts`, `src/ui/{StatusBar,Hud,DebugMenu}.test.tsx` |
 | `voice.mjs` | movement-while-journal-open (scene), TTS read-aloud (assets from the local `.cache/tts/` record-and-replay cache — first run records from the CDNs, later runs are strictly offline; delete the dir to re-prime), the cold-load main-thread liveness gate (see `liveness.mjs`), screenshots | `src/journal/voiceMarkup.test.ts`, `src/i18n/i18n.test.ts`, `src/ui/JournalPanel.test.tsx`, `scripts/verify/liveness.test.mjs` |
 | `touch.mjs` | touch/tablet layer (`hasTouch` context, real CDP touch): guard mounts the overlay on first touch + mobile quality preset, virtual-stick walk, right-half look drag, tappable prompt, two-finger pinch zoom | `src/systems/touchInput.test.ts`, `src/state/ui.test.ts`, `src/ui/Hud.test.tsx` (touch absence/presence), `src/ui/DebugMenu.test.tsx` (SSAO/shadow checkboxes) |
@@ -941,11 +998,15 @@ its own subject never occurred:
   suite RAY-PROBES clear first (a camera dropped on a fixed bearing lands inside
   a hut in a dense settlement and would photograph a wall), each forced through
   the dev hook `__placeForceGesture` and awaited on the GESTURE's own clock, not
-  the wall clock. Then the ambient conversation is sampled over 60 reads: every
-  live gesture is one of the four kinds, none runs past its own duration, the
-  pair takes turns, and a figure between gestures stands exactly at rest. The
-  state machine itself is pure (`src/render/gesture.test.ts`); only the poses the
-  renderer actually DRAWS need the browser.
+  the wall clock. Then the standing conversation is sampled over 60 reads: since
+  point 580 the pair must be QUIET — it used to cycle the four gestures as
+  ambient dressing with no utterance behind them, a mute pantomime at any
+  distance — so no live gesture may appear, none may run past its own duration,
+  the two never gesture over each other, and a figure that is not speaking stands
+  exactly at rest. The state machine itself is pure
+  (`src/render/gesture.test.ts`), and so is the rule that binds a gesture to the
+  range its utterance carries (`src/communication/spokenGesture.test.ts`); only
+  the poses the renderer actually DRAWS need the browser.
 - **The hypothesis over the speaker's head (point 485).** The label's lifetime
   and its binding to the note are pure Vitest; the browser owes only the
   ATTACHMENT, which no unit test can see. A named inhabitant is made to speak a

@@ -22,11 +22,29 @@
 // still ARMED. These cases run the REAL config — copied byte for byte — over a
 // fixture that reproduces the pinFamily shape, and assert it is refused; a
 // future edit that drops the rule, the env or the file glob turns them red.
+//
+// TWO THINGS THIS FILE GOT WRONG, AND WHY THEY ARE WORTH THE COMMENT (points
+// 569/573/606). It used to resolve the linter as
+// `resolve(process.cwd(), 'node_modules/.bin/oxlint')`. In a git WORKTREE — where
+// CLAUDE.md §6 builds every point — `node_modules/` is git-ignored and therefore
+// absent, so the spawn ENOENT'd and BOTH halves of this suite lied:
+//   1. the five cases that expect the linter to ACCEPT clean code went red in
+//      every worktree run, for a reason that had nothing to do with the change
+//      under test — which is how a pool learns to discount a red run;
+//   2. the cases that expect it to REJECT bad code kept PASSING, because a spawn
+//      that never started exits non-zero exactly like a linter that ran and
+//      refused. The rule this suite exists to keep armed could have rotted away
+//      unnoticed, in exactly the environment most of our work happens in.
+// The resolution now goes through `scripts/local-bin.mjs`, and every negative
+// assertion goes through `expectRejected`, which fails as "THE LINTER DID NOT
+// RUN" rather than counting a missing binary as a rejection.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { execFileSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
+import { didRun, findLocalBin, describeMissing, NOT_RUN, OXLINT_OUTPUT } from '../local-bin.mjs'
+import { REPO_ROOT } from '../repo-paths.mjs'
 import {
   crossSectionGlobals,
   formatCrossSectionGlobals,
@@ -36,23 +54,49 @@ import {
   sectionAt,
 } from './sectionScope.mjs'
 
-const ROOT = process.cwd()
-const OXLINT = resolve(ROOT, 'node_modules/.bin/oxlint')
+const ROOT = REPO_ROOT
+const FOUND = findLocalBin('oxlint', { start: ROOT })
+const OXLINT = FOUND?.path ?? null
 
-/** Run oxlint over `paths` in `cwd` and return { code, out }. Never throws on a
- *  lint failure — a non-zero exit is the RESULT here, not an error. */
+// What oxlint's own output looks like — the shape is what separates the tool's
+// verdict from a shell complaining "oxlint: not found", which is also non-zero
+// WITH output. Defined beside `didRun` so no caller can pin a narrower shape
+// than the tool prints.
+
+// A red must mean a defect (point 569). With no linter anywhere — no worktree
+// link, no install, nothing on PATH — these cases have nothing to say, so they
+// SKIP with the reason printed instead of failing for the environment.
+const NO_LINTER = OXLINT === null ? describeMissing('oxlint', findLocalBin('oxlint', { start: ROOT, exists: () => false })?.tried ?? []) : null
+if (NO_LINTER) console.warn(`scope.test.mjs: SKIPPING the linter cases —\n${NO_LINTER}`)
+const withLinter = it.skipIf(NO_LINTER !== null)
+
+/** Run oxlint over `paths` in `cwd`. Returns { code, out, ran }: a non-zero exit
+ *  is the RESULT here, not an error — but `ran` is what says whether that exit
+ *  code means anything at all. */
 function lint(paths, cwd = ROOT) {
-  try {
-    const out = execFileSync(OXLINT, paths, {
-      cwd,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true, // point 401: no console window flashing at a turn end
-    })
-    return { code: 0, out }
-  } catch (e) {
-    return { code: e.status ?? 1, out: `${e.stdout ?? ''}${e.stderr ?? ''}` }
-  }
+  const r = spawnSync(OXLINT, paths, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true, // point 401: no console window flashing at a turn end
+  })
+  const out = `${r.stdout ?? ''}${r.stderr ?? ''}`
+  return { code: r.status ?? 1, out, ran: didRun({ ...r, out }, { expect: OXLINT_OUTPUT }), raw: r }
+}
+
+/** The linter RAN and REFUSED — never "the exit code was non-zero". The order
+ *  matters: the run is established first, so a missing binary reports itself
+ *  rather than being read as a rejection. */
+function expectRejected(result, what) {
+  expect(result.ran, `${NOT_RUN('linter', result.raw ?? {})}\n(while checking that oxlint refuses ${what})`).toBe(true)
+  expect(result.code, `oxlint ACCEPTED ${what}:\n${result.out}`).not.toBe(0)
+}
+
+/** The linter RAN and ACCEPTED. Same discipline from the other side: a spawn
+ *  that never started must not read as "clean". */
+function expectAccepted(result, what) {
+  expect(result.ran, `${NOT_RUN('linter', result.raw ?? {})}\n(while checking that oxlint accepts ${what})`).toBe(true)
+  expect(result.code, `oxlint REFUSED ${what}:\n${result.out}`).toBe(0)
 }
 
 // A section block in miniature: `pinFamily` declared inside one, called from the
@@ -109,28 +153,29 @@ describe('the scope net over the verify suites', () => {
   })
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-  it('REFUSES a helper used across two section blocks, naming it', () => {
-    const { code, out } = lint(['scripts/verify/cross-block.mjs'], dir)
-    expect(code, `oxlint accepted the cross-block reference:\n${out}`).not.toBe(0)
-    expect(out).toContain('no-undef')
-    expect(out).toContain('pinFamily')
+  withLinter('REFUSES a helper used across two section blocks, naming it', () => {
+    const result = lint(['scripts/verify/cross-block.mjs'], dir)
+    expectRejected(result, 'the cross-block reference')
+    expect(result.out).toContain('no-undef')
+    expect(result.out).toContain('pinFamily')
   })
 
-  it('REFUSES a `var`, which hoists straight past no-undef', () => {
-    const { code, out } = lint(['scripts/verify/var-block.mjs'], dir)
-    expect(code, `oxlint accepted the hoisting var:\n${out}`).not.toBe(0)
-    expect(out).toContain('no-var')
+  withLinter('REFUSES a `var`, which hoists straight past no-undef', () => {
+    const result = lint(['scripts/verify/var-block.mjs'], dir)
+    expectRejected(result, 'the hoisting var')
+    expect(result.out).toContain('no-var')
     // …and it is exactly no-undef that does NOT see it, which is why the rule pair
-    // is one override rather than one rule.
-    expect(out).not.toContain('no-undef')
+    // is one override rather than one rule. This is a NEGATIVE assertion about the
+    // output, so it is worth nothing on its own — an empty output satisfies it.
+    // `expectRejected` above is what makes it mean something.
+    expect(result.out).not.toContain('no-undef')
   })
 
-  it('accepts the same helper hoisted above the blocks — the honest fix', () => {
-    const { code, out } = lint(['scripts/verify/hoisted.mjs'], dir)
-    expect(code, out).toBe(0)
+  withLinter('accepts the same helper hoisted above the blocks — the honest fix', () => {
+    expectAccepted(lint(['scripts/verify/hoisted.mjs'], dir), 'the hoisted helper')
   })
 
-  it('treats the browser globals of page.evaluate as defined, so the check stays readable', () => {
+  withLinter('treats the browser globals of page.evaluate as defined, so the check stays readable', () => {
     // A net that reported `window`/`document` on every suite would be ignored
     // within a day. This is what the browser env in the override buys.
     writeFileSync(
@@ -140,17 +185,18 @@ describe('the scope net over the verify suites', () => {
         'Event, Image, HTMLCanvasElement, fetch, URL, TextDecoder, console, ' +
         'process, Buffer, setTimeout, clearTimeout, setInterval, clearInterval]\n',
     )
-    const { code, out } = lint(['scripts/verify/globals.mjs'], dir)
-    expect(code, out).toBe(0)
+    expectAccepted(lint(['scripts/verify/globals.mjs'], dir), 'the browser globals')
   })
 
   // THE LIVE GATE. Everything above proves the rule works; this proves the
   // repository is clean under it right now — the assertion that would have
   // failed on 08.08.2026 in 0.1 s instead of 27 minutes.
-  it('finds no undefined identifier anywhere under scripts/', () => {
-    const { code, out } = lint(['scripts/'])
-    expect(out).not.toContain('no-undef')
-    expect(code, out).toBe(0)
+  withLinter('finds no undefined identifier anywhere under scripts/', () => {
+    const result = lint(['scripts/'])
+    // The order is deliberate: `not.toContain` passes on the EMPTY output of a
+    // linter that never ran, so the run is established before it is trusted.
+    expectAccepted(result, 'the repository under scripts/')
+    expect(result.out).not.toContain('no-undef')
   })
 })
 

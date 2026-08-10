@@ -15,7 +15,9 @@ import {
   speechAnchor,
   speechClock,
   speechLabelState,
+  speechTargetLabel,
   subscribeSpeechLabels,
+  updateSpeechTarget,
 } from './speechChannel'
 
 const COME = utteranceOf('COME')
@@ -159,5 +161,70 @@ describe('the height comes from the speaker itself', () => {
   it('lets an explicit height win — the dev hook and the tests set their own', () => {
     speakOverhead('probe', [COME], drawn(1), { now: 0, height: 9 })
     expect(speechLabelState().labels[0].height).toBe(9)
+  })
+})
+
+/**
+ * WHICH SPEAKER A CLICK WOULD TAKE (work-order point 588). The picking rule
+ * itself is pinned in src/communication/speechTarget.test.ts; what the channel
+ * owes is the measurement: the nearest DRAWN label, from the player's live
+ * position, and no target at all outside a settlement.
+ */
+describe('the speaker a click would take (design.md §13.4)', () => {
+  /** A figure standing at (x, z), mounted in the scene graph. */
+  function standing(x: number, z: number): Object3D {
+    return {
+      parent: {},
+      updateWorldMatrix() {},
+      matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0, z, 1] },
+    } as unknown as Object3D
+  }
+  const anyLabel = () => true
+  const player = (x: number, z: number) => ({ x, z, active: true })
+
+  it('highlights the nearest speaker and follows him as he moves', () => {
+    speakOverhead('kid-1', [COME], standing(3, 0), { now: 0, seconds: 100 })
+    speakOverhead('kid-2', [DIG], standing(8, 0), { now: 0, seconds: 100 })
+    updateSpeechTarget(anyLabel, 10, player(0, 0))
+    expect(speechLabelState().targetId).toBe('kid-1')
+    expect(speechTargetLabel()?.atoms).toEqual([COME])
+    // The player walks past kid-1 and up to kid-2.
+    updateSpeechTarget(anyLabel, 10, player(9, 0))
+    expect(speechLabelState().targetId).toBe('kid-2')
+  })
+
+  it('never highlights a label the player cannot see drawn', () => {
+    speakOverhead('kid-1', [COME], standing(1, 0), { now: 0, seconds: 100 })
+    speakOverhead('kid-2', [DIG], standing(4, 0), { now: 0, seconds: 100 })
+    updateSpeechTarget((l) => l.speakerId !== 'kid-1', 10, player(0, 0))
+    expect(speechLabelState().targetId).toBe('kid-2')
+  })
+
+  it('holds the highlighted note against the sweep, and drops it once the pick moves', () => {
+    speakOverhead('kid-1', [COME], standing(2, 0), { now: 0, seconds: 1 })
+    updateSpeechTarget(anyLabel, 10, player(0, 0))
+    pruneSpeechLabels(60)
+    expect(speechLabelState().labels.map((l) => l.speakerId)).toEqual(['kid-1'])
+    // He walks out of earshot: nothing is highlighted, and the note goes.
+    updateSpeechTarget(anyLabel, 10, player(50, 0))
+    pruneSpeechLabels(60)
+    expect(speechLabelState().labels).toHaveLength(0)
+    expect(speechTargetLabel()).toBeNull()
+  })
+
+  it('highlights nobody while the player is not in a settlement', () => {
+    speakOverhead('kid-1', [COME], standing(1, 0), { now: 0, seconds: 100 })
+    updateSpeechTarget(anyLabel, 10, { x: 0, z: 0, active: false })
+    expect(speechLabelState().targetId).toBeNull()
+  })
+
+  it('takes the highlight with a figure that leaves the scene', () => {
+    const kid = standing(1, 0)
+    speakOverhead('kid-1', [COME], kid, { now: 0, seconds: 100 })
+    updateSpeechTarget(anyLabel, 10, player(0, 0))
+    ;(kid as unknown as { parent: unknown }).parent = null
+    pruneSpeechLabels(1)
+    expect(speechLabelState().targetId).toBeNull()
+    expect(speechTargetLabel()).toBeNull()
   })
 })

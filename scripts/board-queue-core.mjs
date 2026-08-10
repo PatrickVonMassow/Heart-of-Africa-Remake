@@ -40,7 +40,7 @@ import {
   TRANSLITERATION_STEMS,
 } from './dashboard-guard-core.mjs'
 import { normaliseLineEndings } from './board-core.mjs'
-import { FINDER_POINTS, RELEASE_TAG_POINT } from './queue-order-guard-core.mjs'
+import { FINDER_POINTS } from './queue-order-guard-core.mjs'
 import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
 
@@ -273,7 +273,10 @@ export function queueOrder(open, data, gates) {
   const rank = (n) => {
     if (gated.has(n)) return 3
     if (answered.has(n)) return -1
-    return n === RELEASE_TAG_POINT ? 2 : FINDER_POINTS.has(n) ? 1 : 0
+    // The release tag is NOT pushed to the back any more (user 10.08.2026): it
+    // sits where the work order puts it, right behind the work that gates it.
+    // The finder/audit block still sinks — that block is post-release work.
+    return FINDER_POINTS.has(n) ? 1 : 0
   }
   return all
     .map((n, i) => ({ n, i, rank: rank(n) }))

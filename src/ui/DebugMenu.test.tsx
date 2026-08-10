@@ -440,6 +440,31 @@ describe('DebugMenu remaining boolean toggles write through (design.md §21, poi
     expect(useUi.getState().invertLook).toBe(true)
   })
 
+  // Work-order 601: outside fullscreen nothing can stop Ctrl+W from closing the
+  // tab, so the hold key of the §17.8 name labels is the player's to move.
+  it('the hold-key picker ships on Ctrl and rebinds, in both languages', () => {
+    useUi.setState({ labelModifier: 'ctrl' })
+    const { unmount } = render(<DebugMenu />)
+    const picker = () => screen.getByText(en.debug.labelModifier).closest('label')?.querySelector('select') as HTMLSelectElement
+    expect(picker().value).toBe('ctrl') // design.md §17.8 states Ctrl
+    // Every offered option, and a safe one among them.
+    expect([...picker().options].map((o) => o.value)).toEqual(['ctrl', 'shift', 'alt'])
+    fireEvent.change(picker(), { target: { value: 'shift' } })
+    expect(useUi.getState().labelModifier).toBe('shift')
+    unmount()
+
+    useLocale.getState().setLang('de')
+    render(<DebugMenu />)
+    const german = screen.getByText(de.debug.labelModifier).closest('label')?.querySelector('select') as HTMLSelectElement
+    expect(german.value).toBe('shift')
+    expect([...german.options].map((o) => o.textContent)).toEqual([
+      de.debug.labelModifierCtrl, de.debug.labelModifierShift, de.debug.labelModifierAlt,
+    ])
+    fireEvent.change(german, { target: { value: 'ctrl' } })
+    expect(useUi.getState().labelModifier).toBe('ctrl')
+    useLocale.getState().setLang('en')
+  })
+
   it('the graphics-level picker writes through to the store (design.md §21, point 276)', () => {
     useUi.setState({ detailLevel: 'medium', ssaoEnabled: true, shadowsEnabled: true })
     render(<DebugMenu />)
@@ -777,6 +802,8 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.unstuckStallDistance', 'debug.unstuckStallSeconds',
     'debug.unstuckSearchRadius', 'debug.unstuckSearchStep',
     'debug.invertLook', 'debug.wheelZoom',
+    // The rebindable hold key for the §17.8 name labels (work-order 601).
+    'debug.labelModifier',
   ],
   travel: [
     'debug.travelSpeed', 'debug.daysPerUnit', 'debug.canoeSpeedup', 'debug.junglePenalty',
@@ -908,12 +935,12 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 162 controls in total, and none twice', () => {
+  it('carries all 163 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(162)
+    expect(labels.length).toBe(163)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
@@ -960,7 +987,7 @@ describe('DebugMenu completeness: every control is present, in its group (point 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(162)
+    expect(rows.length).toBe(163)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -1014,7 +1041,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(162)
+    expect(renderedRowLabels().length).toBe(163)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -1062,7 +1089,7 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     typeFilter('croc')
     expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(162)
+    expect(renderedRowLabels().length).toBe(163)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 

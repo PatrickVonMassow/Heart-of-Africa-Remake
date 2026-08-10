@@ -38,6 +38,11 @@ scripts/.tile-cache
 # a committed one would hand a clone a fence from somebody else's history.
 .claude/batch-fence.json
 .claude/batch-fence.json.tmp-*
+# The fence's per-session notice ledger — which session has already been told
+# about which fenced turn. Same class as the fence itself: this machine's
+# runtime state, keyed by session ids that mean nothing in a clone.
+.claude/fence-notice.json
+.claude/fence-notice.json.tmp-*
 .batch-dashboard.html
 .batch-dashboard-archive.html
 # The derived queue's prose and order (point 400, delta C) — session state that

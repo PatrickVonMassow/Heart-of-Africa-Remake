@@ -10,7 +10,15 @@ import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, rmSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { judgeTarget, insideRoot, shouldDetach, assertInside, formatRefusal, REFUSALS } from './worktree-cleanup-core.mjs'
+import {
+  judgeTarget,
+  insideRoot,
+  shouldDetach,
+  assertInside,
+  formatRefusal,
+  stubBranchFor,
+  REFUSALS,
+} from './worktree-cleanup-core.mjs'
 import { cleanupWorktree, detachLinks } from './worktree-cleanup.mjs'
 
 const ROOT = 'C:/repo'
@@ -71,6 +79,20 @@ describe('judgeTarget — what may be removed', () => {
   it('every refusal reason has a sentence', () => {
     for (const key of Object.keys(REFUSALS)) expect(REFUSALS[key]).toBeTruthy()
     expect(formatRefusal({ path: WT, reason: 'main-tree' })).toContain('MAIN checkout')
+  })
+})
+
+describe('stubBranchFor — the branch an agent worktree is cut with (point 613)', () => {
+  it('names the setup branch of an agent worktree, separators either way', () => {
+    expect(stubBranchFor(WT)).toBe('worktree-agent-1')
+    expect(stubBranchFor('C:\\repo\\.claude\\worktrees\\agent-af39\\')).toBe('worktree-agent-af39')
+  })
+
+  it('names NOTHING for a tree that carries no such stub', () => {
+    expect(stubBranchFor(`${ROOT}/wt`)).toBe(null)
+    expect(stubBranchFor(ROOT)).toBe(null)
+    expect(stubBranchFor('')).toBe(null)
+    expect(stubBranchFor(null)).toBe(null)
   })
 })
 
@@ -226,6 +248,72 @@ describe('the incident, replayed on a THROWAWAY repository', () => {
     expect(existsSync(join(worktree, 'node_modules'))).toBe(true)
     expect(existsSync(worktree)).toBe(true)
     expect(existsSync(probe)).toBe(true)
+  })
+
+  // POINT 613: the setup branch git creates with an agent worktree is abandoned
+  // seconds later, and once `main` moves it reads as merged debris to
+  // branch-hygiene-guard. It is cleaned up HERE, where it is created.
+  const addAgentTree = (id, { commit = false } = {}) => {
+    const path = join(tmp, id)
+    git(['worktree', 'add', '-q', '-b', `worktree-${id}`, path])
+    if (commit) {
+      writeFileSync(join(path, 'work.txt'), 'a commit the stub actually carries')
+      git(['add', '-A'], path)
+      git(['commit', '-qm', 'work on the stub'], path)
+    }
+    return path
+  }
+  const branches = () =>
+    git(['for-each-ref', '--format=%(refname:short)', 'refs/heads'])
+      .split(/\r?\n/)
+      .filter(Boolean)
+
+  it('removes the setup branch together with the tree it belongs to', () => {
+    const path = addAgentTree('agent-99')
+    expect(branches()).toContain('worktree-agent-99')
+
+    const result = cleanupWorktree(path, { git })
+
+    expect(result.ok).toBe(true)
+    expect(existsSync(path)).toBe(false)
+    expect(result.stub).toMatchObject({ branch: 'worktree-agent-99', deleted: true })
+    expect(branches()).not.toContain('worktree-agent-99')
+  })
+
+  it('leaves an ordinary worktree branch alone — only the setup stub goes', () => {
+    const result = cleanupWorktree(worktree, { git })
+    expect(result.stub).toBe(null)
+    expect(branches()).toContain('feat/x')
+  })
+
+  it('KEEPS a stub that carries commits of its own — `-d`, never `-D`', () => {
+    const path = addAgentTree('agent-98', { commit: true })
+    const result = cleanupWorktree(path, { git })
+    expect(existsSync(path)).toBe(false)
+    expect(result.stub).toMatchObject({ branch: 'worktree-agent-98', deleted: false })
+    expect(branches()).toContain('worktree-agent-98') // work is not debris
+  })
+
+  it('drops the stub of a tree a half-finished removal already took', () => {
+    // The state the guard used to find and report: the directory is gone, git's
+    // record is stale, and the branch is the only thing left.
+    const path = addAgentTree('agent-96')
+    rmSync(path, { recursive: true, force: true })
+
+    const result = cleanupWorktree(path, { git })
+
+    expect(result.ok).toBe(true)
+    expect(result.note).toContain('already gone')
+    expect(result.stub).toMatchObject({ branch: 'worktree-agent-96', deleted: true })
+    expect(branches()).not.toContain('worktree-agent-96')
+  })
+
+  it('--dry deletes no branch either', () => {
+    const path = addAgentTree('agent-97')
+    const result = cleanupWorktree(path, { git, dry: true })
+    expect(result.stub).toMatchObject({ branch: 'worktree-agent-97', deleted: false })
+    expect(branches()).toContain('worktree-agent-97')
+    expect(existsSync(path)).toBe(true)
   })
 
   it('detachLinks alone never descends through a link', () => {

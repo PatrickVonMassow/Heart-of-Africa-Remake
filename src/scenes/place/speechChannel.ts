@@ -17,6 +17,7 @@
 // src/communication/speechLabel.ts.
 
 import type { Object3D } from 'three/webgpu'
+import { balance } from '../../config/balance'
 import type { Phrase } from '../../communication/lexicon'
 import {
   dropSpeechLabel,
@@ -24,9 +25,13 @@ import {
   noSpeechLabels,
   showSpeechLabel,
   speechLabelHeight,
+  withSpeechTarget,
+  type SpeechLabel,
   type SpeechLabelState,
 } from '../../communication/speechLabel'
+import { pickSpeechTarget, type SpeechTargetCandidate } from '../../communication/speechTarget'
 import { markedActorRise, type MarkedNode } from '../actorLabelSource'
+import { placePlayerPosition } from './playerPosition'
 
 let state: SpeechLabelState = noSpeechLabels()
 
@@ -88,6 +93,45 @@ export function speakOverhead(
 /** The object a speaker is drawn as, or null once it is gone. */
 export function speechAnchor(speakerId: string): Object3D | null {
   return anchors.get(speakerId) ?? null
+}
+
+/**
+ * Names the speaker a LEFT CLICK would take (point 588): the nearest one whose
+ * label is actually drawn, within the reach a voice carries. Called once per
+ * frame by the label layer, which alone knows which labels the player's own
+ * memory lets it draw — an utterance he has never heard shows nothing, and
+ * nothing is not clickable.
+ *
+ * The player's position is the settlement's live one; a frame taken outside a
+ * settlement leaves no target at all.
+ */
+export function updateSpeechTarget(
+  isVisible: (label: SpeechLabel) => boolean,
+  reach: number = balance.communication.hearingRadius,
+  player: { x: number; z: number; active: boolean } = placePlayerPosition,
+): void {
+  if (!player.active) {
+    publish(withSpeechTarget(state, null))
+    return
+  }
+  const candidates: SpeechTargetCandidate[] = []
+  for (const label of state.labels) {
+    if (!isVisible(label)) continue
+    const anchor = anchors.get(label.speakerId)
+    if (!anchor || anchor.parent === null) continue
+    // The figure's world translation, taken off its own matrix rather than
+    // through a scratch vector — the module stays free of a three value import.
+    anchor.updateWorldMatrix(true, false)
+    const e = anchor.matrixWorld.elements
+    candidates.push({ speakerId: label.speakerId, distance: Math.hypot(e[12] - player.x, e[14] - player.z) })
+  }
+  publish(withSpeechTarget(state, pickSpeechTarget(candidates, state.targetId, reach)))
+}
+
+/** The label a click would take right now, or null while none is highlighted. */
+export function speechTargetLabel(): SpeechLabel | null {
+  const { labels, targetId } = state
+  return targetId === null ? null : (labels.find((l) => l.speakerId === targetId) ?? null)
 }
 
 /**

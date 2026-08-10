@@ -15,7 +15,7 @@ import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { judgeTarget, assertInside, shouldDetach, formatRefusal, insideRoot } from './worktree-cleanup-core.mjs'
+import { judgeTarget, assertInside, shouldDetach, formatRefusal, insideRoot, stubBranchFor } from './worktree-cleanup-core.mjs'
 
 /**
  * lstat as the pure rule wants to see it.
@@ -142,20 +142,52 @@ export function listWorktrees(runGit = git) {
     .map((l) => l.slice(9).trim())
 }
 
-/** The whole operation: judge, detach, remove, prune. Returns a report.
- *  `git` is injectable so the Vitest case can run it against a throwaway
- *  repository instead of this one. */
+/**
+ * THE STUB BRANCH GOES WITH THE TREE (point 613).
+ *
+ * Called only once the worktree is gone and git's record pruned — git holds on
+ * to a branch a tree has checked out. `-d`, never `-D`: a stub that somehow
+ * carries commits of its own is WORK, and work is not debris; git refusing it
+ * is the right answer, reported rather than forced.
+ *
+ * Returns null when the path names no agent worktree or the branch does not
+ * exist, else `{ branch, deleted, reason? }`.
+ */
+export function removeStubBranch(target, { dry = false, git: runGit = git } = {}) {
+  const branch = stubBranchFor(target)
+  if (!branch) return null
+  try {
+    runGit(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])
+  } catch {
+    return null // no such branch — nothing was left behind
+  }
+  if (dry) return { branch, deleted: false, reason: 'dry' }
+  try {
+    runGit(['branch', '-d', branch])
+    return { branch, deleted: true }
+  } catch (e) {
+    return { branch, deleted: false, reason: (e && e.message) || 'git refused the deletion' }
+  }
+}
+
+/** The whole operation: judge, detach, remove, prune, drop the stub branch.
+ *  Returns a report. `git` is injectable so the Vitest case can run it against
+ *  a throwaway repository instead of this one. */
 export function cleanupWorktree(target, { dry = false, git: runGit = git } = {}) {
   const worktrees = listWorktrees(runGit)
   const verdict = judgeTarget({ target, mainRoot: worktrees[0] ?? REPO_ROOT, worktrees })
   if (!verdict.ok) return { ok: false, verdict, detached: [] }
   if (!existsSync(target)) {
     if (!dry) tryPrune(runGit)
-    return { ok: true, verdict, detached: [], note: "already gone — only git's record was pruned" }
+    // The stub outlives a half-finished removal too — that is exactly the state
+    // the guard used to find and report.
+    const stub = removeStubBranch(target, { dry, git: runGit })
+    return { ok: true, verdict, detached: [], stub, note: "already gone — only git's record was pruned" }
   }
   const detached = removeTreeSafely(target, { dry, git: runGit, registered: verdict.reason === 'registered' })
   if (!dry) tryPrune(runGit)
-  return { ok: true, verdict, detached }
+  const stub = removeStubBranch(target, { dry, git: runGit })
+  return { ok: true, verdict, detached, stub }
 }
 
 function tryPrune(runGit = git) {
@@ -183,6 +215,15 @@ if (isMainModule(import.meta.url)) {
       result.note ??
         `${dry ? 'would remove' : 'removed'} worktree ${result.verdict.path} (${result.detached.length} link(s) detached first)`,
     )
+    if (result.stub) {
+      console.log(
+        result.stub.deleted
+          ? `deleted setup branch ${result.stub.branch} (it belongs to that worktree)`
+          : dry
+            ? `would delete setup branch ${result.stub.branch}`
+            : `setup branch ${result.stub.branch} KEPT — git refused: ${result.stub.reason}`,
+      )
+    }
     process.exit(0)
   } catch (e) {
     console.error(`worktree-cleanup failed: ${e && e.message}`)

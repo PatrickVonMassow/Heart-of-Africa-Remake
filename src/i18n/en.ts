@@ -264,6 +264,16 @@ export const en: Strings = {
     reopenDrumMessage: "Read the chief's drum message again",
   },
 
+  speechGuess: {
+    invite: 'Click to guess meaning',
+    title: 'What did he mean?',
+    hint: 'What I take his words to mean. My own note — nobody here can tell me whether it is right.',
+    readingFor: (utterance: string) => `My reading of ${utterance}`,
+    notePlaceholder: 'My reading',
+    save: 'Write it down (Enter)',
+    cancel: 'Let it be (Esc)',
+  },
+
   drumMessage: {
     title: "The Chief's Message on the Drums",
     hint: 'Seven words, one after another. Above each stands my own reading — click one to change it; it is the same note my book holds.',
@@ -494,7 +504,7 @@ export const en: Strings = {
     walkerUnstuck: 'Inhabitant unstuck (s)',
     placeCollisionFactor: 'Settlement collision (share of enter radius)',
     startupFreezeBudget: 'Loading-picture freeze budget (ms)',
-    labelOverlayMax: 'Ctrl labels (max.)',
+    labelOverlayMax: 'Name labels (max.)',
     mouseSensitivity: 'Mouse sensitivity (first-person)',
     lookPitchLimit: 'Look up/down limit (°)',
     unstuckStallDistance: 'Stuck: progress threshold (m)',
@@ -502,6 +512,10 @@ export const en: Strings = {
     unstuckSearchRadius: 'Unstuck: search radius (m)',
     unstuckSearchStep: 'Unstuck: search step (m)',
     invertLook: 'Invert mouse look',
+    labelModifier: 'Hold key for name labels',
+    labelModifierCtrl: 'Ctrl (safe in fullscreen only)',
+    labelModifierShift: 'Shift (no browser shortcuts)',
+    labelModifierAlt: 'Alt (focus jumps to the browser menu on release)',
     ambienceVolume: 'Ambience volume',
     footstepVolume: 'Footstep volume',
     ambientVolume: 'Other ambient volume',

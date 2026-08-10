@@ -1916,6 +1916,25 @@ the launcher. That is not tidiness: on this platform a `process.exit()` after an
 fifteen points, so it holds no fetch at all, and the child cannot take a
 resurrection down with it.
 
+**A failed fetch is not a board that is gone** (point 562). On 08.08.2026 at
+13:39 a flickering probe climbed the escalation ladder and PAUSED the whole
+batch: `.claude/batch-launcher.log` shows `board: unreachable — fetch failed`
+interleaved with successful probes of the same URL, while a counter-probe
+answered HTTP 200 and `board-publish.mjs --check` reported CURRENT. Four rules
+now separate the flicker from the outage, all pure in
+`scripts/board-probe-core.mjs`: a failed probe is **retried at once** (briefly
+spaced) before it counts as anything; a failed currency probe is **corroborated
+against the other transport** — raw.githubusercontent.com carries the
+fingerprint, the Pages viewer is what the reader opens — and while either
+answers the fault is a TRANSPORT hiccup, reported at `default` priority, which
+the ladder may never pause on (`PAUSE_MIN_PRIORITY`); only **consecutive** full
+failures count, one success anywhere resetting the streak, which the launcher
+carries between ticks (`--streak`); and only at `UNREACHABLE_STREAK` consecutive
+full failures does the board count as unreachable — the one verdict that still
+climbs to the pause, because that is what a real outage is for. The alert names
+which of the two happened, since a failed fetch says nothing about the board's
+currency and only staleness is worth waking anybody for.
+
 **What each layer buys, honestly.** The due mark (`lock-heartbeat-hook.mjs`)
 notices a changed open-point set after any tool call and persists `publishDue`,
 so a session that dies before publishing hands the mark to its successor. The

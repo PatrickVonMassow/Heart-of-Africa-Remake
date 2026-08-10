@@ -982,6 +982,64 @@ Beides ist nicht Nachlässigkeit, sondern die Bauform: Wer n Schritte zu einem z
 
 **Lehre:** Ein neuer Befehl, der bestehende ersetzt, wird gegen die **vollständige** Liste der Kontrollen geprüft, die auf die ersetzten Befehle greifen — namentlich, nicht nach Gefühl, und die Prüfung ist ausführbar (jeden Klassifizierer einmal mit dem neuen Befehl aufrufen und das Urteil lesen). Und die Reihenfolge seiner Schritte ist eine Eigenschaft, kein Detail: Was Arbeit dauerhaft macht, steht **vor** dem, was etwas löscht, und diese Reihenfolge wird per Test festgehalten.
 
+### 3.103 Eine korrekte Übergabe, die niemand aufnimmt, ist ein Stillstand
+
+Der Stapel stand eine halbe Stunde still, und keines der beteiligten Teile war
+kaputt. Die abgebende Sitzung hatte den Grenzstein sauber gesetzt und die Sperre
+freigegeben; der Starter schaut alle 15 Minuten nach, hätte also frühestens elf
+Minuten später gestartet; drei Minuten vor diesem Blick nahm ein unbeaufsichtigtes
+Fenster die freie Sperre beim Sitzungsstart, worauf der Blick korrekt einen lebenden
+Besitzer sah und nichts tat. Jede Regel griff, jede für sich richtig — und die Kette
+als ganze arbeitete nicht.
+
+Zwei Bauformen stecken darin. Die eine: **Ein Übergabepunkt, der auf eine Uhr
+wartet statt auf das Ereignis**, verschenkt bei jedem Wechsel das halbe Intervall;
+das ist kein Fehler, den man findet, sondern einer, den man erst bemerkt, wenn
+jemand hinsieht. Die andere: **Besitz war an Leben gebunden, nicht an Arbeit.** Die
+Pacht fragt, ob der Besitzer noch atmet, nie, ob er etwas tut — und ein Fenster, das
+nichts tut, atmet perfekt. Der Nutzer hat es zugespitzt: Er muss mehrere Tage weg
+sein dürfen. Gegen genau das war das Bündel Urlaubsfestigkeit geschnitten, und es
+stand unbearbeitet hinter allem anderen.
+
+Das ist der dritte Teil, und der unangenehmste: **Die Priorität stand da, nur las
+sie keine Maschine.** Die dokumentierte Arbeitsreihenfolge begann seit jeher mit der
+Urlaubsfestigkeit; die flache Liste, aus der sich jede Nachfolgesitzung orientiert,
+begann mit etwas anderem — und eine dritte, handgeführte Reihenfolge in den
+Tafeldaten begann mit einer vierten. Drei Orte, drei Antworten auf dieselbe Frage.
+Als der Nutzer die Neusortierung auf der Tafel nicht sah, war das kein
+Anzeigefehler, sondern dieselbe Spaltung eine Ebene tiefer.
+
+**Lehre:** Eine erklärte Reihenfolge ist erst dann eine, wenn genau EIN Ort sie
+hält und alle Leser aus ihm ableiten; und eine Übergabe wird an ihrem WORST CASE
+gemessen, nicht daran, dass jeder Schritt für sich korrekt war. Wo ein Recht (hier:
+der Besitz des Stapels) nur an ein Lebenszeichen gebunden ist, gehört es an einen
+FORTSCHRITT gebunden — sonst blockiert der Untätige den Fleißigen, ohne dass eine
+Regel verletzt wäre.
+
+### 3.104 Eine Sitzung wächst an Anliegen, nicht an Punkten
+
+Die Regel gegen aufgeblähten Kontext ist geschrieben für einen delegierten Punkt: Ein
+Auftrag, eine Sitzung, dann der Grenzstein. Am 10.08.2026 nahm eine begleitete Sitzung
+sechs getrennte Anliegen des Nutzers hintereinander auf — eine Frage zur Tafel, die zu
+einer Neusortierung wurde, dazu die Neufassung des Release-Tors, das Aufräumen der
+Arbeitsordnung, die Ergebnisse einer Vier-Augen-Analyse über 148 Punkte und fünf
+Zweig-Landungen. Nichts hielt das auf, und zwar aus einem strukturellen Grund: **Der
+Grenzstein hängt an einem ABGESCHLOSSENEN Punkt**, und eine begleitete Sitzung mitten
+im Gespräch erreicht diesen Zustand nie. Sie kann also beliebig wachsen, ohne eine
+einzige Regel zu verletzen.
+
+Der Nutzer hat die richtige Konsequenz benannt: Die Einsicht allein ändert nichts.
+Sie hätte in jeder der sechs Übernahmen genauso richtig danebengestanden.
+
+**Lehre:** Eine Obergrenze, die nur einen Arbeitstyp kennt, ist keine Obergrenze,
+sondern eine Einladung, in den anderen auszuweichen. Was den Verbrauch treibt, ist
+nicht die Art der Arbeit, sondern die ZAHL DER THEMEN in einem Fenster — und die
+wächst bei einer begleiteten Sitzung am schnellsten, weil jede Rückfrage des Nutzers
+wie eine Fortsetzung aussieht und keine ist. Der Durchsetzer muss deshalb den
+Verbrauch der begleiteten Sitzung genauso zählen, und ein NEUES Thema jenseits der
+Grenze wird angehängt statt begonnen. Das ist zugleich die billigste Bauform: Der
+Zähler existiert bereits, ihm fehlte nur der zweite Fall.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -1071,7 +1129,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 10.08.2026, 13:03 · Quellen-Fingerprint: `cccf60019a1d…`
+Zuletzt aktualisiert: Montag, 10.08.2026, 21:56 · Quellen-Fingerprint: `ffe4fdc0bde2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1100,7 +1158,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | hoa dashboard \"Woran ich gerade arbeite\" holds ONE CARD PER parallel point being actively worked (not a single card); cards move from Warteschlange into it (possibly several at once); a point is NEVER in both sections at once | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Never put a hardcoded `open` attribute on a dashboard `<details>` card — default all closed; localStorage persistence keeps user-opened cards open across refresh | 1 | niedrig | batch-autostart.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | The batch dashboard \"Von dir zu klären\" section holds ONLY genuine user decisions — no done items, no announcements for in-progress work | 2 | mittel | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
-| When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, and needs the user's reason | 1 | niedrig | doc-budget-guard.mjs | ✔ Mechanismus |
+| When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 2 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is ONLY for four-eyes review and as the first fallback when Opus 5 is unavailable — never for \"hard\" tasks; Opus 5 handles those (user rule 25.07.2026, supersedes the earlier hard-task delegation) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1151,8 +1209,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 46 Prozess-/Meta-TASKS-Punkte (davon 20 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 47 Prozess-/Meta-TASKS-Punkte (davon 17 offen).
 
-<!-- RETRO-FINGERPRINT: cccf60019a1df8c9bdfecb2462555ea1a152896cbf8eaed613ed8bf2d964a546 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-10T11:03:17.885Z -->
+<!-- RETRO-FINGERPRINT: ffe4fdc0bde2d43af96e90ee69290b304fcc20adb5733c746b13ceb760b9b6e5 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-10T19:56:58.321Z -->
 <!-- AUTO-GENERATED:END -->
