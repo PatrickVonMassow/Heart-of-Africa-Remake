@@ -507,7 +507,7 @@ export const de: Strings = {
     labelModifier: 'Haltetaste für Namensschilder',
     labelModifierCtrl: 'Strg (nur im Vollbild gefahrlos)',
     labelModifierShift: 'Umschalt (keine Browser-Kürzel)',
-    labelModifierAlt: 'Alt',
+    labelModifierAlt: 'Alt (Fokus springt beim Loslassen ins Browser-Menü)',
     ambienceVolume: 'Ambiente-Lautstärke',
     footstepVolume: 'Schritt-Lautstärke',
     ambientVolume: 'Übrige Ambiente-Lautstärke',

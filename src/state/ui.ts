@@ -10,8 +10,10 @@ export type BuildingType = 'shop' | 'weapons' | 'tools' | 'market' | 'bazaar' | 
  * The modifier the player holds for the name labels of design.md §17.8. Only
  * modifiers are offered: the layer is a HOLD, and a modifier is the one kind of
  * key that can be held without the character doing anything else. SHIFT is the
- * safe one — no browser binds a chord on it — while Alt is offered for a player
- * whose keyboard makes it easier to reach (work-order 601).
+ * safe one — no browser binds a chord on it. Alt is offered for a player whose
+ * keyboard makes it easier to reach, and its option text names the cost: on
+ * Windows and Linux a plain Alt press-and-release focuses the browser menu, so
+ * it steals the keyboard after every peek (work-order 601).
  */
 export type LabelModifier = 'ctrl' | 'shift' | 'alt'
 

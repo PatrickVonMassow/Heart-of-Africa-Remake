@@ -505,7 +505,7 @@ export const en: Strings = {
     labelModifier: 'Hold key for name labels',
     labelModifierCtrl: 'Ctrl (safe in fullscreen only)',
     labelModifierShift: 'Shift (no browser shortcuts)',
-    labelModifierAlt: 'Alt',
+    labelModifierAlt: 'Alt (focus jumps to the browser menu on release)',
     ambienceVolume: 'Ambience volume',
     footstepVolume: 'Footstep volume',
     ambientVolume: 'Other ambient volume',

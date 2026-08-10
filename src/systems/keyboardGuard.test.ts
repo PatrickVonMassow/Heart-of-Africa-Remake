@@ -7,6 +7,7 @@ import {
   GAME_KEY_CODES,
   KEYBOARD_LOCK_CODES,
   createKeyboardLockController,
+  installKeyboardLock,
   isGameKeyCode,
   looksFullscreen,
   preventsBrowserChord,
@@ -141,6 +142,54 @@ describe('the lock controller', () => {
     expect(c.held()).toBe(false)
     c.sync({ fullscreen: true, pointerLocked: true })
     expect(api.lock).toHaveBeenCalledTimes(2)
+  })
+
+  // THE ORDER THAT ALMOST GOT AWAY: pointer lock FIRST, F11 second. F11 fires
+  // neither fullscreenchange nor pointerlockchange and sets no
+  // fullscreenElement — the viewport simply grows, which is a `resize`. Without
+  // that listener the lock would never engage in the very state the settings
+  // call safe.
+  it('locks when the viewport fills the screen AFTER the pointer lock (F11 fires only resize)', () => {
+    const lock = vi.fn(() => Promise.resolve())
+    const unlock = vi.fn()
+    const owned: Array<[object, string]> = []
+    const fake = (obj: object, name: string, get: () => unknown) => {
+      Object.defineProperty(obj, name, { configurable: true, get })
+      owned.push([obj, name])
+    }
+    Object.defineProperty(navigator, 'keyboard', { configurable: true, value: { lock, unlock } })
+    owned.push([navigator, 'keyboard'])
+    let pointerLocked = false
+    let innerHeight = 800
+    fake(document, 'pointerLockElement', () => (pointerLocked ? document.body : null))
+    fake(document, 'fullscreenElement', () => null) // F11 never sets it
+    fake(window, 'innerHeight', () => innerHeight)
+    fake(window.screen, 'height', () => 1200)
+
+    const off = installKeyboardLock()
+    expect(lock).not.toHaveBeenCalled()
+
+    // The player enters the first-person view: pointer locked, still a window.
+    pointerLocked = true
+    document.dispatchEvent(new Event('pointerlockchange'))
+    expect(lock).not.toHaveBeenCalled()
+
+    // Now F11. The ONLY event is the resize.
+    innerHeight = 1200
+    window.dispatchEvent(new Event('resize'))
+    expect(lock).toHaveBeenCalledTimes(1)
+
+    // Leave it as it was found: release the lock, uninstall, drop the stubs.
+    pointerLocked = false
+    document.dispatchEvent(new Event('pointerlockchange'))
+    expect(unlock).toHaveBeenCalledTimes(1)
+    off()
+    // And the uninstall really unhooks the resize.
+    pointerLocked = true
+    innerHeight = 1200
+    window.dispatchEvent(new Event('resize'))
+    expect(lock).toHaveBeenCalledTimes(1)
+    for (const [obj, name] of owned) delete (obj as Record<string, unknown>)[name]
   })
 
   it('survives a throwing lock and an unlock on a browser that never locked', () => {

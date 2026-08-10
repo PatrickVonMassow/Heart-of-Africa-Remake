@@ -181,6 +181,11 @@ function documentLockState(): { fullscreen: boolean; pointerLocked: boolean } {
  * Wire the lock to the document: it follows the pointer lock and fullscreen,
  * and it lets go the moment the tab goes away. Idempotent; returns the
  * uninstall for symmetry with the other input installers.
+ *
+ * RESIZE is one of the four, and it is the one that carries F11: that
+ * fullscreen fires no `fullscreenchange` (it sets no `fullscreenElement`
+ * either), so a player who is ALREADY pointer-locked and only then presses F11
+ * would never be sampled — in exactly the state the settings call safe.
  */
 export function installKeyboardLock(): () => void {
   if (typeof document === 'undefined') return () => {}
@@ -190,12 +195,18 @@ export function installKeyboardLock(): () => void {
   document.addEventListener('pointerlockchange', sync)
   document.addEventListener('fullscreenchange', sync)
   document.addEventListener('visibilitychange', sync)
-  if (typeof window !== 'undefined') window.addEventListener('blur', sync)
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', sync)
+    window.addEventListener('blur', sync)
+  }
   sync()
   return () => {
     document.removeEventListener('pointerlockchange', sync)
     document.removeEventListener('fullscreenchange', sync)
     document.removeEventListener('visibilitychange', sync)
-    if (typeof window !== 'undefined') window.removeEventListener('blur', sync)
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('resize', sync)
+      window.removeEventListener('blur', sync)
+    }
   }
 }

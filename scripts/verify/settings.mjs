@@ -1034,7 +1034,8 @@ if (section('keyboard-lock')) {
         configurable: true,
         get: () => window.innerHeight + (s.fullscreen ? 0 : 400),
       })
-      document.dispatchEvent(new Event(s.event))
+      if (s.event === 'resize') window.dispatchEvent(new Event('resize'))
+      else document.dispatchEvent(new Event(s.event))
       return window.__lockCalls
     }, state)
 
@@ -1058,6 +1059,16 @@ if (section('keyboard-lock')) {
   const hidden = await drive({ fullscreen: true, pointerLocked: true, hidden: true, event: 'visibilitychange' })
   check('a hidden tab gives the keyboard back', hidden.at(-1)?.kind === 'unlock',
     hidden.map((c) => c.kind).join(','))
+
+  // F11 AFTER the pointer lock: it fires neither fullscreenchange nor
+  // pointerlockchange and sets no fullscreenElement — the viewport just grows.
+  // Only the resize listener sees it, in the state the settings call safe.
+  await drive({ fullscreen: false, pointerLocked: true, event: 'pointerlockchange' })
+  const beforeF11 = await drive({ fullscreen: false, pointerLocked: true, event: 'resize' })
+  const f11 = await drive({ fullscreen: true, pointerLocked: true, event: 'resize' })
+  check('F11 while already pointer-locked still reaches the lock (resize is its only event)',
+    f11.length === beforeF11.length + 1 && f11.at(-1)?.kind === 'lock',
+    f11.map((c) => c.kind).join(','))
 
   // Hand the page back its own document and keyboard: nothing downstream may
   // measure a stubbed state.
