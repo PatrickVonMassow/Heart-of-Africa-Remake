@@ -5479,3 +5479,29 @@ to land than a mechanism that needs a review.
   path, not only by the test.
   Criticality: high — it is the batch's ownership arithmetic, and getting it wrong either
   strands the queue or produces two live owners.
+
+- [ ] 618. A MODIFIED KEY STILL DOES TWO THINGS AT ONCE OUTSIDE THE CALENDAR ROW
+  (four-eyes finding on point 601, 10.08.2026, recorded with its merge verdict). Point 601
+  closed this defect class for the calendar keys: a chord the game hands back to the browser
+  must not ALSO run the game's own handler, or one press does two things and the game's half
+  is silent. The reviewer found the class survives in three places 601 did not reach, all of
+  them pre-existing.
+  FINAL STATE:
+  1. `onTab` in `src/ui/Hud.tsx` goes through the same modifier check as every other
+     handler instead of bypassing `onKeyPress`. Today a windowed Ctrl+Tab switches the
+     browser tab AND toggles the journal; Ctrl+Tab is not one of the three reserved chords
+     the prevention path can swallow, so standing the handler down is the only cure.
+  2. Meta counts as a modifier wherever Ctrl and Alt already do. On macOS the game acts on
+     Cmd+G (dig), Cmd+C (pitch camp) and Cmd+M (map) while the browser or the OS runs its
+     own command on the same press — the same one-press-two-things the point closed, and
+     the comment in `src/systems/keyboardGuard.ts` claiming nothing a page does reaches
+     these is true only of Cmd+W/T/N.
+  3. The four YEAR-key registrations get the same test cover the month keys have. Removing
+     their opt-in currently passes the suite, although Ctrl+NumpadAdd is a browser zoom the
+     game deliberately hands back.
+  VERIFIABLE: Vitest — Ctrl+Tab leaves the journal closed and the event unprevented, so the
+  browser keeps its chord, while a plain Tab still toggles it; each of the Meta-modified
+  game keys leaves its action untaken; and each of the four year keys is pinned in both
+  directions, so removing an opt-in reds the suite.
+  Criticality: medium — it takes no session down the way Ctrl+W did, but every instance is
+  a silent state change the player did not ask for and cannot see the cause of.
