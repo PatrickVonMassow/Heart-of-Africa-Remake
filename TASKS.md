@@ -5549,6 +5549,16 @@ to land than a mechanism that needs a review.
      logic pure in `decision-card-guard-core.mjs`, and the remedy NAMES the exact
      command per card — a guard that only says "decide" is a guard that gets
      rubber-stamped.
+  5. AND THE SAME GUARD STOPS COUNTING A LOOK BACK AS A REQUEST (measured 10.08.2026,
+     two turns lost in one session; bundled here because it is the same core). "Die beste
+     Werbung für deine Entscheidung von heute Abend" ASKS FOR NOTHING — it names a ruling
+     the user gave hours earlier — and the guard blocked it, because a `address: 'sentence'`
+     phrase only tests whether the sentence ADDRESSES the user, which a retrospect does
+     exactly as much as a request. So a sentence in the PAST TENSE, or carrying a
+     backward-pointing marker (von heute, von gestern, vorhin, damals, bereits, schon),
+     is not a request while it has neither a question mark nor an imperative. The
+     fail direction is unchanged — in doubt, block — but a pure retrospect is not a
+     doubtful case.
   VERIFIABLE: Vitest cases in `scripts/decision-card-guard-core.test.mjs` covering — a
   user message with two open cards blocks; one removed plus one kept passes; the same
   cards pass silently on a turn with NO user message; a NEW user message re-arms both;
@@ -5556,7 +5566,8 @@ to land than a mechanism that needs a review.
   while a shared stop word ("nicht", "board", "punkt") does not; a carried answer blocks
   the owner and passes the non-owner; an answer naming a vanished card self-clears; a
   throwing state read allows the stop. Plus the replay of the 10.08 case: the real card
-  titles and the real user message, which must block.
+  titles and the real user message, which must block; and, for item 5, the real sentence
+  that must NOT block beside a present-tense request that still must.
   Criticality: HIGH — it is a guard, so `mechanism-review-guard` demands the other
   model's recorded review, and its failure mode is the user acting on a question that
   was settled hours ago.
