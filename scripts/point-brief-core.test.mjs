@@ -33,7 +33,9 @@ import {
   extractPointRefs,
   findPoint,
   parseDesignSections,
+  parseSliceDeclarations,
   parseWorkOrderPoints,
+  sliceDocsFor,
   pointTitle,
   resolveSectionRefs,
   workOrderFingerprint,
@@ -786,6 +788,81 @@ describe('adoption — the specification a point declares binding', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// THE SLICE DOCUMENT (point 516 item 5): one level out from the sections. The
+// brief named design.md sections and knew no other spec document, so
+// docs/communication-poc-spec.md — which pins the loop for the whole 477–488
+// slice — was found only through a code comment while point 487 was built.
+// ---------------------------------------------------------------------------
+describe('the spec document a point’s slice belongs to', () => {
+  const SPEC_DOC = [
+    '# The communication PoC',
+    '',
+    'The brief answers the open question for a first playable slice. This',
+    'document is the reference the work-order points 477–488 cite; it states the',
+    'decisions the brief left to the build.',
+  ].join('\n')
+  const ONE_POINT_DOC = ['# Levers', '', 'Second phase of work-order point 361. The figures live here.'].join('\n')
+  const LATE_MENTION = [
+    '# A long document',
+    ...Array.from({ length: 30 }, (_, i) => `Line ${i} of ordinary prose.`),
+    'It should be filed as a work-order point 477 like everything else.',
+  ].join('\n')
+  const SLICE_DOCS = [
+    { path: 'docs/communication-poc-spec.md', text: SPEC_DOC },
+    { path: 'docs/picture-check-levers.md', text: ONE_POINT_DOC },
+    { path: 'docs/batch-autonomy.md', text: LATE_MENTION },
+  ]
+
+  it('reads a declared RANGE, and a single declared point', () => {
+    const decls = parseSliceDeclarations(SLICE_DOCS)
+    const range = decls.find((d) => d.path === 'docs/communication-poc-spec.md')
+    expect(range.numbers).toHaveLength(12)
+    expect(range.numbers[0]).toBe(477)
+    expect(range.numbers.at(-1)).toBe(488)
+    expect(range.scope).toBe('work-order points 477–488')
+    expect(range.declaration).toBe('This document is the reference the work-order points 477–488 cite')
+    expect(decls.find((d) => d.path === 'docs/picture-check-levers.md').numbers).toEqual([361])
+  })
+
+  it('takes a declaration only from the OPENING — deeper down it is prose', () => {
+    // The measured false positive: docs/batch-autonomy.md talks about filing a
+    // work-order point 2000 lines in, and governs no slice at all.
+    expect(parseSliceDeclarations(SLICE_DOCS).some((d) => d.path === 'docs/batch-autonomy.md')).toBe(false)
+    expect(sliceDocsFor(SLICE_DOCS, 477).map((d) => d.path)).toEqual(['docs/communication-poc-spec.md'])
+  })
+
+  it('NAMES the document in the brief of every point in the slice', () => {
+    const tasks = ['# TASKS', '', '- [ ] 487. DIGGING AT THE ROCK. The loop is learn, understand, dig.'].join('\n')
+    const { brief, sliceDocs } = buildBrief({ ...args, tasksText: tasks, docs: SLICE_DOCS, number: 487 })
+    expect(sliceDocs.map((d) => d.path)).toEqual(['docs/communication-poc-spec.md'])
+    expect(brief).toContain("--- THE SPEC DOCUMENT THIS POINT'S SLICE BELONGS TO ---")
+    expect(brief).toContain('docs/communication-poc-spec.md — declares itself for work-order points 477–488')
+    // Named, never carried: the document is thousands of words, and the brief's
+    // whole value is that it is not.
+    expect(brief).not.toContain('it states the decisions the brief left to the build')
+  })
+
+  it('says an unnamed slice document is a FINDING, not a search task', () => {
+    const tasks = ['# TASKS', '', '- [ ] 487. DIGGING AT THE ROCK.'].join('\n')
+    const { brief } = buildBrief({ ...args, tasksText: tasks, docs: SLICE_DOCS, number: 487 })
+    expect(brief).toMatch(/is NOT named here is a FINDING, not a search task/)
+    expect(brief).toMatch(/declare its work-order points in its opening lines/)
+  })
+
+  it('adds nothing to the brief of a point no document declares', () => {
+    const tasks = ['# TASKS', '', '- [ ] 700. A POINT NO SPEC DOCUMENT CLAIMS.'].join('\n')
+    const { brief, sliceDocs } = buildBrief({ ...args, tasksText: tasks, docs: SLICE_DOCS, number: 700 })
+    expect(sliceDocs).toEqual([])
+    expect(brief).not.toContain("--- THE SPEC DOCUMENT THIS POINT'S SLICE BELONGS TO ---")
+  })
+
+  it('ignores an absurd range rather than claiming hundreds of points', () => {
+    const junk = [{ path: 'docs/junk.md', text: '# J\n\nSee work-order points 1-9999 for context.' }]
+    expect(parseSliceDeclarations(junk)).toEqual([])
+  })
+})
+
 describe('assembleBrief', () => {
   it('omits the empty parts instead of printing empty headings', () => {
     const brief = assembleBrief({ point: { number: 1, done: false, body: 'x' } })
@@ -1162,6 +1239,30 @@ describe('faithfulness over the WHOLE work order', () => {
     )
     expect(off).toEqual([])
     expect(briefOf(84)).toMatch(/point 32 → adopting wording .* ACCEPTANCE CRITERION 32/)
+  })
+
+  it('names docs/communication-poc-spec.md to the whole slice it declares', () => {
+    // The measured case: point 487 found this document through a code comment.
+    const claimed = built.filter(({ result }) =>
+      result.sliceDocs.some((d) => d.path === 'docs/communication-poc-spec.md'),
+    )
+    expect(claimed.map((b) => b.point.number).sort((a, b) => a - b)).toEqual([
+      477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488,
+    ])
+    expect(briefOf(487)).toContain('docs/communication-poc-spec.md — declares itself for work-order points 477–488')
+  })
+
+  it('claims no point no document declares — the block stays the exception', () => {
+    const withDoc = built.filter(({ result }) => result.sliceDocs.length)
+    expect(withDoc.length).toBeGreaterThan(0)
+    expect(withDoc.length).toBeLessThan(points.length / 10)
+    const off = built
+      .filter(
+        ({ result }) =>
+          !result.sliceDocs.length && result.brief.includes("--- THE SPEC DOCUMENT THIS POINT'S SLICE"),
+      )
+      .map((b) => b.point.number)
+    expect(off).toEqual([])
   })
 
   it('keeps EVERY brief — archived ones too — under the measured ceiling', () => {

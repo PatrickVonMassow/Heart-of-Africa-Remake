@@ -687,6 +687,88 @@ export function collectAdoptedSpecs({
   return { chain, beyond, ambiguous }
 }
 
+/**
+ * How far into a document a scope declaration may stand (point 516 item 5).
+ *
+ * A document says what it governs in its OPENING — "This document is the
+ * reference the work-order points 477–488 cite" sits in the second paragraph of
+ * docs/communication-poc-spec.md. Measured over the corpus, the same phrase
+ * further down is ordinary prose (docs/batch-autonomy.md line 2063, a table cell
+ * in docs/rule-corpus-audit.md), so the head is what separates a declaration
+ * from a mention — nothing else in the wording does.
+ */
+export const SLICE_DECLARATION_HEAD_LINES = 20
+
+/** `work-order points 477–488`, `work-order point 361`, `work-order points 12, 13`. */
+const SLICE_DECLARATION_RE = /work-order\s+(?:points?|pts?\.?)\s+(\d+(?:\s*(?:[-–—]|,|\/|\s+and\s+)\s*\d+)*)/gi
+
+/** The widest span a declared range may cover — beyond it, the match is prose. */
+const SLICE_RANGE_LIMIT = 200
+
+/** The numbers a declaration covers, and the short scope wording for the brief. */
+function expandPointScope(raw) {
+  const text = String(raw).trim()
+  const range = /^(\d+)\s*[-–—]\s*(\d+)$/.exec(text)
+  if (range) {
+    const from = Number(range[1])
+    const to = Number(range[2])
+    if (to < from || to - from > SLICE_RANGE_LIMIT) return { numbers: [], scope: '' }
+    const numbers = []
+    for (let n = from; n <= to; n++) numbers.push(n)
+    return { numbers, scope: `work-order points ${from}–${to}` }
+  }
+  const numbers = [...new Set(text.split(/[,/]|\s+and\s+/).map((p) => Number(p.trim())).filter(Boolean))]
+  if (!numbers.length) return { numbers: [], scope: '' }
+  return {
+    numbers,
+    scope: numbers.length === 1 ? `work-order point ${numbers[0]}` : `work-order points ${numbers.join(', ')}`,
+  }
+}
+
+/** The sentence a declaration stands in, collapsed to one line for the brief. */
+function declarationSentence(text, at, maxChars = 180) {
+  const before = text.slice(0, at)
+  const start = Math.max(before.lastIndexOf('. '), before.lastIndexOf('\n\n'), -1) + 1
+  const rest = text.slice(start)
+  const end = /[.;]\s/.exec(rest.slice(at - start))
+  const sentence = rest
+    .slice(0, end ? at - start + end.index : rest.length)
+    .replace(/\s+/g, ' ')
+    .trim()
+  return sentence.length > maxChars ? `${sentence.slice(0, maxChars).trim()}…` : sentence
+}
+
+/**
+ * Which spec DOCUMENT a work-order point's slice belongs to.
+ *
+ * WHY (measured 06.08.2026 while point 487 was built): the brief names the
+ * design.md sections a spec cites but knows no other spec document, so
+ * docs/communication-poc-spec.md — which pins the five-step loop verbatim and
+ * decided the journal wording for the whole 477–488 slice — was found only
+ * through a code comment. The document itself declares what it governs; reading
+ * that declaration is the whole mechanism, and it puts the duty on the document
+ * (declare your points) rather than on every reader (go looking).
+ */
+export function parseSliceDeclarations(docs = [], { headLines = SLICE_DECLARATION_HEAD_LINES } = {}) {
+  const out = []
+  for (const doc of docs) {
+    if (!doc || !doc.path) continue
+    const head = normalise(doc.text).split('\n').slice(0, headLines).join('\n')
+    for (const m of head.matchAll(SLICE_DECLARATION_RE)) {
+      const { numbers, scope } = expandPointScope(m[1])
+      if (!numbers.length) continue
+      out.push({ path: doc.path, numbers, scope, declaration: declarationSentence(head, m.index) })
+    }
+  }
+  return out
+}
+
+/** The declarations that cover `number` — usually none, occasionally one or two. */
+export function sliceDocsFor(docs = [], number, options) {
+  const n = Number(number)
+  return parseSliceDeclarations(docs, options).filter((d) => d.numbers.includes(n))
+}
+
 /** Other work-order points a spec names ("per point 288", "pt. 30", "points 175/177"). */
 export function extractPointRefs(spec, selfNumber = null) {
   const text = normalise(spec)
@@ -863,6 +945,7 @@ export function assembleBrief({
   adopted = [],
   adoptionBeyond = [],
   adoptionCap = ADOPTION_DEPTH_CAP,
+  sliceDocs = [],
 }) {
   const out = [
     `=== DELEGATION BRIEF — WORK-ORDER POINT ${point.number} (${point.done ? 'DONE/ARCHIVED' : 'OPEN'}) ===`,
@@ -897,6 +980,16 @@ export function assembleBrief({
       }
     }
     out.push('')
+  }
+  if (sliceDocs.length) {
+    out.push(
+      "--- THE SPEC DOCUMENT THIS POINT'S SLICE BELONGS TO ---",
+      'Named, not carried. Read it before the code: it pins decisions this point\'s wording assumes.',
+      ...sliceDocs.map((d) => `- ${d.path} — declares itself for ${d.scope}: "${d.declaration}"`),
+      'A document that governs this slice and is NOT named here is a FINDING, not a search task: file',
+      'it, and make that document declare its work-order points in its opening lines.',
+      '',
+    )
   }
   if (sections.length) {
     out.push('--- SECTIONS THE SPEC REFERENCES (verbatim) ---')
@@ -1013,6 +1106,11 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
   } = collectAdoptedSpecs({ points: all, root: point, mayBeCriterion: (n) => criterionTitle(n) !== null })
   const { quoted: adoptionQuoted } = classifyPointRefs(point.body, { selfNumber: point.number })
   const adoptedNumbers = new Set(adopted.map((a) => a.number))
+
+  // The spec document this point's slice belongs to, named the way a design.md
+  // section is named — one level out from the sections, and the same failure:
+  // what the point is specified in must not be a search task for its reader.
+  const sliceDocs = sliceDocsFor(docs, point.number)
 
   const alsoNote = (r) => {
     if (!r.alsoIn?.length) return ''
@@ -1149,6 +1247,7 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
     revision: stamp,
     adopted,
     adoptionBeyond,
+    sliceDocs,
   })
   return {
     brief,
@@ -1162,6 +1261,7 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
     adoptionAmbiguous,
     adoptionQuoted,
     adoptedRefs,
+    sliceDocs,
     designRefs: carried.map((s) => s.id),
     claudeRefs: refs.filter((r) => r.docPath === 'CLAUDE.md').map((r) => r.id),
     otherDocRefs: refs.filter((r) => r.docPath && r.docPath !== 'design.md' && r.docPath !== 'CLAUDE.md'),
