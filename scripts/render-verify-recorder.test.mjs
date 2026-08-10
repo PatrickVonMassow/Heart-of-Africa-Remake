@@ -260,6 +260,18 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     }
   })
 
+  // Point 595: the record names the TREE it was taken on, so "the full proof ran
+  // on the exact merge candidate" is checkable instead of claimed.
+  it('records the git HEAD the run was taken on, and whether that tree was dirty', async () => {
+    const run = await armed('polish')
+    const record = run.exit(0)
+    const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true }).trim()
+    expect(record.head).toBe(head)
+    expect(typeof record.dirty).toBe('boolean')
+    // Evidence, not a gate: naming the tree may never change what a run is worth.
+    expect(runVerdict(record, { openPoints }).covers).toBe(true)
+  })
+
   it('leaves a run without the variable unstamped, so it can still cover', async () => {
     const before = process.env.VERIFY_SECTION
     delete process.env.VERIFY_SECTION

@@ -9,6 +9,11 @@
 // "I ran it" can never be a hollow claim: the record only exists when the suite
 // process itself wrote it.
 //
+// Every record names the TREE it was taken on (point 595): the `git HEAD` the
+// suite armed against and whether the checkout was dirty. That is what makes
+// "the full proof ran on the exact merge candidate" checkable rather than
+// claimed — evidence only, judged by nothing here.
+//
 // A `--section` run is recorded PARTIAL (point 566): it exercised one named
 // block of the suite, so runVerdict refuses the record as coverage whatever its
 // exit code. The flag comes from the env the runner set, never from the suite —
@@ -25,6 +30,7 @@
 // Observe-only and total: every step is wrapped so the bookkeeping can NEVER
 // fail a verify suite.
 import { basename, join, resolve } from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { recordRun } from './render-verify-state.mjs'
@@ -41,6 +47,18 @@ const SCREENSHOT_DIR = (() => {
     return fileURLToPath(new URL('../verification', import.meta.url))
   } catch {
     return resolve(process.cwd(), 'verification')
+  }
+})()
+
+/** The checkout the suite is running out of — a git WORKTREE is one of its own,
+ *  and its HEAD is the tree that was verified. Derived the same way as the
+ *  screenshot directory rather than imported, so this file asks nothing of a
+ *  module a test may have replaced. */
+const CHECKOUT_DIR = (() => {
+  try {
+    return fileURLToPath(new URL('..', import.meta.url))
+  } catch {
+    return process.cwd()
   }
 })()
 
@@ -116,6 +134,42 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
   }
 }
 
+/**
+ * THE TREE THAT WAS VERIFIED (point 595): the commit the suite ran against, and
+ * whether anything was modified on top of it.
+ *
+ * WHY IT BELONGS IN THE RECORD. The ladder's final rung says the full proof runs
+ * ONCE, on the exact merge candidate — `main` merged INTO the branch, the tree
+ * that will land — and names "the recorded `git HEAD` of that run" as the
+ * evidence that the verified tree IS the merged one. Until now the record named
+ * backend, suite, exit code and screenshots, but not the code: two runs of one
+ * suite on two different trees were indistinguishable in it, so the claim had
+ * nothing behind it.
+ *
+ * EVIDENCE, DELIBERATELY NOT A GATE. Nothing judges these fields; they let a
+ * reader (or a later mechanism) check the claim after the fact. A DIRTY tree is
+ * recorded as such rather than being refused, because a dirty checkout is
+ * ordinary while repairing — what must not happen is a dirty run passing as a
+ * proof of the committed tree, and naming it is what prevents that.
+ *
+ * Read ONCE, when the suite arms, not at exit: a run that took twenty minutes
+ * should name the tree it started on, and a `git` that is missing or slow must
+ * never delay a suite's exit handler. Unreadable answers null — never a guess.
+ */
+function verifiedTree() {
+  const git = (...args) => {
+    const r = spawnSync('git', args, { cwd: CHECKOUT_DIR, encoding: 'utf8', windowsHide: true, timeout: 5000 })
+    return r.status === 0 ? String(r.stdout ?? '').trim() : null
+  }
+  try {
+    const head = git('rev-parse', 'HEAD')
+    const status = git('status', '--porcelain')
+    return { head: head || null, dirty: status === null ? null : status.length > 0 }
+  } catch {
+    return { head: null, dirty: null }
+  }
+}
+
 /** Screenshot files written since the run started — the "it rendered" evidence. */
 function screenshotsSince(startedAt) {
   const names = []
@@ -146,6 +200,8 @@ export function armRunRecorder(backend) {
       // declare its own partiality, and the flag is what makes runVerdict refuse
       // the record as coverage. Empty/unset means the suite ran whole.
       section: String(process.env[SECTION_ENV] ?? '').trim() || null,
+      // The tree this run verified (point 595) — read here, at arming time.
+      tree: verifiedTree(),
       startedAt: Date.now(),
       asserted: false,
       // The WebGPU feature level the run really came up at, filled in by
@@ -224,6 +280,10 @@ export function armRunRecorder(backend) {
         recordRun({
           backend: armed.backend,
           suite: armed.suite,
+          // Named even when unreadable (null), so a record can never be mistaken
+          // for one taken on a tree nobody wrote down.
+          head: armed.tree.head,
+          dirty: armed.tree.dirty,
           startedAt: armed.startedAt,
           at: Date.now(),
           exit,
