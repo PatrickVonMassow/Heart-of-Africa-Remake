@@ -17166,3 +17166,27 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   names `Monitor` for the per-occurrence case.
   Criticality: HIGH — it touches the idle guard, and a guard that goes blind stops
   catching an idle stop, so the other model's mechanism review applies.
+
+- [x] 608. THE BOARD'S ORDER IS HAND-KEPT AND DRIFTS FROM THE WORK ORDER (found
+  10.08.2026, and the user found it before any check did). The queue section renders from
+  the stored list `order` in `.claude/board-queue.json`, NOT from the sequence of open
+  points in `TASKS.md`. Two reorderings were made on 10.08.2026 — four points pushed behind
+  602, five throughput levers pulled to the head — the work order was rewritten both times,
+  the board was rebuilt and republished both times, and it kept showing the OLD sequence.
+  `queue-order-guard` stayed green throughout, because it judges completeness (every open
+  point has a card), not agreement of the two sequences. The user reads that page on his
+  phone as the plan; a plan that silently lags the work order is worse than no plan.
+  FINAL STATE:
+  1. The queue's ORDER is DERIVED from the work order — `TASKS.md`'s open points, read
+     through `scripts/tasks-source.mjs`, are the sequence, and the stored file keeps only
+     what is genuinely its own: title, body and estimate per point. One fact, one home.
+  2. The existing rank rules stay exactly as they are (the finder points and the release
+     tag sort to the back, a gated point to the very back) — they are a VIEW on the order,
+     not a second order, and this point does not change what they do.
+  3. `queue-order-guard` gains the comparison it lacked: the rendered sequence against the
+     derived one, so a drift blocks instead of being seen by the user first.
+  VERIFIABLE: Vitest — the order comes out of a work order fixture in file sequence, a
+  reordering of that fixture changes the rendered sequence with no other edit, the rank
+  rules still hold on top of it, and the guard fails on a hand-edited divergence.
+  Criticality: medium — nothing the player sees, but it is the one surface the user steers
+  the batch by, and it was wrong while every check said it was fine.
