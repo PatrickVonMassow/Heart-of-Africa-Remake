@@ -399,19 +399,23 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     expect(spawnDecision(a)).toBe('spawn')
   })
 
-  it('a handed-over lock with a LIVE process waits out the grace, then frees', () => {
-    const at = NOW - HANDOVER_GRACE_MS + 60_000 // handed over, grace not yet elapsed
-    const inGrace = assessOwner(handed({ claimedAt: at - 1, handedOverAt: at }), {
+  it('a handed-over lock with a LIVE process frees AT ONCE — no grace (point 612)', () => {
+    // MEASURED 10.08.2026: the handover was marked at 13:57 and the ticks at
+    // 14:01, 14:16 and 14:31 all skipped. The grace was one half of why; the
+    // other is the case below. A release is an EVENT, and the successor may start
+    // within seconds of it, so no age of the mark buys the outgoing process time.
+    const justNow = assessOwner(handed({ claimedAt: NOW - 2000, handedOverAt: NOW - 1000 }), {
       now: NOW,
       bootTime: BOOT,
       probe: aliveProbe,
     })
-    expect(inGrace.alive).toBe(true)
-    expect(inGrace.reason).toBe('handover-grace')
-    expect(spawnDecision(inGrace)).toBe('skip-alive')
+    expect(justNow.alive).toBe(false)
+    expect(justNow.reason).toBe('handed-over')
+    expect(spawnDecision(justNow)).toBe('spawn')
 
-    const past = NOW - HANDOVER_GRACE_MS - 1000
-    const elapsed = assessOwner(handed({ claimedAt: past - 1, handedOverAt: past }), {
+    // …and it is still the same verdict a whole grace window later.
+    const old = NOW - HANDOVER_GRACE_MS - 1000
+    const elapsed = assessOwner(handed({ claimedAt: old - 1, handedOverAt: old }), {
       now: NOW,
       bootTime: BOOT,
       probe: aliveProbe,
@@ -420,19 +424,35 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     expect(elapsed.reason).toBe('handed-over')
   })
 
-  it('THE SAFETY INVARIANT: a session that kept working WITHDRAWS its own handover', () => {
-    // A later Stop hook in the chain blocked the turn end, the session carried on
-    // and its PostToolUse heartbeat stamped claimedAt past the handover. The lock
-    // must read ALIVE again — no successor may be spawned beside a working session.
+  it('THE INCIDENT: a LATER heartbeat no longer un-marks a handover (point 612)', () => {
+    // 10.08.2026, and the reason pid liveness cannot answer this question here:
+    // pid 939 is the attended window's `claude` process, started the day before.
+    // It survives `/clear` and hosts EVERY session of that window, so successive
+    // sessions write the SAME pid and `pidStartedAt` records the CONTAINER's start,
+    // not the session's — the pid-alive branch can never observe a dead one.
+    //
+    // The old rule demanded `claimedAt <= handedOverAt`, and any later write of the
+    // lock breaks that WITHOUT deleting the flag: a late PostToolUse hook whose
+    // withdrawal `withdrawalIsCausal` judges non-causal leaves exactly this state.
+    // The handover then silently stopped counting while the flag still sat in the
+    // file, and three ticks read `pid-alive` off a lock that said "handed over".
     const at = NOW - 30 * 60_000
     const a = assessOwner(handed({ handedOverAt: at, claimedAt: at + 1000 }), {
       now: NOW,
       bootTime: BOOT,
       probe: aliveProbe,
     })
-    expect(a.alive).toBe(true)
-    expect(a.reason).toBe('pid-alive')
-    expect(spawnDecision(a)).toBe('skip-alive')
+    expect(a.alive).toBe(false)
+    expect(a.reason).toBe('handed-over')
+    expect(spawnDecision(a)).toBe('spawn')
+
+    // THE SAFETY INVARIANT IS UNCHANGED, only its mechanism: a session that really
+    // did keep working WITHDRAWS its handover by DELETING it, which `heartbeat`
+    // does wherever the work is causal (see the withdrawal cases below). A lock
+    // with no mark on it is an ordinary live owner again.
+    const withdrawn = assessOwner(lock({ claimedAt: NOW - 60_000 }), { now: NOW, bootTime: BOOT, probe: aliveProbe })
+    expect(withdrawn.alive).toBe(true)
+    expect(spawnDecision(withdrawn)).toBe('skip-alive')
   })
 
   it('a half-written or forged handover flag alone frees nothing', () => {

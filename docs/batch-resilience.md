@@ -107,6 +107,47 @@ check for themselves, so the check goes in **one PreToolUse chokepoint** — the
 a session whose fence is stale. Without that chokepoint the fence protects only the
 file that was already protected, and the woken owner still pushes to main.
 
+**One function owns the verdict** (point 612, with point 614's cross-point ruling).
+Point 612's idle window and point 517's lease extension pull the SAME `leaseUntil`
+arithmetic in opposite directions, so whichever landed second as an independent
+patch would silently undo the first. The whole question — does this lock still
+belong to its owner, and until when — is therefore answered by `ownershipVerdict`
+over `effectiveLeaseUntil` in `scripts/batch-ownership-core.mjs`, and 517's
+extension is expressed INSIDE `effectiveLeaseUntil`, never beside it.
+`assessOwner` reads the files and the pid probe and asks that one function; only
+the pid branches, which are probe semantics, stay with it.
+
+**Two things a live pid may no longer do** (point 612, measured 10.08.2026 —
+35 minutes of idle batch in one incident). First, it may not outrank an explicit
+HANDOVER: the mark now frees the lock at once, with no grace and without the old
+`claimedAt <= handedOverAt` qualifier, because any later write of the lock breaks
+that comparison WITHOUT deleting the flag — a late PostToolUse hook is enough — and
+the handover then stops counting while it still sits in the file. A handover is
+withdrawn by DELETING it, which is an explicit act. Second, it may not stand in for
+SESSION liveness: one `claude` process hosts every session of a window (it survives
+`/clear`, and `pidStartedAt` records the container process's start), so successive
+sessions write the same pid and the pid-alive branch can never observe a dead one.
+A session that took the lock and has **not completed one tool call since**
+(`claimedAt` still equal to `acquiredAt`), with nothing declared in flight, loses it
+after the idle window — five minutes, calibratable via `HOA_IDLE_WINDOW_MIN`. The
+rule stops deliberately short of "no state change within the window": a single tool
+call runs past five minutes about once in a hundred here and the LARGE regression is
+one call of 30–40 minutes, so the broader wording would dispossess working sessions
+routinely and spawn a successor beside each — the 24.07.2026 double-spawn as an
+everyday event. Nothing is killed either way.
+
+**A state change is the OWNER'S OWN.** The idle window may only be moved by
+something the owner wrote — its heartbeat, a commit of its own, a board write
+(`ownerActivityAt`) — and never by a file timestamp. The launcher today prints
+`declared work advancing — worktree … active 1 min ago (working files|git
+metadata)` off mtimes alone, so a leaked dev server or a file watcher touching a
+worktree would keep a dead-idle owner "active" for as long as the takeover override
+(1 h) or the work-max-age (4 h) allows. `idleVerdict` therefore takes no
+"is it advancing?" signal at all, and `ownershipVerdict` reads only `work.declared`
+— a declaration the owner wrote — never `work.advancing`. The same three inputs
+answer for a takeover CLAIM that reserves the batch without working (point 616),
+which is why the function is free of the lock.
+
 **Standby is the accepted loss case.** All stamps are epoch, so DST is irrelevant
 and an NTP step only matters if it exceeds the window. Sleep is the real one: the
 wall clock advances, no code runs, and the owner loses the lease through no fault
@@ -235,6 +276,28 @@ lease.
 
 **433 also carries the failCount fix from §4**, because without it this layer is
 what turns a quiet night into a loud one.
+
+**A release is an EVENT, not a state to be discovered** (point 612). On 10.08.2026
+the outgoing session handed over correctly at 13:20 and the lock was released; the
+launcher ticks every 15 minutes and would not have looked before 13:31; at 13:28 an
+unattended window took the free lock, so the 13:31 tick correctly found a live owner
+and spawned nobody. Every part behaved as built and the batch stood still for half
+an hour. So the daemon now WATCHES the lock while it sleeps (`ownershipSignal` /
+`releaseSpawnDecision` in `batch-launcher-core.mjs`, polled every
+`WAKE_POLL_MS` = 5 s) and cuts the sleep short the moment NOBODY OWNS THE BATCH ANY
+MORE — the successor starts within seconds. The event is every ownership-ending
+transition, not the handover mark alone: an idle lapse and an expired lease end
+ownership just as definitively, and a signal hung on the mark would leave exactly
+those two waiting out the quarter hour. So the watcher asks `assessOwner` — the same
+verdict the tick uses — and one code path decides "ownership just ended". Three
+properties keep it safe: it reacts to a CHANGE, never to a standing state, so a lock
+that has been free for hours does not tick the launcher four times a minute; `WAKE_MIN_GAP_MS`
+floors two early ticks a minute apart, so a tick that cannot spawn (backoff, quota,
+preflight) cannot spin; and it SPAWNS NOTHING — all it does is shorten a sleep, so
+the tick it brings forward is the same `batch-autostart.mjs` child as ever and the
+hard singleton, the claim reservation and the atomic acquire are untouched. The
+15-minute tick REMAINS the backstop for everything no signal covers (a killed
+session, a missed write, an unreadable lock).
 
 ### Layer 3 + 4 — one external watcher, off this machine
 
