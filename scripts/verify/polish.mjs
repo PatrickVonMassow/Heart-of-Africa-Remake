@@ -878,6 +878,198 @@ if (section('speech-hypothesis')) {
     if (saved.pitch !== undefined) p.pitch = saved.pitch
   }, pose)
 }
+// --- Guessing a meaning where it is spoken (design.md §13.4, point 588) -------
+// The picking rule, the dialog and the note it writes are pinned in the Vitest
+// layer. What ONLY a browser can answer is the input path: a real left click on
+// the settlement view opens the dialog at all, the pointer lock is given up for
+// it and asked back on close, and real keystrokes land in the field. The lock
+// itself cannot be exercised here — it is deliberately never engaged under
+// browser automation (system-Chrome headless grabs the real OS cursor), so what
+// is read is the game's own DECISION counter, while the click, the focus and
+// the typing are the genuine article.
+if (section('speech-guess')) {
+  await goToPlace('maasai-village')
+  const GUESS_UTTERANCE = 'BA-BA-ba-ba-ba'
+  const guessPose = await page.evaluate(() => {
+    const p = window.__placePlayer
+    return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null
+  })
+  // Stage ONE speaker a few steps in front of the player: the click takes the
+  // NEAREST speaker, so standing near him is what the highlight is for — and at
+  // a distance a player really walks up to, since the note's size follows it.
+  const staged = await page.evaluate((u) => {
+    const scene = window.__placeScene
+    const p = window.__placePlayer
+    if (!scene || !p) return false
+    let figure = null
+    scene.traverse((o) => {
+      if (!figure && o.name === 'inhabitant') figure = o
+    })
+    if (!figure) return false
+    figure.updateWorldMatrix(true, false)
+    const e = figure.matrixWorld.elements
+    p.x = e[12] + 4
+    p.z = e[14]
+    p.pitch = 0
+    // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+    p.yaw = Math.atan2(e[12] - p.x, e[14] - p.z) + Math.PI
+    // A label shows only over speech the player has ALREADY observed, and a
+    // long lifetime keeps this off the expiry clock, which is pure-tested.
+    window.__game.getState().hearUtterance(u)
+    window.__game.getState().setUtteranceHypothesis(u, '')
+    figure.name = 'guess-probe-figure'
+    const ok = window.__speech?.speak('guess-speaker', [u], 'guess-probe-figure', 120) === true
+    figure.name = 'inhabitant'
+    return ok
+  }, GUESS_UTTERANCE)
+  check('a figure can be staged to speak beside the player (point 588)', staged, `staged ${staged}`)
+  await nextFrames(4)
+  // What the player sees: which note is highlighted, and what stands under it.
+  const highlight = await page.evaluate(() => {
+    const all = Array.from(document.querySelectorAll('.speech-label'))
+    const targeted = all.filter((el) => el.classList.contains('targeted'))
+    const one = targeted[0]
+    return {
+      labels: all.length,
+      targeted: targeted.length,
+      speaker: one?.getAttribute('data-speaker') ?? null,
+      invite: one?.querySelector('.speech-invite')?.textContent ?? '',
+      strayInvites: all.filter(
+        (el) => !el.classList.contains('targeted') && el.querySelector('.speech-invite'),
+      ).length,
+      syllables: Array.from(one?.querySelectorAll('.syllables') ?? []).map((s) => s.textContent),
+    }
+  })
+  check(
+    'exactly one note is highlighted, and it is the speaker beside the player (point 588)',
+    highlight.targeted === 1 && highlight.speaker === 'guess-speaker',
+    JSON.stringify(highlight),
+  )
+  check(
+    'the invitation stands under the highlighted note alone, and does not shout (point 588)',
+    highlight.invite.length > 0 &&
+      highlight.invite !== highlight.invite.toUpperCase() &&
+      highlight.strayInvites === 0,
+    `invite ${JSON.stringify(highlight.invite)}, invitations on unhighlighted notes ${highlight.strayInvites}`,
+  )
+  await frame('148-speech-guess-invitation', {
+    element: '.speech-label.targeted',
+    label: 'the highlighted note of the nearest speaker, inviting the guess',
+  })
+  // A point of the settlement view the click can actually land on: the notes are
+  // drawn in an overlay of their own, and a click that hit one would prove
+  // nothing about the canvas the player clicks.
+  const spot = await page.evaluate(() => {
+    const w = window.innerWidth
+    const h = window.innerHeight
+    for (const [fx, fy] of [[0.2, 0.55], [0.8, 0.55], [0.2, 0.35], [0.5, 0.62]]) {
+      const x = Math.round(w * fx)
+      const y = Math.round(h * fy)
+      if (document.elementFromPoint(x, y)?.tagName === 'CANVAS') return { x, y }
+    }
+    return null
+  })
+  check('the settlement view offers a spot to click on (point 588)', !!spot, JSON.stringify(spot))
+  if (spot) {
+    const lockBefore = await page.evaluate(() => ({ ...window.__placeLock }))
+    await page.mouse.click(spot.x, spot.y)
+    await nextFrames(2)
+    const opened = await page.evaluate(() => {
+      const dialog = document.querySelector('.dialog.speech-guess')
+      return {
+        open: !!dialog,
+        spoken: Array.from(dialog?.querySelectorAll('.utterance') ?? []).map((u) =>
+          Array.from(u.querySelectorAll('span'))
+            .map((s) => s.textContent)
+            .join('-'),
+        ),
+        focused: document.activeElement?.className ?? '',
+        lock: { ...window.__placeLock },
+      }
+    })
+    check(
+      'a left click on the settlement opens the guess for the highlighted speaker (point 588)',
+      opened.open && opened.spoken.join(' ') === highlight.syllables.join(' '),
+      `${JSON.stringify(opened.spoken)} against the note's ${JSON.stringify(highlight.syllables)}`,
+    )
+    check(
+      'the pointer is given back when the dialog opens (point 588)',
+      opened.lock.releases > lockBefore.releases,
+      `releases ${lockBefore.releases} → ${opened.lock.releases}`,
+    )
+    check(
+      'the field takes the keyboard the moment the dialog stands (point 588)',
+      String(opened.focused).includes('hypothesis'),
+      `focus on ${JSON.stringify(opened.focused)}`,
+    )
+    // The genuine article: real keystrokes, not a synthetic change event.
+    await page.keyboard.type('come here')
+    const typed = await page.evaluate(
+      () => document.querySelector('.dialog.speech-guess .hypothesis')?.value ?? null,
+    )
+    check(
+      'what the player types reaches the field (point 588)',
+      typed === 'come here',
+      `field reads ${JSON.stringify(typed)}`,
+    )
+    await frame('149-speech-guess-dialog', {
+      element: '.dialog.speech-guess',
+      label: 'the guess at what the villager just said',
+    })
+    await page.keyboard.press('Enter')
+    await nextFrames(2)
+    const saved = await page.evaluate(
+      (u) => ({
+        open: !!document.querySelector('.dialog.speech-guess'),
+        reading: window.__game.getState().communication.heard[u]?.hypothesis ?? null,
+        lock: { ...window.__placeLock },
+      }),
+      GUESS_UTTERANCE,
+    )
+    check(
+      'Enter writes the reading into the same note the journal keeps (point 588)',
+      !saved.open && saved.reading === 'come here',
+      JSON.stringify(saved),
+    )
+    check(
+      'the pointer is asked back when the dialog closes (point 588)',
+      saved.lock.grabs > lockBefore.grabs,
+      `grabs ${lockBefore.grabs} → ${saved.lock.grabs}`,
+    )
+    // And Escape leaves the note exactly as it was.
+    await page.mouse.click(spot.x, spot.y)
+    await nextFrames(2)
+    const reopened = await page.evaluate(() => !!document.querySelector('.dialog.speech-guess'))
+    if (reopened) await page.keyboard.type(' and never mind')
+    await page.keyboard.press('Escape')
+    await nextFrames(2)
+    const cancelled = await page.evaluate(
+      (u) => ({
+        open: !!document.querySelector('.dialog.speech-guess'),
+        reading: window.__game.getState().communication.heard[u]?.hypothesis ?? null,
+      }),
+      GUESS_UTTERANCE,
+    )
+    check(
+      'Escape closes the guess and leaves the note unchanged (point 588)',
+      reopened && !cancelled.open && cancelled.reading === 'come here',
+      `reopened ${reopened}, ${JSON.stringify(cancelled)}`,
+    )
+  }
+  await page.evaluate(
+    ({ u, saved }) => {
+      window.__game.getState().setUtteranceHypothesis(u, '')
+      window.__speech?.clear()
+      const p = window.__placePlayer
+      if (!p || !saved) return
+      p.x = saved.x
+      p.z = saved.z
+      p.yaw = saved.yaw
+      if (saved.pitch !== undefined) p.pitch = saved.pitch
+    },
+    { u: GUESS_UTTERANCE, saved: guessPose },
+  )
+}
 // Point 300, slope footing: a silhouette on a dune must lie ON the incline —
 // its body pitched over its own wheelbase, and each foot then seated on the
 // ground under ITS OWN spot — so the planted foot touches the ground drawn
