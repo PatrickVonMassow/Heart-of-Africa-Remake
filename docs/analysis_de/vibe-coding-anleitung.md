@@ -161,10 +161,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   und nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die
   im Entwicklungsmodus laut meckern — jeder Testlauf wird so zum Detektor."
 
-- **Angeblich behoben, aber nicht.** Der Fix wird als fertig gemeldet, das Symptom bleibt.
-  → *Prompt:* „Ein Fix zählt erst als fertig, wenn das **Symptom am Ort des Symptoms** als behoben
-  gezeigt wurde **und** derselbe Versuch am **alten Stand** noch hindurchgeht. Beißt du dich
-  zweimal fest, wechsle das Modell."
+- **Angeblich behoben — und im Präsens behauptet.** Der Fix gilt als fertig, das Symptom bleibt;
+  „das Feld wird bereits gesetzt" steht so im Code nicht.
+  → *Prompt:* „Fertig ist ein Fix, wenn das **Symptom am Ort des Symptoms** behoben ist **und** der
+  gleiche Versuch am **alten Stand** noch durchgeht. Was du im **Präsens** behauptest, sieh vorher
+  nach; was erst gebaut wird, steht in der Zukunftsform. Beißt du dich zweimal fest, wechsle das
+  Modell."
 
 - **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende
   Prüfung verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie
@@ -264,12 +266,6 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Grenze anheben ist das **letzte** Mittel. Und der Commit, der eine Prüfung einführt,
   streicht den Text, den sie ersetzt."
 
-- **Im Präsens behauptet, nie nachgesehen.** „Das Feld wird bereits gesetzt" — im Code steht
-  es nicht. Eine falsche Tatsachenbehauptung liefert etwas, das nichts tut und grün ist.
-  → *Prompt:* „Was du im **Präsens** behauptest, sieh vorher nach. Was erst gebaut
-  werden muss, schreib in die Zukunftsform. Und prüfe jede Zusicherung, die ein
-  Dokument über den Code macht, gegen den Code — oder kennzeichne sie als Absicht."
-
 - **Jedes Teil grün, die Kette trotzdem tot.** Alle Bausteine sind getestet, am Ende
   passiert trotzdem nichts — dazwischen hat niemand nachgesehen.
   → *Prompt:* „Was aus mehreren Schritten besteht, spiel **einmal vollständig durch**
@@ -301,18 +297,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   und scheitert **sichtbar**, statt einen plausiblen Ersatz einzusetzen; jeder Rückfall wird
   **gemeldet**, mit dem Befehl, der ihn behebt."
 
-- **Die Gegenprüfung wurde angestoßen, nie abgeschlossen.** Der Helfer startet das Review und
-  ist fertig, bevor das Urteil kommt — der Zweig sieht geprüft aus.
-  → *Prompt:* „Wer eine Gegenprüfung beauftragt, bleibt dran, bis sie da ist. Ein Urteil
-  öffnet das Tor nur, wenn es **zustimmt** — ein ‚nicht zusammenführen' ist erst durch ein
-  **späteres** Urteil über den korrigierten Stand erledigt."
+- **Die Gegenprüfung wurde angestoßen, nie abgeschlossen.** Der Helfer ist fertig, bevor das Urteil
+  kommt — der Zweig sieht geprüft aus.
+  → *Prompt:* „Wer eine Gegenprüfung beauftragt, bleibt dran, bis sie da ist. Ein ‚nicht
+  zusammenführen' ist erst durch ein **späteres** Urteil über den korrigierten Stand erledigt."
 
-- **Der Ausfall kommt nie an der bequemen Stelle.** Am tückischsten bei Abläufen mit **zwei
-  Hälften**, deren zweite bei der Gegenseite liegt: fällt sie dazwischen aus, meldet jede
-  Seite korrektes Verhalten.
-  → *Prompt:* „Gib jeder kritischen Aktion einen **wiederholbaren Aufräumschritt** bei jedem
-  Start. Prüfe die Erholung mit Abbrüchen zu **zufälligen** Zeitpunkten und frag danach nicht
-  ‚läuft es weiter?', sondern ‚läuft es **dort** weiter, wo es sollte?'"
+- **Der Ausfall kommt nie an der bequemen Stelle.** Am tückischsten bei **zwei Hälften**, deren
+  zweite bei der Gegenseite liegt: fällt sie dazwischen aus, meldet jede Seite korrektes Verhalten.
+  → *Prompt:* „Gib jeder kritischen Aktion einen **wiederholbaren Aufräumschritt** bei jedem Start.
+  Prüf die Erholung mit Abbrüchen zu **zufälligen** Zeiten und frag: ‚läuft es **dort** weiter, wo
+  es sollte?'"
 
 - **Der Umzug nimmt nur mit, was versioniert ist.** Das Projekt kommt an, die Mechanik nicht:
   Aufgaben, Geheimnisse, Werkzeuge — und die **Scharfstellung** der Wächter. Ein stummer
@@ -340,11 +334,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Fehlt wirklich eine Fähigkeit, bitte **einmal um die Fähigkeit** — nie um ihre Ausführung."
 
 - **Nicht jedes Rot ist deins.** Eine Prüfung, die nur „rot" und „grün" kennt, schiebt fremde
-  Ausfälle deinem Code zu und schickt dich auf eine ergebnislose Suche.
-  → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — nach der Beobachtung, nicht nach
-  Namensliste: **lief überhaupt ein eigener Schritt?** Liegt sie außerhalb, nenn den **echten Griff**
-  dort; und wer auf einen fremden Dienst wartet, gibt beim Aufgeben das **Angefangene zurück**, sonst
-  sperrt er alle Nachfolger."
+  Ausfälle deinem Code zu.
+  → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — nach der Beobachtung: **lief
+  überhaupt ein eigener Schritt?** Liegt sie außerhalb, nenn den **echten Griff** dort; und wer auf
+  einen fremden Dienst wartet, gibt beim Aufgeben das **Angefangene zurück**."
 
 - **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er sitzt
   — Netz, Rechte, Umgebung —, verliert mit dem Fehlschlag die nächste Reparatur mit.
@@ -365,14 +358,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   die Ursache **sichtbar**? Führ ihn zuerst aus. Und sag mir, ob schon ein **anderer Weg
   läuft**, der dasselbe trägt — statt den blockierten zu reparieren."
 
-- **Gebaut heißt nicht auffindbar.** Ein Feature kann korrekt sein, geprüft, in beiden Sprachen
-  beschriftet — und der Nutzer meldet es trotzdem als fehlend, weil die Bedienung unter der
-  falschen Überschrift einsortiert ist. Deine Tests fragen „wirkt der Wert?"; er fragt „komme ich
-  von dort, wo ich suche, zu dem, was ich brauche?".
-  → *Prompt:* „Wenn der Nutzer etwas erneut meldet, das schon repariert ist: Nimm zuerst an, dass er
-  es **nicht erreicht**, nicht dass er sich irrt. Und prüfe bei allem, was er **finden** muss, die
-  **Nachbarschaft** — steht das Neue bei seinesgleichen? Wo diese Regel sich als Test schreiben
-  lässt (‚jede Lautstärke sitzt in der Ton-Gruppe'), schreib sie als Test, nicht als Vorsatz."
+- **Gebaut heißt nicht auffindbar.** Ein Feature kann korrekt sein und trotzdem als fehlend gemeldet
+  werden, weil seine Bedienung unter der falschen Überschrift steht. Dein Test fragt „wirkt es?", der
+  Nutzer „komme ich dorthin?".
+  → *Prompt:* „Meldet er etwas erneut, das repariert ist, nimm an, er **erreicht** es nicht. Prüf bei
+  allem, was er finden muss, die **Nachbarschaft** — und wo das als Test schreibbar ist (‚jede
+  Lautstärke in der Ton-Gruppe'), schreib es als Test."
 
 ---
 

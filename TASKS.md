@@ -223,31 +223,6 @@ there exactly once; a new point joins a bundle when appended.
   Criticality: medium — it is the teaching loop of the communication PoC, and it fails
   quietly.
 
-- [ ] 581. THE SETTLEMENT BOUNDARY IS TOO FAINT, AND ITS SLIDER IS ALREADY AT THE CEILING
-  (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
-  Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
-  state: `placeEdgeBand` stands at the shipped defaults, `widthM: 3`, `wanderM: 0.9`,
-  `strength: 1` — and `strength` is documented as "0 (invisible) .. 1 (the full per-kind
-  look)". He is therefore already looking at the STRONGEST edge the game can draw, and it
-  is not enough. This is not a calibration miss: there is no knob left to turn, so the
-  per-kind look itself carries too little contrast against the ground it sits on.
-  FINAL STATE: the boundary READS at a glance from inside the settlement, at the walking
-  pace and eye height the player actually has, in every settlement kind and on the ground
-  colours they stand on — the Bambara village's pale sand is the case that failed, so it
-  is the case that must be shown to work. The contrast comes from the band's own design
-  (value against the surrounding ground, not hue alone — the report is from a sand-on-sand
-  village), and it stays a give-way rather than becoming a painted stripe: the §2.6 look
-  is a threshold the player reads, not a fence. `strength: 1` remains the full look, so
-  the ceiling moves with the design rather than being raised past it.
-  VERIFIABLE: the PICTURE decides, since the complaint is legibility — a first-person
-  frame from inside the settlement at the boundary in at least the Bambara village and
-  one contrasting settlement kind, on BOTH backends, judged by looking. Plus a pure test
-  pinning the contrast the design settles on (the band's value against the sampled ground
-  value stays above the chosen minimum for every settlement kind), so a later ground or
-  palette change cannot quietly erase it again.
-  Criticality: medium — the boundary is what tells the player where the settlement ends
-  and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
-
 - [ ] 174. Tag the demo build `v0.3` and publish it at
   https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3/.
   GATE (user, 19.07.2026): tag v0.3 only after ALL of these are green — 175 (the
@@ -3621,92 +3596,6 @@ to land than a mechanism that needs a review.
   Criticality: low — pure measurement; it changes no behaviour, and it is the precondition
   for judging the remaining structural levers.
 
-- [ ] 603. THE GROUND'S MICRO-DETAIL SITS JUST UNDER ITS OWN BAR, AND NOBODY OWNS IT
-  (measured 10.08.2026 during the acceptance of the play-session packages; the triage point
-  of 04.08.2026 named this failure and closed without giving it an owner). The `settings`
-  check `first-person ground shows micro-detail (edge energy)` reads a Laplacian mean of
-  1.08–1.09 against a bar of 1.1 — red twice in a row on a QUIET machine, and
-  `baseline-classify` against the pre-merge commit calls it PRE-EXISTING / stale
-  assumption. It has therefore been red for days while every run charged it to "known",
-  which is precisely how a check stops being evidence.
-  WHAT MAKES IT WORTH A POINT rather than a threshold nudge: 1.08 against 1.1 is not a
-  wrong number, it is a number without a verdict. Either the ground genuinely lost the
-  grain that acceptance criterion 15 demands at eye height, or the crop the check measures
-  no longer contains the surface it was written for. On 04.08.2026 the same check read 0.00
-  with AND without the graphics card, which proved it was not the hardware and left the
-  question open.
-  FINAL STATE, decided BY THE PICTURE and never by the number (the triage point's own
-  rule): take the frame the check measures at the current head, look at it, and say which
-  of the two it is. If the ground lost its relief, that is a render defect and is fixed. If
-  the check crops somewhere the relief never was, the CHECK is corrected — with the reason
-  written into it — and never by lowering the bar until it passes. Whichever it is, the
-  check goes green on a quiet machine twice in a row, or it is deleted with its reason.
-  UNTIL THEN this point is where that red is charged, so an acceptance run can state its
-  reds honestly instead of carrying an unowned one.
-  Criticality: medium — no crash and nothing the player reports, but an unowned red inside
-  the everyday gate is a hole in the one signal every other point is judged by.
-
-- [ ] 600. THE CTRL LABEL DOES NOT NAME AN ATTACKING LION — AND THE ROSTER IS RE-TESTED
-  WHOLE (user 09.08.2026, first play test of the feature: "STRG einmal getestet und direkt
-  einen Fehler gefunden: funktioniert nicht für angreifenden Löwen. Nochmal alles
-  durchtesten — ist vielleicht nicht der einzige Fehler"). Point 342 shipped the hold-Ctrl
-  overlay and its own §7.2 evidence was green; the very first hold in real play found a
-  gap. THE SPECIFIC DEFECT: a lion in its ATTACK state carries no label, while the roster
-  and point 342's predicate ("a thing is named when it can MOVE or the player can DO
-  something with it") plainly include it. Establish the cause before fixing — the two
-  candidates the code makes plausible are that the attack run swaps the actor into a
-  different entity list the overlay does not walk, and that §19.16's CONCEALED rule (a
-  submerged crocodile stays silent until it lunges) is being applied to a predator that is
-  not concealed at all. Do not guess between them: dump the overlay's actor set during a
-  staged lion attack and see which one it is.
-  THE POINT IS NOT ONE FIX. The user asked for the whole thing to be re-tested, and one
-  miss on the first hold means the roster was never exercised in its STATES. FINAL STATE:
-  every actor of point 342's roster is named in EVERY state it can be in — idle, walking,
-  fleeing, attacking, drinking, dead, and mid-staged-event — in both perspectives; the
-  §17.2 discovery gate and the §19.16 concealment exclusion still hold exactly where they
-  are meant to and nowhere else.
-  VERIFIABLE, AND AT THE LEVEL THE PLAYER EXPERIENCES IT (point 589's rule): a Vitest
-  matrix over the pure predicate covering the full cross product of kind × state, which is
-  what would have caught this one; plus a browser check that STAGES a predator attack and
-  asserts the label is drawn at the attacker while it runs — not that the predicate would
-  have returned true.
-  Criticality: medium — no crash, but the feature's promise is that holding Ctrl tells you
-  what you are looking at, and it fails hardest at the moment the player most wants it.
-
-- [ ] 601. HOLDING CTRL WHILE WALKING CLOSES THE BROWSER (user 09.08.2026: "Wenn ich STRG
-  gedrückt halte und dabei WASD benutze, passieren fatale Dinge — z. B. schließt STRG-W
-  Chrome ohne Rückfrage"). The label overlay is a HOLD, and W is the forward key, so the
-  feature's normal use IS the browser's close-tab chord. Point 342 decided this
-  deliberately — "Do NOT preventDefault: the browser's own Ctrl combinations stay the
-  browser's" — and that decision is what the user has now hit; it is SUPERSEDED here.
-  ESTABLISHED ABOUT THE PLATFORM, so nobody re-researches it: `preventDefault` on keydown
-  does NOT stop Ctrl+W, Ctrl+T or Ctrl+N — those are reserved. The ONE mechanism that
-  captures them is the Keyboard Lock API (`navigator.keyboard.lock([...])`), which works
-  only while the document is in FULLSCREEN and only on Chromium.
-  FINAL STATE:
-  1. While the game holds the pointer (the first-person view) AND the document is
-     fullscreen, the game holds a keyboard lock for the codes the controls actually use,
-     so no Ctrl chord reaches the browser. The lock is released with the pointer lock and
-     on `visibilitychange`, and its absence is never an error — a browser without the API
-     simply does not get this protection.
-  2. WHERE THE LOCK IS UNAVAILABLE the danger must not simply remain. The label modifier
-     becomes REBINDABLE in the settings (§21, in both languages), with at least one
-     default-safe alternative that no browser claims, so a player in a window can take the
-     trap out of his own hands. Ctrl stays the shipped default — it is what design.md
-     §17.8 states and what the player already knows.
-  3. Every Ctrl combination that IS preventable and collides with a game control is
-     prevented while the game has the pointer, so the set of dangerous chords shrinks to
-     the three reserved ones the lock covers.
-  DOCS: design.md §17.8 and §17.5 gain the fullscreen note and the rebind in the same
-  commit, and CLAUDE.md §7.1 criterion 20 is where the setting is proved.
-  VERIFIABLE: Vitest for the rebinding and for the preventable-chord set (a bound game key
-  under Ctrl is prevented, an unbound one is not); a Playwright check that the lock is
-  requested exactly when fullscreen + pointer lock hold and released with either — the
-  reserved chords themselves cannot be asserted from a test, so the request is what is
-  proved, and the user's own play is the acceptance.
-  Criticality: HIGH — it destroys the player's session without a prompt, and it is
-  triggered by the feature's ordinary use, not by an unusual one.
-
 - [ ] 602. WHAT ELSE DID WE BUILD AND NEVER USE? (user 09.08.2026, on learning that the
   section runner of point 566 has never been used once: "Dass du 566 nicht eingesetzt
   hast, ist aber fatal und legt eine grundsätzliche Lücke auf. Lege einen weiteren Punkt
@@ -3759,6 +3648,117 @@ to land than a mechanism that needs a review.
   (CLAUDE.md §6). The prevention's design is convergent and takes the ordinary review.
   Criticality: HIGH — every unused mechanism was paid for twice: once when it was built,
   and again in every hour it would have saved and did not.
+
+- [ ] 581. THE SETTLEMENT BOUNDARY IS TOO FAINT, AND ITS SLIDER IS ALREADY AT THE CEILING
+  (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
+  Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
+  state: `placeEdgeBand` stands at the shipped defaults, `widthM: 3`, `wanderM: 0.9`,
+  `strength: 1` — and `strength` is documented as "0 (invisible) .. 1 (the full per-kind
+  look)". He is therefore already looking at the STRONGEST edge the game can draw, and it
+  is not enough. This is not a calibration miss: there is no knob left to turn, so the
+  per-kind look itself carries too little contrast against the ground it sits on.
+  FINAL STATE: the boundary READS at a glance from inside the settlement, at the walking
+  pace and eye height the player actually has, in every settlement kind and on the ground
+  colours they stand on — the Bambara village's pale sand is the case that failed, so it
+  is the case that must be shown to work. The contrast comes from the band's own design
+  (value against the surrounding ground, not hue alone — the report is from a sand-on-sand
+  village), and it stays a give-way rather than becoming a painted stripe: the §2.6 look
+  is a threshold the player reads, not a fence. `strength: 1` remains the full look, so
+  the ceiling moves with the design rather than being raised past it.
+  VERIFIABLE: the PICTURE decides, since the complaint is legibility — a first-person
+  frame from inside the settlement at the boundary in at least the Bambara village and
+  one contrasting settlement kind, on BOTH backends, judged by looking. Plus a pure test
+  pinning the contrast the design settles on (the band's value against the sampled ground
+  value stays above the chosen minimum for every settlement kind), so a later ground or
+  palette change cannot quietly erase it again.
+  Criticality: medium — the boundary is what tells the player where the settlement ends
+  and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
+
+- [ ] 601. HOLDING CTRL WHILE WALKING CLOSES THE BROWSER (user 09.08.2026: "Wenn ich STRG
+  gedrückt halte und dabei WASD benutze, passieren fatale Dinge — z. B. schließt STRG-W
+  Chrome ohne Rückfrage"). The label overlay is a HOLD, and W is the forward key, so the
+  feature's normal use IS the browser's close-tab chord. Point 342 decided this
+  deliberately — "Do NOT preventDefault: the browser's own Ctrl combinations stay the
+  browser's" — and that decision is what the user has now hit; it is SUPERSEDED here.
+  ESTABLISHED ABOUT THE PLATFORM, so nobody re-researches it: `preventDefault` on keydown
+  does NOT stop Ctrl+W, Ctrl+T or Ctrl+N — those are reserved. The ONE mechanism that
+  captures them is the Keyboard Lock API (`navigator.keyboard.lock([...])`), which works
+  only while the document is in FULLSCREEN and only on Chromium.
+  FINAL STATE:
+  1. While the game holds the pointer (the first-person view) AND the document is
+     fullscreen, the game holds a keyboard lock for the codes the controls actually use,
+     so no Ctrl chord reaches the browser. The lock is released with the pointer lock and
+     on `visibilitychange`, and its absence is never an error — a browser without the API
+     simply does not get this protection.
+  2. WHERE THE LOCK IS UNAVAILABLE the danger must not simply remain. The label modifier
+     becomes REBINDABLE in the settings (§21, in both languages), with at least one
+     default-safe alternative that no browser claims, so a player in a window can take the
+     trap out of his own hands. Ctrl stays the shipped default — it is what design.md
+     §17.8 states and what the player already knows.
+  3. Every Ctrl combination that IS preventable and collides with a game control is
+     prevented while the game has the pointer, so the set of dangerous chords shrinks to
+     the three reserved ones the lock covers.
+  DOCS: design.md §17.8 and §17.5 gain the fullscreen note and the rebind in the same
+  commit, and CLAUDE.md §7.1 criterion 20 is where the setting is proved.
+  VERIFIABLE: Vitest for the rebinding and for the preventable-chord set (a bound game key
+  under Ctrl is prevented, an unbound one is not); a Playwright check that the lock is
+  requested exactly when fullscreen + pointer lock hold and released with either — the
+  reserved chords themselves cannot be asserted from a test, so the request is what is
+  proved, and the user's own play is the acceptance.
+  Criticality: HIGH — it destroys the player's session without a prompt, and it is
+  triggered by the feature's ordinary use, not by an unusual one.
+
+- [ ] 600. THE CTRL LABEL DOES NOT NAME AN ATTACKING LION — AND THE ROSTER IS RE-TESTED
+  WHOLE (user 09.08.2026, first play test of the feature: "STRG einmal getestet und direkt
+  einen Fehler gefunden: funktioniert nicht für angreifenden Löwen. Nochmal alles
+  durchtesten — ist vielleicht nicht der einzige Fehler"). Point 342 shipped the hold-Ctrl
+  overlay and its own §7.2 evidence was green; the very first hold in real play found a
+  gap. THE SPECIFIC DEFECT: a lion in its ATTACK state carries no label, while the roster
+  and point 342's predicate ("a thing is named when it can MOVE or the player can DO
+  something with it") plainly include it. Establish the cause before fixing — the two
+  candidates the code makes plausible are that the attack run swaps the actor into a
+  different entity list the overlay does not walk, and that §19.16's CONCEALED rule (a
+  submerged crocodile stays silent until it lunges) is being applied to a predator that is
+  not concealed at all. Do not guess between them: dump the overlay's actor set during a
+  staged lion attack and see which one it is.
+  THE POINT IS NOT ONE FIX. The user asked for the whole thing to be re-tested, and one
+  miss on the first hold means the roster was never exercised in its STATES. FINAL STATE:
+  every actor of point 342's roster is named in EVERY state it can be in — idle, walking,
+  fleeing, attacking, drinking, dead, and mid-staged-event — in both perspectives; the
+  §17.2 discovery gate and the §19.16 concealment exclusion still hold exactly where they
+  are meant to and nowhere else.
+  VERIFIABLE, AND AT THE LEVEL THE PLAYER EXPERIENCES IT (point 589's rule): a Vitest
+  matrix over the pure predicate covering the full cross product of kind × state, which is
+  what would have caught this one; plus a browser check that STAGES a predator attack and
+  asserts the label is drawn at the attacker while it runs — not that the predicate would
+  have returned true.
+  Criticality: medium — no crash, but the feature's promise is that holding Ctrl tells you
+  what you are looking at, and it fails hardest at the moment the player most wants it.
+
+- [ ] 603. THE GROUND'S MICRO-DETAIL SITS JUST UNDER ITS OWN BAR, AND NOBODY OWNS IT
+  (measured 10.08.2026 during the acceptance of the play-session packages; the triage point
+  of 04.08.2026 named this failure and closed without giving it an owner). The `settings`
+  check `first-person ground shows micro-detail (edge energy)` reads a Laplacian mean of
+  1.08–1.09 against a bar of 1.1 — red twice in a row on a QUIET machine, and
+  `baseline-classify` against the pre-merge commit calls it PRE-EXISTING / stale
+  assumption. It has therefore been red for days while every run charged it to "known",
+  which is precisely how a check stops being evidence.
+  WHAT MAKES IT WORTH A POINT rather than a threshold nudge: 1.08 against 1.1 is not a
+  wrong number, it is a number without a verdict. Either the ground genuinely lost the
+  grain that acceptance criterion 15 demands at eye height, or the crop the check measures
+  no longer contains the surface it was written for. On 04.08.2026 the same check read 0.00
+  with AND without the graphics card, which proved it was not the hardware and left the
+  question open.
+  FINAL STATE, decided BY THE PICTURE and never by the number (the triage point's own
+  rule): take the frame the check measures at the current head, look at it, and say which
+  of the two it is. If the ground lost its relief, that is a render defect and is fixed. If
+  the check crops somewhere the relief never was, the CHECK is corrected — with the reason
+  written into it — and never by lowering the bar until it passes. Whichever it is, the
+  check goes green on a quiet machine twice in a row, or it is deleted with its reason.
+  UNTIL THEN this point is where that red is charged, so an acceptance run can state its
+  reds honestly instead of carrying an unowned one.
+  Criticality: medium — no crash and nothing the player reports, but an unowned red inside
+  the everyday gate is a hole in the one signal every other point is judged by.
 
 - [ ] 606. THE SCOPE TEST IS RED IN EVERY WORKTREE (found while delivering point 605).
   `scripts/verify/scope.test.mjs` resolves `node_modules/.bin/oxlint` under

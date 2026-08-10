@@ -150,6 +150,13 @@ decision.
 The packages, cut by what ONE acceptance run can judge — re-cut them as further
 reports arrive rather than letting a package grow past its own acceptance:
 
+**FOUR OF THE 09.08. POINTS DROP BEHIND 602** (user 10.08.2026): 581 (the faint
+settlement boundary), 601 (Ctrl+W closing the browser), 600 (the unlabelled attacking
+lion) and 603 (the ground's micro-detail) now sit AFTER 602. His reason, and it is the
+ranking rule of this document applied by him: none of them is needed for the
+communication mechanic, and none of them makes a following point cheaper — so neither
+of the two things that pull work forward applies to them.
+
 **AND THE 10.08.2026 SESSION LEADS THAT** (user 10.08.2026). He played the deployed
 build again and reported two things. Being STUCK (604) goes to the front of the whole
 queue, ahead of the 09.08. packages: with saving tied to port visits, a wedged traveller
