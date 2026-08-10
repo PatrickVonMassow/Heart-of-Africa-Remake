@@ -68,10 +68,14 @@ export function isGameKeyCode(code: string): boolean {
 
 /**
  * The codes whose modifier chord is taken from the browser. Prevention is for
- * keys the game binds UNDER a modifier; a plain binding does not earn it — the
- * calendar row is bound plain, so swallowing Ctrl+1–9 and the keyboard zoom
- * (Ctrl +/−/0) would protect nothing and cost the player two of the browser's
- * most-used chords. They stay in the LOCK set, which takes whole keys.
+ * keys the game ACTS ON under a modifier; a key that is bound plain AND stands
+ * down while Ctrl/Alt/Meta is held does not earn it — the chord does nothing in
+ * the game, so it belongs to the browser. That is the calendar row of §21.1:
+ * bound plain, and registered `ignoreModified` (src/ui/Hud.tsx), so swallowing
+ * Ctrl+1–9 and the keyboard zoom (Ctrl +/−/0) would protect nothing and cost
+ * the player two of the browser's most-used chords. Both halves are needed —
+ * with only the plain binding, one press would do two things at once. They stay
+ * in the LOCK set, which takes whole keys rather than chords.
  */
 export const PREVENTED_CHORD_CODES: readonly string[] = GAME_KEY_CODES.filter(
   (c) => !CALENDAR_KEY_SET.has(c),

@@ -533,6 +533,30 @@ describe('month keys (design.md §21.1 — stepping the seasons)', () => {
     expect(new Set(MONTH_KEYS).size).toBe(12) // no key means two months
   })
 
+  // Work-order 601: the chords on this row were handed back to the browser
+  // (Ctrl+1–9 tab jumps, Ctrl +/−/0 zoom). The handler must therefore stand
+  // down under a modifier, or one press does BOTH — switching the tab and
+  // silently moving the expedition's date.
+  it('does not move the date on a Ctrl press, and leaves the chord to the browser', () => {
+    render(<Hud />)
+    const monthOf = () =>
+      new Date(Date.UTC(START_YEAR, 0, 1) + useGame.getState().day * 86400000).getUTCMonth()
+    const before = useGame.getState().day
+    const notPrevented = window.dispatchEvent(
+      new KeyboardEvent('keydown', { code: 'Digit3', ctrlKey: true, cancelable: true }),
+    )
+    expect(useGame.getState().day).toBe(before) // the date did not move
+    expect(notPrevented).toBe(true) // …and the browser keeps its tab jump
+    // Alt and Meta are the same case.
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Equal', altKey: true, cancelable: true }))
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit1', metaKey: true, cancelable: true }))
+    expect(useGame.getState().day).toBe(before)
+    // The PLAIN press still jumps, exactly as before.
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit3', cancelable: true }))
+    expect(monthOf()).toBe(2) // March
+    expect(useGame.getState().day).not.toBe(before)
+  })
+
   it('jumps the store to that month, keeping the year', () => {
     const year3 = (Date.UTC(START_YEAR + 2, 5, 20) - Date.UTC(START_YEAR, 0, 1)) / 86400000
     useGame.setState({ day: year3 })

@@ -66,10 +66,23 @@ export function wheelTargetsScene(target: EventTarget | null): boolean {
   return el.closest(SCROLLABLE_OVERLAY_SELECTOR) === null
 }
 
+export interface KeyPressOptions {
+  /**
+   * Ignore a press carrying Ctrl, Alt or Meta (work-order 601). For a key whose
+   * CHORD is left to the browser — the calendar row of §21.1, see
+   * PREVENTED_CHORD_CODES — the handler must stand down, or the one press does
+   * two things at once: Ctrl+3 would switch the browser to tab 3 AND jump the
+   * expedition to March. Shift is not a chord any browser binds, so it still
+   * reaches the handler.
+   */
+  ignoreModified?: boolean
+}
+
 /** Register a keydown handler for a specific code; returns unsubscribe. */
-export function onKeyPress(code: string, cb: () => void): () => void {
+export function onKeyPress(code: string, cb: () => void, options: KeyPressOptions = {}): () => void {
   const handler = (e: KeyboardEvent) => {
     if (isTypingTarget(e)) return
+    if (options.ignoreModified && (e.ctrlKey || e.altKey || e.metaKey)) return
     if (e.code === code) cb()
   }
   window.addEventListener('keydown', handler)

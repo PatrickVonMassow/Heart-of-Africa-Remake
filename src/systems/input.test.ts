@@ -42,6 +42,31 @@ describe('onKeyPress (design.md §17)', () => {
     expect(cb).toHaveBeenCalledTimes(2)
   })
 
+  // Work-order 601: a key whose CHORD is left to the browser must not act on
+  // the chord as well, or one press does two things — Ctrl+3 switching the tab
+  // AND jumping the date.
+  it('stands down on a Ctrl/Alt/Meta press when registered ignoreModified — and only then', () => {
+    const guarded = vi.fn()
+    const plain = vi.fn()
+    const offGuarded = onKeyPress('Digit3', guarded, { ignoreModified: true })
+    const offPlain = onKeyPress('KeyM', plain) // the default is unchanged
+    for (const mod of [{ ctrlKey: true }, { altKey: true }, { metaKey: true }]) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit3', ...mod }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', ...mod }))
+    }
+    expect(guarded).not.toHaveBeenCalled()
+    expect(plain).toHaveBeenCalledTimes(3) // a prevented chord still reaches its handler
+    // Shift is no browser chord, so it is not "modified" for this purpose.
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit3', shiftKey: true }))
+    expect(guarded).toHaveBeenCalledTimes(1)
+    press('Digit3')
+    expect(guarded).toHaveBeenCalledTimes(2)
+    offGuarded()
+    offPlain()
+    release('Digit3')
+    release('KeyM')
+  })
+
   it('ignores keydowns originating from a text input (debug-field guard)', () => {
     // input.ts guards only INPUT targets (the debug-menu fields); TEXTAREA and
     // SELECT are not handled by the source, so only INPUT is asserted here.
