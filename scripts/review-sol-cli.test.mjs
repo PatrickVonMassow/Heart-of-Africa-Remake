@@ -47,6 +47,9 @@ import { FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, SOL_MODEL_NAME } from 
 const SCRIPT_FILES = [
   'review-sol.mjs',
   'review-sol-core.mjs',
+  // The recorder too: the suite RUNS the record command the report prints, which
+  // is the only honest way to claim that command is complete.
+  'mechanism-review.mjs',
   'mechanism-review-core.mjs',
   'repo-paths.mjs',
   'is-main.mjs',
@@ -60,6 +63,7 @@ let script = ''
 let mainSha = ''
 let headSha = ''
 let fableSha = ''
+let orphanSha = ''
 
 /** A `codex` that answers however the case's env asks it to. */
 const STUB = `#!/usr/bin/env node
@@ -94,8 +98,31 @@ process.stdout.write(answer)
 process.exit(0)
 `
 
+/**
+ * A hermetic git: the developer's own configuration is NOT inherited.
+ *
+ * `commit.gpgsign=true` in a global config would fail every fixture commit on a
+ * machine without the signer, and a global `core.hooksPath` would run somebody
+ * else's hooks inside our temp repository (four-eyes finding, 11.08.2026). The
+ * suite must answer the same on any machine, which is the whole reason the
+ * fixture exists.
+ */
+const HERMETIC_GIT = Object.freeze({
+  GIT_CONFIG_GLOBAL: '/dev/null',
+  GIT_CONFIG_SYSTEM: '/dev/null',
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_AUTHOR_NAME: 'Fixture',
+  GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
+  GIT_COMMITTER_NAME: 'Fixture',
+  GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
+})
+
 const git = (...args) => {
-  const r = spawnSync('git', ['-C', repo, ...args], { encoding: 'utf8', windowsHide: true })
+  const r = spawnSync('git', ['-C', repo, '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
+    encoding: 'utf8',
+    windowsHide: true,
+    env: { ...process.env, ...HERMETIC_GIT },
+  })
   if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr}`)
   return (r.stdout ?? '').trim()
 }
@@ -104,17 +131,7 @@ const git = (...args) => {
 const commit = (file, text, subject, model) => {
   writeFileSync(join(repo, file), text)
   git('add', '-A')
-  git(
-    '-c',
-    'user.name=Fixture',
-    '-c',
-    'user.email=fixture@example.invalid',
-    'commit',
-    '--no-verify',
-    '-q',
-    '-m',
-    `${subject}\n\nCo-Authored-By: Claude ${model} <noreply@anthropic.com>`,
-  )
+  git('commit', '--no-verify', '-q', '-m', `${subject}\n\nCo-Authored-By: Claude ${model} <noreply@anthropic.com>`)
   return git('rev-parse', 'HEAD')
 }
 
@@ -125,6 +142,7 @@ const run = (args, env = {}) =>
     cwd: repo,
     env: {
       ...process.env,
+      ...HERMETIC_GIT,
       PATH: `${stubDir}${delimiter}${process.env.PATH}`,
       REVIEW_SOL_STATE_DIR: stateDir,
       CODEX_HOME: join(dir, 'codex-home'),
@@ -133,6 +151,19 @@ const run = (args, env = {}) =>
       ...env,
     },
   })
+
+/** The record command out of the command's report, as one line. */
+const recordCommandIn = (stdout) => {
+  const line = String(stdout).split('\n').find((l) => l.includes('mechanism-review.mjs --record'))
+  expect(line, 'the report should carry a record command').toBeTruthy()
+  return line.trim()
+}
+
+/** Split a printed command line into argv, honouring its double quotes. */
+const splitCommand = (line) =>
+  (line.match(/"(?:[^"\\]|\\.)*"|\S+/g) ?? []).map((token) =>
+    token.startsWith('"') ? token.slice(1, -1).replace(/\\(["\\$`])/g, '$1') : token,
+  )
 
 const calls = () => {
   try {
@@ -165,6 +196,11 @@ beforeAll(() => {
 
   writeFileSync(join(stubDir, 'codex'), STUB)
   chmodSync(join(stubDir, 'codex'), 0o755)
+  // Windows cannot execute an extensionless shebang script, and this suite makes
+  // Windows-specific assertions elsewhere (four-eyes finding, 11.08.2026).
+  if (process.platform === 'win32') {
+    writeFileSync(join(stubDir, 'codex.cmd'), `@echo off\r\nnode "%~dp0codex" %*\r\n`)
+  }
   writeFileSync(join(dir, 'calls.log'), '')
 
   // The fixture history: main, a feature branch above it, and a branch whose
@@ -184,7 +220,13 @@ beforeAll(() => {
 
   git('checkout', '-q', '-b', 'fable-work', 'main')
   fableSha = commit('fable.txt', 'written by the fallback reviewer\n', 'Write something as Fable', 'Fable 5')
-  git('checkout', '-q', 'feat')
+
+  // A history sharing no ancestor with the rest: the third form of "not a proper
+  // ancestor", which merge-base answers with nothing at all.
+  git('checkout', '-q', '--orphan', 'unrelated')
+  git('rm', '-rqf', '--ignore-unmatch', '.')
+  orphanSha = commit('orphan.txt', 'no common ancestor with anything\n', 'Start an unrelated history', 'Opus 5')
+  git('checkout', '-q', '-f', 'feat')
 })
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -196,9 +238,31 @@ describe('a review that runs', () => {
     expect(r.status, r.stderr).toBe(0)
     expect(r.stdout).toContain(SOL_MODEL_NAME)
     expect(r.stdout).toContain('read the whole range and both test files')
-    expect(r.stdout).toContain('--model "GPT-5.6 Sol"')
-    expect(r.stdout).toContain('--verdict merge')
-    expect(r.stdout).toContain('--point 624')
+    // THE RECORD COMMAND IS RUN, not merely pattern-matched (four-eyes finding,
+    // 11.08.2026): asserting three of its flags leaves a malformed, unrunnable
+    // command green, and "prints a complete record command" is a claim about
+    // whether the recorder ACCEPTS it.
+    const printed = recordCommandIn(r.stdout)
+    expect(printed).toContain('--model "GPT-5.6 Sol"')
+    expect(printed).toContain('--verdict merge')
+    expect(printed).toContain('--point 624')
+    expect(printed).toContain(headSha)
+    const recorded = spawnSync(process.execPath, splitCommand(printed).slice(1), {
+      cwd: repo,
+      encoding: 'utf8',
+      windowsHide: true,
+      env: { ...process.env, ...HERMETIC_GIT },
+    })
+    expect(recorded.status, recorded.stderr).toBe(0)
+    const ledger = readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')
+    expect(JSON.parse(ledger.at(-1))).toMatchObject({
+      sha: headSha,
+      model: 'GPT-5.6 Sol',
+      verdict: 'merge',
+      mode: 'review',
+      point: 624,
+      authoredBy: expect.stringContaining('Opus 5'),
+    })
     // The material really REACHES the model — asserted on what the process
     // received, not on the caller's own log line.
     const received = readFileSync(join(dir, 'stdin.txt'), 'utf8')
@@ -280,12 +344,21 @@ describe('the guards around the run', () => {
     expect(r.stdout).not.toContain('mechanism-review.mjs --record')
   })
 
-  it('refuses an explicit --since that is not a proper ancestor of the sha', () => {
+  it('refuses an explicit --since that is not a proper ancestor, in each of its three forms', () => {
     provenId()
-    for (const since of [headSha, 'feat']) {
-      const r = run(['--sha', `${headSha}~1`, '--since', since, '--brief', 'judge it'])
-      expect(r.status).not.toBe(0)
-      expect(r.stderr).toMatch(/--since/)
+    const cases = [
+      // the range start IS the reviewed commit …
+      { sha: headSha, since: headSha },
+      // … a DESCENDANT of it …
+      { sha: `${headSha}~1`, since: headSha },
+      // … and a history with no common ancestor at all.
+      { sha: headSha, since: orphanSha },
+    ]
+    for (const { sha, since } of cases) {
+      const r = run(['--sha', sha, '--since', since, '--brief', 'judge it'])
+      expect(r.status, `${since} should be refused as a range start`).not.toBe(0)
+      expect(r.stderr).toMatch(/--since|does not diverge/)
+      expect(r.stdout).not.toContain('mechanism-review.mjs --record')
     }
   })
 
@@ -317,57 +390,74 @@ describe('the guards around the run', () => {
 })
 
 describe('the saved login', () => {
-  const home = () => join(dir, 'codex-home')
+  // EACH CASE BUILDS ITS OWN WORLD (four-eyes finding, 11.08.2026): the first
+  // version had "restores it again" depending on the token the case above it had
+  // saved, so running one case alone — or in another order — changed the answer.
+  let n = 0
+  const world = ({ token = true } = {}) => {
+    const id = `login-${n++}`
+    const home = join(dir, `${id}-home`)
+    const state = join(repo, 'local', id)
+    mkdirSync(home, { recursive: true })
+    if (token) writeFileSync(join(home, 'auth.json'), `{"tokens":{"access_token":"s","account_id":"${id}"}}`)
+    return { id, home, state, env: { CODEX_HOME: home, REVIEW_SOL_STATE_DIR: state } }
+  }
 
   it('says so when there is no login to save', () => {
-    const r = run(['--save-login'], { CODEX_HOME: join(dir, 'empty-home') })
+    const w = world({ token: false })
+    const r = run(['--save-login'], w.env)
     expect(r.status).toBe(1)
     expect(r.stderr).toMatch(/no login found/)
   })
 
   it('saves a real token into the ignored directory, readable only by its owner', () => {
-    mkdirSync(home(), { recursive: true })
-    writeFileSync(join(home(), 'auth.json'), '{"tokens":{"access_token":"secret","account_id":"acct-1"}}')
-    const r = run(['--save-login'])
+    const w = world()
+    const r = run(['--save-login'], w.env)
     expect(r.status, r.stderr).toBe(0)
-    const saved = join(stateDir, 'codex-auth.json')
-    expect(readFileSync(saved, 'utf8')).toContain('acct-1')
+    const saved = join(w.state, 'codex-auth.json')
+    expect(readFileSync(saved, 'utf8')).toContain(w.id)
     if (process.platform !== 'win32') expect(statSync(saved).mode & 0o777).toBe(0o600)
     // …and git really does ignore where it landed.
-    expect(spawnSync('git', ['-C', repo, 'check-ignore', '-q', saved], { windowsHide: true }).status).toBe(0)
+    expect(git('check-ignore', '-q', saved)).toBe('')
   })
 
   it('restores it again, and reports how old it is', () => {
-    const restored = join(dir, 'restore-home')
-    const r = run(['--restore-login'], { CODEX_HOME: restored })
+    const w = world()
+    expect(run(['--save-login'], w.env).status).toBe(0)
+    const restored = join(dir, `${w.id}-restored`)
+    const r = run(['--restore-login'], { ...w.env, CODEX_HOME: restored })
     expect(r.status, r.stderr).toBe(0)
-    expect(readFileSync(join(restored, 'auth.json'), 'utf8')).toContain('acct-1')
+    expect(readFileSync(join(restored, 'auth.json'), 'utf8')).toContain(w.id)
     expect(r.stdout).toMatch(/day\(s\) ago/)
   })
 
   it('REFUSES to write the token where git does not ignore it', () => {
-    const r = run(['--save-login'], { REVIEW_SOL_STATE_DIR: join(repo, 'not-ignored') })
+    const w = world()
+    const notIgnored = join(repo, 'not-ignored', w.id)
+    const r = run(['--save-login'], { ...w.env, REVIEW_SOL_STATE_DIR: notIgnored })
     expect(r.status).toBe(1)
     expect(r.stderr).toMatch(/does not ignore/)
-    expect(existsSync(join(repo, 'not-ignored', 'codex-auth.json'))).toBe(false)
+    expect(existsSync(join(notIgnored, 'codex-auth.json'))).toBe(false)
   })
 
   it('REFUSES a state directory that is a link out of where it claims to be', () => {
     // The lexical ignore check passes for a symlinked `local/`, and the copy
     // would then follow the link.
-    const elsewhere = join(dir, 'elsewhere')
-    const linked = join(dir, 'linked-state')
+    const w = world()
+    const elsewhere = join(dir, `${w.id}-elsewhere`)
+    const linked = join(dir, `${w.id}-linked`)
     mkdirSync(elsewhere, { recursive: true })
     symlinkSync(elsewhere, linked)
     writeFileSync(join(elsewhere, 'codex-auth.json'), '{"tokens":{}}')
-    const r = run(['--restore-login'], { REVIEW_SOL_STATE_DIR: linked })
+    const r = run(['--restore-login'], { ...w.env, REVIEW_SOL_STATE_DIR: linked })
     expect(r.status).toBe(1)
     expect(r.stderr).toMatch(/REFUSING/)
     expect(r.stderr).toMatch(/resolves to/)
   })
 
   it('says what to do when nothing was ever saved', () => {
-    const r = run(['--restore-login'], { REVIEW_SOL_STATE_DIR: join(dir, 'nothing-here') })
+    const w = world()
+    const r = run(['--restore-login'], { ...w.env, REVIEW_SOL_STATE_DIR: join(dir, `${w.id}-nothing-here`) })
     expect(r.status).toBe(1)
     expect(r.stderr).toMatch(/nothing saved/)
     expect(r.stderr).toMatch(/--save-login/)
