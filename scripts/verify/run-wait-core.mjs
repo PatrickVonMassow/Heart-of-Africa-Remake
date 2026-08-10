@@ -26,6 +26,7 @@
 // Everything here is data-in / data-out so the Vitest layer can pin it; all
 // process work — the record file, the frame scan, the blocking wait — lives in
 // run-wait.mjs and run-logged.mjs.
+import { parseArgs, planBackends, selectBackend, suitesFor } from './tiers.mjs'
 
 /**
  * MEASURED median wall clock per suite, in SECONDS, on the WebGL 2 lane —
@@ -161,6 +162,62 @@ export function expectedFrames(suites = []) {
     else frames += one
   }
   return { frames, unmeasured }
+}
+
+/**
+ * WHAT THIS INVOCATION WILL ACTUALLY RUN, and what that is expected to cost.
+ *
+ * The suite→tier→backend map is `tiers.mjs` and stays the single source of it:
+ * a receipt that listed a different suite set from the one the runner drives
+ * would be a second truth, and this project has paid for those. `argv` is the
+ * runner's own argument list, `verifyGl` the pinned backend (undefined means
+ * unpinned, which is what makes a LARGE run cover both).
+ *
+ * Time adds per PASS (the second backend pass repeats the render suites);
+ * frames do NOT (it overwrites the same files), so they are counted over the
+ * union.
+ */
+export function planRun({ argv = [], verifyGl } = {}) {
+  const { tier, filter, fullRun, isLargeEquivalent } = parseArgs(argv)
+  const plan = planBackends({ isLargeEquivalent, verifyGl, ranBoth: false })
+  const passes =
+    plan.length > 0
+      ? plan.map((p) => ({
+          backend: p.backend,
+          skipPreflight: p.skipPreflight,
+          suites: suitesFor({ tier, filter, backend: p.backend, webglOnlyCovered: p.webglOnlyCovered }),
+        }))
+      : [
+          {
+            backend: selectBackend(verifyGl),
+            skipPreflight: false,
+            suites: suitesFor({ tier, filter, backend: selectBackend(verifyGl) }),
+          },
+        ]
+  // The prod-preview smoke is not one of the DEV suites: it runs on the LARGE/
+  // default tier only, and only on a pass that did not skip the preflight.
+  const wantsPreview = (fullRun && tier !== 'small') || filter.includes('preview')
+  let ms = 0
+  const unmeasured = new Set()
+  for (const pass of passes) {
+    const withPreview = wantsPreview && !pass.skipPreflight ? [...pass.suites, 'preview'] : pass.suites
+    const cost = expectedRuntimeMs(withPreview)
+    ms += cost.ms
+    for (const u of cost.unmeasured) unmeasured.add(u)
+  }
+  const union = [...new Set(passes.flatMap((p) => p.suites))]
+  if (wantsPreview) union.push('preview')
+  const frames = expectedFrames(union)
+  return {
+    tier,
+    filter,
+    passes,
+    backends: passes.map((p) => p.backend),
+    suites: union,
+    expectedMs: ms,
+    expectedFrames: frames.frames,
+    unmeasured: [...unmeasured],
+  }
 }
 
 /**

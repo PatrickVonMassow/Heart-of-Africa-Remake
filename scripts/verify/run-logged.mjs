@@ -20,6 +20,14 @@
 //     patterns have no name for.
 //   - ON DEMAND: `--show <log>` reads a bounded WINDOW back (tail/grep/max), so
 //     the way to the detail is never `cat`.
+//   - AS ONE OBJECT (point 592): a RUN RECORD beside the log, written the moment
+//     the run starts and closed with a structured RECEIPT when it ends — exit
+//     code, backend(s), suites, the git HEAD it ran on, the log path, the
+//     failing names UNCUT, the frames EXPECTED against the frames WRITTEN, and
+//     how often anybody polled it. `scripts/verify/run-wait.mjs` awaits and
+//     reads that record, which is what makes a poll loop unnecessary; the frame
+//     comparison is the half point 375's shutter cannot see, since a frame that
+//     was never written at all raises nothing today.
 //
 // Usage:
 //   node scripts/verify/run-logged.mjs [<run-all args…>]   (npm test / test:small / test:large)
@@ -34,7 +42,9 @@ import { spawn } from 'node:child_process'
 import { createWriteStream, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { DEFAULTS, buildDigest, createSelector, showWindow } from './run-digest-core.mjs'
+import { DEFAULTS, buildDigest, createSelector, failureSurface, showWindow } from './run-digest-core.mjs'
+import { backendsFrom, buildReceipt, formatReceipt, planRun } from './run-wait-core.mjs'
+import { framesWrittenSince, gitPosition, readRecord, recordPathFor, writeRecord } from './run-record.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
@@ -98,6 +108,53 @@ function showLog(path) {
   return 0
 }
 
+/**
+ * CLOSE THE RUN RECORD AND HAND BACK THE RECEIPT LINES (point 592).
+ *
+ * The record is re-read first: a `--status` poll may have raised its counter
+ * while the run went, and the receipt is where that count is PRINTED — the rule
+ * "await, do not poll" is visible in the transcript rather than remembered.
+ *
+ * Never throws. A receipt is worth a great deal and a run is worth more; a
+ * failure here says so in one line and leaves the digest above untouched.
+ */
+function closeRecord({ lines, exitCode, started, recordPath, baseRecord }) {
+  try {
+    const prior = readRecord(recordPath) ?? baseRecord
+    const framesWritten = baseRecord.expectedFrames > 0 ? framesWrittenSince(started) : 0
+    const receipt = buildReceipt({
+      command: baseRecord.command,
+      tier: baseRecord.tier,
+      suites: baseRecord.suites,
+      backends: backendsFrom({ lines, verifyGl: baseRecord.verifyGl, fallback: baseRecord.backends[0] }),
+      head: baseRecord.head,
+      branch: baseRecord.branch,
+      logPath: baseRecord.log,
+      exitCode,
+      startedAt: started,
+      finishedAt: Date.now(),
+      polls: prior.polls ?? 0,
+      // UNCUT on purpose (point 592): the digest above bounds its detail lines
+      // because it is read on every poll; the receipt is read ONCE, and a
+      // truncated failure list is what makes a reader start the run again.
+      failing: failureSurface(lines, { maxDetails: Number.POSITIVE_INFINITY }),
+      framesExpected: baseRecord.expectedFrames,
+      framesWritten,
+    })
+    writeRecord(recordPath, {
+      ...prior,
+      status: 'finished',
+      finishedAt: receipt.finishedAt,
+      exitCode,
+      framesWritten,
+      receipt,
+    })
+    return formatReceipt(receipt)
+  } catch (err) {
+    return [`── verify receipt ── unavailable (${err?.message ?? err}); the digest above and the log still stand.`]
+  }
+}
+
 /** Run the regression, log all of it, print the bounded digest. */
 function runVerify() {
   const logPath = logPathFor(forward, own)
@@ -108,7 +165,37 @@ function runVerify() {
 
   console.log(`# ${command} — full output → ${shown}`)
 
+  // THE RUN AS AN OBJECT (point 592), written BEFORE the child exists: a caller
+  // that wants to await this run must be able to find it the instant the launch
+  // returns, and a record written after the spawn would leave that window open.
   const started = Date.now()
+  const plan = planRun({ argv: forward, verifyGl: process.env.VERIFY_GL })
+  const where = gitPosition()
+  const recordPath = recordPathFor(logPath)
+  const baseRecord = {
+    command,
+    args: forward,
+    tier: plan.tier,
+    suites: plan.suites,
+    backends: plan.backends,
+    verifyGl: process.env.VERIFY_GL ?? null,
+    head: where.head,
+    branch: where.branch,
+    log: shown,
+    startedAt: started,
+    expectedRuntimeMs: plan.expectedMs,
+    expectedFrames: plan.expectedFrames,
+    unmeasuredSuites: plan.unmeasured,
+    polls: 0,
+    status: 'running',
+    pid: process.pid,
+    finishedAt: null,
+    exitCode: null,
+    framesWritten: null,
+    receipt: null,
+  }
+  writeRecord(recordPath, baseRecord)
+
   const child = spawn(process.execPath, [join(HERE, 'run-all.mjs'), ...forward], {
     windowsHide: true,
     cwd: ROOT,
@@ -173,6 +260,7 @@ function runVerify() {
       tailLines: own.tail,
     })
     console.log(digest.text)
+    for (const line of closeRecord({ lines, exitCode, started, recordPath, baseRecord })) console.log(line)
     // NOT process.exit(): stdout may be a pipe, and an explicit exit can drop
     // what is still buffered in it — which is the digest itself. Setting the code
     // and letting the loop drain keeps the caller's copy complete.
@@ -182,6 +270,15 @@ function runVerify() {
   child.on('error', (err) => {
     console.log(`FAIL  run-logged   could not start the runner: ${err.message}`)
     log.end()
+    // The record must never stay `running` for a run that never ran: a Stop
+    // guard reading it would take a dead launch for a live wait.
+    for (const line of closeRecord({
+      lines: [`FAIL  run-logged   could not start the runner: ${err.message}`],
+      exitCode: 1,
+      started,
+      recordPath,
+      baseRecord,
+    })) console.log(line)
     process.exitCode = 1
   })
 }
