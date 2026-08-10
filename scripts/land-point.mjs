@@ -91,6 +91,27 @@ function listWorktrees() {
 }
 
 /**
+ * Should the board be published — decided against the work order the tick
+ * PRODUCES, never the one it replaces.
+ *
+ * THE INPUT IS THE WHOLE POINT. Every landing moves the open-point set by
+ * definition, so a fingerprint taken from the pre-tick TASKS.md is stale before
+ * the step it decides even runs: the skip would then fire exactly when it must
+ * not, the live page would fall behind, `publishDue` would arm, and
+ * `board-first-guard` would deny the next turn's first state-changing call — the
+ * block loop the second input exists to prevent. `boardPublishNeeded` was right;
+ * it was being fed the wrong text.
+ */
+function boardDecision(postTickTasks) {
+  const bytes = readIf(BOARD_FILE)
+  return boardPublishNeeded({
+    fileHash: bytes ? createHash('sha256').update(Buffer.from(bytes)).digest('hex') : null,
+    fingerprint: openFingerprintOfTasks(postTickTasks),
+    state: readJson(STATE_FILE),
+  })
+}
+
+/**
  * The machine probe, as data.
  *
  * `level: 'unknown'` is the probe's own word for "I could not read this machine"
@@ -220,12 +241,16 @@ async function main(argv) {
     const probe = probeMachine()
     gate = gateConcurrency({ ...probe, force })
 
-    const boardBytes = readIf(BOARD_FILE)
-    board = boardPublishNeeded({
-      fileHash: boardBytes ? createHash('sha256').update(Buffer.from(boardBytes)).digest('hex') : null,
-      fingerprint: openFingerprintOfTasks(readIf(TASKS)),
-      state: readJson(STATE_FILE),
+    // THE TICK IS COMPUTED HERE, BEFORE THE MERGE, for two reasons. It validates
+    // the point (a number that is not in TASKS.md, or already archived, fails
+    // while nothing has moved yet), and it yields the POST-tick work order the
+    // board decision has to be taken against — see `boardDecision` below.
+    const preview = tickAndArchive({
+      tasksText: readIf(TASKS),
+      archiveText: readIf(ARCHIVE),
+      number,
     })
+    board = boardDecision(preview.tasks)
 
     plan = planLanding({ number, branch, audit, board, gate, worktrees })
   } catch (e) {
@@ -356,7 +381,12 @@ async function main(argv) {
       throw error
     }
 
-    // 6. BOARD PUBLISH (rider b: skipped when nothing changed).
+    // 6. BOARD PUBLISH (rider b: skipped when nothing changed). Re-decided here
+    // against the state as it now stands on disk: the plan's decision was taken
+    // against the same POST-tick work order, but the board file and the recorded
+    // publish state may have moved since — a publish is cheap, a stale page is
+    // a blocked next turn.
+    board = boardDecision(moved.tasks)
     if (board.run) {
       try {
         sh('node', [join('scripts', 'board-publish.mjs')], { stdio: ['ignore', 'pipe', 'pipe'] })
@@ -364,7 +394,9 @@ async function main(argv) {
       } catch (e) {
         error = new LandingError('the board publish failed', {
           step: 'board',
-          repair: 'node scripts/board-publish.mjs — the tick already landed, so re-running resumes from here',
+          // NOT "re-run this command": the tick has landed, so a re-run dies at
+          // the tick step with "not in TASKS.md". The publisher is the repair.
+          repair: 'node scripts/board-publish.mjs — the point itself has landed; only the board is behind',
         })
         step('board', VERDICT.failed, `${(e && (e.stderr || e.message)) || e}`.split('\n').slice(-1)[0])
         throw error

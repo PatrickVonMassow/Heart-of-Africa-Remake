@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
+import { openFingerprintOfTasks } from './board-currency-core.mjs'
 import {
   AUDIT_TRIGGER_FILES,
   GATE_COMMANDS,
@@ -243,6 +244,31 @@ describe('rider (b) — an unchanged board is not republished', () => {
   it('publishes on an empty state', () => {
     expect(boardPublishNeeded({ fileHash: hash, fingerprint: fp, state: {} }).run).toBe(true)
     expect(boardPublishNeeded({}).run).toBe(true)
+  })
+
+  // THE COMPOSITION, not the function. The decision was once taken against the
+  // PRE-tick work order, and every landing moves the open-point set by
+  // definition — so the skip fired exactly when it must not, the live page went
+  // stale, publishDue armed and board-first-guard denied the next turn. The
+  // function was never wrong; its input was. These two cases pin the input.
+  it('SKIPS on the pre-tick work order and PUBLISHES on the post-tick one', () => {
+    const { tasks: afterTick } = tickAndArchive({ tasksText: TASKS, archiveText: ARCHIVE, number: 594 })
+    const before = openFingerprintOfTasks(TASKS)
+    const after = openFingerprintOfTasks(afterTick)
+    expect(after).not.toBe(before)
+
+    // The board bytes are unchanged, and the recorded state matches the PRE-tick
+    // fingerprint — the exact steady state of a landing.
+    const state = { pagesPublishedHash: hash, publishedFingerprint: before }
+    expect(boardPublishNeeded({ fileHash: hash, fingerprint: before, state }).run).toBe(false)
+    expect(boardPublishNeeded({ fileHash: hash, fingerprint: after, state }).run).toBe(true)
+  })
+
+  it('every ticked point moves the fingerprint, so no landing can ever skip on it', () => {
+    for (const n of [592, 594, 595]) {
+      const { tasks } = tickAndArchive({ tasksText: TASKS, archiveText: ARCHIVE, number: n })
+      expect(openFingerprintOfTasks(tasks)).not.toBe(openFingerprintOfTasks(TASKS))
+    }
   })
 })
 
