@@ -209,6 +209,33 @@ describe('the chokepoint — the four paths with no guard of their own', () => {
     })
   })
 
+  it('§8 chokepoint: the LANDING CHAIN is refused too — it does all four in one call', () => {
+    // Point 594 wrapped merge + tick + archive move + board publish + branch
+    // deletion in one command. Every one of those is a family this chokepoint
+    // guards, and NONE of them is visible inside the process. A convenience
+    // command that let a dispossessed session do in one call what it is refused
+    // in six would not be a convenience — it would be the hole.
+    for (const command of [
+      'node scripts/land-point.mjs 594',
+      'node scripts/land-point.mjs 594 --serial',
+      'cd /repo && node scripts/land-point.mjs 594',
+    ]) {
+      expect(call({ toolName: 'Bash', command })).toMatchObject({ block: true, kind: 'git-main' })
+    }
+    expect(fenceGuardedAction({ toolName: 'Bash', command: 'node scripts/land-point.mjs 594' }).what).toMatch(
+      /landing chain/,
+    )
+  })
+
+  it('§8 chokepoint: the landing chain stays allowed for the CURRENT-fence session, and READING it always', () => {
+    // The same asymmetry the rest of the chokepoint keeps: it gates the ACTION,
+    // never the ability to find out what the action is.
+    expect(fenceDecision({ fenceState: stale, sessionId: 's-new', toolName: 'Bash', command: 'node scripts/land-point.mjs 594' }).block).toBe(false)
+    expect(fenceGuardedAction({ toolName: 'Read', filePath: 'scripts/land-point.mjs' })).toBe(null)
+    // A --dry run is still the command; the gate does not parse intent out of flags.
+    expect(call({ toolName: 'Bash', command: 'node scripts/land-point.mjs 594 --dry' }).block).toBe(true)
+  })
+
   it('names the two fences and the way back in its reason', () => {
     const r = call({ toolName: 'Bash', command: 'git push' })
     expect(r.reason).toContain('held fence 7')

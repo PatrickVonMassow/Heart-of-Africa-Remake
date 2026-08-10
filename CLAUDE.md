@@ -176,22 +176,20 @@ coverage map live in `scripts/verify/README.md`.
   committed because a session or agent was killed mid-build — carries
   `[skip ci]` in its SUBJECT plus a `Rescue: <what was interrupted>` trailer
   (user 28.07.2026): it is no claim of completeness, and its red CI run would
-  alert on a state nobody claims is done. Durability is untouched — the commit
-  still pushes; only that run is skipped, and the NEXT commit, the one that
-  finishes the work, runs CI normally. The `commit-msg` hook
-  refuses each half without the other. Merge to `main` ONLY when
+  alert on a state nobody claims is done. Durability is untouched: it still
+  pushes, only that run is skipped, and the NEXT commit — the one that finishes
+  the work — runs CI normally. The `commit-msg` hook refuses each half without
+  the other. Merge to `main` ONLY when
   the point is COMPLETE and verified — tests green on both layers AND, for a
   render/GUI change, the rendered picture checked: on BOTH backends where the
   change can render differently on each, and on ONE where it cannot — a DOM-only
   change under `src/ui/` draws identically whichever renderer holds the canvas,
   so the second inspection buys nothing (user 26.07.2026; the classification is
   `isBackendSensitivePath` in `scripts/render-verify-core.mjs`, and the guard
-  demands accordingly). On merge,
-  resolve any conflict CAREFULLY so nothing breaks, and RE-TEST (re-run the
-  relevant regression) whenever a conflict touched real code. THE MERGE ENDS THE
-  BRANCH: delete it — local, remote AND its worktree, via
-  `node scripts/worktree-cleanup.mjs <path>` — before the tick, or the debris of
-  28.07.2026 returns (31 of 36 remote branches already contained in `main`).
+  demands accordingly). On merge, resolve any conflict CAREFULLY, and RE-TEST the
+  relevant regression whenever a conflict touched real code. THE MERGE ENDS THE
+  BRANCH — local, remote AND its worktree — or the debris of 28.07.2026 returns
+  (31 of 36 remote branches already contained in `main`);
   `branch-hygiene-guard` is only the backstop. `main` therefore
   always reflects finished, verified work — it is the deployed branch (the
   GH-Pages root builds from `main`; the `/poc/` deploy builds from the immutable
@@ -200,9 +198,9 @@ coverage map live in `scripts/verify/README.md`.
   process files — are committed directly to `main` while they stay SMALL (a
   feature branch for each would be needless ceremony). BEYOND a small commit —
   a new mechanism, a multi-file guard rebuild — such a change is DELEGATED to a
-  worktree agent like any point (measured 30.07.2026 over the last 60 first-parent
-  commits on `main`: 42 were main-only bookkeeping, and the 9 delegable ones were
-  all small). What genuinely stays here is the ARMING in `.claude/settings.json`
+  worktree agent like any point (measured 30.07.2026: of 60 first-parent commits
+  on `main`, 42 were main-only bookkeeping and the 9 delegable ones all small).
+  What genuinely stays here is the ARMING in `.claude/settings.json`
   or the git hooks, which needs an attended session, and the bookkeeping. Use
   worktree isolation for parallel file-mutating agents so their branches never
   collide in one tree.
@@ -222,10 +220,11 @@ coverage map live in `scripts/verify/README.md`.
     (`readTasksAll`). The split is enforced by `tasks-archive-guard` — a tick left
     in place, an open point stranded in the archive, or a point present in both
     files blocks the turn end.
-  - After EVERY merge to `main` — conflict or not — run the fast gate
-    (`npm run test:unit` + build + lint) before moving on; two points that
-    auto-merge cleanly can still break together. On a conflict that touched real
-    code, additionally re-run the relevant browser regression.
+  - **The landing is ONE command.** `node scripts/land-point.mjs <N>` drives merge
+    (`--no-ff` always), fast gate, tick, archive move, board publish and worktree
+    cleanup — one verdict per step. It STOPS at the first red, leaves no half state
+    and bypasses no guard. That gate stays mandatory after EVERY merge: two points
+    that auto-merge cleanly can still break together.
   - Keep branches SHORT. If `main` moved substantially, merge `main` INTO the
     branch before the final verify, and run that verify on the synced state, so
     what is verified is what lands.
@@ -266,8 +265,7 @@ coverage map live in `scripts/verify/README.md`.
   NON-OVERLAPPING files, and the cap is also a TARGET: while the queue holds an
   independent point, a free slot owes a reason (`--slots-free`). Infra and doc
   work too. What stays here: picture-verification on BOTH backends, the serial
-  merge → fast-gate → tick → deploy → cleanup, and the Artifact publish
-  (URL-bound).
+  landing (`land-point.mjs`) and deploy, and the Artifact publish (URL-bound).
 - **Delegation brief instead of a reading assignment (point 365).** A delegated
   agent receives its point as a BRIEF: `node scripts/point-brief.mjs <N>` prints
   the spec verbatim, the design.md sections it cites, one identifying line per
@@ -622,8 +620,9 @@ detail section change in the SAME commit.
 After completion and after every major system:
 
 - Run `npm run build` and confirm it passes without errors.
-- Run `npm run lint` and `npm audit` and confirm both are clean (zero
-  lint errors/warnings, zero vulnerabilities) per §7.1 point 18.
+- Run `npm run lint` always, and `node scripts/audit-check.mjs` whenever the
+  lockfile moved (nothing else moves the tree it reads); both clean — zero lint
+  errors/warnings, zero vulnerabilities — per §7.1 point 18.
 - Run `npm run test:unit` (the fast Vitest layer) and confirm it is green;
   add or extend a test there for the changed logic/store/HUD when applicable.
 - Start the dev server and verify via headless screenshot (e.g. Playwright)

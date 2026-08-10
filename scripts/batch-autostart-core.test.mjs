@@ -129,6 +129,15 @@ describe('the resume prompt', () => {
     expect(RESUME_PROMPT).toMatch(/batch-boundary\.mjs/)
     expect(RESUME_PROMPT).toMatch(/STAND DOWN/)
   })
+
+  it('points the landing at the ONE command (point 594)', () => {
+    // The headless successor reads this prompt and nothing else at start-up. A
+    // landing command it is never told about is a landing command nobody runs —
+    // which is the failure mode the point exists to fix, not a cosmetic gap.
+    expect(RESUME_PROMPT).toMatch(/land-point\.mjs/)
+    expect(RESUME_PROMPT).toMatch(/--dry/)
+    expect(RESUME_PROMPT).toMatch(/ersten Rot/)
+  })
 })
 
 // ---------------------------------------------------------------------------

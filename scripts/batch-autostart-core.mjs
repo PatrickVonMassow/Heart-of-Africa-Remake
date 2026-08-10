@@ -106,7 +106,12 @@ export const RESUME_PROMPT =
   'EIGENEN feat/<punkt>-<slug>-Branch von main, atomare Commits, den BRANCH nach jedem Commit pushen, ' +
   'Merge nach main NUR wenn der Punkt fertig und verifiziert ist (Tests gruen; Render-/GUI-Aenderungen ' +
   'auf BEIDEN Backends am Bild geprueft); TASKS.md nur auf main abhaken (beim Merge); ' +
-  'Querschnitts-Aenderungen (Guards, Docs, Dashboard, Prozessdateien) direkt auf main. Dashboard-Guard + ' +
+  'Querschnitts-Aenderungen (Guards, Docs, Dashboard, Prozessdateien) direkt auf main. DIE LANDUNG IST ' +
+  'EIN BEFEHL: steht der Punkt fertig und am Bild verifiziert, fuehrt `node scripts/land-point.mjs ' +
+  '<punkt>` die ganze Kette aus — Merge (--no-ff), Fast-Gate, Abhaken, Archiv-Umzug, Board-Publish, ' +
+  'Worktree-Aufraeumen — und druckt EIN Urteil je Schritt. Sie haelt beim ersten Rot an und laesst ' +
+  'keinen Halbzustand zurueck; `--dry` zeigt den Plan, ohne etwas anzufassen. Danach die Punktgrenze. ' +
+  'Dashboard-Guard + ' +
   'prep-guard gruen halten, Vorarbeit waehrend jeder Validierung. WARTEN IST SICHTBAR (28.07.2026): ' +
   'waehrend ein delegierter Agent baut, POLLE innerhalb des Zuges (TaskOutput, Branch-Tip, Logdatei) ' +
   'statt still zu sitzen — jeder Werkzeugaufruf frischt den Heartbeat, und eine still wartende Sitzung ' +
