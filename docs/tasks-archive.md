@@ -17088,3 +17088,50 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   proved, and the user's own play is the acceptance.
   Criticality: HIGH — it destroys the player's session without a prompt, and it is
   triggered by the feature's ordinary use, not by an unusual one.
+
+- [x] 588. GUESS A MEANING WHERE IT IS SPOKEN, NOT ONLY IN THE JOURNAL (user
+  09.08.2026). Today a reading is written only in the journal (`src/ui/JournalPanel.tsx`
+  → `setUtteranceHypothesis`), so the player must break off watching, open the journal
+  and find the utterance among the others — at the very moment he saw what it MEANT. The
+  guess belongs where the guess is formed.
+  FINAL STATE:
+  1. While one or more inhabitants are speaking, the label of the NEAREST speaker is
+     visibly HIGHLIGHTED against the others, so it is unambiguous which one a click will
+     take. Nearest = by distance to the player; a tie keeps the current pick rather than
+     flickering between two.
+  2. Under that label stands a short invitation, from the language files in German and
+     English, in the sense of "Click to guess meaning" — and NOT in upper case
+     (user 09.08.2026, same rule as point 579).
+  3. A LEFT CLICK on it opens a dialog for exactly that utterance: the syllables as
+     spoken, a text field carrying any reading already written, save and cancel. Enter
+     saves, Escape cancels. It writes the SAME store field the journal writes
+     (`setUtteranceHypothesis`), so a reading entered here appears in the journal and over
+     the speaker's head at once, and one entered in the journal shows up here.
+  4. The dialog is PART OF THE APPLICATION and looks like the game (the existing in-game
+     dialog look, `src/ui/Dialogs.tsx`) — never a browser prompt, never an OS window
+     (user's explicit requirement). It is MODAL, also his decision, and therefore the one
+     deliberate exception to the non-modal rule §16.1 keeps for the journal.
+  5. POINTER LOCK IS RELEASED while it is open and restored on close. Without that the
+     click never reaches the dialog and no key reaches the field — the first-person view
+     holds the pointer (`src/scenes/place/PlaceScene.tsx`). Movement and looking are
+     inert while it stands open, and the view does not jump when the lock returns.
+  6. THE CLICK TARGET MUST LIVE LONG ENOUGH TO BE CLICKED. A label expires after
+     `labelSeconds` (2.6 s today), which is shorter than reaching for the mouse: while a
+     label is the highlighted target it does not expire under the pointer, and the dialog
+     keeps the utterance it was opened for even once the label is gone.
+  7. The game still never interprets the text — it is the player's note, unchecked, as
+     everywhere else. This is an input comfort for a mechanic that exists, NOT a
+     translation aid and not an onboarding layer (CLAUDE.md §2).
+  DOCS: this is new player-visible design, so `design.md` §13.4 gains its description in
+  the SAME commit as the code. The document stands at its ceiling, so the addition is
+  written tight and, if it still does not fit, the choice between compressing elsewhere
+  and raising the budget goes to the user — it is not decided in passing.
+  VERIFIABLE: Vitest in the HUD/unit layer — with several speakers the highlight and the
+  invitation sit on the nearest one and move when he does; a click opens the dialog for
+  THAT utterance; saving writes the store field and the journal shows it; Escape and
+  cancel leave it unchanged; the invitation renders in both languages and in no
+  upper-case form. Plus one Playwright check for what only a browser proves: the pointer
+  lock is released on open and re-acquired on close, and typing reaches the field.
+  Criticality: medium — the mechanic works without it, but this is where the player's
+  thinking actually happens, and every guess he does not bother to write is a concept he
+  will not remember.
