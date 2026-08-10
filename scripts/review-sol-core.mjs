@@ -250,6 +250,22 @@ export function decideReview({ outcome = {}, parsed = {} } = {}) {
   }
 }
 
+/**
+ * Where the saved ChatGPT login lives, given git's COMMON dir.
+ *
+ * `local/` is per CHECKOUT, and a delegated agent works in a git WORKTREE that
+ * is deleted when its point lands — a login saved there would vanish with it,
+ * which is the opposite of surviving a rebuild. The login belongs to the
+ * machine, so it is kept in the MAIN checkout's `local/`: `--git-common-dir`
+ * points at the one real `.git` directory from every worktree alike. With no
+ * git answer the current checkout is the honest fallback.
+ */
+export function savedAuthPathFrom(gitCommonDir, repoRoot, { sep = '/' } = {}) {
+  const common = String(gitCommonDir ?? '').trim().replace(/[/\\]+$/, '')
+  const base = /(?:^|[/\\])\.git$/.test(common) ? common.replace(/[/\\]\.git$/, '') : String(repoRoot ?? '')
+  return `${base || String(repoRoot ?? '')}${sep}local${sep}codex-auth.json`
+}
+
 /** Shell-quote one value for the record command line we print. */
 const q = (s) => `"${String(s ?? '').replace(/(["\\$`])/g, '\\$1')}"`
 

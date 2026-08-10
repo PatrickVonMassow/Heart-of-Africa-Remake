@@ -298,20 +298,23 @@ coverage map live in `scripts/verify/README.md`.
   A MESSAGE WAKES IT TOO (29.07.2026): `scripts/chat-watcher.mjs` spawns a light
   responder from the chat inbox — only with no live owner and no honoured claim,
   under a bounded claim; the launcher tick supervises it.
-- **Model policy (user decision 25.07.2026, points 309 + the role revision).**
-  ONLY three models may author work here: **Opus 5** is the WORKER at any
-  difficulty; **Fable 5** serves the four-eyes principle (the two-mode rule
-  below) or the first fallback; **Opus 4.8** is the last
-  fallback. The chain is Opus 5 → Fable 5 → Opus 4.8, and
-  `scripts/batch-autostart.mjs` launches accordingly. DIFFICULTY IS NOT A REASON
-  to hand work to Fable — Opus 5 is equally capable, and a second model's value
-  is its different blind spots, which only a REVIEW realises. Sonnet and Haiku
-  are NOT acceptable: a session degraded to one is a capability breach and the
-  batch STOPS. Every commit NAMES its author model in the `Co-Authored-By`
-  trailer, and the `commit-msg` hook refuses one that does not.
-  `scripts/model-guard-core.mjs` holds the allowlist (`ALLOWED`) and the Stop
-  hook `scripts/model-guard.mjs` blocks the turn end on any commit after its
-  baseline authored outside it: HARD on a NAMED forbidden model (pause),
+- **Model policy (users 25.07./10.08.2026, points 309/624). AUTHOR AND REVIEWER
+  ARE SEPARATE ROLES.** AUTHORS: only **Opus 5**, then **Fable 5**, then **Opus
+  4.8**; `scripts/batch-autostart.mjs` launches that chain. DIFFICULTY IS NOT A
+  REASON to hand work to Fable — Opus 5 is the WORKER at any difficulty.
+  REVIEWERS (both modes below): **GPT-5.6 Sol** at reasoning effort HIGH,
+  **Fable 5** when Sol is unavailable. A reviewer is bought for its DIFFERENT
+  errors, and another VENDOR decorrelates further than our own house — do not
+  "simplify" the split away. Reviews run through `node scripts/review-sol.mjs
+  --sha <sha> --brief "<…>"`, never a hand-typed `codex` line: it names the
+  cause in ONE line, falls back to Fable on any failure (host, login, allowance,
+  error exit), and RECORDS the model that actually ran. Sonnet and Haiku are NOT
+  acceptable: a session degraded to one is a capability breach and the batch
+  STOPS. Every commit NAMES its author model in the `Co-Authored-By` trailer,
+  and the `commit-msg` hook refuses one that does not.
+  `scripts/model-guard-core.mjs` holds the AUTHOR allowlist (`ALLOWED`) and the
+  Stop hook `scripts/model-guard.mjs` blocks the turn end on any commit after
+  its baseline authored outside it: HARD on a NAMED forbidden model (pause),
   resolvably on an UNNAMED one, which the transcripts settle. (History: on
   24.07.2026 a degraded session merged three defective Haiku deliveries in 14
   minutes — only the trailers could have caught it.)
@@ -331,7 +334,7 @@ coverage map live in `scripts/verify/README.md`.
   be produced twice independently; it keeps the ORDINARY REVIEW, refined only in
   that the reviewer reads the ARTEFACT before the author's rationale, so the
   justification cannot anchor it either. Two sets are worth what their errors
-  are UNCORRELATED, so CROSS-MODEL is the default pairing (the allowlist above);
+  are UNCORRELATED, so CROSS-VENDOR is the default pairing (the reviewers above);
   two blind runs of ONE model are independent in what they saw but not in how
   they think — the WEAKER fallback when no second model is available, recorded
   as such and DECORRELATED BY FRAMING (a hostile tester, a maintainer inheriting

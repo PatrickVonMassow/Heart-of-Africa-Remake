@@ -186,6 +186,9 @@ export const usage = () =>
   `                       same inputs without seeing each other's result\n` +
   `--framing records how a second blind run by the SAME model was decorrelated, and\n` +
   `       belongs to blind-parallel alone.\n` +
+  `\nWHO REVIEWS (CLAUDE.md §6): GPT-5.6 Sol at reasoning effort high, Fable 5 when\n` +
+  `       Sol is unavailable. Run it — never a hand-typed codex line — with:\n` +
+  `       node scripts/review-sol.mjs --sha <sha> --brief "<what to judge>"\n` +
   `\nThe GATES are separate commands and answer --status themselves:\n` +
   `       node scripts/mechanism-review-guard.mjs --status\n` +
   `       node scripts/criticality-review-guard.mjs --status`

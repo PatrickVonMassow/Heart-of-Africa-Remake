@@ -17,6 +17,7 @@ import {
   isUnknownModelRefusal,
   OUTCOME,
   parseVerdict,
+  savedAuthPathFrom,
   SOL_MODEL_ID,
   SOL_MODEL_NAME,
   SOL_REASONING_EFFORT,
@@ -222,6 +223,25 @@ describe('the recorder accepts the reviewer the rule now prefers (point 624)', (
       })
       expect(check.ok).toBe(true)
     }
+  })
+})
+
+describe('the saved login survives what it has to survive', () => {
+  it('is kept in the MAIN checkout, not in a worktree that gets deleted', () => {
+    expect(savedAuthPathFrom('/workspace/hoa/.git', '/workspace/hoa/.claude/worktrees/agent-1')).toBe(
+      '/workspace/hoa/local/codex-auth.json',
+    )
+  })
+
+  it('falls back to the current checkout when git answers nothing', () => {
+    expect(savedAuthPathFrom('', '/repo')).toBe('/repo/local/codex-auth.json')
+    expect(savedAuthPathFrom('   \n', '/repo')).toBe('/repo/local/codex-auth.json')
+  })
+
+  it('handles a windows path and a trailing separator', () => {
+    expect(savedAuthPathFrom('C:\\src\\hoa\\.git\\', 'C:\\src\\hoa\\wt', { sep: '\\' })).toBe(
+      'C:\\src\\hoa\\local\\codex-auth.json',
+    )
   })
 })
 

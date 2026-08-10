@@ -376,7 +376,10 @@ export function validateRecord({ sha, model, verdict, evidence, authoredBy, mode
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
   }
   if (!String(model ?? '').trim()) {
-    errors.push('--model <name>: which model performed the review (e.g. "Fable 5")')
+    // The example NAMES the reviewer the rule prefers (point 624): reviews go to
+    // GPT-5.6 Sol first and to Fable 5 when Sol is unavailable, and nothing here
+    // restricts the value — a reviewer this recorder refused could not be used.
+    errors.push('--model <name>: which model performed the review (e.g. "GPT-5.6 Sol", "Fable 5")')
   }
   if (!VERDICTS.includes(String(verdict ?? '').trim())) {
     errors.push(`--verdict <v>: one of ${VERDICTS.join(' | ')}`)

@@ -28,8 +28,8 @@
 import { spawnSync } from 'node:child_process'
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { REPO_ROOT, repoPath } from './repo-paths.mjs'
+import { dirname, join, sep as sep_ } from 'node:path'
+import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import {
   buildReviewPrompt,
@@ -41,6 +41,7 @@ import {
   isUnknownModelRefusal,
   parseVerdict,
   REVIEW_TIMEOUT_MS,
+  savedAuthPathFrom,
   SOL_MODEL_ID,
   SOL_MODEL_NAME,
   SOL_REASONING_EFFORT,
@@ -49,7 +50,17 @@ import {
 /** Where codex keeps the ChatGPT login, and where we park a copy of it. */
 export const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), '.codex')
 export const AUTH_FILE = join(CODEX_HOME, 'auth.json')
-export const SAVED_AUTH_FILE = repoPath('local/codex-auth.json')
+
+/** The MAIN checkout's `local/` — never the throwaway worktree's (see the core). */
+export const SAVED_AUTH_FILE = savedAuthPathFrom(
+  spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    windowsHide: true,
+  }).stdout ?? '',
+  REPO_ROOT,
+  { sep: sep_ },
+)
 
 /** Run codex once and hand back everything the classifier needs. */
 function runCodex({ prompt, modelId = SOL_MODEL_ID, timeoutMs = REVIEW_TIMEOUT_MS }) {
@@ -112,7 +123,7 @@ function saveLogin() {
     console.error(`review-sol --save-login: no login found at ${AUTH_FILE} — run \`codex login\` first.`)
     return 1
   }
-  mkdirSync(repoPath('local'), { recursive: true })
+  mkdirSync(dirname(SAVED_AUTH_FILE), { recursive: true })
   copyFileSync(AUTH_FILE, SAVED_AUTH_FILE)
   chmodSync(SAVED_AUTH_FILE, 0o600)
   console.log(
