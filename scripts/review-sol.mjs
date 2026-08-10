@@ -345,8 +345,11 @@ function saveLogin() {
   // (four-eyes finding, 10.08.2026): `local/` is git-ignored today, and a token
   // written where git can see it is one `git add -A` away from the repository.
   // The same check refuses a destination that is a symlink pointing elsewhere.
+  // Asked in the checkout that OWNS the path, not in this one: from a delegated
+  // agent's worktree the destination lies in the MAIN checkout, and git answers
+  // "outside repository" — a refusal that has nothing to do with ignoring.
   const ignored = spawnSync('git', ['check-ignore', '-q', SAVED_AUTH_FILE], {
-    cwd: REPO_ROOT,
+    cwd: dirname(STATE_DIR),
     windowsHide: true,
   })
   if (ignored.status !== 0) {
