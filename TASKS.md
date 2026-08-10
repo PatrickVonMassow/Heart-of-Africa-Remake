@@ -70,6 +70,92 @@ there exactly once; a new point joins a bundle when appended.
 
 ## Checklist
 
+- [ ] 604. STUCK IS FATAL, AND THE GAME OFFERS NO WAY OUT (user 10.08.2026, F6 report
+  `local/bugreports/HaengeFest.zip`: "Ich hänge fest"; build 787817c, webgpu, seed
+  1941555626, mode place / bambara-village, x/z -59.62 / -131.19, day 0). His frame shows
+  the traveller pressed into the gap between a compound's curved palisade and the wall
+  beside it, with the free ground in view and no way to reach it. What makes this fatal
+  rather than annoying is what the game does NOT have: saving happens only on entering a
+  port (`design.md` §18), so a traveller wedged in a village loses everything since the
+  last port; and the INHABITANTS already have the remedy the player lacks — a walker that
+  has not moved for `balance.walkerUnstuck` seconds is set free (`src/scenes/place/`
+  routing), while the player has nothing at all.
+  FINAL STATE:
+  1. AN ESCAPE THE PLAYER CAN ALWAYS REACH: a key frees the traveller, works whenever the
+     game accepts input in a walkable place AND in the bird's-eye travel view (the same
+     wedge can close around a landmark collider), and needs no prior state — a player who
+     merely FEELS stuck may press it. It is listed with the other controls in both
+     languages.
+  2. WHERE IT PUTS HIM: the nearest collision-free position, found by a deterministic
+     outward search from where he stands — inside the settlement (or, travelling, inside
+     the world bounds), standing on the drawn ground, never inside a building, never on
+     the far side of a collider he could not have walked through. Found nothing within the
+     search radius: the place's entry point, which is free by construction.
+  3. IT ANNOUNCES ITSELF WHEN IT IS NEEDED. A traveller who holds a movement key while his
+     position does not advance past a small threshold for a few seconds is stuck; that
+     raises the existing in-game toast, localized in both languages, naming the key. The
+     toast goes as soon as he moves again. Detection only INFORMS — it never frees him by
+     itself, because a rescue nobody asked for would teleport a player who is merely
+     standing against a wall on purpose.
+  4. NO COST AND NO SIDE EFFECT: no time passes, no provisions, no health, no journal
+     entry, no reputation. It repairs a defect of ours; the player does not pay for it.
+  5. Its values — the stall threshold in metres, the stall seconds, the search radius and
+     step — live in `src/config/balance.ts` under one `unstuck` group and are editable in
+     the debug menu's movement group like every other calibratable value (CLAUDE.md §2).
+  6. THE REPORTED SPOT IS REPRODUCED, NOT ONLY CAUGHT BY THE NET. Reproduce his seed and
+     position, name the collider pair that trapped him, and where the geometry itself is
+     the trap — two colliders leaving a gap narrower than the player's radius, or a fence
+     box reaching past its posts — fix that geometry too (`design.md` §2.6, CLAUDE.md §7.1
+     point 16). The escape hatch is the safety net, never the excuse for the hole.
+  DOCS: the control is player-visible design — `design.md` §2.2 (controls) and §17.5 gain
+  it in the SAME commit as the code, and `docs/acceptance-evidence.md` §16 records the
+  proof. Both documents sit near their measured ceiling: write it tight, and if it still
+  does not fit, the choice between compressing elsewhere and raising the budget goes to
+  the user rather than being taken in passing.
+  VERIFIABLE: Vitest for the pure halves — the stall detector (fires on a held key with no
+  progress, never on a standing player, clears on movement) and the free-spot search (it
+  returns a spot that no collider contains, prefers the nearest, refuses a spot behind a
+  wall, and falls back to the entry point when the radius holds nothing). Plus a browser
+  check that starts the traveller in the reported wedge, presses the key and proves he is
+  free and can walk, with a frame of the freed position through the shutter.
+  Criticality: high — it is the difference between a lost expedition and a lost second.
+
+- [ ] 605. THE SPEECH VOLUME SITS WHERE NOBODY LOOKS, AND STARTS TOO LOW (user 10.08.2026,
+  on the build that already HAS point 577's slider — 787817c: "es gibt nach wie vor keinen
+  eigenen Lautstärkeregler für die Sprache und sie ist standardmäßig zu leise"). Checked
+  against his dump: `communication.speechVolume` is there and it works — he now hears the
+  children and can tell the syllables apart. What is wrong is WHERE its control sits.
+  Every other level in the game — the master ambience, the footsteps, the "everything
+  else" bus, the birdsong — is a row of the debug menu's GRAPHICS AND SOUND group
+  (`src/ui/DebugMenu.tsx` ~line 696); the speech volume is a row of the SETTLEMENT group
+  (~line 575), between the syllable length and the label headroom. A player who wants the
+  speech louder opens the sound group, finds no speech in it, and concludes there is none
+  — which is exactly what he reported.
+  FINAL STATE:
+  1. The speech volume is a row of the GRAPHICS AND SOUND group, among the other volumes.
+     It MOVES there — one control, one home, not a second copy in the settlement group.
+  2. Its label reads as a volume in the same wording family as its neighbours, in both
+     languages, and still names the village speech rather than "voice" (nothing else in
+     the game speaks; point 577's rule stands).
+  3. THE SAME QUESTION IS ASKED OF EVERY OTHER LEVEL, not just this one: any debug control
+     whose effect is a volume belongs to that group. A Vitest test pins the rule so the
+     next one cannot drift back — every field whose id ends in `Volume` is in the graphics
+     and sound group, and no such field sits anywhere else.
+  4. THE DEFAULT IS RAISED so the syllables carry over the drums and the ambience at the
+     DEFAULT settings, without clipping the mix. It is calibrated against the audio graph,
+     not by feel: the existing ambience test measures the speech bus against the drum and
+     ambient buses at default balance and holds the new relation, so a later change to
+     either side fails loudly instead of quietly re-burying the speech. The user judges
+     the final loudness on the deployed build; this point delivers a default that is
+     audibly present rather than one that needs a slider to be found at all.
+  DOCS: `design.md`'s sound section keeps its statement that each source carries its own
+  level (line 616) and gains nothing; `docs/acceptance-evidence.md` §20 records the proof.
+  VERIFIABLE: Vitest — the group rule of 3, the new default in `balance.ts`, both labels
+  present and localized, and the measured bus relation of 4. No browser suite: this is a
+  menu row and a gain value, neither of which a picture judges.
+  Criticality: medium — the mechanic itself works; what fails is the player's ability to
+  reach it, which is how the defect reached him a second time.
+
 - [ ] 588. GUESS A MEANING WHERE IT IS SPOKEN, NOT ONLY IN THE JOURNAL (user
   09.08.2026). Today a reading is written only in the journal (`src/ui/JournalPanel.tsx`
   → `setUtteranceHypothesis`), so the player must break off watching, open the journal

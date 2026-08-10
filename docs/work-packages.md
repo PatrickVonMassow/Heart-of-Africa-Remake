@@ -81,7 +81,7 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 |---|---|---|---|
 | **Dorfleben** | A | Village life | 350, 351, 356, 357, 359, 360, 394, 578 |
 | **Wetter & Wasser** | B | Weather, ground and water surface | 314, 320, 321, 323, 348, 353, 354, 358, 384, 385 |
-| **Siedlungsgeometrie** | C | Settlement geometry | 299, 349, 352, 380, 415, 428, 581, 583 |
+| **Siedlungsgeometrie** | C | Settlement geometry | 299, 349, 352, 380, 415, 428, 581, 583, 604 |
 | **Sonne & Himmel** | D | Sun and sky | 343, 344, 345, 346 |
 | **Monumente** | E | Monument sites | 315, 379, 391 |
 | **Tierverhalten** | F | Animal behaviour | 265, 269, 312, 362, 363, 364, 414, 565, 575 |
@@ -93,7 +93,7 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 | **Dokumentation** | L | Docs and knowledge transfer | 303, 333, 422, 555 — the rest landed 30.07.2026 (459) |
 | **Steuerung & Performance** | M | Controls and performance | 310, 342, 347 |
 | **Urlaubsfestigkeit** | N | Unattended operation for a fortnight — recovery from a failure at ANY moment, quota waiting, the boot path, the readiness check and the chaos drill that proves it | 442, 443, 444, 445, 446, 447, 448, 449, 450, 533, 562 |
-| **Kommunikation** | O | The communication PoC: the tonal language, who speaks it, where it is spoken, what the player may write down | 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488 (480 IS point 351 and 488 IS point 352, pulled forward — they close together); and the PLAY-SESSION findings of 09.08.2026: 587, 577, 586, 580, 582, 588, 576, 585, 584, 579 |
+| **Kommunikation** | O | The communication PoC: the tonal language, who speaks it, where it is spoken, what the player may write down | 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488 (480 IS point 351 and 488 IS point 352, pulled forward — they close together); and the PLAY-SESSION findings of 09.08.2026: 587, 577, 586, 580, 582, 588, 576, 585, 584, 579, and of 10.08.2026: 605 |
 
 **Urlaubsfestigkeit** was cut on 30.07.2026 on the user's demand that the batch be
 worked for two weeks without them, surviving an outage of Claude, of their internet
@@ -150,16 +150,25 @@ decision.
 The packages, cut by what ONE acceptance run can judge — re-cut them as further
 reports arrive rather than letting a package grow past its own acceptance:
 
+**AND THE 10.08.2026 SESSION LEADS THAT** (user 10.08.2026). He played the deployed
+build again and reported two things. Being STUCK (604) goes to the front of the whole
+queue, ahead of the 09.08. packages: with saving tied to port visits, a wedged traveller
+loses the expedition, and no other defect on the list can end a session that way. The
+speech volume (605) joins Ton, where it belongs — it is the same complaint as 577 seen
+from the player's side, the control being unfindable rather than absent.
+
 | Package | Points | The one acceptance |
 |---|---|---|
-| Ton | 577, 587 | one listening pass |
+| Festhängen | 604 | one walk into the reported wedge |
+| Ton | 577, 587, 605 | one listening pass |
 | Lehrtext erreicht den Spieler | 580, 582, 586, 588 | one live session in the village |
 | Figuren | 576, 578 | one picture check |
 | Ufer & Welt | 583, 584, 585, 581 | one walk along the bank and the boundary |
 | Journal | 579 | HUD only, no scene |
 
-Ton leads: while the syllables are a squawk and the speech is muted by the wrong
-slider, nothing else about the language can be judged at all.
+Festhängen leads, then Ton: a session that cannot be continued makes every other
+judgment moot, and after it, while the syllables are a squawk and the speech sits behind
+a control nobody finds, nothing about the language can be judged at all.
 
 Then **Urlaubsfestigkeit** (30.07.2026): the user must be able to leave for two
 weeks and rely on the batch being worked without them, so the layer that keeps it
