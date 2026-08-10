@@ -39,9 +39,14 @@ import {
   LAUNCHER_DAEMON_NAME,
   LAUNCHER_RECORD_VERSION,
   LAUNCHER_TASK_NAME,
+  WAKE_MIN_GAP_MS,
+  WAKE_POLL_MS,
   classifyDaemonRecord,
   launcherRemedy,
+  ownershipSignal,
+  releaseSpawnDecision,
 } from './batch-launcher-core.mjs'
+import { LOCK_PATH, assessOwner, bootTimeMs, readOwnerLock } from './batch-singleton.mjs'
 
 export const LAUNCHER_RECORD_PATH = repoPath('.claude/batch-launcher.json')
 export const LAUNCHER_LOG_PATH = repoPath('.claude/batch-launcher.log')
@@ -189,6 +194,23 @@ export async function runDaemon({
   recordPath = LAUNCHER_RECORD_PATH,
   logPath = LAUNCHER_LOG_PATH,
   tickMs = LAUNCHER_TICK_MS,
+  // THE END OF OWNERSHIP WAKES IT (point 612). The daemon watches the batch lock
+  // while it sleeps and brings its next tick forward the moment NOBODY owns the
+  // batch any more — released, handed over, idle or lease-expired alike — instead
+  // of discovering it up to a quarter of an hour later. The verdict is
+  // `assessOwner`'s, the same one the tick itself uses, so there is one code path
+  // deciding "ownership just ended". All of it is injected so the loop can be
+  // exercised without a batch.
+  //
+  // The probe is two `/proc` reads on Linux, which is the only host this daemon
+  // runs on (`--daemon` refuses win32, where the same call is a PowerShell round
+  // trip) — cheap enough for a five-second poll.
+  readLock = () => readOwnerLock(LOCK_PATH),
+  assess = (lock) =>
+    assessOwner(lock, { now: Date.now(), bootTime: bootTimeMs(), probe: probePid(lock?.pid ?? 0) }),
+  isPaused = () => pauseState().state !== 'none',
+  pollMs = WAKE_POLL_MS,
+  wakeGapMs = WAKE_MIN_GAP_MS,
 } = {}) {
   const existing = launcherState({ recordPath, tickMs })
   if ((existing.state === 'ready' || existing.state === 'running') && Number(existing.record?.pid) !== process.pid) {
@@ -206,6 +228,12 @@ export async function runDaemon({
   const base = { v: LAUNCHER_RECORD_VERSION, name: LAUNCHER_DAEMON_NAME, pid: process.pid, pidStartedAt, startedAt, tickMs }
   let lastTickAt = startedAt
   let leaving = null
+  // The lock state as the last poll saw it, and when an early tick last ran. Both
+  // live across the whole loop: the watcher reacts to a CHANGE (a lock that has
+  // been free for hours is not an event), and the floor keeps a tick that could
+  // not spawn from waking itself again five seconds later.
+  let lastSignal = null
+  let lastWakeAt = 0
   /** Writes the record, unless somebody else's claim or a stop order says not to.
    *  Returns false when this daemon has just lost the singleton and must leave. */
   const publish = (patch = {}) => {
@@ -259,13 +287,51 @@ export async function runDaemon({
     lastTickAt = Date.now()
     if (!publish({ tickInFlight: false })) return leave()
     if (stopping) break
-    // Interruptible: a stop signal must not have to wait out a whole interval.
+    // Interruptible, and WATCHFUL: a stop signal must not have to wait out a whole
+    // interval, and neither must a release. The poll only ever shortens this
+    // sleep — the tick it brings forward is the same child as always, so the hard
+    // singleton below it is untouched and no second owner can come of it.
     await new Promise((resolve) => {
-      const timer = setTimeout(resolve, tickMs)
-      wake = () => {
-        clearTimeout(timer)
+      const deadline = Date.now() + tickMs
+      let timer = null
+      let done = false
+      const finish = () => {
+        if (done) return
+        done = true
+        if (timer) clearTimeout(timer)
+        timer = null
         resolve()
       }
+      const poll = () => {
+        timer = null
+        if (stopping || Date.now() >= deadline) return finish()
+        let decision = { wake: false, reason: '' }
+        try {
+          const seen = readLock()
+          const signal = ownershipSignal({ lock: seen, assessment: seen ? assess(seen) : null })
+          decision = releaseSpawnDecision({
+            signal,
+            previous: lastSignal,
+            now: Date.now(),
+            paused: isPaused(),
+            lastWakeAt,
+            minGapMs: wakeGapMs,
+          })
+          lastSignal = signal
+        } catch (e) {
+          // A watcher that cannot read must never take the launcher down: the
+          // 15-minute tick is the backstop and it is still running.
+          appendLog(logPath, `lock watch failed: ${(e && e.message) || e}`)
+        }
+        if (decision.wake) {
+          lastWakeAt = Date.now()
+          appendLog(logPath, `early tick — ${decision.reason}`)
+          return finish()
+        }
+        timer = setTimeout(poll, Math.max(1, Math.min(pollMs, deadline - Date.now())))
+      }
+      wake = finish
+      timer = setTimeout(poll, Math.max(1, Math.min(pollMs, tickMs)))
     })
     wake = null
   }

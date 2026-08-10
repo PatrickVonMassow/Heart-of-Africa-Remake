@@ -801,11 +801,17 @@ if (dispossessed) {
   // "handed-over" is not death: the owner finished a point and passed the batch
   // on (point 388). Logged distinctly so the end-to-end chain can be READ out of
   // this file rather than inferred.
+  // An IDLE release is neither death nor a handover: the owner reserved the batch
+  // and never ran a thing (point 612). It is a routine, healthy transition — like
+  // a handover — so it is logged distinctly and nobody's phone is buzzed for it.
   log(
     assessment.reason === 'handed-over'
       ? `HANDOVER accepted: ${lock.sessionId} handed the batch over${lock.handoverPoint ? ` at point ${lock.handoverPoint}` : ''} — spawning the successor`
-      : `owner provably dead (${assessment.reason}) — taking over`,
+      : assessment.reason === 'idle'
+        ? `IDLE owner superseded: ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) held the batch without working — spawning the successor`
+        : `owner provably dead (${assessment.reason}) — taking over`,
   )
+  if (assessment.reason === 'idle' && assessment.detail) log(`  ${assessment.detail}`)
 } else {
   // The headless path leaves no lock at all: a `claude -p` that ends at a
   // boundary exits, and SessionEnd releases the lock before this tick runs. Said
