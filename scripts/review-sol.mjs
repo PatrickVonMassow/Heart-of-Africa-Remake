@@ -47,7 +47,6 @@ import { homedir, tmpdir } from 'node:os'
 import { dirname, join, sep as sep_ } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { modelFromTrailers } from './mechanism-review-core.mjs'
 import {
   addedFilesAreCoveredByPatch,
   buildReviewPrompt,
@@ -59,6 +58,7 @@ import {
   formatReviewMaterial,
   formatReviewReport,
   isUnknownModelRefusal,
+  modelsInTrailerField,
   newFilePathsIn,
   parseVerdict,
   probeFreshness,
@@ -166,12 +166,25 @@ function gatherMaterial(sha, base = '') {
  * commit below it — the exact "reviewed" state nobody looked at. An empty answer
  * means only that the two do not diverge, which is an ordinary case.
  */
-function mergeBase(ref, sha) {
+function mergeBase(ref, sha, { explicit = false } = {}) {
   if (git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { required: false }) === null) {
     throw new Error(`--since ${ref}: no such commit in this repository`)
   }
   const base = git(['merge-base', ref, sha], { required: false })
-  return base && base !== sha ? base : ''
+  if (base && base !== sha) return base
+  // NO DIVERGENCE FROM THE DEFAULT REF: the commit is already on `main`, and
+  // falling back to its own diff would show the reviewer ONE commit while the
+  // record it produces clears every commit below it (third cross-vendor round).
+  // The range must then be named, and the operator is told how.
+  if (!explicit) {
+    throw new Error(
+      `${sha.slice(0, 7)} does not diverge from ${ref}, so there is no branch range to show.\n` +
+        '  A record covers every commit it CONTAINS, so the range must be named:\n' +
+        `    --since ${sha.slice(0, 7)}~1   (this commit alone)\n` +
+        '    --since <the last reviewed sha>',
+    )
+  }
+  return ''
 }
 
 /** Every model that authored a commit in the reviewed range (or the commit). */
@@ -180,7 +193,9 @@ function authorsIn(sha, base = '') {
   const log = base
     ? git(['log', `--format=${field}`, `${base}..${sha}`])
     : git(['show', '-s', `--format=${field}`, sha])
-  return String(log).split('\n').map((line) => modelFromTrailers(line)).filter(Boolean)
+  // EVERY model on each line, not just its first: a commit naming two would
+  // otherwise hide one, and the chain could hand the review to an author.
+  return String(log).split('\n').flatMap((line) => modelsInTrailerField(line))
 }
 
 /** Run codex once and hand back everything the classifier needs. */
@@ -423,7 +438,8 @@ if (isMainModule(import.meta.url)) {
       }
     }
 
-    const base = mergeBase(flag('--since') || 'main', full)
+    const since = flag('--since')
+    const base = mergeBase(since || 'main', full, { explicit: Boolean(since) })
     const material = gatherMaterial(full, base)
     console.error(
       `  material: ${material.length} characters of diff and file content` +

@@ -19,7 +19,7 @@
 // Side-effect free: the process spawn, the temp files and the printing belong to
 // scripts/review-sol.mjs. Pinned by review-sol-core.test.mjs.
 
-import { BLIND_REVIEWER, sameModel, VERDICTS } from './mechanism-review-core.mjs'
+import { BLIND_REVIEWER, modelFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
 
 // Re-exported: the runner and the recorder refuse the same sentence, from one
 // definition (mechanism-review-core.mjs).
@@ -389,6 +389,22 @@ export function newFilePathsIn(patch) {
     }
   }
   return paths
+}
+
+/**
+ * EVERY model named in one commit's `Co-Authored-By` field, not just the first.
+ *
+ * `modelFromTrailers` deliberately returns the FIRST Claude co-author, which is
+ * the right answer for "who wrote this" but the wrong one for "who may not
+ * review this": a commit naming two models would hide the second, and the
+ * fallback chain could then pick a model that authored the work (third
+ * cross-vendor round). The separator is the one the git format uses.
+ */
+export function modelsInTrailerField(field) {
+  return String(field ?? '')
+    .split(';')
+    .map((part) => modelFromTrailers(part))
+    .filter(Boolean)
 }
 
 /** How long a passed model-id probe stands before it must be repeated. */

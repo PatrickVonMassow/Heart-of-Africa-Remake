@@ -144,6 +144,19 @@ describe('the guards around the run', () => {
     expect(r.stderr).toMatch(/no such commit/)
   })
 
+  it('refuses to review a commit that does not diverge from main without a named range', () => {
+    // A record covers every commit it CONTAINS, so showing the reviewer one
+    // commit while clearing its ancestors is the hole (third round). Naming the
+    // range explicitly is accepted.
+    provenId()
+    const onMain = spawnSync('git', ['rev-parse', 'main'], { encoding: 'utf8' }).stdout.trim()
+    const r = run(['--sha', onMain, '--brief', 'judge it'])
+    expect(r.status).not.toBe(0)
+    expect(r.stderr).toMatch(/does not diverge/)
+    expect(r.stderr).toMatch(/--since/)
+    expect(run(['--sha', onMain, '--since', `${onMain}~1`, '--brief', 'judge it']).status).toBe(0)
+  })
+
   it('refuses a sha that is not a commit', () => {
     provenId()
     const r = run(['--sha', 'deadbeefdeadbeef', '--brief', 'judge it'])

@@ -347,7 +347,11 @@ export const BLIND_REVIEWER = new RegExp(
     /\bnone\s+of\s+my\s+commands\b/.source,
     /\b(?:repository|repo|file|material|workspace)\s+access\s+(?:failed|denied|was\s+denied)\b/.source,
     // "the diff could not be read", "the patch was not supplied/provided"
-    /\b(?:could\s+not|unable\s+to)\s+(?:be\s+)?(?:read|inspect|access|retrieve)(?:ed)?\s+(?:the\s+)?(?:diff|patch|files?|repository|material|change)\b/
+    /\b(?:could\s+not|unable\s+to)\s+(?:read|inspect|access|retrieve)\s+(?:the\s+)?(?:diff|patch|files?|repository|material|change)\b/
+      .source,
+    // …and the same sentence in the passive, which the active form above does
+    // NOT match: "the diff could not be read" (third cross-vendor round).
+    /\b(?:diff|patch|files?|repository|material|change)\s+(?:could\s+not|cannot|can't)\s+be\s+(?:read|inspected|accessed|retrieved|seen)\b/
       .source,
     /\b(?:diff|patch|material|files?)\s+(?:was|were)\s+(?:not\s+(?:supplied|provided|available|accessible)|un(?:available|supplied|provided))\b/
       .source,

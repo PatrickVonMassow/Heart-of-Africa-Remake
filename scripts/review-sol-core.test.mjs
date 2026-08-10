@@ -18,6 +18,7 @@ import {
   formatReviewMaterial,
   formatReviewReport,
   isUnknownModelRefusal,
+  modelsInTrailerField,
   newFilePathsIn,
   OUTCOME,
   parseVerdict,
@@ -196,6 +197,15 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     expect(fallbackReviewerFor(['Claude Opus 5', 'Claude Fable 5'])).toBe('Opus 4.8')
     expect(fallbackReviewerFor(['Claude Opus 5', 'Claude Opus 4.8'])).toBe(FALLBACK_MODEL_NAME)
     expect(fallbackReviewerFor(['Claude Fable 5'])).toBe(SECOND_FALLBACK_MODEL_NAME)
+  })
+
+  it('sees BOTH models when one commit names two co-authors', () => {
+    // modelFromTrailers answers "who wrote this" with the first name; for "who
+    // may not review this" that would hide the second (third round).
+    const field = 'Claude Opus 5 <noreply@anthropic.com>;Claude Fable 5 <noreply@anthropic.com>'
+    expect(modelsInTrailerField(field)).toHaveLength(2)
+    expect(fallbackReviewerFor(modelsInTrailerField(field))).toBe('Opus 4.8')
+    expect(modelsInTrailerField('Patrick <p@example.com>')).toEqual([])
   })
 
   it('names NOBODY when every model in the chain authored part of the range', () => {
