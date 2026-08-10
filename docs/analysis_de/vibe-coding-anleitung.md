@@ -405,4 +405,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: fd78ed661640a653b9803879ef1810281eb1806c2eab8fb5692baad2b93dd950 -->
+<!-- GUIDE-FINGERPRINT: ffe4fdc0bde2d43af96e90ee69290b304fcc20adb5733c746b13ceb760b9b6e5 -->
