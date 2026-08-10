@@ -70,85 +70,326 @@ there exactly once; a new point joins a bundle when appended.
 
 ## Checklist
 
-- [ ] 562. A FLICKERING REACHABILITY PROBE STOPS THE WHOLE BATCH (measured 08.08.2026;
-  bundle Urlaubsfestigkeit). The launcher probes the published board each tick and
-  escalates when it cannot read it: five alerts with growing spacing, then a deliberate
-  pause of the batch (`.claude/batch-paused`, the point-445 escalation). On 08.08.2026 at
-  13:39 that chain fired and stopped the work; it only resumed because the restart clock
-  ran out. The board was never gone. `.claude/batch-launcher.log` shows
-  `board: unreachable — fetch failed` INTERLEAVED with successful probes of the same URL
-  (lines 1114 and 1136 sit after already-green ones), and a counter-probe from the same
-  container at the same time returns HTTP 200 — with and without `--dns-result-order=
-  ipv4first` — while `board-publish.mjs --check` reports CURRENT. So a sporadic network
-  hiccup halts every point in the queue, and the alert that fetches the user out of his
-  weekend reports something untrue.
-  FINAL STATE: a transport failure and a STALE board are told apart, because they are not
-  the same claim — a failed fetch says nothing about the board's currency, and only
-  staleness is worth waking anybody for. A probe that fails is RETRIED at once (a second
-  attempt, briefly spaced) before it counts as anything, and the escalation counts only
-  CONSECUTIVE failures: one success anywhere in the chain resets it. The pause stays the
-  last stage for a genuinely unreachable board — it is the right instrument for a real
-  outage — but a transport failure alone never reaches it while the currency check still
-  answers over its own transport (`--check` reads raw.githubusercontent.com, a different
-  host from the Pages viewer, and the two failing together is what an outage looks like).
-  The alert text names WHICH of the two happened.
-  VERIFIABLE: pure Vitest over the probe's decision function — an alternating
-  failure/success sequence never escalates; N consecutive failures do; a single failure
-  followed by a successful retry is not counted; and a fetch failure while the currency
-  check still answers is reported as a transport failure, not as a stale board.
-  Criticality: high for unattended operation — this is the one failure mode that stops
-  every other point, and it fired on a false positive.
+- [ ] 601. HOLDING CTRL WHILE WALKING CLOSES THE BROWSER (user 09.08.2026: "Wenn ich STRG
+  gedrückt halte und dabei WASD benutze, passieren fatale Dinge — z. B. schließt STRG-W
+  Chrome ohne Rückfrage"). The label overlay is a HOLD, and W is the forward key, so the
+  feature's normal use IS the browser's close-tab chord. Point 342 decided this
+  deliberately — "Do NOT preventDefault: the browser's own Ctrl combinations stay the
+  browser's" — and that decision is what the user has now hit; it is SUPERSEDED here.
+  ESTABLISHED ABOUT THE PLATFORM, so nobody re-researches it: `preventDefault` on keydown
+  does NOT stop Ctrl+W, Ctrl+T or Ctrl+N — those are reserved. The ONE mechanism that
+  captures them is the Keyboard Lock API (`navigator.keyboard.lock([...])`), which works
+  only while the document is in FULLSCREEN and only on Chromium.
+  FINAL STATE:
+  1. While the game holds the pointer (the first-person view) AND the document is
+     fullscreen, the game holds a keyboard lock for the codes the controls actually use,
+     so no Ctrl chord reaches the browser. The lock is released with the pointer lock and
+     on `visibilitychange`, and its absence is never an error — a browser without the API
+     simply does not get this protection.
+  2. WHERE THE LOCK IS UNAVAILABLE the danger must not simply remain. The label modifier
+     becomes REBINDABLE in the settings (§21, in both languages), with at least one
+     default-safe alternative that no browser claims, so a player in a window can take the
+     trap out of his own hands. Ctrl stays the shipped default — it is what design.md
+     §17.8 states and what the player already knows.
+  3. Every Ctrl combination that IS preventable and collides with a game control is
+     prevented while the game has the pointer, so the set of dangerous chords shrinks to
+     the three reserved ones the lock covers.
+  DOCS: design.md §17.8 and §17.5 gain the fullscreen note and the rebind in the same
+  commit, and CLAUDE.md §7.1 criterion 20 is where the setting is proved.
+  VERIFIABLE: Vitest for the rebinding and for the preventable-chord set (a bound game key
+  under Ctrl is prevented, an unbound one is not); a Playwright check that the lock is
+  requested exactly when fullscreen + pointer lock hold and released with either — the
+  reserved chords themselves cannot be asserted from a test, so the request is what is
+  proved, and the user's own play is the acceptance.
+  Criticality: HIGH — it destroys the player's session without a prompt, and it is
+  triggered by the feature's ordinary use, not by an unusual one.
 
-- [ ] 612. THE HANDOVER WAITS FOR THE CLOCK, AND AN IDLE OWNER BLOCKS IT (10.08.2026;
-  bundle Urlaubsfestigkeit). Measured on this day: the batch stood still for 30 minutes
-  with nothing broken. The outgoing session handed over correctly at 13:20
-  (`HANDOVER point 604` in `.claude/boundary.log`, the lock released); the launcher ticks
-  every 15 minutes and would not have looked before 13:31; at 13:28 an unattended window
-  took the free lock at session start, so the 13:31 tick correctly found a live owner and
-  spawned nobody. Every part behaved as built, and the batch was idle anyway — which is
-  the failure mode this bundle exists to remove, because an absence turns 30 minutes into
-  hours.
-  FINAL STATE, two independent repairs:
-  1. THE RELEASE TRIGGERS THE SPAWN. Marking the lock handed over is an EVENT the launcher
-     reacts to, not a state it discovers on its next tick: the boundary path signals the
-     launcher (the launcher watches the lock file, or `batch-boundary.mjs` wakes it), and
-     the successor starts within seconds. The 15-minute tick REMAINS as the backstop for
-     the cases no signal covers (a killed session, a missed write) — the fast path is
-     added, the slow path is not removed. The mark also OUTRANKS every liveness heuristic,
-     at any grace age: an owner that has declared itself finished is finished, and liveness
-     answers a question nobody asked. Measured 10.08.2026 — the handover was written at
-     13:57:46Z and the ticks at 14:01, 14:16 and 14:31 each logged `skip: owner alive
-     (pid-alive; heartbeat 5..20 min old, pid 939)` and spawned nobody, because the handover
-     grace had elapsed one tick earlier and the verdict fell back to the pid. That pid is the
-     attended window's `claude` process, which survives a `/clear` and hosts every session in
-     that window, so successive owners write the SAME pid and the pid-alive branch can never
-     observe a dead one. Ownership liveness therefore keys on the SESSION — its identity,
-     heartbeat and lease — never on the bare existence of a hosting process.
-  2. OWNERSHIP IS BOUND TO WORK, NOT MERELY TO LIFE. Today `leaseUntil` runs an hour and
-     never asks whether the owner is doing anything, so a session that takes the lock and
-     idles holds the batch for that hour. An owner that has neither declared in-flight work
-     (`batch-in-flight.mjs`) nor produced a state change within a short IDLE WINDOW
-     (starting value 5 min, calibratable) loses the lock the same arithmetic way an expired
-     lease loses it — no process is killed, the owner simply stops owning, and the launcher
-     may spawn. An ATTENDED window is not exempt: it either works or it releases.
-     A STATE CHANGE IS THE OWNER'S OWN: a heartbeat it wrote, a commit, a board write — not
-     a worktree's file timestamps, which a leaked dev server or a file watcher keeps fresh
-     while the owner does nothing (the launcher reads exactly that today as "declared work
-     advancing"). Otherwise the idle window is defeated by a process nobody is watching.
-  3. THE SPAWN EVENT FIRES ON EVERY OWNERSHIP-ENDING TRANSITION of the lock, not on the
-     handover mark alone — an idle lapse and an expired lease end ownership just as
-     definitively, and without this they wait for the next 15-minute tick, which is the
-     latency part 1 exists to remove.
-  Both parts must leave the singleton property intact — no path may produce two live owners
-  — and both stand down for a paused batch as every guard here does.
-  VERIFIABLE: Vitest on the pure parts (the release-to-spawn decision from a lock state and
-  a clock; the idle verdict from declared work, last state change and the window, including
-  the boundary cases at exactly the window and with in-flight work declared); plus the real
-  proof, which this bundle already owns — the chaos drill (449) gains a case that releases
-  the lock and asserts a successor is running in seconds rather than at the next tick, and a
-  case where an idle owner is superseded while a working one is not.
-  Criticality: high — it is the failure this bundle is for, it is silent, and it costs the
-  whole absence rather than one point.
+- [ ] 585. THE LEARNING BOULDER FLOATS IN THE RIVER (user 09.08.2026, F6 report
+  `local/bugreports/SchwebenderFindling.zip`: "Ist das der Findling zum Lernen? Der
+  schwebt in der Luft über der Wasseroberfläche"; seed 1425108822, Bambara village,
+  x/z -60.55 / -130.01). The frame shows a single dark boulder standing OUT IN THE WATER,
+  its underside clear of the surface — on no ground at all.
+  FIRST, IDENTIFY WHICH BOULDER IT IS, because the two have different rules and the answer
+  decides the fix: point 482 item 7 puts a SMALL boulder INSIDE the village, visible from
+  it, and BIG_ROCK is taught on that one; item 6 puts the LARGE target erratic OUTSIDE the
+  settlement, on the Niger's bank at least 1.6° upstream (`src/world/communicationRock.ts`).
+  Neither may stand in the river, and the report is inside the settlement, so the small one
+  is the first suspect — but the seeded placement of the large one must be checked at this
+  seed as well before either is called innocent.
+  ROOT CAUSE TO ESTABLISH, not to guess: the placement samples the terrain
+  (`sampleTerrain`/`isBlocked`) and a boulder both IN the water and ABOVE it means the
+  ground query and the drawn surface disagree — the same class the project already wrote a
+  rule for (points 129/378: derive from what the picture draws). Report which of the two
+  queries was wrong.
+  FINAL STATE:
+  1. Neither boulder is ever placed in water. The placement REJECTS a wet spot instead of
+     accepting it, at every seed.
+  2. Every boulder SITS on the ground it is placed on — its base meets the drawn surface,
+     with no gap and no sinking, at the exact coordinate the digging spot uses.
+  3. The teaching pair still reads as the point intends: the small one visible from inside
+     the village, the large one unmistakably bigger and further away upstream.
+  VERIFIABLE: pure Vitest over MANY seeds — no boulder lands on water, and each one's base
+  height equals the terrain height at its own coordinate within a tight tolerance. Then a
+  picture at the reported seed on one backend: the boulder stands on ground.
+  Criticality: HIGH — the goal of the whole communication PoC is dug up at this boulder,
+  and a rock floating in a river teaches the player that the world is not to be trusted.
+
+- [ ] 588. GUESS A MEANING WHERE IT IS SPOKEN, NOT ONLY IN THE JOURNAL (user
+  09.08.2026). Today a reading is written only in the journal (`src/ui/JournalPanel.tsx`
+  → `setUtteranceHypothesis`), so the player must break off watching, open the journal
+  and find the utterance among the others — at the very moment he saw what it MEANT. The
+  guess belongs where the guess is formed.
+  FINAL STATE:
+  1. While one or more inhabitants are speaking, the label of the NEAREST speaker is
+     visibly HIGHLIGHTED against the others, so it is unambiguous which one a click will
+     take. Nearest = by distance to the player; a tie keeps the current pick rather than
+     flickering between two.
+  2. Under that label stands a short invitation, from the language files in German and
+     English, in the sense of "Click to guess meaning" — and NOT in upper case
+     (user 09.08.2026, same rule as point 579).
+  3. A LEFT CLICK on it opens a dialog for exactly that utterance: the syllables as
+     spoken, a text field carrying any reading already written, save and cancel. Enter
+     saves, Escape cancels. It writes the SAME store field the journal writes
+     (`setUtteranceHypothesis`), so a reading entered here appears in the journal and over
+     the speaker's head at once, and one entered in the journal shows up here.
+  4. The dialog is PART OF THE APPLICATION and looks like the game (the existing in-game
+     dialog look, `src/ui/Dialogs.tsx`) — never a browser prompt, never an OS window
+     (user's explicit requirement). It is MODAL, also his decision, and therefore the one
+     deliberate exception to the non-modal rule §16.1 keeps for the journal.
+  5. POINTER LOCK IS RELEASED while it is open and restored on close. Without that the
+     click never reaches the dialog and no key reaches the field — the first-person view
+     holds the pointer (`src/scenes/place/PlaceScene.tsx`). Movement and looking are
+     inert while it stands open, and the view does not jump when the lock returns.
+  6. THE CLICK TARGET MUST LIVE LONG ENOUGH TO BE CLICKED. A label expires after
+     `labelSeconds` (2.6 s today), which is shorter than reaching for the mouse: while a
+     label is the highlighted target it does not expire under the pointer, and the dialog
+     keeps the utterance it was opened for even once the label is gone.
+  7. The game still never interprets the text — it is the player's note, unchecked, as
+     everywhere else. This is an input comfort for a mechanic that exists, NOT a
+     translation aid and not an onboarding layer (CLAUDE.md §2).
+  DOCS: this is new player-visible design, so `design.md` §13.4 gains its description in
+  the SAME commit as the code. The document stands at its ceiling, so the addition is
+  written tight and, if it still does not fit, the choice between compressing elsewhere
+  and raising the budget goes to the user — it is not decided in passing.
+  VERIFIABLE: Vitest in the HUD/unit layer — with several speakers the highlight and the
+  invitation sit on the nearest one and move when he does; a click opens the dialog for
+  THAT utterance; saving writes the store field and the journal shows it; Escape and
+  cancel leave it unchanged; the invitation renders in both languages and in no
+  upper-case form. Plus one Playwright check for what only a browser proves: the pointer
+  lock is released on open and re-acquired on close, and typing reaches the field.
+  Criticality: medium — the mechanic works without it, but this is where the player's
+  thinking actually happens, and every guess he does not bother to write is a concept he
+  will not remember.
+
+
+
+- [ ] 509. NO INHABITANT STANDS ON THE SETTLEMENT ORIGIN (observed 05.08.2026 while
+  verifying another point, bundle Dorfleben). In `maasai-village` several
+  `inhabitant` groups report the world position exactly `(0,0,0)`. A ray probe finds
+  a body cone there, so figures ARE being drawn at the origin — either stacked on
+  one another or left at an uninitialised transform. Point 155 closed the
+  stuck-walker case; this is the other failure of the same layer, and an exact zero
+  is the signature of a placement that never happened rather than one that went
+  wrong.
+  FINAL STATE:
+  1. Every inhabitant of every settlement stands at the spot its layout assigns it;
+     none reports the settlement origin unless its layout genuinely places it there.
+  2. Whatever produced the exact zero is fixed at its source, not by nudging the
+     figure away afterwards.
+  3. The dev-mode assert channel reports an inhabitant at an unplaced transform, so
+     the next occurrence is caught by any run rather than by a passing observation.
+  VERIFIABLE: a browser check over every settlement asserts no inhabitant's world
+  position sits within a small radius of the origin while its layout anchor lies
+  elsewhere; a Vitest case pins the placement function against the uninitialised
+  case that produced the zero.
+
+- [ ] 589. WHY THE COMMUNICATION MECHANIC SHIPPED BROKEN THOUGH EVERY SUITE WAS GREEN
+  (root-cause finding of the play session 09.08.2026). Twelve defects in ONE mechanic
+  whose twelve points had all been accepted as finished. Four causes, each pinned to a
+  concrete case:
+  (a) THE TESTS CHECK THE MECHANISM, NOT THE RESULT. `speechProbe` counts planned
+      syllables and their level — it cannot hear that the same tone is multiplied by zero
+      further down at the ambient bus (577), nor that it sounds like a squawk (587). The
+      label tests check the visibility RULE and the presence in the DOM, not whether the
+      note stands at the speaker's head (582). The catch-game tests check the game LOGIC,
+      not whether two children occupy the same point in space (578). That is exactly the
+      "green against a proxy" failure CLAUDE.md §7.2 warns about — the rule existed, this
+      area did not follow it.
+  (b) NO PICTURE SHOWS THE FEATURE. The frame shutter secures WHICH place is
+      photographed, not whether the subject is legible; for the drummer, the playing
+      children and the speech labels no verification frame existed at all.
+  (c) NOTHING MEASURES TIME. 586 (the adults fall permanently silent after minutes) is
+      unreachable for any suite that simulates seconds.
+  (d) THE PARTS WERE ACCEPTED, THE COMPOSITION NEVER. Each of the twelve points was green
+      on its own; nobody ever stood in the village as a PLAYER, with sound, for two
+      minutes.
+  FINAL STATE — three mechanisms, and deliberately NOT "more tests":
+  1. PER FIX, ONE ASSERTION AT THE LEVEL THE PLAYER EXPERIENCES IT. Sound is judged at
+     the END of the chain (the level that actually reaches the output, not the level a
+     source planned), position is judged in WORLD space (do two bodies overlap, does the
+     note sit within a hand's breadth of the head), not by the rule that was supposed to
+     produce it. A fix whose assertion can only reach the mechanism names in its commit
+     why the result is not assertable.
+  2. ONE PLAY ACCEPTANCE PER PACKAGE. A package of play-session fixes is not finished by
+     its suites: the merged result is entered as a player — the scene, the sound, two
+     minutes — and what was seen and heard is recorded with the merge.
+  3. AN IN-APP ALARM FOR EVERYTHING TIME-DEPENDENT. The dev-mode assert channel gains a
+     LONG-RUN rule family: a system that must keep producing (the adults' utterances, the
+     children's play, the errand loop) raises a `console.error` when it falls silent
+     longer than its own specified maximum. That turns every session — test or manual —
+     into a detector for the class 586 belongs to, which no seconds-long suite can reach.
+  VERIFIABLE: the alarm family is Vitest-covered (a stalled producer trips it, a
+  producing one does not); the assertion rule and the play acceptance are recorded in
+  `scripts/verify/README.md` and in `docs/acceptance-evidence.md` beside the criteria
+  they serve.
+  Criticality: HIGH — it is the reason a whole feature reached the user broken while the
+  gate reported green, and every further mechanic is built through the same gate.
+
+- [ ] 174. Tag the demo build `v0.3` and publish it at
+  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3/.
+  GATE (user 10.08.2026, replacing the 19.07.2026 wording): v0.3 no longer waits for
+  EVERY open bugfix — that gate was unreachable and pushed the release out
+  indefinitely. What must be closed is exactly two classes:
+  1. the CRITICAL bugs (the tier-c block at the head of the work order — anything that
+     ends the player's session, loses the expedition, or voids a verification), and
+  2. everything on the COMMUNICATION MECHANIC, until the PoC is in a usable state —
+     that is the release's purpose.
+  Everything else — visuals, ambience, wildlife, the big audits — ships AFTER v0.3.
+  A final closing run (CLAUDE.md §9: Vitest + LARGE regression on both backends,
+  dead-code and `.md` audit, lint and CVE clean) at the exact HEAD to be tagged
+  remains mandatory; the closing is what the tag certifies, and no tag is cut on an
+  unclosed state.
+  FINAL TAG HELD FOR THE USER. The tag and the /v0.3/ publish are the one
+  irreversible, outward-facing step: do ALL the work up to it, then report "ready to
+  tag" and WAIT for the user's explicit go for that tag (`tags-only-on-request`).
+  When it comes, tag `v0.3` at that HEAD, MOVE the `poc` tag to the same commit, and
+  run the deploy via `workflow_dispatch` — the Pages workflow enumerates every `v*`
+  tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
+  that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
+  re-pointed.
+
+- [ ] 590. THE BOARD'S QUEUE ORDER IS A SECOND COPY OF THE WORK ORDER, AND IT KEEPS
+  DRIFTING (user 09.08.2026: "Das Problem, dass die Reihenfolge der Karten auf dem
+  Dashboard falsch war, hatten wir immer wieder. Können wir nicht einen Mechanismus
+  etablieren, der das dauerhaft gesichert behebt?"). ESTABLISHED, twice within one hour on
+  09.08.2026: the thirteen play-session points the user had put AHEAD OF EVERYTHING sat at
+  queue position ~90, and the freshly appended 589 landed at the very back — both times
+  because the board renders from an `order` array in `.claude/board-queue.json` that is
+  maintained BY HAND and appends anything it does not already list. `queue-order-guard`
+  did not catch either: it only enforces "fixes before finders" and "the release tag last",
+  never that a point sits where its priority actually puts it. This is the project's own
+  named failure — a second place for one fact — applied to the one artefact the user reads.
+  FINAL STATE:
+  1. THE ORDER HAS ONE HOME. The board's queue is rendered in the order the OPEN points
+     stand in `TASKS.md`, read through `scripts/tasks-source.mjs`. The hand-maintained
+     `order` array is DELETED, not merely validated — a copy that is checked is still a
+     copy, and the check is what nobody runs. The existing rank rules stay and are applied
+     ON TOP of that sequence, exactly as `queueOrder` applies them today: the bug-finding
+     and QA points to the back, the release tag last of all, a point WAITING on a user
+     decision behind everything, a point he has just ANSWERED to the head. The per-point
+     card text, title and estimate stay in `board-queue.json`; only the ORDERING leaves it.
+  2. RE-RANKING A POINT MEANS MOVING IT IN THE WORK ORDER. Where the queue order was
+     edited before, the point's block is moved inside `TASKS.md` — verbatim, with its
+     number. That is one edit in the file the rules already call the work order, and it is
+     visible in the diff instead of hidden in a JSON array.
+  3. AN APPENDED POINT IS RANKED ONCE, DELIBERATELY. Append-and-defer puts a new point at
+     the END, which is a DEFAULT, not a judgment — and 589 shows the default is often
+     wrong. A Stop guard therefore refuses to end the turn that appended a point until its
+     rank was settled: either the point was moved to where it belongs, or the turn recorded
+     that last is right (`node scripts/queue-rank.mjs --ranked <N> --why "<one line>"`).
+     One decision per new point, at the moment its content is freshest.
+  4. THE GUARD CATCHES THE CLASS, NOT THE CASE. `queue-order-guard` gains the rendered-vs-
+     source comparison: a published board whose card sequence does not match what the work
+     order plus the rank rules produce BLOCKS the turn end, naming the first card that is
+     out of place. Today it would have fired on both of the day's misorderings.
+  VERIFIABLE: Vitest over the pure core — the render order of a fixture work order matches
+  the expected sequence with each rank rule in play; a point appended at the end is
+  reported unranked until it is recorded; a board whose sequence was hand-edited is
+  detected as out of place. Plus the real proof on live data: rendering today's board from
+  the work order reproduces the sequence the user asked for, with the play-session points
+  at the head.
+  MECHANISM, so the four-eyes rule applies: the other model reviews the guard and the
+  ranking gate before they land (`scripts/mechanism-review.mjs --record`).
+  Criticality: HIGH — the board is the only thing the user sees while the batch runs, and a
+  queue in the wrong order misrepresents what is being worked on next.
+
+- [ ] 608. THE BOARD'S ORDER IS HAND-KEPT AND DRIFTS FROM THE WORK ORDER (found
+  10.08.2026, and the user found it before any check did). The queue section renders from
+  the stored list `order` in `.claude/board-queue.json`, NOT from the sequence of open
+  points in `TASKS.md`. Two reorderings were made on 10.08.2026 — four points pushed behind
+  602, five throughput levers pulled to the head — the work order was rewritten both times,
+  the board was rebuilt and republished both times, and it kept showing the OLD sequence.
+  `queue-order-guard` stayed green throughout, because it judges completeness (every open
+  point has a card), not agreement of the two sequences. The user reads that page on his
+  phone as the plan; a plan that silently lags the work order is worse than no plan.
+  FINAL STATE:
+  1. The queue's ORDER is DERIVED from the work order — `TASKS.md`'s open points, read
+     through `scripts/tasks-source.mjs`, are the sequence, and the stored file keeps only
+     what is genuinely its own: title, body and estimate per point. One fact, one home.
+  2. The existing rank rules stay exactly as they are (the finder points and the release
+     tag sort to the back, a gated point to the very back) — they are a VIEW on the order,
+     not a second order, and this point does not change what they do.
+  3. `queue-order-guard` gains the comparison it lacked: the rendered sequence against the
+     derived one, so a drift blocks instead of being seen by the user first.
+  VERIFIABLE: Vitest — the order comes out of a work order fixture in file sequence, a
+  reordering of that fixture changes the rendered sequence with no other edit, the rank
+  rules still hold on top of it, and the guard fails on a hand-edited divergence.
+  Criticality: medium — nothing the player sees, but it is the one surface the user steers
+  the batch by, and it was wrong while every check said it was fine.
+
+- [ ] 600. THE CTRL LABEL DOES NOT NAME AN ATTACKING LION — AND THE ROSTER IS RE-TESTED
+  WHOLE (user 09.08.2026, first play test of the feature: "STRG einmal getestet und direkt
+  einen Fehler gefunden: funktioniert nicht für angreifenden Löwen. Nochmal alles
+  durchtesten — ist vielleicht nicht der einzige Fehler"). Point 342 shipped the hold-Ctrl
+  overlay and its own §7.2 evidence was green; the very first hold in real play found a
+  gap. THE SPECIFIC DEFECT: a lion in its ATTACK state carries no label, while the roster
+  and point 342's predicate ("a thing is named when it can MOVE or the player can DO
+  something with it") plainly include it. Establish the cause before fixing — the two
+  candidates the code makes plausible are that the attack run swaps the actor into a
+  different entity list the overlay does not walk, and that §19.16's CONCEALED rule (a
+  submerged crocodile stays silent until it lunges) is being applied to a predator that is
+  not concealed at all. Do not guess between them: dump the overlay's actor set during a
+  staged lion attack and see which one it is.
+  THE POINT IS NOT ONE FIX. The user asked for the whole thing to be re-tested, and one
+  miss on the first hold means the roster was never exercised in its STATES. FINAL STATE:
+  every actor of point 342's roster is named in EVERY state it can be in — idle, walking,
+  fleeing, attacking, drinking, dead, and mid-staged-event — in both perspectives; the
+  §17.2 discovery gate and the §19.16 concealment exclusion still hold exactly where they
+  are meant to and nowhere else.
+  VERIFIABLE, AND AT THE LEVEL THE PLAYER EXPERIENCES IT (point 589's rule): a Vitest
+  matrix over the pure predicate covering the full cross product of kind × state, which is
+  what would have caught this one; plus a browser check that STAGES a predator attack and
+  asserts the label is drawn at the attacker while it runs — not that the predicate would
+  have returned true.
+  Criticality: medium — no crash, but the feature's promise is that holding Ctrl tells you
+  what you are looking at, and it fails hardest at the moment the player most wants it.
+
+- [ ] 610. THE ESCAPE IS REACHABLE ONLY BY KEYBOARD, AND IT REPORTS A RESCUE THAT DID NOT
+  HAPPEN (four-eyes findings on point 604, 10.08.2026). Two things the delivery left:
+  (a) `GAMEPAD_BUTTON_KEYS` (`src/systems/input.ts` ~141-150) maps NO button to `KeyU`, and
+  the stuck hint is a toast rather than the tappable prompt — so a pad-only or touch-only
+  player who is wedged still loses the expedition, which is the exact class 604 exists to
+  close, and `design.md` §17.5 already promises that the pad's buttons map onto the existing
+  key handlers. (b) In the bird's-eye view the search can report a rescue that did not
+  happen: with `found:false` nothing moves and the game still toasts "freed".
+  FINAL STATE:
+  1. A spare pad button (L3 or R3, whichever stays free of §17.5's existing map) dispatches
+     the same synthetic key as U — one input path, as the design demands — and the stuck
+     hint becomes tappable on the touch layer, dispatching the key it names like the
+     interaction prompt does.
+  2. A search that frees nobody says so: no "freed" message where nothing moved, and in the
+     travel view the traveller is told what happened instead.
+  3. THE TRAVEL SEARCH SEES WHAT IT LANDS ON: `travelObstacles` is sampled once at the
+     player while `collidableFloraNear` reaches ~4.2 u and the scaled search reaches 6.72 u,
+     so a landing spot can overlap a tree nobody looked at (the next frame pushes him out,
+     which is a papered-over hit, not a placement). The search queries obstacles over the
+     radius it actually searches.
+  4. `docs/acceptance-evidence.md` §16 stops claiming the live check "proved he was unable
+     to walk out" — the script does not prove that; it states what the check really does.
+  VERIFIABLE: Vitest for the button map, the tappable hint and the honest report; the
+  existing `unstuck` section of `scripts/verify/collision.mjs` extended by the pad path.
+  Criticality: medium — the mechanism is there; what is missing is a way to it for two of
+  the three input devices the game supports.
 
 - [ ] 614. EXECUTE THE FOUR-EYES WORK-ORDER CLEANUP (10.08.2026; the verdict of a
   BLIND-PARALLEL analysis by two models on the 148 open points — CLAUDE.md §6, divergent
@@ -632,74 +873,7 @@ there exactly once; a new point joins a bundle when appended.
   VERIFIABLE: the index names no entry whose whole content is an armed guard's
   rule; the audit doc lists each retired entry beside the guard that replaced it.
 
-- [ ] 590. THE BOARD'S QUEUE ORDER IS A SECOND COPY OF THE WORK ORDER, AND IT KEEPS
-  DRIFTING (user 09.08.2026: "Das Problem, dass die Reihenfolge der Karten auf dem
-  Dashboard falsch war, hatten wir immer wieder. Können wir nicht einen Mechanismus
-  etablieren, der das dauerhaft gesichert behebt?"). ESTABLISHED, twice within one hour on
-  09.08.2026: the thirteen play-session points the user had put AHEAD OF EVERYTHING sat at
-  queue position ~90, and the freshly appended 589 landed at the very back — both times
-  because the board renders from an `order` array in `.claude/board-queue.json` that is
-  maintained BY HAND and appends anything it does not already list. `queue-order-guard`
-  did not catch either: it only enforces "fixes before finders" and "the release tag last",
-  never that a point sits where its priority actually puts it. This is the project's own
-  named failure — a second place for one fact — applied to the one artefact the user reads.
-  FINAL STATE:
-  1. THE ORDER HAS ONE HOME. The board's queue is rendered in the order the OPEN points
-     stand in `TASKS.md`, read through `scripts/tasks-source.mjs`. The hand-maintained
-     `order` array is DELETED, not merely validated — a copy that is checked is still a
-     copy, and the check is what nobody runs. The existing rank rules stay and are applied
-     ON TOP of that sequence, exactly as `queueOrder` applies them today: the bug-finding
-     and QA points to the back, the release tag last of all, a point WAITING on a user
-     decision behind everything, a point he has just ANSWERED to the head. The per-point
-     card text, title and estimate stay in `board-queue.json`; only the ORDERING leaves it.
-  2. RE-RANKING A POINT MEANS MOVING IT IN THE WORK ORDER. Where the queue order was
-     edited before, the point's block is moved inside `TASKS.md` — verbatim, with its
-     number. That is one edit in the file the rules already call the work order, and it is
-     visible in the diff instead of hidden in a JSON array.
-  3. AN APPENDED POINT IS RANKED ONCE, DELIBERATELY. Append-and-defer puts a new point at
-     the END, which is a DEFAULT, not a judgment — and 589 shows the default is often
-     wrong. A Stop guard therefore refuses to end the turn that appended a point until its
-     rank was settled: either the point was moved to where it belongs, or the turn recorded
-     that last is right (`node scripts/queue-rank.mjs --ranked <N> --why "<one line>"`).
-     One decision per new point, at the moment its content is freshest.
-  4. THE GUARD CATCHES THE CLASS, NOT THE CASE. `queue-order-guard` gains the rendered-vs-
-     source comparison: a published board whose card sequence does not match what the work
-     order plus the rank rules produce BLOCKS the turn end, naming the first card that is
-     out of place. Today it would have fired on both of the day's misorderings.
-  VERIFIABLE: Vitest over the pure core — the render order of a fixture work order matches
-  the expected sequence with each rank rule in play; a point appended at the end is
-  reported unranked until it is recorded; a board whose sequence was hand-edited is
-  detected as out of place. Plus the real proof on live data: rendering today's board from
-  the work order reproduces the sequence the user asked for, with the play-session points
-  at the head.
-  MECHANISM, so the four-eyes rule applies: the other model reviews the guard and the
-  ranking gate before they land (`scripts/mechanism-review.mjs --record`).
-  Criticality: HIGH — the board is the only thing the user sees while the batch runs, and a
-  queue in the wrong order misrepresents what is being worked on next.
 
-- [ ] 608. THE BOARD'S ORDER IS HAND-KEPT AND DRIFTS FROM THE WORK ORDER (found
-  10.08.2026, and the user found it before any check did). The queue section renders from
-  the stored list `order` in `.claude/board-queue.json`, NOT from the sequence of open
-  points in `TASKS.md`. Two reorderings were made on 10.08.2026 — four points pushed behind
-  602, five throughput levers pulled to the head — the work order was rewritten both times,
-  the board was rebuilt and republished both times, and it kept showing the OLD sequence.
-  `queue-order-guard` stayed green throughout, because it judges completeness (every open
-  point has a card), not agreement of the two sequences. The user reads that page on his
-  phone as the plan; a plan that silently lags the work order is worse than no plan.
-  FINAL STATE:
-  1. The queue's ORDER is DERIVED from the work order — `TASKS.md`'s open points, read
-     through `scripts/tasks-source.mjs`, are the sequence, and the stored file keeps only
-     what is genuinely its own: title, body and estimate per point. One fact, one home.
-  2. The existing rank rules stay exactly as they are (the finder points and the release
-     tag sort to the back, a gated point to the very back) — they are a VIEW on the order,
-     not a second order, and this point does not change what they do.
-  3. `queue-order-guard` gains the comparison it lacked: the rendered sequence against the
-     derived one, so a drift blocks instead of being seen by the user first.
-  VERIFIABLE: Vitest — the order comes out of a work order fixture in file sequence, a
-  reordering of that fixture changes the rendered sequence with no other edit, the rank
-  rules still hold on top of it, and the guard fails on a hand-edited divergence.
-  Criticality: medium — nothing the player sees, but it is the one surface the user steers
-  the batch by, and it was wrong while every check said it was fine.
 
 - [ ] 471. THE WORK ORDER STARVES THE POOL IT IS SUPPOSED TO FEED (user 30.07.2026, drawn
   from the branch-per-point ruling: "Dann sollte die aktuelle Abarbeitungsreihenfolge dahingend
@@ -1137,236 +1311,6 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: HIGH — every unused mechanism was paid for twice: once when it was built,
   and again in every hour it would have saved and did not.
 
-- [ ] 589. WHY THE COMMUNICATION MECHANIC SHIPPED BROKEN THOUGH EVERY SUITE WAS GREEN
-  (root-cause finding of the play session 09.08.2026). Twelve defects in ONE mechanic
-  whose twelve points had all been accepted as finished. Four causes, each pinned to a
-  concrete case:
-  (a) THE TESTS CHECK THE MECHANISM, NOT THE RESULT. `speechProbe` counts planned
-      syllables and their level — it cannot hear that the same tone is multiplied by zero
-      further down at the ambient bus (577), nor that it sounds like a squawk (587). The
-      label tests check the visibility RULE and the presence in the DOM, not whether the
-      note stands at the speaker's head (582). The catch-game tests check the game LOGIC,
-      not whether two children occupy the same point in space (578). That is exactly the
-      "green against a proxy" failure CLAUDE.md §7.2 warns about — the rule existed, this
-      area did not follow it.
-  (b) NO PICTURE SHOWS THE FEATURE. The frame shutter secures WHICH place is
-      photographed, not whether the subject is legible; for the drummer, the playing
-      children and the speech labels no verification frame existed at all.
-  (c) NOTHING MEASURES TIME. 586 (the adults fall permanently silent after minutes) is
-      unreachable for any suite that simulates seconds.
-  (d) THE PARTS WERE ACCEPTED, THE COMPOSITION NEVER. Each of the twelve points was green
-      on its own; nobody ever stood in the village as a PLAYER, with sound, for two
-      minutes.
-  FINAL STATE — three mechanisms, and deliberately NOT "more tests":
-  1. PER FIX, ONE ASSERTION AT THE LEVEL THE PLAYER EXPERIENCES IT. Sound is judged at
-     the END of the chain (the level that actually reaches the output, not the level a
-     source planned), position is judged in WORLD space (do two bodies overlap, does the
-     note sit within a hand's breadth of the head), not by the rule that was supposed to
-     produce it. A fix whose assertion can only reach the mechanism names in its commit
-     why the result is not assertable.
-  2. ONE PLAY ACCEPTANCE PER PACKAGE. A package of play-session fixes is not finished by
-     its suites: the merged result is entered as a player — the scene, the sound, two
-     minutes — and what was seen and heard is recorded with the merge.
-  3. AN IN-APP ALARM FOR EVERYTHING TIME-DEPENDENT. The dev-mode assert channel gains a
-     LONG-RUN rule family: a system that must keep producing (the adults' utterances, the
-     children's play, the errand loop) raises a `console.error` when it falls silent
-     longer than its own specified maximum. That turns every session — test or manual —
-     into a detector for the class 586 belongs to, which no seconds-long suite can reach.
-  VERIFIABLE: the alarm family is Vitest-covered (a stalled producer trips it, a
-  producing one does not); the assertion rule and the play acceptance are recorded in
-  `scripts/verify/README.md` and in `docs/acceptance-evidence.md` beside the criteria
-  they serve.
-  Criticality: HIGH — it is the reason a whole feature reached the user broken while the
-  gate reported green, and every further mechanic is built through the same gate.
-
-- [ ] 585. THE LEARNING BOULDER FLOATS IN THE RIVER (user 09.08.2026, F6 report
-  `local/bugreports/SchwebenderFindling.zip`: "Ist das der Findling zum Lernen? Der
-  schwebt in der Luft über der Wasseroberfläche"; seed 1425108822, Bambara village,
-  x/z -60.55 / -130.01). The frame shows a single dark boulder standing OUT IN THE WATER,
-  its underside clear of the surface — on no ground at all.
-  FIRST, IDENTIFY WHICH BOULDER IT IS, because the two have different rules and the answer
-  decides the fix: point 482 item 7 puts a SMALL boulder INSIDE the village, visible from
-  it, and BIG_ROCK is taught on that one; item 6 puts the LARGE target erratic OUTSIDE the
-  settlement, on the Niger's bank at least 1.6° upstream (`src/world/communicationRock.ts`).
-  Neither may stand in the river, and the report is inside the settlement, so the small one
-  is the first suspect — but the seeded placement of the large one must be checked at this
-  seed as well before either is called innocent.
-  ROOT CAUSE TO ESTABLISH, not to guess: the placement samples the terrain
-  (`sampleTerrain`/`isBlocked`) and a boulder both IN the water and ABOVE it means the
-  ground query and the drawn surface disagree — the same class the project already wrote a
-  rule for (points 129/378: derive from what the picture draws). Report which of the two
-  queries was wrong.
-  FINAL STATE:
-  1. Neither boulder is ever placed in water. The placement REJECTS a wet spot instead of
-     accepting it, at every seed.
-  2. Every boulder SITS on the ground it is placed on — its base meets the drawn surface,
-     with no gap and no sinking, at the exact coordinate the digging spot uses.
-  3. The teaching pair still reads as the point intends: the small one visible from inside
-     the village, the large one unmistakably bigger and further away upstream.
-  VERIFIABLE: pure Vitest over MANY seeds — no boulder lands on water, and each one's base
-  height equals the terrain height at its own coordinate within a tight tolerance. Then a
-  picture at the reported seed on one backend: the boulder stands on ground.
-  Criticality: HIGH — the goal of the whole communication PoC is dug up at this boulder,
-  and a rock floating in a river teaches the player that the world is not to be trusted.
-
-- [ ] 580. THE FIGURES PANTOMIME OUT OF EARSHOT (user 09.08.2026, F6 report
-  `local/bugreports/GestenOhneSprache.zip`: "Die beiden gestikulieren herum, aber ich
-  sehe keine Texte über ihren Köpfen"). ESTABLISHED: the overlay dump of that moment
-  contains no speech label at all, while the journal in the same dump already holds eight
-  overheard utterances — so the label machinery works and simply did not fire here. The
-  gate is distance: both speaking paths (`PlaceLife.tsx` ~line 388 for the children,
-  ~line 1940 for the adults) hear the utterance, record it and raise the overhead label
-  ONLY inside `isWithinHearing(distance)` — `balance.communication.hearingRadius`, 10 m.
-  The GESTURE has no such range: a figure gestures wherever it is drawn, across the whole
-  village. Beyond ten metres the player therefore watches a mute pantomime, which is
-  exactly what he reported — and worse for the PoC than plain silence, because a gesture
-  without its utterance teaches a concept with no word attached to it.
-  FINAL STATE: a figure that GESTURES is a figure the player can hear and read, or it does
-  not gesture. Either the gesture is gated on the same range as the utterance, or the
-  utterance's range is what the gesture reaches — one decision, applied to BOTH the
-  children's and the adults' paths, with the chosen rule written where the range is
-  defined. The hearing radius itself stays calibratable and the label keeps its own
-  lifetime.
-  VERIFIABLE: pure Vitest — across the range there is no distance at which a figure
-  gestures while neither the utterance nor its label is raised; the existing hearing and
-  label tests keep passing.
-  Criticality: medium — it is the teaching loop of the communication PoC, and it fails
-  quietly.
-
-- [ ] 588. GUESS A MEANING WHERE IT IS SPOKEN, NOT ONLY IN THE JOURNAL (user
-  09.08.2026). Today a reading is written only in the journal (`src/ui/JournalPanel.tsx`
-  → `setUtteranceHypothesis`), so the player must break off watching, open the journal
-  and find the utterance among the others — at the very moment he saw what it MEANT. The
-  guess belongs where the guess is formed.
-  FINAL STATE:
-  1. While one or more inhabitants are speaking, the label of the NEAREST speaker is
-     visibly HIGHLIGHTED against the others, so it is unambiguous which one a click will
-     take. Nearest = by distance to the player; a tie keeps the current pick rather than
-     flickering between two.
-  2. Under that label stands a short invitation, from the language files in German and
-     English, in the sense of "Click to guess meaning" — and NOT in upper case
-     (user 09.08.2026, same rule as point 579).
-  3. A LEFT CLICK on it opens a dialog for exactly that utterance: the syllables as
-     spoken, a text field carrying any reading already written, save and cancel. Enter
-     saves, Escape cancels. It writes the SAME store field the journal writes
-     (`setUtteranceHypothesis`), so a reading entered here appears in the journal and over
-     the speaker's head at once, and one entered in the journal shows up here.
-  4. The dialog is PART OF THE APPLICATION and looks like the game (the existing in-game
-     dialog look, `src/ui/Dialogs.tsx`) — never a browser prompt, never an OS window
-     (user's explicit requirement). It is MODAL, also his decision, and therefore the one
-     deliberate exception to the non-modal rule §16.1 keeps for the journal.
-  5. POINTER LOCK IS RELEASED while it is open and restored on close. Without that the
-     click never reaches the dialog and no key reaches the field — the first-person view
-     holds the pointer (`src/scenes/place/PlaceScene.tsx`). Movement and looking are
-     inert while it stands open, and the view does not jump when the lock returns.
-  6. THE CLICK TARGET MUST LIVE LONG ENOUGH TO BE CLICKED. A label expires after
-     `labelSeconds` (2.6 s today), which is shorter than reaching for the mouse: while a
-     label is the highlighted target it does not expire under the pointer, and the dialog
-     keeps the utterance it was opened for even once the label is gone.
-  7. The game still never interprets the text — it is the player's note, unchecked, as
-     everywhere else. This is an input comfort for a mechanic that exists, NOT a
-     translation aid and not an onboarding layer (CLAUDE.md §2).
-  DOCS: this is new player-visible design, so `design.md` §13.4 gains its description in
-  the SAME commit as the code. The document stands at its ceiling, so the addition is
-  written tight and, if it still does not fit, the choice between compressing elsewhere
-  and raising the budget goes to the user — it is not decided in passing.
-  VERIFIABLE: Vitest in the HUD/unit layer — with several speakers the highlight and the
-  invitation sit on the nearest one and move when he does; a click opens the dialog for
-  THAT utterance; saving writes the store field and the journal shows it; Escape and
-  cancel leave it unchanged; the invitation renders in both languages and in no
-  upper-case form. Plus one Playwright check for what only a browser proves: the pointer
-  lock is released on open and re-acquired on close, and typing reaches the field.
-  Criticality: medium — the mechanic works without it, but this is where the player's
-  thinking actually happens, and every guess he does not bother to write is a concept he
-  will not remember.
-
-- [ ] 601. HOLDING CTRL WHILE WALKING CLOSES THE BROWSER (user 09.08.2026: "Wenn ich STRG
-  gedrückt halte und dabei WASD benutze, passieren fatale Dinge — z. B. schließt STRG-W
-  Chrome ohne Rückfrage"). The label overlay is a HOLD, and W is the forward key, so the
-  feature's normal use IS the browser's close-tab chord. Point 342 decided this
-  deliberately — "Do NOT preventDefault: the browser's own Ctrl combinations stay the
-  browser's" — and that decision is what the user has now hit; it is SUPERSEDED here.
-  ESTABLISHED ABOUT THE PLATFORM, so nobody re-researches it: `preventDefault` on keydown
-  does NOT stop Ctrl+W, Ctrl+T or Ctrl+N — those are reserved. The ONE mechanism that
-  captures them is the Keyboard Lock API (`navigator.keyboard.lock([...])`), which works
-  only while the document is in FULLSCREEN and only on Chromium.
-  FINAL STATE:
-  1. While the game holds the pointer (the first-person view) AND the document is
-     fullscreen, the game holds a keyboard lock for the codes the controls actually use,
-     so no Ctrl chord reaches the browser. The lock is released with the pointer lock and
-     on `visibilitychange`, and its absence is never an error — a browser without the API
-     simply does not get this protection.
-  2. WHERE THE LOCK IS UNAVAILABLE the danger must not simply remain. The label modifier
-     becomes REBINDABLE in the settings (§21, in both languages), with at least one
-     default-safe alternative that no browser claims, so a player in a window can take the
-     trap out of his own hands. Ctrl stays the shipped default — it is what design.md
-     §17.8 states and what the player already knows.
-  3. Every Ctrl combination that IS preventable and collides with a game control is
-     prevented while the game has the pointer, so the set of dangerous chords shrinks to
-     the three reserved ones the lock covers.
-  DOCS: design.md §17.8 and §17.5 gain the fullscreen note and the rebind in the same
-  commit, and CLAUDE.md §7.1 criterion 20 is where the setting is proved.
-  VERIFIABLE: Vitest for the rebinding and for the preventable-chord set (a bound game key
-  under Ctrl is prevented, an unbound one is not); a Playwright check that the lock is
-  requested exactly when fullscreen + pointer lock hold and released with either — the
-  reserved chords themselves cannot be asserted from a test, so the request is what is
-  proved, and the user's own play is the acceptance.
-  Criticality: HIGH — it destroys the player's session without a prompt, and it is
-  triggered by the feature's ordinary use, not by an unusual one.
-
-- [ ] 610. THE ESCAPE IS REACHABLE ONLY BY KEYBOARD, AND IT REPORTS A RESCUE THAT DID NOT
-  HAPPEN (four-eyes findings on point 604, 10.08.2026). Two things the delivery left:
-  (a) `GAMEPAD_BUTTON_KEYS` (`src/systems/input.ts` ~141-150) maps NO button to `KeyU`, and
-  the stuck hint is a toast rather than the tappable prompt — so a pad-only or touch-only
-  player who is wedged still loses the expedition, which is the exact class 604 exists to
-  close, and `design.md` §17.5 already promises that the pad's buttons map onto the existing
-  key handlers. (b) In the bird's-eye view the search can report a rescue that did not
-  happen: with `found:false` nothing moves and the game still toasts "freed".
-  FINAL STATE:
-  1. A spare pad button (L3 or R3, whichever stays free of §17.5's existing map) dispatches
-     the same synthetic key as U — one input path, as the design demands — and the stuck
-     hint becomes tappable on the touch layer, dispatching the key it names like the
-     interaction prompt does.
-  2. A search that frees nobody says so: no "freed" message where nothing moved, and in the
-     travel view the traveller is told what happened instead.
-  3. THE TRAVEL SEARCH SEES WHAT IT LANDS ON: `travelObstacles` is sampled once at the
-     player while `collidableFloraNear` reaches ~4.2 u and the scaled search reaches 6.72 u,
-     so a landing spot can overlap a tree nobody looked at (the next frame pushes him out,
-     which is a papered-over hit, not a placement). The search queries obstacles over the
-     radius it actually searches.
-  4. `docs/acceptance-evidence.md` §16 stops claiming the live check "proved he was unable
-     to walk out" — the script does not prove that; it states what the check really does.
-  VERIFIABLE: Vitest for the button map, the tappable hint and the honest report; the
-  existing `unstuck` section of `scripts/verify/collision.mjs` extended by the pad path.
-  Criticality: medium — the mechanism is there; what is missing is a way to it for two of
-  the three input devices the game supports.
-
-- [ ] 600. THE CTRL LABEL DOES NOT NAME AN ATTACKING LION — AND THE ROSTER IS RE-TESTED
-  WHOLE (user 09.08.2026, first play test of the feature: "STRG einmal getestet und direkt
-  einen Fehler gefunden: funktioniert nicht für angreifenden Löwen. Nochmal alles
-  durchtesten — ist vielleicht nicht der einzige Fehler"). Point 342 shipped the hold-Ctrl
-  overlay and its own §7.2 evidence was green; the very first hold in real play found a
-  gap. THE SPECIFIC DEFECT: a lion in its ATTACK state carries no label, while the roster
-  and point 342's predicate ("a thing is named when it can MOVE or the player can DO
-  something with it") plainly include it. Establish the cause before fixing — the two
-  candidates the code makes plausible are that the attack run swaps the actor into a
-  different entity list the overlay does not walk, and that §19.16's CONCEALED rule (a
-  submerged crocodile stays silent until it lunges) is being applied to a predator that is
-  not concealed at all. Do not guess between them: dump the overlay's actor set during a
-  staged lion attack and see which one it is.
-  THE POINT IS NOT ONE FIX. The user asked for the whole thing to be re-tested, and one
-  miss on the first hold means the roster was never exercised in its STATES. FINAL STATE:
-  every actor of point 342's roster is named in EVERY state it can be in — idle, walking,
-  fleeing, attacking, drinking, dead, and mid-staged-event — in both perspectives; the
-  §17.2 discovery gate and the §19.16 concealment exclusion still hold exactly where they
-  are meant to and nowhere else.
-  VERIFIABLE, AND AT THE LEVEL THE PLAYER EXPERIENCES IT (point 589's rule): a Vitest
-  matrix over the pure predicate covering the full cross product of kind × state, which is
-  what would have caught this one; plus a browser check that STAGES a predator attack and
-  asserts the label is drawn at the attacker while it runs — not that the predicate would
-  have returned true.
-  Criticality: medium — no crash, but the feature's promise is that holding Ctrl tells you
-  what you are looking at, and it fails hardest at the moment the player most wants it.
 
 - [ ] 581. THE SETTLEMENT BOUNDARY IS TOO FAINT, AND ITS SLIDER IS ALREADY AT THE CEILING
   (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
@@ -1722,25 +1666,6 @@ Build order, chosen so no two parallel agents own the same file:
   full-page element frame serves the stand-still wait while a clipped or
   locator-bound one does not), and live the two Aswan frames stay green.
 
-- [ ] 509. NO INHABITANT STANDS ON THE SETTLEMENT ORIGIN (observed 05.08.2026 while
-  verifying another point, bundle Dorfleben). In `maasai-village` several
-  `inhabitant` groups report the world position exactly `(0,0,0)`. A ray probe finds
-  a body cone there, so figures ARE being drawn at the origin — either stacked on
-  one another or left at an uninitialised transform. Point 155 closed the
-  stuck-walker case; this is the other failure of the same layer, and an exact zero
-  is the signature of a placement that never happened rather than one that went
-  wrong.
-  FINAL STATE:
-  1. Every inhabitant of every settlement stands at the spot its layout assigns it;
-     none reports the settlement origin unless its layout genuinely places it there.
-  2. Whatever produced the exact zero is fixed at its source, not by nudging the
-     figure away afterwards.
-  3. The dev-mode assert channel reports an inhabitant at an unplaced transform, so
-     the next occurrence is caught by any run rather than by a passing observation.
-  VERIFIABLE: a browser check over every settlement asserts no inhabitant's world
-  position sits within a small radius of the origin while its layout anchor lies
-  elsewhere; a Vitest case pins the placement function against the uninitialised
-  case that produced the zero.
 
 - [ ] 565. A DRINKING WILDEBEEST CALF STANDS BURIED IN THE GROUND
   (caught 08.08.2026, 19:xx, by the in-game anchoring tripwire on the `enrichments`
@@ -1853,28 +1778,6 @@ Build order, chosen so no two parallel agents own the same file:
   when the panorama orientation is deliberately inverted — a check that cannot
   fail proves nothing.
 
-- [ ] 174. Tag the demo build `v0.3` and publish it at
-  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3/.
-  GATE (user 10.08.2026, replacing the 19.07.2026 wording): v0.3 no longer waits for
-  EVERY open bugfix — that gate was unreachable and pushed the release out
-  indefinitely. What must be closed is exactly two classes:
-  1. the CRITICAL bugs (the tier-c block at the head of the work order — anything that
-     ends the player's session, loses the expedition, or voids a verification), and
-  2. everything on the COMMUNICATION MECHANIC, until the PoC is in a usable state —
-     that is the release's purpose.
-  Everything else — visuals, ambience, wildlife, the big audits — ships AFTER v0.3.
-  A final closing run (CLAUDE.md §9: Vitest + LARGE regression on both backends,
-  dead-code and `.md` audit, lint and CVE clean) at the exact HEAD to be tagged
-  remains mandatory; the closing is what the tag certifies, and no tag is cut on an
-  unclosed state.
-  FINAL TAG HELD FOR THE USER. The tag and the /v0.3/ publish are the one
-  irreversible, outward-facing step: do ALL the work up to it, then report "ready to
-  tag" and WAIT for the user's explicit go for that tag (`tags-only-on-request`).
-  When it comes, tag `v0.3` at that HEAD, MOVE the `poc` tag to the same commit, and
-  run the deploy via `workflow_dispatch` — the Pages workflow enumerates every `v*`
-  tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
-  that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
-  re-pointed.
 
 - [ ] 453. WHAT IS THE LION EATING? (user bug report 30.07.2026,
   `local/WasFrisstDerLoewe.zip`, seed 1608676381, east region at the river, WebGPU/high:
@@ -5553,3 +5456,26 @@ to land than a mechanism that needs a review.
   that kills the launcher and asserts the next session re-arms it.
   Criticality: high for unattended operation — each of the three has already cost more
   standing-still time than the failure 612 repairs.
+
+- [ ] 617. AN OWNER THAT WORKS ONCE AND THEN IDLES STILL HOLDS THE BATCH FOR AN HOUR
+  (four-eyes finding on point 612, 10.08.2026, recorded with its merge verdict). Point 612
+  binds ownership to work, but its idle window only reaches a session that has completed
+  NO call since taking the lock (`workedSinceClaim === false`). That restriction is right
+  as far as it goes — the literal rule would dispossess a session in the middle of a
+  30–40-minute regression, and each dispossession spawns a successor beside a working
+  owner, which is the 24.07.2026 double-spawn as an everyday event. What it leaves open is
+  the point's own sentence, "it either works or it releases": an owner that completes one
+  call and then goes quiet keeps the batch for the full lease.
+  FINAL STATE: idleness is decided by two facts instead of one — silence longer than the
+  window AND no call in flight. The second needs its own stamp: `leaseUntil` cannot serve,
+  because a declared wait extends it by up to four hours, so a renewal timestamp is written
+  where the call actually renews and the idle verdict reads THAT. A session inside a long
+  call is never dispossessed; a session that finished its last call and went quiet is, at
+  the window. The decision stays in the one ownership function point 612 built, so no
+  second arithmetic can disagree with it.
+  VERIFIABLE: pure Vitest — a long call in flight holds the lock past the window; the same
+  session with the call finished loses it at the window; a declared wait still holds; the
+  boundary cases exactly at the window; and the renewal stamp is written by the real hook
+  path, not only by the test.
+  Criticality: high — it is the batch's ownership arithmetic, and getting it wrong either
+  strands the queue or produces two live owners.

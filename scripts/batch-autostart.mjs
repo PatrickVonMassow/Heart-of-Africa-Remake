@@ -437,14 +437,32 @@ if (batchParked) {
 // Bounded by a timeout and wrapped fail-open on top, because the launcher's job
 // is bringing the batch back and a board check may never be a reason it does not.
 try {
-  const out = execFileSync(process.execPath, [R('board-watchdog.mjs'), '--last-key', state.boardWatchKey ?? ''], {
-    windowsHide: true,
-    cwd: REPO,
-    encoding: 'utf8',
-    timeout: 60000,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
+  const out = execFileSync(
+    process.execPath,
+    [
+      R('board-watchdog.mjs'),
+      '--last-key',
+      state.boardWatchKey ?? '',
+      // THE CONSECUTIVE-FAILURE COUNT lives here, between ticks (point 562): the
+      // child is a fresh process every quarter of an hour and can hold no memory
+      // of its own, and only consecutive failures may escalate — one success
+      // anywhere resets it to zero.
+      '--streak',
+      String(state.boardProbeStreak ?? 0),
+    ],
+    {
+      windowsHide: true,
+      cwd: REPO,
+      encoding: 'utf8',
+      // Two probes of two attempts with a brief pause between them (point 562)
+      // fit far inside this; the child bounds every attempt at 15 s itself.
+      timeout: 90000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  )
   const r = JSON.parse(out.trim().split('\n').filter(Boolean).pop())
+  state.boardProbeStreak = Number(r.streak) || 0
+  if (r.rescued) log('board: a probe failed and its immediate retry succeeded — a flicker, not a fault')
   if (r.verdict !== 'current') log(`board: ${r.verdict}${r.reason ? ` — ${r.reason}` : ''} (${BOARD_PAGE_URL})`)
   if (r.notified) {
     log(`BOARD ALERT: ${r.message}`)
@@ -783,11 +801,17 @@ if (dispossessed) {
   // "handed-over" is not death: the owner finished a point and passed the batch
   // on (point 388). Logged distinctly so the end-to-end chain can be READ out of
   // this file rather than inferred.
+  // An IDLE release is neither death nor a handover: the owner reserved the batch
+  // and never ran a thing (point 612). It is a routine, healthy transition — like
+  // a handover — so it is logged distinctly and nobody's phone is buzzed for it.
   log(
     assessment.reason === 'handed-over'
       ? `HANDOVER accepted: ${lock.sessionId} handed the batch over${lock.handoverPoint ? ` at point ${lock.handoverPoint}` : ''} — spawning the successor`
-      : `owner provably dead (${assessment.reason}) — taking over`,
+      : assessment.reason === 'idle'
+        ? `IDLE owner superseded: ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) held the batch without working — spawning the successor`
+        : `owner provably dead (${assessment.reason}) — taking over`,
   )
+  if (assessment.reason === 'idle' && assessment.detail) log(`  ${assessment.detail}`)
 } else {
   // The headless path leaves no lock at all: a `claude -p` that ends at a
   // boundary exits, and SessionEnd releases the lock before this tick runs. Said

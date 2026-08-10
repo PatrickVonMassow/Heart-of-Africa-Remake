@@ -929,11 +929,15 @@ its own subject never occurred:
   suite RAY-PROBES clear first (a camera dropped on a fixed bearing lands inside
   a hut in a dense settlement and would photograph a wall), each forced through
   the dev hook `__placeForceGesture` and awaited on the GESTURE's own clock, not
-  the wall clock. Then the ambient conversation is sampled over 60 reads: every
-  live gesture is one of the four kinds, none runs past its own duration, the
-  pair takes turns, and a figure between gestures stands exactly at rest. The
-  state machine itself is pure (`src/render/gesture.test.ts`); only the poses the
-  renderer actually DRAWS need the browser.
+  the wall clock. Then the standing conversation is sampled over 60 reads: since
+  point 580 the pair must be QUIET — it used to cycle the four gestures as
+  ambient dressing with no utterance behind them, a mute pantomime at any
+  distance — so no live gesture may appear, none may run past its own duration,
+  the two never gesture over each other, and a figure that is not speaking stands
+  exactly at rest. The state machine itself is pure
+  (`src/render/gesture.test.ts`), and so is the rule that binds a gesture to the
+  range its utterance carries (`src/communication/spokenGesture.test.ts`); only
+  the poses the renderer actually DRAWS need the browser.
 - **The hypothesis over the speaker's head (point 485).** The label's lifetime
   and its binding to the note are pure Vitest; the browser owes only the
   ATTACHMENT, which no unit test can see. A named inhabitant is made to speak a
