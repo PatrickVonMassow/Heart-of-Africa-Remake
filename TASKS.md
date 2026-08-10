@@ -5616,3 +5616,37 @@ to land than a mechanism that needs a review.
   accepts; `node scripts/mechanism-review-guard.mjs --status` green afterwards.
   Criticality: HIGH — it changes the model policy the guards enforce, so the mechanism
   review applies and can fittingly be its own first customer.
+
+- [ ] 625. THE SAME DEFECT WAS BUILT TWICE, IN PARALLEL (measured 11.08.2026, 00:12).
+  Point 590 ("THE BOARD'S QUEUE ORDER IS A SECOND COPY OF THE WORK ORDER, AND IT KEEPS
+  DRIFTING", from the user's report of 09.08.) and point 608 ("THE BOARD'S ORDER IS
+  HAND-KEPT AND DRIFTS FROM THE WORK ORDER", a finding of 10.08.) name ONE defect and
+  demand ONE final state: the queue's order is derived from `TASKS.md` instead of the
+  `order` array in `.claude/board-queue.json`. Two agents built it at the same time, on
+  the SAME two files (`scripts/board-queue-core.mjs`, `scripts/queue-order-guard-core.mjs`),
+  so the branches could never both land; one full agent run plus its own review was spent
+  twice over. The duplication was visible in the two headlines, and two mechanisms let it
+  through — the finding was opened as a NEW point while the user's report stood open
+  (against `bundle-first`), and the free-slot check listed 608 as "independent of the
+  running branches" while both rebuilt the same core.
+  FINAL STATE:
+  1. OPENING A POINT LOOKS FOR ITS TWIN. Recording a finding or appending a point reports
+     the open points whose headline shares its distinctive terms, or whose spec names the
+     same file, and asks the author to fold it in or to say in one line why it is genuinely
+     separate. It never refuses — a false twin costs a sentence, a missed one costs a
+     whole build.
+  2. COMMISSIONING AN AGENT COMPARES FILES, NOT NUMBERS. The independence a free slot is
+     judged by reads the FILES each candidate would touch — from the paths its spec names,
+     and from those the running branches have already changed (`git diff --name-only
+     main...<branch>`) — and a candidate that shares one is reported as OVERLAPPING rather
+     than independent. `scripts/batch-in-flight-core.mjs` holds that judgment today and
+     had it wrong.
+  3. The resolution of the concrete case is not part of this point: 590 lands (it also
+     covers the rank side and absorbs 608's duplicate check) and 608 is ticked as covered
+     by it.
+  VERIFIABLE: Vitest — two headlines sharing a distinctive term are reported as twins while
+  two sharing only stop words are not; a candidate whose spec names a file a running branch
+  changed is OVERLAPPING; one that names none is independent; the real 590/608 pair, as
+  they stood on 11.08.2026, is reported as a twin AND as overlapping.
+  Criticality: MEDIUM — no player-visible behaviour, but it wastes whole agent runs and
+  produces branches that cannot both land.
