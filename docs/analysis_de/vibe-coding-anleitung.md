@@ -365,6 +365,15 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   die Ursache **sichtbar**? Führ ihn zuerst aus. Und sag mir, ob schon ein **anderer Weg
   läuft**, der dasselbe trägt — statt den blockierten zu reparieren."
 
+- **Gebaut heißt nicht auffindbar.** Ein Feature kann korrekt sein, geprüft, in beiden Sprachen
+  beschriftet — und der Nutzer meldet es trotzdem als fehlend, weil die Bedienung unter der
+  falschen Überschrift einsortiert ist. Deine Tests fragen „wirkt der Wert?"; er fragt „komme ich
+  von dort, wo ich suche, zu dem, was ich brauche?".
+  → *Prompt:* „Wenn der Nutzer etwas erneut meldet, das schon repariert ist: Nimm zuerst an, dass er
+  es **nicht erreicht**, nicht dass er sich irrt. Und prüfe bei allem, was er **finden** muss, die
+  **Nachbarschaft** — steht das Neue bei seinesgleichen? Wo diese Regel sich als Test schreiben
+  lässt (‚jede Lautstärke sitzt in der Ton-Gruppe'), schreib sie als Test, nicht als Vorsatz."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -405,4 +414,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 4ddbf3ebf25991b0b56aea2a850d6b9bb9300c0fc12e393df1a3b86192571cb0 -->
+<!-- GUIDE-FINGERPRINT: f9091f10c4c500ca43d4cbc6ccc2ec48e28f1f770b56a87a1aec94d84e4fe224 -->

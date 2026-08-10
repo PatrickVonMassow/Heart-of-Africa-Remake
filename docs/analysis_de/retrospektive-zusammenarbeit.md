@@ -966,6 +966,14 @@ Die Ursache ist eine Lücke im Begriff von „fertig". Ein Punkt gilt als gelief
 
 **Lehre:** *Gebaut* ist nicht *geliefert* — dazwischen steht *in den Weg gelegt*. Und weil man die Frage „wird das eigentlich benutzt?" sonst nur durch Lesen des ganzen Bestandes beantworten kann, gehört zu jeder gelieferten Fähigkeit die Angabe, **woran** man ihre Benutzung erkennen würde. Ein Ding ohne beobachtbare Benutzung ist nicht fertig, sondern unsichtbar.
 
+### 3.101 Der Regler war da — unter der falschen Überschrift
+
+In der Nacht wurde repariert, dass die Dorfsprache am Regler für „alles Übrige" hing, und sie bekam einen eigenen. Am Morgen meldete der Nutzer denselben Mangel noch einmal: „nach wie vor kein eigener Lautstärkeregler für die Sprache". Sein Zustandsabzug widerlegte das — der Regler war in seinem Build, er wirkte, er hörte die Kinder zum ersten Mal. Er saß nur in der Gruppe *Siedlungsleben*, zwischen Silbenlänge und Beschriftungsabstand, während jede andere Lautstärke des Spiels in *Grafik und Ton* steht. Wer die Sprache lauter haben will, öffnet den Tonbereich, findet dort nichts und schließt daraus: gibt es nicht.
+
+Das ist nicht 3.100 in klein. Dort erfuhr niemand von einer Fähigkeit; hier war sie sichtbar, beschriftet, in beiden Sprachen, live editierbar — und trotzdem unauffindbar, weil sie unter der falschen Überschrift einsortiert war. Unsere Prüfung stellte genau die Frage, die der Punkt gestellt hatte: Existiert der Wert, wirkt er, ist er kalibrierbar? Die Frage, die der Nutzer stellt, lautet anders: **Komme ich von dort, wo ich suche, zu dem, was ich brauche?** Kein Test im Bestand hat je einen Weg dorthin gemessen, nur Zustände.
+
+**Lehre:** Bei allem, was der Spieler *finden* muss, gehört neben die Wirkungsprüfung eine **Nachbarschaftsprüfung** — steht das Neue bei seinesgleichen? Sie ist billig und maschinell haltbar: Die Regel „jede Lautstärke sitzt in der Tongruppe" ist als Test formulierbar und gilt dann auch für die nächste, die jemand anlegt. Und wenn ein Nutzer eine schon reparierte Sache erneut meldet, ist die erste Vermutung nicht „er irrt sich" und nicht „der alte Stand", sondern: Wir haben etwas gebaut, das er nicht erreicht.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -1055,7 +1063,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 09.08.2026, 21:21 · Quellen-Fingerprint: `4ddbf3ebf259…`
+Zuletzt aktualisiert: Montag, 10.08.2026, 10:50 · Quellen-Fingerprint: `f9091f10c4c5…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1135,8 +1143,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 44 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 45 Prozess-/Meta-TASKS-Punkte (davon 20 offen).
 
-<!-- RETRO-FINGERPRINT: 4ddbf3ebf25991b0b56aea2a850d6b9bb9300c0fc12e393df1a3b86192571cb0 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-09T19:21:09.499Z -->
+<!-- RETRO-FINGERPRINT: f9091f10c4c500ca43d4cbc6ccc2ec48e28f1f770b56a87a1aec94d84e4fe224 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-10T08:50:40.856Z -->
 <!-- AUTO-GENERATED:END -->
