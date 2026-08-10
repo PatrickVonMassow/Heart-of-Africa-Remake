@@ -214,10 +214,13 @@ describe('the communication rock stands at the river, upstream of the village', 
     const site = drowned.communicationRockSite(4242)
     const village = placeById(ROCK_VILLAGE_ID)
     // Nothing was accepted at the river: the site fell back to the village
-    // coordinate, which the §4.2 clearance keeps out of the water for real.
+    // coordinate. In a world that is water everywhere that spot is wet too, and
+    // the fallback must SAY so rather than hand it back looking ordinary — the
+    // test used to bless a wet site silently (four-eyes review, 11.08.2026).
     expect(site.upstreamDeg).toBe(0)
     expect(site.lat).toBe(village.lat)
     expect(site.lon).toBe(village.lon)
+    expect(site.unvouched).toBe(true)
     vi.doUnmock('./terrain')
     vi.resetModules()
   })

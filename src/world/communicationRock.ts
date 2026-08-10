@@ -85,6 +85,11 @@ export interface CommunicationRockSite {
   yaw: number
   /** How far upstream of the village it stands, in degrees along the axis. */
   upstreamDeg: number
+  /** Set only where the search exhausted itself AND the fallback spot does not
+   *  pass the footprint test — a site nothing can vouch for. Unreachable in the
+   *  shipped world; a synthetic all-water world reaches it, and it must be
+   *  distinguishable there rather than looking like an ordinary placement. */
+  unvouched?: boolean
   /** Downstream direction at the boulder as a unit vector in (lat, lon) — the
    *  sense the chief's UPSTREAM word is measured against. */
   downstream: { lat: number; lon: number }
@@ -181,9 +186,16 @@ function buildSite(seed: number): CommunicationRockSite {
       }
     }
   }
-  // Unreachable in the shipped world (the seed sweep in the test proves it), and
-  // dry where it is reached: a village keeps the §4.2 clearance to river water,
-  // so even this last resort cannot put the boulder in the river.
+  // THE LAST RESORT VOUCHES FOR ITSELF OR SAYS IT CANNOT (four-eyes review by
+  // GPT-5.6 Sol, 11.08.2026). It used to be argued dry — a village keeps the
+  // §4.2 clearance to river water — and the argument is right for the shipped
+  // world, but an argument is not a measurement: on a synthetic all-water world
+  // this branch handed back a wet spot and a test blessed it. So the same
+  // footprint test the loop uses decides here too, and where it says no, the
+  // site is returned MARKED. Callers draw it as before; what changes is that the
+  // one case nobody can vouch for is no longer indistinguishable from the
+  // ordinary one, in the tests or in a bug report.
+  const standsVouched = standsDry(village.lat, village.lon, seed)
   return {
     lat: village.lat,
     lon: village.lon,
@@ -193,17 +205,25 @@ function buildSite(seed: number): CommunicationRockSite {
     yaw,
     upstreamDeg: 0,
     downstream: { lat: 0, lon: 1 },
+    unvouched: !standsVouched,
   }
 }
 
-/** The points the ground under the drawn block is read at: its centre, a ring at
- *  half the footprint and a ring at its rim. */
+/** The points the ground under the drawn block is read at: its centre and three
+ *  rings out to its rim, each ring offset by half a step against the one inside
+ *  it. Two rings left a gap the width of a probe spacing between them, and a
+ *  waterline is a LINE — it can cross a footprint through such a gap and be
+ *  missed (four-eyes review by GPT-5.6 Sol, 11.08.2026). Three staggered rings
+ *  leave no straight path across the disc that misses every probe by more than
+ *  a fifth of the footprint. */
 function footprintProbes(lat: number, lon: number): Array<{ lat: number; lon: number }> {
   const r = ROCK_FOOTPRINT_UNITS / 10 // world units → degrees
   const out = [{ lat, lon }]
-  for (const f of [0.5, 1]) {
+  const rings = [0.4, 0.72, 1]
+  for (let k = 0; k < rings.length; k++) {
+    const f = rings[k]
     for (let i = 0; i < FOOTPRINT_RING; i++) {
-      const a = (i / FOOTPRINT_RING) * Math.PI * 2
+      const a = ((i + (k % 2) * 0.5) / FOOTPRINT_RING) * Math.PI * 2
       out.push({ lat: lat + Math.cos(a) * r * f, lon: lon + Math.sin(a) * r * f })
     }
   }
