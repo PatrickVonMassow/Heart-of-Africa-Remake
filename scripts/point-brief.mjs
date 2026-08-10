@@ -12,11 +12,25 @@
 // failure too — a brief nobody notices is over budget is how the saving quietly
 // disappears.
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
-import { relative } from 'node:path'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { join, relative, resolve } from 'node:path'
 import { ARCHIVE_PATH, readTasksAll, TASKS_PATH } from './tasks-source.mjs'
-import { BriefError, buildBrief, BRIEF_TOKEN_CEILING } from './point-brief-core.mjs'
+import { BriefError, buildBrief, BRIEF_TOKEN_CEILING, ORIENTATION_LIMITS } from './point-brief-core.mjs'
 import { CLAUDE_PATH, DESIGN_PATH, REPO_ROOT, readDocCorpus } from './doc-corpus.mjs'
+
+/**
+ * The suites' own section parser, loaded ONLY if scripts/verify/ is there.
+ * A static import would tie this script to that directory, and it is spawned in
+ * places that carry the top-level scripts alone (the guard-hooks fixture stages
+ * exactly that tree). The orientation's section names are a convenience; the
+ * brief is not, so their parser is optional and never duplicated here.
+ */
+let listSections = null
+try {
+  ;({ listSections } = await import('./verify/sections.mjs'))
+} catch {
+  /* no verify tree in this checkout — the suite lines simply carry no sections */
+}
 
 /**
  * The git half of the brief's provenance stamp: which commit, and whether the
@@ -44,6 +58,93 @@ function gitRevision() {
   }
 }
 
+/**
+ * THE TREE HALF OF THE ORIENTATION (point 598). Called by buildBrief with the
+ * paths the spec named and the suites its mapping resolved to; everything here
+ * is read at generation time, so nothing in the block can be stale.
+ *
+ * Three readings, each cheap and each bounded:
+ *  - the named file's OWN first header line. These files open with a comment
+ *    saying what they are for, which is a better one-liner than anything a
+ *    generator could invent — and a path that is NOT in the tree is said so,
+ *    because "the spec names a file that does not exist" is worth knowing before
+ *    the search rather than after it.
+ *  - the directory around it: how many files, and either its README's first
+ *    line or its siblings' names. That is the "what lives here" a reader would
+ *    otherwise buy with a listing and a couple of opens.
+ *  - the suites' declared `--section` names, read out of each suite's source by
+ *    the same parser the runner uses (scripts/verify/sections.mjs), so the
+ *    cheapest rung of the ladder is NAMED rather than merely available.
+ *
+ * Every step is guarded: an unreadable file costs its line, never the brief.
+ */
+function readTree({ paths = [], suites = [] } = {}) {
+  const abs = (p) => resolve(REPO_ROOT, p)
+  /** The first line of a file's leading comment — its own statement of purpose. */
+  const headerLine = (file) => {
+    try {
+      const head = readFileSync(file, 'utf8').slice(0, 4000).split('\n')
+      for (const raw of head) {
+        const line = raw.trim()
+        if (line === '') continue
+        const m = /^(?:\/\/|\/\*\*?|\*|#)\s?(.*)$/.exec(line)
+        if (!m) return null // the file opens with code: it states no purpose
+        const text = m[1].trim()
+        if (text) return text.length > 120 ? `${text.slice(0, 117)}…` : text
+      }
+    } catch {
+      /* unreadable — the line is simply left off */
+    }
+    return null
+  }
+  const isDirPath = (p) => p.endsWith('/')
+  const files = []
+  const dirsSeen = new Map()
+  for (const p of paths) {
+    const target = abs(p)
+    let exists = false
+    let dir = p.replace(/[^/]*$/, '')
+    try {
+      const st = statSync(target)
+      exists = true
+      if (st.isDirectory()) dir = p.endsWith('/') ? p : `${p}/`
+      else files.push({ path: p, exists: true, header: headerLine(target) })
+    } catch {
+      exists = false
+    }
+    if (!exists && !isDirPath(p)) files.push({ path: p, exists: false, header: null })
+    if (dir && !dirsSeen.has(dir)) dirsSeen.set(dir, true)
+  }
+  const dirs = []
+  for (const dir of dirsSeen.keys()) {
+    try {
+      const entries = readdirSync(abs(dir), { withFileTypes: true })
+      const names = entries.filter((e) => e.isFile()).map((e) => e.name)
+      const readme = names.includes('README.md') ? headerLine(abs(join(dir, 'README.md'))) : null
+      const siblings = names
+        .filter((n) => !/\.test\.[cm]?[jt]sx?$/.test(n))
+        .slice(0, ORIENTATION_LIMITS.siblings)
+      dirs.push({
+        dir,
+        count: names.length,
+        note: readme ? `README: ${readme}` : siblings.join(', ') + (names.length > siblings.length ? ', …' : ''),
+      })
+    } catch {
+      /* a directory the spec names but the tree does not have — the file line above already says so */
+    }
+  }
+  const sections = {}
+  for (const suite of listSections ? suites : []) {
+    try {
+      const list = listSections(readFileSync(abs(`scripts/verify/${suite}.mjs`), 'utf8'))
+      if (list.length) sections[suite] = list
+    } catch {
+      /* not a suite file, or not sectioned — the suite line stands on its own */
+    }
+  }
+  return { files, dirs, sections }
+}
+
 const args = process.argv.slice(2)
 const number = args.find((a) => /^\d+$/.test(a))
 const showTokens = args.includes('--tokens')
@@ -65,6 +166,7 @@ try {
     docs: readDocCorpus(),
     number,
     revision: gitRevision(),
+    readTree,
   })
   process.stdout.write(brief.endsWith('\n') ? brief : `${brief}\n`)
   if (showTokens || tokens > BRIEF_TOKEN_CEILING) {

@@ -396,6 +396,16 @@ front of each turns one into a declaration.
   picture proof once, on `main`-merged-into-the-branch, with the verified
   `git HEAD` reported. It is a building block of the brief, not a paragraph
   somebody has to remember.
+- **And the brief NAMES the check, with its sections (point 598).** The same
+  brief carries a generated ORIENTATION: the paths the spec itself names with
+  each file's own header line, what lives in their directories, and — read from
+  the work order's own `Diff → browser-suite mapping` paragraph — which suite
+  proves the point, followed by that suite's declared `--section` names. All of
+  it is read from the tree at generation time (`readTree` in
+  `scripts/point-brief.mjs`), so it cannot go stale, and all of it is framed as
+  a HINT: the spec decides what changes, the block only says where to look. An
+  unknown name lists the real ones, so `--section=list` is the way to see a
+  suite's blocks without booting anything.
 - **The one recurring defect is a section that does NOT own its setup**: it
   reads a scene the block before it staged, so it passes in the whole run and
   fails standalone. Where blocks genuinely share one staging they belong in ONE
