@@ -13,6 +13,7 @@ import {
   CLOSING_WORK_TITLE,
   NO_CURRENT_WORK_TITLE,
   claimsNoCurrentWork,
+  setCardStatus,
   dropStrayNowCards,
   setCardTitle,
   toClosingWork,
@@ -545,6 +546,17 @@ describe('every current-work card names its point and its subject', () => {
     expect(nowCards(rewritten)).toHaveLength(1)
     expect(rewritten).not.toContain('Alt; Punkt 656 folgt.')
     expect(codes(rewritten)).toEqual([])
+  })
+
+  // A STATUS BELONGS TO ITS OWN CARD (four-eyes 12.08.): the rewrite used to run
+  // freely to the next `<div class="body">`, so a card that had lost its body
+  // sent the text into the FOLLOWING card and overwrote another point's status.
+  it('never writes a status into the next card when its own has no body', () => {
+    const bodyless = '<details class="now">\n  <summary><span class="num">651</span><span class="t">Ohne Rumpf</span></summary>\n</details>'
+    const board = withNow(`${bodyless}\n${chipCard(652, 'Echte Arbeit')}`)
+    expect(() => setCardStatus(board, 651, 'Neuer Stand.', '09:00')).toThrow(/no current-work card/)
+    // …and the neighbour's text is untouched by the attempt.
+    expect(board).toContain('<p>Text</p>')
   })
 
   // EVERY READER OF A TITLE MATCHES `[^<]*`, so a raw `<` made the card

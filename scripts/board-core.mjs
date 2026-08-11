@@ -1092,7 +1092,12 @@ export function setCardStatus(html, point, text, stamp = berlinStamp()) {
   if (typeof html !== 'string' || !html) throw new Error('board: empty document')
   if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
   if (!text || !String(text).trim()) throw new Error('board: refusing to write an empty status')
-  const re = new RegExp(`(${NOW_HEAD(point)}[\\s\\S]*?<div class="body">)[\\s\\S]*?(</div>\\s*</details>)`)
+  // BOUNDED TO ITS OWN CARD (four-eyes review, 12.08.2026). The run to the body
+  // used to be free, so a card that had lost its body sent the rewrite into the
+  // NEXT card's body — a status for one point silently overwriting another
+  // point's text, with markup that still looked plausible afterwards. A card
+  // without a body is now simply not found, and the refusal says so.
+  const re = new RegExp(`(${NOW_HEAD(point)}${WITHIN_CARD}<div class="body">)${WITHIN_CARD}(</div>\\s*</details>)`)
   if (!re.test(html)) throw new Error(`board: no current-work card for point ${point} — add the card first`)
   const body = renderCardBody(text, { stamp })
   return html.replace(re, `$1\n${body}\n  $2`)
