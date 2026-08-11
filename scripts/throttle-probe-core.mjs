@@ -8,23 +8,34 @@
 // and DOM read in two round trips) and, after the fix, 0 of 8.
 //
 // This module holds everything that decision needs and no I/O: the argument
-// shape, what throttling is available on this host, and the arithmetic of the
-// skew rate. scripts/throttle-probe.mjs runs the section and hands the results
-// here; scripts/throttle-probe-core.test.mjs pins every rule.
+// shape, what throttling is available on this host, how a run-all log is read,
+// and the arithmetic of the skew rate. scripts/throttle-probe.mjs runs the
+// section and hands the results here; scripts/throttle-probe-core.test.mjs pins
+// every rule.
 
 /** How many times a probe runs the section by default — the point-600 sample. */
 export const DEFAULT_RUNS = 8
-/** How many CPUs the run is pinned to by default. One is the strongest throttle
- *  this mechanism has: the suite, the dev server, the browser and its GPU
- *  process then queue on a single core, which is the contention a loaded machine
- *  produces and a check that reads state in two round trips cannot survive. */
+/** How many CPUs the run is pinned to by default. */
 export const DEFAULT_CPUS = 1
-/** A run that has not finished by then is killed and counted as no verdict.
- *  Generous — a pinned run IS slow — but bounded: eight hung runs must not cost
- *  a working day. */
+/**
+ * The default throttle RATE: the suite gets roughly one nth of the pinned core,
+ * because `rate - 1` busy processes are pinned beside it.
+ *
+ * Measured 11.08.2026 on the point-600 defect (the pre-fix `ctrl-actor-labels`
+ * check of `polish`, which reads the label state and the DOM in two round trips):
+ * the bare pin, rate 1, reproduced it 1 of 8 — real, but far short of the 8 of 8
+ * a 20× CPU throttle produced. Contention has to be manufactured, not merely
+ * allowed. The default trades reproduction against wall clock; raise `--rate`
+ * when a suspected race will not show.
+ */
+export const DEFAULT_RATE = 4
+/** A run that has not finished by then is killed and counted as NO VERDICT.
+ *  Generous — a throttled run IS slow — but bounded: eight hung runs must not
+ *  cost a working day. */
 export const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000
 
 const RUNS_MAX = 50
+const RATE_MAX = 64
 
 /**
  * Parse the command line. Total: never throws, and every refusal NAMES what was
@@ -32,16 +43,23 @@ const RUNS_MAX = 50
  * probe that silently measured something else would be worse than no probe.
  *
  *   node scripts/throttle-probe.mjs <suite> --section=<name> [--runs 8]
- *                                  [--cpus 1] [--backend webgpu|webgl]
+ *                                  [--rate 4] [--cpus 1] [--backend webgpu|webgl]
  *                                  [--timeout-ms 900000] [--no-throttle]
  */
 export function parseProbeArgs(argv) {
-  const args = (Array.isArray(argv) ? argv : []).map((a) => String(a))
+  const args = (Array.isArray(argv) ? argv : []).map((a) => {
+    try {
+      return String(a)
+    } catch {
+      return ''
+    }
+  })
   const out = {
     suite: null,
     section: null,
     runs: DEFAULT_RUNS,
     cpus: DEFAULT_CPUS,
+    rate: DEFAULT_RATE,
     backend: null,
     timeoutMs: DEFAULT_TIMEOUT_MS,
     throttle: true,
@@ -66,6 +84,7 @@ export function parseProbeArgs(argv) {
     else if (flag === '--section') out.section = String(value(attached) ?? '').trim() || null
     else if (flag === '--runs') out.runs = number(value(attached), 'runs', { max: RUNS_MAX }) ?? out.runs
     else if (flag === '--cpus') out.cpus = number(value(attached), 'cpus', { max: 1024 }) ?? out.cpus
+    else if (flag === '--rate') out.rate = number(value(attached), 'rate', { max: RATE_MAX }) ?? out.rate
     else if (flag === '--timeout-ms') out.timeoutMs = number(value(attached), 'timeout-ms', { min: 1000 }) ?? out.timeoutMs
     else if (flag === '--no-throttle') out.throttle = false
     else if (flag === '--backend') {
@@ -86,92 +105,183 @@ export function parseProbeArgs(argv) {
   return out
 }
 
+/** The CPUs this process may actually run on, from `Cpus_allowed_list` in
+ *  /proc/self/status ("0-3,8,10-11"). `[]` when it cannot be read — an unknown
+ *  mask must never be guessed at, because guessing produces a `taskset` call
+ *  that fails while the report claims a throttle. Total. */
+export function parseCpusAllowedList(text) {
+  const line = /^Cpus_allowed_list:\s*(.+)$/m.exec(String(text ?? ''))
+  if (!line) return []
+  const out = []
+  for (const part of line[1].trim().split(',')) {
+    const range = /^(\d+)-(\d+)$/.exec(part.trim())
+    const single = /^(\d+)$/.exec(part.trim())
+    if (range) {
+      const [from, to] = [Number(range[1]), Number(range[2])]
+      if (to - from > 4096) continue
+      for (let c = from; c <= to; c++) out.push(c)
+    } else if (single) out.push(Number(single[1]))
+  }
+  return [...new Set(out)].sort((a, b) => a - b)
+}
+
 /**
  * HOW this host can throttle a run, or why it cannot.
  *
- * CPU AFFINITY, not a renderer-side multiplier: the suite spawns the dev server
- * and the browser as children, which inherit the mask, so pinning the probe pins
- * the whole stack — the contention a loaded machine really produces, which is
- * the claim ("it was load") being tested. `taskset` is util-linux; where it is
- * absent the probe says so and refuses to pretend, because a run that was NOT
- * throttled would answer a different question with the same output.
+ * CPU CONTENTION, not a renderer-side multiplier: the suite spawns the dev
+ * server and the browser as children, which inherit the affinity mask, so
+ * pinning the probe pins the whole stack. `rate` then decides how hard the
+ * squeeze is — `rate - 1` busy processes share the same core, leaving the run
+ * roughly one nth of it. That is the contention a loaded machine really
+ * produces, which is the claim ("it was load") being tested.
+ *
+ * `allowedCpus` comes from the process's REAL mask, never from a core count: a
+ * container whose cpuset excludes CPU 0 would take `taskset -c 0` and fail, and
+ * a probe that reports a throttle it never applied is worse than no probe.
+ * `taskset` is util-linux; where it is absent the plan says so.
  *
  * Total: never throws, and never claims a throttle it cannot apply.
  */
-export function throttlePlan({ platform = process.platform, cpuCount = 1, cpus = DEFAULT_CPUS, hasTaskset = false, throttle = true } = {}) {
-  const total = Number.isInteger(cpuCount) && cpuCount > 0 ? cpuCount : 1
-  if (!throttle) {
-    return { available: false, argv: [], how: 'NOT throttled (--no-throttle) — the control run', why: null }
-  }
+export function throttlePlan(input) {
+  const {
+    platform = 'linux',
+    allowedCpus = [],
+    cpus = DEFAULT_CPUS,
+    rate = DEFAULT_RATE,
+    hasTaskset = false,
+    throttle = true,
+  } = input ?? {}
+  const unavailable = (how, why) => ({ available: false, argv: [], cpuList: null, rate: 1, spinners: 0, how, why })
+  if (!throttle) return unavailable('NOT throttled (--no-throttle) — the control run', null)
   if (platform !== 'linux' || !hasTaskset) {
-    return {
-      available: false,
-      argv: [],
-      how: 'NOT throttled',
-      why:
-        platform === 'linux'
-          ? 'taskset is missing (install util-linux) — the runs below carry no throttle, so a green proves nothing about load'
-          : `no CPU-affinity throttle on ${platform} — the runs below carry no throttle, so a green proves nothing about load`,
-    }
+    return unavailable(
+      'NOT throttled',
+      platform === 'linux'
+        ? 'taskset is missing (install util-linux) — the runs below carry no throttle, so a green proves nothing about load'
+        : `no CPU-affinity throttle on ${platform} — the runs below carry no throttle, so a green proves nothing about load`,
+    )
   }
-  const want = Math.max(1, Math.min(Number.isInteger(cpus) && cpus > 0 ? cpus : DEFAULT_CPUS, total))
-  const list = want === 1 ? '0' : `0-${want - 1}`
+  const allowed = (Array.isArray(allowedCpus) ? allowedCpus : []).filter((c) => Number.isInteger(c) && c >= 0)
+  if (allowed.length === 0) {
+    return unavailable('NOT throttled', 'the process CPU mask could not be read, so no pin can be trusted to apply')
+  }
+  const want = Math.max(1, Math.min(Number.isInteger(cpus) && cpus > 0 ? cpus : DEFAULT_CPUS, allowed.length))
+  const picked = allowed.slice(0, want)
+  const cpuList = picked.join(',')
+  const squeeze = Math.max(1, Math.min(Number.isInteger(rate) && rate > 0 ? rate : DEFAULT_RATE, RATE_MAX))
+  const spinners = (squeeze - 1) * want
   return {
     available: true,
-    argv: ['taskset', '-c', list],
-    how: `CPU affinity pinned to ${want} of ${total} core(s) (taskset -c ${list})`,
+    argv: ['taskset', '-c', cpuList],
+    cpuList,
+    rate: squeeze,
+    spinners,
+    how:
+      `${want} of ${allowed.length} permitted core(s) (taskset -c ${cpuList})` +
+      (spinners > 0 ? `, shared with ${spinners} busy process(es) — about 1/${squeeze} of a core` : ''),
     why: null,
   }
 }
 
-/** One completed probe run, as the wrapper reports it:
- *  `{ ok, checks: string[], timedOut?: boolean, exit?: number }`. */
+/** run-all's own per-suite summary line, or null. It is the only place a run's
+ *  check COUNTS appear, which is how a run that never reached a check (a crash,
+ *  a failed pin, a dead dev server) is told from one that reported reds. */
+export function runnerSummary(output) {
+  const m = /^(?:PASS|FAIL)\s{2,}(\S+)\s+(\d+) pass, (\d+) fail, (\d+) console-errors \(exit (-?\d+)\)/m.exec(
+    String(output ?? ''),
+  )
+  if (!m) return null
+  return { suite: m[1], pass: Number(m[2]), fail: Number(m[3]), consoleErrors: Number(m[4]), exit: Number(m[5]) }
+}
+
+/** The SUITE's own result lines out of a run-all log, which echoes them indented
+ *  under its summary. Without this the only `FAIL` at column 0 is run-all's own
+ *  summary, and every red would be named "polish 7 pass, 1 fail". Falls back to
+ *  the whole output, so a suite run directly still parses. Total. */
+export function suiteOutput(output) {
+  const text = String(output ?? '')
+  const inner = text
+    .split('\n')
+    .filter((l) => /^\s+(?:FAIL\s{2,}|ERR:)/.test(l))
+    .map((l) => l.trim())
+  return inner.length ? inner.join('\n') : text
+}
+
+/**
+ * WHAT ONE PROBE RUN WAS. Four outcomes, because three of them are not "the
+ * check failed": a killed run and a run whose suite never reported reached no
+ * verdict at all, and counting either as a red would let eight broken launches
+ * read as "reproduced under throttle".
+ */
+export function classifyRun({ timedOut = false, exit = null, summary = null, checks = [] } = {}) {
+  if (timedOut) return 'killed'
+  if (exit === 0) return 'green'
+  if (summary && (summary.fail > 0 || summary.consoleErrors > 0)) return 'red'
+  if ((Array.isArray(checks) ? checks : []).length > 0) return 'red'
+  return 'broken'
+}
 
 /**
  * The skew rate and what reddened. `byCheck` is sorted by how often a check
- * failed (then by name), so the mechanism to hunt stands at the top. Total.
+ * failed (then by name), so the mechanism to hunt stands at the top. The rate is
+ * taken over the runs that produced a VERDICT — a killed or broken run measures
+ * nothing and must not dilute or inflate it. Total.
  */
 export function summarise(results) {
-  const list = Array.isArray(results) ? results.filter((r) => r && typeof r === 'object') : []
-  const reds = list.filter((r) => r.ok !== true)
+  const list = (Array.isArray(results) ? results : []).filter((r) => r && typeof r === 'object')
+  const kind = (r) => (typeof r.kind === 'string' ? r.kind : r.ok === true ? 'green' : 'red')
+  const red = list.filter((r) => kind(r) === 'red')
+  const green = list.filter((r) => kind(r) === 'green')
+  const killed = list.filter((r) => kind(r) === 'killed')
+  const broken = list.filter((r) => kind(r) === 'broken')
   const counts = new Map()
-  for (const r of reds) {
+  for (const r of red) {
     for (const name of Array.isArray(r.checks) ? r.checks : []) {
       const key = String(name)
       counts.set(key, (counts.get(key) ?? 0) + 1)
     }
   }
-  const byCheck = [...counts.entries()]
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+  const judged = red.length + green.length
   return {
     runs: list.length,
-    reds: reds.length,
-    timeouts: reds.filter((r) => r.timedOut === true).length,
-    rate: list.length === 0 ? 0 : reds.length / list.length,
-    byCheck,
+    judged,
+    reds: red.length,
+    greens: green.length,
+    killed: killed.length,
+    broken: broken.length,
+    rate: judged === 0 ? 0 : red.length / judged,
+    byCheck: [...counts.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
   }
 }
 
 /**
- * THE VERDICT IN WORDS. Three cases, and none of them closes a red on its own —
- * that is the whole point of the mechanism this serves: a measurement tells you
- * WHERE to look for the cause, it is not itself the cause.
+ * THE VERDICT IN WORDS, and none of them closes a red — that is the whole point
+ * of the mechanism this serves: a measurement says WHERE to look, it is not
+ * itself a cause. A sample with runs that reached no verdict is called out
+ * first: a rate over three of eight runs is not a rate over eight.
  */
 export function verdictOf(summary, { throttled = true } = {}) {
-  const s = summary ?? { runs: 0, reds: 0 }
-  const of = `${s.reds}/${s.runs}`
+  const s = summary ?? {}
+  const judged = Number.isFinite(s.judged) ? s.judged : Number(s.runs) || 0
+  const reds = Number(s.reds) || 0
+  const lost = (Number(s.killed) || 0) + (Number(s.broken) || 0)
+  const lostNote = lost
+    ? ` ${lost} run(s) reached NO verdict (killed, or the suite never reported) — read their logs: a probe cannot measure through a broken harness.`
+    : ''
+  if (judged === 0) return `NOTHING MEASURED — no run produced a verdict.${lostNote}`
+  const of = `${reds}/${judged}`
   if (!throttled) {
-    return `UNTHROTTLED CONTROL — ${of} runs red. Compare it against a throttled probe; on its own it measures nothing about load.`
+    return `UNTHROTTLED CONTROL — ${of} runs red. It is the comparison for a throttled probe; on its own it says nothing about load.${lostNote}`
   }
-  if (s.runs === 0) return 'NOTHING MEASURED — no run completed.'
-  if (s.reds === s.runs) {
-    return `REPRODUCED — ${of} runs red under the throttle. The check is load-dependent: name the MECHANISM (what does it read twice, what does it assume finished), fix it, and show the reproduction gone.`
+  if (reds === judged) {
+    return `REPRODUCED — ${of} runs red under the throttle. Run the same section with --no-throttle: if it holds green there, the check is load-dependent — then name the MECHANISM (what does it read twice, what does it assume has finished), fix it, and show the reproduction gone.${lostNote}`
   }
-  if (s.reds > 0) {
-    return `SKEWED — ${of} runs red under the throttle. Load moves this check, so the red is real and timing-shaped; hunt the mechanism before charging or filing it.`
+  if (reds > 0) {
+    return `SKEWED — ${of} runs red under the throttle. Load moves this check, so it is timing-shaped; raise --rate to reproduce it harder, then hunt the mechanism.${lostNote}`
   }
-  return `NOT REPRODUCED — ${of} runs red under the throttle. Load does not explain the red, and these greens do NOT close it: name its cause, charge it to the open point that owns it, or file it as a point of its own.`
+  return `NOT REPRODUCED — ${of} runs red under the throttle. Load at this rate does not explain the red, and these greens do NOT close it: name its cause, charge it to the open point that owns it, or file it as a point of its own (raise --rate before concluding).${lostNote}`
 }
 
 /** The whole report, line by line — the wrapper only prints what it is handed. */
@@ -182,17 +292,27 @@ export function formatProbeReport({ suite = '?', section = '?', backend = null, 
     `===== throttle probe — ${suite} --section=${section}${backend ? ` (${backend})` : ''} =====`,
     `throttle: ${plan?.how ?? 'unknown'}${plan?.why ? ` — ${plan.why}` : ''}`,
   ]
+  const label = { green: 'GREEN ', red: 'RED   ', killed: 'KILLED', broken: 'BROKEN' }
   for (const [i, r] of (Array.isArray(results) ? results : []).entries()) {
-    const label = r?.ok === true ? 'GREEN' : r?.timedOut === true ? 'KILLED' : 'RED  '
-    const detail = r?.ok === true
-      ? ''
-      : r?.timedOut === true
-        ? ' — no verdict: killed at the probe timeout'
-        : ` — ${(Array.isArray(r?.checks) && r.checks.length ? r.checks : ['(no check named — read the run output)']).join('; ')}`
-    lines.push(`run ${String(i + 1).padStart(2)}  ${label}${detail}`)
+    const kind = typeof r?.kind === 'string' ? r.kind : r?.ok === true ? 'green' : 'red'
+    const named = Array.isArray(r?.checks) && r.checks.length ? r.checks.join('; ') : null
+    const detail =
+      kind === 'green'
+        ? ''
+        : kind === 'killed'
+          ? ' — no verdict: killed at the probe timeout'
+          : kind === 'broken'
+            ? ` — no verdict: the suite never reported (exit ${r?.exit ?? '?'})`
+            : ` — ${named ?? '(no check named — read the run output)'}`
+    lines.push(`run ${String(i + 1).padStart(2)}  ${label[kind] ?? 'RED   '}${detail}`)
   }
-  lines.push(`SKEW RATE ${s.reds}/${s.runs} (${Math.round(s.rate * 100)} %)${s.timeouts ? `, ${s.timeouts} killed` : ''}`)
-  for (const c of s.byCheck) lines.push(`  ${String(c.count).padStart(2)}×  ${c.name}`)
-  lines.push(verdictOf(s, { throttled: plan?.available === true }))
+  const s_ = s ?? {}
+  lines.push(
+    `SKEW RATE ${Number(s_.reds) || 0}/${Number(s_.judged) || 0} (${Math.round((Number(s_.rate) || 0) * 100)} %)` +
+      (s_.killed ? `, ${s_.killed} killed` : '') +
+      (s_.broken ? `, ${s_.broken} without a verdict` : ''),
+  )
+  for (const c of Array.isArray(s_.byCheck) ? s_.byCheck : []) lines.push(`  ${String(c.count).padStart(2)}×  ${c.name}`)
+  lines.push(verdictOf(s_, { throttled: plan?.available === true }))
   return lines
 }

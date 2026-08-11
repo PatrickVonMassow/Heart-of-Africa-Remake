@@ -26,6 +26,7 @@ import {
   runVerdict,
   formatSuspectEnv,
   parseSuspectEnv,
+  unexplainedRuns,
   SUSPECT_UNNAMED,
 } from './render-verify-core.mjs'
 import { RED_CHARGES } from './render-verify-charges.mjs'
@@ -769,6 +770,97 @@ describe('runVerdict — the run that passed only on the RETRY (point 640)', () 
   it('is total on a malformed suspect record', () => {
     expect(() => runVerdict({ exit: 0, suspect: true, suspectOf: 'nonsense' }, { openPoints })).not.toThrow()
     expect(runVerdict({ exit: 0, suspect: true, suspectOf: null }, { openPoints }).covers).toBe(false)
+  })
+})
+
+describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 640)', () => {
+  const openPoints = [506, 546]
+  const suspectRun = (backend, at) => ({ ...run(backend, at), suite: 'polish', suspect: true, suspectOf: ['the goat stance'] })
+  const unfiled = (backend, at) => redRun(backend, at, [red('a NEW check nobody filed')])
+
+  it('BLOCKS although a later clean run of both backends exists — the whole fourth route', () => {
+    const result = evaluate(
+      renderChange({
+        runs: [unfiled('webgpu', 1500), run('webgpu', 2000), run('webgl', 2100)],
+        openPoints,
+      }),
+    )
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/UNEXPLAINED RED/)
+    expect(result.reason).toMatch(/A LATER GREEN DOES NOT CLOSE IT/)
+    expect(result.reason).toMatch(/a NEW check nobody filed/)
+  })
+
+  it('blocks the same way when the failure was a retry pass followed by a clean run', () => {
+    const result = evaluate(
+      renderChange({ runs: [suspectRun('webgpu', 1500), run('webgpu', 2000), run('webgl', 2100)], openPoints }),
+    )
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/passed only on the RETRY/)
+  })
+
+  it('blocks a clean run that a SUSPECT run followed — the order does not matter', () => {
+    const result = evaluate(
+      renderChange({ runs: [run('webgpu', 1500), run('webgl', 1600), suspectRun('webgpu', 2000)], openPoints }),
+    )
+    expect(result.decision).toBe('block')
+  })
+
+  it('names the three ways out and the throttle probe, and offers the loud deferral', () => {
+    const { reason } = evaluate(
+      renderChange({ runs: [unfiled('webgpu', 1500), run('webgpu', 2000), run('webgl', 2100)], openPoints }),
+    )
+    expect(reason).toMatch(/CAUSE is named and FIXED/)
+    expect(reason).toMatch(/CHARGED in scripts\/render-verify-charges\.mjs/)
+    expect(reason).toMatch(/becomes an OPEN point/)
+    expect(reason).toMatch(/throttle-probe\.mjs polish --section=<name> --runs 8/)
+    expect(reason).toMatch(/--defer/)
+  })
+
+  it('lets the FIX through: the red predates the last render edit, so it is out of the window', () => {
+    const result = evaluate(
+      renderChange({
+        latestChangeAt: 3000,
+        runs: [unfiled('webgpu', 1500), run('webgpu', 3500), run('webgl', 3600)],
+        openPoints,
+      }),
+    )
+    expect(result).toEqual({ decision: 'allow', clear: true })
+  })
+
+  it('lets a CHARGED red through — it is explained, and the run still accounts', () => {
+    const charged = redRun('webgpu', 1500, [red('goat stance', 506)])
+    const result = evaluate(renderChange({ runs: [charged, run('webgpu', 2000), run('webgl', 2100)], openPoints }))
+    expect(result.decision).toBe('allow')
+  })
+
+  it('lets the loud DEFERRAL through — the explanation nobody can miss', () => {
+    const result = evaluate(
+      renderChange({
+        runs: [unfiled('webgpu', 1500)],
+        deferral: { head: 'def5678', reason: 'the red was the check helper, fixed off the render set', at: 1600 },
+        openPoints,
+      }),
+    )
+    expect(result).toEqual({ decision: 'allow', clear: true, deferred: true })
+  })
+
+  it('ignores PARTIAL runs in both directions, so the throttle probe blocks nobody', () => {
+    const probeRun = (at) => ({ ...redRun('webgpu', at, [red('the goat stance')]), partial: true, section: 'goat-stance' })
+    const result = evaluate(
+      renderChange({
+        runs: [probeRun(1500), probeRun(1600), probeRun(1700), run('webgpu', 2000), run('webgl', 2100)],
+        openPoints,
+      }),
+    )
+    expect(result.decision).toBe('allow')
+  })
+
+  it('unexplainedRuns is total, and reports oldest first', () => {
+    expect(unexplainedRuns(null, 0)).toEqual([])
+    expect(() => unexplainedRuns([null, 7, { at: 'soon' }], 0)).not.toThrow()
+    const found = unexplainedRuns([unfiled('webgl', 2000), unfiled('webgpu', 1000)], 0, { openPoints })
+    expect(found.map((u) => u.at)).toEqual([1000, 2000])
   })
 })
 

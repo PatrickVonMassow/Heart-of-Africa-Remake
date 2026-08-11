@@ -234,10 +234,20 @@ export const SUSPECT_UNNAMED = 'the first attempt failed without naming a check'
 const MAX_SUSPECT_NAMES = 8
 const MAX_SUSPECT_NAME_LEN = 200
 
+/** A value as text, or '' — `String(x)` itself throws on an object whose
+ *  toString does, and these two must be total on whatever a suite printed. */
+function text(value) {
+  try {
+    return String(value ?? '')
+  } catch {
+    return ''
+  }
+}
+
 /** Format the names for the env var. Total: never throws. */
 export function formatSuspectEnv(names) {
   const list = (Array.isArray(names) ? names : [])
-    .map((n) => String(n?.name ?? n ?? '').trim())
+    .map((n) => (text(n?.name) || text(n)).trim())
     .filter(Boolean)
     .slice(0, MAX_SUSPECT_NAMES)
     .map((n) => n.slice(0, MAX_SUSPECT_NAME_LEN))
@@ -248,7 +258,7 @@ export function formatSuspectEnv(names) {
  *  must never mark an ordinary run suspect (a stale export would else condemn
  *  every run in the shell). Total: never throws. */
 export function parseSuspectEnv(value) {
-  return String(value ?? '')
+  return text(value)
     .split('\n')
     .map((n) => n.trim())
     .filter(Boolean)
@@ -417,6 +427,45 @@ export function coveringRun(runs, backend, since, { featureLevel = null, openPoi
   return best
 }
 
+/**
+ * EVERY RUN IN THE WINDOW THAT FAILED AND WAS NEVER EXPLAINED (point 640) — an
+ * unaccounted red, or a pass that only came on the retry.
+ *
+ * This is what stops the fourth closing. Refusing the retry's own record was
+ * only half of it: the gate reads the most recent COVERING run, so running the
+ * same code again until it comes up green cleared it just as well — which is
+ * the very argument the point forbids. A red therefore stays in force until
+ * something explains it: a fix (which edits a render file and moves the window
+ * past the red), a CHARGE to the open point that owns it, a point of its own, or
+ * the loud deferral valve.
+ *
+ * PARTIAL (`--section`) runs are excluded in BOTH directions: they are not
+ * evidence about the picture, so they neither cover a backend nor condemn one.
+ * That is also what lets the throttle probe reproduce a red eight times over
+ * without blocking anybody's turn.
+ *
+ * Total: never throws on partial input.
+ */
+export function unexplainedRuns(runs, since, { openPoints = null } = {}) {
+  const from = Number.isFinite(since) ? since : 0
+  const out = []
+  for (const r of Array.isArray(runs) ? runs : []) {
+    if (!r || typeof r !== 'object') continue
+    const at = Number(r.at ?? 0)
+    if (!Number.isFinite(at) || at < from) continue
+    const verdict = runVerdict(r, { openPoints })
+    if (verdict.status !== 'red' && verdict.status !== 'suspect') continue
+    out.push({
+      backend: typeof r.backend === 'string' ? r.backend : 'unknown',
+      suite: typeof r.suite === 'string' && r.suite ? r.suite : 'unknown',
+      at,
+      status: verdict.status,
+      unaccounted: verdict.unaccounted,
+    })
+  }
+  return out.sort((a, b) => a.at - b.at)
+}
+
 /** The most recent run of `backend` since `since`, covering or not — what the
  *  block message reads to say WHY the last attempt did not count. */
 export function latestRun(runs, backend, since) {
@@ -548,12 +597,51 @@ export function evaluate(input) {
   // run is the whole proof, and the second is a picture inspection bought for
   // nothing (user 26.07.2026).
   const dual = changedRenderPaths.some(isBackendSensitivePath)
+
+  // A RED IS NOT CLOSED BY THE RUNS THAT FOLLOWED IT (point 640). Refusing the
+  // retry's own record was only half the job: the gate reads the most recent
+  // COVERING run, so re-running the same code until it came up green cleared it
+  // just as well — "it passed three times since" wearing a mechanism's clothes.
+  // So an unexplained failure in the window holds the gate whatever came after,
+  // and the way out is a CAUSE: fix it (which moves the window past the red),
+  // charge it to the open point that owns it, file it as a point, or record the
+  // loud deferral.
+  const unexplained = unexplainedRuns(runs, since, opts)
+
   const covering = new Map(BACKENDS.map((b) => [b, coveringRun(runs, b, since, opts)]))
   const missing = dual
     ? BACKENDS.filter((b) => !covering.get(b))
     : BACKENDS.some((b) => covering.get(b))
       ? []
       : [BACKENDS[0]]
+
+  // Coverage exists, but something in the window failed and was never explained.
+  // (Where a backend is missing too, the message below says so with the same
+  // three ways out — this one is for the case the old gate waved through.)
+  if (missing.length === 0 && unexplained.length > 0) {
+    const named = unexplained
+      .slice(0, 3)
+      .map((u) => {
+        const what = u.status === 'suspect' ? 'passed only on the RETRY' : `${u.unaccounted.length} unaccounted red(s)`
+        const first = u.unaccounted[0]?.name
+        return `${u.backend}/${u.suite}: ${what}${first ? ` — "${first}"` : ''}`
+      })
+      .join(' | ')
+    return {
+      decision: 'block',
+      reason:
+        `UNEXPLAINED RED SINCE THE LAST RENDER EDIT: ${unexplained.length} recorded run(s) failed and nothing ` +
+        `says why — ${named}${unexplained.length > 3 ? ', …' : ''}. A LATER GREEN DOES NOT CLOSE IT (point 640): ` +
+        'three greens are consistent with a fixed defect, a rare one, a timing race and an idle machine alike. ' +
+        'A red closes in exactly THREE ways: (1) its CAUSE is named and FIXED — the fix edits the code, which ' +
+        'moves this window past the red; (2) it is CHARGED in scripts/render-verify-charges.mjs to the OPEN ' +
+        'point that owns it; (3) it becomes an OPEN point of its own. Is it load? MEASURE it: ' +
+        `node scripts/throttle-probe.mjs ${unexplained[0].suite} --section=<name> --runs 8. If the cause lies ` +
+        'outside the render set (a fixed helper, a dead dev server), say so loudly instead: ' +
+        'node scripts/render-verify-guard.mjs --defer "<reason>".',
+    }
+  }
+
   if (missing.length === 0) {
     // An ACCOUNTED-FOR run is never reported as a clean pass: name every red it
     // carried and the point it was charged to, so the record keeps the difference.
