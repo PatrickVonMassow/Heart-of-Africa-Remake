@@ -333,7 +333,8 @@ coverage map live in `scripts/verify/README.md`.
   is this diff correct, does it match its spec, is this measurement sound —
   judges ONE artefact, which cannot be produced twice; it keeps the ORDINARY
   REVIEW, refined only in that the reviewer reads the ARTEFACT before the
-  author's rationale, so that cannot anchor it either. Two sets are worth what their errors are UNCORRELATED, so CROSS-VENDOR
+  author's rationale, so that cannot anchor it either. Two sets are worth what
+  their errors are UNCORRELATED, so CROSS-VENDOR
   is the default pairing (the reviewers above); two blind runs of ONE model are
   the WEAKER fallback, recorded as such and DECORRELATED BY FRAMING (a hostile
   tester), since a re-run varies least where the model is confidently blind. The
