@@ -101,6 +101,40 @@ describe('ownership must be PROVEN', () => {
     expect(formatCleanupNotes(sel).join('\n')).toContain(tree.path)
   })
 
+  it('the MAIN checkout DETACHED keeps both branches — never removed is not "proves nothing"', () => {
+    // Sixth review, finding 2: the main-checkout test returned `foreign` before the
+    // detached handling could see it, so a main tree detached during the cleanup
+    // (mid-rebase, mid-bisect) blocked neither deletion.
+    const detachedMain = { path: ROOT, branch: '' }
+    const v = judgeCleanupTarget({ ...base, worktree: detachedMain, evidence: deadFor('main') })
+    expect(v.disposition).toBe(DISPOSITION.unproven)
+    expect(v.reason).toMatch(/MAIN checkout with a detached HEAD/)
+
+    const sel = selectCleanupTargets({ ...base, worktrees: [detachedMain], evidence: { [ROOT]: deadFor('main') } })
+    expect(sel.remove).toEqual([]) // and it is STILL never removed
+    expect(sel.reported.map((r) => r.path)).toEqual([ROOT])
+    expect(sel.branch.delete).toBe(false)
+    expect(formatCleanupNotes(sel).join('\n')).toContain(ROOT)
+  })
+
+  it('the MAIN checkout on a branch stays foreign — git itself refuses to delete under it', () => {
+    const v = judgeCleanupTarget({ ...base, worktree: { path: ROOT, branch: 'main' }, evidence: deadFor('main') })
+    expect(v.disposition).toBe(DISPOSITION.foreign)
+    expect(v.reason).toBe('the MAIN checkout')
+  })
+
+  it('a detached main checkout blocks even beside a removable tree of the landed point', () => {
+    const own = wt('608a', 'feat/608-x')
+    const sel = selectCleanupTargets({
+      ...base,
+      worktrees: [{ path: ROOT, branch: '' }, own],
+      evidence: { [ROOT]: deadFor('main'), [own.path]: deadFor('608a') },
+    })
+    expect(sel.remove).toEqual([own.path])
+    expect(sel.branch.delete).toBe(false)
+    expect(sel.branch.reason).toContain(ROOT)
+  })
+
   it('a DETACHED checkout outside the agent directory is REPORTED too — and keeps BOTH branches', () => {
     // Whole-branch review, finding 5: this was classified `foreign`, so it fell out
     // of `reported`, its empty branch matched nothing in the fallback comparison,

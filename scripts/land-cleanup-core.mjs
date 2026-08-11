@@ -155,7 +155,21 @@ export function judgeCleanupTarget({ worktree, branch, mainRoot, evidence = null
   const at = (disposition, reason) => ({ path, branch: has, disposition, reason })
 
   if (!path) return at(DISPOSITION.unproven, 'git named a worktree without a path')
-  if (normPath(path) === normPath(mainRoot)) return at(DISPOSITION.foreign, 'the MAIN checkout')
+  if (normPath(path) === normPath(mainRoot)) {
+    // THE MAIN CHECKOUT IS NEVER REMOVED — but "never removed" is not "proves
+    // nothing" (sixth review, finding 2). This returned `foreign` before the
+    // detached-HEAD handling below could see it, so a main checkout DETACHED
+    // during the cleanup — mid-rebase, mid-bisect, a `checkout --detach` — fell out
+    // of `reported`, matched no branch in the fallback comparison, and blocked
+    // neither branch deletion. That is finding 5 in the one checkout the landing
+    // itself runs in.
+    return has
+      ? at(DISPOSITION.foreign, 'the MAIN checkout')
+      : at(
+          DISPOSITION.unproven,
+          `the MAIN checkout with a detached HEAD — nothing proves it is not standing on ${want || 'the landed branch'}`,
+        )
+  }
 
   // ── OWNERSHIP ──────────────────────────────────────────────────────────────
   if (!want) return at(DISPOSITION.unproven, 'the landing named no branch, so nothing can be tied to it')
