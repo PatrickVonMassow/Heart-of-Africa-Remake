@@ -1178,6 +1178,41 @@ einer. „Es lief danach durch" ist keiner davon. Und wo eine Beobachtung beide 
 gleich gut trägt, ist sie kein Beleg, sondern eine Erzählung: Der Prüfstein ist, ob das
 Gegenteil dieselbe Beobachtung erzeugt hätte.
 
+
+### 3.110 Die Gegenprüfung schweigt auch da, wo sie nichts gesehen hat
+
+Punkt 629 lief am 11.08.2026 durch fünf Gegenprüfungen. In JEDER meldete der Prüfer
+beiläufig, `worktree-cleanup.mjs` und der Schwanz seiner Testdatei seien abgeschnitten
+oder weggelassen — der Zweig-Diff stößt bei rund 200 000 Zeichen an die Materialgrenze.
+Vier Runden lang habe ich das gelesen und nicht gehandelt. Erst als es zum fünften Mal
+dastand, habe ich die Datei selbst aufgeschlagen und darin binnen Minuten einen Defekt
+gefunden: Das Freigeben der Sperre prüfte nicht, ob die Sperre noch die eigene ist, sodass
+ein Aufräum-Lauf, der das Wettrennen verloren hatte, dem Gewinner die Sperre wegnahm.
+
+Der Punkt ist nicht, dass der Prüfer etwas übersehen hätte — er hat nichts übersehen, er
+hat es angesagt. Der Punkt ist, wie sein Ergebnis GELESEN wird. Ein Befund zu einer Datei
+heißt „hier ist etwas falsch". Das Ausbleiben eines Befunds zu einer Datei, die nie im
+Material lag, heißt NICHTS — und liest sich doch genau wie „dort ist alles in Ordnung".
+Das ist §3.46 in anderer Kleidung: Dort waren 3546 grüne Tests über einer stillschweigend
+geschrumpften Menge grün, hier ist eine Gegenprüfung über einem stillschweigend
+beschnittenen Material sauber. Beide Male trägt das Verfahren sein eigenes Loch, ohne zu
+lügen.
+
+Erschwerend kommt hinzu, dass die Beschneidung mit der GRÜNDLICHKEIT wächst. Je länger an
+einem Punkt gearbeitet wird, desto größer der Zweig-Diff, desto mehr fällt heraus — die
+Prüfung wird also genau dort blind, wo am meisten geändert wurde. Die fünfte Runde, auf den
+letzten Abschnitt statt auf den ganzen Zweig geschnitten, passte wieder ins Material und
+fand prompt vier Befunde; die anschließende Prüfung des ganzen Zweigs meldete erneut
+Beschneidung — und fand trotzdem zwei weitere, diesmal in der Klasse des ursprünglichen
+Unfalls.
+
+Die Lehre ist billig und gilt ab sofort: Ein Prüfergebnis wird zusammen mit seiner
+ABDECKUNG gelesen. Nennt der Prüfer beschnittenes Material, ist das Ergebnis eine
+TEILprüfung; die ungesehenen Pfade werden benannt und anders gedeckt — durch einen
+zweiten, auf den Rest geschnittenen Lauf oder durch eigenes Lesen. Was hier noch fehlt,
+ist der Mechanismus: Solange die Abdeckung nur in der Prosa des Prüfers steht, hängt sie
+daran, dass jemand sie liest — und vier Runden lang hat das niemand getan.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -1267,7 +1302,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 11.08.2026, 15:33 · Quellen-Fingerprint: `9cab01484839…`
+Zuletzt aktualisiert: Dienstag, 11.08.2026, 20:24 · Quellen-Fingerprint: `cbc6c033514f…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1309,6 +1344,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | After every change, npm run lint (oxlint) and npm audit must be clean — zero lint errors/warnings, zero CVEs. Standing user directive. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | hoa PERMANENT process — delegate as much implementation as possible to worktree-isolated subagents; keep only picture-verify + merge at the main session; run a pool of parallel agents on non-overlapping files | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | The \"Maximum QA\" QA process and the \"new demo\" trigger (append it + closing + increment tag + publish) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| State only what was just measured, with its reading time; never assert machine/repo state from a plausible model | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Before building, triage difficulty × criticality; HIGH/critical work gets a second, different model — in which FORM (blind-parallel vs. review) is normative in CLAUDE.md §6, not here | 2 | mittel | criticality-review-guard.mjs, model-guard.mjs | ✔ Mechanismus |
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
@@ -1349,8 +1385,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 74 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 50 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
+Erfasste Quellen: 75 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 51 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
 
-<!-- RETRO-FINGERPRINT: 9cab0148483975dedd45d1023a4fbd0902292dc6d1ddf20007764eee8e056bc8 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-11T13:33:57.378Z -->
+<!-- RETRO-FINGERPRINT: cbc6c033514fbf0301f4c7b112951d0e019604e7dd76858beace3dddfe08da01 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-11T18:24:42.038Z -->
 <!-- AUTO-GENERATED:END -->
