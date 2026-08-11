@@ -248,6 +248,34 @@ there exactly once; a new point joins a bundle when appended.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+- [ ] 642. EVERY CHECK THAT CAN BE LOAD-PROOF IS MADE LOAD-PROOF, AND THE REST SAYS SO (user
+  11.08.2026: "Was ist mit dem Problem, dass nicht alle Tests Last-resistent sind? … Das muss
+  nicht mehr vor der 0.3 passieren, aber möglichst bald danach"). The rebuild that replaced
+  wall-clock waits with waiting on the app's own state was applied CASE BY CASE, never swept:
+  measured 11.08.2026, the bird's-eye half of the Ctrl-label check had taken the one-moment
+  snapshot on 08.08., the settlement half never did, and the same defect reappeared there
+  three days later. Nothing forbids the pattern, so the next one will appear again.
+  THE TWO KINDS MUST BE SEPARATED, because "no test may fail from load" is only half
+  achievable and pretending otherwise would produce a green that means nothing:
+  1. A STATE check — does this exist, is it drawn there, does the label read that — CAN be
+     made load-proof, and must be: poll on the app's own frames or state until the answer is
+     stable, read every side of a comparison in ONE evaluation, never compare two separate
+     round trips. Sweep every `scripts/verify/*.mjs` for the pattern and fix each site.
+  2. A TIMING check — frame budget, animation smoothness, how long a step takes — is
+     load-sensitive BY NATURE. It is not made load-proof; it is RECOGNISED: under load its
+     verdict does not count as evidence (the runner already prints exactly that) and it is
+     reported as UNMEASURED rather than red, so a loaded machine can never manufacture a
+     failure nor hide one.
+  3. A GATE keeps the pattern out: a pure test over the verify sources refuses a comparison
+     assembled from two separate `page.evaluate` calls. The agent that found this case left
+     the gate undone on purpose and asked for the decision — this point is the decision.
+  VERIFIABLE: the sweep names every site it changed and every one it deliberately left,
+  with which kind it is; the gate fails on a re-introduced two-round-trip comparison and
+  passes on the fixed shape; and the throttle probe of point 640 shows 0/8 skew for each
+  repaired state check that previously skewed.
+  Criticality: HIGH — a suite that can fail from load makes every red arguable, which is the
+  door point 640 closes from the other side.
+
 - [ ] 629. THE LANDING DELETES THE WORKTREE OF AN AGENT THAT IS STILL WORKING (measured
   11.08.2026, and it destroyed finished work). Landing point 608 ran `land-point.mjs`
   through its `cleanup` step ("delete branch, remote branch and worktree"), and the
