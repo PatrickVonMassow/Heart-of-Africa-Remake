@@ -128,13 +128,16 @@ function linkedGitdirOf(path) {
 }
 
 /**
- * THE IDENTITY OF THE `.git` FILE — what a same-path replacement cannot reuse.
+ * THE IDENTITY OF THE `.git` FILE — a device, an inode and two timestamps.
  *
  * Measured 11.08.2026: after `git worktree remove` + `git worktree add` at the
  * SAME path, git's admin gitdir is byte-identical (it reuses the record name once
- * the old one is pruned) while the `.git` file's inode is not. A platform without
- * inode numbers reports 0 for both, which the comparison reads as "no such proof"
- * rather than as a match.
+ * the old one is pruned) and the inode frequently comes back too, because the
+ * filesystem had just freed it — so the write time is what separates the two
+ * creations. `birthtimeMs` is carried as ONE MORE FIELD and no more: Node may
+ * return the ctime where the filesystem has no birth time, and `utimes` can move
+ * it on Darwin/FreeBSD. A field the platform cannot answer reports 0, which the
+ * comparison reads as "no such proof" rather than as a match.
  */
 function gitFileIdentity(path) {
   try {

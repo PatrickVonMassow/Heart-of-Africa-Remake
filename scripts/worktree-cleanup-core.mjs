@@ -144,10 +144,11 @@ export function assertInside(path, root) {
  *              head means an unchanged verdict, and a changed one refuses.
  *   gitLink  — the admin gitdir its `.git` pointed at (still a linked worktree of
  *              the same repository)
- *   ino/dev/gitMtime/gitBirth — the identity of that `.git` file. The inode alone
- *              is not enough: a filesystem hands a freed inode straight back, so a
- *              same-path replacement often gets the same number. The creation
- *              times do not come back, and git writes that file once.
+ *   ino/dev/gitMtime/gitBirth — the identity of that `.git` file: a device, an
+ *              inode and two timestamps. The inode alone is not enough (a
+ *              filesystem hands a freed one straight back), and `gitBirth` is one
+ *              more field rather than an unforgeable stamp — see the comment at
+ *              the comparison itself for exactly what it is worth.
  *   notWrittenAfter — the instant the caller's freshness proof was taken against
  *
  * Every carried field must be re-read and must MATCH; a field the caller carried
@@ -192,15 +193,24 @@ export function matchesExpectation({ expected, entry, actual = null, dirty, ownL
     const bad = mismatch(name, wanted, found)
     if (bad) return { ok: false, reason: bad }
   }
-  // THE `.git` FILE'S IDENTITY — inode, device, and the two times it was created.
+  // THE `.git` FILE'S IDENTITY — device, inode, and two timestamps.
   //
   // The inode ALONE is not enough, and that is measured rather than assumed
   // (11.08.2026): a worktree removed and re-added at the same path frequently gets
   // the inode straight back, because the filesystem had just freed it. Git writes
   // that one-line file when it creates the tree and never touches it again, so its
-  // write time and its BIRTH time are creation stamps; birth is the strongest of
-  // the four where the platform has it, because no userspace API can set it
-  // (`utimes` reaches mtime, nothing reaches birthtime).
+  // write time distinguishes one creation from the next.
+  //
+  // WHAT `gitBirth` IS ACTUALLY WORTH — one more field, not an unforgeable stamp
+  // (fourth review, finding B). It reads `birthtimeMs`, and Node's own contract is
+  // weaker than it sounds: a filesystem without birthtime support may return the
+  // ctime instead, the precision is platform-specific, and on Darwin and FreeBSD
+  // `utimes` CAN move it. So it is carried as a fourth field beside device, inode
+  // and mtime — where the platform keeps a real birth time it is an independent
+  // creation stamp, and where it does not it duplicates another field and adds
+  // nothing. Either way it can only ever make this check REFUSE more (the fields
+  // are a conjunction), never less, which is why carrying it is safe without the
+  // platform guaranteeing anything.
   //
   // AN ABSENT IDENTITY REFUSES (third review, finding A). This comparison used to
   // skip itself when nothing was carried and fall through to `ok: true` — the very
@@ -209,11 +219,12 @@ export function matchesExpectation({ expected, entry, actual = null, dirty, ownL
   // the refusal NAMES what was unavailable so a platform that genuinely cannot
   // supply it gets an answer it can act on rather than a silent pass.
   //
-  // THE RESIDUAL, STATED. These are (device, inode, two timestamps). POSIX exposes
-  // no file GENERATION number through Node, so a filesystem that hands back the
-  // same inode AND reproduces both creation times to the nanosecond would defeat
-  // it. That is the honest bound; it sits behind the branch, HEAD and admin-record
-  // checks above and behind the lock this command holds while it asks.
+  // THE RESIDUAL, STATED. These are (device, inode, two timestamps) and nothing
+  // stronger: POSIX exposes no file GENERATION number through Node, so a
+  // filesystem that hands back the same inode AND reproduces both timestamps to
+  // the nanosecond would defeat them. That is the honest bound; it sits behind the
+  // branch, HEAD and admin-record checks above and behind the lock this command
+  // holds while it asks.
   const IDENTITY = ['ino', 'dev', 'gitMtime', 'gitBirth']
   const carried = IDENTITY.map((k) => Number(want[k] ?? 0))
   const found = IDENTITY.map((k) => Number(got[k] ?? 0))
@@ -267,20 +278,36 @@ export function matchesExpectation({ expected, entry, actual = null, dirty, ownL
 // PROVABLY gone, is ever recovered; a foreign lock, an unparseable one, and one
 // whose holder cannot be judged all stay exactly where they are and are reported.
 
-/** How this command signs the worktree lock it holds while verifying and
- *  deleting. `pid`/`start` make it a RUN rather than a command name. */
-export const CLEANUP_LOCK_PREFIX = 'worktree-cleanup'
+/**
+ * How this command signs the worktree lock it holds while verifying and deleting.
+ * `pid`/`start` make it a RUN rather than a command name.
+ *
+ * THE WHOLE SIGNATURE IS MATCHED, NEVER A PREFIX (fourth review, finding A). A
+ * `startsWith('worktree-cleanup')` test claimed `worktree-cleanup-helper (pid …)`
+ * as ours, and a foreign lock that parses as ours becomes BREAKABLE the moment
+ * its pid is absent — which is precisely the rule the asymmetry above says is
+ * never bent. The writer and the reader are built from ONE template so they
+ * cannot drift apart.
+ */
+export const CLEANUP_LOCK_BODY = 'worktree-cleanup verifying and deleting'
+
+/** The one lock spelling this command has ever written before it carried a run
+ *  identity. Recognised so its message can say how to clear it — never
+ *  recoverable, because it names no process. */
+export const CLEANUP_LOCK_LEGACY = 'worktree-cleanup: verifying and deleting'
+
+const CLEANUP_LOCK_SIGNATURE = new RegExp(`^${CLEANUP_LOCK_BODY} \\(pid (\\d+) start (-?\\d+)\\)$`)
 
 export const formatCleanupLock = ({ pid, startedAt } = {}) =>
-  `${CLEANUP_LOCK_PREFIX} verifying and deleting (pid ${Number(pid) || 0} start ${Number(startedAt) || 0})`
+  `${CLEANUP_LOCK_BODY} (pid ${Number(pid) || 0} start ${Number(startedAt) || 0})`
 
 /** `{ ours, pid, startedAt }` for a lock reason — `ours: false` for anything this
  *  command did not write, which is never recovered. PURE. */
 export function parseCleanupLock(reason) {
   const text = String(reason ?? '').trim()
-  if (!text.startsWith(CLEANUP_LOCK_PREFIX)) return { ours: false, pid: 0, startedAt: 0 }
-  const m = /\(pid\s+(\d+)\s+start\s+(-?\d+)\)/.exec(text)
-  return { ours: true, pid: m ? Number(m[1]) : 0, startedAt: m ? Number(m[2]) : 0 }
+  const m = CLEANUP_LOCK_SIGNATURE.exec(text)
+  if (m) return { ours: true, pid: Number(m[1]), startedAt: Number(m[2]) }
+  return { ours: text === CLEANUP_LOCK_LEGACY, pid: 0, startedAt: 0 }
 }
 
 /**

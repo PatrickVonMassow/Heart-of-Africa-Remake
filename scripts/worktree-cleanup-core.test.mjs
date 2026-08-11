@@ -17,6 +17,7 @@ import {
   assertInside,
   formatRefusal,
   stubBranchFor,
+  CLEANUP_LOCK_LEGACY,
   formatCleanupLock,
   matchesExpectation,
   parseCleanupLock,
@@ -441,6 +442,33 @@ describe('matchesExpectation — pure', () => {
     expect(r.reason).toMatch(/REPLACED/)
   })
 
+  it('treats EVERY identity field the same — each one alone refuses when it differs', () => {
+    // What the code now claims about `gitBirth` (fourth review, finding B): it is
+    // one more field beside device, inode and mtime, NOT an unforgeable stamp. So
+    // it is asserted the way the other three are, and no case here rests on it
+    // being genuine — a conjunction can only refuse more, never less.
+    for (const field of ['ino', 'dev', 'gitMtime', 'gitBirth']) {
+      const r = ask({ actual: { ...actual, [field]: Number(actual[field]) + 1 } })
+      expect(r.ok, `${field} must refuse when it differs`).toBe(false)
+      expect(r.reason).toMatch(/REPLACED/)
+    }
+  })
+
+  it('a genuine birth time is not required — the other three still decide without it', () => {
+    // The platform case Node documents: no birthtime support, so the field is 0.
+    const noBirth = { ...expected, gitBirth: 0 }
+    const same = matchesExpectation({ expected: noBirth, entry, actual: { ...actual, gitBirth: 0 }, dirty: false })
+    expect(same.ok).toBe(true)
+    expect(same.reason).toMatch(/same \.git file \(ino, dev, gitMtime\)/)
+    const moved = matchesExpectation({
+      expected: noBirth,
+      entry,
+      actual: { ...actual, gitBirth: 0, gitMtime: 901 },
+      dirty: false,
+    })
+    expect(moved.ok).toBe(false)
+  })
+
   it('refuses a tree written into after the caller took its freshness proof', () => {
     const r = ask({ actual: { ...actual, activeAt: 9000 } })
     expect(r.ok).toBe(false)
@@ -465,11 +493,45 @@ describe('staleLockVerdict — may a lock in the way be broken?', () => {
     expect(parseCleanupLock(ours)).toEqual({ ours: true, pid: 4711, startedAt: 1000 })
   })
 
+  it('round-trips its own signature, so writer and reader cannot drift apart', () => {
+    for (const pid of [1, 4711, 999_999]) {
+      expect(parseCleanupLock(formatCleanupLock({ pid, startedAt: pid * 3 }))).toEqual({
+        ours: true,
+        pid,
+        startedAt: pid * 3,
+      })
+    }
+  })
+
   it('NEVER breaks a foreign lock — that is an agent still holding its tree', () => {
     const r = staleLockVerdict({ reason: 'claude agent agent-x (pid 4711 start 1000)', probe: { exists: false } })
     expect(r.recoverable).toBe(false)
     expect(r.why).toMatch(/not this command's/)
     expect(parseCleanupLock('claude agent agent-x (pid 1 start 2)').ours).toBe(false)
+  })
+
+  it('NEVER claims a lock that merely BEGINS with our name — the whole signature must match', () => {
+    // Fourth review, finding A: a `startsWith` test claimed these as ours, and a
+    // foreign lock that parses as ours becomes breakable the moment its pid is
+    // absent — the one rule the asymmetry says is never bent.
+    const collisions = [
+      'worktree-cleanup-helper (pid 4711 start 1000)',
+      'worktree-cleanup2 verifying and deleting (pid 4711 start 1000)',
+      'worktree-cleanup verifying and deleting (pid 4711 start 1000) — and then something else',
+      'worktree-cleanup verifying and deleting',
+      'worktree-cleanupverifying and deleting (pid 4711 start 1000)',
+    ]
+    for (const reason of collisions) {
+      expect(parseCleanupLock(reason).ours, reason).toBe(false)
+      expect(staleLockVerdict({ reason, probe: { exists: false, startedAt: null } }).recoverable, reason).toBe(false)
+    }
+  })
+
+  it('still recognises the one legacy spelling it wrote, only to say how to clear it', () => {
+    const legacy = staleLockVerdict({ reason: CLEANUP_LOCK_LEGACY, probe: { exists: false } })
+    expect(parseCleanupLock(CLEANUP_LOCK_LEGACY)).toEqual({ ours: true, pid: 0, startedAt: 0 })
+    expect(legacy.recoverable).toBe(false)
+    expect(legacy.why).toMatch(/by hand/)
   })
 
   it('breaks OUR lock when its process is gone', () => {
@@ -494,11 +556,6 @@ describe('staleLockVerdict — may a lock in the way be broken?', () => {
     for (const probe of [null, {}, { exists: true, startedAt: null }]) {
       expect(staleLockVerdict({ reason: ours, probe }).recoverable).toBe(false)
     }
-    // One of ours from before the identity existed: unparseable, so it stays and
-    // says how to clear it.
-    const old = staleLockVerdict({ reason: 'worktree-cleanup: verifying and deleting', probe: { exists: false } })
-    expect(old.recoverable).toBe(false)
-    expect(old.why).toMatch(/by hand/)
     expect(staleLockVerdict({ reason: '' }).recoverable).toBe(false)
   })
 })
@@ -548,9 +605,15 @@ describe('--expect, on a THROWAWAY repository', () => {
   }
   const cleanup = (opts) => cleanupWorktree(worktree, { git: gitOf, ...opts })
 
-  it('removes the tree when the expectation still holds', () => {
+  it('removes the tree when the expectation still holds, leaving no record and no lock', () => {
     expect(cleanup({ expected: expectationNow() }).ok).toBe(true)
     expect(existsSync(worktree)).toBe(false)
+    // The record must go WITH the tree. `git worktree prune` SKIPS a locked
+    // worktree, so a lock still standing here would outlive the directory and no
+    // prune could ever clear it — the same wedge by another road.
+    const listed = run(['worktree', 'list', '--porcelain'])
+    expect(listed).not.toContain(worktree)
+    expect(listed).not.toContain('locked')
   })
 
   it("REFUSES a tree that was locked between the caller's check and this command", () => {
