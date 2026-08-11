@@ -318,28 +318,27 @@ coverage map live in `scripts/verify/README.md`.
   trailers could have caught it.)
 - **The four-eyes principle has TWO MODES, chosen by the STAGE (user
   25.07.2026). This is its normative wording; everywhere else refers here.** A
-  DIVERGENT stage — what could go wrong, which scenarios to test, which designs
-  are possible, where a system might break — runs BLIND PARALLEL: both models
-  work from the same inputs to their own complete result, neither seeing the
-  other's until both are done; the two are then merged into a union
-  deduplicated BY MEANING, keeping both wherever it is unclear that one subsumes
-  the other, MARKING what only one produced and dropping none for being
-  unusual. The reason is anchoring: a reviewer handed a finished
-  list CHECKS THAT LIST and produces far less than it would have from a blank
-  page, so review is the wrong instrument wherever the risk is the item nobody
-  thought of. A CONVERGENT stage — is this diff correct, does this implementation
-  match its spec, is this measurement sound — judges ONE artefact, which cannot
-  be produced twice independently; it keeps the ORDINARY REVIEW, refined only in
-  that the reviewer reads the ARTEFACT before the author's rationale, so the
-  justification cannot anchor it either. Two sets are worth what their errors
-  are UNCORRELATED, so CROSS-VENDOR is the default pairing (the reviewers above);
-  two blind runs of ONE model are independent in what they saw but not in how
-  they think — the WEAKER fallback when no second model is available, recorded
-  as such and DECORRELATED BY FRAMING (a hostile tester, a maintainer inheriting
-  the code, a player trying to break it), since a re-run varies least where the
-  model is confidently blind. The generative stage runs twice, so it costs
-  roughly 2× there and applies where four-eyes already applies by the
-  criticality triage, not everywhere.
+  DIVERGENT stage — what could go wrong, which cases to test, which designs are
+  possible — runs BLIND PARALLEL: both models work from the same inputs to their
+  own complete result, neither seeing the other's until both are done; the two
+  are then merged BY MEANING, keeping both wherever it is unclear that one
+  subsumes the other and dropping none for being unusual. The reason is
+  anchoring: a reviewer handed a finished list CHECKS THAT LIST and names far
+  less than from a blank page, wrong where the risk is the item nobody thought
+  of. THE MERGE, where a finding vanishes silently, GOES TO THE MODEL THAT WROTE
+  NEITHER LIST and is COUNTED (user 11.08.2026): every entry carries an id and
+  the union accounts for each — `only A`, `only B`, `merged with <id>` — via
+  `scripts/blind-merge.mjs`; `mechanism-review.mjs --merged-by` names the merger
+  and refuses either author unless only two models existed. A CONVERGENT stage —
+  is this diff correct, does it match its spec, is this measurement sound —
+  judges ONE artefact, which cannot be produced twice; it keeps the ORDINARY
+  REVIEW, refined only in that the reviewer reads the ARTEFACT before the
+  author's rationale, so that cannot anchor it either. Two sets are worth what their errors are UNCORRELATED, so CROSS-VENDOR
+  is the default pairing (the reviewers above); two blind runs of ONE model are
+  the WEAKER fallback, recorded as such and DECORRELATED BY FRAMING (a hostile
+  tester), since a re-run varies least where the model is confidently blind. The
+  generative stage runs twice, so ~2× there, and applies where four-eyes already
+  applies by the criticality triage, not everywhere.
 - **Language.** All player-visible text (UI, chronicle, messages) is served
   from the language files (`design.md` §17): English is the default game
   language, German is available, and the structure must make further
