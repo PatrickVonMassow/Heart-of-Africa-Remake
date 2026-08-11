@@ -17312,3 +17312,50 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   existing `unstuck` section of `scripts/verify/collision.mjs` extended by the pad path.
   Criticality: medium — the mechanism is there; what is missing is a way to it for two of
   the three input devices the game supports.
+
+- [x] 590. THE BOARD'S QUEUE ORDER IS A SECOND COPY OF THE WORK ORDER, AND IT KEEPS
+  DRIFTING (user 09.08.2026: "Das Problem, dass die Reihenfolge der Karten auf dem
+  Dashboard falsch war, hatten wir immer wieder. Können wir nicht einen Mechanismus
+  etablieren, der das dauerhaft gesichert behebt?"). ESTABLISHED, twice within one hour on
+  09.08.2026: the thirteen play-session points the user had put AHEAD OF EVERYTHING sat at
+  queue position ~90, and the freshly appended 589 landed at the very back — both times
+  because the board renders from an `order` array in `.claude/board-queue.json` that is
+  maintained BY HAND and appends anything it does not already list. `queue-order-guard`
+  did not catch either: it only enforces "fixes before finders" and "the release tag last",
+  never that a point sits where its priority actually puts it. This is the project's own
+  named failure — a second place for one fact — applied to the one artefact the user reads.
+  ALREADY DELIVERED BY POINT 608 (merged 10.08.2026, established 11.08.2026 while landing
+  this one): the queue renders from the work order's own sequence read through
+  `tasks-source.mjs` (`openPointsOf`/`queueOrder` in `board-queue-core.mjs`), the `order`
+  array is gone from `.claude/board-queue.json`, the rank rules apply on top unchanged, and
+  `queue-order-guard`'s `queueOrderDrift` blocks a published sequence that differs — a
+  point carded twice included. Re-ranking therefore already means MOVING the point's block
+  inside `TASKS.md`. None of that is to be built again; what remains is the one thing 608
+  does not do.
+  FINAL STATE:
+  1. AN APPENDED POINT IS RANKED ONCE, DELIBERATELY. Append-and-defer puts a new point at
+     the END, which is a DEFAULT, not a judgment — and 589 shows the default is often
+     wrong. A Stop guard therefore refuses to end the turn that appended a point until its
+     rank was settled: either the point was moved to where it belongs, or the turn recorded
+     that last is right (`node scripts/queue-rank.mjs --ranked <N> --why "<one line>"`).
+     One decision per new point, at the moment its content is freshest.
+  2. WHICH POINT COUNTS AS APPENDED IS READ OFF PROVENANCE, never off the numbers or the
+     positions (three cross-vendor passes refuted every position heuristic). The tracked
+     record `.claude/queue-rank.json` carries the deliberate decisions AND a `settled`
+     baseline — the open set as it stood the last time no rank question was outstanding —
+     and a point is new exactly when it is missing from that baseline. The baseline moves
+     only when nothing is outstanding, and it is ARMED by hand (`--seed`), never as a side
+     effect. A point standing BEFORE one the baseline remembers was placed deliberately and
+     is not asked about; a REOPENED point re-entering at the end is asked like any append,
+     and so is a new point placed before another new one (two points appended in one turn
+     arrive exactly like that). A record that does not parse is TORN: the gate stays quiet
+     and the CLI is loud, and nothing overwrites it. A `ranked` entry without a reason is
+     no decision and is dropped.
+  VERIFIABLE: Vitest over the pure core — an appended point is reported unranked until it
+  is recorded; the survivor left last by a closing is never asked; descending appends are
+  all asked; a torn or reasonless record silences nothing. Plus the guard test: the turn
+  that appended a point blocks, and the recorded decision releases it.
+  MECHANISM, so the four-eyes rule applies: the other model reviews the guard and the
+  ranking gate before they land (`scripts/mechanism-review.mjs --record`).
+  Criticality: HIGH — the board is the only thing the user sees while the batch runs, and a
+  queue in the wrong order misrepresents what is being worked on next.
