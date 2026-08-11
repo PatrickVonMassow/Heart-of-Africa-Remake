@@ -6106,7 +6106,22 @@ to land than a mechanism that needs a review.
      process-start probe cannot answer, and `staleLockVerdict` permanently refuses to
      recover any zero-start lock. A crash while holding such a lock wedges that worktree for
      good; the recovery tests all use non-zero synthetic starts.
-  FINAL STATE: 1, 3 and 4 are fixed at their cause — the parser matches what the formatter
+  TWO MORE, OF THE ORIGINAL CLASS, found by the whole-branch review (GPT-5.6 Sol,
+  5ceaa3ab..ae40a081). These are BRANCH loss rather than worktree loss, but the cost is the
+  same — a live tree left standing on a branch that no longer exists:
+  5. A DETACHED NON-AGENT WORKTREE IS TREATED AS FOREIGN AND THEREFORE PROTECTS NOTHING. In
+     `judgeCleanupTarget`, `if (!has)` classifies a detached non-agent tree as `foreign`;
+     `selectCleanupTargets` then leaves it out of `reported`, and its EMPTY branch fails the
+     fallback branch comparison. So a live manual worktree that happens to be rebasing the
+     landed branch permits BOTH branch deletions — the exact shape of the incident, one level
+     up.
+  6. THE BRANCH BLOCKER IS READ FROM A STALE SNAPSHOT. `branchBlocked` in `land-point.mjs`
+     uses the `cleanup` snapshot taken minutes earlier and never re-lists the worktrees before
+     deleting; `deleteLandedBranch` then runs the local and the remote deletion as two
+     commands. A detached tree appearing AFTER selection can lose both branches, and a live
+     tree that recreates the local branch after `branch -d` can still lose its remote. The
+     tests cover command failure and ordering, not either concurrent transition.
+  FINAL STATE: 1, 3, 4, 5 and 6 are fixed at their cause — the parser matches what the formatter
   writes with no normalisation that widens it, the release is made a single act or, where
   git offers no such primitive, is narrowed and its residual written down, and a lock this
   command wrote that carries no usable identity is recoverable by SOME stated rule rather
@@ -6116,6 +6131,9 @@ to land than a mechanism that needs a review.
   VERIFIABLE: a Vitest case per hole, each failing before its fix — a padded foreign
   reason is refused as foreign; a verification that finds no lock while `weLocked` refuses;
   a release that finds a foreign lock in place leaves it standing; and a zero-start lock of
-  ours is recoverable by the stated rule. The existing suite stays green.
+  ours is recoverable by the stated rule. For 5 and 6: a detached non-agent worktree holding
+  the landed branch BLOCKS both branch deletions, and a tree that appears between the
+  selection and the deletion blocks them too — the branch state is re-read at the moment of
+  deletion, not taken from the plan. The existing suite stays green.
   Criticality: high — same subject as 629 and the same cost if it goes wrong, and it is
   live on `main` today. Bundle: Session- & Repo-Hygiene.
