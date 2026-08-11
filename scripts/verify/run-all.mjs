@@ -20,6 +20,7 @@ import {
   LEVEL, annotateResult, annotateStageFailure, decideRun, formatLoadReport, onLoadMode,
 } from './machine-load-core.mjs'
 import { readMachine } from './machine-load.mjs'
+import { RETRY_ENV, formatSuspectEnv } from '../render-verify-core.mjs'
 import { DEV_SUITES, laneFor, needsDevServer, parseArgs, planBackends, selectBackend, skippedSuites, suitesFor } from './tiers.mjs'
 import { SECTION_ENV, listSections, planSectionRun, resolveSelection } from './sections.mjs'
 import { readFileSync } from 'node:fs'
@@ -166,7 +167,10 @@ if (loadMode !== 'off') {
 // run (the staged-drama suites poll until state on a slow WebGPU backend) is
 // NEVER killed for merely being slow. Configurable via VERIFY_SUITE_TIMEOUT_MS.
 const SUITE_TIMEOUT_MS = Number(process.env.VERIFY_SUITE_TIMEOUT_MS) || 45 * 60 * 1000
-function runSuite(name, baseUrl) {
+/** `retryAfter` is the env value that marks this spawn as the RETRY of a failed
+ *  attempt (point 640) — blank for a first attempt, which also neutralises a
+ *  stale export in the calling shell. */
+function runSuite(name, baseUrl, retryAfter = '') {
   const res = spawnSync(process.execPath, [join(HERE, `${name}.mjs`)], {
     windowsHide: true,
     encoding: 'utf8',
@@ -178,6 +182,7 @@ function runSuite(name, baseUrl) {
     env: {
       ...process.env,
       ...(baseUrl ? { BASE_URL: baseUrl } : {}),
+      [RETRY_ENV]: retryAfter,
       VERIFY_GL: laneFor(name, VERIFY_GL),
     },
     timeout: SUITE_TIMEOUT_MS,
@@ -209,11 +214,16 @@ function runSuite(name, baseUrl) {
 // The suites drive a real-time RAF simulation whose staging can miss its window
 // under full-regression load, and each run tends to surface a DIFFERENT rare
 // intermittent — so a single retry almost always clears a rotating flake, while
-// a REAL failure fails BOTH runs and is still reported. A retry is made LOUD, not
-// silent: a "PASSED ON RETRY" line flags the suite for investigation, so a
-// genuine INTERMITTENT bug (one that flaked, like the buried-drinker) is surfaced
-// rather than masked. The root-cause fix stays the point-200 sim-clock/condition
-// polling; this only stops one transient from failing the whole regression.
+// a REAL failure fails BOTH runs and is still reported. The root-cause fix stays
+// the point-200 sim-clock/condition polling; this only stops one transient from
+// failing the whole regression.
+//
+// THE RETRY IS NOT AN ANSWER (point 640). The "PASSED ON RETRY" line was prose in
+// a log nobody re-reads, and a run that passed only the second time was worth as
+// much to the gate as one that never failed. So the retry now also carries the
+// first attempt's failing checks into its own run record, which is stamped
+// SUSPECT and covers no backend: the red stays open until a CAUSE closes it —
+// named and fixed, charged to the open point that owns it, or filed as one.
 //
 // A double failure is TRIAGED, not asserted (point 294). "Failed twice" used to
 // print "a real failure, not a flake", which is not what two failures prove: on
@@ -237,9 +247,17 @@ function runSuiteWithRetry(name, baseUrl) {
     return false
   }
   console.log(`↻ retry ${name} once — a first-try failure may be a rotating staging flake (point 200)`)
-  const second = runSuite(name, baseUrl)
+  // The retry carries what the first attempt failed on, so its own run record is
+  // stamped SUSPECT (point 640) and cannot be the covering evidence for a landing.
+  const second = runSuite(name, baseUrl, formatSuspectEnv(failedChecks(first.out)))
   if (second.ok) {
-    console.log(`⚠ PASSED ON RETRY  ${name} — it flaked once; INVESTIGATE if it recurs (could be a real intermittent)`)
+    console.log(
+      `⚠ PASSED ON RETRY  ${name} — recorded SUSPECT: it covers no backend, because "it passed the ` +
+        'second time" is consistent with a fixed defect, a rare one, a timing race and an idle ' +
+        'machine alike. Close it by a CAUSE (fix it), by CHARGING it in ' +
+        'scripts/render-verify-charges.mjs to the open point that owns it, or by filing it as an ' +
+        `open point. Is it load? Measure: node scripts/throttle-probe.mjs ${name} --section=<name> --runs 8`,
+    )
     return true
   }
   const signature = repeatSignature({ first: first.out, second: second.out })

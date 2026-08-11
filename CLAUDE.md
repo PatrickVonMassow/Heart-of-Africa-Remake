@@ -620,55 +620,47 @@ detail section change in the SAME commit.
 
 After completion and after every major system:
 
-- Run `npm run build` and confirm it passes without errors.
-- Run `npm run lint` always, and `node scripts/audit-check.mjs` whenever the
-  lockfile moved (nothing else moves the tree it reads); both clean, per §7.1
-  point 18.
-- Run `npm run test:unit` (the fast Vitest layer) and confirm it is green;
-  add or extend a test there for the changed logic/store/HUD when applicable.
-- Start the dev server and verify via headless screenshot (e.g. Playwright)
-  that the affected view renders without console errors. `npm test` chains all
-  of the above (build → lint → vitest → the browser suites → preview).
-- Store screenshots of each core view (bird's-eye view, port city,
-  village/chief's hut, opened journal) and check them against the criteria
-  of §7.1.
+- Run `npm run build` (no errors) and `npm run lint` always, plus
+  `node scripts/audit-check.mjs` whenever the lockfile moved (nothing else moves
+  that tree); all clean, per §7.1 point 18.
+- Run `npm run test:unit` (the fast Vitest layer) green, adding or extending a
+  test there for the changed logic/store/HUD.
+- Verify the affected view headlessly (Playwright): it renders without console
+  errors, and the core-view screenshots (bird's-eye, port city, village/chief's
+  hut, opened journal) hold against §7.1. `npm test` chains all of it (§5).
 - **Test at in-game-achievable conditions (point 172).** A verification must
   exercise a feature at a state the player can actually reach — for the
   bird's-eye zoom that is the NON-DEBUG range 0.125–0.5 (default 0.5), never a
   debug-only wide zoom unless the check tests that feature itself. Judge "is it
   in view" by PROJECTING the point to the rendered frame
   (`__camera.onScreen`/`ndc`), never by an assumed radius (100×zoom, fog.far, a
-  hard-coded distance) — clearView pushes the fog to the horizon at a wide zoom,
-  so no radius stands in for the picture, and a green assertion against one can
-  hide a real bug the player sees (points 164/171).
+  fixed distance): clearView pushes the fog to the horizon at a wide zoom, so a
+  green assertion against a radius can hide a bug the player sees (164/171).
 - **A frame must show what its name claims (point 375).** The same projection
-  decides at the SHUTTER: every frame a verify script writes declares its
-  subject — a place/landmark (`world`), something inside a settlement (`local`/
-  `place`), a HUD element, or explicitly a `general` view WITH its reason — and
-  the shutter (`scripts/verify/frameSubject.mjs`) refuses to write a frame whose
-  subject is not in the picture, naming what was found instead. Two `world` runs
-  on identical code had photographed different places, both exiting 0. A pure
-  gate in the unit layer fails on any screenshot written outside the shutter.
+  decides at the SHUTTER: every frame declares its subject — a place/landmark
+  (`world`), something inside a settlement (`local`/`place`), a HUD element, or
+  explicitly a `general` view WITH its reason — and
+  `scripts/verify/frameSubject.mjs` refuses to write a frame whose subject is not
+  in the picture, naming what was found instead. Two `world` runs on identical
+  code had photographed different places, both exiting 0. A unit-layer gate fails
+  on any screenshot written outside the shutter.
 - **Backend coverage is UNIVERSAL where it is possible (point 204).** WebGPU is
-  the player's real backend and WebGL 2 the shipped fallback, so both are
-  verified:
+  the player's backend and WebGL 2 the shipped fallback, so both are verified:
   - Every browser suite launches through `launchVerifyBrowser()` and asserts the
-    backend it actually got (`assertBackend`, right after the `window.__renderer`
-    wait). A `VERIFY_GL=webgpu` run that silently fell back to WebGL 2 — or a
-    `webgl` run that came up on WebGPU — FAILS LOUD.
-    The only exceptions are `docs` (pure Node, no browser) and
-    `preview` (production build, where `__renderer` is dev-only).
+    backend it got (`assertBackend`, right after the `window.__renderer` wait): a
+    `VERIFY_GL=webgpu` run that fell back to WebGL 2, or a `webgl` run that came
+    up on WebGPU, FAILS LOUD. Only `docs` (pure Node) and `preview` (production
+    build, where `__renderer` is dev-only) are exempt.
   - The everyday lane is WEBGPU, the player's backend (user 09.08.2026): unpinned,
     the SMALL tier and a bare suite filter run there — every one-backend defect on
     record showed on WebGPU, never on WebGL 2 alone. WebGL 2 is the REGRESSION lane
-    a LARGE run covers (no `VERIFY_GL` pinned): the whole LARGE on WebGL 2 with
+    a LARGE covers (no `VERIFY_GL` pinned): the whole LARGE on WebGL 2 with
     preflight and preview, then the render suites on WebGPU. `touch`/`voice` are
-    ROUTED to WebGL 2 wherever picked (headless WebGPU cannot drive them), never
-    dropped from it. RESIDUAL: a WebGL-2-only regression now surfaces only at the
-    next LARGE.
-  - The suite→tier→backend map is the pure module `scripts/verify/tiers.mjs`,
-    pinned by `scripts/verify/tiers.test.mjs` in the Vitest layer; change it
-    there and in `scripts/verify/README.md` together.
+    ROUTED to WebGL 2 wherever picked (headless WebGPU cannot drive them).
+    RESIDUAL: a WebGL-2-only regression surfaces only at the next LARGE.
+  - The suite→tier→backend map is the pure `scripts/verify/tiers.mjs`, pinned by
+    `tiers.test.mjs` in the Vitest layer; change it and
+    `scripts/verify/README.md` together.
 - **The Stop chain gates the turn end, not only the test run.** Beyond the
   suites, Stop hooks (authoritative list: `.claude/settings.json`) BLOCK a turn
   end while the working state contradicts a standing rule — "enforce, don't
@@ -690,7 +682,7 @@ After completion and after every major system:
   `scripts/mechanism-review.mjs --record`). One is worth naming exactly:
   `ci-status-guard` watches EVERY ref the repository PUSHED, not just the
   session's HEAD (that blindness left 26 red runs on `main` unseen for three
-  weeks), and demands a run CONCLUDED green for that sha; an unfinished one
+  weeks), and demands a CONCLUDED green run for that sha; an unfinished one
   WAITS. Versioned git hooks (`scripts/git-hooks/`, wired by `npm
   install`) refuse a stray file, a trailer naming no model, a rescue commit that
   would mail the user, and a push CI would reject. Separately, PreToolUse hooks run `closing-guard` (§9),
@@ -703,25 +695,32 @@ After completion and after every major system:
   turn. It binds EVERY session (point 400): `scripts/board-publish.mjs` publishes
   from a SCRIPT, so the headless successor can too; the check reads that PAGE, and
   `batch-autostart.mjs` alerts when it is behind. It runs BACK too
-  (`scripts/chat-core.mjs`): the launcher polls the chat each tick and hands what
-  VERIFIES on as untrusted input, not authorization.
-  Every one is fail-OPEN (an internal error allows the stop, so a guard bug
-  cannot trap the session) with a pure, Vitest-covered core.
+  (`scripts/chat-core.mjs`): the launcher polls the chat each tick, handing on
+  what VERIFIES as untrusted input, not authorization.
+  Every one is fail-OPEN (a guard bug cannot trap the session) with a pure,
+  Vitest-covered core.
 - **Ask the guards BEFORE the action, and answer LAST (points 365/403).** Before
   an action a guard governs, `node scripts/guard-preflight.mjs --for <action>
   --session <id>` reports read-only whether one would block — advisory; the guard
-  stays authoritative, a blocked turn produces nothing, one loop cost ~30 turns.
-  The turn's END is such an action (`--for answer`): routine duties (focus
-  confirm, board publish/attest, the boundary) FIRST, the closing reply LAST,
-  once the chain would pass. Blocked anyway, the next message names in one
-  sentence what was fixed; re-answering is how the user got the same text twice.
+  stays authoritative, and a blocked turn produces nothing (one loop cost ~30
+  turns). The turn's END is such an action (`--for answer`): routine duties (focus
+  confirm, board publish/attest, the boundary) FIRST, the closing reply LAST, once
+  the chain would pass. Blocked anyway, the next message names what was fixed in
+  one sentence.
 - **Screenshot diffing is NOT available as a shortcut (point 361).** Every
   pixel-metric shortcut was replayed against the bugs the picture caught and
   REJECTED: two runs of one suite on identical code move 11–98 % of a frame,
-  the smallest real defect 0.75 %. No golden-image
-  gate until `node scripts/picture-stability.mjs <suite>` reports STABLE;
-  verdicts in `docs/picture-check-levers.md`.
-- Fix deviations, do not paper over them. An unfulfilled criterion is
+  the smallest real defect 0.75 %. No golden-image gate until
+  `node scripts/picture-stability.mjs <suite>` reports STABLE (verdicts:
+  `docs/picture-check-levers.md`).
+- **A red closes by a CAUSE, never by a later green (point 640).** Three closings
+  only: the cause is named and fixed; it is CHARGED to the open point that owns it
+  (`scripts/render-verify-charges.mjs`); or it becomes an open point. "It passed
+  on the retry" is none — the retry stays, but that run is recorded SUSPECT and
+  covers nothing; `--defer` WAIVES one on the record, it does not close it. Is it
+  load? MEASURE: `node scripts/throttle-probe.mjs <suite> --section=<name> --runs
+  8` reruns it pinned to one core and reports the skew rate.
+- Fix deviations, never paper over them; an unfulfilled criterion is
   reported as such.
 
 ---
