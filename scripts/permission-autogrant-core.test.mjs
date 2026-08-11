@@ -14,12 +14,13 @@ describe('permission auto-grant', () => {
     }
   })
 
-  it('keeps asking where a bare allow would answer the wrong question', () => {
-    // AskUserQuestion IS the answer; ExitPlanMode needs the plan decision. Granting
-    // either blind feeds an unattended run a hollow reply instead of unblocking it.
-    for (const tool of ['AskUserQuestion', 'ExitPlanMode']) {
-      expect(decide({ tool_name: tool }), tool).toBeNull()
-    }
+  it('keeps asking ONLY where a bare allow would answer the wrong question', () => {
+    // AskUserQuestion IS the answer; approving it blind hands back an empty one.
+    expect(decide({ tool_name: 'AskUserQuestion' })).toBeNull()
+    // ExitPlanMode sat here for one round and had to come out: it takes a bare allow,
+    // and in a `-p` session no decision means DENY, not "a human decides" — the entry
+    // meant to protect the unattended batch would have stopped it.
+    expect(decide({ tool_name: 'ExitPlanMode' })?.decision).toBe('allow')
   })
 
   // Fail-open: each of these leaves the decision to the harness, which asks.
@@ -43,8 +44,9 @@ describe('permission auto-grant', () => {
     const out = JSON.parse(render(decide({ tool_name: 'Bash' })))
     expect(out.hookSpecificOutput.hookEventName).toBe('PermissionRequest')
     expect(out.hookSpecificOutput.decision).toEqual({ behavior: 'allow' })
-    expect(out.hookSpecificOutput.permissionDecision).toBeUndefined()
-    expect(out.hookSpecificOutput.permissionDecisionReason).toBeTruthy()
+    // And NOTHING borrowed from PreToolUse beside it. An unsupported property is
+    // ignored, not rejected, so asserting one would bless our invention as contract.
+    expect(Object.keys(out.hookSpecificOutput).sort()).toEqual(['decision', 'hookEventName'])
   })
 
   it('never flips the session mode — the classifier is not ours to switch off', () => {

@@ -94,6 +94,16 @@ describe('classifyOutcome — how a codex run ended', () => {
         stderr: 'attempt 1: 429 Too Many Requests\nReconnecting... 3/5\nstream disconnected before completion',
       }),
     ).toMatchObject({ kind: OUTCOME.ALLOWANCE_EXHAUSTED })
+    // But a NAKED status code is not the server refusing. Codex reconnects through
+    // 403s and prints `last status: 429` as the last thing it saw, on accounts with
+    // allowance to spare — that run died in transport, and calling it a spent account
+    // is the original mistake one round further along (GPT-5.6 Sol, second review).
+    expect(
+      classifyOutcome({
+        exitCode: 1,
+        stderr: 'websocket 403\nReconnecting... 5/5\nstream disconnected; last status: 429',
+      }),
+    ).toMatchObject({ kind: OUTCOME.UNREACHABLE })
     // And a genuine quota verdict on its own is still read as one.
     expect(classifyOutcome({ exitCode: 1, stderr: 'You have hit your usage limit. (429)' })).toMatchObject({
       kind: OUTCOME.ALLOWANCE_EXHAUSTED,

@@ -256,16 +256,38 @@ function readRunLogSegment(from) {
 // this tick needs, so it is launched and let go: its own log records what it did,
 // and the tick proceeds at once. A firewall hiccup must never be able to hold up
 // the mechanism that keeps the batch alive.
+// AND IT IS SINGLE-FILE (second review, 11.08.2026). A detached child belongs to no
+// ledger — the tick's reaper only knows its own Claude workers — so one wedged in DNS
+// would survive while every later tick started another, a slow pile-up nobody watches.
+// The previous child's pid is therefore written down and probed first: while it still
+// runs, this tick starts nothing and says so. A stale record is harmless (an unrelated
+// pid at most costs one skipped tick), and the top-up is idempotent anyway.
 try {
-  const out = openSync(C('firewall-topup.log'), 'a')
-  const child = spawn(process.execPath, [R('firewall-allow.mjs')], {
-    cwd: REPO,
-    detached: true,
-    stdio: ['ignore', out, out],
-    windowsHide: true,
-  })
-  child.on('error', (e) => log(`firewall top-up could not start (${(e && e.message) || e})`))
-  child.unref()
+  const PIDFILE = C('firewall-topup.pid')
+  const prev = Number(readFileSync(PIDFILE, 'utf8')) || 0
+  let busy = false
+  if (prev > 0) {
+    try {
+      process.kill(prev, 0)
+      busy = true
+    } catch {
+      busy = false
+    }
+  }
+  if (busy) {
+    log(`firewall top-up still running (pid ${prev}) — not starting a second`)
+  } else {
+    const out = openSync(C('firewall-topup.log'), 'a')
+    const child = spawn(process.execPath, [R('firewall-allow.mjs')], {
+      cwd: REPO,
+      detached: true,
+      stdio: ['ignore', out, out],
+      windowsHide: true,
+    })
+    child.on('error', (e) => log(`firewall top-up could not start (${(e && e.message) || e})`))
+    if (child.pid) writeFileSync(PIDFILE, String(child.pid))
+    child.unref()
+  }
 } catch (e) {
   log(`firewall top-up skipped (${(e && e.message) || e})`)
 }

@@ -33,13 +33,17 @@
 /**
  * Tool calls that keep asking even under a blanket grant.
  *
- * A bare "allow" answers the question "may this run?" — which is not what these two
- * ask. `AskUserQuestion` IS the user's answer, and an approval without one grants an
- * empty reply; `ExitPlanMode` needs the plan decision itself. Granting them blind
- * would not unblock an unattended run, it would feed it a hollow answer, which is
- * worse than the stall it was meant to prevent (found by GPT-5.6 Sol, 11.08.2026).
+ * ONLY `AskUserQuestion`, and the list stayed short the hard way. A bare "allow"
+ * answers "may this run?", which `AskUserQuestion` never asked: it IS the user's
+ * answer, so approving it without one hands an unattended run an empty reply.
+ * `ExitPlanMode` was in here for one round on the same reasoning and did not belong:
+ * it takes a bare allow, and in a non-interactive `-p` session returning NO decision
+ * does not fall through to a human — there is none — it DENIES. The entry meant to
+ * protect the batch would have stopped it (GPT-5.6 Sol, second review, 11.08.2026).
+ * Nothing joins this list without that question answered: what does silence do where
+ * nobody is watching?
  */
-const ALWAYS_ASK = ['AskUserQuestion', 'ExitPlanMode']
+const ALWAYS_ASK = ['AskUserQuestion']
 
 /**
  * Decide a PermissionRequest.
@@ -76,11 +80,17 @@ export function decide(input) {
  */
 export function render(verdict) {
   if (!verdict) return ''
+  // NOTHING BESIDES `decision` (second review, 11.08.2026). A reason field rode along
+  // here at first, borrowed from PreToolUse: this event's decision permits `behavior`,
+  // `updatedInput`, `updatedPermissions` and a deny-only message, and has no
+  // allow-reason. An unsupported property is ignored rather than rejected, so a test
+  // asserting it blesses our own invention instead of the harness contract — the same
+  // way the flat field passed review the first time. The rationale belongs where a
+  // human reads it, which is this file.
   return JSON.stringify({
     hookSpecificOutput: {
       hookEventName: 'PermissionRequest',
       decision: { behavior: verdict.decision },
-      permissionDecisionReason: verdict.reason,
     },
   })
 }

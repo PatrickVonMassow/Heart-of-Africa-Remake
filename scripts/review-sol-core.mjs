@@ -101,7 +101,14 @@ const FAILURE_PATTERNS = [
   // only when nothing was ever said. The narrow `DEFINITIVE_QUOTA` is deliberately not
   // the broad allowance pattern — "rate limit" as a hint or a doc line must not
   // outrank a dead socket, only an actual refusal may.
-  [OUTCOME.ALLOWANCE_EXHAUSTED, /\b429\b|too many requests|usage limit (?:reached|exceeded|hit)|you(?:'ve| have) hit your usage limit|quota (?:exceeded|exhausted)|credit balance/i],
+  // NOT a bare `429` (second review, 11.08.2026). A real codex transcript reconnects
+  // through repeated websocket 403s and then prints `last status: 429` as the LAST
+  // thing it saw — an account with allowance to spare, whose run died in transport.
+  // A bare code first would call that a spent account, which is the very mistake this
+  // whole ordering exists to prevent, only one round further along. So the definitive
+  // pattern demands the server's own REFUSING WORDS, and a naked code falls through to
+  // transport and then to the broad pattern below.
+  [OUTCOME.ALLOWANCE_EXHAUSTED, /too many requests|usage limit (?:reached|exceeded|hit)|you(?:'ve| have) hit your usage limit|quota (?:exceeded|exhausted)|credit balance|rate limit exceeded/i],
   [OUTCOME.UNREACHABLE, /error sending request|stream disconnected|reconnecting\b|connection (?:refused|reset|closed)|enotfound|eai_again|econnrefused|econnreset|etimedout|dns error|failed to lookup|network (?:error|is unreachable)/i],
   [OUTCOME.ALLOWANCE_EXHAUSTED, /usage limit|rate limit|quota|allowance|plan limit/i],
   [OUTCOME.LOGIN_EXPIRED, /not logged in|log ?in again|codex login|refresh token|invalid[_ ]api[_ ]key|unauthorized|authentication|\b401\b|\b403\b/i],
