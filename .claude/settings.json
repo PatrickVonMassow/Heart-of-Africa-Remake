@@ -233,6 +233,17 @@
           }
         ]
       }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/permission-autogrant.mjs",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   },
   "permissions": {
