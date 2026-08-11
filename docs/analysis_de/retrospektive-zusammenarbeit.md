@@ -1308,7 +1308,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 11.08.2026, 22:23 · Quellen-Fingerprint: `5ae4206a22d6…`
+Zuletzt aktualisiert: Dienstag, 11.08.2026, 23:03 · Quellen-Fingerprint: `2276626ca090…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1392,10 +1392,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 76 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 52 Prozess-/Meta-TASKS-Punkte (davon 20 offen).
+Erfasste Quellen: 76 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 52 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
 
-<!-- RETRO-FINGERPRINT: 5ae4206a22d65a9c475e84cc90ffec9974f3face8bb1d5d87230f4fe867543ad -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-11T20:23:09.587Z -->
+<!-- RETRO-FINGERPRINT: 2276626ca090ece14fe05ba9eda0535fc5e4020fadc1f30446a77b247fbfc7fe -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-11T21:03:44.508Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1405,3 +1405,29 @@ Am selben Abend dreimal derselbe Fehlschluss, jedes Mal mit einer Messung in der
 Das ist nicht die Klasse aus `measure-dont-assume` (eine Behauptung ohne Messung), sondern die gefährlichere Nachbarin: Es WURDE gemessen, nur konnte die Messung die konkurrierenden Erklärungen gar nicht trennen. Ein Erfolg beweist, dass etwas gelang — nicht, WARUM. Wo ein Mensch im Spiel ist, der zustimmen kann, ist ein Erfolg überhaupt kein Signal über die Automatik.
 
 **Lehre:** Vor der Messung benennen, welches Ergebnis welche Hypothese AUSSCHLIESSEN würde. Kann ein Wert unter allen Hypothesen gleich ausfallen, ist er kein Beleg. Und Verifikationen, deren Ausgang von einem Klick des Nutzers abhängen kann, sind erst dann Belege, wenn er bestätigt, nicht geklickt zu haben.
+
+### 3.112 Der Mechanismus war verdrahtet, feuerte — und war völlig wirkungslos
+
+Der Freigabe-Haken vom 11.08.2026 stand in der Hook-Kette, wurde bei jeder Rückfrage
+ausgeführt und beendete sich mit Erfolg. Trotzdem erschien der Dialog weiter, denn seine
+Ausgabe hatte das falsche FORMAT: Das Ereignis erteilt eine Freigabe über ein
+Entscheidungs-Objekt, geschrieben war das flache Feld eines anderen Ereignisses. Eine
+unbekannte Eigenschaft wird nicht abgelehnt, sondern ignoriert — es gibt also keine
+Fehlermeldung, keinen roten Lauf, kein Protokoll. Von außen ist ein wirkungsloser
+Mechanismus von einem wirksamen nicht zu unterscheiden.
+
+Das ist eine eigene Klasse neben „der Wächter kann nie auslösen" (den fängt
+`guard-health-guard` an der Verdrahtung ab): Hier stimmt die Verdrahtung, es ist die
+SPRACHE zur Gegenseite, die nicht ankommt. Unser eigener Test hat es nicht gefunden,
+weil er die Ausgabe der Implementierung nachbaute statt des fremden Vertrags — er hätte
+jede beliebige Erfindung genauso bestätigt. Gefunden haben es zwei Modelle zweier
+Hersteller, unabhängig, als jeweils ERSTEN Punkt; und dieselbe Prüfrunde deckte danach
+zweimal einen Fehler auf, den erst das BEHEBEN eingebaut hatte — darunter eine Ausnahme,
+die den unbeaufsichtigten Betrieb angehalten hätte, weil dort „keine Entscheidung" nicht
+Rückfrage bedeutet, sondern Ablehnung.
+
+**Lehre:** Wo ein Mechanismus mit einer fremden Schnittstelle spricht, ist der Test gegen
+die eigene Ausgabe wertlos — geprüft wird gegen die dokumentierte Gegenseite, und der
+Schlüsselsatz wird festgenagelt (welche Felder genau, nicht nur welcher Wert). Und ein
+Durchsetzer, dessen Wirkung man nicht am Verhalten sieht, braucht einen Beleg, dass er
+nicht nur LIEF, sondern etwas BEWIRKT hat.
