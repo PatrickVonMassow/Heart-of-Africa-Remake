@@ -6,9 +6,9 @@
 // mechanism reviews all carry "GPT-5.6 Sol" with no silent fallback, so the path works.
 //
 // What it did NOT do is carry any other kind of pure text work — and text work is where
-// the volume is: measured 11.08.2026, verification is 41.9 % of the whole spend and
-// 41.8 % of that is reading logs, scripts and reports, i.e. 17.5 % of everything, with
-// no browser and no picture involved.
+// the volume is: measured 12.08.2026, verification is 41.5 % of the whole spend and
+// 48.0 % of that is reading logs, scripts and reports, i.e. 19.9 % of everything, with
+// no browser and no picture involved (docs/sol-routing.md carries the whole table).
 //
 // THE RULE THIS FILE IS SHAPED AROUND is the review path's, unchanged: an answer nobody
 // gave must never be reported as an answer. Every path out of a failed run says so in
