@@ -603,6 +603,17 @@ there exactly once; a new point joins a bundle when appended.
   closed point with an armed launcher; a spent budget with a written handoff and an armed
   launcher joins it. Every other stop stays illegal, so the guard can never be talked into
   an idle stop by writing a handoff for work that was never started.
+  (e) AN ORPHANED BRANCH IS SURFACED, NOT LEFT TO CHANCE (found 11.08.2026). The handoff
+  covers the session that hands over deliberately; it does nothing for the agent that dies
+  without one, and that is the case that actually cost work. Two feature branches sat in
+  the tree unreported — one carrying ~2000 lines for points that still read as untouched,
+  one fully superseded — and the only thing that found them was a resuming session running
+  `git worktree list` on a hunch. So the resume path REPORTS every branch that has commits
+  `main` does not contain and no live agent behind it, with its point, its last commit and
+  its age, exactly as it reports the work order; and a branch whose work has landed under
+  another number is ENDED at that landing rather than left to be re-triaged. VERIFIABLE by
+  Vitest on the pure core — an orphan is listed, a branch with a live agent is not, a
+  contained branch is not — plus the resume hook printing it.
   MEASURE THE RESULT, as 373 did and on the same tool: `node scripts/measure-context-cost.mjs`
   for a full day after the lever lands, in BOTH scopes, against the 0.988 %/h this point
   starts from and the 0.6 %/h that fits. The point counts as delivered when the rate is
