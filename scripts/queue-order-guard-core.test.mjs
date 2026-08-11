@@ -10,6 +10,7 @@ import {
   parseOpenPoints,
   parseQueueCards,
   parseNowCard,
+  parseNowCards,
   finderBeforeOpenFix,
   queueOrderDrift,
   falseDoneClaims,
@@ -108,6 +109,8 @@ describe('parseQueueCards / parseNowCard', () => {
     expect(parseQueueCards(null)).toEqual([])
     expect(parseNowCard('<p>no board</p>')).toBeNull()
     expect(parseNowCard(undefined)).toBeNull()
+    expect(parseNowCards('<p>no board</p>')).toEqual([])
+    expect(parseNowCards(undefined)).toEqual([])
   })
 })
 
@@ -394,6 +397,85 @@ describe('evaluate — end to end on the two raw files', () => {
     ).toBe(false)
     // No open points at all → nothing enforceable.
     expect(evaluate({ dashboardHtml: boardHtml({ queue: [{ n: 203 }] }), tasksMd: '- [x] 209. Done.' }).block).toBe(false)
+  })
+})
+
+describe('a done-claim is attributed to the card it stands in (10.08.2026)', () => {
+  /** The now-section as the live board builds it: one card PER point in parallel work. */
+  const nowSection = (cards) =>
+    `<main><h1>Dashboard</h1>
+<h2>Woran ich gerade arbeite</h2>
+${cards
+  .map(
+    ({ n, body }) =>
+      `<details class="now"><summary><span class="t">${n} — Arbeit ${n}</span></summary>\n<div class="body"><p>${body}</p></div></details>`,
+  )
+  .join('\n')}
+<h2>Von dir zu klären</h2>
+<h2>Warteschlange</h2>
+<h2>Erledigt</h2>
+</main>`
+
+  const tasks = ['- [ ] 610. A.', '- [ ] 590. B.', '- [ ] 509. C.', '- [ ] 585. D.'].join('\n')
+  const rankRecordJson = ranks([509, 585, 590, 610])
+
+  it('reads the section as one card PER point, in document order', () => {
+    const cards = parseNowCards(nowSection([{ n: 610, body: 'läuft' }, { n: 590, body: 'fertig' }]))
+    expect(cards.map((c) => c.point)).toEqual([610, 590])
+    expect(cards[1].text).toContain('fertig')
+    expect(cards[0].text).not.toContain('fertig')
+  })
+
+  it('names the point whose OWN card carries the claim, not the section’s first', () => {
+    // The live case: the word stood in the 590 card and the guard blocked naming
+    // 610, sending the reader to an innocent card with full confidence.
+    const html = nowSection([
+      { n: 610, body: 'Status: läuft.' },
+      { n: 590, body: 'Der Zweig ist fertig und geprüft.' },
+      { n: 509, body: 'Status: läuft.' },
+    ])
+    const r = evaluate({ dashboardHtml: html, tasksMd: tasks, rankRecordJson })
+    expect(r.block).toBe(true)
+    expect(r.reason).toMatch(/CLAIMS DONE[^|]*\b590\b/)
+    expect(r.reason).not.toMatch(/CLAIMS DONE[^|]*\b610\b/)
+  })
+
+  it('finds the claim in the LAST card as readily as in the first', () => {
+    const r = evaluate({
+      dashboardHtml: nowSection([
+        { n: 610, body: 'Status: läuft.' },
+        { n: 585, body: 'Alles erledigt.' },
+      ]),
+      tasksMd: tasks,
+      rankRecordJson,
+    })
+    expect(r.reason).toMatch(/CLAIMS DONE[^|]*\b585\b/)
+    expect(r.reason).not.toMatch(/CLAIMS DONE[^|]*\b610\b/)
+  })
+
+  it('flips to allowed when THAT card’s wording is corrected, and only then', () => {
+    const clean = nowSection([
+      { n: 610, body: 'Status: läuft.' },
+      { n: 509, body: 'Der Zweig ist geprüft, der Punkt bleibt offen.' },
+    ])
+    expect(evaluate({ dashboardHtml: clean, tasksMd: tasks, rankRecordJson }).block).toBe(false)
+    const stillClaiming = nowSection([
+      { n: 610, body: 'Status: läuft.' },
+      { n: 509, body: 'Der Zweig ist fertig und geprüft.' },
+    ])
+    expect(evaluate({ dashboardHtml: stillClaiming, tasksMd: tasks, rankRecordJson }).block).toBe(true)
+  })
+
+  it('says nothing about a card whose title carries no point number', () => {
+    const r = evaluate({
+      dashboardHtml: nowSection([{ n: 610, body: 'Status: läuft.' }]).replace(
+        '610 — Arbeit 610',
+        'Closing-Zyklus, alles erledigt',
+      ),
+      tasksMd: tasks,
+      rankRecordJson,
+    })
+    expect(r.block).toBe(false)
   })
 })
 

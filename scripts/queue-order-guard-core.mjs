@@ -113,18 +113,48 @@ export function parseQueueCards(html) {
   return cards
 }
 
-/**
- * The now-card as {point, text} (point null when its title has no leading
- * number — non-point work), or null when the section is missing. The point is
- * the first `class="t">N` after the heading, never an incidental mention.
- */
-export function parseNowCard(html) {
+/** The "Woran ich gerade arbeite" section, from its heading to the next `<h2>`. */
+function nowSection(html) {
   if (typeof html !== 'string') return null
   const nowStart = html.indexOf('Woran ich gerade arbeite')
   if (nowStart < 0) return null
   const rest = html.slice(nowStart)
   const nextH2 = rest.indexOf('<h2>')
-  const section = nextH2 < 0 ? rest : rest.slice(0, nextH2)
+  return nextH2 < 0 ? rest : rest.slice(0, nextH2)
+}
+
+/**
+ * EVERY card of the now-section, in document order: [{point, text}], the point
+ * null where a title carries no leading number (non-point work).
+ *
+ * The section holds ONE CARD PER POINT in active parallel work (user decision
+ * 22.07.2026), and reading it as a single card is how the done-claim rule came
+ * to name the wrong artefact: on the live board a word standing in the 590 card
+ * was reported against 610 — the section's FIRST point — sending the reader to an
+ * innocent card with full confidence. Each card is judged on its own text.
+ */
+export function parseNowCards(html) {
+  const section = nowSection(html)
+  if (section === null) return []
+  const cards = []
+  for (const chunk of section.split(/<details\b/).slice(1)) {
+    const m = chunk.match(/class="t">\s*(\d+)/)
+    cards.push({ point: m ? Number(m[1]) : null, text: stripTags(chunk) })
+  }
+  return cards
+}
+
+/**
+ * The now-SECTION as {point, text} — a probe for "does this board have a now
+ * section at all", which is all `dashboard-integrity-guard-core` asks of it.
+ *
+ * Its text is the WHOLE section and its point the first number in it, so it must
+ * never be used to attribute a card's words to a point: use `parseNowCards`
+ * above. Both exist on purpose; collapsing them re-creates the mix-up.
+ */
+export function parseNowCard(html) {
+  const section = nowSection(html)
+  if (section === null) return null
   const m = section.match(/class="t">\s*(\d+)/)
   return { point: m ? Number(m[1]) : null, text: stripTags(section) }
 }
@@ -285,12 +315,14 @@ export function evaluate({ dashboardHtml, tasksMd, rankRecordJson } = {}) {
     if (unranked) problems.push(unranked)
 
     const cards = parseQueueCards(dashboardHtml)
-    if (cards.length === 0) return problems.length ? { block: true, reason: problems.join(' | ') } : { block: false, reason: '' }
 
+    // The ORDER rules need a queue to judge; the DONE-CLAIM rule below does not,
+    // and used to sit behind the same test — a board with an empty Warteschlange
+    // and a now-card claiming an open point done was never looked at.
     // The ORDER rule judges workable points only (point 450); the DONE-CLAIM rule
-    // below judges every open one — a card claiming a gated point is finished is
-    // just as false as any other.
-    const misordered = finderBeforeOpenFix(cards.map((c) => c.point), parseWorkablePoints(tasksMd))
+    // judges every open one — a card claiming a gated point is finished is just
+    // as false as any other.
+    const misordered = cards.length ? finderBeforeOpenFix(cards.map((c) => c.point), parseWorkablePoints(tasksMd)) : []
     if (misordered.length) {
       problems.push(
         `QUEUE ORDER WRONG: finder/QA point(s) ${misordered.join(', ')} are queued AHEAD of open fix ` +
@@ -320,9 +352,11 @@ export function evaluate({ dashboardHtml, tasksMd, rankRecordJson } = {}) {
       )
     }
 
-    const nowCard = parseNowCard(dashboardHtml)
-    const claimCards = nowCard && nowCard.point != null ? [...cards, nowCard] : cards
-    const claims = falseDoneClaims(claimCards, open)
+    // EACH now-card with its OWN text: the section carries one card per point in
+    // parallel work, and judging it as one card attributed every claim in it to
+    // the first point — which sent the reader to an innocent card.
+    const nowCards = parseNowCards(dashboardHtml).filter((c) => c.point != null)
+    const claims = falseDoneClaims([...cards, ...nowCards], open)
     if (claims.length) {
       problems.push(
         `DASHBOARD CLAIMS DONE WHAT IS OPEN: the card(s) for point(s) ${claims.join(', ')} contain a ` +
