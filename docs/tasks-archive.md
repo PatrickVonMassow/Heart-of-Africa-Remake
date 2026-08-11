@@ -17461,3 +17461,35 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   plus a case that the guard still fails open on its own internal error.
   Criticality: high — this is the mechanism that certifies a tag. Bundle: Modell &
   Wächter.
+
+- [x] 634. THE MERGE IS THE ONE PLACE WHERE A FINDING CAN VANISH — SO IT GOES TO A THIRD
+  MODEL AND IS MADE COUNTABLE (user 11.08.2026: "Wäre es nicht sinnvoll, die
+  Zusammenführung nochmal durch ein anderes Modell erledigen zu lassen? In diesem Fall
+  stünde noch Fable zur Auswahl", and on the cost answer: "setze das so wie von dir
+  empfohlen als neuen Prozess für Vier-Augen-Prüfungen um"). Today a blind-parallel stage
+  has Opus 5 and GPT-5.6 Sol produce one complete list each, and Opus 5 — the author of
+  one of them — merges. Two faults in that: it JUDGES ITS OWN LIST (the recorder already
+  refuses a self-review one stage earlier, the merge does not), and the merge's errors are
+  ONE-SIDED — collapsing two entries LOSES a finding silently, while wrongly keeping them
+  apart costs one duplicated review. It is the only stage in the whole procedure where
+  work can disappear without a trace.
+  FINAL STATE:
+  1. THE MERGE GOES TO THE MODEL THAT WROTE NEITHER LIST — Fable 5 by the allowlist, and
+     the recorded result NAMES it. Where only two models were available, that is recorded
+     as such, not silently merged by an author.
+  2. AND IT IS COUNTABLE, which is the safeguard identity alone cannot give: each entry of
+     both input lists carries an ID, and the union must account for EVERY one of them —
+     `only A`, `only B`, or `merged with <id>`. A dropped finding is then an arithmetic
+     error, not a matter of trust, and a script checks it.
+  3. THE CHEAP SHAPE: both models deliver structured entries (id, file, the defect in one
+     line), tooling collapses the exact duplicates for free, and the third model decides
+     only the CANDIDATE PAIRS. That keeps the added cost in the low single-digit percent
+     of a stage that already costs 2× — measured basis: one agent pass over one point ran
+     126k–385k tokens last night, while a merge reads only the two lists (~30–60k).
+  4. The rule is written where the four-eyes principle is normative — CLAUDE.md §6 — and
+     the blind-parallel closing step of point 633 refers to it rather than restating it.
+  VERIFIABLE: Vitest over the pure accounting — an input entry missing from the union is
+  reported with its ID; a `merged with` naming an ID that does not exist is reported; a
+  union that accounts for every entry passes. Plus one real run: the union of a genuine
+  blind-parallel stage, merged by Fable 5, accounts for every entry of both lists.
+  Criticality: HIGH — it decides whether a four-eyes stage keeps what it found.
