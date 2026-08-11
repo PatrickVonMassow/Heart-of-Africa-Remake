@@ -257,11 +257,29 @@ export function unrankedAppends(open, record) {
  * The record as it should stand once nothing is pending — the baseline advanced
  * to today's open set, and decisions about closed points dropped.
  *
- * IT NEVER ADVANCES WHILE A QUESTION STANDS. That is the whole safety property:
+ * IT NEVER GROWS WHILE A QUESTION STANDS. That is the whole safety property:
  * an append swallowed into the baseline before anybody answered for it would be
- * invisible for ever afterwards, so `pending`, `unarmed` and `torn` all return
- * "no change" and only an ARMED, answered order moves the mark. Arming itself is
- * never automatic either — `--seed` is a stated decision, not a side effect.
+ * invisible for ever afterwards, so an outstanding question, an unarmed record
+ * and a torn one all leave the remembered set alone, and only an ARMED, answered
+ * order takes today's open set as the new mark. Arming itself is never automatic
+ * either — `--seed` is a stated decision, not a side effect.
+ *
+ * IT DOES SHRINK, THOUGH, AND IT HAS TO (cross-vendor review, 11.08.2026).
+ * Blocking every write while a question stood also stopped CLOSED points from
+ * leaving the baseline, and that lost a whole class of REOPEN. Baseline `[1, 2]`
+ * with 3 outstanding: 2 lands, so the open order reads `[1, 3]` and nothing is
+ * written; 2 then reopens at the end, giving `[1, 3, 2]`. The baseline still
+ * remembers 2, so 2 reads as a survivor and 3 — an append nobody answered for —
+ * reads as deliberately placed INSIDE it. Two questions vanish at once, and the
+ * gate falls silent without anybody deciding anything.
+ *
+ * Dropping a closed point is the opposite of swallowing an append: the remembered
+ * set only ever gets SMALLER, so the gate can only ever ask MORE. Hence the two
+ * directions are separated — grow only when nothing is outstanding, shrink to
+ * what is still open at every turn end. (A work order read as partial would
+ * narrow the baseline wrongly; that risk is not new — the settled branch has
+ * always taken the read at face value — and a read of ZERO open points, the one
+ * that would erase everything, is refused outright below.)
  */
 export function settleRecord(open, record, { at = '' } = {}) {
   const list = pointList(open)
@@ -285,8 +303,20 @@ export function settleRecord(open, record, { at = '' } = {}) {
   // the second is the ambiguous one, and it stays unresolved rather than guessed.
   if (!list.length) return { changed: false, record: null }
   const state = appendGateState(list, record)
-  if (state.state !== 'settled') return { changed: false, record: null }
   const { ranked, settled } = normaliseRankRecord(record)
+  if (state.state !== 'settled') {
+    // A QUESTION STANDS, so the baseline may not take today's order — but the
+    // points it remembers that are no longer OPEN are dropped all the same, or a
+    // closure that happened while the question stood would let the point back in
+    // unquestioned when it reopens. Shrinking can only add questions.
+    if (state.state !== 'pending') return { changed: false, record: null }
+    const kept = settled.points.filter((n) => list.includes(n))
+    if (kept.length === settled.points.length) return { changed: false, record: null }
+    // The baseline keeps its own `at`/`why`: this is the same settlement, minus
+    // what has since closed, not a new one.
+    const narrowed = { ...pruneRankRecord({ ranked }, list), settled: { ...settled, points: kept } }
+    return { changed: true, record: narrowed }
+  }
   const points = [...list].sort((a, b) => a - b)
   const next = { ...pruneRankRecord({ ranked }, list), settled: { at: String(at ?? '').trim(), points } }
   // Unchanged is unchanged — the same baseline AND the same live decisions. The

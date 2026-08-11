@@ -176,6 +176,26 @@ describe('the baseline moves only when nothing is outstanding', () => {
     expect(settleRecord([9, 5], parseRankRecord('{"ranked":{'), { at: 't' }).changed).toBe(false)
     expect(settleRecord([9, 5], null, { at: 't' }).changed).toBe(false)
   })
+  it('DOES drop a closed point while a question stands, so its reopen is still asked about', () => {
+    // The escape a cross-vendor review found: blocking every write while a
+    // question stood also kept CLOSED points in the baseline. Baseline [1, 2]
+    // with 3 outstanding — 2 lands, and 2 then reopens behind 3.
+    const base = settledAt([1, 2])
+    const narrowed = settleRecord([1, 3], base, { at: 'ignored' })
+    expect(narrowed.changed).toBe(true)
+    expect(narrowed.record.settled.points).toEqual([1])
+    // Same settlement, minus what closed — not a new one.
+    expect(narrowed.record.settled.at).toBe(base.settled.at)
+    // 3 is STILL outstanding, and the reopened 2 is asked about like any append.
+    expect(unrankedAppends([1, 3, 2], narrowed.record)).toEqual([3, 2])
+    // Without the shrink both questions vanished at once: 2 read as a survivor
+    // and 3 as deliberately placed inside it.
+    expect(unrankedAppends([1, 3, 2], base)).toEqual([])
+    // It shrinks and never grows: nothing new enters the baseline here.
+    expect(narrowed.record.settled.points).not.toContain(3)
+    // Nothing to drop → nothing written, even with a question standing.
+    expect(settleRecord([1, 2, 3], base, { at: 't' })).toEqual({ changed: false, record: null })
+  })
   it('writes nothing when the baseline already says what stands', () => {
     expect(settleRecord([9, 5], settledAt([5, 9]), { at: 't' })).toEqual({ changed: false, record: null })
   })
