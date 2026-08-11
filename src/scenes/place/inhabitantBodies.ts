@@ -14,13 +14,12 @@
 // different behaviours (the chase, the errand walkers, the routine walkers, the
 // porters, the task loop), each with its own stepper, and every one of them
 // would have had to learn to exclude its own body from the set it resolves
-// against. One damped pass over a shared body registry, run right after each
-// behaviour has moved its own figures, gives all five the same rule.
+// against. One pass over a shared body registry, run right after each behaviour
+// has moved its own figures, gives all five the same rule.
 //
-// AND WHY IT RESOLVES IN ONE STEP: the correction takes the WHOLE remaining
-// overlap and stops dead inside a slop band. It cannot ring, because it never
-// overshoots — the push is exactly the penetration, so the pair lands on the
-// contact distance and the dead band then holds it there.
+// AND WHY ONE PUSH TAKES THE WHOLE OVERLAP: the correction stops dead inside a
+// slop band, so it cannot ring — the push is exactly the penetration, the pair
+// lands on the contact distance, and the dead band holds it there.
 //
 // AND WHY THE GROUP IS SWEPT MORE THAN ONCE: one body at a time is a
 // Gauss-Seidel sweep, and a sweep resolves a PAIR but not a CHAIN. Pushing body
@@ -28,24 +27,24 @@
 // looked at again — so with three or more figures in one cluster a residual
 // overlap survives every frame. Measured over 600 s of the children's game at
 // the reported seed: a single sweep left 192–537 overlapping pair-frames, the
-// worst of them 0.07 m of a 0.264 m contact; TWO sweeps left none at all
-// (work-order 648, the second half of the user's "Kinder klemmen kurz
+// worst of them 0.07 m of a 0.264 m contact; two sweeps left none at all, and
+// four are needed once the adults, the porters and the routine walkers share the
+// set (work-order 648, the second half of the user's "Kinder klemmen kurz
 // ineinander"). `separateGroup` therefore sweeps until a sweep moves nothing,
 // bounded by the calibratable `passes` — which costs nothing in the ordinary
 // case, where the first sweep already moves no one.
 //
 // It used to take a FRACTION per frame instead, damped against a tremble that
-// the dead band already prevents, and capped at a push SPEED. That was the
-// defect behind the user's "Kinder klemmen kurz ineinander" (work-order 648):
-// two children close on one another at up to sprint plus runner speed, which is
-// several times what the cap allowed the correction to undo, so every frame
-// added more overlap than the pass took out and the pair stayed inside one
-// another for as long as they ran together — measured at the reported seed,
-// 30 % of all frames, up to six seconds at a stretch, and at the worst of them
-// two children within a centimetre of the same point. `maxSpeed` therefore only
-// bounds how fast a DEEP stack — two bodies spawned on one spot — unwinds; it
-// is set above the fastest pair that can close, so it never throttles the
-// ordinary crossing it was silently throttling before.
+// the dead band already prevents, and capped at a push SPEED of 1.2 m/s. That
+// was the first half of the user's "Kinder klemmen kurz ineinander" (work-order
+// 648): two children close on one another at up to sprint plus runner speed,
+// which is six times what that cap let the correction undo, so every frame added
+// more overlap than the pass took out. Measured on one head-on crossing at the
+// speed the game can really build, the pair ended five consecutive frames inside
+// one another, at worst 0.21 m into a 0.26 m contact — all but merged; with the
+// whole overlap taken at a cap above the closing speed, not one frame.
+// `maxSpeed` therefore only bounds how fast a DEEP stack — two bodies spawned on
+// one spot — unwinds.
 
 /** One inhabitant's body in the shared set — mutated in place each frame, so a
  *  settlement never rebuilds the array. */

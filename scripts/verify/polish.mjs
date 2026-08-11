@@ -3326,6 +3326,181 @@ if (section('children-tag')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 
+// --- How the children MOVE (work-order 648) ----------------------------------
+// The user reported three things from one state in the Bambara village: a child
+// hangs briefly, a child jitters on the spot, two children clip through each
+// other. All three are the same system, and the pure layer pins each cause
+// (src/scenes/place/tagGame.test.ts, inhabitantBodies.test.ts). What needs a
+// real browser is the state itself: this settlement, at HIS seed, with its own
+// huts, fences, fire and lanes in the collision set — the pockets that stalled a
+// child are drawn by THAT layout, and no synthetic world can stand in for it.
+//
+// The trace is taken INSIDE the page, one entry per rendered frame. The defects
+// are per-frame — an alternation, a single stalled step, a moment of overlap —
+// and a sampling loop that crosses the process boundary between readings would
+// step straight over them.
+if (section('children-motion')) {
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  // HIS seed: the settlement layout is derived from place + seed, so this is the
+  // village he was standing in and not merely one of the same people.
+  await page.evaluate(() => window.__game.setState({ seed: 2972259115 }))
+  await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+  const live = await page
+    .waitForFunction(
+      () => window.__game.getState().placeId === 'bambara-village' && !!window.__placeTag,
+      null,
+      { timeout: 40000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  check('the reported village publishes its live game of tag', live)
+  if (live) {
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    await page
+      .waitForFunction(() => window.__placeTag().playing, null, { timeout: 40000 })
+      .catch(() => false)
+    const FRAMES = 1200
+    const trace = await page.evaluate(
+      (frames) =>
+        new Promise((resolve) => {
+          const log = []
+          const tick = () => {
+            const t = window.__placeTag()
+            log.push({
+              clock: t.clock,
+              playing: t.playing,
+              c: t.children.map((k) => ({
+                x: k.x,
+                z: k.z,
+                pace: k.pace,
+                held: k.held,
+                walked: k.walked,
+                heading: k.heading,
+              })),
+            })
+            if (log.length < frames) requestAnimationFrame(tick)
+            else resolve({ bodyRadius: t.bodyRadius, log })
+          }
+          requestAnimationFrame(tick)
+        }),
+      FRAMES,
+    )
+    const log = trace.log
+    const n = log[0]?.c.length ?? 0
+    check(
+      'the trace covers a real stretch of the game, frame by frame',
+      log.length >= FRAMES && n >= 2 && log[log.length - 1].clock - log[0].clock > 5,
+      `${log.length} frames, ${n} children, ${(log[log.length - 1].clock - log[0].clock).toFixed(1)}s`,
+    )
+
+    // 3. THEY NEVER OCCUPY ONE ANOTHER. Judged against the body the game itself
+    // publishes, not an assumed radius (§7.2) — and against the distance the
+    // separation actually settles a resting pair at, which is the contact
+    // distance less the deliberate slop band. Judging it against the bare
+    // contact distance would call every settled pair an overlap.
+    const contact = trace.bodyRadius * 2 - (await page.evaluate(() => window.__balance.villageLife.separation.slop))
+    let worstOverlap = 0
+    let overlapFrames = 0
+    for (const f of log) {
+      let bad = false
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          const d = Math.hypot(f.c[i].x - f.c[j].x, f.c[i].z - f.c[j].z)
+          if (contact - d > worstOverlap) worstOverlap = contact - d
+          if (contact - d > 1e-6) bad = true
+        }
+      }
+      if (bad) overlapFrames++
+    }
+    check(
+      'no two children are ever inside one another, in any frame',
+      overlapFrames === 0,
+      `${overlapFrames} of ${log.length} frames, worst ${Math.max(0, worstOverlap).toFixed(4)} m inside a ${contact.toFixed(3)} m contact`,
+    )
+
+    // 1. NOTHING SNAGS. A child COMMANDED to move that covers no ground is the
+    // reported hang; a child standing at a pace of zero, or standing because it
+    // was told to, is not — that is the game idling or a call being obeyed.
+    let longestStall = 0
+    for (let k = 0; k < n; k++) {
+      let run = 0
+      for (let i = 1; i < log.length; i++) {
+        const before = log[i - 1].c[k]
+        const now = log[i].c[k]
+        const moving = now.pace > 1e-6 && !now.held
+        if (moving && now.walked - before.walked < 1e-4) {
+          run += log[i].clock - log[i - 1].clock
+          longestStall = Math.max(longestStall, run)
+        } else run = 0
+      }
+    }
+    check(
+      'no child that is walking is held motionless by the settlement',
+      longestStall < 0.25,
+      `longest stall while commanded to move ${longestStall.toFixed(2)}s`,
+    )
+
+    // 2. NOTHING JITTERS. A shuffle on the spot is an ALTERNATION: the step taken
+    // this frame undoes the last one. Real running does not reverse — the body
+    // turns at a bounded rate, so consecutive steps are near-parallel — and a
+    // reversal rate above a few per cent is the signature the user described.
+    let reversals = 0
+    let steps = 0
+    const diag = { tiny: 0, near: 0, pushed: 0, idle: 0, mag: 0, headingFlip: 0, offHeading: 0, detour: 0, perChild: Array(n).fill(0) }
+    for (let k = 0; k < n; k++) {
+      for (let i = 2; i < log.length; i++) {
+        const a = log[i - 2].c[k]
+        const b = log[i - 1].c[k]
+        const c = log[i].c[k]
+        const ux = b.x - a.x
+        const uz = b.z - a.z
+        const vx = c.x - b.x
+        const vz = c.z - b.z
+        // Only real steps count: two stationary frames have no direction at all.
+        if (Math.hypot(ux, uz) < 1e-3 || Math.hypot(vx, vz) < 1e-3) continue
+        steps++
+        if (ux * vx + uz * vz >= 0) continue
+        reversals++
+        diag.perChild[k]++
+        const back = Math.hypot(vx, vz)
+        diag.mag += back
+        if (back < 0.005) diag.tiny++
+        if (c.pace < 1e-6) diag.idle++
+        // Did the chase itself walk that far, or did something else move it?
+        if (back - (c.walked - b.walked) > 0.001) diag.pushed++
+        // Did the game's OWN travel heading reverse with the step, or did the
+        // step disagree with the heading it reports?
+        const dh = Math.abs(Math.atan2(Math.sin(c.heading - b.heading), Math.cos(c.heading - b.heading)))
+        if (dh > Math.PI / 2) diag.headingFlip++
+        const stepH = Math.atan2(vx, vz)
+        const off = Math.abs(Math.atan2(Math.sin(stepH - c.heading), Math.cos(stepH - c.heading)))
+        if (off > 0.3) diag.offHeading++
+        let nearest = Infinity
+        for (let j = 0; j < n; j++) {
+          if (j === k) continue
+          nearest = Math.min(nearest, Math.hypot(c.x - log[i].c[j].x, c.z - log[i].c[j].z))
+        }
+        if (nearest < contact + 0.15) diag.near++
+      }
+    }
+    const rate = steps > 0 ? reversals / steps : 0
+    check(
+      'no child alternates back and forth on the spot',
+      steps > 200 && rate < 0.03,
+      `${reversals} reversals in ${steps} steps (${(rate * 100).toFixed(1)} %) — ` +
+        `per child ${diag.perChild.join('/')}, mean back-step ${(diag.mag / Math.max(1, reversals) * 1000).toFixed(1)} mm, ` +
+        `${diag.tiny} under 5 mm, ${diag.idle} at pace 0, ${diag.pushed} moved further than the chase walked, ${diag.near} beside a neighbour, ` +
+        `${diag.headingFlip} with the travel heading itself reversed, ${diag.offHeading} stepping off their heading, ${diag.detour} while holding a way out`,
+    )
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
 // --- The adults' errands (work-order point 483) -------------------------------
 // What needs a real browser here is the WALK: the catalogue, the fair queue and
 // every teaching rule are pinned in src/scenes/place/adultErrands.test.ts, but

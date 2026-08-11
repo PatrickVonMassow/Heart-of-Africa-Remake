@@ -1766,6 +1766,26 @@ export function retainedSpawnChunks(
  * and a bounded play ground make pockets whose only way out is backwards, and a
  * caller that lives in one passes 12 (a full circle) so its mover turns around
  * instead of standing there (work-order 648).
+ *
+ * `course` is the heading this walker was ACTUALLY travelling on — pass `NaN`
+ * (the default) to have none. Where it is given, a DEFLECTION may not undo the
+ * step before it: the search first considers only the turns that keep the walker
+ * within a quarter of the course it is on, and falls back to the full swing only
+ * when none of those is free. The intended heading itself is never constrained —
+ * a walker with a clear way ahead always takes it, however sharply it just
+ * changed its mind.
+ *
+ * WHY IT EXISTS. The search takes the SMALLEST free turn, and which turns are
+ * free depends on where the walker is standing — so the minimum flips between
+ * two values that undo one another, frame after frame. Measured in a dead-end
+ * lane 0.7 m wide: at the far end the child's smallest free turn was +30°, which
+ * walked it back toward the wall; one step later +30° was shut and the smallest
+ * free turn was +150°, which walked it out again; one step later +30° was free
+ * once more. It shuffled between those two points for as long as it was sent
+ * that way — a metre of walking every three seconds and no ground covered at
+ * all, which is the user's "Kind zittert auf der Stelle herum". Measured in the
+ * settlement he reported it in, one step in ten reversed the one before; in the
+ * open, where there is nothing to go round, one in four hundred (work-order 648).
  */
 export function deflectedStep(
   x: number,
@@ -1775,20 +1795,35 @@ export function deflectedStep(
   blocked: (x: number, z: number) => boolean,
   lookahead = dist,
   maxTurn = 6,
+  course = NaN,
 ): { x: number; z: number; heading: number; moved: boolean } {
   // The PROBE reaches `lookahead` ahead while the STEP stays `dist`: a
   // single land cell poking into the water reads as blocked from outside,
   // so the walker never enters a one-cell dead end it must bounce out of.
   const probe = Math.max(dist, lookahead)
-  for (let step = 0; step <= Math.max(0, maxTurn); step++) {
-    for (const sgn of step === 0 ? [1] : [1, -1]) {
-      const h = heading + sgn * step * (Math.PI / 12) // 15° steps
-      const sx = x + Math.sin(h) * dist
-      const sz = z + Math.cos(h) * dist
-      // Both the STEP TARGET and the far probe must be dry: the lookahead
-      // alone let a walker step into a narrow channel with land beyond it.
-      if (blocked(sx, sz) || blocked(x + Math.sin(h) * probe, z + Math.cos(h) * probe)) continue
-      return { x: sx, z: sz, heading: h, moved: true }
+  const clear = (h: number) =>
+    // Both the STEP TARGET and the far probe must be dry: the lookahead alone
+    // let a walker step into a narrow channel with land beyond it.
+    !blocked(x + Math.sin(h) * dist, z + Math.cos(h) * dist) &&
+    !blocked(x + Math.sin(h) * probe, z + Math.cos(h) * probe)
+  const take = (h: number) => ({
+    x: x + Math.sin(h) * dist,
+    z: z + Math.cos(h) * dist,
+    heading: h,
+    moved: true,
+  })
+  if (clear(heading)) return take(heading)
+  const keeps = (h: number) => !Number.isFinite(course) || Math.cos(h - course) >= 0
+  const swing = Math.max(0, maxTurn)
+  // First the turns that keep the course, then — only if the walker is really
+  // shut in — the ones that give it up.
+  for (const keeping of Number.isFinite(course) ? [true, false] : [false]) {
+    for (let step = 1; step <= swing; step++) {
+      for (const sgn of [1, -1]) {
+        const h = heading + sgn * step * (Math.PI / 12) // 15° steps
+        if (keeping && !keeps(h)) continue
+        if (clear(h)) return take(h)
+      }
     }
   }
   return { x, z, heading, moved: false }

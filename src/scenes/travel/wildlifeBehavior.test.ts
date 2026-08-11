@@ -2501,6 +2501,42 @@ describe('deflectedStep (scripted walks obey the land constraint, point 83)', ()
     expect(corridor(r.x, r.z)).toBe(false)
     expect(Math.abs(r.heading)).toBeGreaterThan(Math.PI / 2) // it went backwards
   })
+
+  // THE COURSE RULE (work-order 648). The search takes the SMALLEST free turn,
+  // and which turns are free depends on where the walker is standing — so the
+  // minimum flips between two values that undo one another, and the walker
+  // shuffles on the spot instead of walking. Told what it is travelling on, it
+  // may no longer undo its own step.
+  it('undoes its own step with no course to keep', () => {
+    const a = deflectedStep(0, -1, 0, 0.03, corridor, 0.6, 12)
+    const b = deflectedStep(a.x, a.z, 0, 0.03, corridor, 0.6, 12)
+    expect(a.moved && b.moved).toBe(true)
+    expect(Math.cos(b.heading - a.heading)).toBeLessThan(0)
+  })
+
+  it('keeps the course it is on instead, and still gets somewhere', () => {
+    const a = deflectedStep(0, -1, 0, 0.03, corridor, 0.6, 12)
+    const b = deflectedStep(a.x, a.z, 0, 0.03, corridor, 0.6, 12, a.heading)
+    expect(b.moved).toBe(true)
+    expect(corridor(b.x, b.z)).toBe(false)
+    expect(Math.cos(b.heading - a.heading)).toBeGreaterThanOrEqual(0)
+  })
+
+  it('gives the course up rather than stand, when nothing that keeps it is free', () => {
+    // Walking INTO the pocket is exactly that case: the only free ground is
+    // behind, so the rule yields instead of pinning the walker.
+    const r = deflectedStep(0, -1, 0, 0.03, corridor, 0.6, 12, 0)
+    expect(r.moved).toBe(true)
+    expect(Math.abs(r.heading)).toBeGreaterThan(Math.PI / 2)
+  })
+
+  it('never constrains the heading the caller ASKED for, however sharply it turned', () => {
+    // The rule is about the DEFLECTION. A walker that changed its mind and has a
+    // clear way there takes it — an evading runner turning round is not a bug.
+    const r = deflectedStep(0, 0, Math.PI, 0.03, () => false, 0.06, 6, 0)
+    expect(r.moved).toBe(true)
+    expect(r.heading).toBe(Math.PI)
+  })
 })
 
 describe('escapeCorridorHeading (point 188 — the walk-off picks a land corridor, not the seaward radial)', () => {

@@ -665,8 +665,8 @@ export interface BalanceConfig {
       variation: number
       /** Seconds without real movement before a child is nudged free. */
       unstuckSeconds: number
-      /** Seconds a child sticks to the way out of a pocket it had to turn far to
-       *  find, so a dead-end lane is walked out of rather than bounced in. */
+      /** Seconds a child commits to a bearing it had to turn right round to
+       *  find, so a pocket is left rather than stepped in and out of. */
       detourSeconds: number
       /** Dev-mode alarm: a group that could play and has produced neither a
        *  catch nor a fresh round for this long raises `tag-silent`. */
@@ -1151,10 +1151,10 @@ export const balance: BalanceConfig = {
       trendLeave: 0.12,
       variation: 0.2,
       unstuckSeconds: 1.5,
-      // How long a child holds the way out of a dead-end lane (point 648). At
-      // the floor pace it carries the child about half a metre, at a sprint
-      // nearly two — past the hut corner it just turned round, and short enough
-      // that the chase it interrupts is never noticeably interrupted.
+      // How long a child carries itself clear of a pocket (point 648). At the
+      // floor pace that is about half a metre, at a sprint nearly two — past the
+      // hut corner it just turned round — and short enough that the chase it
+      // interrupts is never noticeably interrupted.
       detourSeconds: 0.45,
       // The long-run alarm's window (point 589). The longest LEGITIMATE gap
       // between two round events is a tenure that runs to the backstop plus the
@@ -1239,17 +1239,21 @@ export const balance: BalanceConfig = {
     //  - PASSES is the chain half. One sweep resolves a PAIR; pushing the middle
     //    of THREE out of one neighbour presses it back into the other, which was
     //    resolved already, so a cluster kept a residual overlap for ever.
-    //    Measured over 600 s of the children's game: one sweep left 192–537
+    //    Measured over 600 s of the children's game alone: one sweep left 192–537
     //    overlapping pair-frames (worst 0.07 m of a 0.264 m contact), two left
-    //    NONE. The second sweep is only ever paid for when the first one moved
-    //    somebody, and at two the deep spawn stack still comes apart as a step.
+    //    NONE. The SETTLEMENT holds more than the children, though — the adults,
+    //    the porters and the routine walkers share one body set — so its chains
+    //    are longer, and two sweeps still left a tenth of a percent of frames
+    //    touching in the reported village. Four clears it. It is a CEILING, not a
+    //    cost: the sweeping stops the moment one moves nobody, so an ordinary
+    //    frame pays for one and only a real cluster pays for more.
     separation: {
       bodyRadius: 0.24,
       slop: 0.01,
       stiffness: 1,
       maxSpeed: 8,
       wedgeSeconds: 1.5,
-      passes: 2,
+      passes: 4,
     },
   },
   communication: {

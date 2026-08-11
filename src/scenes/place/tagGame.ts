@@ -89,12 +89,16 @@ export interface TagConfig extends StaminaProfile {
   /** Seconds of no real movement before a child is nudged to free ground. */
   unstuckSeconds: number
   /**
-   * How long a child STICKS to the way out it found when the settlement made it
-   * turn more than a quarter (point 648). Without it a dead-end lane is a
-   * bounce: the step turns the child round, the next frame aims it back at the
-   * hut it came from, and it shuffles on the spot between the two. Long enough
-   * to clear a pocket, short enough that the chase is never really interrupted —
-   * the same hysteresis the animals' dodge and guard states use.
+   * How long a child COMMITS to a way out it had to turn right round to find
+   * (point 648). Deflecting round a hut needs no commitment — the course rule in
+   * `deflectedStep` already stops a walker undoing its own step. A POCKET does:
+   * there the only free ground is behind the child, and the moment it has backed
+   * out one step the way ahead reads clear again, so it walks straight back in
+   * and out and in, on the spot. Holding the bearing it escaped on carries it
+   * clear of the pocket first — measured in a dead-end lane, the difference
+   * between leaving it and pacing 14 cm at its mouth for as long as the chase
+   * pointed that way. Long enough to leave one, short enough that the chase it
+   * interrupts is never noticeably interrupted.
    */
   detourSeconds: number
   /**
@@ -149,9 +153,9 @@ export interface TagChild {
   walked: number
   /** Seconds without real movement. */
   pinned: number
-  /** The way out of a pocket the last step had to turn far to find, and how long
-   *  the child still holds it. See `TagConfig.detourSeconds`. */
-  detour: number
+  /** The bearing a child escaped a pocket on and still holds, and for how long.
+   *  See `TagConfig.detourSeconds`. */
+  detourHeading: number
   detourFor: number
   /** Eased posture, 0 = upright, `leanAtSprint` = flat out. */
   lean: number
@@ -265,7 +269,7 @@ export function createTagGame(
       pace: 0,
       walked: 0,
       pinned: 0,
-      detour: heading,
+      detourHeading: heading,
       detourFor: 0,
       lean: 0,
       held: false,
@@ -396,32 +400,27 @@ function breakOffRound(s: TagState, cfg: TagConfig): void {
 }
 
 /**
- * The detour ages on the CLOCK, not on the walking, and every child is aged
- * every frame. Ageing it only where it is USED would freeze it on a child that
- * stands — a call obeyed, a spot held, a round break — and that child would then
- * set off again on a way out it found half a minute earlier, in a direction that
- * by then means nothing.
+ * The escape bearing ages on the CLOCK, not on the walking, and every child is
+ * aged every frame. Ageing it only where it is USED would freeze it on a child
+ * that stands — a call obeyed, a spot held, a round break — and that child would
+ * then set off again on a way out of a pocket it is no longer in.
  */
 function ageDetour(c: TagChild, dt: number): void {
   if (c.detourFor > 0) c.detourFor = Math.max(0, c.detourFor - dt)
 }
 
-/** The heading a child really walks on this step: the one it was given, unless
- *  it is still holding the way out of a pocket (`TagConfig.detourSeconds`). */
+/** Where a child is really sent this step: where it was asked to go, unless it
+ *  is still carrying itself clear of a pocket. */
 function walkHeading(c: TagChild, desired: number): number {
-  return c.detourFor > 0 ? c.detour : desired
+  return c.detourFor > 0 ? c.detourHeading : desired
 }
 
 /**
  * Move one child `dist` along `desired`, substepped so nothing is stepped over,
  * deflected around whatever is in the way, and nudged free if it is genuinely
- * pinned. The heading it ends on is the one it TRAVELLED.
- *
- * A step that had to turn more than a quarter to get anywhere leaves a DETOUR
- * behind it: the way out is held for a moment, because the direction the chase
- * wants is recomputed every frame and would aim the child straight back into
- * the pocket it just left — turn out, turn back, turn out, which is a shuffle on
- * the spot rather than a walk (point 648).
+ * pinned. The heading it ends on is the one it TRAVELLED — and that heading is
+ * handed back to the deflection as the COURSE it is on, so a step round a hut
+ * can never undo the step before it (point 648).
  */
 function moveChild(
   c: TagChild,
@@ -436,6 +435,7 @@ function moveChild(
   const len = distance / steps
   const look = Math.max(len, world.childRadius * 2)
   let heading = desired
+  let course = c.heading
   let moved = false
   for (let k = 0; k < steps; k++) {
     // THE PROBE TURNS THE FULL CIRCLE, not the wildlife's ±90°. A coast is
@@ -446,20 +446,24 @@ function moveChild(
     // the user's "hängt kurz fest": measured at his seed, every single stalled
     // frame had free ground 105–150° off the heading it wanted, just outside
     // what the probe could see.
-    const r = deflectedStep(c.x, c.z, heading, len, world.blocked, look, 12)
+    const r = deflectedStep(c.x, c.z, heading, len, world.blocked, look, 12, course)
     if (!r.moved) break
     c.walked += Math.hypot(r.x - c.x, r.z - c.z)
     c.x = r.x
     c.z = r.z
     heading = r.heading
+    course = r.heading
     moved = true
   }
   if (moved) {
+    // It had to turn RIGHT ROUND to get anywhere: that is a pocket, not a hut
+    // corner, and the bearing it escaped on is held for a moment so it clears
+    // the pocket instead of stepping straight back into it.
+    const gaveUp = Math.cos(heading - c.heading) < 0
     c.heading = heading
     c.pinned = 0
-    const turned = Math.abs(Math.atan2(Math.sin(heading - desired), Math.cos(heading - desired)))
-    if (turned > Math.PI / 2) {
-      c.detour = heading
+    if (gaveUp) {
+      c.detourHeading = heading
       c.detourFor = Math.max(0, cfg.detourSeconds)
     }
     return

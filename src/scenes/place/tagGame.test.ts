@@ -1264,6 +1264,61 @@ describe('an outside claim on a child: what was SAID steers it (point 481)', () 
   })
 })
 
+describe('a village of huts does not make the children shuffle (point 648)', () => {
+  // The user's "Kind zittert auf der Stelle herum", in the shape that produces
+  // it: a walled compound with a fence across the yard, which is what turns a run
+  // into a run PAST things. Open ground barely shows it at all — the defect is in
+  // the DEFLECTION, which re-minimised the turn every frame while which turns are
+  // free depends on where the child is standing, so the minimum flipped between
+  // two values that undid one another.
+  const huts: Collider[] = Array.from({ length: 8 }, (_, i) => {
+    const a = (i / 8) * Math.PI * 2
+    return boxCollider(Math.sin(a) * 5.5, Math.cos(a) * 5.5, 2.6, 2.6, a)
+  })
+  huts.push(boxCollider(0, 1.6, 6, 0.3, 0.4)) // a fence across the yard
+  const village: TagWorld = {
+    radius: 10,
+    childRadius: CHILD_R,
+    blocked: (x, z) => Math.hypot(x, z) > 10 || !standingClear(huts, x, z, CHILD_R),
+    nudge: (x, z) => {
+      const r = tryNudgeToFree(huts, x, z, CHILD_R)
+      return { x: r.pos[0], z: r.pos[1], found: r.found }
+    },
+  }
+
+  it('lets a step reverse the one before it only rarely, over a long game', () => {
+    const s = game([
+      [0, 0],
+      [0.9, -0.7],
+      [-1.1, -0.5],
+      [1.4, -1.4],
+    ])
+    const prev = s.children.map((c) => ({ x: c.x, z: c.z }))
+    const last: Array<{ x: number; z: number } | null> = s.children.map(() => null)
+    let steps = 0
+    let reversals = 0
+    run(s, 40, village, CFG, 1 / 30, (st) => {
+      st.children.forEach((c, k) => {
+        const v = { x: c.x - prev[k].x, z: c.z - prev[k].z }
+        const u = last[k]
+        // Only real steps have a direction to compare at all.
+        if (u && Math.hypot(u.x, u.z) >= 1e-3 && Math.hypot(v.x, v.z) >= 1e-3) {
+          steps++
+          if (u.x * v.x + u.z * v.z < 0) reversals++
+        }
+        if (Math.hypot(v.x, v.z) >= 1e-3) last[k] = v
+        prev[k] = { x: c.x, z: c.z }
+      })
+    })
+    expect(steps).toBeGreaterThan(2000) // they really ran
+    // Measured on this fixture: 1.0 % with the course rule and 3.3 % without it,
+    // against 0.2–0.4 % on open ground with no huts at all. The gate sits between
+    // the two, so it can only be tripped by the defect coming back — not by a run
+    // of unlucky evasions.
+    expect(reversals / steps).toBeLessThan(0.02)
+  })
+})
+
 describe('a child cornered by the settlement walks out (point 648)', () => {
   // A dead-end lane between two huts: the only free ground is BEHIND the child.
   // The wildlife's ±90° deflection cannot see it, so the child used to stand
