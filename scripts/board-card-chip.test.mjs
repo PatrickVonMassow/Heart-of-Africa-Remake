@@ -26,6 +26,8 @@ import { toClosingWork, toNoCurrentWork, toNow } from './board-core.mjs'
 import { REQUIRED_SECTIONS } from './board-structure-core.mjs'
 
 const PHONE_WIDTH = 390 // an iPhone-class viewport, well under the 460 px break
+/** The living board. Git-ignored, so the stylesheet half is SKIPPED where it is absent. */
+const BOARD_FILE = resolve(REPO_ROOT, '.batch-dashboard.html')
 
 const sect = (title, body) => `<details class="sect"><summary><h2>${title}</h2></summary>\n${body}\n</details>`
 const queueCard = (n, title) =>
@@ -89,13 +91,8 @@ describe('the numbered chip renders on a now-card as it does in the queue', () =
 
   // The REAL stylesheet, where it is available: the board file is git-ignored,
   // so this half is skipped in a fresh checkout rather than faked.
-  it('is hidden by no rule of the real board, the phone media query included', () => {
-    const file = resolve(REPO_ROOT, '.batch-dashboard.html')
-    if (!existsSync(file)) {
-      expect(true).toBe(true) // no board in this checkout — nothing to read
-      return
-    }
-    const css = (readFileSync(file, 'utf8').match(/<style>([\s\S]*?)<\/style>/) ?? [])[1] ?? ''
+  it.skipIf(!existsSync(BOARD_FILE))('is hidden by no rule of the real board, the phone media query included', () => {
+    const css = (readFileSync(BOARD_FILE, 'utf8').match(/<style>([\s\S]*?)<\/style>/) ?? [])[1] ?? ''
     expect(css, 'the board carries no stylesheet').toContain('.num{')
     // Every rule that mentions the chip, the phone block included: none of them
     // may take it out of the picture.
