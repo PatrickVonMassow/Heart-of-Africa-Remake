@@ -1344,11 +1344,20 @@ Build order, chosen so no two parallel agents own the same file:
   make this impossible, and on the same afternoon it PROVED it can fail closed (it refused a
   push of this session's with "unit ran an unreadable file count … nothing was compared").
   So the defect is not "the gate is missing" but "the gate's verdict is not binding".
-  FIRST, ESTABLISH THE PATH, do not guess it: reconstruct from the gate's own log and the
-  reflog which decision let `4d580957` through — the gate not running at all, a stale green
-  from an earlier run being reused, `--no-verify`, or a hook that exits 0 on its own error.
-  Write the answer into the commit message; the fix depends on it and a guessed cause here
-  would produce a guard that guards nothing.
+  THE PATH IS MEASURED, not guessed (11.08.2026, the same failure a second time): the push of
+  `7eb2076f` turned `main` red at `npm run test:unit` and mailed the owner, and the red is
+  `scripts/retro-core.test.mjs` — two freshly written retrospective sections without an entry
+  in the lesson-mechanism ledger. Reproduced locally on that exact commit: 1 failed, 52
+  passed. The gate let it through because it REUSED an older unit verdict:
+  `.claude/pre-push-gate-state.json` names its last unit run at 2026-08-11T03:56Z with 9660
+  tests while CI ran 9685, so no fresh run was recorded for this push, and the gate's own line
+  ("unit ran N — the same N files as the last green run") says why: the reuse is keyed on the
+  SET OF TEST FILES, which does not change when a test reads a DOCUMENT that did. That is the
+  same blind spot `isProseOnlyPath` deliberately avoids elsewhere — a prose commit is not
+  test-neutral when a test asserts about the prose.
+  SO THE FIX HAS TWO HALVES: the reuse key must cover every input a test READS, not only the
+  test files themselves (in doubt, run — a reused verdict is only ever an optimisation), and
+  the verdict must be bound to the sha as below.
   FINAL STATE, whichever path it was: a push of `main` carries a RECORDED gate verdict — the
   HEAD sha it was computed for, the suite counts, the verdict — and a push whose recorded
   verdict does not belong to the exact sha being pushed is REFUSED, not warned about. An
