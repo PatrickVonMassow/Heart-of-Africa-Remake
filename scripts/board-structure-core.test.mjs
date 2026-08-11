@@ -12,6 +12,7 @@ import {
 import {
   CLOSING_WORK_TITLE,
   NO_CURRENT_WORK_TITLE,
+  claimsNoCurrentWork,
   dropStrayNowCards,
   setCardTitle,
   toClosingWork,
@@ -544,6 +545,20 @@ describe('every current-work card names its point and its subject', () => {
     expect(nowCards(rewritten)).toHaveLength(1)
     expect(rewritten).not.toContain('Alt; Punkt 656 folgt.')
     expect(codes(rewritten)).toEqual([])
+  })
+
+  // The point-470 deny reads this predicate, and its remedies cannot reach a
+  // card the strip refuses to remove — so the claim must be as true as the strip
+  // (four-eyes 12.08.): a numbered card wearing the idle marker is running work.
+  it('does not let a numbered card wearing the idle marker claim that nothing runs', () => {
+    const falseIdle =
+      '<details class="now" data-state="idle">\n  <summary><span class="num">651</span>' +
+      '<span class="t">Echte Arbeit</span></summary>\n' +
+      '  <div class="body"><p>Läuft.</p></div>\n</details>'
+    expect(claimsNoCurrentWork(withNow(falseIdle))).toBe(false)
+    // …while the genuine handover card still makes the claim.
+    const handover = toNoCurrentWork(withNow(''), 'Weiter mit Punkt 656.', { stamp: '23:55' })
+    expect(claimsNoCurrentWork(handover)).toBe(true)
   })
 
   it('does not read a NUMBERED card wearing the old closing sentence as a state', () => {

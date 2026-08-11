@@ -745,19 +745,6 @@ function standingPointCards(html) {
   return [...parseNowCardPoints(stripStateCards(String(html ?? '')))]
 }
 
-/** Test a pattern against the current-work SECTION alone, not the whole board. */
-function testInNowSection(html, pattern) {
-  const text = String(html ?? '')
-  let scope = text
-  try {
-    const { from, end } = sectionBounds(text, 'now')
-    scope = text.slice(from, end)
-  } catch {
-    /* no section — judge the fragment as it stands */
-  }
-  return pattern.test(scope)
-}
-
 /**
  * Does the board's current-work section CLAIM that nothing is running
  * (point 470)? This is the predicate `board-first-guard` denies on, so it is
@@ -773,12 +760,34 @@ function testInNowSection(html, pattern) {
  * predicate can quietly take the other card with it.
  */
 export function claimsNoCurrentWork(html) {
-  return testInNowSection(html, noWorkCardPattern())
+  return sectionStateCards(html, 'idle').length > 0
 }
 
 /** Does the current-work section say that only closing duties are left? */
 export function claimsClosingWork(html) {
-  return testInNowSection(html, closingCardPattern())
+  return sectionStateCards(html, 'closing').length > 0
+}
+
+/**
+ * The cards in the current-work section that REALLY are the given state — the
+ * marker checked against the card itself (four-eyes review, 12.08.2026).
+ *
+ * A numbered card wearing the idle marker is running work, not a claim to stop.
+ * Trusting the marker there fired the point-470 deny on a card the strip
+ * deliberately refuses to remove, and the deny's remedies (`now`, `closing`)
+ * cannot reach it while the ones that can (`title`, `queue`) are themselves the
+ * state-changing calls it blocks — a trap with no way out.
+ */
+function sectionStateCards(html, kind) {
+  const text = String(html ?? '')
+  let scope = text
+  try {
+    const { from, end } = sectionBounds(text, 'now')
+    scope = text.slice(from, end)
+  } catch {
+    /* no section — judge the fragment as it stands */
+  }
+  return (scope.match(stateCardPattern(kind)) ?? []).filter((card) => isTrulyStateCard(card, kind))
 }
 
 /**
