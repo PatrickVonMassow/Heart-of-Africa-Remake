@@ -39,8 +39,8 @@ import {
   appendGateState,
   parseRankRecord,
   pruneRankRecord,
+  recordProvenanceFrom,
   recordRank,
-  restoreCommandFor,
   seedRecord,
   settleRecord,
 } from './queue-rank-core.mjs'
@@ -76,6 +76,9 @@ function writeRankRecord(record, open, path = RECORD) {
   return next
 }
 
+/** One git question, answered without a window and without a throw. */
+const git = (args) => spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true })
+
 /**
  * Does this repository carry the rank record AT ALL — and if it does, which
  * command puts it back?
@@ -93,22 +96,62 @@ function writeRankRecord(record, open, path = RECORD) {
  * message that names the restore, while allowing wrongly is the hole itself.
  */
 function recordProvenance(path = RANK_RECORD_PATH) {
-  const git = (args) => spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true })
-  const closed = (over) => ({ tracked: true, restore: restoreCommandFor(over) })
+  const failClosed = { tracked: true, restore: RESTORE_CMD }
   try {
-    const inIndex = git(['ls-files', '--error-unmatch', '--', path]).status === 0
-    if (git(['cat-file', '-e', `HEAD:${path}`]).status === 0) return closed({ headHasIt: true })
-    if (inIndex) return closed({ headHasIt: false, inIndex: true })
-    // Neither has it: either the deletion was COMMITTED — the record then lives
-    // one commit before the one that removed it — or this repository has never
-    // carried the record, which is the one state arming is for.
+    const headHasIt = git(['cat-file', '-e', `HEAD:${path}`]).status === 0
+    // "<mode> <sha> <stage>\t<path>" — the stage is what says whether this is a
+    // plain entry or one side of an unmerged conflict.
+    const staged = git(['ls-files', '--stage', '--', path])
+    const entry = String(staged.stdout ?? '').trim().split('\n')[0] ?? ''
+    const match = staged.status === 0 ? entry.match(/^\d+ [0-9a-f]+ (\d)\t/) : null
+    const indexStage = match ? Number(match[1]) : null
+    const size = indexStage === 0 ? git(['cat-file', '-s', `:0:${path}`]) : null
+    const indexSize = size && size.status === 0 ? Number(String(size.stdout).trim()) : 0
     const history = git(['rev-list', '-n', '1', 'HEAD', '--', path])
-    if (history.status !== 0) return closed({ headHasIt: true })
-    const removedIn = String(history.stdout ?? '').trim()
-    if (!removedIn) return { tracked: false, restore: RESTORE_CMD }
-    return closed({ headHasIt: false, removedIn })
+    // git said nothing usable — not installed, not a repository, a broken index.
+    // The one legitimate arming happens before the record is ever committed, so
+    // refusing wrongly costs a message naming the restore, while allowing wrongly
+    // is the hole itself.
+    if (!headHasIt && history.status !== 0) return failClosed
+    return recordProvenanceFrom({
+      headHasIt,
+      indexStage,
+      indexSize,
+      removedIn: String(history.stdout ?? '').trim(),
+    })
   } catch {
-    return closed({ headHasIt: true })
+    return failClosed
+  }
+}
+
+/**
+ * Put the freshly armed record under git at once.
+ *
+ * THE ARMING WINDOW IS THE LAST REMOVAL ROUTE (cross-vendor review, seventh
+ * pass). `--seed` is refused on a record the repository carries, which leaves
+ * exactly one moment where removing the file still reads as "a checkout that
+ * never had a baseline": between the first arming and the commit that tracks it.
+ * Append a point in that window, delete the record, seed again, and the
+ * outstanding question is settled by the collective reason after all. Staging the
+ * record closes that window in the same command that opens it — the record is a
+ * TRACKED artefact by design, and an armed one sitting outside git is the
+ * anomaly. It cannot fail silently: a stage that does not happen is said out
+ * loud, because the arming is then not durable.
+ */
+function stageRecord(path = RANK_RECORD_PATH) {
+  let failure = ''
+  try {
+    const added = git(['add', '--', path])
+    if (added.status !== 0) failure = String(added.stderr ?? '').trim() || `git add exited ${added.status}`
+  } catch (e) {
+    failure = e && e.message
+  }
+  if (failure) {
+    console.error(
+      `queue-rank: WARNING — could not stage ${path} (${failure}). Stage and commit it now: until the ` +
+        'repository carries the record, deleting it reads as a checkout that never had a baseline, and a ' +
+        'second --seed would settle every outstanding question on one reason.',
+    )
   }
 }
 
@@ -145,6 +188,7 @@ if (isMainModule(import.meta.url)) {
         seedRecord(record, open, { why, at: new Date().toISOString(), ...recordProvenance() }),
         open,
       )
+      stageRecord()
       console.log(`queue-rank: baseline armed with ${next.settled.points.length} open point(s) — "${why.trim()}"`)
     } else {
       const state = appendGateState(open, record)

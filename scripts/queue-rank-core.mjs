@@ -76,6 +76,32 @@ export function restoreCommandFor({ headHasIt = true, inIndex = false, removedIn
   return /^[0-9a-f]{7,40}$/i.test(at) ? `git checkout ${at}^ -- ${RANK_RECORD_PATH}` : RESTORE_CMD
 }
 
+/**
+ * Does the repository carry the record, and what puts it back — decided from what
+ * git ANSWERED, so the decision is pure and swept by the unit layer rather than
+ * only by a live repository (cross-vendor review, seventh pass).
+ *
+ * `indexStage` is the stage of the index entry: 0 is a plain one, 1/2/3 are the
+ * sides of an unmerged conflict, which `git checkout -- <path>` cannot restore
+ * from. `indexSize` is that entry's blob size, because `git add -N` leaves a
+ * stage-0 entry holding the EMPTY blob — restoring it would write a zero-byte
+ * record, which this module reads as TORN, so the remedy would hand the caller
+ * from one refusal into another. Either way the answer is not "no index copy" but
+ * "no USABLE index copy": the repository still carries the record, and the search
+ * moves on to the commit that removed it.
+ */
+export function recordProvenanceFrom({ headHasIt = false, indexStage = null, indexSize = 0, removedIn = '' } = {}) {
+  if (headHasIt) return { tracked: true, restore: restoreCommandFor({ headHasIt: true }) }
+  if (Number(indexStage) === 0 && Number(indexSize) > 0) {
+    return { tracked: true, restore: restoreCommandFor({ headHasIt: false, inIndex: true }) }
+  }
+  const restore = restoreCommandFor({ headHasIt: false, removedIn })
+  // Only a restore that names a real commit proves the repository ever had it;
+  // anything else is the one state arming exists for — a checkout that has never
+  // carried the record.
+  return restore === RESTORE_CMD ? { tracked: false, restore } : { tracked: true, restore }
+}
+
 /** The open points as clean integers, in the order they were handed over, each
  *  once. `openPointsOf` does not deduplicate, and a number listed twice would
  *  otherwise make the same point read as both remembered and appended. */
@@ -338,6 +364,17 @@ export function settleRecord(open, record, { at = '', closed = [] } = {}) {
   // leaves the freeze exactly as it was. The caller supplies the ticks (the
   // guard reads the archive only in this case, which is the only one that needs
   // it — 1.3 MB at every turn end for a question that never arises otherwise).
+  //
+  // THE RESIDUAL, and why it is not closed further (cross-vendor review, seventh
+  // pass): this — like every rule here — reads the state it is SHOWN. Where a
+  // point closes and reopens without one readable observation in between, the
+  // transition is not seen and the reopen is not asked about. Widening the rule
+  // to "an empty order empties the baseline" would close it and reopen something
+  // far worse: a mangled TASKS.md reads as zero open points too, so the baseline
+  // would be erased on a transient bad read and EVERY open point would come back
+  // as an append — the block loop this file keeps refusing to build. Confirmed
+  // finished is therefore the only thing dropped, and the residual stays with a
+  // test that states it.
   if (!list.length) {
     const finished = new Set(pointList(closed))
     const kept = settled.points.filter((n) => !finished.has(n))

@@ -22,6 +22,7 @@ import {
   normaliseRankRecord,
   parseRankRecord,
   pruneRankRecord,
+  recordProvenanceFrom,
   recordRank,
   removedRecordMessage,
   restoreCommandFor,
@@ -255,6 +256,35 @@ describe('the baseline moves only when nothing is outstanding', () => {
     }
     expect(thrown.message).toContain('git checkout deadbee^ -- x')
   })
+
+  it('reads the git state it is shown, including the index entries that restore nothing', () => {
+    // The discovery itself, not just the string it produces. `ls-files` succeeding
+    // proves an ENTRY, not a usable one: stages 1/2/3 are the sides of an unmerged
+    // conflict, and `git add -N` leaves a stage-0 entry holding the empty blob,
+    // which would restore a zero-byte record — torn, i.e. one refusal handing the
+    // caller into the next.
+    expect(recordProvenanceFrom({ headHasIt: true, indexStage: 2 })).toEqual({ tracked: true, restore: RESTORE_CMD })
+    expect(recordProvenanceFrom({ headHasIt: false, indexStage: 0, indexSize: 1870 })).toEqual({
+      tracked: true,
+      restore: 'git checkout -- .claude/queue-rank.json',
+    })
+    for (const unusable of [
+      { indexStage: 2, indexSize: 1870 },
+      { indexStage: 1, indexSize: 1870 },
+      { indexStage: 0, indexSize: 0 },
+      { indexStage: null, indexSize: 0 },
+    ]) {
+      // No usable index copy, but the history has it: restore from before the
+      // commit that removed it, and the record still counts as carried.
+      expect(recordProvenanceFrom({ headHasIt: false, ...unusable, removedIn: 'abc1234' })).toEqual({
+        tracked: true,
+        restore: 'git checkout abc1234^ -- .claude/queue-rank.json',
+      })
+      // And with no history either, this is the one state arming exists for.
+      expect(recordProvenanceFrom({ headHasIt: false, ...unusable }).tracked).toBe(false)
+    }
+    expect(recordProvenanceFrom()).toEqual({ tracked: false, restore: RESTORE_CMD })
+  })
   it('writes nothing when the baseline already says what stands', () => {
     expect(settleRecord([9, 5], settledAt([5, 9]), { at: 't' })).toEqual({ changed: false, record: null })
   })
@@ -284,6 +314,22 @@ describe('the baseline moves only when nothing is outstanding', () => {
     // And the gate is still ARMED afterwards — an emptied baseline is not an
     // absent one, so nothing reads as a clean slate.
     expect(appendGateState([4], finished.record).state).toBe('pending')
+  })
+  it('sees the closure through the whole event sequence, and states what it cannot see', () => {
+    // THE SEQUENCE, not the two states separately: baseline [4] → 4 lands and the
+    // order reads empty → 4 reopens at the end.
+    let record = settledAt([4])
+    record = settleRecord([], record, { at: 't1', closed: [4] }).record
+    expect(unrankedAppends([4], record)).toEqual([4])
+    // THE RESIDUAL, pinned rather than discovered later: where NO readable
+    // observation falls between the closing and the reopen — the archive
+    // unreadable at that one moment — the transition is not seen and the reopen
+    // is not asked about. Every rule that would close it (an empty order empties
+    // the baseline) erases the baseline on a mangled TASKS.md instead, and hands
+    // back every open point as an append at once.
+    const unseen = settleRecord([], settledAt([4]), { at: 't1', closed: [] })
+    expect(unseen.changed).toBe(false)
+    expect(unrankedAppends([4], settledAt([4]))).toEqual([])
   })
   it('--seed arms the whole open order at once, with its reason', () => {
     const seeded = seedRecord(null, [9, 5, 4], { why: 'arming baseline', at: 't' })
