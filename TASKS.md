@@ -236,8 +236,8 @@ there exactly once; a new point joins a bundle when appended.
      the SAME mistake occurs a second time: the repetition is the evidence that the gap is
      expensive.
   EXPLICITLY NOT a blocking guard on the mere EXISTENCE of a gap. An honestly named gap is
-  better than an invented cover (§3.32), and a gate on it would teach us to stop naming gaps
-  at all.
+  better than an invented cover (retrospective §3.32), and a gate on it would teach us to
+  stop naming gaps at all.
   VERIFIABLE: Vitest over the directory parser and the tick derivation — an entry claiming
   `built` against an open point fails, the same entry against a ticked point passes, an
   archived point counts as ticked, and a `named` entry older than N days appears in the
