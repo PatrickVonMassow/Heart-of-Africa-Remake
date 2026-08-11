@@ -794,6 +794,13 @@ there exactly once; a new point joins a bundle when appended.
   which 566 deferred ("enrichments first, then the other render suites"); and (c) states
   in the same building block that the final proof is whole-suite, so the cheap rung can
   never be mistaken for the acceptance.
+  WORK FOR 595–598 ALREADY STANDS ON A BRANCH (11.08.2026). A session that died left
+  `feat/595-598-verification-ladder-brief` PUSHED at 0d555552 — four commits plus a merge of
+  `origin/main`, covering all four points — with its worktree
+  `.claude/worktrees/agent-a7b6ba2cc654e6411` still in the tree. It was never reported,
+  verified or landed. Whoever takes these points STARTS FROM THAT BRANCH and verifies it
+  against the specs here; rebuilding from scratch throws away finished work. Cleaning that
+  worktree away before the branch has been judged is what point 629 exists to prevent.
   Criticality: medium — it reorders the proof but must not dilute it; the both-backend
   picture proof stays exactly as binding as it is today.
 
