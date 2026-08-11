@@ -357,16 +357,52 @@ export function reproveOne({ path, expected, since, mergeTarget = null, cwd = RE
  * failed removal); it skips both. Exported and taking an injected `runGit` so the
  * ORDER can be pinned by a test rather than by reading.
  *
- * AND THE SECOND DELETION IS GATED AGAIN, ON A STATE READ AFTER THE FIRST ONE
- * (whole-branch review, finding 6). The two commands are not one act, and the gap
- * between them is a real window: a live tree that recreates the local branch after
- * `branch -d` — or one that appears in that instant — would still lose its REMOTE,
- * which is the same loss by the other half. `recheck` is called between them and
- * any reason it returns SKIPS the remote deletion. A recheck that throws blocks
- * too: an unanswerable question is not permission.
+ * AND EACH DELETION IS GATED BY THE STRONGEST THING AVAILABLE TO IT — a snapshot
+ * is used NOWHERE as the last word (sixth review, finding 3). Measured on git
+ * 2.39.5, in this order of strength:
+ *
+ *   THE REMOTE: `git push --force-with-lease=refs/heads/<b>:<sha> --delete <b>` is
+ *   a real COMPARE-AND-SWAP, and it is what runs here. Verified against a throwaway
+ *   remote: with the lease naming a sha the remote has moved off, the deletion is
+ *   REJECTED (`! [rejected] (delete) -> <b> (stale info)`, exit 1) and the branch
+ *   survives; with a matching lease it deletes. The check happens at the server, at
+ *   the instant of the update, so NO window exists between our read and the delete:
+ *   anything pushed to that branch after the sha we merged makes the deletion fail.
+ *   This is what closes the "somebody pushed since the snapshot" race outright,
+ *   rather than narrowing it.
+ *
+ *   THE LOCAL: `git branch -d` carries git's own two refusals, both taken inside the
+ *   deleting process. Verified: it refuses a branch a worktree has CHECKED OUT
+ *   (`Cannot delete branch '<b>' checked out at '<path>'`), and it refuses one that
+ *   is NOT FULLY MERGED — `-d`, never `-D`, so the ref cannot vanish while it
+ *   carries commits `main` does not have.
+ *
+ *   THE RESIDUAL, AND WHY IT IS ACCEPTABLE HERE. One case no primitive can see: a
+ *   worktree DETACHED on that branch's commit. Verified in the same probe — with the
+ *   tree detached, `branch -d` deletes without complaint, because a detached HEAD
+ *   holds no reference to the branch and there is nothing for git to check. That is
+ *   what `recheck` and the fresh selection are for, and they remain a snapshot. What
+ *   the residual costs is bounded and is NOT this file's failure class: nothing is
+ *   deleted from the working tree, no commit becomes unreachable (the tree's own
+ *   HEAD and reflog hold them), and the loss is a NAME. So the sha is carried out
+ *   and printed, and restoring it is `git branch <b> <sha>` — one command, against
+ *   the destroyed-work class this cleanup exists to prevent, which cannot be
+ *   reached from here at all.
+ *
+ * `recheck` runs BETWEEN the two deletions and any reason it returns skips the
+ * remote one. A recheck that throws blocks too: an unanswerable question is not
+ * permission.
  */
 export function deleteLandedBranch({ branch, blocked = '', recheck = null, git: runGit = git } = {}) {
-  if (blocked) return { local: 'skipped', remote: 'skipped', problems: [], note: '' }
+  if (blocked) return { local: 'skipped', remote: 'skipped', problems: [], note: '', sha: '' }
+  // READ FIRST, DELETE SECOND: after `branch -d` the ref is gone and the lease for
+  // the remote deletion could no longer be formed.
+  let sha = ''
+  try {
+    sha = String(runGit(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { stdio: ['ignore', 'pipe', 'pipe'] }) ?? '').trim()
+  } catch {
+    /* an unreadable ref leaves the lease empty, which SKIPS the remote deletion */
+  }
   try {
     runGit(['branch', '-d', branch], { stdio: ['ignore', 'pipe', 'pipe'] })
   } catch (e) {
@@ -374,6 +410,7 @@ export function deleteLandedBranch({ branch, blocked = '', recheck = null, git: 
       local: 'failed',
       remote: 'skipped',
       note: '',
+      sha,
       problems: [
         `local branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0],
         `remote branch: NOT deleted — the local deletion failed, and the usual cause is a worktree still standing on ${branch}`,
@@ -388,25 +425,40 @@ export function deleteLandedBranch({ branch, blocked = '', recheck = null, git: 
       stop = `the state could not be re-read before the remote deletion: ${`${(e && e.message) || e}`.split('\n')[0]}`
     }
   }
+  if (!stop && !sha) {
+    stop = 'the commit that branch stood on could not be read, so the remote deletion could not be made conditional on it'
+  }
   if (stop) {
     return {
       local: 'ok',
       remote: 'skipped',
       problems: [],
+      sha,
       note: `the remote branch ${branch} was NOT deleted — ${stop}`,
     }
   }
   try {
-    runGit(['push', 'origin', '--delete', branch], { stdio: ['ignore', 'pipe', 'pipe'] })
+    // COMPARE-AND-SWAP, not a plain delete: the server refuses if origin/<branch>
+    // is no longer the commit the landing merged.
+    runGit(['push', 'origin', `--force-with-lease=refs/heads/${branch}:${sha}`, '--delete', branch], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
   } catch (e) {
+    const said = `${(e && (e.stderr || e.message)) || e}`
+    const stale = /stale info|force-with-lease|rejected/i.test(said)
     return {
       local: 'ok',
       remote: 'failed',
       note: '',
-      problems: [`remote branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0]],
+      sha,
+      problems: [
+        stale
+          ? `remote branch: NOT deleted — origin/${branch} has moved off ${sha.slice(0, 8)} since the landing merged it, so somebody pushed to it; the remote branch is left standing on purpose`
+          : `remote branch: ${said}`.split('\n')[0],
+      ],
     }
   }
-  return { local: 'ok', remote: 'ok', problems: [], note: '' }
+  return { local: 'ok', remote: 'ok', problems: [], note: '', sha }
 }
 
 /**
@@ -819,6 +871,12 @@ async function main(argv) {
       for (const line of refused) console.log(line)
     }
     if (branchResult.note) console.log(`land-point: ${branchResult.note}`)
+    // THE SHA THE BRANCH STOOD ON, PRINTED. The one case no git primitive can see
+    // is a worktree DETACHED on that commit, and what it loses is the NAME — so the
+    // name is one command away for as long as this line is in the log.
+    if (branchResult.local === 'ok' && branchResult.sha) {
+      console.log(`land-point: deleted branch ${branch} (was ${branchResult.sha}) — restore it with: git branch ${branch} ${branchResult.sha}`)
+    }
     // The kept TREES come from the selection the removals ran against; the branch
     // line carries the blocker taken at the deletion, so the reason printed is the
     // one that actually decided and it is never printed twice.
