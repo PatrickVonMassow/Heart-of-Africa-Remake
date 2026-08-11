@@ -135,53 +135,6 @@ there exactly once; a new point joins a bundle when appended.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
-- [ ] 590. THE BOARD'S QUEUE ORDER IS A SECOND COPY OF THE WORK ORDER, AND IT KEEPS
-  DRIFTING (user 09.08.2026: "Das Problem, dass die Reihenfolge der Karten auf dem
-  Dashboard falsch war, hatten wir immer wieder. Können wir nicht einen Mechanismus
-  etablieren, der das dauerhaft gesichert behebt?"). ESTABLISHED, twice within one hour on
-  09.08.2026: the thirteen play-session points the user had put AHEAD OF EVERYTHING sat at
-  queue position ~90, and the freshly appended 589 landed at the very back — both times
-  because the board renders from an `order` array in `.claude/board-queue.json` that is
-  maintained BY HAND and appends anything it does not already list. `queue-order-guard`
-  did not catch either: it only enforces "fixes before finders" and "the release tag last",
-  never that a point sits where its priority actually puts it. This is the project's own
-  named failure — a second place for one fact — applied to the one artefact the user reads.
-  ALREADY DELIVERED BY POINT 608 (merged 10.08.2026, established 11.08.2026 while landing
-  this one): the queue renders from the work order's own sequence read through
-  `tasks-source.mjs` (`openPointsOf`/`queueOrder` in `board-queue-core.mjs`), the `order`
-  array is gone from `.claude/board-queue.json`, the rank rules apply on top unchanged, and
-  `queue-order-guard`'s `queueOrderDrift` blocks a published sequence that differs — a
-  point carded twice included. Re-ranking therefore already means MOVING the point's block
-  inside `TASKS.md`. None of that is to be built again; what remains is the one thing 608
-  does not do.
-  FINAL STATE:
-  1. AN APPENDED POINT IS RANKED ONCE, DELIBERATELY. Append-and-defer puts a new point at
-     the END, which is a DEFAULT, not a judgment — and 589 shows the default is often
-     wrong. A Stop guard therefore refuses to end the turn that appended a point until its
-     rank was settled: either the point was moved to where it belongs, or the turn recorded
-     that last is right (`node scripts/queue-rank.mjs --ranked <N> --why "<one line>"`).
-     One decision per new point, at the moment its content is freshest.
-  2. WHICH POINT COUNTS AS APPENDED IS READ OFF PROVENANCE, never off the numbers or the
-     positions (three cross-vendor passes refuted every position heuristic). The tracked
-     record `.claude/queue-rank.json` carries the deliberate decisions AND a `settled`
-     baseline — the open set as it stood the last time no rank question was outstanding —
-     and a point is new exactly when it is missing from that baseline. The baseline moves
-     only when nothing is outstanding, and it is ARMED by hand (`--seed`), never as a side
-     effect. A point standing BEFORE one the baseline remembers was placed deliberately and
-     is not asked about; a REOPENED point re-entering at the end is asked like any append,
-     and so is a new point placed before another new one (two points appended in one turn
-     arrive exactly like that). A record that does not parse is TORN: the gate stays quiet
-     and the CLI is loud, and nothing overwrites it. A `ranked` entry without a reason is
-     no decision and is dropped.
-  VERIFIABLE: Vitest over the pure core — an appended point is reported unranked until it
-  is recorded; the survivor left last by a closing is never asked; descending appends are
-  all asked; a torn or reasonless record silences nothing. Plus the guard test: the turn
-  that appended a point blocks, and the recorded decision releases it.
-  MECHANISM, so the four-eyes rule applies: the other model reviews the guard and the
-  ranking gate before they land (`scripts/mechanism-review.mjs --record`).
-  Criticality: HIGH — the board is the only thing the user sees while the batch runs, and a
-  queue in the wrong order misrepresents what is being worked on next.
-
 - [ ] 600. THE CTRL LABEL DOES NOT NAME AN ATTACKING LION — AND THE ROSTER IS RE-TESTED
   WHOLE (user 09.08.2026, first play test of the feature: "STRG einmal getestet und direkt
   einen Fehler gefunden: funktioniert nicht für angreifenden Löwen. Nochmal alles
@@ -603,6 +556,17 @@ there exactly once; a new point joins a bundle when appended.
   closed point with an armed launcher; a spent budget with a written handoff and an armed
   launcher joins it. Every other stop stays illegal, so the guard can never be talked into
   an idle stop by writing a handoff for work that was never started.
+  (e) AN ORPHANED BRANCH IS SURFACED, NOT LEFT TO CHANCE (found 11.08.2026). The handoff
+  covers the session that hands over deliberately; it does nothing for the agent that dies
+  without one, and that is the case that actually cost work. Two feature branches sat in
+  the tree unreported — one carrying ~2000 lines for points that still read as untouched,
+  one fully superseded — and the only thing that found them was a resuming session running
+  `git worktree list` on a hunch. So the resume path REPORTS every branch that has commits
+  `main` does not contain and no live agent behind it, with its point, its last commit and
+  its age, exactly as it reports the work order; and a branch whose work has landed under
+  another number is ENDED at that landing rather than left to be re-triaged. VERIFIABLE by
+  Vitest on the pure core — an orphan is listed, a branch with a live agent is not, a
+  contained branch is not — plus the resume hook printing it.
   MEASURE THE RESULT, as 373 did and on the same tool: `node scripts/measure-context-cost.mjs`
   for a full day after the lever lands, in BOTH scopes, against the 0.988 %/h this point
   starts from and the 0.6 %/h that fits. The point counts as delivered when the rate is
@@ -5577,3 +5541,38 @@ to land than a mechanism that needs a review.
   the check red again.
   Criticality: medium — it blocks no player, but an unaccounted red on `main` blinds the
   render gate for every later change.
+
+- [ ] 628. THE HOLD-CTRL LAYER LABELS A CAMP TWICE AND NAMES THE PLAYER'S OWN BOAT
+  (found 11.08.2026 while re-testing the roster for point 600, and deliberately not fixed
+  there: both halves are a judgment about what the layer PROMISES, not a defect in the
+  state coverage that point closed).
+  FINAL STATE:
+  1. A PITCHED CAMP CARRIES EXACTLY ONE LABEL. `CampMarkers` in
+     `src/scenes/travel/TravelScene.tsx` draws a permanent `map-label` reading
+     `labels.camp` AND registers the same object with the hold-Ctrl layer, whose text is
+     that same word — so holding Ctrl stacks two identical boxes over one camp. The camp
+     STAYS in point 342's roster, which names "a pitched camp, a set-down canoe"
+     explicitly, so the cure is the one the elder already uses: an object that carries a
+     permanent label of its own is not offered a second time by the Ctrl layer, whoever
+     draws it. Stating that as a rule about permanent labels, not a per-object exception,
+     is the point — a second exception list would rot the way the first one nearly did.
+  2. THE TRAVELLER'S OWN CANOE IS NOT NAMED. The marked canoe groups at the same call site
+     are the boat the player rides or drags. The layer's promise is "what am I looking
+     at", and the player's own vehicle is not that. A canoe SET DOWN in the world keeps
+     its label, per the same roster line.
+  3. TWO LABELS NEVER OVERLAP INTO ONE UNREADABLE BOX (seen 11.08.2026 in
+     `verification/148-ctrl-actor-labels-village.png`, the point-600 evidence frame). Where
+     two villagers stand close, their boxes overlap and the picture reads "Villager llager"
+     and "Villa Villager" — each label is correct, the PICTURE is not, and no test looks at
+     it because every check asks the DOM whether the text is present. The layer therefore
+     declutters: boxes that would overlap are offset, or the further one is dropped while
+     the nearer keeps its name. Which of the two is a judgment to make at the picture, on a
+     crowd, not in the abstract.
+  VERIFIABLE: the pure source/roster test gains both cases — a pitched camp yields exactly
+  one offered label, a ridden or dragged canoe yields none while a set-down one yields its
+  own; the declutter is judged AT THE FRAME on a crowded village, since a DOM assertion is
+  exactly the proxy that let this through; plus the browser check that asks the scene what
+  it DREW asserts that no two labels of identical text stand at one position.
+  Criticality: low — nothing breaks, but a doubled box is exactly the noise the elder
+  exception exists to prevent, and naming the player's own boat makes the layer read as
+  though it labels everything indiscriminately.
