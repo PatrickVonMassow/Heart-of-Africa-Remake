@@ -362,6 +362,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   gemeinsam danebenliegen; die Einigkeit fühlt sich dann an wie ein Beweis.
   → *Prompt:* „Bevor du Versuche vorschlägst: Welcher **eine Test** macht die Ursache **sichtbar**?"
 
+- **Der Erfolg beweist den Weg nicht.** Das Kommando lief durch, also greift die neue Einstellung —
+  nur hattest du in Wahrheit den Freigabe-Dialog weggeklickt. Es wurde gemessen; die Messung konnte
+  die Erklärungen bloß nicht trennen. Verwandt: Eine Einstellung, die einen Zustand nur *anlegt*,
+  erreicht eine schon laufende Sitzung nie — die „Behebung" wird dann mehrfach gemeldet und wirkt kein Mal.
+  → *Prompt:* „Sag **vor** der Messung, welches Ergebnis welche Erklärung **ausschließen** würde. Fällt
+  der Wert unter allen gleich aus, ist er kein Beleg — und wo ich zustimmen kann, ist ein Erfolg gar
+  kein Signal über die Automatik."
+
 - **Zwei Aufträge für einen Fehler.** Fällt derselbe Mangel erneut auf, schreibst du ihn arglos
   ein zweites Mal auf — sichtbar wird das erst, wenn beide Ergebnisse aufeinandertreffen.
   → *Prompt:* „Vor jedem neuen Punkt: Such die offenen nach demselben Problem ab — gibt es einen,
@@ -412,4 +420,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Sie setzt auf, woran alles andere hängt: eine Wahrheit, eine Arbeitsordnung, zwei
 Testschichten, den Reflex zum Check. Die Fallstricke oben ersetzt sie nicht.
 
-<!-- GUIDE-FINGERPRINT: 50f51f16520290edfc2978518be693f42f9b42e5b1e88ea982433360af864d06 -->
+<!-- GUIDE-FINGERPRINT: 5ae4206a22d65a9c475e84cc90ffec9974f3face8bb1d5d87230f4fe867543ad -->
