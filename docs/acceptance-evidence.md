@@ -1198,8 +1198,13 @@ headless or manual, which no seconds-long suite can reach. Verifiable both ways
 in the fast layer (`src/systems/devAssert.test.ts`, plus the three producers'
 own test files): a stalled producer trips its alarm, a healthy one is silent
 through half an hour of simulated play, a legitimately quiet one (a lone child,
-a village with nowhere to send anyone) is never judged, and a frame-loop gap is
-not counted as silence. The separation rule is pinned
+a village with nowhere to send anyone) is never judged, and a frame-loop gap
+cannot raise the alarm while a loop crawling at six-second frames still does.
+The watches reach the SCHEDULERS, so the ear's own end of the chain is armed
+where it lives: `playSpeech` raises `speech-inaudible` when the level that
+actually LEAVES the graph is zero — peak × speech bus × master — while the
+player's speech slider says otherwise, which is the shape point 577 had, an
+intact plan silenced further down (`src/systems/ambience.test.ts`). The separation rule is pinned
 in `src/scenes/place/lifeSpots.test.ts` (every adult station outside the hearing
 radius of the whole play ground, swept over the fire's position, shrinking rather
 than giving up), and the chase's side of it in

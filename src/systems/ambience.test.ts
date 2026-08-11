@@ -5,7 +5,7 @@
 // and a fake AudioContext pins that a flash SCHEDULES the clap at the pure
 // thunderDelaySeconds lag on the audio clock and SURVIVES to fire — no later
 // frame or ambience state change can cancel it.
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   coastSurfGain,
   emitFootstep,
@@ -27,6 +27,7 @@ import { thunderDelaySeconds } from './season'
 import { balance } from '../config/balance'
 import { phraseOf, utteranceOf, SEQUENCE_LENGTH } from '../communication/lexicon'
 import { phrasePlan, utterancePlan } from '../communication/speaking'
+import { resetDevAsserts } from './devAssert'
 
 describe('coastSurfGain (point 153 — the coastal surf fade)', () => {
   const near = 0.4
@@ -745,6 +746,49 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       balance.communication.speechVolume = -3
       refreshAmbienceVolume()
       expect(speechBusOf(speak()[0]).gain.value).toBe(0)
+    })
+
+    // THE RESULT-LEVEL ASSERTION (point 589, rule 1): the level that LEAVES the
+    // graph is what the ear gets, and point 577 proved a plan can be perfect
+    // while the chain behind it multiplies the tone away. So the running game
+    // judges the end of the chain, and every session — headless or manual —
+    // reports it.
+    describe('the armed end-of-chain level', () => {
+      let spy: ReturnType<typeof vi.spyOn>
+      beforeEach(() => {
+        resetDevAsserts()
+        spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      })
+      afterEach(() => spy.mockRestore())
+
+      const codes = () => spy.mock.calls.map((c) => String(c[0]))
+
+      it('says nothing at the shipped mix, nor with the bed turned to zero', () => {
+        ctx.currentTime = 240
+        balance.ambientVolume = 0
+        refreshAmbienceVolume()
+        speak()
+        expect(codes()).toEqual([])
+      })
+
+      it('stays silent when the PLAYER turned the speech off — that is not a defect', () => {
+        ctx.currentTime = 260
+        balance.communication.speechVolume = 0
+        refreshAmbienceVolume()
+        speak()
+        expect(codes()).toEqual([])
+      })
+
+      it('FIRES when the chain behind an intact plan is zero (the point-577 shape)', () => {
+        ctx.currentTime = 280
+        // The bus is left at zero while the player's own setting says otherwise
+        // — exactly the state in which every plan-level measurement was green.
+        balance.communication.speechVolume = 0
+        refreshAmbienceVolume()
+        balance.communication.speechVolume = defaultSpeech
+        speak()
+        expect(codes().join(' ')).toContain('speech-inaudible')
+      })
     })
   })
 

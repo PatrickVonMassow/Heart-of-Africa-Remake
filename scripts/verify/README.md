@@ -936,7 +936,11 @@ the level a source planned. POSITION is judged in WORLD space — do two bodies
 overlap, does the note sit within a hand's breadth of the head — not by the rule
 that was supposed to place it. A fix whose assertion can only reach the mechanism
 NAMES IN ITS COMMIT why the result is not assertable; that is a permitted
-outcome, silently asserting the proxy instead is not.
+outcome, silently asserting the proxy instead is not. The worked example is
+`playSpeech` (`src/systems/ambience.ts`): it asserts the level that actually
+LEAVES the graph — peak × speech bus × master — against the player's own slider,
+because point 577's tone was planned at a perfect level and multiplied by zero
+one node further down, with every plan-level measurement green.
 
 **2. One PLAY ACCEPTANCE per package.** A package of play-session fixes is not
 finished by its suites. The parts were each accepted and the COMPOSITION never

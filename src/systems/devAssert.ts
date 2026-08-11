@@ -60,13 +60,18 @@ export function resetDevAsserts(): void {
 // week, and then it is worth nothing when the real one comes.
 
 /**
- * A single step longer than this is the FRAME LOOP standing still — a hidden
- * tab, a breakpoint, a machine swapped out under a run — rather than a frame:
- * the game was not running, the producer never got its chance, and the gap is
- * not counted at all. Everything shorter counts in FULL, so a window of 60 s
- * means sixty elapsed seconds at ANY frame rate a running game has. (Clamping a
- * long step to a cap instead was the tempting version and is wrong: at sustained
- * two-second frames a 60 s window would silently have become 120 s.)
+ * Where a step stops being a FRAME and becomes the frame loop standing still — a
+ * hidden tab, a breakpoint, a machine swapped out under a run. Up to it a step
+ * counts in FULL, so a window of 60 s means sixty ELAPSED seconds at any frame
+ * rate a running game has; a longer gap counts this much and no more, so one
+ * suspension cannot flood the clock (5 s against the shortest window, 60 s)
+ * while a loop that really is crawling at six-second frames still accrues and is
+ * still reported, a little later.
+ *
+ * Both simpler rules are wrong, and both were tried: clamping EVERY step to a
+ * second turned a 60 s window into 120 s at two-second frames, and discarding a
+ * long step entirely let a producer stalled at six-second frames stay silent for
+ * ever without a word.
  */
 export const LONG_RUN_SUSPEND_SECONDS = 5
 
@@ -122,7 +127,7 @@ function record(code: string, watch: ProducerWatch, max: number, expected: boole
  */
 export function watchProducer(watch: ProducerWatch, step: ProducerStep): void {
   const dt =
-    Number.isFinite(step.dt) && step.dt > 0 && step.dt <= LONG_RUN_SUSPEND_SECONDS ? step.dt : 0
+    Number.isFinite(step.dt) && step.dt > 0 ? Math.min(step.dt, LONG_RUN_SUSPEND_SECONDS) : 0
   if (step.produced) {
     watch.produced++
     watch.silence = 0

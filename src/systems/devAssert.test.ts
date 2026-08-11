@@ -141,10 +141,10 @@ describe('watchProducer (point 589 — a producer that must keep producing)', ()
     expect(fired().length).toBe(2)
   })
 
-  it('does not count a frame-loop gap as silence (a hidden tab is not a stall)', () => {
+  it('does not let a frame-loop gap raise the alarm (a hidden tab is not a stall)', () => {
     const watch = createProducerWatch()
     // Ten minutes of wall clock arriving as one step: the game was not running,
-    // so the producer is owed nothing.
+    // so the producer is owed nothing beyond the suspend threshold.
     watchProducer(watch, {
       code: 'demo-producer',
       dt: 600,
@@ -153,7 +153,15 @@ describe('watchProducer (point 589 — a producer that must keep producing)', ()
       maxSilenceSeconds: 60,
     })
     expect(fired()).toEqual([])
-    expect(watch.silence).toBe(0)
+    expect(watch.silence).toBe(LONG_RUN_SUSPEND_SECONDS)
+  })
+
+  it('still reports a producer stalled on a loop crawling past the suspend threshold', () => {
+    // Six-second frames: a game in that state is barely running, but a producer
+    // that has stopped in it must not be able to hide behind the frame time.
+    const watch = createProducerWatch()
+    run(watch, 120, { step: 6, max: 60 })
+    expect(fired().join(' ')).toContain('demo-producer')
   })
 
   it('keeps the window in ELAPSED seconds on a machine running at half a frame a second', () => {
