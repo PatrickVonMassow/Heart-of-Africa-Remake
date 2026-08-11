@@ -36,7 +36,8 @@ import { fileURLToPath } from 'node:url'
 import { isMainModule } from './is-main.mjs'
 import { failedChecks } from './verify/baseline-classify-core.mjs'
 import { listSections, resolveSelection } from './verify/sections.mjs'
-import { DEV_SUITES } from './verify/tiers.mjs'
+import { readMachine } from './verify/machine-load.mjs'
+import { DEV_SUITES, laneFor, selectBackend } from './verify/tiers.mjs'
 import {
   classifyRun,
   countAlive,
@@ -168,7 +169,128 @@ function logDirFor(suite, section) {
   }
 }
 
-function main(argv = process.argv.slice(2)) {
+/**
+ * ONE probe run, in its OWN PROCESS GROUP.
+ *
+ * `spawnSync`'s timeout kills the runner and nothing else, so a killed run left
+ * its dev server and its browser behind — burning the very CPU the next run is
+ * trying to measure, and holding its port. Detached, the child leads a group,
+ * and the timeout kills the GROUP.
+ */
+function runOnce(plan, opts) {
+  const args = [
+    ...plan.argv,
+    process.execPath,
+    join(ROOT, 'scripts', 'verify', 'run-all.mjs'),
+    opts.suite,
+    `--section=${opts.section}`,
+  ]
+  return new Promise((resolve) => {
+    const child = spawn(args[0], args.slice(1), {
+      windowsHide: true,
+      cwd: ROOT,
+      // Its own group, so the whole tree can be killed together.
+      detached: process.platform !== 'win32',
+      env: {
+        ...process.env,
+        // The probe COUNTS first attempts: a retry would fold two runs into one
+        // verdict and halve the sample it is here to measure.
+        VERIFY_NO_RETRY: '1',
+        // The machine is deliberately not quiet — that is the experiment. The
+        // load check would otherwise flag (or, set to defer, skip) every run.
+        VERIFY_ON_LOAD: 'off',
+        ...(opts.backend ? { VERIFY_GL: opts.backend } : {}),
+      },
+    })
+    let out = ''
+    let timedOut = false
+    child.stdout?.on('data', (c) => (out += c))
+    child.stderr?.on('data', (c) => (out += c))
+    const timer = setTimeout(() => {
+      timedOut = true
+      killTree(child)
+    }, opts.timeoutMs)
+    child.on('error', (err) => {
+      clearTimeout(timer)
+      resolve({ out: `${out}\nthrottle-probe: the run could not be started: ${err?.message ?? err}`, timedOut, exit: null })
+    })
+    child.on('close', (code) => {
+      clearTimeout(timer)
+      // A killed group leaves nothing behind, but give the descendants a moment
+      // to go before the next run starts measuring.
+      resolve({ out, timedOut, exit: timedOut ? null : code })
+    })
+  })
+}
+
+/** Kill the run and everything it spawned — a survivor would burn the CPU the
+ *  next run measures and hold its port. The group goes first; the DESCENDANTS
+ *  that left the group do not die with it (`_server.mjs` starts the dev server
+ *  detached, and Playwright's browser likewise), so the leftovers of THIS
+ *  checkout are swept afterwards — measured 11.08.2026: a group kill alone left
+ *  a vite and a headless chrome running. */
+function killTree(child) {
+  try {
+    if (process.platform !== 'win32' && child.pid) process.kill(-child.pid, 'SIGKILL')
+    else child.kill('SIGKILL')
+  } catch {
+    try {
+      child.kill('SIGKILL')
+    } catch {
+      /* already gone */
+    }
+  }
+}
+
+/** The sweep, but AFTER the orphans have been reparented. Measured 11.08.2026:
+ *  a sweep fired the instant the group died found nothing — the dev server was
+ *  still a child of the dying runner, so the detector counted it as part of this
+ *  process's own tree. A second pass covers a slow reparent. */
+async function sweepAfterKill() {
+  let killed = 0
+  for (const wait of [1500, 2000]) {
+    await new Promise((r) => setTimeout(r, wait))
+    killed += await sweepStrays()
+    if (killed > 0) break
+  }
+  return killed
+}
+
+/** Sweep this checkout's leftover dev servers and browsers, using the house
+ *  stray detector — which matches on THIS repo path, so a parallel agent's own
+ *  run in another worktree is never touched. Returns how many it killed. */
+async function sweepStrays() {
+  let killed = 0
+  try {
+    const { strays } = await readMachine()
+    for (const stray of Array.isArray(strays) ? strays : []) {
+      if (!stray?.fromThisRepo || !Number.isInteger(stray.pid)) continue
+      // The GROUP, then the pid: the detector names the ROOT of the leftover
+      // tree, which for the dev server is the `sh -c vite` wrapper — killing
+      // that alone orphans the node beneath it, which goes on serving and goes
+      // on burning the core the next run is measuring (measured 11.08.2026).
+      let done = false
+      try {
+        process.kill(-stray.pid, 'SIGKILL')
+        done = true
+      } catch {
+        /* not a group leader — the pid itself still stands */
+      }
+      try {
+        process.kill(stray.pid, 'SIGKILL')
+        done = true
+      } catch {
+        /* gone already */
+      }
+      if (done) killed++
+    }
+  } catch {
+    /* a sweep that cannot read the machine is a weaker guarantee, not a failure */
+  }
+  return killed
+}
+
+async function main(argv = process.argv.slice(2)) {
   const opts = parseProbeArgs(argv)
   if (opts.help) {
     console.log(USAGE)
@@ -211,6 +333,11 @@ function main(argv = process.argv.slice(2)) {
     plan.how = 'NOT throttled'
     plan.why = 'the pin was refused by this host, so the runs below carry no throttle and a green proves nothing about load'
   }
+  // WHICH LANE the runner will really pin for this suite — not the flag. A
+  // request for WebGPU on `touch`/`voice` is ROUTED to WebGL 2 by the runner, and
+  // with no flag at all an inherited VERIFY_GL decides; a report naming the
+  // request would name a backend the run never used.
+  const lane = laneFor(opts.suite, selectBackend(opts.backend ?? process.env.VERIFY_GL))
   const logDir = logDirFor(opts.suite, opts.section)
   console.log(`# ${opts.runs} run(s) of ${opts.suite} --section=${opts.section} — ${plan.how}${plan.why ? ` (${plan.why})` : ''}`)
   if (logDir) console.log(`# each run's output: ${logDir}`)
@@ -223,35 +350,19 @@ function main(argv = process.argv.slice(2)) {
     const spun = startSpinners(plan)
     let res
     try {
-      const args = [
-        ...plan.argv,
-        process.execPath,
-        join(ROOT, 'scripts', 'verify', 'run-all.mjs'),
-        opts.suite,
-        `--section=${opts.section}`,
-      ]
-      res = spawnSync(args[0], args.slice(1), {
-        windowsHide: true,
-        cwd: ROOT,
-        encoding: 'utf8',
-        timeout: opts.timeoutMs,
-        killSignal: 'SIGKILL',
-        env: {
-          ...process.env,
-          // The probe COUNTS first attempts: a retry would fold two runs into
-          // one verdict and halve the sample it is here to measure.
-          VERIFY_NO_RETRY: '1',
-          // The machine is deliberately not quiet — that is the experiment. The
-          // load check would otherwise flag (or, set to defer, skip) every run.
-          VERIFY_ON_LOAD: 'off',
-          ...(opts.backend ? { VERIFY_GL: opts.backend } : {}),
-        },
-      })
+      res = await runOnce(plan, opts)
     } finally {
       leastSpinners = Math.min(leastSpinners, stopSpinners(spun))
     }
-    const out = (res.stdout ?? '') + (res.stderr ?? '')
-    const timedOut = res.error?.code === 'ETIMEDOUT'
+    const out = res.out
+    const timedOut = res.timedOut
+    // A killed run's dev server and browser outlive the group kill; sweep them
+    // before the next run starts, or the "throttle" of run i+1 is really run i
+    // still rendering.
+    if (timedOut) {
+      const swept = await sweepAfterKill()
+      if (swept > 0) console.log(`# swept ${swept} leftover process(es) of the killed run`)
+    }
     const summary = runnerSummary(out)
     const checks = (() => {
       try {
@@ -260,7 +371,7 @@ function main(argv = process.argv.slice(2)) {
         return []
       }
     })()
-    const exit = res.status ?? null
+    const exit = res.exit
     const kind = classifyRun({ timedOut, exit, summary, checks })
     results.push({ kind, ok: kind === 'green', checks, exit })
     if (logDir) {
@@ -288,7 +399,7 @@ function main(argv = process.argv.slice(2)) {
   for (const line of formatProbeReport({
     suite: opts.suite,
     section: opts.section,
-    backend: opts.backend,
+    backend: lane,
     plan: applied,
     results,
     summary: summarise(results),
@@ -298,6 +409,6 @@ function main(argv = process.argv.slice(2)) {
   return 0
 }
 
-if (isMainModule(import.meta.url)) process.exit(main())
+if (isMainModule(import.meta.url)) process.exit(await main())
 
 export { main }

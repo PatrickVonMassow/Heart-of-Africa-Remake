@@ -256,12 +256,16 @@ function text(value) {
  * every red back as a `check` and charge it as one. Total: never throws.
  */
 export function formatSuspectEnv(reds) {
-  const list = []
-  for (const r of Array.isArray(reds) ? reds : []) {
-    const name = (text(r?.name) || text(r)).trim().slice(0, MAX_SUSPECT_NAME_LEN)
-    if (!name) continue
-    list.push(`${r?.kind === 'console' ? 'console' : 'check'}\t${name}`)
-    if (list.length >= MAX_SUSPECT_NAMES) break
+  const all = (Array.isArray(reds) ? reds : [])
+    .map((r) => ({ name: (text(r?.name) || text(r)).trim().slice(0, MAX_SUSPECT_NAME_LEN), kind: r?.kind }))
+    .filter((r) => r.name)
+  const list = all.slice(0, MAX_SUSPECT_NAMES).map((r) => `${r.kind === 'console' ? 'console' : 'check'}\t${r.name}`)
+  // A first attempt with more reds than the marker can carry says SO, as one
+  // more red — a truncation nobody is told about is a red that quietly stops
+  // blocking once the eight that fitted are charged. Deliberately worded so no
+  // ledger entry can match it: what is missing cannot be charged.
+  if (all.length > MAX_SUSPECT_NAMES) {
+    list.push(`check\t${all.length - MAX_SUSPECT_NAMES} further red(s) of the first attempt were NOT carried`)
   }
   return (list.length ? list : [`check\t${SUSPECT_UNNAMED}`]).join('\n')
 }
@@ -278,7 +282,9 @@ export function parseSuspectReds(value) {
     const name = (rest.length ? rest.join('\t') : head).trim()
     if (!name) continue
     out.push({ name, kind })
-    if (out.length >= MAX_SUSPECT_NAMES) break
+    // One more than the marker carries: the "further red(s) … NOT carried" line
+    // is itself one of them and must never be the entry dropped here.
+    if (out.length >= MAX_SUSPECT_NAMES + 1) break
   }
   return out
 }
@@ -299,7 +305,9 @@ export function suspectRedsOf(run) {
     if (!name.trim()) continue
     out.push({ name: name.trim(), kind: entry?.kind === 'console' ? 'console' : 'check' })
   }
-  return out.slice(0, MAX_SUSPECT_NAMES)
+  // One more than the marker carries: the last may be the "further red(s) … NOT
+  // carried" entry, which is the one that must never be dropped.
+  return out.slice(0, MAX_SUSPECT_NAMES + 1)
 }
 
 /**
@@ -528,17 +536,23 @@ export function unexplainedRuns(runs, since, options) {
     // A crash explains nothing about the picture whatever its reds say, so it is
     // never talked away by the ledger — runVerdict says so and this must not
     // undo it.
+    let unowned = null
     if (r.crashed !== true) {
       const reds = verdict.status === 'suspect' ? suspectRedsOf(r) : Array.isArray(r.reds) ? r.reds : []
-      if (reds.length > 0 && reds.every((red) => owned(red, suite, backend))) continue
+      if (reds.length > 0) {
+        // Only the reds NOBODY owns are still open. Counting the whole run's
+        // reds would report a charged one as waved through beside its
+        // unexplained neighbour.
+        unowned = reds.filter((red) => !owned(red, suite, backend))
+        if (unowned.length === 0) continue
+      }
     }
     // The individual reds, NOT the one sentence runVerdict writes about them: a
     // suspect run's whole first attempt is summarised into a single unaccounted
     // entry, and a caller counting those would report two reds as one.
-    const names =
-      verdict.status === 'suspect'
-        ? suspectRedsOf(r).map((x) => x.name)
-        : verdict.unaccounted.map((u) => u.name)
+    const names = (unowned ?? (verdict.status === 'suspect' ? suspectRedsOf(r) : verdict.unaccounted)).map(
+      (x) => text(x?.name),
+    ).filter(Boolean)
     out.push({
       backend,
       suite,

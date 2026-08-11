@@ -1002,11 +1002,25 @@ describe('the retry marker travels in the environment (point 640)', () => {
     expect(parseSuspectEnv('  \n \n')).toEqual([])
   })
 
-  it('bounds what it puts in an environment variable', () => {
+  it('bounds what it puts in an environment variable, and SAYS what it dropped', () => {
     const many = Array.from({ length: 40 }, (_, i) => `check ${i} `.padEnd(500, 'x'))
     const parsed = parseSuspectEnv(formatSuspectEnv(many))
-    expect(parsed).toHaveLength(8)
-    for (const name of parsed) expect(name.length).toBeLessThanOrEqual(200)
+    expect(parsed).toHaveLength(9)
+    for (const name of parsed.slice(0, 8)) expect(name.length).toBeLessThanOrEqual(200)
+    // The ninth entry is the truncation itself, so the dropped reds cannot go
+    // quiet once the eight that fitted are charged.
+    expect(parsed[8]).toMatch(/32 further red\(s\) of the first attempt were NOT carried/)
+  })
+
+  it('a truncated first attempt cannot be charged away', () => {
+    const openPoints = [506]
+    const marker = formatSuspectEnv(Array.from({ length: 12 }, (_, i) => ({ name: `red number ${i}` })))
+    const suspectMany = { ...run('webgpu', 1500), suite: 'polish', suspect: true, suspectOf: parseSuspectReds(marker) }
+    const ledger = [{ point: 506, match: /^red number \d+$/, why: 'every carried red charged' }]
+    const runs = [suspectMany, run('webgpu', 2000), run('webgl', 2100)]
+    const result = evaluate(renderChange({ runs, openPoints, ledger }))
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/NOT carried/)
   })
 })
 
