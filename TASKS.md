@@ -994,9 +994,20 @@ Build order, chosen so no two parallel agents own the same file:
   already dates an agent by its edits — reuse it, do not build a second one), and the verdict
   names its evidence: which worktree, how old its newest edit, what CPU was measured. A stale
   worktree directory is debris (443) and never an excuse.
+  THE SAME EXCUSE FROM THE PROCESS SIDE (11.08.2026, measured): the quiet-machine check of the
+  verify runner counted the BATCH SESSION ITSELF as "another verify/browser suite run" — its
+  evidence line named `pid 1373729: /usr/local/share/npm-global/bin/claude -p Autonome
+  Batch-Wiederaufnahme …`, because the session's own prompt text contains the verify script
+  names and the probe matches the whole command line. Unattended that is total: every run of an
+  autonomous session declares itself loaded, so every red it takes is "not authoritative" by
+  house rule. A process counts as load only when it IS a suite (its argv NAMES a
+  `scripts/verify/` entry point as the program, not inside a prompt), and the session's own
+  process and its descendants never count as load against themselves.
   VERIFIABLE: Vitest on the pure verdict — a red beside a worktree whose newest edit is hours
   old is BROKEN, not inconclusive; a red beside a worktree edited a minute ago stays
-  inconclusive; the reason string names the deciding measurement.
+  inconclusive; the reason string names the deciding measurement. Plus, on the process probe: a
+  `claude -p "<prompt naming scripts/verify/run-all.mjs>"` argv is NOT load, a real
+  `node scripts/verify/run-all.mjs polish` argv IS, and the session's own pid never counts.
 
 - [ ] 602. WHAT ELSE DID WE BUILD AND NEVER USE? (user 09.08.2026, on learning that the
   section runner of point 566 has never been used once: "Dass du 566 nicht eingesetzt
