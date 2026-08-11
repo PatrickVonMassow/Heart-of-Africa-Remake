@@ -98,6 +98,17 @@ describe('the material', () => {
     expect(omitted).toEqual(['FILE: empty.ts'])
   })
 
+  // Third cross-vendor round: the omission markers were free, so enough of them — or long
+  // enough titles — pushed the SENT request past the ceiling it advertises.
+  it('never exceeds its budget, however many sections it has to omit', () => {
+    const many = Array.from({ length: 400 }, (_, i) => ({ title: `FILE: ${'p'.repeat(60)}/${i}.ts`, text: 'q'.repeat(400) }))
+    const { text, carried, omitted } = formatAskMaterial({ sections: many, budget: 2000 })
+    expect(text.length).toBeLessThanOrEqual(2000)
+    // What did not travel is still REPORTED, so the caller can name it without sending it.
+    expect(carried.length + omitted.length).toBe(many.length)
+    expect(omitted.length).toBeGreaterThan(300)
+  })
+
   it('is empty for nothing at all, which is what the command refuses to send', () => {
     expect(formatAskMaterial({ sections: [] }).text.trim()).toBe('')
   })

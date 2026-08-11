@@ -79,10 +79,21 @@ export function classifyBash(command = '') {
   return null
 }
 
+/**
+ * A file that is a PICTURE — read with eyes, never routed, whatever its format and
+ * WHEREVER it lies (third cross-vendor round).
+ *
+ * It beats the scratch rule below: a frame saved to the scratchpad and then looked at is
+ * still a frame being judged, and giving it no vote let the turn's other, textual call
+ * carry the whole verification share — inflating exactly the routable number this module
+ * reports. Only scratch TEXT keeps its no-vote rule; a picture is unambiguous evidence.
+ */
+const VERIFICATION_IMAGE = /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|svg)$/i
+
 /** File rules, FIRST MATCH WINS. `read` separates a spec LOOKUP from a spec EDIT. */
 const SPEC_DOCS = /^(TASKS\.md|design\.md|CLAUDE\.md|docs\/tasks-archive\.md|docs\/acceptance-(criteria-detail|evidence)\.md)$/
 const FILE_RULES = [
-  ['verification', /^(scripts\/verify\/|verification\/|scripts\/(render-verify|picture-|measure-picture))|\.png$/],
+  ['verification', /^(scripts\/verify\/|verification\/|scripts\/(render-verify|picture-|measure-picture))/],
   ['bookkeeping', /^(\.batch-dashboard\.html|TASKS\.md|scripts\/(board|batch|focus|dashboard|finding|mechanism-review|chat-)|docs\/batch-autonomy\.md)|[a-z-]*-guard(-core)?(\.test)?\.mjs$/],
   ['implementation', /^(src\/|scripts\/|docs\/|public\/|index\.html|package\.json|vite\.config|tsconfig|\.github\/)|\.md$/],
 ]
@@ -95,6 +106,9 @@ const FILE_RULES = [
  */
 export function classifyFile(path = '', { read = false } = {}) {
   const rel = normalisePath(path)
+  // A PICTURE FIRST, wherever it lies — see VERIFICATION_IMAGE for why it outranks the
+  // scratch rule on the next line.
+  if (VERIFICATION_IMAGE.test(rel)) return 'verification'
   if (rel.startsWith('/tmp/') || rel.startsWith('/home/')) return null
   if (read && SPEC_DOCS.test(rel)) return 'brief'
   for (const [phase, re] of FILE_RULES) if (re.test(rel)) return phase
@@ -181,9 +195,6 @@ const VERIFICATION_RUNNER =
   /npm (run )?test:(small|large)|npm test\b|npm run preview|VERIFY_GL=|playwright|\bnode\s[^|;&]*(scripts\/verify\/[a-z0-9-]+\.mjs|render-verify[a-z-]*\.mjs|picture-stability|throttle-probe|measure-picture-cost)/i
 /** A shell command that only READS what a run left behind. */
 const VERIFICATION_READER = /(^|[|;&]\s*|\s)(cat|head|tail|grep|rg|wc|jq|ls|find|diff|sed|awk|node --check)\b/
-
-/** A file that is a PICTURE — read with eyes, never routed, whatever its format. */
-const VERIFICATION_IMAGE = /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|svg)$/i
 
 /**
  * A command that NAMES a verify script without running it — it parses the file and

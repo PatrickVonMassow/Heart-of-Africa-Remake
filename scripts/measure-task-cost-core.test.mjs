@@ -490,6 +490,19 @@ describe('verification split', () => {
     expect(kind('verification/report.json')).toBe('text')
   })
 
+  // Third round: a frame saved to the scratchpad and then looked at was given no vote at
+  // all, so the turn's other, textual call carried the whole verification share.
+  it('reads a frame as eyes WHEREVER it lies, the scratchpad included', () => {
+    const kind = (file_path) => classifyVerificationToolCall({ name: 'Read', input: { file_path } })
+    expect(classifyFile('/tmp/claude/scratch/frame.jpg', { read: true })).toBe('verification')
+    expect(kind('/tmp/claude/scratch/frame.jpg')).toBe('eyes')
+    // …while scratch TEXT keeps its no-vote rule.
+    expect(classifyFile('/tmp/claude/scratch/x.mjs')).toBeNull()
+    const split = turnVerificationKinds([bash('tail -5 verification/out.log'), { name: 'Read', input: { file_path: '/tmp/claude/scratch/frame.jpg' } }])
+    expect(split.text).toBeCloseTo(0.5, 6)
+    expect(split.eyes).toBeCloseTo(0.5, 6)
+  })
+
   it('splits a turn in proportion to the halves its calls vote for', () => {
     const split = turnVerificationKinds([
       bash('npm test'),

@@ -119,25 +119,41 @@ export function buildAskPrompt({ kind = '', brief = '' } = {}) {
  * counts as carried only if it was written AND had content to write.
  */
 export function formatAskMaterial({ sections = [], budget = MATERIAL_BUDGET_CHARS } = {}) {
+  const cap = Math.max(0, Number(budget) || 0)
   const out = []
   const carried = []
   const omitted = []
-  let left = Math.max(0, Number(budget) || 0)
-  for (const section of sections ?? []) {
+  // THE BUDGET IS COUNTED ON WHAT IS ACTUALLY WRITTEN (third cross-vendor round). The
+  // omission markers used to be free: enough of them — or long enough titles — pushed the
+  // sent request past the ceiling it advertises. Every line, marker included, is charged
+  // here, and once even a marker no longer fits nothing more is written. The remaining
+  // titles still come back in `omitted`, so the caller can name them without sending them.
+  let spent = 0
+  const push = (line) => {
+    out.push(line)
+    spent += line.length + 1
+  }
+  const list = Array.isArray(sections) ? sections : []
+  for (const section of list) {
     const title = String(section?.title ?? 'MATERIAL')
     const text = String(section?.text ?? '')
     const header = `=== ${title} ===`
-    if (left <= header.length + 200) {
-      out.push(`=== OMITTED ENTIRELY (material budget spent): ${title} ===`, '')
+    const room = cap - spent - header.length - 80
+    if (room <= 120) {
+      const marker = `=== OMITTED ENTIRELY (material budget spent): ${title} ===`
       omitted.push(title)
+      if (spent + marker.length + 1 <= cap) {
+        push(marker)
+        push('')
+      }
       continue
     }
-    const room = left - header.length - 80
     const body = text.length > room ? `${text.slice(0, room)}\n… [TRUNCATED: ${text.length - room} characters not shown]` : text
-    out.push(header, body, '')
+    push(header)
+    push(body)
+    push('')
     if (text.trim()) carried.push(title)
     else omitted.push(title)
-    left -= header.length + Math.min(text.length, room) + 80
   }
   return { text: out.join('\n'), carried, omitted }
 }
