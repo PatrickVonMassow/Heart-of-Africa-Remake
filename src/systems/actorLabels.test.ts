@@ -7,9 +7,11 @@ import { describe, it, expect } from 'vitest'
 import {
   ACTOR_KINDS,
   actorLabelText,
+  declutterLabels,
   nearestActors,
   qualifiesAsActor,
   type ActorKind,
+  type ScreenLabel,
 } from './actorLabels'
 import { SPECIES } from '../scenes/travel/animalBodies'
 import { FLORA_SPECIES } from '../scenes/travel/floraSpecies'
@@ -150,6 +152,74 @@ describe('actorLabelText — kind, age, state, in both languages', () => {
       )
     }
     expect(Object.keys(de.actors.kinds).sort()).toEqual(Object.keys(en.actors.kinds).sort())
+  })
+})
+
+describe('declutterLabels — no two boxes fuse into one (point 628)', () => {
+  /** A label box of the size the game really draws (12 px text, 8 chars). */
+  const box = (x: number, y: number, depth: number, width = 52): ScreenLabel => ({
+    x,
+    y,
+    width,
+    height: 18,
+    depth,
+  })
+
+  it('leaves labels that do not touch exactly where they are', () => {
+    const lifts = declutterLabels([box(100, 400, 10), box(400, 400, 20), box(100, 600, 30)])
+    expect(lifts).toEqual([0, 0, 0])
+  })
+
+  it('lifts the FURTHER of two boxes that would overlap, and keeps both names', () => {
+    // The measured defect: two villagers side by side, 40 px apart, boxes 52 px
+    // wide — they printed "Villager llager".
+    const lifts = declutterLabels([box(320, 447, 25), box(280, 447, 12)])
+    expect(lifts[1], 'the nearer keeps its place').toBe(0)
+    expect(lifts[0], 'the further rises clear of it').toBeGreaterThanOrEqual(18)
+    // And it really is clear: a full box height plus the gap.
+    expect(lifts[0]).toBe(21)
+  })
+
+  it('does not care in which order they arrive — depth decides', () => {
+    const near = box(280, 447, 12)
+    const far = box(320, 447, 25)
+    expect(declutterLabels([near, far])).toEqual([0, 21])
+    expect(declutterLabels([far, near])).toEqual([21, 0])
+  })
+
+  it('stacks a whole crowd into readable rows rather than one blur', () => {
+    const crowd = [0, 1, 2, 3].map((i) => box(300, 450, 10 + i))
+    const lifts = declutterLabels(crowd)
+    expect(lifts).toEqual([0, 21, 42, 63])
+  })
+
+  it('drops the farthest label once no clear row is left', () => {
+    // Five boxes in one spot: four rows fit (the box itself plus three lifts),
+    // the fifth would stand a full frame above its own figure and says nothing.
+    const crowd = [0, 1, 2, 3, 4].map((i) => box(300, 450, 10 + i))
+    const lifts = declutterLabels(crowd)
+    expect(lifts.slice(0, 4)).toEqual([0, 21, 42, 63])
+    expect(lifts[4], 'the farthest yields entirely').toBeNull()
+  })
+
+  it('measures the real box, so a long name yields to a short one further away', () => {
+    // "Dead giraffe calf" is far wider than "Goat": the wide box overlaps a
+    // neighbour the narrow one would have cleared.
+    const wide = box(300, 400, 30, 130)
+    const narrow = box(380, 400, 10, 40)
+    expect(declutterLabels([wide, narrow])[0]).toBeGreaterThan(0)
+    const slim = box(300, 400, 30, 40)
+    expect(declutterLabels([slim, narrow])[0]).toBe(0)
+  })
+
+  it('answers one lift per label, in the order it was given', () => {
+    const lifts = declutterLabels([box(0, 0, 1), box(0, 0, 2), box(900, 500, 3)])
+    expect(lifts).toHaveLength(3)
+    expect(lifts[2]).toBe(0)
+  })
+
+  it('says nothing about an empty picture', () => {
+    expect(declutterLabels([])).toEqual([])
   })
 })
 

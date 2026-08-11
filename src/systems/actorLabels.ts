@@ -157,6 +157,59 @@ export interface Positioned {
   z: number
 }
 
+/** One label box as it would stand in the picture, in CSS pixels: the centre it
+ *  is drawn around, its measured size, and how far its subject is from the
+ *  camera. */
+export interface ScreenLabel {
+  x: number
+  y: number
+  width: number
+  height: number
+  /** Camera distance — the NEARER label keeps its place. */
+  depth: number
+}
+
+/** Clear space demanded between two boxes, in CSS pixels. */
+const LABEL_GAP = 3
+/** How many line-steps a box may rise before it is dropped instead. Three keeps
+ *  the highest label still plainly over its own subject; beyond that the label
+ *  starts to point at the wrong figure, which is worse than saying nothing. */
+const MAX_LIFT_STEPS = 3
+
+/**
+ * Keep two labels from fusing into one unreadable box. Returns, per label, how
+ * far UP it must be drawn (0 = where it sits), or null when it must be dropped.
+ *
+ * Nearest first, so the subject the player is closest to keeps its place and a
+ * further one yields: first by rising a line — which keeps it over its own
+ * figure — and only when even the top step is taken by dropping out entirely.
+ * The measured picture is the reason (point 628): two villagers standing close
+ * printed "Villager llager" and "Villa Villager", each label correct and the
+ * pair unreadable, while every DOM check went on passing.
+ */
+export function declutterLabels(labels: readonly ScreenLabel[]): (number | null)[] {
+  const lifts: (number | null)[] = labels.map(() => null)
+  const placed: ScreenLabel[] = []
+  const order = labels.map((_, i) => i).sort((a, b) => labels[a].depth - labels[b].depth)
+  for (const i of order) {
+    const label = labels[i]
+    const step = label.height + LABEL_GAP
+    for (let s = 0; s <= MAX_LIFT_STEPS; s++) {
+      const y = label.y - s * step
+      const clash = placed.some(
+        (p) =>
+          Math.abs(p.x - label.x) < (p.width + label.width) / 2 + LABEL_GAP &&
+          Math.abs(p.y - y) < (p.height + label.height) / 2 + LABEL_GAP,
+      )
+      if (clash) continue
+      placed.push({ ...label, y })
+      lifts[i] = s * step
+      break
+    }
+  }
+  return lifts
+}
+
 /**
  * The `max` labels NEAREST the viewer, the rest dropped (§17.8: "a reading aid,
  * not a radar"). A crowded savanna otherwise turns into a wall of text and the

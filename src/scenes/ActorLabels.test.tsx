@@ -23,12 +23,14 @@ let frameCallback: ((state: unknown, dt: number) => void) | null = null
 const IDENTITY = { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }
 const camera = { projectionMatrix: IDENTITY, matrixWorldInverse: IDENTITY, position: { x: 0, y: 0, z: 0 } }
 const scene = { visible: true, children: [] }
+/** The canvas the labels are laid out in — the declutter works in ITS pixels. */
+const SIZE = { width: 800, height: 600 }
 
 vi.mock('@react-three/fiber', () => ({
   useFrame: (cb: (state: unknown, dt: number) => void) => {
     frameCallback = cb
   },
-  useThree: (select: (state: unknown) => unknown) => select({ camera, scene }),
+  useThree: (select: (state: unknown) => unknown) => select({ camera, scene, size: SIZE }),
 }))
 
 vi.mock('@react-three/drei', () => ({
@@ -139,6 +141,20 @@ describe('ActorLabels (design.md §17.8)', () => {
       window.dispatchEvent(new MouseEvent('mousedown', { ctrlKey: false }))
     })
     expect(screen.queryByText('Adult giraffe')).toBeNull()
+  })
+
+  // Point 628: the two subjects above stand within 40 px of each other, so
+  // their boxes would fuse. Both keep their names — the further one rises.
+  it('lifts a label out of its neighbour rather than printing them into each other', () => {
+    render(<ActorLabels />)
+    holdCtrl()
+    tick()
+    const near = screen.getByText('Adult giraffe')
+    const far = screen.getByText('Dead giraffe calf')
+    expect(near.style.transform, 'the nearer subject keeps the plain rise').toBe('translateY(-4px)')
+    const lifted = /translateY\(-(\d+(?:\.\d+)?)px\)/.exec(far.style.transform)
+    expect(lifted, far.style.transform).not.toBeNull()
+    expect(Number(lifted![1]), 'the further one stands a full line higher').toBeGreaterThan(18)
   })
 
   it('honours the calibratable label cap', () => {
