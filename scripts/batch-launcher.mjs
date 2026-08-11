@@ -309,12 +309,15 @@ export async function runDaemon({
     // window became the baseline instead of an event, and the daemon then slept
     // the whole interval out with nobody owning the batch. That is the exact
     // latency point 612 removed, reintroduced through the back door, and it is
-    // what turned `main` red: the same gap left the daemon test's second tick
-    // waiting for a quarter of an hour, which vitest reports as a TIMEOUT rather
-    // than a missed budget. On the CI runner the first poll is late often enough
-    // to hit it (measured there; locally the window is ~1 ms wide, which is why
-    // no amount of local load reproduced it). Reading here closes it for good:
-    // anything that ends ownership from the tick's start onward is a CHANGE.
+    // what turned `main` red (CI run 31504918389): the same gap left the daemon
+    // test's second tick waiting for a quarter of an hour, which vitest reports
+    // as a TIMEOUT rather than a missed budget. Measured on the runner, the poll
+    // follows the tick by 1 ms at the median and 14 ms at the worst of 400
+    // samples, with the event loop's own lag never past 23 ms — so the window is
+    // narrow, it is not empty, and nothing bounds it: one starved scheduling
+    // moment is all it takes, and the wake is then lost for good rather than
+    // late. Reading here closes it: anything that ends ownership from the tick's
+    // start onward is a CHANGE.
     lastSignal = observeOwnership() ?? lastSignal
     try {
       const code = await tick({ logPath })
