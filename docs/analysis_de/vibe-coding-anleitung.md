@@ -198,8 +198,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   oder hängt an einer Rückfrage — beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
   Aufgabe. Bleib **nie mit einer Rückfrage stehen**: vernünftigste Annahme treffen, sichtbar
-  festhalten, was mich braucht, weitergehen. Und jede Warteschleife muss auch beim **Fehler**
-  abbrechen, nicht nur beim Erfolg — sonst wartet sie geduldig auf etwas, das nie kommt."
+  festhalten, was mich braucht, weitergehen. Und jedes Warten bricht auch beim **Fehler** ab —
+  sonst wartet es auf etwas, das nie kommt."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, kurz,
@@ -395,13 +395,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 ## Der kürzeste mögliche Start
 
-> „Erarbeite mit mir zuerst ein `design.md` als einzige Wahrheit — frag mich dafür
-> gründlich aus —, dann leg ein `TASKS.md` an und richte die zwei
-> Testschichten ein. Nach jeder Änderung: Build/Lint/Audit sauber, ein Test auf der
-> passenden Schicht, ein atomarer Commit. Beurteile Sichtbares am Screenshot. Wenn
-> wir eine Regel festlegen, bau sofort den Check, der sie erzwingt. Bei Kritischem
-> hol ein zweites Modell als Gegenprüfer. Frag nach, wenn das Zielbild unklar ist — rate
-> nicht."
+> „Erarbeite mit mir zuerst ein `design.md` als einzige Wahrheit — frag mich dafür gründlich
+> aus —, dann leg ein `TASKS.md` an und richte die zwei Testschichten ein. Nach jeder
+> Änderung: Build/Lint/Audit sauber, ein Test auf der passenden Schicht, ein atomarer Commit.
+> Beurteile Sichtbares am Screenshot. Wenn wir eine Regel festlegen, bau sofort den Check, der
+> sie erzwingt. Bei Kritischem hol ein zweites Modell als Gegenprüfer. Frag nach, wenn das
+> Zielbild unklar ist — rate nicht."
 
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
