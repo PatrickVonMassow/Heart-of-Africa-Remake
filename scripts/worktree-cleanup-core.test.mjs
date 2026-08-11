@@ -527,6 +527,63 @@ describe('staleLockVerdict — may a lock in the way be broken?', () => {
     }
   })
 
+  it('NEVER claims a PADDED copy of its signature — the parser normalises nothing', () => {
+    // Fifth review, finding 1. The parser TRIMMED before matching, which widened
+    // the anchored signature: a foreign lock padded with whitespace read as ours
+    // and became breakable the moment its pid was absent. The padding is real
+    // where it matters — git stores a lock reason VERBATIM in `<gitdir>/locked`
+    // (measured, git 2.39.5), which is the file the callers read.
+    const padded = [
+      ' worktree-cleanup verifying and deleting (pid 999999 start 1) ',
+      'worktree-cleanup verifying and deleting (pid 999999 start 1) ',
+      '\tworktree-cleanup verifying and deleting (pid 999999 start 1)',
+      'worktree-cleanup verifying and deleting (pid 999999 start 1)\n',
+      `  ${CLEANUP_LOCK_LEGACY}  `,
+    ]
+    for (const reason of padded) {
+      expect(parseCleanupLock(reason).ours, reason).toBe(false)
+      // …and therefore NEVER recoverable, however dead the pid it names looks.
+      const r = staleLockVerdict({ reason, probe: { exists: false, startedAt: null } })
+      expect(r.recoverable, reason).toBe(false)
+      expect(r.why).toMatch(/not this command's/)
+    }
+  })
+
+  it('a lock of OURS that recorded no start time is recoverable once its pid is GONE', () => {
+    // Fifth review, finding 4: `cleanupLockReason` writes `start 0` whenever the
+    // process-start probe cannot answer, and refusing every zero-start lock wedged
+    // that worktree for good after a crash — the failure the run identity exists
+    // to prevent, coming back through its own fallback.
+    const zero = formatCleanupLock({ pid: 4711 })
+    expect(zero).toMatch(/pid 4711 start 0/)
+    expect(parseCleanupLock(zero)).toEqual({ ours: true, pid: 4711, startedAt: 0 })
+
+    const gone = staleLockVerdict({ reason: zero, probe: { exists: false, startedAt: null } })
+    expect(gone.recoverable).toBe(true)
+    expect(gone.why).toMatch(/no start time/)
+  })
+
+  it('KEEPS a zero-start lock while ANY process holds that pid — a recycled one cannot be told apart', () => {
+    const zero = formatCleanupLock({ pid: 4711, startedAt: 0 })
+    for (const probe of [{ exists: true, startedAt: 1000 }, { exists: true, startedAt: null }]) {
+      const r = staleLockVerdict({ reason: zero, probe })
+      expect(r.recoverable).toBe(false)
+      expect(r.why).toMatch(/recycled pid cannot be told/)
+    }
+    // And an unjudgeable probe keeps it too, exactly like every other lock.
+    for (const probe of [null, {}, { exists: 'maybe' }]) {
+      expect(staleLockVerdict({ reason: zero, probe }).recoverable).toBe(false)
+    }
+  })
+
+  it('a lock naming NO pid at all stays a by-hand job, start time or not', () => {
+    for (const reason of [formatCleanupLock({}), formatCleanupLock({ pid: 0, startedAt: 1000 })]) {
+      const r = staleLockVerdict({ reason, probe: { exists: false, startedAt: null } })
+      expect(r.recoverable, reason).toBe(false)
+      expect(r.why).toMatch(/names no run/)
+    }
+  })
+
   it('still recognises the one legacy spelling it wrote, only to say how to clear it', () => {
     const legacy = staleLockVerdict({ reason: CLEANUP_LOCK_LEGACY, probe: { exists: false } })
     expect(parseCleanupLock(CLEANUP_LOCK_LEGACY)).toEqual({ ours: true, pid: 0, startedAt: 0 })

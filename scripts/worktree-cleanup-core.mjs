@@ -301,10 +301,27 @@ const CLEANUP_LOCK_SIGNATURE = new RegExp(`^${CLEANUP_LOCK_BODY} \\(pid (\\d+) s
 export const formatCleanupLock = ({ pid, startedAt } = {}) =>
   `${CLEANUP_LOCK_BODY} (pid ${Number(pid) || 0} start ${Number(startedAt) || 0})`
 
-/** `{ ours, pid, startedAt }` for a lock reason — `ours: false` for anything this
- *  command did not write, which is never recovered. PURE. */
+/**
+ * `{ ours, pid, startedAt }` for a lock reason — `ours: false` for anything this
+ * command did not write, which is never recovered. PURE.
+ *
+ * THE REASON IS MATCHED VERBATIM (fifth review, finding 1). This used to TRIM
+ * before matching, which WIDENED the anchored signature the formatter writes: a
+ * foreign lock padded with whitespace — `" worktree-cleanup verifying and deleting
+ * (pid 999999 start 1) "` — then read as OURS, and a foreign lock that parses as
+ * ours becomes BREAKABLE the moment its pid is absent. That is the one rule the
+ * asymmetry above never bends, so the reader now matches exactly what the writer
+ * emits and normalises nothing.
+ *
+ * THE PADDING IS REAL, measured 11.08.2026 (git 2.39.5): `git worktree lock
+ * --reason` stores the reason VERBATIM in `<admin gitdir>/locked` (the file is the
+ * reason plus one newline), while `git worktree list --porcelain` TRIMS it before
+ * printing. Git's own trim is unavoidable, which is exactly why the callers of this
+ * parser read the lock FILE rather than the porcelain — see `readLockReason` in
+ * `worktree-cleanup.mjs`.
+ */
 export function parseCleanupLock(reason) {
-  const text = String(reason ?? '').trim()
+  const text = String(reason ?? '')
   const m = CLEANUP_LOCK_SIGNATURE.exec(text)
   if (m) return { ours: true, pid: Number(m[1]), startedAt: Number(m[2]) }
   return { ours: text === CLEANUP_LOCK_LEGACY, pid: 0, startedAt: 0 }
@@ -320,17 +337,36 @@ export function parseCleanupLock(reason) {
  * PROVABLY gone: the process no longer exists, or a process with that pid exists
  * whose start time is not the recorded one, which means the pid was recycled and
  * the original holder is dead. Everything else keeps the lock.
+ *
+ * A LOCK OF OURS THAT RECORDS NO START TIME IS RECOVERABLE BY A NARROWER RULE
+ * (fifth review, finding 4). `cleanupLockReason` writes `start 0` whenever the
+ * process-start probe cannot answer, and refusing every zero-start lock made a
+ * crash while holding one WEDGE that worktree for good — the very failure the run
+ * identity was added to end, reintroduced through its own fallback. So a
+ * zero-start lock OF OURS is recoverable on the one piece of evidence that still
+ * carries: the pid is PROVABLY ABSENT. It is never recovered while a process with
+ * that pid exists, because without a start time a recycled pid cannot be told from
+ * the original holder — that half stays wedged, visibly, and a human clears it.
+ * A lock naming no pid at all (the legacy spelling) stays by-hand as before.
  */
 export function staleLockVerdict({ reason, probe = null, tolerance = 5000 } = {}) {
-  const text = String(reason ?? '').trim()
-  if (!text) return { recoverable: false, why: 'there is no lock reason to judge' }
+  const text = String(reason ?? '')
+  if (!text.trim()) return { recoverable: false, why: 'there is no lock reason to judge' }
   const lock = parseCleanupLock(text)
   if (!lock.ours) return { recoverable: false, why: `the lock is not this command's: ${text}` }
-  if (!lock.pid || !lock.startedAt) {
+  if (!lock.pid) {
     return { recoverable: false, why: `this command's lock names no run (${text}) — remove it by hand once you are sure` }
   }
   if (!probe || typeof probe.exists !== 'boolean') {
     return { recoverable: false, why: `the holder of ${text} could not be judged` }
+  }
+  if (!lock.startedAt) {
+    return probe.exists === false
+      ? { recoverable: true, why: `its holder (pid ${lock.pid}) is gone — the lock recorded no start time, so an absent pid is the only thing that clears it` }
+      : {
+          recoverable: false,
+          why: `pid ${lock.pid} exists and this lock recorded no start time, so a recycled pid cannot be told from its holder — clear it by hand once you are sure`,
+        }
   }
   if (probe.exists === false) return { recoverable: true, why: `its holder (pid ${lock.pid}) is gone` }
   if (typeof probe.startedAt !== 'number') {
