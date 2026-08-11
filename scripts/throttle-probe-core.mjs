@@ -249,7 +249,13 @@ export function classifyRun(input) {
   // launch that produced no summary reached no verdict, whatever it exited with
   // — and an exit-0 harness failure counted as green would quietly dilute the
   // very rate this instrument exists to report.
-  if (exit === 0) return summary ? 'green' : 'broken'
+  if (exit === 0) {
+    // Exit 0 while the summary reports failures is the runner CONTRADICTING
+    // itself. Neither reading may be preferred — a green would dilute the rate,
+    // a red would invent one — so the run measured nothing.
+    if (!summary) return 'broken'
+    return summary.fail > 0 || summary.consoleErrors > 0 ? 'broken' : 'green'
+  }
   if (summary && (summary.fail > 0 || summary.consoleErrors > 0)) return 'red'
   if ((Array.isArray(checks) ? checks : []).length > 0) return 'red'
   return 'broken'

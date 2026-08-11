@@ -468,6 +468,25 @@ export function isBackendSensitivePath(path) {
  * itself asks that way, so a compat lane still proves the WebGPU picture rather than
  * blocking every render change on a host that has no core adapter.
  */
+/**
+ * DID THIS RUN SEE THE CODE AS IT NOW STANDS? Judged on when it STARTED, not on
+ * when it finished (four-eyes, 11.08.2026): a suite loads the page at its
+ * beginning, so a run that began before the last edit and ended after it tested
+ * the OLD code either way — counting it by its end would let it cover a fix it
+ * never loaded, and let a pre-fix failure condemn one. `at` stands in for a
+ * record that carries no start. Total.
+ */
+export function sawCodeSince(run, since) {
+  const from = Number.isFinite(since) ? since : 0
+  // No edit time known (or none at all): the freshness question does not apply,
+  // and the guard's fail-open posture says accept rather than invent a window.
+  if (from <= 0) return true
+  const started = Number(run?.startedAt)
+  const ended = Number(run?.at)
+  const when = Number.isFinite(started) ? started : ended
+  return Number.isFinite(when) && when >= from
+}
+
 export function coveringRun(runs, backend, since, options) {
   const { featureLevel = null, openPoints = null } = options ?? {}
   if (!Array.isArray(runs)) return null
@@ -476,9 +495,8 @@ export function coveringRun(runs, backend, since, options) {
     if (!r || r.backend !== backend) continue
     if (!runVerdict(r, { openPoints }).covers) continue
     if (featureLevel && r.featureLevel !== featureLevel) continue
-    const at = Number(r.at ?? 0)
-    if (at < since) continue
-    if (!best || at > Number(best.at ?? 0)) best = r
+    if (!sawCodeSince(r, since)) continue
+    if (!best || Number(r.at ?? 0) > Number(best.at ?? 0)) best = r
   }
   return best
 }
@@ -539,7 +557,7 @@ export function unexplainedRuns(runs, since, options) {
   for (const r of Array.isArray(runs) ? runs : []) {
     if (!r || typeof r !== 'object') continue
     const at = Number(r.at ?? 0)
-    if (!Number.isFinite(at) || at < from) continue
+    if (!Number.isFinite(at) || !sawCodeSince(r, from)) continue
     const verdict = runVerdict(r, { openPoints })
     if (verdict.status !== 'red' && verdict.status !== 'suspect') continue
     const suite = typeof r.suite === 'string' && r.suite ? r.suite : 'unknown'

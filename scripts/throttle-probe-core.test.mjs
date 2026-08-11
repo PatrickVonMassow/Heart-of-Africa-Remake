@@ -197,6 +197,11 @@ describe('classifyRun — three of the four outcomes are NOT "the check failed"'
     expect(classifyRun({ exit: 0, summary: null })).toBe('broken')
   })
 
+  it('calls a runner that contradicts itself BROKEN, neither green nor red', () => {
+    expect(classifyRun({ exit: 0, summary: { fail: 2, consoleErrors: 0 } })).toBe('broken')
+    expect(classifyRun({ exit: 0, summary: { fail: 0, consoleErrors: 3 } })).toBe('broken')
+  })
+
   it('calls a reported failure red', () => {
     expect(classifyRun({ exit: 1, summary: { fail: 1, consoleErrors: 0 } })).toBe('red')
     expect(classifyRun({ exit: 1, summary: { fail: 0, consoleErrors: 2 } })).toBe('red')

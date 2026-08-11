@@ -697,8 +697,8 @@ After completion and after every major system:
   `batch-autostart.mjs` alerts when it is behind. It runs BACK too
   (`scripts/chat-core.mjs`): the launcher polls the chat each tick, handing on
   what VERIFIES as untrusted input, not authorization.
-  Every one is fail-OPEN (an internal error allows the stop, so a guard bug
-  cannot trap the session) with a pure, Vitest-covered core.
+  Every one is fail-OPEN (a guard bug cannot trap the session) with a pure,
+  Vitest-covered core.
 - **Ask the guards BEFORE the action, and answer LAST (points 365/403).** Before
   an action a guard governs, `node scripts/guard-preflight.mjs --for <action>
   --session <id>` reports read-only whether one would block — advisory; the guard
@@ -706,7 +706,7 @@ After completion and after every major system:
   turns). The turn's END is such an action (`--for answer`): routine duties (focus
   confirm, board publish/attest, the boundary) FIRST, the closing reply LAST, once
   the chain would pass. Blocked anyway, the next message names what was fixed in
-  one sentence; re-answering is how the user got the same text twice.
+  one sentence.
 - **Screenshot diffing is NOT available as a shortcut (point 361).** Every
   pixel-metric shortcut was replayed against the bugs the picture caught and
   REJECTED: two runs of one suite on identical code move 11–98 % of a frame,
@@ -717,9 +717,9 @@ After completion and after every major system:
   only: the cause is named and fixed; it is CHARGED to the open point that owns it
   (`scripts/render-verify-charges.mjs`); or it becomes an open point. "It passed
   on the retry" is none — the retry stays, but that run is recorded SUSPECT and
-  covers nothing. Is it load? MEASURE: `node scripts/throttle-probe.mjs <suite>
-  --section=<name> --runs 8` reruns it pinned to one core and reports the skew
-  rate.
+  covers nothing; `--defer` WAIVES one on the record, it does not close it. Is it
+  load? MEASURE: `node scripts/throttle-probe.mjs <suite> --section=<name> --runs
+  8` reruns it pinned to one core and reports the skew rate.
 - Fix deviations, never paper over them; an unfulfilled criterion is
   reported as such.
 

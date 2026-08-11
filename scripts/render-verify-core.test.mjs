@@ -39,7 +39,10 @@ const VERIFY_DIR = join(dirname(fileURLToPath(import.meta.url)), 'verify')
 
 /** A passing run record as the recorder writes it. */
 function run(backend, at, overrides = {}) {
-  return { backend, suite: 'enrichments', startedAt: at - 60_000, at, exit: 0, asserted: true, ...overrides }
+  // `startedAt` sits just before `at`: these fixtures model runs that BEGAN
+  // after the edit they are judged against, which is what a real repair loop
+  // does. The case where a run began BEFORE the edit has its own tests below.
+  return { backend, suite: 'enrichments', startedAt: at - 10, at, exit: 0, asserted: true, ...overrides }
 }
 
 /** The motivating scenario: a committed water-shader change, edited at t=1000. */
@@ -575,7 +578,7 @@ const red = (name, point = null, kind = 'check') => ({ name, key: name.toLowerCa
 const redRun = (backend, at, reds, overrides = {}) => ({
   backend,
   suite: 'polish',
-  startedAt: at - 60_000,
+  startedAt: at - 10,
   at,
   exit: 1,
   asserted: true,
@@ -942,6 +945,19 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     const ledger = [{ point: 387, match: /the Giza settlement edge/, why: 'a point that has since been ticked' }]
     const runs = [redRun('webgpu', 1500, [red('the Giza settlement edge is drawn')]), run('webgpu', 2000), run('webgl', 2100)]
     expect(evaluate(renderChange({ runs, openPoints, ledger })).decision).toBe('block')
+  })
+
+  // Four-eyes, 11.08.2026: a run is judged by when it STARTED. A suite loads the
+  // page at its beginning, so one that began before the edit tested the old code
+  // however late it finished — it can neither prove the fix nor condemn it.
+  it('does not let a run that BEGAN before the edit cover the code that followed', () => {
+    const straddling = { ...run('webgpu', 2000), startedAt: 500 }
+    expect(coveringRun([straddling], 'webgpu', 1000, { openPoints })).toBeNull()
+  })
+
+  it('does not let a red from a run that BEGAN before the edit condemn the code that followed', () => {
+    const straddling = { ...unfiled('webgpu', 2000), startedAt: 500 }
+    expect(unexplainedRuns([straddling], 1000, { openPoints })).toEqual([])
   })
 
   it('unexplainedRuns is total, and reports oldest first', () => {
