@@ -222,9 +222,10 @@ export function upgradeNowCards(html) {
 /**
  * The document without the current-work cards that name NEITHER a point NOR a
  * state — the shape no command could otherwise remove (four-eyes review,
- * 12.08.2026). Returns the cleaned document and the titles dropped, so the
- * caller can SAY what it removed; an edit that silently swallowed a card's prose
- * would be its own defect.
+ * 12.08.2026). Returns the cleaned document and, for each card removed, its
+ * title AND its text: this is the ONE place the board loses content, so what it
+ * loses is handed back for the caller to print. Nothing else deletes a card —
+ * the state writers replace only what really is that state.
  *
  * Such a card is refused by the publish gate anyway, and every way of repairing
  * it needs a number it does not have — while a numbered card standing beside it
@@ -241,16 +242,36 @@ export function dropStrayNowCards(html) {
     // a numbered card is reached by `title`/`queue`/`done`, and the handover
     // card by `none`. A marker alone does not save a card here either, or an
     // impostor wearing one would be exactly as unremovable as before.
-    if (/<span class="num">\s*\d+\s*<\/span>/.test(summary)) return card
-    if (new RegExp(`<span class="t">\\s*\\d+\\s*${DASH}`).test(summary)) return card
+    const { chip, legacy } = summaryPoint(summary)
+    if (chip || legacy) return card
     if (isStateCardTitle(title)) return card
     // A genuine state card that lost its chip is still replaceable by its own
     // command (`none`, `closing <N>`), so it is kept rather than swept.
     if (/data-state="closing"/.test(card) && looksLikeClosingTitle(title)) return card
-    dropped.push(title.trim() || '<untitled>')
+    dropped.push({
+      title: title.trim() || '<untitled>',
+      text: card.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+    })
     return ''
   })
   return { html: out, dropped }
+}
+
+/**
+ * The point a SUMMARY names, and where it names it: `{ chip, legacy }`.
+ *
+ * HEAD-ANCHORED, because that is what the point commands can find (four-eyes
+ * review, 12.08.2026). A chip buried behind another span passed the publish gate
+ * while `title`, `status`, `queue` and `done` all missed it — a card accepted as
+ * numbered that no numbered command could reach. One definition, so the gate and
+ * the finders cannot disagree about what "numbered" means.
+ */
+export function summaryPoint(summary) {
+  const text = String(summary ?? '')
+  const chip = text.match(/^\s*<span class="num">\s*(\d+)\s*<\/span>\s*<span class="t">/)
+  if (chip) return { chip: chip[1], legacy: null }
+  const legacy = text.match(new RegExp(`^\\s*<span class="t">\\s*(\\d+)\\s*${DASH}`))
+  return { chip: null, legacy: legacy ? legacy[1] : null }
 }
 
 /** A title without the leading "651 — " a card written before the chip carried. */
@@ -279,6 +300,16 @@ export function promoteToNow(html, point, { title, times, status, stamp = berlin
   const card = queueCard(html, point)
   if (!card) throw new Error(`board: no queue card for point ${point}`)
   if (!title || !status) throw new Error('board: promote needs a title and a status')
+  // THE QUEUE TITLE IS THE NOW-CARD'S TITLE, so the rule that governs one governs
+  // the other (four-eyes review, 12.08.2026): promoting a card titled
+  // "Vorbereitung" would write exactly the card the publish gate refuses.
+  if (stageOnlyTitle(stripPointPrefix(title, point))) {
+    throw new Error(
+      `board: the queue card for point ${point} is titled "${title}", which names a STAGE and no ` +
+        'subject — the promoted card would say nothing about the point. Give it a subject first: ' +
+        `node scripts/board-queue.mjs set ${point} --title "<Betreff>"`,
+    )
+  }
   const now =
     `<details class="now">\n  <summary>${numberChip(point)}<span class="t">${stripPointPrefix(title, point)}</span>` +
     `<span class="right"><span class="meta">${times ?? stamp}</span></span></summary>\n` +
@@ -635,9 +666,7 @@ const stateCardPattern = (kind) =>
 function isTrulyStateCard(card, kind) {
   const summary = (String(card).match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
   const title = ((summary.match(/<span class="t">([^<]*)<\/span>/) ?? [])[1] ?? '').trim()
-  if (kind === 'idle') {
-    return title === NO_CURRENT_WORK_TITLE && !/<span class="num">\s*\d+\s*<\/span>/.test(summary)
-  }
+  if (kind === 'idle') return title === NO_CURRENT_WORK_TITLE && summaryPoint(summary).chip == null
   return looksLikeClosingTitle(title) || title === CLOSING_WORK_TITLE
 }
 
@@ -693,17 +722,7 @@ export function stripClosingWork(html) {
  * hand edit this whole module exists to make unnecessary.
  */
 export function stripStateCards(html) {
-  return stripUnnumberedNowCards(stripClosingWork(stripNoCurrentWork(html)))
-}
-
-/** Every now-card whose summary carries neither a chip nor a leading title number. */
-function stripUnnumberedNowCards(html) {
-  return String(html ?? '').replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card) => {
-    const summary = (card.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
-    if (/<span class="num">\s*\d+\s*<\/span>/.test(summary)) return card
-    if (new RegExp(`<span class="t">\\s*\\d+\\s*${DASH}`).test(summary)) return card
-    return ''
-  })
+  return stripClosingWork(stripNoCurrentWork(html))
 }
 
 /**

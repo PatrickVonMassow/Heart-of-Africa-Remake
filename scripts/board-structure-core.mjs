@@ -32,6 +32,7 @@ import {
   looksLikeClosingTitle,
   namesFollowOnWork,
   stageOnlyTitle,
+  summaryPoint,
 } from './board-core.mjs'
 
 /** The four sections, in the order the user's mandate fixes them. */
@@ -246,10 +247,10 @@ export function cardNamingViolations(html) {
         code: 'now-card-unnumbered',
         msg:
           `the current-work card ${named} carries no numbered chip — every card but the handover ` +
-          'card names its point. A card without a number counts as a STATE card, so writing one ' +
-          'replaces it: node scripts/board.mjs closing <N> "<Grund>" for the closing duties, ' +
-          'node scripts/board.mjs none "<Grund>" at a boundary, node scripts/board.mjs now <N> ' +
-          '"<Stand>" for running work',
+          'card names its point, and no numbered command can reach a card without one. ANY ' +
+          'board.mjs edit sweeps such a card and prints what it removed, so the next command ' +
+          'repairs this whatever else stands; write the card the state really is with ' +
+          'node scripts/board.mjs closing <N> "<Grund>", none "<Grund>" or now <N> "<Stand>"',
       })
     }
     if (stageOnlyTitle(card.title)) {
@@ -325,7 +326,9 @@ export function nowCards(html) {
   for (const hit of section.matchAll(/<details class="now"([^>]*)>\s*<summary>([\s\S]*?)<\/summary>/g)) {
     const marked = (hit[1].match(/data-state="([^"]*)"/) ?? [])[1] ?? null
     const title = ((hit[2].match(/<span class="t">([^<]*)<\/span>/) ?? [])[1] ?? '').trim()
-    const num = (hit[2].match(/<span class="num">\s*(\d+)\s*<\/span>/) ?? [])[1] ?? null
+    // The SAME definition of "numbered" the point commands use: a chip they
+    // cannot find is no chip, however the markup reads (four-eyes 12.08.2026).
+    const { chip: num, legacy: legacyNum } = summaryPoint(hit[2])
     const legacy = title === NO_CURRENT_WORK_TITLE ? 'idle' : title === CLOSING_WORK_TITLE ? 'closing' : 'point'
     cards.push({
       kind: marked === 'idle' || marked === 'closing' ? marked : legacy,
@@ -335,7 +338,7 @@ export function nowCards(html) {
       // chip (four-eyes review, 12.08.2026) — the publish upgrades an older card
       // first, so a strict demand traps no board.
       chip: num,
-      point: num ?? (title.match(/^(\d+)\s*[—–-]/) ?? [])[1] ?? null,
+      point: num ?? legacyNum,
       title,
     })
   }

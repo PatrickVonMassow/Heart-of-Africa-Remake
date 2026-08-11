@@ -16,6 +16,7 @@ import {
   setCardTitle,
   toClosingWork,
   toNoCurrentWork,
+  toNow,
   toQueue,
   upgradeNowCards,
 } from './board-core.mjs'
@@ -320,24 +321,25 @@ describe('every current-work card names its point and its subject', () => {
   // A DIAGNOSTIC IS WORTH WHAT ITS REMEDY IS (four-eyes review, 12.08.2026): the
   // first version of these cases asserted the message and never ran the command
   // it named — and two of those commands could not in fact repair the card.
-  it('is repaired by the command it names: an unnumbered card is a STATE card', () => {
+  it('is repaired by the command it names: the sweep every edit performs', () => {
     const stray =
       '<details class="now">\n  <summary><span class="t">Abschlussarbeiten</span></summary>\n' +
       '  <div class="body"><p>Irgendwas.</p></div>\n</details>'
     const broken = withNow(stray)
     expect(codes(broken)).toContain('now-card-unnumbered')
-    // The named remedy, executed — not merely quoted.
-    const repaired = toNoCurrentWork(broken, 'Abgeschlossen; der Nachfolger nimmt Punkt 656.', { stamp: '23:55' })
-    expect(codes(repaired)).toEqual([])
-    expect(repaired).not.toContain('Irgendwas.')
-    // …and so is the closing card, which replaces it just as well.
+    expect(cardNamingViolations(broken)[0].msg).toContain('ANY board.mjs edit')
+    // The named remedy, EXECUTED — the sweep board.mjs runs on every edit.
+    const swept = dropStrayNowCards(broken)
+    expect(codes(swept.html)).toEqual([])
+    // …and it hands back the prose it removed, so nothing vanishes unsaid.
+    expect(swept.dropped).toEqual([{ title: 'Abschlussarbeiten', text: 'Abschlussarbeiten Irgendwas.' }])
+    // The state writers do NOT delete it: only the one reporting path removes a card.
     const closing = toClosingWork(broken, 651, {
       subject: 'Ein Betreff',
       reason: 'Vier-Augen fehlt.',
       stamp: '23:40',
     })
-    expect(codes(closing)).toEqual([])
-    expect(closing).not.toContain('Irgendwas.')
+    expect(closing).toContain('Irgendwas.')
   })
 
   // EVERY LEGACY DASH, not only the em dash (four-eyes 12.08.): a card written
@@ -452,7 +454,8 @@ describe('every current-work card names its point and its subject', () => {
     const board = withNow(`${chipCard(651, 'Echte Arbeit')}\n${stray}`)
     expect(codes(board)).toContain('now-card-unnumbered')
     const swept = dropStrayNowCards(board)
-    expect(swept.dropped).toEqual(['Irgendwas ohne Nummer'])
+    expect(swept.dropped.map((d) => d.title)).toEqual(['Irgendwas ohne Nummer'])
+    expect(swept.dropped[0].text).toContain('Prosa.')
     expect(codes(swept.html)).toEqual([])
     expect(swept.html).toContain('Echte Arbeit')
     // The genuine handover card and every numbered card survive it.
@@ -483,6 +486,39 @@ describe('every current-work card names its point and its subject', () => {
     // A NUMBERED impostor is sent away instead, which its message names.
     const numbered = withNow(`${chipCard(652, 'Irgendwas', 'idle')}`)
     expect(cardNamingViolations(numbered)[0].msg).toContain('board.mjs queue 652')
+  })
+
+  // A chip the point commands cannot find is no chip (four-eyes 12.08.): the gate
+  // and the finders share one definition of "numbered", head-anchored.
+  it('does not accept a chip that no command could find', () => {
+    const buried =
+      '<details class="now">\n  <summary><span class="right"><span class="meta">09:00</span></span>' +
+      '<span class="num">651</span><span class="t">Ein Betreff</span></summary>\n' +
+      '  <div class="body"><p>Läuft.</p></div>\n</details>'
+    expect(nowCards(withNow(buried))[0].chip).toBeNull()
+    expect(codes(withNow(buried))).toContain('now-card-unnumbered')
+    // …and the sweep takes it, because no numbered command can repair it.
+    expect(dropStrayNowCards(withNow(buried)).dropped.map((d) => d.title)).toEqual(['Ein Betreff'])
+  })
+
+  it('refuses to promote a queue card whose title is only a stage', () => {
+    const queued =
+      VIEWPORT +
+      '<div class="wrap">\n' +
+      sect(REQUIRED_SECTIONS[0], '') +
+      '\n' +
+      sect(REQUIRED_SECTIONS[1], '') +
+      '\n' +
+      sect(
+        REQUIRED_SECTIONS[2],
+        '<details>\n  <summary><span class="num">651</span><span class="t">Vorbereitung</span>' +
+          '<span class="right"><span class="meta">~2 h</span></span></summary>\n' +
+          '  <div class="body"><p>Text</p></div>\n</details>',
+      ) +
+      '\n' +
+      sect(REQUIRED_SECTIONS[3], '') +
+      '\n</div>'
+    expect(() => toNow(queued, 651, 'Läuft.', { stamp: '09:00' })).toThrow(/STAGE and no subject/)
   })
 
   it('names a remedy that FITS the card: no title command for an unnumbered one', () => {

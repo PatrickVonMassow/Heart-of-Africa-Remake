@@ -132,8 +132,9 @@ function edit(fn, done) {
   // It is said out loud, because an edit that silently swallowed a card's prose
   // would be its own defect.
   const swept = dropStrayNowCards(normaliseLineEndings(readFileSync(BOARD, 'utf8')))
-  for (const title of swept.dropped) {
-    console.error(`board: dropped the current-work card "${title}" — it named neither a point nor a state`)
+  for (const { title, text } of swept.dropped) {
+    console.error(`board: dropped the current-work card "${title}" — it named neither a point nor a state.`)
+    console.error(`  its text, so nothing is lost unsaid: ${text}`)
   }
   const edited = dropStrayNowCards(upgradeNowCards(normaliseLineEndings(fn(swept.html))))
   writeTextAtomic(BOARD, edited.html)
