@@ -2537,6 +2537,53 @@ describe('deflectedStep (scripted walks obey the land constraint, point 83)', ()
     expect(r.moved).toBe(true)
     expect(r.heading).toBe(Math.PI)
   })
+
+  // THE COMMITTED SIDE (work-order 648): a caller going ROUND something says
+  // which way round, and the search takes that side even where the other one is
+  // the smaller turn — which is what makes it follow an edge rather than take
+  // whichever flank is momentarily nearer.
+  describe('a committed side', () => {
+    // A wall straight ahead, open on both flanks: the free turns are symmetric,
+    // so nothing but the commitment can decide between them.
+    const wall = (x: number, z: number) => z > 0.5 && Math.abs(x) < 0.4
+
+    it('takes the side it is given, either way', () => {
+      const plus = deflectedStep(0, 0, 0, 0.1, wall, 0.6, 12, NaN, 1)
+      const minus = deflectedStep(0, 0, 0, 0.1, wall, 0.6, 12, NaN, -1)
+      expect(plus.moved && minus.moved).toBe(true)
+      expect(plus.heading).toBeGreaterThan(0)
+      expect(minus.heading).toBeLessThan(0)
+    })
+
+    it('leaves the search exactly as it was with no side committed', () => {
+      const bare = deflectedStep(0, 0, 0, 0.1, wall, 0.6, 12)
+      const zero = deflectedStep(0, 0, 0, 0.1, wall, 0.6, 12, NaN, 0)
+      expect(zero).toEqual(bare)
+    })
+
+    it('takes a clear way ahead whatever side is committed', () => {
+      const r = deflectedStep(0, 0, 0, 0.1, () => false, 0.6, 12, NaN, -1)
+      expect(r.heading).toBe(0)
+    })
+
+    it('never gives the COURSE up for the sake of its side', () => {
+      // The way out on the committed side is a turn RIGHT ROUND, and a smaller
+      // turn keeping the course is free on the other one. Preferring the side
+      // there would undo the walker's own step — the shuffle all over again.
+      const lane = (x: number, z: number) => z > 0.5 || x < -0.4
+      const r = deflectedStep(0, 0, 0, 0.1, lane, 0.6, 12, 0, -1)
+      expect(r.moved).toBe(true)
+      expect(Math.cos(r.heading)).toBeGreaterThanOrEqual(0) // it kept its course
+    })
+
+    it('falls back to the other side rather than stand', () => {
+      // Everything on the committed side is shut; the walker still walks.
+      const shut = (x: number, z: number) => x > 0.05 || z > 0.5
+      const r = deflectedStep(0, 0, 0, 0.1, shut, 0.6, 12, NaN, 1)
+      expect(r.moved).toBe(true)
+      expect(shut(r.x, r.z)).toBe(false)
+    })
+  })
 })
 
 describe('escapeCorridorHeading (point 188 — the walk-off picks a land corridor, not the seaward radial)', () => {

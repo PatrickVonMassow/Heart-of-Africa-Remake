@@ -1786,6 +1786,14 @@ export function retainedSpawnChunks(
  * all, which is the user's "Kind zittert auf der Stelle herum". Measured in the
  * settlement he reported it in, one step in ten reversed the one before; in the
  * open, where there is nothing to go round, one in four hundred (work-order 648).
+ *
+ * `side` is the turn SENSE the caller has committed to — +1 for the turns that
+ * add to the heading, −1 for the ones that subtract, 0 (the default) for the
+ * symmetric search above. It is what lets a mover go ROUND something rather than
+ * bounce off it: the committed sense is searched whole, in both course passes,
+ * before the other sense is looked at at all, so the walker keeps hugging one
+ * edge of an obstacle instead of taking whichever flank is momentarily nearer.
+ * A caller with no commitment gets exactly the search this function always did.
  */
 export function deflectedStep(
   x: number,
@@ -1796,6 +1804,7 @@ export function deflectedStep(
   lookahead = dist,
   maxTurn = 6,
   course = NaN,
+  side = 0,
 ): { x: number; z: number; heading: number; moved: boolean } {
   // The PROBE reaches `lookahead` ahead while the STEP stays `dist`: a
   // single land cell poking into the water reads as blocked from outside,
@@ -1815,14 +1824,23 @@ export function deflectedStep(
   if (clear(heading)) return take(heading)
   const keeps = (h: number) => !Number.isFinite(course) || Math.cos(h - course) >= 0
   const swing = Math.max(0, maxTurn)
+  // The committed sense is preferred over the other, but never over the COURSE:
+  // giving the course up is a turn right round, and a walker that took one
+  // merely because it was on its committed side would undo its own step — the
+  // very reversal the course rule exists to forbid. So the course passes are
+  // outermost, and the commitment only orders the search inside each of them.
+  // With no commitment both senses are searched together, smallest turn first.
+  const senses = side > 0 ? [[1], [-1]] : side < 0 ? [[-1], [1]] : [[1, -1]]
   // First the turns that keep the course, then — only if the walker is really
   // shut in — the ones that give it up.
   for (const keeping of Number.isFinite(course) ? [true, false] : [false]) {
-    for (let step = 1; step <= swing; step++) {
-      for (const sgn of [1, -1]) {
-        const h = heading + sgn * step * (Math.PI / 12) // 15° steps
-        if (keeping && !keeps(h)) continue
-        if (clear(h)) return take(h)
+    for (const signs of senses) {
+      for (let step = 1; step <= swing; step++) {
+        for (const sgn of signs) {
+          const h = heading + sgn * step * (Math.PI / 12) // 15° steps
+          if (keeping && !keeps(h)) continue
+          if (clear(h)) return take(h)
+        }
       }
     }
   }
