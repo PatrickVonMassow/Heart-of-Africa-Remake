@@ -1158,8 +1158,21 @@ export function setCardTitle(html, point, title) {
     `(<details class="now"[^>]*>\\s*<summary>\\s*)<span class="t">\\s*${point}\\s*${DASH}[^<]*(</span>)`,
   )
   if (legacyRe.test(html)) return html.replace(legacyRe, `$1${numberChip(point)}<span class="t">${bare}$2`)
+  // SCOPED TO THE QUEUE (four-eyes review, 12.08.2026): the archived cards carry
+  // the very same markup, so an unscoped fallback retitled FINISHED work for a
+  // point that had no card left in either live section — silently, since the
+  // command reports success either way. The Erledigt section is history; a
+  // retitle there is a hand edit's business, not this command's.
   const queueRe = new RegExp(`(<summary><span class="num">${point}</span><span class="t">)[^<]*(</span>)`)
-  if (queueRe.test(html)) return html.replace(queueRe, `$1${escapeCardTitle(text)}$2`)
+  try {
+    const { from, end } = sectionBounds(html, 'queue')
+    const section = html.slice(from, end)
+    if (queueRe.test(section)) {
+      return html.slice(0, from) + section.replace(queueRe, `$1${escapeCardTitle(text)}$2`) + html.slice(end)
+    }
+  } catch {
+    /* no queue section — the refusal below is the honest answer */
+  }
   throw new Error(`board: no current-work or queue card for point ${point}`)
 }
 

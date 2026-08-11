@@ -548,6 +548,24 @@ describe('every current-work card names its point and its subject', () => {
     expect(codes(rewritten)).toEqual([])
   })
 
+  // The Erledigt cards carry the queue card's markup exactly, so an unscoped
+  // fallback retitled FINISHED work — silently (four-eyes 12.08.).
+  it('does not retitle an archived card when no live card exists', () => {
+    const archived =
+      VIEWPORT +
+      '<div class="wrap">\n' +
+      sect(REQUIRED_SECTIONS[0], chipCard(651, 'Echte Arbeit')) +
+      '\n' +
+      sect(REQUIRED_SECTIONS[1], '') +
+      '\n' +
+      sect(REQUIRED_SECTIONS[2], '') +
+      '\n' +
+      sect(REQUIRED_SECTIONS[3], queueCard(640)) +
+      '\n</div>'
+    expect(() => setCardTitle(archived, 640, 'Neu')).toThrow(/no current-work or queue card/)
+    expect(archived).toContain('<span class="num">640</span><span class="t">Titel</span>')
+  })
+
   // A STATUS BELONGS TO ITS OWN CARD (four-eyes 12.08.): the rewrite used to run
   // freely to the next `<div class="body">`, so a card that had lost its body
   // sent the text into the FOLLOWING card and overwrote another point's status.
