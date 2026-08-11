@@ -12,6 +12,13 @@
 //       agreement of two documents, so it stayed green through both re-sequencings
 //       of 10.08.2026 while the published board kept showing the old plan. The
 //       user found that before any check did.
+//   (1c) THE APPEND GATE (point 590) — the turn that APPENDED a point does not
+//       end until that point's rank was settled: moved inside TASKS.md, or
+//       recorded as "last is right". Since the queue renders the work order's
+//       sequence, the end of that order is what the user sees, and
+//       append-and-defer puts every new point there by DEFAULT — 589 landed at
+//       the very back although the user wanted it worked at once. This rule is
+//       about the work order ALONE and is judged without a board.
 //   (2) DASHBOARD TRUTH — a queue/now card must not CLAIM its point is done
 //       ("behoben", "erledigt", …) while that point is still open ([ ]) in
 //       TASKS.md. A conservative negation/qualifier window keeps honest
@@ -29,6 +36,7 @@ import {
   openPointsOf,
   queueOrder,
 } from './board-queue-core.mjs'
+import { RANK_CMD, SEED_CMD, appendGateState, parseRankRecord } from './queue-rank-core.mjs'
 
 // The rank constants moved to board-queue-core with the ranking itself (point
 // 608) — this guard is now a CONSUMER of that order, and owning them here would
@@ -230,15 +238,54 @@ export function falseDoneClaims(cards, tasksOpenSet) {
   return offenders
 }
 
-/** Top-level decision on the two raw file contents. Total: any bad input → allow. */
-export function evaluate({ dashboardHtml, tasksMd } = {}) {
+/**
+ * Rule 1c (point 590): the points appended since anybody last judged where they
+ * belong. The turn that appends owes ONE decision — move the block in TASKS.md,
+ * or record that last is right — and this is the message that asks for it.
+ *
+ * "Appended since" is read off the record's PROVENANCE baseline, never off the
+ * numbers: a survivor left standing last by the point behind it closing is not
+ * an append, and an append carrying a LOWER number than its neighbours still is
+ * one. An UNARMED record (no baseline at all) asks for that baseline instead of
+ * falling silent — a clean-slate exemption is how an unranked append would get
+ * swallowed by a damaged or half-merged file. A TORN one says nothing at all:
+ * a guard may draw no verdict from state it cannot read.
+ */
+export function unrankedAppendProblem(tasksMd, rankRecordJson) {
+  const state = appendGateState(openPointsOf(tasksMd), parseRankRecord(rankRecordJson))
+  if (state.state === 'unarmed') {
+    return (
+      'QUEUE RANK BASELINE MISSING: nothing records which points the work order was last settled with, so no ' +
+      'check can tell a freshly appended point from one that has stood there all along. Arm it once, for the ' +
+      `whole open order at once — ${SEED_CMD} — and every point appended afterwards is decided individually.`
+    )
+  }
+  if (!state.pending.length) return ''
+  return (
+    `APPENDED POINT NOT RANKED: point(s) ${state.pending.join(', ')} were appended behind everything the work ` +
+    'order was last settled with, which is where append-and-defer puts them rather than where they belong — and ' +
+    'the board renders that order. Decide it once, while the content is fresh: MOVE the point’s block inside ' +
+    `TASKS.md to where it belongs (verbatim, with its number), or record that last is right — ${RANK_CMD}.`
+  )
+}
+
+/** Top-level decision on the raw file contents. Total: any bad input → allow. */
+export function evaluate({ dashboardHtml, tasksMd, rankRecordJson } = {}) {
   try {
     const open = parseOpenPoints(tasksMd)
     if (open.size === 0) return { block: false, reason: '' }
-    const cards = parseQueueCards(dashboardHtml)
-    if (cards.length === 0) return { block: false, reason: '' }
 
     const problems = []
+
+    // The APPEND GATE is judged FIRST, and without the board: it is a statement
+    // about the work order alone, and a checkout whose board is missing or whose
+    // Warteschlange is empty must not be able to append-and-forget past it. The
+    // board rules below keep their own "nothing to judge" test instead.
+    const unranked = unrankedAppendProblem(tasksMd, rankRecordJson)
+    if (unranked) problems.push(unranked)
+
+    const cards = parseQueueCards(dashboardHtml)
+    if (cards.length === 0) return problems.length ? { block: true, reason: problems.join(' | ') } : { block: false, reason: '' }
 
     // The ORDER rule judges workable points only (point 450); the DONE-CLAIM rule
     // below judges every open one — a card claiming a gated point is finished is

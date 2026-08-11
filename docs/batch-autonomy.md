@@ -1909,6 +1909,43 @@ deadlock). `board.mjs queue` is a different command — it MOVES a current-work
 card back — and it throws on a point that has no card at all, which is precisely
 the case the refusal catches.
 
+**An appended point is ranked ONCE, deliberately** (point 590, 09.08.2026). With
+the queue's sequence derived from the work order (point 608), the END of that
+order is what the user sees — and append-and-defer puts every new point there by
+DEFAULT, which is not a judgment: the freshly appended 589 sat at the very back
+although the user wanted it worked at once. So `queue-order-guard` refuses to end
+the turn that appended a point until its rank was settled, one of two ways: MOVE
+the point's block inside `TASKS.md` to where it belongs (verbatim, with its
+number — one edit, visible in the diff), or record that last is right with `node
+scripts/queue-rank.mjs --ranked <N> --why "<one line>"`. One decision per new
+point, at the moment its content is freshest.
+
+WHICH POINT COUNTS AS APPENDED is read off PROVENANCE, never off the numbers or
+the positions (three cross-vendor passes refuted every position heuristic). The
+tracked record `.claude/queue-rank.json` — tracked, because a clone that
+inherited nothing would re-ask about every point ever appended — carries the
+deliberate decisions AND a `settled` baseline: the open set as it stood the last
+time no rank question was outstanding. A point is new exactly when it is missing
+from that set. Position could not tell the difference: a point left standing last
+because the point behind it CLOSED was asked about though nobody had appended
+anything, and points appended in DESCENDING order (`[9, 5]` plus the reopened 4,
+then 3) hid behind the running-maximum walk that questioned only the last of
+them. A new point standing BEFORE one the baseline remembers was placed
+deliberately and is not asked about; a REOPENED point re-entering at the end is
+asked like any append, and so is a new point placed before another new one — two
+points appended in one turn arrive exactly like that, and reading that as a
+judgment would let the earlier of them through unasked. The baseline moves only
+while nothing is outstanding (`settleRecord`, which the guard runs at the turn
+end), and it is only ever ARMED by hand (`--seed --why`), which is also what a
+checkout carrying no baseline is asked for once, instead of the gate falling
+silent there. A record that does not PARSE is torn: the gate stays quiet — every
+guard here is fail-open — while the CLI refuses to write over it, and a `ranked`
+entry without a reason is no decision and is dropped. Whether the gate is armed
+is read off `settled` alone, so an emptied `ranked` cannot pose as a fresh
+checkout. The decision logic is pure in `scripts/queue-rank-core.mjs`, which
+imports nothing: it judges provenance, `board-queue-core.mjs` renders the order,
+and neither owns a copy of the other's fact.
+
 The watchdog runs as its own process (`scripts/board-watchdog.mjs`), called by
 the launcher. That is not tidiness: on this platform a `process.exit()` after any
 `fetch` tears undici's socket down mid-close and ABORTS the process

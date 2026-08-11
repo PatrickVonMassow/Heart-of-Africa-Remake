@@ -14,6 +14,7 @@ import {
   queueOrderDrift,
   falseDoneClaims,
   parseWorkablePoints,
+  unrankedAppendProblem,
   evaluate,
 } from './queue-order-guard-core.mjs'
 
@@ -42,6 +43,15 @@ ${d}
 
 const tasksMd = (open, done = [209]) =>
   [...open.map((n) => `- [ ] ${n}. Open point ${n}.`), ...done.map((n) => `- [x] ${n}. Done point ${n}.`)].join('\n')
+
+/**
+ * The rank record as a settled order: `points` is the PROVENANCE baseline — what
+ * the work order held when nothing was outstanding. Every fixture that is not
+ * about the append gate itself carries one, because a checkout with no baseline
+ * is a state the gate speaks up about in its own right (point 590).
+ */
+const ranks = (points, ranked = {}) =>
+  JSON.stringify({ ranked, settled: { at: '2026-08-10T09:00:00.000Z', points } })
 
 describe('constants', () => {
   it('pin the finder set, the tag exemption and the claim tokens', () => {
@@ -211,6 +221,7 @@ describe('evaluate — end to end on the two raw files', () => {
     const r = evaluate({
       dashboardHtml: boardHtml({ queue: [{ n: 203 }, { n: 211 }, { n: 174 }] }),
       tasksMd: tasksMd([210, 203, 211, 174]),
+      rankRecordJson: ranks([174, 203, 210, 211]),
     })
     expect(r.block).toBe(true)
     expect(r.reason).toMatch(/QUEUE ORDER WRONG.*203/)
@@ -221,6 +232,7 @@ describe('evaluate — end to end on the two raw files', () => {
     const r = evaluate({
       dashboardHtml: boardHtml({ queue: [{ n: 174 }, { n: 203 }] }),
       tasksMd: tasksMd([210, 203, 174]),
+      rankRecordJson: ranks([174, 203, 210]),
     })
     expect(r.block).toBe(false)
   })
@@ -233,7 +245,11 @@ describe('evaluate — end to end on the two raw files', () => {
       '- [ ] 211. Open point 211. AWAITING-USER(2026-07-29; needs a ruling)',
       '- [x] 209. Done point 209.',
     ].join('\n')
-    const r = evaluate({ dashboardHtml: boardHtml({ queue: [{ n: 203 }, { n: 211 }] }), tasksMd: tasks })
+    const r = evaluate({
+      dashboardHtml: boardHtml({ queue: [{ n: 203 }, { n: 211 }] }),
+      tasksMd: tasks,
+      rankRecordJson: ranks([203, 211]),
+    })
     expect(r.block).toBe(false)
   })
 
@@ -243,7 +259,11 @@ describe('evaluate — end to end on the two raw files', () => {
       '- [ ] 211. Open point 211. USER-ANSWERED(2026-08-07)',
       '- [x] 209. Done point 209.',
     ].join('\n')
-    const r = evaluate({ dashboardHtml: boardHtml({ queue: [{ n: 203 }, { n: 211 }] }), tasksMd: tasks })
+    const r = evaluate({
+      dashboardHtml: boardHtml({ queue: [{ n: 203 }, { n: 211 }] }),
+      tasksMd: tasks,
+      rankRecordJson: ranks([203, 211]),
+    })
     expect(r.block).toBe(true)
     expect(r.reason).toMatch(/QUEUE ORDER WRONG.*203/)
   })
@@ -253,6 +273,7 @@ describe('evaluate — end to end on the two raw files', () => {
     const r = evaluate({
       dashboardHtml: boardHtml({ queue: [{ n: 211, body: 'Behoben und verifiziert.' }] }),
       tasksMd: tasks,
+      rankRecordJson: ranks([211]),
     })
     expect(r.block).toBe(true)
     expect(r.reason).toMatch(/CLAIMS DONE.*211/)
@@ -262,6 +283,7 @@ describe('evaluate — end to end on the two raw files', () => {
     const r = evaluate({
       dashboardHtml: boardHtml({ queue: [{ n: 211, body: 'Behoben, beide Backends bildverifiziert.' }] }),
       tasksMd: tasksMd([210, 211]),
+      rankRecordJson: ranks([210, 211]),
     })
     expect(r.block).toBe(true)
     expect(r.reason).toMatch(/CLAIMS DONE.*211/)
@@ -270,6 +292,7 @@ describe('evaluate — end to end on the two raw files', () => {
     const r = evaluate({
       dashboardHtml: boardHtml({ nowTitle: '210 — Meereskante', nowBody: 'Behoben und verifiziert.', queue: [{ n: 211 }] }),
       tasksMd: tasksMd([210, 211]),
+      rankRecordJson: ranks([210, 211]),
     })
     expect(r.block).toBe(true)
     expect(r.reason).toMatch(/CLAIMS DONE.*210/)
@@ -281,12 +304,15 @@ describe('evaluate — end to end on the two raw files', () => {
         { n: 209, body: 'Behoben und verifiziert.' }, // stale queue card, but the point is closed
       ],
     })
-    expect(evaluate({ dashboardHtml: html, tasksMd: tasksMd([210, 211]) }).block).toBe(false)
+    expect(evaluate({ dashboardHtml: html, tasksMd: tasksMd([210, 211]), rankRecordJson: ranks([210, 211]) }).block).toBe(
+      false,
+    )
   })
   it('reports both problems in one reason', () => {
     const r = evaluate({
       dashboardHtml: boardHtml({ queue: [{ n: 203 }, { n: 211, body: 'Behoben, beide Backends bildverifiziert.' }] }),
       tasksMd: tasksMd([203, 211]),
+      rankRecordJson: ranks([203, 211]),
     })
     expect(r.block).toBe(true)
     expect(r.reason).toMatch(/QUEUE ORDER WRONG.*203/)
@@ -296,9 +322,10 @@ describe('evaluate — end to end on the two raw files', () => {
   // rebuilt and republished both times, and it kept showing the old plan.
   it('blocks a board whose queue no longer follows the work order', () => {
     const board = boardHtml({ queue: [{ n: 601 }, { n: 602 }, { n: 603 }] })
-    expect(evaluate({ dashboardHtml: board, tasksMd: tasksMd([210, 601, 602, 603]) }).block).toBe(false)
+    const rankRecordJson = ranks([210, 601, 602, 603])
+    expect(evaluate({ dashboardHtml: board, tasksMd: tasksMd([210, 601, 602, 603]), rankRecordJson }).block).toBe(false)
     // The work order is re-sequenced; the board is not rebuilt.
-    const r = evaluate({ dashboardHtml: board, tasksMd: tasksMd([210, 603, 601, 602]) })
+    const r = evaluate({ dashboardHtml: board, tasksMd: tasksMd([210, 603, 601, 602]), rankRecordJson })
     expect(r.block).toBe(true)
     expect(r.reason).toMatch(/QUEUE ORDER DRIFTED/)
     expect(r.reason).toMatch(/603/)
@@ -309,8 +336,11 @@ describe('evaluate — end to end on the two raw files', () => {
     // Two ordinary fixes swapped by hand: no finder overtakes anything, so rule
     // (1) is silent — this is the case that went unseen.
     const tasks = tasksMd([601, 602])
-    expect(evaluate({ dashboardHtml: boardHtml({ queue: [{ n: 601 }, { n: 602 }] }), tasksMd: tasks }).block).toBe(false)
-    const r = evaluate({ dashboardHtml: boardHtml({ queue: [{ n: 602 }, { n: 601 }] }), tasksMd: tasks })
+    const rankRecordJson = ranks([601, 602])
+    expect(
+      evaluate({ dashboardHtml: boardHtml({ queue: [{ n: 601 }, { n: 602 }] }), tasksMd: tasks, rankRecordJson }).block,
+    ).toBe(false)
+    const r = evaluate({ dashboardHtml: boardHtml({ queue: [{ n: 602 }, { n: 601 }] }), tasksMd: tasks, rankRecordJson })
     expect(r.block).toBe(true)
     expect(r.reason).toMatch(/QUEUE ORDER DRIFTED/)
     expect(r.reason).not.toMatch(/QUEUE ORDER WRONG/)
@@ -322,7 +352,11 @@ describe('evaluate — end to end on the two raw files', () => {
     const points = Array.from({ length: 20 }, (_, i) => 601 + i)
     const swapped = [...points]
     ;[swapped[17], swapped[18]] = [swapped[18], swapped[17]]
-    const r = evaluate({ dashboardHtml: boardHtml({ queue: swapped.map((n) => ({ n })) }), tasksMd: tasksMd(points) })
+    const r = evaluate({
+      dashboardHtml: boardHtml({ queue: swapped.map((n) => ({ n })) }),
+      tasksMd: tasksMd(points),
+      rankRecordJson: ranks(points),
+    })
     expect(r.block).toBe(true)
     expect(r.reason).toContain('position 18')
     expect(r.reason).toContain('Board there: …, 614, 615, 616, 617, 619, 618, 620')
@@ -334,6 +368,7 @@ describe('evaluate — end to end on the two raw files', () => {
     const r = evaluate({
       dashboardHtml: boardHtml({ queue: [{ n: 601 }, { n: 602 }, { n: 601 }] }),
       tasksMd: tasksMd([601, 602]),
+      rankRecordJson: ranks([601, 602]),
     })
     expect(r.block).toBe(true)
     expect(r.reason).toMatch(/LISTS ONE POINT TWICE.*601/)
@@ -345,6 +380,7 @@ describe('evaluate — end to end on the two raw files', () => {
     const r = evaluate({
       dashboardHtml: boardHtml({ queue: [{ n: 601 }, { n: 602 }, { n: 203 }] }),
       tasksMd: tasksMd([210, 601, 203, 602]),
+      rankRecordJson: ranks([210, 203, 601, 602]),
     })
     expect(r.block).toBe(false)
   })
@@ -353,8 +389,129 @@ describe('evaluate — end to end on the two raw files', () => {
     expect(evaluate().block).toBe(false)
     expect(evaluate({ dashboardHtml: null, tasksMd: null }).block).toBe(false)
     expect(evaluate({ dashboardHtml: 42, tasksMd: {} }).block).toBe(false)
-    expect(evaluate({ dashboardHtml: '<p>no sections</p>', tasksMd: tasksMd([210]) }).block).toBe(false)
+    expect(
+      evaluate({ dashboardHtml: '<p>no sections</p>', tasksMd: tasksMd([210]), rankRecordJson: ranks([210]) }).block,
+    ).toBe(false)
     // No open points at all → nothing enforceable.
     expect(evaluate({ dashboardHtml: boardHtml({ queue: [{ n: 203 }] }), tasksMd: '- [x] 209. Done.' }).block).toBe(false)
+  })
+})
+
+// POINT 590: rules (1) and (1b) judge the BOARD. This one judges the WORK ORDER
+// — an appended point sits where append-and-defer put it, which is a default and
+// not a judgment, and the board renders that default to the user.
+describe('the APPEND GATE — a new point is ranked once, deliberately', () => {
+  // 211 stands ahead of 210, so the order carries a judgment; 300 was appended
+  // behind both — it is missing from the baseline the order was last settled
+  // with — and nobody has said whether that is where it belongs.
+  const appended = ['- [ ] 211. Erst dieser.', '- [ ] 210. Dann dieser.', '- [ ] 300. FRISCH ANGEHÄNGT.'].join('\n')
+  const board = boardHtml({ queue: [{ n: 211 }, { n: 210 }, { n: 300 }] })
+  const before = ranks([210, 211])
+
+  it('blocks the turn that appended a point until its rank is settled', () => {
+    const r = evaluate({ dashboardHtml: board, tasksMd: appended, rankRecordJson: before })
+    expect(r.block).toBe(true)
+    expect(r.reason).toMatch(/APPENDED POINT NOT RANKED.*300/)
+    expect(r.reason).toMatch(/queue-rank\.mjs --ranked/)
+  })
+
+  it('is satisfied by the recorded decision that last is right', () => {
+    const rankRecordJson = ranks([210, 211], { 300: { at: '2026-08-10T09:00:00.000Z', why: 'nothing waits on it' } })
+    expect(evaluate({ dashboardHtml: board, tasksMd: appended, rankRecordJson }).block).toBe(false)
+  })
+
+  it('never asks again once the appended point is part of the settled order', () => {
+    // The FALSE BLOCK a review found: 300 answered and settled, then 300 lands —
+    // and 210, which has stood there all along, was asked about because it now
+    // happens to be last. Nothing was appended; nothing is asked.
+    const settled = ranks([210, 211, 300])
+    expect(evaluate({ dashboardHtml: board, tasksMd: appended, rankRecordJson: settled }).block).toBe(false)
+    const closed = ['- [ ] 211. Erst dieser.', '- [ ] 210. Dann dieser.', '- [x] 300. Erledigt.'].join('\n')
+    const r = evaluate({
+      dashboardHtml: boardHtml({ queue: [{ n: 211 }, { n: 210 }] }),
+      tasksMd: closed,
+      rankRecordJson: settled,
+    })
+    expect(r.block).toBe(false)
+  })
+
+  it('asks about EVERY point appended since, whatever the numbers do', () => {
+    // The SILENT ESCAPE: two reopened points appended behind [9, 5] in
+    // descending order — the running-maximum walk questioned only the last.
+    const reopened = [
+      '- [ ] 9. Alt.',
+      '- [ ] 5. Auch alt.',
+      '- [ ] 4. WIEDER GEÖFFNET.',
+      '- [ ] 3. UND NOCH EINER.',
+    ].join('\n')
+    const r = evaluate({
+      dashboardHtml: boardHtml({ queue: [{ n: 9 }, { n: 5 }, { n: 4 }, { n: 3 }] }),
+      tasksMd: reopened,
+      rankRecordJson: ranks([5, 9]),
+    })
+    expect(r.block).toBe(true)
+    expect(r.reason).toMatch(/NOT RANKED[^|]*\b4, 3\b/)
+  })
+
+  it('stops asking about a point that was MOVED into the order', () => {
+    // Moved ahead of points the baseline remembers, 300 is judged by the move
+    // itself — and no survivor takes its place in the question.
+    const moved = [
+      '- [ ] 300. FRISCH ANGEHÄNGT, sofort zu arbeiten.',
+      '- [ ] 211. Erst dieser.',
+      '- [ ] 210. Dann dieser.',
+    ].join('\n')
+    const html = boardHtml({ queue: [{ n: 300 }, { n: 211 }, { n: 210 }] })
+    expect(evaluate({ dashboardHtml: html, tasksMd: moved, rankRecordJson: before }).block).toBe(false)
+  })
+
+  it('asks even where there is no board to judge — the gate is about the work order', () => {
+    // The board rules have nothing to say without a Warteschlange; this one does,
+    // so `evaluate` may not return early on an empty card list any more.
+    for (const dashboardHtml of ['', '<p>kein Board</p>', boardHtml({ queue: [] })]) {
+      const r = evaluate({ dashboardHtml, tasksMd: appended, rankRecordJson: before })
+      expect(r.block).toBe(true)
+      expect(r.reason).toMatch(/APPENDED POINT NOT RANKED/)
+    }
+  })
+
+  it('stays QUIET on a TORN record rather than trapping the session', () => {
+    // Every guard here is fail-OPEN by decree: an unreadable record is not a
+    // verdict, and the CLI is the loud half (it refuses to write over it).
+    for (const rankRecordJson of ['{"ranked":{', 'not json', '[]', '{"settled":{"points":"kaputt"}}']) {
+      expect(evaluate({ dashboardHtml: board, tasksMd: appended, rankRecordJson }).block).toBe(false)
+    }
+  })
+
+  it('asks for the BASELINE where none was ever recorded, instead of waving the order through', () => {
+    // A record that carries no baseline cannot tell an append from a survivor,
+    // and falling silent there is the exemption that swallowed an unranked
+    // append. One command answers the whole order — and an EMPTIED `ranked` is
+    // not "never armed": armedness is read off `settled` alone.
+    for (const rankRecordJson of [null, '', '{"ranked":{}}', '{"ranked":{"300":{}}}']) {
+      const r = evaluate({ dashboardHtml: board, tasksMd: appended, rankRecordJson })
+      expect(r.block).toBe(true)
+      expect(r.reason).toMatch(/QUEUE RANK BASELINE MISSING/)
+      expect(r.reason).toMatch(/queue-rank\.mjs --seed/)
+    }
+    expect(unrankedAppendProblem(appended, ranks([210, 211, 300], {}))).toBe('')
+  })
+
+  it('does not accept a decision that states no reason', () => {
+    const r = evaluate({
+      dashboardHtml: board,
+      tasksMd: appended,
+      rankRecordJson: ranks([210, 211], { 300: {} }),
+    })
+    expect(r.block).toBe(true)
+    expect(r.reason).toMatch(/NOT RANKED[^|]*300/)
+  })
+
+  it('is total on malformed input, like every rule beside it', () => {
+    expect(unrankedAppendProblem(null, null)).toMatch(/BASELINE MISSING/)
+    expect(unrankedAppendProblem(42, null)).toMatch(/BASELINE MISSING/)
+    // Anything that is not the file's own bytes reads as TORN, which is quiet.
+    expect(unrankedAppendProblem('- [ ] 1. A.', {})).toBe('')
+    expect(unrankedAppendProblem('- [ ] 1. A.', ranks([1]))).toBe('')
   })
 })
