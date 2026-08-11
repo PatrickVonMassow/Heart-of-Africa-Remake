@@ -49,7 +49,7 @@
 // lines under the old 409 and rides that slack, so 408 is the exact count and 417 would have
 // been room for a whole future entry — the four-eyes review caught precisely that.
 export const LIMITS = {
-  maxLines: 408,
+  maxLines: 415,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -72,7 +72,25 @@ export const LIMITS = {
   // dated and never rewritten. Recorded as a decision card besides, because the
   // standing rule is shorten-before-raise and the last step of a raise belongs
   // to the user.
-  maxWords: 3580,
+  //
+  // RAISED to 3680 on 11.08.2026 by the 97 measured words of two genuinely new
+  // decisions, and NOT escalated to the user — he withdrew that requirement
+  // generally on 10.08.2026 ("Frage mich in Zukunft allgemein nicht mehr bzgl.
+  // Anhebungen"), so a raise is ours to take and to justify in writing. What was
+  // added: (1) the MERGE of two blind-parallel lists goes to the model that wrote
+  // neither, and every input entry stays findable in the union — the merge is the
+  // one stage where a finding disappears silently, and the guide taught the
+  // blind-parallel half without it; (2) "a lesson counts as served once its
+  // enforcer is NAMED" — measured here at 29 of 107 lessons naming an
+  // unenforced remainder. Both are DECISIONS a reader must copy, not experience
+  // to read about, so neither belongs in the retrospective instead. Shortened
+  // first, twice: the four-eyes entry was rewritten tighter than before the
+  // addition (it also fell back inside the LINE budget, which is untouched), and
+  // the new entry was cut from 8 lines to 5. What remains is the two decisions
+  // themselves. The LINE ceiling moves with it, by the 7 lines those two entries
+  // occupy after that tightening — the per-entry ceiling (11) is untouched, so
+  // the guide's shape as a list of short tips is unchanged.
+  maxWords: 3680,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

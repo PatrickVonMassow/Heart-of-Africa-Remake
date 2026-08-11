@@ -247,12 +247,19 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Der Autor sieht seine eigene Annahme nicht — und wer eine fertige Liste prüft, hakt sie ab.**
   Wer baut, prüft gegen dieselbe Vorstellung, aus der der Fehler stammt; und wer eine fertige Liste
   prüft, nennt weit weniger als vor dem leeren Blatt — falsch, wenn der **übersehene** Punkt zählt.
-  → *Prompt:* „Etabliere einen Mechanismus, der vor dem Bau **Schwierigkeit × Kritikalität** schätzt und
-  bei Kritischem **ein anderes Modell** hinzuzieht. Beim **Finden** blind
-  parallel: gleiche Vorgabe, je ein vollständiges Ergebnis; vereinigt
-  **nach Bedeutung**, Einzelnennungen **markiert statt gestrichen**. Beim **Beurteilen** Gegenlesen,
-  aber **erst das Ergebnis, dann die Begründung**; zwei Läufe desselben Modells nur mit **anderer
-  Rolle**." *(Kosten ≈ 2x für den Fundschritt)*
+  → *Prompt:* „Schätze vor dem Bau **Schwierigkeit × Kritikalität** und zieh bei Kritischem **ein
+  anderes Modell** hinzu. Beim **Finden** blind parallel: gleiche Vorgabe, je ein vollständiges
+  Ergebnis, vereinigt **nach Bedeutung**, Einzelnennungen **markiert statt gestrichen**. Beim
+  **Beurteilen** Gegenlesen, aber **erst das Ergebnis, dann die Begründung**. Das **Vereinigen**
+  macht das Modell, das an **keiner** Liste mitschrieb, und jeder Eingang bleibt darin auffindbar
+  (nur A, nur B, verschmolzen mit X) — Verschmelzen verliert lautlos." *(≈ 2x für den Fundschritt,
+  das Vereinigen kostet wenige Prozent)*
+
+- **Die Lehre gilt als versorgt, sobald ihr Wächter benannt ist** — gebaut ist er damit nicht.
+  → *Prompt:* „Trenne **benannt** von **gebaut**: ‚gebaut' wird am Haken des genannten Punktes
+  geprüft, nicht der Prosa geglaubt, und ein Bericht nennt jede Lehre, deren Wächter seit Wochen
+  nur benannt ist. Kein Blocker auf die Lücke selbst — eine benannte Lücke ist mehr wert als eine
+  erfundene Deckung."
 
 - **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, ein zweiter Lauf, ein
   zweites Modell kosten ein Vielfaches — pauschal gefordert, zahlst du sie auch dort, wo sie
@@ -405,4 +412,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: a3f4fb724ee4d8033887ef78efd2d6b2390c035fa67751429f2973685faa74aa -->
+<!-- GUIDE-FINGERPRINT: 647c0823f89dd548538ba6ba675e02a3a6721f73952de669a417955ba31aab1a -->
