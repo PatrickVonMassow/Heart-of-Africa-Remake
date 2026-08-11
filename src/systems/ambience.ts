@@ -5,6 +5,7 @@
 
 import type { PlaceKind, RegionId } from '../world/geo'
 import { balance } from '../config/balance'
+import { devAssert } from './devAssert'
 import type { Tone } from '../communication/lexicon'
 import { phrasePlan, utterancePlan, type SpeechPlan } from '../communication/speaking'
 import type { DrumId, DrumMessagePlan } from '../communication/drumMessage'
@@ -849,11 +850,38 @@ export function playSpeech(plan: SpeechPlan): void {
   for (const s of plan.syllables) {
     speakSyllable(ac, dest, t0 + s.startOffset, s.tone, s.duration, Math.max(0.0001, s.peak))
   }
+  const peak = Math.max(...plan.syllables.map((s) => s.peak))
+  // THE RESULT-LEVEL ASSERTION (point 589, rule 1): sound is judged at the END
+  // of the chain — the level that actually LEAVES the graph — not at the level
+  // the plan asked for. Point 577's defect had an intact plan with a positive
+  // peak whose tone was multiplied by ZERO further down the bus, and every
+  // measurement that stopped at the plan reported it healthy. The one legitimate
+  // silence is the player's own speech slider at zero.
+  //
+  // The PLAN's peak is what is read, deliberately, not the 0.0001 floor the
+  // scheduling passes to the envelope: that floor exists because an exponential
+  // ramp cannot reach zero, and it is silence to the ear. A plan carrying
+  // syllables at peak 0 is therefore a defect and is reported as one —
+  // `phrasePlan` returns no syllables at all for an inaudible level.
+  //
+  // What it CANNOT see is the topology: whether the buses are still connected to
+  // the destination is not readable through the Web Audio API. That end is held
+  // by the live browser check, which listens to what the output really carries
+  // (`scripts/verify/settings.mjs`).
+  const chain = speechBus ? speechBus.gain.value * master.gain.value : master.gain.value
+  devAssert(
+    peak * chain > 0 || balance.communication.speechVolume <= 0,
+    'speech-inaudible',
+    () =>
+      `${plan.syllables.length} syllables leave the graph at ${(peak * chain).toExponential(2)} ` +
+      `(peak ${peak.toFixed(3)}, speech bus ${(speechBus?.gain.value ?? 1).toFixed(3)}, ` +
+      `master ${master?.gain.value.toFixed(3)}) while the speech volume is ${balance.communication.speechVolume}`,
+  )
   // Counted SEPARATELY from `spoken`, so the live gate proves audio was really
   // scheduled at a positive level — not merely that a counter moved.
   if (speechProbe) {
     speechProbe.syllables += plan.syllables.length
-    speechProbe.lastPeak = Math.max(...plan.syllables.map((s) => s.peak))
+    speechProbe.lastPeak = peak
   }
 }
 

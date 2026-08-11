@@ -162,6 +162,7 @@ const TAG_FIELDS: ReadonlyArray<{
   { key: 'trendLeave', label: 'tagTrendLeave', step: 0.02, min: 0 },
   { key: 'variation', label: 'tagVariation', step: 0.05, min: 0, max: 0.9 },
   { key: 'unstuckSeconds', label: 'tagUnstuck', step: 0.5, min: 0.1 },
+  { key: 'silenceSeconds', label: 'tagSilence', step: 5, min: 1 },
   { key: 'leanAtSprint', label: 'tagLean', step: 0.02, min: 0 },
   { key: 'turnRate', label: 'tagTurnRate', step: 0.2, min: 0.1 },
   { key: 'playRadius', label: 'tagPlayRadius', step: 1, min: 2 },
@@ -186,6 +187,7 @@ const CHILD_SPEECH_FIELDS: ReadonlyArray<{
   { key: 'actionPace', label: 'childSpeechPace', step: 0.1, min: 0.1 },
   { key: 'refusalChance', label: 'childSpeechRefusal', step: 0.05, min: 0, max: 1 },
   { key: 'replySeconds', label: 'childSpeechReply', step: 0.5, min: 0 },
+  { key: 'silenceSeconds', label: 'childSpeechSilence', step: 5, min: 1 },
 ]
 
 /**

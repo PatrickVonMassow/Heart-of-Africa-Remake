@@ -665,6 +665,9 @@ export interface BalanceConfig {
       variation: number
       /** Seconds without real movement before a child is nudged free. */
       unstuckSeconds: number
+      /** Dev-mode alarm: a group that could play and has produced neither a
+       *  catch nor a fresh round for this long raises `tag-silent`. */
+      silenceSeconds: number
       /** Forward lean (rad) at the full sprint. */
       leanAtSprint: number
       /** How fast the drawn body may turn, in rad/s. */
@@ -688,6 +691,9 @@ export interface BalanceConfig {
       refusalChance: number
       /** How long after a call a refusal still reads as its answer. */
       replySeconds: number
+      /** Dev-mode alarm: a group of children that could speak and has said
+       *  nothing for this long raises `child-speech-silent`. */
+      silenceSeconds: number
     }
     /** The adults' errands, which teach the five landscape and action concepts
      *  (work-order point 483). */
@@ -1139,6 +1145,11 @@ export const balance: BalanceConfig = {
       trendLeave: 0.12,
       variation: 0.2,
       unstuckSeconds: 1.5,
+      // The long-run alarm's window (point 589). The longest LEGITIMATE gap
+      // between two round events is a tenure that runs to the backstop plus the
+      // idle break after it (45 + 8 s); this sits well clear of it, so only a
+      // game that has genuinely stopped producing trips it.
+      silenceSeconds: 90,
       leanAtSprint: 0.28,
       // ~3.6 rad/s: a body turns a half circle in about a second — quick enough
       // for a chase to read as agile, slow enough that no figure snaps about-face.
@@ -1159,6 +1170,9 @@ export const balance: BalanceConfig = {
       actionPace: 1.6, // a brisk errand walk, well under the chase's trot
       refusalChance: 0.35,
       replySeconds: 5,
+      // The long-run alarm's window (point 589): well clear of the interval and
+      // its spread, so only a group that has genuinely stopped speaking trips it.
+      silenceSeconds: 60,
     },
     // The adults' errands (work-order point 483). Calibratable starting values
     // (educated guess, CLAUDE.md §2): slower than the children's chatter,

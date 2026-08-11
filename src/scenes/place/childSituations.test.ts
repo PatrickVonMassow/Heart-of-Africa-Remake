@@ -9,7 +9,7 @@
 // stepped forward in frames — because a catalogue that is correct and never
 // staged teaches nothing either.
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   AIM_HEIGHT,
   CHILD_CONCEPTS,
@@ -34,6 +34,7 @@ import {
 } from '../../communication/lexicon'
 import { GESTURE_KINDS } from '../../render/gesture'
 import { mulberry32 } from '../../world/noise'
+import { resetDevAsserts } from '../../systems/devAssert'
 
 const CFG: ChildSpeechConfig = balance.villageLife.childSpeech
 
@@ -493,5 +494,47 @@ describe('the action that follows is really carried out', () => {
     const v = view()
     const state = createChildSpeech(v.children.length, CFG)
     for (let i = 0; i < v.children.length; i++) expect(childSteer(state, v, i, CFG)).toBeNull()
+  })
+})
+
+/**
+ * THE LONG-RUN ALARM (point 589). The defect class it exists for is the one the
+ * suites structurally cannot reach: a scheduler that speaks for a while and then
+ * stops. It is judged on the utterance the player would have HEARD, so a
+ * cooldown that keeps ticking over a scheduler which stages nothing is caught.
+ */
+describe('the long-run alarm over what the children say', () => {
+  let spy: ReturnType<typeof vi.spyOn>
+  beforeEach(() => {
+    resetDevAsserts()
+    spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+  afterEach(() => spy.mockRestore())
+
+  const codes = () => spy.mock.calls.map((c) => String(c[0]))
+
+  it('says nothing through half an hour of a healthy group', () => {
+    run(1800)
+    expect(codes()).toEqual([])
+  })
+
+  it('FIRES when a group that could speak has said nothing for its window', () => {
+    // A scheduler that stages nothing while four children stand there —
+    // whatever the future cause; here the interval never comes round again.
+    const v = view()
+    const state = createChildSpeech(v.children.length, CFG)
+    const rand = mulberry32(3)
+    const frozen: ChildSpeechConfig = { ...CFG, intervalSeconds: 1e6 }
+    for (let t = 0; t < CFG.silenceSeconds + 10; t += 0.5) stepChildSpeech(state, v, 0.5, frozen, rand)
+    expect(codes().join(' ')).toContain('child-speech-silent')
+  })
+
+  it('nor with a single child, who has nobody to speak to', () => {
+    const v = view({ children: [{ x: GROUND.x, z: GROUND.z, heading: 0 }] })
+    const state = createChildSpeech(1, CFG)
+    const rand = mulberry32(3)
+    const frozen: ChildSpeechConfig = { ...CFG, intervalSeconds: 1e6 }
+    for (let t = 0; t < CFG.silenceSeconds * 3; t += 0.5) stepChildSpeech(state, v, 0.5, frozen, rand)
+    expect(codes()).toEqual([])
   })
 })
