@@ -3346,7 +3346,10 @@ if (section('children-motion')) {
   })
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
   // HIS seed: the settlement layout is derived from place + seed, so this is the
-  // village he was standing in and not merely one of the same people.
+  // village he was standing in and not merely one of the same people. Put back
+  // afterwards — every section after this one would otherwise be reading a world
+  // it did not ask for.
+  const bootSeed = await page.evaluate(() => window.__game.getState().seed)
   await page.evaluate(() => window.__game.setState({ seed: 2972259115 }))
   await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
   const live = await page
@@ -3446,11 +3449,16 @@ if (section('children-motion')) {
 
     // 2. NOTHING JITTERS. A shuffle on the spot is an ALTERNATION: the step taken
     // this frame undoes the last one. Real running does not reverse — the body
-    // turns at a bounded rate, so consecutive steps are near-parallel — and a
-    // reversal rate above a few per cent is the signature the user described.
+    // turns at a bounded rate, so consecutive steps are near-parallel. Measured
+    // here before the fix: 7.2 to 11.5 % of all steps. After it: under 1 %.
+    //
+    // The breakdown rides along in the detail because it is what NAMED the cause
+    // when this first went red: nearly every reversal carried the game's own
+    // travel heading with it, which ruled out the separation and the bodies and
+    // pointed at the steering — where it was.
     let reversals = 0
     let steps = 0
-    const diag = { tiny: 0, near: 0, pushed: 0, idle: 0, mag: 0, headingFlip: 0, offHeading: 0, detour: 0, perChild: Array(n).fill(0) }
+    const diag = { tiny: 0, near: 0, pushed: 0, idle: 0, mag: 0, headingFlip: 0, offHeading: 0, perChild: Array(n).fill(0) }
     for (let k = 0; k < n; k++) {
       for (let i = 2; i < log.length; i++) {
         const a = log[i - 2].c[k]
@@ -3494,11 +3502,12 @@ if (section('children-motion')) {
       `${reversals} reversals in ${steps} steps (${(rate * 100).toFixed(1)} %) — ` +
         `per child ${diag.perChild.join('/')}, mean back-step ${(diag.mag / Math.max(1, reversals) * 1000).toFixed(1)} mm, ` +
         `${diag.tiny} under 5 mm, ${diag.idle} at pace 0, ${diag.pushed} moved further than the chase walked, ${diag.near} beside a neighbour, ` +
-        `${diag.headingFlip} with the travel heading itself reversed, ${diag.offHeading} stepping off their heading, ${diag.detour} while holding a way out`,
+        `${diag.headingFlip} with the travel heading itself reversed, ${diag.offHeading} stepping off their heading`,
     )
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  await page.evaluate((seed) => window.__game.setState({ seed }), bootSeed)
 }
 
 // --- The adults' errands (work-order point 483) -------------------------------
