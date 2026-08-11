@@ -667,7 +667,12 @@ async function main(argv) {
       console.log('land-point: the cleanup refused these at the moment of deletion — they changed under it:')
       for (const line of refused) console.log(line)
     }
-    if (branchBlocked) console.log(`land-point: the branch ${branch} was NOT deleted — ${branchBlocked}`)
+    // `formatCleanupNotes` already speaks for the selection's own reason; this line
+    // covers the two the selection could not know about (a last-moment refusal, a
+    // removal that failed), so it is not printed twice for the same cause.
+    if (branchBlocked && branchBlocked !== cleanup.branch.reason) {
+      console.log(`land-point: the branch ${branch} was NOT deleted — ${branchBlocked}`)
+    }
     for (const line of formatCleanupNotes(cleanup)) console.log(line)
     if (problems.length) {
       // NOT a failure of the landing — the point IS on main, ticked and archived.

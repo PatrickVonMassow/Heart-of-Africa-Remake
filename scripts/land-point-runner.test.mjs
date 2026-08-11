@@ -24,7 +24,7 @@
 // `land-cleanup-core.mjs` assumes — the lock line, the dirtiness, and above all
 // WITHOUT its own look becoming the evidence (point 629).
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, it, expect } from 'vitest'
@@ -200,7 +200,13 @@ describe('the probe must not become its own evidence', () => {
     await new Promise((r) => setTimeout(r, 1100))
     writeFileSync(join(own, 'a.txt'), 'a\n')
 
-    const since = Date.now()
+    // `since` is taken from the FILESYSTEM, not from the clock: a file's mtime
+    // carries sub-millisecond precision while `Date.now()` truncates to whole
+    // milliseconds, so a wall-clock baseline can land BEFORE the write that
+    // precedes it and fail this case for a reason it is not testing. The index
+    // rewrite this case is actually about happens later still, during the first
+    // pass, so nothing about the discrimination is weakened.
+    const since = Math.max(Date.now(), statSync(join(own, 'a.txt')).mtimeMs)
     const trees = listWorktrees({ cwd: root })
     const probe = () => cleanupEvidence(trees, { branch: 'feat/608-x', mainRoot: root, mergeTarget: 'main', cwd: root })
     const first = probe()
