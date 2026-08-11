@@ -6042,3 +6042,30 @@ to land than a mechanism that needs a review.
   Criticality: medium — no player sees it, but it is the document the closing run and the
   release tag read as proof, and it currently misreports delivered work as unbuilt.
   Bundle: Dokumentation.
+
+- [ ] 646. THE REPO DOCTOR IS THE SECOND DOOR INTO THE SAME DISASTER (found 11.08.2026 by the
+  agent delivering point 629, and left to its own point rather than smuggled into that
+  scope). Point 629 closes the LANDING's path to deleting a live agent's worktree.
+  `scripts/batch-doctor.mjs`'s `remove-orphan-worktrees` reaches the same directories under
+  `.claude/worktrees/` by a different route. It is the narrower door — it only removes
+  directories git does NOT list, and it re-judges at execute time, so a REGISTERED live tree
+  is skipped twice — but the hole is an UNREGISTERED live tree, and
+  `scripts/batch-doctor-states.mjs` already names it in its own comment: "the registration is
+  the ONLY shield a live agent's tree has here — the idle window does not help, because a
+  directory's mtime never moves while the agent writes in its SUBdirectories." A
+  `git worktree prune` that drops a record while an agent is still working in that tree
+  produces exactly that state, and is a plausible path to the 11.08.2026 incident whose exact
+  code path point 629 could not reconstruct.
+  FINAL STATE: `remove-orphan-worktrees` proves liveness before it deletes, by the same
+  standard point 629 establishes for the landing — git's own worktree lock, uncommitted
+  content, and recent writes probed BELOW the directory rather than at it, with every
+  unknown answering "keep and report" instead of "delete". An unregistered tree that cannot
+  be proven dead is reported by name and left standing; the doctor says what it left and why,
+  so a genuine orphan is still cleared by an operator who can see it.
+  VERIFIABLE: Vitest over the pure selector — an unregistered but LIVE tree (locked, or
+  dirty, or written to below its root) is reported and NOT removed; an unregistered tree
+  provably dead by all three probes is removed; an unreadable probe answers keep, not delete;
+  plus the mtime case the existing comment names, where the root's own timestamp is stale
+  while a subdirectory is being written.
+  Criticality: high — same failure class as point 629 and the same cost: it destroys work
+  that is already done, and it fires while the pool is busiest. Bundle: Session- & Repo-Hygiene.
