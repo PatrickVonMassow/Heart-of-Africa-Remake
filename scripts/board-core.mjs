@@ -205,6 +205,9 @@ export function escapeCardTitle(text) {
  */
 const DASH = '[—–-]'
 
+/** Whatever stands inside a title span — bounded by its closing tag, not by `<`. */
+const TITLE_TEXT = '((?:(?!</span>)[\\s\\S])*)'
+
 /**
  * Lift every current-work card written BEFORE point 655 into the shape this
  * module now writes: the number out of the title and into the chip, the two
@@ -227,7 +230,10 @@ export function upgradeNowCards(html) {
     )
   }
   return out.replace(
-    new RegExp(`<details class="now"([^>]*)>(\\s*<summary>)<span class="t">(\\d+)\\s*${DASH}\\s*([^<]*)</span>`, 'g'),
+    new RegExp(
+      `<details class="now"([^>]*)>(\\s*<summary>)<span class="t">(\\d+)\\s*${DASH}\\s*${TITLE_TEXT}</span>`,
+      'g',
+    ),
     (_m, attrs, head, point, title) =>
       `<details class="now"${attrs}>${head}${numberChip(point)}<span class="t">${title.trim()}</span>`,
   )
@@ -251,7 +257,7 @@ export function dropStrayNowCards(html) {
   const dropped = []
   const out = String(html ?? '').replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card) => {
     const summary = (card.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
-    const title = (summary.match(/<span class="t">([^<]*)<\/span>/) ?? [])[1] ?? ''
+    const title = (summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? ''
     // A NUMBER, or the handover card's own title — nothing else is repairable:
     // a numbered card is reached by `title`/`queue`/`done`, and the handover
     // card by `none`. A marker alone does not save a card here either, or an
@@ -414,7 +420,7 @@ function spanHours(times) {
   return ((to - from + 1440) % 1440) / 60
 }
 
-const titleOf = (card) => (card.match(/<span class="t">([^<]*)<\/span>/) ?? [])[1] ?? ''
+const titleOf = (card) => (card.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? ''
 const metaOf = (card) => (card.match(/<span class="meta">([^<]*)<\/span>/) ?? [])[1] ?? ''
 /** The card's last status text, stamp span stripped — what a move carries over. */
 const statusOf = (card) => {
@@ -683,7 +689,7 @@ const stateCardPattern = (kind) =>
  */
 function isTrulyStateCard(card, kind) {
   const summary = (String(card).match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
-  const title = ((summary.match(/<span class="t">([^<]*)<\/span>/) ?? [])[1] ?? '').trim()
+  const title = ((summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? '').trim()
   const numbered = summaryPoint(summary).chip != null
   if (kind === 'idle') return title === NO_CURRENT_WORK_TITLE && !numbered
   // THE LEGACY TITLE ONLY COUNTS ON AN UNNUMBERED CARD (four-eyes review,
@@ -946,8 +952,8 @@ export function namesFollowOnWork(text) {
  */
 export function pointSubject(html, point) {
   const doc = String(html ?? '')
-  const chip = doc.match(new RegExp(`<span class="num">${point}</span><span class="t">([^<]*)</span>`))
-  const legacy = chip ? null : doc.match(new RegExp(`<span class="t">${point}\\s*${DASH}\\s*([^<]*)</span>`))
+  const chip = doc.match(new RegExp(`<span class="num">${point}</span><span class="t">${TITLE_TEXT}</span>`))
+  const legacy = chip ? null : doc.match(new RegExp(`<span class="t">${point}\\s*${DASH}\\s*${TITLE_TEXT}</span>`))
   const text = stripClosingStage((chip ?? legacy ?? [])[1])
   return text || null
 }
@@ -1173,11 +1179,12 @@ export function setCardTitle(html, point, title) {
   }
   const bare = escapeCardTitle(closingMarked ? closingCardTitle(stripPointPrefix(text, point)) : stripPointPrefix(text, point))
   const chipRe = new RegExp(
-    `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*<span class="t">)[^<]*(</span>)`,
+    `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*<span class="t">)` +
+      `(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
   if (chipRe.test(html)) return html.replace(chipRe, `$1${bare}$2`)
   const legacyRe = new RegExp(
-    `(<details class="now"[^>]*>\\s*<summary>\\s*)<span class="t">\\s*${point}\\s*${DASH}[^<]*(</span>)`,
+    `(<details class="now"[^>]*>\\s*<summary>\\s*)<span class="t">\\s*${point}\\s*${DASH}(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
   if (legacyRe.test(html)) return html.replace(legacyRe, `$1${numberChip(point)}<span class="t">${bare}$2`)
   // SCOPED TO THE QUEUE (four-eyes review, 12.08.2026): the archived cards carry
@@ -1185,7 +1192,9 @@ export function setCardTitle(html, point, title) {
   // point that had no card left in either live section — silently, since the
   // command reports success either way. The Erledigt section is history; a
   // retitle there is a hand edit's business, not this command's.
-  const queueRe = new RegExp(`(<summary><span class="num">${point}</span><span class="t">)[^<]*(</span>)`)
+  const queueRe = new RegExp(
+    `(<summary><span class="num">${point}</span><span class="t">)(?:(?!</span>)[\\s\\S])*(</span>)`,
+  )
   try {
     const { from, end } = sectionBounds(html, 'queue')
     const section = html.slice(from, end)

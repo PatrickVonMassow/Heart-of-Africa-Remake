@@ -557,6 +557,20 @@ describe('every current-work card names its point and its subject', () => {
     expect(codes(rewritten)).toEqual([])
   })
 
+  // A card the PRE-escaping writer left with a raw bracket in its title must
+  // still be migratable and retitleable — otherwise the escaping above fixes the
+  // future and strands the past (four-eyes 12.08.).
+  it('migrates and repairs a legacy title that carries a raw bracket', () => {
+    const raw =
+      '<details class="now">\n  <summary><span class="t">651 — A < B</span></summary>\n' +
+      '  <div class="body"><p>Text</p></div>\n</details>'
+    const lifted = upgradeNowCards(withNow(raw))
+    expect(lifted).toContain('<span class="num">651</span><span class="t">A < B</span>')
+    const repaired = setCardTitle(lifted, 651, 'A < B')
+    expect(repaired).toContain('<span class="t">A &lt; B</span>')
+    expect(codes(repaired)).toEqual([])
+  })
+
   // The Erledigt cards carry the queue card's markup exactly, so an unscoped
   // fallback retitled FINISHED work — silently (four-eyes 12.08.).
   it('does not retitle an archived card when no live card exists', () => {
