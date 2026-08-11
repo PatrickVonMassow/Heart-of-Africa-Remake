@@ -14,6 +14,7 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
+import { cropLuminance, shotReading } from './cropLuma.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -2610,18 +2611,19 @@ if (section('settlement-edge')) {
       return null
     })
 
-  /** Mean luminance of a crop centred on a ground point. */
+  /** Luminance of a crop centred on a ground point — the MEDIAN of its pixels,
+   *  not the mean (point 641). The band tones the whole crop, so the median
+   *  carries its effect exactly, while the §19.13 rain streaks that fall through
+   *  this crop cover a minority of it and cannot move the reading. Measured at
+   *  giza: a streak moved the mean +11.4 % and the median +0.68 %. The reasoning
+   *  and its fixtures live in cropLuma.mjs / cropLuma.test.mjs. */
   const groundLuma = async (buf, ndc, w, h) => {
     const view = page.viewportSize()
     const left = Math.round(((ndc.x + 1) / 2) * view.width - w / 2)
     const top = Math.round(((1 - ndc.y) / 2) * view.height - h / 2)
     if (left < 0 || top < 0 || left + w > view.width || top + h > view.height) return null
     const { data, info } = await sharp(buf).extract({ left, top, width: w, height: h }).raw().toBuffer({ resolveWithObject: true })
-    let sum = 0
-    for (let i = 0; i < info.width * info.height; i++) {
-      sum += 0.35 * data[i * info.channels] + 0.5 * data[i * info.channels + 1] + 0.15 * data[i * info.channels + 2]
-    }
-    return sum / (info.width * info.height)
+    return cropLuminance(data, info)
   }
 
   /** Aim the camera at a ground point ahead by bisecting the pitch on the
@@ -2710,23 +2712,30 @@ if (section('settlement-edge')) {
    *  the live proof that the calibratable strength lands without a reload. */
   const bandRatio = async (ndc) => {
     // Point 549: three frames were not the band arriving, they were three frames.
-    // Each shot now waits for the crop to STOP MOVING on the new strength and
-    // then averages three reads of it — the rains draw over the ground and TRAA
-    // jitters it, so a single frame samples that noise instead of measuring the
-    // band. The measured spread of `capetown (wet)` across five runs was 6.5
-    // luminance points on an unchanged scene, straddling its own 0.04 bar.
+    // Each shot waits for the crop to STOP MOVING on the new strength and then
+    // takes three reads of it — the rains draw over the ground and TRAA jitters
+    // it, so a single frame samples that noise instead of measuring the band.
+    // The measured spread of `capetown (wet)` across five runs was 6.5 luminance
+    // points on an unchanged scene, straddling its own 0.04 bar.
+    //
+    // Point 641: the three reads are combined by their MEDIAN, and they are
+    // spaced far enough apart to be different pictures. A rain streak lingers in
+    // the crop for up to ~0.7 s — measured — so reads two frames apart were the
+    // same streak three times; twelve frames apart they are not, and the median
+    // then drops the contaminated one outright instead of averaging a ninth of
+    // its value into the shot.
     const shot = async (strength) => {
       await page.evaluate((s) => { window.__balance.placeEdgeBand.strength = s }, strength)
       const first = await settledLuma(ndc, 0.2)
       if (first === null) return null
       const reads = [first]
       for (let i = 0; i < 2; i++) {
-        await settleFrames(2)
+        await settleFrames(12)
         const cur = await groundLuma(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
         if (cur === null) return null
         reads.push(cur)
       }
-      return reads.reduce((a, b) => a + b, 0) / reads.length
+      return shotReading(reads)
     }
     // ON, OFF, ON — and the two ONs averaged. In the rains the ground SOAKS
     // while the shots are taken (the §19.13 wet accumulation keeps darkening
@@ -2823,9 +2832,26 @@ if (section('settlement-edge')) {
   // Both were reading a wet state still on its way in. With the soak and the
   // light on it polled until they stop, four consecutive WebGL 2 runs reported
   // capetown inside ×0.946, ×0.944, ×0.944, ×0.946 (spread 0.002) and giza
-  // inside ×0.905, ×0.906, ×0.906. The outside half is steady but not yet
-  // perfectly still: giza read ×1.000, ×1.000, ×0.980 — inside the ±0.025 bar,
-  // and the one reading worth watching if this check ever rotates again.
+  // inside ×0.905, ×0.906, ×0.906.
+  //
+  // WHAT STILL ROTATED, AND WHY (point 641). The outside half kept moving —
+  // ×1.000, ×1.000, ×0.980, and on 11.08.2026 `giza (wet)` went red at ×0.963,
+  // in one of three full runs while the same section passed 3/3 in isolation.
+  // The wet state was not the cause and neither was load: the crop was sampled
+  // 284 times over 90 s at giza with the band strength fixed and the light
+  // constant, and its MEAN jumped from 102.5 to 114.0 — +11.4 % — about every
+  // 13 s. The saved frames name it: a §19.13 rain streak, bright and ~14 px
+  // wide, falling straight through the 150×46 crop. In one of the three shots a
+  // ratio takes, that is the whole red — a streak in an ON shot gives ×1.057
+  // (the reading on record, to three decimals), one in the OFF shot ×0.90, a
+  // partial hit the ×0.963. The reading is the crop's MEDIAN now and a shot is
+  // the median of its reads (cropLuma.mjs), which the streak cannot move.
+  // The geometry was measured and ruled out in the same pass: at giza the
+  // outside crop's near row sits at radius+2.7 m and the band reaches at most
+  // radius+2.4 m, the per-row ON/OFF profile reads 1.000 across every row of the
+  // crop, and the aim is reproducible to 16 digits between runs — clear, though
+  // by only 0.3 m, which is the number to look at first if the offsets or the
+  // band's width are ever recalibrated.
   const kinds = [
     { id: 'maasai-village', shoot: { name: '488-village-edge-band', label: 'the swept village ground giving way at the edge' } },
     { id: 'capetown', shoot: { name: '488-port-edge-band', label: 'the port ground giving way at the edge' } },
