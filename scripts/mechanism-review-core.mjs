@@ -73,6 +73,7 @@ export const NAMED_MECHANISM_FILES = Object.freeze([
   'scripts/command-classify-core.test.mjs',
   'scripts/blind-merge-core.mjs',
   'scripts/blind-merge-core.test.mjs',
+  'scripts/blind-merge-cli.test.mjs',
   'scripts/blind-merge.mjs',
 ])
 
@@ -164,6 +165,19 @@ export function sameModel(a, b) {
   return x.version === y.version
 }
 
+/** A model designation this project would recognise, for the fallback below. */
+const MODEL_NAMED = /\b(sol|gpt|fable|opus|claude|sonnet|haiku|gemini|grok|llama|mistral|qwen|deepseek)\b/i
+
+/**
+ * The RECEIPT that a union was counted: the summary line
+ * `scripts/blind-merge.mjs` prints when every input entry is accounted for.
+ * The shape is asserted against a real summaryLine() in blind-merge-core.test.mjs,
+ * so the two halves cannot drift apart — the regex lives HERE because this core
+ * must not import the accounting one (that one already imports this).
+ */
+export const ACCOUNTING_RECEIPT =
+  /\b\d+\s+A\s*\+\s*\d+\s+B entries\b[\s\S]*\bunion entries\b[\s\S]*\bevery input entry accounted for\b/i
+
 /**
  * May THIS model MERGE the two lists of a blind-parallel stage? (point 634)
  *
@@ -202,24 +216,48 @@ export function validateMerger({ mergedBy, authors = [], fallback = '' } = {}) {
   if (reason && !conflict) {
     errors.push(`a two-model fallback is recorded, but "${who}" authored neither list — no fallback was needed`)
   }
-  if (reason && reason.length < 8) {
-    errors.push('the two-model fallback needs a line saying which model was unavailable, not a word')
+  if (reason && !MODEL_NAMED.test(reason)) {
+    // A FALLBACK HAS TO NAME THE MODEL THAT WAS NOT THERE (four-eyes review of
+    // point 634). Any eight characters would otherwise buy an author the right
+    // to merge its own list — the escape hatch would be the rule. Nothing can
+    // verify the claim, but a claim that names a model is one someone can check
+    // against the session, and a vague one is refused where it is cheapest.
+    errors.push(
+      `the two-model fallback has to NAME the model that was unavailable ("${reason}" names none) — ` +
+        'it is the reason an author was allowed to merge, and an unnamed reason cannot be checked',
+    )
   }
   return { ok: errors.length === 0, errors, fallback: Boolean(conflict && reason) }
 }
 
 /**
- * The merge half of a RECORD: who folded the two lists, and does that model owe
- * the two-model fallback? Required under blind-parallel and meaningless under a
- * review, which judges one artefact and folds nothing.
+ * The merge half of a RECORD: who folded the two lists, on what count, and does
+ * that model owe the two-model fallback? Required under blind-parallel and
+ * meaningless under a review, which judges one artefact and folds nothing.
  *
- * The two list authors are the record's own two models: `model` reviewed, and
- * `authoredBy` wrote the commit — so the merger has to be neither.
+ * The list authors are the record's own models: `model` reviewed, and the commit
+ * trailers name who wrote it — EVERY Claude co-author (`authors`), not just the
+ * first, since a second one named there could otherwise merge its own list
+ * (four-eyes review of point 634). The merger has to be none of them.
+ *
+ * `accounting` is the receipt from `scripts/blind-merge.mjs`. Without it the
+ * identity rule would stand alone and a record could claim a merge nobody
+ * counted — the same review's second finding — so a blind-parallel record
+ * carries the line that says every input entry was accounted for.
  */
-export function validateMergedBy({ mode, mergedBy, mergeFallback, model, authoredBy } = {}) {
+export function validateMergedBy({
+  mode,
+  mergedBy,
+  mergeFallback,
+  accounting,
+  model,
+  authoredBy,
+  authors,
+} = {}) {
   const m = String(mode ?? '').trim()
   const who = String(mergedBy ?? '').trim()
   const reason = String(mergeFallback ?? '').trim()
+  const receipt = String(accounting ?? '').trim()
   if (m && m !== BLIND_PARALLEL) {
     const errors = []
     if (who || reason) {
@@ -228,19 +266,46 @@ export function validateMergedBy({ mode, mergedBy, mergeFallback, model, authore
           'into one union, and a review has no such fold.',
       )
     }
+    if (receipt) errors.push(`--accounting is meaningless under --mode ${m}: there is no union to count.`)
     return { ok: errors.length === 0, errors }
   }
   if (m !== BLIND_PARALLEL) return { ok: true, errors: [] }
-  const { ok, errors } = validateMerger({ mergedBy: who, authors: [model, authoredBy], fallback: reason })
-  return { ok, errors }
+  const wrote = (Array.isArray(authors) && authors.length ? authors : [authoredBy]).filter(Boolean)
+  const { errors } = validateMerger({ mergedBy: who, authors: [model, ...wrote], fallback: reason })
+  if (!receipt) {
+    errors.push(
+      '--accounting "<the summary line>": the union of a blind-parallel stage is COUNTED, not trusted. ' +
+        'Run `node scripts/blind-merge.mjs --a <A> --b <B> --union <U>` and record the line it prints.',
+    )
+  } else if (!ACCOUNTING_RECEIPT.test(receipt)) {
+    errors.push(
+      `--accounting: "${receipt}" is not the line blind-merge.mjs prints for a union that balances ` +
+        '("<n> A + <m> B entries → <k> union entries …: every input entry accounted for"). A merge that ' +
+        'leaves an entry unaccounted for is not recorded as one.',
+    )
+  }
+  return { ok: errors.length === 0, errors }
 }
 
 /** The first Claude co-author out of a `Co-Authored-By` trailer field. */
 export function modelFromTrailers(field) {
-  for (const part of String(field ?? '').split(/[;,]/)) {
-    if (/\bclaude\b/i.test(part)) return part.trim()
+  return modelsFromTrailers(field)[0] ?? ''
+}
+
+/**
+ * EVERY Claude co-author of a commit, not just the first.
+ *
+ * The single-author read is right for "who wrote this" — the gate compares one
+ * author against one reviewer — but wrong for the merge: a commit naming two
+ * models has two list authors, and taking only the first would let the second
+ * merge its own list (four-eyes review of point 634).
+ */
+export function modelsFromTrailers(field) {
+  const out = []
+  for (const part of String(field ?? '').split(/[;,\n]/)) {
+    if (/\bclaude\b/i.test(part) && part.trim()) out.push(part.trim())
   }
-  return ''
+  return out
 }
 
 // ---------------------------------------------------------------------------
@@ -274,6 +339,7 @@ export const FLAG_SPEC = Object.freeze({
   '--framing': true,
   '--merged-by': true,
   '--merge-fallback': true,
+  '--accounting': true,
   '--list': false,
 })
 
@@ -291,6 +357,7 @@ const VALUE_KEY = Object.freeze({
   '--framing': 'framing',
   '--merged-by': 'mergedBy',
   '--merge-fallback': 'mergeFallback',
+  '--accounting': 'accounting',
 })
 
 /** Levenshtein distance — small inputs only, so the simple two-row form. */
@@ -507,10 +574,12 @@ export function validateRecord({
   framing,
   mergedBy,
   mergeFallback,
+  accounting,
+  authors,
 } = {}) {
   const errors = []
   errors.push(...validateMode({ mode, framing }).errors)
-  errors.push(...validateMergedBy({ mode, mergedBy, mergeFallback, model, authoredBy }).errors)
+  errors.push(...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors }).errors)
   if (!/^[0-9a-f]{7,40}$/i.test(String(sha ?? '').trim())) {
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
   }
@@ -592,8 +661,19 @@ export function evaluateMechanismReview({
     const wellFormed = covering.filter(
       (r) => VERDICTS.includes(String(r.verdict)) && String(r.model ?? '').trim(),
     )
-    const selfReviews = wellFormed.filter((r) => sameModel(r.model, commit?.authorModel))
-    const valid = wellFormed.filter((r) => !sameModel(r.model, commit?.authorModel))
+    // A SELF-MERGE IS AS EMPTY AS A SELF-REVIEW, and the ledger is a tracked file
+    // anyone can hand-edit (four-eyes review of point 634): the recorder refuses
+    // a blind-parallel row whose merger wrote one of the lists, and the gate has
+    // to refuse the same row when it arrives some other way. Only a row that
+    // NAMES a merger is judged — the rows written before the flag existed carry
+    // none, and are read as unrecorded rather than as offenders.
+    const selfMerge = (r) =>
+      String(r.mode ?? '') === BLIND_PARALLEL &&
+      String(r.mergedBy ?? '').trim() &&
+      !String(r.mergeFallback ?? '').trim() &&
+      (sameModel(r.mergedBy, commit?.authorModel) || sameModel(r.mergedBy, r.model))
+    const selfReviews = wellFormed.filter((r) => sameModel(r.model, commit?.authorModel) || selfMerge(r))
+    const valid = wellFormed.filter((r) => !sameModel(r.model, commit?.authorModel) && !selfMerge(r))
 
     if (!valid.length) {
       findings.push({
@@ -636,12 +716,16 @@ export function formatMechanismReviewVerdict(verdict) {
       )
       continue
     }
+    const merged = (f.records ?? []).find((r) => String(r?.mergedBy ?? '').trim())
     lines.push(
       `  ✗ ${short(c.sha)} ${c.subject ?? ''}`,
       `      ${files}`,
-      f.kind === 'self-review'
-        ? `      the only review on record is by ${author}'s own model — a self-review is not a review`
-        : `      authored by ${author}; no review recorded`,
+      f.kind !== 'self-review'
+        ? `      authored by ${author}; no review recorded`
+        : merged
+          ? `      the record's union was merged by ${String(merged.mergedBy).trim()}, which wrote one of the ` +
+            'two lists — a self-merge is where a finding disappears'
+          : `      the only review on record is by ${author}'s own model — a self-review is not a review`,
     )
   }
   lines.push(

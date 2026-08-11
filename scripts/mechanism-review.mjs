@@ -43,6 +43,7 @@ import {
   formatArgErrors,
   KNOWN_FLAGS,
   modelFromTrailers,
+  modelsFromTrailers,
   MODES,
   parseArgs,
   validateRecord,
@@ -109,6 +110,7 @@ export function buildRecord({
   framing = '',
   mergedBy = '',
   mergeFallback = '',
+  accounting = '',
   now = Date.now(),
   resolve = resolveCommit,
 } = {}) {
@@ -119,7 +121,17 @@ export function buildRecord({
   if (!String(sha).trim()) {
     return {
       ok: false,
-      errors: validateRecord({ sha: '', model, verdict, evidence, mode, framing, mergedBy, mergeFallback }).errors,
+      errors: validateRecord({
+        sha: '',
+        model,
+        verdict,
+        evidence,
+        mode,
+        framing,
+        mergedBy,
+        mergeFallback,
+        accounting,
+      }).errors,
     }
   }
   const commit = resolve(sha)
@@ -129,10 +141,14 @@ export function buildRecord({
     verdict,
     evidence,
     authoredBy: commit.authoredBy,
+    // EVERY model named in the trailers, not only the first: two co-authors mean
+    // two list authors, and the merger has to be neither (four-eyes, point 634).
+    authors: commit.authors,
     mode,
     framing,
     mergedBy,
     mergeFallback,
+    accounting,
   })
   const errors = [...check.errors]
   // Optional, but never sloppy: a mistyped point number would record a review
@@ -164,6 +180,8 @@ export function buildRecord({
       // written before this flag carry none, and read as unrecorded.
       ...(String(mergedBy).trim() ? { mergedBy: String(mergedBy).trim() } : {}),
       ...(String(mergeFallback).trim() ? { mergeFallback: String(mergeFallback).trim() } : {}),
+      // The count itself, so the ledger holds the receipt and not only the claim.
+      ...(String(accounting).trim() ? { accounting: String(accounting).trim() } : {}),
       ...(wanted ? { point: Number(wanted) } : {}),
       at: now,
       atIso: new Date(now).toISOString(),
@@ -182,6 +200,7 @@ export function resolveCommit(sha) {
     sha: resolved || full,
     subject: subject ?? '',
     authoredBy: modelFromTrailers(trailers),
+    authors: modelsFromTrailers(trailers),
   }
 }
 
@@ -190,7 +209,8 @@ export const usage = () =>
   `usage: node scripts/mechanism-review.mjs --record <sha> --model <name> ` +
   `--verdict <${VERDICTS.join('|')}> --evidence "<one line>" \\\n` +
   `           --mode <${MODES.join('|')}> [--framing "<one line>"] [--point <N>]\n` +
-  `           --merged-by "<model>" [--merge-fallback "<why only two models>"]   (blind-parallel)\n` +
+  `           --merged-by "<model>" --accounting "<the blind-merge summary line>" \\\n` +
+  `           [--merge-fallback "<which model was unavailable>"]           (blind-parallel)\n` +
   `       node scripts/mechanism-review.mjs --list        (the recorded reviews)\n` +
   `\n--mode names which half of the four-eyes principle this verdict covers ` +
   `(CLAUDE.md §6):\n` +
@@ -201,8 +221,9 @@ export const usage = () =>
   `--framing records how a second blind run by the SAME model was decorrelated, and\n` +
   `       belongs to blind-parallel alone.\n` +
   `--merged-by names the model that folded the two lists into the union — the one that\n` +
-  `       wrote NEITHER of them, because a merge can lose a finding silently. Count the\n` +
-  `       union first: node scripts/blind-merge.mjs --a <A.json> --b <B.json> --union <U.json>\n` +
+  `       wrote NEITHER of them, because a merge can lose a finding silently — and\n` +
+  `--accounting carries the COUNT that says none did. Both come from:\n` +
+  `       node scripts/blind-merge.mjs --a <A> --b <B> --union <U> --merged-by "<model>"\n` +
   `\nWHO REVIEWS (CLAUDE.md §6): GPT-5.6 Sol at reasoning effort high; when Sol is\n` +
   `       unavailable, the first of Fable 5 / Opus 5 / Opus 4.8 that authored no part of\n` +
   `       the range. Run it — never a hand-typed codex line — with:\n` +
@@ -238,7 +259,8 @@ if (isMainModule(import.meta.url)) {
             // never as one of the two modes.
             `[${r.mode || 'mode not recorded'}]  ${r.atIso ?? ''}` +
             `\n      ${r.evidence ?? ''}${r.framing ? `\n      framing: ${r.framing}` : ''}` +
-            `${r.mergedBy ? `\n      union merged by: ${r.mergedBy}${r.mergeFallback ? ` (two-model fallback: ${r.mergeFallback})` : ''}` : ''}`,
+            `${r.mergedBy ? `\n      union merged by: ${r.mergedBy}${r.mergeFallback ? ` (two-model fallback: ${r.mergeFallback})` : ''}` : ''}` +
+            `${r.accounting ? `\n      accounting: ${r.accounting}` : ''}`,
         )
       }
       process.exit(0)

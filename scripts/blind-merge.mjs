@@ -88,11 +88,11 @@ export function parseArgs(argv = []) {
 export const usage = () =>
   'usage: node scripts/blind-merge.mjs --a <A.json> --b <B.json>            (what to decide)\n' +
   '       node scripts/blind-merge.mjs --a <A.json> --b <B.json> --union <U.json> \\\n' +
-  '           --merged-by "<model>" [--fallback "<why only two models>"]  (the count)\n' +
+  '           --merged-by "<model>" [--fallback "<which model was unavailable>"]  (the count)\n' +
   '\nThe merge of a blind-parallel stage goes to the model that wrote NEITHER list\n' +
-  '(CLAUDE.md §6). Record the result with:\n' +
-  '       node scripts/mechanism-review.mjs --record <sha> --model <name> --verdict <v> \\\n' +
-  '           --mode blind-parallel --merged-by "<model>" --evidence "<the summary line>"'
+  '(CLAUDE.md §6); --fallback records that only two models existed and NAMES the one\n' +
+  'that did not. A balanced run prints the mechanism-review.mjs command to record,\n' +
+  'including the --accounting line, which is the receipt that nothing was dropped.'
 
 if (isMainModule(import.meta.url)) {
   try {
@@ -136,19 +136,22 @@ if (isMainModule(import.meta.url)) {
         )
       }
       console.log(
-        '\nEvery other entry stands alone. Write the union as { "mergedBy": "<model>", "entries":\n' +
-          '[ { "id": "U1", "from": ["A1","B2"] } ] } — one entry per finding KEPT, `from` naming the\n' +
-          'input entries it stands for — and check it with --union.',
+        '\nThese pairs are a RANKING, not the merge: read BOTH lists in full and pair anything\n' +
+          'that means the same, whether it is listed above or not — the ranking only saves you\n' +
+          'the obvious ones. Write the union as { "mergedBy": "<model>", "entries": [ { "id":\n' +
+          '"U1", "from": ["A1","B2"], "defect": "what the merged finding is" } ] } — one entry\n' +
+          'per finding KEPT, `from` naming the input entries it stands for, and a `defect` line\n' +
+          'on every fold — then check it with --union.',
       )
       process.exit(0)
     }
 
     const rawU = readJson(pathU)
-    const merger = validateMerger({
-      mergedBy: mergedBy || (Array.isArray(rawU) ? '' : (rawU?.mergedBy ?? '')),
-      authors: [a.model, b.model],
-      fallback,
-    })
+    // The union may name its own merger; the flag wins, and whichever is used is
+    // the one validated AND the one printed below (four-eyes review: the printed
+    // record command used to echo an empty --merged-by for the union-only form).
+    const who = mergedBy || (Array.isArray(rawU) ? '' : (rawU?.mergedBy ?? ''))
+    const merger = validateMerger({ mergedBy: who, authors: [a.model, b.model], fallback })
     const result = accountUnion({ a, b, union: rawU })
     console.log(formatAccounting(result))
     if (!merger.ok) {
@@ -158,7 +161,12 @@ if (isMainModule(import.meta.url)) {
       console.log(`\nrecorded as a TWO-MODEL fallback: ${fallback}`)
     }
     if (!result.ok || !merger.ok) process.exit(1)
-    console.log(`\nrecord it: --mode blind-parallel --merged-by "${mergedBy}" --evidence "${summaryLine(result)}"`)
+    console.log(
+      `\nrecord it: node scripts/mechanism-review.mjs --record <sha> --model "<the second model>" \\\n` +
+        `    --verdict merge --mode blind-parallel --merged-by "${who}"` +
+        `${merger.fallback ? ` --merge-fallback "${fallback}"` : ''} \\\n` +
+        `    --accounting "${summaryLine(result)}" --evidence "<what the stage found>"`,
+    )
     process.exit(0)
   } catch (e) {
     console.error(`blind-merge failed: ${(e && e.message) || e}`)

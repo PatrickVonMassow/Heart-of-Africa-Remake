@@ -8,6 +8,7 @@
 // the model that wrote neither list) and the cheap shape that keeps it cheap
 // (identical pairs collapsed for free, only the candidates put to the merger).
 import { describe, it, expect } from 'vitest'
+import { ACCOUNTING_RECEIPT } from './mechanism-review-core.mjs'
 import {
   accountUnion,
   candidatePairs,
@@ -49,7 +50,8 @@ const goodUnion = {
   mergedBy: 'Fable 5',
   entries: [
     { id: 'U1', from: ['A1'] },
-    { id: 'U2', from: ['A2', 'B1'] },
+    // A FOLD says what the one finding is; a pass-through entry needs no line.
+    { id: 'U2', from: ['A2', 'B1'], defect: 'the affliction badge overlaps the date in the status bar' },
     { id: 'U3', from: ['A3'] },
     { id: 'U4', from: ['B2'] },
   ],
@@ -194,6 +196,26 @@ describe('the count — every input entry is accounted for', () => {
     expect(r.findings.find((f) => f.kind === 'double-counted').message).toMatch(/twice in union entry U1/)
   })
 
+  it('REFUSES A FOLD THAT SAYS NOTHING — the way to satisfy the count by cheating', () => {
+    // Counting alone would pass a union that folds every id into one content-free
+    // entry: every entry "accounted for" while the findings are gone.
+    const all = { entries: [{ id: 'U1', from: ['A1', 'A2', 'A3', 'B1', 'B2'] }] }
+    const r = accountUnion({ a: listA, b: listB, union: all })
+    expect(r.ok).toBe(false)
+    const f = r.findings.find((x) => x.kind === 'no-defect')
+    expect(f.union).toBe('U1')
+    expect(f.message).toMatch(/folds 5 entries/)
+  })
+
+  it('accepts the same fold once it says what the one finding is', () => {
+    const all = { entries: [{ id: 'U1', from: ['A1', 'A2', 'A3', 'B1', 'B2'], defect: 'one HUD layout defect' }] }
+    expect(accountUnion({ a: listA, b: listB, union: all }).ok).toBe(true)
+  })
+
+  it('asks no defect line of a pass-through entry, which has its source text', () => {
+    expect(accountUnion({ a: listA, b: listB, union: goodUnion }).findings).toEqual([])
+  })
+
   it('reports a union entry that stands for nothing', () => {
     const r = accountUnion({ a: listA, b: listB, union: { entries: [...goodUnion.entries, { id: 'U5', from: [] }] } })
     expect(r.findings.find((f) => f.kind === 'empty-from').union).toBe('U5')
@@ -229,7 +251,8 @@ describe('the count — every input entry is accounted for', () => {
       { id: 'A2', file: 'x.ts', defect: 'two' },
     ])
     const b = readList('B', [{ id: 'B1', file: 'x.ts', defect: 'three' }])
-    const r = accountUnion({ a, b, union: { entries: [{ id: 'U1', from: ['A1', 'A2', 'B1'] }] } })
+    const union = { entries: [{ id: 'U1', from: ['A1', 'A2', 'B1'], defect: 'the same defect, said three ways' }] }
+    const r = accountUnion({ a, b, union })
     expect(r.ok).toBe(true)
     expect(r.dispositions.find((d) => d.id === 'A1').disposition).toBe('merged with A2, B1')
     expect(r.counts.merged).toBe(3)
@@ -255,9 +278,19 @@ describe('who may merge', () => {
     const r = validateMerger({
       mergedBy: 'Opus 5',
       authors: ['Opus 5', 'Opus 5'],
-      fallback: 'no third model was reachable in this session',
+      fallback: 'GPT-5.6 Sol was unreachable and Fable 5 was not available in this session',
     })
     expect(r).toMatchObject({ ok: true, fallback: true })
+  })
+
+  it('refuses a fallback that names no model — otherwise it is a free pass', () => {
+    const r = validateMerger({
+      mergedBy: 'Opus 5',
+      authors: ['Opus 5'],
+      fallback: 'there was nobody else around today',
+    })
+    expect(r.ok).toBe(false)
+    expect(r.errors.join(' ')).toMatch(/NAME the model/i)
   })
 
   it('refuses a fallback claimed where none was needed', () => {
@@ -364,6 +397,16 @@ describe('the report', () => {
     expect(text).toContain('B2')
     expect(text).toMatch(/accounting error/i)
     expect(text).toMatch(/only A.*only B.*merged with/s)
+  })
+
+  it('THE RECORDER ACCEPTS EXACTLY THE LINE THIS PRINTS, and only when it balances', () => {
+    // The two halves live in different files and must not drift: the recorder's
+    // receipt pattern is asserted against a REAL summary line, not a copy of it.
+    const green = summaryLine(accountUnion({ a: listA, b: listB, union: goodUnion }))
+    expect(ACCOUNTING_RECEIPT.test(green)).toBe(true)
+    const red = summaryLine(accountUnion({ a: listA, b: listB, union: { entries: [{ id: 'U1', from: ['A1'] }] } }))
+    expect(ACCOUNTING_RECEIPT.test(red)).toBe(false)
+    expect(ACCOUNTING_RECEIPT.test('I merged the lists carefully')).toBe(false)
   })
 
   it('a green report is the summary line alone', () => {
