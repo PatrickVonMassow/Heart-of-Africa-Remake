@@ -310,7 +310,9 @@ draw pass and standing in the picture, and the hunt's own two figures,
 reach the raw candidate set (`scripts/verify/enrichments.mjs`), and
 every inhabitant figure the settlement draws carries its mark, is
 offered, and is still named where it now stands after it has walked
-(`scripts/verify/polish.mjs`).
+(`scripts/verify/polish.mjs`). The roster's usable objects are exercised
+too: a camp pitched where the traveller stands names itself under Ctrl
+(`scripts/verify/enrichments.mjs`).
 
 ## 10. Goal scaffolding.
 

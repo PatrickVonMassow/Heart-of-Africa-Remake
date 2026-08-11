@@ -8505,6 +8505,34 @@ if (section('ctrl-actor-labels')) {
       : 'no candidate hook',
   )
 
+  // The roster's USABLE OBJECTS, not only its animals (point 342's roster in
+  // point 600's states): a camp pitched where the traveller stands is one key
+  // away for the player, and it must name itself like anything that moves. The
+  // camp is taken back out before the frame, so the picture and every later
+  // section see the state they expect.
+  const camped = await page.evaluate(async () => {
+    const before = window.__game.getState().freeCamps
+    window.__game.getState().pitchOrOpenCamp()
+    window.__ui.getState().setDialog(null)
+    const seen = await new Promise((res) => {
+      let frames = 0
+      const step = () => {
+        const camp = (window.__actorLabels?.() ?? []).find((l) => l.kind === 'camp') ?? null
+        if (camp !== null || ++frames > 240) res(camp)
+        else requestAnimationFrame(step)
+      }
+      requestAnimationFrame(step)
+    })
+    const texts = [...document.querySelectorAll('.actor-label')].map((el) => el.textContent ?? '')
+    window.__game.setState({ freeCamps: before })
+    return { camp: seen, drawn: seen !== null && texts.includes(seen.text) }
+  })
+  check(
+    'a pitched camp names itself under Ctrl (points 342/600)',
+    camped.camp !== null && camped.drawn,
+    camped.camp ? `"${camped.camp.text}" drawn at the camp` : 'the pitched camp carried no Ctrl label',
+  )
+
   await shot('147-ctrl-actor-labels', {
     world: { lat: -2.6, lon: 35.2 },
     label: 'the savanna with the Ctrl labels over its animals',
