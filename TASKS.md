@@ -177,12 +177,6 @@ there exactly once; a new point joins a bundle when appended.
   is recorded; the survivor left last by a closing is never asked; descending appends are
   all asked; a torn or reasonless record silences nothing. Plus the guard test: the turn
   that appended a point blocks, and the recorded decision releases it.
-  VERIFIABLE: Vitest over the pure core — the render order of a fixture work order matches
-  the expected sequence with each rank rule in play; a point appended at the end is
-  reported unranked until it is recorded; a board whose sequence was hand-edited is
-  detected as out of place. Plus the real proof on live data: rendering today's board from
-  the work order reproduces the sequence the user asked for, with the play-session points
-  at the head.
   MECHANISM, so the four-eyes rule applies: the other model reviews the guard and the
   ranking gate before they land (`scripts/mechanism-review.mjs --record`).
   Criticality: HIGH — the board is the only thing the user sees while the batch runs, and a
