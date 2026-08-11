@@ -8,6 +8,11 @@
 // the SURVIVOR left standing last by a closing, and the DESCENDING appends that
 // slipped past a running-maximum walk (10.08.2026).
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { REPO_ROOT } from './repo-paths.mjs'
+import { openPointsOf } from './board-queue-core.mjs'
+import { readTasksOpen } from './tasks-source.mjs'
 import {
   RANK_RECORD_PATH,
   appendGateState,
@@ -228,5 +233,18 @@ describe('the rank record degrades, it never throws inside a guard', () => {
   })
   it('names the tracked record, so no caller invents a second path', () => {
     expect(RANK_RECORD_PATH).toBe('.claude/queue-rank.json')
+  })
+})
+
+describe('the LIVE record, which is what every checkout inherits', () => {
+  it('carries a readable, ARMED provenance baseline', () => {
+    // Armed and parseable is what a clone must inherit; WHETHER a point is
+    // currently outstanding is the Stop guard's question, not this layer's — a
+    // red unit test for an unanswered bookkeeping decision would stop CI for
+    // something no build broke.
+    const record = parseRankRecord(readFileSync(resolve(REPO_ROOT, RANK_RECORD_PATH), 'utf8'))
+    expect(record.torn).toBe(false)
+    expect(record.settled).not.toBeNull()
+    expect(appendGateState(openPointsOf(readTasksOpen()), record).state).not.toBe('unarmed')
   })
 })
