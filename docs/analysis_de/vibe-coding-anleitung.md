@@ -409,7 +409,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 > sie erzwingt. Bei Kritischem hol ein zweites Modell als Gegenprüfer. Frag nach, wenn das
 > Zielbild unklar ist — rate nicht."
 
-Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
-erste Zeile Code entsteht.
+Diese eine Nachricht setzt die vier Dinge auf, an denen alles andere hängt: eine Wahrheit,
+eine Arbeitsordnung, zwei Testschichten und die Gewohnheit, zu jeder Regel sofort den Check
+zu bauen. Sie ersetzt die Fallstricke oben NICHT — die stehen hier, weil wir sie mit
+laufendem Projekt bezahlt haben, und die teuersten kamen erst, als die Automatik selbst
+anfing zu entscheiden.
 
 <!-- GUIDE-FINGERPRINT: 647c0823f89dd548538ba6ba675e02a3a6721f73952de669a417955ba31aab1a -->
