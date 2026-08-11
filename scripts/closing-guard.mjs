@@ -22,7 +22,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { CLOSING_STEPS, STEP_IDS, evaluate, missingSteps, mayTickPoint } from './closing-guard-core.mjs'
+import { AFTER_CLEANUP_STEP_ID, CLOSING_STEPS, STEP_IDS, evaluate, isVersionTagCommand, missingSteps, mayTickPoint } from './closing-guard-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -46,6 +46,34 @@ function headSha() {
   } catch {
     return ''
   }
+}
+
+/**
+ * The commit times the ORDER check needs (point 631): the `regression-after-
+ * cleanup` evidence may name the commit its run covered instead of a date, and
+ * only git knows when that commit was made. Resolved HERE because the core
+ * reads nothing. Only a well-formed sha is ever handed to git, and every failure
+ * (unknown commit, no repository) simply leaves the entry out.
+ */
+function commitTimesFor(state) {
+  const out = {}
+  try {
+    const evidence = state && state.steps && state.steps[AFTER_CLEANUP_STEP_ID] && state.steps[AFTER_CLEANUP_STEP_ID].evidence
+    if (typeof evidence !== 'string') return out
+    for (const m of evidence.matchAll(/\b[0-9a-f]{7,40}\b/gi)) {
+      const sha = m[0].toLowerCase()
+      if (sha in out) continue
+      try {
+        const at = execSync(`git show -s --format=%cI ${sha}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+        if (at) out[sha] = at
+      } catch {
+        /* not a commit in this repository — the core falls back to the record time */
+      }
+    }
+  } catch {
+    /* a resolver failure must never block the guard */
+  }
+  return out
 }
 
 function readState() {
@@ -74,11 +102,15 @@ const flag = (name) => {
 
 if (argv.includes('--status')) {
   const head = headSha()
-  const missing = missingSteps(readState(), head)
+  const state = readState()
+  const missing = missingSteps(state, head, { commitTimes: commitTimesFor(state) })
   const done = CLOSING_STEPS.length - missing.length
   console.log(`Closing checklist for HEAD ${head.slice(0, 12)}: ${done}/${CLOSING_STEPS.length} done`)
-  const missingIds = new Set(missing.map((s) => s.id))
-  for (const s of CLOSING_STEPS) console.log(`  [${missingIds.has(s.id) ? ' ' : 'x'}] ${s.id} — ${s.title}`)
+  const notes = new Map(missing.map((s) => [s.id, s.note || '']))
+  for (const s of CLOSING_STEPS) {
+    console.log(`  [${notes.has(s.id) ? ' ' : 'x'}] ${s.id} — ${s.title}`)
+    if (notes.get(s.id)) console.log(`      RECORDED BUT OUT OF ORDER — ${notes.get(s.id)}`)
+  }
   if (missing.length === 0) console.log('ALL closing steps recorded — a version tag is permitted.')
   process.exit(0)
 }
@@ -104,10 +136,13 @@ if (argv.includes('--step')) {
   let state = readState()
   if (!state || typeof state !== 'object' || state.commit !== head) state = { commit: head, steps: {} }
   if (!state.steps || typeof state.steps !== 'object') state.steps = {}
-  state.steps[id] = { evidence: evidence.trim() }
+  // The record time is what the ORDER check reads (point 631): it dates every
+  // cleanup step, so the second regression can be judged against the youngest.
+  state.steps[id] = { evidence: evidence.trim(), at: new Date().toISOString() }
   writeState(state)
-  const missing = missingSteps(state, head)
+  const missing = missingSteps(state, head, { commitTimes: commitTimesFor(state) })
   console.log(`Recorded "${id}" for HEAD ${head.slice(0, 12)}. ${CLOSING_STEPS.length - missing.length}/${CLOSING_STEPS.length} done.`)
+  for (const s of missing) if (s.note) console.log(`"${s.id}" does NOT count — ${s.note}`)
   if (missing.length) console.log(`Still missing: ${missing.map((s) => s.id).join(', ')}`)
   else console.log('ALL closing steps recorded — a version tag is now permitted.')
   process.exit(0)
@@ -133,8 +168,15 @@ try {
   const command = toolInput && toolInput.command
   // The work order is read ONLY when the payload could carry a tick — every
   // other call (the overwhelming majority) costs no file read at all.
-  const tasksText = mayTickPoint(payload.tool_name, toolInput) ? readTasks() : ''
-  const decision = evaluate({ command, state: readState(), headSha: headSha(), toolName: payload.tool_name, toolInput, tasksText })
+  const mayTick = mayTickPoint(payload.tool_name, toolInput)
+  const tasksText = mayTick ? readTasks() : ''
+  const state = readState()
+  // Resolving a commit costs a git spawn, so it happens only for a call that
+  // can be a release act at all — the same two the core judges, asked exactly
+  // rather than by a cheaper guess that could drop the anchor and weaken the
+  // order check into the record-time fallback.
+  const couldBlock = mayTick || isVersionTagCommand(command)
+  const decision = evaluate({ command, state, headSha: headSha(), toolName: payload.tool_name, toolInput, tasksText, commitTimes: couldBlock ? commitTimesFor(state) : null })
   if (decision.block) {
     process.stdout.write(
       JSON.stringify({

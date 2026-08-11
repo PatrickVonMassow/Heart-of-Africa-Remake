@@ -34,6 +34,20 @@ export const CLOSING_STEPS = [
   { id: 'stale-doc', title: 'Stale-doc audit — design.md / CLAUDE.md / READMEs match the code' },
   { id: 'stale-comment', title: 'Stale-comment audit — comments match the code they describe' },
   { id: 'md-audit', title: '.md cruft audit — section numbers preserved, no orphaned/contradictory prose' },
+  {
+    id: 'cleanup-blind-parallel',
+    title:
+      'The legacy cleanup ran as a BLIND-PARALLEL four-eyes stage (CLAUDE.md §6) — both models ' +
+      'worked from the same inputs to their own complete result, neither seeing the other’s before ' +
+      'it was done; the union is deduplicated BY MEANING, marks what only one side found and drops ' +
+      'nothing for being unusual',
+  },
+  {
+    id: 'regression-after-cleanup',
+    title:
+      'Second full LARGE regression on BOTH backends, AFTER the last cleanup commit (evidence must ' +
+      'NAME that commit or its timestamp)',
+  },
   { id: 'impl-sections', title: 'Implementation sections current — peoples-1890 §8, climate-1890 §9' },
   { id: 'graphics-detail-doc', title: 'docs/graphics-detail-levels.md matches QUALITY_PRESETS' },
   { id: 'acceptance-criteria', title: '§7.1 acceptance criteria confirmed with evidence' },
@@ -357,35 +371,135 @@ export function tickClaim({ toolName, toolInput, tasksText } = {}) {
   }
 }
 
+// THE CLOSING IS A SEQUENCE, NOT A SET (user 11.08.2026, point 631).
+//
+// "Volle Regression, dann gründliches Vier-Augen-Cleanup von Altlasten im
+// kompletten Code und allen Dokumenten und dann nochmal eine volle Regression."
+// A checklist that only asks WHETHER each step happened is satisfied by a
+// cleanup performed AFTER the one green regression — and the tag then carries
+// changes nothing ever tested. So the second regression is its own step, and its
+// position is CHECKED: its evidence must name a commit or a timestamp that lies
+// after the youngest cleanup step, or the step does not count.
+
+/** The cleanup steps the second regression must come after. */
+export const CLEANUP_STEP_IDS = ['dead-code', 'stale-doc', 'stale-comment', 'md-audit', 'cleanup-blind-parallel']
+/** The step whose POSITION is checked, not merely its presence. */
+export const AFTER_CLEANUP_STEP_ID = 'regression-after-cleanup'
+
+/** An ISO-ish date or date-time anywhere in a text (`2026-08-11`, `2026-08-11T14:03:00Z`). */
+const TIMESTAMP_IN_TEXT = /\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?)?\b/
+/**
+ * A commit sha: 7-40 hex characters WITH at least one digit. The digit is what
+ * separates a sha from an English word that happens to be all-hex (`defaced`,
+ * `deadbeef`) — evidence is prose, and a word must not pass as an anchor.
+ */
+const SHA_IN_TEXT = /\b(?=[0-9a-f]{7,40}\b)[0-9a-f]*\d[0-9a-f]*\b/i
+
+/** Milliseconds of an ISO-ish string, or null. Total: anything unparseable → null. */
+function parseTime(value) {
+  if (typeof value !== 'string' || !value.trim()) return null
+  const t = Date.parse(value.trim())
+  return Number.isFinite(t) ? t : null
+}
+
+/**
+ * The anchor a `regression-after-cleanup` evidence names: the point in time the
+ * run can be pinned to. A named TIMESTAMP wins (it dates the run itself); a
+ * named COMMIT is resolved through `commitTimes` when the caller could look it
+ * up, and otherwise falls back to when the step was RECORDED — which is still
+ * an honest lower bound, since a step is recorded after it was done.
+ * Total: no anchor → null.
+ */
+export function evidenceAnchor(entry, commitTimes = null) {
+  if (!entry || typeof entry !== 'object') return null
+  const evidence = typeof entry.evidence === 'string' ? entry.evidence : ''
+  const stamp = TIMESTAMP_IN_TEXT.exec(evidence)
+  if (stamp) {
+    const time = parseTime(stamp[0])
+    if (time !== null) return { kind: 'timestamp', token: stamp[0], time }
+  }
+  const sha = SHA_IN_TEXT.exec(evidence)
+  if (sha) {
+    const known = commitTimes && typeof commitTimes === 'object' ? parseTime(commitTimes[sha[0].toLowerCase()]) : null
+    return { kind: 'commit', token: sha[0], time: known !== null ? known : parseTime(entry.at) }
+  }
+  return null
+}
+
+/**
+ * Why the recorded `regression-after-cleanup` does NOT count, or '' when it
+ * does. Total by contract: anything unreadable → '' (fail-open — a guard bug
+ * must not trap a release either).
+ */
+export function afterCleanupProblem(steps, commitTimes = null) {
+  try {
+    const table = steps && typeof steps === 'object' ? steps : {}
+    const entry = table[AFTER_CLEANUP_STEP_ID]
+    if (!entry || typeof entry !== 'object') return ''
+    const anchor = evidenceAnchor(entry, commitTimes)
+    if (!anchor) {
+      return `its evidence names neither a commit nor a timestamp, so nothing proves it ran AFTER the cleanup — record it as e.g. --evidence "LARGE green on <sha> (2026-08-11), both backends"`
+    }
+    let youngest = null
+    for (const id of CLEANUP_STEP_IDS) {
+      const cleanup = table[id]
+      if (!cleanup || typeof cleanup !== 'object') continue
+      const at = parseTime(cleanup.at)
+      if (at !== null && (youngest === null || at > youngest.at)) youngest = { id, at }
+    }
+    if (!youngest || anchor.time === null) return ''
+    if (anchor.time > youngest.at) return ''
+    return `it is anchored to ${anchor.token}, which is NOT after the youngest cleanup step (${youngest.id}, recorded ${new Date(youngest.at).toISOString()}) — a regression run before the cleanup does not test it`
+  } catch {
+    return ''
+  }
+}
+
 /**
  * Which closing steps are NOT satisfied for `headSha`, given the recorded state.
  * A step is satisfied ONLY when the state is FOR this exact commit and the step
  * has an entry (with evidence). A state recorded for a different commit counts
  * for NOTHING — a closing is per-commit, so re-tagging a new commit needs a
- * fresh closing. Total: bad input → ALL steps missing (safest: blocks).
+ * fresh closing. `regression-after-cleanup` must additionally stand AFTER the
+ * cleanup (point 631); when it does not, it is reported missing WITH the reason
+ * in `note`. `commitTimes` (sha → ISO string) is what the caller resolved for
+ * the shas the evidence names — the core reads no git.
+ * Total: bad input → ALL steps missing (safest: blocks).
  */
-export function missingSteps(state, headSha) {
+export function missingSteps(state, headSha, { commitTimes = null } = {}) {
   const done = new Set()
-  if (state && typeof state === 'object' && typeof headSha === 'string' && headSha && state.commit === headSha) {
-    const steps = state.steps && typeof state.steps === 'object' ? state.steps : {}
-    for (const id of Object.keys(steps)) {
-      const e = steps[id]
-      // A step counts only with a non-empty evidence string — no blank ticks.
-      if (STEP_IDS.has(id) && e && typeof e === 'object' && typeof e.evidence === 'string' && e.evidence.trim()) {
-        done.add(id)
+  let note = ''
+  try {
+    let steps = {}
+    if (state && typeof state === 'object' && typeof headSha === 'string' && headSha && state.commit === headSha) {
+      steps = state.steps && typeof state.steps === 'object' ? state.steps : {}
+      for (const id of Object.keys(steps)) {
+        const e = steps[id]
+        // A step counts only with a non-empty evidence string — no blank ticks.
+        if (STEP_IDS.has(id) && e && typeof e === 'object' && typeof e.evidence === 'string' && e.evidence.trim()) {
+          done.add(id)
+        }
       }
     }
+    if (done.has(AFTER_CLEANUP_STEP_ID)) {
+      note = afterCleanupProblem(steps, commitTimes)
+      if (note) done.delete(AFTER_CLEANUP_STEP_ID)
+    }
+  } catch {
+    done.clear() // unreadable state → nothing counts, which is the safe direction here
+    note = ''
   }
-  return CLOSING_STEPS.filter((s) => !done.has(s.id))
+  return CLOSING_STEPS.filter((s) => !done.has(s.id)).map((s) => (s.id === AFTER_CLEANUP_STEP_ID && note ? { ...s, note } : s))
 }
 
 /** The shared tail of every block reason: what is missing and how to record it. */
 function remedy(missing, retry) {
-  const list = missing.map((s) => `  - ${s.id}: ${s.title}`).join('\n')
+  const list = missing.map((s) => `  - ${s.id}: ${s.title}${s.note ? `\n      RECORDED BUT OUT OF ORDER — ${s.note}` : ''}`).join('\n')
   return (
-    `A closing runs the FULL cycle (§7.2 / Maximum-QA Phase 8), not just the LARGE ` +
-    `regression — the dead-code/stale-doc/stale-comment cleanup and the .md audit are ` +
-    `what distinguish a closing from a regression (the v0.2 miss).\nMissing:\n${list}\n` +
+    `A closing runs the FULL cycle (§7.2 / Maximum-QA Phase 8) IN ORDER: LARGE regression, ` +
+    `then the blind-parallel cleanup of code AND documents, then a SECOND LARGE regression ` +
+    `after the last cleanup commit — the cleanup is what distinguishes a closing from a ` +
+    `regression (the v0.2 miss), and the second regression is what tests it.\nMissing:\n${list}\n` +
     `Do each step, record it with evidence:\n` +
     `  node scripts/closing-guard.mjs --step <id> --evidence "<what you did / the proof>"\n` +
     `${retry} Inspect anytime: node scripts/closing-guard.mjs --status`
@@ -402,12 +516,12 @@ function remedy(missing, retry) {
  * error is the wrapper's to swallow — this function never throws on partial
  * input (returns {block:false} on anything it cannot evaluate).
  */
-export function evaluate({ command, state, headSha, toolName, toolInput, tasksText } = {}) {
+export function evaluate({ command, state, headSha, toolName, toolInput, tasksText, commitTimes } = {}) {
   try {
     const tagAct = isVersionTagCommand(command)
     const tickedPoints = tagAct ? [] : closingTickClaim({ toolName, toolInput, tasksText })
     if (!tagAct && tickedPoints.length === 0) return { block: false, reason: '' }
-    const missing = missingSteps(state, headSha)
+    const missing = missingSteps(state, headSha, { commitTimes })
     if (missing.length === 0) return { block: false, reason: '' }
     const forCommit = headSha ? ` for commit ${String(headSha).slice(0, 12)}` : ''
     if (tagAct) {

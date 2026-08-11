@@ -21,7 +21,19 @@ let head
 const git = (args) => spawnSync('git', args, { windowsHide: true, cwd: repo, encoding: 'utf8' })
 const statePath = () => resolve(repo, '.claude', 'closing-state.json')
 const writeState = (state) => writeFileSync(statePath(), JSON.stringify(state, null, 2))
-const completeState = (commit) => ({ commit, steps: Object.fromEntries(CLOSING_STEPS.map((s) => [s.id, { evidence: `did ${s.id}` }])) })
+// A COMPLETE closing is also an ORDERED one (point 631): every cleanup step is
+// dated, and the second regression names a run that came after them.
+const completeState = (commit) => ({
+  commit,
+  steps: Object.fromEntries(
+    CLOSING_STEPS.map((s) => [
+      s.id,
+      s.id === 'regression-after-cleanup'
+        ? { evidence: 'LARGE green, both backends, 2026-08-11T12:00:00Z', at: '2026-08-11T12:05:00.000Z' }
+        : { evidence: `did ${s.id}`, at: '2026-08-11T10:00:00.000Z' },
+    ]),
+  ),
+})
 
 /** The work order the tick tests act on: one closing point, one ordinary point. */
 const TASKS = [
@@ -146,6 +158,39 @@ describe('closing-guard (spawned)', () => {
     }
   })
 
+  it('keeps the tag shut when the second regression predates the cleanup, and opens it when it does not', () => {
+    // The order check runs in the SPAWNED guard, on the state file it reads
+    // itself — the sequence point 631 anchors, proven end to end.
+    const stale = completeState(head)
+    stale.steps['regression-after-cleanup'] = { evidence: 'LARGE green, both backends, 2026-08-11T09:00:00Z', at: '2026-08-11T09:05:00.000Z' }
+    writeState(stale)
+    const reason = reasonOf(callGuard('Bash', { command: 'git tag -a v0.3 -m x' }))
+    expect(reason).toContain('regression-after-cleanup')
+    expect(reason).toContain('RECORDED BUT OUT OF ORDER')
+
+    writeState(completeState(head))
+    expect(callGuard('Bash', { command: 'git tag -a v0.3 -m x' }).stdout.trim()).toBe('')
+  })
+
+  it('fails OPEN on a structurally hostile state file rather than trapping the session', () => {
+    // Types nobody writes on purpose: a step that is a string, an `at` that is a
+    // number, a steps table that is an array. An internal error here must exit 0
+    // and allow every ordinary call — the guard's own bug may never stop work.
+    writeState({ commit: head, steps: { 'regression-after-cleanup': 'not an object', 'dead-code': { evidence: 1, at: {} } } })
+    for (const call of [
+      ['Bash', { command: 'git push origin main' }],
+      ['Edit', { file_path: resolve(repo, 'TASKS.md'), new_string: '- [ ] 500. a new point' }],
+    ]) {
+      const r = callGuard(call[0], call[1])
+      expect(r.status, r.stderr).toBe(0)
+      expect(r.stdout.trim()).toBe('')
+    }
+    writeState({ commit: head, steps: [] })
+    const tag = callGuard('Bash', { command: 'git tag v0.3' })
+    expect(tag.status, tag.stderr).toBe(0) // nothing recorded → still denies the TAG, but never crashes
+    expect(reasonOf(tag)).toContain('CLOSING INCOMPLETE')
+  })
+
   it('drives the checklist from the CLI: --status, --step and --reset', () => {
     const run = (...args) => spawnSync(process.execPath, [resolve(repo, 'scripts', 'closing-guard.mjs'), ...args], { windowsHide: true, cwd: repo, encoding: 'utf8' })
     writeState({ commit: head, steps: {} })
@@ -156,5 +201,12 @@ describe('closing-guard (spawned)', () => {
     expect(run('--status').stdout).toContain('[x] dead-code')
     expect(run('--reset').status).toBe(0)
     expect(run('--status').stdout).toContain(`0/${CLOSING_STEPS.length} done`)
+
+    // The second regression is recorded like any step, but an evidence that
+    // pins it to nothing does not count — and says so at the moment of writing.
+    expect(run('--step', 'regression-after-cleanup', '--evidence', 'ran it again').stdout).toContain('does NOT count')
+    expect(run('--status').stdout).toContain('neither a commit nor a timestamp')
+    expect(run('--step', 'regression-after-cleanup', '--evidence', 'LARGE green 2026-08-11T12:00:00Z, both backends').stdout).toContain(`1/${CLOSING_STEPS.length}`)
+    expect(run('--status').stdout).toContain('[x] regression-after-cleanup')
   })
 })

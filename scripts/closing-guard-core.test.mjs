@@ -4,8 +4,12 @@
 // fail-open depends on the core never throwing).
 import { describe, it, expect } from 'vitest'
 import {
+  AFTER_CLEANUP_STEP_ID,
+  CLEANUP_STEP_IDS,
   CLOSING_STEPS,
   STEP_IDS,
+  afterCleanupProblem,
+  evidenceAnchor,
   isVersionTagCommand,
   isWorkOrderPath,
   closingPointNumbers,
@@ -19,10 +23,22 @@ import {
 } from './closing-guard-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 
+// The two times the ORDER check is judged against (point 631): every cleanup
+// step is recorded at CLEANUP_AT, the second regression names a commit and a
+// date AFTER it — a plain "did it" evidence no longer counts for that step.
+const CLEANUP_AT = '2026-08-11T10:00:00.000Z'
+const AFTER_CLEANUP_AT = '2026-08-11T12:00:00.000Z'
+const AFTER_CLEANUP_EVIDENCE = 'LARGE green on 9f3c1a2, both backends, 2026-08-11T12:00:00Z'
+
 /** A closing-state with the given step ids marked done (with evidence) for `commit`. */
 function stateWith(commit, ids) {
   const steps = {}
-  for (const id of ids) steps[id] = { evidence: `did ${id}` }
+  for (const id of ids) {
+    steps[id] =
+      id === AFTER_CLEANUP_STEP_ID
+        ? { evidence: AFTER_CLEANUP_EVIDENCE, at: AFTER_CLEANUP_AT }
+        : { evidence: `did ${id}`, at: CLEANUP_AT }
+  }
   return { commit, steps }
 }
 const ALL_IDS = CLOSING_STEPS.map((s) => s.id)
@@ -217,6 +233,120 @@ describe('missingSteps — per-commit accounting', () => {
     expect(() => missingSteps('garbage', HEAD)).not.toThrow()
     expect(() => missingSteps({ commit: HEAD, steps: 'x' }, HEAD)).not.toThrow()
     expect(missingSteps({ commit: HEAD, steps: null }, null).length).toBe(CLOSING_STEPS.length)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE CLOSING IS A SEQUENCE (point 631). A checklist that only asks WHETHER a
+// step happened is satisfied by a cleanup performed AFTER the one green
+// regression, and the tag then carries changes nothing ever tested. So the
+// second regression is its own step and its POSITION is checked.
+describe('the second regression must stand AFTER the cleanup', () => {
+  const withRegression = (evidence, at, cleanupAt = CLEANUP_AT) => ({
+    commit: HEAD,
+    steps: {
+      ...Object.fromEntries(CLEANUP_STEP_IDS.map((id) => [id, { evidence: `did ${id}`, at: cleanupAt }])),
+      [AFTER_CLEANUP_STEP_ID]: { evidence, at },
+    },
+  })
+
+  it('carries both new steps in the canonical checklist', () => {
+    expect(STEP_IDS.has('cleanup-blind-parallel')).toBe(true)
+    expect(STEP_IDS.has(AFTER_CLEANUP_STEP_ID)).toBe(true)
+    // the blind-parallel cleanup is one of the steps the second regression follows
+    expect(CLEANUP_STEP_IDS).toContain('cleanup-blind-parallel')
+    // and the checklist READS as the sequence: first regression, cleanup, second regression
+    const order = CLOSING_STEPS.map((s) => s.id)
+    expect(order.indexOf('large-regression')).toBeLessThan(order.indexOf('cleanup-blind-parallel'))
+    expect(order.indexOf('cleanup-blind-parallel')).toBeLessThan(order.indexOf(AFTER_CLEANUP_STEP_ID))
+  })
+
+  it('REJECTS a regression recorded BEFORE the youngest cleanup step, naming why', () => {
+    const state = withRegression('LARGE green, both backends, 2026-08-11T08:00:00Z', '2026-08-11T08:05:00.000Z')
+    const missing = missingSteps(state, HEAD)
+    const entry = missing.find((s) => s.id === AFTER_CLEANUP_STEP_ID)
+    expect(entry, 'the out-of-order step must count as missing').toBeTruthy()
+    expect(entry.note).toMatch(/NOT after the youngest cleanup step/)
+    expect(entry.note).toMatch(/2026-08-11T08:00:00Z/)
+  })
+
+  it('ACCEPTS a regression whose evidence names a timestamp after the cleanup', () => {
+    const state = withRegression('LARGE green, both backends, 2026-08-11T12:30:00Z', AFTER_CLEANUP_AT)
+    expect(missingSteps(state, HEAD).map((s) => s.id)).not.toContain(AFTER_CLEANUP_STEP_ID)
+  })
+
+  it('reads a NAMED COMMIT through the times the caller resolved, in both directions', () => {
+    const state = withRegression('LARGE green on 9f3c1a2, both backends', AFTER_CLEANUP_AT)
+    // git says that commit predates the cleanup → the run cannot have tested it
+    const stale = missingSteps(state, HEAD, { commitTimes: { '9f3c1a2': '2026-08-11T09:00:00Z' } })
+    expect(stale.find((s) => s.id === AFTER_CLEANUP_STEP_ID).note).toMatch(/9f3c1a2/)
+    // a commit made after the cleanup counts
+    const fresh = missingSteps(state, HEAD, { commitTimes: { '9f3c1a2': '2026-08-11T11:30:00Z' } })
+    expect(fresh.map((s) => s.id)).not.toContain(AFTER_CLEANUP_STEP_ID)
+    // and with no resolution at all the RECORD time stands in — an honest lower bound
+    expect(missingSteps(state, HEAD).map((s) => s.id)).not.toContain(AFTER_CLEANUP_STEP_ID)
+  })
+
+  it('REJECTS an evidence that names neither a commit nor a timestamp', () => {
+    const state = withRegression('ran the large regression again', AFTER_CLEANUP_AT)
+    const entry = missingSteps(state, HEAD).find((s) => s.id === AFTER_CLEANUP_STEP_ID)
+    expect(entry.note).toMatch(/neither a commit nor a timestamp/)
+  })
+
+  it('does not read an all-hex English word as a commit', () => {
+    // "defaced" is seven hex characters and no sha — an anchor must carry a digit.
+    expect(evidenceAnchor({ evidence: 'the defaced fixture was removed' })).toBe(null)
+    expect(evidenceAnchor({ evidence: 'green on 9f3c1a2' }).kind).toBe('commit')
+    expect(evidenceAnchor({ evidence: 'green on 2026-08-11' }).kind).toBe('timestamp')
+  })
+
+  it('BLOCKS the tag while the blind-parallel cleanup is unrecorded', () => {
+    const withoutBlind = stateWith(
+      HEAD,
+      CLOSING_STEPS.map((s) => s.id).filter((id) => id !== 'cleanup-blind-parallel'),
+    )
+    const r = evaluate({ command: 'git tag -a v0.3 -m "demo"', state: withoutBlind, headSha: HEAD })
+    expect(r.block).toBe(true)
+    expect(r.reason).toMatch(/cleanup-blind-parallel/)
+    expect(r.reason).toMatch(/BLIND-PARALLEL/)
+  })
+
+  it('BLOCKS the tag on an out-of-order second regression, and allows it once put right', () => {
+    const stale = stateWith(HEAD, ALL_IDS)
+    stale.steps[AFTER_CLEANUP_STEP_ID] = { evidence: 'LARGE green 2026-08-11T09:00:00Z', at: '2026-08-11T09:05:00.000Z' }
+    const blocked = evaluate({ command: 'git push origin v0.3', state: stale, headSha: HEAD })
+    expect(blocked.block).toBe(true)
+    expect(blocked.reason).toMatch(/RECORDED BUT OUT OF ORDER/)
+    expect(evaluate({ command: 'git push origin v0.3', state: stateWith(HEAD, ALL_IDS), headSha: HEAD }).block).toBe(false)
+  })
+
+  it('is TOTAL on its own internal error — the wrapper fails OPEN only if the core never throws', () => {
+    // a state whose step table throws on every access: the order check must not
+    // escape as an exception, and evaluate must decide ALLOW
+    const explosive = {
+      commit: HEAD,
+      steps: new Proxy(
+        {},
+        {
+          get() {
+            throw new Error('boom')
+          },
+          ownKeys() {
+            throw new Error('boom')
+          },
+        },
+      ),
+    }
+    expect(() => missingSteps(explosive, HEAD)).not.toThrow()
+    expect(evaluate({ command: 'git tag v0.3', state: explosive, headSha: HEAD }).block).toBe(true) // nothing recorded → the safe direction
+    expect(() => afterCleanupProblem(explosive.steps)).not.toThrow()
+    expect(afterCleanupProblem(explosive.steps)).toBe('')
+    // and the plain totality of the new helpers
+    for (const junk of [null, undefined, 42, 'x', [], {}]) {
+      expect(() => afterCleanupProblem(junk)).not.toThrow()
+      expect(() => evidenceAnchor(junk)).not.toThrow()
+      expect(() => missingSteps({ commit: HEAD, steps: { [AFTER_CLEANUP_STEP_ID]: junk } }, HEAD)).not.toThrow()
+    }
   })
 })
 
