@@ -10,7 +10,7 @@
 // checkout without touching it.
 import { describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { appendRecord, buildRecord, KNOWN_FLAGS, readRecords, usage } from './mechanism-review.mjs'
@@ -174,7 +174,9 @@ describe('the mode round-trips into the ledger', () => {
   /** A blind-parallel record also names the third model that folded the two
    *  lists AND carries the count of that union (point 634); a review has neither. */
   const ACCOUNTED =
-    '4 A + 3 B entries → 5 union entries (2 merged, 2 only A, 1 only B): every input entry accounted for'
+    // The numbers ADD UP — the receipt is checked, not just shaped: 4 + 3 inputs,
+    // each one merged or standing alone, 2 folds plus 3 singles = 5 union entries.
+    '4 A + 3 B entries → 5 union entries (4 merged, 2 only A, 1 only B): every input entry accounted for'
   const merged = { mergedBy: 'GPT-5.6 Sol', accounting: ACCOUNTED }
   const forMode = (mode) => (mode === 'blind-parallel' ? { mode, ...merged } : { mode })
 
@@ -229,6 +231,60 @@ describe('the mode round-trips into the ledger', () => {
     const own = build({ mode: 'blind-parallel', ...merged, mergedBy: 'Opus 5' })
     expect(own.ok).toBe(false)
     expect(own.errors.join('\n')).toMatch(/may not merge them/i)
+  })
+
+  it('COUNTS the union itself when handed the files, instead of believing a line', () => {
+    // A typed receipt is a claim; given the three files the recorder measures it
+    // (four-eyes review, third round).
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-union-'))
+    try {
+      const w = (name, value) => {
+        const path = join(dir, name)
+        writeFileSync(path, typeof value === 'string' ? value : JSON.stringify(value))
+        return path
+      }
+      const listA = w('A.json', {
+        model: 'Opus 5',
+        entries: [
+          { id: 'A1', file: 'x.ts', defect: 'the first defect' },
+          { id: 'A2', file: 'y.ts', defect: 'the second defect' },
+        ],
+      })
+      const listB = w('B.json', { model: 'GPT-5.6 Sol', entries: [{ id: 'B1', file: 'y.ts', defect: 'the second' }] })
+      const union = w('U.json', {
+        entries: [
+          { id: 'U1', from: ['A1'] },
+          { id: 'U2', from: ['A2', 'B1'], defect: 'the second defect, both said it' },
+        ],
+      })
+      const built = build({
+        mode: 'blind-parallel',
+        mergedBy: 'GPT-5.6 Sol',
+        unionPath: union,
+        listAPath: listA,
+        listBPath: listB,
+      })
+      expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
+      expect(built.record.accounting).toMatch(/^2 A \+ 1 B entries → 2 union entries .*every input entry accounted for$/)
+      expect(built.record.accountingSource).toBe('computed')
+
+      // A union that drops an entry cannot be recorded at all.
+      const dropped = w('U-bad.json', { entries: [{ id: 'U1', from: ['A1'] }] })
+      const bad = build({ mode: 'blind-parallel', mergedBy: 'Fable 5', unionPath: dropped, listAPath: listA, listBPath: listB })
+      expect(bad.ok).toBe(false)
+      expect(bad.errors.join('\n')).toMatch(/is in NO union entry/)
+
+      // Half the files is a mistake, not a shortcut.
+      const half = build({ mode: 'blind-parallel', mergedBy: 'Fable 5', unionPath: union })
+      expect(half.ok).toBe(false)
+      expect(half.errors.join('\n')).toMatch(/--list-a and --list-b/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('marks a typed receipt as stated, so the ledger says which it was', () => {
+    expect(build({ mode: 'blind-parallel', ...merged }).record.accountingSource).toBe('stated')
   })
 
   it('a review record carries no merging model at all', () => {

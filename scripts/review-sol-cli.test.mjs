@@ -51,6 +51,9 @@ const SCRIPT_FILES = [
   // is the only honest way to claim that command is complete.
   'mechanism-review.mjs',
   'mechanism-review-core.mjs',
+  // …which counts a blind-parallel union itself (point 634), so its accounting
+  // core travels with it.
+  'blind-merge-core.mjs',
   'repo-paths.mjs',
   'is-main.mjs',
 ]

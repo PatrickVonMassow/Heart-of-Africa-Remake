@@ -176,7 +176,28 @@ const MODEL_NAMED = /\b(sol|gpt|fable|opus|claude|sonnet|haiku|gemini|grok|llama
  * must not import the accounting one (that one already imports this).
  */
 export const ACCOUNTING_RECEIPT =
-  /^\d+ A \+ \d+ B entries → \d+ union entries \([^)]*\): every input entry accounted for$/
+  /^(\d+) A \+ (\d+) B entries → (\d+) union entries \((\d+) merged, (\d+) only A, (\d+) only B\): every input entry accounted for$/
+
+/**
+ * Is this receipt a line the accounting could actually have printed?
+ *
+ * The shape alone is a copyable string, so the NUMBERS are checked against each
+ * other (four-eyes review, third round): every input entry has exactly one
+ * disposition, so merged + only A + only B must equal the two list sizes; a
+ * union cannot hold more entries than it folded, nor fewer than one when there
+ * was anything to fold; and a "fold" of one entry is not a fold. It does not
+ * make a fabricated line impossible — only one that has to add up.
+ */
+export function receiptBalances(line) {
+  const m = ACCOUNTING_RECEIPT.exec(String(line ?? '').trim())
+  if (!m) return false
+  const [a, b, union, merged, onlyA, onlyB] = m.slice(1).map(Number)
+  if (merged + onlyA + onlyB !== a + b) return false
+  if (merged === 1) return false
+  if (onlyA > a || onlyB > b) return false
+  if (union > a + b) return false
+  return a + b === 0 ? union === 0 : union >= 1
+}
 
 /**
  * From when a blind-parallel record OWES its merger and its count.
@@ -288,7 +309,7 @@ export function validateMergedBy({
       '--accounting "<the summary line>": the union of a blind-parallel stage is COUNTED, not trusted. ' +
         'Run `node scripts/blind-merge.mjs --a <A> --b <B> --union <U>` and record the line it prints.',
     )
-  } else if (!ACCOUNTING_RECEIPT.test(receipt)) {
+  } else if (!receiptBalances(receipt)) {
     errors.push(
       `--accounting: "${receipt}" is not the line blind-merge.mjs prints for a union that balances ` +
         '("<n> A + <m> B entries → <k> union entries …: every input entry accounted for"). A merge that ' +
@@ -351,6 +372,9 @@ export const FLAG_SPEC = Object.freeze({
   '--merged-by': true,
   '--merge-fallback': true,
   '--accounting': true,
+  '--union': true,
+  '--list-a': true,
+  '--list-b': true,
   '--list': false,
 })
 
@@ -369,6 +393,9 @@ const VALUE_KEY = Object.freeze({
   '--merged-by': 'mergedBy',
   '--merge-fallback': 'mergeFallback',
   '--accounting': 'accounting',
+  '--union': 'unionPath',
+  '--list-a': 'listAPath',
+  '--list-b': 'listBPath',
 })
 
 /** Levenshtein distance — small inputs only, so the simple two-row form. */
@@ -647,13 +674,25 @@ export function validateRecord({
  */
 export function mergeProblem(record = {}, commit = {}) {
   if (String(record.mode ?? '') !== BLIND_PARALLEL) return ''
-  if (Number(record.at ?? 0) < MERGE_ACCOUNTING_SINCE) return ''
+  // A row is grandfathered only by a REAL timestamp older than the rule. A row
+  // with NO `at` is not old, it is unstamped — reading a missing field as legacy
+  // was itself a bypass (four-eyes review, third round): omit `at`, `mergedBy`
+  // and `accounting` together and nothing was ever checked.
+  const at = Number(record.at)
+  if (Number.isFinite(at) && at > 0 && at < MERGE_ACCOUNTING_SINCE) return ''
   const who = String(record.mergedBy ?? '').trim()
   if (!who) return 'no-merger'
-  if (!ACCOUNTING_RECEIPT.test(String(record.accounting ?? '').trim())) return 'no-count'
-  if (String(record.mergeFallback ?? '').trim()) return ''
+  if (!receiptBalances(record.accounting)) return 'no-count'
+  // The FALLBACK is judged, not merely present: any word in that field used to
+  // buy an author the merge, while the recorder demanded it name the model that
+  // was missing. One function answers for both halves.
   const authors = (commit.authorModels ?? [commit.authorModel]).filter(Boolean)
-  return authors.some((m) => sameModel(who, m)) || sameModel(who, record.model) ? 'self-merge' : ''
+  const check = validateMerger({
+    mergedBy: who,
+    authors: [...authors, record.model].filter(Boolean),
+    fallback: record.mergeFallback,
+  })
+  return check.ok ? '' : 'self-merge'
 }
 
 /**

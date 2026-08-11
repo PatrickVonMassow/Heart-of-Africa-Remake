@@ -22,6 +22,7 @@ import {
   nearestFlag,
   parseArgs,
   parseModel,
+  receiptBalances,
   sameModel,
   validateMode,
   validateRecord,
@@ -345,6 +346,44 @@ describe('evaluateMechanismReview', () => {
         }),
       ),
     ).toMatch(/no count of it/)
+  })
+
+  it('does NOT read a row with no timestamp as a legacy one', () => {
+    // Omitting `at` together with the merger and the count was a way past every
+    // check (four-eyes review, third round): unstamped is not old.
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [{ sha: 'c'.repeat(40), model: 'Fable 5', verdict: 'merge', mode: 'blind-parallel' }],
+    })
+    expect(v.block).toBe(true)
+  })
+
+  it('judges the two-model FALLBACK instead of accepting any word in the field', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [record({ mode: 'blind-parallel', mergedBy: 'Opus 5', accounting: RECEIPT, mergeFallback: 'x' })],
+    })
+    expect(v.block).toBe(true)
+  })
+
+  it('refuses a receipt whose numbers do not add up', () => {
+    const cooked = '3 A + 2 B entries → 4 union entries (1 merged, 1 only A, 1 only B): every input entry accounted for'
+    expect(receiptBalances(cooked)).toBe(false)
+    expect(receiptBalances(RECEIPT)).toBe(true)
+    // and the arithmetic edges the shape alone would wave through
+    expect(receiptBalances('1 A + 1 B entries → 2 union entries (0 merged, 2 only A, 0 only B): every input entry accounted for')).toBe(false)
+    expect(receiptBalances('0 A + 0 B entries → 3 union entries (0 merged, 0 only A, 0 only B): every input entry accounted for')).toBe(false)
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [record({ mode: 'blind-parallel', mergedBy: 'GPT-5.6 Sol', accounting: cooked })],
+    })
+    expect(v.block).toBe(true)
   })
 
   it('refuses a merge by a SECOND co-author of the commit', () => {
@@ -688,7 +727,7 @@ describe('validateRecord carries the mode', () => {
   const counted = {
     mode: 'blind-parallel',
     mergedBy: 'GPT-5.6 Sol',
-    accounting: '7 A + 5 B entries → 9 union entries (3 merged, 4 only A, 2 only B): every input entry accounted for',
+    accounting: '7 A + 5 B entries → 9 union entries (6 merged, 4 only A, 2 only B): every input entry accounted for',
   }
 
   it('accepts it once the mode is named', () => {
