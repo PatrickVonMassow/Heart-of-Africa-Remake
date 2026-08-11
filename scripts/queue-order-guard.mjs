@@ -63,7 +63,18 @@ export function gatherQueueOrderInputs({ sessionId = '' } = {}) {
  */
 function settleBaseline({ tasksMd, rankRecordJson }, path = RANKS) {
   try {
-    const settled = settleRecord(openPointsOf(tasksMd), parseRankRecord(rankRecordJson), {
+    const record = parseRankRecord(rankRecordJson)
+    // QUIET IS NOT SILENT. A torn record makes the gate draw no verdict — fail-open
+    // by decree — and that is exactly the state nobody would notice, because the
+    // only thing that used to say so was a CLI nobody runs while the gate is quiet.
+    // Blocking would trap the session, so the guard says it instead.
+    if (record.torn) {
+      console.error(
+        `queue-order-guard: ${RANK_RECORD_PATH} does not parse — the append gate is QUIET until it is ` +
+          `repaired: git checkout -- ${RANK_RECORD_PATH}`,
+      )
+    }
+    const settled = settleRecord(openPointsOf(tasksMd), record, {
       at: new Date().toISOString(),
     })
     if (settled.changed) writeTextAtomic(path, `${JSON.stringify(settled.record, null, 2)}\n`)

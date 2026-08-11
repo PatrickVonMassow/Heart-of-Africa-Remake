@@ -87,7 +87,7 @@ function writeRankRecord(record, open, path = RECORD) {
  * message that names the restore, while allowing wrongly is the hole itself.
  */
 function recordKnownToRepo(path = RANK_RECORD_PATH) {
-  const git = (args) => spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' })
+  const git = (args) => spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true })
   try {
     if (git(['ls-files', '--error-unmatch', '--', path]).status === 0) return true
     const history = git(['log', '-1', '--format=%H', '--', path])

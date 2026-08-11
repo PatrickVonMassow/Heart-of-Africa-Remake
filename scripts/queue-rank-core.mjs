@@ -331,8 +331,9 @@ export function settleRecord(open, record, { at = '' } = {}) {
 /** What a caller is told when it tries to write over an unreadable record. */
 export const TORN_RECORD_MESSAGE =
   `${RANK_RECORD_PATH} exists but does not parse. Refusing to write: every decision it holds would be ` +
-  'replaced by this one. Repair the file (or move it aside deliberately), then run the command again. ' +
-  'Until then the append gate stays QUIET rather than blocking — an unreadable record is not a verdict.'
+  `replaced by this one. Restore the tracked record — git checkout -- ${RANK_RECORD_PATH} — and run the ` +
+  'command again. Until then the append gate stays QUIET rather than blocking: an unreadable record is not a ' +
+  'verdict, so this command is the loud half.'
 
 /** Record one deliberate "it stays where it is" decision (pure). */
 export function recordRank(record, point, { why = '', at = '' } = {}) {

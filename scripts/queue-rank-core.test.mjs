@@ -15,6 +15,7 @@ import { openPointsOf } from './board-queue-core.mjs'
 import { readTasksOpen } from './tasks-source.mjs'
 import {
   RANK_RECORD_PATH,
+  TORN_RECORD_MESSAGE,
   alreadyArmedMessage,
   appendGateState,
   normaliseRankRecord,
@@ -144,6 +145,10 @@ describe('PROVENANCE — which points are new since the order was last settled',
     expect(() => recordRank(parseRankRecord(''), 615, { why: 'w' })).toThrow(/does not parse/)
     expect(() => seedRecord(parseRankRecord(''), [1, 2], { why: 'w' })).toThrow(/does not parse/)
     expect(appendGateState([1, 2], parseRankRecord('')).state).toBe('torn')
+    // The refusal names the RESTORE, not the removal: a torn record moved aside
+    // reads as unarmed, which is the same door the arming refusal had to close.
+    expect(TORN_RECORD_MESSAGE).toMatch(/git checkout -- \.claude\/queue-rank\.json/)
+    expect(TORN_RECORD_MESSAGE).not.toMatch(/aside/)
   })
   it('is pure — recording does not mutate what it was given', () => {
     const before = settledAt([615], { 615: { at: '', why: 'w' } })
