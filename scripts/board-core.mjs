@@ -670,8 +670,14 @@ const stateCardPattern = (kind) =>
 function isTrulyStateCard(card, kind) {
   const summary = (String(card).match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
   const title = ((summary.match(/<span class="t">([^<]*)<\/span>/) ?? [])[1] ?? '').trim()
-  if (kind === 'idle') return title === NO_CURRENT_WORK_TITLE && summaryPoint(summary).chip == null
-  return looksLikeClosingTitle(title) || title === CLOSING_WORK_TITLE
+  const numbered = summaryPoint(summary).chip != null
+  if (kind === 'idle') return title === NO_CURRENT_WORK_TITLE && !numbered
+  // THE LEGACY TITLE ONLY COUNTS ON AN UNNUMBERED CARD (four-eyes review,
+  // 12.08.2026). That card never had a number; a NUMBERED card wearing the old
+  // sentence is a point card whose title is merely wrong, and removing it would
+  // delete real work without passing the one path that reports what it removes.
+  if (title === CLOSING_WORK_TITLE) return !numbered
+  return looksLikeClosingTitle(title)
 }
 
 const noWorkCardPattern = () => stateCardPattern('idle')

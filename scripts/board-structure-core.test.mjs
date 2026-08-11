@@ -546,6 +546,17 @@ describe('every current-work card names its point and its subject', () => {
     expect(codes(rewritten)).toEqual([])
   })
 
+  it('does not read a NUMBERED card wearing the old closing sentence as a state', () => {
+    // Its title is merely wrong; the card is running work, and removing it would
+    // delete real prose outside the one path that reports what it removes.
+    const numberedLegacy = withNow(chipCard(651, CLOSING_WORK_TITLE))
+    expect(() => toNoCurrentWork(numberedLegacy, 'Weiter mit Punkt 656.')).toThrow(/refusing to claim/)
+    expect(dropStrayNowCards(numberedLegacy).dropped).toEqual([])
+    // The gate names it, and the retitle repairs it.
+    expect(codes(numberedLegacy)).toContain('now-card-stage-title')
+    expect(codes(setCardTitle(numberedLegacy, 651, 'Ein Betreff'))).toEqual([])
+  })
+
   it('never lets a state match run past its own card into the next', () => {
     const two = withNow(`${chipCard(651, 'Echte Arbeit')}\n${chipCard(652, 'Noch echte Arbeit')}`)
     // No state card stands, so nothing may be removed — the guarded run stops at
