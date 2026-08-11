@@ -15,6 +15,8 @@ import { openPointsOf } from './board-queue-core.mjs'
 import { readTasksOpen } from './tasks-source.mjs'
 import {
   RANK_RECORD_PATH,
+  REMOVED_RECORD_MESSAGE,
+  RESTORE_CMD,
   TORN_RECORD_MESSAGE,
   alreadyArmedMessage,
   appendGateState,
@@ -147,7 +149,7 @@ describe('PROVENANCE — which points are new since the order was last settled',
     expect(appendGateState([1, 2], parseRankRecord('')).state).toBe('torn')
     // The refusal names the RESTORE, not the removal: a torn record moved aside
     // reads as unarmed, which is the same door the arming refusal had to close.
-    expect(TORN_RECORD_MESSAGE).toMatch(/git checkout -- \.claude\/queue-rank\.json/)
+    expect(TORN_RECORD_MESSAGE).toContain(RESTORE_CMD)
     expect(TORN_RECORD_MESSAGE).not.toMatch(/aside/)
   })
   it('is pure — recording does not mutate what it was given', () => {
@@ -200,6 +202,38 @@ describe('the baseline moves only when nothing is outstanding', () => {
     expect(narrowed.record.settled.points).not.toContain(3)
     // Nothing to drop → nothing written, even with a question standing.
     expect(settleRecord([1, 2, 3], base, { at: 't' })).toEqual({ changed: false, record: null })
+  })
+  it('writes the MOVE down, so it survives the point it was moved ahead of closing', () => {
+    // "Stands ahead of a remembered point" is a decision read off a NEIGHBOUR, and
+    // the neighbour can close. Baseline [1, 2]; 3 moved inside to [1, 3, 2]; 4
+    // appended and outstanding. When 2 lands, [1, 3, 4] leaves 3 with no anchor
+    // behind it and the gate asked a second time for a placement already made.
+    const base = settledAt([1, 2])
+    const moved = settleRecord([1, 3, 2, 4], base, { at: 'now' })
+    expect(moved.changed).toBe(true)
+    expect(moved.record.ranked[3].why).toMatch(/the move is the decision/)
+    expect(moved.record.ranked[3].at).toBe('now')
+    expect(unrankedAppends([1, 3, 2, 4], moved.record)).toEqual([4])
+    // 2 closes while 4 is STILL unanswered — the case where the baseline cannot
+    // absorb the placement for us.
+    const closed = settleRecord([1, 3, 4], moved.record, { at: 'later' })
+    expect(closed.record.settled.points).toEqual([1])
+    expect(unrankedAppends([1, 3, 4], closed.record)).toEqual([4])
+    // Without the written-down move, 3 was asked all over again.
+    expect(unrankedAppends([1, 3, 4], settledAt([1, 2]))).toEqual([3, 4])
+    // It records the placement only — 4, which is genuinely at the append
+    // default, is never answered on its behalf.
+    expect(moved.record.ranked[4]).toBeUndefined()
+  })
+  it('names a restore that works on a DELETED record, not only a modified one', () => {
+    // `git checkout -- <path>` restores the INDEX copy: after a staged `git rm`
+    // the path is not in the index, so the prescribed remedy failed and left the
+    // caller in the refusal it was meant to end.
+    expect(RESTORE_CMD).toBe('git checkout HEAD -- .claude/queue-rank.json')
+    for (const message of [TORN_RECORD_MESSAGE, REMOVED_RECORD_MESSAGE]) {
+      expect(message).toContain(RESTORE_CMD)
+      expect(message).not.toMatch(/git checkout -- /)
+    }
   })
   it('writes nothing when the baseline already says what stands', () => {
     expect(settleRecord([9, 5], settledAt([5, 9]), { at: 't' })).toEqual({ changed: false, record: null })
@@ -266,7 +300,7 @@ describe('the baseline moves only when nothing is outstanding', () => {
       thrown = e
     }
     expect(thrown).toBeTruthy()
-    expect(thrown.message).toMatch(/git checkout -- \.claude\/queue-rank\.json/)
+    expect(thrown.message).toContain(RESTORE_CMD)
     // The genuine first arming — a repository that has never carried the record —
     // is untouched.
     expect(seedRecord(null, [9, 5, 4], { why: 'arming', at: 't' }).settled.points).toEqual([4, 5, 9])

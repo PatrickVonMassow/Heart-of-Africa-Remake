@@ -29,6 +29,12 @@
 // between the ranking and the rendering — a second copy of the ORDER is precisely
 // the failure points 590 and 608 were opened about.
 
+/** The reason written down for a point whose PLACEMENT already answered the
+ *  question — it stands ahead of a point the baseline remembers, which is the
+ *  "move it in TASKS.md" half of the one decision the gate asks for. */
+export const MOVED_INSIDE_WHY =
+  'placed inside the order in TASKS.md, ahead of a point already judged — the move is the decision'
+
 /** Record the rank of a point that stays where append-and-defer put it. */
 export const RANK_CMD = 'node scripts/queue-rank.mjs --ranked <N> --why "<one line>"'
 
@@ -39,6 +45,13 @@ export const SEED_CMD = 'node scripts/queue-rank.mjs --seed --why "<one line>"'
  *  recorded (TRACKED, not runtime state: both are repository history, and a clone
  *  that inherited neither would re-ask about every point ever appended). */
 export const RANK_RECORD_PATH = '.claude/queue-rank.json'
+
+/** Put the tracked record back — from HEAD, NOT from the index (cross-vendor
+ *  review, fifth pass). `git checkout -- <path>` restores the INDEX copy, which a
+ *  staged `git rm` has already removed and a half-repaired index still holds
+ *  broken; naming HEAD covers a plain delete, a staged one and a damaged index
+ *  alike, so the remedy a refusal prints actually ends the refusal. */
+export const RESTORE_CMD = `git checkout HEAD -- ${RANK_RECORD_PATH}`
 
 /** The open points as clean integers, in the order they were handed over, each
  *  once. `openPointsOf` does not deduplicate, and a number listed twice would
@@ -311,10 +324,24 @@ export function settleRecord(open, record, { at = '' } = {}) {
     // unquestioned when it reopens. Shrinking can only add questions.
     if (state.state !== 'pending') return { changed: false, record: null }
     const kept = settled.points.filter((n) => list.includes(n))
-    if (kept.length === settled.points.length) return { changed: false, record: null }
+    // AND THE MOVE IS WRITTEN DOWN WHILE IT CAN STILL BE READ (cross-vendor
+    // review, fifth pass). Standing ahead of a remembered point IS the decision,
+    // but it is a decision inferred from a NEIGHBOUR: baseline [1, 2] with 3
+    // moved to [1, 3, 2] and 4 outstanding reads correctly — until 2 closes.
+    // [1, 3, 4] then has no anchor behind 3 any more, and the gate asks a second
+    // time for a placement somebody already made. While nothing is outstanding
+    // the baseline absorbs those points at this same write, so the decision only
+    // evaporates in the pending case; recording it here makes it durable, in the
+    // one place decisions live and with the reason that was true of it.
+    const decided = { ...ranked }
+    for (const n of state.inside) {
+      if (!decided[n]) decided[n] = { at: String(at ?? '').trim(), why: MOVED_INSIDE_WHY }
+    }
+    const noted = Object.keys(decided).length !== Object.keys(ranked).length
+    if (!noted && kept.length === settled.points.length) return { changed: false, record: null }
     // The baseline keeps its own `at`/`why`: this is the same settlement, minus
     // what has since closed, not a new one.
-    const narrowed = { ...pruneRankRecord({ ranked }, list), settled: { ...settled, points: kept } }
+    const narrowed = { ...pruneRankRecord({ ranked: decided }, list), settled: { ...settled, points: kept } }
     return { changed: true, record: narrowed }
   }
   const points = [...list].sort((a, b) => a - b)
@@ -331,9 +358,9 @@ export function settleRecord(open, record, { at = '' } = {}) {
 /** What a caller is told when it tries to write over an unreadable record. */
 export const TORN_RECORD_MESSAGE =
   `${RANK_RECORD_PATH} exists but does not parse. Refusing to write: every decision it holds would be ` +
-  `replaced by this one. Restore the tracked record — git checkout -- ${RANK_RECORD_PATH} — and run the ` +
-  'command again. Until then the append gate stays QUIET rather than blocking: an unreadable record is not a ' +
-  'verdict, so this command is the loud half.'
+  `replaced by this one. Restore the committed record — ${RESTORE_CMD} — or repair the bytes by hand where the ` +
+  'damage was committed, then run the command again. Until then the append gate stays QUIET rather than ' +
+  'blocking: an unreadable record is not a verdict, so this command is the loud half.'
 
 /** Record one deliberate "it stays where it is" decision (pure). */
 export function recordRank(record, point, { why = '', at = '' } = {}) {
@@ -404,7 +431,7 @@ export function alreadyArmedMessage(pending = []) {
 export const REMOVED_RECORD_MESSAGE =
   `${RANK_RECORD_PATH} is missing here, but this repository carries it — so this checkout HAS a baseline and ` +
   'is not arming a first one. A record that exists is restored, not re-armed, or every question outstanding ' +
-  `when it went missing would count as answered by the arming: git checkout -- ${RANK_RECORD_PATH}`
+  `when it went missing would count as answered by the arming: ${RESTORE_CMD}`
 
 /**
  * ARM the gate: everything standing in the order today counts as judged, with one

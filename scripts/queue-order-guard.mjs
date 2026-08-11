@@ -12,7 +12,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluate } from './queue-order-guard-core.mjs'
 import { openPointsOf } from './board-queue-core.mjs'
-import { RANK_RECORD_PATH, parseRankRecord, settleRecord } from './queue-rank-core.mjs'
+import { RANK_RECORD_PATH, RESTORE_CMD, parseRankRecord, settleRecord } from './queue-rank-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { repoPath } from './repo-paths.mjs'
@@ -71,7 +71,7 @@ function settleBaseline({ tasksMd, rankRecordJson }, path = RANKS) {
     if (record.torn) {
       console.error(
         `queue-order-guard: ${RANK_RECORD_PATH} does not parse — the append gate is QUIET until it is ` +
-          `repaired: git checkout -- ${RANK_RECORD_PATH}`,
+          `repaired: ${RESTORE_CMD}`,
       )
     }
     const settled = settleRecord(openPointsOf(tasksMd), record, {
