@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   cardNamingViolations,
+  looksLikeClosingTitle,
   markupOnly,
   nowCardKinds,
   nowCards,
@@ -267,28 +268,59 @@ describe('every current-work card names its point and its subject', () => {
   it('REFUSES a title that is only a stage word, in either language', () => {
     for (const title of [
       'Abschlussarbeiten',
+      // The card the user photographed: every word after the stage points back
+      // at the point instead of naming it.
       'Abschlussarbeiten zum gerade beendeten Punkt',
-      'Nacharbeit am Zweig',
       'Vorbereitung',
       'Aufräumen',
       'closing duties',
       'cleanup',
+      'closing work on this point',
     ]) {
       expect(stageOnlyTitle(title), title).toBe(true)
       expect(codes(withNow(chipCard(651, title)))).toContain('now-card-stage-title')
     }
   })
 
-  it('lets a subject through that merely CONTAINS a stage word', () => {
+  // A refusal costs a retitle, so it may not fire on a title that names a real
+  // subject and merely happens to open on a stage word (four-eyes 12.08.2026).
+  it('lets every title through that names a subject beside the stage', () => {
     for (const title of [
       'Das Trommelbett ist eine 1,9-Sekunden-Schleife: Abschlussarbeiten',
+      'Vorbereitung der Karten',
+      'Nacharbeit am Zweig',
+      'Cleanup parser for Windows',
       'Die Vorbereitung der Karten ist der Punkt',
       '651 — Ein Betreff',
     ]) {
       expect(stageOnlyTitle(title), title).toBe(false)
+      expect(codes(withNow(chipCard(651, title))), title).not.toContain('now-card-stage-title')
     }
     expect(stageOnlyTitle('')).toBe(true)
     expect(stageOnlyTitle(null)).toBe(true)
+  })
+
+  // Without the marker no command can REPLACE the card, and a state that cannot
+  // be replaced is the trap the marker exists to prevent.
+  it('REFUSES a closing-shaped title that carries no closing marker', () => {
+    const unmarked = chipCard(651, 'Ein Betreff: Abschlussarbeiten')
+    expect(codes(withNow(unmarked))).toContain('now-card-unmarked-closing')
+    expect(codes(withNow(chipCard(651, 'Ein Betreff: Abschlussarbeiten', 'closing')))).toEqual([])
+    expect(looksLikeClosingTitle('Ein Betreff: Abschlussarbeiten')).toBe(true)
+    expect(looksLikeClosingTitle('Ein Betreff')).toBe(false)
+    expect(looksLikeClosingTitle(null)).toBe(false)
+  })
+
+  // The legacy closing card cannot be upgraded — it holds neither point nor
+  // subject — so the gate must name the command that REPLACES it.
+  it('names the command that replaces a legacy closing card it refuses', () => {
+    const legacy =
+      '<details class="now" data-state="closing">\n  <summary><span class="t">' +
+      'Abschlussarbeiten zum gerade beendeten Punkt</span></summary>\n' +
+      '  <div class="body"><p>Text</p></div>\n</details>'
+    const found = cardNamingViolations(withNow(legacy))
+    expect(found.map((v) => v.code)).toContain('now-card-unnumbered')
+    expect(found.map((v) => v.msg).join(' ')).toContain('board.mjs closing <N>')
   })
 
   it('exempts the handover card from the chip — it belongs to NO point', () => {
@@ -296,6 +328,14 @@ describe('every current-work card names its point and its subject', () => {
       '<details class="now" data-state="idle">\n  <summary><span class="t">Gerade keine laufende Arbeit</span>' +
       '</summary>\n  <div class="body"><p>Der Nachfolger nimmt Punkt 656 auf.</p></div>\n</details>'
     expect(codes(withNow(handover))).toEqual([])
+  })
+
+  it('takes a follow-on point of any length, and names its own remedy', () => {
+    const card = (body) =>
+      '<details class="now" data-state="idle">\n  <summary><span class="t">Gerade keine laufende Arbeit</span>' +
+      `</summary>\n  <div class="body"><p>${body}</p></div>\n</details>`
+    expect(codes(withNow(card('Weiter mit Punkt 10000.')))).toEqual([])
+    expect(cardNamingViolations(withNow(card('Nichts weiter.')))[0].msg).toContain('board.mjs none')
   })
 
   it('…but REFUSES a handover card that names no follow-on work', () => {

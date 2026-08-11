@@ -112,5 +112,15 @@ describe('the numbered chip renders on a now-card as it does in the queue', () =
     const phone = (css.match(new RegExp(`@media\\(max-width:(\\d+)px\\)\\{([^}]*\\}[^{]*)*`)) ?? [])[0] ?? ''
     expect(Number((phone.match(/max-width:(\d+)px/) ?? [])[1] ?? 0)).toBeGreaterThan(PHONE_WIDTH)
     expect(phone).not.toContain('.num')
+    // AND NO RULE SCOPED TO THE CURRENT-WORK SECTION MAY RELAY IT (four-eyes
+    // review, 12.08.2026): the DOM comparison above cannot see an ancestor rule
+    // like `.now summary{flex-wrap:wrap}`, which would push the chip onto its own
+    // line only inside the section this point is about.
+    for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!/\.now\b/.test(selector) || !/summary|\.t\b/.test(selector)) continue
+      expect(body, `${selector.trim()} relays the current-work summary`).not.toMatch(
+        /flex-wrap\s*:\s*wrap|display\s*:\s*(block|grid)|flex-direction\s*:\s*column/,
+      )
+    }
   })
 })

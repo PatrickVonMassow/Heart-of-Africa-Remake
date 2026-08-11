@@ -188,17 +188,48 @@ export const STAGE_WORDS = [
 ]
 
 /**
- * Does this title say only what STAGE the work is in? True when it BEGINS with a
- * stage word, because then nothing names the subject ahead of it — the composed
- * form is "<Betreff>: <Stage>", subject first. The number prefix of a card
- * written before the chip is stripped before judging.
+ * The words that name no subject: articles, prepositions and the words that
+ * only point BACK at the point itself ("zum gerade beendeten Punkt"). They are
+ * what separates the card the user complained about from a legitimate title that
+ * happens to open on a stage word.
+ */
+const FILLER_WORDS = new Set([
+  'zum', 'zur', 'zu', 'am', 'an', 'im', 'in', 'auf', 'für', 'fur', 'des', 'der', 'die', 'das', 'den', 'dem',
+  'ein', 'eine', 'einen', 'einem', 'eines', 'und', 'noch', 'nur', 'gerade', 'eben', 'soeben', 'letzten',
+  'letzte', 'aktuellen', 'aktuelle', 'beendeten', 'beendete', 'abgeschlossenen', 'fertigen', 'meines',
+  'meiner', 'diesem', 'diesen', 'dieses', 'punkt', 'punkts', 'punktes', 'point', 'points', 'the', 'this',
+  'that', 'of', 'for', 'to', 'on', 'at', 'just', 'now', 'current', 'finished', 'closed', 'my', 'work',
+  'works', 'duties', 'a', 'an', 'and',
+])
+
+/**
+ * Does this title say only what STAGE the work is in (point 655)?
+ *
+ * THE RULE, and why it is not simply "begins with a stage word" (four-eyes
+ * review, GPT-5.6 Sol, 12.08.2026): the title is stripped of its number prefix,
+ * of every stage word and of the FILLER above — and if NOTHING is left, it named
+ * no subject. "Abschlussarbeiten zum gerade beendeten Punkt" leaves nothing and
+ * is refused; "Vorbereitung der Karten", "Cleanup parser for Windows" and
+ * "<Betreff>: Abschlussarbeiten" all leave a subject and pass. A refusal here
+ * costs a retitle, so it must fire only where the card really says nothing.
  */
 export function stageOnlyTitle(title) {
-  const text = String(title ?? '')
+  let text = String(title ?? '')
     .replace(/^\s*\d+\s*[—–-]\s*/, '')
     .trim()
   if (!text) return true
-  return STAGE_WORDS.some((w) => new RegExp(`^${w}\\b`, 'i').test(text))
+  for (const w of STAGE_WORDS) text = text.replace(new RegExp(`\\b${w}\\b`, 'gi'), ' ')
+  const rest = text
+    .toLowerCase()
+    .split(/[^a-zäöüß0-9-]+/i)
+    .filter((t) => t && !FILLER_WORDS.has(t))
+  return rest.length === 0
+}
+
+/** Does this title END on a stage word — the shape the closing card composes? */
+export function looksLikeClosingTitle(title) {
+  const text = String(title ?? '').trim()
+  return STAGE_WORDS.some((w) => new RegExp(`[:—–-]\\s*${w}\\s*$`, 'i').test(text))
 }
 
 /**
@@ -208,7 +239,12 @@ export function stageOnlyTitle(title) {
  * happens next.
  */
 export function namesFollowOnWork(bodyText) {
-  return /\b(?:punkt|point)\s*(\d{1,4})\b/i.test(String(bodyText ?? ''))
+  // KNOWN LIMIT (four-eyes review, 12.08.2026): this asks that A point is named,
+  // not that it is the RIGHT one — the gate has no way to know which point just
+  // ended. It catches the card that names none at all, which is the reported
+  // defect; naming the finished point instead of the next one is a mistake only
+  // the author can avoid.
+  return /\b(?:punkt|point)\s*(\d{1,6})\b/i.test(String(bodyText ?? ''))
 }
 
 /**
@@ -238,7 +274,8 @@ export function cardNamingViolations(html) {
           code: 'handover-card-nameless',
           msg:
             `the handover card ${named} names no follow-on work — it is the one card without a ` +
-            'number, so its text must say which point the batch picks up next',
+            'number, so its text must say which point the batch picks up next. Rewrite it: ' +
+            'node scripts/board.mjs none "<Grund, der den nächsten Punkt nennt>"',
         })
       }
       return
@@ -246,13 +283,33 @@ export function cardNamingViolations(html) {
     if (card.point == null) {
       out.push({
         code: 'now-card-unnumbered',
-        msg: `the current-work card ${named} carries no numbered chip — every card but the handover card names its point`,
+        msg:
+          `the current-work card ${named} carries no numbered chip — every card but the handover ` +
+          'card names its point. Replace it: node scripts/board.mjs closing <N> "<Grund>" for the ' +
+          'closing card, node scripts/board.mjs now <N> "<Stand>" for running work',
       })
     }
     if (stageOnlyTitle(card.title)) {
       out.push({
         code: 'now-card-stage-title',
-        msg: `the current-work card ${named} is titled with a STAGE and no subject — say what the point is about first, e.g. "<Betreff>: Abschlussarbeiten"`,
+        msg:
+          `the current-work card ${named} is titled with a STAGE and no subject — say what the ` +
+          'point is about first, e.g. "<Betreff>: Abschlussarbeiten". node scripts/board.mjs title ' +
+          '<N> "<Betreff>" rewrites a title; the closing card is composed by ' +
+          'node scripts/board.mjs closing <N> "<Grund>"',
+      })
+    }
+    // A COMPOSED CLOSING TITLE MUST CARRY THE CLOSING MARKER (four-eyes review,
+    // 12.08.2026). Without it the card reads as ordinary point work, so the two
+    // state writers refuse to REPLACE it and the state can never be cleared —
+    // exactly the trap the marker was introduced to avoid.
+    if (card.kind !== 'closing' && looksLikeClosingTitle(card.title)) {
+      out.push({
+        code: 'now-card-unmarked-closing',
+        msg:
+          `the current-work card ${named} is titled as a closing card but carries no ` +
+          'data-state="closing" marker, so no command could ever replace it. Write it with ' +
+          'node scripts/board.mjs closing <N> "<Grund>"',
       })
     }
   })

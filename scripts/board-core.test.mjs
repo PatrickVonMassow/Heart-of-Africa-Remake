@@ -920,14 +920,23 @@ describe('the closing card — a state that is NOT a claim to stop', () => {
   })
 
   it('produces markup the board guards accept — structurally and by audit', () => {
-    const out = toClosingWork(emptyBoard(), 544, { reason: REASON, stamp: '23:40' })
-    const before = new Set(structureViolations(emptyBoard()).map((v) => v.code))
+    // AT THE STATE IT IS ACTUALLY WRITTEN IN (four-eyes review, 12.08.2026): the
+    // point is merged AND TICKED by then, so it is archived and DONE — judging
+    // this card against `open: [544]` would test a state that cannot occur, and
+    // the number it now carries is exactly what such a test would hide.
+    const running = toNow(emptyBoard(), 544, 'Läuft.', { stamp: '21:00' })
+    const board = toDone(running, 544, { text: 'Zusammengeführt.', end: '23:30' })
+    const out = toClosingWork(board, 544, { reason: REASON, stamp: '23:40' })
+    const before = new Set(structureViolations(board).map((v) => v.code))
     expect(structureViolations(out).map((v) => v.code).filter((c) => !before.has(c))).toEqual([])
-    const auditBefore = new Set(auditDashboard(emptyBoard(), { open: [544], done: [] }).map((v) => v.code))
-    const added = auditDashboard(out, { open: [544], done: [] })
+    const auditBefore = new Set(auditDashboard(board, { open: [], done: [544] }).map((v) => v.code))
+    const added = auditDashboard(out, { open: [], done: [544] })
       .map((v) => v.code)
       .filter((c) => !auditBefore.has(c))
     expect(added).toEqual([])
+    // The point IS current work while its closing duties run — that is what the
+    // card says, and the focus check reads exactly this set.
+    expect(parseNowCardPoints(out)).toEqual(new Set([544]))
     // …and the conciseness guard passes over it: one short, glanceable paragraph.
     expect(concisenessOffenders(out)).toEqual([])
   })
