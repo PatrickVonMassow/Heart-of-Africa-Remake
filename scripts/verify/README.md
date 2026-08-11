@@ -937,6 +937,30 @@ test observes:
 Never add a store/logic/HUD-text assert to Playwright when it can live in
 Vitest — that is exactly the coupling this split removed.
 
+### A system that must KEEP PRODUCING carries a long-run alarm (point 589)
+
+Twelve defects shipped in one mechanic whose twelve points had all passed their
+gates, and one of them — the adults falling permanently silent after minutes —
+was out of reach of every suite by construction: a suite simulates seconds. So
+the running game measures it. `watchProducer` (`src/systems/devAssert.ts`) is the
+existing assert channel's LONG-RUN family: a producer that has emitted nothing
+for longer than its own specified window raises the ordinary `console.error`,
+which every suite's console gate fails on and every manual session shows. Wired
+so far: `errands-silent` (the adults' utterances and the errands they stage),
+`tag-silent` (the children's play — a catch or a fresh round), and
+`child-speech-silent` (what the children say). `window.__longRun` reports every
+watch live.
+
+Two rules keep it worth having: it judges the OUTPUT (an utterance staged, a
+round played), never the timer that was supposed to produce one; and a producer
+that is legitimately quiet — nobody to speak to, nothing to speak about, a group
+of one — is not judged at all. Each window is a `balance` value, debug-editable,
+and each is covered in the fast layer both ways: a stalled producer trips it, a
+healthy one stays silent through half an hour of simulated play.
+
+When a new system must keep producing, add a watch rather than a test that hopes
+to be looking at the right second.
+
 ## Old → new coverage map
 
 Every assert removed from Playwright has an equivalent (or stricter) Vitest

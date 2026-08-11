@@ -1167,7 +1167,20 @@ the concept's own; a gesture and a following action on every one; every concept
 in more than one situation, and heard in at least two DIFFERENT ones over a
 driven visit; every situation staged within a visit; both staged contrasts; the
 refusals only ever as answers, cancelling what the child was told; the errands
-really carried out and every one of them expiring. The separation rule is pinned
+really carried out and every one of them expiring.
+THE VILLAGE'S PRODUCERS ARE ALARMED FOR THE LONG RUN (point 589): the adults'
+utterances, the children's play and the children's speech each carry a watch of
+the dev-assert channel's long-run family (`watchProducer`,
+`src/systems/devAssert.ts`), and each raises `errands-silent` / `tag-silent` /
+`child-speech-silent` once it has produced nothing for its own window
+(`balance.villageLife.*.silenceSeconds`, debug-editable in both languages) —
+so a village that goes quiet after minutes reports itself in every session,
+headless or manual, which no seconds-long suite can reach. Verifiable both ways
+in the fast layer (`src/systems/devAssert.test.ts`, plus the three producers'
+own test files): a stalled producer trips its alarm, a healthy one is silent
+through half an hour of simulated play, a legitimately quiet one (a lone child,
+a village with nowhere to send anyone) is never judged, and a frame-loop gap is
+not counted as silence. The separation rule is pinned
 in `src/scenes/place/lifeSpots.test.ts` (every adult station outside the hearing
 radius of the whole play ground, swept over the fire's position, shrinking rather
 than giving up), and the chase's side of it in

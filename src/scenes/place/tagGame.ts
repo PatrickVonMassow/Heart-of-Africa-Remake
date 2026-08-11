@@ -24,7 +24,12 @@
 // side of a fence panel, overlapping nothing.
 
 import { deflectedStep } from '../travel/wildlifeBehavior'
-import { devAssert } from '../../systems/devAssert'
+import {
+  createProducerWatch,
+  devAssert,
+  watchProducer,
+  type ProducerWatch,
+} from '../../systems/devAssert'
 import {
   advanceReserve,
   chaserPresses,
@@ -83,6 +88,13 @@ export interface TagConfig extends StaminaProfile {
   variation: number
   /** Seconds of no real movement before a child is nudged to free ground. */
   unstuckSeconds: number
+  /**
+   * The dev-mode long-run alarm's window (point 589): a group that CAN play and
+   * has produced neither a catch nor a fresh round for this long is broken, not
+   * quiet. It must sit clear of the longest LEGITIMATE gap between two round
+   * events — a tenure that runs to the backstop plus the idle break after it.
+   */
+  silenceSeconds: number
   /** Forward lean (rad) at the full sprint; the posture eases toward it in
    *  proportion to the pace, and back to upright while recovering. */
   leanAtSprint: number
@@ -162,6 +174,9 @@ export interface TagState {
    * without a bug behind it.
    */
   clock: number
+  /** The long-run alarm's watch over the play itself (point 589): how long the
+   *  group has produced no catch and no fresh round. */
+  play: ProducerWatch
 }
 
 /** The settlement as the chase sees it. `blocked` answers for the FULL set —
@@ -246,6 +261,7 @@ export function createTagGame(
     playing: false,
     tags: 0,
     clock: 0,
+    play: createProducerWatch(),
   }
 }
 
@@ -414,6 +430,32 @@ function moveChild(
  * pace, everything else stays the chase's.
  */
 export function stepTagGame(
+  s: TagState,
+  dt: number,
+  cfg: TagConfig,
+  world: TagWorld,
+  steer?: TagSteer,
+): void {
+  const tags = s.tags
+  const wasPlaying = s.playing
+  advanceTagGame(s, dt, cfg, world, steer)
+  // THE LONG-RUN ALARM (point 589), judged on what the PLAYER would have seen:
+  // a catch, or a fresh round starting. Not on the timers meant to produce them
+  // — a chase that runs on forever with a dead catch test keeps every timer
+  // moving and still shows a group that never plays. A group of one has nobody
+  // to chase and is quiet by right.
+  watchProducer(s.play, {
+    code: 'tag-silent',
+    dt,
+    produced: s.tags !== tags || (s.playing && !wasPlaying),
+    expected: s.children.length >= 2,
+    maxSilenceSeconds: cfg.silenceSeconds,
+    detail: () =>
+      `${s.children.length} children, ${s.playing ? `chaser ${s.chaser} for ${s.chaserFor.toFixed(0)}s` : `idling for ${s.idleFor.toFixed(0)}s more`}`,
+  })
+}
+
+function advanceTagGame(
   s: TagState,
   dt: number,
   cfg: TagConfig,

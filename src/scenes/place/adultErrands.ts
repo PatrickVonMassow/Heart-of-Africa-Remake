@@ -39,7 +39,7 @@
 // what lets the whole teaching be pinned in the fast test layer.
 
 import { phraseOf, type ConceptId, type Phrase } from '../../communication/lexicon'
-import { devAssert } from '../../systems/devAssert'
+import { createProducerWatch, watchProducer, type ProducerWatch } from '../../systems/devAssert'
 import type { GestureKind } from '../../render/gesture'
 
 /** Every errand the adults stage, in the catalogue's own order. */
@@ -275,9 +275,10 @@ export interface AdultErrandState {
   /** How often each errand has been staged this visit — the probe a live check
    *  and the dev hook read. */
   staged: Record<ErrandSituationId, number>
-  /** Seconds since the last errand was staged. The alarm below reads it, and so
-   *  does the dev hook — a village that has gone quiet says how long ago. */
-  silence: number
+  /** The long-run alarm's watch over the adults' utterances (point 589): how
+   *  long the village has said nothing, and how much it has said. The dev hook
+   *  reads it too — a village that has gone quiet says how long ago. */
+  speech: ProducerWatch
 }
 
 const dist = (a: ErrandPoint, b: ErrandPoint) => Math.hypot(a.x - b.x, a.z - b.z)
@@ -654,7 +655,7 @@ export function createAdultErrands(count: number, cfg: AdultErrandConfig): Adult
     last: null,
     assignments: Array.from({ length: Math.max(0, count) }, () => null),
     staged,
-    silence: 0,
+    speech: createProducerWatch(),
   }
 }
 
@@ -793,7 +794,6 @@ function stage(
     age: 0,
   }
   state.staged[event.id]++
-  state.silence = 0
   return event
 }
 
@@ -805,33 +805,40 @@ function hasErrandPlaces(view: ErrandView): boolean {
 }
 
 /**
- * THE ARMED INVARIANT (point 207(i), work-order point 586): a village that CAN
- * stage errands and has not staged one for the stated window is broken, and says
- * so — in every headless suite, whose console-error gates fail on it, and in
- * every manual session.
+ * THE ARMED INVARIANT (point 207(i), work-order points 586/589): a village that
+ * CAN stage errands and has not staged one for the stated window is broken, and
+ * says so — in every headless suite, whose console-error gates fail on it, and
+ * in every manual session.
  *
  * This defect class is invisible in a screenshot and invisible in a test that
  * simulates seconds: the adults went quiet after MINUTES of play, and no suite
  * ran that long. What a picture cannot show, the running game reports itself.
+ * The judgment is the long-run family's (`watchProducer`), and what it judges is
+ * the OUTPUT the player would have heard — an utterance actually staged this
+ * step — never the cooldown that was supposed to schedule one.
  *
- * The guards are what a healthy village legitimately needs to speak at all: two
- * villagers (all but one errand casts a speaker AND an addressee) and somewhere
- * to send them. Measured on a healthy village, the longest quiet spell is ~25 s,
- * so the default window sits well clear of it.
+ * A village is only judged when it legitimately CAN speak: two villagers (all
+ * but one errand casts a speaker AND an addressee) and somewhere to send them.
+ * Measured on a healthy village, the longest quiet spell is ~25 s, so the
+ * default window sits well clear of it.
  */
-function assertStillSpeaking(
+function watchSpeaking(
   state: AdultErrandState,
   view: ErrandView,
   cfg: AdultErrandConfig,
+  dt: number,
+  said: SpokenErrand | null,
 ): void {
-  const window = Math.max(1, cfg.silenceSeconds)
-  devAssert(
-    view.villagers.length < 2 || !hasErrandPlaces(view) || state.silence <= window,
-    'errands-silent',
-    () =>
-      `no adult has spoken for ${state.silence.toFixed(0)}s of ${window}s — ` +
-      `${view.villagers.length} villagers, ${view.villagers.filter((v) => !v.free).length} of them on an errand`,
-  )
+  watchProducer(state.speech, {
+    code: 'errands-silent',
+    dt,
+    produced: said !== null,
+    expected: view.villagers.length >= 2 && hasErrandPlaces(view),
+    maxSilenceSeconds: cfg.silenceSeconds,
+    detail: () =>
+      `no adult has spoken — ${view.villagers.length} villagers, ` +
+      `${view.villagers.filter((v) => !v.free).length} of them on an errand`,
+  })
 }
 
 /**
@@ -884,6 +891,20 @@ export function stepAdultErrands(
   cfg: AdultErrandConfig,
   rand: () => number,
 ): SpokenErrand | null {
+  const said = advanceErrands(state, view, dt, cfg, rand)
+  // Judged on the RESULT of the step, once it is known (point 589).
+  watchSpeaking(state, view, cfg, dt, said)
+  return said
+}
+
+/** The step itself: ages what is running and stages at most one errand. */
+function advanceErrands(
+  state: AdultErrandState,
+  view: ErrandView,
+  dt: number,
+  cfg: AdultErrandConfig,
+  rand: () => number,
+): SpokenErrand | null {
   const step = Number.isFinite(dt) && dt > 0 ? dt : 0
   // The roster is fixed for a visit, but a group that changed size keeps its
   // slots in step rather than steering a villager that is no longer there.
@@ -915,8 +936,6 @@ export function stepAdultErrands(
     }
   }
   if (state.last) state.last.age += step
-  state.silence += step
-  assertStillSpeaking(state, view, cfg)
   state.cooldown -= step
   if (state.cooldown > 0) return null
   if (view.villagers.length === 0) {

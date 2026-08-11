@@ -983,6 +983,42 @@ describe('the armed invariants (point 207(i)) — the channel every session list
     stepTagGame(s, 1 / 3600, CFG, OPEN)
     expect(codes().join(' ')).toContain('tag-pinned')
   })
+
+  // THE LONG-RUN ALARM (point 589): the play itself is a producer, and what it
+  // produces is what the player sees happen — a catch, or a fresh round. The
+  // defect class is the one no suite reaches: a game that runs for minutes and
+  // then stops producing while every timer inside it keeps moving.
+  it('says nothing over half an hour of a healthy game', () => {
+    const s = game(FOUR, 5)
+    run(s, 1800)
+    expect(codes()).toEqual([])
+    expect(s.play.produced).toBeGreaterThan(1)
+  })
+
+  it('nor when a tenure runs all the way to the backstop and the group idles after it', () => {
+    // The longest LEGITIMATE gap between two round events, at the shipped
+    // calibration: nobody is ever caught, so each round runs to the cap and the
+    // idle break follows it. The window must sit clear of exactly this.
+    const cfg: TagConfig = { ...CFG, catchDistance: 0 }
+    const s = game(FOUR, 5, cfg)
+    run(s, 600, OPEN, cfg)
+    expect(codes()).toEqual([])
+  })
+
+  it('FIRES when the game produces neither a catch nor a fresh round for its window', () => {
+    // A round that can never end: nobody catchable, and the backstop pushed out
+    // of reach. Every timer still runs — which is why only the RESULT catches it.
+    const cfg: TagConfig = { ...CFG, catchDistance: 0, resolveCapSeconds: 1e6 }
+    const s = game(FOUR, 5, cfg)
+    run(s, cfg.silenceSeconds + 20, OPEN, cfg)
+    expect(codes().join(' ')).toContain('tag-silent')
+  })
+
+  it('nor with a single child, who has nobody to play with', () => {
+    const s = game([[6, 6]], 5)
+    run(s, CFG.silenceSeconds * 3)
+    expect(codes()).toEqual([])
+  })
 })
 
 describe('the group never tires in unison (the per-child spread)', () => {
