@@ -507,9 +507,19 @@ export function probeFreshness(receipt, now = Date.now(), maxAgeMs = PROBE_MAX_A
  * git answer the current checkout is the honest fallback.
  */
 export function savedAuthPathFrom(gitCommonDir, repoRoot, { sep = '/' } = {}) {
+  return `${mainCheckoutFrom(gitCommonDir, repoRoot)}${sep}local${sep}codex-auth.json`
+}
+
+/**
+ * The MAIN checkout, given git's common dir — the directory the login above and the
+ * share switch (scripts/sol-share-core.mjs) both belong in, for the same reason: they
+ * are the MACHINE's state, and a delegated agent's worktree is deleted when its point
+ * lands. With no git answer the current checkout is the honest fallback.
+ */
+export function mainCheckoutFrom(gitCommonDir, repoRoot) {
   const common = String(gitCommonDir ?? '').trim().replace(/[/\\]+$/, '')
   const base = /(?:^|[/\\])\.git$/.test(common) ? common.replace(/[/\\]\.git$/, '') : String(repoRoot ?? '')
-  return `${base || String(repoRoot ?? '')}${sep}local${sep}codex-auth.json`
+  return base || String(repoRoot ?? '')
 }
 
 /** Shell-quote one value for the record command line we print. */

@@ -128,6 +128,14 @@ scripts/.tile-cache
 # Runtime state of the batch-resilience layers (child-retry, alert-escalation).
 .claude/resilience/
 
+# Which vendor the read-only work goes to (scripts/sol-share.mjs, point 654). THIS
+# MACHINE's operator setting, flipped when one of the two allowances runs short — a
+# committed one would hand a clone somebody else's routing, and it would conflict on
+# every branch that touched it. It lives in the MAIN checkout, so every worktree agent
+# reads the setting the user actually flipped.
+.claude/sol-share.json
+.claude/sol-share.json.tmp-*
+
 # Local GitHub PAT (ci-status-guard.mjs probes this path) — never committed
 .secrets/
 
