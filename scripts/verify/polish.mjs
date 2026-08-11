@@ -2766,7 +2766,16 @@ if (section('settlement-edge')) {
         const s = window.__placeSeason()
         return { wetness: s.wetness, groundWet: s.groundWet, sun: s.sun, hemi: s.hemi }
       },
-      { settleMs: 400, samples: 3, timeout: 60000 },
+      // A LOAD-PROOF budget, not a tight one (point 641). The soak advances per
+      // FRAME, so a machine that draws a quarter of the frames needs about four
+      // times the wall clock for the same drying — and the 60 s this used to
+      // allow is only 1.7× the 34.9 s the dry settle takes on a quiet machine.
+      // Measured under `throttle-probe … --rate 4`: 1 of 3 runs failed here at
+      // 60 051 ms with groundWet at 0.133 and still falling — a budget expiring
+      // on a converging reading, not a scene that had stopped. The ceiling stays
+      // as a net for a settle that genuinely never comes; it costs a green run
+      // nothing.
+      { settleMs: 400, samples: 3, timeout: 240000 },
     )
     check(
       `${id} (${seasonName}): the ground's wet state settles before the band is measured`,
