@@ -276,6 +276,23 @@ describe('the rank record degrades, it never throws inside a guard', () => {
     expect(parseRankRecord('{"ranked":{"300":{"at":"t"}}}').ranked).toEqual({})
     expect(parseRankRecord('{"ranked":{"300":{"why":"weil"}}}').ranked[300]).toEqual({ at: '', why: 'weil' })
   })
+  it('lets NO record declare itself torn — the mark is the parser’s alone', () => {
+    // The escape: a syntactically PERFECT file carrying `"torn": true` used to
+    // disable the gate for ever and lock the door behind it — the guard drew no
+    // verdict, and every CLI write was refused as unreadable, so nothing could
+    // repair the file that did it.
+    const claims = '{"ranked":{},"settled":{"at":"t","points":[1,2]},"torn":true}'
+    expect(parseRankRecord(claims).torn).toBe(false)
+    expect(appendGateState([1, 2, 3], parseRankRecord(claims)).state).toBe('pending')
+    expect(unrankedAppends([1, 2, 3], parseRankRecord(claims))).toEqual([3])
+    // …and the file stays repairable, rather than refusing every write.
+    expect(() => recordRank(parseRankRecord(claims), 3, { why: 'last is right' })).not.toThrow()
+    expect(normaliseRankRecord({ torn: true })).toEqual({ ranked: {}, settled: null, torn: false })
+    // The one thing that DOES mark a record torn survives being normalised again.
+    expect(normaliseRankRecord(parseRankRecord('{"ranked":{')).torn).toBe(true)
+    // And nothing writes the field back: the repaired record carries no `torn`.
+    expect('torn' in recordRank(parseRankRecord(claims), 3, { why: 'w' })).toBe(false)
+  })
   it('drops hostile entries instead of trusting them', () => {
     const r = normaliseRankRecord({ ranked: { 0: { why: 'x' }, '-2': { why: 'x' }, z: {}, 7: 'no', 8: { why: ' w ' } } })
     expect(r).toEqual({ ranked: { 8: { at: '', why: 'w' } }, settled: null, torn: false })

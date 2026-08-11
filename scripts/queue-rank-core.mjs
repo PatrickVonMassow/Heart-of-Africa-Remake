@@ -109,6 +109,32 @@ function normaliseSettled(raw) {
 }
 
 /**
+ * THE TORN MARK BELONGS TO THE PARSER, AND NO FILE CAN CARRY IT (cross-vendor
+ * review, 11.08.2026).
+ *
+ * `torn` used to be read straight off the record — `src.torn === true` — which
+ * made it the one field a record could assert about ITSELF. A syntactically
+ * perfect `{"ranked":{},"settled":{…},"torn":true}` therefore disabled the gate
+ * for ever and locked the door behind it: the guard drew no verdict from a "torn"
+ * record, and every CLI write was refused as unreadable, so nothing could repair
+ * the file that did it. One hand-edit, one bad merge or one careless copy of a
+ * parse result was enough.
+ *
+ * A SYMBOL CANNOT BE WRITTEN IN JSON, so the flag is carried on one — set only
+ * where the bytes actually failed to parse, and non-enumerable so it never
+ * reaches a serialiser or a comparison. Whatever a record says about itself, only
+ * the parser decides that it is torn. Nothing writes the field back either:
+ * `pruneRankRecord` and `settleRecord` build `{ranked, settled}`, so a file that
+ * arrived carrying `"torn"` loses it at the next write.
+ */
+const PARSER_TORN = Symbol('queue-rank.torn')
+
+/** Mark a record as unreadable — the parser's own hand, not the file's. */
+function markTorn(record) {
+  return Object.defineProperty(record, PARSER_TORN, { value: true, enumerable: false })
+}
+
+/**
  * The stored record: `{ ranked: { "<N>": {at, why} }, settled: {at, points[], why?}, torn }`.
  *
  * `ranked` holds the deliberate "last is right" decisions; `settled` is the
@@ -137,7 +163,11 @@ export function normaliseRankRecord(raw) {
     if (!why) continue
     ranked[n] = { at: str(value.at), why }
   }
-  return { ranked, settled: normaliseSettled(src.settled), torn: src.torn === true }
+  // NOT `src.torn`: the flag is read off the parser's mark, so a record can never
+  // declare itself unreadable and silence the gate.
+  const torn = raw !== null && raw !== undefined && raw[PARSER_TORN] === true
+  const out = { ranked, settled: normaliseSettled(src.settled), torn }
+  return torn ? markTorn(out) : out
 }
 
 /**
@@ -164,7 +194,7 @@ export function normaliseRankRecord(raw) {
  */
 export function parseRankRecord(text) {
   const empty = { ranked: {}, settled: null, torn: false }
-  const broken = { ranked: {}, settled: null, torn: true }
+  const broken = markTorn({ ranked: {}, settled: null, torn: true })
   if (text === null || text === undefined) return empty
   // Anything that is not the file's own bytes is not a record either.
   if (typeof text !== 'string' || !text.trim()) return broken
