@@ -45,6 +45,12 @@ import {
   resolveCardText,
   hoursLabel,
   nowCard,
+  parseClosingArgs,
+  pointSubject,
+  queueCard,
+  upgradeNowCards,
+  closingCardTitle,
+  CLOSING_STAGE,
   promoteToNow,
   refreshFooter,
   removeVdzk,
@@ -114,11 +120,12 @@ describe('promoteToNow', () => {
       status: 'läuft',
       stamp: '15:41',
     })
-    expect(out).toContain('<span class="t">369 — Etwas</span>')
+    // The number rides in the SAME chip the queue cards use (point 655).
+    expect(out).toContain('<summary><span class="num">369</span><span class="t">Etwas</span>')
     expect(out).toContain('<span class="stamp">Stand 15:41</span> läuft')
     // the queue card is gone, and the now-card sits inside the first section
-    expect(out.match(/class="num">369/g)).toBeNull()
-    const nowAt = out.indexOf('369 — Etwas')
+    expect(queueCard(out, 369)).toBeNull()
+    const nowAt = out.indexOf('<span class="t">Etwas</span>')
     expect(nowAt).toBeGreaterThan(out.indexOf('Woran ich gerade arbeite'))
     expect(nowAt).toBeLessThan(out.indexOf('Warteschlange'))
   })
@@ -207,15 +214,15 @@ describe('toNow — queue card in, current-work card out', () => {
 
   it('derives title and projected end from the queue card the caller never retypes', () => {
     const out = toNow(board(), 369, 'Neu angesetzt.', { stamp: '16:20' })
-    expect(out).toContain('<span class="t">369 — Ein verwaistes Jungtier</span>')
+    expect(out).toContain('<span class="num">369</span><span class="t">Ein verwaistes Jungtier</span>')
     expect(out).toContain('<span class="meta">16:20 · ~18:20</span>')
     expect(out).toContain('<span class="stamp">Stand 16:20</span> Neu angesetzt.')
   })
 
   it('leaves no queue card behind — the double-listing the guard blocks on', () => {
     const out = toNow(board(), 369, 'x', { stamp: '16:20' })
-    expect(out).not.toContain('class="num">369')
-    expect(out.indexOf('369 — ')).toBeLessThan(out.indexOf('Warteschlange'))
+    expect(queueCard(out, 369)).toBeNull()
+    expect(out.indexOf('class="num">369')).toBeLessThan(out.indexOf('Warteschlange'))
   })
 
   it('leads the section, because the focus guard reads the FIRST now-card', () => {
@@ -325,9 +332,9 @@ describe('closeCard — archiving a point never empties the board', () => {
   it('archives and promotes the successor in one document, with no empty state in between', () => {
     const out = closeCard(board(), 300, { text: 'Fertig.', end: '16:45', next: 416, nextStatus: 'Angefangen.' })
     expect(hasCurrentWork(out)).toBe(true)
-    expect(out).toContain('<span class="t">416 — Die leere Tafel</span>')
+    expect(out).toContain('<span class="num">416</span><span class="t">Die leere Tafel</span>')
     expect(out).toContain('<span class="meta">10:07 · 16:45</span>') // the archived card
-    expect(out).not.toContain('class="num">416') // …and the queue card is gone
+    expect(queueCard(out, 416)).toBeNull() // …and the queue card is gone
   })
 
   it('names the gap with --none when there is genuinely nothing to promote', () => {
@@ -641,7 +648,8 @@ describe('setCardTitle — the command a now-card never had', () => {
 
   it('retitles a now-card, keeping its number, times and body', () => {
     const out = setCardTitle(withBoth(), 373, 'Die Sitzungsgrenze')
-    expect(out).toContain('<span class="t">373 — Die Sitzungsgrenze</span>')
+    // A card still written in the pre-655 shape is lifted into the chip.
+    expect(out).toContain('<span class="num">373</span><span class="t">Die Sitzungsgrenze</span>')
     expect(out).toContain('<span class="meta">16:20 · ~18:30</span>')
     expect(out).toContain('<span class="stamp">Stand 16:20</span> läuft')
     expect(out).not.toContain('DER ALTE TITEL')
@@ -745,13 +753,15 @@ describe('the no-work card replaces rather than appends', () => {
   })
 
   it('is writable with NO point to close — the boundary case that forced the hand edit', () => {
-    const out = toNoCurrentWork(emptyBoard(), 'Der Punkt ist abgeschlossen.', { stamp: '22:27' })
+    const out = toNoCurrentWork(emptyBoard(), 'Punkt 470 ist abgeschlossen.', { stamp: '22:27' })
     expect(hasCurrentWork(out)).toBe(true)
     expect(claimsNoCurrentWork(out)).toBe(true)
   })
 
   it('produces markup the board guards accept — structurally and by audit', () => {
-    const out = toNoCurrentWork(emptyBoard(), 'Der Punkt ist abgeschlossen.', { stamp: '22:27' })
+    // The handover card names the follow-on point in PROSE — it is the one card
+    // without a chip, and the publish gate refuses it when it names none (655).
+    const out = toNoCurrentWork(emptyBoard(), 'Abgeschlossen; der Nachfolger nimmt Punkt 471.', { stamp: '22:27' })
     const before = new Set(structureViolations(emptyBoard()).map((v) => v.code))
     expect(structureViolations(out).map((v) => v.code).filter((c) => !before.has(c))).toEqual([])
     const auditBefore = new Set(auditDashboard(emptyBoard(), { open: [470], done: [] }).map((v) => v.code))
@@ -773,7 +783,7 @@ describe('the no-work card replaces rather than appends', () => {
     const out = toNow(idle, 470, 'Angefangen.', { stamp: '22:30' })
     expect(noCurrentWorkCards(out)).toHaveLength(0)
     expect(claimsNoCurrentWork(out)).toBe(false)
-    expect(out).toContain('<span class="t">470 — Die leere Karte</span>')
+    expect(out).toContain('<span class="num">470</span><span class="t">Die leere Karte</span>')
   })
 
   it('closeCard --none still names the gap, and still only once', () => {
@@ -815,17 +825,44 @@ describe('the closing card — a state that is NOT a claim to stop', () => {
   const emptyBoard = () => fullBoard({ queue: queueEntry(544, 'Die dritte Kartenart', '~2 h') })
   const REASON = 'Der Punkt ist gemergt und abgehakt; das Vier-Augen-Protokoll und die Retrospektive fehlen noch.'
 
-  it('stands unnumbered under its own title, with the reason the reader needs', () => {
-    const out = toClosingWork(emptyBoard(), REASON, { stamp: '23:40' })
-    expect(out).toContain(`<span class="t">${CLOSING_WORK_TITLE}</span>`)
-    expect(out).toContain(`<span class="stamp">Stand 23:40</span> ${REASON}`)
+  // POINT 655: the card NAMES its point — the chip, the subject, the stage —
+  // and its body says what the point was about before what is left of it.
+  it('stands under its point: the chip, the subject, then the stage', () => {
+    const out = toClosingWork(emptyBoard(), 544, { reason: REASON, stamp: '23:40' })
+    expect(out).toContain('<span class="num">544</span><span class="t">Die dritte Kartenart: Abschlussarbeiten</span>')
+    expect(out).toContain(REASON)
     expect(hasCurrentWork(out)).toBe(true)
-    expect(parseNowCardPoints(out).size).toBe(0)
+    expect(parseNowCardPoints(out)).toEqual(new Set([544]))
     expect(closingWorkCards(out)).toHaveLength(1)
   })
 
+  it('leads its body with the subject and only then with the stage', () => {
+    const out = toClosingWork(emptyBoard(), 544, { reason: REASON, stamp: '23:40' })
+    const body = out.slice(out.indexOf('<div class="body">'), out.indexOf('</div>'))
+    expect(body.indexOf('Die dritte Kartenart')).toBeLessThan(body.indexOf(REASON))
+    expect(body).toContain(CLOSING_STAGE)
+  })
+
+  it('takes the subject the board already knows — from the queue, Erledigt or a now-card', () => {
+    expect(pointSubject(emptyBoard(), 544)).toBe('Die dritte Kartenart')
+    expect(pointSubject(emptyBoard(), 999)).toBeNull()
+    // A card composed twice must not stack its stage word.
+    expect(closingCardTitle('X: Abschlussarbeiten')).toBe('X: Abschlussarbeiten')
+  })
+
+  it('refuses a point it can name no subject for, rather than writing a stage alone', () => {
+    expect(() => toClosingWork(fullBoard({}), 999, { reason: REASON })).toThrow(/--title/)
+    // …and takes one when the caller supplies it.
+    const out = toClosingWork(fullBoard({}), 999, { subject: 'Ein Betreff', reason: REASON, stamp: '23:40' })
+    expect(out).toContain('<span class="num">999</span><span class="t">Ein Betreff: Abschlussarbeiten</span>')
+  })
+
+  it('refuses a call with no point at all — the shape that lost the number', () => {
+    expect(() => toClosingWork(emptyBoard(), REASON)).toThrow(/takes the POINT it closes/)
+  })
+
   it('is NOT the idle claim — that is the whole reason it exists', () => {
-    const out = toClosingWork(emptyBoard(), REASON, { stamp: '23:40' })
+    const out = toClosingWork(emptyBoard(), 544, { reason: REASON, stamp: '23:40' })
     expect(claimsNoCurrentWork(out)).toBe(false)
     expect(claimsClosingWork(out)).toBe(true)
   })
@@ -833,7 +870,7 @@ describe('the closing card — a state that is NOT a claim to stop', () => {
   it('leaves exactly ONE card however often it is written, like the idle card', () => {
     let html = emptyBoard()
     for (const reason of ['Vier-Augen-Protokoll fehlt.', 'Retrospektive fehlt.', 'Nur noch der Nachtrag.']) {
-      html = toClosingWork(html, reason, { stamp: '23:40' })
+      html = toClosingWork(html, 544, { reason, stamp: '23:40' })
       expect(closingWorkCards(html)).toHaveLength(1)
     }
     expect(html).toContain('Nur noch der Nachtrag.')
@@ -842,24 +879,28 @@ describe('the closing card — a state that is NOT a claim to stop', () => {
 
   it('REPLACES a standing idle card rather than joining it', () => {
     const idle = toNoCurrentWork(emptyBoard(), 'Sitzungsgrenze.', { stamp: '23:30' })
-    const out = toClosingWork(idle, REASON, { stamp: '23:40' })
+    const out = toClosingWork(idle, 544, { reason: REASON, stamp: '23:40' })
     expect(noCurrentWorkCards(out)).toHaveLength(0)
     expect(closingWorkCards(out)).toHaveLength(1)
     expect(claimsNoCurrentWork(out)).toBe(false)
   })
 
   it('is swept away the moment a numbered point is promoted', () => {
-    const closing = toClosingWork(emptyBoard(), REASON, { stamp: '23:40' })
+    const closing = toClosingWork(emptyBoard(), 544, { reason: REASON, stamp: '23:40' })
     const out = toNow(closing, 544, 'Angefangen.', { stamp: '23:45' })
     expect(closingWorkCards(out)).toHaveLength(0)
-    expect(out).toContain('<span class="t">544 — Die dritte Kartenart</span>')
+    expect(out).toContain('<span class="num">544</span><span class="t">Die dritte Kartenart</span>')
   })
 
   // THE BOUNDARY STILL ENDS THE SAME WAY: `batch-boundary.mjs` prints
   // `board.mjs none`, and the claim to stop is made exactly once, at the end.
   it('gives way to the idle card at the boundary, which then stands ALONE', () => {
-    const closing = toClosingWork(emptyBoard(), REASON, { stamp: '23:40' })
-    const out = toNoCurrentWork(closing, 'Der Punkt ist abgeschlossen.', { stamp: '23:55' })
+    // The closing card is NUMBERED since point 655, and the boundary's handover
+    // card must still be writable over it — it is a state, not running work.
+    const closing = toClosingWork(emptyBoard(), 544, { reason: REASON, stamp: '23:40' })
+    const out = toNoCurrentWork(closing, 'Punkt 544 ist abgeschlossen; der Nachfolger nimmt Punkt 545.', {
+      stamp: '23:55',
+    })
     expect(closingWorkCards(out)).toHaveLength(0)
     expect(noCurrentWorkCards(out)).toHaveLength(1)
     expect(claimsNoCurrentWork(out)).toBe(true)
@@ -868,16 +909,18 @@ describe('the closing card — a state that is NOT a claim to stop', () => {
 
   it('refuses to claim it while a numbered card stands, naming both ways out', () => {
     const busy = fullBoard({ now: nowEntry(544, 'Läuft', '22:30 · ~23:00') })
-    expect(() => toClosingWork(busy, REASON)).toThrow(/refusing to claim that only closing duties are left/)
-    expect(() => toClosingWork(busy, REASON)).toThrow(/done 544 --none[\s\S]*queue 544/)
+    expect(() => toClosingWork(busy, 544, { reason: REASON })).toThrow(
+      /refusing to claim that only closing duties are left/,
+    )
+    expect(() => toClosingWork(busy, 544, { reason: REASON })).toThrow(/done 544 --none[\s\S]*queue 544/)
   })
 
   it('demands a reason — a bare card would say nothing the reader can act on', () => {
-    expect(() => toClosingWork(emptyBoard(), '   ')).toThrow(/WHICH duties are still owed/)
+    expect(() => toClosingWork(emptyBoard(), 544, { reason: '   ' })).toThrow(/WHICH duties are still owed/)
   })
 
   it('produces markup the board guards accept — structurally and by audit', () => {
-    const out = toClosingWork(emptyBoard(), REASON, { stamp: '23:40' })
+    const out = toClosingWork(emptyBoard(), 544, { reason: REASON, stamp: '23:40' })
     const before = new Set(structureViolations(emptyBoard()).map((v) => v.code))
     expect(structureViolations(out).map((v) => v.code).filter((c) => !before.has(c))).toEqual([])
     const auditBefore = new Set(auditDashboard(emptyBoard(), { open: [544], done: [] }).map((v) => v.code))
@@ -895,6 +938,51 @@ describe('the closing card — a state that is NOT a claim to stop', () => {
       expect(claimsClosingWork(junk)).toBe(false)
       expect(closingWorkCards(junk)).toEqual([])
     }
+  })
+
+  // The board is ONE living file that is never checked out fresh, so on the day
+  // the chip lands every card on it is still in the old shape — and the publish
+  // gate refuses a card without a chip. Every board.mjs edit lifts them.
+  it('upgrades a card written before the chip, on any edit', () => {
+    const old =
+      fullBoard({
+        now: nowEntry(648, 'Die Kinder hängen', '23:39 · ~03:39'),
+        queue: queueEntry(369, 'Ein verwaistes Jungtier', '~2 h'),
+      }) +
+      '\n<details class="now">\n  <summary><span class="t">Gerade keine laufende Arbeit</span></summary>\n' +
+      '  <div class="body"><p>Punkt 649 folgt.</p></div>\n</details>'
+    const out = upgradeNowCards(old)
+    expect(out).toContain('<span class="num">648</span><span class="t">Die Kinder hängen</span>')
+    expect(out).toContain('<details class="now" data-state="idle">')
+    // Idempotent: a second pass changes nothing, and a queue card is untouched.
+    expect(upgradeNowCards(out)).toBe(out)
+    expect(out).toContain('<span class="num">369</span>')
+    for (const junk of [null, undefined, 42, {}]) expect(() => upgradeNowCards(junk)).not.toThrow()
+  })
+
+  it('finds and replaces a legacy state card by its title, so the state still REPLACES', () => {
+    const legacy =
+      fullBoard({}) +
+      `\n<details class="now">\n  <summary><span class="t">${CLOSING_WORK_TITLE}</span></summary>\n` +
+      '  <div class="body"><p>Alt.</p></div>\n</details>'
+    expect(closingWorkCards(legacy)).toHaveLength(1)
+    expect(closingWorkCards(upgradeNowCards(legacy))).toHaveLength(1)
+  })
+
+  it('splits its argv into point, subject and reason', () => {
+    expect(parseClosingArgs(['544', 'Vier-Augen fehlt.'])).toEqual({
+      point: '544',
+      subject: null,
+      words: ['Vier-Augen fehlt.'],
+    })
+    expect(parseClosingArgs(['544', '--title', 'Der Betreff', 'Grund'])).toEqual({
+      point: '544',
+      subject: 'Der Betreff',
+      words: ['Grund'],
+    })
+    expect(() => parseClosingArgs(['544', '--title'])).toThrow(/needs the point SUBJECT/)
+    expect(() => parseClosingArgs(['544', '--title', 'a', '--title', 'b'])).toThrow(/twice/)
+    expect(parseClosingArgs(undefined)).toEqual({ point: '', subject: null, words: [] })
   })
 
   it('names both unnumbered state cards for the guards that must know them', () => {

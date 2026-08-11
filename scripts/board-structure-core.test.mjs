@@ -1,12 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { markupOnly, nowCardKinds, REQUIRED_SECTIONS, structureViolations } from './board-structure-core.mjs'
-import { CLOSING_WORK_TITLE, NO_CURRENT_WORK_TITLE } from './board-core.mjs'
+import {
+  cardNamingViolations,
+  markupOnly,
+  nowCardKinds,
+  nowCards,
+  REQUIRED_SECTIONS,
+  stageOnlyTitle,
+  structureViolations,
+} from './board-structure-core.mjs'
+import { CLOSING_WORK_TITLE, NO_CURRENT_WORK_TITLE, toClosingWork, toNoCurrentWork } from './board-core.mjs'
 
 /** A minimal but structurally faithful board. */
 const sect = (title, body = '') =>
   `<details class="sect"><summary><h2>${title}</h2></summary>\n${body}\n</details>`
+// The pre-655 shape, deliberately: it must stay readable and stay accepted —
+// its number simply sits in the title instead of the chip.
 const nowCard = (n) =>
   `<details class="now">\n  <summary><span class="t">${n} — Titel</span></summary>\n  <div class="body"><p>Text</p></div>\n</details>`
+/** The shape every current-work card carries since point 655. */
+const chipCard = (n, title = 'Titel', state = '') =>
+  `<details class="now"${state ? ` data-state="${state}"` : ''}>\n  <summary><span class="num">${n}</span>` +
+  `<span class="t">${title}</span></summary>\n  <div class="body"><p>Text</p></div>\n</details>`
 const queueCard = (n) =>
   `<details>\n  <summary><span class="num">${n}</span><span class="t">Titel</span></summary>\n  <div class="body"><p>Text</p></div>\n</details>`
 
@@ -141,12 +155,15 @@ describe('the board carries its own viewport', () => {
 // others, so a mixture means a hand edit — and this gate runs before the bytes
 // leave, which is where a hand edit is still cheap to catch.
 describe('one kind of current-work card', () => {
-  const stateCard = (title) =>
-    `<details class="now">\n  <summary><span class="t">${title}</span>` +
+  const stateCard = (title, { state = '', point = null, body = 'Text' } = {}) =>
+    `<details class="now"${state ? ` data-state="${state}"` : ''}>\n  <summary>` +
+    `${point == null ? '' : `<span class="num">${point}</span>`}<span class="t">${title}</span>` +
     `<span class="right"><span class="meta">23:40</span></span></summary>\n` +
-    `  <div class="body"><p>Text</p></div>\n</details>`
-  const IDLE = stateCard(NO_CURRENT_WORK_TITLE)
-  const CLOSING = stateCard(CLOSING_WORK_TITLE)
+    `  <div class="body"><p>${body}</p></div>\n</details>`
+  // The handover card carries no chip by design, so its BODY has to name the
+  // point the successor picks up (point 655).
+  const IDLE = stateCard(NO_CURRENT_WORK_TITLE, { state: 'idle', body: 'Der Nachfolger nimmt Punkt 545.' })
+  const CLOSING = stateCard('Die dritte Kartenart: Abschlussarbeiten', { state: 'closing', point: 544 })
   const withNow = (body) =>
     VIEWPORT +
     '<div class="wrap">\n' +
@@ -195,7 +212,7 @@ describe('one kind of current-work card', () => {
       '\n' +
       sect(
         REQUIRED_SECTIONS[3],
-        `<details>\n  <summary><span class="num">543</span><span class="t">${CLOSING_WORK_TITLE}</span>` +
+        `<details>\n  <summary><span class="num">543</span><span class="t">${CLOSING_WORK_TITLE}: X</span>` +
           `</summary>\n  <div class="body"><p>Text</p></div>\n</details>`,
       ) +
       '\n</div>'
@@ -207,6 +224,108 @@ describe('one kind of current-work card', () => {
     for (const junk of [null, undefined, 42, {}, '', '<main>nichts</main>']) {
       expect(() => nowCardKinds(junk)).not.toThrow()
       expect(nowCardKinds(junk)).toEqual([])
+    }
+  })
+})
+
+// ═══ Point 655 — every card names its point and its subject ═══
+// The user, 11.08.2026, with a screenshot of a card titled "Abschlussarbeiten
+// zum gerade beendeten Punkt": "there is not even the number of the point on it,
+// let alone what the point is about. Both must always be on it, by mechanism."
+// The board is read on a phone at a glance, so a card that names only the STAGE
+// is, to the reader, the same as no card at all.
+describe('every current-work card names its point and its subject', () => {
+  const withNow = (body) =>
+    VIEWPORT +
+    '<div class="wrap">\n' +
+    sect(REQUIRED_SECTIONS[0], body) +
+    '\n' +
+    sect(REQUIRED_SECTIONS[1], queueCard(1)) +
+    '\n' +
+    sect(REQUIRED_SECTIONS[2], queueCard(401)) +
+    '\n' +
+    sect(REQUIRED_SECTIONS[3], queueCard(2)) +
+    '\n</div>'
+
+  it('accepts a card with the chip and a subject title', () => {
+    expect(codes(withNow(chipCard(651, 'Das Trommelbett ist eine 1,9-Sekunden-Schleife')))).toEqual([])
+    // …and the composed closing title: number, subject, THEN the stage.
+    expect(
+      codes(withNow(chipCard(651, 'Das Trommelbett ist eine 1,9-Sekunden-Schleife: Abschlussarbeiten', 'closing'))),
+    ).toEqual([])
+  })
+
+  it('REFUSES a now-card without a numbered chip, naming the card', () => {
+    const nameless =
+      '<details class="now">\n  <summary><span class="t">Abschlussarbeiten zum gerade beendeten Punkt</span>' +
+      '</summary>\n  <div class="body"><p>Text</p></div>\n</details>'
+    const found = cardNamingViolations(withNow(nameless))
+    expect(found.map((v) => v.code)).toContain('now-card-unnumbered')
+    expect(found[0].msg).toContain('Abschlussarbeiten zum gerade beendeten Punkt')
+  })
+
+  it('REFUSES a title that is only a stage word, in either language', () => {
+    for (const title of [
+      'Abschlussarbeiten',
+      'Abschlussarbeiten zum gerade beendeten Punkt',
+      'Nacharbeit am Zweig',
+      'Vorbereitung',
+      'Aufräumen',
+      'closing duties',
+      'cleanup',
+    ]) {
+      expect(stageOnlyTitle(title), title).toBe(true)
+      expect(codes(withNow(chipCard(651, title)))).toContain('now-card-stage-title')
+    }
+  })
+
+  it('lets a subject through that merely CONTAINS a stage word', () => {
+    for (const title of [
+      'Das Trommelbett ist eine 1,9-Sekunden-Schleife: Abschlussarbeiten',
+      'Die Vorbereitung der Karten ist der Punkt',
+      '651 — Ein Betreff',
+    ]) {
+      expect(stageOnlyTitle(title), title).toBe(false)
+    }
+    expect(stageOnlyTitle('')).toBe(true)
+    expect(stageOnlyTitle(null)).toBe(true)
+  })
+
+  it('exempts the handover card from the chip — it belongs to NO point', () => {
+    const handover =
+      '<details class="now" data-state="idle">\n  <summary><span class="t">Gerade keine laufende Arbeit</span>' +
+      '</summary>\n  <div class="body"><p>Der Nachfolger nimmt Punkt 656 auf.</p></div>\n</details>'
+    expect(codes(withNow(handover))).toEqual([])
+  })
+
+  it('…but REFUSES a handover card that names no follow-on work', () => {
+    const mute =
+      '<details class="now" data-state="idle">\n  <summary><span class="t">Gerade keine laufende Arbeit</span>' +
+      '</summary>\n  <div class="body"><p>Die Sitzung endet hier.</p></div>\n</details>'
+    expect(codes(withNow(mute))).toContain('handover-card-nameless')
+  })
+
+  it('keeps reading a card written before the chip existed', () => {
+    expect(codes(withNow(nowCard(544)))).toEqual([])
+    expect(nowCards(withNow(nowCard(544)))).toEqual([{ kind: 'point', point: '544', title: '544 — Titel' }])
+  })
+
+  it('passes what the sanctioned writers produce', () => {
+    const base = withNow(chipCard(651, 'Ein Betreff'))
+    const closing = toClosingWork(base.replace(chipCard(651, 'Ein Betreff'), ''), 651, {
+      subject: 'Ein Betreff',
+      reason: 'Das Vier-Augen-Protokoll fehlt noch.',
+      stamp: '23:40',
+    })
+    expect(codes(closing)).toEqual([])
+    const handover = toNoCurrentWork(closing, 'Abgeschlossen; der Nachfolger nimmt Punkt 652.', { stamp: '23:55' })
+    expect(codes(handover)).toEqual([])
+  })
+
+  it('is total on junk rather than throwing into the publisher', () => {
+    for (const junk of [null, undefined, 42, {}, '', '<main>nichts</main>']) {
+      expect(() => cardNamingViolations(junk)).not.toThrow()
+      expect(cardNamingViolations(junk)).toEqual([])
     }
   })
 })

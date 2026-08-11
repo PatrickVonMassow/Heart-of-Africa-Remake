@@ -107,8 +107,8 @@ export function structureViolations(html) {
   const nowStart = m.indexOf(REQUIRED_SECTIONS[0])
   const nextStart = m.indexOf(REQUIRED_SECTIONS[1])
   if (nowStart >= 0 && nextStart > nowStart) {
-    const inside = count(m.slice(nowStart, nextStart), /<details class="now">/g)
-    const total = count(m, /<details class="now">/g)
+    const inside = count(m.slice(nowStart, nextStart), /<details class="now"[^>]*>/g)
+    const total = count(m, /<details class="now"[^>]*>/g)
     if (inside !== total) {
       out.push({
         code: 'now-card-outside',
@@ -156,6 +156,106 @@ export function structureViolations(html) {
     }
   }
 
+  out.push(...cardNamingViolations(html))
+
+  return out
+}
+
+/**
+ * THE STAGE WORDS a card title may not consist of (point 655, user 11.08.2026,
+ * both languages). A stage says WHERE in the work the session stands, never what
+ * the work IS — "Abschlussarbeiten" was the whole title of a card, and the user
+ * read it on his phone without learning which point had ended or what it had
+ * been about.
+ */
+export const STAGE_WORDS = [
+  'Abschlussarbeiten',
+  'Nacharbeit',
+  'Nacharbeiten',
+  'Vorbereitung',
+  'Vorbereitungen',
+  'Aufräumen',
+  'Aufraeumen',
+  'Aufräumarbeiten',
+  'closing work',
+  'closing duties',
+  'closing',
+  'rework',
+  'preparation',
+  'cleanup',
+  'clean-up',
+  'tidying',
+]
+
+/**
+ * Does this title say only what STAGE the work is in? True when it BEGINS with a
+ * stage word, because then nothing names the subject ahead of it — the composed
+ * form is "<Betreff>: <Stage>", subject first. The number prefix of a card
+ * written before the chip is stripped before judging.
+ */
+export function stageOnlyTitle(title) {
+  const text = String(title ?? '')
+    .replace(/^\s*\d+\s*[—–-]\s*/, '')
+    .trim()
+  if (!text) return true
+  return STAGE_WORDS.some((w) => new RegExp(`^${w}\\b`, 'i').test(text))
+}
+
+/**
+ * Does this handover card name the work that FOLLOWS? The one unnumbered card
+ * carries no chip, so the point the successor picks up has to stand in its prose
+ * — otherwise the single screen the reader has says nothing at all about what
+ * happens next.
+ */
+export function namesFollowOnWork(bodyText) {
+  return /\b(?:punkt|point)\s*(\d{1,4})\b/i.test(String(bodyText ?? ''))
+}
+
+/**
+ * (7) EVERY CURRENT-WORK CARD NAMES ITS POINT AND ITS SUBJECT (point 655).
+ *
+ * The queue cards always did — a numbered chip and a German title — and the
+ * cards a session writes at a TRANSITION did not: the now-card, the closing
+ * card, the handover card. A card titled with a stage alone is, to the reader on
+ * his phone, the same as no card. Refused before the bytes leave, naming the
+ * card that is wrong; `scripts/board.mjs` lifts an older card into the chip
+ * shape on every edit, so the repair is any board command, never a hand edit.
+ */
+export function cardNamingViolations(html) {
+  const out = []
+  const doc = markupOnly(typeof html === 'string' ? html : '')
+  const bodies = [...doc.matchAll(/<details class="now"[^>]*>([\s\S]*?)<\/details>/g)].map((m) =>
+    m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+  )
+  nowCards(doc).forEach((card, i) => {
+    const named = card.title ? `"${card.title.slice(0, 60)}"` : '<untitled>'
+    if (card.kind === 'idle') {
+      // The ONE deliberate exception (point 434(7)): the handover card belongs to
+      // no point, so it may not carry a chip — but it owes the successor's point
+      // in prose.
+      if (!namesFollowOnWork(bodies[i])) {
+        out.push({
+          code: 'handover-card-nameless',
+          msg:
+            `the handover card ${named} names no follow-on work — it is the one card without a ` +
+            'number, so its text must say which point the batch picks up next',
+        })
+      }
+      return
+    }
+    if (card.point == null) {
+      out.push({
+        code: 'now-card-unnumbered',
+        msg: `the current-work card ${named} carries no numbered chip — every card but the handover card names its point`,
+      })
+    }
+    if (stageOnlyTitle(card.title)) {
+      out.push({
+        code: 'now-card-stage-title',
+        msg: `the current-work card ${named} is titled with a STAGE and no subject — say what the point is about first, e.g. "<Betreff>: Abschlussarbeiten"`,
+      })
+    }
+  })
   return out
 }
 
@@ -168,15 +268,36 @@ export function structureViolations(html) {
  * are a report and not a card. Total: anything unreadable yields [].
  */
 export function nowCardKinds(html) {
+  return nowCards(html).map((c) => c.kind)
+}
+
+/**
+ * Every current-work card as {kind, point, title}, in document order.
+ *
+ * The KIND comes from the `data-state` marker the writers stamp on since point
+ * 655 — the closing card's title is composed per point now, so no literal text
+ * can identify it — and falls back to the two legacy titles for a card written
+ * before that. `point` is the numbered chip, null on the unnumbered handover
+ * card. Total: anything unreadable yields [].
+ */
+export function nowCards(html) {
   const m = markupOnly(typeof html === 'string' ? html : '')
   const from = m.indexOf(REQUIRED_SECTIONS[0])
   if (from < 0) return []
   const to = m.indexOf(REQUIRED_SECTIONS[1], from + 1)
   const section = m.slice(from, to > from ? to : undefined)
-  const kinds = []
-  for (const hit of section.matchAll(/<details class="now">\s*<summary><span class="t">([^<]*)<\/span>/g)) {
-    const title = hit[1].trim()
-    kinds.push(title === NO_CURRENT_WORK_TITLE ? 'idle' : title === CLOSING_WORK_TITLE ? 'closing' : 'point')
+  const cards = []
+  for (const hit of section.matchAll(/<details class="now"([^>]*)>\s*<summary>([\s\S]*?)<\/summary>/g)) {
+    const marked = (hit[1].match(/data-state="([^"]*)"/) ?? [])[1] ?? null
+    const title = ((hit[2].match(/<span class="t">([^<]*)<\/span>/) ?? [])[1] ?? '').trim()
+    const num = (hit[2].match(/<span class="num">\s*(\d+)\s*<\/span>/) ?? [])[1] ?? null
+    const legacy = title === NO_CURRENT_WORK_TITLE ? 'idle' : title === CLOSING_WORK_TITLE ? 'closing' : 'point'
+    cards.push({
+      kind: marked === 'idle' || marked === 'closing' ? marked : legacy,
+      // A card written before the chip carries its number in the title instead.
+      point: num ?? (title.match(/^(\d+)\s*[—–-]/) ?? [])[1] ?? null,
+      title,
+    })
   }
-  return kinds
+  return cards
 }
