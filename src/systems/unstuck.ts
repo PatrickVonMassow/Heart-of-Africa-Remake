@@ -72,6 +72,27 @@ export function updateStall(
   return { ...s, heldSeconds, stuck }
 }
 
+/**
+ * The hint that names the escape belongs on screen (work-order 610).
+ *
+ * On the stuck EDGE it is raised, as it always was. It is also raised again when
+ * it has timed out while he is still holding an input and getting nowhere: the
+ * hint is the only route to the escape for a player with no U key — on touch it
+ * IS the button — and `stuck` only clears by real movement, so a man who missed
+ * the one showing could never call it back. It never displaces another message:
+ * a hint is only re-raised over an empty toast.
+ */
+export function stuckHintDue(
+  stuck: boolean,
+  wasStuck: boolean,
+  moving: boolean,
+  toastShowing: boolean,
+): boolean {
+  if (!stuck) return false
+  if (!wasStuck) return true
+  return moving && !toastShowing
+}
+
 export interface FreeSpotOptions {
   /** Ring spacing of the outward search, in metres. */
   step: number

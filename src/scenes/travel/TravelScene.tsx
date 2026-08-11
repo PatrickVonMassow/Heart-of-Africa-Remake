@@ -121,7 +121,7 @@ import { markActor } from '../actorLabelSource'
 import { RegionBorders } from './RegionBorders'
 import { Wildlife } from './Wildlife'
 import { collidableAnimalsNear } from './wildlifeCollision'
-import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, escapeOutcome, findFreeSpot, newStallState, updateStall } from '../../systems/unstuck'
+import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, escapeOutcome, findFreeSpot, newStallState, stuckHintDue, updateStall } from '../../systems/unstuck'
 
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js'
 import { releaseCascadeShadowMaps, type CascadedShadowNode } from '../../render/shadowRelease'
@@ -3046,7 +3046,7 @@ export function TravelScene() {
         stallSeconds: balance.unstuck.stallSeconds,
       })
       const strings = getStrings()
-      if (travelStall.current.stuck && !before) {
+      if (stuckHintDue(travelStall.current.stuck, before, movingInput, useGame.getState().toast !== null)) {
         useGame.getState().setToast(strings.toasts.stuckHint(UNSTUCK_KEY_LABEL))
       } else if (!travelStall.current.stuck && before) {
         const g = useGame.getState()

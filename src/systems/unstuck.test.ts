@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { escapeOutcome, findFreeSpot, newStallState, updateStall } from './unstuck'
+import { escapeOutcome, findFreeSpot, newStallState, stuckHintDue, updateStall } from './unstuck'
 import { standingClear, PLAYER_RADIUS, type Collider } from '../scenes/place/collision'
 
 const cfg = { stallDistance: 0.5, stallSeconds: 3 }
@@ -133,6 +133,32 @@ describe('free-spot search (work-order 604)', () => {
     })
     expect(r.found).toBe(false)
     expect(r.pos).toEqual([0, 18])
+  })
+})
+
+describe('the hint stays reachable (work-order 610)', () => {
+  it('is raised on the stuck edge, as it always was', () => {
+    expect(stuckHintDue(true, false, true, false)).toBe(true)
+  })
+
+  it('comes back after it timed out while he is still pushing', () => {
+    // `stuck` only clears by real movement, so without this a player who missed
+    // the one showing could never call it back — and on touch that hint IS the
+    // only button to the escape.
+    expect(stuckHintDue(true, true, true, false)).toBe(true)
+  })
+
+  it('never displaces another message', () => {
+    expect(stuckHintDue(true, true, true, true)).toBe(false)
+  })
+
+  it('stays quiet while he has let go of the controls', () => {
+    expect(stuckHintDue(true, true, false, false)).toBe(false)
+  })
+
+  it('says nothing at all about a man who is not stuck', () => {
+    expect(stuckHintDue(false, true, true, false)).toBe(false)
+    expect(stuckHintDue(false, false, false, false)).toBe(false)
   })
 })
 

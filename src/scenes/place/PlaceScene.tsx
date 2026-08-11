@@ -89,7 +89,7 @@ import { releasePointerLock, requestPlacePointerLock } from './pointerLock'
 import { ActorLabels } from '../ActorLabels'
 import { markActor } from '../actorLabelSource'
 import { resolveMove, standingClear, PLAYER_RADIUS } from './collision'
-import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, escapeOutcome, findFreeSpot, newStallState, updateStall } from '../../systems/unstuck'
+import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, escapeOutcome, findFreeSpot, newStallState, stuckHintDue, updateStall } from '../../systems/unstuck'
 import { buildBoundaryLut, isOutsidePlace } from './boundary'
 import {
   RIVER_HALF_LENGTH,
@@ -2702,9 +2702,10 @@ export function PlaceScene() {
     // on purpose would teleport him for nothing.
     {
       const before = stall.current.stuck
-      stall.current = updateStall(stall.current, p.x, p.z, tf !== 0 || ts !== 0, dt, balance.unstuck)
+      const moving = tf !== 0 || ts !== 0
+      stall.current = updateStall(stall.current, p.x, p.z, moving, dt, balance.unstuck)
       const strings = getStrings()
-      if (stall.current.stuck && !before) {
+      if (stuckHintDue(stall.current.stuck, before, moving, useGame.getState().toast !== null)) {
         useGame.getState().setToast(strings.toasts.stuckHint(UNSTUCK_KEY_LABEL))
       } else if (!stall.current.stuck && before) {
         // He moved again: the hint goes with the wedge it described.
