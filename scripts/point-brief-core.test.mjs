@@ -863,6 +863,21 @@ describe('the spec document a point’s slice belongs to', () => {
   })
 })
 
+describe('the durability demand every brief carries (point 629)', () => {
+  const brief = assembleBrief({ point: { number: 1, done: false, body: 'x' } })
+
+  it('demands a commit at every self-contained step, not one at the end', () => {
+    expect(brief).toMatch(/COMMIT AND PUSH AT EVERY SELF-CONTAINED STEP/)
+  })
+
+  it('states WHY: an uncommitted block is the one state nothing can rescue', () => {
+    expect(brief).toMatch(/UNCOMMITTED BLOCK IS THE ONE STATE NOTHING CAN RESCUE/)
+    // The evidence, not just the rule — a rule without its incident reads as ceremony.
+    expect(brief).toContain('isolation worktree appears to have been removed')
+    expect(brief).toMatch(/failed push is REPORTED, never skipped/)
+  })
+})
+
 describe('assembleBrief', () => {
   it('omits the empty parts instead of printing empty headings', () => {
     const brief = assembleBrief({ point: { number: 1, done: false, body: 'x' } })
