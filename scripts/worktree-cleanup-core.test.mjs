@@ -33,6 +33,7 @@ import {
   readIdentity,
   readLockReason,
   releaseCleanupLock,
+  takeCleanupLock,
   parseCleanupArgs,
 } from './worktree-cleanup.mjs'
 
@@ -949,23 +950,68 @@ describe('--expect, on a THROWAWAY repository', () => {
     expect(releaseCleanupLock(worktree, { file, ours, git: gitOf })).toBe('')
   })
 
-  it('never unlinks a lock that is not ours, whichever road the release takes', () => {
+  it('never unlinks a lock that is not ours', () => {
     const foreign = 'claude agent agent-later (pid 424242 start 7)'
     run(['worktree', 'lock', '--reason', foreign, worktree])
     const file = cleanupLockFile(worktree)
     const ours = formatCleanupLock({ pid: 4711, startedAt: 1000 })
-    expect(releaseCleanupLock(worktree, { file, ours, git: gitOf })).toMatch(/LEFT ALONE/)
-    // …and the FALLBACK road (no lock file resolved) reaches the same verdict
-    // through git's own commands, wider window and all.
-    expect(releaseCleanupLock(worktree, { file: null, ours, git: gitOf })).toMatch(/LEFT ALONE/)
+    expect(releaseCleanupLock(worktree, { file, ours })).toMatch(/LEFT ALONE/)
     expect(readLockReason(file)).toBe(foreign)
   })
 
-  it('the fallback road releases our own lock when no lock file could be resolved', () => {
-    const ours = formatCleanupLock({ pid: 4711, startedAt: 1000 })
-    run(['worktree', 'lock', '--reason', ours, worktree])
-    expect(releaseCleanupLock(worktree, { file: null, ours, git: gitOf })).toBe('')
+  it('WITHOUT a lock file it releases NOTHING — the porcelain is not a substitute', () => {
+    // Sixth review, finding 1: the release used to fall back to the trimmed
+    // porcelain reason, where a PADDED copy of ours compares equal — so the
+    // fallback could clear a stranger's lock. There is no fallback now; an
+    // unprovable lock is left standing, and the wedge is recoverable by the
+    // stale-lock rule once its holder is gone.
+    const padded = ` ${formatCleanupLock({ pid: 4711, startedAt: 1000 })} `
+    run(['worktree', 'lock', '--reason', padded, worktree])
+    const note = releaseCleanupLock(worktree, { file: null, ours: formatCleanupLock({ pid: 4711, startedAt: 1000 }) })
+    expect(note).toMatch(/LEFT IN PLACE/)
+    expect(readLockReason(cleanupLockFile(worktree))).toBe(padded) // untouched
+  })
+
+  it('TAKES no lock at all when git\'s lock file cannot be located', () => {
+    // The other half of the same back door: holding a lock we cannot prove is ours
+    // is what forced a fallback comparison in the first place. Nothing is locked,
+    // so nothing is left behind either.
+    const calls = []
+    const taken = takeCleanupLock(worktree, {
+      git: (args, cwd) => {
+        calls.push(args.join(' '))
+        return run(args, cwd)
+      },
+      file: null,
+    })
+    expect(taken.locked).toBe(false)
+    expect(taken.note).toMatch(/could not be located/)
+    expect(calls).toEqual([]) // git was never even asked to lock
     expect(run(['worktree', 'list', '--porcelain'])).not.toContain('locked')
+  })
+
+  it('the residual can only STRIP a lock, and a stripped lock REFUSES the deletion', () => {
+    // The bound that makes the read-then-unlink window acceptable: its worst
+    // outcome is another cleanup losing its lock, and that cleanup then refuses
+    // rather than deleting. This composes the two halves in one case.
+    const expected = expectationNow()
+    let stripped = false
+    const r = cleanupWorktree(worktree, {
+      git: (args, cwd) => {
+        const out = run(args, cwd)
+        if (!stripped && args[0] === 'worktree' && args[1] === 'lock') {
+          stripped = true
+          // Exactly what the residual does to a third party: the lock file goes.
+          rmSync(cleanupLockFile(worktree), { force: true })
+        }
+        return out
+      },
+      expected,
+    })
+    expect(stripped).toBe(true)
+    expect(r.ok).toBe(false)
+    expect(r.verdict.reason).toMatch(/lock this cleanup took is GONE/)
+    expect(existsSync(worktree)).toBe(true)
   })
 
   it('does NOT recover a FOREIGN lock, however dead its holder looks', () => {
