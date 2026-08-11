@@ -129,6 +129,29 @@ export function findFreeSpot(
   return { pos: [o.fallback[0], o.fallback[1]], found: false }
 }
 
+/**
+ * What a press of the escape key actually achieved — the message must say this
+ * and nothing better (work-order 610).
+ *
+ * `freed` he was carried to another spot; `alreadyFree` he stood on open ground
+ * and the search left him there; `noRoom` the radius held nothing and the
+ * fallback was the spot he was already standing on, so NOBODY was freed. The
+ * bird's-eye search falls back to the traveller's own position, so it produced
+ * `noRoom` while the game still announced a rescue.
+ */
+export type EscapeOutcome = 'freed' | 'alreadyFree' | 'noRoom'
+
+export function escapeOutcome(
+  fromX: number,
+  fromZ: number,
+  result: { pos: readonly [number, number]; found: boolean },
+): EscapeOutcome {
+  // A hair of floating-point drift is not a rescue; a real one moves him at
+  // least one search step.
+  if (Math.hypot(result.pos[0] - fromX, result.pos[1] - fromZ) > 1e-6) return 'freed'
+  return result.found ? 'alreadyFree' : 'noRoom'
+}
+
 /** No sampled point on the straight line from (x1,z1) to (x2,z2) lies inside a
  *  collider — the candidate is reachable without passing through a wall. */
 function lineOfSightClear(
