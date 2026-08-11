@@ -53,8 +53,12 @@ beforeAll(() => {
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
 describe('the command', () => {
+  /** The line form carries no author, so the flag names it. A function, not a
+   *  constant: the temp dir only exists once beforeAll has run. */
+  const counted = () => ['--union', p('U.json'), '--model-b', 'GPT-5.6 Sol']
+
   it('exits 0 on a union that accounts for every entry, and prints the record command', () => {
-    const r = run('--a', p('A.json'), '--b', p('B.txt'), '--union', p('U.json'), '--merged-by', 'Fable 5')
+    const r = run('--a', p('A.json'), '--b', p('B.txt'), ...counted(), '--merged-by', 'Fable 5')
     expect(r.status).toBe(0)
     expect(r.out).toMatch(/every input entry accounted for/)
     expect(r.out).toMatch(/--merged-by "Fable 5"/)
@@ -63,14 +67,38 @@ describe('the command', () => {
 
   it('takes the merger from the union file when the flag is absent — and echoes THAT name', () => {
     // It used to validate the union's name and then print --merged-by "".
-    const r = run('--a', p('A.json'), '--b', p('B.txt'), '--union', p('U.json'))
+    const r = run('--a', p('A.json'), '--b', p('B.txt'), ...counted())
     expect(r.status).toBe(0)
     expect(r.out).toMatch(/--merged-by "Fable 5"/)
     expect(r.out).not.toMatch(/--merged-by ""/)
   })
 
+  it('EXITS 1 WHEN A LIST NAMES NO AUTHOR — the merger could not be checked against it', () => {
+    const r = run('--a', p('A.json'), '--b', p('B.txt'), '--union', p('U.json'), '--merged-by', 'Fable 5')
+    expect(r.status).toBe(1)
+    expect(r.out).toMatch(/list B names no model/)
+  })
+
+  it('EXITS 1 ON A LIST WHOSE LINES CARRY NO IDS instead of counting an empty list', () => {
+    const bare = write('bare.txt', 'src/x.ts | the ribbon tears\nsrc/y.ts | the save drops gifts')
+    const r = run('--a', p('A.json'), '--b', bare)
+    expect(r.status).toBe(1)
+    expect(r.out).toMatch(/carries no id/)
+  })
+
   it('EXITS 1 AND NAMES THE DROPPED ENTRY', () => {
-    const r = run('--a', p('A.json'), '--b', p('B.txt'), '--union', p('U-dropped.json'), '--merged-by', 'Fable 5')
+    const r = run(
+      '--a',
+      p('A.json'),
+      '--b',
+      p('B.txt'),
+      '--union',
+      p('U-dropped.json'),
+      '--model-b',
+      'GPT-5.6 Sol',
+      '--merged-by',
+      'Fable 5',
+    )
     expect(r.status).toBe(1)
     expect(r.out).toMatch(/A2 .*is in NO union entry/)
     expect(r.out).toMatch(/B1 .*is in NO union entry/)
@@ -78,7 +106,7 @@ describe('the command', () => {
   })
 
   it('exits 1 when the merger wrote one of the lists', () => {
-    const r = run('--a', p('A.json'), '--b', p('B.txt'), '--union', p('U.json'), '--merged-by', 'Opus 5')
+    const r = run('--a', p('A.json'), '--b', p('B.txt'), ...counted(), '--merged-by', 'Opus 5')
     expect(r.status).toBe(1)
     expect(r.out).toMatch(/may not merge them/)
   })
@@ -89,8 +117,7 @@ describe('the command', () => {
       p('A.json'),
       '--b',
       p('B.txt'),
-      '--union',
-      p('U.json'),
+      ...counted(),
       '--merged-by',
       'Opus 5',
       '--fallback',

@@ -60,6 +60,11 @@ export const FLAG_SPEC = Object.freeze({
   '--union': true,
   '--merged-by': true,
   '--fallback': true,
+  // WHO WROTE EACH LIST. A JSON list can carry its own "model"; the line form
+  // cannot, and without both names the merger cannot be checked against them —
+  // an author would pass as the third model (four-eyes review, second round).
+  '--model-a': true,
+  '--model-b': true,
 })
 
 /** Parse argv into { ok, values, errors } — an unknown flag is refused, never dropped. */
@@ -86,9 +91,10 @@ export function parseArgs(argv = []) {
 }
 
 export const usage = () =>
-  'usage: node scripts/blind-merge.mjs --a <A.json> --b <B.json>            (what to decide)\n' +
-  '       node scripts/blind-merge.mjs --a <A.json> --b <B.json> --union <U.json> \\\n' +
-  '           --merged-by "<model>" [--fallback "<which model was unavailable>"]  (the count)\n' +
+  'usage: node scripts/blind-merge.mjs --a <A> --b <B>                      (what to decide)\n' +
+  '       node scripts/blind-merge.mjs --a <A> --b <B> --union <U.json> \\\n' +
+  '           --merged-by "<model>" [--model-a "<model>"] [--model-b "<model>"] \\\n' +
+  '           [--fallback "<which model was unavailable>"]                 (the count)\n' +
   '\nThe merge of a blind-parallel stage goes to the model that wrote NEITHER list\n' +
   '(CLAUDE.md §6); --fallback records that only two models existed and NAMES the one\n' +
   'that did not. A balanced run prints the mechanism-review.mjs command to record,\n' +
@@ -103,9 +109,12 @@ if (isMainModule(import.meta.url)) {
       console.error(`\n${usage()}`)
       process.exit(2)
     }
-    const { a: pathA, b: pathB, union: pathU, mergedBy = '', fallback = '' } = parsed.values
+    const { a: pathA, b: pathB, union: pathU, mergedBy = '', fallback = '', modelA = '', modelB = '' } = parsed.values
     const a = parseListText('A', readText(pathA))
     const b = parseListText('B', readText(pathB))
+    // The flag wins over the file, and the line form has only the flag.
+    if (modelA) a.model = modelA
+    if (modelB) b.model = modelB
 
     // A list that cannot be counted is refused BEFORE the merge, not after: a
     // missing or repeated ID makes every number below meaningless.
@@ -152,6 +161,22 @@ if (isMainModule(import.meta.url)) {
     // record command used to echo an empty --merged-by for the union-only form).
     const who = mergedBy || (Array.isArray(rawU) ? '' : (rawU?.mergedBy ?? ''))
     const merger = validateMerger({ mergedBy: who, authors: [a.model, b.model], fallback })
+    // AN UNNAMED LIST AUTHOR CANNOT BE COMPARED TO THE MERGER, so it is asked for
+    // rather than assumed: without it, the author of that list passes as the
+    // third model and the identity rule quietly does nothing.
+    for (const [name, list] of [
+      ['A', a],
+      ['B', b],
+    ]) {
+      if (!String(list.model ?? '').trim()) {
+        merger.ok = false
+        merger.errors.push(
+          `list ${name} names no model: say who wrote it with --model-${name.toLowerCase()} "<model>" ` +
+            '(or a "model" field in its JSON) — the merger is checked against both authors, and an ' +
+            'unnamed author is one nobody can rule out',
+        )
+      }
+    }
     const result = accountUnion({ a, b, union: rawU })
     console.log(formatAccounting(result))
     if (!merger.ok) {

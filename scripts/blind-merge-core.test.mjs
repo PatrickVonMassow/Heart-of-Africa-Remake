@@ -86,6 +86,25 @@ describe('reading and validating the two input lists', () => {
     expect(validateInputs(readList('A', []), list).ok).toBe(true)
   })
 
+  it('REPORTS a line that was meant to be an entry and carries no id', () => {
+    // Skipping it quietly turned an unnumbered list into an EMPTY one, which an
+    // empty union accounts for perfectly (four-eyes review, second round).
+    const list = parseListText('B', 'src/x.ts | the ribbon tears\nsrc/y.ts | the save drops gifts')
+    const { ok, errors } = validateList(list)
+    expect(ok).toBe(false)
+    expect(errors.join('\n')).toMatch(/meant to be an entry but carries no id/)
+    expect(errors.join('\n')).toMatch(/not one entry could be read/)
+  })
+
+  it('an unreadable list can never be accounted for by an empty union', () => {
+    const b = parseListText('B', 'no ids | nothing here')
+    expect(validateInputs(parseListText('A', '[]'), b).ok).toBe(false)
+  })
+
+  it('takes a genuinely empty file as an empty list', () => {
+    expect(validateList(parseListText('B', '   ')).ok).toBe(true)
+  })
+
   it('keeps a defect line that contains a pipe of its own', () => {
     const [entry] = parseEntryLines('A1 | src/x.ts | the a | b split breaks')
     expect(entry.defect).toBe('the a | b split breaks')
@@ -407,6 +426,11 @@ describe('the report', () => {
     const red = summaryLine(accountUnion({ a: listA, b: listB, union: { entries: [{ id: 'U1', from: ['A1'] }] } }))
     expect(ACCOUNTING_RECEIPT.test(red)).toBe(false)
     expect(ACCOUNTING_RECEIPT.test('I merged the lists carefully')).toBe(false)
+    // ANCHORED: a line that merely contains the words, or negates them, is not
+    // the receipt (four-eyes review, second round).
+    expect(ACCOUNTING_RECEIPT.test('1 A + 1 B entries → 2 union entries (x): not every input entry accounted for'))
+      .toBe(false)
+    expect(ACCOUNTING_RECEIPT.test(`I claim: ${green}, believe me`)).toBe(false)
   })
 
   it('a green report is the summary line alone', () => {

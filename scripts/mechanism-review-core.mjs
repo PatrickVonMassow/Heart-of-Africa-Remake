@@ -176,7 +176,18 @@ const MODEL_NAMED = /\b(sol|gpt|fable|opus|claude|sonnet|haiku|gemini|grok|llama
  * must not import the accounting one (that one already imports this).
  */
 export const ACCOUNTING_RECEIPT =
-  /\b\d+\s+A\s*\+\s*\d+\s+B entries\b[\s\S]*\bunion entries\b[\s\S]*\bevery input entry accounted for\b/i
+  /^\d+ A \+ \d+ B entries → \d+ union entries \([^)]*\): every input entry accounted for$/
+
+/**
+ * From when a blind-parallel record OWES its merger and its count.
+ *
+ * The ledger is tracked and outlives the CLI that wrote it, so the rows written
+ * before this rule existed carry neither and must keep clearing the gate. A
+ * cutoff grandfathers them by DATE instead of by "the field is missing", which
+ * is what let a hand-edited row omit the fields and pass (four-eyes review,
+ * second round). 11.08.2026, the day the rule landed.
+ */
+export const MERGE_ACCOUNTING_SINCE = Date.UTC(2026, 7, 11)
 
 /**
  * May THIS model MERGE the two lists of a blind-parallel stage? (point 634)
@@ -625,6 +636,27 @@ export function validateRecord({
 }
 
 /**
+ * What is wrong with the MERGE this record claims, or '' if nothing is.
+ *
+ * The gate needs the same answer the recorder gives, on a row that may have been
+ * hand-edited or written by a CLI that predates the rule: a blind-parallel row
+ * from the rule's era owes a merging model, a receipt that the union balanced,
+ * and a merger that wrote neither list (or a recorded two-model fallback).
+ * `commit.authorModels` carries EVERY co-author where the wrapper could read it,
+ * so a second one named in the trailers cannot merge its own list either.
+ */
+export function mergeProblem(record = {}, commit = {}) {
+  if (String(record.mode ?? '') !== BLIND_PARALLEL) return ''
+  if (Number(record.at ?? 0) < MERGE_ACCOUNTING_SINCE) return ''
+  const who = String(record.mergedBy ?? '').trim()
+  if (!who) return 'no-merger'
+  if (!ACCOUNTING_RECEIPT.test(String(record.accounting ?? '').trim())) return 'no-count'
+  if (String(record.mergeFallback ?? '').trim()) return ''
+  const authors = (commit.authorModels ?? [commit.authorModel]).filter(Boolean)
+  return authors.some((m) => sameModel(who, m)) || sameModel(who, record.model) ? 'self-merge' : ''
+}
+
+/**
  * The gate itself.
  *
  * Inputs (plain data — the wrapper does the git work):
@@ -663,17 +695,13 @@ export function evaluateMechanismReview({
     )
     // A SELF-MERGE IS AS EMPTY AS A SELF-REVIEW, and the ledger is a tracked file
     // anyone can hand-edit (four-eyes review of point 634): the recorder refuses
-    // a blind-parallel row whose merger wrote one of the lists, and the gate has
-    // to refuse the same row when it arrives some other way. Only a row that
-    // NAMES a merger is judged — the rows written before the flag existed carry
-    // none, and are read as unrecorded rather than as offenders.
-    const selfMerge = (r) =>
-      String(r.mode ?? '') === BLIND_PARALLEL &&
-      String(r.mergedBy ?? '').trim() &&
-      !String(r.mergeFallback ?? '').trim() &&
-      (sameModel(r.mergedBy, commit?.authorModel) || sameModel(r.mergedBy, r.model))
-    const selfReviews = wellFormed.filter((r) => sameModel(r.model, commit?.authorModel) || selfMerge(r))
-    const valid = wellFormed.filter((r) => !sameModel(r.model, commit?.authorModel) && !selfMerge(r))
+    // a blind-parallel row whose merger wrote one of the lists or whose union was
+    // never counted, and the gate refuses the same row when it arrives some other
+    // way — by an edit, or from a branch whose CLI predates the rule. Rows older
+    // than MERGE_ACCOUNTING_SINCE are grandfathered by DATE; treating a MISSING
+    // field as legacy is what let an edited row simply omit it.
+    const selfReviews = wellFormed.filter((r) => sameModel(r.model, commit?.authorModel) || mergeProblem(r, commit))
+    const valid = wellFormed.filter((r) => !sameModel(r.model, commit?.authorModel) && !mergeProblem(r, commit))
 
     if (!valid.length) {
       findings.push({
@@ -716,15 +744,28 @@ export function formatMechanismReviewVerdict(verdict) {
       )
       continue
     }
-    const merged = (f.records ?? []).find((r) => String(r?.mergedBy ?? '').trim())
+    const blind = (f.records ?? []).find((r) => mergeProblem(r, c))
+    const mergeLine = () => {
+      const who = String(blind?.mergedBy ?? '').trim()
+      const problem = mergeProblem(blind, c)
+      if (problem === 'no-merger') {
+        return "      the record is blind-parallel and names no merging model — the union's fold is unowned"
+      }
+      if (problem === 'no-count') {
+        return `      ${who} merged the union, but the record carries no count of it — a merge nobody counted`
+      }
+      return (
+        `      the union was merged by ${who}, which wrote one of the two lists — ` +
+        'a self-merge is where a finding disappears'
+      )
+    }
     lines.push(
       `  ✗ ${short(c.sha)} ${c.subject ?? ''}`,
       `      ${files}`,
       f.kind !== 'self-review'
         ? `      authored by ${author}; no review recorded`
-        : merged
-          ? `      the record's union was merged by ${String(merged.mergedBy).trim()}, which wrote one of the ` +
-            'two lists — a self-merge is where a finding disappears'
+        : blind
+          ? mergeLine()
           : `      the only review on record is by ${author}'s own model — a self-review is not a review`,
     )
   }

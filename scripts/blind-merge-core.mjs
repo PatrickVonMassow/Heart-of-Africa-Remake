@@ -124,23 +124,51 @@ export function readList(name, raw) {
  * guessed at: an entry has an id like A3/B12 in its first field.
  */
 export function parseEntryLines(text) {
+  return readEntryLines(text).entries
+}
+
+/**
+ * The same read, with what it could NOT read (four-eyes review, second round).
+ *
+ * Skipping quietly was the bug: a list whose entries carry no ids parsed to an
+ * EMPTY list, and an empty list is accounted for by an empty union — every
+ * finding gone, the count green. So a pipe line that is not an entry and is not
+ * table furniture is REPORTED, and validateList refuses on it.
+ */
+export function readEntryLines(text) {
   const entries = []
+  const unreadable = []
   for (const raw of String(text ?? '').split(/\r?\n/)) {
     const line = raw.trim().replace(/^[-*+]\s+/, '').replace(/^\|/, '').replace(/\|$/, '')
     if (!line.includes('|')) continue
+    // A markdown table's header and its dashed separator are furniture, not
+    // entries; everything else with a pipe in it was meant to be one.
+    if (/^[\s|:-]+$/.test(line)) continue
     const [id, file, ...rest] = line.split('|').map((s) => s.trim())
-    if (!/^[A-Za-z]{0,3}\d+$/.test(id)) continue
+    if (/^id$/i.test(id)) continue
+    if (!/^[A-Za-z]{0,3}\d+$/.test(id)) {
+      unreadable.push(line)
+      continue
+    }
     entries.push({ id, file, defect: rest.join(' | ').trim() })
   }
-  return entries
+  return { entries, unreadable }
 }
 
-/** One input list from a file's TEXT — JSON if it parses, the line form if not. */
+/**
+ * One input list from a file's TEXT — JSON if it parses, the line form if not.
+ *
+ * Carries `unreadable` (lines that looked like entries and were not) and
+ * `hadText`, so validateList can tell an EMPTY list from a list nobody could
+ * read: the two look identical downstream and only one of them is honest.
+ */
 export function parseListText(name, text) {
+  const raw = String(text ?? '')
   try {
-    return readList(name, JSON.parse(String(text ?? '')))
+    return { ...readList(name, JSON.parse(raw)), unreadable: [], hadText: Boolean(raw.trim()) }
   } catch {
-    return readList(name, parseEntryLines(text))
+    const { entries, unreadable } = readEntryLines(raw)
+    return { ...readList(name, entries), unreadable, hadText: Boolean(raw.trim()) }
   }
 }
 
@@ -153,6 +181,18 @@ export function parseListText(name, text) {
 export function validateList(list) {
   const errors = []
   const seen = new Map()
+  for (const line of list?.unreadable ?? []) {
+    errors.push(
+      `list ${list?.list ?? '?'}: "${line}" was meant to be an entry but carries no id — write it as ` +
+        '`A3 | <file> | <the defect>`, or it is counted by nobody',
+    )
+  }
+  if (list?.hadText && !(list?.entries ?? []).length) {
+    errors.push(
+      `list ${list?.list ?? '?'}: not one entry could be read from a file that is not empty — an empty list ` +
+        'is accounted for by an empty union, so this would pass while every finding is gone',
+    )
+  }
   for (const [i, e] of (list?.entries ?? []).entries()) {
     const where = `list ${list?.list ?? '?'} entry #${i + 1}`
     if (!e.id) errors.push(`${where}: no id — an entry without an ID cannot be accounted for`)

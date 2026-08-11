@@ -14,6 +14,7 @@ import {
   formatMechanismReviewVerdict,
   isMechanismPath,
   KNOWN_FLAGS,
+  MERGE_ACCOUNTING_SINCE,
   mechanismPathsIn,
   modelFromTrailers,
   modelsFromTrailers,
@@ -211,6 +212,9 @@ describe('validateRecord', () => {
   })
 })
 
+/** A receipt in exactly the shape blind-merge.mjs prints for a balanced union. */
+const RECEIPT = '3 A + 2 B entries → 4 union entries (2 merged, 2 only A, 1 only B): every input entry accounted for'
+
 describe('evaluateMechanismReview', () => {
   const commit = (over = {}) => ({
     sha: 'c'.repeat(40),
@@ -226,7 +230,9 @@ describe('evaluateMechanismReview', () => {
     model: 'Fable 5',
     verdict: 'merge',
     evidence: 'checked the fast path against the unit layer',
-    at: 2000,
+    // Written since the merge rule landed, so a blind-parallel row here owes its
+    // merger and its count (the older rows are grandfathered by date).
+    at: MERGE_ACCOUNTING_SINCE + 2000,
     authoredBy: 'Claude Opus 5',
     ...over,
   })
@@ -272,7 +278,7 @@ describe('evaluateMechanismReview', () => {
       baseline: 'b',
       head: 'h',
       pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
-      records: [record({ mode: 'blind-parallel', mergedBy: 'Opus 5' })],
+      records: [record({ mode: 'blind-parallel', mergedBy: 'Opus 5', accounting: RECEIPT })],
     })
     expect(v.block).toBe(true)
     expect(v.findings[0].kind).toBe('self-review')
@@ -285,26 +291,73 @@ describe('evaluateMechanismReview', () => {
       baseline: 'b',
       head: 'h',
       pendingCommits: pending,
-      records: [record({ mode: 'blind-parallel', mergedBy: 'GPT-5.6 Sol' })],
+      records: [record({ mode: 'blind-parallel', mergedBy: 'GPT-5.6 Sol', accounting: RECEIPT })],
     })
     expect(third.block).toBe(false)
     const fallback = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',
       pendingCommits: pending,
-      records: [record({ mode: 'blind-parallel', mergedBy: 'Opus 5', mergeFallback: 'Sol was unreachable' })],
+      records: [
+        record({
+          mode: 'blind-parallel',
+          mergedBy: 'Opus 5',
+          accounting: RECEIPT,
+          mergeFallback: 'Sol was unreachable',
+        }),
+      ],
     })
     expect(fallback.block).toBe(false)
   })
 
-  it('leaves the rows written before the merge flag existed alone', () => {
+  it('leaves the rows written BEFORE the rule landed alone, and no younger one', () => {
+    const pending = [commit({ coveringRecordShas: ['c'.repeat(40)] })]
+    // A row from before MERGE_ACCOUNTING_SINCE carries neither field and stands.
+    const legacy = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: pending,
+      records: [record({ mode: 'blind-parallel', at: MERGE_ACCOUNTING_SINCE - 1 })],
+    })
+    expect(legacy.block).toBe(false)
+    // A row written since owes both — leaving the fields out is not a legacy row.
+    for (const over of [
+      {},
+      { mergedBy: 'GPT-5.6 Sol' },
+      { mergedBy: 'GPT-5.6 Sol', accounting: 'I counted them all' },
+    ]) {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: pending,
+        records: [record({ mode: 'blind-parallel', at: MERGE_ACCOUNTING_SINCE + 1, ...over })],
+      })
+      expect(v.block, JSON.stringify(over)).toBe(true)
+      expect(v.findings[0].kind).toBe('self-review')
+    }
+    expect(
+      formatMechanismReviewVerdict(
+        evaluateMechanismReview({
+          baseline: 'b',
+          head: 'h',
+          pendingCommits: pending,
+          records: [record({ mode: 'blind-parallel', at: MERGE_ACCOUNTING_SINCE + 1, mergedBy: 'GPT-5.6 Sol' })],
+        }),
+      ),
+    ).toMatch(/no count of it/)
+  })
+
+  it('refuses a merge by a SECOND co-author of the commit', () => {
     const v = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',
-      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
-      records: [record({ mode: 'blind-parallel' })],
+      pendingCommits: [
+        commit({ coveringRecordShas: ['c'.repeat(40)], authorModels: ['Claude Opus 5', 'Claude Fable 5'] }),
+      ],
+      records: [record({ mode: 'blind-parallel', mergedBy: 'Fable 5', accounting: RECEIPT })],
     })
-    expect(v.block).toBe(false)
+    expect(v.block).toBe(true)
+    expect(formatMechanismReviewVerdict(v)).toMatch(/self-merge/)
   })
 
   it('BLOCKS on a do-not-merge verdict as loudly as on a missing record', () => {
