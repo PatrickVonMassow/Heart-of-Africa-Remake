@@ -911,6 +911,6 @@ describe('the silence alarm', () => {
     let said = null
     for (let t = 0; t < 60 && !said; t += 0.5) said = stepAdultErrands(state, view, 0.5, CFG, rand)
     expect(said).not.toBeNull()
-    expect(state.silence).toBeLessThan(1)
+    expect(state.speech.silence).toBeLessThan(1)
   })
 })

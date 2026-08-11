@@ -6,6 +6,25 @@ and these chains were the larger part of it, while they are needed at a closing 
 a tag. The wording is moved verbatim; numbering and conditions are as they stood in
 §7.1. A criterion and its evidence section change in the SAME commit.
 
+**Two rules bind every chain below (point 589).** Twelve defects shipped in one
+mechanic whose twelve points had all been accepted as finished, because the
+proofs judged the MECHANISM rather than the RESULT.
+
+1. **Per fix, ONE assertion at the level the player experiences it.** Sound is
+   judged at the END of the chain — the level that actually reaches the output,
+   not the level a source planned. Position is judged in WORLD space — do two
+   bodies overlap, does the note sit within a hand's breadth of the head — not by
+   the rule that was supposed to place it. A fix whose assertion can only reach
+   the mechanism names in its COMMIT why the result is not assertable.
+2. **One play acceptance per package.** A package of play-session fixes is not
+   finished by its suites: the merged result is entered as a PLAYER — the scene,
+   the sound, two minutes — and what was seen and heard is recorded with the
+   merge. The parts had each been accepted; the composition never was.
+
+Anything that must keep producing over time is beyond both, and carries a
+long-run alarm instead (§15, `src/systems/devAssert.ts`). The full reasoning
+lives in `scripts/verify/README.md`.
+
 ---
 
 ## 2. Two perspectives.
@@ -1132,9 +1151,9 @@ walker slide, so a chase continues past a hut corner instead of stopping against
 it; the settlement reaches the chase as ONE predicate (colliders, the fire ring
 and the walkable rim together). The pursue-and-evade half is a reusable helper
 (`src/systems/pursuit.ts`), the round the module beside the scene
-(`src/scenes/place/tagGame.ts`). All 24 values are calibratable
+(`src/scenes/place/tagGame.ts`). All 27 values are calibratable
 (`balance.villageLife.tag`) and debug-editable in both languages.
-Verifiable: the pure layer pins the whole behaviour in 103 cases
+Verifiable: the pure layer pins the whole behaviour in 118 cases
 (`src/systems/pursuit.test.ts`, `src/scenes/place/tagGame.test.ts`) — the curve
 monotone, continuous and bounded in slope; a fresh runner strictly faster than a
 fresh chaser and a spent one strictly slower; the reserve never outside its
@@ -1197,7 +1216,25 @@ the concept's own; a gesture and a following action on every one; every concept
 in more than one situation, and heard in at least two DIFFERENT ones over a
 driven visit; every situation staged within a visit; both staged contrasts; the
 refusals only ever as answers, cancelling what the child was told; the errands
-really carried out and every one of them expiring. The separation rule is pinned
+really carried out and every one of them expiring.
+THE VILLAGE'S PRODUCERS ARE ALARMED FOR THE LONG RUN (point 589): the adults'
+utterances, the children's play and the children's speech each carry a watch of
+the dev-assert channel's long-run family (`watchProducer`,
+`src/systems/devAssert.ts`), and each raises `errands-silent` / `tag-silent` /
+`child-speech-silent` once it has produced nothing for its own window
+(`balance.villageLife.*.silenceSeconds`, debug-editable in both languages) —
+so a village that goes quiet after minutes reports itself in every session,
+headless or manual, which no seconds-long suite can reach. Verifiable both ways
+in the fast layer (`src/systems/devAssert.test.ts`, plus the three producers'
+own test files): a stalled producer trips its alarm, a healthy one is silent
+through half an hour of simulated play, a legitimately quiet one (a lone child,
+a village with nowhere to send anyone) is never judged, and a frame-loop gap
+cannot raise the alarm while a loop crawling at six-second frames still does.
+The watches reach the SCHEDULERS, so the ear's own end of the chain is armed
+where it lives: `playSpeech` raises `speech-inaudible` when the level that
+actually LEAVES the graph is zero — peak × speech bus × master — while the
+player's speech slider says otherwise, which is the shape point 577 had, an
+intact plan silenced further down (`src/systems/ambience.test.ts`). The separation rule is pinned
 in `src/scenes/place/lifeSpots.test.ts` (every adult station outside the hearing
 radius of the whole play ground, swept over the fire's position, shrinking rather
 than giving up), and the chase's side of it in
@@ -1429,7 +1466,7 @@ Verifiable, by suite:
 - `scripts/verify/voice.mjs`: the automatic narration of a new entry
   (pt. 19).
 - The menu's STRUCTURE (`design.md` §21, point 393) is proved in
-  `src/ui/DebugMenu.test.tsx`: a COMPLETENESS pin names all 163
+  `src/ui/DebugMenu.test.tsx`: a COMPLETENESS pin names all 165
   controls and the group each belongs to and compares that against the
   rendered menu in BOTH directions and in both languages — a dropped
   control fails, and so does one added without being named — plus every

@@ -555,6 +555,7 @@ export interface Strings {
     tagTrendLeave: string
     tagVariation: string
     tagUnstuck: string
+    tagSilence: string
     tagLean: string
     tagTurnRate: string
     tagPlayRadius: string
@@ -564,6 +565,7 @@ export interface Strings {
     childSpeechPace: string
     childSpeechRefusal: string
     childSpeechReply: string
+    childSpeechSilence: string
     adultErrandInterval: string
     adultErrandSpread: string
     adultErrandDwell: string
