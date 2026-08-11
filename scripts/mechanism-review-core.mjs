@@ -165,12 +165,60 @@ export function sameModel(a, b) {
   return x.version === y.version
 }
 
-/** A model designation this project would recognise, for the fallback below. */
-const MODEL_NAMED = /\b(sol|gpt|fable|opus|claude|sonnet|haiku|gemini|grok|llama|mistral|qwen|deepseek)\b/gi
+/** The family words of a model this project would recognise. */
+const MODEL_FAMILY = 'sol|gpt|fable|opus|claude|sonnet|haiku|gemini|grok|llama|mistral|qwen|deepseek'
 
-/** …and the fallback has to say the model was NOT THERE, not merely name one. */
-const UNAVAILABLE =
-  /\b(unavailable|unreachable|inaccessible|offline|absent|missing|down|no access|not available|not reachable|not there|could ?n[o']t be reached|could not be reached|failed|refused|timed out|only two)\b/i
+/** A model designation this project would recognise, for the fallback below. */
+const MODEL_NAMED = new RegExp(`\\b(${MODEL_FAMILY})\\b`, 'gi')
+
+/** …with its version where one is given: "Opus 4.8", "GPT-5.6", plain "Sol". */
+const MODEL_WITH_VERSION = new RegExp(`\\b(?:${MODEL_FAMILY})(?:[\\s-]*\\d+(?:\\.\\d+)?)?`, 'gi')
+
+/**
+ * …and the fallback has to say the model was NOT THERE, not merely name one.
+ *
+ * `failed` and `refused` are deliberately BOUND to what failed (four-eyes
+ * review, sixth round): bare, they matched "Sol failed the review", which is a
+ * model that was very much there.
+ */
+const UNAVAILABLE = new RegExp(
+  [
+    /\b(unavailable|unreachable|inaccessible|offline|absent|missing|down|no access)\b/.source,
+    /\bnot (available|reachable|there|running|up)\b/.source,
+    /\bcould ?n[o']?t be reached\b/.source,
+    /\bfailed to (respond|answer|reply|start|run|reach|load|launch)\b/.source,
+    /\b(call|request|session|login|connection|command|run|attempt)s? (failed|refused|timed out|died)\b/.source,
+    /\btimed out\b/.source,
+    /\bonly two\b/.source,
+  ].join('|'),
+  'i',
+)
+
+/** "…was NOT unavailable" is not an absence; it is the opposite of one. */
+const NEGATED_ABSENCE = /\bnot\s+(unavailable|unreachable|inaccessible|offline|absent|missing|down)\b/i
+
+/**
+ * Does `text` name a model that is NOT the one that merged?
+ *
+ * A designation carrying a VERSION is judged by sameModel, so an Opus 5 merger
+ * may name Opus 4.8 as the model that was missing (four-eyes review, sixth
+ * round: the family-word test refused that legitimate case). A bare family word
+ * falls back to the words of the merger's own name, so "Sol was unreachable"
+ * cannot be written by GPT-5.6 Sol about itself.
+ */
+export function namesOtherModel(text, who) {
+  const mine = new Set([...String(who ?? '').matchAll(MODEL_NAMED)].map((m) => m[1].toLowerCase()))
+  for (const [designation] of String(text ?? '').matchAll(MODEL_WITH_VERSION)) {
+    const family = (designation.match(/[a-z]+/i) ?? [''])[0].toLowerCase()
+    if (family === 'claude') continue
+    if (parseModel(designation).version) {
+      if (!sameModel(designation, who)) return true
+      continue
+    }
+    if (!mine.has(family)) return true
+  }
+  return false
+}
 
 /**
  * The RECEIPT that a union was counted: the summary line
@@ -266,24 +314,21 @@ export function validateMerger({ mergedBy, authors = [], fallback = '' } = {}) {
     // the merge"). Nothing can VERIFY the claim; what is enforced is that it is
     // a checkable one: a model OTHER than the merger, and said to be absent.
     const named = [...String(reason).matchAll(MODEL_NAMED)].map((m) => m[1].toLowerCase())
-    // Every word of the MERGER'S OWN name, so "Sol was unavailable" cannot be
-    // written by Sol itself.
-    const mine = new Set([...String(who).matchAll(MODEL_NAMED)].map((m) => m[1].toLowerCase()))
-    const other = (words) => words.some((f) => !mine.has(f) && f !== 'claude')
     // THE NAME AND THE ABSENCE MUST BE THE SAME CLAIM (four-eyes review, sixth
     // round). Checked apart, "GPT-5.6 Sol was present; Opus 5 was unavailable"
     // satisfied both halves and said the opposite of what the exception means.
-    // So one CLAUSE has to carry the other model AND its absence.
-    const clauses = String(reason).split(/[;,]|\.\s|\band\b|\bbut\b|\bwhile\b|\bso\b|\bhowever\b/i)
+    // So one CLAUSE has to carry the other model AND its absence. The period
+    // splits sentences but not version numbers ("GPT-5.6" stays whole).
+    const clauses = String(reason).split(/[;,]|\.(?!\d)|\band\b|\bbut\b|\bwhile\b|\bso\b|\bhowever\b/i)
     const bound = clauses.some(
-      (c) => UNAVAILABLE.test(c) && other([...c.matchAll(MODEL_NAMED)].map((m) => m[1].toLowerCase())),
+      (c) => UNAVAILABLE.test(c) && !NEGATED_ABSENCE.test(c) && namesOtherModel(c, who),
     )
     if (!named.length) {
       errors.push(
         `the two-model fallback has to NAME the model that was unavailable ("${reason}" names none) — ` +
           'it is the reason an author was allowed to merge, and an unnamed reason cannot be checked',
       )
-    } else if (!other(named)) {
+    } else if (!namesOtherModel(reason, who)) {
       errors.push(
         `the two-model fallback names only "${who}" itself: it has to say which OTHER model was ` +
           'unavailable, since that is what made an author the merger',

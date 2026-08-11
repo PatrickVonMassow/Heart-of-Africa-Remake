@@ -367,6 +367,35 @@ describe('who may merge', () => {
     expect(solItself.ok).toBe(false)
   })
 
+  it('reads the absence claim, not the words in it', () => {
+    const fb = (fallback) => validateMerger({ mergedBy: 'Opus 5', authors: ['Opus 5'], fallback })
+    // A model that was there, in a sentence that happens to hold "failed" or
+    // "unavailable" (four-eyes review, sixth round).
+    expect(fb('GPT-5.6 Sol failed the review').ok).toBe(false)
+    expect(fb('GPT-5.6 Sol was not unavailable').ok).toBe(false)
+    // …and a sentence break without a space is still a sentence break.
+    expect(fb('GPT-5.6 Sol was present.Opus 5 was unavailable').ok).toBe(false)
+    // The honest forms still pass, version numbers intact.
+    expect(fb('GPT-5.6 Sol was unreachable in this session').ok, 'unreachable').toBe(true)
+    expect(fb('the call to GPT-5.6 Sol timed out twice').ok, 'timed out').toBe(true)
+  })
+
+  it('lets a merger name another VERSION of its own family as the missing one', () => {
+    // Opus 4.8 and Opus 5 are different models to this project, so an Opus 5
+    // merger naming Opus 4.8 is a legitimate fallback — the family-word test
+    // used to refuse it (four-eyes review, sixth round).
+    const r = validateMerger({
+      mergedBy: 'Opus 5',
+      authors: ['Opus 5'],
+      fallback: 'Opus 4.8 was unavailable in this session',
+    })
+    expect(r.ok, r.errors.join(' ')).toBe(true)
+    // …but not its OWN version.
+    expect(
+      validateMerger({ mergedBy: 'Opus 5', authors: ['Opus 5'], fallback: 'Opus 5 was unavailable' }).ok,
+    ).toBe(false)
+  })
+
   it('refuses a fallback claimed where none was needed', () => {
     const r = validateMerger({
       mergedBy: 'Fable 5',
