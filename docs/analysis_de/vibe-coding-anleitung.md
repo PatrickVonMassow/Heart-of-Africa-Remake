@@ -141,9 +141,10 @@ jede Änderung braucht die volle Batterie — sonst wird Testen umgangen. Bewäh
 Zwei Mechanismen, die das Netz ehrlich halten:
 
 > *Prompt:* „Etabliere einen Mechanismus, der eine Wiederholung **sichtbar** macht: Ein
-> flakender Test darf einmal wiederholt werden, muss dann aber eine ‚auf Wiederholung
-> bestanden — untersuchen'-Zeile hinterlassen, und der Release-Lauf muss strikt ohne
-> Wiederholung grün sein. Und einen, der feste Wartezeiten aufspürt."
+> flakender Test darf einmal wiederholt werden, gilt danach aber als **verdächtig** und trägt
+> keine Freigabe mehr; der Release-Lauf muss strikt ohne Wiederholung grün sein. Erledigt ist
+> ein Rot nur mit **benannter Ursache** — wiederholte Grüns sind keine. Und einen, der feste
+> Wartezeiten aufspürt."
 
 ---
 
@@ -235,11 +236,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   nie eine Uhr. Schlag auch fehl, wenn der Wert *unerwartet* ausschlägt."
 
 - **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, pflegt nur die
-  Stelle, an der er schreibt; die Kopien rotten unbemerkt.
+  Stelle, an der er schreibt.
   → *Prompt:* „Gib jedem Fakt genau **einen** verbindlichen Ort; alle anderen verweisen darauf.
   Unvermeidbare Wiederholung prüft ein Test gegen den **Code**, dem der Fakt gehört, nie gegen
-  die Nachbarprosa. Berührt eine Änderung das Design, aktualisiere Doc und Code im **selben**
-  Commit."
+  die Nachbarprosa. Berührt eine Änderung das Design, aktualisiere Doc und Code im **selben** Commit."
 
 - **„Aufgeräumt" ohne Beweisliste.** Man räumt dort auf, wo man den Schaden vermutet.
   → *Prompt:* „Erzwing nach jedem Zwischenfall eine **Beweisliste**: Liegt alles am Zielort? Gibt es Reste? Passen Dokumente und Code zusammen?"
@@ -412,4 +412,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Sie setzt auf, woran alles andere hängt: eine Wahrheit, eine Arbeitsordnung, zwei
 Testschichten, den Reflex zum Check. Die Fallstricke oben ersetzt sie nicht.
 
-<!-- GUIDE-FINGERPRINT: 647c0823f89dd548538ba6ba675e02a3a6721f73952de669a417955ba31aab1a -->
+<!-- GUIDE-FINGERPRINT: 9cab0148483975dedd45d1023a4fbd0902292dc6d1ddf20007764eee8e056bc8 -->
