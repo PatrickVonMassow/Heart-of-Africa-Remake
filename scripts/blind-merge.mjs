@@ -10,8 +10,9 @@
 //       the COUNT: every entry of both lists is `only A`, `only B` or
 //       `merged with <id>`, or this exits 1 naming the entries that vanished
 //
-// Input list, as either model hands it back (a bare array of entries is accepted
-// too):
+// Input list, as either model hands it back — the line form the review prompt
+// asks for, `B1 | src/x.ts | one line saying what is wrong`, or the same as JSON
+// (a bare array of entries is accepted too):
 //   { "model": "GPT-5.6 Sol", "entries": [ { "id": "B1", "file": "src/x.ts",
 //     "defect": "one line saying what is wrong" } ] }
 // Union, as the THIRD model writes it — `from` names the input entries each
@@ -27,20 +28,24 @@ import {
   candidatePairs,
   exactDuplicates,
   formatAccounting,
-  readList,
+  parseListText,
   summaryLine,
   validateInputs,
   validateMerger,
 } from './blind-merge-core.mjs'
 
-/** Read one JSON file, naming the file in any complaint about it. */
-export function readJson(path) {
-  let text = ''
+/** Read one file, naming it in any complaint about it. */
+export function readText(path) {
   try {
-    text = readFileSync(path, 'utf8')
+    return readFileSync(path, 'utf8')
   } catch (e) {
     throw new Error(`cannot read ${path}: ${(e && e.message) || e}`)
   }
+}
+
+/** Read the union, which is JSON — it is written by a model that was asked for JSON. */
+export function readJson(path) {
+  const text = readText(path)
   try {
     return JSON.parse(text)
   } catch (e) {
@@ -99,10 +104,8 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
     const { a: pathA, b: pathB, union: pathU, mergedBy = '', fallback = '' } = parsed.values
-    const rawA = readJson(pathA)
-    const rawB = readJson(pathB)
-    const a = readList('A', rawA)
-    const b = readList('B', rawB)
+    const a = parseListText('A', readText(pathA))
+    const b = parseListText('B', readText(pathB))
 
     // A list that cannot be counted is refused BEFORE the merge, not after: a
     // missing or repeated ID makes every number below meaningless.

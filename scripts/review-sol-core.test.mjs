@@ -513,4 +513,14 @@ describe('the codex command line is the rule, not a preference of the caller', (
     expect(prompt).toMatch(/CONVERGENT review/)
     expect(buildReviewPrompt({ sha: 'abc', brief: 'x', mode: 'blind-parallel' })).toMatch(/DIVERGENT step/)
   })
+
+  it('asks a DIVERGENT run for the countable entry shape, and a review for none', () => {
+    // The two lists are merged by a third model and counted entry by entry
+    // (point 634), which an unnumbered prose list cannot survive.
+    const divergent = buildReviewPrompt({ sha: 'abc', brief: 'x', mode: 'blind-parallel' })
+    expect(divergent).toMatch(/ONE ENTRY PER LINE/)
+    expect(divergent).toMatch(/B<n> \| <file> \| <the defect in/)
+    expect(divergent).toMatch(/cannot be counted/)
+    expect(buildReviewPrompt({ sha: 'abc', brief: 'x' })).not.toMatch(/ONE ENTRY PER LINE/)
+  })
 })

@@ -18,6 +18,8 @@ import {
   formatAccounting,
   normalizePath,
   normalizeText,
+  parseEntryLines,
+  parseListText,
   readList,
   similarity,
   summaryLine,
@@ -60,6 +62,41 @@ describe('reading and validating the two input lists', () => {
     expect(bare.model).toBe('')
     expect(readList('A', { model: 'Opus 5', entries: [] }).model).toBe('Opus 5')
     expect(readList('A', null).entries).toEqual([])
+  })
+
+  it('reads the line form the review prompt asks for, bullets and table pipes and all', () => {
+    const text = [
+      'Here is what I found:',
+      '',
+      '- B1 | src/ui/hud.tsx | the badge overlaps the date',
+      '| B2 | src/state/save.ts | the snapshot drops the gift inventory |',
+      'B3 | | a defect with no file named',
+      'and that is the whole list.',
+    ].join('\n')
+    const list = parseListText('B', text)
+    expect(list.entries.map((e) => e.id)).toEqual(['B1', 'B2', 'B3'])
+    expect(list.entries[1]).toEqual({
+      id: 'B2',
+      file: 'src/state/save.ts',
+      defect: 'the snapshot drops the gift inventory',
+    })
+    expect(list.entries[2].file).toBe('')
+    expect(validateInputs(readList('A', []), list).ok).toBe(true)
+  })
+
+  it('keeps a defect line that contains a pipe of its own', () => {
+    const [entry] = parseEntryLines('A1 | src/x.ts | the a | b split breaks')
+    expect(entry.defect).toBe('the a | b split breaks')
+  })
+
+  it('skips a prose line and a markdown table header rather than inventing an entry', () => {
+    expect(parseEntryLines('| id | file | defect |\n|----|----|----|\nnothing here at all')).toEqual([])
+  })
+
+  it('prefers JSON when the file is JSON', () => {
+    expect(parseListText('A', '{"model":"Opus 5","entries":[{"id":"A1","file":"x","defect":"y"}]}').model).toBe(
+      'Opus 5',
+    )
   })
 
   it('refuses an entry with no id — it could never be accounted for', () => {
