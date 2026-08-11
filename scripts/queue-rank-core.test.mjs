@@ -25,7 +25,6 @@ import {
   recordProvenanceFrom,
   recordRank,
   removedRecordMessage,
-  restoreCommandFor,
   seedRecord,
   settleRecord,
   unrankedAppends,
@@ -205,48 +204,63 @@ describe('the baseline moves only when nothing is outstanding', () => {
     // Nothing to drop → nothing written, even with a question standing.
     expect(settleRecord([1, 2, 3], base, { at: 't' })).toEqual({ changed: false, record: null })
   })
-  it('writes the MOVE down, so it survives the point it was moved ahead of closing', () => {
-    // "Stands ahead of a remembered point" is a decision read off a NEIGHBOUR, and
-    // the neighbour can close. Baseline [1, 2]; 3 moved inside to [1, 3, 2]; 4
-    // appended and outstanding. When 2 lands, [1, 3, 4] leaves 3 with no anchor
-    // behind it and the gate asked a second time for a placement already made.
+  it('never writes an INFERRED decision, whatever a single reading suggests', () => {
+    // Two reviews pull opposite ways here, and this is the resolution. A point
+    // standing ahead of a remembered one is judged BY ITS NEIGHBOUR, and the
+    // neighbour can close: baseline [1, 2], 3 moved to [1, 3, 2], 4 outstanding —
+    // when 2 lands, [1, 3, 4] asks about 3 a second time. Recording the placement
+    // would end that, and would freeze a TRANSIENT reading (a half-written file,
+    // an order mid-move) into a decision nobody took, never asked about again.
     const base = settledAt([1, 2])
     const moved = settleRecord([1, 3, 2, 4], base, { at: 'now' })
-    expect(moved.changed).toBe(true)
-    expect(moved.record.ranked[3].why).toMatch(/the move is the decision/)
-    expect(moved.record.ranked[3].at).toBe('now')
-    expect(unrankedAppends([1, 3, 2, 4], moved.record)).toEqual([4])
-    // 2 closes while 4 is STILL unanswered — the case where the baseline cannot
-    // absorb the placement for us.
-    const closed = settleRecord([1, 3, 4], moved.record, { at: 'later' })
+    expect(moved).toEqual({ changed: false, record: null })
+    // The placement is read live, not stored: while 2 stands, 3 is not asked about.
+    expect(unrankedAppends([1, 3, 2, 4], base)).toEqual([4])
+    // THE PRICE, pinned: once 2 lands, 3 is asked again — one command answers it
+    // (--ranked 3 --why …), and no reading can ever silence it by itself.
+    const closed = settleRecord([1, 3, 4], base, { at: 'later' })
     expect(closed.record.settled.points).toEqual([1])
-    expect(unrankedAppends([1, 3, 4], closed.record)).toEqual([4])
-    // Without the written-down move, 3 was asked all over again.
-    expect(unrankedAppends([1, 3, 4], settledAt([1, 2]))).toEqual([3, 4])
-    // It records the placement only — 4, which is genuinely at the append
-    // default, is never answered on its behalf.
-    expect(moved.record.ranked[4]).toBeUndefined()
+    expect(closed.record.ranked).toEqual({})
+    expect(unrankedAppends([1, 3, 4], closed.record)).toEqual([3, 4])
+    const answered = recordRank(closed.record, 3, { why: 'moved ahead of 2 deliberately' })
+    expect(unrankedAppends([1, 3, 4], answered)).toEqual([4])
   })
-  it('names a restore that works in every state the record can be missing in', () => {
-    // One fixed command cannot end the refusal: `git checkout -- <path>` reads
-    // the INDEX, which a staged `git rm` has emptied, and `git checkout HEAD --`
-    // cannot restore a path a COMMITTED deletion took out of HEAD. Naming the
-    // wrong one leaves the caller in the loop the message was meant to end.
+
+  it('reads every git state it is shown, not just the string it prints', () => {
+    // WHETHER THE RECORD IS CARRIED and WHICH COMMAND RESTORES IT are separate
+    // questions. Any index entry answers the first — an unmerged conflict side is
+    // no restorable copy but is proof the repository has the record, and reading
+    // it as "never carried" reopens the removal route. Only a candidate that
+    // PARSES answers the second: a remedy handing back torn bytes walks the caller
+    // from one refusal into the next.
     expect(RESTORE_CMD).toBe('git checkout HEAD -- .claude/queue-rank.json')
-    expect(restoreCommandFor({ headHasIt: true })).toBe(RESTORE_CMD)
-    expect(restoreCommandFor({ headHasIt: false, inIndex: true })).toBe('git checkout -- .claude/queue-rank.json')
-    expect(restoreCommandFor({ headHasIt: false, removedIn: 'c0f0baca' })).toBe(
+    expect(recordProvenanceFrom({ headOk: true })).toEqual({ tracked: true, restore: RESTORE_CMD })
+    expect(recordProvenanceFrom({ indexOk: true, known: true })).toEqual({
+      tracked: true,
+      restore: 'git checkout -- .claude/queue-rank.json',
+    })
+    expect(recordProvenanceFrom({ removedIn: 'c0f0baca', known: true }).restore).toBe(
       'git checkout c0f0baca^ -- .claude/queue-rank.json',
     )
+    // A SHA-256 repository names 64 hex digits; the 40-digit rule read that as no
+    // commit at all and handed the removal route back.
+    expect(recordProvenanceFrom({ removedIn: 'a'.repeat(64), known: true })).toEqual({
+      tracked: true,
+      restore: `git checkout ${'a'.repeat(64)}^ -- .claude/queue-rank.json`,
+    })
+    // Carried, but nothing readable to name: still refused, and pointed at the
+    // state rather than at a command that cannot work.
+    const stuck = recordProvenanceFrom({ known: true })
+    expect(stuck.tracked).toBe(true)
+    expect(stuck.restore).toBe('')
+    expect(removedRecordMessage(stuck.restore)).toContain('git log --oneline -- .claude/queue-rank.json')
     // A revision that is not one is never printed as a command.
     for (const junk of ['', '   ', 'HEAD~1; rm -rf /', null]) {
-      expect(restoreCommandFor({ headHasIt: false, removedIn: junk })).toBe(RESTORE_CMD)
+      expect(recordProvenanceFrom({ removedIn: junk, known: true }).restore).toBe('')
     }
-    expect(restoreCommandFor()).toBe(RESTORE_CMD)
-    // Both refusals carry the command the caller established, not a fixed one.
-    expect(removedRecordMessage(restoreCommandFor({ headHasIt: false, removedIn: 'abc1234' }))).toContain(
-      'git checkout abc1234^ -- .claude/queue-rank.json',
-    )
+    // And the ONE state arming exists for: git knows nothing of the path.
+    expect(recordProvenanceFrom()).toEqual({ tracked: false, restore: RESTORE_CMD })
+    // The refusal carries the command the caller established, not a fixed one.
     expect(TORN_RECORD_MESSAGE).toContain(RESTORE_CMD)
     let thrown = null
     try {
@@ -255,35 +269,6 @@ describe('the baseline moves only when nothing is outstanding', () => {
       thrown = e
     }
     expect(thrown.message).toContain('git checkout deadbee^ -- x')
-  })
-
-  it('reads the git state it is shown, including the index entries that restore nothing', () => {
-    // The discovery itself, not just the string it produces. `ls-files` succeeding
-    // proves an ENTRY, not a usable one: stages 1/2/3 are the sides of an unmerged
-    // conflict, and `git add -N` leaves a stage-0 entry holding the empty blob,
-    // which would restore a zero-byte record — torn, i.e. one refusal handing the
-    // caller into the next.
-    expect(recordProvenanceFrom({ headHasIt: true, indexStage: 2 })).toEqual({ tracked: true, restore: RESTORE_CMD })
-    expect(recordProvenanceFrom({ headHasIt: false, indexStage: 0, indexSize: 1870 })).toEqual({
-      tracked: true,
-      restore: 'git checkout -- .claude/queue-rank.json',
-    })
-    for (const unusable of [
-      { indexStage: 2, indexSize: 1870 },
-      { indexStage: 1, indexSize: 1870 },
-      { indexStage: 0, indexSize: 0 },
-      { indexStage: null, indexSize: 0 },
-    ]) {
-      // No usable index copy, but the history has it: restore from before the
-      // commit that removed it, and the record still counts as carried.
-      expect(recordProvenanceFrom({ headHasIt: false, ...unusable, removedIn: 'abc1234' })).toEqual({
-        tracked: true,
-        restore: 'git checkout abc1234^ -- .claude/queue-rank.json',
-      })
-      // And with no history either, this is the one state arming exists for.
-      expect(recordProvenanceFrom({ headHasIt: false, ...unusable }).tracked).toBe(false)
-    }
-    expect(recordProvenanceFrom()).toEqual({ tracked: false, restore: RESTORE_CMD })
   })
   it('writes nothing when the baseline already says what stands', () => {
     expect(settleRecord([9, 5], settledAt([5, 9]), { at: 't' })).toEqual({ changed: false, record: null })

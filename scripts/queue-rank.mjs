@@ -23,7 +23,7 @@
 // and a clone that inherited nothing would re-ask about every point ever appended.
 // Decisions about points that are no longer open are dropped on every write — the
 // archive keeps the history, this file keeps the live judgments.
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { isMainModule } from './is-main.mjs'
@@ -97,27 +97,35 @@ const git = (args) => spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8',
  */
 function recordProvenance(path = RANK_RECORD_PATH) {
   const failClosed = { tracked: true, restore: RESTORE_CMD }
+  // A candidate is only worth NAMING as the remedy if its bytes are a record;
+  // restoring torn ones would hand the caller from this refusal into the next.
+  const readable = (rev) => {
+    const out = git(['cat-file', '-p', rev])
+    return out.status === 0 && !parseRankRecord(String(out.stdout ?? '')).torn
+  }
   try {
-    const headHasIt = git(['cat-file', '-e', `HEAD:${path}`]).status === 0
-    // "<mode> <sha> <stage>\t<path>" — the stage is what says whether this is a
-    // plain entry or one side of an unmerged conflict.
+    const inHead = git(['cat-file', '-e', `HEAD:${path}`]).status === 0
+    // "<mode> <sha> <stage>\t<path>" — ANY stage proves an entry; only stage 0 is
+    // one `git checkout -- <path>` can restore from (1/2/3 are the sides of an
+    // unmerged conflict).
     const staged = git(['ls-files', '--stage', '--', path])
-    const entry = String(staged.stdout ?? '').trim().split('\n')[0] ?? ''
-    const match = staged.status === 0 ? entry.match(/^\d+ [0-9a-f]+ (\d)\t/) : null
+    const entry = staged.status === 0 ? (String(staged.stdout ?? '').trim().split('\n')[0] ?? '') : ''
+    const match = entry.match(/^\d+ [0-9a-f]+ (\d)\t/)
     const indexStage = match ? Number(match[1]) : null
-    const size = indexStage === 0 ? git(['cat-file', '-s', `:0:${path}`]) : null
-    const indexSize = size && size.status === 0 ? Number(String(size.stdout).trim()) : 0
     const history = git(['rev-list', '-n', '1', 'HEAD', '--', path])
     // git said nothing usable — not installed, not a repository, a broken index.
     // The one legitimate arming happens before the record is ever committed, so
-    // refusing wrongly costs a message naming the restore, while allowing wrongly
+    // refusing wrongly costs a message naming the state, while allowing wrongly
     // is the hole itself.
-    if (!headHasIt && history.status !== 0) return failClosed
+    if (!inHead && indexStage === null && history.status !== 0) return failClosed
+    const removedIn = String(history.stdout ?? '').trim()
     return recordProvenanceFrom({
-      headHasIt,
-      indexStage,
-      indexSize,
-      removedIn: String(history.stdout ?? '').trim(),
+      headOk: inHead && readable(`HEAD:${path}`),
+      indexOk: indexStage === 0 && readable(`:0:${path}`),
+      // Only where the copy before the removal is itself readable — otherwise the
+      // record is carried but not recoverable from there either.
+      removedIn: removedIn && readable(`${removedIn}^:${path}`) ? removedIn : '',
+      known: inHead || indexStage !== null || Boolean(removedIn),
     })
   } catch {
     return failClosed
@@ -135,24 +143,25 @@ function recordProvenance(path = RANK_RECORD_PATH) {
  * outstanding question is settled by the collective reason after all. Staging the
  * record closes that window in the same command that opens it — the record is a
  * TRACKED artefact by design, and an armed one sitting outside git is the
- * anomaly. It cannot fail silently: a stage that does not happen is said out
- * loud, because the arming is then not durable.
+ * anomaly. AND IT IS PART OF THE ARMING, NOT AN AFTERTHOUGHT (cross-vendor
+ * review, eighth pass): a warning that the staging failed left the record armed
+ * but untracked, which is the escape itself. A staging that fails therefore UNDOES
+ * the write and refuses, so the checkout is exactly as it was before.
  */
 function stageRecord(path = RANK_RECORD_PATH) {
-  let failure = ''
   try {
     const added = git(['add', '--', path])
-    if (added.status !== 0) failure = String(added.stderr ?? '').trim() || `git add exited ${added.status}`
+    return added.status === 0 ? '' : String(added.stderr ?? '').trim() || `git add exited ${added.status}`
   } catch (e) {
-    failure = e && e.message
+    return (e && e.message) || 'git add could not be run'
   }
-  if (failure) {
-    console.error(
-      `queue-rank: WARNING — could not stage ${path} (${failure}). Stage and commit it now: until the ` +
-        'repository carries the record, deleting it reads as a checkout that never had a baseline, and a ' +
-        'second --seed would settle every outstanding question on one reason.',
-    )
-  }
+}
+
+/** Put the checkout back as it was before an arming that could not be made
+ *  durable — the previous bytes, or no file where there was none. */
+function undoWrite(before, path = RECORD) {
+  if (before === null) rmSync(path, { force: true })
+  else writeTextAtomic(path, before)
 }
 
 function flagValue(argv, flag) {
@@ -184,11 +193,20 @@ if (isMainModule(import.meta.url)) {
       // and `seedRecord` refuses an already armed record — and a record the
       // repository still carries — so this can never be the shortcut out of an
       // outstanding question, by re-seeding or by removal.
+      const before = existsSync(RECORD) ? readFileSync(RECORD, 'utf8') : null
       const next = writeRankRecord(
         seedRecord(record, open, { why, at: new Date().toISOString(), ...recordProvenance() }),
         open,
       )
-      stageRecord()
+      const unstaged = stageRecord()
+      if (unstaged) {
+        undoWrite(before)
+        throw new Error(
+          `armed nothing: ${RANK_RECORD_PATH} could not be staged (${unstaged}), and an arming that git does ` +
+            'not carry is one a later removal cannot be told apart from a checkout that never had a baseline. ' +
+            'The checkout is unchanged; fix git and run the command again.',
+        )
+      }
       console.log(`queue-rank: baseline armed with ${next.settled.points.length} open point(s) — "${why.trim()}"`)
     } else {
       const state = appendGateState(open, record)

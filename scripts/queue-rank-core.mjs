@@ -29,12 +29,6 @@
 // between the ranking and the rendering — a second copy of the ORDER is precisely
 // the failure points 590 and 608 were opened about.
 
-/** The reason written down for a point whose PLACEMENT already answered the
- *  question — it stands ahead of a point the baseline remembers, which is the
- *  "move it in TASKS.md" half of the one decision the gate asks for. */
-export const MOVED_INSIDE_WHY =
-  'placed inside the order in TASKS.md, ahead of a point already judged — the move is the decision'
-
 /** Record the rank of a point that stays where append-and-defer put it. */
 export const RANK_CMD = 'node scripts/queue-rank.mjs --ranked <N> --why "<one line>"'
 
@@ -54,52 +48,39 @@ export const RANK_RECORD_PATH = '.claude/queue-rank.json'
 export const RESTORE_CMD = `git checkout HEAD -- ${RANK_RECORD_PATH}`
 
 /**
- * The restore a refusal prints, aimed at a commit that ACTUALLY HAS the record
- * (cross-vendor review, sixth pass).
- *
- * A refusal is only closed by a remedy that works, and one fixed command cannot
- * cover the three states a missing record can be in: HEAD still has it (a plain
- * delete in the working tree), only the INDEX has it (added but never committed,
- * then deleted), or NEITHER does because the deletion was committed — where the
- * record lives one commit before the one that removed it. Naming the wrong one
- * leaves the caller in the loop the refusal was meant to end: `--seed` keeps
- * refusing, the gate keeps blocking as unarmed, and the printed command keeps
- * failing. The caller establishes the state (`scripts/queue-rank.mjs` asks git);
- * choosing the command from it is pure, so it is decided and tested here.
+ * Where to look when nothing in git holds a READABLE copy — the state itself,
+ * rather than a restore command that cannot work.
  */
-export function restoreCommandFor({ headHasIt = true, inIndex = false, removedIn = '' } = {}) {
-  if (headHasIt) return RESTORE_CMD
-  if (inIndex) return `git checkout -- ${RANK_RECORD_PATH}`
-  const at = String(removedIn ?? '').trim()
-  // The parent of the commit that removed it — and only where that really is a
-  // commit id, since a guessed revision is another command that cannot work.
-  return /^[0-9a-f]{7,40}$/i.test(at) ? `git checkout ${at}^ -- ${RANK_RECORD_PATH}` : RESTORE_CMD
-}
+export const INSPECT_CMD = `git log --oneline -- ${RANK_RECORD_PATH}`
 
 /**
  * Does the repository carry the record, and what puts it back — decided from what
  * git ANSWERED, so the decision is pure and swept by the unit layer rather than
- * only by a live repository (cross-vendor review, seventh pass).
+ * only by a live repository (cross-vendor reviews, sixth to eighth pass).
  *
- * `indexStage` is the stage of the index entry: 0 is a plain one, 1/2/3 are the
- * sides of an unmerged conflict, which `git checkout -- <path>` cannot restore
- * from. `indexSize` is that entry's blob size, because `git add -N` leaves a
- * stage-0 entry holding the EMPTY blob — restoring it would write a zero-byte
- * record, which this module reads as TORN, so the remedy would hand the caller
- * from one refusal into another. Either way the answer is not "no index copy" but
- * "no USABLE index copy": the repository still carries the record, and the search
- * moves on to the commit that removed it.
+ * TWO QUESTIONS, KEPT APART. Whether the record is CARRIED decides whether arming
+ * is refused, and ANY entry answers it — an unmerged conflict side or an
+ * intent-to-add stub is no restorable copy, but it is proof the repository has
+ * the record, and reading it as "never carried" reopens the removal route arming
+ * was closed against. Which command RESTORES it is the other question, and only a
+ * copy that actually PARSES may be named: a remedy handing back torn bytes moves
+ * the caller from one refusal into the next, and a staged-but-malformed record is
+ * exactly that. So the caller reports what each candidate HOLDS — `headOk`,
+ * `indexOk`, `removedIn` (the commit that removed a readable copy) — plus
+ * `known`, and where nothing readable can be named the answer is
+ * carried-but-unrecoverable: arming stays refused and the caller is pointed at
+ * the state instead of at a command.
  */
-export function recordProvenanceFrom({ headHasIt = false, indexStage = null, indexSize = 0, removedIn = '' } = {}) {
-  if (headHasIt) return { tracked: true, restore: restoreCommandFor({ headHasIt: true }) }
-  if (Number(indexStage) === 0 && Number(indexSize) > 0) {
-    return { tracked: true, restore: restoreCommandFor({ headHasIt: false, inIndex: true }) }
-  }
-  const restore = restoreCommandFor({ headHasIt: false, removedIn })
-  // Only a restore that names a real commit proves the repository ever had it;
-  // anything else is the one state arming exists for — a checkout that has never
-  // carried the record.
-  return restore === RESTORE_CMD ? { tracked: false, restore } : { tracked: true, restore }
+export function recordProvenanceFrom({ headOk = false, indexOk = false, removedIn = '', known = false } = {}) {
+  if (headOk) return { tracked: true, restore: RESTORE_CMD }
+  if (indexOk) return { tracked: true, restore: `git checkout -- ${RANK_RECORD_PATH}` }
+  const at = String(removedIn ?? '').trim()
+  // The parent of the commit that removed it — and only where that really is an
+  // object id, since a guessed revision is another command that cannot work.
+  // SHA-256 repositories name 64 hex digits, SHA-1 ones 40.
+  if (/^[0-9a-f]{7,64}$/i.test(at)) return { tracked: true, restore: `git checkout ${at}^ -- ${RANK_RECORD_PATH}` }
+  if (known) return { tracked: true, restore: '' }
+  return { tracked: false, restore: RESTORE_CMD }
 }
 
 /** The open points as clean integers, in the order they were handed over, each
@@ -391,24 +372,23 @@ export function settleRecord(open, record, { at = '', closed = [] } = {}) {
     // unquestioned when it reopens. Shrinking can only add questions.
     if (state.state !== 'pending') return { changed: false, record: null }
     const kept = settled.points.filter((n) => list.includes(n))
-    // AND THE MOVE IS WRITTEN DOWN WHILE IT CAN STILL BE READ (cross-vendor
-    // review, fifth pass). Standing ahead of a remembered point IS the decision,
-    // but it is a decision inferred from a NEIGHBOUR: baseline [1, 2] with 3
-    // moved to [1, 3, 2] and 4 outstanding reads correctly — until 2 closes.
-    // [1, 3, 4] then has no anchor behind 3 any more, and the gate asks a second
-    // time for a placement somebody already made. While nothing is outstanding
-    // the baseline absorbs those points at this same write, so the decision only
-    // evaporates in the pending case; recording it here makes it durable, in the
-    // one place decisions live and with the reason that was true of it.
-    const decided = { ...ranked }
-    for (const n of state.inside) {
-      if (!decided[n]) decided[n] = { at: String(at ?? '').trim(), why: MOVED_INSIDE_WHY }
-    }
-    const noted = Object.keys(decided).length !== Object.keys(ranked).length
-    if (!noted && kept.length === settled.points.length) return { changed: false, record: null }
+    // NO INFERRED DECISION IS EVER WRITTEN DOWN (cross-vendor reviews, fifth and
+    // eighth pass — they pull in opposite directions and this is the resolution).
+    // The fifth pass observed that "stands ahead of a remembered point" is a
+    // decision read off a NEIGHBOUR, and the neighbour can close: baseline [1, 2]
+    // with 3 moved to [1, 3, 2] and 4 outstanding reads correctly until 2 lands,
+    // and [1, 3, 4] then asks a second time for a placement somebody made. It was
+    // fixed by recording the placement — and the eighth pass showed what that
+    // costs: the same inference from a TRANSIENT view (a half-written file, an
+    // order mid-move, a checkout mid-merge) would be frozen into a permanent
+    // decision nobody took, and the gate would never ask about that point again.
+    // An extra question costs ONE command and is always answerable; a silent
+    // permanent exemption is the failure this whole mechanism exists to prevent.
+    // So a placement stays a live reading, and only a HUMAN writes a decision.
+    if (kept.length === settled.points.length) return { changed: false, record: null }
     // The baseline keeps its own `at`/`why`: this is the same settlement, minus
     // what has since closed, not a new one.
-    const narrowed = { ...pruneRankRecord({ ranked: decided }, list), settled: { ...settled, points: kept } }
+    const narrowed = { ...pruneRankRecord({ ranked }, list), settled: { ...settled, points: kept } }
     return { changed: true, record: narrowed }
   }
   const points = [...list].sort((a, b) => a - b)
@@ -498,7 +478,10 @@ export function alreadyArmedMessage(pending = []) {
 export const removedRecordMessage = (restore = RESTORE_CMD) =>
   `${RANK_RECORD_PATH} is missing here, but this repository carries it — so this checkout HAS a baseline and ` +
   'is not arming a first one. A record that exists is restored, not re-armed, or every question outstanding ' +
-  `when it went missing would count as answered by the arming: ${restore}`
+  'when it went missing would count as answered by the arming: ' +
+  // No readable copy anywhere in git: naming a restore that cannot work would
+  // only walk the caller into the next refusal, so name the state instead.
+  (restore || `no copy of it in git parses as a record — see what is there (${INSPECT_CMD}) and recover it first`)
 
 /**
  * ARM the gate: everything standing in the order today counts as judged, with one
