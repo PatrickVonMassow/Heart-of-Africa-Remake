@@ -8454,6 +8454,85 @@ if (section('ctrl-actor-labels')) {
     held ? `${plantNamed.length} scenery labels` : 'no layer',
   )
 
+  // NOTHING THE PASS DREW IS INVISIBLE TO THE LAYER (point 600). The reported
+  // defect was not a wrong predicate but a missing SOURCE: the attacking
+  // predator is drawn from the hunt's own groups, and only the herds had one,
+  // so it never reached the layer to be judged at all. This compares the raw
+  // candidate set against what the SCENE says it drew — every animal stamped
+  // with the current draw pass and standing in the picture must be offered,
+  // whatever state it is in. Both readings happen in ONE synchronous block, so
+  // no frame can run between them and they describe the same moment.
+  const offered = await page.evaluate(() => {
+    const cands = window.__actorCandidates ? window.__actorCandidates() : null
+    const herds = window.__wildlife?.herdsRef?.current
+    if (!cands || !herds) return null
+    // The stamp of the pass that just drew: the newest any animal carries.
+    let frame = -1
+    for (const sp of Object.keys(herds)) {
+      for (const a of herds[sp]) if (a.drawn && a.drawn.frame > frame) frame = a.drawn.frame
+    }
+    const at = (kind, x, z) => cands.some((c) => c.kind === kind && Math.hypot(c.x - x, c.z - z) < 1.5)
+    const missing = []
+    let drawnOnScreen = 0
+    for (const sp of Object.keys(herds)) {
+      for (const a of herds[sp]) {
+        const d = a.drawn
+        if (!d || d.frame !== frame) continue
+        if (!window.__camera.onScreen(d.x, d.z)) continue
+        drawnOnScreen++
+        if (!at(sp, d.x, d.z)) missing.push(`${sp}@${d.x.toFixed(0)},${d.z.toFixed(0)}`)
+      }
+    }
+    // The scripted hunt draws its two figures from its own groups — the gap.
+    const hunt = window.__lionHunt
+    const L = hunt?.state
+    if (L && hunt.lion.current?.visible === true && window.__camera.onScreen(L.lx, L.lz)) {
+      drawnOnScreen++
+      if (!at(L.predator, L.lx, L.lz)) missing.push(`${L.predator}@hunt(${L.mode})`)
+    }
+    if (L && hunt.prey.current?.visible === true && window.__camera.onScreen(L.px, L.pz)) {
+      drawnOnScreen++
+      if (!at(L.prey, L.px, L.pz)) missing.push(`${L.prey}@hunt(${L.mode})`)
+    }
+    return { missing, drawnOnScreen, candidates: cands.length }
+  })
+  check(
+    'every animal the pass drew on screen reaches the label layer (point 600)',
+    !!offered && offered.drawnOnScreen > 0 && offered.missing.length === 0,
+    offered
+      ? `${offered.drawnOnScreen} drawn on screen, ${offered.candidates} offered, ` +
+        `missing [${offered.missing.slice(0, 6).join(', ')}]`
+      : 'no candidate hook',
+  )
+
+  // The roster's USABLE OBJECTS, not only its animals (point 342's roster in
+  // point 600's states): a camp pitched where the traveller stands is one key
+  // away for the player, and it must name itself like anything that moves. The
+  // camp is taken back out before the frame, so the picture and every later
+  // section see the state they expect.
+  const camped = await page.evaluate(async () => {
+    const before = window.__game.getState().freeCamps
+    window.__game.getState().pitchOrOpenCamp()
+    window.__ui.getState().setDialog(null)
+    const seen = await new Promise((res) => {
+      let frames = 0
+      const step = () => {
+        const camp = (window.__actorLabels?.() ?? []).find((l) => l.kind === 'camp') ?? null
+        if (camp !== null || ++frames > 240) res(camp)
+        else requestAnimationFrame(step)
+      }
+      requestAnimationFrame(step)
+    })
+    const texts = [...document.querySelectorAll('.actor-label')].map((el) => el.textContent ?? '')
+    window.__game.setState({ freeCamps: before })
+    return { camp: seen, drawn: seen !== null && texts.includes(seen.text) }
+  })
+  check(
+    'a pitched camp names itself under Ctrl (points 342/600)',
+    camped.camp !== null && camped.drawn,
+    camped.camp ? `"${camped.camp.text}" drawn at the camp` : 'the pitched camp carried no Ctrl label',
+  )
+
   await shot('147-ctrl-actor-labels', {
     world: { lat: -2.6, lon: 35.2 },
     label: 'the savanna with the Ctrl labels over its animals',
@@ -8474,6 +8553,178 @@ if (section('ctrl-actor-labels')) {
     hook: window.__actorLabels === undefined,
   }))
   check('releasing Ctrl clears every label (point 342)', cleared && after.dom === 0 && after.hook, JSON.stringify(after))
+}
+
+// --- Hold Ctrl on an ATTACKING predator (design.md §17.8, point 600) ---------
+// The first hold in real play found the one state the layer failed in: a
+// predator in its attack run carried no label. It is drawn from the hunt's own
+// groups, not from the herds, and only the herds had a source — so the check
+// STAGES the attack and reads the label at the attacker while it runs, rather
+// than asking whether the predicate would have said yes.
+if (section('ctrl-labels-attacking-predator')) {
+  await page.evaluate(() => {
+    const ui = window.__ui.getState()
+    if (ui.mapOpen) ui.toggleMap()
+    ui.setTravelZoom(0.5) // the in-game default (point 172)
+    window.__game.getState().setJournalOpen(false)
+    window.__game.getState().debugJumpTo(-2.2, 34.8) // eastern savanna: lions hunt here
+  })
+  await waitForHerds()
+  await page.waitForFunction(() => window.__lionHunt && window.__lionHunt.state, null, { timeout: 30000 })
+  await page.waitForFunction(() => window.__camera?.settled?.() === true, null, { timeout: 30000 }).catch(() => {})
+
+  // Stage the hunt the way the DEBUG MENU stages it (design.md §21.3) and hold
+  // it beside the traveller: a chase left to run leaves the frame and retires
+  // before anything can be read off it. The predator is drawn from the region's
+  // pool, so the roll is repeated for the LION the player reported — and if the
+  // dice never give one, the run says so and asserts on the predator it got:
+  // the gap is the entity list, not the species.
+  const staged = await page.evaluate(async () => {
+    const L = window.__lionHunt.state
+    const p = { x: window.__game.getState().pos.x, z: window.__game.getState().pos.z }
+    const frames = (n) =>
+      new Promise((res) => {
+        let i = 0
+        const step = () => (++i >= n ? res() : requestAnimationFrame(step))
+        requestAnimationFrame(step)
+      })
+    let rolls = 0
+    for (; rolls < 16; rolls++) {
+      L.mode = 'idle'
+      L.timer = 0
+      L.victim = null
+      L.victimHunt = false
+      L.force = { x: p.x + 6, z: p.z + 6, kind: 'generic' }
+      await frames(3)
+      if (L.predator === 'lion') break
+    }
+    // Pin predator and prey a few metres in front of the traveller EVERY frame,
+    // so the chase cannot run out past the offstage ring mid-read (point 177:
+    // the app's own clock, never a wall-clock sleep).
+    window.__ctrlAttackPinStop = false
+    const pin = () => {
+      if (window.__ctrlAttackPinStop) return
+      if (L.mode !== 'idle') {
+        L.lx = p.x + 4
+        L.lz = p.z + 4
+        L.px = p.x + 7
+        L.pz = p.z + 6
+        L.timer = Math.max(L.timer, 30)
+      }
+      requestAnimationFrame(pin)
+    }
+    requestAnimationFrame(pin)
+    await frames(12)
+    return {
+      rolls,
+      predator: L.predator,
+      prey: L.prey,
+      mode: L.mode,
+      drawn: window.__lionHunt.lion.current?.visible === true,
+      onScreen: window.__camera.onScreen(L.lx, L.lz),
+    }
+  })
+  check(
+    'the staged attack is really running in the picture (point 600)',
+    staged.mode !== 'idle' && staged.drawn && staged.onScreen,
+    JSON.stringify(staged),
+  )
+
+  await page.keyboard.down('Control')
+  const attack = await page
+    .waitForFunction(
+      () => {
+        const labels = window.__actorLabels?.()
+        if (!labels) return false
+        const L = window.__lionHunt.state
+        return labels.some((l) => l.kind === L.predator && Math.hypot(l.x - L.lx, l.z - L.lz) < 3)
+      },
+      null,
+      { timeout: 20000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  // The hook reports the list the layer last rendered FROM; a fresh label
+  // reaches the DOM through drei's portal a frame later. Both readings must
+  // describe the same moment, so poll on the app's own frames until they agree
+  // (the same convergence the section above waits for).
+  const held = await page.evaluate(async () => {
+    const L = window.__lionHunt.state
+    const settled = await new Promise((res) => {
+      let frames = 0
+      const step = () => {
+        const labels = window.__actorLabels?.() ?? []
+        const drawn = document.querySelectorAll('.actor-label').length
+        if ((drawn === labels.length && drawn > 0) || ++frames > 240) res(frames)
+        else requestAnimationFrame(step)
+      }
+      requestAnimationFrame(step)
+    })
+    const labels = window.__actorLabels() ?? []
+    const cands = window.__actorCandidates() ?? []
+    const near = (a, x, z) => Math.hypot(a.x - x, a.z - z) < 3
+    const attacker = labels.find((l) => l.kind === L.predator && near(l, L.lx, L.lz)) ?? null
+    const hunted = labels.find((l) => l.kind === L.prey && near(l, L.px, L.pz)) ?? null
+    return {
+      settledAfterFrames: settled,
+      predator: L.predator,
+      prey: L.prey,
+      attacker,
+      hunted,
+      // The attacker's own record BEFORE the predicate: it must be collected,
+      // and it must NOT be flagged concealed — that flag belongs to the §19.16
+      // submerged crocodile and to nothing else.
+      attackerCandidates: cands
+        .filter((c) => c.kind === L.predator && near(c, L.lx, L.lz))
+        .map((c) => ({ concealed: c.concealed === true, dead: c.dead === true })),
+      concealedKinds: [...new Set(cands.filter((c) => c.concealed === true).map((c) => c.kind))],
+      attackerOnScreen: attacker ? window.__camera.onScreen(attacker.x, attacker.z, attacker.y) : null,
+      drawnTexts: [...document.querySelectorAll('.actor-label')].map((el) => el.textContent ?? ''),
+    }
+  })
+  check(
+    'an ATTACKING predator carries its label while the attack runs (point 600)',
+    attack && held.attacker !== null && held.attackerOnScreen === true,
+    `${held.predator}: ${held.attacker ? `"${held.attacker.text}"` : 'UNLABELLED'}` +
+      `${staged.rolls >= 16 ? ' (the region never rolled a lion)' : ''}`,
+  )
+  check(
+    'the label the player reads really stands in the frame (point 600)',
+    held.attacker !== null && held.drawnTexts.includes(held.attacker.text),
+    held.attacker
+      ? `"${held.attacker.text}" among ${held.drawnTexts.length} drawn after ${held.settledAfterFrames} frame(s)`
+      : 'no attacker label',
+  )
+  check(
+    'the hunted animal is named as it flees (point 600)',
+    held.hunted !== null,
+    held.hunted ? `${held.prey}: "${held.hunted.text}"` : `${held.prey} UNLABELLED`,
+  )
+  check(
+    'the §19.16 concealment stays the crocodile ambush and nothing else (point 600)',
+    held.attackerCandidates.length > 0 &&
+      held.attackerCandidates.every((c) => !c.concealed) &&
+      held.concealedKinds.every((k) => k === 'crocodile'),
+    `attacker ${JSON.stringify(held.attackerCandidates)}, concealed kinds [${held.concealedKinds.join(', ')}]`,
+  )
+
+  await shot('600-ctrl-label-attacking-predator', {
+    world: { lat: -2.2, lon: 34.8 },
+    label: 'the staged predator attack with the Ctrl label standing at the attacker',
+  })
+
+  await page.keyboard.up('Control')
+  await page.evaluate(() => {
+    window.__ctrlAttackPinStop = true
+    const L = window.__lionHunt.state
+    L.mode = 'idle'
+    L.timer = 60
+    L.victim = null
+    L.victimHunt = false
+  })
+  await page
+    .waitForFunction(() => document.querySelectorAll('.actor-label').length === 0, null, { timeout: 15000 })
+    .catch(() => {})
 }
 
 // A selected section that never executed is a FAILURE, not a quiet pass: it is

@@ -92,10 +92,22 @@ function ActorLabelLayer() {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
     w.__actorLabels = () => drawn.current.map((l) => ({ kind: l.kind, text: l.text, x: l.x, y: l.y, z: l.z }))
+    // The set BEFORE the predicate and the projection (point 600): a missing
+    // label has two very different causes — the subject was never collected
+    // (its scene draws it outside every registered source), or it was collected
+    // and then excluded (concealed, a map point, off screen). Only the raw set
+    // tells the two apart, and the first hold in real play turned on exactly
+    // that question. Freshly collected on call, not the refresh's leftovers.
+    w.__actorCandidates = () => {
+      const all = collectActors([])
+      pushMarkedActors(scene, all)
+      return all
+    }
     return () => {
       delete w.__actorLabels
+      delete w.__actorCandidates
     }
-  }, [])
+  }, [scene])
 
   return (
     <>

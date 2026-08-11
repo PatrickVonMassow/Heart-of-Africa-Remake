@@ -29,6 +29,7 @@ import {
 import { setWildlifeDumpSource } from '../../systems/wildlifeDump'
 import { setAnimalCollider, collidableAnimalsNear } from './wildlifeCollision'
 import { registerActorSource, type LabelledActor } from '../actorLabelSource'
+import { pushFlockActors, pushHerdActors, pushHuntActor } from './wildlifeActorSource'
 import {
   recordDrawnBody,
   drawnCollisionCircle,
@@ -903,45 +904,15 @@ const SEPARATION_MAX_SPEED = 2.2
  * unrendered body leaves no phantom collider either (the point-129 rule).
  */
 /**
- * The hold-Ctrl label layer's view of the herds (design.md §17.8): every animal
- * the LAST render pass actually drew, at the transform it drew it with — the
- * same rule as the collider (point 378), so an animal the frame skipped is
- * never named where it is not standing.
- *
- * The submerged crocodile is collected but flagged CONCEALED: naming an
- * ambusher that has not broken cover would end the §19.16 ambush before it
- * began. It names itself the moment it lunges, and a crocodile carcass — which
- * hides nothing — always does.
+ * The hold-Ctrl label layer's view of the herds (design.md §17.8): the streamed
+ * animals this scene currently holds, handed to the pure source rule
+ * (wildlifeActorSource.ts), which decides what the frame really drew and which
+ * of them is concealed.
  */
 function pushWildlifeActors(out: LabelledActor[]): void {
   const herds = ACTIVE_HERDS
   if (herds === null) return
-  for (const sp of SPECIES) {
-    for (const a of herds[sp]) {
-      const d = a.drawn
-      if (d === undefined || d.frame !== ACTIVE_DRAW_FRAME) continue
-      out.push({
-        kind: sp,
-        age: a.young === true ? 'young' : 'adult',
-        dead: a.dead === true,
-        concealed: sp === 'crocodile' && a.dead !== true && a.lunge === undefined,
-        x: d.x,
-        // Clear of the body: the tallest animals carry the largest radius.
-        y: d.y + (1 + BODY_RADIUS[sp] * 1.6) * d.scale,
-        z: d.z,
-      })
-    }
-  }
-}
-
-/** Vultures from one circling or landed flock group, as drawn (design.md
- *  §19.6). Each bird is its own object under the flock's group. */
-function pushVultureFlock(group: THREE.Group | null, out: LabelledActor[]): void {
-  if (group === null || !group.visible) return
-  for (const bird of group.children) {
-    const m = bird.matrixWorld.elements
-    out.push({ kind: 'vulture', x: m[12], y: m[13] + 1.2, z: m[14] })
-  }
+  pushHerdActors(herds, ACTIVE_DRAW_FRAME, out)
 }
 
 function nearAnimalObstacles(px: number, pz: number, radius: number): Array<[number, number, number]> {
@@ -2169,7 +2140,7 @@ function Herds() {
     () =>
       registerActorSource((out) => {
         pushWildlifeActors(out)
-        for (const g of scavengeGroups.current) pushVultureFlock(g, out)
+        for (const g of scavengeGroups.current) pushFlockActors(g, out)
       }),
     [],
   )
@@ -5405,6 +5376,22 @@ function LionHunt() {
     }
   }, [])
 
+  // The hunt's own two figures name themselves under Ctrl (design.md §17.8,
+  // point 600): the herd source walks ACTIVE_HERDS, and these two are drawn
+  // from this component's groups instead — which is why an ATTACKING predator
+  // stood unlabelled. Both are named in every phase they are drawn in: the
+  // predator through chase, feed and walk-off, the prey as a fleeing animal
+  // while the chase runs and as a carcass once the feeding starts.
+  useEffect(
+    () =>
+      registerActorSource((out) => {
+        const s = state.current
+        pushHuntActor(lion.current, s.predator, PREDATOR_SCALE[s.predator], false, out)
+        pushHuntActor(prey.current, s.prey, PREY_SCALE[s.prey], s.mode === 'feed', out)
+      }),
+    [],
+  )
+
   const FEED_DURATION = 20
 
   useFrame(({ clock }, rawDt) => {
@@ -5942,8 +5929,8 @@ function Vultures() {
   useEffect(
     () =>
       registerActorSource((out) => {
-        pushVultureFlock(group.current, out)
-        pushVultureFlock(killGroup.current, out)
+        pushFlockActors(group.current, out)
+        pushFlockActors(killGroup.current, out)
       }),
     [],
   )
