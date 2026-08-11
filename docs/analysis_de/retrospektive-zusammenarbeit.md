@@ -710,6 +710,8 @@ Bemerkenswert ist die Asymmetrie. Was versioniert im Repository liegt, zieht sel
 
 **Lehre:** Eine Umgebung ist Teil des Systems, auch wenn sie nicht im Repository steht. Was ein Projekt zum Arbeiten braucht und NICHT versioniert ist, gehört auf eine ausdrückliche Liste, die ein Umzug abarbeitet — sonst ist der erste Beweis für ihre Existenz ihr Fehlen. Und die Prüfung „läuft das Projekt hier?" ist nicht dieselbe wie „arbeitet die Mechanik hier?": Die erste war in fünf Minuten grün, die zweite kostete einen halben Tag.
 
+**Nachtrag 11.08.2026 — die zweite Hälfte derselben Lücke.** Repariert wurde damals der Wächter: Er liest das Token seither aus dem Projekt. Das Kommandozeilenwerkzeug `gh` selbst blieb unangemeldet — und eine Wartestellung, die ich von Hand darauf baute, prüfte zehn Minuten lang einen Lauf ab, der längst grün war. Der Grund ist die eigentliche Lehre: Meine Schleife behandelte den Anmeldefehler wie ein „läuft noch". Ein Warten, dessen Abbruchbedingung nur den Erfolgsfall kennt, kann durch einen Fehler nie enden — es sieht von außen exakt aus wie Geduld. Wer wartet, muss den Fehlerfall genauso auswerten wie den Erfolgsfall, und wer ein Werkzeug von Hand aufruft, wo das Projekt einen eigenen Weg hat, zahlt dessen Umgebungsschulden erneut.
+
 ---
 
 ### 3.76 Ein Urteil gehört dem Stand, den es gemessen hat
@@ -1074,6 +1076,78 @@ mit ihm unter.
 
 ---
 
+### 3.106 Unsere eigene Aufräumung hat fremde Arbeit vernichtet
+
+Am 11.08.2026 landete ein Punkt mit dem Sammelbefehl, dessen letzter Schritt Zweig und
+Arbeitsbaum löscht. Gelöscht wurde auch der Arbeitsbaum eines Agenten, der an einem
+ANDEREN Punkt mitten in der Arbeit war; von da an wies jeder seiner Befehle sich selbst
+ab. Verloren war seine fertige, getestete, viermal gegengeprüfte, aber nicht committete
+Antwort auf sechs Prüfbefunde. Kein Absturz, kein Fremdeinfluss — die Werkstatt hat ihr
+eigenes Werkstück weggeräumt.
+
+Zwei Ursachen, und die zweite ist die unbequemere. Die Aufräumung handelte nach einem
+NAMEN, nicht nach einem Eigentumsnachweis, und fragte nirgends, ob in dem Baum noch
+jemand arbeitet — obwohl das Projekt die Lebendprüfung dafür längst besitzt und sie im
+Wartemechanismus täglich benutzt. Und der Agent stand überhaupt erst deshalb ungeschützt
+da, weil er seine Arbeit als EINEN Block bis zur Grünmeldung führte: Die Regel, nach jedem
+abgeschlossenen Schritt zu committen und zu pushen, existiert seit Wochen und war hier
+nicht befolgt. Sie ist genau für diesen Fall geschrieben.
+
+**Lehre:** Ein löschender Schritt braucht einen Eigentumsnachweis, keinen plausiblen Namen
+— und wo er ihn nicht führen kann, lässt er stehen und sagt es. Das gilt doppelt, wo
+parallel gearbeitet wird: Zerstörungsrisiko und Nebenläufigkeit treffen sich genau dann,
+wenn der Betrieb am produktivsten ist. Die zweite Hälfte ist billiger und wird trotzdem
+übersprungen: Nicht gepushte Arbeit ist der einzige Zustand, den nichts retten kann.
+
+---
+
+### 3.107 Die Schicht über den eigenen Einstellungen
+
+Der Nutzer verlangte, dass in seinem Editor niemals eine Rückfrage erscheint — und es
+erschienen welche, obwohl beide Einstellungsdateien das Werkzeug als GANZES erlauben. Die
+Messung schied den Verdacht sauber aus: Dieselbe Schreibzeile läuft in jeden Ordner still
+durch und fragt nur bei `.claude/` nach, und unsere Node-Skripte, die exakt dieselben
+Dateien schreiben, fragten die ganze Nacht kein einziges Mal. Die Sperre sitzt also
+oberhalb unserer Erlaubnisliste und ist durch einen Eintrag dort nicht abzustellen.
+
+Die Lösung liegt deshalb nicht in den Einstellungen, sondern eine Stufe früher: Ein
+Wächter verweigert solche Shell-Zeilen selbst und nennt den richtigen Weg. Eine
+Verweigerung kommt VOR der Rückfrage — aus einer Frage an den Nutzer wird eine Anweisung
+an den Agenten.
+
+**Lehre:** Wenn eine Konfiguration nachweislich das Richtige sagt und das Verhalten
+trotzdem abweicht, ist die nächste Frage nicht „welcher Eintrag fehlt", sondern „wer
+entscheidet oberhalb davon". Und wo eine fremde Schicht nicht zu konfigurieren ist, kann
+man ihr oft zuvorkommen, statt gegen sie anzuschreiben.
+
+---
+
+### 3.108 Eine Checkliste, die Anwesenheit prüft und nicht Reihenfolge
+
+Der Nutzer hakte am 11.08.2026 zum Release nach und beschrieb den Ablauf, den er für
+etabliert hielt: volle Regression, gründliches Aufräumen von Altlasten, noch einmal volle
+Regression. Die Prüfung ergab ein gemischtes Bild. Die Aufräumschritte sind alle
+verankert — Toter Code, veraltete Dokumente, veraltete Kommentare, der Dokumenten-Audit —
+und ohne sie verweigert der Wächter den Tag. Was fehlt, ist die Ordnung: Es gibt EINEN
+Regressionsschritt und keinerlei Aussage darüber, ob er vor oder nach dem Aufräumen liegt.
+Ein Aufräumen nach der einzigen grünen Regression ist heute vollständig regelkonform, und
+der Tag trüge eine ungetestete Änderung.
+
+Das ist die allgemeine Form: Eine Liste von Häkchen prüft, DASS etwas geschehen ist, nie
+WANN. Solange jeder Schritt für sich steht, ist das gleichgültig; sobald ein Schritt den
+Stand ändert, den ein anderer beweist, wird die Liste zur Zusicherung, die sie nicht
+einlöst. Derselbe Wächter, der einen Tag ohne Nachweis verweigert, lässt einen mit
+veraltetem Nachweis durch. Der zweite Teil des Nachhakens traf eine andere Lücke am selben
+Ort: Das Aufräumen ist eine AUFZÄHLENDE Stufe — was ist tot, was ist veraltet —, und für
+die schreibt §6 blind-parallele Vier-Augen vor; kein Abschlussschritt verlangt sie.
+
+**Lehre:** Wo ein Schritt den Gegenstand verändert, den ein anderer bezeugt, muss der
+Nachweis JÜNGER sein als die Änderung — sonst prüft die Liste eine Vergangenheit. Und eine
+allgemeine Regel greift nur dort, wo ein konkreter Schritt sie einfordert: §6 gilt seit
+Wochen für jede aufzählende Stufe, und der Abschluss hat sie trotzdem nie angewandt.
+
+---
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -1161,7 +1235,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 11.08.2026, 03:46 · Quellen-Fingerprint: `04a0f42d0f72…`
+Zuletzt aktualisiert: Dienstag, 11.08.2026, 08:03 · Quellen-Fingerprint: `a3f4fb724ee4…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1195,6 +1269,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is ONLY for four-eyes review and as the first fallback when Opus 5 is unavailable — never for \"hard\" tasks; Opus 5 handles those (user rule 25.07.2026, supersedes the earlier hard-task delegation) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | All journal texts (de + en) must carry emotional voice markup; English read-aloud runs via Kokoro TTS | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1242,8 +1317,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 73 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 47 Prozess-/Meta-TASKS-Punkte (davon 17 offen).
+Erfasste Quellen: 74 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 49 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
 
-<!-- RETRO-FINGERPRINT: 04a0f42d0f729f0db081332fb83b4f55c1765e8b84d77b54382ea911943245be -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-11T01:46:12.853Z -->
+<!-- RETRO-FINGERPRINT: a3f4fb724ee4d8033887ef78efd2d6b2390c035fa67751429f2973685faa74aa -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-11T06:03:40.336Z -->
 <!-- AUTO-GENERATED:END -->

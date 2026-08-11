@@ -120,6 +120,96 @@ there exactly once; a new point joins a bundle when appended.
   Criticality: medium — no crash, but the feature's promise is that holding Ctrl tells you
   what you are looking at, and it fails hardest at the moment the player most wants it.
 
+- [ ] 631. THE RELEASE PROCESS DEMANDS A CLEANUP BETWEEN TWO REGRESSIONS, AND NEITHER HALF
+  IS ANCHORED (user 11.08.2026, following up on point 174: "Das ist ein Release. Dazu
+  gehört unser etablierter Release-Prozess mit Closing-Durchlauf, also insbesondere volle
+  Regression, dann gründliches Vier-Augen-Cleanup von Altlasten im kompletten Code und
+  allen Dokumenten und dann nochmal eine volle Regression" — and the cleanup runs with a
+  FOREIGN model, both models independent and blind to each other's result).
+  STATE CHECKED: `scripts/closing-guard-core.mjs` (`CLOSING_STEPS`) already carries
+  `large-regression`, `lint-audit`, `dead-code`, `stale-doc`, `stale-comment`, `md-audit`,
+  `impl-sections`, `graphics-detail-doc`, `acceptance-criteria`, `open-items` and
+  `simplifications`, and the PreToolUse guard already refuses a tag while a step is
+  missing. Exactly the two things the user stresses are NOT anchored: (1) the SECOND full
+  regression AFTER the cleanup — there is one regression step and no ORDER between it and
+  the cleanup steps, so a cleanup may happen after the only green regression and the tag
+  then carries an untested change; (2) the BLIND-PARALLEL form of the cleanup — CLAUDE.md
+  §6 prescribes it for every ENUMERATING stage (what is dead, what is stale — precisely
+  this), but no closing step demands it and point 174 does not name it.
+  FINAL STATE: (a) `CLOSING_STEPS` gains `cleanup-blind-parallel` ("clearing out legacy as
+  a BLIND-PARALLEL four-eyes stage: both models work from the same inputs to their own
+  complete result, neither seeing the other's before it is done; the union is deduplicated
+  BY MEANING, marks what only one side found and drops nothing for being unusual") and
+  `regression-after-cleanup` ("second full LARGE regression on BOTH backends, after the
+  last cleanup commit"). (b) The ORDER is checked, not merely the presence: the evidence
+  for `regression-after-cleanup` must name a commit or timestamp AFTER the youngest
+  cleanup step, or it does not count. (c) Point 174 and CLAUDE.md §9 state the sequence
+  explicitly — regression, blind-parallel cleanup, regression, and only then the user's go
+  for the tag. (d) It holds for EVERY release point, not only 174.
+  VERIFIABLE: Vitest cases over the pure closing core — a recorded
+  `regression-after-cleanup` older than the youngest cleanup step is rejected with the
+  reason, one younger is accepted, and a missing `cleanup-blind-parallel` blocks the tag;
+  plus a case that the guard still fails open on its own internal error.
+  Criticality: high — this is the mechanism that certifies a tag. Bundle: Modell &
+  Wächter.
+
+- [ ] 629. THE LANDING DELETES THE WORKTREE OF AN AGENT THAT IS STILL WORKING (measured
+  11.08.2026, and it destroyed finished work). Landing point 608 ran `land-point.mjs`
+  through its `cleanup` step ("delete branch, remote branch and worktree"), and the
+  worktree of the agent on point 590 (`.claude/worktrees/agent-a46632fd8f7f4bbce`)
+  disappeared underneath it. From then on every one of that agent's shell calls was
+  refused with "the isolation worktree appears to have been removed". LOST: the finished,
+  tested, UNCOMMITTED answer to six review findings — `queue-rank-core.mjs`,
+  `queue-rank.mjs`, `queue-order-guard-core.mjs` with 89 green cases and the reviewer's
+  recorded verdict. Only the pushed state 6105a528 survived.
+  TWO FAULTS, FIXED SEPARATELY. (a) The landing's cleanup must touch the branch and the
+  worktree OF THE LANDED POINT and nothing else. Where it cannot prove a worktree belongs
+  to the point it is landing, it leaves it alone and says so; where a worktree is
+  demonstrably ALIVE (an agent process, a recently written branch — the liveness evidence
+  `batch-in-flight.mjs` already collects), it is never removed, even when it does belong
+  to the point. (b) An agent whose ground is pulled away must not be standing on
+  unpublished work: the commit-and-push-per-step rule exists and was not followed here,
+  because the whole answer ran as one block up to the green verdict. The delegation prompt
+  therefore demands a commit at each self-contained step, and the agent is told that an
+  uncommitted block is the one state nothing can rescue.
+  VERIFIABLE: a Vitest case over the pure cleanup selector — given a landed point, a set of
+  worktrees and their liveness evidence, it returns exactly the landed point's dead
+  worktree and never a foreign or a live one; plus a case that a worktree whose ownership
+  cannot be established is reported, not removed.
+  Criticality: high — this is the one failure class that destroys work already done, and it
+  fires precisely when the batch is at its most productive (a landing beside a running
+  pool). Bundle: Session- & Repo-Hygiene.
+
+- [ ] 630. A SHELL WRITE INTO `.claude/` RAISES A PROMPT IN THE USER'S VS CODE WINDOW
+  (measured twice 11.08.2026 — once by a delegated agent, once by a direct probe; user
+  requirement the same day: "Es dürfen niemals Rückfragen hier in VS Code kommen"). THE
+  RULE, as measured: a write by SHELL REDIRECTION into `.claude/` raises the harness
+  permission prompt regardless of our settings. `echo probe > local/perm-probe.txt` runs
+  through unasked; the identical line against `.claude/perm-probe.txt` asks. Both settings
+  files already allow Bash as a WHOLE tool with `defaultMode: dontAsk`, so the prompt comes
+  from a protection layer ABOVE the allowlist and cannot be switched off by an entry in it
+  (the five narrow entries in `.claude/settings.local.json` are the trace of earlier
+  clicks, not the cause). Node scripts writing the SAME files through `fs` — `board.mjs`,
+  `board-queue.mjs`, `batch-*.mjs`, `queue-rank.mjs` — never ask; not once across a whole
+  night.
+  FINAL STATE, without editing `settings.json` (editing it would itself raise the prompt):
+  the PreToolUse chain already holds two guards on the Bash tool (`closing-guard.mjs`,
+  `firewall-guard.mjs`). One of them gains a check that DENIES a shell line carrying a
+  redirection, a `cp`/`mv`/`tee`/`sed -i` or an `rm` into `.claude/`, with a reason naming
+  the right way instead — the project script that owns that file, or the Write tool. A
+  hook's deny arrives BEFORE the prompt, so it turns a question to the user into an
+  instruction to the agent. Separately, no test may write its state into `.claude/`: it
+  goes to a temporary directory passed by environment variable, the way
+  `decision-card-guard` already does with `DECISION_CARD_GUARD_STATE` — that is exactly
+  what the point-590 agent got stuck on.
+  VERIFIABLE: Vitest cases over the pure matcher — each of the write forms above against
+  `.claude/` is denied with the naming reason, a read (`cat`, `grep`, `node … --status`)
+  and every write outside `.claude/` passes untouched, and a `.claude` substring inside an
+  unrelated word or path does not trip it; plus a test-hygiene case that no test writes
+  into `.claude/`.
+  Criticality: high — the user has forbidden prompts in that window outright, and a prompt
+  in an unattended session is a stall nobody is there to clear. Bundle: Modell & Wächter.
+
 - [ ] 614. EXECUTE THE FOUR-EYES WORK-ORDER CLEANUP (10.08.2026; the verdict of a
   BLIND-PARALLEL analysis by two models on the 148 open points — CLAUDE.md §6, divergent
   stage). Both runs were merged by MEANING; where only one model found an item it is
@@ -1254,11 +1344,20 @@ Build order, chosen so no two parallel agents own the same file:
   make this impossible, and on the same afternoon it PROVED it can fail closed (it refused a
   push of this session's with "unit ran an unreadable file count … nothing was compared").
   So the defect is not "the gate is missing" but "the gate's verdict is not binding".
-  FIRST, ESTABLISH THE PATH, do not guess it: reconstruct from the gate's own log and the
-  reflog which decision let `4d580957` through — the gate not running at all, a stale green
-  from an earlier run being reused, `--no-verify`, or a hook that exits 0 on its own error.
-  Write the answer into the commit message; the fix depends on it and a guessed cause here
-  would produce a guard that guards nothing.
+  THE PATH IS MEASURED, not guessed (11.08.2026, the same failure a second time): the push of
+  `7eb2076f` turned `main` red at `npm run test:unit` and mailed the owner, and the red is
+  `scripts/retro-core.test.mjs` — two freshly written retrospective sections without an entry
+  in the lesson-mechanism ledger. Reproduced locally on that exact commit: 1 failed, 52
+  passed. The gate let it through because it REUSED an older unit verdict:
+  `.claude/pre-push-gate-state.json` names its last unit run at 2026-08-11T03:56Z with 9660
+  tests while CI ran 9685, so no fresh run was recorded for this push, and the gate's own line
+  ("unit ran N — the same N files as the last green run") says why: the reuse is keyed on the
+  SET OF TEST FILES, which does not change when a test reads a DOCUMENT that did. That is the
+  same blind spot `isProseOnlyPath` deliberately avoids elsewhere — a prose commit is not
+  test-neutral when a test asserts about the prose.
+  SO THE FIX HAS TWO HALVES: the reuse key must cover every input a test READS, not only the
+  test files themselves (in doubt, run — a reused verdict is only ever an optimisation), and
+  the verdict must be bound to the sha as below.
   FINAL STATE, whichever path it was: a push of `main` carries a RECORDED gate verdict — the
   HEAD sha it was computed for, the suite counts, the verdict — and a push whose recorded
   verdict does not belong to the exact sha being pushed is REFUSED, not warned about. An
@@ -5545,3 +5644,4 @@ to land than a mechanism that needs a review.
   Criticality: low — nothing breaks, but a doubled box is exactly the noise the elder
   exception exists to prevent, and naming the player's own boat makes the layer read as
   though it labels everything indiscriminately.
+
