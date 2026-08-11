@@ -70,6 +70,87 @@ there exactly once; a new point joins a bundle when appended.
 
 ## Checklist
 
+- [ ] 654. THE WORK THAT NEEDS NO WRITE ACCESS GOES TO SOL, WITH A CHEAP SWITCH OVER IT (user 11.08.2026).
+  INSERT AT THE TOP OF THE QUEUE. This point REPLACES the earlier request "Ein Switch tauscht die
+  Rollen von Opus 5 und GPT-5.6 Sol auf Zeit" — the user chose this instead, and then bounded it:
+  "Mir reicht ein günstig zu bauender Schalter, mit dem ich die Last mehr zu OpenAI hin verlegen
+  kann, wenn das Anthropic-Volumen knapp wird. Ich muss ja nicht warten, bis vom Anthropic-Volumen
+  nur noch 1 % übrig ist, sondern kann schon früher umschalten."
+  
+  MEASURED FIRST (`node scripts/measure-task-cost.mjs`, 45,078 turns from 371 transcripts,
+  03.08.–11.08.2026, weighted share): verification 43.3 %, bookkeeping 26.9 %, implementation
+  15.6 %, gates 10.4 %, brief 2.1 %, merge 1.6 %. Subagents burn 69.1 % of the whole and 55.5 % of
+  THEIR spend is verification; the top-level session puts 63.5 % of its own into bookkeeping. The
+  volume sits in the delegated work.
+  
+  THE FOUNDATION EXISTS: `scripts/review-sol.mjs` (519 lines over a 577-line pure core, ~1050
+  lines of tests) runs `codex exec` non-interactively in a READ-ONLY sandbox with the artefact on
+  stdin, because this container cannot create user namespaces. It is proven daily — the last 12
+  recorded mechanism reviews in `.claude/mechanism-reviews.jsonl` all carry `"model":"GPT-5.6
+  Sol"`, with no silent fallback.
+  
+  === PART A — BUILD NOW ===
+  
+  A1. `scripts/ask-sol.mjs`: the read-only path generalised beyond reviews. It takes a TASK KIND,
+      a brief and the material (files, diff, logs — on stdin, exactly as `review-sol.mjs` ships
+      it), runs the same proven `codex exec` path at effort HIGH, and returns the result in the
+      shape its caller records. KINDS, all pure text work: DIAGNOSE (name the cause of a red from
+      log plus diff), AUDIT (the enumerating plausibility and bug-finding sweeps), ENUMERATE
+      (risk, test-case and option lists — BOTH halves of a blind-parallel divergent stage per
+      CLAUDE.md §6), EXPLAIN (what a subsystem does, where something is handled). Login handling,
+      the unavailability path and the model-id freshness probe are REUSED from
+      `review-sol-core.mjs`, not rebuilt. When Sol is unavailable it says so in ONE line, names
+      the cause and hands back to the Claude chain — never silently, never recorded as Sol's work.
+  
+  A2. THE CHEAP SWITCH, which is cheap precisely because Sol AUTHORS NOTHING here: no commit
+      carries Sol's trailer, so the author allowlist, the `commit-msg` hook and `model-guard` are
+      untouched, and none of the auditability machinery a role swap would need is required.
+      `node scripts/sol-share.mjs --status | --more | --less` over `.claude/sol-share.json` with
+      three settings:
+        · `default` — today's behaviour: reviews to Sol, everything else to Claude.
+        · `prefer-sol` — every kind A1 supports goes to Sol; Claude keeps authoring, driving the
+          suites, judging pictures and landing.
+        · `claude-only` — the escape hatch when the ChatGPT side is the scarce one.
+      `--status` prints in ONE line what goes where right now; the dashboard shows a non-default
+      setting while it is on, so nobody wonders why a diagnosis came back in another voice. The
+      delegation prompt and the guards READ this file rather than keeping their own copy.
+  
+  A3. The delegated-agent prompt and `docs/` name the switch, so an agent asks Sol for its
+      diagnosis or enumeration when the setting says so, instead of doing it in its own context.
+  
+  === PART B — DEFERRED, NOT DROPPED (do not start without the user's word) ===
+  
+  B1. Authoring as a PATCH round-trip (`author-sol.mjs`): Sol gets the brief plus the current file
+      contents and returns a UNIFIED DIFF; a script applies it in the worktree, runs the fast gate,
+      commits with Sol's trailer on green, feeds the gate output back for a bounded 2 rounds on
+      red, and hands the point to a Claude author afterwards with Sol's work attached.
+  B2. Only B1 makes Sol an AUTHOR, and only then does the role swap at guard level become
+      necessary: `model-roles.mjs --swap`, every consumer reading one core, the swap never
+      retroactive (a commit is judged against the roles in force at ITS commit time), a refusal of
+      any setting that puts the same vendor on both sides of a four-eyes stage, and the history
+      kept with timestamps.
+  WHY DEFERRED: B is where the effort and the uncertainty sit (the quality of Sol's diffs is
+  unproven here, and B2 widens the guard that exists to stop a degraded session), while A already
+  delivers the lever the user asked for.
+  
+  MEASUREMENT OWED, FIRST STEP OF THIS POINT (small): the verification phase is 43.3 % but the
+  tool does not split it into TEXT work (reading logs, diagnosing) and work needing the harness or
+  eyes (driving suites, judging screenshots). Measure that split from the verification turns' tool
+  calls; it decides how much further A is worth pushing and whether B is worth starting at all.
+  
+  WHAT IS EXPLICITLY NOT ROUTED: driving the browser suites and JUDGING THE PICTURE, the landing
+  (`land-point.mjs`), and the main session's bookkeeping — that share answers to reduction (point
+  boundary, brief), not to a change of vendor.
+  
+  VERIFIABLE: Vitest over the pure cores — the kind→prompt mapping, the unavailability path and
+  its one-line report, the three switch settings and what each routes, `--status`'s wording, the
+  consumers asked through the core rather than a constant, and the dashboard note while a
+  non-default setting is on. Plus ONE recorded end-to-end run: a real DIAGNOSE through
+  `ask-sol.mjs` on an actual red, named in the point's commit.
+  
+  CRITICALITY: MEDIUM for part A (it routes work; it does not touch the model guard, and a failure
+  degrades to Claude). HIGH for part B when it is started.
+
 - [ ] 648. THE CHILDREN SNAG, JITTER AND CLIP THROUGH EACH OTHER (user F6 reports
   11.08.2026, 19:08–19:11, all three from ONE state — `local/bugreports/`
   `KindHaengtKurzFest.zip`, `KindZittertAufStelleHerum.zip`,
@@ -182,7 +263,6 @@ there exactly once; a new point joins a bundle when appended.
   Criticality: low — nothing breaks, but a doubled box is exactly the noise the elder
   exception exists to prevent, and naming the player's own boat makes the layer read as
   though it labels everything indiscriminately.
-
 
 - [ ] 651. THE VILLAGE DRUM BED IS A 1.9-SECOND LOOP (user 11.08.2026, testing the deployed
   `main`, build e1bd2fa, in the Bambara village: "Das monotone Trommel-Ambient-Geräusch nervt
@@ -1114,8 +1194,6 @@ there exactly once; a new point joins a bundle when appended.
   VERIFIABLE: the index names no entry whose whole content is an armed guard's
   rule; the audit doc lists each retired entry beside the guard that replaced it.
 
-
-
 - [ ] 471. THE WORK ORDER STARVES THE POOL IT IS SUPPOSED TO FEED (user 30.07.2026, drawn
   from the branch-per-point ruling: "Dann sollte die aktuelle Abarbeitungsreihenfolge dahingend
   optimiert werden, dass sie den potenziellen Vorteil der Bündel optimal nutzt"; bundle
@@ -1589,7 +1667,6 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: HIGH — every unused mechanism was paid for twice: once when it was built,
   and again in every hour it would have saved and did not.
 
-
 - [ ] 603. THE GROUND'S MICRO-DETAIL SITS JUST UNDER ITS OWN BAR, AND NOBODY OWNS IT
   (measured 10.08.2026 during the acceptance of the play-session packages; the triage point
   of 04.08.2026 named this failure and closed without giving it an owner). The `settings`
@@ -1944,7 +2021,6 @@ Build order, chosen so no two parallel agents own the same file:
   full-page element frame serves the stand-still wait while a clipped or
   locator-bound one does not), and live the two Aswan frames stay green.
 
-
 - [ ] 565. A DRINKING WILDEBEEST CALF STANDS BURIED IN THE GROUND
   (caught 08.08.2026, 19:xx, by the in-game anchoring tripwire on the `enrichments`
   WebGL 2 lane). The dev-mode assert fired: `animal-buried — wildebeest bodyY=1.09
@@ -2055,7 +2131,6 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: the `polish` compass check passes three consecutive runs and fails
   when the panorama orientation is deliberately inverted — a check that cannot
   fail proves nothing.
-
 
 - [ ] 321. GRASS FIRE READS WRONG ON EVERY COUNT (user 25.07.2026 with screenshot:
   the burning-grass event shows a column of flat orange blocks — no recognizable
@@ -6058,7 +6133,6 @@ to land than a mechanism that needs a review.
   lets a red be signed off by evidence that never touched it, which is the same defect
   class point 640 closed from the other side. Bundle: Testinfrastruktur.
 
-
 - [ ] 645. CRITERION 7 DESCRIBES THE PLACEHOLDER, NOT THE COMMUNICATION MECHANICS THAT WERE
   BUILT (found 11.08.2026 in conversation with the user while the batch was paused).
   `docs/acceptance-criteria-detail.md` §7 and the short form in CLAUDE.md §7.1 point 7 still
@@ -6178,3 +6252,197 @@ to land than a mechanism that needs a review.
   narrow reviews that jointly cover the branch.
   Criticality: medium — it does not break the product, but it decides how much a review is
   worth, and every HIGH point is signed off on one. Bundle: Modell & Wächter.
+
+- [ ] 652. THE SESSION MAY NOT ASSERT A STATE IT DID NOT MEASURE, AND IS HANDED THE FACTS IT
+  OTHERWISE GUESSES (user 11.08.2026, after five wrong assertions in one attended session:
+  "your playing costs this machine nothing" — the container is WSL2 on the user's own host and
+  shares CPU and GPU; `/poc/` offered as a test target — a frozen tag; "the machine is quiet" —
+  a snapshot taken while `.claude/batch-in-flight.json` named three delegated agents building;
+  "I must wait for the lock to file the finding" — the findings carrier needs no lock. Each was
+  one command away from being right, and the user had to correct every one). USER, VERBATIM:
+  "Aber der Container läuft doch auf meiner Maschine und nutzt dieselbe GPU. Wenn ich meine
+  Maschine auslaste, bremst das auch den Container." — "Wieso ist die Maschine ruhig, wenn die
+  andere Session noch arbeitet?" — "Wenn der Batch steht, worauf musst du dann warten, um das
+  als Punkt in die Warteschlange zu legen?" — "Irgendwie war fast alles, was du in dieser
+  Session erzählt hast, Unsinn." — "Kannst du bei allen fünf Fehlern durch einen Mechanismus
+  sicherstellen, dass sie nicht mehr passieren?"
+  
+  FINAL STATE:
+  
+  1. A new Stop guard `scripts/state-claim-guard.mjs` over a pure core
+     `scripts/state-claim-core.mjs` BLOCKS the turn end when the turn's answer asserts a
+     machine/run state without a reading in the SAME turn. The core takes the answer text plus
+     the turn's tool calls and returns the unsupported claims; it decides nothing about truth,
+     only about whether a reading was taken.
+     - CLAIM CLASSES, each with the readings that satisfy it (German AND English wording, since
+       answers are German and code is English):
+       * machine load / idleness ("ruhig", "keine Last", "läuft nichts", "keine Suite", "quiet",
+         "idle", "nothing is running") → `uptime`, `ps`, `pgrep`, or `.claude/batch-in-flight.json`
+       * batch ownership / lock ("Lock ist frei", "der Batch steht", "die andere Session arbeitet",
+         "paused", "released") → `batch-claim.mjs --status`, `batch-lock.json`,
+         `.claude/batch-paused`, `batch-in-flight.json`
+       * CI / deploy verdict ("grün", "rot", "der Deploy steht", "green", "failing") →
+         `gh run list`/`gh run view` in this turn, or a `ci-status-guard` reading
+       * built-state claims about the game ("ist gebaut", "ist nur ein Platzhalter", "existiert
+         nicht") → a read under `src/`, a `grep`/`ls` over `src/`, or a test run — a DOC read
+         alone never satisfies this class, which is the §7 case that went wrong.
+     - The block names the claim it found, the class, and the exact command that would satisfy
+       it. One line per unsupported claim.
+     - It binds EVERY session, INCLUDING one that is stood down or working while the batch is
+       paused. This is a deliberate exception to the house rule that guards stand down for a
+       non-owner: the guard governs the session's own assertions, not batch work, and the five
+       failures happened in exactly such a session. It stays off for subagent transcripts, which
+       produce no user-facing answer.
+     - Fail-open like every guard: no transcript, an unreadable one or a core throw lets the turn
+       end.
+  
+  2. The STAND-DOWN message (`scripts/batch-resume-hook-core.mjs`, `scripts/batch-singleton.mjs`)
+     also names what REMAINS POSSIBLE without the lock, because today it lists only prohibitions
+     and that is what produced the fourth error: securing a finding with
+     `node scripts/finding.mjs --record`, reading anything, answering the user, and running
+     `node scripts/guard-preflight.mjs`. It states in the same breath that `.claude/batch-paused`
+     stops NEW work and the launcher spawn but never cuts a running agent or suite in half.
+  
+  3. `node scripts/guard-preflight.mjs --for finding` reports that recording a finding needs no
+     lock and is allowed while paused.
+  
+  4. The SessionStart block carries HOUSE FACTS the session otherwise guesses after a `/clear`,
+     every one DERIVED at hook time, none hard-coded and no network call:
+     - that this container shares CPU and GPU with the user's own machine (derived from
+       `/proc/version` naming WSL), so its own suites and the user's playing compete;
+     - the deployed test URL — the GH-Pages root serving `main` — with `/poc/` named as the
+       frozen tag that is NOT what the user tests (derived from the deploy workflow and the tag
+       list, not written into the hook);
+     - the command that reports the deployed commit and its CI verdict, so the session fetches
+       it when it needs it instead of asserting it.
+  
+  VERIFIABLE: Vitest over both pure cores. The claim/evidence matrix runs every class twice —
+  once with its reading in the turn, once without — and asserts block/pass and the named command;
+  a claim backed only by a DOC read fails the built-state class; a missing or corrupt transcript
+  passes (fail-open); a stood-down session is still bound; a subagent transcript is not. The
+  message texts are asserted verbatim, and the derived house facts are tested against a fake
+  `/proc/version` and a fake tag list rather than the live machine.
+  
+  CRITICALITY: HIGH (a guard). Needs the other model's recorded review per
+  `scripts/mechanism-review.mjs --record` before it may end a turn, and the wiring in
+  `.claude/settings.json` needs an attended session.
+
+- [ ] 653. EVERY ACCEPTANCE CRITERION'S DETAIL SECTION IS BOUND TO THE CODE IT DESCRIBES (user
+  11.08.2026: "Ja, natürlich teste ich von der Kommunikationsmechanik nur den aktuellen Stand.
+  Den habe ich ja selbst spezifiziert und dich bauen lassen und für den bauen wir bald die 0.3.
+  Bevor die gebaut wird, will ich ihn testen."). MEASURED: `docs/acceptance-criteria-detail.md` §7 still describes the OLD
+  placeholder — the village elder handing out a glossary and direction words, plus the §13.4
+  notice that the real mechanic is undecided, "do not build on them — and do not PROTECT them
+  either" — while the user's specified mechanic is built and deployed on `main`:
+  `src/communication/` with `lexicon`, `speaking`, `heard`, `speechLabel`, `speechTarget`,
+  `spokenGesture`, `drumMessage` and `chiefReply`, and the teaching adults and children of the
+  Bambara village. That section is the text a closing and a version tag read as PROOF, so a
+  stale one signs off a built mechanic as a placeholder and invites the next change to sacrifice
+  it. Nothing in the repository notices, because no rule ties the section to the code.
+  
+  FINAL STATE:
+  
+  1. Every numbered section of `docs/acceptance-criteria-detail.md` carries a machine-readable
+     header declaring the source paths it describes and the revision it was last checked
+     against — the same shape the graphics-detail doc and the retrospective already use
+     (`src/config/qualityDoc.test.ts`, `scripts/retro-currency-guard.mjs`).
+  2. A Vitest FAILS when code under a declared path has moved since that revision, naming the
+     section, the paths and the commits, so the section is re-read and re-stamped (or rewritten)
+     in the same commit as the code change.
+  3. A section that declares NO path fails as well: no silent exemption, and a criterion whose
+     subject genuinely has no code (e.g. build/lint hygiene) declares that explicitly instead.
+  4. §7 and its short form in `CLAUDE.md` §7.1 point 7 are brought to the built state as the
+     first application, with what is REALLY still open from `design.md` §13.4 (the invented,
+     researched language per region) left standing as a clearly bounded remainder; the evidence
+     chain in `docs/acceptance-evidence.md` §7 points at the tests that actually cover
+     `src/communication/`.
+  
+  VERIFIABLE: Vitest against a fixture — a section whose paths moved after its stamp fails, one
+  whose paths did not passes, a pathless section fails, and a section naming a path that does
+  not exist fails loudly rather than passing vacuously. The real repository run is the gate; the
+  initial stamping pass is part of this point, so it lands green.
+  
+  Note the cost honestly: the path map is written once for all 32 criteria, and the mechanism
+  catches "the text is STALE", not "the text is WRONG" — a section rewritten carelessly still
+  passes. It would have caught this case, because `src/communication/` is young and the section
+  is old.
+  THE WORK THAT NEEDS NO WRITE ACCESS GOES TO SOL, WITH A CHEAP SWITCH OVER IT (user 11.08.2026).
+  INSERT AT THE TOP OF THE QUEUE. This point REPLACES the earlier request "Ein Switch tauscht die
+  Rollen von Opus 5 und GPT-5.6 Sol auf Zeit" — the user chose this instead, and then bounded it:
+  "Mir reicht ein günstig zu bauender Schalter, mit dem ich die Last mehr zu OpenAI hin verlegen
+  kann, wenn das Anthropic-Volumen knapp wird. Ich muss ja nicht warten, bis vom Anthropic-Volumen
+  nur noch 1 % übrig ist, sondern kann schon früher umschalten."
+  
+  MEASURED FIRST (`node scripts/measure-task-cost.mjs`, 45,078 turns from 371 transcripts,
+  03.08.–11.08.2026, weighted share): verification 43.3 %, bookkeeping 26.9 %, implementation
+  15.6 %, gates 10.4 %, brief 2.1 %, merge 1.6 %. Subagents burn 69.1 % of the whole and 55.5 % of
+  THEIR spend is verification; the top-level session puts 63.5 % of its own into bookkeeping. The
+  volume sits in the delegated work.
+  
+  THE FOUNDATION EXISTS: `scripts/review-sol.mjs` (519 lines over a 577-line pure core, ~1050
+  lines of tests) runs `codex exec` non-interactively in a READ-ONLY sandbox with the artefact on
+  stdin, because this container cannot create user namespaces. It is proven daily — the last 12
+  recorded mechanism reviews in `.claude/mechanism-reviews.jsonl` all carry `"model":"GPT-5.6
+  Sol"`, with no silent fallback.
+  
+  === PART A — BUILD NOW ===
+  
+  A1. `scripts/ask-sol.mjs`: the read-only path generalised beyond reviews. It takes a TASK KIND,
+      a brief and the material (files, diff, logs — on stdin, exactly as `review-sol.mjs` ships
+      it), runs the same proven `codex exec` path at effort HIGH, and returns the result in the
+      shape its caller records. KINDS, all pure text work: DIAGNOSE (name the cause of a red from
+      log plus diff), AUDIT (the enumerating plausibility and bug-finding sweeps), ENUMERATE
+      (risk, test-case and option lists — BOTH halves of a blind-parallel divergent stage per
+      CLAUDE.md §6), EXPLAIN (what a subsystem does, where something is handled). Login handling,
+      the unavailability path and the model-id freshness probe are REUSED from
+      `review-sol-core.mjs`, not rebuilt. When Sol is unavailable it says so in ONE line, names
+      the cause and hands back to the Claude chain — never silently, never recorded as Sol's work.
+  
+  A2. THE CHEAP SWITCH, which is cheap precisely because Sol AUTHORS NOTHING here: no commit
+      carries Sol's trailer, so the author allowlist, the `commit-msg` hook and `model-guard` are
+      untouched, and none of the auditability machinery a role swap would need is required.
+      `node scripts/sol-share.mjs --status | --more | --less` over `.claude/sol-share.json` with
+      three settings:
+        · `default` — today's behaviour: reviews to Sol, everything else to Claude.
+        · `prefer-sol` — every kind A1 supports goes to Sol; Claude keeps authoring, driving the
+          suites, judging pictures and landing.
+        · `claude-only` — the escape hatch when the ChatGPT side is the scarce one.
+      `--status` prints in ONE line what goes where right now; the dashboard shows a non-default
+      setting while it is on, so nobody wonders why a diagnosis came back in another voice. The
+      delegation prompt and the guards READ this file rather than keeping their own copy.
+  
+  A3. The delegated-agent prompt and `docs/` name the switch, so an agent asks Sol for its
+      diagnosis or enumeration when the setting says so, instead of doing it in its own context.
+  
+  === PART B — DEFERRED, NOT DROPPED (do not start without the user's word) ===
+  
+  B1. Authoring as a PATCH round-trip (`author-sol.mjs`): Sol gets the brief plus the current file
+      contents and returns a UNIFIED DIFF; a script applies it in the worktree, runs the fast gate,
+      commits with Sol's trailer on green, feeds the gate output back for a bounded 2 rounds on
+      red, and hands the point to a Claude author afterwards with Sol's work attached.
+  B2. Only B1 makes Sol an AUTHOR, and only then does the role swap at guard level become
+      necessary: `model-roles.mjs --swap`, every consumer reading one core, the swap never
+      retroactive (a commit is judged against the roles in force at ITS commit time), a refusal of
+      any setting that puts the same vendor on both sides of a four-eyes stage, and the history
+      kept with timestamps.
+  WHY DEFERRED: B is where the effort and the uncertainty sit (the quality of Sol's diffs is
+  unproven here, and B2 widens the guard that exists to stop a degraded session), while A already
+  delivers the lever the user asked for.
+  
+  MEASUREMENT OWED, FIRST STEP OF THIS POINT (small): the verification phase is 43.3 % but the
+  tool does not split it into TEXT work (reading logs, diagnosing) and work needing the harness or
+  eyes (driving suites, judging screenshots). Measure that split from the verification turns' tool
+  calls; it decides how much further A is worth pushing and whether B is worth starting at all.
+  
+  WHAT IS EXPLICITLY NOT ROUTED: driving the browser suites and JUDGING THE PICTURE, the landing
+  (`land-point.mjs`), and the main session's bookkeeping — that share answers to reduction (point
+  boundary, brief), not to a change of vendor.
+  
+  VERIFIABLE: Vitest over the pure cores — the kind→prompt mapping, the unavailability path and
+  its one-line report, the three switch settings and what each routes, `--status`'s wording, the
+  consumers asked through the core rather than a constant, and the dashboard note while a
+  non-default setting is on. Plus ONE recorded end-to-end run: a real DIAGNOSE through
+  `ask-sol.mjs` on an actual red, named in the point's commit.
+  
+  CRITICALITY: MEDIUM for part A (it routes work; it does not touch the model guard, and a failure
+  degrades to Claude). HIGH for part B when it is started.
