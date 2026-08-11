@@ -1122,6 +1122,32 @@ man ihr oft zuvorkommen, statt gegen sie anzuschreiben.
 
 ---
 
+### 3.108 Eine Checkliste, die Anwesenheit prüft und nicht Reihenfolge
+
+Der Nutzer hakte am 11.08.2026 zum Release nach und beschrieb den Ablauf, den er für
+etabliert hielt: volle Regression, gründliches Aufräumen von Altlasten, noch einmal volle
+Regression. Die Prüfung ergab ein gemischtes Bild. Die Aufräumschritte sind alle
+verankert — Toter Code, veraltete Dokumente, veraltete Kommentare, der Dokumenten-Audit —
+und ohne sie verweigert der Wächter den Tag. Was fehlt, ist die Ordnung: Es gibt EINEN
+Regressionsschritt und keinerlei Aussage darüber, ob er vor oder nach dem Aufräumen liegt.
+Ein Aufräumen nach der einzigen grünen Regression ist heute vollständig regelkonform, und
+der Tag trüge eine ungetestete Änderung.
+
+Das ist die allgemeine Form: Eine Liste von Häkchen prüft, DASS etwas geschehen ist, nie
+WANN. Solange jeder Schritt für sich steht, ist das gleichgültig; sobald ein Schritt den
+Stand ändert, den ein anderer beweist, wird die Liste zur Zusicherung, die sie nicht
+einlöst. Derselbe Wächter, der einen Tag ohne Nachweis verweigert, lässt einen mit
+veraltetem Nachweis durch. Der zweite Teil des Nachhakens traf eine andere Lücke am selben
+Ort: Das Aufräumen ist eine AUFZÄHLENDE Stufe — was ist tot, was ist veraltet —, und für
+die schreibt §6 blind-parallele Vier-Augen vor; kein Abschlussschritt verlangt sie.
+
+**Lehre:** Wo ein Schritt den Gegenstand verändert, den ein anderer bezeugt, muss der
+Nachweis JÜNGER sein als die Änderung — sonst prüft die Liste eine Vergangenheit. Und eine
+allgemeine Regel greift nur dort, wo ein konkreter Schritt sie einfordert: §6 gilt seit
+Wochen für jede aufzählende Stufe, und der Abschluss hat sie trotzdem nie angewandt.
+
+---
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -1209,7 +1235,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 11.08.2026, 08:01 · Quellen-Fingerprint: `592ed585a55b…`
+Zuletzt aktualisiert: Dienstag, 11.08.2026, 08:03 · Quellen-Fingerprint: `a3f4fb724ee4…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1291,8 +1317,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 74 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 48 Prozess-/Meta-TASKS-Punkte (davon 18 offen).
+Erfasste Quellen: 74 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 49 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
 
-<!-- RETRO-FINGERPRINT: 592ed585a55b03b7caf10534bbc7347a6f213b65dfa638b32bf7d63cfcc49a8e -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-11T06:01:20.747Z -->
+<!-- RETRO-FINGERPRINT: a3f4fb724ee4d8033887ef78efd2d6b2390c035fa67751429f2973685faa74aa -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-11T06:03:40.336Z -->
 <!-- AUTO-GENERATED:END -->
