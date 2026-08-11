@@ -243,7 +243,7 @@ export function suiteOutput(output) {
  * read as "reproduced under throttle".
  */
 export function classifyRun(input) {
-  const { timedOut = false, exit = null, summary = null, checks = [] } = input ?? {}
+  const { timedOut = false, exit = null, summary = null, checks = [], ran = null } = input ?? {}
   if (timedOut) return 'killed'
   // Exit 0 is only a GREEN when the runner also reported the checks it ran. A
   // launch that produced no summary reached no verdict, whatever it exited with
@@ -255,15 +255,19 @@ export function classifyRun(input) {
     // out of the log. Any disagreement is a run that measured nothing — a green
     // would dilute the rate, a red would invent one.
     //
-    // The PASS COUNT is deliberately not part of that test. Measured 11.08.2026:
-    // `i18n --section=english-default` runs green and reports "0 pass, 0 fail",
-    // because not every suite prints its checks in the form the summary counts.
-    // Requiring a positive count called a healthy run broken, which is the same
-    // false verdict from the other side.
+    // AND it has to have HAPPENED. A summary of "0 pass, 0 fail" is ambiguous on
+    // its own — measured 11.08.2026, `i18n --section=english-default` is green
+    // and reports exactly that, because not every suite prints its checks in the
+    // form the summary counts, while an exit-0 harness that ran nothing reports
+    // the same tuple. So the tie is broken by evidence from OUTSIDE the log:
+    // `ran` is true when the suite process wrote its own run record, which only
+    // happens once it has launched a browser (render-verify-recorder.mjs). With
+    // neither a counted check nor a record, the run measured nothing.
     if (!summary) return 'broken'
     const named = (Array.isArray(checks) ? checks : []).length
     const agrees = summary.fail === 0 && summary.consoleErrors === 0 && summary.exit === 0 && named === 0
-    return agrees ? 'green' : 'broken'
+    if (!agrees) return 'broken'
+    return ran === true || summary.pass > 0 ? 'green' : 'broken'
   }
   if (summary && (summary.fail > 0 || summary.consoleErrors > 0)) return 'red'
   if ((Array.isArray(checks) ? checks : []).length > 0) return 'red'

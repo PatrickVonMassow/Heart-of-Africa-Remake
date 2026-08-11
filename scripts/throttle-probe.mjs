@@ -36,6 +36,7 @@ import { fileURLToPath } from 'node:url'
 import { isMainModule } from './is-main.mjs'
 import { failedChecks } from './verify/baseline-classify-core.mjs'
 import { listSections, resolveSelection } from './verify/sections.mjs'
+import { readRenderState } from './render-verify-state.mjs'
 import { readMachine } from './verify/machine-load.mjs'
 import { DEV_SUITES, laneFor, selectBackend } from './verify/tiers.mjs'
 import {
@@ -154,6 +155,22 @@ function stopSpinners(spun) {
     }
   }
   return alive
+}
+
+/** Did a run of this suite REALLY start after `since`? The suite's own process
+ *  writes its run record when it launches a browser (render-verify-recorder.mjs),
+ *  so a record that new is evidence from outside the runner's log that the suite
+ *  ran at all. Unreadable state answers false, which calls a run unmeasured
+ *  rather than passing an empty one off as green. */
+function suiteRanSince(since, suite) {
+  try {
+    const runs = readRenderState()?.runs
+    return (Array.isArray(runs) ? runs : []).some(
+      (r) => r?.suite === suite && Number(r?.startedAt ?? r?.at) >= since - 2000,
+    )
+  } catch {
+    return false
+  }
 }
 
 /** Where a run's whole output is kept, so a KILLED or BROKEN run can be read
@@ -349,6 +366,7 @@ async function main(argv = process.argv.slice(2)) {
   // report may claim is what ran.
   let leastSpinners = plan.spinners
   for (let i = 0; i < opts.runs; i++) {
+    const startedAt = Date.now()
     const spun = startSpinners(plan)
     let res
     try {
@@ -374,7 +392,11 @@ async function main(argv = process.argv.slice(2)) {
       }
     })()
     const exit = res.exit
-    const kind = classifyRun({ timedOut, exit, summary, checks })
+    // Did the SUITE really run? Its own process writes a run record the moment
+    // it launches a browser, so a record newer than this run's start is evidence
+    // from outside the log that something happened — which is what tells a green
+    // "0 pass, 0 fail" section from an exit-0 harness that ran nothing.
+    const kind = classifyRun({ timedOut, exit, summary, checks, ran: suiteRanSince(startedAt, opts.suite) })
     results.push({ kind, ok: kind === 'green', checks, exit })
     if (logDir) {
       try {

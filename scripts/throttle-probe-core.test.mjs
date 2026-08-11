@@ -198,10 +198,14 @@ describe('classifyRun — three of the four outcomes are NOT "the check failed"'
   })
 
   // Measured: a genuinely green `i18n --section=english-default` reports "0 pass,
-  // 0 fail", so a pass count of zero is a suite's printing style, not a broken
-  // harness — demanding one called a healthy run broken.
-  it('accepts a green run whose suite prints no per-check PASS lines', () => {
-    expect(classifyRun({ exit: 0, summary: { pass: 0, fail: 0, consoleErrors: 0, exit: 0 } })).toBe('green')
+  // 0 fail", so a pass count of zero is a suite's printing style — but the same
+  // tuple is what an exit-0 harness that ran nothing reports, so the suite's own
+  // run record breaks the tie.
+  it('accepts a zero-count green ONLY on evidence that the suite really ran', () => {
+    const zero = { pass: 0, fail: 0, consoleErrors: 0, exit: 0 }
+    expect(classifyRun({ exit: 0, summary: zero, ran: true })).toBe('green')
+    expect(classifyRun({ exit: 0, summary: zero, ran: false })).toBe('broken')
+    expect(classifyRun({ exit: 0, summary: zero })).toBe('broken')
   })
 
   it('calls a runner that contradicts itself BROKEN, neither green nor red', () => {
