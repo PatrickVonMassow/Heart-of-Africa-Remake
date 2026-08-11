@@ -2484,6 +2484,23 @@ describe('deflectedStep (scripted walks obey the land constraint, point 83)', ()
     // It did NOT step straight into the pocket column.
     expect(Math.abs(r.heading)).toBeGreaterThan(0.01)
   })
+
+  // A DEAD-END CORRIDOR is what a settlement has and a coast does not: the only
+  // way out is backwards (work-order 648). The default arc is the open-country
+  // ±90° and stands still in one; a caller that lives among walls asks for the
+  // full circle and turns round.
+  const corridor = (x: number, z: number) => z > -0.5 || Math.abs(x) > 0.35
+  it('stands in a dead-end corridor on the default ±90° arc', () => {
+    const r = deflectedStep(0, -1, 0, 0.03, corridor, 0.6)
+    expect(r.moved).toBe(false)
+  })
+
+  it('turns round out of it when the caller allows the full circle', () => {
+    const r = deflectedStep(0, -1, 0, 0.03, corridor, 0.6, 12)
+    expect(r.moved).toBe(true)
+    expect(corridor(r.x, r.z)).toBe(false)
+    expect(Math.abs(r.heading)).toBeGreaterThan(Math.PI / 2) // it went backwards
+  })
 })
 
 describe('escapeCorridorHeading (point 188 — the walk-off picks a land corridor, not the seaward radial)', () => {

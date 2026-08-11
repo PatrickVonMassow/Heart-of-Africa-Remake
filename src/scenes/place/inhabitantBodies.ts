@@ -17,12 +17,23 @@
 // against. One damped pass over a shared body registry, run right after each
 // behaviour has moved its own figures, gives all five the same rule.
 //
-// AND WHY DAMPED: a pair that overlaps and is pushed fully apart every frame
-// oscillates, and a child vibrating on the spot reads as broken rather than as
-// playing (the user's "festklemmen und rumzittern"). The correction therefore
-// takes only a FRACTION of the remaining overlap, never overshoots it, and stops
-// completely inside a slop band — so a separated pair stays separated without a
-// tremble.
+// AND WHY IT RESOLVES IN ONE STEP: the correction takes the WHOLE remaining
+// overlap and stops dead inside a slop band. It cannot ring, because it never
+// overshoots — the push is exactly the penetration, so the pair lands on the
+// contact distance and the dead band then holds it there.
+//
+// It used to take a FRACTION per frame instead, damped against a tremble that
+// the dead band already prevents, and capped at a push SPEED. That was the
+// defect behind the user's "Kinder klemmen kurz ineinander" (work-order 648):
+// two children close on one another at up to sprint plus runner speed, which is
+// several times what the cap allowed the correction to undo, so every frame
+// added more overlap than the pass took out and the pair stayed inside one
+// another for as long as they ran together — measured at the reported seed,
+// 30 % of all frames, up to six seconds at a stretch, and at the worst of them
+// two children within a centimetre of the same point. `maxSpeed` therefore only
+// bounds how fast a DEEP stack — two bodies spawned on one spot — unwinds; it
+// is set above the fastest pair that can close, so it never throttles the
+// ordinary crossing it was silently throttling before.
 
 /** One inhabitant's body in the shared set — mutated in place each frame, so a
  *  settlement never rebuilds the array. */
@@ -58,13 +69,18 @@ export interface SeparationConfig {
    *  wide enough to be a wall has the village shouldering itself all day. */
   bodyRadius: number
   /** Overlap tolerated before anything is corrected at all. The dead band is
-   *  what stops a resting pair from trading micro-corrections for ever. */
+   *  what stops a resting pair from trading micro-corrections for ever, and it
+   *  is what makes a FULL correction safe. */
   slop: number
-  /** Fraction of the remaining overlap taken out per frame (0..1). Below 1 it
-   *  cannot overshoot, which is what makes the pass settle instead of ring. */
+  /** Fraction of the remaining overlap taken out per step (0..1). At 1 the
+   *  overlap is gone in the step it appeared, which is the point: below 1 the
+   *  pass falls behind two movers closing on each other and the pair stays
+   *  visibly inside one another. It never overshoots at any value. */
   stiffness: number
-  /** Cap on how fast a body may be pushed (m/s), so a deep overlap (a spawn
-   *  stack) comes apart as a step rather than as a teleport. */
+  /** Cap on how fast a body may be pushed (m/s), so a DEEP overlap (a spawn
+   *  stack) comes apart as a step rather than as a teleport. It must stay above
+   *  the fastest pair that can close on one another, or it throttles the
+   *  ordinary crossing instead of only the stack. */
   maxSpeed: number
   /** Seconds of being unable to push free before the escape nudge is asked for. */
   wedgeSeconds: number
@@ -177,11 +193,16 @@ export function separateBody(
       ux = Math.cos(a)
       uz = Math.sin(a)
     }
-    // A fixed body gives nothing, so the mover owes the whole overlap; two
-    // movers split it, and the pair closes it together.
-    const share = other.fixed ? 1 : 0.5
-    px += ux * overlap * share
-    pz += uz * overlap * share
+    // THE MOVER OWES THE WHOLE OVERLAP, against a fixed body and against another
+    // mover alike. Splitting it in halves looks fairer and does not work: the
+    // bodies are resolved one after another, so the second of a pair sees only
+    // what the first left and takes half of THAT — a quarter of the overlap
+    // survives every pass, for ever, and two children walking into one another
+    // stay visibly merged (point 648). Resolved whole, the first of the pair
+    // steps out and the second then has nothing to correct, so the overlap is
+    // gone at the end of the pass rather than decaying across frames.
+    px += ux * overlap
+    pz += uz * overlap
   }
 
   const want = Math.hypot(px, pz)

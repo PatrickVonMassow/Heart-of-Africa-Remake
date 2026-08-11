@@ -1759,6 +1759,13 @@ export function retainedSpawnChunks(
  * every streamed animal, it deflects along the coast instead. Tries the
  * intended heading first, then swings alternately outward up to ±90°; if
  * every probe is blocked (a dead-end spit), it stands rather than swims.
+ *
+ * `maxTurn` is how far that swing may reach, in 15° steps — 6 (±90°) by
+ * default, the open-country case this was written for, where a coast is never
+ * something a walker has to turn ROUND. Inside a settlement it is: huts, fences
+ * and a bounded play ground make pockets whose only way out is backwards, and a
+ * caller that lives in one passes 12 (a full circle) so its mover turns around
+ * instead of standing there (work-order 648).
  */
 export function deflectedStep(
   x: number,
@@ -1767,12 +1774,13 @@ export function deflectedStep(
   dist: number,
   blocked: (x: number, z: number) => boolean,
   lookahead = dist,
+  maxTurn = 6,
 ): { x: number; z: number; heading: number; moved: boolean } {
   // The PROBE reaches `lookahead` ahead while the STEP stays `dist`: a
   // single land cell poking into the water reads as blocked from outside,
   // so the walker never enters a one-cell dead end it must bounce out of.
   const probe = Math.max(dist, lookahead)
-  for (let step = 0; step <= 6; step++) {
+  for (let step = 0; step <= Math.max(0, maxTurn); step++) {
     for (const sgn of step === 0 ? [1] : [1, -1]) {
       const h = heading + sgn * step * (Math.PI / 12) // 15° steps
       const sx = x + Math.sin(h) * dist

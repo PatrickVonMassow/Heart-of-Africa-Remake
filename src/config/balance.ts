@@ -665,6 +665,9 @@ export interface BalanceConfig {
       variation: number
       /** Seconds without real movement before a child is nudged free. */
       unstuckSeconds: number
+      /** Seconds a child sticks to the way out of a pocket it had to turn far to
+       *  find, so a dead-end lane is walked out of rather than bounced in. */
+      detourSeconds: number
       /** Dev-mode alarm: a group that could play and has produced neither a
        *  catch nor a fresh round for this long raises `tag-silent`. */
       silenceSeconds: number
@@ -1145,6 +1148,11 @@ export const balance: BalanceConfig = {
       trendLeave: 0.12,
       variation: 0.2,
       unstuckSeconds: 1.5,
+      // How long a child holds the way out of a dead-end lane (point 648). At
+      // the floor pace it carries the child about half a metre, at a sprint
+      // nearly two — past the hut corner it just turned round, and short enough
+      // that the chase it interrupts is never noticeably interrupted.
+      detourSeconds: 0.45,
       // The long-run alarm's window (point 589). The longest LEGITIMATE gap
       // between two round events is a tenure that runs to the backstop plus the
       // idle break after it (45 + 8 s); this sits well clear of it, so only a
@@ -1214,14 +1222,22 @@ export const balance: BalanceConfig = {
     //  - THE CATCH WINS (point 578.4): the children's catch distance is 0.8 m,
     //    three times the separation two children settle at, so a chaser is
     //    always well inside its tag before the bodies ever touch.
-    //  - the slop and the stiffness are the anti-jitter half: nothing is
-    //    corrected inside a centimetre, and a correction never takes more than
-    //    half of what is left, so it settles instead of ringing.
+    //  - THE SLOP is the anti-jitter half, and it is the whole of it: nothing is
+    //    corrected inside a centimetre, so a settled pair has nothing left to
+    //    trade. The STIFFNESS was the other half and was the bug (point 648):
+    //    taking half of the overlap per frame is less than two children running
+    //    at each other ADD per frame, so the pass never caught up and the pair
+    //    stayed visibly inside one another. At 1 the overlap is gone in the step
+    //    it appeared, and nothing rings because the push never overshoots.
+    //  - MAX SPEED bounds only the deep spawn stack. 8 m/s is above the fastest
+    //    pair that can close (a chaser at 3.4 and a runner at 3.81 = 7.21 m/s),
+    //    so it can never again throttle an ordinary crossing, while a stack of
+    //    two adults still unwinds over a couple of frames rather than snapping.
     separation: {
       bodyRadius: 0.24,
       slop: 0.01,
-      stiffness: 0.5,
-      maxSpeed: 1.2,
+      stiffness: 1,
+      maxSpeed: 8,
       wedgeSeconds: 1.5,
     },
   },

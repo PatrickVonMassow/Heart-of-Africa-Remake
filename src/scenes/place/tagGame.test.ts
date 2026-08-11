@@ -1153,10 +1153,12 @@ describe('an outside claim on a child: what was SAID steers it (point 481)', () 
     expect(asked).toBe(false)
   })
 
-  it('keeps the floor pace while a round runs, whatever the claim asks for', () => {
+  it('keeps the floor pace for every child the CHASE steers, claim or no claim', () => {
     const s = game(FOUR)
     run(s, 1)
     const floor = floorPace(CFG)
+    // Only the odd children are claimed: the rest are the chase's own, and the
+    // floor is theirs — winded, never frozen.
     run(
       s,
       3,
@@ -1165,10 +1167,78 @@ describe('an outside claim on a child: what was SAID steers it (point 481)', () 
       1 / 60,
       (st) => {
         if (!st.playing) return
-        for (const c of st.children) expect(c.pace).toBeGreaterThanOrEqual(floor - 1e-6)
+        st.children.forEach((c, i) => {
+          if (i % 2 === 0 || i === st.chaser) expect(c.pace).toBeGreaterThanOrEqual(floor - 1e-6)
+        })
       },
-      () => ({ heading: 0, pace: 0 }),
+      (i) => (i % 2 === 1 ? { heading: 0, pace: 2 } : null),
     )
+  })
+
+  it('lets a child that was TOLD to stand actually stand, mid-round (point 648)', () => {
+    // The refusal, the held spot and a reached errand target all ask for a pace
+    // of zero. Forcing the chase's floor on them walked the child forward at
+    // 1.16 m/s into whatever stood in front of it, and the blocked-step fallback
+    // then turned it a quarter every frame — it spun on the spot instead of
+    // standing (the user's "Kind zittert auf der Stelle herum").
+    const s = game(FOUR)
+    run(s, 1)
+    expect(s.playing).toBe(true)
+    const still = s.children.findIndex((_, i) => i !== s.chaser)
+    s.immune = still // uncatchable, so the role cannot move onto it mid-run
+    s.immuneFor = 1e4
+    const at = { x: s.children[still].x, z: s.children[still].z }
+    const walked = s.children[still].walked
+    run(s, 3, OPEN, CFG, 1 / 60, undefined, (i, st) =>
+      i === still && i !== st.chaser ? { heading: 1.2, pace: 0 } : null,
+    )
+    expect(s.children[still].pace).toBe(0)
+    expect(s.children[still].held).toBe(true)
+    expect(Math.hypot(s.children[still].x - at.x, s.children[still].z - at.z)).toBeLessThan(0.01)
+    // Its legs stay still with it, and it never counts as pinned on geometry.
+    expect(s.children[still].walked - walked).toBeLessThan(0.01)
+    expect(s.children[still].pinned).toBe(0)
+  })
+
+  it('settles a child at the target it was sent to instead of oscillating (point 648)', () => {
+    // The situations' own shape: walk to a spot, and once there ask for nothing.
+    // A child that is pushed on regardless overshoots its mark and turns back on
+    // it, frame after frame — the alternating step that reads as a jitter.
+    const s = game(FOUR)
+    run(s, 1)
+    const sent = s.children.findIndex((_, i) => i !== s.chaser)
+    // Off the chaser's list for the whole run, so the round cannot hand it the
+    // role halfway through and turn the measurement into one of a chase.
+    s.immune = sent
+    s.immuneFor = 1e4
+    const mark = { x: s.children[sent].x + 3, z: s.children[sent].z }
+    const arrived: Array<{ x: number; z: number }> = []
+    run(
+      s,
+      6,
+      OPEN,
+      CFG,
+      1 / 60,
+      (st) => {
+        const c = st.children[sent]
+        if (Math.hypot(c.x - mark.x, c.z - mark.z) <= 0.8) arrived.push({ x: c.x, z: c.z })
+      },
+      (i, st) => {
+        if (i !== sent || i === st.chaser) return null
+        const c = st.children[i]
+        const d = Math.hypot(c.x - mark.x, c.z - mark.z)
+        return d <= 0.8
+          ? { heading: c.heading, pace: 0 }
+          : { heading: Math.atan2(mark.x - c.x, mark.z - c.z), pace: 1.6 }
+      },
+    )
+    expect(arrived.length).toBeGreaterThan(60) // it got there and stayed
+    // CONVERGED, not alternating: every reading after the first sits on the same
+    // spot, so the position does not swing back and forth across the mark.
+    const spread = Math.max(
+      ...arrived.map((p) => Math.hypot(p.x - arrived[0].x, p.z - arrived[0].z)),
+    )
+    expect(spread).toBeLessThan(0.05)
   })
 
   it('leaves every child where a walker may stand, claim or no claim', () => {
@@ -1191,6 +1261,53 @@ describe('an outside claim on a child: what was SAID steers it (point 481)', () 
           ? { heading: Math.atan2(-st.children[i].x, -st.children[i].z), pace: 3 }
           : null,
     )
+  })
+})
+
+describe('a child cornered by the settlement walks out (point 648)', () => {
+  // A dead-end lane between two huts: the only free ground is BEHIND the child.
+  // The wildlife's ±90° deflection cannot see it, so the child used to stand
+  // there until the unstuck timer teleported it — the user's "Kind hängt kurz
+  // fest", measured at his seed as every stalled frame having free ground
+  // 105–150° off the heading it wanted.
+  const deadEnd: TagWorld = {
+    radius: 20,
+    childRadius: CHILD_R,
+    blocked: (x, z) => z > -0.5 || Math.abs(x) > 0.35,
+    nudge: (x, z) => ({ x, z, found: false }),
+  }
+
+  it('keeps walking instead of standing there, and needs no teleport', () => {
+    const s = game([[0, -1]]) // a lone child: the round idles, the claim steers
+    let left = 0
+    let walked = 0
+    let stillest = Infinity
+    let window = 0
+    run(
+      s,
+      4,
+      deadEnd,
+      CFG,
+      1 / 60,
+      (st) => {
+        const c = st.children[0]
+        left = Math.max(left, Math.hypot(c.x, c.z + 1))
+        expect(deadEnd.blocked(c.x, c.z)).toBe(false)
+        // The least ground covered in any half second: a child that stood there
+        // for its unstuck window would leave a zero here.
+        if (c.walked - window >= 0 && st.clock % 0.5 < 1 / 60) {
+          stillest = Math.min(stillest, c.walked - window)
+          window = c.walked
+        }
+        walked = c.walked
+      },
+      // Sent straight at the dead end, the way a chase or an errand would.
+      () => ({ heading: 0, pace: 2 }),
+    )
+    expect(left).toBeGreaterThan(0.8) // it turned round and left the pocket
+    expect(walked).toBeGreaterThan(6) // and kept walking the whole time
+    expect(stillest).toBeGreaterThan(0.2) // never froze in any half second
+    expect(s.children[0].pinned).toBe(0) // never stalled long enough to be nudged
   })
 })
 
