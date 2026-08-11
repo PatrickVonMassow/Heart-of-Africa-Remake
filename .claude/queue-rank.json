@@ -1,7 +1,12 @@
 {
-  "ranked": {},
+  "ranked": {
+    "628": {
+      "at": "2026-08-11T04:00:08.693Z",
+      "why": "Kosmetische Nachfolge zu 600: doppelter Kasten und das eigene Boot, kein Spielabbruch — hinten ist richtig, die Reparaturen und die Urlaubsfestigkeit gehen vor"
+    }
+  },
   "settled": {
-    "at": "2026-08-11T00:57:35.669Z",
+    "at": "2026-08-11T04:00:08.693Z",
     "points": [
       174,
       184,
@@ -123,7 +128,6 @@
       575,
       581,
       589,
-      590,
       591,
       595,
       596,
@@ -135,7 +139,6 @@
       603,
       607,
       609,
-      610,
       611,
       614,
       615,
@@ -149,8 +152,8 @@
       623,
       625,
       626,
-      627
-    ],
-    "why": "Arming the append gate: the 147 open points stand in the sequence the user last re-ranked, so the order as it stands today is the judged one"
+      627,
+      628
+    ]
   }
 }

@@ -5541,3 +5541,29 @@ to land than a mechanism that needs a review.
   the check red again.
   Criticality: medium — it blocks no player, but an unaccounted red on `main` blinds the
   render gate for every later change.
+
+- [ ] 628. THE HOLD-CTRL LAYER LABELS A CAMP TWICE AND NAMES THE PLAYER'S OWN BOAT
+  (found 11.08.2026 while re-testing the roster for point 600, and deliberately not fixed
+  there: both halves are a judgment about what the layer PROMISES, not a defect in the
+  state coverage that point closed).
+  FINAL STATE:
+  1. A PITCHED CAMP CARRIES EXACTLY ONE LABEL. `CampMarkers` in
+     `src/scenes/travel/TravelScene.tsx` draws a permanent `map-label` reading
+     `labels.camp` AND registers the same object with the hold-Ctrl layer, whose text is
+     that same word — so holding Ctrl stacks two identical boxes over one camp. The camp
+     STAYS in point 342's roster, which names "a pitched camp, a set-down canoe"
+     explicitly, so the cure is the one the elder already uses: an object that carries a
+     permanent label of its own is not offered a second time by the Ctrl layer, whoever
+     draws it. Stating that as a rule about permanent labels, not a per-object exception,
+     is the point — a second exception list would rot the way the first one nearly did.
+  2. THE TRAVELLER'S OWN CANOE IS NOT NAMED. The marked canoe groups at the same call site
+     are the boat the player rides or drags. The layer's promise is "what am I looking
+     at", and the player's own vehicle is not that. A canoe SET DOWN in the world keeps
+     its label, per the same roster line.
+  VERIFIABLE: the pure source/roster test gains both cases — a pitched camp yields exactly
+  one offered label, a ridden or dragged canoe yields none while a set-down one yields its
+  own; plus the browser check that asks the scene what it DREW asserts that no two labels
+  of identical text stand at one position.
+  Criticality: low — nothing breaks, but a doubled box is exactly the noise the elder
+  exception exists to prevent, and naming the player's own boat makes the layer read as
+  though it labels everything indiscriminately.
