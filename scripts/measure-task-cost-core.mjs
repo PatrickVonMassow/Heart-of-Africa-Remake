@@ -93,7 +93,10 @@ const VERIFICATION_IMAGE = /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|svg)$/i
 /** File rules, FIRST MATCH WINS. `read` separates a spec LOOKUP from a spec EDIT. */
 const SPEC_DOCS = /^(TASKS\.md|design\.md|CLAUDE\.md|docs\/tasks-archive\.md|docs\/acceptance-(criteria-detail|evidence)\.md)$/
 const FILE_RULES = [
-  ['verification', /^(scripts\/verify\/|verification\/|scripts\/(render-verify|picture-|measure-picture))|^.*\.(png|jpe?g|webp|avif)$/],
+  // WHERE THE FRAMES ARE, not "any image file" (final round). Every screenshot this
+  // repository takes is written under `verification/` by the shutter, so the old global
+  // `\.png$` bought nothing and made `src/assets/logo.png` verification work.
+  ['verification', /^(scripts\/verify\/|verification\/|scripts\/(render-verify|picture-|measure-picture))/],
   ['bookkeeping', /^(\.batch-dashboard\.html|TASKS\.md|scripts\/(board|batch|focus|dashboard|finding|mechanism-review|chat-)|docs\/batch-autonomy\.md)|[a-z-]*-guard(-core)?(\.test)?\.mjs$/],
   ['implementation', /^(src\/|scripts\/|docs\/|public\/|index\.html|package\.json|vite\.config|tsconfig|\.github\/)|\.md$/],
 ]
@@ -224,7 +227,14 @@ const VERIFICATION_NOT_A_RUN = /\bnode\s+--check\b/
  * turn costs, whatever else the line does with its output.
  */
 export function classifyVerificationBash(command = '') {
-  const segments = String(command).split(/&&|\|\||;|\|/)
+  // QUOTED TEXT IS AN ARGUMENT, NOT A COMMAND (final round): `rg 'playwright|npm test'
+  // scripts/verify/` was split INSIDE its search pattern, and the fragment that fell out
+  // matched the runner — a search reported as a suite run. Quoted runs are removed before
+  // anything is split or matched, so nothing inside them can look like a command.
+  const segments = String(command)
+    .replace(/'[^']*'/g, ' ')
+    .replace(/"[^"]*"/g, ' ')
+    .split(/&&|\|\||;|\|/)
   let text = false
   for (const segment of segments) {
     // THE FIRST WORD DECIDES BEFORE ITS ARGUMENTS DO. A reader's arguments name whatever

@@ -498,6 +498,10 @@ describe('verification split', () => {
     // …while the run itself, with or without its environment, is still a run.
     expect(classifyVerificationBash('VERIFY_GL=webgpu npm run test:small')).toBe('harness')
     expect(classifyVerificationBash('/usr/bin/grep -rn npm scripts/verify/')).toBe('text')
+    // …and a runner word INSIDE a quoted search pattern is an argument, not a command:
+    // splitting on the `|` inside it used to drop a fragment that matched the runner.
+    expect(classifyVerificationBash("rg 'playwright|npm test' scripts/verify/")).toBe('text')
+    expect(classifyVerificationBash('grep -n "npm test" scripts/verify/place.mjs')).toBe('text')
   })
 
   // Final round: the picture rule outranked EVERY other, so editing `src/assets/logo.svg`
@@ -506,7 +510,10 @@ describe('verification split', () => {
   it('does not turn a repository image asset into verification work', () => {
     expect(classifyFile('src/assets/logo.svg')).toBe('implementation')
     expect(classifyFile('public/icons/tent.svg')).toBe('implementation')
-    // A raster anywhere is still a frame — that rule predates this point.
+    // A RASTER in the repository is no different: every frame this project takes is
+    // written under `verification/` by the shutter, so the old global `.png` rule bought
+    // nothing and made an image asset verification work (final round).
+    expect(classifyFile('src/assets/logo.png')).toBe('implementation')
     expect(classifyFile('verification/480-village.png')).toBe('verification')
   })
 

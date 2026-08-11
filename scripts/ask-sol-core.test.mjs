@@ -199,6 +199,14 @@ describe('reading the answer', () => {
     expect(parseAnswer({ kind: 'enumerate', text: 'NO FINDINGS: nothing could go wrong here' }).ok).toBe(false)
   })
 
+  // Final round: an answer that lists findings AND claims there are none says two things,
+  // and whichever half the caller acts on, it acted on half an answer.
+  it('refuses an answer that both lists findings and claims there are none', () => {
+    const both = parseAnswer({ kind: 'audit', text: 'A1 | a.mjs | the lease is not renewed\n\nNO FINDINGS: everything else looked fine' })
+    expect(both.ok).toBe(false)
+    expect(both.error).toMatch(/says two things/)
+  })
+
   it('takes an EXPLAIN as prose, but not two words of it', () => {
     expect(parseAnswer({ kind: 'explain', text: 'The board core renders the cards; board-publish pushes the bytes to the orphan branch.' }).ok).toBe(true)
     expect(parseAnswer({ kind: 'explain', text: 'It renders.' }).ok).toBe(false)

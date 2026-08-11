@@ -112,18 +112,18 @@ Measured over 47,258 turns from 391 transcripts (03.–11.08.2026, weighted):
 
 | | share |
 | --- | --- |
-| verification, of the whole spend | 42.0 % |
-| — text (reads a log, a script, a report) | 45.6 % of it |
-| — harness (runs a suite) | 41.4 % of it |
-| — eyes (looks at a frame) | 8.3 % of it |
-| — authoring (edits the verification code) | 4.7 % of it |
+| verification, of the whole spend | 41.9 % |
+| — text (reads a log, a script, a report) | 48.0 % of it |
+| — harness (runs a suite) | 39.3 % of it |
+| — eyes (looks at a frame) | 7.8 % of it |
+| — authoring (edits the verification code) | 4.8 % of it |
 | — unclear (never guessed into a half) | 0.1 % of it |
 
-So the routable text half is **18.9 % of the entire spend**, and 44.9 % of the
+So the routable text half is **19.9 % of the entire spend**, and 46.6 % of the
 delegated agents' own verification — which is what makes part A worth having and
 what any decision about part B should be argued against.
 
-Seven classification errors were found by the cross-vendor review rounds of
+Nine classification errors were found by the cross-vendor review rounds of
 this very branch and are fixed in these figures: an unplaceable call used to be
 dropped instead of voting (so a turn that read one log and did one unplaceable
 thing read as wholly routable); `node --check` on a verify script counted as a
@@ -133,8 +133,11 @@ run always wins); a frame in any format other than PNG counted as text rather th
 as a picture; and a frame saved to the scratchpad and then looked at got no vote
 at all, so the turn's other, textual call carried its whole share; a SEARCH for a
 runner word (`rg playwright …`) counted as a run, because a reader's arguments name
-whatever it is looking for; and the picture rule outranked every other, so editing
-an image asset in `src/` counted as verification. The `unclear` row exists so the
+whatever it is looking for, and a runner word inside a QUOTED search pattern was
+split out of it and matched as a command; and any image file counted as
+verification wherever it lay, so editing an asset in `src/` did too — every frame
+this project takes is written under `verification/` by the shutter, so nothing was
+lost by scoping it there. The `unclear` row exists so the
 residue is visible rather than distributed.
 
 ## The first real run

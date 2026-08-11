@@ -218,11 +218,15 @@ function parseEntries(clean, prefix, { allowEmpty = false } = {}) {
     // A finding that names no file is still a finding; it is marked, never dropped.
     entries.push({ id, file: m[2].trim() || '(unspecified)', text })
   }
+  const saysNone = /(^|\n)\s*[-*]?\s*NO FINDINGS\s*:\s*\S/i.test(clean)
   if (!entries.length) {
-    if (allowEmpty && /(^|\n)\s*[-*]?\s*NO FINDINGS\s*:\s*\S/i.test(clean)) {
-      return { ok: true, answer: { entries: [] }, summary: 'no findings' }
-    }
+    if (allowEmpty && saysNone) return { ok: true, answer: { entries: [] }, summary: 'no findings' }
     return { ok: false, error: `no entry in the form \`${prefix}1 | <file> | <one line>\`` }
+  }
+  // FINDINGS AND "NO FINDINGS" CANNOT BOTH BE TRUE (final round). Such an answer says two
+  // things, and whichever the caller acts on, it acted on half an answer.
+  if (saysNone) {
+    return { ok: false, error: 'the answer lists findings AND claims there are none — it says two things' }
   }
   return { ok: true, answer: { entries }, summary: `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}` }
 }
