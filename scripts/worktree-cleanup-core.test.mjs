@@ -19,12 +19,22 @@ import {
   stubBranchFor,
   CLEANUP_LOCK_LEGACY,
   formatCleanupLock,
+  judgeLockRelease,
   matchesExpectation,
   parseCleanupLock,
   staleLockVerdict,
   REFUSALS,
 } from './worktree-cleanup-core.mjs'
-import { cleanupWorktree, detachLinks, pathExists, readIdentity, parseCleanupArgs } from './worktree-cleanup.mjs'
+import {
+  cleanupLockFile,
+  cleanupWorktree,
+  detachLinks,
+  pathExists,
+  readIdentity,
+  readLockReason,
+  releaseCleanupLock,
+  parseCleanupArgs,
+} from './worktree-cleanup.mjs'
 
 const ROOT = 'C:/repo'
 const WT = `${ROOT}/.claude/worktrees/agent-1`
@@ -644,6 +654,46 @@ describe('staleLockVerdict — may a lock in the way be broken?', () => {
   })
 })
 
+// THE RELEASE IS NOT ONE ACT AND CANNOT BE MADE ONE — git has no compare-and-
+// unlock. So the decision is pure, the gap is two syscalls wide, and every
+// uncertain case LEAVES THE LOCK STANDING and says so (fifth review, finding 3).
+describe('judgeLockRelease — whose lock is in place?', () => {
+  const ours = formatCleanupLock({ pid: 4711, startedAt: 1000 })
+
+  it('releases exactly our own reason, verbatim', () => {
+    expect(judgeLockRelease({ held: ours, ours })).toEqual({ release: true, note: '' })
+  })
+
+  it('LEAVES a foreign lock standing, and says which one', () => {
+    const foreign = 'claude agent agent-later (pid 424242 start 7)'
+    const r = judgeLockRelease({ held: foreign, ours })
+    expect(r.release).toBe(false)
+    expect(r.note).toMatch(/LEFT ALONE/)
+    expect(r.note).toContain(foreign)
+  })
+
+  it('LEAVES a padded copy of our own reason standing — the comparison normalises nothing', () => {
+    for (const held of [` ${ours}`, `${ours} `, `\t${ours}`]) {
+      expect(judgeLockRelease({ held, ours }).release, held).toBe(false)
+    }
+  })
+
+  it('releases NOTHING when we took no lock', () => {
+    expect(judgeLockRelease({ held: ours, ours: '' })).toEqual({ release: false, note: '' })
+    expect(judgeLockRelease({})).toEqual({ release: false, note: '' })
+  })
+
+  it('says nothing when the lock is already gone — it went with the tree', () => {
+    expect(judgeLockRelease({ held: '', ours })).toEqual({ release: false, note: '' })
+  })
+
+  it('LEAVES a lock it could not read, and says so — a wedge somebody must see', () => {
+    const r = judgeLockRelease({ held: null, ours })
+    expect(r.release).toBe(false)
+    expect(r.note).toMatch(/LEFT IN PLACE/)
+  })
+})
+
 describe('--expect, on a THROWAWAY repository', () => {
   let tmp
   let repo
@@ -860,6 +910,62 @@ describe('--expect, on a THROWAWAY repository', () => {
     expect(r.verdict.reason).toMatch(/could-not-take-the-lock/)
     expect(run(['worktree', 'list', '--porcelain'])).toContain(foreign)
     expect(existsSync(worktree)).toBe(true)
+  })
+
+  it('reads a lock reason out of git\'s own file VERBATIM, where the porcelain trims it', () => {
+    // Measured 11.08.2026 (git 2.39.5) and pinned here, because the whole padding
+    // hole rests on it: the file keeps what was written, the porcelain does not.
+    const padded = ' worktree-cleanup verifying and deleting (pid 999999 start 1) '
+    run(['worktree', 'lock', '--reason', padded, worktree])
+    const file = cleanupLockFile(worktree)
+    expect(file).toBeTruthy()
+    expect(readLockReason(file)).toBe(padded)
+    expect(run(['worktree', 'list', '--porcelain'])).toContain(padded.trim())
+    run(['worktree', 'unlock', worktree])
+    expect(readLockReason(file)).toBe('') // no lock, as against unreadable
+  })
+
+  it('does NOT break a foreign lock PADDED to look like ours, however dead its pid', () => {
+    // Fifth review, finding 1, end to end: git stores the padding, the porcelain
+    // hides it, and the parser used to trim it away — so this lock was claimed as
+    // ours and broken the moment its pid was absent.
+    const expected = expectationNow()
+    run(['worktree', 'lock', '--reason', ' worktree-cleanup verifying and deleting (pid 999999 start 1) ', worktree])
+    const r = cleanupWorktree(worktree, { git: gitOf, expected, probe: () => ({ exists: false, startedAt: null }) })
+    expect(r.ok).toBe(false)
+    expect(r.verdict.reason).toMatch(/not this command's/)
+    expect(existsSync(worktree)).toBe(true)
+    expect(run(['worktree', 'list', '--porcelain'])).toContain('locked')
+  })
+
+  it('releases its own lock by unlinking git\'s lock file, and git agrees the tree is unlocked', () => {
+    const ours = formatCleanupLock({ pid: 4711, startedAt: 1000 })
+    run(['worktree', 'lock', '--reason', ours, worktree])
+    const file = cleanupLockFile(worktree)
+    expect(releaseCleanupLock(worktree, { file, ours, git: gitOf })).toBe('')
+    expect(existsSync(file)).toBe(false)
+    expect(run(['worktree', 'list', '--porcelain'])).not.toContain('locked')
+    // And a second release finds nothing to do rather than reaching for git.
+    expect(releaseCleanupLock(worktree, { file, ours, git: gitOf })).toBe('')
+  })
+
+  it('never unlinks a lock that is not ours, whichever road the release takes', () => {
+    const foreign = 'claude agent agent-later (pid 424242 start 7)'
+    run(['worktree', 'lock', '--reason', foreign, worktree])
+    const file = cleanupLockFile(worktree)
+    const ours = formatCleanupLock({ pid: 4711, startedAt: 1000 })
+    expect(releaseCleanupLock(worktree, { file, ours, git: gitOf })).toMatch(/LEFT ALONE/)
+    // …and the FALLBACK road (no lock file resolved) reaches the same verdict
+    // through git's own commands, wider window and all.
+    expect(releaseCleanupLock(worktree, { file: null, ours, git: gitOf })).toMatch(/LEFT ALONE/)
+    expect(readLockReason(file)).toBe(foreign)
+  })
+
+  it('the fallback road releases our own lock when no lock file could be resolved', () => {
+    const ours = formatCleanupLock({ pid: 4711, startedAt: 1000 })
+    run(['worktree', 'lock', '--reason', ours, worktree])
+    expect(releaseCleanupLock(worktree, { file: null, ours, git: gitOf })).toBe('')
+    expect(run(['worktree', 'list', '--porcelain'])).not.toContain('locked')
   })
 
   it('does NOT recover a FOREIGN lock, however dead its holder looks', () => {

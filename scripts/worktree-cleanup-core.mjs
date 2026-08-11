@@ -399,6 +399,37 @@ export function staleLockVerdict({ reason, probe = null, tolerance = 5000 } = {}
 }
 
 /**
+ * MAY THE LOCK IN PLACE BE RELEASED? PURE (fifth review, finding 3).
+ *
+ * THE RELEASE IS STILL NOT ONE ACT, AND GIT HAS NO PRIMITIVE THAT WOULD MAKE IT
+ * ONE: `git worktree unlock` names no lock, it clears whatever is there, and
+ * there is no compare-and-unlock anywhere in git or in POSIX. So the release is
+ * NARROWED instead — this verdict is taken from the reason read out of git's own
+ * lock file and the unlink follows it immediately, two syscalls in one process
+ * rather than two git subprocesses (see `releaseCleanupLock` in
+ * `worktree-cleanup.mjs` for the measured shape and the residual).
+ *
+ * Inputs:
+ *   held  the reason in place, VERBATIM — '' for no lock, null when it could not
+ *         be read
+ *   ours  the reason this command wrote, '' when it took none
+ *
+ * Returns { release, note }. A note is a sentence to PRINT: a lock nobody
+ * released is a wedge somebody has to see.
+ */
+export function judgeLockRelease({ held, ours } = {}) {
+  const mine = String(ours ?? '')
+  if (!mine) return { release: false, note: '' } // we took no lock, so we release none
+  if (held === null || held === undefined) {
+    return { release: false, note: 'the lock could not be re-read, so it was LEFT IN PLACE' }
+  }
+  const there = String(held)
+  if (!there) return { release: false, note: '' } // it went with the tree, or somebody cleared it
+  if (there !== mine) return { release: false, note: `the lock in place is not ours (${there}) — LEFT ALONE` }
+  return { release: true, note: '' }
+}
+
+/**
  * THE SETUP BRANCH THAT COMES WITH AN AGENT WORKTREE. PURE.
  *
  * Creating the isolated tree `<repo>/.claude/worktrees/agent-<id>` also creates
