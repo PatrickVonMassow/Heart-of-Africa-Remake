@@ -58,6 +58,10 @@ export const OUTCOME = Object.freeze({
   TIMEOUT: 'timeout',
   ERROR_EXIT: 'error-exit',
   NO_VERDICT: 'no-verdict',
+  // NOT a failure: the operator has moved the load away from OpenAI (point 654). It ends
+  // in the same place every failure does — the review handed to a Claude reviewer with NO
+  // verdict — because that is the honest state either way: Sol has not seen this change.
+  SWITCHED_OFF: 'switched-off',
 })
 
 /** One human sentence per kind — what the reader is told went wrong. */
@@ -70,7 +74,13 @@ const CAUSE_TEXT = Object.freeze({
   [OUTCOME.TIMEOUT]: 'the review did not finish inside its time budget',
   [OUTCOME.ERROR_EXIT]: 'codex exited with an error',
   [OUTCOME.NO_VERDICT]: 'the run produced no parseable verdict',
+  [OUTCOME.SWITCHED_OFF]: 'the share switch is at `claude-only` (node scripts/sol-share.mjs --status)',
 })
+
+/** The cause sentence of one outcome kind — for the callers that skip classifyOutcome. */
+export function causeTextFor(kind) {
+  return CAUSE_TEXT[kind] ?? ''
+}
 
 /**
  * The message patterns each failure kind is recognised by.
