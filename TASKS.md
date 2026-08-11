@@ -5933,3 +5933,27 @@ to land than a mechanism that needs a review.
   exception exists to prevent, and naming the player's own boat makes the layer read as
   though it labels everything indiscriminately.
 
+
+- [ ] 643. A RED IS RELEASED BY THE WRONG PROOF: THE SUITE PASSED, NOT THE CHECK (found by
+  GPT-5.6 Sol while reviewing point 640, and left standing there as a named boundary rather
+  than smuggled into that point's scope). Point 640 settled how a red is CLOSED — cause,
+  charge, or its own point. What it does not settle is how a red is RELEASED once recorded.
+  Today the record releases a red when the red's own SUITE comes up covering on code newer
+  than the red. That is one level too coarse: a suite holds many checks, so a deliberate
+  no-op edit inside the render set plus one green run of that suite releases a red whose
+  own check never ran again. The release then rests on the suite having passed, not on the
+  thing that failed having passed.
+  FINAL STATE: the record keeps a resolution history PER CHECK, not per suite — for each
+  named check, the newest code it last passed on. A recorded red is released only when THAT
+  CHECK passed on code newer than the red; a green run of its suite that did not exercise
+  it leaves it standing, and the record says which check is still outstanding rather than
+  reporting the suite as covering. A check that has been removed or renamed is reported as
+  such, never treated as passed by absence.
+  VERIFIABLE: Vitest over the pure core in `scripts/render-verify-core.mjs` — a red on
+  check A is NOT released by a run in which only check B passed, is released by a run in
+  which A passed on newer code, and a run whose check set no longer contains A reports A as
+  vanished rather than covered; plus the concrete case that motivated it, a no-op render
+  edit and one green suite run leaving the red standing.
+  Criticality: medium — it does not let broken code land (the fast gate still runs), but it
+  lets a red be signed off by evidence that never touched it, which is the same defect
+  class point 640 closed from the other side. Bundle: Testinfrastruktur.

@@ -656,7 +656,8 @@ After completion and after every major system:
     record showed on WebGPU, never on WebGL 2 alone. WebGL 2 is the REGRESSION lane
     a LARGE covers (no `VERIFY_GL` pinned): the whole LARGE on WebGL 2 with
     preflight and preview, then the render suites on WebGPU. `touch`/`voice` are
-    ROUTED to WebGL 2 wherever picked (headless WebGPU cannot drive them).
+    ROUTED to WebGL 2 wherever picked (headless WebGPU cannot drive them), never
+    dropped from a tier.
     RESIDUAL: a WebGL-2-only regression surfaces only at the next LARGE.
   - The suite→tier→backend map is the pure `scripts/verify/tiers.mjs`, pinned by
     `tiers.test.mjs` in the Vitest layer; change it and
