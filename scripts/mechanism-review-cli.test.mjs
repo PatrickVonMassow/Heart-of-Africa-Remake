@@ -171,9 +171,13 @@ describe('the mode round-trips into the ledger', () => {
     }
   }
 
+  /** A blind-parallel record also names the third model that folded the two
+   *  lists (point 634); a review names none. */
+  const forMode = (mode) => (mode === 'blind-parallel' ? { mode, mergedBy: 'GPT-5.6 Sol' } : { mode })
+
   it('writes the mode and reads it back, for both modes', () => {
     for (const mode of MODES) {
-      const built = build({ mode })
+      const built = build(forMode(mode))
       expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
       expect(built.record.mode).toBe(mode)
       withLedger((path) => {
@@ -188,12 +192,41 @@ describe('the mode round-trips into the ledger', () => {
 
   it('carries the same-model fallback framing through with a blind-parallel mode', () => {
     const framing = 'the second run was framed as a maintainer inheriting the code'
-    const built = build({ mode: 'blind-parallel', framing })
+    const built = build({ mode: 'blind-parallel', framing, mergedBy: 'GPT-5.6 Sol' })
     expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
     withLedger((path) => {
       appendRecord(built.record, path)
       expect(readRecords(path)[0].framing).toBe(framing)
     })
+  })
+
+  it('carries the MERGING model into the ledger, and the fallback beside it', () => {
+    const built = build({ mode: 'blind-parallel', mergedBy: 'GPT-5.6 Sol' })
+    expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
+    withLedger((path) => {
+      appendRecord(built.record, path)
+      const back = readRecords(path)[0]
+      expect(back.mergedBy).toBe('GPT-5.6 Sol')
+      expect(back.mergeFallback).toBeUndefined()
+    })
+    const two = build({
+      mode: 'blind-parallel',
+      mergedBy: 'Fable 5',
+      mergeFallback: 'only two models were reachable in this session',
+    })
+    expect(two.ok, (two.errors ?? []).join('\n')).toBe(true)
+    expect(two.record.mergeFallback).toMatch(/only two models/)
+  })
+
+  it('refuses to build a blind-parallel record with no merging model, or one that wrote a list', () => {
+    expect(build({ mode: 'blind-parallel' }).ok).toBe(false)
+    const own = build({ mode: 'blind-parallel', mergedBy: 'Opus 5' })
+    expect(own.ok).toBe(false)
+    expect(own.errors.join('\n')).toMatch(/may not merge them/i)
+  })
+
+  it('a review record carries no merging model at all', () => {
+    expect(build({ mode: 'review' }).record.mergedBy).toBeUndefined()
   })
 
   it('REFUSES to build a record that names no mode, and says which two there are', () => {

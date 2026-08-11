@@ -107,6 +107,8 @@ export function buildRecord({
   point = '',
   mode = '',
   framing = '',
+  mergedBy = '',
+  mergeFallback = '',
   now = Date.now(),
   resolve = resolveCommit,
 } = {}) {
@@ -115,7 +117,10 @@ export function buildRecord({
   // deep inside git, so the one refusal that names what the command wants — the
   // usage block below — was the one the caller never saw.
   if (!String(sha).trim()) {
-    return { ok: false, errors: validateRecord({ sha: '', model, verdict, evidence, mode, framing }).errors }
+    return {
+      ok: false,
+      errors: validateRecord({ sha: '', model, verdict, evidence, mode, framing, mergedBy, mergeFallback }).errors,
+    }
   }
   const commit = resolve(sha)
   const check = validateRecord({
@@ -126,6 +131,8 @@ export function buildRecord({
     authoredBy: commit.authoredBy,
     mode,
     framing,
+    mergedBy,
+    mergeFallback,
   })
   const errors = [...check.errors]
   // Optional, but never sloppy: a mistyped point number would record a review
@@ -151,6 +158,12 @@ export function buildRecord({
       // outlives the CLI that wrote it.
       mode: String(mode).trim(),
       ...(String(framing).trim() ? { framing: String(framing).trim() } : {}),
+      // WHO FOLDED THE TWO LISTS (point 634). A blind-parallel record carries it
+      // — the merge is the one step where a finding can vanish, so the model
+      // that wrote neither list does it and the record NAMES that model. Rows
+      // written before this flag carry none, and read as unrecorded.
+      ...(String(mergedBy).trim() ? { mergedBy: String(mergedBy).trim() } : {}),
+      ...(String(mergeFallback).trim() ? { mergeFallback: String(mergeFallback).trim() } : {}),
       ...(wanted ? { point: Number(wanted) } : {}),
       at: now,
       atIso: new Date(now).toISOString(),
@@ -177,6 +190,7 @@ export const usage = () =>
   `usage: node scripts/mechanism-review.mjs --record <sha> --model <name> ` +
   `--verdict <${VERDICTS.join('|')}> --evidence "<one line>" \\\n` +
   `           --mode <${MODES.join('|')}> [--framing "<one line>"] [--point <N>]\n` +
+  `           --merged-by "<model>" [--merge-fallback "<why only two models>"]   (blind-parallel)\n` +
   `       node scripts/mechanism-review.mjs --list        (the recorded reviews)\n` +
   `\n--mode names which half of the four-eyes principle this verdict covers ` +
   `(CLAUDE.md §6):\n` +
@@ -186,6 +200,9 @@ export const usage = () =>
   `                       same inputs without seeing each other's result\n` +
   `--framing records how a second blind run by the SAME model was decorrelated, and\n` +
   `       belongs to blind-parallel alone.\n` +
+  `--merged-by names the model that folded the two lists into the union — the one that\n` +
+  `       wrote NEITHER of them, because a merge can lose a finding silently. Count the\n` +
+  `       union first: node scripts/blind-merge.mjs --a <A.json> --b <B.json> --union <U.json>\n` +
   `\nWHO REVIEWS (CLAUDE.md §6): GPT-5.6 Sol at reasoning effort high; when Sol is\n` +
   `       unavailable, the first of Fable 5 / Opus 5 / Opus 4.8 that authored no part of\n` +
   `       the range. Run it — never a hand-typed codex line — with:\n` +
@@ -220,7 +237,8 @@ if (isMainModule(import.meta.url)) {
             // A row from before --mode existed has none; it reads as unrecorded,
             // never as one of the two modes.
             `[${r.mode || 'mode not recorded'}]  ${r.atIso ?? ''}` +
-            `\n      ${r.evidence ?? ''}${r.framing ? `\n      framing: ${r.framing}` : ''}`,
+            `\n      ${r.evidence ?? ''}${r.framing ? `\n      framing: ${r.framing}` : ''}` +
+            `${r.mergedBy ? `\n      union merged by: ${r.mergedBy}${r.mergeFallback ? ` (two-model fallback: ${r.mergeFallback})` : ''}` : ''}`,
         )
       }
       process.exit(0)

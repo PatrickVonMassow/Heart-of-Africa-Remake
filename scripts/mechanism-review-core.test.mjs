@@ -589,7 +589,40 @@ describe('validateRecord carries the mode', () => {
 
   it('accepts it once the mode is named', () => {
     expect(validateRecord({ ...good, mode: 'review' })).toEqual({ ok: true, errors: [] })
-    expect(validateRecord({ ...good, mode: 'blind-parallel' }).ok).toBe(true)
+    // A blind-parallel record also names who folded the two lists (point 634).
+    expect(validateRecord({ ...good, mode: 'blind-parallel', mergedBy: 'GPT-5.6 Sol' }).ok).toBe(true)
+  })
+
+  it('refuses a blind-parallel record that names no merging model', () => {
+    const v = validateRecord({ ...good, mode: 'blind-parallel' })
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toMatch(/no merging model named/i)
+  })
+
+  it('refuses a merge by either of the two models that wrote the lists', () => {
+    for (const who of ['Fable 5', 'Claude Opus 5']) {
+      const v = validateRecord({ ...good, mode: 'blind-parallel', mergedBy: who })
+      expect(v.ok, who).toBe(false)
+      expect(v.errors.join('\n')).toMatch(/may not merge them/i)
+    }
+  })
+
+  it('lets the recorded two-model fallback through, and nothing shorter', () => {
+    const fallback = { ...good, mode: 'blind-parallel', mergedBy: 'Fable 5' }
+    expect(validateRecord({ ...fallback, mergeFallback: 'no third model was reachable today' }).ok).toBe(true)
+    expect(validateRecord({ ...fallback, mergeFallback: 'none' }).ok).toBe(false)
+  })
+
+  it('refuses a merging model under a review, which folds nothing', () => {
+    const v = validateRecord({ ...good, mode: 'review', mergedBy: 'GPT-5.6 Sol' })
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toMatch(/meaningless under --mode review/i)
+  })
+
+  it('does not blame the merger when the mode itself is missing', () => {
+    // Same reason as the framing: two errors for one mistake sends the reader
+    // to fix the wrong flag.
+    expect(validateRecord(good).errors.filter((e) => /merg/i.test(e))).toHaveLength(0)
   })
 
   it('still refuses a self-review, whichever mode is claimed', () => {
