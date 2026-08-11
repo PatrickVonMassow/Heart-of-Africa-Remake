@@ -108,21 +108,20 @@ change of vendor.
 
 `node scripts/measure-task-cost.mjs` now splits the verification phase into the
 half that needs this machine or a pair of eyes and the half that is pure text.
-Measured over 47,258 turns from 391 transcripts (03.–11.08.2026, weighted):
+Measured over 47,863 turns from 391 transcripts (03.–12.08.2026, weighted):
 
 | | share |
 | --- | --- |
-| verification, of the whole spend | 41.9 % |
+| verification, of the whole spend | 41.5 % |
 | — text (reads a log, a script, a report) | 48.0 % of it |
-| — harness (runs a suite) | 39.3 % of it |
+| — harness (runs a suite) | 39.4 % of it |
 | — eyes (looks at a frame) | 7.8 % of it |
-| — authoring (edits the verification code) | 4.8 % of it |
+| — authoring (edits the verification code) | 4.7 % of it |
 | — unclear (never guessed into a half) | 0.1 % of it |
 
-So the routable text half is **19.9 % of the entire spend** — the figure the tool
-computes from the unrounded values; the two rounded percentages above multiply to
-20.1 % — and 46.6 % of the delegated agents' own verification. That is what makes
-part A worth having, and what any decision about part B should be argued against.
+So the routable text half is **19.9 % of the entire spend**, and 46.6 % of the
+delegated agents' own verification. That is what makes part A worth having, and
+what any decision about part B should be argued against.
 
 Eight classification errors were found by the cross-vendor review rounds of
 this very branch and are fixed in these figures: an unplaceable call used to be

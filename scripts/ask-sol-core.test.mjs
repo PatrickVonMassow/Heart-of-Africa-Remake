@@ -121,6 +121,19 @@ describe('the material', () => {
     expect(omitted).toEqual(['FILE: empty.ts'])
   })
 
+  // Final round: `carried` judged the SOURCE, not the slice that travelled — a file whose
+  // first characters are blank goes out as a header, whitespace and a truncation marker,
+  // which is nothing to answer about.
+  it('counts what TRAVELLED, not what was held: a blank prefix carries nothing', () => {
+    const { carried, omitted, text } = formatAskMaterial({
+      sections: [{ title: 'FILE: late.ts', text: `${' '.repeat(2000)}the real content is far past the cut` }],
+      budget: 800,
+    })
+    expect(text).toMatch(/TRUNCATED/)
+    expect(carried).toEqual([])
+    expect(omitted).toEqual(['FILE: late.ts'])
+  })
+
   // Third cross-vendor round: the omission markers were free, so enough of them — or long
   // enough titles — pushed the SENT request past the ceiling it advertises.
   it('never exceeds its budget, however many sections it has to omit', () => {

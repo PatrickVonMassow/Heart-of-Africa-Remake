@@ -161,11 +161,16 @@ export function formatAskMaterial({ sections = [], budget = MATERIAL_BUDGET_CHAR
       }
       continue
     }
-    const body = text.length > room ? `${text.slice(0, room)}\n… [TRUNCATED: ${text.length - room} characters not shown]` : text
+    const sent = text.slice(0, room)
+    const body = text.length > room ? `${sent}\n… [TRUNCATED: ${text.length - room} characters not shown]` : text
     push(header)
     push(body)
     push('')
-    if (text.trim()) carried.push(title)
+    // CARRIED MEANS WHAT WAS SENT, not what was held (final round). A file whose first
+    // `room` characters are blank travels as a header, whitespace and a truncation
+    // marker — nothing to answer about — and counting it as real material is how a
+    // shaped answer about nothing gets reported as work done.
+    if (sent.trim()) carried.push(title)
     else omitted.push(title)
   }
   // The closing count, paid for by the reserve: what did not fit is NEVER invisible —
