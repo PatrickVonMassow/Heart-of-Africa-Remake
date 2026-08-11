@@ -282,7 +282,21 @@ labels the animals in view with every label on an ON-SCREEN subject
 clears every one — `scripts/verify/enrichments.mjs`
 (`147-ctrl-actor-labels.png`) for the bird's-eye view and
 `scripts/verify/polish.mjs` (`148-ctrl-actor-labels-village.png`) for
-the settlement.
+the settlement. The roster in every STATE (point 600): the kind x state
+cross product runs over the SOURCES, not only the predicate — every
+species named while idle, walking, fleeing, drinking, crossing, seized,
+mired, at vigil, at play, mourning and dead; the scripted hunt's
+predator named through chase, feed and walk-off and its prey both
+running and as the carcass it becomes; concealment proved to be the
+submerged crocodile and nothing else, with a lunging, dragging,
+gripping or withdrawing one named and no predator ever concealed
+(`src/scenes/travel/wildlifeActorSource.test.ts`). Live, both backends:
+a STAGED predator attack carries the attacker's label at the attacker
+while the attack runs, the label really stands in the frame, the fleeing
+prey is named too, and the attacker's own pre-predicate record is not
+concealed — `scripts/verify/enrichments.mjs`
+(`--section=ctrl-labels-attacking-predator`,
+`600-ctrl-label-attacking-predator.png`).
 
 ## 10. Goal scaffolding.
 
