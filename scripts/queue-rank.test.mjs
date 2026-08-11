@@ -105,14 +105,17 @@ describe('the git state the rank record is missing in', () => {
     })
   })
 
-  it('fails CLOSED where git answers nothing usable at all', () => {
+  it('fails CLOSED where git answers nothing usable at all, and names no remedy', () => {
     // Not installed, not a repository, a broken index: refusing wrongly costs a
-    // message, allowing wrongly is the hole.
-    expect(recordProvenance(PATH, () => FAIL)).toEqual({ tracked: true, restore: `git checkout HEAD -- ${PATH}` })
+    // message, allowing wrongly is the hole. But nothing was ESTABLISHED here, so
+    // no restore is printed either — a command nobody checked is how a refusal
+    // walks the caller into the next one.
+    const nothing = { tracked: true, restore: '' }
+    expect(recordProvenance(PATH, () => FAIL)).toEqual(nothing)
     expect(
       recordProvenance(PATH, () => {
         throw new Error('git exploded')
       }),
-    ).toEqual({ tracked: true, restore: `git checkout HEAD -- ${PATH}` })
+    ).toEqual(nothing)
   })
 })

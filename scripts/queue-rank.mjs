@@ -33,7 +33,6 @@ import { QUEUE_REBUILD_CMD, closedPointsOf, openPointsOf } from './board-queue-c
 import {
   RANK_CMD,
   RANK_RECORD_PATH,
-  RESTORE_CMD,
   SEED_CMD,
   tornRecordMessage,
   appendGateState,
@@ -101,7 +100,11 @@ const runGit = (args) => spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf
  * message that names the restore, while allowing wrongly is the hole itself.
  */
 export function recordProvenance(path = RANK_RECORD_PATH, git = runGit) {
-  const failClosed = { tracked: true, restore: RESTORE_CMD }
+  // Fail CLOSED on tracking — refusing wrongly costs a message, allowing wrongly
+  // is the hole — but name NO restore: git established nothing here, and a
+  // command nobody checked is how a refusal walks the caller into the next one
+  // (cross-vendor review, tenth pass). The refusals print the inspection instead.
+  const failClosed = { tracked: true, restore: '' }
   // A candidate is only worth NAMING as the remedy if its bytes are a record;
   // restoring torn ones would hand the caller from this refusal into the next.
   const readable = (rev) => {
@@ -218,6 +221,18 @@ if (isMainModule(import.meta.url)) {
         )
       }
       console.log(`queue-rank: baseline armed with ${next.settled.points.length} open point(s) — "${why.trim()}"`)
+      // AND THE WINDOW IS NAMED, because only a commit closes it (cross-vendor
+      // review, tenth pass). Staging makes the record visible to git, but an
+      // uncommitted one can be unstaged and removed again, leaving no trace and
+      // no diff — the one state where a later reading cannot tell a removal from
+      // a checkout that never had a baseline. Committing it ends that for good,
+      // so the command says so instead of leaving it to be discovered.
+      if (runGit(['cat-file', '-e', `HEAD:${RANK_RECORD_PATH}`]).status !== 0) {
+        console.log(
+          `  COMMIT ${RANK_RECORD_PATH} NOW. Until the repository carries it, this arming is only staged, and ` +
+            'nothing that reads the checkout later can tell its removal from a baseline that never existed.',
+        )
+      }
     } else {
       const state = appendGateState(open, record)
       if (state.state === 'unarmed') {
