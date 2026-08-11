@@ -385,6 +385,157 @@ there exactly once; a new point joins a bundle when appended.
   Criticality: medium — it removes verification rounds that would otherwise be paid
   several times for one defect, and it stops five blocks from reading as unstarted work.
 
+- [ ] 635. THE QUEUE IS CUT INTO RELEASES, AND THE CUT IS DATA (user 11.08.2026, sketching
+  the board: "Unterteilung der Warteschlange in Releases … für jedes Release eines und
+  unten ein Abschnitt Backlog"). Today the scope of a release is PROSE inside point 174 —
+  nothing can check whether a point belongs to v0.3, and nothing tells the batch where one
+  release ends and the next begins. As data it becomes what the whole release mechanism
+  stands on: the block boundary IS the moment the closing run and the tag fall due (631/633).
+  FINAL STATE:
+  1. A point's release is a STORED ASSIGNMENT — one small tracked file, point number to
+     block ("v0.3", "v0.4", or the backlog). NOT a second order: the sequence WITHIN a block
+     stays derived from `TASKS.md`, exactly as points 590/608 established, because a second
+     hand-kept list is the defect those points removed and the user saw twice.
+  2. The board renders one collapsible section PER BLOCK, top to bottom, ending in "Backlog
+     (bisher in keinem Release eingeplant)" — named so it reads as "not yet scheduled",
+     never as "unimportant", or work quietly dies there. Each block header carries its count
+     and the sum of its estimates ("Release 0.4 — 12 Punkte, ~40 h"), so an unrealistic cut
+     is visible at a glance.
+  3. `queue-order-guard` learns blocks: the rendered sequence must equal block order first,
+     then the work order's sequence inside each block. Every open point sits in exactly one
+     block; a point in none is REPORTED (the backlog is a decision, not a default).
+  4. The work order names the block per point — one line, so the assignment survives without
+     the board and a brief can carry it.
+  VERIFIABLE: Vitest over the pure derivation — a point in no block is reported; a block
+  order that disagrees with the render blocks; the within-block sequence follows TASKS.md;
+  an unreadable assignment file fails OPEN (no guard may trap a session). Plus the real
+  board rendered from the live work order, with the current v0.3 set taken from point 174.
+  Criticality: HIGH — every later release step reads this cut. Verified under the regime of
+  point 639.
+
+- [ ] 636. A FINISHED BLOCK CLOSES AND TAGS ITSELF (user 11.08.2026: "Du sollst diese
+  Release-Blöcke von oben nach unten abarbeiten. Am Ende jedes Blocks soll automatisch der
+  übliche Release-Abschluss passieren … Das Taggen auf die Release-Version kannst du
+  selbständig immer direkt machen und es unter …/VERSION/ veröffentlichen"). This is the
+  point that ACTS on its own, so it is the one that can do lasting damage: a tag is frozen
+  and never re-pointed.
+  IT NEEDS 631, 634 and 633 FIRST — the order check, the third-model merge and the closing
+  run itself. Armed before them it would tag a state whose cleanup came after its only
+  green regression.
+  FINAL STATE:
+  1. WHEN THE LAST POINT OF A BLOCK IS TICKED, the closing run of 633 is DUE, and the batch
+     may not start the next block before it is recorded complete.
+  2. THE VERSION TAG BECOMES OURS TO CUT. The standing rule — no tag without the user's
+     explicit go — is SOFTENED by his decision of 11.08.2026, and everywhere it is written:
+     `CLAUDE.md` §6 (release mechanism), the memory rule `tags-only-on-request`,
+     `scripts/closing-guard-core.mjs` and every remedy text repeating it. The new rule:
+     `vX.Y` is cut and published at `…/vX.Y/` WITHOUT asking, but ONLY on a HEAD whose
+     closing run is recorded complete — the checklist gate stays exactly as binding, it
+     merely stops waiting for a human sentence.
+  3. `poc` STAYS THE USER'S. It moves only on his explicit go for that version, because that
+     is the address he tests as "the current state".
+  4. SHADOW FIRST, ACT SECOND. The mechanism ships REPORT-ONLY: it names the tag it WOULD
+     cut, on which HEAD, from which recorded evidence, and does nothing. It is armed only
+     after it has been right about a real release without acting. A frozen tag on a bad
+     state cannot be repaired, so the cheap insurance is taken.
+  VERIFIABLE: Vitest over the pure decision — a block with an open point is not finished; a
+  finished block with an incomplete closing record yields NO tag and names what is missing;
+  a complete record yields exactly one tag proposal with its HEAD; `poc` never appears in an
+  automatic proposal. Plus the shadow log of one real release, compared by hand against what
+  a human would have cut.
+  Criticality: MAXIMUM — it acts unattended and its mistakes are permanent. Verified under
+  the regime of point 639.
+
+- [ ] 637. THE BOARD BECOMES A PLACE TO DECIDE, NOT ONLY TO READ (user 11.08.2026: "Drag &
+  Drop von Punkten in der Warteschlange … So kann ich selbstständig solche Änderungen
+  vornehmen, ohne immer über dich gehen zu müssen").
+  FINAL STATE:
+  1. A card can be dragged WITHIN a block and BETWEEN blocks. On touch — the user reads the
+     board on his phone in portrait — every drag has a MENU equivalent ("nach Release 0.4",
+     "ganz nach oben"); dragging is the desktop path, tapping the mobile one.
+  2. THE PAGE CANNOT WRITE INTO THE REPOSITORY, and the design says so rather than
+     pretending otherwise: a move emits a SIGNED intent over the transport the chat already
+     uses (`scripts/chat-core.mjs` — signed, verified, replay-proof; anything unsigned,
+     stale or already seen is dropped). A session applies it: a move between blocks rewrites
+     the assignment of 635, a move within a block moves the point's block in `TASKS.md`.
+  3. THE LATENCY IS VISIBLE. A moved card reads "vorgemerkt" until a session has applied it,
+     with the time it was requested. Without that the user drags, sees nothing happen, and
+     drags again — the failure mode of every optimistic interface that is not one.
+  4. An intent that cannot be applied (the point was ticked meanwhile, the block is gone) is
+     REPORTED on the board, never silently dropped.
+  VERIFIABLE: Vitest over the pure intent handling — an unsigned or replayed intent is
+  refused; an intent naming a ticked point is reported; a valid between-block intent yields
+  exactly one assignment change and no reordering; a within-block intent yields exactly one
+  work-order move. Plus one real drag applied end to end, and the mobile menu exercised in
+  the browser layer.
+  Criticality: HIGH — it writes into the work order from a public page. Verified under the
+  regime of point 639.
+
+- [ ] 638. A TICKET I OPEN MYSELF GETS ITS URGENCY DECIDED, NOT ITS DEFAULT (user
+  11.08.2026: "Wenn du selbständig neue Tickets anlegst, bewerte deren Dringlichkeit …
+  Wenn du unsicher bist, lege mir eine Karte unter 'Von dir zu klären' an. Das muss
+  zuverlässig verankert sein"). Append-and-defer puts every new point LAST — the right
+  default for a wish, the wrong one for a defect that breaks what the current release
+  promises. The difference is exactly what the author knows while writing and forgets an
+  hour later.
+  FINAL STATE:
+  1. OPENING A POINT ANSWERS ONE QUESTION: does it break something the CURRENT block
+     promises (→ into that block, at the position its urgency earns), is it ordinary work
+     (→ a later block), or is it not urgent (→ the backlog)? The answer is recorded WITH the
+     point, in one line, so a placement can be read back and challenged.
+  2. UNSURE IS AN ANSWER, and it has a destination: a "Von dir zu klären" card naming the
+     point, the two placements considered and what makes it doubtful. Never a silent
+     default.
+  3. IT IS ENFORCED, not remembered: a new point carrying no placement decision blocks the
+     turn end, the way the work-order guards already block an unranked append. Rule and
+     enforcer land together — the lesson of point 632 is that a named enforcer is not one.
+  VERIFIABLE: Vitest — a new point with no recorded placement blocks; each of the three
+  placements passes; "unsure" passes only with a matching board card; the check fails OPEN
+  on unreadable input. Plus a replay over the points opened on 10./11.08.2026, which must
+  reproduce their actual placement or name the disagreement.
+  Criticality: HIGH — it decides what is worked next, silently and every day. Verified under
+  the regime of point 639.
+
+- [ ] 639. THE ASSURANCE REGIME FOR THE RELEASE MACHINERY (user 11.08.2026: "Das Ganze ist
+  ein kritischer neuer Mechanismus … Überlege, ob du die drei verfügbaren Modelle hier noch
+  intensiver zur gegenseitigen Absicherung einsetzen kannst … Der Umbau hat daher maximale
+  Kritikalität und muss entsprechend gründlich verifiziert werden, bevor er scharfgeschaltet
+  wird"). Points 635–638 decide, unattended and daily, WHAT is worked and WHAT is tagged. A
+  fault there does not crash — it quietly works the wrong thing, or freezes a tag on a state
+  nobody closed. This point is the regime those four are built under; it is written once
+  here instead of four times, and each of them names it.
+  FINAL STATE — five instruments, each answering a different failure:
+  1. THREE-WAY HAZARD ENUMERATION, BLIND. Before a line is written, all THREE models — Opus
+     5, GPT-5.6 Sol, Fable 5 — answer the same question from the same inputs and see none of
+     the others' answers: what can go wrong with this mechanism, which state makes it act
+     wrongly, what does it do on a torn file, a half-ticked block, two sessions at once? The
+     three lists are merged by the model that wrote NONE of them, by the accounting of point
+     634 (every input entry findable in the union). The union IS the test list; nothing is
+     dropped for sounding unlikely.
+  2. DIFFERENTIAL IMPLEMENTATION OF THE DECIDING CORE. The pure function that answers "is
+     this block finished, and what follows" is written TWICE, independently, from the same
+     spec by two different models, and a fuzz harness runs both over thousands of generated
+     states — blocks with holes, ticks out of order, missing records, duplicates. ANY
+     disagreement is a finding to be settled before either version ships. This is the one
+     instrument that finds what all three models were confidently wrong about together,
+     because it compares behaviour instead of opinions.
+  3. ADVERSARIAL PASS ON THE ACTING HALF. A model that neither built nor reviewed the
+     tagging gets one brief: make it tag a state that is not closed. Whatever it finds is a
+     defect, not a scenario.
+  4. SHADOW BEFORE ARMED. 636 runs report-only through at least one real release, and its
+     proposals are compared by hand with what a human would have cut. Arming is a separate,
+     recorded step.
+  5. THE FOUR-EYES RECORD PER POINT. Each of 635–638 carries its own recorded review by a
+     model that did not author it, and none is ticked on a `do-not-merge` or an unanswered
+     `merge-with-fixes` — the criticality gate already enforces exactly this, and 636 is
+     MAXIMUM, so it also carries the adversarial pass above.
+  VERIFIABLE: the union of the three hazard lists exists with its accounting; the
+  differential harness runs in the fast layer and reports zero disagreements over its
+  generated corpus; the adversarial brief and its answer are recorded; the shadow log of one
+  release exists and was compared; and `node scripts/criticality-review-guard.mjs --status`
+  is clean for all four points.
+  Criticality: MAXIMUM — it is the assurance the other four are trusted on.
+
 - [ ] 456. THE TEST THAT IS ONLY GREEN IN THE SIDE TREE (retrospective §3.68, 30.07.2026;
   bundle Testinfrastruktur). Two blockers of one day shared a cause: a test passed because a
   git-ignored file is ABSENT in the agent's worktree while it exists in the main tree — it

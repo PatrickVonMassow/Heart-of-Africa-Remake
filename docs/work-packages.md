@@ -88,7 +88,7 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 | **Kadaver & Geier** | G | Carrion, vultures, staging | 319, 322, 326, 327, 328, 336, 453 |
 | **Chat & Tafel** | H | Chat and board | 440, 451, 465, 467, 473, 539 — the rest landed 30.07.2026 (308, 410, 411, 416, 421, 423, 424, 430, 435, 436, 441, 439, 452, 472, 470) |
 | **Session- & Repo-Hygiene** | I | Session, pool and repo hygiene | 401, 434, 461, 462, 463, 471, 553, 554, 556, 629 (553 is 373's measured successor lever; 556 is the lease half of the same singleton family) — the rest landed 30.07.2026 (329, 396, 399, 409, 426, 427, 429, 431, 433, 458) and 08.08.2026 (373) |
-| **Modell & Wächter** | J | Model and guard chain | 309, 355, 397, 425, 437, 438, 457, 468, 534, 535, 536, 537, 538, 540, 560, 561, 613, 630, 631, 632, 634 (534–538 are the audit findings of point 297 — worked BEFORE the rest of the bundle, because they decide what the four-eyes gate and the review schedule see at all) |
+| **Modell & Wächter** | J | Model and guard chain | 309, 355, 397, 425, 437, 438, 457, 468, 534, 535, 536, 537, 538, 540, 560, 561, 613, 630, 631, 632, 634, 638, 639 (534–538 are the audit findings of point 297 — worked BEFORE the rest of the bundle, because they decide what the four-eyes gate and the review schedule see at all) |
 | **Testinfrastruktur** | K | Test and verification infrastructure | 295, 330, 387, 418, 455, 456, 460, 464, 466, 532, 549, 557, 563, 564, 566, 567, 568, 569, 570, 571, 572, 573, 574 (564/566/567 all came out of the point-342 verification: what a red is believed to mean, what a repair costs, and what a killed session leaves running) |
 | **Dokumentation** | L | Docs and knowledge transfer | 303, 333, 422, 555 — the rest landed 30.07.2026 (459) |
 | **Steuerung & Performance** | M | Controls and performance | 310, 342, 347 |
@@ -109,6 +109,9 @@ change) and 449 last, because the drill is what makes the others more than a cla
 - **184, 200, 203, 205, 207** — the big audits. They sweep the whole codebase and would
   swallow any bundle they were put in.
 - **174, 224** — releases, gated on a full closing run rather than on a branch.
+- **635, 636, 637** — the release machinery the user asked for on 11.08.2026: the queue cut
+  into release blocks, a block that closes and tags itself, and a board that can be
+  rearranged by hand. Built under the assurance regime of 639.
 - **633** — the release's own closing run: two regressions with the blind-parallel cleanup
   between them. Not a bundle member; it IS the gate 174 waits on.
 - **285**.
