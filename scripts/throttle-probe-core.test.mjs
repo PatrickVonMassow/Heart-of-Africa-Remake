@@ -197,6 +197,13 @@ describe('classifyRun — three of the four outcomes are NOT "the check failed"'
     expect(classifyRun({ exit: 0, summary: null })).toBe('broken')
   })
 
+  // Measured: a genuinely green `i18n --section=english-default` reports "0 pass,
+  // 0 fail", so a pass count of zero is a suite's printing style, not a broken
+  // harness — demanding one called a healthy run broken.
+  it('accepts a green run whose suite prints no per-check PASS lines', () => {
+    expect(classifyRun({ exit: 0, summary: { pass: 0, fail: 0, consoleErrors: 0, exit: 0 } })).toBe('green')
+  })
+
   it('calls a runner that contradicts itself BROKEN, neither green nor red', () => {
     const green = { pass: 8, fail: 0, consoleErrors: 0, exit: 0 }
     expect(classifyRun({ exit: 0, summary: { ...green, fail: 2 } })).toBe('broken')
@@ -205,7 +212,6 @@ describe('classifyRun — three of the four outcomes are NOT "the check failed"'
     // all, and a FAIL line parsed out of a run that exited 0 — each is a run
     // whose report cannot be believed.
     expect(classifyRun({ exit: 0, summary: { ...green, exit: 1 } })).toBe('broken')
-    expect(classifyRun({ exit: 0, summary: { ...green, pass: 0 } })).toBe('broken')
     expect(classifyRun({ exit: 0, summary: green, checks: ['a red printed by a run that exited 0'] })).toBe('broken')
   })
 

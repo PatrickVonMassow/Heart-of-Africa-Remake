@@ -251,14 +251,18 @@ export function classifyRun(input) {
   // very rate this instrument exists to report.
   if (exit === 0) {
     // A GREEN has to agree with itself: the runner exited 0, its summary says
-    // exit 0 with no failures and no console errors, it reached at least one
-    // check, and no FAIL line was parsed out of the log. Any disagreement is a
-    // run that measured nothing — a green would dilute the rate, a red would
-    // invent one.
+    // exit 0 with no failures and no console errors, and no FAIL line was parsed
+    // out of the log. Any disagreement is a run that measured nothing — a green
+    // would dilute the rate, a red would invent one.
+    //
+    // The PASS COUNT is deliberately not part of that test. Measured 11.08.2026:
+    // `i18n --section=english-default` runs green and reports "0 pass, 0 fail",
+    // because not every suite prints its checks in the form the summary counts.
+    // Requiring a positive count called a healthy run broken, which is the same
+    // false verdict from the other side.
     if (!summary) return 'broken'
     const named = (Array.isArray(checks) ? checks : []).length
-    const agrees =
-      summary.fail === 0 && summary.consoleErrors === 0 && summary.exit === 0 && summary.pass > 0 && named === 0
+    const agrees = summary.fail === 0 && summary.consoleErrors === 0 && summary.exit === 0 && named === 0
     return agrees ? 'green' : 'broken'
   }
   if (summary && (summary.fail > 0 || summary.consoleErrors > 0)) return 'red'
