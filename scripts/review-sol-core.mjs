@@ -84,16 +84,26 @@ const CAUSE_TEXT = Object.freeze({
  */
 const FAILURE_PATTERNS = [
   [OUTCOME.MODEL_REFUSED, /not supported when using codex with a chatgpt account|unknown model|model[^.\n]*not (?:supported|available|found)/i],
-  // TRANSPORT BEFORE VERDICT (11.08.2026). A request that never completed carries
-  // no answer from the server, so it cannot be a statement about the account — but
-  // its text may still mention a limit (a retry banner, a rate-limit hint in the
-  // same stream), and this list stops at the FIRST match. Reported the wrong way
-  // round it is actively misleading: the user was sent to check his billing while
-  // his weekly allowance stood at 96 % and the real cause was an ipset entry gone
-  // stale after a container restart. The connection-failure wording is unambiguous
-  // in a way a quota message never is, so it is decided first.
+  // A SPOKEN VERDICT OUTRANKS A DEAD CONNECTION; A DEAD CONNECTION OUTRANKS SILENCE
+  // (11.08.2026, both halves found the hard way).
+  //
+  // First half: reported as an exhausted allowance, a transport failure sent the user
+  // to his billing page while 96 % of his weekly limit stood unused, and it hid a
+  // cause that was ours — a firewall entry gone stale after a container restart. So a
+  // text that ONLY shows a broken connection is unreachable, whatever stray word it
+  // carries.
+  //
+  // Second half (GPT-5.6 Sol, reviewing the first): the naive fix overshoots. Codex
+  // RETRIES, so one transcript can hold a real `429` from attempt 1 and a
+  // `Reconnecting…` storm after it — and a server that answered 429 DID speak about
+  // the account, however the stream ended. Hence the order below: a definitive quota
+  // verdict is matched first and wins wherever both appear; transport is the answer
+  // only when nothing was ever said. The narrow `DEFINITIVE_QUOTA` is deliberately not
+  // the broad allowance pattern — "rate limit" as a hint or a doc line must not
+  // outrank a dead socket, only an actual refusal may.
+  [OUTCOME.ALLOWANCE_EXHAUSTED, /\b429\b|too many requests|usage limit (?:reached|exceeded|hit)|you(?:'ve| have) hit your usage limit|quota (?:exceeded|exhausted)|credit balance/i],
   [OUTCOME.UNREACHABLE, /error sending request|stream disconnected|reconnecting\b|connection (?:refused|reset|closed)|enotfound|eai_again|econnrefused|econnreset|etimedout|dns error|failed to lookup|network (?:error|is unreachable)/i],
-  [OUTCOME.ALLOWANCE_EXHAUSTED, /usage limit|rate limit|quota|too many requests|\b429\b|allowance|credit balance|plan limit/i],
+  [OUTCOME.ALLOWANCE_EXHAUSTED, /usage limit|rate limit|quota|allowance|plan limit/i],
   [OUTCOME.LOGIN_EXPIRED, /not logged in|log ?in again|codex login|refresh token|invalid[_ ]api[_ ]key|unauthorized|authentication|\b401\b|\b403\b/i],
   [OUTCOME.UNREACHABLE, /enotfound|eai_again|econnrefused|econnreset|etimedout|dns error|failed to lookup|error sending request|network (?:error|is unreachable)|connection (?:refused|reset|closed)|proxy|tls|certificate/i],
 ]

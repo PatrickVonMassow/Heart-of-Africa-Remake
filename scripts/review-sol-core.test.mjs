@@ -80,12 +80,21 @@ describe('classifyOutcome — how a codex run ended', () => {
       ok: false,
       kind: OUTCOME.UNREACHABLE,
     })
-    // A transport failure wins even when a rate-limit banner rode along in the
-    // same stream: no answer arrived, so nothing was said about the account.
+    // A bare mention of a limit does not outrank a dead socket…
     expect(
       classifyOutcome({ exitCode: 1, stderr: 'rate limit hint\nerror sending request for url (…)' }),
     ).toMatchObject({ kind: OUTCOME.UNREACHABLE })
-    // And a genuine quota verdict is still read as one.
+    // …but a server that actually REFUSED does, however the stream ended afterwards.
+    // Codex retries, so a real 429 and a reconnect storm share one transcript, and
+    // calling that unreachable would send us hunting a firewall that is fine
+    // (GPT-5.6 Sol, reviewing the first version of this fix).
+    expect(
+      classifyOutcome({
+        exitCode: 1,
+        stderr: 'attempt 1: 429 Too Many Requests\nReconnecting... 3/5\nstream disconnected before completion',
+      }),
+    ).toMatchObject({ kind: OUTCOME.ALLOWANCE_EXHAUSTED })
+    // And a genuine quota verdict on its own is still read as one.
     expect(classifyOutcome({ exitCode: 1, stderr: 'You have hit your usage limit. (429)' })).toMatchObject({
       kind: OUTCOME.ALLOWANCE_EXHAUSTED,
     })

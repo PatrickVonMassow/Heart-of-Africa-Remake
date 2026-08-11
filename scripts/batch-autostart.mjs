@@ -245,17 +245,27 @@ function readRunLogSegment(from) {
 // later.
 //
 // So the tick re-applies it. It is additive and cannot seal the container (that
-// is the whole point of `firewall-allow.mjs`), it needs no network of its own
-// beyond DNS, and it is BEST-EFFORT: a failure is logged and the tick carries on,
-// because a launcher that stops on a firewall hiccup is worse than a stale entry.
+// is the whole point of `firewall-allow.mjs`), and it needs no network of its own
+// beyond DNS.
+//
+// IT IS DETACHED, NOT AWAITED (GPT-5.6 Sol, 11.08.2026). Run synchronously it sat
+// in front of every later duty of the tick — the spawn decision, the chat inbox,
+// the leaked-worker sweep — and `timeout` on a sync call is no ceiling at all:
+// node signals the child and then waits for it to actually exit, so a wedged
+// resolver stalls the launcher for as long as it likes. The top-up has no result
+// this tick needs, so it is launched and let go: its own log records what it did,
+// and the tick proceeds at once. A firewall hiccup must never be able to hold up
+// the mechanism that keeps the batch alive.
 try {
-  const topUp = execFileSync(process.execPath, [R('firewall-allow.mjs')], {
+  const out = openSync(C('firewall-topup.log'), 'a')
+  const child = spawn(process.execPath, [R('firewall-allow.mjs')], {
     cwd: REPO,
-    encoding: 'utf8',
-    timeout: 120_000,
+    detached: true,
+    stdio: ['ignore', out, out],
+    windowsHide: true,
   })
-  const changed = topUp.split('\n').filter((l) => /\b[1-9]\d*\/\d+ added/.test(l))
-  if (changed.length > 0) log(`firewall top-up: ${changed.length} host(s) refreshed`)
+  child.on('error', (e) => log(`firewall top-up could not start (${(e && e.message) || e})`))
+  child.unref()
 } catch (e) {
   log(`firewall top-up skipped (${(e && e.message) || e})`)
 }

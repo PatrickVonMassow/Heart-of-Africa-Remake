@@ -14,6 +14,14 @@ describe('permission auto-grant', () => {
     }
   })
 
+  it('keeps asking where a bare allow would answer the wrong question', () => {
+    // AskUserQuestion IS the answer; ExitPlanMode needs the plan decision. Granting
+    // either blind feeds an unattended run a hollow reply instead of unblocking it.
+    for (const tool of ['AskUserQuestion', 'ExitPlanMode']) {
+      expect(decide({ tool_name: tool }), tool).toBeNull()
+    }
+  })
+
   // Fail-open: each of these leaves the decision to the harness, which asks.
   it.each([
     ['null', null],
@@ -27,13 +35,24 @@ describe('permission auto-grant', () => {
     expect(decide(input)).toBeNull()
   })
 
-  it('renders the shape the harness reads', () => {
+  it('renders a PermissionRequest DECISION OBJECT — not the PreToolUse field', () => {
+    // The first version emitted the flat `permissionDecision`, which this event
+    // ignores without complaint: the hook fired, the output was dropped, the dialog
+    // appeared anyway. Only the object grants here, so the shape is asserted, not
+    // just the value.
     const out = JSON.parse(render(decide({ tool_name: 'Bash' })))
-    expect(out.hookSpecificOutput).toMatchObject({
-      hookEventName: 'PermissionRequest',
-      permissionDecision: 'allow',
-    })
+    expect(out.hookSpecificOutput.hookEventName).toBe('PermissionRequest')
+    expect(out.hookSpecificOutput.decision).toEqual({ behavior: 'allow' })
+    expect(out.hookSpecificOutput.permissionDecision).toBeUndefined()
     expect(out.hookSpecificOutput.permissionDecisionReason).toBeTruthy()
+  })
+
+  it('never flips the session mode — the classifier is not ours to switch off', () => {
+    // Both reviewers proposed adding a session-scoped setMode so the auto-mode
+    // classifier stops judging. That is circumvention of a safety gate, not
+    // configuration, and it stays out: this hook answers one pending question.
+    const out = render(decide({ tool_name: 'Bash' }))
+    expect(out).not.toMatch(/setMode|updatedPermissions|bypassPermissions/)
   })
 
   it('renders NOTHING when it has no opinion, so the harness falls back to asking', () => {

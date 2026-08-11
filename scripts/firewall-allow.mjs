@@ -81,11 +81,16 @@ export const DEFAULT_TOPUP = [
   // storage.googleapis.com did: `.devcontainer/init-firewall.sh` already lists them,
   // yet after the 22:04 restart the resolved addresses were no longer in the set and
   // the review came back as "allowance exhausted" while the account had 96 % left.
-  // Hence /24, and hence HERE — this list is the one that is re-applied, the boot
-  // script runs once.
-  { host: 'chatgpt.com', net24: true },
-  { host: 'auth.openai.com', net24: true },
-  { host: 'api.openai.com', net24: true },
+  // NOT as /24, though that was the first attempt (GPT-5.6 Sol, 11.08.2026): a /24
+  // around a Cloudflare anycast address is 256 addresses SHARED with unrelated
+  // proxied hostnames, so it grants far more than the reviewer's endpoint — and it
+  // still misses a rotation into a different block, which is the very thing it was
+  // meant to cover. It buys reach nowhere and gives away reach everywhere. The
+  // re-application is what actually covers rotation, so exact addresses it is, and
+  // HERE rather than in the boot script, which runs once.
+  { host: 'chatgpt.com', net24: false },
+  { host: 'auth.openai.com', net24: false },
+  { host: 'api.openai.com', net24: false },
 ]
 
 /** Per-command ceiling. An `ipset add` is instant; anything slower is stuck. */

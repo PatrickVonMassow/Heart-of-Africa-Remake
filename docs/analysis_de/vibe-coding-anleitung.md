@@ -362,13 +362,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   gemeinsam danebenliegen; die Einigkeit fühlt sich dann an wie ein Beweis.
   → *Prompt:* „Bevor du Versuche vorschlägst: Welcher **eine Test** macht die Ursache **sichtbar**?"
 
-- **Der Erfolg beweist den Weg nicht.** Das Kommando lief durch, also greift die neue Einstellung —
-  nur hattest du in Wahrheit den Freigabe-Dialog weggeklickt. Es wurde gemessen; die Messung konnte
-  die Erklärungen bloß nicht trennen. Verwandt: Eine Einstellung, die einen Zustand nur *anlegt*,
-  erreicht eine schon laufende Sitzung nie — die „Behebung" wird dann mehrfach gemeldet und wirkt kein Mal.
-  → *Prompt:* „Sag **vor** der Messung, welches Ergebnis welche Erklärung **ausschließen** würde. Fällt
-  der Wert unter allen gleich aus, ist er kein Beleg — und wo ich zustimmen kann, ist ein Erfolg gar
-  kein Signal über die Automatik."
+- **Der Erfolg beweist den Weg nicht.** Es lief durch, also greift die neue Einstellung — nur hattest
+  du den Dialog weggeklickt. Gemessen wurde; die Messung konnte die Erklärungen nur nicht trennen.
+  → *Prompt:* „Sag **vor** der Messung, welches Ergebnis welche Erklärung **ausschließen** würde.
+  Fällt der Wert unter allen gleich aus, ist er kein Beleg."
 
 - **Zwei Aufträge für einen Fehler.** Fällt derselbe Mangel erneut auf, schreibst du ihn arglos
   ein zweites Mal auf — sichtbar wird das erst, wenn beide Ergebnisse aufeinandertreffen.
