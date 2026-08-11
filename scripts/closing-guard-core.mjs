@@ -378,22 +378,40 @@ export function tickClaim({ toolName, toolInput, tasksText } = {}) {
 // A checklist that only asks WHETHER each step happened is satisfied by a
 // cleanup performed AFTER the one green regression — and the tag then carries
 // changes nothing ever tested. So the second regression is its own step, and its
-// position is CHECKED: its evidence must name a commit or a timestamp that lies
-// after the youngest cleanup step, or the step does not count.
+// POSITION is checked.
+//
+// WHAT "AFTER" CAN HONESTLY BE CHECKED AGAINST (four-eyes review 11.08.2026,
+// GPT-5.6 Sol). A commit's own DATE is the wrong clock: the closing state is
+// keyed to the commit being tagged, the cleanup steps are recorded after that
+// commit exists, so a regression naming the very state it tested would read as
+// "too old", while any unrelated newer commit would read as fine. Two things
+// can be judged without git, and both are:
+//   - THE COMMIT NAMED IS THE ONE BEING CLOSED. The state is per-commit, so the
+//     cleanup recorded in it landed at or before that commit; a LARGE run on it
+//     therefore covers the cleanup. A run on any OTHER commit proves nothing.
+//   - EVERY TIME NAMED LIES AFTER THE CLEANUP. Cleanup steps are recorded when
+//     the cleanup is done, so their youngest record time is a lower bound for
+//     "the cleanup existed". The EARLIEST time the evidence names must beat it —
+//     earliest, because "report 2026-08-12: run of 2026-08-10" must not certify
+//     a pre-cleanup run by quoting a later date somewhere in the sentence.
+// The step's own record time is only ever used as a NECESSARY condition (it is
+// an upper bound of the run, never a lower one): a step recorded before a
+// cleanup step cannot describe a run that came after it.
 
 /** The cleanup steps the second regression must come after. */
 export const CLEANUP_STEP_IDS = ['dead-code', 'stale-doc', 'stale-comment', 'md-audit', 'cleanup-blind-parallel']
 /** The step whose POSITION is checked, not merely its presence. */
 export const AFTER_CLEANUP_STEP_ID = 'regression-after-cleanup'
 
-/** An ISO-ish date or date-time anywhere in a text (`2026-08-11`, `2026-08-11T14:03:00Z`). */
-const TIMESTAMP_IN_TEXT = /\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?)?\b/
+/** An ISO-ish date or date-time (`2026-08-11`, `2026-08-11T14:03:00Z`, `2026-08-11 14:03`). */
+const TIMESTAMP_IN_TEXT = /\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?\b/g
 /**
  * A commit sha: 7-40 hex characters WITH at least one digit. The digit is what
  * separates a sha from an English word that happens to be all-hex (`defaced`,
- * `deadbeef`) — evidence is prose, and a word must not pass as an anchor.
+ * `deadbeef`) — evidence is prose, and a word must not read as a commit.
  */
-const SHA_IN_TEXT = /\b(?=[0-9a-f]{7,40}\b)[0-9a-f]*\d[0-9a-f]*\b/i
+const SHA_IN_TEXT = /\b(?=[0-9a-f]{7,40}\b)[0-9a-f]*\d[0-9a-f]*\b/gi
+const DAY_MS = 86_400_000
 
 /** Milliseconds of an ISO-ish string, or null. Total: anything unparseable → null. */
 function parseTime(value) {
@@ -403,53 +421,104 @@ function parseTime(value) {
 }
 
 /**
- * The anchor a `regression-after-cleanup` evidence names: the point in time the
- * run can be pinned to. A named TIMESTAMP wins (it dates the run itself); a
- * named COMMIT is resolved through `commitTimes` when the caller could look it
- * up, and otherwise falls back to when the step was RECORDED — which is still
- * an honest lower bound, since a step is recorded after it was done.
- * Total: no anchor → null.
+ * Milliseconds of a timestamp TOKEN, read as UTC when it carries no zone, so
+ * the same evidence is judged identically on every machine.
  */
-export function evidenceAnchor(entry, commitTimes = null) {
-  if (!entry || typeof entry !== 'object') return null
-  const evidence = typeof entry.evidence === 'string' ? entry.evidence : ''
-  const stamp = TIMESTAMP_IN_TEXT.exec(evidence)
-  if (stamp) {
-    const time = parseTime(stamp[0])
-    if (time !== null) return { kind: 'timestamp', token: stamp[0], time }
-  }
-  const sha = SHA_IN_TEXT.exec(evidence)
-  if (sha) {
-    const known = commitTimes && typeof commitTimes === 'object' ? parseTime(commitTimes[sha[0].toLowerCase()]) : null
-    return { kind: 'commit', token: sha[0], time: known !== null ? known : parseTime(entry.at) }
-  }
-  return null
+function parseStamp(token) {
+  const normalized = token.replace(' ', 'T')
+  const dateOnly = !normalized.includes('T')
+  if (dateOnly) return { time: parseTime(`${normalized}T00:00:00Z`), dateOnly: true }
+  const zoned = /(?:Z|[+-]\d{2}:?\d{2})$/.test(normalized) ? normalized : `${normalized}Z`
+  return { time: parseTime(zoned), dateOnly: false }
 }
 
 /**
- * Why the recorded `regression-after-cleanup` does NOT count, or '' when it
- * does. Total by contract: anything unreadable → '' (fail-open — a guard bug
- * must not trap a release either).
+ * Every anchor an evidence text names: the commit shas and the timestamps, with
+ * the EARLIEST timestamp singled out (that is the one the order is judged by).
+ * Total by contract: anything unreadable → empty lists.
  */
-export function afterCleanupProblem(steps, commitTimes = null) {
+export function evidenceAnchors(text) {
+  const out = { commits: [], times: [], earliest: null }
+  try {
+    const s = typeof text === 'string' ? text : ''
+    for (const m of s.matchAll(TIMESTAMP_IN_TEXT)) {
+      const { time, dateOnly } = parseStamp(m[0])
+      if (time === null) continue
+      const stamp = { token: m[0], time, dateOnly }
+      out.times.push(stamp)
+      if (!out.earliest || time < out.earliest.time) out.earliest = stamp
+    }
+    for (const m of s.matchAll(SHA_IN_TEXT)) {
+      const sha = m[0].toLowerCase()
+      // A date's digits are not a sha, and a token already read as a time is not one either.
+      if (!out.commits.includes(sha)) out.commits.push(sha)
+    }
+  } catch {
+    /* total by contract */
+  }
+  return out
+}
+
+const iso = (ms) => new Date(ms).toISOString()
+
+/**
+ * Why the recorded `regression-after-cleanup` does NOT count for the closing of
+ * `headSha`, or '' when it does. Total by contract: anything unreadable → ''
+ * (a guard bug must not trap a release either).
+ */
+export function afterCleanupProblem(steps, headSha) {
   try {
     const table = steps && typeof steps === 'object' ? steps : {}
     const entry = table[AFTER_CLEANUP_STEP_ID]
     if (!entry || typeof entry !== 'object') return ''
-    const anchor = evidenceAnchor(entry, commitTimes)
-    if (!anchor) {
-      return `its evidence names neither a commit nor a timestamp, so nothing proves it ran AFTER the cleanup — record it as e.g. --evidence "LARGE green on <sha> (2026-08-11), both backends"`
+    const head = typeof headSha === 'string' ? headSha.toLowerCase() : ''
+    const anchors = evidenceAnchors(entry.evidence)
+    const namesHead = anchors.commits.some((sha) => head && head.startsWith(sha))
+    const foreign = anchors.commits.filter((sha) => !(head && head.startsWith(sha)))
+    if (!namesHead && foreign.length) {
+      return `its evidence names commit ${foreign[0]}, which is NOT the commit being closed (${head.slice(0, 12) || 'unknown'}) — a regression on another commit says nothing about this one`
     }
+    if (!namesHead && anchors.times.length === 0) {
+      return `its evidence names neither the commit being closed nor a timestamp, so nothing places it after the cleanup — record it as e.g. --evidence "LARGE green on ${head.slice(0, 12) || '<sha>'}, both backends, 2026-08-11T14:00Z"`
+    }
+
     let youngest = null
+    let undated = ''
     for (const id of CLEANUP_STEP_IDS) {
       const cleanup = table[id]
-      if (!cleanup || typeof cleanup !== 'object') continue
+      if (!cleanup || typeof cleanup !== 'object' || typeof cleanup.evidence !== 'string' || !cleanup.evidence.trim()) continue
       const at = parseTime(cleanup.at)
-      if (at !== null && (youngest === null || at > youngest.at)) youngest = { id, at }
+      if (at === null) {
+        if (!undated) undated = id
+        continue
+      }
+      if (youngest === null || at > youngest.at) youngest = { id, at }
     }
-    if (!youngest || anchor.time === null) return ''
-    if (anchor.time > youngest.at) return ''
-    return `it is anchored to ${anchor.token}, which is NOT after the youngest cleanup step (${youngest.id}, recorded ${new Date(youngest.at).toISOString()}) — a regression run before the cleanup does not test it`
+    // A cleanup step written by an older wrapper carries no record time. Unknown
+    // is not "fine": re-record it rather than let the order go unjudged.
+    if (undated) {
+      return `the cleanup step "${undated}" carries no record time, so nothing can be ordered against it — re-record it: node scripts/closing-guard.mjs --step ${undated} --evidence "<proof>"`
+    }
+    if (!youngest) return '' // no cleanup recorded at all — those missing steps block on their own
+
+    const recordedAt = parseTime(entry.at)
+    if (recordedAt === null) {
+      return `it carries no record time — re-record it: node scripts/closing-guard.mjs --step ${AFTER_CLEANUP_STEP_ID} --evidence "<proof>"`
+    }
+    if (recordedAt <= youngest.at) {
+      return `it was recorded ${iso(recordedAt)}, BEFORE the cleanup step "${youngest.id}" (${iso(youngest.at)}) — a run written down before the cleanup cannot have covered it`
+    }
+    const earliest = anchors.earliest
+    if (earliest) {
+      if (earliest.dateOnly) {
+        if (Math.floor(earliest.time / DAY_MS) <= Math.floor(youngest.at / DAY_MS)) {
+          return `its evidence dates the run ${earliest.token}, the cleanup's own day or earlier ("${youngest.id}", ${iso(youngest.at)}) — a bare date cannot order two runs of one day, so name the time or the commit ${head.slice(0, 12) || ''}`.trim()
+        }
+      } else if (earliest.time <= youngest.at) {
+        return `its evidence dates the run ${earliest.token}, which is NOT after the youngest cleanup step ("${youngest.id}", ${iso(youngest.at)}) — every time the evidence names must lie after the cleanup, so drop or fix the earlier one`
+      }
+    }
+    return ''
   } catch {
     return ''
   }
@@ -462,11 +531,10 @@ export function afterCleanupProblem(steps, commitTimes = null) {
  * for NOTHING — a closing is per-commit, so re-tagging a new commit needs a
  * fresh closing. `regression-after-cleanup` must additionally stand AFTER the
  * cleanup (point 631); when it does not, it is reported missing WITH the reason
- * in `note`. `commitTimes` (sha → ISO string) is what the caller resolved for
- * the shas the evidence names — the core reads no git.
+ * in `note`.
  * Total: bad input → ALL steps missing (safest: blocks).
  */
-export function missingSteps(state, headSha, { commitTimes = null } = {}) {
+export function missingSteps(state, headSha) {
   const done = new Set()
   let note = ''
   try {
@@ -482,7 +550,7 @@ export function missingSteps(state, headSha, { commitTimes = null } = {}) {
       }
     }
     if (done.has(AFTER_CLEANUP_STEP_ID)) {
-      note = afterCleanupProblem(steps, commitTimes)
+      note = afterCleanupProblem(steps, headSha)
       if (note) done.delete(AFTER_CLEANUP_STEP_ID)
     }
   } catch {
@@ -516,12 +584,12 @@ function remedy(missing, retry) {
  * error is the wrapper's to swallow — this function never throws on partial
  * input (returns {block:false} on anything it cannot evaluate).
  */
-export function evaluate({ command, state, headSha, toolName, toolInput, tasksText, commitTimes } = {}) {
+export function evaluate({ command, state, headSha, toolName, toolInput, tasksText } = {}) {
   try {
     const tagAct = isVersionTagCommand(command)
     const tickedPoints = tagAct ? [] : closingTickClaim({ toolName, toolInput, tasksText })
     if (!tagAct && tickedPoints.length === 0) return { block: false, reason: '' }
-    const missing = missingSteps(state, headSha, { commitTimes })
+    const missing = missingSteps(state, headSha)
     if (missing.length === 0) return { block: false, reason: '' }
     const forCommit = headSha ? ` for commit ${String(headSha).slice(0, 12)}` : ''
     if (tagAct) {

@@ -22,14 +22,15 @@ const git = (args) => spawnSync('git', args, { windowsHide: true, cwd: repo, enc
 const statePath = () => resolve(repo, '.claude', 'closing-state.json')
 const writeState = (state) => writeFileSync(statePath(), JSON.stringify(state, null, 2))
 // A COMPLETE closing is also an ORDERED one (point 631): every cleanup step is
-// dated, and the second regression names a run that came after them.
+// dated, and the second regression names the commit being closed and a time
+// after them.
 const completeState = (commit) => ({
   commit,
   steps: Object.fromEntries(
     CLOSING_STEPS.map((s) => [
       s.id,
       s.id === 'regression-after-cleanup'
-        ? { evidence: 'LARGE green, both backends, 2026-08-11T12:00:00Z', at: '2026-08-11T12:05:00.000Z' }
+        ? { evidence: `LARGE green on ${commit}, both backends, 2026-08-11T12:00:00Z`, at: '2026-08-11T12:05:00.000Z' }
         : { evidence: `did ${s.id}`, at: '2026-08-11T10:00:00.000Z' },
     ]),
   ),
@@ -160,13 +161,20 @@ describe('closing-guard (spawned)', () => {
 
   it('keeps the tag shut when the second regression predates the cleanup, and opens it when it does not', () => {
     // The order check runs in the SPAWNED guard, on the state file it reads
-    // itself — the sequence point 631 anchors, proven end to end.
+    // itself and against the REAL head of this repository — the sequence point
+    // 631 anchors, proven end to end.
     const stale = completeState(head)
-    stale.steps['regression-after-cleanup'] = { evidence: 'LARGE green, both backends, 2026-08-11T09:00:00Z', at: '2026-08-11T09:05:00.000Z' }
+    stale.steps['regression-after-cleanup'] = { evidence: `LARGE green on ${head}, 2026-08-11T09:00:00Z`, at: '2026-08-11T09:05:00.000Z' }
     writeState(stale)
     const reason = reasonOf(callGuard('Bash', { command: 'git tag -a v0.3 -m x' }))
     expect(reason).toContain('regression-after-cleanup')
     expect(reason).toContain('RECORDED BUT OUT OF ORDER')
+
+    // a run on SOME OTHER commit is no proof either, however recent
+    const foreign = completeState(head)
+    foreign.steps['regression-after-cleanup'] = { evidence: 'LARGE green on 1234abc, both backends, 2026-08-11T12:00:00Z', at: '2026-08-11T12:05:00.000Z' }
+    writeState(foreign)
+    expect(reasonOf(callGuard('Bash', { command: 'git tag -a v0.3 -m x' }))).toContain('NOT the commit being closed')
 
     writeState(completeState(head))
     expect(callGuard('Bash', { command: 'git tag -a v0.3 -m x' }).stdout.trim()).toBe('')
@@ -205,8 +213,10 @@ describe('closing-guard (spawned)', () => {
     // The second regression is recorded like any step, but an evidence that
     // pins it to nothing does not count — and says so at the moment of writing.
     expect(run('--step', 'regression-after-cleanup', '--evidence', 'ran it again').stdout).toContain('does NOT count')
-    expect(run('--status').stdout).toContain('neither a commit nor a timestamp')
-    expect(run('--step', 'regression-after-cleanup', '--evidence', 'LARGE green 2026-08-11T12:00:00Z, both backends').stdout).toContain(`1/${CLOSING_STEPS.length}`)
+    expect(run('--status').stdout).toContain('neither the commit being closed nor a timestamp')
+    // the record time the CLI stamps is what the order is judged by, so a run
+    // named by the real head counts as soon as it is written
+    expect(run('--step', 'regression-after-cleanup', '--evidence', `LARGE green on ${head}, both backends`).stdout).toContain(`1/${CLOSING_STEPS.length}`)
     expect(run('--status').stdout).toContain('[x] regression-after-cleanup')
   })
 })

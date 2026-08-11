@@ -753,7 +753,7 @@ At the end:
   for the tag. v0.2 skipped the cleanup; a skipped second regression tags untested
   changes. The checklist is machine-readable in `scripts/closing-guard-core.mjs`
   (`CLOSING_STEPS`) and its ORDER is checked: the `regression-after-cleanup` evidence
-  must NAME a commit or timestamp after the youngest cleanup step. A PreToolUse guard
+  must NAME the tagged commit or a time after the cleanup. A PreToolUse guard
   (`scripts/closing-guard.mjs`) DENIES a version tag (created, pushed, `poc` moved) AND
   the tick of a point that itself delivers one, until EVERY step is recorded for
   that commit. Drive it: `--status`, then `--step <id> --evidence "<proof>"`; a step a
