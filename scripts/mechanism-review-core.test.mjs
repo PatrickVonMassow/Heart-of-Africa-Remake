@@ -14,12 +14,15 @@ import {
   formatMechanismReviewVerdict,
   isMechanismPath,
   KNOWN_FLAGS,
+  MERGE_ACCOUNTING_SINCE,
   mechanismPathsIn,
   modelFromTrailers,
+  modelsFromTrailers,
   MODES,
   nearestFlag,
   parseArgs,
   parseModel,
+  receiptBalances,
   sameModel,
   validateMode,
   validateRecord,
@@ -210,6 +213,9 @@ describe('validateRecord', () => {
   })
 })
 
+/** A receipt in exactly the shape blind-merge.mjs prints for a balanced union. */
+const RECEIPT = '3 A + 2 B entries → 4 union entries (2 merged, 2 only A, 1 only B): every input entry accounted for'
+
 describe('evaluateMechanismReview', () => {
   const commit = (over = {}) => ({
     sha: 'c'.repeat(40),
@@ -225,7 +231,9 @@ describe('evaluateMechanismReview', () => {
     model: 'Fable 5',
     verdict: 'merge',
     evidence: 'checked the fast path against the unit layer',
-    at: 2000,
+    // Written since the merge rule landed, so a blind-parallel row here owes its
+    // merger and its count (the older rows are grandfathered by date).
+    at: MERGE_ACCOUNTING_SINCE + 2000,
     authoredBy: 'Claude Opus 5',
     ...over,
   })
@@ -261,6 +269,139 @@ describe('evaluateMechanismReview', () => {
     expect(v.block).toBe(true)
     expect(v.findings[0].kind).toBe('self-review')
     expect(formatMechanismReviewVerdict(v)).toMatch(/a self-review is not a review/)
+  })
+
+  it('REFUSES a hand-edited row whose UNION was merged by an author of it', () => {
+    // The ledger is a tracked text file; the recorder's refusal of a self-merge
+    // has to hold at the gate too, or an edited row walks straight past it
+    // (four-eyes finding on point 634).
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [record({ mode: 'blind-parallel', mergedBy: 'Opus 5', accounting: RECEIPT })],
+    })
+    expect(v.block).toBe(true)
+    expect(v.findings[0].kind).toBe('self-review')
+    expect(formatMechanismReviewVerdict(v)).toMatch(/self-merge is where a finding disappears/)
+  })
+
+  it('takes the same row once a third model merged it, or the fallback is recorded', () => {
+    const pending = [commit({ coveringRecordShas: ['c'.repeat(40)] })]
+    const third = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: pending,
+      records: [record({ mode: 'blind-parallel', mergedBy: 'GPT-5.6 Sol', accounting: RECEIPT })],
+    })
+    expect(third.block).toBe(false)
+    const fallback = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: pending,
+      records: [
+        record({
+          mode: 'blind-parallel',
+          mergedBy: 'Opus 5',
+          accounting: RECEIPT,
+          mergeFallback: 'Sol was unreachable',
+        }),
+      ],
+    })
+    expect(fallback.block).toBe(false)
+  })
+
+  it('leaves the rows written BEFORE the rule landed alone, and no younger one', () => {
+    const pending = [commit({ coveringRecordShas: ['c'.repeat(40)] })]
+    // A row from before MERGE_ACCOUNTING_SINCE carries neither field and stands.
+    const legacy = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: pending,
+      records: [record({ mode: 'blind-parallel', at: MERGE_ACCOUNTING_SINCE - 1 })],
+    })
+    expect(legacy.block).toBe(false)
+    // A row written since owes both — leaving the fields out is not a legacy row.
+    for (const over of [
+      {},
+      { mergedBy: 'GPT-5.6 Sol' },
+      { mergedBy: 'GPT-5.6 Sol', accounting: 'I counted them all' },
+    ]) {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: pending,
+        records: [record({ mode: 'blind-parallel', at: MERGE_ACCOUNTING_SINCE + 1, ...over })],
+      })
+      expect(v.block, JSON.stringify(over)).toBe(true)
+      expect(v.findings[0].kind).toBe('self-review')
+    }
+    expect(
+      formatMechanismReviewVerdict(
+        evaluateMechanismReview({
+          baseline: 'b',
+          head: 'h',
+          pendingCommits: pending,
+          records: [record({ mode: 'blind-parallel', at: MERGE_ACCOUNTING_SINCE + 1, mergedBy: 'GPT-5.6 Sol' })],
+        }),
+      ),
+    ).toMatch(/no count of it/)
+  })
+
+  it('does NOT read a row with no timestamp as a legacy one', () => {
+    // Omitting `at` together with the merger and the count was a way past every
+    // check (four-eyes review, third round): unstamped is not old.
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [{ sha: 'c'.repeat(40), model: 'Fable 5', verdict: 'merge', mode: 'blind-parallel' }],
+    })
+    expect(v.block).toBe(true)
+  })
+
+  it('judges the two-model FALLBACK instead of accepting any word in the field', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [record({ mode: 'blind-parallel', mergedBy: 'Opus 5', accounting: RECEIPT, mergeFallback: 'x' })],
+    })
+    expect(v.block).toBe(true)
+  })
+
+  it('refuses a receipt whose numbers do not add up', () => {
+    const cooked = '3 A + 2 B entries → 4 union entries (1 merged, 1 only A, 1 only B): every input entry accounted for'
+    expect(receiptBalances(cooked)).toBe(false)
+    expect(receiptBalances(RECEIPT)).toBe(true)
+    // and the arithmetic edges the shape alone would wave through
+    expect(receiptBalances('1 A + 1 B entries → 2 union entries (0 merged, 2 only A, 0 only B): every input entry accounted for')).toBe(false)
+    expect(receiptBalances('0 A + 0 B entries → 3 union entries (0 merged, 0 only A, 0 only B): every input entry accounted for')).toBe(false)
+    // The union's SIZE follows from the dispositions: two entries that were not
+    // merged cannot share one union entry, and folds cannot outnumber the pairs.
+    expect(receiptBalances('1 A + 1 B entries → 1 union entries (0 merged, 1 only A, 1 only B): every input entry accounted for')).toBe(false)
+    expect(receiptBalances('2 A + 2 B entries → 4 union entries (4 merged, 0 only A, 0 only B): every input entry accounted for')).toBe(false)
+    expect(receiptBalances('2 A + 2 B entries → 2 union entries (4 merged, 0 only A, 0 only B): every input entry accounted for')).toBe(true)
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [record({ mode: 'blind-parallel', mergedBy: 'GPT-5.6 Sol', accounting: cooked })],
+    })
+    expect(v.block).toBe(true)
+  })
+
+  it('refuses a merge by a SECOND co-author of the commit', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [
+        commit({ coveringRecordShas: ['c'.repeat(40)], authorModels: ['Claude Opus 5', 'Claude Fable 5'] }),
+      ],
+      records: [record({ mode: 'blind-parallel', mergedBy: 'Fable 5', accounting: RECEIPT })],
+    })
+    expect(v.block).toBe(true)
+    expect(formatMechanismReviewVerdict(v)).toMatch(/self-merge/)
   })
 
   it('BLOCKS on a do-not-merge verdict as loudly as on a missing record', () => {
@@ -587,9 +728,89 @@ describe('validateRecord carries the mode', () => {
     expect(v.errors.join('\n')).toContain('--mode')
   })
 
+  /** A blind-parallel record names the third model AND carries the count. */
+  const counted = {
+    mode: 'blind-parallel',
+    mergedBy: 'GPT-5.6 Sol',
+    accounting: '7 A + 5 B entries → 9 union entries (6 merged, 4 only A, 2 only B): every input entry accounted for',
+  }
+
   it('accepts it once the mode is named', () => {
     expect(validateRecord({ ...good, mode: 'review' })).toEqual({ ok: true, errors: [] })
-    expect(validateRecord({ ...good, mode: 'blind-parallel' }).ok).toBe(true)
+    expect(validateRecord({ ...good, ...counted }).ok, validateRecord({ ...good, ...counted }).errors).toBe(true)
+  })
+
+  it('refuses a blind-parallel record that names no merging model', () => {
+    const v = validateRecord({ ...good, ...counted, mergedBy: '' })
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toMatch(/no merging model named/i)
+  })
+
+  it('refuses a merge by either of the two models that wrote the lists', () => {
+    for (const who of ['Fable 5', 'Claude Opus 5']) {
+      const v = validateRecord({ ...good, ...counted, mergedBy: who })
+      expect(v.ok, who).toBe(false)
+      expect(v.errors.join('\n')).toMatch(/may not merge them/i)
+    }
+  })
+
+  it('refuses a merge by a SECOND model named in the trailers, not only the first', () => {
+    // modelFromTrailers reads one author; a commit can name two, and the second
+    // must not be able to merge its own list (four-eyes finding on this point).
+    const v = validateRecord({
+      ...good,
+      ...counted,
+      authors: ['Claude Opus 5', 'Claude Fable 5'],
+      mergedBy: 'Fable 5',
+    })
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toMatch(/may not merge them/i)
+  })
+
+  it('REFUSES A BLIND-PARALLEL RECORD WITH NO COUNT, and one whose count did not balance', () => {
+    const v = validateRecord({ ...good, ...counted, accounting: '' })
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toMatch(/COUNTED, not trusted/)
+    const red = validateRecord({
+      ...good,
+      ...counted,
+      accounting: '7 A + 5 B entries → 8 union entries: 1 accounting error(s) — the union does not account',
+    })
+    expect(red.ok).toBe(false)
+    expect(red.errors.join('\n')).toMatch(/not the line blind-merge.mjs prints/)
+    expect(validateRecord({ ...good, ...counted, accounting: 'I merged them carefully' }).ok).toBe(false)
+  })
+
+  it('lets the recorded two-model fallback through, and refuses one naming no model', () => {
+    const fb = { ...good, ...counted, mergedBy: 'Fable 5' }
+    expect(validateRecord({ ...fb, mergeFallback: 'GPT-5.6 Sol was unreachable all session' }).ok).toBe(true)
+    expect(validateRecord({ ...fb, mergeFallback: 'nobody else was around' }).ok).toBe(false)
+    expect(validateRecord({ ...fb, mergeFallback: 'none' }).ok).toBe(false)
+  })
+
+  it('refuses a merging model or a count under a review, which folds nothing', () => {
+    const v = validateRecord({ ...good, mode: 'review', mergedBy: 'GPT-5.6 Sol' })
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toMatch(/meaningless under --mode review/i)
+    const c = validateRecord({ ...good, mode: 'review', accounting: counted.accounting })
+    expect(c.ok).toBe(false)
+    expect(c.errors.join('\n')).toMatch(/--accounting is meaningless/i)
+  })
+
+  it('does not blame the merger when the mode itself is missing', () => {
+    // Same reason as the framing: two errors for one mistake sends the reader
+    // to fix the wrong flag.
+    expect(validateRecord(good).errors.filter((e) => /merg|accounting/i.test(e))).toHaveLength(0)
+  })
+
+  it('reads every Claude co-author out of the trailers, not just the first', () => {
+    expect(modelsFromTrailers('Claude Opus 5 <a@b>; Claude Fable 5 <c@d>')).toEqual([
+      'Claude Opus 5 <a@b>',
+      'Claude Fable 5 <c@d>',
+    ])
+    expect(modelsFromTrailers('Someone Else <x@y>')).toEqual([])
+    // The single-author read stays what it was — the gate compares one to one.
+    expect(modelFromTrailers('Claude Opus 5 <a@b>; Claude Fable 5 <c@d>')).toBe('Claude Opus 5 <a@b>')
   })
 
   it('still refuses a self-review, whichever mode is claimed', () => {

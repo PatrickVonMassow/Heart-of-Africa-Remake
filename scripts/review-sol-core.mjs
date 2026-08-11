@@ -187,7 +187,11 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review' } = {}
     '',
     divergent
       ? 'This is a DIVERGENT step: produce your OWN complete list from the inputs, do not\n' +
-        'check somebody else\'s. Name what could go wrong that nobody has written down.'
+        "check somebody else's. Name what could go wrong that nobody has written down.\n" +
+        'Write the list as ONE ENTRY PER LINE in the form `B<n> | <file> | <the defect in\n' +
+        'one line>`, numbered B1, B2, … — your list is list B. A THIRD model merges it with\n' +
+        'list A and every entry is then accounted for by its id (CLAUDE.md §6), so an entry\n' +
+        'without one cannot be counted and would simply disappear.'
       : 'This is a CONVERGENT review of ONE artefact: is the diff correct, does it match its\n' +
         'spec, are its tests real tests, what breaks that nobody tested?',
     '',

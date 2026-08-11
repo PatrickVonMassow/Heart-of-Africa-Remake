@@ -211,8 +211,9 @@ export const DIVERGENT_STEP_QUESTION = Object.freeze([
   '  both models from the same inputs to their own complete result, neither seeing the',
   '  other\'s, then merged by MEANING (CLAUDE.md §6). A reviewer handed a finished list',
   '  checks THAT LIST — which is the failure the rule exists to prevent.',
-  '  Record which form the verdict covers: mechanism-review.mjs --record … --mode',
-  '  <review|blind-parallel>.',
+  '  The MERGE goes to the model that wrote NEITHER list and is COUNTED, entry by entry:',
+  '  blind-merge.mjs --a <A> --b <B> --union <U>. Record which form the verdict covers:',
+  '  mechanism-review.mjs --record … --mode <review|blind-parallel> --merged-by "<model>".',
 ])
 
 /** First line of a reason, shortened — the report is a scan, not a transcript. */
