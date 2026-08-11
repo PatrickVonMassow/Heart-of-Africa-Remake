@@ -24,7 +24,7 @@ import {
   staleLockVerdict,
   REFUSALS,
 } from './worktree-cleanup-core.mjs'
-import { cleanupWorktree, detachLinks, pathExists, readIdentity } from './worktree-cleanup.mjs'
+import { cleanupWorktree, detachLinks, pathExists, readIdentity, parseCleanupArgs } from './worktree-cleanup.mjs'
 
 const ROOT = 'C:/repo'
 const WT = `${ROOT}/.claude/worktrees/agent-1`
@@ -765,5 +765,42 @@ describe('--expect, on a THROWAWAY repository', () => {
     expect(r.ok).toBe(false)
     expect(r.verdict.reason).toMatch(/not this command's/)
     expect(existsSync(worktree)).toBe(true)
+  })
+})
+
+// THE PLAIN CALL IS THE ONE THE LANDING MAKES, and it was the one that broke.
+// `indexOf` answers -1 for an absent `--expect`, so the unguarded skip of
+// `expectAt + 1` threw away argument 0 — the path — and `land-point.mjs`'s
+// cleanup step refused with "no path was given" the first time it ran.
+describe('the cleanup command line (parseCleanupArgs)', () => {
+  it('takes the path from a plain call, which is what the landing makes', () => {
+    const got = parseCleanupArgs(['/tmp/agent-1'])
+    expect(got.target).toBe('/tmp/agent-1')
+    expect(got.error).toBe('')
+    expect(got.dry).toBe(false)
+    expect(got.expected).toBe(null)
+  })
+
+  it('takes the path whatever order the flags come in', () => {
+    expect(parseCleanupArgs(['--dry', '/tmp/agent-2']).target).toBe('/tmp/agent-2')
+    expect(parseCleanupArgs(['/tmp/agent-3', '--dry']).target).toBe('/tmp/agent-3')
+    expect(parseCleanupArgs(['--dry', '/tmp/agent-4']).dry).toBe(true)
+  })
+
+  it('skips the value after --expect without swallowing the path', () => {
+    const record = '{"branch":"feat/x","head":"abc"}'
+    const got = parseCleanupArgs(['/tmp/agent-5', '--expect', record])
+    expect(got.target).toBe('/tmp/agent-5')
+    expect(got.expected).toEqual({ branch: 'feat/x', head: 'abc' })
+
+    const flagFirst = parseCleanupArgs(['--expect', record, '/tmp/agent-6'])
+    expect(flagFirst.target).toBe('/tmp/agent-6')
+    expect(flagFirst.expected).toEqual({ branch: 'feat/x', head: 'abc' })
+  })
+
+  it('refuses rather than guesses when there is no path or the record is unreadable', () => {
+    expect(parseCleanupArgs([]).error).toMatch(/no path/)
+    expect(parseCleanupArgs(['--dry']).error).toMatch(/no path/)
+    expect(parseCleanupArgs(['/tmp/agent-7', '--expect', 'not json']).error).toMatch(/identity record/)
   })
 })

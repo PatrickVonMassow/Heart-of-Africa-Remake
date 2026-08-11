@@ -482,8 +482,18 @@ function tryPrune(runGit = git) {
   }
 }
 
-if (isMainModule(import.meta.url)) {
-  const args = process.argv.slice(2)
+/**
+ * THE COMMAND LINE — `<path> [--dry] [--expect <json>]`. PURE, and separate from
+ * the block below BECAUSE it was wrong: `indexOf` answers -1 for an absent
+ * `--expect`, so an unguarded `i !== expectAt + 1` excluded index 0 — the PATH —
+ * and every plain `worktree-cleanup.mjs <path>` refused with "no path was given".
+ * The landing's own cleanup step is that plain call, so it failed the first time
+ * it ran. Inline argument parsing is what hid it; this is testable.
+ *
+ * Returns `{ target, dry, expected, error }` — `error` set means refuse.
+ */
+export function parseCleanupArgs(argv = []) {
+  const args = Array.isArray(argv) ? argv.map(String) : []
   const dry = args.includes('--dry')
   const expectAt = args.indexOf('--expect')
   let expected = null
@@ -491,11 +501,22 @@ if (isMainModule(import.meta.url)) {
     try {
       expected = JSON.parse(args[expectAt + 1] ?? '')
     } catch {
-      console.error('worktree-cleanup: --expect needs the caller\'s identity record as JSON')
-      process.exit(2)
+      return { target: '', dry, expected: null, error: '--expect needs the caller\'s identity record as JSON' }
     }
   }
-  const target = args.filter((a, i) => !a.startsWith('--') && i !== expectAt + 1)[0]
+  // The value AFTER `--expect` is the only non-flag argument that is not the path,
+  // and it is skipped only when `--expect` is actually there.
+  const valueAt = expectAt >= 0 ? expectAt + 1 : -1
+  const target = args.filter((a, i) => !a.startsWith('--') && i !== valueAt)[0] ?? ''
+  return { target, dry, expected, error: target ? '' : 'no path was given' }
+}
+
+if (isMainModule(import.meta.url)) {
+  const { target, dry, expected, error } = parseCleanupArgs(process.argv.slice(2))
+  if (error) {
+    console.error(`worktree-cleanup: ${error}`)
+    process.exit(2)
+  }
   try {
     const result = cleanupWorktree(target, { dry, expected })
     if (!result.ok) {
