@@ -331,9 +331,22 @@ export function takeCleanupLock(target, { git: runGit = git, probe = probePid, r
   }
   const second = tryLock()
   // A second failure means somebody took it in between — theirs, and it stays.
-  return second
-    ? { locked: false, reason: mine, note: `the lock was taken again while a dead one was cleared: ${second}` }
-    : { locked: true, reason: mine, note: `cleared a dead lock — ${verdict.why}` }
+  if (second) return { locked: false, reason: mine, note: `the lock was taken again while a dead one was cleared: ${second}` }
+
+  // AND CONFIRM THE LOCK IN PLACE IS OURS (fifth review). Two cleanups meeting the
+  // same stale lock both read it before either cleared it, so both can reach this
+  // line; `git worktree unlock` names no lock, so the loser cleared the winner's.
+  // Whoever ends up NOT holding its own lock discovers it here — at the one moment
+  // the discovery is free, before anything has been verified or deleted.
+  const nowHeld = String(worktreeEntry(target, runGit)?.locked ?? '').trim()
+  if (nowHeld !== mine) {
+    return {
+      locked: false,
+      reason: mine,
+      note: `another cleanup won the race for that tree — the lock in place is ${nowHeld || 'gone'}, not ours`,
+    }
+  }
+  return { locked: true, reason: mine, note: `cleared a dead lock — ${verdict.why}` }
 }
 
 /**
@@ -379,17 +392,40 @@ export function cleanupWorktree(target, { dry = false, git: runGit = git, expect
     ourLock = taken.reason
     lockNote = taken.note
   }
+  // RELEASE ONLY THE LOCK WE TOOK (fifth review). `git worktree unlock` names no
+  // lock — it clears whatever is in place — so an unconditional release reaches a
+  // lock that is not ours to touch, which is the exact class this point exists to
+  // end. It happens: two cleanups meeting one stale lock both read it before
+  // either cleared it, so the loser can end up releasing the winner's lock while
+  // the winner is still verifying. The winner then refuses (its own
+  // `matchesExpectation` sees a foreign reason), and THAT refusal must not take a
+  // third party's lock with it. So the reason in place is re-read and compared
+  // against ours; anything else is left standing and SAID, because a lock nobody
+  // released is a wedge somebody has to see.
+  let unlockNote = ''
   const tryUnlock = () => {
     if (!weLocked) return
+    let held
+    try {
+      held = String(worktreeEntry(target, runGit)?.locked ?? '').trim()
+    } catch {
+      unlockNote = 'the lock could not be re-read, so it was LEFT IN PLACE'
+      return
+    }
+    if (!held) return // it went with the tree, or somebody already cleared it
+    if (held !== ourLock) {
+      unlockNote = `the lock in place is not ours (${held}) — LEFT ALONE`
+      return
+    }
     try {
       runGit(['worktree', 'unlock', target])
-    } catch {
-      /* already gone with the tree, or it stays and is reported — both are safe */
+    } catch (e) {
+      unlockNote = `our own lock could not be released: ${`${(e && (e.stderr || e.message)) || e}`.split('\n')[0]}`
     }
   }
   const unlockOnRefusal = (reason) => {
     tryUnlock()
-    return refuse(reason)
+    return refuse(`${reason}${unlockNote ? ` [${unlockNote}]` : ''}`)
   }
 
   // A THROW MUST NOT LEAVE THE LOCK BEHIND. Every probe below catches its own
@@ -430,7 +466,8 @@ export function cleanupWorktree(target, { dry = false, git: runGit = git, expect
     tryUnlock()
     if (!dry) tryPrune(runGit)
     const stub = removeStubBranch(target, { dry, git: runGit })
-    return { ok: true, verdict, detached, stub, ...(lockNote ? { lockNote } : {}) }
+    const notes = [lockNote, unlockNote].filter(Boolean).join('; ')
+    return { ok: true, verdict, detached, stub, ...(notes ? { lockNote: notes } : {}) }
   } catch (e) {
     tryUnlock()
     throw e

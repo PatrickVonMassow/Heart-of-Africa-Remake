@@ -702,6 +702,58 @@ describe('--expect, on a THROWAWAY repository', () => {
     expect(existsSync(worktree)).toBe(true)
   })
 
+  it('a refusal NEVER releases a lock that is no longer ours', () => {
+    // THE RACE THIS PINS (fifth review). Two cleanups meet one stale lock, both
+    // read it before either clears it, so the loser's `worktree unlock` — which
+    // names no lock — clears the WINNER's. The winner then refuses, because its
+    // own verification sees a reason that is not its own. That refusal must not
+    // take the third party's lock with it on the way out.
+    const expected = expectationNow()
+    const foreign = 'claude agent agent-later (pid 424242 start 7)'
+    let swapped = false
+    const r = cleanupWorktree(worktree, {
+      git: (args, cwd) => {
+        const out = run(args, cwd)
+        // We take our lock — and the instant we hold it, the loser of the race
+        // clears it (its `unlock` names no lock) and somebody else takes the tree.
+        if (!swapped && args[0] === 'worktree' && args[1] === 'lock') {
+          swapped = true
+          run(['worktree', 'unlock', worktree])
+          run(['worktree', 'lock', '--reason', foreign, worktree])
+        }
+        return out
+      },
+      expected,
+    })
+    expect(r.ok).toBe(false)
+    expect(r.verdict.reason).toMatch(/git-locked/) // our verification saw a stranger's lock
+    expect(r.verdict.reason).toMatch(/LEFT ALONE/) // and said it did not touch it
+    // And the other party's lock is STILL THERE, untouched.
+    expect(run(['worktree', 'list', '--porcelain'])).toContain(foreign)
+    expect(existsSync(worktree)).toBe(true)
+  })
+
+  it('a cleanup that LOSES the race discovers it before verifying anything', () => {
+    const expected = expectationNow()
+    const stale = formatCleanupLock({ pid: 999_999, startedAt: 1 })
+    run(['worktree', 'lock', '--reason', stale, worktree])
+    const foreign = 'claude agent agent-later (pid 424242 start 7)'
+    const r = cleanupWorktree(worktree, {
+      git: (args, cwd) => {
+        const out = run(args, cwd)
+        // The moment we clear the dead lock, the winner takes the tree.
+        if (args[0] === 'worktree' && args[1] === 'unlock') run(['worktree', 'lock', '--reason', foreign, worktree])
+        return out
+      },
+      expected,
+      probe: () => ({ exists: false, startedAt: null }), // the stale holder is gone
+    })
+    expect(r.ok).toBe(false)
+    expect(r.verdict.reason).toMatch(/could-not-take-the-lock/)
+    expect(run(['worktree', 'list', '--porcelain'])).toContain(foreign)
+    expect(existsSync(worktree)).toBe(true)
+  })
+
   it('does NOT recover a FOREIGN lock, however dead its holder looks', () => {
     const expected = expectationNow()
     run(['worktree', 'lock', '--reason', 'claude agent agent-x (pid 999999 start 1)', worktree])
