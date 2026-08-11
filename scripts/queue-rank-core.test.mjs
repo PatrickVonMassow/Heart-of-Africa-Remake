@@ -235,6 +235,11 @@ describe('the baseline moves only when nothing is outstanding', () => {
     // from one refusal into the next.
     expect(RESTORE_CMD).toBe('git checkout HEAD -- .claude/queue-rank.json')
     expect(recordProvenanceFrom({ headOk: true })).toEqual({ tracked: true, restore: RESTORE_CMD })
+    // Both readable: the STAGED copy wins, since HEAD can be the staler of the
+    // two and restoring it would put a closed point back into the baseline.
+    expect(recordProvenanceFrom({ headOk: true, indexOk: true, known: true }).restore).toBe(
+      'git checkout -- .claude/queue-rank.json',
+    )
     expect(recordProvenanceFrom({ indexOk: true, known: true })).toEqual({
       tracked: true,
       restore: 'git checkout -- .claude/queue-rank.json',

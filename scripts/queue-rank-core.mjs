@@ -72,8 +72,14 @@ export const INSPECT_CMD = `git log --oneline -- ${RANK_RECORD_PATH}`
  * the state instead of at a command.
  */
 export function recordProvenanceFrom({ headOk = false, indexOk = false, removedIn = '', known = false } = {}) {
-  if (headOk) return { tracked: true, restore: RESTORE_CMD }
+  // THE STAGED COPY COMES FIRST (cross-vendor review, eleventh pass). Preferring
+  // HEAD restored an OLDER record over a newer staged one and silenced the gate
+  // with it: HEAD remembers [1, 2], point 2 closes and the narrowed [1] is
+  // staged, 2 reopens, the working copy is lost — and `git checkout HEAD` would
+  // put 2 back into the baseline, so the reopen is never asked about. The index
+  // is what the next commit would record, so it is never the staler of the two.
   if (indexOk) return { tracked: true, restore: `git checkout -- ${RANK_RECORD_PATH}` }
+  if (headOk) return { tracked: true, restore: RESTORE_CMD }
   const at = String(removedIn ?? '').trim()
   // The parent of the commit that removed it — and only where that really is an
   // object id, since a guessed revision is another command that cannot work.

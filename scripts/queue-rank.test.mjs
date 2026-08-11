@@ -36,6 +36,23 @@ describe('the git state the rank record is missing in', () => {
     ).toEqual({ tracked: true, restore: `git checkout HEAD -- ${PATH}` })
   })
 
+  it('prefers the STAGED copy where both are readable — HEAD can be the staler one', () => {
+    // HEAD remembers [1, 2]; the narrowed [1] is staged after 2 closed; 2
+    // reopens and the working copy is lost. Restoring HEAD would put 2 back into
+    // the baseline and the reopen would never be asked about.
+    const out = recordProvenance(
+      PATH,
+      fakeGit({
+        [`cat-file -e HEAD:${PATH}`]: OK(),
+        [`cat-file -p HEAD:${PATH}`]: OK(GOOD),
+        'ls-files --stage': OK(`100644 bbbbbbb 0\t${PATH}`),
+        [`cat-file -p :0:${PATH}`]: OK(JSON.stringify({ ranked: {}, settled: { at: 't', points: [1] } })),
+        'rev-list': OK(''),
+      }),
+    )
+    expect(out).toEqual({ tracked: true, restore: `git checkout -- ${PATH}` })
+  })
+
   it('does not name HEAD when HEAD holds the damage itself', () => {
     // Restoring torn bytes hands the caller from one refusal into the next, so
     // the search falls through — here to the commit before the removal.
