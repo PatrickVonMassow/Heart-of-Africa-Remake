@@ -17,9 +17,14 @@ import {
   assertInside,
   formatRefusal,
   stubBranchFor,
+  CLEANUP_LOCK_LEGACY,
+  formatCleanupLock,
+  matchesExpectation,
+  parseCleanupLock,
+  staleLockVerdict,
   REFUSALS,
 } from './worktree-cleanup-core.mjs'
-import { cleanupWorktree, detachLinks } from './worktree-cleanup.mjs'
+import { cleanupWorktree, detachLinks, pathExists, readIdentity } from './worktree-cleanup.mjs'
 
 const ROOT = 'C:/repo'
 const WT = `${ROOT}/.claude/worktrees/agent-1`
@@ -322,5 +327,443 @@ describe('the incident, replayed on a THROWAWAY repository', () => {
     expect(existsSync(join(worktree, 'node_modules'))).toBe(false)
     expect(existsSync(probe)).toBe(true)
     expect(existsSync(join(worktree, 'dirty.txt'))).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE RE-PROOF INSIDE THE PROCESS THAT DELETES (point 629). The caller checked
+// before it spawned this command; between that answer and the removal a worktree
+// can be picked up again, and only a check INSIDE this process can see that.
+//
+// A BRANCH NAME IS NOT AN IDENTITY (second review, finding 1): branch + unlocked +
+// clean also describes a DIFFERENT checkout standing at the same path, so the
+// expectation carries the head, the admin gitdir and the `.git` file's inode.
+describe('matchesExpectation — pure', () => {
+  const entry = { path: '/repo/.claude/worktrees/agent-a', branch: 'feat/608-x', head: 'abc123', locked: null }
+  const actual = { gitLink: '/repo/.git/worktrees/agent-a', ino: 4711, dev: 66, gitMtime: 900, gitBirth: 880, activeAt: 1000 }
+  const expected = {
+    branch: 'feat/608-x',
+    head: 'abc123',
+    gitLink: '/repo/.git/worktrees/agent-a',
+    ino: 4711,
+    dev: 66,
+    gitMtime: 900,
+    gitBirth: 880,
+    notWrittenAfter: 5000,
+  }
+  const ask = (over = {}) => matchesExpectation({ expected, entry, actual, dirty: false, ...over })
+
+  it('passes the very checkout the caller selected', () => {
+    expect(ask()).toMatchObject({ ok: true })
+  })
+
+  it('changes nothing when the caller expects nothing — orphan removal has no branch to compare', () => {
+    expect(matchesExpectation({ entry: null, dirty: null }).ok).toBe(true)
+    expect(matchesExpectation({ expected: { branch: '  ' }, entry: null }).ok).toBe(true)
+  })
+
+  it('refuses a path git no longer lists', () => {
+    const r = ask({ entry: null })
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/no longer lists/)
+  })
+
+  it('refuses a checkout that moved to another branch, or detached', () => {
+    expect(ask({ entry: { ...entry, branch: 'feat/590-y' } }).ok).toBe(false)
+    expect(ask({ entry: { ...entry, branch: '' } }).ok).toBe(false)
+  })
+
+  it('refuses a checkout locked by anyone else, and accepts only our OWN lock', () => {
+    const locked = { ...entry, locked: 'claude agent (pid 7)' }
+    expect(ask({ entry: locked }).reason).toMatch(/git-locked/)
+    expect(ask({ entry: { ...entry, locked: 'ours' }, ownLock: 'ours' }).ok).toBe(true)
+    expect(ask({ entry: locked, ownLock: 'ours' }).ok).toBe(false)
+  })
+
+  it('refuses a checkout whose HEAD moved — the containment proof was taken on that sha', () => {
+    const r = ask({ entry: { ...entry, head: 'def456' } })
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/head changed/)
+  })
+
+  it('refuses a checkout that is no longer the same linked worktree', () => {
+    expect(ask({ actual: { ...actual, gitLink: '/elsewhere/.git/worktrees/agent-a' } }).ok).toBe(false)
+  })
+
+  it('refuses a REPLACEMENT at the same path — same branch, same admin record, new .git file', () => {
+    // The case a branch name cannot see, and the one measured on a real repo:
+    // remove + add at the same path reuses the record name and never the inode.
+    const r = ask({ actual: { ...actual, ino: 4712 } })
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/REPLACED/)
+  })
+
+  it('refuses when a carried field cannot be re-read at all', () => {
+    expect(ask({ actual: { ...actual, gitLink: null } }).ok).toBe(false)
+    expect(ask({ entry: { ...entry, head: '' }, actual: { ...actual, head: null } }).ok).toBe(false)
+    expect(ask({ actual: { ...actual, activeAt: null } }).ok).toBe(false)
+  })
+
+  it('REFUSES when no file identity was carried at all — no proof is not permission', () => {
+    // Third review, finding A: this comparison used to SKIP itself when nothing
+    // was carried and fall through to ok, and the old test pinned that pass. An
+    // absent proof refuses, and the refusal names what was missing so a platform
+    // that genuinely cannot supply it gets an answer it can act on.
+    const r = matchesExpectation({
+      expected: { ...expected, ino: 0, dev: 0, gitMtime: 0, gitBirth: 0 },
+      entry,
+      actual: { ...actual, ino: 0, dev: 0, gitMtime: 0, gitBirth: 0 },
+      dirty: false,
+    })
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/carried NO file identity/)
+  })
+
+  it('REFUSES when a carried identity field cannot be re-read, naming which', () => {
+    const r = ask({ actual: { ...actual, gitMtime: 0 } })
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/could not be re-read \(gitMtime\)/)
+  })
+
+  it('names which identity proofs actually held', () => {
+    expect(ask().reason).toMatch(/same \.git file \(ino, dev, gitMtime, gitBirth\)/)
+    // A platform that gives only some of them proves only those, and says so.
+    const partial = { ...expected, ino: 0, dev: 0 }
+    const r = matchesExpectation({ expected: partial, entry, actual: { ...actual, ino: 0, dev: 0 }, dirty: false })
+    expect(r.ok).toBe(true)
+    expect(r.reason).toMatch(/same \.git file \(gitMtime, gitBirth\)/)
+  })
+
+  it('catches a replacement that got the SAME inode back — the write time cannot be reused', () => {
+    // Measured on a real repository: a filesystem hands a freed inode straight
+    // back, so remove+add at one path often reproduces the number exactly.
+    const r = ask({ actual: { ...actual, gitMtime: 901 } })
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/REPLACED/)
+  })
+
+  it('treats EVERY identity field the same — each one alone refuses when it differs', () => {
+    // What the code now claims about `gitBirth` (fourth review, finding B): it is
+    // one more field beside device, inode and mtime, NOT an unforgeable stamp. So
+    // it is asserted the way the other three are, and no case here rests on it
+    // being genuine — a conjunction can only refuse more, never less.
+    for (const field of ['ino', 'dev', 'gitMtime', 'gitBirth']) {
+      const r = ask({ actual: { ...actual, [field]: Number(actual[field]) + 1 } })
+      expect(r.ok, `${field} must refuse when it differs`).toBe(false)
+      expect(r.reason).toMatch(/REPLACED/)
+    }
+  })
+
+  it('a genuine birth time is not required — the other three still decide without it', () => {
+    // The platform case Node documents: no birthtime support, so the field is 0.
+    const noBirth = { ...expected, gitBirth: 0 }
+    const same = matchesExpectation({ expected: noBirth, entry, actual: { ...actual, gitBirth: 0 }, dirty: false })
+    expect(same.ok).toBe(true)
+    expect(same.reason).toMatch(/same \.git file \(ino, dev, gitMtime\)/)
+    const moved = matchesExpectation({
+      expected: noBirth,
+      entry,
+      actual: { ...actual, gitBirth: 0, gitMtime: 901 },
+      dirty: false,
+    })
+    expect(moved.ok).toBe(false)
+  })
+
+  it('refuses a tree written into after the caller took its freshness proof', () => {
+    const r = ask({ actual: { ...actual, activeAt: 9000 } })
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/written into/)
+  })
+
+  it('refuses on uncommitted work, and on a dirtiness that could not be read', () => {
+    expect(ask({ dirty: true }).ok).toBe(false)
+    expect(ask({ dirty: null }).ok).toBe(false)
+  })
+})
+
+// A LOCK THAT NAMES ONLY ITSELF WEDGES THE TREE FOREVER (third review, finding B).
+// The asymmetry these cases enforce: a stale lock is annoying and a human can
+// clear it; breaking a LIVE one destroys work. So only OUR lock, whose holder is
+// PROVABLY gone, is ever recovered.
+describe('staleLockVerdict — may a lock in the way be broken?', () => {
+  const ours = formatCleanupLock({ pid: 4711, startedAt: 1000 })
+
+  it('signs the lock with the RUN, not just the command name', () => {
+    expect(ours).toMatch(/pid 4711 start 1000/)
+    expect(parseCleanupLock(ours)).toEqual({ ours: true, pid: 4711, startedAt: 1000 })
+  })
+
+  it('round-trips its own signature, so writer and reader cannot drift apart', () => {
+    for (const pid of [1, 4711, 999_999]) {
+      expect(parseCleanupLock(formatCleanupLock({ pid, startedAt: pid * 3 }))).toEqual({
+        ours: true,
+        pid,
+        startedAt: pid * 3,
+      })
+    }
+  })
+
+  it('NEVER breaks a foreign lock — that is an agent still holding its tree', () => {
+    const r = staleLockVerdict({ reason: 'claude agent agent-x (pid 4711 start 1000)', probe: { exists: false } })
+    expect(r.recoverable).toBe(false)
+    expect(r.why).toMatch(/not this command's/)
+    expect(parseCleanupLock('claude agent agent-x (pid 1 start 2)').ours).toBe(false)
+  })
+
+  it('NEVER claims a lock that merely BEGINS with our name — the whole signature must match', () => {
+    // Fourth review, finding A: a `startsWith` test claimed these as ours, and a
+    // foreign lock that parses as ours becomes breakable the moment its pid is
+    // absent — the one rule the asymmetry says is never bent.
+    const collisions = [
+      'worktree-cleanup-helper (pid 4711 start 1000)',
+      'worktree-cleanup2 verifying and deleting (pid 4711 start 1000)',
+      'worktree-cleanup verifying and deleting (pid 4711 start 1000) — and then something else',
+      'worktree-cleanup verifying and deleting',
+      'worktree-cleanupverifying and deleting (pid 4711 start 1000)',
+    ]
+    for (const reason of collisions) {
+      expect(parseCleanupLock(reason).ours, reason).toBe(false)
+      expect(staleLockVerdict({ reason, probe: { exists: false, startedAt: null } }).recoverable, reason).toBe(false)
+    }
+  })
+
+  it('still recognises the one legacy spelling it wrote, only to say how to clear it', () => {
+    const legacy = staleLockVerdict({ reason: CLEANUP_LOCK_LEGACY, probe: { exists: false } })
+    expect(parseCleanupLock(CLEANUP_LOCK_LEGACY)).toEqual({ ours: true, pid: 0, startedAt: 0 })
+    expect(legacy.recoverable).toBe(false)
+    expect(legacy.why).toMatch(/by hand/)
+  })
+
+  it('breaks OUR lock when its process is gone', () => {
+    const r = staleLockVerdict({ reason: ours, probe: { exists: false, startedAt: null } })
+    expect(r.recoverable).toBe(true)
+    expect(r.why).toMatch(/pid 4711\) is gone/)
+  })
+
+  it('breaks OUR lock when the pid was recycled by a different process', () => {
+    const r = staleLockVerdict({ reason: ours, probe: { exists: true, startedAt: 999_000 } })
+    expect(r.recoverable).toBe(true)
+    expect(r.why).toMatch(/recycled/)
+  })
+
+  it('KEEPS our lock while its holder is still running', () => {
+    const r = staleLockVerdict({ reason: ours, probe: { exists: true, startedAt: 1000 } })
+    expect(r.recoverable).toBe(false)
+    expect(r.why).toMatch(/still running/)
+  })
+
+  it('KEEPS every lock it cannot judge — wedge over destruction', () => {
+    for (const probe of [null, {}, { exists: true, startedAt: null }]) {
+      expect(staleLockVerdict({ reason: ours, probe }).recoverable).toBe(false)
+    }
+    expect(staleLockVerdict({ reason: '' }).recoverable).toBe(false)
+  })
+})
+
+describe('--expect, on a THROWAWAY repository', () => {
+  let tmp
+  let repo
+  let worktree
+  const run = (args, cwd) => execFileSync('git', args, { cwd: cwd ?? repo, encoding: 'utf8', windowsHide: true })
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'hoa-wt-expect-'))
+    repo = join(tmp, 'main')
+    mkdirSync(repo, { recursive: true })
+    run(['init', '-q', '-b', 'main'])
+    run(['config', 'user.email', 'test@example.invalid'])
+    run(['config', 'user.name', 'test'])
+    writeFileSync(join(repo, 'a.txt'), 'a')
+    run(['add', '-A'])
+    run(['commit', '-qm', 'init'])
+    worktree = join(tmp, 'wt')
+    run(['worktree', 'add', '-q', '-b', 'feat/608-x', worktree])
+  })
+
+  afterEach(() => {
+    try {
+      rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+    } catch {
+      /* the OS's problem, not the suite's */
+    }
+  })
+
+  const gitOf = (args, cwd) => run(args, cwd)
+  /** What the caller would carry, read off the real tree. */
+  const expectationNow = () => {
+    const identity = readIdentity(worktree)
+    return {
+      branch: 'feat/608-x',
+      head: run(['rev-parse', 'HEAD'], worktree).trim(),
+      gitLink: identity.gitLink,
+      ino: identity.ino,
+      dev: identity.dev,
+      gitMtime: identity.gitMtime,
+      gitBirth: identity.gitBirth,
+      notWrittenAfter: Date.now() + 60_000,
+    }
+  }
+  const cleanup = (opts) => cleanupWorktree(worktree, { git: gitOf, ...opts })
+
+  it('removes the tree when the expectation still holds, leaving no record and no lock', () => {
+    expect(cleanup({ expected: expectationNow() }).ok).toBe(true)
+    expect(existsSync(worktree)).toBe(false)
+    // The record must go WITH the tree. `git worktree prune` SKIPS a locked
+    // worktree, so a lock still standing here would outlive the directory and no
+    // prune could ever clear it — the same wedge by another road.
+    const listed = run(['worktree', 'list', '--porcelain'])
+    expect(listed).not.toContain(worktree)
+    expect(listed).not.toContain('locked')
+  })
+
+  it("REFUSES a tree that was locked between the caller's check and this command", () => {
+    const expected = expectationNow()
+    run(['worktree', 'lock', '--reason', 'claude agent agent-x (pid 999999 start 1)', worktree])
+    const r = cleanup({ expected })
+    expect(r.ok).toBe(false)
+    // The lock ACQUISITION is what fails here, which is the exclusion working:
+    // a tree somebody else holds cannot even be taken, let alone deleted.
+    expect(r.verdict.reason).toMatch(/could-not-take-the-lock|changed-under-cleanup/)
+    expect(existsSync(worktree)).toBe(true) // the whole point: it is still standing
+  })
+
+  it('REFUSES a tree carrying uncommitted work, and leaves no lock of ours behind', () => {
+    const expected = expectationNow()
+    writeFileSync(join(worktree, 'in-progress.txt'), 'the state nothing can rescue')
+    expect(cleanup({ expected }).ok).toBe(false)
+    expect(existsSync(join(worktree, 'in-progress.txt'))).toBe(true)
+    expect(run(['worktree', 'list', '--porcelain']).includes('locked')).toBe(false)
+  })
+
+  it('REFUSES a tree that moved to another branch', () => {
+    const expected = expectationNow()
+    run(['checkout', '-q', '-b', 'feat/590-y'], worktree)
+    expect(cleanup({ expected }).ok).toBe(false)
+    expect(existsSync(worktree)).toBe(true)
+  })
+
+  it('REFUSES a tree whose HEAD moved on since the caller looked', () => {
+    const expected = expectationNow()
+    writeFileSync(join(worktree, 'more.txt'), 'work')
+    run(['add', '-A'], worktree)
+    run(['commit', '-qm', 'a commit the caller never saw'], worktree)
+    expect(cleanup({ expected }).ok).toBe(false)
+    expect(existsSync(worktree)).toBe(true)
+  })
+
+  it('REFUSES a REPLACEMENT checkout standing at the same path on the same branch', () => {
+    const expected = expectationNow()
+    run(['worktree', 'remove', '--force', worktree])
+    run(['worktree', 'add', '-q', '-B', 'feat/608-x', worktree])
+    const r = cleanup({ expected })
+    expect(r.ok).toBe(false)
+    expect(r.verdict.reason).toMatch(/REPLACED/)
+    expect(existsSync(worktree)).toBe(true)
+  })
+
+  it('still removes a dirty tree when NO expectation is given — the old contract is untouched', () => {
+    writeFileSync(join(worktree, 'leftovers.txt'), 'what a finished agent leaves')
+    expect(cleanup({}).ok).toBe(true)
+    expect(existsSync(worktree)).toBe(false)
+  })
+
+  it('refuses a path whose existence cannot be established, rather than calling it gone', () => {
+    // A stat that fails for any reason other than absence is not absence (second
+    // review, finding 4). `pathExists` is the tri-state probe that decides it.
+    expect(pathExists(worktree)).toBe(true)
+    expect(pathExists(join(worktree, 'nothing-here'))).toBe(false)
+  })
+
+  it('RECOVERS its own lock left behind by a crashed run — the tree is not wedged', () => {
+    // Third review, finding B: a process killed between `worktree lock` and the
+    // unlink used to make the worktree permanently un-cleanable.
+    const expected = expectationNow()
+    run(['worktree', 'lock', '--reason', formatCleanupLock({ pid: 999_999, startedAt: 1 }), worktree])
+    const r = cleanupWorktree(worktree, {
+      git: gitOf,
+      expected,
+      probe: () => ({ exists: false, startedAt: null }), // the crashed run is gone
+    })
+    expect(r.ok).toBe(true)
+    expect(r.lockNote).toMatch(/cleared a dead lock/)
+    expect(existsSync(worktree)).toBe(false)
+  })
+
+  it('does NOT recover its own lock while that run is still alive', () => {
+    const expected = expectationNow()
+    run(['worktree', 'lock', '--reason', formatCleanupLock({ pid: 4711, startedAt: 1000 }), worktree])
+    const r = cleanupWorktree(worktree, {
+      git: gitOf,
+      expected,
+      probe: () => ({ exists: true, startedAt: 1000 }),
+    })
+    expect(r.ok).toBe(false)
+    expect(r.verdict.reason).toMatch(/still running/)
+    expect(existsSync(worktree)).toBe(true)
+  })
+
+  it('a refusal NEVER releases a lock that is no longer ours', () => {
+    // THE RACE THIS PINS (fifth review). Two cleanups meet one stale lock, both
+    // read it before either clears it, so the loser's `worktree unlock` — which
+    // names no lock — clears the WINNER's. The winner then refuses, because its
+    // own verification sees a reason that is not its own. That refusal must not
+    // take the third party's lock with it on the way out.
+    const expected = expectationNow()
+    const foreign = 'claude agent agent-later (pid 424242 start 7)'
+    let swapped = false
+    const r = cleanupWorktree(worktree, {
+      git: (args, cwd) => {
+        const out = run(args, cwd)
+        // We take our lock — and the instant we hold it, the loser of the race
+        // clears it (its `unlock` names no lock) and somebody else takes the tree.
+        if (!swapped && args[0] === 'worktree' && args[1] === 'lock') {
+          swapped = true
+          run(['worktree', 'unlock', worktree])
+          run(['worktree', 'lock', '--reason', foreign, worktree])
+        }
+        return out
+      },
+      expected,
+    })
+    expect(r.ok).toBe(false)
+    expect(r.verdict.reason).toMatch(/git-locked/) // our verification saw a stranger's lock
+    expect(r.verdict.reason).toMatch(/LEFT ALONE/) // and said it did not touch it
+    // And the other party's lock is STILL THERE, untouched.
+    expect(run(['worktree', 'list', '--porcelain'])).toContain(foreign)
+    expect(existsSync(worktree)).toBe(true)
+  })
+
+  it('a cleanup that LOSES the race discovers it before verifying anything', () => {
+    const expected = expectationNow()
+    const stale = formatCleanupLock({ pid: 999_999, startedAt: 1 })
+    run(['worktree', 'lock', '--reason', stale, worktree])
+    const foreign = 'claude agent agent-later (pid 424242 start 7)'
+    const r = cleanupWorktree(worktree, {
+      git: (args, cwd) => {
+        const out = run(args, cwd)
+        // The moment we clear the dead lock, the winner takes the tree.
+        if (args[0] === 'worktree' && args[1] === 'unlock') run(['worktree', 'lock', '--reason', foreign, worktree])
+        return out
+      },
+      expected,
+      probe: () => ({ exists: false, startedAt: null }), // the stale holder is gone
+    })
+    expect(r.ok).toBe(false)
+    expect(r.verdict.reason).toMatch(/could-not-take-the-lock/)
+    expect(run(['worktree', 'list', '--porcelain'])).toContain(foreign)
+    expect(existsSync(worktree)).toBe(true)
+  })
+
+  it('does NOT recover a FOREIGN lock, however dead its holder looks', () => {
+    const expected = expectationNow()
+    run(['worktree', 'lock', '--reason', 'claude agent agent-x (pid 999999 start 1)', worktree])
+    const r = cleanupWorktree(worktree, {
+      git: gitOf,
+      expected,
+      probe: () => ({ exists: false, startedAt: null }),
+    })
+    expect(r.ok).toBe(false)
+    expect(r.verdict.reason).toMatch(/not this command's/)
+    expect(existsSync(worktree)).toBe(true)
   })
 })

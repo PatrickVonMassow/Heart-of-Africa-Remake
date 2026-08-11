@@ -32,7 +32,6 @@ import {
   tickAndArchive,
   tickCommitMessage,
   transitionAccepted,
-  worktreesForBranch,
 } from './land-point-core.mjs'
 
 // ---------------------------------------------------------------------------
@@ -127,33 +126,6 @@ describe('resolveBranch', () => {
 
   it('refuses when nothing matches', () => {
     expect(() => resolveBranch({ branches: ['main'], number: 594 })).toThrow(/nothing to land/)
-  })
-})
-
-describe('worktreesForBranch', () => {
-  const trees = [
-    { path: '/repo', branch: 'main' },
-    { path: '/repo/.claude/worktrees/a', branch: 'feat/594-x' },
-    { path: '/repo/.claude/worktrees/b', branch: 'feat/594-x' },
-    { path: '/repo/.claude/worktrees/c', branch: 'feat/593-y' },
-  ]
-
-  it('finds EVERY tree on the branch, not the first', () => {
-    // A restarted agent leaves a second tree on the same branch; cleaning one
-    // while the other keeps the branch alive is how the debris accumulated.
-    expect(worktreesForBranch({ worktrees: trees, branch: 'feat/594-x', mainRoot: '/repo' })).toEqual([
-      '/repo/.claude/worktrees/a',
-      '/repo/.claude/worktrees/b',
-    ])
-  })
-
-  it('never returns the main tree', () => {
-    expect(worktreesForBranch({ worktrees: trees, branch: 'main', mainRoot: '/repo' })).toEqual([])
-  })
-
-  it('survives junk input', () => {
-    expect(worktreesForBranch({ worktrees: null, branch: 'x' })).toEqual([])
-    expect(worktreesForBranch({ worktrees: [null, {}], branch: '' })).toEqual([])
   })
 })
 

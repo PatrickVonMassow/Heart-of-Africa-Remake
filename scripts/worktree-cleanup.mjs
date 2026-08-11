@@ -3,6 +3,13 @@
 //
 //   node scripts/worktree-cleanup.mjs <path>        remove one worktree safely
 //   node scripts/worktree-cleanup.mjs <path> --dry  say what it would do
+//   node scripts/worktree-cleanup.mjs <path> --expect '<json>'
+//                                                   refuse unless the checkout is
+//                                                   STILL the one the caller
+//                                                   selected — branch, HEAD, the
+//                                                   .git file's identity, nobody
+//                                                   else's lock, clean, and not
+//                                                   written into since (point 629)
 //
 // Call this instead of `git worktree remove` and instead of `rm -rf`. Both of
 // those follow the `node_modules` junction into the MAIN tree and delete the
@@ -10,12 +17,25 @@
 // what makes it safe: DETACH every reparse point inside the tree first (the
 // link goes, its target does not), then remove the tree, then prune git's
 // administrative record.
-import { lstatSync, readdirSync, readlinkSync, rmSync, unlinkSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { lstatSync, readdirSync, readlinkSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { judgeTarget, assertInside, shouldDetach, formatRefusal, insideRoot, stubBranchFor } from './worktree-cleanup-core.mjs'
+import { worktreeActiveAt } from './batch-in-flight.mjs'
+import {
+  judgeTarget,
+  assertInside,
+  formatCleanupLock,
+  matchesExpectation,
+  parseCleanupLock,
+  shouldDetach,
+  staleLockVerdict,
+  formatRefusal,
+  insideRoot,
+  stubBranchFor,
+} from './worktree-cleanup-core.mjs'
+import { probePid } from './batch-singleton.mjs'
 
 /**
  * lstat as the pure rule wants to see it.
@@ -114,13 +134,17 @@ export function detachLinks(root, { dry = false } = {}) {
  *
  * Exported so the Vitest case can drive exactly this path.
  */
-export function removeTreeSafely(root, { dry = false, git: runGit = git, registered = false } = {}) {
+export function removeTreeSafely(root, { dry = false, git: runGit = git, registered = false, weLocked = false } = {}) {
   const detached = detachLinks(root, { dry })
   if (dry) return detached
   let removed = false
   if (registered) {
     try {
-      runGit(['worktree', 'remove', '--force', root])
+      // `--force` twice ONLY where we took the lock ourselves a moment ago (see
+      // `cleanupWorktree`): git refuses to remove a locked tree, and the lock in
+      // the way is then our own. It is never used to override somebody else's —
+      // a foreign lock refuses the removal long before this line.
+      runGit(weLocked ? ['worktree', 'remove', '--force', '--force', root] : ['worktree', 'remove', '--force', root])
       removed = true
     } catch {
       /* a dirty or already-half-gone tree: fall through to the plain delete */
@@ -140,6 +164,95 @@ export function listWorktrees(runGit = git) {
     .split(/\r?\n/)
     .filter((l) => l.startsWith('worktree '))
     .map((l) => l.slice(9).trim())
+}
+
+/** What `git worktree list` says about ONE path right now — { path, branch, head,
+ *  locked } — or null when it lists nothing there. */
+export function worktreeEntry(target, runGit = git) {
+  const want = normPathOf(target)
+  let cur = null
+  for (const line of runGit(['worktree', 'list', '--porcelain']).split(/\r?\n/)) {
+    if (line.startsWith('worktree ')) {
+      if (cur && normPathOf(cur.path) === want) return cur
+      cur = { path: line.slice(9).trim(), branch: '', head: '', locked: null }
+    } else if (line.startsWith('HEAD ') && cur) {
+      cur.head = line.slice(5).trim()
+    } else if (line.startsWith('branch ') && cur) {
+      cur.branch = line.slice(7).trim().replace(/^refs\/heads\//, '')
+    } else if (cur && (line === 'locked' || line.startsWith('locked '))) {
+      cur.locked = line.slice(6).trim() || 'a holder that recorded no reason'
+    }
+  }
+  return cur && normPathOf(cur.path) === want ? cur : null
+}
+
+const normPathOf = (p) =>
+  String(p ?? '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/\/+$/, '')
+    .toLowerCase()
+
+/** Does this checkout hold uncommitted or untracked work? null when unreadable.
+ *  `--no-optional-locks` so the question does not rewrite the index it asks about;
+ *  submodules deliberately NOT ignored — hidden dirty work is what this guards. */
+export function checkoutDirty(path, runGit = git) {
+  try {
+    return runGit(['--no-optional-locks', '-C', path, 'status', '--porcelain']).trim().length > 0
+  } catch {
+    return null
+  }
+}
+
+/**
+ * DOES THIS PATH EXIST? true / false / null — tri-state, deliberately.
+ *
+ * `existsSync` answers false for a permission or stat error exactly as it does
+ * for genuine absence (second review, finding 4), and "already gone" is a verdict
+ * that SKIPS every other proof. Only ENOENT/ENOTDIR is absence; anything else is
+ * "could not be established", which keeps the tree like every other unreadable
+ * probe in this rule.
+ */
+export function pathExists(path) {
+  try {
+    statSync(path)
+    return true
+  } catch (e) {
+    return e && (e.code === 'ENOENT' || e.code === 'ENOTDIR') ? false : null
+  }
+}
+
+/**
+ * THE IDENTITY OF THE CHECKOUT AT THIS PATH, as `matchesExpectation` wants it.
+ *
+ * `gitLink` is the admin gitdir its `.git` points at; `ino`/`dev` identify that
+ * `.git` FILE itself, which is what a same-path replacement cannot reuse (measured
+ * 11.08.2026: after `worktree remove` + `worktree add` at the same path the admin
+ * gitdir is byte-identical and the inode is not). `activeAt` is the project's own
+ * freshness probe, so the caller's "nothing was written after" survives into this
+ * process. Every field answers null when it cannot be read, and null refuses.
+ */
+export function readIdentity(path) {
+  const out = { gitLink: null, ino: 0, dev: 0, gitMtime: 0, gitBirth: 0, activeAt: null }
+  const dot = join(path, '.git')
+  try {
+    const st = statSync(dot)
+    out.ino = Number(st.ino ?? 0)
+    out.dev = Number(st.dev ?? 0)
+    out.gitMtime = Number(st.mtimeMs ?? 0)
+    out.gitBirth = Number(st.birthtimeMs ?? 0)
+    out.gitLink = st.isDirectory() ? dot : (readFileSync(dot, 'utf8').match(/^gitdir:\s*(.+)$/m)?.[1]?.trim() ?? null)
+    if (out.gitLink && !st.isDirectory()) out.gitLink = resolve(path, out.gitLink)
+  } catch {
+    return out
+  }
+  try {
+    const stamp = worktreeActiveAt(path)
+    out.activeAt = typeof stamp === 'number' ? stamp : typeof stamp?.at === 'number' ? stamp.at : null
+  } catch {
+    /* an unreadable freshness answers null, which refuses */
+  }
+  return out
 }
 
 /**
@@ -170,24 +283,195 @@ export function removeStubBranch(target, { dry = false, git: runGit = git } = {}
   }
 }
 
-/** The whole operation: judge, detach, remove, prune, drop the stub branch.
- *  Returns a report. `git` is injectable so the Vitest case can run it against
- *  a throwaway repository instead of this one. */
-export function cleanupWorktree(target, { dry = false, git: runGit = git } = {}) {
+/**
+ * THE REASON THIS COMMAND WRITES INTO GIT'S WORKTREE LOCK — naming the RUN.
+ *
+ * pid AND process start time, so a later run can tell a crashed predecessor's
+ * lock from a live one (third review, finding B). Without them a process killed
+ * between `worktree lock` and the unlink wedges that worktree permanently: every
+ * later cleanup fails to acquire and refuses, forever.
+ */
+export function cleanupLockReason(pid = process.pid) {
+  return formatCleanupLock({ pid, startedAt: probePid(pid)?.startedAt ?? 0 })
+}
+
+/**
+ * TAKE THE LOCK, RECOVERING ONLY A PROVABLY DEAD ONE OF OUR OWN.
+ *
+ * The acquisition itself is the exclusion: `git worktree lock` FAILS on a tree
+ * somebody already holds. On that failure the lock in the way is judged — and the
+ * asymmetry decides every uncertain case, because a stale lock is a WEDGE a human
+ * can clear while breaking a live one DESTROYS WORK. A foreign lock (the isolation
+ * harness's, an agent's) is NEVER broken; one of ours is broken only where the
+ * holder is provably gone.
+ *
+ * Returns { locked, reason, note } — `locked: false` means refuse.
+ */
+export function takeCleanupLock(target, { git: runGit = git, probe = probePid, reason = null } = {}) {
+  const mine = reason ?? cleanupLockReason()
+  const tryLock = () => {
+    try {
+      runGit(['worktree', 'lock', '--reason', mine, target])
+      return null
+    } catch (e) {
+      return `${(e && (e.stderr || e.message)) || e}`.split('\n')[0]
+    }
+  }
+  const first = tryLock()
+  if (!first) return { locked: true, reason: mine, note: '' }
+
+  const entry = worktreeEntry(target, runGit)
+  const held = String(entry?.locked ?? '').trim()
+  const verdict = staleLockVerdict({ reason: held, probe: probe(parseCleanupLock(held).pid) })
+  if (!verdict.recoverable) return { locked: false, reason: mine, note: `${verdict.why}` }
+  try {
+    runGit(['worktree', 'unlock', target])
+  } catch (e) {
+    return { locked: false, reason: mine, note: `a dead lock could not be cleared: ${(e && e.message) || e}` }
+  }
+  const second = tryLock()
+  // A second failure means somebody took it in between — theirs, and it stays.
+  if (second) return { locked: false, reason: mine, note: `the lock was taken again while a dead one was cleared: ${second}` }
+
+  // AND CONFIRM THE LOCK IN PLACE IS OURS (fifth review). Two cleanups meeting the
+  // same stale lock both read it before either cleared it, so both can reach this
+  // line; `git worktree unlock` names no lock, so the loser cleared the winner's.
+  // Whoever ends up NOT holding its own lock discovers it here — at the one moment
+  // the discovery is free, before anything has been verified or deleted.
+  const nowHeld = String(worktreeEntry(target, runGit)?.locked ?? '').trim()
+  if (nowHeld !== mine) {
+    return {
+      locked: false,
+      reason: mine,
+      note: `another cleanup won the race for that tree — the lock in place is ${nowHeld || 'gone'}, not ours`,
+    }
+  }
+  return { locked: true, reason: mine, note: `cleared a dead lock — ${verdict.why}` }
+}
+
+/**
+ * THE LAST RE-PROOF, INSIDE THE PROCESS THAT DELETES (point 629) — AND ITS
+ * RESIDUAL WINDOW, WHICH IS NOT CLOSED.
+ *
+ * WHAT IS CLOSED. git's worktree LOCK is a real mutual-exclusion primitive:
+ * `git worktree lock` FAILS on an already-locked tree (measured 11.08.2026 —
+ * "fatal: … is already locked"). So this command TAKES the lock first, and only
+ * then re-reads the tree. Everything that respects the lock — the isolation
+ * harness, which locks a tree while an agent holds it, and every git command that
+ * refuses a locked worktree — cannot enter after that point. A tree already held
+ * by somebody else fails the acquisition and is refused, so the foreign-lock check
+ * and the exclusion are the same atomic act rather than two.
+ *
+ * WHAT IS NOT, AND MUST NOT BE DESCRIBED AS CLOSED (second review, finding 2).
+ * git offers no compare-and-delete: between taking the lock, reading the entry,
+ * reading the dirtiness, reading the identity and unlinking the tree, several
+ * separate syscalls pass. A writer that does NOT consult the lock — a stray
+ * process writing files into the checkout, an editor saving on a timer — is not
+ * excluded by any of it. The residual is therefore: a write that (a) ignores git's
+ * lock, (b) lands after the last of these reads, and (c) is not visible in them.
+ * It is bounded by the few milliseconds between the reads and the unlink, and it
+ * is the smallest this design can make it without a primitive git does not have.
+ */
+export function cleanupWorktree(target, { dry = false, git: runGit = git, expected = null, probe = probePid } = {}) {
   const worktrees = listWorktrees(runGit)
   const verdict = judgeTarget({ target, mainRoot: worktrees[0] ?? REPO_ROOT, worktrees })
   if (!verdict.ok) return { ok: false, verdict, detached: [] }
-  if (!existsSync(target)) {
-    if (!dry) tryPrune(runGit)
-    // The stub outlives a half-finished removal too — that is exactly the state
-    // the guard used to find and report.
-    const stub = removeStubBranch(target, { dry, git: runGit })
-    return { ok: true, verdict, detached: [], stub, note: "already gone — only git's record was pruned" }
+  const refuse = (reason) => ({ ok: false, verdict: { ...verdict, ok: false, reason }, detached: [] })
+
+  const exists = pathExists(target)
+  if (exists === null) return refuse('unreadable-path: whether anything is at that path could not be established')
+
+  const wants = expected && typeof expected === 'object' && String(expected.branch ?? '').trim()
+  let weLocked = false
+  let ourLock = ''
+  let lockNote = ''
+  if (wants && exists && !dry) {
+    const taken = takeCleanupLock(target, { git: runGit, probe })
+    if (!taken.locked) return refuse(`could-not-take-the-lock: ${taken.note}`)
+    weLocked = true
+    ourLock = taken.reason
+    lockNote = taken.note
   }
-  const detached = removeTreeSafely(target, { dry, git: runGit, registered: verdict.reason === 'registered' })
-  if (!dry) tryPrune(runGit)
-  const stub = removeStubBranch(target, { dry, git: runGit })
-  return { ok: true, verdict, detached, stub }
+  // RELEASE ONLY THE LOCK WE TOOK (fifth review). `git worktree unlock` names no
+  // lock — it clears whatever is in place — so an unconditional release reaches a
+  // lock that is not ours to touch, which is the exact class this point exists to
+  // end. It happens: two cleanups meeting one stale lock both read it before
+  // either cleared it, so the loser can end up releasing the winner's lock while
+  // the winner is still verifying. The winner then refuses (its own
+  // `matchesExpectation` sees a foreign reason), and THAT refusal must not take a
+  // third party's lock with it. So the reason in place is re-read and compared
+  // against ours; anything else is left standing and SAID, because a lock nobody
+  // released is a wedge somebody has to see.
+  let unlockNote = ''
+  const tryUnlock = () => {
+    if (!weLocked) return
+    let held
+    try {
+      held = String(worktreeEntry(target, runGit)?.locked ?? '').trim()
+    } catch {
+      unlockNote = 'the lock could not be re-read, so it was LEFT IN PLACE'
+      return
+    }
+    if (!held) return // it went with the tree, or somebody already cleared it
+    if (held !== ourLock) {
+      unlockNote = `the lock in place is not ours (${held}) — LEFT ALONE`
+      return
+    }
+    try {
+      runGit(['worktree', 'unlock', target])
+    } catch (e) {
+      unlockNote = `our own lock could not be released: ${`${(e && (e.stderr || e.message)) || e}`.split('\n')[0]}`
+    }
+  }
+  const unlockOnRefusal = (reason) => {
+    tryUnlock()
+    return refuse(`${reason}${unlockNote ? ` [${unlockNote}]` : ''}`)
+  }
+
+  // A THROW MUST NOT LEAVE THE LOCK BEHIND. Every probe below catches its own
+  // failures, so this is the belt for the one nobody predicted: without it an
+  // unexpected exception would wedge the tree exactly the way a crash does, which
+  // is the failure this whole lock had to be made recoverable for.
+  try {
+    if (wants && exists) {
+      const match = matchesExpectation({
+        expected,
+        entry: worktreeEntry(target, runGit),
+        actual: readIdentity(target),
+        dirty: checkoutDirty(target, runGit),
+        ownLock: weLocked ? ourLock : '',
+      })
+      if (!match.ok) return unlockOnRefusal(`changed-under-cleanup: ${match.reason}`)
+    }
+
+    if (exists === false) {
+      if (!dry) tryPrune(runGit)
+      // The stub outlives a half-finished removal too — that is exactly the state
+      // the guard used to find and report.
+      const stub = removeStubBranch(target, { dry, git: runGit })
+      return { ok: true, verdict, detached: [], stub, note: "already gone — only git's record was pruned" }
+    }
+    const detached = removeTreeSafely(target, {
+      dry,
+      git: runGit,
+      registered: verdict.reason === 'registered',
+      weLocked,
+    })
+    // UNLOCK BEFORE PRUNING, or the record outlives the tree FOREVER. `git
+    // worktree prune` SKIPS a locked worktree, and `removeTreeSafely` falls back
+    // to a plain delete whenever git's own removal refuses — so a fallback path
+    // would leave a deleted directory with a locked administrative record that no
+    // prune can ever clear. Where git's removal succeeded the lock went with it
+    // and this call simply fails, which is why it ignores its own error.
+    tryUnlock()
+    if (!dry) tryPrune(runGit)
+    const stub = removeStubBranch(target, { dry, git: runGit })
+    const notes = [lockNote, unlockNote].filter(Boolean).join('; ')
+    return { ok: true, verdict, detached, stub, ...(notes ? { lockNote: notes } : {}) }
+  } catch (e) {
+    tryUnlock()
+    throw e
+  }
 }
 
 function tryPrune(runGit = git) {
@@ -201,9 +485,19 @@ function tryPrune(runGit = git) {
 if (isMainModule(import.meta.url)) {
   const args = process.argv.slice(2)
   const dry = args.includes('--dry')
-  const target = args.find((a) => !a.startsWith('--'))
+  const expectAt = args.indexOf('--expect')
+  let expected = null
+  if (expectAt >= 0) {
+    try {
+      expected = JSON.parse(args[expectAt + 1] ?? '')
+    } catch {
+      console.error('worktree-cleanup: --expect needs the caller\'s identity record as JSON')
+      process.exit(2)
+    }
+  }
+  const target = args.filter((a, i) => !a.startsWith('--') && i !== expectAt + 1)[0]
   try {
-    const result = cleanupWorktree(target, { dry })
+    const result = cleanupWorktree(target, { dry, expected })
     if (!result.ok) {
       console.error(formatRefusal(result.verdict))
       process.exit(2)
