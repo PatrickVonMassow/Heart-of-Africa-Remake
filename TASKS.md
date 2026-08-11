@@ -6074,3 +6074,42 @@ to land than a mechanism that needs a review.
   Criticality: medium — the red is on a branch, not on `main`, and the fast gate still stands
   between it and a landing; what makes it worth a point is that it could not be ANSWERED,
   which is the condition points 455, 640 and 643 all exist to end. Bundle: Testinfrastruktur.
+
+- [ ] 649. THE CLEANUP'S NEW LOCK PROTOCOL STILL HAS FOUR WAYS TO GO WRONG (GPT-5.6 Sol,
+  fifth review of point 629, on the delta 213702f..ae40a08; recorded 11.08.2026 and filed
+  rather than held back, because 629 landed and these are defects in the mechanism it
+  added). Point 629 replaced a cleanup that deleted live worktrees; it now takes git's own
+  worktree lock, proves the tree's identity, and recovers only a lock of its own whose
+  holder is provably dead. That is a large improvement on what stood before, and none of
+  the four below reaches the old failure — but each is a hole in the NEW protocol.
+  1. THE PARSER CLAIMS REASONS THE FORMATTER NEVER WRITES. `parseCleanupLock` TRIMS before
+     matching its anchored signature, so a foreign reason padded with whitespace —
+     `" worktree-cleanup verifying and deleting (pid 999999 start 1) "` — reads as OURS and
+     becomes recoverable once that pid is absent. The collision tests carry no padding.
+  2. LOSING THE LOCK CAN STILL END IN AN UNLOCKED DELETION. `takeCleanupLock` returns as
+     soon as the FIRST acquisition succeeds, and `matchesExpectation` rejects only a
+     NON-EMPTY foreign lock. A concurrent stale-lock recovery that clears our lock and
+     pauses before retaking it leaves NO lock at all: verification sees an empty reason,
+     passes, and the deletion proceeds without exclusion. The race tests always install the
+     competing lock immediately, so the empty interval is never exercised.
+  3. `tryUnlock` STILL COMPARES AND UNLOCKS AS TWO ACTS. It re-reads the reason, then runs
+     an unconditional `git worktree unlock`. A recovery that clears ours and a winner that
+     installs its own between those two calls means we release the WINNER's lock — the same
+     defect the re-read was added to close, moved one step later.
+  4. A LOCK NOTHING CAN EVER CLEAR. `cleanupLockReason` writes `start 0` when the
+     process-start probe cannot answer, and `staleLockVerdict` permanently refuses to
+     recover any zero-start lock. A crash while holding such a lock wedges that worktree for
+     good; the recovery tests all use non-zero synthetic starts.
+  FINAL STATE: 1, 3 and 4 are fixed at their cause — the parser matches what the formatter
+  writes with no normalisation that widens it, the release is made a single act or, where
+  git offers no such primitive, is narrowed and its residual written down, and a lock this
+  command wrote that carries no usable identity is recoverable by SOME stated rule rather
+  than never. For 2 the honest answer may be that git gives no way to hold exclusion across
+  the gap; then verification must treat an EMPTY lock where we hold one as a refusal, not
+  as a pass, which closes the deletion path even if the exclusion cannot be kept.
+  VERIFIABLE: a Vitest case per hole, each failing before its fix — a padded foreign
+  reason is refused as foreign; a verification that finds no lock while `weLocked` refuses;
+  a release that finds a foreign lock in place leaves it standing; and a zero-start lock of
+  ours is recoverable by the stated rule. The existing suite stays green.
+  Criticality: high — same subject as 629 and the same cost if it goes wrong, and it is
+  live on `main` today. Bundle: Session- & Repo-Hygiene.

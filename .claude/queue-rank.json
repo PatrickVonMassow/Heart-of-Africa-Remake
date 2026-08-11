@@ -8,13 +8,25 @@
       "at": "2026-08-11T15:00:17.845Z",
       "why": "Not release-blocking: the closing run proves the build with two full regressions rather than relying on a released red, and 643 refines a mechanism that only landed today. It waits behind the release work."
     },
-    "644": {
-      "at": "2026-08-11T15:12:32.611Z",
-      "why": "Placed by hand at the head of the verification-integrity block instead: it is the only red on main right now, and a red main mails the user."
+    "645": {
+      "at": "2026-08-11T18:08:06.942Z",
+      "why": "Nachweistext-Hygiene: wichtig vor Abschluss und Tag, aber kein Spielfehler und niemand ist darauf blockiert"
+    },
+    "646": {
+      "at": "2026-08-11T18:08:06.988Z",
+      "why": "Zweite Tuer zum selben Loeschen wie 629 — hinter den Spielfehlern, aber vor der Release-Mechanik"
+    },
+    "647": {
+      "at": "2026-08-11T18:08:07.037Z",
+      "why": "Der unerklaerte Rot-Lauf ist auf einem Zweig, nicht auf main; das Fast-Gate steht davor"
+    },
+    "649": {
+      "at": "2026-08-11T18:08:12.354Z",
+      "why": "Loecher im NEUEN Sperrprotokoll, keines erreicht den alten Fehler; hinter den Spielfehlern, mit denen der Nutzer blockiert ist"
     }
   },
   "settled": {
-    "at": "2026-08-11T15:12:32.611Z",
+    "at": "2026-08-11T18:08:12.355Z",
     "points": [
       174,
       184,
@@ -160,7 +172,6 @@
       626,
       627,
       628,
-      629,
       630,
       632,
       633,
@@ -172,7 +183,11 @@
       641,
       642,
       643,
-      644
+      645,
+      646,
+      647,
+      648,
+      649
     ]
   }
 }
