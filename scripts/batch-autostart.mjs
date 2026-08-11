@@ -233,6 +233,80 @@ function readRunLogSegment(from) {
 // server routinely is. The 600-second ceiling used to end exactly those, and
 // `state.lastPid` alone cannot track them because a handover overwrites it. A
 // leaked session holds ports, and that breaks the next session's verify suites.
+// --- THE FIREWALL TOP-UP: reachability decays while nobody looks ------------
+// The container's allowlist is an ipset of ADDRESSES, filled at boot by
+// `init-firewall.sh` from a `dig A` of each domain. Cloudflare-fronted hosts
+// rotate theirs, so that snapshot goes stale WHILE THE SESSION RUNS — no restart
+// needed. Measured 11.08.2026: after a restart at 22:04, chatgpt.com resolved to
+// addresses that were not in the set, and every Sol review silently fell back to
+// one of our own models, which costs the four-eyes rule the cross-vendor
+// decorrelation it exists for. The boot script cannot fix this: it is baked into
+// the image and runs once, and the addresses it wrote were already wrong minutes
+// later.
+//
+// So the tick re-applies it. It is additive and cannot seal the container (that
+// is the whole point of `firewall-allow.mjs`), and it needs no network of its own
+// beyond DNS.
+//
+// IT IS DETACHED, NOT AWAITED (GPT-5.6 Sol, 11.08.2026). Run synchronously it sat
+// in front of every later duty of the tick — the spawn decision, the chat inbox,
+// the leaked-worker sweep — and `timeout` on a sync call is no ceiling at all:
+// node signals the child and then waits for it to actually exit, so a wedged
+// resolver stalls the launcher for as long as it likes. The top-up has no result
+// this tick needs, so it is launched and let go: its own log records what it did,
+// and the tick proceeds at once. A firewall hiccup must never be able to hold up
+// the mechanism that keeps the batch alive.
+// AND IT IS SINGLE-FILE (second review, 11.08.2026). A detached child belongs to no
+// ledger — the tick's reaper only knows its own Claude workers — so one wedged in DNS
+// would survive while every later tick started another, a slow pile-up nobody watches.
+// The previous child's pid is therefore written down and probed first: while it still
+// runs, this tick starts nothing and says so. A stale record is harmless (an unrelated
+// pid at most costs one skipped tick), and the top-up is idempotent anyway.
+// A LIVE PID IS NOT PROOF OF OUR CHILD, and a lost record is not proof of none
+// (third review, 11.08.2026). `kill(pid, 0)` says only that SOMEBODY owns that
+// number: after reuse an unrelated long-lived process would read as "busy" and
+// suppress the top-up for as long as IT lives — not for one tick, forever. So the
+// recorded pid is confirmed against what that process actually IS. And the record is
+// written under the same try as the spawn: if it fails, the child is killed rather
+// than left running unrecorded, because an untracked child is the very class this
+// bounds.
+try {
+  const PIDFILE = C('firewall-topup.pid')
+  const prev = Number(readFileSync(PIDFILE, 'utf8')) || 0
+  let busy = false
+  if (prev > 0) {
+    try {
+      // The identity check, not just liveness. Linux only; elsewhere the read throws
+      // and `busy` stays false — starting a redundant top-up is the safe direction,
+      // since it is idempotent and short.
+      busy = readFileSync(`/proc/${prev}/cmdline`, 'utf8').includes('firewall-allow')
+    } catch {
+      busy = false
+    }
+  }
+  if (busy) {
+    log(`firewall top-up still running (pid ${prev}) — not starting a second`)
+  } else {
+    const out = openSync(C('firewall-topup.log'), 'a')
+    const child = spawn(process.execPath, [R('firewall-allow.mjs')], {
+      cwd: REPO,
+      detached: true,
+      stdio: ['ignore', out, out],
+      windowsHide: true,
+    })
+    child.on('error', (e) => log(`firewall top-up could not start (${(e && e.message) || e})`))
+    try {
+      if (child.pid) writeFileSync(PIDFILE, String(child.pid))
+      child.unref()
+    } catch (e) {
+      try { if (child.pid) process.kill(child.pid) } catch { /* already gone */ }
+      log(`firewall top-up stopped — its pid could not be recorded (${(e && e.message) || e})`)
+    }
+  }
+} catch (e) {
+  log(`firewall top-up skipped (${(e && e.message) || e})`)
+}
+
 // Narrow by construction (see reapableSpawns): our own spawn by pid AND start
 // time, past its boot window, not the lock owner, and superseded.
 //

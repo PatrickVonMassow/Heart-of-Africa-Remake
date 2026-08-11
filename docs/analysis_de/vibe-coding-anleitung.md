@@ -150,28 +150,27 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 ## Die häufigsten Fallstricke → und was hilft
 
-- **Grüner Test, falsches Bild.** Der Test ist grün, das Ergebnis falsch — er prüfte
-  einen Hilfswert, einen unerreichbaren Zustand, einen geratenen Wert. Oder das
-  Beweisbild entstand vor der fertigen Szene.
+- **Grüner Test, falsches Bild.** Der Test ist grün, das Ergebnis falsch — er prüfte einen
+  Hilfswert, einen unerreichbaren Zustand, einen geratenen Wert. Oder das Beweisbild entstand
+  vor der fertigen Szene.
   → *Prompt:* „Eine sichtbare Änderung gilt erst als fertig, wenn sie am **echten gerenderten
   Bild** unter einer erreichbaren Bedingung geprüft wurde — und ein Prüfbild entsteht erst, wenn
   die Darstellung fertig ist." *(≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen richtig aus?)*
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
-  → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft
-  und nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die
-  im Entwicklungsmodus laut meckern — jeder Testlauf wird so zum Detektor."
+  → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
+  nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die im
+  Entwicklungsmodus laut meckern — jeder Testlauf wird so zum Detektor."
 
 - **Angeblich behoben — und im Präsens behauptet.** Der Fix gilt als fertig, das Symptom bleibt;
   „das Feld wird bereits gesetzt" steht so im Code nicht.
   → *Prompt:* „Fertig ist ein Fix, wenn das **Symptom am Ort des Symptoms** behoben ist **und** der
   gleiche Versuch am **alten Stand** noch durchgeht. Was du im **Präsens** behauptest, sieh vorher
-  nach; was erst gebaut wird, steht in der Zukunftsform. Beißt du dich zweimal fest, wechsle das
-  Modell."
+  nach; Gebautes erst in der Zukunftsform. Zweimal festgebissen: wechsle das Modell."
 
-- **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende
-  Prüfung verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie
-  sollte. Ein Fehlalarm meldet sich selbst, ein ausgefallener nie.
+- **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende Prüfung
+  verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie sollte. Ein
+  Fehlalarm meldet sich selbst, ein ausgefallener nie.
   → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme
   weg UND echte Treffer noch da. Die Fälle erfindet das **andere Modell**, gemessen an der
   Mechanik statt an Testnamen, die **eingeräumten** Grenzen zuerst — eine zugegebene
@@ -245,15 +244,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Erzwing nach jedem Zwischenfall eine **Beweisliste**: Liegt alles am Zielort? Gibt es Reste? Passen Dokumente und Code zusammen?"
 
 - **Der Autor sieht seine eigene Annahme nicht — und wer eine fertige Liste prüft, hakt sie ab.**
-  Wer baut, prüft gegen dieselbe Vorstellung, aus der der Fehler stammt; und wer eine fertige Liste
+  Wer baut, prüft gegen dieselbe Vorstellung, aus der der Fehler stammt; wer eine fertige Liste
   prüft, nennt weit weniger als vor dem leeren Blatt — falsch, wenn der **übersehene** Punkt zählt.
   → *Prompt:* „Schätze vor dem Bau **Schwierigkeit × Kritikalität** und zieh bei Kritischem **ein
   anderes Modell** hinzu. Beim **Finden** blind parallel: gleiche Vorgabe, je ein vollständiges
-  Ergebnis, vereinigt **nach Bedeutung**, Einzelnennungen **markiert statt gestrichen**. Beim
-  **Beurteilen** Gegenlesen, aber **erst das Ergebnis, dann die Begründung**. Das **Vereinigen**
-  macht das Modell, das an **keiner** Liste mitschrieb, und jeder Eingang bleibt darin auffindbar
-  (nur A, nur B, verschmolzen mit X) — Verschmelzen verliert lautlos." *(≈ 2x für den Fundschritt,
-  das Vereinigen kostet wenige Prozent)*
+  Ergebnis; beim **Beurteilen** Gegenlesen, aber **erst das Ergebnis, dann die Begründung**.
+  **Vereinigt** wird nach Bedeutung, vom Modell, das an **keiner** Liste mitschrieb, jeder Eingang
+  auffindbar (nur A, nur B, verschmolzen mit X) — Verschmelzen verliert lautlos."
+  *(≈ 2x für den Fundschritt)*
 
 - **Die Lehre gilt als versorgt, sobald ihr Wächter benannt ist** — gebaut ist er damit nicht.
   → *Prompt:* „Trenne **benannt** von **gebaut**: ‚gebaut' wird am Haken des genannten Punktes
@@ -280,12 +278,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   und lies das Ergebnis aus den Protokollen, nicht aus den Tests. Wo eine Prüfung auch
   etwas ausführt, melde ein Scheitern im selben Atemzug wie die Freigabe."
 
-- **Die Messung sah weniger, als sie behauptet.** Sie schaut nur die letzten *n* Einträge
-  an, misst erst *nach* dem Vorgang, oder ein Teil der Testdateien lud gar nicht — nicht
-  geladen ist nicht rot, sondern abwesend, und liest sich *grüner* als ein Fehlschlag.
-  → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: eine Frage über
-  einen Zeitraum nach Zeit, nie nach Anzahl. Melde die **Zahl der ausgeführten Prüfungen**
-  mit — ein Rückgang ist ein Rot."
+- **Die Messung — und die Gegenprüfung — sah weniger, als sie behauptet.** Nur die letzten *n*
+  Einträge, ein Teil der Tests lud nicht, dem Prüfer wurde die Hälfte nie gereicht. Nicht
+  geliefert ist nicht rot, sondern abwesend — und liest sich *grüner* als ein Fehlschlag.
+  → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
+  Anzahl. Melde die **Abdeckung** mit; ein Urteil über unvollständigem Material ist **Teilprüfung**."
 
 - **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren dieselbe Regel
   getrennt — eines schreibt, eines prüft; das blockiert *alle* Arbeit.
@@ -358,18 +355,21 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Ein Ersatzwert im `catch` darf nur verschluckt werden, wenn er zu **weniger** Aktion
   führt. ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
 
-- **Einigkeit ist keine Evidenz.** Mehrere Modelle können sich über eine Ursache einig sein und
-  gemeinsam danebenliegen; die Einigkeit fühlt sich dann an wie ein Beweis.
+- **Einigkeit ist keine Evidenz.** Mehrere Modelle können sich einig sein und gemeinsam
+  danebenliegen; die Einigkeit fühlt sich dann an wie ein Beweis.
   → *Prompt:* „Bevor du Versuche vorschlägst: Welcher **eine Test** macht die Ursache **sichtbar**?"
 
-- **Zwei Aufträge für einen Fehler.** Fällt derselbe Mangel erneut auf, schreibst du ihn arglos
-  ein zweites Mal auf — sichtbar wird das erst, wenn beide Ergebnisse aufeinandertreffen.
-  → *Prompt:* „Vor jedem neuen Punkt: Such die offenen nach demselben Problem ab — gibt es einen,
-  **erweitere ihn**. Wird ein Zweig verworfen, rette, was er über seinen Auftrag hinaus mitbrachte."
+- **Der Erfolg beweist den Weg nicht.** Es lief durch — nur hattest du den Dialog weggeklickt.
+  → *Prompt:* „Sag **vor** der Messung, welches Ergebnis welche Erklärung **ausschließen** würde."
 
-- **Gebaut heißt nicht auffindbar.** Ein Feature kann korrekt sein und trotzdem als fehlend
-  gemeldet werden, weil seine Bedienung unter der falschen Überschrift steht: Dein Test fragt
-  „wirkt es?", der Nutzer „komme ich dorthin?".
+- **Zwei Aufträge für einen Fehler.** Fällt derselbe Mangel erneut auf, schreibst du ihn arglos ein
+  zweites Mal auf — sichtbar wird das erst, wenn beide Ergebnisse aufeinandertreffen.
+  → *Prompt:* „Vor jedem neuen Punkt: Such die offenen nach demselben Problem ab — gibt es einen,
+  **erweitere ihn**. Verwirfst du einen Zweig, rette, was er über seinen Auftrag hinaus mitbrachte."
+
+- **Gebaut heißt nicht auffindbar.** Ein Feature ist korrekt und wird trotzdem als fehlend
+  gemeldet, weil seine Bedienung falsch einsortiert ist: Dein Test fragt „wirkt es?", der Nutzer
+  „komme ich dorthin?".
   → *Prompt:* „Meldet er etwas erneut, das repariert ist, nimm an, er **erreicht** es nicht. Prüf
   die **Nachbarschaft** — und wo das als Test schreibbar ist, schreib es als Test."
 
@@ -412,4 +412,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Sie setzt auf, woran alles andere hängt: eine Wahrheit, eine Arbeitsordnung, zwei
 Testschichten, den Reflex zum Check. Die Fallstricke oben ersetzt sie nicht.
 
-<!-- GUIDE-FINGERPRINT: 9cab0148483975dedd45d1023a4fbd0902292dc6d1ddf20007764eee8e056bc8 -->
+<!-- GUIDE-FINGERPRINT: 2276626ca090ece14fe05ba9eda0535fc5e4020fadc1f30446a77b247fbfc7fe -->

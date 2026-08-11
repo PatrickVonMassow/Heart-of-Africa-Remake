@@ -20,13 +20,25 @@
       "at": "2026-08-11T18:08:07.037Z",
       "why": "Der unerklaerte Rot-Lauf ist auf einem Zweig, nicht auf main; das Fast-Gate steht davor"
     },
-    "649": {
-      "at": "2026-08-11T18:08:12.354Z",
-      "why": "Loecher im NEUEN Sperrprotokoll, keines erreicht den alten Fehler; hinter den Spielfehlern, mit denen der Nutzer blockiert ist"
+    "650": {
+      "at": "2026-08-11T18:34:39.594Z",
+      "why": "Verfahrensschaerfe an der Gegenpruefung; wichtig, aber kein Spielfehler und niemand ist darauf blockiert"
+    },
+    "652": {
+      "at": "2026-08-11T21:10:35.758Z",
+      "why": "Last is right: it is a guard over the session's own answers, which costs nothing the deployed game shows — and 174 gates the release."
+    },
+    "653": {
+      "at": "2026-08-11T21:10:45.801Z",
+      "why": "Last is right for the mechanism; the ONE stale section it names (criterion 7) is corrected inside point 174, which gates the release anyway."
+    },
+    "655": {
+      "at": "2026-08-11T21:15:43.331Z",
+      "why": "Last is right: the board is legible enough to run the batch today, and every point ahead of it either fixes something the user SEES in the game or gates the release."
     }
   },
   "settled": {
-    "at": "2026-08-11T18:08:12.355Z",
+    "at": "2026-08-11T21:15:43.331Z",
     "points": [
       174,
       184,
@@ -187,7 +199,12 @@
       646,
       647,
       648,
-      649
+      650,
+      651,
+      652,
+      653,
+      654,
+      655
     ]
   }
 }

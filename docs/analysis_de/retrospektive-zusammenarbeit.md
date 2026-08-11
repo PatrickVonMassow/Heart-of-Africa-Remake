@@ -47,6 +47,8 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 09.08. | Ein Punkt wartete auf ein Tor, das nicht aufgehen konnte: die Zuordnung der Fehlschläge war getroffen, aber nie in das Register eingetragen, das der Wächter liest (§3.97) |
 | 09.08. abends | Spielsitzung: zwölf Defekte in einer Mechanik, deren zwölf Punkte alle abgenommen waren — grün gegen einen Stellvertreter (Punkt 589); die veröffentlichte Reihenfolge zweimal falsch, weil sie eine zweite Heimat hat (Punkt 590, Rückfall in §3.77); ein abgehakter Punkt mit unerfülltem drittem Liefergegenstand, gefunden durch eine Nutzerfrage (§3.99) |
 
+| 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
+
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
 ---
@@ -82,6 +84,10 @@ Die Eindämmung ist am **27.07.2026** wieder aufgehoben: Der Scheduled Task ist 
 Der erste Ansatz („Buch führen, Regeln vorschlagen") scheiterte, weil Präfix-Matching an zusammengesetzten Kommandos, `cd`-Präfixen und Heredocs vorbeigreift. Gelöst durch breite Whole-Tool-Allows plus zwei nicht offensichtliche Einsichten: Settings greifen **erst nach Session-Neustart**, und die größten Prompt-Verursacher waren **selbstverschuldete Kommandoformen**.
 
 **Lehre:** Bei wiederholter Umgebungs-Reibung erst die Mechanik des Matchings verstehen, statt Regeln zu stapeln — und die eigenen Gewohnheiten als Mitverursacher prüfen.
+
+**Nachtrag 11.08.2026 — die Einstellung, die die laufende Sitzung nicht mehr erreicht.** Die Rückfragen kamen weiter, obwohl `permissions.defaultMode: bypassPermissions` auf beiden Ebenen stand und die Zustimmung zum Modus vermerkt war. Das Protokoll der Sitzung entschied es: ihr gespeicherter Modus war `acceptEdits` — Datei-Änderungen still, jede Kommandozeile mit Rückfrage, genau das beobachtete Muster. `defaultMode` gibt einer Sitzung ihren Modus nur bei der Anlage; eine mit `--resume` fortgesetzte trägt den alten weiter, und keine Einstellungsdatei kommt an ihn heran. Die Freigabe muss deshalb dort ansetzen, wo die Rückfrage entsteht, nicht in einer Vorgabe für neue Sitzungen. Die Lehre aus 3.3 hatte das halb vorweggenommen („Settings greifen erst nach Session-Neustart") — sie war als Wartezeit gelesen worden, nicht als Aussage darüber, welchen Zustand eine Einstellung überhaupt noch erreicht.
+
+**Lehre:** Eine Einstellung, die einen Zustand nur INITIALISIERT, ist kein Hebel auf einen bestehenden Zustand. Bevor eine Konfigurationsänderung als Behebung gilt, muss belegt sein, dass sie den laufenden Fall erreicht — sonst wird sie mehrfach „behoben" gemeldet und wirkt kein einziges Mal.
 
 ### 3.4 Das Dashboard: Aktualität und Formtreue
 
@@ -1178,6 +1184,41 @@ einer. „Es lief danach durch" ist keiner davon. Und wo eine Beobachtung beide 
 gleich gut trägt, ist sie kein Beleg, sondern eine Erzählung: Der Prüfstein ist, ob das
 Gegenteil dieselbe Beobachtung erzeugt hätte.
 
+
+### 3.110 Die Gegenprüfung schweigt auch da, wo sie nichts gesehen hat
+
+Punkt 629 lief am 11.08.2026 durch fünf Gegenprüfungen. In JEDER meldete der Prüfer
+beiläufig, `worktree-cleanup.mjs` und der Schwanz seiner Testdatei seien abgeschnitten
+oder weggelassen — der Zweig-Diff stößt bei rund 200 000 Zeichen an die Materialgrenze.
+Vier Runden lang habe ich das gelesen und nicht gehandelt. Erst als es zum fünften Mal
+dastand, habe ich die Datei selbst aufgeschlagen und darin binnen Minuten einen Defekt
+gefunden: Das Freigeben der Sperre prüfte nicht, ob die Sperre noch die eigene ist, sodass
+ein Aufräum-Lauf, der das Wettrennen verloren hatte, dem Gewinner die Sperre wegnahm.
+
+Der Punkt ist nicht, dass der Prüfer etwas übersehen hätte — er hat nichts übersehen, er
+hat es angesagt. Der Punkt ist, wie sein Ergebnis GELESEN wird. Ein Befund zu einer Datei
+heißt „hier ist etwas falsch". Das Ausbleiben eines Befunds zu einer Datei, die nie im
+Material lag, heißt NICHTS — und liest sich doch genau wie „dort ist alles in Ordnung".
+Das ist §3.46 in anderer Kleidung: Dort waren 3546 grüne Tests über einer stillschweigend
+geschrumpften Menge grün, hier ist eine Gegenprüfung über einem stillschweigend
+beschnittenen Material sauber. Beide Male trägt das Verfahren sein eigenes Loch, ohne zu
+lügen.
+
+Erschwerend kommt hinzu, dass die Beschneidung mit der GRÜNDLICHKEIT wächst. Je länger an
+einem Punkt gearbeitet wird, desto größer der Zweig-Diff, desto mehr fällt heraus — die
+Prüfung wird also genau dort blind, wo am meisten geändert wurde. Die fünfte Runde, auf den
+letzten Abschnitt statt auf den ganzen Zweig geschnitten, passte wieder ins Material und
+fand prompt vier Befunde; die anschließende Prüfung des ganzen Zweigs meldete erneut
+Beschneidung — und fand trotzdem zwei weitere, diesmal in der Klasse des ursprünglichen
+Unfalls.
+
+Die Lehre ist billig und gilt ab sofort: Ein Prüfergebnis wird zusammen mit seiner
+ABDECKUNG gelesen. Nennt der Prüfer beschnittenes Material, ist das Ergebnis eine
+TEILprüfung; die ungesehenen Pfade werden benannt und anders gedeckt — durch einen
+zweiten, auf den Rest geschnittenen Lauf oder durch eigenes Lesen. Was hier noch fehlt,
+ist der Mechanismus: Solange die Abdeckung nur in der Prosa des Prüfers steht, hängt sie
+daran, dass jemand sie liest — und vier Runden lang hat das niemand getan.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -1267,7 +1308,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 11.08.2026, 15:33 · Quellen-Fingerprint: `9cab01484839…`
+Zuletzt aktualisiert: Dienstag, 11.08.2026, 23:37 · Quellen-Fingerprint: `2276626ca090…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1309,6 +1350,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | After every change, npm run lint (oxlint) and npm audit must be clean — zero lint errors/warnings, zero CVEs. Standing user directive. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | hoa PERMANENT process — delegate as much implementation as possible to worktree-isolated subagents; keep only picture-verify + merge at the main session; run a pool of parallel agents on non-overlapping files | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | The \"Maximum QA\" QA process and the \"new demo\" trigger (append it + closing + increment tag + publish) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| State only what was just measured, with its reading time; never assert machine/repo state from a plausible model | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Before building, triage difficulty × criticality; HIGH/critical work gets a second, different model — in which FORM (blind-parallel vs. review) is normative in CLAUDE.md §6, not here | 2 | mittel | criticality-review-guard.mjs, model-guard.mjs | ✔ Mechanismus |
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
@@ -1344,13 +1386,48 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 1 | niedrig | container-ask-guard.mjs | ✔ Mechanismus |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 74 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 50 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
+Erfasste Quellen: 76 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 52 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
 
-<!-- RETRO-FINGERPRINT: 9cab0148483975dedd45d1023a4fbd0902292dc6d1ddf20007764eee8e056bc8 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-11T13:33:57.378Z -->
+<!-- RETRO-FINGERPRINT: 2276626ca090ece14fe05ba9eda0535fc5e4020fadc1f30446a77b247fbfc7fe -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-11T21:37:46.665Z -->
 <!-- AUTO-GENERATED:END -->
+
+### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
+
+Am selben Abend dreimal derselbe Fehlschluss, jedes Mal mit einer Messung in der Hand. Die Vorgängersitzung starb, weil ein VS-Code-Neustart im Devcontainer den Container mitnimmt — ich hatte aus `PPID 1` geschlossen, sie hänge nicht am Fenster, und aus `uptime` von zwei Tagen, dass nichts neu gestartet sei; beide Werte sind in einem Container über den Neustart hinweg genau so zu erwarten und unterscheiden die Hypothesen nicht. Danach lief eine Rechte-Sonde durch, und „durchgelaufen" wurde als „keine Rückfrage" gelesen — der Nutzer hatte geklickt. Erst sein Bildschirmfoto deckte es auf.
+
+Das ist nicht die Klasse aus `measure-dont-assume` (eine Behauptung ohne Messung), sondern die gefährlichere Nachbarin: Es WURDE gemessen, nur konnte die Messung die konkurrierenden Erklärungen gar nicht trennen. Ein Erfolg beweist, dass etwas gelang — nicht, WARUM. Wo ein Mensch im Spiel ist, der zustimmen kann, ist ein Erfolg überhaupt kein Signal über die Automatik.
+
+**Lehre:** Vor der Messung benennen, welches Ergebnis welche Hypothese AUSSCHLIESSEN würde. Kann ein Wert unter allen Hypothesen gleich ausfallen, ist er kein Beleg. Und Verifikationen, deren Ausgang von einem Klick des Nutzers abhängen kann, sind erst dann Belege, wenn er bestätigt, nicht geklickt zu haben.
+
+### 3.112 Der Mechanismus war verdrahtet, feuerte — und war völlig wirkungslos
+
+Der Freigabe-Haken vom 11.08.2026 stand in der Hook-Kette, wurde bei jeder Rückfrage
+ausgeführt und beendete sich mit Erfolg. Trotzdem erschien der Dialog weiter, denn seine
+Ausgabe hatte das falsche FORMAT: Das Ereignis erteilt eine Freigabe über ein
+Entscheidungs-Objekt, geschrieben war das flache Feld eines anderen Ereignisses. Eine
+unbekannte Eigenschaft wird nicht abgelehnt, sondern ignoriert — es gibt also keine
+Fehlermeldung, keinen roten Lauf, kein Protokoll. Von außen ist ein wirkungsloser
+Mechanismus von einem wirksamen nicht zu unterscheiden.
+
+Das ist eine eigene Klasse neben „der Wächter kann nie auslösen" (den fängt
+`guard-health-guard` an der Verdrahtung ab): Hier stimmt die Verdrahtung, es ist die
+SPRACHE zur Gegenseite, die nicht ankommt. Unser eigener Test hat es nicht gefunden,
+weil er die Ausgabe der Implementierung nachbaute statt des fremden Vertrags — er hätte
+jede beliebige Erfindung genauso bestätigt. Gefunden haben es zwei Modelle zweier
+Hersteller, unabhängig, als jeweils ERSTEN Punkt; und dieselbe Prüfrunde deckte danach
+zweimal einen Fehler auf, den erst das BEHEBEN eingebaut hatte — darunter eine Ausnahme,
+die den unbeaufsichtigten Betrieb angehalten hätte, weil dort „keine Entscheidung" nicht
+Rückfrage bedeutet, sondern Ablehnung.
+
+**Lehre:** Wo ein Mechanismus mit einer fremden Schnittstelle spricht, ist der Test gegen
+die eigene Ausgabe wertlos — geprüft wird gegen die dokumentierte Gegenseite, und der
+Schlüsselsatz wird festgenagelt (welche Felder genau, nicht nur welcher Wert). Und ein
+Durchsetzer, dessen Wirkung man nicht am Verhalten sieht, braucht einen Beleg, dass er
+nicht nur LIEF, sondern etwas BEWIRKT hat.

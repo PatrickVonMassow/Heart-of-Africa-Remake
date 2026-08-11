@@ -27,6 +27,8 @@ import {
   judgeTarget,
   assertInside,
   formatCleanupLock,
+  judgeLockHeld,
+  judgeLockRelease,
   matchesExpectation,
   parseCleanupLock,
   shouldDetach,
@@ -67,6 +69,50 @@ function readlinkable(path) {
 }
 
 /**
+ * THE ONLY WAY TO SAY "NO LOCK WAS TAKEN" — and it has to be SAID (eighth review,
+ * finding 2). A guard that defaults to permitting is not a guard: an omitted
+ * argument deleted the tree. So the destructive functions below take an
+ * `exclusion` that is either `{ file, reason }` — git's lock file and the reason
+ * we wrote into it — or THIS sentinel, and nothing else passes. The ONE caller
+ * that names it is `cleanupWorktree` itself, on the path where it took no lock
+ * (an ORPHAN, or a removal called with no expectation — how `batch-doctor`
+ * reaches it); an omission cannot spell it by accident.
+ */
+export const WITHOUT_A_LOCK = Object.freeze({ noLockWasTaken: true })
+
+/** A refusal that `cleanupWorktree` turns into a verdict instead of a crash. */
+function refusalError(reason) {
+  const e = new Error(`lock-lost-before-removal: ${reason}`)
+  e.refusal = `lock-lost-before-removal: ${reason}`
+  return e
+}
+
+/**
+ * PROVE THE EXCLUSION, RIGHT HERE, RIGHT NOW — or refuse (eighth review).
+ *
+ * NO CALLBACK, DELIBERATELY. The previous shape took a `guard` function, and a
+ * function can be handed a cached verdict (`() => alreadyDecided`), which is the
+ * very mistake the seventh review found one layer up. This takes the INPUTS and
+ * does the reading itself, so freshness is a property of the code rather than a
+ * promise about the caller: every call is one `readFileSync` of git's lock file,
+ * compared verbatim against the reason we wrote.
+ *
+ * ONLY AN EXPLICIT AFFIRMATIVE PASSES. A missing exclusion, a malformed one, an
+ * unreadable lock file, an empty lock, a foreign lock and anything unexpected all
+ * throw. There is no shape of input that means "carry on, unproven".
+ */
+export function proveExclusion(exclusion, what) {
+  if (exclusion === WITHOUT_A_LOCK) return // said out loud, and only where no lock exists
+  if (!exclusion || typeof exclusion !== 'object' || typeof exclusion.file !== 'string' || !exclusion.file || !exclusion.reason) {
+    throw refusalError(
+      `no usable exclusion was handed to ${what} — a removal is never permitted without one (pass WITHOUT_A_LOCK to say there is none)`,
+    )
+  }
+  const verdict = judgeLockHeld({ held: readLockReason(exclusion.file), ours: exclusion.reason })
+  if (verdict.ok !== true) throw refusalError(`${verdict.reason} — refused before ${what}`)
+}
+
+/**
  * Remove every link INSIDE `root` without following one. Returns the paths that
  * were detached, so the caller can say what it did.
  *
@@ -74,7 +120,7 @@ function readlinkable(path) {
  * it is targeted directly, which is precisely what a RECURSIVE delete of the
  * parent does not do. Hence the walk.
  */
-export function detachLinks(root, { dry = false } = {}) {
+export function detachLinks(root, { dry = false, exclusion = null } = {}) {
   const detached = []
   const walk = (dir) => {
     let entries
@@ -103,6 +149,13 @@ export function detachLinks(root, { dry = false } = {}) {
         }
         detached.push({ path: full, target })
         if (!dry) {
+          // THE PROOF SITS AGAINST THE UNLINK, not before the walk (eighth review,
+          // finding 1). The walk that found this entry did directory reads, stats
+          // and readlinks — real I/O, in which a lock can be lost — so a proof
+          // taken before it would be stale by exactly that much. Each link is its
+          // own destructive act and carries its own fresh proof; a lock lost
+          // mid-walk stops the next unlink instead of being noticed afterwards.
+          proveExclusion(exclusion, `detaching ${full}`)
           // Remove the LINK, never its contents. `rmSync` without `recursive`
           // refuses a real directory and unlinks a junction, which is exactly
           // the distinction wanted; `unlinkSync` covers a file symlink.
@@ -133,24 +186,49 @@ export function detachLinks(root, { dry = false } = {}) {
  * that refuses.
  *
  * Exported so the Vitest case can drive exactly this path.
+ *
+ * `exclusion` IS MANDATORY, AND IT IS RE-PROVEN AT EVERY DESTRUCTIVE STEP (eighth
+ * review). Each of the three things that destroy — a link unlinked inside the
+ * walk, git's own removal, the plain delete it falls back to — is preceded by its
+ * OWN fresh read of git's lock file, because the steps between them are real I/O
+ * (a recursive walk, a subprocess) in which exclusion can be lost. A refusal
+ * throws, and `cleanupWorktree` turns it into a verdict.
+ *
+ * WHAT IS BETWEEN THE PROOF AND THE ACT, stated exactly, since "microseconds" was
+ * once claimed here and was not true: for a link, `assertInside` (string
+ * comparison) and the unlink call — no I/O. For the plain delete, the `rmSync`
+ * call — no I/O. For git's removal, the SPAWN of `git worktree remove`, whose own
+ * unlink happens inside that child a few milliseconds later; that one cannot be
+ * narrowed while git does the removal, and git does it because the administrative
+ * record must go with the tree.
  */
-export function removeTreeSafely(root, { dry = false, git: runGit = git, registered = false, weLocked = false } = {}) {
-  const detached = detachLinks(root, { dry })
+export function removeTreeSafely(root, { dry = false, git: runGit = git, registered = false, weLocked = false, exclusion } = {}) {
+  const detached = detachLinks(root, { dry, exclusion })
   if (dry) return detached
   let removed = false
   if (registered) {
     try {
+      // PROVEN AGAIN: the walk above may have taken any amount of time.
+      proveExclusion(exclusion, `git's removal of ${root}`)
       // `--force` twice ONLY where we took the lock ourselves a moment ago (see
       // `cleanupWorktree`): git refuses to remove a locked tree, and the lock in
       // the way is then our own. It is never used to override somebody else's —
       // a foreign lock refuses the removal long before this line.
       runGit(weLocked ? ['worktree', 'remove', '--force', '--force', root] : ['worktree', 'remove', '--force', root])
       removed = true
-    } catch {
+    } catch (e) {
+      // A REFUSAL IS NOT A "git said no" (which the fallback below exists for):
+      // it must stop the removal outright, or the fallback would delete exactly
+      // what the proof just refused.
+      if (e && e.refusal) throw e
       /* a dirty or already-half-gone tree: fall through to the plain delete */
     }
   }
-  if (!removed) rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+  if (!removed) {
+    // AND AGAIN: git's attempt cost a subprocess, so this is its own act.
+    proveExclusion(exclusion, `the plain delete of ${root}`)
+    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+  }
   return detached
 }
 
@@ -296,6 +374,125 @@ export function cleanupLockReason(pid = process.pid) {
 }
 
 /**
+ * WHERE GIT KEEPS THE LOCK OF ONE WORKTREE — `<admin gitdir>/locked`, the layout
+ * `gitrepository-layout(5)` documents and `git worktree lock/unlock` writes and
+ * unlinks. Resolved from the tree's own `.git` file, so it must be taken while the
+ * tree is still THERE (the caller takes it at acquisition, not at release).
+ *
+ * null when the admin directory cannot be resolved; every caller then falls back
+ * to git's own commands, which is wider but never wrong.
+ */
+export function cleanupLockFile(target) {
+  try {
+    const link = readIdentity(target).gitLink
+    return link ? join(link, 'locked') : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * THE LOCK REASON, VERBATIM — '' when there is no lock, null when it could not be
+ * read.
+ *
+ * READ FROM THE FILE, NOT FROM THE PORCELAIN (fifth review, finding 1). Measured
+ * 11.08.2026 on git 2.39.5: `git worktree lock --reason` stores the reason exactly
+ * as given, plus one newline, while `git worktree list --porcelain` TRIMS it before
+ * printing. So a foreign lock padded with whitespace is INDISTINGUISHABLE from ours
+ * through the porcelain and distinct in the file — and the file is what git itself
+ * consults. Only git's own terminating newline is removed here; nothing else is
+ * normalised, because normalising is what made a stranger's lock look like ours.
+ */
+export function readLockReason(file) {
+  if (!file) return null
+  try {
+    return readFileSync(file, 'utf8').replace(/\n$/, '')
+  } catch (e) {
+    return e && (e.code === 'ENOENT' || e.code === 'ENOTDIR') ? '' : null
+  }
+}
+
+/**
+ * RELEASE ONLY OUR OWN LOCK — as narrow as git allows (fifth review, finding 3).
+ *
+ * THE COMPARE AND THE RELEASE ARE TWO ACTS, AND NOTHING AVAILABLE MAKES THEM ONE.
+ * That is a capability statement, and it was CHECKED rather than assumed:
+ *   · `git worktree unlock <worktree>` takes a worktree and nothing else — its
+ *     entire usage line, verified on git 2.39.5 — so there is no expected-reason
+ *     to hand it, and what it does to that lock file is the same unconditional
+ *     unlink. git cannot do better than this code, which is why this code stopped
+ *     calling it.
+ *   · Node exposes `unlink`/`unlinkSync` and nothing else (checked: no `funlink`).
+ *     The syscall that would serve — `funlinkat(2)`, "unlink the file this
+ *     descriptor refers to" — is FreeBSD-only and unexposed, so holding the file
+ *     open across the compare buys no atomicity.
+ *   · A rename-away-then-inspect scheme was considered and REJECTED on its worst
+ *     case, not on taste: taking the file is atomic, but a reason that turns out
+ *     NOT to be ours has to be put back, and that restore would clobber a lock
+ *     installed in the meantime. Its worst outcome is therefore the same one —
+ *     a lock vanishing under its holder — reached by a path with a temp file that
+ *     can be orphaned. No gain, more surface.
+ *
+ * SO THE GAP IS NARROWED AND ITS WORST OUTCOME IS BOUNDED. Narrowed: the reason is
+ * read from git's lock file and that file is unlinked immediately after — two
+ * syscalls in one process, where it used to be a `worktree list --porcelain`
+ * subprocess followed by a `worktree unlock` subprocess.
+ *
+ * BOUNDED — BUT NOT BY THE CHECK THAT USED TO BE CLAIMED HERE. The bound was once
+ * written as "a cleanup whose lock is missing refuses, so this window cannot make
+ * anything delete", pointing at `matchesExpectation`. The seventh review defeated
+ * exactly that: the victim validates the lock reason it read EARLIER and, unless
+ * something looks again, never learns its lock was stripped — so the window ended
+ * in a removal without exclusion, which is the destroyed-work class itself.
+ *
+ * WHAT CARRIES THE BOUND NOW is `proveExclusion`, called by every destructive step
+ * in `removeTreeSafely` for itself (seventh review finding 4; eighth review
+ * finding 1): each link unlink, git's removal and the plain delete each re-read
+ * git's lock file immediately before acting, and anything but our own reason
+ * REFUSES. So a lock stripped by this window is seen by its owner at the moment
+ * that decides, and the outcome is a refused cleanup and a tree left standing —
+ * one command's worth of debris.
+ *
+ * WHAT REMAINS is the gap between one of those reads and the act it guards, and it
+ * is stated exactly rather than rounded down to "microseconds" (which was claimed
+ * here once and was not true — a whole directory walk sat inside it):
+ *   · before a link unlink: a string comparison, then the unlink — no I/O;
+ *   · before the plain delete: the `rmSync` call — no I/O;
+ *   · before git's removal: the SPAWN of `git worktree remove`, whose own unlink
+ *     happens inside that child a few milliseconds later. That one is real
+ *     latency, and it cannot be removed while git performs the removal — which it
+ *     does because the administrative record has to go with the tree.
+ * None of it can be closed by any design available here, and what it can do is
+ * bounded by what the removal itself is: a tree proven merged, clean and
+ * unwritten-into under a lock held for every one of those proofs. Destroying WORK
+ * through it needs a writer that ignores git's lock entirely AND lands inside that
+ * gap — the same residual `cleanupWorktree` already states, not a second one.
+ *
+ * WITHOUT A LOCK FILE THERE IS NO RELEASE. The porcelain is not an acceptable
+ * substitute — it TRIMS the reason, so a padded copy of ours would compare equal
+ * and we would clear a stranger's lock, which is finding 1 through the back door.
+ * A lock we cannot prove is ours is left standing and SAID; `takeCleanupLock`
+ * refuses to take one at all when the file cannot be located, so this branch is
+ * only ever reached by a direct caller.
+ *
+ * Returns the note to print, '' when there is nothing to say.
+ */
+export function releaseCleanupLock(target, { file = null, ours = '' } = {}) {
+  if (!String(ours ?? '')) return ''
+  if (!file) {
+    return "git's own lock file could not be located, so our lock was LEFT IN PLACE rather than released through a reason the porcelain has trimmed"
+  }
+  const verdict = judgeLockRelease({ held: readLockReason(file), ours })
+  if (!verdict.release) return verdict.note
+  try {
+    unlinkSync(file)
+    return ''
+  } catch (e) {
+    return e && e.code === 'ENOENT' ? '' : `our own lock could not be released: ${`${(e && e.message) || e}`.split('\n')[0]}`
+  }
+}
+
+/**
  * TAKE THE LOCK, RECOVERING ONLY A PROVABLY DEAD ONE OF OUR OWN.
  *
  * The acquisition itself is the exclusion: `git worktree lock` FAILS on a tree
@@ -305,10 +502,30 @@ export function cleanupLockReason(pid = process.pid) {
  * harness's, an agent's) is NEVER broken; one of ours is broken only where the
  * holder is provably gone.
  *
- * Returns { locked, reason, note } — `locked: false` means refuse.
+ * Returns { locked, reason, note, file } — `locked: false` means refuse, and
+ * `file` is git's lock file for that tree, resolved while the tree still stands so
+ * the release can find it afterwards.
  */
-export function takeCleanupLock(target, { git: runGit = git, probe = probePid, reason = null } = {}) {
+export function takeCleanupLock(target, { git: runGit = git, probe = probePid, reason = null, file = undefined } = {}) {
   const mine = reason ?? cleanupLockReason()
+  // Resolved BEFORE anything is deleted, and carried out to the caller: after the
+  // tree is gone there is no `.git` left to resolve it from.
+  const lockFile = file === undefined ? cleanupLockFile(target) : file
+  // NO LOCK FILE, NO LOCK (sixth review, finding 1). Everything downstream proves
+  // ownership by comparing against what git's lock FILE holds, because the
+  // porcelain trims the reason and a padded copy of ours would pass as ours there.
+  // A tree whose lock file cannot be located therefore cannot be held provably —
+  // and a lock we could not prove is one we must not take, since the fallback would
+  // be exactly the widened comparison this review closed. Nothing is locked here,
+  // so there is nothing left behind either.
+  if (!lockFile) {
+    return {
+      locked: false,
+      reason: mine,
+      file: null,
+      note: "git's own lock file for that tree could not be located, so a lock could not be proven ours — nothing was locked and nothing was deleted",
+    }
+  }
   const tryLock = () => {
     try {
       runGit(['worktree', 'lock', '--reason', mine, target])
@@ -318,35 +535,54 @@ export function takeCleanupLock(target, { git: runGit = git, probe = probePid, r
     }
   }
   const first = tryLock()
-  if (!first) return { locked: true, reason: mine, note: '' }
+  if (!first) return { locked: true, reason: mine, note: '', file: lockFile }
 
-  const entry = worktreeEntry(target, runGit)
-  const held = String(entry?.locked ?? '').trim()
+  // WHAT IS IN THE WAY IS READ FROM GIT'S OWN LOCK FILE, VERBATIM (finding 1).
+  // The porcelain trims the reason, which would let a padded copy of our signature
+  // pass as ours and become breakable; the file carries what was actually written.
+  // A reason we cannot read that way is a lock we cannot judge, and an unjudgeable
+  // lock is never broken.
+  const held = readLockReason(lockFile)
+  if (!held) {
+    const shown = String(worktreeEntry(target, runGit)?.locked ?? '').trim()
+    return {
+      locked: false,
+      reason: mine,
+      file: lockFile,
+      note: shown
+        ? `a lock is in place (${shown}) and its reason could not be read from git's own lock file, so it is left alone`
+        : `the tree could not be locked: ${first}`,
+    }
+  }
   const verdict = staleLockVerdict({ reason: held, probe: probe(parseCleanupLock(held).pid) })
-  if (!verdict.recoverable) return { locked: false, reason: mine, note: `${verdict.why}` }
+  if (!verdict.recoverable) return { locked: false, reason: mine, file: lockFile, note: `${verdict.why}` }
   try {
     runGit(['worktree', 'unlock', target])
   } catch (e) {
-    return { locked: false, reason: mine, note: `a dead lock could not be cleared: ${(e && e.message) || e}` }
+    return { locked: false, reason: mine, file: lockFile, note: `a dead lock could not be cleared: ${(e && e.message) || e}` }
   }
   const second = tryLock()
   // A second failure means somebody took it in between — theirs, and it stays.
-  if (second) return { locked: false, reason: mine, note: `the lock was taken again while a dead one was cleared: ${second}` }
+  if (second) {
+    return { locked: false, reason: mine, file: lockFile, note: `the lock was taken again while a dead one was cleared: ${second}` }
+  }
 
   // AND CONFIRM THE LOCK IN PLACE IS OURS (fifth review). Two cleanups meeting the
   // same stale lock both read it before either cleared it, so both can reach this
   // line; `git worktree unlock` names no lock, so the loser cleared the winner's.
   // Whoever ends up NOT holding its own lock discovers it here — at the one moment
-  // the discovery is free, before anything has been verified or deleted.
-  const nowHeld = String(worktreeEntry(target, runGit)?.locked ?? '').trim()
+  // the discovery is free, before anything has been verified or deleted. Read from
+  // the file for the same reason as above: a padded copy of ours is not ours.
+  const nowHeld = readLockReason(lockFile)
   if (nowHeld !== mine) {
     return {
       locked: false,
       reason: mine,
+      file: lockFile,
       note: `another cleanup won the race for that tree — the lock in place is ${nowHeld || 'gone'}, not ours`,
     }
   }
-  return { locked: true, reason: mine, note: `cleared a dead lock — ${verdict.why}` }
+  return { locked: true, reason: mine, note: `cleared a dead lock — ${verdict.why}`, file: lockFile }
 }
 
 /**
@@ -371,6 +607,16 @@ export function takeCleanupLock(target, { git: runGit = git, probe = probePid, r
  * lock, (b) lands after the last of these reads, and (c) is not visible in them.
  * It is bounded by the few milliseconds between the reads and the unlink, and it
  * is the smallest this design can make it without a primitive git does not have.
+ *
+ * THE ONE THING THAT IS NOT PART OF THAT RESIDUAL, since the seventh and eighth
+ * reviews: a writer that DOES respect the lock. The exclusion these reads were
+ * taken under is re-proven by EVERY destructive step for itself — each link
+ * unlink, git's removal, the plain delete (`proveExclusion`, `removeTreeSafely`) —
+ * so a lock stripped or replaced at any point, including in the middle of the
+ * walk, REFUSES the removal instead of being missed. What is left is only the
+ * writer that ignores git's lock altogether, landing between one of those reads
+ * and the act it guards (exact widths at `removeTreeSafely`) — the case named
+ * above, not a second one.
  */
 export function cleanupWorktree(target, { dry = false, git: runGit = git, expected = null, probe = probePid } = {}) {
   const worktrees = listWorktrees(runGit)
@@ -384,44 +630,41 @@ export function cleanupWorktree(target, { dry = false, git: runGit = git, expect
   const wants = expected && typeof expected === 'object' && String(expected.branch ?? '').trim()
   let weLocked = false
   let ourLock = ''
+  let ourLockFile = null
   let lockNote = ''
   if (wants && exists && !dry) {
     const taken = takeCleanupLock(target, { git: runGit, probe })
     if (!taken.locked) return refuse(`could-not-take-the-lock: ${taken.note}`)
     weLocked = true
     ourLock = taken.reason
+    // Taken while the tree still stands: after the removal nothing can resolve it.
+    ourLockFile = taken.file ?? null
     lockNote = taken.note
   }
-  // RELEASE ONLY THE LOCK WE TOOK (fifth review). `git worktree unlock` names no
-  // lock — it clears whatever is in place — so an unconditional release reaches a
-  // lock that is not ours to touch, which is the exact class this point exists to
-  // end. It happens: two cleanups meeting one stale lock both read it before
-  // either cleared it, so the loser can end up releasing the winner's lock while
-  // the winner is still verifying. The winner then refuses (its own
-  // `matchesExpectation` sees a foreign reason), and THAT refusal must not take a
-  // third party's lock with it. So the reason in place is re-read and compared
-  // against ours; anything else is left standing and SAID, because a lock nobody
-  // released is a wedge somebody has to see.
+  // RELEASE ONLY THE LOCK WE TOOK — `releaseCleanupLock` holds the rule, the
+  // capability argument and the residual. It happens: two cleanups meeting one
+  // stale lock both read it before either cleared it, so the loser can end up
+  // releasing the winner's lock while the winner is still verifying. The winner
+  // then refuses (its own `matchesExpectation` sees a foreign reason, or none at
+  // all), and THAT refusal must not take a third party's lock with it. Whatever is
+  // left standing is SAID, because a lock nobody released is a wedge somebody has
+  // to see.
+  //
+  // THE RESIDUAL AT THIS CALL SITE, so nobody widens it by accident: the compare
+  // and the unlink inside cannot be made one act (git's own `worktree unlock` is
+  // an unconditional unlink of that same file, and POSIX has no compare-and-
+  // unlink). What that window can do is STRIP a lock another cleanup installed
+  // between the two syscalls — and that cleanup then REFUSES, because EVERY
+  // destructive step it takes re-reads this file for itself (`proveExclusion`, via
+  // the `exclusion` handed to `removeTreeSafely` below). Do not move those reads
+  // back into the verification, and do not collapse them into one before the walk:
+  // reading once and acting later is what the seventh and eighth reviews defeated,
+  // and the difference between a refused cleanup and a deletion without exclusion
+  // is exactly this ordering.
   let unlockNote = ''
   const tryUnlock = () => {
     if (!weLocked) return
-    let held
-    try {
-      held = String(worktreeEntry(target, runGit)?.locked ?? '').trim()
-    } catch {
-      unlockNote = 'the lock could not be re-read, so it was LEFT IN PLACE'
-      return
-    }
-    if (!held) return // it went with the tree, or somebody already cleared it
-    if (held !== ourLock) {
-      unlockNote = `the lock in place is not ours (${held}) — LEFT ALONE`
-      return
-    }
-    try {
-      runGit(['worktree', 'unlock', target])
-    } catch (e) {
-      unlockNote = `our own lock could not be released: ${`${(e && (e.stderr || e.message)) || e}`.split('\n')[0]}`
-    }
+    unlockNote = releaseCleanupLock(target, { file: ourLockFile, ours: ourLock })
   }
   const unlockOnRefusal = (reason) => {
     tryUnlock()
@@ -434,9 +677,23 @@ export function cleanupWorktree(target, { dry = false, git: runGit = git, expect
   // is the failure this whole lock had to be made recoverable for.
   try {
     if (wants && exists) {
+      const listed = worktreeEntry(target, runGit)
+      // WHERE WE HOLD A LOCK, THE FILE IS THE ONLY AUTHORITY ON WHAT IS IN PLACE —
+      // AND THERE IS NO FALLING BACK TO THE PORCELAIN (sixth review, finding 1).
+      // The porcelain TRIMS a lock reason (measured), so a padded copy of our own
+      // compares equal there and ownership would be "proven" by a comparison that
+      // cannot tell the two apart — finding 1 through the back door. `null` (the
+      // file could not be read) is not an answer either, and an unproven exclusion
+      // refuses like every other unproven fact in this rule. `takeCleanupLock`
+      // refuses to take a lock it cannot locate a file for, so `weLocked` already
+      // implies one.
+      const heldRaw = weLocked ? readLockReason(ourLockFile) : null
+      if (weLocked && heldRaw === null) {
+        return unlockOnRefusal("changed-under-cleanup: the lock this cleanup took could not be read back from git's own lock file")
+      }
       const match = matchesExpectation({
         expected,
-        entry: worktreeEntry(target, runGit),
+        entry: listed && weLocked ? { ...listed, locked: heldRaw } : listed,
         actual: readIdentity(target),
         dirty: checkoutDirty(target, runGit),
         ownLock: weLocked ? ourLock : '',
@@ -456,6 +713,15 @@ export function cleanupWorktree(target, { dry = false, git: runGit = git, expect
       git: runGit,
       registered: verdict.reason === 'registered',
       weLocked,
+      // THE EXCLUSION ITSELF, NOT A VERDICT ABOUT IT (seventh review, finding 4;
+      // eighth review, finding 2). The verification above read the lock and then
+      // ran `readIdentity` and a `git status` — hundreds of syscalls and a
+      // subprocess — before reaching this line, so deleting on THAT read is
+      // deleting on a cached fact. What travels down is the lock FILE and our
+      // reason; every destructive step inside re-reads them for itself. This is
+      // also what makes the other facts above trustworthy: they were established
+      // while we held the lock, and each fresh proof says we still do.
+      exclusion: weLocked ? { file: ourLockFile, reason: ourLock } : WITHOUT_A_LOCK,
     })
     // UNLOCK BEFORE PRUNING, or the record outlives the tree FOREVER. `git
     // worktree prune` SKIPS a locked worktree, and `removeTreeSafely` falls back
@@ -470,6 +736,11 @@ export function cleanupWorktree(target, { dry = false, git: runGit = git, expect
     return { ok: true, verdict, detached, stub, ...(notes ? { lockNote: notes } : {}) }
   } catch (e) {
     tryUnlock()
+    // A GUARD REFUSAL IS AN ANSWER, NOT A CRASH. `removeTreeSafely` throws when its
+    // last look finds the lock gone or foreign, because a return value can be
+    // ignored and a throw cannot; here it becomes the ordinary refusal verdict, so
+    // the caller sees "it changed under the cleanup" rather than a stack trace.
+    if (e && e.refusal) return refuse(`${e.refusal}${unlockNote ? ` [${unlockNote}]` : ''}`)
     throw e
   }
 }
