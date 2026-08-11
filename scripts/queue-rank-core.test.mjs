@@ -173,13 +173,21 @@ describe('the baseline moves only when nothing is outstanding', () => {
   it('writes nothing when the baseline already says what stands', () => {
     expect(settleRecord([9, 5], settledAt([5, 9]), { at: 't' })).toEqual({ changed: false, record: null })
   })
-  it('never erases the baseline over an order that reads as empty', () => {
+  it('never erases the baseline over an order that reads as empty — and FREEZES it, which is the price', () => {
     // A work order that is unreadable, half-written or mid-merge parses to zero
     // open points; taking that as "settled" would hand every point back as an
     // append the moment it read normally again.
     for (const empty of [[], null, 'garbage']) {
       expect(settleRecord(empty, settledAt([5, 9]), { at: 't' })).toEqual({ changed: false, record: null })
     }
+    // THE COST OF THAT RULE, pinned so nobody discovers it as a surprise: where
+    // the order really IS empty the baseline freezes, so the last point of a
+    // finished batch stays remembered and its later REOPEN is never asked about.
+    // One missed question, against a block loop out of every transient bad read —
+    // and nothing here can tell a finished work order from a mangled one.
+    const finished = settleRecord([], settledAt([4]), { at: 't' })
+    expect(finished.changed).toBe(false)
+    expect(unrankedAppends([4], settledAt([4]))).toEqual([])
   })
   it('--seed arms the whole open order at once, with its reason', () => {
     const seeded = seedRecord(null, [9, 5, 4], { why: 'arming baseline', at: 't' })

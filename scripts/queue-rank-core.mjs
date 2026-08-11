@@ -227,6 +227,20 @@ export function settleRecord(open, record, { at = '' } = {}) {
   // open points — unreadable, half-written, a checkout mid-merge — would
   // otherwise erase the baseline, and every open point would come back as an
   // append the moment it read normally again.
+  //
+  // THE PRICE, TAKEN DELIBERATELY (cross-vendor review, 11.08.2026): where the
+  // order really is empty, the baseline FREEZES. With a baseline of [4], closing
+  // 4 leaves the order empty, 4 stays remembered for ever, and its later REOPEN
+  // is never asked about — one missed question, on the last point of a finished
+  // batch. The alternative costs incomparably more: an unreadable or half-written
+  // read would erase the baseline and hand back EVERY open point as an append at
+  // once, a block loop out of a transient file state. Nothing here can tell the
+  // two apart — a genuinely finished work order and a mangled one both parse to
+  // zero open points, and every rule that would separate them (does a checklist
+  // heading survive, how many lines, did it shrink) is a guess about a file that
+  // is by then already broken. The READER could distinguish "no TASKS.md" from
+  // "TASKS.md with nothing open", and the guard already stands down on the first;
+  // the second is the ambiguous one, and it stays unresolved rather than guessed.
   if (!list.length) return { changed: false, record: null }
   const state = appendGateState(list, record)
   if (state.state !== 'settled') return { changed: false, record: null }

@@ -1938,7 +1938,13 @@ judgment would let the earlier of them through unasked. The baseline moves only
 while nothing is outstanding (`settleRecord`, which the guard runs at the turn
 end), and it is only ever ARMED by hand (`--seed --why`), which is also what a
 checkout carrying no baseline is asked for once, instead of the gate falling
-silent there. A record that does not PARSE is torn: the gate stays quiet — every
+silent there. RESIDUAL, taken deliberately: an order that reads as EMPTY settles
+nothing, so where the work order really is empty the baseline FREEZES and the
+last point of a finished batch is never asked about again when it reopens. The
+alternative — letting an empty read erase the baseline — hands back every open
+point as an append the moment the file reads badly, and nothing can tell a
+finished work order from a mangled one without guessing. A record that does not
+PARSE is torn: the gate stays quiet — every
 guard here is fail-open — while the CLI refuses to write over it, and a `ranked`
 entry without a reason is no decision and is dropped. Whether the gate is armed
 is read off `settled` alone, so an emptied `ranked` cannot pose as a fresh
