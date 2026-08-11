@@ -532,9 +532,28 @@ export function stripClosingWork(html) {
  * The document without ANY state card. The three kinds are mutually exclusive
  * (`board-structure-core` refuses a board carrying two), so whatever writes one
  * kind clears the others in the same edit.
+ *
+ * AN UNNUMBERED CARD IS A STATE CARD, whatever it says (four-eyes review,
+ * 12.08.2026). Since point 655 a current-work card either names its point in the
+ * chip or IS the handover card, so a card with neither chip nor legacy title
+ * number can only be a state card — one written by hand, or by a version of this
+ * module that had no marker yet. Without this clause nothing could remove such a
+ * card: the state patterns miss it and every point command needs a number, so
+ * the publish gate would refuse the board and the only repair left would be the
+ * hand edit this whole module exists to make unnecessary.
  */
 export function stripStateCards(html) {
-  return stripClosingWork(stripNoCurrentWork(html))
+  return stripUnnumberedNowCards(stripClosingWork(stripNoCurrentWork(html)))
+}
+
+/** Every now-card whose summary carries neither a chip nor a leading title number. */
+function stripUnnumberedNowCards(html) {
+  return String(html ?? '').replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card) => {
+    const summary = (card.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+    if (/<span class="num">\s*\d+\s*<\/span>/.test(summary)) return card
+    if (/<span class="t">\s*\d+\s*[—–-]/.test(summary)) return card
+    return ''
+  })
 }
 
 /**

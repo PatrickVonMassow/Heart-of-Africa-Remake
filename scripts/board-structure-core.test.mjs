@@ -9,7 +9,13 @@ import {
   stageOnlyTitle,
   structureViolations,
 } from './board-structure-core.mjs'
-import { CLOSING_WORK_TITLE, NO_CURRENT_WORK_TITLE, toClosingWork, toNoCurrentWork } from './board-core.mjs'
+import {
+  CLOSING_WORK_TITLE,
+  NO_CURRENT_WORK_TITLE,
+  setCardTitle,
+  toClosingWork,
+  toNoCurrentWork,
+} from './board-core.mjs'
 
 /** A minimal but structurally faithful board. */
 const sect = (title, body = '') =>
@@ -291,6 +297,11 @@ describe('every current-work card names its point and its subject', () => {
       'Nacharbeit am Zweig',
       'Cleanup parser for Windows',
       'Die Vorbereitung der Karten ist der Punkt',
+      // A stage word at the END is only the closing card's own shape when the
+      // stage is the closing one; these are ordinary titles and must publish.
+      'Karten: Vorbereitung',
+      'Parser: cleanup',
+      'Zweig: rework',
       '651 — Ein Betreff',
     ]) {
       expect(stageOnlyTitle(title), title).toBe(false)
@@ -302,6 +313,36 @@ describe('every current-work card names its point and its subject', () => {
 
   // Without the marker no command can REPLACE the card, and a state that cannot
   // be replaced is the trap the marker exists to prevent.
+  // A DIAGNOSTIC IS WORTH WHAT ITS REMEDY IS (four-eyes review, 12.08.2026): the
+  // first version of these cases asserted the message and never ran the command
+  // it named — and two of those commands could not in fact repair the card.
+  it('is repaired by the command it names: an unnumbered card is a STATE card', () => {
+    const stray =
+      '<details class="now">\n  <summary><span class="t">Abschlussarbeiten</span></summary>\n' +
+      '  <div class="body"><p>Irgendwas.</p></div>\n</details>'
+    const broken = withNow(stray)
+    expect(codes(broken)).toContain('now-card-unnumbered')
+    // The named remedy, executed — not merely quoted.
+    const repaired = toNoCurrentWork(broken, 'Abgeschlossen; der Nachfolger nimmt Punkt 656.', { stamp: '23:55' })
+    expect(codes(repaired)).toEqual([])
+    expect(repaired).not.toContain('Irgendwas.')
+    // …and so is the closing card, which replaces it just as well.
+    const closing = toClosingWork(broken, 651, {
+      subject: 'Ein Betreff',
+      reason: 'Vier-Augen fehlt.',
+      stamp: '23:40',
+    })
+    expect(codes(closing)).toEqual([])
+    expect(closing).not.toContain('Irgendwas.')
+  })
+
+  it('is repaired by the command it names: an unmarked closing title is retitled', () => {
+    const broken = withNow(chipCard(651, 'Ein Betreff: Abschlussarbeiten'))
+    expect(codes(broken)).toContain('now-card-unmarked-closing')
+    const repaired = setCardTitle(broken, 651, 'Ein Betreff')
+    expect(codes(repaired)).toEqual([])
+  })
+
   it('REFUSES a closing-shaped title that carries no closing marker', () => {
     const unmarked = chipCard(651, 'Ein Betreff: Abschlussarbeiten')
     expect(codes(withNow(unmarked))).toContain('now-card-unmarked-closing')
@@ -309,6 +350,11 @@ describe('every current-work card names its point and its subject', () => {
     expect(looksLikeClosingTitle('Ein Betreff: Abschlussarbeiten')).toBe(true)
     expect(looksLikeClosingTitle('Ein Betreff')).toBe(false)
     expect(looksLikeClosingTitle(null)).toBe(false)
+    // Only the CLOSING stage composes a state title — the others are subjects.
+    for (const title of ['Karten: Vorbereitung', 'Parser: cleanup', 'Zweig: rework']) {
+      expect(looksLikeClosingTitle(title), title).toBe(false)
+      expect(codes(withNow(chipCard(651, title))), title).toEqual([])
+    }
   })
 
   // The legacy closing card cannot be upgraded — it holds neither point nor

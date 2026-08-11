@@ -226,10 +226,16 @@ export function stageOnlyTitle(title) {
   return rest.length === 0
 }
 
-/** Does this title END on a stage word — the shape the closing card composes? */
+/**
+ * Is this title the shape the CLOSING card composes — "<Betreff>: <Stage>"?
+ *
+ * Only the closing stage counts, not every stage word (four-eyes review,
+ * 12.08.2026): "Karten: Vorbereitung" and "Parser: cleanup" are ordinary titles
+ * with a real subject and must publish, while a card that says a point's closing
+ * duties are what is running IS the closing state and owes the marker.
+ */
 export function looksLikeClosingTitle(title) {
-  const text = String(title ?? '').trim()
-  return STAGE_WORDS.some((w) => new RegExp(`[:—–-]\\s*${w}\\s*$`, 'i').test(text))
+  return /[:—–]\s*Abschlussarbeiten\s*$/i.test(String(title ?? '').trim())
 }
 
 /**
@@ -285,8 +291,10 @@ export function cardNamingViolations(html) {
         code: 'now-card-unnumbered',
         msg:
           `the current-work card ${named} carries no numbered chip — every card but the handover ` +
-          'card names its point. Replace it: node scripts/board.mjs closing <N> "<Grund>" for the ' +
-          'closing card, node scripts/board.mjs now <N> "<Stand>" for running work',
+          'card names its point. A card without a number counts as a STATE card, so writing one ' +
+          'replaces it: node scripts/board.mjs closing <N> "<Grund>" for the closing duties, ' +
+          'node scripts/board.mjs none "<Grund>" at a boundary, node scripts/board.mjs now <N> ' +
+          '"<Stand>" for running work',
       })
     }
     if (stageOnlyTitle(card.title)) {
@@ -308,8 +316,9 @@ export function cardNamingViolations(html) {
         code: 'now-card-unmarked-closing',
         msg:
           `the current-work card ${named} is titled as a closing card but carries no ` +
-          'data-state="closing" marker, so no command could ever replace it. Write it with ' +
-          'node scripts/board.mjs closing <N> "<Grund>"',
+          'data-state="closing" marker, so no state command would ever replace it. Retitle it — ' +
+          'node scripts/board.mjs title <N> "<Betreff>" — or send it away and write the real one: ' +
+          'node scripts/board.mjs queue <N>, then node scripts/board.mjs closing <N> "<Grund>"',
       })
     }
   })
