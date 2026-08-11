@@ -1092,9 +1092,34 @@ Build order, chosen so no two parallel agents own the same file:
   re-checked in a world where A concluded green and B is still running, reports B and
   not A; an entry re-checked with nothing pending stops blocking; the message for two
   pending runs names both. Plus a case pinning that no API call is added by the change.
+  SECOND HALF, SAME GUARD (measured 11.08.2026): the guard watches EVERY pushed ref, and
+  a ref a delegated agent is still BUILDING ON can never satisfy it. While one agent
+  worked, its branch took a push every few minutes; GitHub's concurrency group cancels
+  the in-progress run on each new push, so the branch presented `cancelled, cancelled,
+  cancelled, queued` — never a CONCLUDED run. The main session's turn end was blocked
+  four times in ~25 minutes, each block answered by a blocking wait that returned
+  "cancelled" and taught nothing. The rule is right where it came from (26 red runs on
+  `main` unseen for three weeks) and wrong here: an agent's intermediate commit is not a
+  state anybody claims is done — the same reasoning that gives a RESCUE commit
+  `[skip ci]` — and the state that must be green is the one `land-point.mjs` re-tests at
+  the merge anyway.
+  FINAL STATE, second half: (a) a CANCELLED run is never read as pending. Superseded by a
+  newer push is a known, harmless outcome, so the guard judges the NEWEST run per (ref,
+  workflow) and says "superseded" where an older one was cancelled. (b) A ref carrying a
+  LIVE delegated agent — the liveness probe of `scripts/batch-in-flight.mjs` already
+  exists and is already consulted at the landing — does not BLOCK on an unfinished run;
+  it is REPORTED as still building and judged when the agent reports. (c) A genuinely RED
+  run blocks in EVERY case, agent alive or not: this must not become a way to push red
+  work past the gate by keeping an agent running.
+  VERIFIABLE, second half: Vitest over the pure core — a ref whose newest run is
+  cancelled and superseded does not block; a ref with a live agent and a pending run
+  reports instead of blocking; the SAME ref with no live agent still blocks; a red run
+  blocks with the agent alive. Plus the transcript case: four consecutive blocks naming
+  cancelled runs produce one "still building" line instead.
   Criticality: low-medium — the gate's decision was right every time, so nothing unsafe
   landed. What it cost is trust and turns: a guard whose stated reason does not survive
-  a check is one the next reader starts arguing with instead of obeying.
+  a check is one the next reader starts arguing with instead of obeying, and one that
+  cannot be satisfied at all is one the next session looks for a way around.
 
 - [ ] 460. A RED VERIFICATION MUST BE DIAGNOSABLE WITHOUT RE-RUNNING IT (30.07.2026; bundle
   K). `runSuite` in `scripts/verify/run-all.mjs` captures each suite's complete output, prints
