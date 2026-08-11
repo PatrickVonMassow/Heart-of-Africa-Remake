@@ -376,6 +376,53 @@ describe('headings', () => {
     // A step along it moves the child inward rather than further out.
     expect(Math.hypot(27 + Math.sin(h) * 0.5, Math.cos(h) * 0.5)).toBeLessThan(27.5)
   })
+
+  // THE TWO PULLS OPPOSING ONE ANOTHER (work-order 648). With the chaser between
+  // a cornered runner and the middle, fleeing and returning point opposite ways
+  // and there are two equally good ways round. Taken always the short way, the
+  // choice flips as the geometry passes through opposition — an about-face, and
+  // the runner shuffles to and fro at the rim instead of breaking along it.
+  describe('with the chaser between the runner and the middle', () => {
+    // Runner far out at +x, chaser directly inside it: away = +x, inward = −x.
+    const runner = { x: 20, z: 0 }
+    const chaser = { x: 14, z: 0 }
+    const RADIUS = 28
+
+    it('breaks along the rim, the way the runner is already running', () => {
+      const north = evadeHeading(runner.x, runner.z, chaser.x, chaser.z, RADIUS, 0, 0, undefined, undefined, 0)
+      const south = evadeHeading(runner.x, runner.z, chaser.x, chaser.z, RADIUS, 0, 0, undefined, undefined, Math.PI)
+      // One goes each way along the rim, and neither is the flee bearing itself.
+      expect(Math.cos(north)).toBeGreaterThan(0)
+      expect(Math.cos(south)).toBeLessThan(0)
+    })
+
+    it('HOLDS that break instead of turning about-face (point 648)', () => {
+      // Walk the runner along the rim with the chaser following it round, the
+      // way the geometry passes through opposition, and count the reversals.
+      let heading = 0
+      let x = runner.x
+      let z = runner.z
+      let flips = 0
+      for (let i = 0; i < 400; i++) {
+        const next = evadeHeading(x, z, chaser.x, chaser.z, RADIUS, 0, 0, undefined, undefined, heading)
+        if (Math.cos(next - heading) < 0) flips++
+        heading = next
+        x += Math.sin(heading) * 0.05
+        z += Math.cos(heading) * 0.05
+      }
+      expect(flips).toBe(0)
+    })
+
+    it('still takes the short way where the two do NOT oppose', () => {
+      // Well inside the pull band and clear of opposition, the runner's own
+      // heading must not drag the evade the long way round.
+      // The chaser abreast of the runner, not between it and the middle.
+      const away = headingToward(14, 20, 20, 14)
+      const h = evadeHeading(20, 14, 14, 20, RADIUS, 0, 0, undefined, undefined, away - 2)
+      const bare = evadeHeading(20, 14, 14, 20, RADIUS)
+      expect(h).toBeCloseTo(bare, 9)
+    })
+  })
 })
 
 describe('the shipped calibration (design.md §21.2 — every value debug-editable)', () => {
