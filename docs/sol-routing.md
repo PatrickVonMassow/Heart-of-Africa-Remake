@@ -105,3 +105,26 @@ Measured over 47,258 turns from 391 transcripts (03.–11.08.2026, weighted):
 So the routable text half is **17.5 % of the entire spend**, and 40.7 % of the
 delegated agents' own verification — which is what makes part A worth having and
 what any decision about part B should be argued against.
+
+## The first real run
+
+Not a stub: `scripts/review-sol-cli.test.mjs` was reproduced red on this branch —
+18 of 19 cases failing — and the run went
+
+```
+node scripts/ask-sol.mjs --kind diagnose \
+     --brief "…18 of 19 cases fail. The attached log is the full run and the attached
+               patch is the only uncommitted change in the tree. Name the single cause." \
+     --log <the 44 kB run log> --log <the working-tree patch> --file scripts/review-sol.mjs --anyway
+```
+
+69,179 characters of material, answered in 9 s:
+
+> **CAUSE:** The patch removed `sol-share.mjs` and its dependencies from the test
+> fixture's `SCRIPT_FILES`, so the copied fixture cannot load `review-sol.mjs`.
+> **EVIDENCE:** The diff deletes `'sol-share.mjs'` from `SCRIPT_FILES`;
+> `review-sol.mjs` imports `currentSetting` from `'./sol-share.mjs'`; every failure
+> reports `ERR_MODULE_NOT_FOUND` for `/tmp/.../repo/scripts/sol-share.mjs`.
+
+Which is the cause, exactly — the same one that had actually cost a turn earlier
+in the build.
