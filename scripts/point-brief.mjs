@@ -17,6 +17,7 @@ import { relative } from 'node:path'
 import { ARCHIVE_PATH, readTasksAll, TASKS_PATH } from './tasks-source.mjs'
 import { BriefError, buildBrief, BRIEF_TOKEN_CEILING } from './point-brief-core.mjs'
 import { CLAUDE_PATH, DESIGN_PATH, REPO_ROOT, readDocCorpus } from './doc-corpus.mjs'
+import { currentSetting } from './sol-share.mjs'
 
 /**
  * The git half of the brief's provenance stamp: which commit, and whether the
@@ -65,6 +66,9 @@ try {
     docs: readDocCorpus(),
     number,
     revision: gitRevision(),
+    // Which vendor the read-only work goes to right now (point 654). READ, never
+    // assumed: the brief tells the agent what the switch actually says.
+    solShare: currentSetting().setting,
   })
   process.stdout.write(brief.endsWith('\n') ? brief : `${brief}\n`)
   if (showTokens || tokens > BRIEF_TOKEN_CEILING) {
