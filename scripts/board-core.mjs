@@ -183,6 +183,20 @@ export function refreshFooter(html, { openCount, now = new Date() } = {}) {
 const numberChip = (point) => `<span class="num">${point}</span>`
 
 /**
+ * A card TITLE as markup-safe text (four-eyes review, 12.08.2026). Every reader
+ * of a title — the gate, the finders, the retitle itself — matches `[^<]*`, so a
+ * raw `<` in a title made the card unreadable to all of them AND unrepairable by
+ * the very command that had written it. Entity-aware, so a title carried from
+ * one card to another does not gain a second `&amp;` on each move.
+ */
+export function escapeCardTitle(text) {
+  return String(text ?? '')
+    .replace(/&(?!(?:[a-z]+|#\d+);)/gi, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+/**
  * THE DASH between a legacy title's number and its subject — em, en or plain.
  * ONE definition for every matcher (four-eyes review, 12.08.2026): the strip,
  * the upgrade, the finder and the retitle each carried their own list, and a
@@ -312,7 +326,7 @@ export function promoteToNow(html, point, { title, times, status, stamp = berlin
     )
   }
   const now =
-    `<details class="now">\n  <summary>${numberChip(point)}<span class="t">${stripPointPrefix(title, point)}</span>` +
+    `<details class="now">\n  <summary>${numberChip(point)}<span class="t">${escapeCardTitle(stripPointPrefix(title, point))}</span>` +
     `<span class="right"><span class="meta">${times ?? stamp}</span></span></summary>\n` +
     `  <div class="body">\n${renderCardBody(status, { stamp })}\n  </div>\n</details>\n`
   // Both state cards go with it (points 470/544): the moment a point is current
@@ -934,7 +948,7 @@ function writeStateCard(html, { kind, point = null, title, text: reason, stamp, 
   if (objection) throw new Error(objection)
   const card =
     `<details class="now"${STATE_ATTR(kind)}>\n  <summary>${point == null ? '' : numberChip(point)}` +
-    `<span class="t">${title}</span>` +
+    `<span class="t">${escapeCardTitle(title)}</span>` +
     `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
     `  <div class="body">\n${renderCardBody(text, { stamp })}\n  </div>\n</details>\n`
   return insertAsFirstNowCard(stripStateCards(html), card)
@@ -1130,7 +1144,7 @@ export function setCardTitle(html, point, title) {
         'title and sets the marker together.',
     )
   }
-  const bare = closingMarked ? closingCardTitle(stripPointPrefix(text, point)) : stripPointPrefix(text, point)
+  const bare = escapeCardTitle(closingMarked ? closingCardTitle(stripPointPrefix(text, point)) : stripPointPrefix(text, point))
   const chipRe = new RegExp(
     `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*<span class="t">)[^<]*(</span>)`,
   )
@@ -1140,7 +1154,7 @@ export function setCardTitle(html, point, title) {
   )
   if (legacyRe.test(html)) return html.replace(legacyRe, `$1${numberChip(point)}<span class="t">${bare}$2`)
   const queueRe = new RegExp(`(<summary><span class="num">${point}</span><span class="t">)[^<]*(</span>)`)
-  if (queueRe.test(html)) return html.replace(queueRe, `$1${text}$2`)
+  if (queueRe.test(html)) return html.replace(queueRe, `$1${escapeCardTitle(text)}$2`)
   throw new Error(`board: no current-work or queue card for point ${point}`)
 }
 

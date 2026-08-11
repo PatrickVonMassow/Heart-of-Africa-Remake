@@ -547,6 +547,21 @@ describe('every current-work card names its point and its subject', () => {
     expect(codes(rewritten)).toEqual([])
   })
 
+  // EVERY READER OF A TITLE MATCHES `[^<]*`, so a raw `<` made the card
+  // unreadable to all of them AND unrepairable by the command that wrote it
+  // (four-eyes 12.08.).
+  it('writes a title with markup characters as text, and can still repair it', () => {
+    const running = withNow(chipCard(651, 'Ein Betreff'))
+    const withTag = setCardTitle(running, 651, 'Parser <API> & Co')
+    expect(withTag).toContain('<span class="t">Parser &lt;API&gt; &amp; Co</span>')
+    expect(nowCards(withTag)[0].title).toBe('Parser &lt;API&gt; &amp; Co')
+    expect(codes(withTag)).toEqual([])
+    // …and the escaped title survives a second retitle without doubling.
+    const again = setCardTitle(withTag, 651, 'Parser &amp; Co')
+    expect(again).toContain('<span class="t">Parser &amp; Co</span>')
+    expect(codes(again)).toEqual([])
+  })
+
   // The point-470 deny reads this predicate, and its remedies cannot reach a
   // card the strip refuses to remove — so the claim must be as true as the strip
   // (four-eyes 12.08.): a numbered card wearing the idle marker is running work.
