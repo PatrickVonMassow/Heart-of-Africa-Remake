@@ -7,10 +7,14 @@
     "643": {
       "at": "2026-08-11T15:00:17.845Z",
       "why": "Not release-blocking: the closing run proves the build with two full regressions rather than relying on a released red, and 643 refines a mechanism that only landed today. It waits behind the release work."
+    },
+    "644": {
+      "at": "2026-08-11T15:12:32.611Z",
+      "why": "Placed by hand at the head of the verification-integrity block instead: it is the only red on main right now, and a red main mails the user."
     }
   },
   "settled": {
-    "at": "2026-08-11T15:00:17.845Z",
+    "at": "2026-08-11T15:12:32.611Z",
     "points": [
       174,
       184,
@@ -167,7 +171,8 @@
       639,
       641,
       642,
-      643
+      643,
+      644
     ]
   }
 }
