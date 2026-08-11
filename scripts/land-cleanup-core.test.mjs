@@ -100,6 +100,37 @@ describe('ownership must be PROVEN', () => {
     expect(formatCleanupNotes(sel).join('\n')).toContain(tree.path)
   })
 
+  it('a DETACHED checkout outside the agent directory is REPORTED too — and keeps BOTH branches', () => {
+    // Whole-branch review, finding 5: this was classified `foreign`, so it fell out
+    // of `reported`, its empty branch matched nothing in the fallback comparison,
+    // and a live manual worktree rebasing the landed branch permitted both branch
+    // deletions — the incident's own shape, one level up.
+    const manual = { path: `${ROOT}/local/somebody-else`, branch: '' }
+    const v = judgeCleanupTarget({ ...base, worktree: manual, evidence: deadFor('x') })
+    expect(v.disposition).toBe(DISPOSITION.unproven)
+    expect(v.reason).toMatch(/detached/)
+    const sel = selectCleanupTargets({ ...base, worktrees: [manual], evidence: { [manual.path]: deadFor('x') } })
+    expect(sel.remove).toEqual([])
+    expect(sel.reported.map((r) => r.path)).toEqual([manual.path])
+    expect(sel.branch.delete).toBe(false)
+    expect(formatCleanupNotes(sel).join('\n')).toContain(manual.path)
+  })
+
+  it('a detached tree standing BESIDE the landed point\'s own dead one still keeps the branch', () => {
+    // The removal is not blocked by it — only the branch is. Debris costs one
+    // command; a branch deleted under a rebase costs the rebase.
+    const own = wt('608a', 'feat/608-x')
+    const manual = { path: `${ROOT}/local/rebasing`, branch: '' }
+    const sel = selectCleanupTargets({
+      ...base,
+      worktrees: [{ path: ROOT, branch: 'main' }, own, manual],
+      evidence: { [own.path]: deadFor('608a'), [manual.path]: deadFor('z') },
+    })
+    expect(sel.remove).toEqual([own.path])
+    expect(sel.branch.delete).toBe(false)
+    expect(sel.branch.reason).toContain(manual.path)
+  })
+
   it('a checkout on the landed branch outside the agent directory is REPORTED, not removed', () => {
     const v = judgeCleanupTarget({
       ...base,

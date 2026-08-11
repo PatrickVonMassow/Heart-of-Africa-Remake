@@ -160,11 +160,21 @@ export function judgeCleanupTarget({ worktree, branch, mainRoot, evidence = null
   // ── OWNERSHIP ──────────────────────────────────────────────────────────────
   if (!want) return at(DISPOSITION.unproven, 'the landing named no branch, so nothing can be tied to it')
   if (!has) {
-    // A detached agent worktree is the shape that cannot be judged: it may be the
-    // landed point's own tree mid-rebase, or another agent's. Say so.
-    return agent
-      ? at(DISPOSITION.unproven, `an agent worktree with a detached HEAD — nothing proves it belongs to ${want}`)
-      : at(DISPOSITION.foreign, 'a detached worktree outside the agent directory')
+    // A DETACHED TREE IS UNPROVEN WHEREVER IT SITS (whole-branch review, finding 5).
+    // A detached HEAD reports no branch, so nothing here can tell a tree that is
+    // rebasing the landed branch from one that has never heard of it — and calling
+    // the non-agent case `foreign` made that ignorance look like knowledge: it
+    // dropped out of `reported`, its empty branch matched nothing in the fallback
+    // comparison, and BOTH branch deletions were permitted while a live manual
+    // checkout stood on the branch mid-rebase. That is the incident's own shape one
+    // level up, so the answer is the same on both sides of the isolation directory:
+    // unproven, reported, and the branch stays.
+    return at(
+      DISPOSITION.unproven,
+      agent
+        ? `an agent worktree with a detached HEAD — nothing proves it belongs to ${want}`
+        : `a detached worktree outside the agent directory — nothing proves it is NOT standing on ${want}`,
+    )
   }
   if (has !== want) return at(DISPOSITION.foreign, `checked out on ${has}, not on ${want}`)
   if (!agent) {
