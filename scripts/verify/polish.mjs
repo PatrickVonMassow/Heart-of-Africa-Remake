@@ -3447,67 +3447,78 @@ if (section('children-motion')) {
       `longest stall while commanded to move ${longestStall.toFixed(2)}s`,
     )
 
-    // 2. NOTHING JITTERS. A shuffle on the spot is an ALTERNATION: the step taken
-    // this frame undoes the last one. Real running does not reverse — the body
-    // turns at a bounded rate, so consecutive steps are near-parallel. Measured
-    // here before the fix: 7.2 to 11.5 % of all steps. After it: under 1 %.
+    // 2. NOTHING SHUFFLES ON THE SPOT — the user's own words, measured as he
+    // would judge them: over a window of two SECONDS, does a child WALK a real
+    // distance without LEAVING a small circle?
     //
-    // The breakdown rides along in the detail because it is what NAMED the cause
-    // when this first went red: nearly every reversal carried the game's own
-    // travel heading with it, which ruled out the separation and the bodies and
-    // pointed at the steering — where it was.
-    let reversals = 0
-    let steps = 0
-    const diag = { tiny: 0, near: 0, pushed: 0, idle: 0, mag: 0, headingFlip: 0, offHeading: 0, perChild: Array(n).fill(0) }
+    // It used to count REVERSALS — a step that undoes the one before — and that
+    // check could never hold, for two reasons found by replaying this same game
+    // in the pure layer (src/scenes/place/tagShuffle.test.ts). A chase is FULL of
+    // legitimate reversals: a runner doubling back at the rim, a chaser cutting
+    // in as its quarry dodges. And their rate rides on the FRAME RATE — 1.4 % of
+    // steps at 60 fps against 3.2 % at 14, because a slower frame turns a longer
+    // step — so on this machine, where a headless frame takes anything from 20 ms
+    // to over a second, one run passed a 3 % gate and the next failed it on the
+    // same code. Ground covered against ground walked has neither fault.
+    //
+    // The gate is the pure layer's, and this run is the proof that the LIVE
+    // settlement — real frame times, the speech, the bodies, the player standing
+    // in it — behaves as the replay says. Measured before the fix at this seed:
+    // 33 % of windows in the worst village, 0.5 % here; after it, none at all.
+    const SPAN = 2
+    const MIN_PATH = 2
+    const CIRCLE = 0.5
+    let windows = 0
+    let stuckWindows = 0
+    let worst = { path: 0, out: 0, child: -1, clock: 0 }
     for (let k = 0; k < n; k++) {
-      for (let i = 2; i < log.length; i++) {
-        const a = log[i - 2].c[k]
-        const b = log[i - 1].c[k]
-        const c = log[i].c[k]
-        const ux = b.x - a.x
-        const uz = b.z - a.z
-        const vx = c.x - b.x
-        const vz = c.z - b.z
-        // Only real steps count: two stationary frames have no direction at all.
-        if (Math.hypot(ux, uz) < 1e-3 || Math.hypot(vx, vz) < 1e-3) continue
-        steps++
-        if (ux * vx + uz * vz >= 0) continue
-        reversals++
-        diag.perChild[k]++
-        const back = Math.hypot(vx, vz)
-        diag.mag += back
-        if (back < 0.005) diag.tiny++
-        if (c.pace < 1e-6) diag.idle++
-        // Did the chase itself walk that far, or did something else move it?
-        if (back - (c.walked - b.walked) > 0.001) diag.pushed++
-        // Did the game's OWN travel heading reverse with the step, or did the
-        // step disagree with the heading it reports?
-        const dh = Math.abs(Math.atan2(Math.sin(c.heading - b.heading), Math.cos(c.heading - b.heading)))
-        if (dh > Math.PI / 2) diag.headingFlip++
-        const stepH = Math.atan2(vx, vz)
-        const off = Math.abs(Math.atan2(Math.sin(stepH - c.heading), Math.cos(stepH - c.heading)))
-        if (off > 0.3) diag.offHeading++
-        let nearest = Infinity
-        for (let j = 0; j < n; j++) {
-          if (j === k) continue
-          nearest = Math.min(nearest, Math.hypot(c.x - log[i].c[j].x, c.z - log[i].c[j].z))
+      for (let i = 0; i < log.length; i++) {
+        let j = i
+        let walked = 0
+        let out = 0
+        while (j < log.length - 1 && log[j + 1].clock - log[i].clock < SPAN) {
+          walked += Math.hypot(log[j + 1].c[k].x - log[j].c[k].x, log[j + 1].c[k].z - log[j].c[k].z)
+          j++
+          out = Math.max(out, Math.hypot(log[j].c[k].x - log[i].c[k].x, log[j].c[k].z - log[i].c[k].z))
         }
-        if (nearest < contact + 0.15) diag.near++
+        // The tail of the trace is shorter than a window: nothing to judge.
+        if (log[j].clock - log[i].clock < SPAN * 0.9) break
+        windows++
+        if (walked > MIN_PATH && out < CIRCLE) {
+          stuckWindows++
+          if (walked / Math.max(0.01, out) > worst.path / Math.max(0.01, worst.out)) {
+            worst = { path: walked, out, child: k, clock: log[i].clock }
+          }
+        }
       }
     }
-    const rate = steps > 0 ? reversals / steps : 0
+    const share = windows > 0 ? stuckWindows / windows : 0
     check(
-      'no child alternates back and forth on the spot',
-      steps > 200 && rate < 0.03,
-      `${reversals} reversals in ${steps} steps (${(rate * 100).toFixed(1)} %) — ` +
-        `per child ${diag.perChild.join('/')}, mean back-step ${(diag.mag / Math.max(1, reversals) * 1000).toFixed(1)} mm, ` +
-        `${diag.tiny} under 5 mm, ${diag.idle} at pace 0, ${diag.pushed} moved further than the chase walked, ${diag.near} beside a neighbour, ` +
-        `${diag.headingFlip} with the travel heading itself reversed, ${diag.offHeading} stepping off their heading`,
+      'no child walks without getting anywhere',
+      windows > 200 && share < 0.01,
+      `${stuckWindows} of ${windows} two-second windows (${(share * 100).toFixed(2)} %) with over ${MIN_PATH} m walked ` +
+        `inside ${CIRCLE} m` +
+        (worst.child >= 0
+          ? ` — worst child ${worst.child} at ${worst.clock.toFixed(1)}s, ${worst.path.toFixed(2)} m inside ${worst.out.toFixed(2)} m`
+          : ''),
     )
     // AND A LOOK AT THEM. The complaint is what the player SEES, so the run
     // leaves a frame of the children themselves — the traveller stepped back to
     // the group and turned to face it, the shutter projecting their centroid so
     // a frame named after them cannot photograph an empty lane (point 375).
+    // A frame of the GROUP, not of the one child who happens to be in the open.
+    // Their ground is 13 m across and the huts stand in it, so at a moment when
+    // the chase has strung them out no standpoint sees more than one of them —
+    // which is a picture of an empty village with a figure in it. The shutter
+    // therefore waits, bounded, for the game to bring them back together, and
+    // shoots anyway if it does not.
+    await stepUntil(() => {
+      const kids = window.__placeTag().children
+      if (kids.length === 0) return true
+      const mx = kids.reduce((s, k) => s + k.x, 0) / kids.length
+      const mz = kids.reduce((s, k) => s + k.z, 0) / kids.length
+      return kids.every((k) => Math.hypot(k.x - mx, k.z - mz) < 3)
+    }, null, 300)
     const aimed = await page.evaluate(() => {
       const p = window.__placePlayer
       const kids = window.__placeTag().children
@@ -3533,6 +3544,15 @@ if (section('children-motion')) {
       // roof is opaque, and a subject that merely projects into the frame can
       // sit behind one. The roof overhangs the footprint, so the sightline is
       // tested against a hut generously wider than its wall.
+      //
+      // AND THEN BY ELBOW ROOM. Seeing every child was not enough: the first
+      // standpoint that saw them all stood in the alley between two dwellings,
+      // and at eye height a wall a metre away fills half the picture whatever
+      // the sightline says — the children came out as thumbnails in the gap
+      // between two roofs. Among the standpoints that see the same number, the
+      // one standing FURTHEST from any dwelling wins, and a nearer one only on
+      // a tie, so the frame is taken from open ground looking in.
+      const room = (sx, sz) => Math.min(...huts.map((h) => Math.hypot(sx - h.x, sz - h.z) - h.r))
       let best = null
       for (let i = 0; i < 24; i++) {
         const a = (i / 24) * Math.PI * 2
@@ -3543,7 +3563,13 @@ if (section('children-motion')) {
           if (blocks(sx, sz, sx, sz, 2)) continue // standing inside a hut
           const seen = kids.filter((k) => !blocks(sx, sz, k.x, k.z, 1.2))
           if (seen.length === 0) continue
-          if (best === null || seen.length > best.seen.length) best = { sx, sz, seen }
+          const clear = huts.length > 0 ? room(sx, sz) : Infinity
+          const better =
+            best === null ||
+            seen.length > best.seen.length ||
+            (seen.length === best.seen.length &&
+              (clear > best.clear + 0.5 || (clear > best.clear - 0.5 && dist < best.dist)))
+          if (better) best = { sx, sz, seen, clear, dist }
         }
       }
       if (!best) return null
