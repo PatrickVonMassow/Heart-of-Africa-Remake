@@ -196,6 +196,12 @@ there exactly once; a new point joins a bundle when appended.
   the first thing to check) — and fixed at that cause. The throttle probe of point 640 is the
   instrument: if the red reproduces under throttle, it is timing; if it never does, the margin
   and the sampling are the suspects.
+  WORK ALREADY STANDS ON A BRANCH (11.08.2026). `feat/641-giza-edge-red` is PUSHED at 8eaa9a6f
+  — three commits: a ground crop read by its MEDIAN so a rain streak cannot fake the edge band, that
+  crop helper classified as the pure decision layer it is, and a soak budget a loaded machine can
+  meet. The agent was STOPPED mid-run to free a pool slot for the user-blocking point 648, not
+  because the work was wrong. Whoever takes this point RESUMES from that branch and re-runs the
+  throttle probe on both backends, which is exactly where it was interrupted.
   VERIFIABLE: the failure reproduced deterministically by a named mechanism, then absent after
   the fix by the same mechanism; `polish --section=settlement-edge` green on both backends,
   three runs each, on a quiet machine AND under throttle.
