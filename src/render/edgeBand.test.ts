@@ -10,20 +10,27 @@ import * as THREE from 'three/webgpu'
 import { PLACES, PLACE_KINDS } from '../world/geo'
 import { buildLayout } from '../scenes/place/layout'
 import { buildBoundaryLut, isOutsidePlace, placeBoundaryRadius, BOUNDARY_LUT_SIZE } from '../scenes/place/boundary'
-import { REGION_PLACE_STYLES } from '../scenes/place/regionStyles'
+import { MONUMENT_GROUND, PORT_GROUND, REGION_PLACE_STYLES } from '../scenes/place/regionStyles'
+import { GROUND_PATCH_WEIGHT } from './materials'
 import { seasonTintCpu } from './seasonTint'
 import { balance } from '../config/balance'
 import {
   EDGE_BAND_MAX_WANDER_M,
+  EDGE_CORE_HALF,
+  MIN_EDGE_CONTRAST,
   SWEPT_GROUND_BY_KIND,
   clampWander,
   clearEdgeBand,
   edgeBandBounds,
   edgeBandState,
+  edgeGroundContrast,
   edgeOpenness,
+  groundLuma,
+  openGroundLevel,
   setEdgeBandBoundary,
   setEdgeBandLook,
   sweptGroundColor,
+  type GroundPalette,
 } from './edgeBand'
 
 const SEED = 4711
@@ -113,19 +120,20 @@ describe('the band sits where the leave check flips (design.md §2.6 "it must no
 })
 
 describe('the wander stays inside its tolerance (it may look natural, it may not mislead)', () => {
-  it('caps whatever the debug menu sets — hard limit and band-relative limit', () => {
+  it('caps whatever the debug menu sets — hard limit and fall-relative limit', () => {
     expect(clampWander(99)).toBe(EDGE_BAND_MAX_WANDER_M)
     expect(clampWander(-5)).toBe(0)
-    // Never more than 45 % of the width, so a narrow band cannot be shifted off
-    // the line it stands for.
-    expect(clampWander(99, 1)).toBeCloseTo(0.45, 6)
-    expect(clampWander(0.4, 1)).toBeCloseTo(0.4, 6)
+    // Never more than 90 % of the band's VISIBLE FALL, so the true boundary
+    // cannot be warped out of the part of the give-way the player sees change.
+    expect(clampWander(99, 1)).toBeCloseTo(EDGE_CORE_HALF * 0.9, 6)
+    expect(clampWander(0.3, 3)).toBeCloseTo(0.3, 6)
     for (const width of [0.2, 1, 3, 12]) {
       for (const wander of [-1, 0, 0.5, 3, 50]) {
         const w = clampWander(wander, width)
         expect(w).toBeGreaterThanOrEqual(0)
         expect(w).toBeLessThanOrEqual(EDGE_BAND_MAX_WANDER_M)
         expect(w).toBeLessThan(Math.max(0.05, width) / 2)
+        expect(w).toBeLessThanOrEqual(Math.max(0.05, width) * EDGE_CORE_HALF * 0.9 + 1e-12)
       }
     }
   })
@@ -157,6 +165,11 @@ describe('the wander stays inside its tolerance (it may look natural, it may not
     expect(clampWander(balance.placeEdgeBand.wanderM, balance.placeEdgeBand.widthM))
       .toBeCloseTo(balance.placeEdgeBand.wanderM, 6)
     expect(balance.placeEdgeBand.wanderM).toBeGreaterThan(0)
+    // The fall stays a give-way a walker crosses in a stride or two, never a
+    // hairline: about the middle metre of the shipped 3 m band.
+    const fall = balance.placeEdgeBand.widthM * EDGE_CORE_HALF * 2
+    expect(fall).toBeGreaterThan(0.5)
+    expect(fall).toBeLessThan(2)
   })
 
   it('the ramp is monotone: further out never reads MORE swept', () => {
@@ -168,6 +181,23 @@ describe('the wander stays inside its tolerance (it may look natural, it may not
     }
     expect(edgeOpenness(28, 3, 28)).toBeCloseTo(0.5, 6)
   })
+
+  it('the change is CONCENTRATED at the boundary — an edge, not a gradient (581)', () => {
+    const radius = 28
+    const width = balance.placeEdgeBand.widthM
+    const halfFall = width * EDGE_CORE_HALF
+    // Nearly the whole change happens inside the fall …
+    const lo = edgeOpenness(radius, width, radius - halfFall)
+    const hi = edgeOpenness(radius, width, radius + halfFall)
+    expect(hi - lo).toBeGreaterThan(0.7)
+    // … while the band's outer thirds stay quiet, so it still gives way.
+    expect(lo).toBeLessThan(0.15)
+    expect(1 - hi).toBeLessThan(0.15)
+    // A metre out from the boundary the ground is already all but open: the old
+    // ramp still stood at ×0.7 there, which is what read as haze rather than edge.
+    expect(edgeOpenness(radius, width, radius + 1)).toBeGreaterThan(0.9)
+    expect(edgeOpenness(radius, width, radius - 1)).toBeLessThan(0.1)
+  })
 })
 
 describe('every place kind decides about its edge (PLACE_KINDS totality, point 335)', () => {
@@ -175,7 +205,7 @@ describe('every place kind decides about its edge (PLACE_KINDS totality, point 3
     expect(Object.keys(SWEPT_GROUND_BY_KIND).sort()).toEqual([...PLACE_KINDS].sort())
   })
 
-  it('every kind gets a readable, bounded look on all three terms', () => {
+  it('every kind gets a readable, bounded look on every term', () => {
     for (const kind of PLACE_KINDS) {
       const look = SWEPT_GROUND_BY_KIND[kind]
       for (const [term, v] of Object.entries(look)) {
@@ -187,13 +217,14 @@ describe('every place kind decides about its edge (PLACE_KINDS totality, point 3
       expect(state.tone).toBeCloseTo(look.tone * balance.placeEdgeBand.strength, 6)
       expect(state.relief).toBeCloseTo(look.relief * balance.placeEdgeBand.strength, 6)
       expect(state.mottle).toBeCloseTo(look.mottle * balance.placeEdgeBand.strength, 6)
+      expect(state.desat).toBeCloseTo(look.desat * balance.placeEdgeBand.strength, 6)
     }
   })
 
   it('the master strength scales the whole edge and 0 switches it off', () => {
     setEdgeBandLook('village', { widthM: 3, wanderM: 0.9, strength: 0 })
     const off = edgeBandState()
-    expect(off.tone + off.relief + off.mottle).toBe(0)
+    expect(off.tone + off.relief + off.mottle + off.desat).toBe(0)
     setEdgeBandLook('village', { widthM: 3, wanderM: 0.9, strength: 0.5 })
     expect(edgeBandState().tone).toBeCloseTo(SWEPT_GROUND_BY_KIND.village.tone * 0.5, 6)
   })
@@ -219,8 +250,7 @@ describe('the edge stays readable at BOTH ends of the year (design.md §19.13)',
         })
         for (const r of ratios) {
           expect(r).toBeCloseTo(ratios[0], 6)
-          // A readable step: at least 10 % of the ground's own brightness.
-          expect(1 - r).toBeGreaterThan(0.1)
+          expect(1 - r).toBeGreaterThan(MIN_EDGE_CONTRAST)
         }
       }
     }
@@ -233,5 +263,98 @@ describe('the edge stays readable at BOTH ends of the year (design.md §19.13)',
       const inside = sweptGroundColor(c, 1, look)
       expect(inside[0] / c[0]).toBeCloseTo(1 - look.tone, 6)
     }
+  })
+})
+
+// The complaint work-order 581 answers was not a wrong number, it was "ich sehe
+// sie nicht": at the shipped defaults, with the master strength already at its
+// documented ceiling, the boundary did not read. The picture decides that, and
+// the frames are taken by hand at the Bambara village it was reported from — but
+// what the picture cannot do is stand guard afterwards. THIS is that guard: the
+// swept ground's value against the ground it actually sits on, for every
+// settlement kind and every palette in the game, so a later ground or palette
+// change cannot quietly bleach the edge away again.
+describe('the edge READS against the ground it sits on (work-order 581)', () => {
+  const linear = (hex: string): [number, number, number] => {
+    const c = new THREE.Color(hex)
+    return [c.r, c.g, c.b]
+  }
+  const paletteOf = (ground: readonly [string, string, string], patchWeight: number): GroundPalette => ({
+    base: linear(ground[0]),
+    alt: linear(ground[1]),
+    patch: linear(ground[2]),
+    patchWeight,
+  })
+
+  /** Every ground a settlement of that kind is really drawn on. */
+  const GROUNDS: { kind: (typeof PLACE_KINDS)[number]; label: string; palette: GroundPalette }[] = [
+    ...Object.entries(REGION_PLACE_STYLES).map(([region, style]) => ({
+      kind: 'village' as const,
+      label: `village on ${region} earth`,
+      palette: paletteOf(style.ground, GROUND_PATCH_WEIGHT.earth),
+    })),
+    { kind: 'port', label: 'port', palette: paletteOf(PORT_GROUND, GROUND_PATCH_WEIGHT.earth) },
+    { kind: 'monument', label: 'monument sand', palette: paletteOf(MONUMENT_GROUND, GROUND_PATCH_WEIGHT.sand) },
+  ]
+
+  it('covers every place kind — no kind is left without a ground to be seen against', () => {
+    expect([...new Set(GROUNDS.map((g) => g.kind))].sort()).toEqual([...PLACE_KINDS].sort())
+  })
+
+  it('clears the minimum contrast on every kind and every palette, at every season', () => {
+    for (const { kind, label, palette } of GROUNDS) {
+      const look = SWEPT_GROUND_BY_KIND[kind]
+      for (const tint of [0, 0.5, 1]) {
+        const tinted: GroundPalette = {
+          base: seasonTintCpu(palette.base, tint),
+          alt: seasonTintCpu(palette.alt, tint),
+          patch: seasonTintCpu(palette.patch, tint),
+          patchWeight: palette.patchWeight,
+        }
+        const { contrast } = edgeGroundContrast(look, tinted)
+        expect(contrast, `${label} @ tint ${tint}`).toBeGreaterThanOrEqual(MIN_EDGE_CONTRAST)
+        // …and it stays a give-way in the world, not a black rim on a bright plate.
+        expect(contrast, `${label} @ tint ${tint}`).toBeLessThan(0.6)
+      }
+    }
+  })
+
+  it('carries a SECOND cue beside the value — the beaten-out dust (581)', () => {
+    const chroma = (c: [number, number, number]) => Math.max(...c) - Math.min(...c)
+    for (const { kind, label, palette } of GROUNDS) {
+      const look = SWEPT_GROUND_BY_KIND[kind]
+      const { open, swept } = edgeGroundContrast(look, palette)
+      // The swept side is the LESS colourful of the two, relative to how bright
+      // each of them is — so the cue survives on the pale sand of a Bambara
+      // village, where a value step alone had little to work with.
+      expect(chroma(swept) / groundLuma(swept), label).toBeLessThan(chroma(open) / groundLuma(open) * 0.85)
+      // …and it moves no brightness: the value step is the value step.
+      const noDesat = { ...look, desat: 0 }
+      expect(groundLuma(sweptGroundColor(open, 1, look)), label)
+        .toBeCloseTo(groundLuma(sweptGroundColor(open, 1, noDesat)), 9)
+    }
+  })
+
+  it('the swept side is LEVELLED, not bleached: losing the blotches costs no brightness', () => {
+    for (const { label, palette } of GROUNDS) {
+      const even: [number, number, number] = [
+        (palette.base[0] + palette.alt[0]) / 2,
+        (palette.base[1] + palette.alt[1]) / 2,
+        (palette.base[2] + palette.alt[2]) / 2,
+      ]
+      const level = openGroundLevel(palette)
+      // The level the mottling is flattened to lies BELOW the unblotched colour
+      // — it is the mottled ground's own mean, which is what used to be missing.
+      expect(groundLuma(level), label).toBeLessThan(groundLuma(even))
+      expect(groundLuma(level), label).toBeGreaterThan(groundLuma(palette.patch))
+    }
+  })
+
+  it('the master strength still owns the whole read, and 0 is no edge at all', () => {
+    const palette = paletteOf(REGION_PLACE_STYLES.west.ground, GROUND_PATCH_WEIGHT.earth)
+    const look = SWEPT_GROUND_BY_KIND.village
+    expect(edgeGroundContrast(look, palette, 0).contrast).toBeCloseTo(0, 9)
+    expect(edgeGroundContrast(look, palette, 0.5).contrast)
+      .toBeCloseTo(edgeGroundContrast(look, palette, 1).contrast / 2, 6)
   })
 })

@@ -784,10 +784,12 @@ export const balance: BalanceConfig = {
   bankWadeDepth: 0.7,
   placeEdgeBand: {
     // Calibratable: ~3 m of give-way reads as a soft change underfoot at walking
-    // pace without turning into a stripe, and 0.9 m of wander bows the outline
-    // visibly while staying well inside the 1.5 m honesty cap.
+    // pace without turning into a stripe, and 0.4 m of wander bows the outline
+    // visibly. The wander is bounded by the band's VISIBLE FALL rather than its
+    // full width (work-order 581) — the fall is now about the middle metre of
+    // those 3 m, and a warp that pushed the true boundary out of it would mislead.
     widthM: 3,
-    wanderM: 0.9,
+    wanderM: 0.4,
     strength: 1,
   },
   bloodStain: {

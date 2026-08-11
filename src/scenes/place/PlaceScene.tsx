@@ -82,7 +82,7 @@ import {
   seatFootOnGround,
   type GoatLeg,
 } from '../../render/fauna'
-import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
+import { MONUMENT_GROUND, PORT_GROUND, REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { SpeechLabels } from './SpeechLabels'
 import { releasePointerLock, requestPlacePointerLock } from './pointerLock'
@@ -238,7 +238,7 @@ function usePlaceMaterials(
       : undefined
     const ground = flatGround
       ? new THREE.MeshStandardMaterial({
-          color: isMonument ? '#e0c489' : isPort ? '#dcc99c' : style.ground[0],
+          color: isMonument ? MONUMENT_GROUND[0] : isPort ? PORT_GROUND[0] : style.ground[0],
           roughness: 1,
           metalness: 0,
         })
@@ -246,9 +246,9 @@ function usePlaceMaterials(
         ? // The walkable Giza plateau: warm, granular DESERT SAND (matched to
           // the travel desert biome), not the port's pebbled sandy earth
           // (point 273) — the `sand` mode mutes the earth mottling.
-          createGroundMaterial('#e0c489', '#d3b578', '#c2a05e', pathOpts, { sand: true })
+          createGroundMaterial(...MONUMENT_GROUND, pathOpts, { sand: true })
         : isPort
-          ? createGroundMaterial('#dcc99c', '#c4ad7c', '#b59a6b', pathOpts)
+          ? createGroundMaterial(...PORT_GROUND, pathOpts)
           : createGroundMaterial(style.ground[0], style.ground[1], style.ground[2], pathOpts)
     return { plaster, plasterDark, mud, thatch, wood, cloth, ground }
   }, [isPort, isMonument, style, pathTex, flatGround])
