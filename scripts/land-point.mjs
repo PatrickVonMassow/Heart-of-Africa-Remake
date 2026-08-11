@@ -25,7 +25,7 @@
 // the failure mode this command exists to remove.
 import { execFile, execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
@@ -33,7 +33,7 @@ import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
-import { formatCleanupNotes, isAgentWorktree, selectCleanupTargets } from './land-cleanup-core.mjs'
+import { formatCleanupNotes, isAgentWorktree, reproveRemoval, selectCleanupTargets } from './land-cleanup-core.mjs'
 import { worktreeActiveAt } from './batch-in-flight.mjs'
 import { probePid } from './batch-singleton.mjs'
 import {
@@ -93,7 +93,9 @@ export function listWorktrees({ cwd = REPO_ROOT } = {}) {
   for (const line of out.split('\n')) {
     if (line.startsWith('worktree ')) {
       if (cur) trees.push(cur)
-      cur = { path: line.slice('worktree '.length).trim(), branch: '', locked: null }
+      cur = { path: line.slice('worktree '.length).trim(), branch: '', head: '', locked: null }
+    } else if (line.startsWith('HEAD ') && cur) {
+      cur.head = line.slice('HEAD '.length).trim()
     } else if (line.startsWith('branch ') && cur) {
       cur.branch = line.slice('branch '.length).trim().replace(/^refs\/heads\//, '')
     } else if (cur && (line === 'locked' || line.startsWith('locked '))) {
@@ -102,6 +104,53 @@ export function listWorktrees({ cwd = REPO_ROOT } = {}) {
   }
   if (cur) trees.push(cur)
   return trees
+}
+
+/**
+ * WHAT GIT'S OWN RECORD SAYS THIS CHECKOUT IS — the admin directory its `.git`
+ * points at, or null when there is none to read.
+ *
+ * A LINKED worktree carries a `.git` FILE reading `gitdir: <repo>/.git/worktrees/
+ * <name>`; git writes it when it creates the tree, which makes it the closest
+ * thing to a creation record that exists (review finding 3). A directory whose
+ * `.git` is a real DIRECTORY is a repository of its own that merely sits at that
+ * path, and it answers its own path — which the pure rule then refuses.
+ */
+function linkedGitdirOf(path) {
+  const dot = join(path, '.git')
+  try {
+    if (statSync(dot).isDirectory()) return dot
+    const m = readFileSync(dot, 'utf8').match(/^gitdir:\s*(.+)$/m)
+    return m ? resolve(path, m[1].trim()) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * IS THIS TREE'S HEAD ALREADY INSIDE WHAT THE LANDING TAKES? true / false / null.
+ *
+ * The landing did not create the worktree, so it cannot prove authorship; what it
+ * CAN prove is that the commit the tree stands on is contained in what it merged.
+ * A tree carrying anything beyond that holds work the landing did not take —
+ * which is the state that cost six finished review answers on 11.08.2026.
+ *
+ * `git merge-base --is-ancestor` answers by exit code: 0 contained, 1 not, and
+ * anything else is an error, which must read as "could not be established" rather
+ * than as either verdict.
+ */
+function headContainedIn(head, target, { cwd = REPO_ROOT } = {}) {
+  if (!head || !target) return null
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', head, target], {
+      cwd,
+      windowsHide: true,
+      stdio: ['ignore', 'ignore', 'ignore'],
+    })
+    return true
+  } catch (e) {
+    return e && e.status === 1 ? false : null
+  }
 }
 
 /**
@@ -116,10 +165,22 @@ export function listWorktrees({ cwd = REPO_ROOT } = {}) {
  * the status runs with `--no-optional-locks` so it does not rewrite the index at
  * all (the same flag `batch-in-flight.mjs` uses, for the same reason).
  *
+ * SUBMODULES ARE NOT IGNORED (review finding 5). The status ran with
+ * `--ignore-submodules=all`, which is a defensible cost saving for a liveness
+ * probe and an indefensible one for a DEATH proof: uncommitted work inside a
+ * submodule read as `dirty: false` and qualified the tree for deletion. This
+ * repository has no submodules, so the saving bought nothing and the blindness
+ * was free.
+ *
+ * ONE KNOWN CONSERVATISM, recorded so it is not later read as a bug: a status that
+ * may not refresh the index reports a STAT-dirty file (rewritten with identical
+ * content) as modified. That keeps a tree the landing could have removed, which is
+ * the direction this whole rule leans.
+ *
  * Anything that cannot be established answers null, which the pure rule treats as
  * "not proven dead" — never as "fine to delete".
  */
-export function cleanupEvidence(worktrees, { branch, mainRoot = REPO_ROOT } = {}) {
+export function cleanupEvidence(worktrees, { branch, mainRoot = REPO_ROOT, mergeTarget = null, cwd = REPO_ROOT } = {}) {
   const evidence = {}
   for (const w of Array.isArray(worktrees) ? worktrees : []) {
     const path = String(w?.path ?? '')
@@ -130,20 +191,28 @@ export function cleanupEvidence(worktrees, { branch, mainRoot = REPO_ROOT } = {}
     if (!path || (!isAgentWorktree(path, mainRoot) && String(w?.branch ?? '') !== String(branch ?? ''))) continue
     const exists = existsSync(path)
     if (!exists) {
-      evidence[path] = { exists: false, dirty: null, activeAt: null, holderAlive: null }
+      evidence[path] = { exists: false, linkedTo: null, headMerged: null, dirty: null, activeAt: null, holderAlive: null }
       continue
     }
     const stamp = worktreeActiveAt(path)
     const activeAt = typeof stamp === 'number' ? stamp : typeof stamp?.at === 'number' ? stamp.at : null
     let dirty = null
     try {
-      dirty = sh('git', ['--no-optional-locks', '-C', path, 'status', '--porcelain', '--ignore-submodules=all'], {
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }).length > 0
+      dirty =
+        sh('git', ['--no-optional-locks', '-C', path, 'status', '--porcelain'], {
+          stdio: ['ignore', 'pipe', 'ignore'],
+        }).length > 0
     } catch {
       /* an unreadable checkout answers null — the rule then keeps it */
     }
-    evidence[path] = { exists: true, dirty, activeAt, holderAlive: lockHolderAlive(w.locked) }
+    evidence[path] = {
+      exists: true,
+      linkedTo: linkedGitdirOf(path),
+      headMerged: headContainedIn(String(w?.head ?? ''), mergeTarget, { cwd }),
+      dirty,
+      activeAt,
+      holderAlive: lockHolderAlive(w.locked),
+    }
   }
   return evidence
 }
@@ -164,21 +233,48 @@ function lockHolderAlive(reason) {
 /**
  * List, probe, decide — the whole cleanup selection, taken FRESH.
  *
- * It runs twice: once for the plan (so `--dry` shows what would be removed and
- * what would be left standing) and once immediately before the deletions, minutes
- * later. The second run is not redundant: a pool agent can pick up a tree between
- * the two, and the decision that matters is the one taken at the moment of the
- * removal.
+ * It runs three times, and none of them is redundant: once for the PLAN (so
+ * `--dry` shows what would be removed and what would be left standing), once at
+ * the START of the cleanup step, and once PER PATH inside the removal loop, in the
+ * moment before that path is handed to the deleting command.
+ *
+ * `mergeTarget` is what the landing takes: the BRANCH before the merge (what it is
+ * about to absorb) and `HEAD` of main after it (what it did absorb). Asking against
+ * main afterwards is the stricter of the two — an agent that commits to the branch
+ * AFTER the merge moves the branch ref with it, and only main stays still.
  */
-export function selectCleanup({ branch, since, cwd = REPO_ROOT, mainRoot = REPO_ROOT } = {}) {
+export function selectCleanup({ branch, since, mergeTarget = null, cwd = REPO_ROOT, mainRoot = REPO_ROOT } = {}) {
   const trees = listWorktrees({ cwd })
   return selectCleanupTargets({
     worktrees: trees,
     branch,
     mainRoot,
-    evidence: cleanupEvidence(trees, { branch, mainRoot }),
+    evidence: cleanupEvidence(trees, { branch, mainRoot, mergeTarget, cwd }),
     since,
   })
+}
+
+/**
+ * THE RE-PROOF, IMMEDIATELY BEFORE ONE PATH IS DELETED (review finding 2).
+ *
+ * The selection above is a SNAPSHOT, and minutes pass between it and the removal;
+ * in that window a worktree can be locked, written into, or replaced at the same
+ * path. So the tree in front of the deletion is listed and probed AGAIN, alone,
+ * and judged against the expectation the selection handed over. The remaining
+ * window — between this answer and the `rm` inside the deleting command — is
+ * closed by `worktree-cleanup.mjs --expect-branch`, which re-proves it a third
+ * time inside the process that actually deletes.
+ */
+export function reproveOne({ path, expected, since, mergeTarget = null, cwd = REPO_ROOT, mainRoot = REPO_ROOT } = {}) {
+  const trees = listWorktrees({ cwd })
+  const worktree = trees.find((w) => resolve(String(w.path)) === resolve(String(path))) ?? null
+  const evidence = cleanupEvidence(worktree ? [worktree] : [], {
+    branch: expected?.branch,
+    mainRoot,
+    mergeTarget,
+    cwd,
+  })
+  return reproveRemoval({ path, expected, worktree, evidence: evidence[String(worktree?.path ?? '')] ?? null, mainRoot, since })
 }
 
 /**
@@ -333,7 +429,9 @@ async function main(argv) {
   try {
     const branches = git(['for-each-ref', '--format=%(refname:short)', 'refs/heads']).split('\n')
     branch = branchArg || resolveBranch({ branches, number })
-    cleanup = selectCleanup({ branch, since })
+    // BEFORE the merge the landing has taken nothing yet, so what it is about to
+    // absorb is the BRANCH; afterwards the cleanup step asks against main instead.
+    cleanup = selectCleanup({ branch, since, mergeTarget: branch })
 
     // What the merge will bring in decides whether the audit runs (rider a).
     const changed = git(['diff', '--name-only', `main...${branch}`]).split('\n').filter(Boolean)
@@ -518,20 +616,42 @@ async function main(argv) {
     // would be acting on what the pool looked like then. Only what is PROVEN to be
     // this point's own DEAD worktree is removed, and what is left standing is said
     // out loud rather than silently skipped.
-    cleanup = selectCleanup({ branch, since })
+    cleanup = selectCleanup({ branch, since, mergeTarget: 'HEAD' })
     const problems = []
+    const refused = []
     for (const path of cleanup.remove) {
+      // AND AGAIN, FOR THIS ONE PATH, NOW. The list above was taken a moment ago,
+      // but "a moment" is where the whole failure class lives; a tree locked,
+      // written into or replaced since is refused here rather than deleted.
+      const again = reproveOne({ path, expected: cleanup.expected[path], since, mergeTarget: 'HEAD' })
+      if (!again.ok) {
+        refused.push(`  KEPT ${path} — ${again.reason}`)
+        continue
+      }
       try {
-        sh('node', [join('scripts', 'worktree-cleanup.mjs'), path], { stdio: ['ignore', 'pipe', 'pipe'] })
+        // The expectation travels INTO the deleting process, which proves it a
+        // third time with the tree already in its hands.
+        sh('node', [join('scripts', 'worktree-cleanup.mjs'), path, '--expect-branch', branch], {
+          stdio: ['ignore', 'pipe', 'pipe'],
+        })
       } catch (e) {
         problems.push(`worktree ${path}: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0])
       }
     }
-    // A KEPT WORKTREE KEEPS ITS BRANCH. git refuses `branch -d` on a branch a
-    // worktree has checked out, and deleting the remote would break the pushes of
-    // whatever is still working there — so this is not attempted-and-failed as
-    // "debris", it is not attempted at all, with the reason printed.
-    if (cleanup.branch.delete) {
+    // A KEPT WORKTREE KEEPS ITS BRANCH, and so does one that could not be removed
+    // (review finding 6): git refuses `branch -d` on a branch a worktree has
+    // checked out, and the REMOTE deletion is independent — it would succeed while
+    // the local one failed, deleting the branch the retained tree is standing on.
+    // Both are therefore gated on the same three conditions, and skipped with the
+    // reason printed rather than attempted and reported as debris.
+    const branchBlocked = !cleanup.branch.delete
+      ? cleanup.branch.reason
+      : refused.length
+        ? 'a worktree was refused at the last moment and may still be standing on it'
+        : problems.length
+          ? 'a worktree could not be removed and may still be standing on it'
+          : ''
+    if (!branchBlocked) {
       try {
         git(['branch', '-d', branch], { stdio: ['ignore', 'pipe', 'pipe'] })
       } catch (e) {
@@ -543,6 +663,11 @@ async function main(argv) {
         problems.push(`remote branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0])
       }
     }
+    if (refused.length) {
+      console.log('land-point: the cleanup refused these at the moment of deletion — they changed under it:')
+      for (const line of refused) console.log(line)
+    }
+    if (branchBlocked) console.log(`land-point: the branch ${branch} was NOT deleted — ${branchBlocked}`)
     for (const line of formatCleanupNotes(cleanup)) console.log(line)
     if (problems.length) {
       // NOT a failure of the landing — the point IS on main, ticked and archived.
@@ -555,11 +680,13 @@ async function main(argv) {
       })
       throw error
     }
-    const keptNote = cleanup.reported.length ? `, ${cleanup.reported.length} kept on purpose` : ''
+    const kept = cleanup.reported.length + refused.length
     step(
       'cleanup',
       VERDICT.ok,
-      `${cleanup.branch.delete ? 'branch' : 'branch KEPT'}${cleanup.remove.length ? ` + ${cleanup.remove.length} worktree(s)` : ''}${keptNote}`,
+      `${branchBlocked ? 'branch KEPT' : 'branch'}${
+        cleanup.remove.length - refused.length > 0 ? ` + ${cleanup.remove.length - refused.length} worktree(s)` : ''
+      }${kept ? `, ${kept} kept on purpose` : ''}`,
     )
   } catch (e) {
     if (!(e instanceof LandingError)) {

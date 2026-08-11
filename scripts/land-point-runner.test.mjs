@@ -28,7 +28,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, it, expect } from 'vitest'
-import { cleanupEvidence, listWorktrees, runCommand, selectCleanup } from './land-point.mjs'
+import { cleanupEvidence, listWorktrees, reproveOne, runCommand, selectCleanup } from './land-point.mjs'
 import { DISPOSITION } from './land-cleanup-core.mjs'
 
 /** A child that takes a measurable, deterministic amount of time. */
@@ -111,51 +111,162 @@ afterAll(() => {
   for (const r of roots) rmSync(r, { recursive: true, force: true })
 })
 
+
+/** The landing's own question, asked the way `main()` asks it after the merge. */
+const select = (root, over = {}) =>
+  selectCleanup({ branch: 'feat/608-x', since: Date.now(), mergeTarget: 'main', cwd: root, mainRoot: root, ...over })
+
 describe('the cleanup evidence, against a real checkout', () => {
-  it('reads git\'s lock line, and the pure rule then keeps that worktree', () => {
+  it("reads git's lock line, and the pure rule then keeps that worktree", () => {
     const { root, own } = scene()
     git(['worktree', 'lock', '--reason', 'claude agent agent-own (pid 999999 start 1)', own], root)
     const listed = listWorktrees({ cwd: root }).find((w) => w.path === own)
     expect(listed.locked).toContain('claude agent agent-own')
 
-    const sel = selectCleanup({ branch: 'feat/608-x', since: Date.now(), cwd: root, mainRoot: root })
+    const sel = select(root)
     expect(sel.remove).toEqual([])
     expect(sel.reported.map((r) => r.disposition)).toContain(DISPOSITION.live)
     expect(sel.branch.delete).toBe(false)
   })
 
-  it('removes the landed point\'s own quiet worktree — and NEVER the other agent\'s', () => {
+  it("removes the landed point's own quiet worktree — and NEVER the other agent's", () => {
     const { root, own, other } = scene()
     // The other agent is mid-work: an uncommitted file, exactly what was lost.
     writeFileSync(join(other, 'in-progress.txt'), 'not committed yet\n')
-    const sel = selectCleanup({ branch: 'feat/608-x', since: Date.now(), cwd: root, mainRoot: root })
+    const sel = select(root)
     expect(sel.remove).toEqual([own])
     expect(sel.remove).not.toContain(other)
+    expect(sel.expected[own]).toEqual({ branch: 'feat/608-x' })
   })
 
   it('sees uncommitted work in the landed tree itself and keeps it', () => {
     const { root, own } = scene()
     writeFileSync(join(own, 'unpushed.txt'), 'work\n')
-    const sel = selectCleanup({ branch: 'feat/608-x', since: Date.now(), cwd: root, mainRoot: root })
+    const sel = select(root)
     expect(sel.remove).toEqual([])
     expect(sel.reported[0].reason).toMatch(/uncommitted/)
+    expect(sel.branch.delete).toBe(false)
+    expect(own).toBeTruthy()
   })
 
-  it('does NOT date its own look — the probe must not make every tree read as live', () => {
-    // THE BUG THIS PINS: `worktreeActiveAt` reads the git metadata, and a plain
-    // `git status` refreshes the index. Probe dirtiness first and every worktree
-    // looks "written since the landing began", so nothing is ever cleaned up.
+  it('keeps a tree holding a commit the landing did not take', () => {
     const { root, own } = scene()
-    const since = Date.now()
-    const ev = cleanupEvidence(listWorktrees({ cwd: root }), { branch: 'feat/608-x', mainRoot: root })
-    expect(ev[own]).toMatchObject({ exists: true, dirty: false })
-    expect(ev[own].activeAt === null || ev[own].activeAt <= since).toBe(true)
+    writeFileSync(join(own, 'more.txt'), 'more\n')
+    git(['add', '.'], own)
+    git(['commit', '-q', '-m', 'work the landing has not merged'], own)
+    const sel = select(root)
+    expect(sel.remove).toEqual([])
+    expect(sel.reported[0].reason).toMatch(/not contained in what was merged/)
+  })
+
+  it('keeps a directory in the isolation folder that git never registered', () => {
+    const { root } = scene()
+    // A stray checkout at an agent-shaped path: git lists nothing there, so the
+    // landing never selects it — and if it ever did, the record check refuses it.
+    const stray = join(root, '.claude', 'worktrees', 'agent-stray')
+    mkdirSync(stray, { recursive: true })
+    writeFileSync(join(stray, 'x.txt'), 'x\n')
+    const ev = cleanupEvidence([{ path: stray, branch: 'feat/608-x', head: '' }], {
+      branch: 'feat/608-x',
+      mainRoot: root,
+      mergeTarget: 'main',
+      cwd: root,
+    })
+    expect(ev[stray].linkedTo).toBeNull()
+    expect(select(root).remove).not.toContain(stray)
   })
 
   it('probes only the plausible candidates, never every checkout in the repository', () => {
     const { root, other } = scene()
-    const ev = cleanupEvidence(listWorktrees({ cwd: root }), { branch: 'feat/608-x', mainRoot: root })
+    const ev = cleanupEvidence(listWorktrees({ cwd: root }), { branch: 'feat/608-x', mainRoot: root, cwd: root })
     expect(ev[root]).toBeUndefined() // the main checkout is never a candidate
     expect(ev[other]).toBeDefined() // an agent tree is, so it can be judged and named
+  })
+})
+
+describe('the probe must not become its own evidence', () => {
+  it('a SECOND pass still reads the tree as quiet — remove --no-optional-locks and this fails', async () => {
+    // THE CLAIM, AND WHY IT TAKES TWO PASSES. `worktreeActiveAt` dates the git
+    // metadata, `index` included; a plain `git status` REFRESHES that index and
+    // moves its mtime. One pass cannot see it — the freshness is read before the
+    // status runs — so the first version of this case would have passed with the
+    // flag removed (review finding 7). Production takes the selection at least
+    // twice, and it is the SECOND pass that inherits the damage: the first pass's
+    // status would have stamped the index, and every tree would then read as
+    // "written after the landing began" and never be cleaned up again.
+    const { root, own } = scene()
+    // Make the index racily stale, which is what provokes the refresh: rewrite a
+    // tracked file with identical content so its stat info no longer matches.
+    await new Promise((r) => setTimeout(r, 1100))
+    writeFileSync(join(own, 'a.txt'), 'a\n')
+
+    const since = Date.now()
+    const trees = listWorktrees({ cwd: root })
+    const probe = () => cleanupEvidence(trees, { branch: 'feat/608-x', mainRoot: root, mergeTarget: 'main', cwd: root })
+    const first = probe()
+    const second = probe()
+
+    // MEASURED against both spellings (11.08.2026): with the flag the index mtime
+    // does not move and both passes answer the same instant; without it the first
+    // pass's status rewrites the index and the second reads a time AFTER the
+    // landing began. Both assertions below go red on its removal.
+    expect(second[own].activeAt).toBeTypeOf('number')
+    expect(second[own].activeAt).toBeLessThanOrEqual(since)
+    expect(second[own].activeAt).toBe(first[own].activeAt)
+  })
+
+  it('reads a stat-dirty file conservatively — the safe direction', () => {
+    // A tracked file rewritten with IDENTICAL content is stat-dirty, and a status
+    // that may not refresh the index reports it as modified. That keeps the tree
+    // rather than deleting it, which is the direction this whole rule leans; it is
+    // recorded here so a later reader does not take it for a bug.
+    const { root, own } = scene()
+    writeFileSync(join(own, 'a.txt'), 'a\n')
+    const sel = select(root)
+    expect(sel.remove).not.toContain(own)
+  })
+})
+
+describe('the re-proof at the moment of deletion', () => {
+  it('passes for the tree that was selected', () => {
+    const { root, own } = scene()
+    const r = reproveOne({
+      path: own,
+      expected: { branch: 'feat/608-x' },
+      since: Date.now(),
+      mergeTarget: 'main',
+      cwd: root,
+      mainRoot: root,
+    })
+    expect(r.ok).toBe(true)
+  })
+
+  it('refuses once the tree is locked after the selection was taken', () => {
+    const { root, own } = scene()
+    git(['worktree', 'lock', '--reason', 'claude agent agent-own (pid 999999 start 1)', own], root)
+    const r = reproveOne({
+      path: own,
+      expected: { branch: 'feat/608-x' },
+      since: Date.now(),
+      mergeTarget: 'main',
+      cwd: root,
+      mainRoot: root,
+    })
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/git-locked/)
+  })
+
+  it('refuses a path git no longer lists', () => {
+    const { root } = scene()
+    const r = reproveOne({
+      path: join(root, '.claude', 'worktrees', 'agent-vanished'),
+      expected: { branch: 'feat/608-x' },
+      since: Date.now(),
+      mergeTarget: 'main',
+      cwd: root,
+      mainRoot: root,
+    })
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/no longer lists/)
   })
 })
