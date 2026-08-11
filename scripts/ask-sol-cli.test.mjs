@@ -135,7 +135,22 @@ describe('what it refuses before spending anything', () => {
     const r = run(['--kind', 'diagnose', '--brief', 'why?', '--log', join(dir, 'does-not-exist.log')])
     expect(r.status).toBe(2)
     expect(r.stderr).toMatch(/material MISSING/)
-    expect(r.stderr).toMatch(/NONE of the material could be read/)
+    expect(r.stderr).toMatch(/NOTHING of the material actually travelled/)
+    expect(calls()).toEqual([])
+  })
+
+  // Second cross-vendor round: "the read succeeded" is not "something travelled" — a
+  // readable but EMPTY file carries nothing, and a shaped answer about it would be an
+  // answer about nothing.
+  it('refuses a request whose only material is a readable but EMPTY file', () => {
+    setting('prefer-sol')
+    clearCalls()
+    rmSync(join(stateDir, 'review-sol-probe.json'), { force: true })
+    const empty = join(dir, 'empty.log')
+    writeFileSync(empty, '   \n')
+    const r = run(['--kind', 'diagnose', '--brief', 'why?', '--log', empty])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toMatch(/EMPTY or DROPPED/)
     expect(calls()).toEqual([])
   })
 

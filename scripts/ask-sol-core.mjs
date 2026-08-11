@@ -112,9 +112,16 @@ export function buildAskPrompt({ kind = '', brief = '' } = {}) {
  * Assemble the material for one ask, spending a fixed budget in the order given and
  * CUTTING VISIBLY. Same rule as the review path, and for the same reason: a model that
  * silently saw half a log would diagnose the half it saw.
+ *
+ * It returns WHICH sections actually travelled, not only the text (second cross-vendor
+ * round): the caller decides whether a request carries any real artefact at all, and it
+ * cannot decide that from a list of sections some of which the budget dropped. A section
+ * counts as carried only if it was written AND had content to write.
  */
 export function formatAskMaterial({ sections = [], budget = MATERIAL_BUDGET_CHARS } = {}) {
   const out = []
+  const carried = []
+  const omitted = []
   let left = Math.max(0, Number(budget) || 0)
   for (const section of sections ?? []) {
     const title = String(section?.title ?? 'MATERIAL')
@@ -122,14 +129,17 @@ export function formatAskMaterial({ sections = [], budget = MATERIAL_BUDGET_CHAR
     const header = `=== ${title} ===`
     if (left <= header.length + 200) {
       out.push(`=== OMITTED ENTIRELY (material budget spent): ${title} ===`, '')
+      omitted.push(title)
       continue
     }
     const room = left - header.length - 80
     const body = text.length > room ? `${text.slice(0, room)}\n… [TRUNCATED: ${text.length - room} characters not shown]` : text
     out.push(header, body, '')
+    if (text.trim()) carried.push(title)
+    else omitted.push(title)
     left -= header.length + Math.min(text.length, room) + 80
   }
-  return out.join('\n')
+  return { text: out.join('\n'), carried, omitted }
 }
 
 /** The two closing lines of a DIAGNOSE answer, read off the END of the message. */

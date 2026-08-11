@@ -182,24 +182,37 @@ const VERIFICATION_RUNNER =
 /** A shell command that only READS what a run left behind. */
 const VERIFICATION_READER = /(^|[|;&]\s*|\s)(cat|head|tail|grep|rg|wc|jq|ls|find|diff|sed|awk|node --check)\b/
 
+/** A file that is a PICTURE — read with eyes, never routed, whatever its format. */
+const VERIFICATION_IMAGE = /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|svg)$/i
+
 /**
- * A command that NAMES a verify script without running it. Asked before the runner, or
- * the runner's `node …` form would swallow it (cross-vendor review, 12.08.2026:
- * `node --check scripts/verify/place.mjs` was filed as a suite run, which it is not —
- * it parses the file and starts no browser).
+ * A command that NAMES a verify script without running it — it parses the file and
+ * starts no browser (cross-vendor review, 12.08.2026: `node --check scripts/verify/x.mjs`
+ * was filed as a suite run, which it is not).
  */
 const VERIFICATION_NOT_A_RUN = /\bnode\s+--check\b/
 
-/** Which half a verification shell command is evidence for, or null. PURE. */
+/**
+ * Which half a verification shell command is evidence for, or null. PURE.
+ *
+ * DECIDED PER SEGMENT, not over the whole line (second cross-vendor round). A shell line
+ * is several commands, and the exceptions cut across them: asking `node --check` of the
+ * WHOLE line filed `node --check x.mjs && npm test` as text, which runs the suite. Each
+ * segment votes, and HARNESS WINS wherever one of them starts a run — the run is what the
+ * turn costs, whatever else the line does with its output.
+ */
 export function classifyVerificationBash(command = '') {
-  const cmd = String(command)
-  if (VERIFICATION_NOT_A_RUN.test(cmd)) return 'text'
-  // THE RUNNER IS ASKED NEXT: `npm test 2>&1 | tail -40` both runs and reads, and what
-  // it costs is the run. Asking the reader first would file every piped suite as text
-  // and report the routable half far too large — the one error this split must not make.
-  if (VERIFICATION_RUNNER.test(cmd)) return 'harness'
-  if (VERIFICATION_READER.test(cmd)) return 'text'
-  return null
+  const segments = String(command).split(/&&|\|\||;|\|/)
+  let text = false
+  for (const segment of segments) {
+    if (VERIFICATION_NOT_A_RUN.test(segment)) {
+      text = true
+      continue
+    }
+    if (VERIFICATION_RUNNER.test(segment)) return 'harness'
+    if (VERIFICATION_READER.test(segment)) text = true
+  }
+  return text ? 'text' : null
 }
 
 /**
@@ -212,7 +225,10 @@ export function classifyVerificationToolCall({ name = '', input = {} } = {}) {
   if (classifyToolCall({ name, input }) !== 'verification') return null
   if (name === 'Bash') return classifyVerificationBash(input?.command ?? '') ?? 'unclear'
   const rel = normalisePath(input?.file_path ?? '')
-  if (name === 'Read') return /\.png$/i.test(rel) ? 'eyes' : 'text'
+  // EVERY picture format, not only PNG (second cross-vendor round): a frame read as a
+  // JPEG or a WebP is still a picture being judged, and counting it as text inflated
+  // exactly the share this split reports.
+  if (name === 'Read') return VERIFICATION_IMAGE.test(rel) ? 'eyes' : 'text'
   if (name === 'Edit' || name === 'Write' || name === 'NotebookEdit') return 'authoring'
   return 'unclear'
 }

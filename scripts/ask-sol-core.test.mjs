@@ -70,25 +70,36 @@ describe('the prompt', () => {
 
 describe('the material', () => {
   it('keeps every section under the budget and CUTS VISIBLY', () => {
-    const out = formatAskMaterial({ sections: [{ title: 'LOG: a', text: 'x'.repeat(5000) }], budget: 1000 })
-    expect(out).toContain('=== LOG: a ===')
-    expect(out).toMatch(/TRUNCATED: \d+ characters not shown/)
-    expect(out.length).toBeLessThan(1400)
+    const { text } = formatAskMaterial({ sections: [{ title: 'LOG: a', text: 'x'.repeat(5000) }], budget: 1000 })
+    expect(text).toContain('=== LOG: a ===')
+    expect(text).toMatch(/TRUNCATED: \d+ characters not shown/)
+    expect(text.length).toBeLessThan(1400)
   })
 
   it('says which section fell out entirely rather than dropping it silently', () => {
-    const out = formatAskMaterial({
+    const { text, carried, omitted } = formatAskMaterial({
       sections: [
         { title: 'FIRST', text: 'y'.repeat(900) },
         { title: 'SECOND', text: 'z'.repeat(900) },
       ],
       budget: 1000,
     })
-    expect(out).toContain('OMITTED ENTIRELY (material budget spent): SECOND')
+    expect(text).toContain('OMITTED ENTIRELY (material budget spent): SECOND')
+    expect(carried).toEqual(['FIRST'])
+    expect(omitted).toEqual(['SECOND'])
+  })
+
+  // Second cross-vendor round: the caller decides whether a request carries any real
+  // artefact, and it cannot decide that from the sections it HANDED IN — a readable but
+  // empty file and a section the budget dropped both carry nothing.
+  it('counts an EMPTY section as carrying nothing, however readable it was', () => {
+    const { carried, omitted } = formatAskMaterial({ sections: [{ title: 'FILE: empty.ts', text: '   \n' }], budget: 1000 })
+    expect(carried).toEqual([])
+    expect(omitted).toEqual(['FILE: empty.ts'])
   })
 
   it('is empty for nothing at all, which is what the command refuses to send', () => {
-    expect(formatAskMaterial({ sections: [] }).trim()).toBe('')
+    expect(formatAskMaterial({ sections: [] }).text.trim()).toBe('')
   })
 })
 

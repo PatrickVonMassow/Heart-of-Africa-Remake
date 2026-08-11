@@ -26,7 +26,7 @@ import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { classifyOutcome, MATERIAL_BUDGET_CHARS, REVIEW_TIMEOUT_MS, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 import { ensureModelProven, runCodex } from './review-sol.mjs'
-import { currentSetting } from './sol-share.mjs'
+import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { routeFor } from './sol-share-core.mjs'
 import { buildAskPrompt, formatAnswerReport, formatAskMaterial, formatUnavailable, KINDS, normaliseKind, parseAnswer } from './ask-sol-core.mjs'
 
@@ -116,6 +116,8 @@ if (isMainModule(import.meta.url)) {
     // override — deliberate, because the whole purpose of the switch is that nobody
     // spends the scarce allowance by habit.
     const share = currentSetting()
+    // A fallback nobody is told about is a setting nobody chose (second cross-vendor round).
+    if (share.problem) console.error(settingProblemLine(share, 'ask-sol'))
     if (routeFor(kind, share.setting) !== 'sol' && !argv.includes('--anyway')) {
       console.error(
         `ask-sol: the share switch is at \`${share.setting}\`, which routes ${kind} to Claude — not asking ${SOL_MODEL_NAME}.\n` +
@@ -128,7 +130,7 @@ if (isMainModule(import.meta.url)) {
     // request that turns out to have nothing to send must cost no codex call at all,
     // and the probe is a codex call.
     const sections = gatherSections({ stdin: readStdin(), logs: flags('--log'), diff: flag('--diff'), files: flags('--file') })
-    const material = formatAskMaterial({ sections, budget: MATERIAL_BUDGET_CHARS })
+    const { text: material, carried, omitted } = formatAskMaterial({ sections, budget: MATERIAL_BUDGET_CHARS })
     if (!material.trim()) {
       console.error('ask-sol: no material at all — give it a --file, a --log, a --diff or something on stdin.')
       process.exit(2)
@@ -136,13 +138,20 @@ if (isMainModule(import.meta.url)) {
     // A REQUEST WHOSE MATERIAL IS ALL PLACEHOLDERS IS NOT A REQUEST. An unreadable file
     // travels as "(could not be read: …)", which is text a model will happily answer
     // ABOUT — a shaped answer about nothing, reported as an answer.
+    //
+    // WHAT COUNTS AS REAL is asked of what actually TRAVELLED (second cross-vendor
+    // round): a readable but EMPTY file and a section the budget dropped are both
+    // "ok" and carry nothing, so the question is which sections were written with
+    // content, not which reads succeeded.
     const failed = sections.filter((s) => !s.ok)
-    if (failed.length) {
-      for (const s of failed) console.error(`ask-sol: material MISSING — ${s.problem ?? s.title}`)
-      if (!sections.some((s) => s.ok)) {
-        console.error('ask-sol: NONE of the material could be read — refusing to send a request that carries only placeholders.')
-        process.exit(2)
-      }
+    for (const s of failed) console.error(`ask-sol: material MISSING — ${s.problem ?? s.title}`)
+    for (const title of omitted) {
+      if (!failed.some((s) => s.title === title)) console.error(`ask-sol: material EMPTY or DROPPED for the budget — ${title}`)
+    }
+    const real = carried.filter((title) => sections.find((s) => s.title === title)?.ok)
+    if (!real.length) {
+      console.error('ask-sol: NOTHING of the material actually travelled — refusing to send a request that carries only placeholders.')
+      process.exit(2)
     }
 
     // The identity is PROVEN before a word is attributed to Sol: nothing in a run's

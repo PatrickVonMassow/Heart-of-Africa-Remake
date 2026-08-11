@@ -472,6 +472,24 @@ describe('verification split', () => {
     expect(classifyVerificationBash('node --check scripts/verify/place.mjs')).toBe('text')
   })
 
+  // Second round: the exception was asked of the WHOLE line, so a line that checks a file
+  // AND runs the suite read as text. Each segment votes now, and a run always wins.
+  it('still calls a line HARNESS when any of its segments starts a run', () => {
+    expect(classifyVerificationBash('node --check scripts/verify/place.mjs && npm test')).toBe('harness')
+    expect(classifyVerificationBash('tail -5 verification/out.log; VERIFY_GL=webgpu npm run test:small')).toBe('harness')
+    expect(classifyVerificationBash('node --check scripts/verify/place.mjs && node --check scripts/verify/port.mjs')).toBe('text')
+  })
+
+  // Second round: a frame is a picture whatever its format, and counting a JPEG as text
+  // inflated the very share this split reports.
+  it('reads EVERY picture format as eyes, not only PNG', () => {
+    const kind = (file_path) => classifyVerificationToolCall({ name: 'Read', input: { file_path } })
+    for (const ext of ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'svg']) {
+      expect(kind(`verification/480-village.${ext}`), ext).toBe('eyes')
+    }
+    expect(kind('verification/report.json')).toBe('text')
+  })
+
   it('splits a turn in proportion to the halves its calls vote for', () => {
     const split = turnVerificationKinds([
       bash('npm test'),

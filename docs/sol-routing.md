@@ -105,21 +105,24 @@ Measured over 47,258 turns from 391 transcripts (03.–11.08.2026, weighted):
 | | share |
 | --- | --- |
 | verification, of the whole spend | 41.9 % |
-| — text (reads a log, a script, a report) | 45.6 % of it |
-| — harness (runs a suite) | 42.1 % of it |
-| — eyes (looks at a frame) | 7.5 % of it |
+| — text (reads a log, a script, a report) | 45.3 % of it |
+| — harness (runs a suite) | 42.4 % of it |
+| — eyes (looks at a frame) | 7.4 % of it |
 | — authoring (edits the verification code) | 4.7 % of it |
 | — unclear (never guessed into a half) | 0.1 % of it |
 
-So the routable text half is **19.0 % of the entire spend**, and 45.0 % of the
+So the routable text half is **18.9 % of the entire spend**, and 44.7 % of the
 delegated agents' own verification — which is what makes part A worth having and
 what any decision about part B should be argued against.
 
-Two classification errors were found by the cross-vendor review of this very
-branch and are fixed in these figures: an unplaceable call used to be dropped
-instead of voting (so a turn that read one log and did one unplaceable thing read
-as wholly routable), and `node --check` on a verify script counted as a suite
-run. The `unclear` row exists so the residue is visible rather than distributed.
+Four classification errors were found by the two cross-vendor review rounds of
+this very branch and are fixed in these figures: an unplaceable call used to be
+dropped instead of voting (so a turn that read one log and did one unplaceable
+thing read as wholly routable); `node --check` on a verify script counted as a
+suite run; the exception for it was asked of the WHOLE shell line, so a line that
+checked a file and then ran the suite read as text (each segment votes now, and a
+run always wins); and a frame in any format other than PNG counted as text rather
+than as a picture. The `unclear` row exists so the residue is visible rather than distributed.
 
 ## The first real run
 
