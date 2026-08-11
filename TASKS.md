@@ -6188,9 +6188,22 @@ to land than a mechanism that needs a review.
   the uncovered paths are named, and covering them — a second run scoped to the remainder,
   or a recorded human read — is what completes it. Since the cap bites hardest on the
   longest branches, the tool also SUGGESTS the narrower range when it truncates, which is
-  what actually worked on 629.
+  what actually worked on 629 and again on 649 (11.08.2026: three whole-branch rounds all
+  reported `worktree-cleanup.mjs` unseen; the range cut to the last two commits delivered
+  it and both test files in full, and that round found two defects the wide ones could not).
+  AND THE NARROW RANGE MUST BECOME RECORDABLE, which today it is not. The tool refuses a
+  record command whenever the reviewed range is narrower than the sha — rightly, since a
+  record at that sha clears every commit back to the merge base. But that leaves the only
+  review that SAW the material with no ledger entry at all, so a real do-not-merge over the
+  decisive files exists nowhere but in a session's memory. FINAL STATE: a narrow review is
+  recorded AS narrow — the entry names the range it actually covered, and it clears exactly
+  that range and nothing before it. A HIGH point is then cleared by a SET of recorded
+  reviews that together cover the branch, not by one entry that claims more than any single
+  run could see.
   VERIFIABLE: Vitest over the pure part — a reviewer output naming truncation yields a
   PARTIAL verdict and a ledger entry carrying that flag; a full-material review does not;
-  and the criticality gate refuses a PARTIAL as the sole clearance for a HIGH point.
+  a narrow review records with its range and clears only that range; and the criticality
+  gate refuses a PARTIAL as the sole clearance for a HIGH point, but accepts a set of
+  narrow reviews that jointly cover the branch.
   Criticality: medium — it does not break the product, but it decides how much a review is
   worth, and every HIGH point is signed off on one. Bundle: Modell & Wächter.
