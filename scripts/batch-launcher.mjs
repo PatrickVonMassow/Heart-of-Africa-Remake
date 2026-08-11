@@ -240,12 +240,24 @@ export async function runDaemon({
   const base = { v: LAUNCHER_RECORD_VERSION, name: LAUNCHER_DAEMON_NAME, pid: process.pid, pidStartedAt, startedAt, tickMs }
   let lastTickAt = startedAt
   let leaving = null
-  // The lock state as the last poll saw it, and when an early tick last ran. Both
-  // live across the whole loop: the watcher reacts to a CHANGE (a lock that has
-  // been free for hours is not an event), and the floor keeps a tick that could
-  // not spawn from waking itself again five seconds later.
+  // The lock state as the last observation saw it, and when an early tick last
+  // ran. Both live across the whole loop: the watcher reacts to a CHANGE (a lock
+  // that has been free for hours is not an event), and the floor keeps a tick
+  // that could not spawn from waking itself again five seconds later.
   let lastSignal = null
   let lastWakeAt = 0
+  /** Ownership as ONE comparable string, or null when the lock could not be read
+   *  at all — a watcher that cannot read must never take the launcher down, so
+   *  the failure is logged and the 15-minute tick carries on as the backstop. */
+  const observeOwnership = () => {
+    try {
+      const seen = readLock()
+      return ownershipSignal({ lock: seen, assessment: seen ? assess(seen) : null })
+    } catch (e) {
+      appendLog(logPath, `lock watch failed: ${(e && e.message) || e}`)
+      return null
+    }
+  }
   /** Writes the record, unless somebody else's claim or a stop order says not to.
    *  Returns false when this daemon has just lost the singleton and must leave. */
   const publish = (patch = {}) => {
@@ -290,6 +302,23 @@ export async function runDaemon({
     // Checked again right here, before the tick rather than after it: a daemon
     // that lost the record must not spend an interval running the batch first.
     if (!publish({ tickInFlight: true, tickStartedAt: Date.now() })) return leave()
+    // THE BASELINE FOR THE COMING SLEEP IS THE STATE THE TICK ACTED ON (point
+    // 644, measured 11.08.2026). It used to be whatever the sleep's FIRST POLL
+    // happened to see, and the first poll is armed only after the tick and its
+    // record writes are done — so every ownership change that landed in that
+    // window became the baseline instead of an event, and the daemon then slept
+    // the whole interval out with nobody owning the batch. That is the exact
+    // latency point 612 removed, reintroduced through the back door, and it is
+    // what turned `main` red (CI run 31504918389): the same gap left the daemon
+    // test's second tick waiting for a quarter of an hour, which vitest reports
+    // as a TIMEOUT rather than a missed budget. Measured on the runner, the poll
+    // follows the tick by 1 ms at the median and 14 ms at the worst of 400
+    // samples, with the event loop's own lag never past 23 ms — so the window is
+    // narrow, it is not empty, and nothing bounds it: one starved scheduling
+    // moment is all it takes, and the wake is then lost for good rather than
+    // late. Reading here closes it: anything that ends ownership from the tick's
+    // start onward is a CHANGE.
+    lastSignal = observeOwnership() ?? lastSignal
     try {
       const code = await tick({ logPath })
       appendLog(logPath, `tick finished (exit ${code === null ? 'killed' : code})`)
@@ -318,21 +347,22 @@ export async function runDaemon({
         timer = null
         if (stopping || Date.now() >= deadline) return finish()
         let decision = { wake: false, reason: '' }
+        const signal = observeOwnership()
         try {
-          const seen = readLock()
-          const signal = ownershipSignal({ lock: seen, assessment: seen ? assess(seen) : null })
-          decision = releaseSpawnDecision({
-            signal,
-            previous: lastSignal,
-            now: Date.now(),
-            paused: isPaused(),
-            lastWakeAt,
-            minGapMs: wakeGapMs,
-          })
-          lastSignal = signal
+          if (signal !== null) {
+            decision = releaseSpawnDecision({
+              signal,
+              previous: lastSignal,
+              now: Date.now(),
+              paused: isPaused(),
+              lastWakeAt,
+              minGapMs: wakeGapMs,
+            })
+            lastSignal = signal
+          }
         } catch (e) {
-          // A watcher that cannot read must never take the launcher down: the
-          // 15-minute tick is the backstop and it is still running.
+          // A watcher that cannot decide must never take the launcher down
+          // either: the 15-minute tick is the backstop and it is still running.
           appendLog(logPath, `lock watch failed: ${(e && e.message) || e}`)
         }
         if (decision.wake) {
