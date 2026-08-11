@@ -24,7 +24,7 @@
 // `land-cleanup-core.mjs` assumes — the lock line, the dirtiness, and above all
 // WITHOUT its own look becoming the evidence (point 629).
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, it, expect } from 'vitest'
@@ -230,8 +230,21 @@ describe('the probe must not become its own evidence', () => {
     // that may not refresh the index reports it as modified. That keeps the tree
     // rather than deleting it, which is the direction this whole rule leans; it is
     // recorded here so a later reader does not take it for a bug.
+    //
+    // THE TIMESTAMP IS SET, NOT HOPED FOR. Rewriting the file alone made this test
+    // pass here and FAIL on the CI runner (11.08.2026, run 31517313867): a rewrite
+    // that lands inside the filesystem's timestamp granularity leaves the stat
+    // unchanged, the file is then not stat-dirty at all, the tree reads clean and
+    // is removed. So the mtime is moved explicitly, and the precondition is
+    // asserted — a test that silently stopped exercising its own subject is worth
+    // less than one that fails.
     const { root, own } = scene()
-    writeFileSync(join(own, 'a.txt'), 'a\n')
+    const file = join(own, 'a.txt')
+    writeFileSync(file, 'a\n')
+    const later = new Date(Date.now() + 10_000)
+    utimesSync(file, later, later)
+    expect(git(['--no-optional-locks', 'status', '--porcelain'], own).trim()).not.toBe('')
+
     const sel = select(root)
     expect(sel.remove).not.toContain(own)
   })
