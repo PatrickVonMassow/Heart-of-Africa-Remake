@@ -208,8 +208,8 @@ export function upgradeNowCards(html) {
   let out = String(html ?? '')
   for (const [kind, title] of Object.entries(LEGACY_STATE_TITLE)) {
     out = out.replace(
-      new RegExp(`<details class="now">(\\s*<summary><span class="t">${title}</span>)`, 'g'),
-      `<details class="now"${STATE_ATTR(kind)}>$1`,
+      new RegExp(`<details class="now"([^>]*)>(\\s*<summary><span class="t">${title}</span>)`, 'g'),
+      (_m, attrs, head) => `<details class="now"${attrs.replace(/\s*data-state="[^"]*"/, '')}${STATE_ATTR(kind)}>${head}`,
     )
   }
   return out.replace(
@@ -303,11 +303,12 @@ export function promoteToNow(html, point, { title, times, status, stamp = berlin
   // THE QUEUE TITLE IS THE NOW-CARD'S TITLE, so the rule that governs one governs
   // the other (four-eyes review, 12.08.2026): promoting a card titled
   // "Vorbereitung" would write exactly the card the publish gate refuses.
-  if (stageOnlyTitle(stripPointPrefix(title, point))) {
+  const subject = stripPointPrefix(title, point)
+  if (stageOnlyTitle(subject) || looksLikeClosingTitle(subject)) {
     throw new Error(
-      `board: the queue card for point ${point} is titled "${title}", which names a STAGE and no ` +
-        'subject — the promoted card would say nothing about the point. Give it a subject first: ' +
-        `node scripts/board-queue.mjs set ${point} --title "<Betreff>"`,
+      `board: the queue card for point ${point} is titled "${title}", which names a STAGE rather ` +
+        'than a subject — the promoted card would say nothing about the point, or claim to be the ' +
+        `closing card. Give it a subject first: node scripts/board-queue.mjs set ${point} --title "<Betreff>"`,
     )
   }
   const now =
@@ -652,7 +653,7 @@ export function isStateCardTitle(title) {
 const stateCardPattern = (kind) =>
   new RegExp(
     `<details class="now"[^>]*data-state="${kind}"[^>]*>[\\s\\S]*?</details>\\s*` +
-      `|<details class="now">\\s*<summary><span class="t">${LEGACY_STATE_TITLE[kind]}</span>[\\s\\S]*?</details>\\s*`,
+      `|<details class="now"[^>]*>\\s*<summary><span class="t">${LEGACY_STATE_TITLE[kind]}</span>[\\s\\S]*?</details>\\s*`,
     'g',
   )
 
@@ -1100,6 +1101,17 @@ export function setCardTitle(html, point, title) {
   const closingMarked = new RegExp(
     `<details class="now"[^>]*data-state="closing"[^>]*>\\s*<summary>[\\s\\S]*?<span class="num">\\s*${point}\\s*</span>`,
   ).test(html)
+  // A CLOSING SHAPE IS THE CLOSING STATE (four-eyes review, 12.08.2026). Writing
+  // that title onto an ordinary card would produce the unmarked closing card the
+  // gate refuses — and the command that writes the state properly is one line
+  // away, so it is named rather than approximated.
+  if (!closingMarked && looksLikeClosingTitle(text)) {
+    throw new Error(
+      `board: "${text}" is the CLOSING card's shape, and this card is not the closing card. ` +
+        `Write that state with node scripts/board.mjs closing ${point} "<Grund>", which composes the ` +
+        'title and sets the marker together.',
+    )
+  }
   const bare = closingMarked ? closingCardTitle(stripPointPrefix(text, point)) : stripPointPrefix(text, point)
   const chipRe = new RegExp(
     `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*<span class="t">)[^<]*(</span>)`,

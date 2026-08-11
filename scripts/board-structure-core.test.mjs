@@ -518,7 +518,29 @@ describe('every current-work card names its point and its subject', () => {
       '\n' +
       sect(REQUIRED_SECTIONS[3], '') +
       '\n</div>'
-    expect(() => toNow(queued, 651, 'Läuft.', { stamp: '09:00' })).toThrow(/STAGE and no subject/)
+    expect(() => toNow(queued, 651, 'Läuft.', { stamp: '09:00' })).toThrow(/names a STAGE rather than a subject/)
+    // …and the closing card's own shape is refused there too: only `closing <N>`
+    // may produce it, marker and title together.
+    const closingShaped = queued.replace('<span class="t">Vorbereitung</span>', '<span class="t">X: Abschlussarbeiten</span>')
+    expect(() => toNow(closingShaped, 651, 'Läuft.', { stamp: '09:00' })).toThrow(/STAGE rather than a subject/)
+  })
+
+  it('refuses to retitle an ordinary card into the closing card\'s shape', () => {
+    const running = withNow(chipCard(651, 'Ein Betreff'))
+    expect(() => setCardTitle(running, 651, 'Ein Betreff: Abschlussarbeiten')).toThrow(/CLOSING card's shape/)
+  })
+
+  it('finds and replaces a legacy state card that carries extra attributes', () => {
+    const legacy =
+      '<details class="now" open>\n  <summary><span class="t">Gerade keine laufende Arbeit</span></summary>\n' +
+      '  <div class="body"><p>Alt; Punkt 656 folgt.</p></div>\n</details>'
+    const board = withNow(legacy)
+    // Upgraded — the marker is added whatever else stands in the tag…
+    expect(upgradeNowCards(board)).toContain('data-state="idle"')
+    // …and the state writer REPLACES it rather than stacking a second one.
+    const rewritten = toNoCurrentWork(board, 'Neu; der Nachfolger nimmt Punkt 657.', { stamp: '23:55' })
+    expect(rewritten).not.toContain('Alt; Punkt 656 folgt.')
+    expect(nowCards(rewritten)).toHaveLength(1)
   })
 
   it('names a remedy that FITS the card: no title command for an unnumbered one', () => {
