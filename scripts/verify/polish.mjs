@@ -3504,6 +3504,71 @@ if (section('children-motion')) {
         `${diag.tiny} under 5 mm, ${diag.idle} at pace 0, ${diag.pushed} moved further than the chase walked, ${diag.near} beside a neighbour, ` +
         `${diag.headingFlip} with the travel heading itself reversed, ${diag.offHeading} stepping off their heading`,
     )
+    // AND A LOOK AT THEM. The complaint is what the player SEES, so the run
+    // leaves a frame of the children themselves — the traveller stepped back to
+    // the group and turned to face it, the shutter projecting their centroid so
+    // a frame named after them cannot photograph an empty lane (point 375).
+    const aimed = await page.evaluate(() => {
+      const p = window.__placePlayer
+      const kids = window.__placeTag().children
+      if (!p || kids.length === 0) return null
+      const pose = { x: p.x, z: p.z, yaw: p.yaw }
+      const cx = kids.reduce((s, k) => s + k.x, 0) / kids.length
+      const cz = kids.reduce((s, k) => s + k.z, 0) / kids.length
+      // A vantage the huts do not stand in. Merely stepping back from where the
+      // traveller happened to be put the camera inside a dwelling, and the
+      // shutter cannot see that: the centroid still PROJECTED into the frame,
+      // behind a wall. So the standpoint is chosen against the layout — clear of
+      // every dwelling, and with a clear line to the children.
+      const huts = window.__placeLayout.dwellings
+      const blocks = (ax, az, bx, bz, pad) =>
+        huts.some((h) => {
+          const dx = bx - ax
+          const dz = bz - az
+          const len2 = dx * dx + dz * dz || 1
+          const t = Math.max(0, Math.min(1, ((h.x - ax) * dx + (h.z - az) * dz) / len2))
+          return Math.hypot(ax + t * dx - h.x, az + t * dz - h.z) < h.r + pad
+        })
+      // Judged by how many children the standpoint can actually SEE — a thatch
+      // roof is opaque, and a subject that merely projects into the frame can
+      // sit behind one. The roof overhangs the footprint, so the sightline is
+      // tested against a hut generously wider than its wall.
+      let best = null
+      for (let i = 0; i < 24; i++) {
+        const a = (i / 24) * Math.PI * 2
+        for (const dist of [6, 8, 10]) {
+          const sx = cx + Math.sin(a) * dist
+          const sz = cz + Math.cos(a) * dist
+          if (Math.hypot(sx, sz) > window.__placeLayout.radius - 2) continue
+          if (blocks(sx, sz, sx, sz, 2)) continue // standing inside a hut
+          const seen = kids.filter((k) => !blocks(sx, sz, k.x, k.z, 1.2))
+          if (seen.length === 0) continue
+          if (best === null || seen.length > best.seen.length) best = { sx, sz, seen }
+        }
+      }
+      if (!best) return null
+      p.x = best.sx
+      p.z = best.sz
+      // Look at what is actually visible, and hand the shutter the same point.
+      const vx = best.seen.reduce((s, k) => s + k.x, 0) / best.seen.length
+      const vz = best.seen.reduce((s, k) => s + k.z, 0) / best.seen.length
+      p.yaw = Math.atan2(-(vx - p.x), -(vz - p.z))
+      return { pose, cx: vx, cz: vz, seen: best.seen.length, of: kids.length }
+    })
+    if (aimed) {
+      await nextFrames(2)
+      await frame('648-village-children', {
+        local: { x: aimed.cx, y: 0.8, z: aimed.cz },
+        label: `the children at their game of tag (${aimed.seen} of ${aimed.of} in the clear)`,
+      })
+      await page.evaluate((pose) => {
+        const p = window.__placePlayer
+        if (!p) return
+        p.x = pose.x
+        p.z = pose.z
+        p.yaw = pose.yaw
+      }, aimed.pose)
+    }
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
