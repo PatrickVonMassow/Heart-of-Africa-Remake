@@ -74,11 +74,15 @@ const flag = (name) => {
 
 if (argv.includes('--status')) {
   const head = headSha()
-  const missing = missingSteps(readState(), head)
+  const state = readState()
+  const missing = missingSteps(state, head)
   const done = CLOSING_STEPS.length - missing.length
   console.log(`Closing checklist for HEAD ${head.slice(0, 12)}: ${done}/${CLOSING_STEPS.length} done`)
-  const missingIds = new Set(missing.map((s) => s.id))
-  for (const s of CLOSING_STEPS) console.log(`  [${missingIds.has(s.id) ? ' ' : 'x'}] ${s.id} — ${s.title}`)
+  const notes = new Map(missing.map((s) => [s.id, s.note || '']))
+  for (const s of CLOSING_STEPS) {
+    console.log(`  [${notes.has(s.id) ? ' ' : 'x'}] ${s.id} — ${s.title}`)
+    if (notes.get(s.id)) console.log(`      RECORDED BUT OUT OF ORDER — ${notes.get(s.id)}`)
+  }
   if (missing.length === 0) console.log('ALL closing steps recorded — a version tag is permitted.')
   process.exit(0)
 }
@@ -104,10 +108,13 @@ if (argv.includes('--step')) {
   let state = readState()
   if (!state || typeof state !== 'object' || state.commit !== head) state = { commit: head, steps: {} }
   if (!state.steps || typeof state.steps !== 'object') state.steps = {}
-  state.steps[id] = { evidence: evidence.trim() }
+  // The record time is what the ORDER check reads (point 631): it dates every
+  // cleanup step, so the second regression can be judged against the youngest.
+  state.steps[id] = { evidence: evidence.trim(), at: new Date().toISOString() }
   writeState(state)
   const missing = missingSteps(state, head)
   console.log(`Recorded "${id}" for HEAD ${head.slice(0, 12)}. ${CLOSING_STEPS.length - missing.length}/${CLOSING_STEPS.length} done.`)
+  for (const s of missing) if (s.note) console.log(`"${s.id}" does NOT count — ${s.note}`)
   if (missing.length) console.log(`Still missing: ${missing.map((s) => s.id).join(', ')}`)
   else console.log('ALL closing steps recorded — a version tag is now permitted.')
   process.exit(0)

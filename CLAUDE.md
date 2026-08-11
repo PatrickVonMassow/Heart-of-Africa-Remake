@@ -746,26 +746,25 @@ At the end:
 - List the collected open items (`// OPEN: …`).
 - Name the simplifications made and the placeholder values set.
 - No silent extensions beyond §7.1.
-- **Closing completeness is ENFORCED, not remembered (user decision 24.07.2026, point
-  306).** A closing is more than the LARGE regression — the dead-code / stale-doc /
-  stale-comment cleanup and the `.md` audit distinguish it (v0.2 skipped these, being
-  memory-tracked). The checklist is machine-readable in
-  `scripts/closing-guard-core.mjs` (`CLOSING_STEPS`), and a PreToolUse guard on the shell
-  AND the editing tools (`scripts/closing-guard.mjs`) DENIES a version tag (created,
-  pushed, or `poc` moved) AND the tick of a point that itself delivers a closing, until
-  EVERY step is recorded done for that commit.
-  Drive it as you close: that script's `--status`, then
-  `--step <id> --evidence "<proof>"` per step. A feature needing a closing step adds it
-  to `CLOSING_STEPS` (the gate tightens automatically).
-- **Graphics detail-level doc current (user 24.07.2026).** Explicitly confirm
+- **Closing completeness is ENFORCED, not remembered (users 24.07./11.08.2026, points
+  306/631).** A closing is a SEQUENCE, not a set: LARGE regression, then the legacy
+  cleanup of ALL code and documents as a BLIND-PARALLEL four-eyes stage (§6), then
+  a SECOND LARGE regression after the last cleanup commit — and only then the user's go
+  for the tag. v0.2 skipped the cleanup; a skipped second regression tags untested
+  changes. The checklist is machine-readable in `scripts/closing-guard-core.mjs`
+  (`CLOSING_STEPS`) and its ORDER is checked: the `regression-after-cleanup` evidence
+  must NAME the tagged commit or a time after the cleanup. A PreToolUse guard
+  (`scripts/closing-guard.mjs`) DENIES a version tag (created, pushed, `poc` moved) AND
+  the tick of a point that itself delivers one, until EVERY step is recorded for
+  that commit. Drive it: `--status`, then `--step <id> --evidence "<proof>"`; a step a
+  feature needs is added to `CLOSING_STEPS`, which tightens the gate.
+- **Graphics detail-level doc current (user 24.07.2026).** Confirm
   `docs/graphics-detail-levels.md` still matches `QUALITY_PRESETS`
-  (`src/config/quality.ts`). The `src/config/qualityDoc.test.ts` sync test
-  enforces it on every `npm run test:unit` run, so a green regression already
-  proves it; the closing names it anyway, as a deliberate check.
+  (`src/config/quality.ts`); `src/config/qualityDoc.test.ts` proves it on every
+  `npm run test:unit`, and the closing names it anyway, deliberately.
 
-**Closing freeze (user decision 22.07.2026).** During a closing run the code
-is FROZEN: no parallel agent work may land or merge while the closing runs,
-else the closing does not test the FINAL state. Before starting a closing
-cycle, stop spawning agents and let all in-flight branches merge (or park
-them); run the closing on the frozen `main`; resume the agent pool only
-AFTER the closing completes.
+**Closing freeze (user decision 22.07.2026).** The code is FROZEN while a
+closing runs: no agent work may land or merge, else the closing does not test
+the FINAL state. Stop spawning agents, let in-flight branches merge or park
+them; run the closing on the frozen `main`; resume the pool only AFTER it
+completes.
