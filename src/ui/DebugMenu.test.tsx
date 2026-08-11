@@ -843,7 +843,7 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.tagBreakOff', 'debug.tagResume', 'debug.tagPressure', 'debug.tagReach', 'debug.tagCommit',
     'debug.tagCatch', 'debug.tagSwitchMargin', 'debug.tagImmunity', 'debug.tagResolveCap',
     'debug.tagIdle', 'debug.tagTrendTau', 'debug.tagTrendEnter', 'debug.tagTrendLeave',
-    'debug.tagVariation', 'debug.tagUnstuck', 'debug.tagDetour', 'debug.tagSilence',
+    'debug.tagVariation', 'debug.tagUnstuck', 'debug.tagEdge', 'debug.tagSilence',
     'debug.tagLean', 'debug.tagTurnRate',
     'debug.tagPlayRadius',
     'debug.childSpeechInterval', 'debug.childSpeechSpread', 'debug.childSpeechAction',

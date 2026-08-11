@@ -555,7 +555,7 @@ export interface Strings {
     tagTrendLeave: string
     tagVariation: string
     tagUnstuck: string
-    tagDetour: string
+    tagEdge: string
     tagSilence: string
     tagLean: string
     tagTurnRate: string

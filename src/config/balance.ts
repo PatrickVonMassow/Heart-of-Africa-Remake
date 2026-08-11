@@ -665,9 +665,9 @@ export interface BalanceConfig {
       variation: number
       /** Seconds without real movement before a child is nudged free. */
       unstuckSeconds: number
-      /** Seconds a child commits to a bearing it had to turn right round to
-       *  find, so a pocket is left rather than stepped in and out of. */
-      detourSeconds: number
+      /** Seconds a child keeps going the same way ROUND an obstacle, so it
+       *  follows its edge instead of pacing to and fro at its face. */
+      edgeSeconds: number
       /** Dev-mode alarm: a group that could play and has produced neither a
        *  catch nor a fresh round for this long raises `tag-silent`. */
       silenceSeconds: number
@@ -1151,11 +1151,13 @@ export const balance: BalanceConfig = {
       trendLeave: 0.12,
       variation: 0.2,
       unstuckSeconds: 1.5,
-      // How long a child carries itself clear of a pocket (point 648). At the
-      // floor pace that is about half a metre, at a sprint nearly two — past the
-      // hut corner it just turned round — and short enough that the chase it
-      // interrupts is never noticeably interrupted.
-      detourSeconds: 0.45,
+      // How long a child keeps to ONE way round what is in front of it (point
+      // 648). The commitment normally ends by itself, the moment the child is
+      // travelling where it wanted again; this is only the backstop on a side
+      // that turned out to be the long way round. At the trot that is some four
+      // metres of edge — a hut is round in two — and short enough that a child
+      // never circles a whole compound before it thinks again.
+      edgeSeconds: 3,
       // The long-run alarm's window (point 589). The longest LEGITIMATE gap
       // between two round events is a tenure that runs to the backstop plus the
       // idle break after it (45 + 8 s); this sits well clear of it, so only a

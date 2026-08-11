@@ -557,7 +557,7 @@ export const en: Strings = {
     tagTrendLeave: 'Tag: end a burst above trend',
     tagVariation: 'Tag: per-child spread',
     tagUnstuck: 'Tag: child unstuck window (s)',
-    tagDetour: 'Tag: child commits to a way out (s)',
+    tagEdge: 'Tag: child keeps to one way round (s)',
     tagSilence: 'Tag: alarm when nobody plays for (s)',
     tagLean: 'Tag: forward lean at sprint (rad)',
     tagTurnRate: 'Tag: body turn rate (rad/s)',

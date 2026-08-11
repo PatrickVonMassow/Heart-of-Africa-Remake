@@ -559,7 +559,7 @@ export const de: Strings = {
     tagTrendLeave: 'Fangen: Spurt beenden über Trend',
     tagVariation: 'Fangen: Streuung je Kind',
     tagUnstuck: 'Fangen: Entklemm-Fenster Kind (s)',
-    tagDetour: 'Fangen: Kind hält seinen Ausweg (s)',
+    tagEdge: 'Fangen: Kind umgeht Hindernis einseitig (s)',
     tagSilence: 'Fangen: Alarm, wenn niemand spielt (s)',
     tagLean: 'Fangen: Vorlage beim Sprint (rad)',
     tagTurnRate: 'Fangen: Drehgeschwindigkeit (rad/s)',

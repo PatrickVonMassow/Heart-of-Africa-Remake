@@ -273,7 +273,11 @@ describe('the catch', () => {
     expect(s.chaser).toBeGreaterThanOrEqual(0)
   })
 
-  it('immunity is PAIR-scoped: the new chaser may tag a third child at once (unique)', () => {
+  it('THE WINDOW IS THE WHOLE GROUP’S: no third child is tagged inside it (point 648, unique)', () => {
+    // The role used to be free to run round a knot — A tags B, B tags C, C tags
+    // A, each catch clearing the last protection — and at the reported seed it
+    // changed every two or three FRAMES, leaving three children trembling within
+    // 7 cm of one another. No catch at all resolves while the window runs.
     const s = game([
       [0, 0],
       [0.3, 0],
@@ -284,7 +288,15 @@ describe('the catch', () => {
     stepTagGame(s, 1e-6, CFG, OPEN)
     expect(s.tags).toBe(1)
     const second = s.chaser
-    // A third child standing beside the new chaser was never immune.
+    // A third child standing right beside the new chaser, the whole window long.
+    for (let i = 0; i < 100; i++) {
+      s.children[2].x = s.children[second].x + CFG.catchDistance * 0.4
+      s.children[2].z = s.children[second].z
+      stepTagGame(s, CFG.immunitySeconds / 200, CFG, OPEN)
+      expect(s.tags).toBe(1)
+    }
+    // And is fair game the moment it has run out.
+    s.immuneFor = 1e-9
     s.children[2].x = s.children[second].x + CFG.catchDistance * 0.4
     s.children[2].z = s.children[second].z
     stepTagGame(s, 1e-6, CFG, OPEN)
@@ -292,7 +304,34 @@ describe('the catch', () => {
     expect(s.chaser).toBe(2)
   })
 
-  it('a chained tag clears the stale immunity — the first child is catchable again (unique)', () => {
+  it('the role changes at most once per window, whoever is standing about (unique)', () => {
+    const s = game([
+      [0, 0],
+      [0.3, 0],
+      [0.5, 0],
+      [0.2, 0.3],
+    ])
+    s.chaser = 0
+    s.playing = true
+    let swaps = 0
+    let last = s.chaser
+    // Ten seconds with the whole group inside one another's catch ring.
+    for (let i = 0; i < 60 * 10; i++) {
+      s.children.forEach((c, k) => {
+        c.x = k * 0.2
+        c.z = 0
+      })
+      stepTagGame(s, 1 / 60, CFG, OPEN)
+      if (s.chaser !== last) {
+        swaps++
+        last = s.chaser
+      }
+    }
+    expect(swaps).toBeGreaterThan(0)
+    expect(swaps).toBeLessThanOrEqual(Math.ceil(10 / CFG.immunitySeconds) + 1)
+  })
+
+  it('the child that just tagged stays out of the quarry while its window runs (unique)', () => {
     const s = game([
       [0, 0],
       [0.3, 0],
@@ -301,14 +340,19 @@ describe('the catch', () => {
     s.chaser = 0
     s.playing = true
     stepTagGame(s, 1e-6, CFG, OPEN) // 0 tags 1 → 0 immune
-    const a = s.immune
-    stepTagGame(s, 1e-6, CFG, OPEN) // 1 tags 2 → 1 immune, 0's protection is stale
-    expect(s.immune).not.toBe(a)
     expect(s.immuneFor).toBe(CFG.immunitySeconds)
-    // Only ONE child is ever immune, so the first one is fair game again.
-    s.children[a].x = s.children[s.chaser].x + CFG.catchDistance * 0.4
-    s.children[a].z = s.children[s.chaser].z
-    expect(nearestCatchable(s)).toBe(a)
+    const gone = s.immune
+    // Standing nearest the new chaser buys it nothing while it is protected —
+    // the third child, well away, is the quarry instead.
+    s.children[gone].x = s.children[s.chaser].x + CFG.catchDistance * 0.4
+    s.children[gone].z = s.children[s.chaser].z
+    s.children[2].x = s.children[s.chaser].x + 5
+    s.children[2].z = s.children[s.chaser].z
+    expect(nearestCatchable(s)).not.toBe(gone)
+    // Once the window is out it is the nearest catchable child like any other.
+    s.immuneFor = 0
+    s.immune = -1
+    expect(nearestCatchable(s)).toBe(gone)
   })
 
   it('is never reached THROUGH a wall (unique)', () => {
@@ -1365,22 +1409,24 @@ describe('a child cornered by the settlement walks out (point 648)', () => {
     expect(s.children[0].pinned).toBe(0) // never stalled long enough to be nudged
   })
 
-  it('lets the held way out AGE while the child stands, so it never sets off on a stale one', () => {
-    // The detour is a hysteresis, and a hysteresis that only ticks while the
+  it('lets the way round AGE while the child stands, so it never sets off on a stale one', () => {
+    // The commitment is a hysteresis, and a hysteresis that only ticks while the
     // child WALKS never runs out on one that stands. A child told to stay put
-    // would keep the way out it found before it stopped and set off on it again
-    // however much later — a direction that by then means nothing.
+    // would keep the way round it committed to before it stopped and set off on
+    // it again however much later — a side that by then means nothing.
     const s = game([[0, -1]])
-    // Sent into the pocket until it has turned round and is holding the way out.
+    // Sent into the pocket until it has turned aside and committed to a side.
     run(s, 0.2, deadEnd, CFG, 1 / 60, undefined, () => ({ heading: 0, pace: 2 }))
-    expect(s.children[0].detourFor).toBeGreaterThan(0)
+    expect(s.children[0].edgeFor).toBeGreaterThan(0)
+    expect(s.children[0].edgeSide).not.toBe(0)
 
     // Now TOLD to stand, for longer than the window lasts.
-    run(s, CFG.detourSeconds + 0.2, deadEnd, CFG, 1 / 60, undefined, (i, st) => ({
+    run(s, CFG.edgeSeconds + 0.2, deadEnd, CFG, 1 / 60, undefined, (i, st) => ({
       heading: st.children[i].heading,
       pace: 0,
     }))
-    expect(s.children[0].detourFor).toBe(0)
+    expect(s.children[0].edgeFor).toBe(0)
+    expect(s.children[0].edgeSide).toBe(0)
     expect(s.children[0].held).toBe(true)
 
     // And set off again on the direction it is GIVEN, not the one it kept. Read
