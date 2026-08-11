@@ -767,9 +767,13 @@ describe('runVerdict — the run that passed only on the RETRY (point 640)', () 
     expect(runVerdict({ ...run('webgpu', 2000), suspect: false }, { openPoints }).status).toBe('clean')
   })
 
-  it('is total on a malformed suspect record', () => {
+  it('is total on a malformed suspect record, and on a null options bag', () => {
     expect(() => runVerdict({ exit: 0, suspect: true, suspectOf: 'nonsense' }, { openPoints })).not.toThrow()
     expect(runVerdict({ exit: 0, suspect: true, suspectOf: null }, { openPoints }).covers).toBe(false)
+    expect(() => runVerdict(run('webgpu', 1), null)).not.toThrow()
+    expect(() => coveringRun([], 'webgpu', 0, null)).not.toThrow()
+    expect(() => unexplainedRuns([], 0, null)).not.toThrow()
+    expect(() => chargeFor(red('x'), null)).not.toThrow()
   })
 })
 
@@ -854,6 +858,42 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
       }),
     )
     expect(result.decision).toBe('allow')
+  })
+
+  // The closing routes must work on a run that is ALREADY recorded: the charge is
+  // stamped at record time, so a rule reading only the record would leave "charge
+  // it" and "file it as a point" nominal — nothing but a code edit could ever
+  // satisfy them (four-eyes finding, 11.08.2026).
+  it('a red CHARGED after the fact stops blocking — no re-run, no code edit', () => {
+    const ledger = [{ point: 641, match: /the Giza settlement edge/, why: 'filed 11.08.2026 as its own point' }]
+    const runs = [
+      redRun('webgpu', 1500, [red('the Giza settlement edge is drawn')]),
+      run('webgpu', 2000),
+      run('webgl', 2100),
+    ]
+    expect(evaluate(renderChange({ runs, openPoints })).decision).toBe('block')
+    expect(evaluate(renderChange({ runs, openPoints: [...openPoints, 641], ledger })).decision).toBe('allow')
+  })
+
+  it('a SUSPECT run whose first-attempt check is charged stops blocking too', () => {
+    const ledger = [{ point: 506, match: /the goat stance/, why: 'the software lane cannot draw fast enough' }]
+    const runs = [suspectRun('webgpu', 1500), run('webgpu', 2000), run('webgl', 2100)]
+    expect(evaluate(renderChange({ runs, openPoints })).decision).toBe('block')
+    expect(evaluate(renderChange({ runs, openPoints, ledger })).decision).toBe('allow')
+  })
+
+  it('does NOT talk a CRASH away with a charge — a run that died judged no picture', () => {
+    const ledger = [{ point: 506, match: /goat/, why: 'the software lane cannot draw fast enough' }]
+    const crashed = redRun('webgpu', 1500, [red('goat stance', 506)], { crashed: true })
+    const result = evaluate(renderChange({ runs: [crashed, run('webgpu', 2000), run('webgl', 2100)], openPoints, ledger }))
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/UNEXPLAINED RED/)
+  })
+
+  it('a charge to a point that is NOT open explains nothing', () => {
+    const ledger = [{ point: 387, match: /the Giza settlement edge/, why: 'a point that has since been ticked' }]
+    const runs = [redRun('webgpu', 1500, [red('the Giza settlement edge is drawn')]), run('webgpu', 2000), run('webgl', 2100)]
+    expect(evaluate(renderChange({ runs, openPoints, ledger })).decision).toBe('block')
   })
 
   it('unexplainedRuns is total, and reports oldest first', () => {

@@ -185,7 +185,8 @@ export function chargeablePoints(text) {
  * `backend` are the run's own, so a charge scoped to one lane cannot excuse the
  * other. Total: a malformed entry matches nothing rather than throwing.
  */
-export function chargeFor(red, { suite = '', backend = '', ledger = RED_CHARGES } = {}) {
+export function chargeFor(red, options) {
+  const { suite = '', backend = '', ledger = RED_CHARGES } = options ?? {}
   const name = String(red?.name ?? '')
   if (!name) return null
   for (const charge of Array.isArray(ledger) ? ledger : []) {
@@ -206,7 +207,8 @@ export function chargeFor(red, { suite = '', backend = '', ledger = RED_CHARGES 
 /** Every red of a run, each with the point it is charged to (null: nothing owns
  *  it). Written into the run record at record time, so the record itself names
  *  what was charged and a later ledger edit cannot bless a run after the fact. */
-export function chargeReds(reds, { suite = '', backend = '', ledger = RED_CHARGES } = {}) {
+export function chargeReds(reds, options) {
+  const { suite = '', backend = '', ledger = RED_CHARGES } = options ?? {}
   return (Array.isArray(reds) ? reds : []).map((red) => {
     const charge = chargeFor(red, { suite, backend, ledger })
     return {
@@ -298,7 +300,8 @@ export function parseSuspectEnv(value) {
  * chargeable and only a clean run covers — the strict default, so a caller that
  * has not read the work order can never widen the gate by accident.
  */
-export function runVerdict(run, { openPoints = null } = {}) {
+export function runVerdict(run, options) {
+  const { openPoints = null } = options ?? {}
   if (!run || typeof run !== 'object') {
     return { status: 'red', covers: false, charges: [], unaccounted: [] }
   }
@@ -413,7 +416,8 @@ export function isBackendSensitivePath(path) {
  * itself asks that way, so a compat lane still proves the WebGPU picture rather than
  * blocking every render change on a host that has no core adapter.
  */
-export function coveringRun(runs, backend, since, { featureLevel = null, openPoints = null } = {}) {
+export function coveringRun(runs, backend, since, options) {
+  const { featureLevel = null, openPoints = null } = options ?? {}
   if (!Array.isArray(runs)) return null
   let best = null
   for (const r of runs) {
@@ -444,10 +448,29 @@ export function coveringRun(runs, backend, since, { featureLevel = null, openPoi
  * That is also what lets the throttle probe reproduce a red eight times over
  * without blocking anybody's turn.
  *
+ * THE CHARGE IS READ AS IT STANDS NOW, not as it stood when the run was recorded
+ * (four-eyes finding, 11.08.2026). The recorder stamps the charge at record time
+ * so no later ledger edit can BLESS a finished run, and that stays: a run still
+ * only COVERS on what it was charged then. But "is this red still an open
+ * question?" is the opposite question — charging it, or filing the point that
+ * owns it and charging it there, IS closing way (2) and way (3), and a rule that
+ * could only be satisfied by editing a render file would have left those two
+ * routes nominal.
+ *
  * Total: never throws on partial input.
  */
-export function unexplainedRuns(runs, since, { openPoints = null } = {}) {
+export function unexplainedRuns(runs, since, options) {
+  const { openPoints = null, ledger = RED_CHARGES } = options ?? {}
   const from = Number.isFinite(since) ? since : 0
+  const open = new Set(Array.isArray(openPoints) ? openPoints : openPoints ? [...openPoints] : [])
+  /** Is this red owned by an OPEN point — by the charge it was recorded with, or
+   *  by one the ledger carries today? */
+  const owned = (red, suite, backend) => {
+    const recorded = Number.isInteger(red?.point) ? red.point : null
+    if (recorded !== null && open.has(recorded)) return true
+    const now = chargeFor(red, { suite, backend, ledger })
+    return !!now && open.has(now.point)
+  }
   const out = []
   for (const r of Array.isArray(runs) ? runs : []) {
     if (!r || typeof r !== 'object') continue
@@ -455,13 +478,22 @@ export function unexplainedRuns(runs, since, { openPoints = null } = {}) {
     if (!Number.isFinite(at) || at < from) continue
     const verdict = runVerdict(r, { openPoints })
     if (verdict.status !== 'red' && verdict.status !== 'suspect') continue
-    out.push({
-      backend: typeof r.backend === 'string' ? r.backend : 'unknown',
-      suite: typeof r.suite === 'string' && r.suite ? r.suite : 'unknown',
-      at,
-      status: verdict.status,
-      unaccounted: verdict.unaccounted,
-    })
+    const suite = typeof r.suite === 'string' && r.suite ? r.suite : 'unknown'
+    const backend = typeof r.backend === 'string' ? r.backend : 'unknown'
+    // A crash explains nothing about the picture whatever its reds say, so it is
+    // never talked away by the ledger — runVerdict says so and this must not
+    // undo it.
+    if (r.crashed !== true) {
+      const reds =
+        verdict.status === 'suspect'
+          ? parseSuspectEnv((Array.isArray(r.suspectOf) ? r.suspectOf : []).join('\n')).map((name) => ({
+              name,
+              kind: 'check',
+            }))
+          : (Array.isArray(r.reds) ? r.reds : [])
+      if (reds.length > 0 && reds.every((red) => owned(red, suite, backend))) continue
+    }
+    out.push({ backend, suite, at, status: verdict.status, unaccounted: verdict.unaccounted })
   }
   return out.sort((a, b) => a.at - b.at)
 }
@@ -573,6 +605,7 @@ export function evaluate(input) {
     runs = [],
     deferral = null,
     openPoints = null,
+    ledger = RED_CHARGES,
   } = input ?? {}
 
   // Garbage where the path list should be: fail open, but do NOT advance the
@@ -592,7 +625,7 @@ export function evaluate(input) {
   }
 
   const since = Number.isFinite(latestChangeAt) ? latestChangeAt : 0
-  const opts = { openPoints }
+  const opts = { openPoints, ledger }
   // Two backends only where the two backends can DIFFER; otherwise one passing
   // run is the whole proof, and the second is a picture inspection bought for
   // nothing (user 26.07.2026).
@@ -635,7 +668,8 @@ export function evaluate(input) {
         'three greens are consistent with a fixed defect, a rare one, a timing race and an idle machine alike. ' +
         'A red closes in exactly THREE ways: (1) its CAUSE is named and FIXED — the fix edits the code, which ' +
         'moves this window past the red; (2) it is CHARGED in scripts/render-verify-charges.mjs to the OPEN ' +
-        'point that owns it; (3) it becomes an OPEN point of its own. Is it load? MEASURE it: ' +
+        'point that owns it — the charge counts at once, no re-run needed; (3) it becomes an OPEN ' +
+        'point of its own, charged there. Is it load? MEASURE it: ' +
         `node scripts/throttle-probe.mjs ${unexplained[0].suite} --section=<name> --runs 8. If the cause lies ` +
         'outside the render set (a fixed helper, a dead dev server), say so loudly instead: ' +
         'node scripts/render-verify-guard.mjs --defer "<reason>".',

@@ -167,8 +167,11 @@ describe('reading a run-all log', () => {
 })
 
 describe('classifyRun — three of the four outcomes are NOT "the check failed"', () => {
-  it('calls exit 0 green', () => {
-    expect(classifyRun({ exit: 0 })).toBe('green')
+  it('calls exit 0 green only when the runner REPORTED its checks', () => {
+    expect(classifyRun({ exit: 0, summary: { fail: 0, consoleErrors: 0 } })).toBe('green')
+    // An exit-0 launch that reported nothing measured nothing — counting it as a
+    // green would dilute the very rate this instrument reports.
+    expect(classifyRun({ exit: 0, summary: null })).toBe('broken')
   })
 
   it('calls a reported failure red', () => {
@@ -184,6 +187,13 @@ describe('classifyRun — three of the four outcomes are NOT "the check failed"'
   it('calls a run whose suite never reported BROKEN — a failed pin is not a defect', () => {
     expect(classifyRun({ exit: 1, summary: null, checks: [] })).toBe('broken')
     expect(classifyRun({ exit: 127 })).toBe('broken')
+  })
+
+  it('is total on garbage', () => {
+    expect(() => classifyRun(null)).not.toThrow()
+    expect(() => classifyRun()).not.toThrow()
+    expect(() => verdictOf(null, null)).not.toThrow()
+    expect(() => formatProbeReport(null)).not.toThrow()
   })
 })
 

@@ -37,6 +37,16 @@ export const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000
 const RUNS_MAX = 50
 const RATE_MAX = 64
 
+/** A value as text, or '' — `String(x)` itself throws on an object whose
+ *  toString does, and everything here must be total on whatever it is handed. */
+function text(value) {
+  try {
+    return String(value ?? '')
+  } catch {
+    return ''
+  }
+}
+
 /**
  * Parse the command line. Total: never throws, and every refusal NAMES what was
  * wrong rather than falling back to a default the caller did not ask for — a
@@ -47,13 +57,7 @@ const RATE_MAX = 64
  *                                  [--timeout-ms 900000] [--no-throttle]
  */
 export function parseProbeArgs(argv) {
-  const args = (Array.isArray(argv) ? argv : []).map((a) => {
-    try {
-      return String(a)
-    } catch {
-      return ''
-    }
-  })
+  const args = (Array.isArray(argv) ? argv : []).map((a) => text(a))
   const out = {
     suite: null,
     section: null,
@@ -81,14 +85,14 @@ export function parseProbeArgs(argv) {
       ? [arg.slice(0, arg.indexOf('=')), arg.slice(arg.indexOf('=') + 1)]
       : [arg, undefined]
     if (flag === '--help' || flag === '-h') out.help = true
-    else if (flag === '--section') out.section = String(value(attached) ?? '').trim() || null
+    else if (flag === '--section') out.section = text(value(attached)).trim() || null
     else if (flag === '--runs') out.runs = number(value(attached), 'runs', { max: RUNS_MAX }) ?? out.runs
     else if (flag === '--cpus') out.cpus = number(value(attached), 'cpus', { max: 1024 }) ?? out.cpus
     else if (flag === '--rate') out.rate = number(value(attached), 'rate', { max: RATE_MAX }) ?? out.rate
     else if (flag === '--timeout-ms') out.timeoutMs = number(value(attached), 'timeout-ms', { min: 1000 }) ?? out.timeoutMs
     else if (flag === '--no-throttle') out.throttle = false
     else if (flag === '--backend') {
-      const backend = String(value(attached) ?? '').toLowerCase()
+      const backend = text(value(attached)).toLowerCase()
       if (backend !== 'webgpu' && backend !== 'webgl') out.error = `--backend takes webgpu or webgl (got "${backend}")`
       else out.backend = backend
     } else if (flag.startsWith('-')) out.error = `unknown flag "${flag}"`
@@ -109,8 +113,8 @@ export function parseProbeArgs(argv) {
  *  /proc/self/status ("0-3,8,10-11"). `[]` when it cannot be read — an unknown
  *  mask must never be guessed at, because guessing produces a `taskset` call
  *  that fails while the report claims a throttle. Total. */
-export function parseCpusAllowedList(text) {
-  const line = /^Cpus_allowed_list:\s*(.+)$/m.exec(String(text ?? ''))
+export function parseCpusAllowedList(status) {
+  const line = /^Cpus_allowed_list:\s*(.+)$/m.exec(text(status))
   if (!line) return []
   const out = []
   for (const part of line[1].trim().split(',')) {
@@ -188,7 +192,7 @@ export function throttlePlan(input) {
  *  a failed pin, a dead dev server) is told from one that reported reds. */
 export function runnerSummary(output) {
   const m = /^(?:PASS|FAIL)\s{2,}(\S+)\s+(\d+) pass, (\d+) fail, (\d+) console-errors \(exit (-?\d+)\)/m.exec(
-    String(output ?? ''),
+    text(output),
   )
   if (!m) return null
   return { suite: m[1], pass: Number(m[2]), fail: Number(m[3]), consoleErrors: Number(m[4]), exit: Number(m[5]) }
@@ -199,12 +203,12 @@ export function runnerSummary(output) {
  *  summary, and every red would be named "polish 7 pass, 1 fail". Falls back to
  *  the whole output, so a suite run directly still parses. Total. */
 export function suiteOutput(output) {
-  const text = String(output ?? '')
-  const inner = text
+  const whole = text(output)
+  const inner = whole
     .split('\n')
     .filter((l) => /^\s+(?:FAIL\s{2,}|ERR:)/.test(l))
     .map((l) => l.trim())
-  return inner.length ? inner.join('\n') : text
+  return inner.length ? inner.join('\n') : whole
 }
 
 /**
@@ -213,9 +217,14 @@ export function suiteOutput(output) {
  * verdict at all, and counting either as a red would let eight broken launches
  * read as "reproduced under throttle".
  */
-export function classifyRun({ timedOut = false, exit = null, summary = null, checks = [] } = {}) {
+export function classifyRun(input) {
+  const { timedOut = false, exit = null, summary = null, checks = [] } = input ?? {}
   if (timedOut) return 'killed'
-  if (exit === 0) return 'green'
+  // Exit 0 is only a GREEN when the runner also reported the checks it ran. A
+  // launch that produced no summary reached no verdict, whatever it exited with
+  // — and an exit-0 harness failure counted as green would quietly dilute the
+  // very rate this instrument exists to report.
+  if (exit === 0) return summary ? 'green' : 'broken'
   if (summary && (summary.fail > 0 || summary.consoleErrors > 0)) return 'red'
   if ((Array.isArray(checks) ? checks : []).length > 0) return 'red'
   return 'broken'
@@ -237,7 +246,7 @@ export function summarise(results) {
   const counts = new Map()
   for (const r of red) {
     for (const name of Array.isArray(r.checks) ? r.checks : []) {
-      const key = String(name)
+      const key = text(name)
       counts.set(key, (counts.get(key) ?? 0) + 1)
     }
   }
@@ -262,7 +271,8 @@ export function summarise(results) {
  * itself a cause. A sample with runs that reached no verdict is called out
  * first: a rate over three of eight runs is not a rate over eight.
  */
-export function verdictOf(summary, { throttled = true } = {}) {
+export function verdictOf(summary, options) {
+  const { throttled = true } = options ?? {}
   const s = summary ?? {}
   const judged = Number.isFinite(s.judged) ? s.judged : Number(s.runs) || 0
   const reds = Number(s.reds) || 0
@@ -285,7 +295,8 @@ export function verdictOf(summary, { throttled = true } = {}) {
 }
 
 /** The whole report, line by line — the wrapper only prints what it is handed. */
-export function formatProbeReport({ suite = '?', section = '?', backend = null, plan = null, results = [], summary = null } = {}) {
+export function formatProbeReport(input) {
+  const { suite = '?', section = '?', backend = null, plan = null, results = [], summary = null } = input ?? {}
   const s = summary ?? summarise(results)
   const lines = [
     '',
