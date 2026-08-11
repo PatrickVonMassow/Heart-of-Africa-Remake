@@ -402,12 +402,29 @@ export function settleRecord(open, record, { at = '', closed = [] } = {}) {
   return { changed: true, record: next }
 }
 
-/** What a caller is told when it tries to write over an unreadable record. */
-export const TORN_RECORD_MESSAGE =
+/**
+ * What a caller is told when it tries to write over an unreadable record.
+ *
+ * IT NAMES THE RESTORE THE CALLER ESTABLISHED (cross-vendor review, ninth pass).
+ * A fixed `git checkout HEAD -- …` is wrong wherever HEAD has no copy, or holds
+ * the damaged bytes itself; the caller that can ask git says which source has a
+ * readable record, exactly as the arming refusal does, and where none has, it
+ * says to repair the file rather than printing a command that cannot work.
+ */
+export const tornRecordMessage = (restore = RESTORE_CMD) =>
   `${RANK_RECORD_PATH} exists but does not parse. Refusing to write: every decision it holds would be ` +
-  `replaced by this one. Restore the committed record — ${RESTORE_CMD} — or repair the bytes by hand where the ` +
-  'damage was committed, then run the command again. Until then the append gate stays QUIET rather than ' +
-  'blocking: an unreadable record is not a verdict, so this command is the loud half.'
+  'replaced by this one. ' +
+  (restore
+    ? `Restore a readable copy — ${restore} — or repair the bytes by hand, then run the command again. `
+    : `No copy of it in git parses either (${INSPECT_CMD}), so repair the bytes by hand, then run the ` +
+      'command again. ') +
+  'Until then the append gate stays QUIET rather than blocking: an unreadable record is not a verdict, so ' +
+  'this command is the loud half.'
+
+/** The same refusal where nothing established a better restore — the pure layer's
+ *  default, kept as a constant because `recordRank`/`seedRecord` throw it without
+ *  ever asking git. */
+export const TORN_RECORD_MESSAGE = tornRecordMessage()
 
 /** Record one deliberate "it stays where it is" decision (pure). */
 export function recordRank(record, point, { why = '', at = '' } = {}) {
@@ -495,14 +512,27 @@ export const removedRecordMessage = (restore = RESTORE_CMD) =>
  * baseline yet; see `alreadyArmedMessage` for why an armed one is refused.
  *
  * `tracked` is the caller's answer to "does this repository carry the record at
- * all" (index or history — `scripts/queue-rank.mjs` asks git). It closes the
- * REMOVAL route: an unarmed reading of a record the repository knows is a file
- * that was moved aside, not a repository that never had a baseline. The caller
- * decides it because this module is pure; it FAILS CLOSED there, since the only
- * legitimate arming in a git checkout happens before the record is ever
- * committed.
+ * all" (any index entry or any history — `scripts/queue-rank.mjs` asks git), and
+ * `present` whether the file is in the working tree at all. Together they close
+ * the REMOVAL route: a record the repository knows, MISSING from the checkout,
+ * was moved aside — not a repository that never had a baseline. The caller
+ * decides both because this module is pure, and `tracked` FAILS CLOSED there.
+ *
+ * IT IS THE REMOVAL THAT IS REFUSED, NOT A BROKEN RECORD (cross-vendor review,
+ * ninth pass). Refusing every tracked record made a PRESENT one that carries no
+ * baseline unanswerable: the guard blocks as unarmed, `--ranked` cannot create a
+ * baseline and arming was refused, with no command left to run. A record that is
+ * THERE is armed normally. That is the deliberate boundary of this gate: it
+ * defends against the append DEFAULT going unnoticed, not against somebody
+ * editing the tracked record — blanking `settled` by hand and writing a point
+ * into it are the same act, no mechanism here can tell them from a legitimate
+ * edit, and what answers them is the diff of a tracked file under review.
  */
-export function seedRecord(record, open, { why = '', at = '', tracked = false, restore = RESTORE_CMD } = {}) {
+export function seedRecord(
+  record,
+  open,
+  { why = '', at = '', tracked = false, present = true, restore = RESTORE_CMD } = {},
+) {
   const reason = String(why ?? '').replace(/\s+/g, ' ').trim()
   if (!reason) throw new Error('--why is required — one line saying why the order as it stands is right')
   const { ranked, torn } = normaliseRankRecord(record)
@@ -510,7 +540,7 @@ export function seedRecord(record, open, { why = '', at = '', tracked = false, r
   const list = pointList(open)
   const state = appendGateState(list, record)
   if (state.state !== 'unarmed') throw new Error(alreadyArmedMessage(state.pending))
-  if (tracked) throw new Error(removedRecordMessage(restore))
+  if (tracked && !present) throw new Error(removedRecordMessage(restore))
   const points = [...list].sort((a, b) => a - b)
   return {
     ...pruneRankRecord({ ranked }, list),

@@ -13,7 +13,7 @@ import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluate } from './queue-order-guard-core.mjs'
 import { closedPointsOf, openPointsOf } from './board-queue-core.mjs'
 import { ARCHIVE_PATH } from './tasks-source.mjs'
-import { RANK_RECORD_PATH, RESTORE_CMD, parseRankRecord, settleRecord } from './queue-rank-core.mjs'
+import { RANK_RECORD_PATH, parseRankRecord, settleRecord } from './queue-rank-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { repoPath } from './repo-paths.mjs'
@@ -76,8 +76,19 @@ function settleBaseline({ tasksMd, rankRecordJson }, path = RANKS) {
     if (record.torn) {
       console.error(
         `queue-order-guard: ${RANK_RECORD_PATH} does not parse — the append gate is QUIET until it is ` +
-          `repaired: ${RESTORE_CMD}`,
+          'repaired. Which copy can be restored depends on the git state, and the CLI establishes it: ' +
+          'node scripts/queue-rank.mjs --status',
       )
+    }
+    // A WORK ORDER MID-MERGE IS NOT A READING (cross-vendor review, ninth pass).
+    // Every rule below reads the order it is SHOWN, and a conflicted file shows
+    // blocks in an order neither side wrote — enough for an appended point to
+    // look deliberately placed and be absorbed into the baseline for good.
+    // Conflict markers say so outright, so nothing is concluded from such a file;
+    // the guard's own judgment still runs, only no state moves.
+    if (/^<{7}|^>{7}/m.test(String(tasksMd ?? ''))) {
+      console.error('queue-order-guard: TASKS.md holds conflict markers — not moving the rank baseline from it')
+      return
     }
     const open = openPointsOf(tasksMd)
     // THE TICKS, BUT ONLY WHERE THEY ARE NEEDED. A baseline point leaves it

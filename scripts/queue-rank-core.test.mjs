@@ -264,7 +264,7 @@ describe('the baseline moves only when nothing is outstanding', () => {
     expect(TORN_RECORD_MESSAGE).toContain(RESTORE_CMD)
     let thrown = null
     try {
-      seedRecord(null, [9], { why: 'w', tracked: true, restore: 'git checkout deadbee^ -- x' })
+      seedRecord(null, [9], { why: 'w', tracked: true, present: false, restore: 'git checkout deadbee^ -- x' })
     } catch (e) {
       thrown = e
     }
@@ -349,20 +349,27 @@ describe('the baseline moves only when nothing is outstanding', () => {
     expect(() => seedRecord(settledAt([5, 9]), [9, 5], { why: 'nochmal', at: 't' })).not.toThrow(/outstanding/)
   })
 
-  it('refuses to arm a record the repository still carries — that was the way round the refusal', () => {
+  it('refuses to arm a record the repository carries but the checkout is MISSING', () => {
     // The escape the refusal itself used to describe: the gate blocks, the
     // tracked record goes aside, the checkout reads as unarmed, and --seed takes
     // the WHOLE current order — outstanding appends included — on one collective
-    // reason. Arming is for a repository that never had a baseline; a record it
-    // knows is restored instead.
+    // reason. A record the repository knows is restored instead of re-armed.
     let thrown = null
     try {
-      seedRecord(null, [9, 5, 4], { why: 'alles passt schon', at: 't', tracked: true })
+      seedRecord(null, [9, 5, 4], { why: 'alles passt schon', at: 't', tracked: true, present: false })
     } catch (e) {
       thrown = e
     }
     expect(thrown).toBeTruthy()
     expect(thrown.message).toContain(RESTORE_CMD)
+    // …but a record that is THERE and simply carries no baseline is armed
+    // normally. Refusing it too left nothing to run at all: the guard blocks as
+    // unarmed, --ranked cannot make a baseline, and arming was refused — a loop
+    // with no answer. This gate defends against the append DEFAULT going
+    // unnoticed, not against somebody editing the tracked record by hand.
+    expect(seedRecord({ ranked: {} }, [9, 5, 4], { why: 'repairing', at: 't', tracked: true }).settled.points).toEqual([
+      4, 5, 9,
+    ])
     // The genuine first arming — a repository that has never carried the record —
     // is untouched.
     expect(seedRecord(null, [9, 5, 4], { why: 'arming', at: 't' }).settled.points).toEqual([4, 5, 9])

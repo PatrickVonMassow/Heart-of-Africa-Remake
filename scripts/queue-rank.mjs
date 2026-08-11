@@ -35,7 +35,7 @@ import {
   RANK_RECORD_PATH,
   RESTORE_CMD,
   SEED_CMD,
-  TORN_RECORD_MESSAGE,
+  tornRecordMessage,
   appendGateState,
   parseRankRecord,
   pruneRankRecord,
@@ -56,7 +56,10 @@ const RECORD = repoPath(RANK_RECORD_PATH)
  */
 export function readRankRecord(path = RECORD) {
   const record = parseRankRecord(existsSync(path) ? readFileSync(path, 'utf8') : null)
-  if (record.torn) throw new Error(TORN_RECORD_MESSAGE)
+  // The refusal names the source that HAS a readable copy, established the same
+  // way the arming refusal establishes it — a fixed `git checkout HEAD` is wrong
+  // wherever HEAD holds no copy, or holds the damage itself (ninth pass).
+  if (record.torn) throw new Error(tornRecordMessage(recordProvenance().restore))
   return record
 }
 
@@ -76,8 +79,10 @@ function writeRankRecord(record, open, path = RECORD) {
   return next
 }
 
-/** One git question, answered without a window and without a throw. */
-const git = (args) => spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true })
+/** One git question, answered without a window and without a throw. Injectable
+ *  so the unit layer can drive the real output SHAPES — an unmerged stage line,
+ *  an intent-to-add stub, a committed deletion — without a repository. */
+const runGit = (args) => spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true })
 
 /**
  * Does this repository carry the rank record AT ALL — and if it does, which
@@ -95,7 +100,7 @@ const git = (args) => spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8',
  * arming happens before the record is ever committed, so refusing wrongly costs a
  * message that names the restore, while allowing wrongly is the hole itself.
  */
-function recordProvenance(path = RANK_RECORD_PATH) {
+export function recordProvenance(path = RANK_RECORD_PATH, git = runGit) {
   const failClosed = { tracked: true, restore: RESTORE_CMD }
   // A candidate is only worth NAMING as the remedy if its bytes are a record;
   // restoring torn ones would hand the caller from this refusal into the next.
@@ -150,7 +155,7 @@ function recordProvenance(path = RANK_RECORD_PATH) {
  */
 function stageRecord(path = RANK_RECORD_PATH) {
   try {
-    const added = git(['add', '--', path])
+    const added = runGit(['add', '--', path])
     return added.status === 0 ? '' : String(added.stderr ?? '').trim() || `git add exited ${added.status}`
   } catch (e) {
     return (e && e.message) || 'git add could not be run'
@@ -195,7 +200,12 @@ if (isMainModule(import.meta.url)) {
       // outstanding question, by re-seeding or by removal.
       const before = existsSync(RECORD) ? readFileSync(RECORD, 'utf8') : null
       const next = writeRankRecord(
-        seedRecord(record, open, { why, at: new Date().toISOString(), ...recordProvenance() }),
+        seedRecord(record, open, {
+          why,
+          at: new Date().toISOString(),
+          present: before !== null,
+          ...recordProvenance(),
+        }),
         open,
       )
       const unstaged = stageRecord()
