@@ -15,7 +15,6 @@ import { openPointsOf } from './board-queue-core.mjs'
 import { readTasksOpen } from './tasks-source.mjs'
 import {
   RANK_RECORD_PATH,
-  REMOVED_RECORD_MESSAGE,
   RESTORE_CMD,
   TORN_RECORD_MESSAGE,
   alreadyArmedMessage,
@@ -24,6 +23,8 @@ import {
   parseRankRecord,
   pruneRankRecord,
   recordRank,
+  removedRecordMessage,
+  restoreCommandFor,
   seedRecord,
   settleRecord,
   unrankedAppends,
@@ -225,34 +226,64 @@ describe('the baseline moves only when nothing is outstanding', () => {
     // default, is never answered on its behalf.
     expect(moved.record.ranked[4]).toBeUndefined()
   })
-  it('names a restore that works on a DELETED record, not only a modified one', () => {
-    // `git checkout -- <path>` restores the INDEX copy: after a staged `git rm`
-    // the path is not in the index, so the prescribed remedy failed and left the
-    // caller in the refusal it was meant to end.
+  it('names a restore that works in every state the record can be missing in', () => {
+    // One fixed command cannot end the refusal: `git checkout -- <path>` reads
+    // the INDEX, which a staged `git rm` has emptied, and `git checkout HEAD --`
+    // cannot restore a path a COMMITTED deletion took out of HEAD. Naming the
+    // wrong one leaves the caller in the loop the message was meant to end.
     expect(RESTORE_CMD).toBe('git checkout HEAD -- .claude/queue-rank.json')
-    for (const message of [TORN_RECORD_MESSAGE, REMOVED_RECORD_MESSAGE]) {
-      expect(message).toContain(RESTORE_CMD)
-      expect(message).not.toMatch(/git checkout -- /)
+    expect(restoreCommandFor({ headHasIt: true })).toBe(RESTORE_CMD)
+    expect(restoreCommandFor({ headHasIt: false, inIndex: true })).toBe('git checkout -- .claude/queue-rank.json')
+    expect(restoreCommandFor({ headHasIt: false, removedIn: 'c0f0baca' })).toBe(
+      'git checkout c0f0baca^ -- .claude/queue-rank.json',
+    )
+    // A revision that is not one is never printed as a command.
+    for (const junk of ['', '   ', 'HEAD~1; rm -rf /', null]) {
+      expect(restoreCommandFor({ headHasIt: false, removedIn: junk })).toBe(RESTORE_CMD)
     }
+    expect(restoreCommandFor()).toBe(RESTORE_CMD)
+    // Both refusals carry the command the caller established, not a fixed one.
+    expect(removedRecordMessage(restoreCommandFor({ headHasIt: false, removedIn: 'abc1234' }))).toContain(
+      'git checkout abc1234^ -- .claude/queue-rank.json',
+    )
+    expect(TORN_RECORD_MESSAGE).toContain(RESTORE_CMD)
+    let thrown = null
+    try {
+      seedRecord(null, [9], { why: 'w', tracked: true, restore: 'git checkout deadbee^ -- x' })
+    } catch (e) {
+      thrown = e
+    }
+    expect(thrown.message).toContain('git checkout deadbee^ -- x')
   })
   it('writes nothing when the baseline already says what stands', () => {
     expect(settleRecord([9, 5], settledAt([5, 9]), { at: 't' })).toEqual({ changed: false, record: null })
   })
-  it('never erases the baseline over an order that reads as empty — and FREEZES it, which is the price', () => {
+  it('never erases the baseline over an order that reads as empty', () => {
     // A work order that is unreadable, half-written or mid-merge parses to zero
     // open points; taking that as "settled" would hand every point back as an
-    // append the moment it read normally again.
+    // append the moment it read normally again. Absence proves nothing here.
     for (const empty of [[], null, 'garbage']) {
       expect(settleRecord(empty, settledAt([5, 9]), { at: 't' })).toEqual({ changed: false, record: null })
     }
-    // THE COST OF THAT RULE, pinned so nobody discovers it as a surprise: where
-    // the order really IS empty the baseline freezes, so the last point of a
-    // finished batch stays remembered and its later REOPEN is never asked about.
-    // One missed question, against a block loop out of every transient bad read —
-    // and nothing here can tell a finished work order from a mangled one.
-    const finished = settleRecord([], settledAt([4]), { at: 't' })
-    expect(finished.changed).toBe(false)
-    expect(unrankedAppends([4], settledAt([4]))).toEqual([])
+    // …and a bad read shows no ticks either, so it drops nothing.
+    expect(settleRecord([], settledAt([4]), { at: 't' })).toEqual({ changed: false, record: null })
+  })
+  it('drops a point the work order TICKS, even with no open points left at all', () => {
+    // The last question this gate used to miss: baseline [4], 4 lands, the order
+    // reads empty so nothing was written, and 4 reopening at the end was never
+    // asked about. A tick is positive evidence — a mangled file can fail to show
+    // one, but it cannot invent one — so it settles what absence could not.
+    const finished = settleRecord([], settledAt([4], { 4: { at: '', why: 'w' } }), { at: 't', closed: [4] })
+    expect(finished.changed).toBe(true)
+    expect(finished.record.settled.points).toEqual([])
+    expect(finished.record.ranked).toEqual({})
+    // The reopen is now asked about like any point standing at the append default.
+    expect(unrankedAppends([4], finished.record)).toEqual([4])
+    // Ticks for points the baseline never held change nothing.
+    expect(settleRecord([], settledAt([4]), { at: 't', closed: [7, 8] })).toEqual({ changed: false, record: null })
+    // And the gate is still ARMED afterwards — an emptied baseline is not an
+    // absent one, so nothing reads as a clean slate.
+    expect(appendGateState([4], finished.record).state).toBe('pending')
   })
   it('--seed arms the whole open order at once, with its reason', () => {
     const seeded = seedRecord(null, [9, 5, 4], { why: 'arming baseline', at: 't' })

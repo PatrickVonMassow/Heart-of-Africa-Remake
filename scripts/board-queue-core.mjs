@@ -785,3 +785,11 @@ export function parseSetArgs(rest) {
 export function openPointsOf(tasksText) {
   return parseTasks(String(tasksText ?? '')).open
 }
+
+/** The points the work order records as FINISHED — its ticks. A landed point
+ *  moves into `docs/tasks-archive.md` carrying its `- [x]`, so the archive text
+ *  is where these come from; unlike "the point is not in the open order", a tick
+ *  is positive evidence that a half-written file cannot fabricate. */
+export function closedPointsOf(tasksText) {
+  return parseTasks(String(tasksText ?? '')).done
+}

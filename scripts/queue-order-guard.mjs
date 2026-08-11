@@ -11,7 +11,8 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluate } from './queue-order-guard-core.mjs'
-import { openPointsOf } from './board-queue-core.mjs'
+import { closedPointsOf, openPointsOf } from './board-queue-core.mjs'
+import { ARCHIVE_PATH } from './tasks-source.mjs'
 import { RANK_RECORD_PATH, RESTORE_CMD, parseRankRecord, settleRecord } from './queue-rank-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
@@ -21,6 +22,10 @@ const TASKS = repoPath('TASKS.md')
 const DASHBOARD = repoPath('.batch-dashboard.html')
 const RANKS = repoPath(RANK_RECORD_PATH)
 const PAUSE = repoPath('.claude/batch-paused')
+
+/** A file's text, or '' where it is not there — this guard never fails over a
+ *  file it only consults. */
+const readIfPresent = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
 
 /** The guard's I/O half, shared with the preflight (point 365 D). */
 export function gatherQueueOrderInputs({ sessionId = '' } = {}) {
@@ -74,9 +79,15 @@ function settleBaseline({ tasksMd, rankRecordJson }, path = RANKS) {
           `repaired: ${RESTORE_CMD}`,
       )
     }
-    const settled = settleRecord(openPointsOf(tasksMd), record, {
-      at: new Date().toISOString(),
-    })
+    const open = openPointsOf(tasksMd)
+    // THE TICKS, BUT ONLY WHERE THEY ARE NEEDED. A baseline point leaves it
+    // because it is no longer in the open order — except when that order reads
+    // as EMPTY, where absence proves nothing and the work order's own tick is
+    // the evidence instead (see settleRecord). That is the only case worth
+    // reading the 1.3 MB archive for, and it is the case that never happens on
+    // an ordinary turn.
+    const closed = open.length ? [] : closedPointsOf(`${tasksMd}\n${readIfPresent(ARCHIVE_PATH)}`)
+    const settled = settleRecord(open, record, { at: new Date().toISOString(), closed })
     if (settled.changed) writeTextAtomic(path, `${JSON.stringify(settled.record, null, 2)}\n`)
   } catch (e) {
     console.error(`queue-order-guard: could not settle the rank baseline (continuing): ${e && e.message}`)

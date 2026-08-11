@@ -28,17 +28,19 @@ import { spawnSync } from 'node:child_process'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
-import { readTasksOpen } from './tasks-source.mjs'
-import { QUEUE_REBUILD_CMD, openPointsOf } from './board-queue-core.mjs'
+import { readTasksAll, readTasksOpen } from './tasks-source.mjs'
+import { QUEUE_REBUILD_CMD, closedPointsOf, openPointsOf } from './board-queue-core.mjs'
 import {
   RANK_CMD,
   RANK_RECORD_PATH,
+  RESTORE_CMD,
   SEED_CMD,
   TORN_RECORD_MESSAGE,
   appendGateState,
   parseRankRecord,
   pruneRankRecord,
   recordRank,
+  restoreCommandFor,
   seedRecord,
   settleRecord,
 } from './queue-rank-core.mjs'
@@ -65,36 +67,48 @@ export function readRankRecord(path = RECORD) {
  * not, or the point still in question would be swallowed into the baseline.
  */
 function writeRankRecord(record, open, path = RECORD) {
-  const settled = settleRecord(open, record, { at: new Date().toISOString() })
+  // The ticks matter only where the open order is empty — see settleRecord — and
+  // that is also the only case worth reading the whole archive for.
+  const closed = open.length ? [] : closedPointsOf(readTasksAll())
+  const settled = settleRecord(open, record, { at: new Date().toISOString(), closed })
   const next = settled.changed ? settled.record : pruneRankRecord(record, open)
   writeTextAtomic(path, `${JSON.stringify(next, null, 2)}\n`)
   return next
 }
 
 /**
- * Does this repository carry the rank record AT ALL — in the index, or anywhere
- * in the history of this branch?
+ * Does this repository carry the rank record AT ALL — and if it does, which
+ * command puts it back?
  *
- * `seedRecord` needs the answer to tell "a checkout that never had a baseline"
- * from "a tracked record somebody moved aside", which is the shape of the escape
- * out of an outstanding rank question. Both halves are asked because either alone
- * is half an answer: a plain `mv` leaves the path in the index, a `git rm` does
- * not but leaves it in the history.
+ * `seedRecord` needs the first half to tell "a checkout that never had a
+ * baseline" from "a tracked record somebody moved aside", which is the shape of
+ * the escape out of an outstanding rank question. It needs the second because a
+ * refusal is only closed by a remedy that WORKS: HEAD, the index and the commit
+ * before a committed deletion are three different sources, and naming the wrong
+ * one leaves the caller in the refusal (cross-vendor review, sixth pass).
  *
  * IT FAILS CLOSED. Where git says nothing usable — not installed, not a
  * repository, a broken index — the answer is "carried". The one legitimate
  * arming happens before the record is ever committed, so refusing wrongly costs a
  * message that names the restore, while allowing wrongly is the hole itself.
  */
-function recordKnownToRepo(path = RANK_RECORD_PATH) {
+function recordProvenance(path = RANK_RECORD_PATH) {
   const git = (args) => spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true })
+  const closed = (over) => ({ tracked: true, restore: restoreCommandFor(over) })
   try {
-    if (git(['ls-files', '--error-unmatch', '--', path]).status === 0) return true
-    const history = git(['log', '-1', '--format=%H', '--', path])
-    if (history.status !== 0) return true
-    return Boolean(String(history.stdout ?? '').trim())
+    const inIndex = git(['ls-files', '--error-unmatch', '--', path]).status === 0
+    if (git(['cat-file', '-e', `HEAD:${path}`]).status === 0) return closed({ headHasIt: true })
+    if (inIndex) return closed({ headHasIt: false, inIndex: true })
+    // Neither has it: either the deletion was COMMITTED — the record then lives
+    // one commit before the one that removed it — or this repository has never
+    // carried the record, which is the one state arming is for.
+    const history = git(['rev-list', '-n', '1', 'HEAD', '--', path])
+    if (history.status !== 0) return closed({ headHasIt: true })
+    const removedIn = String(history.stdout ?? '').trim()
+    if (!removedIn) return { tracked: false, restore: RESTORE_CMD }
+    return closed({ headHasIt: false, removedIn })
   } catch {
-    return true
+    return closed({ headHasIt: true })
   }
 }
 
@@ -128,7 +142,7 @@ if (isMainModule(import.meta.url)) {
       // repository still carries — so this can never be the shortcut out of an
       // outstanding question, by re-seeding or by removal.
       const next = writeRankRecord(
-        seedRecord(record, open, { why, at: new Date().toISOString(), tracked: recordKnownToRepo() }),
+        seedRecord(record, open, { why, at: new Date().toISOString(), ...recordProvenance() }),
         open,
       )
       console.log(`queue-rank: baseline armed with ${next.settled.points.length} open point(s) — "${why.trim()}"`)

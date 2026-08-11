@@ -53,6 +53,29 @@ export const RANK_RECORD_PATH = '.claude/queue-rank.json'
  *  alike, so the remedy a refusal prints actually ends the refusal. */
 export const RESTORE_CMD = `git checkout HEAD -- ${RANK_RECORD_PATH}`
 
+/**
+ * The restore a refusal prints, aimed at a commit that ACTUALLY HAS the record
+ * (cross-vendor review, sixth pass).
+ *
+ * A refusal is only closed by a remedy that works, and one fixed command cannot
+ * cover the three states a missing record can be in: HEAD still has it (a plain
+ * delete in the working tree), only the INDEX has it (added but never committed,
+ * then deleted), or NEITHER does because the deletion was committed — where the
+ * record lives one commit before the one that removed it. Naming the wrong one
+ * leaves the caller in the loop the refusal was meant to end: `--seed` keeps
+ * refusing, the gate keeps blocking as unarmed, and the printed command keeps
+ * failing. The caller establishes the state (`scripts/queue-rank.mjs` asks git);
+ * choosing the command from it is pure, so it is decided and tested here.
+ */
+export function restoreCommandFor({ headHasIt = true, inIndex = false, removedIn = '' } = {}) {
+  if (headHasIt) return RESTORE_CMD
+  if (inIndex) return `git checkout -- ${RANK_RECORD_PATH}`
+  const at = String(removedIn ?? '').trim()
+  // The parent of the commit that removed it — and only where that really is a
+  // commit id, since a guessed revision is another command that cannot work.
+  return /^[0-9a-f]{7,40}$/i.test(at) ? `git checkout ${at}^ -- ${RANK_RECORD_PATH}` : RESTORE_CMD
+}
+
 /** The open points as clean integers, in the order they were handed over, each
  *  once. `openPointsOf` does not deduplicate, and a number listed twice would
  *  otherwise make the same point read as both remembered and appended. */
@@ -291,32 +314,39 @@ export function unrankedAppends(open, record) {
  * directions are separated — grow only when nothing is outstanding, shrink to
  * what is still open at every turn end. (A work order read as partial would
  * narrow the baseline wrongly; that risk is not new — the settled branch has
- * always taken the read at face value — and a read of ZERO open points, the one
- * that would erase everything, is refused outright below.)
+ * always taken the read at face value — and a read of ZERO open points, where
+ * absence would erase everything, shrinks on the TICK instead, see below.)
  */
-export function settleRecord(open, record, { at = '' } = {}) {
+export function settleRecord(open, record, { at = '', closed = [] } = {}) {
   const list = pointList(open)
-  // AN EMPTY ORDER SETTLES NOTHING. A work order that momentarily reads as zero
-  // open points — unreadable, half-written, a checkout mid-merge — would
-  // otherwise erase the baseline, and every open point would come back as an
-  // append the moment it read normally again.
+  const { ranked, settled, torn } = normaliseRankRecord(record)
+  if (torn || !settled) return { changed: false, record: null }
+  // AN EMPTY ORDER ADVANCES NOTHING — a work order that momentarily reads as zero
+  // open points (unreadable, half-written, a checkout mid-merge) would otherwise
+  // erase the baseline, and every open point would come back as an append the
+  // moment it read normally again. ABSENCE proves nothing here: a genuinely
+  // finished work order and a mangled one parse alike.
   //
-  // THE PRICE, TAKEN DELIBERATELY (cross-vendor review, 11.08.2026): where the
-  // order really is empty, the baseline FREEZES. With a baseline of [4], closing
-  // 4 leaves the order empty, 4 stays remembered for ever, and its later REOPEN
-  // is never asked about — one missed question, on the last point of a finished
-  // batch. The alternative costs incomparably more: an unreadable or half-written
-  // read would erase the baseline and hand back EVERY open point as an append at
-  // once, a block loop out of a transient file state. Nothing here can tell the
-  // two apart — a genuinely finished work order and a mangled one both parse to
-  // zero open points, and every rule that would separate them (does a checklist
-  // heading survive, how many lines, did it shrink) is a guess about a file that
-  // is by then already broken. The READER could distinguish "no TASKS.md" from
-  // "TASKS.md with nothing open", and the guard already stands down on the first;
-  // the second is the ambiguous one, and it stays unresolved rather than guessed.
-  if (!list.length) return { changed: false, record: null }
+  // A TICK DOES PROVE SOMETHING, THOUGH (cross-vendor review, sixth pass). This
+  // used to end in a documented price — baseline [4], 4 closes, the order reads
+  // empty, 4 stays remembered for ever and its REOPEN is never asked about. The
+  // way out is not a better guess about an empty file but different evidence:
+  // the work order STATES that a point is finished, by ticking it and moving it
+  // into the archive, and a point the work order calls finished leaves the
+  // baseline whatever the open order looks like. A half-written file cannot
+  // fabricate a tick — it can only fail to show one, which drops nothing and
+  // leaves the freeze exactly as it was. The caller supplies the ticks (the
+  // guard reads the archive only in this case, which is the only one that needs
+  // it — 1.3 MB at every turn end for a question that never arises otherwise).
+  if (!list.length) {
+    const finished = new Set(pointList(closed))
+    const kept = settled.points.filter((n) => !finished.has(n))
+    if (kept.length === settled.points.length) return { changed: false, record: null }
+    const live = {}
+    for (const [key, value] of Object.entries(ranked)) if (!finished.has(Number(key))) live[key] = value
+    return { changed: true, record: { ranked: live, settled: { ...settled, points: kept } } }
+  }
   const state = appendGateState(list, record)
-  const { ranked, settled } = normaliseRankRecord(record)
   if (state.state !== 'settled') {
     // A QUESTION STANDS, so the baseline may not take today's order — but the
     // points it remembers that are no longer OPEN are dropped all the same, or a
@@ -428,10 +458,10 @@ export function alreadyArmedMessage(pending = []) {
  * order as judged". So a record the repository knows is RESTORED, never re-armed,
  * and the caller is told the one command that does it.
  */
-export const REMOVED_RECORD_MESSAGE =
+export const removedRecordMessage = (restore = RESTORE_CMD) =>
   `${RANK_RECORD_PATH} is missing here, but this repository carries it — so this checkout HAS a baseline and ` +
   'is not arming a first one. A record that exists is restored, not re-armed, or every question outstanding ' +
-  `when it went missing would count as answered by the arming: ${RESTORE_CMD}`
+  `when it went missing would count as answered by the arming: ${restore}`
 
 /**
  * ARM the gate: everything standing in the order today counts as judged, with one
@@ -452,7 +482,7 @@ export const REMOVED_RECORD_MESSAGE =
  * legitimate arming in a git checkout happens before the record is ever
  * committed.
  */
-export function seedRecord(record, open, { why = '', at = '', tracked = false } = {}) {
+export function seedRecord(record, open, { why = '', at = '', tracked = false, restore = RESTORE_CMD } = {}) {
   const reason = String(why ?? '').replace(/\s+/g, ' ').trim()
   if (!reason) throw new Error('--why is required — one line saying why the order as it stands is right')
   const { ranked, torn } = normaliseRankRecord(record)
@@ -460,7 +490,7 @@ export function seedRecord(record, open, { why = '', at = '', tracked = false } 
   const list = pointList(open)
   const state = appendGateState(list, record)
   if (state.state !== 'unarmed') throw new Error(alreadyArmedMessage(state.pending))
-  if (tracked) throw new Error(REMOVED_RECORD_MESSAGE)
+  if (tracked) throw new Error(removedRecordMessage(restore))
   const points = [...list].sort((a, b) => a - b)
   return {
     ...pruneRankRecord({ ranked }, list),
