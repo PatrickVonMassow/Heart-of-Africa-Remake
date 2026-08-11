@@ -4213,6 +4213,88 @@ if (section('ctrl-actor-labels')) {
   const scenery = rendered.filter((t) => SCENERY_WORDS.some((w) => t.toLowerCase().includes(w)))
   check('no building, fence or plant is named (point 342)', scenery.length === 0, scenery.join(' | '))
 
+  // NOTHING THE SETTLEMENT DRAWS IS INVISIBLE TO THE LAYER (point 600). The
+  // bird's-eye defect was a figure drawn from a list no source walked, and the
+  // same failure here would be an inhabitant drawn without a mark. Every figure
+  // names ITSELF in the graph (`name="inhabitant"`, set by PlaceLife's Figure
+  // for the speech label), so that name is an INDEPENDENT handle on the people
+  // this scene really draws: each of them must carry an actor mark AND stand in
+  // the layer's raw candidate set, whatever it is doing.
+  const figures = await page.evaluate(() => {
+    const cands = window.__actorCandidates ? window.__actorCandidates() : null
+    if (!cands || !window.__placeScene) return null
+    const drawn = []
+    window.__placeScene.traverse((o) => {
+      if (o.name !== 'inhabitant') return
+      for (let n = o; n; n = n.parent) if (n.visible === false) return
+      const m = o.matrixWorld.elements
+      drawn.push({ x: m[12], z: m[14], kind: o.userData?.actor?.kind ?? null })
+    })
+    const unmarked = drawn.filter((f) => f.kind === null)
+    const unoffered = drawn.filter(
+      (f) => f.kind !== null && !cands.some((c) => c.kind === f.kind && Math.hypot(c.x - f.x, c.z - f.z) < 1.5),
+    )
+    return {
+      total: drawn.length,
+      unmarked: unmarked.length,
+      unoffered: unoffered.length,
+      kinds: [...new Set(drawn.map((f) => f.kind))],
+    }
+  })
+  check(
+    'every inhabitant figure the scene draws reaches the label layer (point 600)',
+    !!figures && figures.total > 0 && figures.unmarked === 0 && figures.unoffered === 0,
+    figures
+      ? `${figures.total} figures [${figures.kinds.join(', ')}], ${figures.unmarked} unmarked, ` +
+        `${figures.unoffered} not offered`
+      : 'no candidate hook',
+  )
+
+  // And it rides them while they WALK: the settlement's states are motion, and
+  // a label that stayed at the birthplace would be the same defect one layer
+  // down. Polled on the app's own frames (point 177), never a wall-clock wait.
+  const walking = await page.evaluate(
+    () =>
+      new Promise((res) => {
+        const figuresNow = () => {
+          const list = []
+          window.__placeScene.traverse((o) => {
+            if (o.name !== 'inhabitant') return
+            const m = o.matrixWorld.elements
+            list.push({ node: o, x: m[12], z: m[14], kind: o.userData?.actor?.kind ?? null })
+          })
+          return list
+        }
+        const start = new Map(figuresNow().map((f) => [f.node, { x: f.x, z: f.z }]))
+        let frames = 0
+        const step = () => {
+          const moved = figuresNow().filter((f) => {
+            const s = start.get(f.node)
+            return s !== undefined && Math.hypot(f.x - s.x, f.z - s.z) > 0.25
+          })
+          if (moved.length > 0) {
+            const cands = window.__actorCandidates()
+            const named = moved.filter((f) =>
+              cands.some((c) => c.kind === f.kind && Math.hypot(c.x - f.x, c.z - f.z) < 1.5),
+            )
+            res({ moved: moved.length, named: named.length, kinds: [...new Set(moved.map((f) => f.kind))], frames })
+            return
+          }
+          if (++frames > 900) {
+            res({ moved: 0, named: 0, kinds: [], frames })
+            return
+          }
+          requestAnimationFrame(step)
+        }
+        requestAnimationFrame(step)
+      }),
+  )
+  check(
+    'a walking inhabitant is named where it now stands (point 600)',
+    walking.moved > 0 && walking.named === walking.moved,
+    `${walking.named}/${walking.moved} moved figures named after ${walking.frames} frame(s) [${walking.kinds.join(', ')}]`,
+  )
+
   await frame('148-ctrl-actor-labels-village', {
     place: 'maasai-village',
     label: 'the Maasai village with the Ctrl labels over its inhabitants',

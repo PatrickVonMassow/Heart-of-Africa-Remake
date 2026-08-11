@@ -296,7 +296,21 @@ while the attack runs, the label really stands in the frame, the fleeing
 prey is named too, and the attacker's own pre-predicate record is not
 concealed — `scripts/verify/enrichments.mjs`
 (`--section=ctrl-labels-attacking-predator`,
-`600-ctrl-label-attacking-predator.png`).
+`600-ctrl-label-attacking-predator.png`). The settlement half of the
+roster and its reachability: every role, kept animal and usable object
+named while standing, walking, gesturing, kneeling, carrying, drawn
+small and deep under the settlement group, in both languages, the
+switched-off figure the one silence — and every kind of the roster
+traced to a scene that really draws it (a herd, a flock, the hunt, a
+`markActor` site, a `Figure` role or the Giza anchors), leaving the
+elder the single documented exception, since he carries his own
+standing label (`src/scenes/actorLabelRoster.test.ts`). Live: nothing
+DRAWN is invisible to the layer — every animal stamped by the current
+draw pass and standing in the picture, and the hunt's own two figures,
+reach the raw candidate set (`scripts/verify/enrichments.mjs`), and
+every inhabitant figure the settlement draws carries its mark, is
+offered, and is still named where it now stands after it has walked
+(`scripts/verify/polish.mjs`).
 
 ## 10. Goal scaffolding.
 

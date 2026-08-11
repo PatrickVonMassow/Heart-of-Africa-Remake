@@ -8454,6 +8454,57 @@ if (section('ctrl-actor-labels')) {
     held ? `${plantNamed.length} scenery labels` : 'no layer',
   )
 
+  // NOTHING THE PASS DREW IS INVISIBLE TO THE LAYER (point 600). The reported
+  // defect was not a wrong predicate but a missing SOURCE: the attacking
+  // predator is drawn from the hunt's own groups, and only the herds had one,
+  // so it never reached the layer to be judged at all. This compares the raw
+  // candidate set against what the SCENE says it drew — every animal stamped
+  // with the current draw pass and standing in the picture must be offered,
+  // whatever state it is in. Both readings happen in ONE synchronous block, so
+  // no frame can run between them and they describe the same moment.
+  const offered = await page.evaluate(() => {
+    const cands = window.__actorCandidates ? window.__actorCandidates() : null
+    const herds = window.__wildlife?.herdsRef?.current
+    if (!cands || !herds) return null
+    // The stamp of the pass that just drew: the newest any animal carries.
+    let frame = -1
+    for (const sp of Object.keys(herds)) {
+      for (const a of herds[sp]) if (a.drawn && a.drawn.frame > frame) frame = a.drawn.frame
+    }
+    const at = (kind, x, z) => cands.some((c) => c.kind === kind && Math.hypot(c.x - x, c.z - z) < 1.5)
+    const missing = []
+    let drawnOnScreen = 0
+    for (const sp of Object.keys(herds)) {
+      for (const a of herds[sp]) {
+        const d = a.drawn
+        if (!d || d.frame !== frame) continue
+        if (!window.__camera.onScreen(d.x, d.z)) continue
+        drawnOnScreen++
+        if (!at(sp, d.x, d.z)) missing.push(`${sp}@${d.x.toFixed(0)},${d.z.toFixed(0)}`)
+      }
+    }
+    // The scripted hunt draws its two figures from its own groups — the gap.
+    const hunt = window.__lionHunt
+    const L = hunt?.state
+    if (L && hunt.lion.current?.visible === true && window.__camera.onScreen(L.lx, L.lz)) {
+      drawnOnScreen++
+      if (!at(L.predator, L.lx, L.lz)) missing.push(`${L.predator}@hunt(${L.mode})`)
+    }
+    if (L && hunt.prey.current?.visible === true && window.__camera.onScreen(L.px, L.pz)) {
+      drawnOnScreen++
+      if (!at(L.prey, L.px, L.pz)) missing.push(`${L.prey}@hunt(${L.mode})`)
+    }
+    return { missing, drawnOnScreen, candidates: cands.length }
+  })
+  check(
+    'every animal the pass drew on screen reaches the label layer (point 600)',
+    !!offered && offered.drawnOnScreen > 0 && offered.missing.length === 0,
+    offered
+      ? `${offered.drawnOnScreen} drawn on screen, ${offered.candidates} offered, ` +
+        `missing [${offered.missing.slice(0, 6).join(', ')}]`
+      : 'no candidate hook',
+  )
+
   await shot('147-ctrl-actor-labels', {
     world: { lat: -2.6, lon: 35.2 },
     label: 'the savanna with the Ctrl labels over its animals',
