@@ -199,9 +199,13 @@ there exactly once; a new point joins a bundle when appended.
      that is the release's purpose.
   Everything else — visuals, ambience, wildlife, the big audits — ships AFTER v0.3.
   THE CLOSING RUN IS ITS OWN POINT (user 11.08.2026, on the estimate: the ~1 h here was
-  true when this meant "tag and publish"). Point 633 carries it — the first LARGE
-  regression, the blind-parallel cleanup, the second LARGE regression after it — and point
-  631 anchors that order in the closing checklist, so both run BEFORE this point. What
+  true when this meant "tag and publish"). The SEQUENCE is binding and runs BEFORE this
+  point: full LARGE regression on both backends → the blind-parallel four-eyes cleanup of
+  legacy in ALL code and ALL documents (CLAUDE.md §6, closing step
+  `cleanup-blind-parallel`) → a SECOND full LARGE regression after the last cleanup commit
+  (`regression-after-cleanup`) → and only THEN the user's go for the tag. Point 633 carries
+  that run; point 631 anchored the order in the closing checklist, which refuses a tag
+  while the second regression does not stand after the cleanup. What
   remains here is the irreversible last hour: the tag, the `poc` move, the deploy and the
   check that the URLs serve the new state. No tag is cut on an unclosed state: this point
   is never ticked without a complete closing run recorded at the very HEAD that carries
