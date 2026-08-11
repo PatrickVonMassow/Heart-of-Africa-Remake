@@ -247,6 +247,56 @@ describe('runDaemon — a released lock is not waited out', () => {
     }
   })
 
+  // THE WAKE MAY NOT DEPEND ON WHEN THE FIRST POLL HAPPENS TO RUN (point 644,
+  // measured 11.08.2026). The two tests above hand the lock its new state from a
+  // 60 ms timer, and the daemon's baseline used to be whatever its first poll saw
+  // — a poll armed only after the tick's record writes are done. On the CI runner
+  // that poll is late often enough to land AFTER the change (measured there;
+  // locally the same measurement never exceeds a few ms, which is why no amount
+  // of local load reproduced it), and the ended state then became the baseline
+  // instead of an event: the daemon slept the whole interval out and vitest
+  // reported a 30 s TIMEOUT, not a missed budget — the red that put point 644 on
+  // the work order.
+  //
+  // This pins the property WITHOUT a race: the lock ends its ownership
+  // SYNCHRONOUSLY inside the tick, so the change is always earlier than the first
+  // poll, whatever the machine is doing. Against the old code it hangs every time
+  // on every host; the wake now comes from the baseline taken before the tick.
+  it('wakes even when ownership ends BEFORE the first poll of the sleep', { timeout: 30_000 }, async () => {
+    const place = arena()
+    try {
+      let lock = { sessionId: 's1', claimedAt: Date.now(), acquiredAt: Date.now() }
+      const ticks = []
+      const started = Date.now()
+      const outcome = await runDaemon({
+        recordPath: place.recordPath,
+        logPath: place.logPath,
+        tickMs: 10 * 60 * 1000,
+        pollMs: 20,
+        wakeGapMs: 0,
+        readLock: () => lock,
+        isPaused: () => false,
+        tick: () => {
+          ticks.push(Date.now() - started)
+          if (ticks.length === 1) {
+            // Idle and long past the window, laid down inside the tick itself —
+            // exactly what a session that lapses while the tick runs produces.
+            const at = Date.now() - 6 * 60 * 1000
+            lock = { sessionId: 's1', claimedAt: at, acquiredAt: at, pid: process.pid }
+          } else {
+            stopFrom(place.recordPath)
+          }
+          return Promise.resolve(0)
+        },
+      })
+      expect(ticks.length).toBeGreaterThanOrEqual(2)
+      expect(ticks[1] - ticks[0]).toBeLessThan(5000)
+      expect(outcome).toBe('yielded')
+    } finally {
+      place.cleanup()
+    }
+  })
+
   it('sleeps the whole interval out while the owner holds the lock', { timeout: 30_000 }, async () => {
     const place = arena()
     try {
