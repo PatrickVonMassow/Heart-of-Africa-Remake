@@ -69,6 +69,7 @@ export const NON_RENDER_VERIFY = new Set([
   'backend-lane-core.mjs', // WHICH lanes exist and whether a renderer is software; the check drives the browser
   'baseline-classify-core.mjs',
   'baseline-classify.mjs',
+  'cropLuma.mjs', // how a ground crop's pixels become one reading; polish.mjs captures them
   'docs.mjs',
   'eavesColumn.mjs', // the head-clearance verdict over a recorded window; polish.mjs records it
   'fixedWaits.mjs',
