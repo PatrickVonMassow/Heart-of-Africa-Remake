@@ -205,6 +205,12 @@ describe('reading the answer', () => {
     const both = parseAnswer({ kind: 'audit', text: 'A1 | a.mjs | the lease is not renewed\n\nNO FINDINGS: everything else looked fine' })
     expect(both.ok).toBe(false)
     expect(both.error).toMatch(/says two things/)
+    // …and a BARE marker is the same contradiction: the claim is what contradicts, not
+    // its explanation, which the acceptance path still demands (last round).
+    const bare = parseAnswer({ kind: 'audit', text: 'A1 | a.mjs | the lease is not renewed\nNO FINDINGS:' })
+    expect(bare.ok).toBe(false)
+    expect(bare.error).toMatch(/says two things/)
+    expect(parseAnswer({ kind: 'audit', text: 'NO FINDINGS:' }).ok).toBe(false)
   })
 
   it('takes an EXPLAIN as prose, but not two words of it', () => {

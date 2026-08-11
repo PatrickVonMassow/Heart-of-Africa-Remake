@@ -119,11 +119,12 @@ Measured over 47,258 turns from 391 transcripts (03.–11.08.2026, weighted):
 | — authoring (edits the verification code) | 4.8 % of it |
 | — unclear (never guessed into a half) | 0.1 % of it |
 
-So the routable text half is **19.9 % of the entire spend**, and 46.6 % of the
-delegated agents' own verification — which is what makes part A worth having and
-what any decision about part B should be argued against.
+So the routable text half is **19.9 % of the entire spend** — the figure the tool
+computes from the unrounded values; the two rounded percentages above multiply to
+20.1 % — and 46.6 % of the delegated agents' own verification. That is what makes
+part A worth having, and what any decision about part B should be argued against.
 
-Nine classification errors were found by the cross-vendor review rounds of
+Eight classification errors were found by the cross-vendor review rounds of
 this very branch and are fixed in these figures: an unplaceable call used to be
 dropped instead of voting (so a turn that read one log and did one unplaceable
 thing read as wholly routable); `node --check` on a verify script counted as a
