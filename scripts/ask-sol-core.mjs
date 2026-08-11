@@ -165,8 +165,13 @@ export function formatAskMaterial({ sections = [], budget = MATERIAL_BUDGET_CHAR
     if (text.trim()) carried.push(title)
     else omitted.push(title)
   }
-  // The closing count, paid for by the reserve: what did not fit is NEVER invisible.
-  if (silent.length) push(`… [${silent.length} further section(s) omitted entirely: the material budget is spent]`)
+  // The closing count, paid for by the reserve: what did not fit is NEVER invisible —
+  // unless the whole budget is smaller than that one line, which the cap still wins
+  // (fifth cross-vendor round: a `budget: 0` returned a non-empty string).
+  if (silent.length) {
+    const tail = `… [${silent.length} further section(s) omitted entirely: the material budget is spent]`
+    if (spent + tail.length + 1 <= cap) push(tail)
+  }
   return { text: out.join('\n'), carried, omitted }
 }
 

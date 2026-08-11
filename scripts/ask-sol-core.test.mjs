@@ -92,11 +92,24 @@ describe('the material', () => {
   // Fourth cross-vendor round: charging the markers made the budget honest, but the
   // sections beyond THEM then vanished in silence — and a model that cannot see that
   // something is missing answers as if nothing were.
-  it('COUNTS what did not even fit a marker, so nothing vanishes unseen', () => {
+  it('COUNTS what did not even fit a marker — the real number, not just a number', () => {
     const many = Array.from({ length: 50 }, (_, i) => ({ title: `FILE: ${'p'.repeat(80)}/${i}.ts`, text: 'q'.repeat(300) }))
-    const { text } = formatAskMaterial({ sections: many, budget: 1200 })
-    expect(text).toMatch(/… \[\d+ further section\(s\) omitted entirely: the material budget is spent\]/)
+    const { text, carried, omitted } = formatAskMaterial({ sections: many, budget: 1200 })
+    const written = (text.match(/OMITTED ENTIRELY \(material budget spent\)/g) ?? []).length
+    const counted = Number(/… \[(\d+) further section\(s\) omitted entirely/.exec(text)?.[1] ?? -1)
+    // The closing line accounts for exactly what neither travelled nor got a marker.
+    expect(counted).toBe(many.length - carried.length - written)
+    expect(counted).toBeGreaterThan(0)
+    expect(carried.length + omitted.length).toBe(many.length)
     expect(text.length).toBeLessThanOrEqual(1200)
+  })
+
+  // Fifth cross-vendor round: the closing line was pushed unconditionally, so a budget
+  // smaller than that one line returned a non-empty string — the cap must win.
+  it('writes NOTHING at a budget too small even for its closing line', () => {
+    const { text, omitted } = formatAskMaterial({ sections: [{ title: 'FIRST', text: 'x'.repeat(50) }], budget: 0 })
+    expect(text).toBe('')
+    expect(omitted).toEqual(['FIRST'])
   })
 
   // Second cross-vendor round: the caller decides whether a request carries any real
