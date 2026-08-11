@@ -349,7 +349,15 @@ describe('who may merge', () => {
       fallback: 'GPT-5.6 Sol reviewed this one earlier',
     })
     expect(noAbsence.ok).toBe(false)
-    expect(noAbsence.errors.join(' ')).toMatch(/NOT THERE/)
+    // …and the two halves have to be ONE claim: naming a present model beside
+    // the merger's own absence is the opposite of the exception.
+    const split = validateMerger({
+      mergedBy: 'Opus 5',
+      authors: ['Opus 5'],
+      fallback: 'GPT-5.6 Sol was present; Opus 5 was unavailable',
+    })
+    expect(split.ok).toBe(false)
+    expect(split.errors.join(' ')).toMatch(/OTHER model was the absent one/)
     // …and the merger cannot excuse itself under its own other name either.
     const solItself = validateMerger({
       mergedBy: 'GPT-5.6 Sol',

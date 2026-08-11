@@ -269,21 +269,29 @@ export function validateMerger({ mergedBy, authors = [], fallback = '' } = {}) {
     // Every word of the MERGER'S OWN name, so "Sol was unavailable" cannot be
     // written by Sol itself.
     const mine = new Set([...String(who).matchAll(MODEL_NAMED)].map((m) => m[1].toLowerCase()))
+    const other = (words) => words.some((f) => !mine.has(f) && f !== 'claude')
+    // THE NAME AND THE ABSENCE MUST BE THE SAME CLAIM (four-eyes review, sixth
+    // round). Checked apart, "GPT-5.6 Sol was present; Opus 5 was unavailable"
+    // satisfied both halves and said the opposite of what the exception means.
+    // So one CLAUSE has to carry the other model AND its absence.
+    const clauses = String(reason).split(/[;,]|\.\s|\band\b|\bbut\b|\bwhile\b|\bso\b|\bhowever\b/i)
+    const bound = clauses.some(
+      (c) => UNAVAILABLE.test(c) && other([...c.matchAll(MODEL_NAMED)].map((m) => m[1].toLowerCase())),
+    )
     if (!named.length) {
       errors.push(
         `the two-model fallback has to NAME the model that was unavailable ("${reason}" names none) — ` +
           'it is the reason an author was allowed to merge, and an unnamed reason cannot be checked',
       )
-    } else if (!named.some((f) => !mine.has(f) && f !== 'claude')) {
+    } else if (!other(named)) {
       errors.push(
         `the two-model fallback names only "${who}" itself: it has to say which OTHER model was ` +
           'unavailable, since that is what made an author the merger',
       )
-    }
-    if (!UNAVAILABLE.test(reason)) {
+    } else if (!bound) {
       errors.push(
-        `the two-model fallback has to say the model was NOT THERE ("${reason}" only mentions one) — ` +
-          'unreachable, unavailable, no access: the exception is an absence, not a preference',
+        `the two-model fallback does not say that the OTHER model was the absent one ("${reason}") — ` +
+          'name it and say it was unreachable, in one breath: the exception is that model\'s absence',
       )
     }
   }
