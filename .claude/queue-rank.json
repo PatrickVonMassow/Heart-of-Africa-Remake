@@ -3,10 +3,14 @@
     "628": {
       "at": "2026-08-11T04:00:08.693Z",
       "why": "Kosmetische Nachfolge zu 600: doppelter Kasten und das eigene Boot, kein Spielabbruch — hinten ist richtig, die Reparaturen und die Urlaubsfestigkeit gehen vor"
+    },
+    "643": {
+      "at": "2026-08-11T15:00:17.845Z",
+      "why": "Not release-blocking: the closing run proves the build with two full regressions rather than relying on a released red, and 643 refines a mechanism that only landed today. It waits behind the release work."
     }
   },
   "settled": {
-    "at": "2026-08-11T14:22:43.173Z",
+    "at": "2026-08-11T15:00:17.845Z",
     "points": [
       174,
       184,
@@ -161,9 +165,9 @@
       637,
       638,
       639,
-      640,
       641,
-      642
+      642,
+      643
     ]
   }
 }

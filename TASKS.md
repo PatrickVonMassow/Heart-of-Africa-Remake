@@ -1070,16 +1070,17 @@ Build order, chosen so no two parallel agents own the same file:
   state anybody claims is done — the same reasoning that gives a RESCUE commit
   `[skip ci]` — and the state that must be green is the one `land-point.mjs` re-tests at
   the merge anyway.
-  FINAL STATE, second half: (a) a CANCELLED run is never read as pending. Superseded by a
-  newer push is a known, harmless outcome, so the guard judges the NEWEST run per (ref,
-  workflow) and says "superseded" where an older one was cancelled. (b) A ref carrying a
+  FINAL STATE, second half: (a) a CANCELLED run is never read as pending. A run that
+  GitHub stopped because a newer push arrived is a known, harmless outcome, so the guard
+  judges the NEWEST run per (ref, workflow) and names that cause where an older one was
+  cancelled. (b) A ref carrying a
   LIVE delegated agent — the liveness probe of `scripts/batch-in-flight.mjs` already
   exists and is already consulted at the landing — does not BLOCK on an unfinished run;
   it is REPORTED as still building and judged when the agent reports. (c) A genuinely RED
   run blocks in EVERY case, agent alive or not: this must not become a way to push red
   work past the gate by keeping an agent running.
-  VERIFIABLE, second half: Vitest over the pure core — a ref whose newest run is
-  cancelled and superseded does not block; a ref with a live agent and a pending run
+  VERIFIABLE, second half: Vitest over the pure core — a ref whose newest run was
+  cancelled by a newer push does not block; a ref with a live agent and a pending run
   reports instead of blocking; the SAME ref with no live agent still blocks; a red run
   blocks with the agent alive. Plus the transcript case: four consecutive blocks naming
   cancelled runs produce one "still building" line instead.
@@ -1661,9 +1662,25 @@ Build order, chosen so no two parallel agents own the same file:
   only a LATER verdict on a LATER commit does. Second half in the delegation brief
   (`scripts/point-brief.mjs`), at the line where the commit-per-step rule already lives:
   whoever commissions a review stays in the turn until it is back.
+  SECOND SOURCE OF THE SAME JUDGMENT (measured 11.08.2026 on point 640, which the gate
+  refused while every review it asked for existed). "Later" is decided by TWO facts: the
+  clearing commit must DESCEND from the refused one, and the clearing row must be RECORDED
+  after it. The first is a property of the code and is sound. The second is a property of
+  when somebody typed the command — and an agent that reviews all round and writes its rows
+  in one batch at the end can write them in any order. Here the closing `merge` landed in
+  the ledger six seconds BEFORE the refusal it answers, so the gate reported "a later merge
+  exists, but not for a LATER commit" about a commit that demonstrably descends from it, and
+  the point could not be ticked until the row was written again.
+  FINAL STATE for it: the descent test decides alone where it can. Where the clearing
+  commit descends from the refused one, the review IS the answer, whatever order the rows
+  reached the file — record time only breaks a tie the code cannot (two records against the
+  SAME commit, where nothing changed between them, which is the case the rule was built
+  for). The refusal the gate prints names which of the two facts is missing, so the reader
+  is not sent to look for a fix that was already made.
   VERIFIABLE: Vitest on the decision — a negative verdict blocks, a positive one on an OLDER
-  commit blocks, a positive one on the current commit passes; the brief's text is pinned by its
-  existing test.
+  commit blocks, a positive one on the current commit passes; a positive one on a DESCENDANT
+  commit passes even when its record timestamp precedes the refusal's; two records on the
+  SAME commit still block; the brief's text is pinned by its existing test.
 
 - [ ] 510. THE RENDER-VERIFY CORE COUNTS A RUN THAT NEVER CONFIRMED ITS BACKEND
   (four-eyes review of point 505's gate change, 05.08.2026 — the reviewer cleared
