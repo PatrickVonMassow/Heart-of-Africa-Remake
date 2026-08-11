@@ -5767,7 +5767,11 @@ to land than a mechanism that needs a review.
      backward-pointing marker (von heute, von gestern, vorhin, damals, bereits, schon),
      is not a request while it has neither a question mark nor an imperative. The
      fail direction is unchanged — in doubt, block — but a pure retrospect is not a
-     doubtful case.
+     doubtful case. The SAME holds for a sentence that merely DESCRIBES a standing
+     arrangement ("poc bleibt deine Entscheidung", "das Taggen liegt bei dir"): it reports
+     who decides, it does not ask. Measured 11.08.2026, two turns in one morning, both on
+     the phrase `deine entscheidung`; a phrase that names a decision-MAKER without a
+     question mark and without an imperative is a statement, and the gate says so.
   VERIFIABLE: Vitest cases in `scripts/decision-card-guard-core.test.mjs` covering — a
   user message with two open cards blocks; one removed plus one kept passes; the same
   cards pass silently on a turn with NO user message; a NEW user message re-arms both;
