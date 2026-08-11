@@ -13,6 +13,7 @@ import {
   DEFAULT_RATE,
   DEFAULT_RUNS,
   classifyRun,
+  countAlive,
   formatProbeReport,
   parseCpusAllowedList,
   parseProbeArgs,
@@ -138,6 +139,28 @@ describe('throttlePlan — a throttle is applied or admitted missing, never fake
     expect(() => throttlePlan()).not.toThrow()
     expect(() => throttlePlan(null)).not.toThrow()
     expect(() => throttlePlan({ platform: 'linux', hasTaskset: true, allowedCpus: 'many', cpus: -3, rate: -1 })).not.toThrow()
+  })
+})
+
+describe('countAlive — the squeeze that HELD, asked of the OS', () => {
+  it('counts only the processes the probe says are running', () => {
+    const running = new Set([11, 13])
+    expect(countAlive([11, 12, 13], (pid) => running.has(pid))).toBe(2)
+  })
+
+  it('counts a throwing or unreadable pid as not running — never overstates the squeeze', () => {
+    expect(
+      countAlive([11, 12], (pid) => {
+        if (pid === 12) throw new Error('ESRCH')
+        return true
+      }),
+    ).toBe(1)
+    expect(countAlive([0, -1, 'x', null], () => true)).toBe(0)
+  })
+
+  it('is total on garbage', () => {
+    expect(countAlive(null, () => true)).toBe(0)
+    expect(() => countAlive([1], null)).not.toThrow()
   })
 })
 

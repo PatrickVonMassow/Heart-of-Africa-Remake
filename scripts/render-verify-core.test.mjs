@@ -855,6 +855,18 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     ])
   })
 
+  it('names EVERY red it waved, not one per run', () => {
+    const twoReds = redRun('webgpu', 1500, [red('the first nobody filed'), red('the second nobody filed')])
+    const result = evaluate(
+      renderChange({
+        runs: [twoReds],
+        deferral: { head: 'def5678', reason: 'the dev server had died', at: 1700 },
+        openPoints,
+      }),
+    )
+    expect(result.waved.map((w) => w.name)).toEqual(['the first nobody filed', 'the second nobody filed'])
+  })
+
   it('a deferral with nothing to wave says nothing — the list is evidence, not decoration', () => {
     const result = evaluate(
       renderChange({ runs: [], deferral: { head: 'def5678', reason: 'headless WebGPU washes the frame out', at: 1600 } }),

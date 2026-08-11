@@ -616,6 +616,11 @@ export function suggestSuite(runs, changedRenderPaths) {
 
 const ALLOW = { decision: 'allow' }
 
+/** How many waved-through reds one deferral record keeps. A bound, because the
+ *  state file is read on every turn — never a silent one: the count that goes
+ *  with it is the real number. */
+const MAX_WAVED = 20
+
 /**
  * Decide whether the turn may end. Inputs (all optional — missing data errs
  * fail-open, matching the wrapper's contract):
@@ -680,12 +685,17 @@ export function evaluate(input) {
   // invisible is one nobody weighs (four-eyes finding, 11.08.2026). The wrapper
   // prints and records that list beside the deferral's own reason.
   if (deferral && head && deferral.head === head) {
-    const waved = unexplained.map((u) => ({
-      backend: u.backend,
-      suite: u.suite,
-      status: u.status,
-      name: u.unaccounted[0]?.name ?? '(unnamed)',
-    }))
+    // EVERY red, not one per run: a run with three unexplained reds waved three
+    // reds through, and a record naming the first would understate exactly what
+    // the reader is being asked to accept.
+    const waved = []
+    for (const u of unexplained) {
+      const reds = u.unaccounted.length > 0 ? u.unaccounted : [{ name: '(unnamed)' }]
+      for (const red of reds) {
+        if (waved.length >= MAX_WAVED) break
+        waved.push({ backend: u.backend, suite: u.suite, status: u.status, name: red.name ?? '(unnamed)' })
+      }
+    }
     return waved.length > 0
       ? { decision: 'allow', clear: true, deferred: true, waved }
       : { decision: 'allow', clear: true, deferred: true }

@@ -39,6 +39,7 @@ import { listSections, resolveSelection } from './verify/sections.mjs'
 import { DEV_SUITES } from './verify/tiers.mjs'
 import {
   classifyRun,
+  countAlive,
   formatProbeReport,
   parseCpusAllowedList,
   parseProbeArgs,
@@ -120,12 +121,23 @@ function startSpinners(plan) {
 }
 
 /** Kill them, and say how many were STILL RUNNING when the run ended — a spinner
- *  that died early squeezed nothing for the rest of it. */
+ *  that died early squeezed nothing for the rest of it. Liveness is asked of the
+ *  OS (signal 0), because the child objects cannot have learnt of an exit while
+ *  spawnSync held the event loop. */
 function stopSpinners(spun) {
-  let alive = 0
+  const alive = countAlive(
+    spun.map((c) => c.pid),
+    (pid) => {
+      try {
+        process.kill(pid, 0)
+        return true
+      } catch (err) {
+        return err?.code === 'EPERM'
+      }
+    },
+  )
   for (const child of spun) {
     try {
-      if (child.exitCode === null && child.signalCode === null) alive++
       child.kill('SIGKILL')
     } catch {
       /* already gone */

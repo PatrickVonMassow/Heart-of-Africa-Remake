@@ -188,6 +188,29 @@ export function throttlePlan(input) {
   }
 }
 
+/**
+ * How many of these processes are STILL RUNNING — asked of the OPERATING SYSTEM,
+ * never of the child objects. The probe blocks Node's event loop inside
+ * `spawnSync` for the whole measured run, so a spinner that died during it
+ * cannot have had its `exitCode` updated by the time anybody looks: reading the
+ * child object would count a dead squeeze as a live one and let the report claim
+ * a contention it stopped applying. `alive` is `process.kill(pid, 0)` in the
+ * wrapper. Total: an unreadable pid counts as not running, which understates the
+ * squeeze rather than overstating it.
+ */
+export function countAlive(pids, alive) {
+  let n = 0
+  for (const pid of Array.isArray(pids) ? pids : []) {
+    if (!Number.isInteger(pid) || pid <= 0) continue
+    try {
+      if (alive(pid) === true) n++
+    } catch {
+      /* not running */
+    }
+  }
+  return n
+}
+
 /** run-all's own per-suite summary line, or null. It is the only place a run's
  *  check COUNTS appear, which is how a run that never reached a check (a crash,
  *  a failed pin, a dead dev server) is told from one that reported reds. */
