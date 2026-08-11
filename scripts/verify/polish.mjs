@@ -3506,80 +3506,89 @@ if (section('children-motion')) {
     // leaves a frame of the children themselves — the traveller stepped back to
     // the group and turned to face it, the shutter projecting their centroid so
     // a frame named after them cannot photograph an empty lane (point 375).
-    // A frame of the GROUP, not of the one child who happens to be in the open.
-    // Their ground is 13 m across and the huts stand in it, so at a moment when
-    // the chase has strung them out no standpoint sees more than one of them —
-    // which is a picture of an empty village with a figure in it. The shutter
-    // therefore waits, bounded, for the game to bring them back together, and
-    // shoots anyway if it does not.
+    // THE STANDPOINT IS SEARCHED, AND SO IS THE MOMENT. Where the children
+    // stand decides what any standpoint can see of them: their ground is 13 m
+    // across with the huts standing in it, so while the chase has them strung
+    // out through the lanes, the best vantage in the settlement still sees one
+    // of them past a wall — a photograph of an empty village with a figure in
+    // it. The search below is therefore run EVERY frame and the shutter waits,
+    // bounded, for a moment worth photographing; if the game never offers one it
+    // shoots the best it found rather than skipping the picture.
+    await page.evaluate(() => {
+      window.__pickChildVantage = () => {
+        const kids = window.__placeTag().children
+        if (kids.length === 0) return null
+        const cx = kids.reduce((s, k) => s + k.x, 0) / kids.length
+        const cz = kids.reduce((s, k) => s + k.z, 0) / kids.length
+        // A vantage the huts do not stand in. Merely stepping back from where
+        // the traveller happened to be put the camera inside a dwelling, and the
+        // shutter cannot see that: the centroid still PROJECTED into the frame,
+        // behind a wall. So the standpoint is chosen against the layout — clear
+        // of every dwelling, and with a clear line to the children.
+        const huts = window.__placeLayout.dwellings
+        const blocks = (ax, az, bx, bz, pad) =>
+          huts.some((h) => {
+            const dx = bx - ax
+            const dz = bz - az
+            const len2 = dx * dx + dz * dz || 1
+            const t = Math.max(0, Math.min(1, ((h.x - ax) * dx + (h.z - az) * dz) / len2))
+            return Math.hypot(ax + t * dx - h.x, az + t * dz - h.z) < h.r + pad
+          })
+        const room = (sx, sz) =>
+          huts.length > 0 ? Math.min(...huts.map((h) => Math.hypot(sx - h.x, sz - h.z) - h.r)) : Infinity
+        let best = null
+        let bestScore = -Infinity
+        for (let i = 0; i < 24; i++) {
+          const a = (i / 24) * Math.PI * 2
+          for (const dist of [6, 8, 10]) {
+            const sx = cx + Math.sin(a) * dist
+            const sz = cz + Math.cos(a) * dist
+            if (Math.hypot(sx, sz) > window.__placeLayout.radius - 2) continue
+            if (blocks(sx, sz, sx, sz, 2)) continue // standing inside a hut
+            // How many children it can actually SEE: a thatch roof is opaque,
+            // and a subject that merely projects into the frame can sit behind
+            // one. The roof overhangs the wall, so the sightline is tested
+            // against a hut generously wider than its footprint.
+            const seen = kids.filter((k) => !blocks(sx, sz, k.x, k.z, 1.2))
+            if (seen.length === 0) continue
+            // Then ELBOW ROOM, then nearness. Seeing them was not enough on its
+            // own: the first standpoint that did stood in the alley between two
+            // dwellings, and at eye height a wall a metre away fills half the
+            // picture whatever the sightline says. Room counts up to four metres
+            // and no further — beyond that the wall is out of the picture, and
+            // what is left to decide is that the children are figures rather
+            // than specks.
+            const clear = Math.min(room(sx, sz), 4)
+            const score = seen.length * 1000 + clear * 50 - dist
+            if (score > bestScore) {
+              bestScore = score
+              best = { sx, sz, seen: seen.length, of: kids.length, clear, dist }
+              const vx = seen.reduce((s, k) => s + k.x, 0) / seen.length
+              const vz = seen.reduce((s, k) => s + k.z, 0) / seen.length
+              best.vx = vx
+              best.vz = vz
+            }
+          }
+        }
+        return best
+      }
+    })
+    // Worth photographing: most of the group in the clear, and the camera in the
+    // open rather than up against a wall.
     await stepUntil(() => {
-      const kids = window.__placeTag().children
-      if (kids.length === 0) return true
-      const mx = kids.reduce((s, k) => s + k.x, 0) / kids.length
-      const mz = kids.reduce((s, k) => s + k.z, 0) / kids.length
-      return kids.every((k) => Math.hypot(k.x - mx, k.z - mz) < 3)
+      const b = window.__pickChildVantage()
+      return !!b && b.seen >= Math.min(3, b.of) && b.clear >= 2.5
     }, null, 300)
     const aimed = await page.evaluate(() => {
       const p = window.__placePlayer
-      const kids = window.__placeTag().children
-      if (!p || kids.length === 0) return null
+      const best = window.__pickChildVantage()
+      if (!p || !best) return null
       const pose = { x: p.x, z: p.z, yaw: p.yaw }
-      const cx = kids.reduce((s, k) => s + k.x, 0) / kids.length
-      const cz = kids.reduce((s, k) => s + k.z, 0) / kids.length
-      // A vantage the huts do not stand in. Merely stepping back from where the
-      // traveller happened to be put the camera inside a dwelling, and the
-      // shutter cannot see that: the centroid still PROJECTED into the frame,
-      // behind a wall. So the standpoint is chosen against the layout — clear of
-      // every dwelling, and with a clear line to the children.
-      const huts = window.__placeLayout.dwellings
-      const blocks = (ax, az, bx, bz, pad) =>
-        huts.some((h) => {
-          const dx = bx - ax
-          const dz = bz - az
-          const len2 = dx * dx + dz * dz || 1
-          const t = Math.max(0, Math.min(1, ((h.x - ax) * dx + (h.z - az) * dz) / len2))
-          return Math.hypot(ax + t * dx - h.x, az + t * dz - h.z) < h.r + pad
-        })
-      // Judged by how many children the standpoint can actually SEE — a thatch
-      // roof is opaque, and a subject that merely projects into the frame can
-      // sit behind one. The roof overhangs the footprint, so the sightline is
-      // tested against a hut generously wider than its wall.
-      //
-      // AND THEN BY ELBOW ROOM. Seeing every child was not enough: the first
-      // standpoint that saw them all stood in the alley between two dwellings,
-      // and at eye height a wall a metre away fills half the picture whatever
-      // the sightline says — the children came out as thumbnails in the gap
-      // between two roofs. Among the standpoints that see the same number, the
-      // one standing FURTHEST from any dwelling wins, and a nearer one only on
-      // a tie, so the frame is taken from open ground looking in.
-      const room = (sx, sz) => Math.min(...huts.map((h) => Math.hypot(sx - h.x, sz - h.z) - h.r))
-      let best = null
-      for (let i = 0; i < 24; i++) {
-        const a = (i / 24) * Math.PI * 2
-        for (const dist of [6, 8, 10]) {
-          const sx = cx + Math.sin(a) * dist
-          const sz = cz + Math.cos(a) * dist
-          if (Math.hypot(sx, sz) > window.__placeLayout.radius - 2) continue
-          if (blocks(sx, sz, sx, sz, 2)) continue // standing inside a hut
-          const seen = kids.filter((k) => !blocks(sx, sz, k.x, k.z, 1.2))
-          if (seen.length === 0) continue
-          const clear = huts.length > 0 ? room(sx, sz) : Infinity
-          const better =
-            best === null ||
-            seen.length > best.seen.length ||
-            (seen.length === best.seen.length &&
-              (clear > best.clear + 0.5 || (clear > best.clear - 0.5 && dist < best.dist)))
-          if (better) best = { sx, sz, seen, clear, dist }
-        }
-      }
-      if (!best) return null
       p.x = best.sx
       p.z = best.sz
       // Look at what is actually visible, and hand the shutter the same point.
-      const vx = best.seen.reduce((s, k) => s + k.x, 0) / best.seen.length
-      const vz = best.seen.reduce((s, k) => s + k.z, 0) / best.seen.length
-      p.yaw = Math.atan2(-(vx - p.x), -(vz - p.z))
-      return { pose, cx: vx, cz: vz, seen: best.seen.length, of: kids.length }
+      p.yaw = Math.atan2(-(best.vx - p.x), -(best.vz - p.z))
+      return { pose, cx: best.vx, cz: best.vz, seen: best.seen, of: best.of }
     })
     if (aimed) {
       await nextFrames(2)
@@ -3595,6 +3604,11 @@ if (section('children-motion')) {
         p.yaw = pose.yaw
       }, aimed.pose)
     }
+    // The world goes back as it was found, the injected search included — every
+    // section after this one would otherwise read a page this one left behind.
+    await page.evaluate(() => {
+      delete window.__pickChildVantage
+    })
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
