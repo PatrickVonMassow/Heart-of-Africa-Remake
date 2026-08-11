@@ -185,7 +185,8 @@ Cheap automated classes first, then the visual sweep:
   audit + Vitest + the LARGE browser set on BOTH backends, **3× flake-free** (a
   single retry may clear a rotating staging flake; a persistent fail is a real
   regression). It must come AFTER the last cleanup commit, and the guard checks
-  that. The evidence names either the commit being tagged — a run on it tests
+  that. The evidence names either the commit being tagged, written as `on <sha>`
+  so prose cannot be mistaken for it — a run on it tests
   exactly the state that will be tagged, which is the point of running it again —
   or a time lying after the youngest cleanup step, where the EARLIEST time it names
   decides and none may lie after the moment it was written down. The record times

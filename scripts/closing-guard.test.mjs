@@ -255,7 +255,7 @@ describe('closing-guard (spawned)', () => {
     // The second regression is recorded like any step, but an evidence that
     // pins it to nothing does not count — and says so at the moment of writing.
     expect(run('--step', 'regression-after-cleanup', '--evidence', 'ran it again').stdout).toContain('does NOT count')
-    expect(run('--status').stdout).toContain('neither the commit being closed nor a timestamp')
+    expect(run('--status').stdout).toContain('names neither the commit being closed')
     // the record time the CLI stamps is what the order is judged by, so a run
     // named by the real head counts as soon as it is written
     expect(run('--step', 'regression-after-cleanup', '--evidence', `LARGE green on ${head}, both backends`).stdout).toContain(`1/${CLOSING_STEPS.length}`)

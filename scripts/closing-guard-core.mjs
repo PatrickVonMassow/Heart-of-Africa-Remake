@@ -45,8 +45,8 @@ export const CLOSING_STEPS = [
   {
     id: 'regression-after-cleanup',
     title:
-      'Second full LARGE regression on BOTH backends, AFTER the last cleanup commit (evidence must ' +
-      'NAME that commit or its timestamp)',
+      'Second full LARGE regression on BOTH backends, AFTER the last cleanup commit — the evidence ' +
+      'names the commit it ran ON ("on <sha>") or a time after the cleanup, and it is a SECOND run',
   },
   { id: 'impl-sections', title: 'Implementation sections current — peoples-1890 §8, climate-1890 §9' },
   { id: 'graphics-detail-doc', title: 'docs/graphics-detail-levels.md matches QUALITY_PRESETS' },
@@ -415,11 +415,14 @@ export const AFTER_CLEANUP_STEP_ID = 'regression-after-cleanup'
 /** An ISO-ish date or date-time (`2026-08-11`, `2026-08-11T14:03:00Z`, `2026-08-11 14:03`). */
 const TIMESTAMP_IN_TEXT = /\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?\b/g
 /**
- * A commit sha: 7-40 hex characters WITH at least one digit. The digit is what
- * separates a sha from an English word that happens to be all-hex (`defaced`,
- * `deadbeef`) — evidence is prose, and a word must not read as a commit.
+ * The commit a run was made ON: 7-40 hex characters introduced by a word that
+ * says so. Evidence is prose, and a bare hex token cannot be told from it — a
+ * digit rule read `face2face` as a commit and missed an honest `defaced`, so the
+ * CONTEXT decides instead (four-eyes review 11.08.2026). What follows the word is
+ * the RUN TARGET; a sha mentioned anywhere else ("fixes 9f3c1a2") is a remark and
+ * is ignored, so the first one named is the one judged.
  */
-const SHA_IN_TEXT = /\b(?=[0-9a-f]{7,40}\b)[0-9a-f]*\d[0-9a-f]*\b/gi
+const RUN_COMMIT_IN_TEXT = /\b(?:on|commit|sha|rev|revision)\s+(?:commit\s+)?([0-9a-f]{7,40})\b/gi
 const DAY_MS = 86_400_000
 
 /** Milliseconds of an ISO-ish string, or null. Total: anything unparseable → null. */
@@ -457,9 +460,8 @@ export function evidenceAnchors(text) {
       out.times.push(stamp)
       if (!out.earliest || time < out.earliest.time) out.earliest = stamp
     }
-    for (const m of s.matchAll(SHA_IN_TEXT)) {
-      const sha = m[0].toLowerCase()
-      // A date's digits are not a sha, and a token already read as a time is not one either.
+    for (const m of s.matchAll(RUN_COMMIT_IN_TEXT)) {
+      const sha = m[1].toLowerCase()
       if (!out.commits.includes(sha)) out.commits.push(sha)
     }
   } catch {
@@ -470,16 +472,16 @@ export function evidenceAnchors(text) {
 
 const iso = (ms) => new Date(ms).toISOString()
 const RE_RECORD = (id) => `re-record it: node scripts/closing-guard.mjs --step ${id} --evidence "<proof>"`
-/** Evidence compared as CLAIMS, not as characters: case and spacing are noise. */
-const sameClaim = (a, b) =>
-  String(a ?? '')
-    .trim()
+/**
+ * Evidence compared as CLAIMS, not as characters: case, spacing AND punctuation
+ * are noise. A trailing full stop was enough to make one run read as two.
+ */
+const claimOf = (text) =>
+  String(text ?? '')
     .toLowerCase()
-    .replace(/\s+/g, ' ') ===
-  String(b ?? '')
+    .replace(/[^a-z0-9]+/g, ' ')
     .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
+const sameClaim = (a, b) => claimOf(a) === claimOf(b)
 
 /** The steps whose POSITION in the sequence is checked, first to last. */
 export const ORDERED_STEP_IDS = ['large-regression', ...CLEANUP_STEP_IDS, AFTER_CLEANUP_STEP_ID]
@@ -493,6 +495,11 @@ export const ORDERED_STEP_IDS = ['large-regression', ...CLEANUP_STEP_IDS, AFTER_
  */
 export function orderProblems(steps, headSha) {
   const problems = new Map()
+  /** The FIRST problem found for a step is its reason: a later rule must not
+   *  overwrite the more fundamental one (an undated step lost its remedy that way). */
+  const add = (id, reason) => {
+    if (!problems.has(id)) problems.set(id, reason)
+  }
   try {
     const table = steps && typeof steps === 'object' ? steps : {}
     const head = typeof headSha === 'string' ? headSha.toLowerCase() : ''
@@ -507,7 +514,7 @@ export function orderProblems(steps, headSha) {
       if (!e) return null
       const at = parseTime(e.at)
       if (at === null) {
-        problems.set(id, `it carries no record time, so its place in the sequence cannot be judged (a state from before the order check) — ${RE_RECORD(id)}`)
+        add(id, `it carries no record time, so its place in the sequence cannot be judged (a state from before the order check) — ${RE_RECORD(id)}`)
         return null
       }
       return at
@@ -535,7 +542,7 @@ export function orderProblems(steps, headSha) {
     // 1. THE FIRST REGRESSION COMES BEFORE THE CLEANUP. Recorded after it, the
     //    "first" run is really a second one and the sequence never happened.
     if (firstAt !== null && oldest && firstAt > oldest.at) {
-      problems.set(
+      add(
         'large-regression',
         `it was recorded ${iso(firstAt)}, AFTER the cleanup step "${oldest.id}" (${iso(oldest.at)}) — the first regression comes BEFORE the cleanup; record the steps in the order they happened`,
       )
@@ -546,16 +553,16 @@ export function orderProblems(steps, headSha) {
     const namesHead = anchors.commits.some((sha) => head && head.startsWith(sha))
     const foreign = anchors.commits.filter((sha) => !(head && head.startsWith(sha)))
     if (!namesHead && foreign.length) {
-      problems.set(
+      add(
         AFTER_CLEANUP_STEP_ID,
         `its evidence names commit ${foreign[0]}, which is NOT the commit being closed (${head.slice(0, 12) || 'unknown'}) — a regression on another commit says nothing about this one`,
       )
       return problems
     }
     if (!namesHead && anchors.times.length === 0) {
-      problems.set(
+      add(
         AFTER_CLEANUP_STEP_ID,
-        `its evidence names neither the commit being closed nor a timestamp, so nothing places it after the cleanup — record it as e.g. --evidence "LARGE green on ${head.slice(0, 12) || '<sha>'}, both backends, 2026-08-11T14:00Z"`,
+        `its evidence names neither the commit being closed ("on <sha>") nor a timestamp, so nothing places it after the cleanup — record it as e.g. --evidence "LARGE green on ${head.slice(0, 12) || '<sha>'}, both backends, 2026-08-11T14:00Z"`,
       )
       return problems
     }
@@ -563,7 +570,7 @@ export function orderProblems(steps, headSha) {
     // 3. IT IS A SECOND RUN, NOT THE FIRST ONE WRITTEN DOWN TWICE.
     const first = recorded('large-regression')
     if (first && sameClaim(first.evidence, second.evidence)) {
-      problems.set(
+      add(
         AFTER_CLEANUP_STEP_ID,
         `its evidence is word for word the evidence of "large-regression" — the closing runs the regression TWICE, and one run cannot be both`,
       )
@@ -573,14 +580,14 @@ export function orderProblems(steps, headSha) {
     // 4. ITS PLACE IN THE RECORD ORDER. Ties pass: two steps written in the same
     //    millisecond are a fast hand, not a violation.
     if (secondAt !== null && youngest && secondAt < youngest.at) {
-      problems.set(
+      add(
         AFTER_CLEANUP_STEP_ID,
         `it was recorded ${iso(secondAt)}, BEFORE the cleanup step "${youngest.id}" (${iso(youngest.at)}) — a run written down before the cleanup cannot have covered it`,
       )
       return problems
     }
     if (secondAt !== null && firstAt !== null && secondAt < firstAt) {
-      problems.set(
+      add(
         AFTER_CLEANUP_STEP_ID,
         `it was recorded ${iso(secondAt)}, BEFORE "large-regression" (${iso(firstAt)}) — the second regression is the LATER of the two runs`,
       )
@@ -593,14 +600,14 @@ export function orderProblems(steps, headSha) {
     if (earliest && youngest) {
       if (earliest.dateOnly) {
         if (Math.floor(earliest.time / DAY_MS) <= Math.floor(youngest.at / DAY_MS)) {
-          problems.set(
+          add(
             AFTER_CLEANUP_STEP_ID,
             `its evidence dates the run ${earliest.token}, the cleanup's own day or earlier ("${youngest.id}", ${iso(youngest.at)}) — a bare date cannot order two runs of one day, so name the time or the commit ${head.slice(0, 12) || ''}`.trim(),
           )
           return problems
         }
       } else if (earliest.time <= youngest.at) {
-        problems.set(
+        add(
           AFTER_CLEANUP_STEP_ID,
           `its evidence dates the run ${earliest.token}, which is NOT after the youngest cleanup step ("${youngest.id}", ${iso(youngest.at)}) — every time the evidence names must lie after the cleanup, so drop or fix the earlier one`,
         )
@@ -614,7 +621,7 @@ export function orderProblems(steps, headSha) {
       // at 09:00 is the same day, not a claim about that evening.
       const beyond = latest && (latest.dateOnly ? Math.floor(latest.time / DAY_MS) > Math.floor(secondAt / DAY_MS) : latest.time > secondAt)
       if (beyond) {
-        problems.set(
+        add(
           AFTER_CLEANUP_STEP_ID,
           `its evidence dates the run ${latest.token}, AFTER the moment it was written down (${iso(secondAt)}) — a run cannot be recorded before it happened`,
         )

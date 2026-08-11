@@ -294,7 +294,7 @@ describe('the second regression must stand AFTER the cleanup', () => {
   })
 
   it('REJECTS an evidence that names neither the commit nor a time', () => {
-    expect(problemOf(withRegression('ran the large regression again', AFTER_CLEANUP_AT))).toMatch(/neither the commit being closed nor a timestamp/)
+    expect(problemOf(withRegression('ran the large regression again', AFTER_CLEANUP_AT))).toMatch(/names neither the commit being closed/)
   })
 
   it('REJECTS a run dated before the cleanup, and lets no later date in the sentence rescue it', () => {
@@ -352,13 +352,40 @@ describe('the second regression must stand AFTER the cleanup', () => {
     expect(noteOf(state, 'large-regression')).toMatch(/the first regression comes BEFORE the cleanup/)
   })
 
-  it('does not read an all-hex English word as a commit', () => {
-    // "defaced" is seven hex characters and no sha — a commit token carries a digit.
-    expect(evidenceAnchors('the defaced fixture was removed').commits).toEqual([])
+  it('reads the commit a run was made ON, and no other hex in the prose', () => {
+    // The CONTEXT decides, not a digit rule: `face2face` in prose is not a
+    // commit, and an honest all-letter prefix is.
+    expect(evidenceAnchors('the defaced fixture and face2face were removed').commits).toEqual([])
     expect(evidenceAnchors(`green on ${HEAD}`).commits).toEqual([HEAD])
+    expect(evidenceAnchors('green on defaced').commits).toEqual(['defaced'])
+    expect(evidenceAnchors(`LARGE green, commit ${HEAD}`).commits).toEqual([HEAD])
     // …and a date's digit groups are all too short to read as one
     expect(evidenceAnchors('green 2026-08-11T12:00:00Z').commits).toEqual([])
     expect(evidenceAnchors('green 2026-08-11T12:00:00Z').earliest.dateOnly).toBe(false)
+  })
+
+  it('judges the commit the run was made ON, not one merely mentioned beside it', () => {
+    // A remark about another commit weakens no claim …
+    expect(problemOf(withRegression(`LARGE green on ${HEAD}, both backends; fixes 9f3c1a2`, AFTER_CLEANUP_AT))).toBe('')
+    // … but a run stated to be ON another commit is refused, however many shas
+    // follow it (the bypass round three named).
+    expect(problemOf(withRegression(`LARGE green on 9f3c1a2; fixes ${HEAD}`, AFTER_CLEANUP_AT))).toMatch(/NOT the commit being closed/)
+  })
+
+  it('reads one run written twice as one run, whatever the punctuation', () => {
+    const state = stateWith(HEAD, ALL_IDS)
+    state.steps['large-regression'] = { evidence: `LARGE green on ${HEAD}, both backends`, at: CLEANUP_AT }
+    state.steps[AFTER_CLEANUP_STEP_ID] = { evidence: `LARGE green on ${HEAD}; both backends.`, at: AFTER_CLEANUP_AT }
+    expect(problemOf(state)).toMatch(/one run cannot be both/)
+  })
+
+  it('keeps the re-record remedy for a step that is BOTH undated and unanchored', () => {
+    // The overwrite round three found: the anchor rule used to bury the more
+    // fundamental "no record time" reason.
+    const state = withRegression('ran it again', AFTER_CLEANUP_AT)
+    delete state.steps[AFTER_CLEANUP_STEP_ID].at
+    expect(problemOf(state)).toMatch(/carries no record time/)
+    expect(problemOf(state)).toMatch(/--step regression-after-cleanup/)
   })
 
   it('reads a zone-less timestamp as UTC, so one evidence is judged the same everywhere', () => {
