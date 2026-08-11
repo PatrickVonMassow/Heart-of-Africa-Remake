@@ -394,7 +394,9 @@ export function releaseCleanupLock(target, { file = null, ours = '', git: runGit
  * harness's, an agent's) is NEVER broken; one of ours is broken only where the
  * holder is provably gone.
  *
- * Returns { locked, reason, note } — `locked: false` means refuse.
+ * Returns { locked, reason, note, file } — `locked: false` means refuse, and
+ * `file` is git's lock file for that tree, resolved while the tree still stands so
+ * the release can find it afterwards.
  */
 export function takeCleanupLock(target, { git: runGit = git, probe = probePid, reason = null, file = undefined } = {}) {
   const mine = reason ?? cleanupLockReason()
