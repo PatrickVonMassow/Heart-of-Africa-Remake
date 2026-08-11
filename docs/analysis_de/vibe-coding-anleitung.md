@@ -249,11 +249,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   prüft, nennt weit weniger als vor dem leeren Blatt — falsch, wenn der **übersehene** Punkt zählt.
   → *Prompt:* „Schätze vor dem Bau **Schwierigkeit × Kritikalität** und zieh bei Kritischem **ein
   anderes Modell** hinzu. Beim **Finden** blind parallel: gleiche Vorgabe, je ein vollständiges
-  Ergebnis, vereinigt **nach Bedeutung**, Einzelnennungen **markiert statt gestrichen**. Beim
-  **Beurteilen** Gegenlesen, aber **erst das Ergebnis, dann die Begründung**. Das **Vereinigen**
-  macht das Modell, das an **keiner** Liste mitschrieb, und jeder Eingang bleibt darin auffindbar
-  (nur A, nur B, verschmolzen mit X) — Verschmelzen verliert lautlos." *(≈ 2x für den Fundschritt,
-  das Vereinigen kostet wenige Prozent)*
+  Ergebnis; beim **Beurteilen** Gegenlesen, aber **erst das Ergebnis, dann die Begründung**.
+  **Vereinigt** wird nach Bedeutung, vom Modell, das an **keiner** Liste mitschrieb, und jeder
+  Eingang bleibt auffindbar (nur A, nur B, verschmolzen mit X) — Verschmelzen verliert lautlos."
+  *(≈ 2x für den Fundschritt)*
 
 - **Die Lehre gilt als versorgt, sobald ihr Wächter benannt ist** — gebaut ist er damit nicht.
   → *Prompt:* „Trenne **benannt** von **gebaut**: ‚gebaut' wird am Haken des genannten Punktes
@@ -280,12 +279,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   und lies das Ergebnis aus den Protokollen, nicht aus den Tests. Wo eine Prüfung auch
   etwas ausführt, melde ein Scheitern im selben Atemzug wie die Freigabe."
 
-- **Die Messung sah weniger, als sie behauptet.** Sie schaut nur die letzten *n* Einträge
-  an, misst erst *nach* dem Vorgang, oder ein Teil der Testdateien lud gar nicht — nicht
-  geladen ist nicht rot, sondern abwesend, und liest sich *grüner* als ein Fehlschlag.
-  → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: eine Frage über
-  einen Zeitraum nach Zeit, nie nach Anzahl. Melde die **Zahl der ausgeführten Prüfungen**
-  mit — ein Rückgang ist ein Rot."
+- **Die Messung — und die Gegenprüfung — sah weniger, als sie behauptet.** Sie schaut nur die
+  letzten *n* Einträge an, ein Teil der Testdateien lud gar nicht, oder dem Prüfer wurde die
+  Hälfte des Codes nie gereicht. Nicht geliefert ist nicht rot, sondern abwesend — und ein
+  ausbleibender Befund liest sich *grüner* als ein Fehlschlag.
+  → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
+  Anzahl. Melde die **Abdeckung** mit; ein Urteil über unvollständigem Material ist eine
+  **Teilprüfung** und reicht als Freigabe nicht."
 
 - **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren dieselbe Regel
   getrennt — eines schreibt, eines prüft; das blockiert *alle* Arbeit.
@@ -412,4 +412,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Sie setzt auf, woran alles andere hängt: eine Wahrheit, eine Arbeitsordnung, zwei
 Testschichten, den Reflex zum Check. Die Fallstricke oben ersetzt sie nicht.
 
-<!-- GUIDE-FINGERPRINT: 9cab0148483975dedd45d1023a4fbd0902292dc6d1ddf20007764eee8e056bc8 -->
+<!-- GUIDE-FINGERPRINT: 50f51f16520290edfc2978518be693f42f9b42e5b1e88ea982433360af864d06 -->
