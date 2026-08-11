@@ -5560,10 +5560,19 @@ to land than a mechanism that needs a review.
      are the boat the player rides or drags. The layer's promise is "what am I looking
      at", and the player's own vehicle is not that. A canoe SET DOWN in the world keeps
      its label, per the same roster line.
+  3. TWO LABELS NEVER OVERLAP INTO ONE UNREADABLE BOX (seen 11.08.2026 in
+     `verification/148-ctrl-actor-labels-village.png`, the point-600 evidence frame). Where
+     two villagers stand close, their boxes overlap and the picture reads "Villager llager"
+     and "Villa Villager" — each label is correct, the PICTURE is not, and no test looks at
+     it because every check asks the DOM whether the text is present. The layer therefore
+     declutters: boxes that would overlap are offset, or the further one is dropped while
+     the nearer keeps its name. Which of the two is a judgment to make at the picture, on a
+     crowd, not in the abstract.
   VERIFIABLE: the pure source/roster test gains both cases — a pitched camp yields exactly
   one offered label, a ridden or dragged canoe yields none while a set-down one yields its
-  own; plus the browser check that asks the scene what it DREW asserts that no two labels
-  of identical text stand at one position.
+  own; the declutter is judged AT THE FRAME on a crowded village, since a DOM assertion is
+  exactly the proxy that let this through; plus the browser check that asks the scene what
+  it DREW asserts that no two labels of identical text stand at one position.
   Criticality: low — nothing breaks, but a doubled box is exactly the noise the elder
   exception exists to prevent, and naming the player's own boat makes the layer read as
   though it labels everything indiscriminately.
