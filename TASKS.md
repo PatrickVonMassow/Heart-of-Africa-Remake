@@ -6069,3 +6069,31 @@ to land than a mechanism that needs a review.
   while a subdirectory is being written.
   Criticality: high — same failure class as point 629 and the same cost: it destroys work
   that is already done, and it fires while the pool is busiest. Bundle: Session- & Repo-Hygiene.
+
+- [ ] 647. A FULL-SUITE RED ON THE 629 BRANCH WHOSE TEST NOBODY CAN NAME (11.08.2026, 18:03,
+  on `feat/629-cleanup-spares-live-worktrees`). One test in a full `npm run test:unit` run
+  failed; the run's output was truncated before the name was read, and no vitest report
+  artifact is kept in the repository, so the test cannot be recovered from the run. It is
+  filed rather than explained, because point 640 forbids the other closings: the same test
+  set had been green four minutes earlier and has been green 5/5 since, and that covers
+  nothing.
+  THE ONE CANDIDATE, RECORDED AS A HYPOTHESIS AND NOT AS A CAUSE. In that same window the
+  author found and fixed a genuine sub-millisecond `mtime` vs `Date.now()` race in a test he
+  had just written (`f5a6feb8`, the index-refresh case). It is the only nondeterminism known
+  to have been introduced in that window, so it is the first thing to test — but nothing ties
+  it to the red beyond the coincidence of timing.
+  FINAL STATE, TWO HALVES. (a) The red is named: either the candidate above is confirmed by
+  reproducing a failure with the pre-`f5a6feb8` test and showing it absent after, or another
+  cause is found; if neither is reachable, this point closes by RECORDING that the run is
+  unrecoverable and naming what was changed so it cannot happen again. (b) The reason it is
+  unrecoverable is removed: a full unit run keeps a machine-readable report of which tests
+  failed (vitest's own reporter into a git-ignored path is enough), so the next red of this
+  kind is answerable from the record instead of from memory. Half (b) is what makes half (a)
+  the last time this question is unanswerable.
+  VERIFIABLE: for (b), a deliberately failing test leaves its NAME in the report file and a
+  green run leaves a report with no failures — pinned by a Vitest case over whatever pure
+  part the wiring has, plus one real run. For (a), whichever of the two closings applies,
+  recorded with its evidence.
+  Criticality: medium — the red is on a branch, not on `main`, and the fast gate still stands
+  between it and a landing; what makes it worth a point is that it could not be ANSWERED,
+  which is the condition points 455, 640 and 643 all exist to end. Bundle: Testinfrastruktur.
