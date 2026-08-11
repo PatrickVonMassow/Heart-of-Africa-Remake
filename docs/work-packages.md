@@ -79,7 +79,7 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 
 | Name | Id | What it is | Points |
 |---|---|---|---|
-| **Dorfleben** | A | Village life | 350, 351, 356, 357, 359, 360, 394, 578 |
+| **Dorfleben** | A | Village life | 648, 350, 351, 356, 357, 359, 360, 394, 578 (648 first — the user is blocked on it) |
 | **Wetter & Wasser** | B | Weather, ground and water surface | 314, 320, 321, 323, 348, 353, 354, 358, 384, 385 |
 | **Siedlungsgeometrie** | C | Settlement geometry | 299, 349, 352, 380, 415, 428, 581, 583, 604 |
 | **Sonne & Himmel** | D | Sun and sky | 343, 344, 345, 346 |
