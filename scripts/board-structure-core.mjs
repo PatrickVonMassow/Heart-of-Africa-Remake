@@ -271,10 +271,28 @@ export function cardNamingViolations(html) {
   )
   nowCards(doc).forEach((card, i) => {
     const named = card.title ? `"${card.title.slice(0, 60)}"` : '<untitled>'
+    // The remedy depends on what the card HAS: a card with no chip is a state
+    // card and is replaced by writing one; only a numbered card can be retitled
+    // (four-eyes review, 12.08.2026 — `setCardTitle` finds a card by its number).
+    const retitle =
+      card.chip == null
+        ? 'node scripts/board.mjs closing <N> "<Grund>" (closing duties) or node scripts/board.mjs ' +
+          'none "<Grund>" (boundary) replaces a card without a number'
+        : `node scripts/board.mjs title ${card.chip} "<Betreff>"`
     if (card.kind === 'idle') {
       // The ONE deliberate exception (point 434(7)): the handover card belongs to
       // no point, so it may not carry a chip — but it owes the successor's point
-      // in prose.
+      // in prose. Its SHAPE is checked all the same: the marker alone must not be
+      // able to exempt an arbitrary card from every rule above.
+      if (card.chip != null || card.title !== NO_CURRENT_WORK_TITLE) {
+        out.push({
+          code: 'handover-card-shape',
+          msg:
+            `the card ${named} is marked as the handover card but is not one — that card is ` +
+            `unnumbered and titled "${NO_CURRENT_WORK_TITLE}". Write it with ` +
+            'node scripts/board.mjs none "<Grund>"',
+        })
+      }
       if (!namesFollowOnWork(bodies[i])) {
         out.push({
           code: 'handover-card-nameless',
@@ -286,7 +304,7 @@ export function cardNamingViolations(html) {
       }
       return
     }
-    if (card.point == null) {
+    if (card.chip == null) {
       out.push({
         code: 'now-card-unnumbered',
         msg:
@@ -302,9 +320,8 @@ export function cardNamingViolations(html) {
         code: 'now-card-stage-title',
         msg:
           `the current-work card ${named} is titled with a STAGE and no subject — say what the ` +
-          'point is about first, e.g. "<Betreff>: Abschlussarbeiten". node scripts/board.mjs title ' +
-          '<N> "<Betreff>" rewrites a title; the closing card is composed by ' +
-          'node scripts/board.mjs closing <N> "<Grund>"',
+          `point is about first, e.g. "<Betreff>: Abschlussarbeiten". ${retitle}; the closing card ` +
+          'is composed by node scripts/board.mjs closing <N> "<Grund>"',
       })
     }
     // A COMPOSED CLOSING TITLE MUST CARRY THE CLOSING MARKER (four-eyes review,
@@ -316,9 +333,9 @@ export function cardNamingViolations(html) {
         code: 'now-card-unmarked-closing',
         msg:
           `the current-work card ${named} is titled as a closing card but carries no ` +
-          'data-state="closing" marker, so no state command would ever replace it. Retitle it — ' +
-          'node scripts/board.mjs title <N> "<Betreff>" — or send it away and write the real one: ' +
-          'node scripts/board.mjs queue <N>, then node scripts/board.mjs closing <N> "<Grund>"',
+          `data-state="closing" marker, so no state command would ever replace it. Retitle it — ` +
+          `${retitle} — or send it away and write the real one: node scripts/board.mjs queue ` +
+          `${card.chip ?? '<N>'}, then node scripts/board.mjs closing <N> "<Grund>"`,
       })
     }
   })
@@ -360,7 +377,12 @@ export function nowCards(html) {
     const legacy = title === NO_CURRENT_WORK_TITLE ? 'idle' : title === CLOSING_WORK_TITLE ? 'closing' : 'point'
     cards.push({
       kind: marked === 'idle' || marked === 'closing' ? marked : legacy,
-      // A card written before the chip carries its number in the title instead.
+      // `chip` is the number as the READER sees it; `point` also accepts the
+      // leading number of a card written before the chip, which every parser
+      // outside the gate still has to understand. The gate itself asks for the
+      // chip (four-eyes review, 12.08.2026) — the publish upgrades an older card
+      // first, so a strict demand traps no board.
+      chip: num,
       point: num ?? (title.match(/^(\d+)\s*[—–-]/) ?? [])[1] ?? null,
       title,
     })

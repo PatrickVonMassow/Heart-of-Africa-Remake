@@ -15,16 +15,18 @@ import {
   setCardTitle,
   toClosingWork,
   toNoCurrentWork,
+  upgradeNowCards,
 } from './board-core.mjs'
 
 /** A minimal but structurally faithful board. */
 const sect = (title, body = '') =>
   `<details class="sect"><summary><h2>${title}</h2></summary>\n${body}\n</details>`
-// The pre-655 shape, deliberately: it must stay readable and stay accepted —
-// its number simply sits in the title instead of the chip.
-const nowCard = (n) =>
+// The pre-655 shape: still READ everywhere, but the publish gate demands the
+// chip, and the publisher lifts such a card before it judges (four-eyes 12.08.).
+const legacyNowCard = (n) =>
   `<details class="now">\n  <summary><span class="t">${n} — Titel</span></summary>\n  <div class="body"><p>Text</p></div>\n</details>`
 /** The shape every current-work card carries since point 655. */
+const nowCard = (n) => chipCard(n)
 const chipCard = (n, title = 'Titel', state = '') =>
   `<details class="now"${state ? ` data-state="${state}"` : ''}>\n  <summary><span class="num">${n}</span>` +
   `<span class="t">${title}</span></summary>\n  <div class="body"><p>Text</p></div>\n</details>`
@@ -336,6 +338,32 @@ describe('every current-work card names its point and its subject', () => {
     expect(closing).not.toContain('Irgendwas.')
   })
 
+  // The marker alone must not exempt a card from every rule (four-eyes 12.08.).
+  it('REFUSES a card that wears the idle marker but is not the handover card', () => {
+    const impostor =
+      '<details class="now" data-state="idle">\n  <summary><span class="num">651</span>' +
+      '<span class="t">Irgendein Titel</span></summary>\n' +
+      '  <div class="body"><p>Weiter mit Punkt 656.</p></div>\n</details>'
+    expect(codes(withNow(impostor))).toContain('handover-card-shape')
+    const wrongTitle =
+      '<details class="now" data-state="idle">\n  <summary><span class="t">Pause</span></summary>\n' +
+      '  <div class="body"><p>Weiter mit Punkt 656.</p></div>\n</details>'
+    expect(codes(withNow(wrongTitle))).toContain('handover-card-shape')
+  })
+
+  it('names a remedy that FITS the card: no title command for an unnumbered one', () => {
+    const stray =
+      '<details class="now">\n  <summary><span class="t">Abschlussarbeiten</span></summary>\n' +
+      '  <div class="body"><p>Irgendwas.</p></div>\n</details>'
+    const msgs = cardNamingViolations(withNow(stray)).map((v) => v.msg).join(' ')
+    expect(msgs).not.toContain('board.mjs title')
+    expect(msgs).toContain('board.mjs none')
+    // …while a numbered card is retitled, which is what actually works there.
+    expect(cardNamingViolations(withNow(chipCard(651, 'Abschlussarbeiten')))[0].msg).toContain(
+      'board.mjs title 651',
+    )
+  })
+
   it('is repaired by the command it names: an unmarked closing title is retitled', () => {
     const broken = withNow(chipCard(651, 'Ein Betreff: Abschlussarbeiten'))
     expect(codes(broken)).toContain('now-card-unmarked-closing')
@@ -391,9 +419,15 @@ describe('every current-work card names its point and its subject', () => {
     expect(codes(withNow(mute))).toContain('handover-card-nameless')
   })
 
-  it('keeps reading a card written before the chip existed', () => {
-    expect(codes(withNow(nowCard(544)))).toEqual([])
-    expect(nowCards(withNow(nowCard(544)))).toEqual([{ kind: 'point', point: '544', title: '544 — Titel' }])
+  it('still READS a card written before the chip, and the publish lifts it first', () => {
+    const legacy = withNow(legacyNowCard(544))
+    expect(nowCards(legacy)).toEqual([
+      { kind: 'point', chip: null, point: '544', title: '544 — Titel' },
+    ])
+    // The gate asks for the chip the reader sees…
+    expect(codes(legacy)).toContain('now-card-unnumbered')
+    // …and the upgrade every edit and every publish performs supplies it.
+    expect(codes(upgradeNowCards(legacy))).toEqual([])
   })
 
   it('passes what the sanctioned writers produce', () => {

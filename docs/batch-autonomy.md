@@ -1843,9 +1843,12 @@ its state can never be replaced. The publish gate refuses a card with no chip, a
 title that is only a stage word (`Abschlussarbeiten`, `Nacharbeit`,
 `Vorbereitung`, `Aufräumen` and their English forms), and — for the ONE
 deliberately unnumbered card, the handover card, which belongs to no point — a
-text that names no follow-on point. Any `board.mjs` edit lifts a card written
-before the chip into the new shape, so a board in the old shape is never repaired
-by hand.
+text that names no follow-on point or a shape that is not the handover card's at
+all. Every `board.mjs` edit AND the publish itself lift a card written before the
+chip into the new shape, so the strict demand traps no board and nothing is ever
+repaired by hand; a card that carries no number counts as a STATE card, so
+writing one replaces it whatever it says, and every refusal names a command that
+actually repairs the card it refused.
 
 **A READ IS JUDGED AS ONE (point 473).** The first classifier matched regexes over
 the whole command STRING, and within minutes it denied two pure reads: a `grep` of
