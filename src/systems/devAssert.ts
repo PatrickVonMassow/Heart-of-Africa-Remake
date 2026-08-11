@@ -63,15 +63,20 @@ export function resetDevAsserts(): void {
  * Where a step stops being a FRAME and becomes the frame loop standing still — a
  * hidden tab, a breakpoint, a machine swapped out under a run. Up to it a step
  * counts in FULL, so a window of 60 s means sixty ELAPSED seconds at any frame
- * rate a running game has; a longer gap counts this much and no more, so one
- * suspension cannot flood the clock (5 s against the shortest window, 60 s)
- * while a loop that really is crawling at six-second frames still accrues and is
- * still reported, a little later.
+ * rate a running game has.
  *
- * Both simpler rules are wrong, and both were tried: clamping EVERY step to a
- * second turned a 60 s window into 120 s at two-second frames, and discarding a
- * long step entirely let a producer stalled at six-second frames stay silent for
- * ever without a word.
+ * Beyond it, WHAT DECIDES IS WHETHER THE LONG STEP REPEATS. A single one after
+ * ordinary frames is a suspension — the game was not running, the producer never
+ * had its chance — and counts nothing, however long it was. Long steps arriving
+ * one after another are not a suspension but a loop that really is crawling: it
+ * IS running, its producers do get their steps, and they are counted (bounded by
+ * this same threshold, so no single gap can ever flood the clock).
+ *
+ * Every simpler rule was tried and is wrong: clamping EVERY step to a second
+ * turned a 60 s window into 120 s at two-second frames; discarding every long
+ * step let a producer stalled at six-second frames stay silent for ever; and
+ * counting a bounded share of every long step let a dozen hide-and-resume cycles
+ * add up to a false alarm without one frame of real play between them.
  */
 export const LONG_RUN_SUSPEND_SECONDS = 5
 
@@ -82,10 +87,13 @@ export interface ProducerWatch {
   silence: number
   /** Outputs seen so far — a probe for the tests and the dev hooks. */
   produced: number
+  /** How many steps in a row have been longer than the suspend threshold. One
+   *  is a suspension; several running together are a crawling loop. */
+  longSteps: number
 }
 
 export function createProducerWatch(): ProducerWatch {
-  return { silence: 0, produced: 0 }
+  return { silence: 0, produced: 0, longSteps: 0 }
 }
 
 /** What one step tells the watch about its producer. */
@@ -126,8 +134,17 @@ function record(code: string, watch: ProducerWatch, max: number, expected: boole
  * full window before anything is claimed about it.
  */
 export function watchProducer(watch: ProducerWatch, step: ProducerStep): void {
+  const raw = Number.isFinite(step.dt) && step.dt > 0 ? step.dt : 0
+  if (raw > LONG_RUN_SUSPEND_SECONDS) watch.longSteps++
+  else watch.longSteps = 0
+  // A lone long step is a suspension and counts nothing; the second and every
+  // one after it is a crawling loop, counted up to the threshold.
   const dt =
-    Number.isFinite(step.dt) && step.dt > 0 ? Math.min(step.dt, LONG_RUN_SUSPEND_SECONDS) : 0
+    watch.longSteps === 0
+      ? raw
+      : watch.longSteps === 1
+        ? 0
+        : LONG_RUN_SUSPEND_SECONDS
   if (step.produced) {
     watch.produced++
     watch.silence = 0

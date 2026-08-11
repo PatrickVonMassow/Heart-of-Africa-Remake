@@ -857,6 +857,17 @@ export function playSpeech(plan: SpeechPlan): void {
   // peak whose tone was multiplied by ZERO further down the bus, and every
   // measurement that stopped at the plan reported it healthy. The one legitimate
   // silence is the player's own speech slider at zero.
+  //
+  // The PLAN's peak is what is read, deliberately, not the 0.0001 floor the
+  // scheduling passes to the envelope: that floor exists because an exponential
+  // ramp cannot reach zero, and it is silence to the ear. A plan carrying
+  // syllables at peak 0 is therefore a defect and is reported as one —
+  // `phrasePlan` returns no syllables at all for an inaudible level.
+  //
+  // What it CANNOT see is the topology: whether the buses are still connected to
+  // the destination is not readable through the Web Audio API. That end is held
+  // by the live browser check, which listens to what the output really carries
+  // (`scripts/verify/settings.mjs`).
   const chain = speechBus ? speechBus.gain.value * master.gain.value : master.gain.value
   devAssert(
     peak * chain > 0 || balance.communication.speechVolume <= 0,

@@ -789,6 +789,32 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
         speak()
         expect(codes().join(' ')).toContain('speech-inaudible')
       })
+
+      it('FIRES on a zero MASTER too — every factor of the chain is in the product', () => {
+        ctx.currentTime = 300
+        // The node the speech bus feeds IS the master; zeroing it silences the
+        // voices just as surely, and a check that read only the sub-bus would
+        // pass. Restored immediately, so nothing after this sees a mute engine.
+        const master = speechBusOf(speak()[0]).connected[0] as FakeGain
+        const held = master.gain.value
+        master.gain.value = 0
+        speak()
+        master.gain.value = held
+        expect(codes().join(' ')).toContain('speech-inaudible')
+      })
+
+      it('FIRES on a plan that carries syllables at no level at all', () => {
+        ctx.currentTime = 320
+        // Not reachable through `phrasePlan` — it returns no syllables for an
+        // inaudible level — but `playSpeech` takes any plan, and syllables at
+        // peak 0 are silence whatever the scheduling floor makes of them.
+        playSpeech({
+          syllables: [{ tone: 'low', startOffset: 0, duration: 0.1, peak: 0 }],
+          duration: 0.1,
+          gain: 1,
+        })
+        expect(codes().join(' ')).toContain('speech-inaudible')
+      })
     })
   })
 
