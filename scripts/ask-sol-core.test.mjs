@@ -169,6 +169,36 @@ describe('reading the answer', () => {
     expect(parseAnswer({ kind: 'audit', text: 'B1 | x | wrong prefix for an audit' }).ok).toBe(false)
   })
 
+  // Final cross-vendor round: blind-merge settles every entry BY ITS ID, so a repeated id
+  // merges two findings into one ledger line — the disappearance the counting exists to
+  // prevent. And an entry with no finding in it is not an entry.
+  it('refuses a duplicated id and an empty entry, naming which', () => {
+    const dup = parseAnswer({ kind: 'enumerate', text: 'B1 | a.mjs | the lease is not renewed\nB1 | b.mjs | the fence is off' })
+    expect(dup.ok).toBe(false)
+    expect(dup.error).toMatch(/B1 is used twice/)
+    const empty = parseAnswer({ kind: 'audit', text: 'A1 | a.mjs | a real finding\nA2 | b.mjs |   ' })
+    expect(empty.ok).toBe(false)
+    expect(empty.error).toMatch(/A2 carries no finding/)
+  })
+
+  it('keeps a finding that names no file, marked rather than dropped', () => {
+    const parsed = parseAnswer({ kind: 'audit', text: 'A1 |  | the two guards disagree about who owns the lock' })
+    expect(parsed.ok).toBe(true)
+    expect(parsed.answer.entries[0].file).toBe('(unspecified)')
+  })
+
+  // Same round: a sweep may honestly find nothing, and refusing that reported a CLEAN
+  // audit as "Sol did not answer" after the allowance had already been spent.
+  it('accepts an audit that found nothing, but only when it SAYS so', () => {
+    const clean = parseAnswer({ kind: 'audit', text: 'I read every line of both files.\n\nNO FINDINGS: the switch table, the fallback and the three consumers' })
+    expect(clean.ok).toBe(true)
+    expect(clean.answer.entries).toEqual([])
+    expect(clean.summary).toBe('no findings')
+    // Silence is still no answer, and an ENUMERATION with nothing in it is no half.
+    expect(parseAnswer({ kind: 'audit', text: 'I looked at it and it seems fine to me.' }).ok).toBe(false)
+    expect(parseAnswer({ kind: 'enumerate', text: 'NO FINDINGS: nothing could go wrong here' }).ok).toBe(false)
+  })
+
   it('takes an EXPLAIN as prose, but not two words of it', () => {
     expect(parseAnswer({ kind: 'explain', text: 'The board core renders the cards; board-publish pushes the bytes to the orphan branch.' }).ok).toBe(true)
     expect(parseAnswer({ kind: 'explain', text: 'It renders.' }).ok).toBe(false)

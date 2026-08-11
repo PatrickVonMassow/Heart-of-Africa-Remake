@@ -93,7 +93,7 @@ const VERIFICATION_IMAGE = /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|svg)$/i
 /** File rules, FIRST MATCH WINS. `read` separates a spec LOOKUP from a spec EDIT. */
 const SPEC_DOCS = /^(TASKS\.md|design\.md|CLAUDE\.md|docs\/tasks-archive\.md|docs\/acceptance-(criteria-detail|evidence)\.md)$/
 const FILE_RULES = [
-  ['verification', /^(scripts\/verify\/|verification\/|scripts\/(render-verify|picture-|measure-picture))/],
+  ['verification', /^(scripts\/verify\/|verification\/|scripts\/(render-verify|picture-|measure-picture))|^.*\.(png|jpe?g|webp|avif)$/],
   ['bookkeeping', /^(\.batch-dashboard\.html|TASKS\.md|scripts\/(board|batch|focus|dashboard|finding|mechanism-review|chat-)|docs\/batch-autonomy\.md)|[a-z-]*-guard(-core)?(\.test)?\.mjs$/],
   ['implementation', /^(src\/|scripts\/|docs\/|public\/|index\.html|package\.json|vite\.config|tsconfig|\.github\/)|\.md$/],
 ]
@@ -106,10 +106,13 @@ const FILE_RULES = [
  */
 export function classifyFile(path = '', { read = false } = {}) {
   const rel = normalisePath(path)
-  // A PICTURE FIRST, wherever it lies — see VERIFICATION_IMAGE for why it outranks the
-  // scratch rule on the next line.
-  if (VERIFICATION_IMAGE.test(rel)) return 'verification'
-  if (rel.startsWith('/tmp/') || rel.startsWith('/home/')) return null
+  const scratch = rel.startsWith('/tmp/') || rel.startsWith('/home/')
+  // A PICTURE IN SCRATCH IS STILL A FRAME — see VERIFICATION_IMAGE. It outranks the
+  // scratch rule below, but ONLY there: a picture inside the repository is placed by the
+  // rules like any other file, or editing `src/assets/logo.svg` would count as
+  // verification (final cross-vendor round).
+  if (scratch && VERIFICATION_IMAGE.test(rel)) return 'verification'
+  if (scratch) return null
   if (read && SPEC_DOCS.test(rel)) return 'brief'
   for (const [phase, re] of FILE_RULES) if (re.test(rel)) return phase
   return null
@@ -197,6 +200,14 @@ const VERIFICATION_RUNNER =
 const VERIFICATION_READER = /(^|[|;&]\s*|\s)(cat|head|tail|grep|rg|wc|jq|ls|find|diff|sed|awk|node --check)\b/
 
 /**
+ * The commands that only ever READ, whatever their arguments NAME (final cross-vendor
+ * round): `rg playwright scripts/verify/x.mjs` searches for a word — it starts no suite —
+ * and reading the runner pattern off its arguments turned a search into a browser run.
+ * So the first word of a segment, after its environment assignments, decides first.
+ */
+const READER_COMMANDS = /^(cat|less|head|tail|grep|rg|wc|jq|ls|find|diff|sed|awk|nl|sort|uniq|cut|tr)$/
+
+/**
  * A command that NAMES a verify script without running it — it parses the file and
  * starts no browser (cross-vendor review, 12.08.2026: `node --check scripts/verify/x.mjs`
  * was filed as a suite run, which it is not).
@@ -216,6 +227,14 @@ export function classifyVerificationBash(command = '') {
   const segments = String(command).split(/&&|\|\||;|\|/)
   let text = false
   for (const segment of segments) {
+    // THE FIRST WORD DECIDES BEFORE ITS ARGUMENTS DO. A reader's arguments name whatever
+    // it is searching for, and reading the runner pattern out of them made a `grep` for
+    // "playwright" into a suite run.
+    const first = segment.trim().replace(/^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*/, '').split(/\s+/)[0] ?? ''
+    if (READER_COMMANDS.test(first.replace(/^.*\//, ''))) {
+      text = true
+      continue
+    }
     if (VERIFICATION_NOT_A_RUN.test(segment)) {
       text = true
       continue

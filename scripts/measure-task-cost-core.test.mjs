@@ -490,6 +490,26 @@ describe('verification split', () => {
     expect(kind('verification/report.json')).toBe('text')
   })
 
+  // Final round: a reader's ARGUMENTS name whatever it is searching for, so reading the
+  // runner pattern out of them turned a `grep` for "playwright" into a browser run.
+  it('calls a SEARCH for a runner word text, not a run', () => {
+    expect(classifyVerificationBash('rg playwright scripts/verify/place.mjs')).toBe('text')
+    expect(classifyVerificationBash('grep -n VERIFY_GL= scripts/verify/place.mjs')).toBe('text')
+    // …while the run itself, with or without its environment, is still a run.
+    expect(classifyVerificationBash('VERIFY_GL=webgpu npm run test:small')).toBe('harness')
+    expect(classifyVerificationBash('/usr/bin/grep -rn npm scripts/verify/')).toBe('text')
+  })
+
+  // Final round: the picture rule outranked EVERY other, so editing `src/assets/logo.svg`
+  // counted as verification. In scratch a picture is a frame; inside the repository the
+  // ordinary rules place it.
+  it('does not turn a repository image asset into verification work', () => {
+    expect(classifyFile('src/assets/logo.svg')).toBe('implementation')
+    expect(classifyFile('public/icons/tent.svg')).toBe('implementation')
+    // A raster anywhere is still a frame — that rule predates this point.
+    expect(classifyFile('verification/480-village.png')).toBe('verification')
+  })
+
   // Third round: a frame saved to the scratchpad and then looked at was given no vote at
   // all, so the turn's other, textual call carried the whole verification share.
   it('reads a frame as eyes WHEREVER it lies, the scratchpad included', () => {

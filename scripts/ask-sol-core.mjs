@@ -50,7 +50,10 @@ export function normaliseKind(value) {
  */
 export const ANSWER_SHAPES = Object.freeze({
   diagnose: ['CAUSE: <the one cause, named>', 'EVIDENCE: <the line(s) in the material that show it>'],
-  audit: ['Each finding on ONE line as `A<n> | <file> | <the defect in one line>`, numbered A1, A2, …'],
+  audit: [
+    'Each finding on ONE line as `A<n> | <file> | <the defect in one line>`, numbered A1, A2, …',
+    'and where you found none, the single line `NO FINDINGS: <what you checked>` instead.',
+  ],
   enumerate: ['Each entry on ONE line as `B<n> | <file> | <the item in one line>`, numbered B1, B2, …'],
   explain: [],
 })
@@ -187,15 +190,40 @@ function parseDiagnose(clean) {
   return { ok: true, answer: { cause, evidence }, summary: cause }
 }
 
-/** The numbered entries of a list answer. */
-function parseEntries(clean, prefix) {
-  const re = new RegExp(`^[-*]?\\s*(${prefix}\\d+)\\s*\\|\\s*([^|]*)\\|\\s*(.+)$`, 'i')
+/**
+ * The numbered entries of a list answer.
+ *
+ * THE IDS ARE THE ACCOUNTING (final cross-vendor round). `scripts/blind-merge.mjs` settles
+ * every entry by its id, so a repeated one silently merges two findings into one line of
+ * the ledger — the very disappearance the counting exists to prevent. A duplicate is
+ * therefore an unusable answer, not a tolerable one, and an entry with no text at all is
+ * not an entry.
+ *
+ * `allowEmpty` exists for the AUDIT: a sweep that finds nothing is a real answer, and
+ * refusing it would report a clean audit as "Sol did not answer" after the allowance was
+ * already spent. It must SAY so in the prescribed line — silence is still no answer.
+ */
+function parseEntries(clean, prefix, { allowEmpty = false } = {}) {
+  const re = new RegExp(`^[-*]?\\s*(${prefix}\\d+)\\s*\\|\\s*([^|]*)\\|\\s*(.*)$`, 'i')
   const entries = []
+  const seen = new Set()
   for (const line of clean.split('\n')) {
     const m = re.exec(line.trim())
-    if (m) entries.push({ id: m[1].toUpperCase(), file: m[2].trim(), text: m[3].trim() })
+    if (!m) continue
+    const id = m[1].toUpperCase()
+    const text = m[3].trim()
+    if (!text) return { ok: false, error: `entry ${id} carries no finding at all` }
+    if (seen.has(id)) return { ok: false, error: `the id ${id} is used twice — the merge accounts by id, so one of them would vanish` }
+    seen.add(id)
+    // A finding that names no file is still a finding; it is marked, never dropped.
+    entries.push({ id, file: m[2].trim() || '(unspecified)', text })
   }
-  if (!entries.length) return { ok: false, error: `no entry in the form \`${prefix}1 | <file> | <one line>\`` }
+  if (!entries.length) {
+    if (allowEmpty && /(^|\n)\s*[-*]?\s*NO FINDINGS\s*:\s*\S/i.test(clean)) {
+      return { ok: true, answer: { entries: [] }, summary: 'no findings' }
+    }
+    return { ok: false, error: `no entry in the form \`${prefix}1 | <file> | <one line>\`` }
+  }
   return { ok: true, answer: { entries }, summary: `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}` }
 }
 
@@ -221,7 +249,9 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
     if (prose.length < 40) return { ok: false, kind: k, answer: null, summary: '', error: 'the answer is too thin to be an explanation' }
     return { ok: true, kind: k, answer: { text: prose }, summary: prose.split('\n')[0].slice(0, 120), error: '' }
   }
-  const parsed = k === 'diagnose' ? parseDiagnose(clean) : parseEntries(clean, entryPrefix(k))
+  // A sweep may honestly find nothing; a DIVERGENT enumeration that lists nothing is no
+  // half of a blind-parallel stage, so only the audit may come back empty.
+  const parsed = k === 'diagnose' ? parseDiagnose(clean) : parseEntries(clean, entryPrefix(k), { allowEmpty: k === 'audit' })
   return parsed.ok
     ? { ok: true, kind: k, answer: parsed.answer, summary: parsed.summary, error: '' }
     : { ok: false, kind: k, answer: null, summary: '', error: parsed.error }
