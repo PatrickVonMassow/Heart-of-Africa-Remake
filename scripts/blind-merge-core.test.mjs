@@ -373,8 +373,11 @@ describe('who may merge', () => {
     // "unavailable" (four-eyes review, sixth round).
     expect(fb('GPT-5.6 Sol failed the review').ok).toBe(false)
     expect(fb('GPT-5.6 Sol was not unavailable').ok).toBe(false)
-    // …and a sentence break without a space is still a sentence break.
+    // …and a sentence break without a space is still a sentence break, whether
+    // or not a digit follows the period (a version number is the only period
+    // that does not split).
     expect(fb('GPT-5.6 Sol was present.Opus 5 was unavailable').ok).toBe(false)
+    expect(fb('GPT-5.6 Sol was present.5 was unavailable').ok).toBe(false)
     // The honest forms still pass, version numbers intact.
     expect(fb('GPT-5.6 Sol was unreachable in this session').ok, 'unreachable').toBe(true)
     expect(fb('the call to GPT-5.6 Sol timed out twice').ok, 'timed out').toBe(true)

@@ -319,7 +319,7 @@ export function validateMerger({ mergedBy, authors = [], fallback = '' } = {}) {
     // satisfied both halves and said the opposite of what the exception means.
     // So one CLAUSE has to carry the other model AND its absence. The period
     // splits sentences but not version numbers ("GPT-5.6" stays whole).
-    const clauses = String(reason).split(/[;,]|\.(?!\d)|\band\b|\bbut\b|\bwhile\b|\bso\b|\bhowever\b/i)
+    const clauses = String(reason).split(/[;,]|(?<!\d)\.|\.(?!\d)|\band\b|\bbut\b|\bwhile\b|\bso\b|\bhowever\b/i)
     const bound = clauses.some(
       (c) => UNAVAILABLE.test(c) && !NEGATED_ABSENCE.test(c) && namesOtherModel(c, who),
     )
