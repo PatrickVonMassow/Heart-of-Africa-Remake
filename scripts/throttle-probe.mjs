@@ -157,16 +157,23 @@ function stopSpinners(spun) {
   return alive
 }
 
-/** Did a run of this suite REALLY start after `since`? The suite's own process
- *  writes its run record when it launches a browser (render-verify-recorder.mjs),
- *  so a record that new is evidence from outside the runner's log that the suite
- *  ran at all. Unreadable state answers false, which calls a run unmeasured
- *  rather than passing an empty one off as green. */
-function suiteRanSince(since, suite) {
+/**
+ * Did THIS run's suite really start? The suite's own process writes its run
+ * record when it launches a browser (render-verify-recorder.mjs), so a record
+ * newer than this run is evidence from outside the runner's log that something
+ * happened.
+ *
+ * Bound to this invocation as tightly as the record allows: the same suite AND
+ * the same section, started at or after this run began — no tolerance window,
+ * because a couple of seconds of slack is exactly where the previous run's
+ * record would fit (four-eyes, 11.08.2026). Unreadable state answers false,
+ * which calls a run unmeasured rather than passing an empty one off as green.
+ */
+function suiteRanSince(since, suite, section) {
   try {
     const runs = readRenderState()?.runs
     return (Array.isArray(runs) ? runs : []).some(
-      (r) => r?.suite === suite && Number(r?.startedAt ?? r?.at) >= since - 2000,
+      (r) => r?.suite === suite && r?.section === section && Number(r?.startedAt) >= since,
     )
   } catch {
     return false
@@ -396,7 +403,13 @@ async function main(argv = process.argv.slice(2)) {
     // it launches a browser, so a record newer than this run's start is evidence
     // from outside the log that something happened — which is what tells a green
     // "0 pass, 0 fail" section from an exit-0 harness that ran nothing.
-    const kind = classifyRun({ timedOut, exit, summary, checks, ran: suiteRanSince(startedAt, opts.suite) })
+    const kind = classifyRun({
+      timedOut,
+      exit,
+      summary,
+      checks,
+      ran: suiteRanSince(startedAt, opts.suite, opts.section),
+    })
     results.push({ kind, ok: kind === 'green', checks, exit })
     if (logDir) {
       try {
