@@ -70,39 +70,6 @@ there exactly once; a new point joins a bundle when appended.
 
 ## Checklist
 
-- [ ] 644. MAIN WENT RED ON A DAEMON TEST THAT NOBODY CAN REPRODUCE, AND THE CAUSE IS NOT
-  NAMED (measured 11.08.2026 on `main` at 4a953ed0, CI run 31504918389). `npm run test:unit`
-  is green locally and RED on the CI runner: `scripts/batch-launcher-daemon.test.mjs > ticks
-  again within seconds of an IDLE lapse too, not only a handover` hit its 30 s timeout while
-  the other 10171 tests passed. This point exists because point 640 forbids closing it any
-  other way — it is filed, not explained.
-  WHAT IS ESTABLISHED. (1) The failure mode is a TIMEOUT, not a missed budget: the test
-  asserts the second tick arrives within 5 s, and a slow tick would fail THAT assertion. It
-  timed out instead, so the daemon loop never woke again at all. That distinction rules out
-  "the runner was merely slow". (2) Load does not reproduce it here: 5 ordinary runs and 6
-  runs pinned to a single core are all green, 11 of 11. By point 640 that closes nothing —
-  it only means the cheap instrument does not reach the cause. (3) The test injects
-  `readLock`, `isPaused` and `tick` but NOT `assess`, so the wake decision runs the real
-  `assessOwner` against the real `/proc` probe of the vitest worker and the real boot clock,
-  and its phase-2 lock carries a live pid with no `pidStartedAt`. That is the one
-  uncontrolled ENVIRONMENT input in an otherwise fully injected test, and the wake fires
-  only if that verdict says ownership ended. The comment above the test says the real
-  `assessOwner` is used ON PURPOSE, so this is not to be "fixed" by injecting it — that
-  would delete the coverage the test exists for. (4) Point 504 records that the two clocks
-  this identity is computed from drift apart in our container, which is a candidate for why
-  the verdict differs between hosts, NOT a demonstration that it did.
-  FINAL STATE: the cause is named with evidence and fixed at that cause — reproduced on a
-  host that shows it (a CI run with the verdict logged is the cheapest handle, since the
-  runner is the only place it has appeared), then absent by the same mechanism. If the
-  verdict genuinely depends on host clocks, the fix belongs where that is computed and
-  point 504 owns it; if it is the daemon's wake, the fix is there. Either way the test keeps
-  judging by the real `assessOwner`.
-  VERIFIABLE: the failure reproduced deliberately by a named mechanism, then absent after
-  the fix by the same mechanism; `npm run test:unit` green on the CI runner three
-  consecutive times without a retry.
-  Criticality: HIGH — it turns `main` red, which mails the user, and a red nobody can
-  explain is what points 455 and 640 exist to stop being argued away.
-
 - [ ] 641. THE GIZA EDGE CHECK REDS ON WEBGPU AND NOBODY KNOWS WHY (measured 11.08.2026 on
   branch `feat/600-ctrl-label-states`, head fde5a652). `polish` on WebGPU: `giza (wet): the
   swept ground inside is measurably darkened, the open land outside is untouched — inside
