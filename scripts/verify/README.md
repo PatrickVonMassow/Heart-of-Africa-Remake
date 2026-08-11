@@ -917,6 +917,36 @@ non-zero exit on a real regression.
 (`SERVERLESS_SUITES` in `tiers.mjs`; a `docs`-only run starts no vite at all) and
 the baseline runs the baseline tree's OWN copy of it.
 
+## What a fix must PROVE (point 589)
+
+Twelve defects shipped in ONE mechanic whose twelve points had all been accepted
+as finished, and the gate reported green throughout. The cause was not too few
+tests: the tests checked the MECHANISM and not the RESULT. `speechProbe` counted
+the syllables a source PLANNED, so it could not hear the same tone multiplied by
+zero further down the bus; the label tests checked the visibility rule and the
+presence in the DOM, not whether the note stood at the speaker's head; the
+catch-game tests checked the game logic, not whether two children occupied one
+point in space. That is the "green against a proxy" failure CLAUDE.md §7.2 warns
+about — the rule existed, this area did not follow it. Two rules bind every fix
+from here:
+
+**1. Per fix, ONE assertion at the level the player experiences it.** SOUND is
+judged at the END of the chain — the level that actually reaches the output, not
+the level a source planned. POSITION is judged in WORLD space — do two bodies
+overlap, does the note sit within a hand's breadth of the head — not by the rule
+that was supposed to place it. A fix whose assertion can only reach the mechanism
+NAMES IN ITS COMMIT why the result is not assertable; that is a permitted
+outcome, silently asserting the proxy instead is not.
+
+**2. One PLAY ACCEPTANCE per package.** A package of play-session fixes is not
+finished by its suites. The parts were each accepted and the COMPOSITION never
+was — nobody ever stood in the village as a player, with sound, for two minutes.
+So the MERGED result is entered as a player — the scene, the sound, two minutes —
+and what was SEEN and HEARD is recorded with the merge.
+
+And for anything time-dependent, neither rule reaches far enough: see the
+long-run alarm below.
+
 ## Adding tests for a new feature (do this every time)
 
 Every new feature must get a test on **one or both** layers — pick by what the

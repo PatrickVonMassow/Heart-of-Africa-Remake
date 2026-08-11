@@ -6,6 +6,25 @@ and these chains were the larger part of it, while they are needed at a closing 
 a tag. The wording is moved verbatim; numbering and conditions are as they stood in
 §7.1. A criterion and its evidence section change in the SAME commit.
 
+**Two rules bind every chain below (point 589).** Twelve defects shipped in one
+mechanic whose twelve points had all been accepted as finished, because the
+proofs judged the MECHANISM rather than the RESULT.
+
+1. **Per fix, ONE assertion at the level the player experiences it.** Sound is
+   judged at the END of the chain — the level that actually reaches the output,
+   not the level a source planned. Position is judged in WORLD space — do two
+   bodies overlap, does the note sit within a hand's breadth of the head — not by
+   the rule that was supposed to place it. A fix whose assertion can only reach
+   the mechanism names in its COMMIT why the result is not assertable.
+2. **One play acceptance per package.** A package of play-session fixes is not
+   finished by its suites: the merged result is entered as a PLAYER — the scene,
+   the sound, two minutes — and what was seen and heard is recorded with the
+   merge. The parts had each been accepted; the composition never was.
+
+Anything that must keep producing over time is beyond both, and carries a
+long-run alarm instead (§15, `src/systems/devAssert.ts`). The full reasoning
+lives in `scripts/verify/README.md`.
+
 ---
 
 ## 2. Two perspectives.
