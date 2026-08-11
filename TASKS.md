@@ -152,8 +152,10 @@ there exactly once; a new point joins a bundle when appended.
      `order` array is DELETED, not merely validated — a copy that is checked is still a
      copy, and the check is what nobody runs. The existing rank rules stay and are applied
      ON TOP of that sequence, exactly as `queueOrder` applies them today: the bug-finding
-     and QA points to the back, the release tag last of all, a point WAITING on a user
-     decision behind everything, a point he has just ANSWERED to the head. The per-point
+     and QA points to the back, the release tag where the work order puts it (user
+     10.08.2026, in point 174: v0.3 no longer waits for the feature work and the audits),
+     a point WAITING on a user decision behind everything, a point he has just ANSWERED
+     to the head. The per-point
      card text, title and estimate stay in `board-queue.json`; only the ORDERING leaves it.
   2. RE-RANKING A POINT MEANS MOVING IT IN THE WORK ORDER. Where the queue order was
      edited before, the point's block is moved inside `TASKS.md` — verbatim, with its
