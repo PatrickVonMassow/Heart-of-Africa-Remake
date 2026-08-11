@@ -146,7 +146,11 @@ export function readEntryLines(text) {
       // round): dropping it quietly let a mixed list report green while one of
       // its entries was never counted. Ordinary prose carries no id and is
       // ignored as before.
-      if (/^[A-Za-z]{0,3}\d+\s*[:.)\-–—]/.test(line)) unreadable.push(line)
+      // The test is the ID ITSELF at the head of the line, whatever follows it:
+      // "B2: …", "B2 - …" and "B2 the save drops gifts" are all the same finding
+      // in the wrong shape. A LETTER prefix is required, so numbered prose
+      // ("1. I compared both lists") stays prose (four-eyes review, fifth round).
+      if (/^[A-Za-z]{1,3}\d+\b/.test(line)) unreadable.push(line)
       continue
     }
     // A markdown table's header and its dashed separator are furniture, not

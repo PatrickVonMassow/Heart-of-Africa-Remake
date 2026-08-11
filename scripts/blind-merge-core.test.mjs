@@ -99,19 +99,26 @@ describe('reading and validating the two input lists', () => {
   it('REPORTS a finding written without pipes beside well-formed ones', () => {
     // The dangerous shape is the MIXED list: one good row makes the list look
     // readable while the other entry is silently gone (four-eyes, fourth round).
-    const list = parseListText('B', ['- B1 | src/x.ts | the ribbon tears', '- B2: the save drops gifts'].join('\n'))
-    expect(list.entries.map((e) => e.id)).toEqual(['B1'])
-    const { ok, errors } = validateList(list)
-    expect(ok).toBe(false)
-    expect(errors.join('\n')).toMatch(/B2: the save drops gifts/)
+    for (const shape of ['- B2: the save drops gifts', 'B2 - the save drops gifts', 'B2 the save drops gifts']) {
+      const list = parseListText('B', ['- B1 | src/x.ts | the ribbon tears', shape].join('\n'))
+      expect(list.entries.map((e) => e.id)).toEqual(['B1'])
+      const { ok, errors } = validateList(list)
+      expect(ok, shape).toBe(false)
+      expect(errors.join('\n')).toMatch(/save drops gifts/)
+    }
   })
 
-  it('still ignores ordinary prose around the list', () => {
+  it('still ignores ordinary prose around the list, numbered prose included', () => {
     const list = parseListText(
       'B',
-      ['Here is what I found in the diff:', 'B1 | src/x.ts | the ribbon tears', 'That is all.'].join('\n'),
+      [
+        'Here is what I found in the diff:',
+        '1. I compared both lists before writing this',
+        'B1 | src/x.ts | the ribbon tears',
+        'That is all.',
+      ].join('\n'),
     )
-    expect(validateList(list).ok).toBe(true)
+    expect(validateList(list).ok, validateList(list).errors.join('\n')).toBe(true)
     expect(list.entries).toHaveLength(1)
   })
 
@@ -329,6 +336,27 @@ describe('who may merge', () => {
     })
     expect(r.ok).toBe(false)
     expect(r.errors.join(' ')).toMatch(/NAME the model/i)
+  })
+
+  it('refuses a fallback that names only the merger, or claims no absence at all', () => {
+    // "Opus 5 performed the merge" names a model and excuses nothing.
+    const self = validateMerger({ mergedBy: 'Opus 5', authors: ['Opus 5'], fallback: 'Opus 5 performed the merge' })
+    expect(self.ok).toBe(false)
+    expect(self.errors.join(' ')).toMatch(/only "Opus 5" itself/)
+    const noAbsence = validateMerger({
+      mergedBy: 'Opus 5',
+      authors: ['Opus 5'],
+      fallback: 'GPT-5.6 Sol reviewed this one earlier',
+    })
+    expect(noAbsence.ok).toBe(false)
+    expect(noAbsence.errors.join(' ')).toMatch(/NOT THERE/)
+    // …and the merger cannot excuse itself under its own other name either.
+    const solItself = validateMerger({
+      mergedBy: 'GPT-5.6 Sol',
+      authors: ['GPT-5.6 Sol'],
+      fallback: 'Sol was unreachable',
+    })
+    expect(solItself.ok).toBe(false)
   })
 
   it('refuses a fallback claimed where none was needed', () => {

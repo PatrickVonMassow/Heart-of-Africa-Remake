@@ -166,7 +166,11 @@ export function sameModel(a, b) {
 }
 
 /** A model designation this project would recognise, for the fallback below. */
-const MODEL_NAMED = /\b(sol|gpt|fable|opus|claude|sonnet|haiku|gemini|grok|llama|mistral|qwen|deepseek)\b/i
+const MODEL_NAMED = /\b(sol|gpt|fable|opus|claude|sonnet|haiku|gemini|grok|llama|mistral|qwen|deepseek)\b/gi
+
+/** …and the fallback has to say the model was NOT THERE, not merely name one. */
+const UNAVAILABLE =
+  /\b(unavailable|unreachable|inaccessible|offline|absent|missing|down|no access|not available|not reachable|not there|could ?n[o']t be reached|could not be reached|failed|refused|timed out|only two)\b/i
 
 /**
  * The RECEIPT that a union was counted: the summary line
@@ -254,16 +258,34 @@ export function validateMerger({ mergedBy, authors = [], fallback = '' } = {}) {
   if (reason && !conflict) {
     errors.push(`a two-model fallback is recorded, but "${who}" authored neither list — no fallback was needed`)
   }
-  if (reason && !MODEL_NAMED.test(reason)) {
-    // A FALLBACK HAS TO NAME THE MODEL THAT WAS NOT THERE (four-eyes review of
-    // point 634). Any eight characters would otherwise buy an author the right
-    // to merge its own list — the escape hatch would be the rule. Nothing can
-    // verify the claim, but a claim that names a model is one someone can check
-    // against the session, and a vague one is refused where it is cheapest.
-    errors.push(
-      `the two-model fallback has to NAME the model that was unavailable ("${reason}" names none) — ` +
-        'it is the reason an author was allowed to merge, and an unnamed reason cannot be checked',
-    )
+  if (reason) {
+    // A FALLBACK HAS TO SAY WHICH MODEL WAS NOT THERE (four-eyes review of point
+    // 634, rounds one and five). Any eight characters would otherwise buy an
+    // author the right to merge its own list — the escape hatch would be the
+    // rule — and so would a line that merely mentions a model ("Opus 5 performed
+    // the merge"). Nothing can VERIFY the claim; what is enforced is that it is
+    // a checkable one: a model OTHER than the merger, and said to be absent.
+    const named = [...String(reason).matchAll(MODEL_NAMED)].map((m) => m[1].toLowerCase())
+    // Every word of the MERGER'S OWN name, so "Sol was unavailable" cannot be
+    // written by Sol itself.
+    const mine = new Set([...String(who).matchAll(MODEL_NAMED)].map((m) => m[1].toLowerCase()))
+    if (!named.length) {
+      errors.push(
+        `the two-model fallback has to NAME the model that was unavailable ("${reason}" names none) — ` +
+          'it is the reason an author was allowed to merge, and an unnamed reason cannot be checked',
+      )
+    } else if (!named.some((f) => !mine.has(f) && f !== 'claude')) {
+      errors.push(
+        `the two-model fallback names only "${who}" itself: it has to say which OTHER model was ` +
+          'unavailable, since that is what made an author the merger',
+      )
+    }
+    if (!UNAVAILABLE.test(reason)) {
+      errors.push(
+        `the two-model fallback has to say the model was NOT THERE ("${reason}" only mentions one) — ` +
+          'unreachable, unavailable, no access: the exception is an absence, not a preference',
+      )
+    }
   }
   return { ok: errors.length === 0, errors, fallback: Boolean(conflict && reason) }
 }
