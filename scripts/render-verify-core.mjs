@@ -611,15 +611,19 @@ export function unexplainedRuns(runs, since, options) {
     // The individual reds, NOT the one sentence runVerdict writes about them: a
     // suspect run's whole first attempt is summarised into a single unaccounted
     // entry, and a caller counting those would report two reds as one.
-    const names = (unowned ?? (verdict.status === 'suspect' ? suspectRedsOf(r) : verdict.unaccounted)).map(
-      (x) => text(x?.name),
-    ).filter(Boolean)
+    const open_ = unowned ?? (verdict.status === 'suspect' ? suspectRedsOf(r) : verdict.unaccounted)
+    const names = open_.map((x) => text(x?.name)).filter(Boolean)
+    // What is REPORTED is what is still open — never the verdict's own list,
+    // which still holds the reds a charge has since taken over: quoting one of
+    // those as the blocker would name the wrong red and count one too many.
+    const stillOpen = open_
+      .map((x) => ({ name: text(x?.name) || '(unnamed red)', point: Number.isInteger(x?.point) ? x.point : null }))
     out.push({
       backend,
       suite,
       at,
       status: verdict.status,
-      unaccounted: verdict.unaccounted,
+      unaccounted: stillOpen.length > 0 ? stillOpen : verdict.unaccounted,
       reds: names.length > 0 ? names : ['(unnamed red)'],
     })
   }
@@ -779,10 +783,18 @@ export function evaluate(input) {
     // EVERY red, not one per run: a run with three unexplained reds waved three
     // reds through, and a record naming the first would understate exactly what
     // the reader is being asked to accept.
+    // ONE ENTRY PER RED, not per record: a real retry leaves TWO records of the
+    // same failure — the first attempt's red one and the retry's SUSPECT one,
+    // which carries the same check names — and counting both would report one
+    // failure as two.
     const waved = []
+    const seen = new Set()
     let wavedCount = 0
     for (const u of unexplained) {
       for (const name of u.reds) {
+        const key = `${u.backend}|${u.suite}|${name}`
+        if (seen.has(key)) continue
+        seen.add(key)
         wavedCount++
         if (waved.length < MAX_WAVED) waved.push({ backend: u.backend, suite: u.suite, status: u.status, name })
       }

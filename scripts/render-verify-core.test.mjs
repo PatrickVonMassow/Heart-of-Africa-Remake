@@ -919,6 +919,37 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(result.waved).toHaveLength(20)
   })
 
+  it('quotes the red that is STILL open, not the one a charge has taken over', () => {
+    const ledger = [{ point: 506, match: /the goat stance/, why: 'the software lane cannot draw fast enough' }]
+    const mixed = redRun('webgpu', 1500, [red('the goat stance'), red('a NEW check nobody filed')])
+    const green = (backend, at) => ({ ...run(backend, at), suite: 'polish' })
+    const result = evaluate(renderChange({ runs: [mixed, green('webgpu', 2000), green('webgl', 2100)], openPoints, ledger }))
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/1 unaccounted red\(s\) — "a NEW check nobody filed"/)
+    expect(result.reason).not.toMatch(/the goat stance/)
+  })
+
+  it('counts ONE failure once, though a real retry leaves two records of it', () => {
+    // What run-all really writes: the first attempt's red record, then the
+    // retry's suspect record carrying the same check name.
+    const firstAttempt = redRun('webgpu', 1500, [red('the goat stance')])
+    const retry = {
+      ...run('webgpu', 1600),
+      suite: 'polish',
+      suspect: true,
+      suspectOf: [{ name: 'the goat stance', kind: 'check' }],
+    }
+    const result = evaluate(
+      renderChange({
+        runs: [firstAttempt, retry],
+        deferral: { head: 'def5678', reason: 'the lane was software', at: 1700 },
+        openPoints,
+      }),
+    )
+    expect(result.wavedCount).toBe(1)
+    expect(result.waved).toHaveLength(1)
+  })
+
   it('a deferral with nothing to wave says nothing — the list is evidence, not decoration', () => {
     const result = evaluate(
       renderChange({ runs: [], deferral: { head: 'def5678', reason: 'headless WebGPU washes the frame out', at: 1600 } }),
