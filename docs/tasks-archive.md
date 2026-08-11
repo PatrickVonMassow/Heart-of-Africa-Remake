@@ -17559,3 +17559,30 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   consecutive times without a retry.
   Criticality: HIGH — it turns `main` red, which mails the user, and a red nobody can
   explain is what points 455 and 640 exist to stop being argued away.
+
+- [x] 629. THE LANDING DELETES THE WORKTREE OF AN AGENT THAT IS STILL WORKING (measured
+  11.08.2026, and it destroyed finished work). Landing point 608 ran `land-point.mjs`
+  through its `cleanup` step ("delete branch, remote branch and worktree"), and the
+  worktree of the agent on point 590 (`.claude/worktrees/agent-a46632fd8f7f4bbce`)
+  disappeared underneath it. From then on every one of that agent's shell calls was
+  refused with "the isolation worktree appears to have been removed". LOST: the finished,
+  tested, UNCOMMITTED answer to six review findings — `queue-rank-core.mjs`,
+  `queue-rank.mjs`, `queue-order-guard-core.mjs` with 89 green cases and the reviewer's
+  recorded verdict. Only the pushed state 6105a528 survived.
+  TWO FAULTS, FIXED SEPARATELY. (a) The landing's cleanup must touch the branch and the
+  worktree OF THE LANDED POINT and nothing else. Where it cannot prove a worktree belongs
+  to the point it is landing, it leaves it alone and says so; where a worktree is
+  demonstrably ALIVE (an agent process, a recently written branch — the liveness evidence
+  `batch-in-flight.mjs` already collects), it is never removed, even when it does belong
+  to the point. (b) An agent whose ground is pulled away must not be standing on
+  unpublished work: the commit-and-push-per-step rule exists and was not followed here,
+  because the whole answer ran as one block up to the green verdict. The delegation prompt
+  therefore demands a commit at each self-contained step, and the agent is told that an
+  uncommitted block is the one state nothing can rescue.
+  VERIFIABLE: a Vitest case over the pure cleanup selector — given a landed point, a set of
+  worktrees and their liveness evidence, it returns exactly the landed point's dead
+  worktree and never a foreign or a live one; plus a case that a worktree whose ownership
+  cannot be established is reported, not removed.
+  Criticality: high — this is the one failure class that destroys work already done, and it
+  fires precisely when the batch is at its most productive (a landing beside a running
+  pool). Bundle: Session- & Repo-Hygiene.
