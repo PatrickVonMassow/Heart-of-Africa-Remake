@@ -61,8 +61,8 @@ export const LIMITS = {
   // Raised 07.08.2026 by the measured NET size of one genuinely new tip (§3.91,
   // the repair that quiets the check it was meant to sharpen). The INVARIANTS,
   // re-measured with this counter by the four-eyes review: the tip cost 129
-  // words as first written, 96 were PAID BACK, 33 is the net raise, and the LINE
-  // budget was met with no raise at all. The largest single payer was trimming
+  // words as first written, 96 were PAID BACK, 33 is the net raise, and THAT raise
+  // moved the word ceiling alone — the line ceiling was met without one. The largest single payer was trimming
   // the TIP ITSELF; the rest came from six neighbouring entries, of which only
   // prose was cut — the one tightening that had dropped a claim ("schreib zu
   // jeder Regel, was sie misst") was restored and repaid inside its own entry.
@@ -73,7 +73,7 @@ export const LIMITS = {
   // standing rule is shorten-before-raise and the last step of a raise belongs
   // to the user.
   //
-  // RAISED to 3680 on 11.08.2026 by the 97 measured words of two genuinely new
+  // RAISED to 3677 on 11.08.2026 by the 97 measured words of two genuinely new
   // decisions, and NOT escalated to the user — he withdrew that requirement
   // generally on 10.08.2026 ("Frage mich in Zukunft allgemein nicht mehr bzgl.
   // Anhebungen"), so a raise is ours to take and to justify in writing. What was
@@ -87,10 +87,10 @@ export const LIMITS = {
   // first, twice: the four-eyes entry was rewritten tighter than before the
   // addition (it also fell back inside the LINE budget, which is untouched), and
   // the new entry was cut from 8 lines to 5. What remains is the two decisions
-  // themselves. The LINE ceiling moves with it, by the 7 lines those two entries
+  // themselves. EXACT FIT, no headroom: 3580 + 97 = 3677. The LINE ceiling moves too, by the 7 lines those two entries
   // occupy after that tightening — the per-entry ceiling (11) is untouched, so
   // the guide's shape as a list of short tips is unchanged.
-  maxWords: 3680,
+  maxWords: 3677,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
