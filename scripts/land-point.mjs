@@ -343,6 +343,29 @@ export function reproveOne({ path, expected, since, mergeTarget = null, cwd = RE
 }
 
 /**
+ * THE BY-HAND REPAIR, AND WHY IT MUST NOT UNDO THE MECHANISM (ninth review,
+ * finding 1). This line prints exactly when a tree was KEPT or a removal REFUSED
+ * — i.e. when something may still stand on this branch — and the line that stood
+ * here (`git branch -D`, then a bare `git push origin --delete`) told the operator
+ * to force through both deletions that `deleteLandedBranch` exists to make
+ * conditional. A repair hint is read at the worst moment and pasted, so it repeats
+ * the CONDITIONAL commands: clear the named blocker first, then `-d`, which git
+ * refuses for a checked-out or unmerged branch, and the remote under the SAME
+ * lease, chained with `&&` so it cannot run after a failed local deletion.
+ *
+ * Exported so a test pins it; the string is the whole mechanism at this step.
+ */
+export function branchRepairHint(branch) {
+  const b = String(branch ?? '').trim()
+  if (!b) return 'clear what the keep-reasons above name, then delete the branch by hand'
+  return (
+    `clear what the keep-reasons above name (e.g. node scripts/worktree-cleanup.mjs <path>), then: ` +
+    `SHA=$(git rev-parse ${b}) && git branch -d ${b} && ` +
+    `git push origin --force-with-lease=refs/heads/${b}:"$SHA" --delete ${b}`
+  )
+}
+
+/**
  * DELETE THE LANDED BRANCH — local FIRST, remote ONLY IF THE LOCAL ONE SUCCEEDED.
  *
  * THE SEQUENCE IS THE POINT (second review, finding 3). The two deletions used to
@@ -890,7 +913,7 @@ async function main(argv) {
       step('cleanup', VERDICT.failed, problems.join(' | '))
       error = new LandingError('the point landed, but its branch/worktree could not be removed', {
         step: 'cleanup',
-        repair: `node scripts/worktree-cleanup.mjs <path>; git branch -D ${branch}; git push origin --delete ${branch}`,
+        repair: branchRepairHint(branch),
       })
       throw error
     }

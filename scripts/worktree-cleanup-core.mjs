@@ -197,7 +197,11 @@ export function matchesExpectation({ expected, entry, actual = null, dirty, ownL
     }
     if (lock !== own) return { ok: false, reason: `it is git-locked: ${lock}` }
   } else if (lock.trim()) {
-    return { ok: false, reason: `it is git-locked: ${lock.trim()}` }
+    // Printed VERBATIM, like the branch above it: the padding is part of what is
+    // in git's file, and a reader comparing this line against the file must see
+    // the same bytes. Only the DECISION trims, so a lock of pure whitespace still
+    // reads as "no lock".
+    return { ok: false, reason: `it is git-locked: ${lock}` }
   }
 
   const got = actual && typeof actual === 'object' ? actual : {}

@@ -73,9 +73,10 @@ function readlinkable(path) {
  * finding 2). A guard that defaults to permitting is not a guard: an omitted
  * argument deleted the tree. So the destructive functions below take an
  * `exclusion` that is either `{ file, reason }` — git's lock file and the reason
- * we wrote into it — or THIS sentinel, and nothing else passes. `batch-doctor`
- * removing an ORPHAN has no lock to hold and names this deliberately; an omission
- * cannot spell it by accident.
+ * we wrote into it — or THIS sentinel, and nothing else passes. The ONE caller
+ * that names it is `cleanupWorktree` itself, on the path where it took no lock
+ * (an ORPHAN, or a removal called with no expectation — how `batch-doctor`
+ * reaches it); an omission cannot spell it by accident.
  */
 export const WITHOUT_A_LOCK = Object.freeze({ noLockWasTaken: true })
 

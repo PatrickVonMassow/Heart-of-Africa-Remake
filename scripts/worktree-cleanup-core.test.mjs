@@ -435,6 +435,16 @@ describe('matchesExpectation — pure', () => {
     expect(ask({ entry: { ...entry, locked: '   ' } }).ok).toBe(true)
   })
 
+  it('prints a foreign lock VERBATIM whether or not we hold one — only the decision trims', () => {
+    // Ninth review, finding 3: the two branches disagreed, the no-own-lock one
+    // printing a TRIMMED copy. A reader comparing this line against git's file has
+    // to see the same bytes, and padding is exactly what distinguishes a foreign
+    // lock from ours here.
+    const padded = ' claude agent (pid 7) '
+    expect(ask({ entry: { ...entry, locked: padded } }).reason).toBe(`it is git-locked: ${padded}`)
+    expect(ask({ entry: { ...entry, locked: padded }, ownLock: 'ours' }).reason).toBe(`it is git-locked: ${padded}`)
+  })
+
   it('refuses a checkout whose HEAD moved — the containment proof was taken on that sha', () => {
     const r = ask({ entry: { ...entry, head: 'def456' } })
     expect(r.ok).toBe(false)

@@ -29,6 +29,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, it, expect } from 'vitest'
 import {
+  branchRepairHint,
   cleanupEvidence,
   deleteLandedBranch,
   listWorktrees,
@@ -254,6 +255,32 @@ describe('the probe must not become its own evidence', () => {
 
     const sel = select(root)
     expect(sel.remove).not.toContain(own)
+  })
+})
+
+describe('the by-hand repair does not undo the mechanism', () => {
+  // Ninth review, finding 1. The hint prints when a tree was KEPT or a removal
+  // REFUSED — the very state where something may still stand on the branch — and
+  // it used to read `git branch -D <b>; git push origin --delete <b>`: the two
+  // forced deletions this file exists to make conditional, handed to the operator
+  // at the worst possible moment.
+  it('names only CONDITIONAL commands — never -D, never a lease-less remote delete', () => {
+    const hint = branchRepairHint('feat/608-x')
+    expect(hint).not.toMatch(/branch\s+-D\b/)
+    expect(hint).toMatch(/git branch -d feat\/608-x/)
+    // The remote deletion carries the same lease the automated path uses …
+    expect(hint).toMatch(/--force-with-lease=refs\/heads\/feat\/608-x:/)
+    // … and every step is chained with && so none runs after a failure.
+    expect(hint).not.toMatch(/;\s*git (branch|push)/)
+    expect(hint).toMatch(/&& git push origin/)
+  })
+
+  it('asks for the blocker to be cleared first, and says nothing forceful without a branch', () => {
+    expect(branchRepairHint('feat/608-x')).toMatch(/keep-reasons/)
+    for (const empty of ['', '   ', null, undefined]) {
+      const hint = branchRepairHint(empty)
+      expect(hint, String(empty)).not.toMatch(/-D|--delete/)
+    }
   })
 })
 
