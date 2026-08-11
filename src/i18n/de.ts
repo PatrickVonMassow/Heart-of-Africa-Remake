@@ -582,7 +582,7 @@ export const de: Strings = {
     adultErrandCount: 'Erwachsene: Dorfbewohner mit Auftrag',
     separationRadius: 'Bewohner: Körperradius',
     separationSlop: 'Bewohner: geduldete Überschneidung (m)',
-    separationStiffness: 'Bewohner: Dämpfung der Trennung',
+    separationStiffness: 'Bewohner: Stärke der Trennung',
     separationSpeed: 'Bewohner: Schubgeschwindigkeit (m/s)',
     separationWedge: 'Bewohner: Befreiung aus Klemme nach (s)',
     separationPasses: 'Bewohner: Trenndurchgänge pro Bild',

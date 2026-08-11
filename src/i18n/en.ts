@@ -580,7 +580,7 @@ export const en: Strings = {
     adultErrandCount: 'Adults: villagers running errands',
     separationRadius: 'Inhabitants: body radius',
     separationSlop: 'Inhabitants: overlap tolerated (m)',
-    separationStiffness: 'Inhabitants: separation damping',
+    separationStiffness: 'Inhabitants: separation strength',
     separationSpeed: 'Inhabitants: push speed (m/s)',
     separationWedge: 'Inhabitants: wedge escape after (s)',
     separationPasses: 'Inhabitants: separation sweeps per frame',
