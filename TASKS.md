@@ -6137,3 +6137,28 @@ to land than a mechanism that needs a review.
   deletion, not taken from the plan. The existing suite stays green.
   Criticality: high — same subject as 629 and the same cost if it goes wrong, and it is
   live on `main` today. Bundle: Session- & Repo-Hygiene.
+
+- [ ] 650. A REVIEW'S COVERAGE IS READ ALONG WITH ITS VERDICT (retrospective §3.110,
+  11.08.2026). `scripts/review-sol.mjs` builds the reviewer's material from the whole
+  commit range and stops at a cap; past it, files are dropped and the reviewer says so IN
+  PROSE ("TRUNCATED/omitted"). Point 629 was reviewed five times and every single round
+  reported `worktree-cleanup.mjs` and its test tail as unseen. Nobody acted on it for four
+  rounds, and the first read of that file found a defect. An absent finding over material
+  that was never delivered reads exactly like a clean verdict.
+  THE MECHANISM EXISTS AND ONLY NEEDS WIDENING: `review-sol.mjs` already REFUSES to print a
+  record command when the reviewed range is narrower than the sha being recorded — the same
+  place decides here.
+  FINAL STATE: the tool knows what it actually sent. It reports the coverage next to the
+  verdict — how many files went in, which were dropped at the cap — and a verdict over
+  truncated material is marked PARTIAL, both on screen and in the recorded ledger entry, so
+  `.claude/mechanism-reviews.jsonl` can never carry an unqualified "merge" for a change the
+  reviewer only half saw. A PARTIAL review does not satisfy the criticality gate on its own;
+  the uncovered paths are named, and covering them — a second run scoped to the remainder,
+  or a recorded human read — is what completes it. Since the cap bites hardest on the
+  longest branches, the tool also SUGGESTS the narrower range when it truncates, which is
+  what actually worked on 629.
+  VERIFIABLE: Vitest over the pure part — a reviewer output naming truncation yields a
+  PARTIAL verdict and a ledger entry carrying that flag; a full-material review does not;
+  and the criticality gate refuses a PARTIAL as the sole clearance for a HIGH point.
+  Criticality: medium — it does not break the product, but it decides how much a review is
+  worth, and every HIGH point is signed off on one. Bundle: Modell & Wächter.
