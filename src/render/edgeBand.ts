@@ -71,7 +71,8 @@ export interface SweptLook {
  *
  * The tones are what `strength: 1` MEANS, and work-order 581 moved them with the
  * design rather than raising a ceiling that was already at its top: the swept
- * ground now reads about two fifths darker than the open land in a village. It
+ * ground now reads about half as bright again as the open land in a village —
+ * calibrated by LOOKING at the Bambara village the complaint came from. It
  * can be stated that plainly because the mottling no longer fights it — the
  * swept side is levelled to the open ground's own MEAN (`SWEPT_PATCH_MEAN`)
  * instead of to its bright, unblotched colour, so `tone` is the whole value
@@ -81,12 +82,12 @@ export const SWEPT_GROUND_BY_KIND: Record<PlaceKind, SweptLook> = {
   // A village floor is swept daily and beaten hard by feet and goats: the
   // strongest read of the three, and the case the user reported (a Bambara
   // village on pale sand, where hue buys nothing and only value carries).
-  village: { tone: 0.4, relief: 0.72, mottle: 0.85, desat: 0.35 },
+  village: { tone: 0.48, relief: 0.72, mottle: 0.85, desat: 0.45 },
   // A port's outskirts are busier but sandier — the same story, stated softer.
-  port: { tone: 0.34, relief: 0.6, mottle: 0.75, desat: 0.3 },
+  port: { tone: 0.4, relief: 0.6, mottle: 0.75, desat: 0.38 },
   // The monument site is open desert sand with visitors' tracks over it; too
   // strong a step would read as a drawn ring on an otherwise even plate.
-  monument: { tone: 0.26, relief: 0.45, mottle: 0.6, desat: 0.22 },
+  monument: { tone: 0.32, relief: 0.45, mottle: 0.6, desat: 0.3 },
 }
 
 /**

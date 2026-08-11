@@ -1104,21 +1104,30 @@ duration, the conversing pair takes turns and a figure between gestures stands
 exactly at rest (`scripts/verify/polish.mjs`, screenshots
 479-gesture-beckon / -point / -refuse / -indicate).
 
-THE SETTLEMENT EDGE ON THE GROUND (§2.6, points 352/488): where the inhabited
+THE SETTLEMENT EDGE ON THE GROUND (§2.6, points 352/488/581): where the inhabited
 ground ends, the swept, trodden earth gives way to open land across a soft band —
-three terms of the ground material that is already drawn (a multiplicative
-darkening of the compacted inside, its blotchy patch mottling faded out, its
+four terms of the ground material that is already drawn (a multiplicative
+darkening of the compacted inside, its blotchy patch mottling levelled out to the
+open ground's own MEAN, the warm dust beaten out of it toward its own grey, its
 micro-relief worn flatter), never a ring or a glow, and NO quality key, because a
-term in a shaded material has no cost to switch off.
+term in a shaded material has no cost to switch off. Point 581 is the legibility
+of that band: the user could not make the boundary out with the master strength
+already at its ceiling, so the per-kind look itself was rebuilt — the fall
+concentrated into the band's middle metre instead of smeared over all three, the
+levelling that had been giving the darkening back, and the dust cue for a
+sand-on-sand village. `strength: 1` still means the full per-kind look.
 Verifiable: the band holds no radius of its own — `src/scenes/place/boundary.ts`
 is the one boundary, the leave check asks it, and its per-angle sampling fills the
 band's lookup, so a boundary that stops being a circle needs no second edit. The
 pure tests BISECT the leave check and compare it with the radius the band draws
 at, for every place in the roster at 32 bearings, follow a moved boundary,
 reproduce a deliberately non-circular one, cover `PLACE_KINDS` totality, cap the
-wander below both the honesty limit and the band's own half-width (so the true
-line always lies inside the visible give-way), and prove the tone step is a RATIO
-that survives both ends of the year against the real season curve
+wander below both the honesty limit and the band's own VISIBLE FALL (so the true
+line always lies inside the part of the give-way the player sees change), pin the
+fall as concentrated at the boundary, and prove the tone step is a RATIO that
+survives both ends of the year against the real season curve — plus, since 581,
+the value the band actually reads at against the ground it sits on, over every
+place kind and every settlement palette in the game, above a stated minimum
 (`src/render/edgeBand.test.ts`); a source-level test refuses a second hand-rolled
 distance-against-radius test in the scene (`src/scenes/place/boundary.test.ts`).
 Live, the picture is measured by ATTRIBUTION rather than correlation — the
