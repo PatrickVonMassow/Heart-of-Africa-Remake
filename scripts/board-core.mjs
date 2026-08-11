@@ -714,7 +714,27 @@ export function closingWorkCards(html) {
  * exactly what the marker was introduced to protect.
  */
 export function stripNoCurrentWork(html) {
-  return String(html ?? '').replace(noWorkCardPattern(), (card) => (isTrulyStateCard(card, 'idle') ? '' : card))
+  return withinNowSection(html, (scope) =>
+    scope.replace(noWorkCardPattern(), (card) => (isTrulyStateCard(card, 'idle') ? '' : card)),
+  )
+}
+
+/**
+ * Apply an edit to the current-work SECTION alone — never to the whole document
+ * (four-eyes review, 12.08.2026). A state card that has drifted out of the
+ * section is a `now-card-outside` violation the gate reports; deleting it from
+ * the archive or the queue on the next state write would take that evidence away
+ * silently, and the one path allowed to remove a card is the one that says so.
+ * A fragment without the section is judged as it stands, like the claims are.
+ */
+function withinNowSection(html, edit) {
+  const text = String(html ?? '')
+  try {
+    const { from, end } = sectionBounds(text, 'now')
+    return text.slice(0, from) + edit(text.slice(from, end)) + text.slice(end)
+  } catch {
+    return edit(text)
+  }
 }
 
 /**
@@ -728,7 +748,9 @@ export function stripNoCurrentWork(html) {
  * number, so `queue <N>`, `done <N>` and `title <N>` all reach it.
  */
 export function stripClosingWork(html) {
-  return String(html ?? '').replace(closingCardPattern(), (card) => (isTrulyStateCard(card, 'closing') ? '' : card))
+  return withinNowSection(html, (scope) =>
+    scope.replace(closingCardPattern(), (card) => (isTrulyStateCard(card, 'closing') ? '' : card)),
+  )
 }
 
 /**

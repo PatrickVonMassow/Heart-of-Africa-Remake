@@ -242,6 +242,20 @@ export function cardNamingViolations(html) {
       }
       return
     }
+    // THE PRE-655 CLOSING CARD, named as itself: it holds neither number nor
+    // subject, so no migration can complete it and the two generic complaints
+    // below would send the reader looking for a repair that does not apply. The
+    // one command that replaces it is named instead (four-eyes review 12.08.2026).
+    if (card.chip == null && (card.title === CLOSING_WORK_TITLE || card.kind === 'closing')) {
+      out.push({
+        code: 'legacy-closing-card',
+        msg:
+          `the closing card ${named} is the pre-655 form: it names neither its point nor its ` +
+          'subject, and nothing can complete it from the outside. Write it again for the point it ' +
+          'belongs to: node scripts/board.mjs closing <N> "<Grund>"',
+      })
+      return
+    }
     if (card.chip == null) {
       out.push({
         code: 'now-card-unnumbered',

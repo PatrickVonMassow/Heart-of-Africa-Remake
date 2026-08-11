@@ -273,9 +273,18 @@ describe('every current-work card names its point and its subject', () => {
     const nameless =
       '<details class="now">\n  <summary><span class="t">Abschlussarbeiten zum gerade beendeten Punkt</span>' +
       '</summary>\n  <div class="body"><p>Text</p></div>\n</details>'
+    // The pre-655 card is named as ITSELF: nothing can complete a card that
+    // holds neither number nor subject, so the one command that replaces it is
+    // named rather than the generic two (four-eyes 12.08.).
     const found = cardNamingViolations(withNow(nameless))
-    expect(found.map((v) => v.code)).toContain('now-card-unnumbered')
+    expect(found.map((v) => v.code)).toContain('legacy-closing-card')
     expect(found[0].msg).toContain('Abschlussarbeiten zum gerade beendeten Punkt')
+    expect(found[0].msg).toContain('board.mjs closing <N>')
+    // …while any OTHER card without a chip gets the general refusal.
+    const stray =
+      '<details class="now">\n  <summary><span class="t">Irgendwas ohne Nummer</span></summary>\n' +
+      '  <div class="body"><p>Text</p></div>\n</details>'
+    expect(cardNamingViolations(withNow(stray)).map((v) => v.code)).toContain('now-card-unnumbered')
   })
 
   it('REFUSES a title that is only a stage word, in either language', () => {
@@ -680,8 +689,30 @@ describe('every current-work card names its point and its subject', () => {
       'Abschlussarbeiten zum gerade beendeten Punkt</span></summary>\n' +
       '  <div class="body"><p>Text</p></div>\n</details>'
     const found = cardNamingViolations(withNow(legacy))
-    expect(found.map((v) => v.code)).toContain('now-card-unnumbered')
+    expect(found.map((v) => v.code)).toEqual(['legacy-closing-card'])
     expect(found.map((v) => v.msg).join(' ')).toContain('board.mjs closing <N>')
+    // And the named command REPLACES it — the marker is what makes that possible.
+    const rewritten = toClosingWork(withNow(legacy), 651, {
+      subject: 'Ein Betreff',
+      reason: 'Vier-Augen fehlt.',
+      stamp: '23:40',
+    })
+    expect(codes(rewritten)).toEqual([])
+  })
+
+  // A state card that has drifted OUT of the section is evidence the gate
+  // reports; a state write must not quietly delete it from wherever it landed
+  // (four-eyes 12.08.).
+  it('deletes a state card only inside the current-work section', () => {
+    const drifted = withNow('').replace(
+      `<details class="sect"><summary><h2>${REQUIRED_SECTIONS[3]}</h2></summary>\n`,
+      `<details class="sect"><summary><h2>${REQUIRED_SECTIONS[3]}</h2></summary>\n` +
+        '<details class="now" data-state="idle">\n  <summary><span class="t">Gerade keine laufende Arbeit</span>' +
+        '</summary>\n  <div class="body"><p>Verirrt; Punkt 656 folgt.</p></div>\n</details>\n',
+    )
+    const written = toNoCurrentWork(drifted, 'Neu; weiter mit Punkt 657.', { stamp: '23:55' })
+    expect(written).toContain('Verirrt; Punkt 656 folgt.')
+    expect(codes(written)).toContain('now-card-outside')
   })
 
   it('exempts the handover card from the chip — it belongs to NO point', () => {
