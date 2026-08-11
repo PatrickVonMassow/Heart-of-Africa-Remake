@@ -88,13 +88,14 @@ export const DEFAULT_TOPUP = [
   // meant to cover. It buys reach nowhere and gives away reach everywhere. So exact
   // addresses, HERE rather than in the boot script, which runs once.
   //
-  // WHAT THIS DOES NOT DO, stated because the first wording overclaimed it: the
-  // re-application does not COVER rotation, it REPAIRS it. Between two ticks a
-  // rotated host is unreachable, so a review can still fail — it recovers by itself
-  // within one tick instead of standing until someone notices. And nothing is ever
-  // removed, so yesterday's addresses accumulate for the life of the container; that
-  // is a slow widening of the allowlist, and if it ever matters the answer is an
-  // expiry on the entries, not a wider mask.
+  // WHAT THIS DOES NOT DO, stated because two earlier wordings overclaimed it: the
+  // re-application does not COVER rotation, it REPAIRS it — and not "within one tick"
+  // either, but at the next tick that actually gets to run this and succeeds. A
+  // rotated host stays unreachable until then, so a review can still fail; what the
+  // mechanism buys is that it heals by itself instead of standing until someone
+  // notices. And nothing is ever removed, so yesterday's addresses accumulate for the
+  // life of the container; that is a slow widening of the allowlist, and if it ever
+  // matters the answer is an expiry on the entries, not a wider mask.
   { host: 'chatgpt.com', net24: false },
   { host: 'auth.openai.com', net24: false },
   { host: 'api.openai.com', net24: false },

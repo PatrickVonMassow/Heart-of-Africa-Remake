@@ -262,14 +262,24 @@ function readRunLogSegment(from) {
 // The previous child's pid is therefore written down and probed first: while it still
 // runs, this tick starts nothing and says so. A stale record is harmless (an unrelated
 // pid at most costs one skipped tick), and the top-up is idempotent anyway.
+// A LIVE PID IS NOT PROOF OF OUR CHILD, and a lost record is not proof of none
+// (third review, 11.08.2026). `kill(pid, 0)` says only that SOMEBODY owns that
+// number: after reuse an unrelated long-lived process would read as "busy" and
+// suppress the top-up for as long as IT lives — not for one tick, forever. So the
+// recorded pid is confirmed against what that process actually IS. And the record is
+// written under the same try as the spawn: if it fails, the child is killed rather
+// than left running unrecorded, because an untracked child is the very class this
+// bounds.
 try {
   const PIDFILE = C('firewall-topup.pid')
   const prev = Number(readFileSync(PIDFILE, 'utf8')) || 0
   let busy = false
   if (prev > 0) {
     try {
-      process.kill(prev, 0)
-      busy = true
+      // The identity check, not just liveness. Linux only; elsewhere the read throws
+      // and `busy` stays false — starting a redundant top-up is the safe direction,
+      // since it is idempotent and short.
+      busy = readFileSync(`/proc/${prev}/cmdline`, 'utf8').includes('firewall-allow')
     } catch {
       busy = false
     }
@@ -285,8 +295,13 @@ try {
       windowsHide: true,
     })
     child.on('error', (e) => log(`firewall top-up could not start (${(e && e.message) || e})`))
-    if (child.pid) writeFileSync(PIDFILE, String(child.pid))
-    child.unref()
+    try {
+      if (child.pid) writeFileSync(PIDFILE, String(child.pid))
+      child.unref()
+    } catch (e) {
+      try { if (child.pid) process.kill(child.pid) } catch { /* already gone */ }
+      log(`firewall top-up stopped — its pid could not be recorded (${(e && e.message) || e})`)
+    }
   }
 } catch (e) {
   log(`firewall top-up skipped (${(e && e.message) || e})`)
