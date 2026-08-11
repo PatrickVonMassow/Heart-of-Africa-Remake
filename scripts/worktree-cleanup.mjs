@@ -339,14 +339,22 @@ export function readLockReason(file) {
  * RELEASE ONLY OUR OWN LOCK — as narrow as git allows (fifth review, finding 3).
  *
  * THE COMPARE AND THE RELEASE ARE TWO ACTS, AND NOTHING AVAILABLE MAKES THEM ONE.
- * That is a capability statement, not a preference: `git worktree unlock` is
- * itself an unconditional unlink of this same file, so git can do no better; POSIX
- * has no compare-and-unlink, and the one syscall that would serve — `funlinkat(2)`,
- * "unlink the file this descriptor refers to" — exists on FreeBSD alone and is not
- * exposed by Node. A rename-away-then-inspect scheme was considered and REJECTED:
- * it makes taking a stranger's lock atomic but has to put it back, and the restore
- * would clobber a lock taken in the meantime — trading a narrow window for a
- * silent one.
+ * That is a capability statement, and it was CHECKED rather than assumed:
+ *   · `git worktree unlock <worktree>` takes a worktree and nothing else — its
+ *     entire usage line, verified on git 2.39.5 — so there is no expected-reason
+ *     to hand it, and what it does to that lock file is the same unconditional
+ *     unlink. git cannot do better than this code, which is why this code stopped
+ *     calling it.
+ *   · Node exposes `unlink`/`unlinkSync` and nothing else (checked: no `funlink`).
+ *     The syscall that would serve — `funlinkat(2)`, "unlink the file this
+ *     descriptor refers to" — is FreeBSD-only and unexposed, so holding the file
+ *     open across the compare buys no atomicity.
+ *   · A rename-away-then-inspect scheme was considered and REJECTED on its worst
+ *     case, not on taste: taking the file is atomic, but a reason that turns out
+ *     NOT to be ours has to be put back, and that restore would clobber a lock
+ *     installed in the meantime. Its worst outcome is therefore the same one —
+ *     a lock vanishing under its holder — reached by a path with a temp file that
+ *     can be orphaned. No gain, more surface.
  *
  * SO THE GAP IS NARROWED AND ITS WORST OUTCOME IS BOUNDED. Narrowed: the reason is
  * read from git's lock file and that file is unlinked immediately after — two

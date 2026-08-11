@@ -990,6 +990,48 @@ describe('--expect, on a THROWAWAY repository', () => {
     expect(run(['worktree', 'list', '--porcelain'])).not.toContain('locked')
   })
 
+  it('a refusal leaves a foreign lock BYTE-IDENTICAL, and asks git to unlock nothing', () => {
+    // The other half of "impossible to widen by accident": the release must not
+    // reach for `git worktree unlock` (which names no lock and would clear
+    // whatever is there), and the file it does not own must come out unchanged
+    // down to its bytes — not merely "still locked".
+    const expected = expectationNow()
+    const foreign = 'claude agent agent-later (pid 424242 start 7)'
+    const unlocks = []
+    let swapped = false
+    const r = cleanupWorktree(worktree, {
+      git: (args, cwd) => {
+        if (args[0] === 'worktree' && args[1] === 'unlock') unlocks.push(args.join(' '))
+        const out = run(args, cwd)
+        if (!swapped && args[0] === 'worktree' && args[1] === 'lock') {
+          swapped = true
+          run(['worktree', 'unlock', worktree])
+          run(['worktree', 'lock', '--reason', foreign, worktree])
+        }
+        return out
+      },
+      expected,
+    })
+    expect(r.ok).toBe(false)
+    // The only `worktree unlock` in the log is the one the SCENE ran, never ours.
+    expect(unlocks).toEqual([])
+    expect(readFileSync(cleanupLockFile(worktree), 'utf8')).toBe(`${foreign}\n`)
+    expect(existsSync(worktree)).toBe(true)
+  })
+
+  it('reads the reason BEFORE it unlinks, and unlinks nothing else', () => {
+    const ours = formatCleanupLock({ pid: 4711, startedAt: 1000 })
+    run(['worktree', 'lock', '--reason', ours, worktree])
+    const file = cleanupLockFile(worktree)
+    const admin = join(file, '..')
+    const before = readdirSync(admin)
+    expect(releaseCleanupLock(worktree, { file, ours })).toBe('')
+    // Exactly ONE entry left the admin directory: the lock file itself.
+    const after = readdirSync(admin)
+    expect(before.filter((n) => !after.includes(n))).toEqual(['locked'])
+    expect(existsSync(worktree)).toBe(true) // and nothing of the tree was touched
+  })
+
   it('the residual can only STRIP a lock, and a stripped lock REFUSES the deletion', () => {
     // The bound that makes the read-then-unlink window acceptable: its worst
     // outcome is another cleanup losing its lock, and that cleanup then refuses
