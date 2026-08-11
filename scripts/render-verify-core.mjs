@@ -187,7 +187,7 @@ export function chargeablePoints(text) {
  */
 export function chargeFor(red, options) {
   const { suite = '', backend = '', ledger = RED_CHARGES } = options ?? {}
-  const name = String(red?.name ?? '')
+  const name = text(red?.name)
   if (!name) return null
   for (const charge of Array.isArray(ledger) ? ledger : []) {
     try {
@@ -212,7 +212,7 @@ export function chargeReds(reds, options) {
   return (Array.isArray(reds) ? reds : []).map((red) => {
     const charge = chargeFor(red, { suite, backend, ledger })
     return {
-      name: String(red?.name ?? '').slice(0, 200),
+      name: text(red?.name).slice(0, 200),
       key: red?.key ?? '',
       kind: red?.kind === 'console' ? 'console' : 'check',
       point: charge ? charge.point : null,
@@ -246,25 +246,60 @@ function text(value) {
   }
 }
 
-/** Format the names for the env var. Total: never throws. */
-export function formatSuspectEnv(names) {
-  const list = (Array.isArray(names) ? names : [])
-    .map((n) => (text(n?.name) || text(n)).trim())
-    .filter(Boolean)
-    .slice(0, MAX_SUSPECT_NAMES)
-    .map((n) => n.slice(0, MAX_SUSPECT_NAME_LEN))
-  return (list.length ? list : [SUSPECT_UNNAMED]).join('\n')
+/**
+ * Format the first attempt's reds for the env var: one per line, each written
+ * `<kind>\t<name>`.
+ *
+ * The KIND travels with the name because the ledger charges by kind (a charge
+ * written for a console error must not be answered by a failing check of the
+ * same wording, nor the reverse) — a marker that carried names alone would hand
+ * every red back as a `check` and charge it as one. Total: never throws.
+ */
+export function formatSuspectEnv(reds) {
+  const list = []
+  for (const r of Array.isArray(reds) ? reds : []) {
+    const name = (text(r?.name) || text(r)).trim().slice(0, MAX_SUSPECT_NAME_LEN)
+    if (!name) continue
+    list.push(`${r?.kind === 'console' ? 'console' : 'check'}\t${name}`)
+    if (list.length >= MAX_SUSPECT_NAMES) break
+  }
+  return (list.length ? list : [`check\t${SUSPECT_UNNAMED}`]).join('\n')
 }
 
-/** Read it back. `[]` means "this run is not a retry" — an unset or blank value
- *  must never mark an ordinary run suspect (a stale export would else condemn
- *  every run in the shell). Total: never throws. */
+/** Read it back as reds — `[{ name, kind }]`. `[]` means "this run is not a
+ *  retry": an unset or blank value must never mark an ordinary run suspect (a
+ *  stale export would else condemn every run in the shell). A line without a
+ *  kind is a `check`, which is what an older marker wrote. Total. */
+export function parseSuspectReds(value) {
+  const out = []
+  for (const line of text(value).split('\n')) {
+    const [head, ...rest] = line.split('\t')
+    const kind = rest.length && (head === 'console' || head === 'check') ? head : 'check'
+    const name = (rest.length ? rest.join('\t') : head).trim()
+    if (!name) continue
+    out.push({ name, kind })
+    if (out.length >= MAX_SUSPECT_NAMES) break
+  }
+  return out
+}
+
+/** The same, as bare names — what a message prints. Total. */
 export function parseSuspectEnv(value) {
-  return text(value)
-    .split('\n')
-    .map((n) => n.trim())
-    .filter(Boolean)
-    .slice(0, MAX_SUSPECT_NAMES)
+  return parseSuspectReds(value).map((r) => r.name)
+}
+
+/** What the FIRST attempt of a suspect run failed on, as reds. The record holds
+ *  `{ name, kind }` entries; a record written by an older recorder holds bare
+ *  names, which read as checks. Total. */
+export function suspectRedsOf(run) {
+  const list = Array.isArray(run?.suspectOf) ? run.suspectOf : []
+  const out = []
+  for (const entry of list) {
+    const name = text(entry?.name) || text(entry)
+    if (!name.trim()) continue
+    out.push({ name: name.trim(), kind: entry?.kind === 'console' ? 'console' : 'check' })
+  }
+  return out.slice(0, MAX_SUSPECT_NAMES)
 }
 
 /**
@@ -318,7 +353,7 @@ export function runVerdict(run, options) {
     }
   }
   if (run.suspect === true && Number(run.exit) === 0) {
-    const names = parseSuspectEnv((Array.isArray(run.suspectOf) ? run.suspectOf : []).join('\n'))
+    const names = suspectRedsOf(run).map((r) => r.name)
     const which = names.length ? names.map((n) => `"${n}"`).join('; ') : SUSPECT_UNNAMED
     return {
       status: 'suspect',
@@ -354,7 +389,7 @@ export function runVerdict(run, options) {
   const charges = []
   const unaccounted = []
   for (const red of reds) {
-    const name = String(red?.name ?? '(unnamed red)')
+    const name = text(red?.name) || '(unnamed red)'
     const point = Number.isInteger(red?.point) ? red.point : null
     if (point === null) unaccounted.push({ name, point: null })
     else if (!open.has(point)) unaccounted.push({ name, point })
@@ -448,6 +483,16 @@ export function coveringRun(runs, backend, since, options) {
  * That is also what lets the throttle probe reproduce a red eight times over
  * without blocking anybody's turn.
  *
+ * KNOWN LIMIT, stated rather than hidden (four-eyes, 11.08.2026): the window is
+ * the last RENDER-file edit, so a red older than the current code is treated as
+ * fixed. Two consequences. A no-op render edit followed by a green run therefore
+ * clears a red without naming its cause — an evader can always do that, as they
+ * can always `--defer`; the rule is aimed at the honest "it passed three times
+ * since", not at somebody determined to get round it. And a fix confined OUTSIDE
+ * the render set does not move the window, so route (1) is not open to it: such
+ * a fix is recorded by naming it in `--defer "<the cause, and where it was
+ * fixed>"`, which is the same statement in a place that is kept.
+ *
  * THE CHARGE IS READ AS IT STANDS NOW, not as it stood when the run was recorded
  * (four-eyes finding, 11.08.2026). The recorder stamps the charge at record time
  * so no later ledger edit can BLESS a finished run, and that stays: a run still
@@ -484,13 +529,7 @@ export function unexplainedRuns(runs, since, options) {
     // never talked away by the ledger — runVerdict says so and this must not
     // undo it.
     if (r.crashed !== true) {
-      const reds =
-        verdict.status === 'suspect'
-          ? parseSuspectEnv((Array.isArray(r.suspectOf) ? r.suspectOf : []).join('\n')).map((name) => ({
-              name,
-              kind: 'check',
-            }))
-          : (Array.isArray(r.reds) ? r.reds : [])
+      const reds = verdict.status === 'suspect' ? suspectRedsOf(r) : Array.isArray(r.reds) ? r.reds : []
       if (reds.length > 0 && reds.every((red) => owned(red, suite, backend))) continue
     }
     out.push({ backend, suite, at, status: verdict.status, unaccounted: verdict.unaccounted })
@@ -618,12 +657,6 @@ export function evaluate(input) {
     return { decision: 'allow', clear: !!head && head !== clearedHead }
   }
 
-  // The loud escape valve: an explicit deferral covers the CURRENT head only —
-  // any further commit reopens the gate.
-  if (deferral && head && deferral.head === head) {
-    return { decision: 'allow', clear: true, deferred: true }
-  }
-
   const since = Number.isFinite(latestChangeAt) ? latestChangeAt : 0
   const opts = { openPoints, ledger }
   // Two backends only where the two backends can DIFFER; otherwise one passing
@@ -640,6 +673,23 @@ export function evaluate(input) {
   // charge it to the open point that owns it, file it as a point, or record the
   // loud deferral.
   const unexplained = unexplainedRuns(runs, since, opts)
+
+  // The loud escape valve: an explicit deferral covers the CURRENT head only —
+  // any further commit reopens the gate. It is judged AFTER the reds are read,
+  // so what it waves through is named in the result: a bypass whose cost is
+  // invisible is one nobody weighs (four-eyes finding, 11.08.2026). The wrapper
+  // prints and records that list beside the deferral's own reason.
+  if (deferral && head && deferral.head === head) {
+    const waved = unexplained.map((u) => ({
+      backend: u.backend,
+      suite: u.suite,
+      status: u.status,
+      name: u.unaccounted[0]?.name ?? '(unnamed)',
+    }))
+    return waved.length > 0
+      ? { decision: 'allow', clear: true, deferred: true, waved }
+      : { decision: 'allow', clear: true, deferred: true }
+  }
 
   const covering = new Map(BACKENDS.map((b) => [b, coveringRun(runs, b, since, opts)]))
   const missing = dual

@@ -284,7 +284,9 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
       const run = await armed('polish')
       const record = run.exit(0)
       expect(record.suspect).toBe(true)
-      expect(record.suspectOf).toEqual(['settlement walker (goat): the planted foot holds its ground spot'])
+      expect(record.suspectOf).toEqual([
+        { name: 'settlement walker (goat): the planted foot holds its ground spot', kind: 'check' },
+      ])
       const verdict = runVerdict(record, { openPoints })
       expect(verdict.status).toBe('suspect')
       expect(verdict.covers).toBe(false)

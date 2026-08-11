@@ -12,9 +12,11 @@
 // from a rare one from a race from an idle machine not at all.
 //
 // MEASURED 11.08.2026 against that very defect (the pre-fix `ctrl-actor-labels`
-// check reinstated in a scratch tree): the bare pin reproduced it 1 of 8, so the
-// squeeze is not decoration — contention has to be manufactured. Raise `--rate`
-// when a suspected race will not show.
+// check reinstated in a worktree, WebGL 2 lane): the bare pin reproduced it 1 of
+// 8, the default squeeze 2 of 8, and the FIXED check 0 of 2 — so the instrument
+// does catch the real thing, and the squeeze is not decoration. It is still well
+// short of the 8 of 8 a 20x renderer-side throttle produced, so a green at one
+// rate is no acquittal: raise `--rate` before concluding anything from it.
 //
 // WHAT IT IS NOT. It closes no red. A reproduction points at a mechanism, a
 // non-reproduction rules out one explanation at that rate; either way the red
@@ -99,32 +101,37 @@ function pinWorks(plan) {
 /** Busy processes pinned to the same core(s) — the squeeze. Plain node loops, so
  *  nothing beyond the repo's own runtime is needed; each is killed with the run
  *  that spawned it, and they are spawned detached from stdio so they cannot
- *  pollute the measured output. */
+ *  pollute the measured output. A spinner that did not FORK (no pid) is not
+ *  counted: the report must never name a squeeze it did not apply. */
 function startSpinners(plan) {
   const spun = []
   for (let i = 0; i < plan.spinners; i++) {
     try {
-      spun.push(
-        spawn(plan.argv[0], [...plan.argv.slice(1), process.execPath, '-e', 'for(;;);'], {
-          windowsHide: true,
-          stdio: 'ignore',
-        }),
-      )
+      const child = spawn(plan.argv[0], [...plan.argv.slice(1), process.execPath, '-e', 'for(;;);'], {
+        windowsHide: true,
+        stdio: 'ignore',
+      })
+      if (child?.pid) spun.push(child)
     } catch {
-      /* one spinner short is a weaker throttle, not a failed measurement */
+      /* counted below as one spinner short, and reported as such */
     }
   }
   return spun
 }
 
+/** Kill them, and say how many were STILL RUNNING when the run ended — a spinner
+ *  that died early squeezed nothing for the rest of it. */
 function stopSpinners(spun) {
+  let alive = 0
   for (const child of spun) {
     try {
+      if (child.exitCode === null && child.signalCode === null) alive++
       child.kill('SIGKILL')
     } catch {
       /* already gone */
     }
   }
+  return alive
 }
 
 /** Where a run's whole output is kept, so a KILLED or BROKEN run can be read
@@ -188,6 +195,9 @@ function main(argv = process.argv.slice(2)) {
   if (logDir) console.log(`# each run's output: ${logDir}`)
 
   const results = []
+  // The WEAKEST squeeze any run really carried. A plan is a request; what the
+  // report may claim is what ran.
+  let leastSpinners = plan.spinners
   for (let i = 0; i < opts.runs; i++) {
     const spun = startSpinners(plan)
     let res
@@ -217,7 +227,7 @@ function main(argv = process.argv.slice(2)) {
         },
       })
     } finally {
-      stopSpinners(spun)
+      leastSpinners = Math.min(leastSpinners, stopSpinners(spun))
     }
     const out = (res.stdout ?? '') + (res.stderr ?? '')
     const timedOut = res.error?.code === 'ETIMEDOUT'
@@ -244,11 +254,21 @@ function main(argv = process.argv.slice(2)) {
     )
   }
 
+  // Report the squeeze that HELD, not the one that was asked for.
+  const applied =
+    plan.spinners > 0 && leastSpinners < plan.spinners
+      ? {
+          ...plan,
+          how:
+            `${plan.how} — but only ${leastSpinners} of ${plan.spinners} busy process(es) ran for a whole run, ` +
+            'so the squeeze below is weaker than the rate names',
+        }
+      : plan
   for (const line of formatProbeReport({
     suite: opts.suite,
     section: opts.section,
     backend: opts.backend,
-    plan,
+    plan: applied,
     results,
     summary: summarise(results),
   })) {

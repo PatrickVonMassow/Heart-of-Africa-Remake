@@ -26,6 +26,8 @@ import {
   runVerdict,
   formatSuspectEnv,
   parseSuspectEnv,
+  parseSuspectReds,
+  suspectRedsOf,
   unexplainedRuns,
   SUSPECT_UNNAMED,
 } from './render-verify-core.mjs'
@@ -838,13 +840,24 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(result.decision).toBe('allow')
   })
 
-  it('lets the loud DEFERRAL through — the explanation nobody can miss', () => {
+  it('lets the loud DEFERRAL through — and NAMES the reds it waved, so the bypass has a price', () => {
     const result = evaluate(
       renderChange({
-        runs: [unfiled('webgpu', 1500)],
-        deferral: { head: 'def5678', reason: 'the red was the check helper, fixed off the render set', at: 1600 },
+        runs: [unfiled('webgpu', 1500), suspectRun('webgl', 1600)],
+        deferral: { head: 'def5678', reason: 'the red was the check helper, fixed off the render set', at: 1700 },
         openPoints,
       }),
+    )
+    expect(result).toMatchObject({ decision: 'allow', clear: true, deferred: true })
+    expect(result.waved.map((w) => [w.backend, w.status])).toEqual([
+      ['webgpu', 'red'],
+      ['webgl', 'suspect'],
+    ])
+  })
+
+  it('a deferral with nothing to wave says nothing — the list is evidence, not decoration', () => {
+    const result = evaluate(
+      renderChange({ runs: [], deferral: { head: 'def5678', reason: 'headless WebGPU washes the frame out', at: 1600 } }),
     )
     expect(result).toEqual({ decision: 'allow', clear: true, deferred: true })
   })
@@ -908,6 +921,40 @@ describe('the retry marker travels in the environment (point 640)', () => {
   it('formats the first attempt\'s failing checks, and reads them back', () => {
     const value = formatSuspectEnv([{ name: 'the goat stance' }, 'the eaves column'])
     expect(parseSuspectEnv(value)).toEqual(['the goat stance', 'the eaves column'])
+  })
+
+  it('carries each red\'s KIND, so a console charge answers a console red and not a check', () => {
+    const value = formatSuspectEnv([
+      { name: 'console error: renderTargets grew back', kind: 'console' },
+      { name: 'the goat stance', kind: 'check' },
+    ])
+    expect(parseSuspectReds(value)).toEqual([
+      { name: 'console error: renderTargets grew back', kind: 'console' },
+      { name: 'the goat stance', kind: 'check' },
+    ])
+  })
+
+  it('reads a record written before the kind travelled — bare names are checks', () => {
+    expect(suspectRedsOf({ suspectOf: ['the goat stance'] })).toEqual([{ name: 'the goat stance', kind: 'check' }])
+    expect(suspectRedsOf({ suspectOf: [{ name: 'a leak', kind: 'console' }] })).toEqual([
+      { name: 'a leak', kind: 'console' },
+    ])
+    expect(suspectRedsOf(null)).toEqual([])
+  })
+
+  it('does not release a CONSOLE red on a charge written for a check of the same wording', () => {
+    const openPoints = [506]
+    const suspectConsole = {
+      ...run('webgpu', 1500),
+      suite: 'polish',
+      suspect: true,
+      suspectOf: [{ name: 'console error: the label layer threw', kind: 'console' }],
+    }
+    const runs = [suspectConsole, run('webgpu', 2000), run('webgl', 2100)]
+    const checkOnly = [{ point: 506, kind: 'check', match: /the label layer threw/, why: 'a charge for a failing check' }]
+    const consoleOnly = [{ point: 506, kind: 'console', match: /the label layer threw/, why: 'the charge that fits' }]
+    expect(evaluate(renderChange({ runs, openPoints, ledger: checkOnly })).decision).toBe('block')
+    expect(evaluate(renderChange({ runs, openPoints, ledger: consoleOnly })).decision).toBe('allow')
   })
 
   it('never formats to an empty value — a nameless failure still marks the retry', () => {

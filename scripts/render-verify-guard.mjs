@@ -435,6 +435,19 @@ if (isMainModule(import.meta.url)) {
         // Consume the deferral but keep it visible (status shows lastDeferral).
         extra.lastDeferral = state.deferral
         extra.deferral = undefined
+        // WHAT THE DEFERRAL WAVED THROUGH (point 640): a deferral is the one way
+        // past an unexplained red, so the reds it carried are written into the
+        // record and said out loud. A bypass whose cost is invisible is one
+        // nobody weighs.
+        const waved = Array.isArray(result.waved) ? result.waved : []
+        if (waved.length > 0) {
+          extra.lastDeferral = { ...state.deferral, waved }
+          console.error(
+            `⚠ RENDER-VERIFY DEFERRAL WAVED ${waved.length} UNEXPLAINED RED(S): ` +
+              waved.map((w) => `${w.backend}/${w.suite} (${w.status}) "${w.name}"`).join('; ') +
+              '. The deferral REASON is now the only record of why — make it name the cause.',
+          )
+        }
       }
       advanceBaseline(state, branch, head, extra)
     }

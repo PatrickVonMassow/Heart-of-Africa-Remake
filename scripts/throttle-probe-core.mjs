@@ -23,10 +23,11 @@ export const DEFAULT_CPUS = 1
  *
  * Measured 11.08.2026 on the point-600 defect (the pre-fix `ctrl-actor-labels`
  * check of `polish`, which reads the label state and the DOM in two round trips):
- * the bare pin, rate 1, reproduced it 1 of 8 — real, but far short of the 8 of 8
- * a 20× CPU throttle produced. Contention has to be manufactured, not merely
- * allowed. The default trades reproduction against wall clock; raise `--rate`
- * when a suspected race will not show.
+ * the bare pin, rate 1, reproduced it 1 of 8; this default, rate 4, 2 of 8. Both
+ * are far short of the 8 of 8 a 20× renderer-side throttle produced, so
+ * contention has to be manufactured and a green at a low rate acquits nothing.
+ * The default trades reproduction against wall clock; raise `--rate` when a
+ * suspected race will not show.
  */
 export const DEFAULT_RATE = 4
 /** A run that has not finished by then is killed and counted as NO VERDICT.

@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url'
 import { recordRun } from './render-verify-state.mjs'
 import { failedChecks } from './verify/baseline-classify-core.mjs'
 import { SECTION_ENV, sectionGateWasBuilt } from './verify/sections.mjs'
-import { RETRY_ENV, chargeReds, parseSuspectEnv } from './render-verify-core.mjs'
+import { RETRY_ENV, chargeReds, parseSuspectReds } from './render-verify-core.mjs'
 
 // Resolved from this module's own location where that is possible, with a
 // working-directory fallback: under the test runner `import.meta.url` is not
@@ -155,7 +155,7 @@ export function armRunRecorder(backend) {
       // What the FIRST attempt of this suite failed on, when this run is a retry
       // (point 640). Empty means "not a retry" — the runner blanks the variable
       // for a first attempt, so a stale export cannot condemn an ordinary run.
-      suspectOf: parseSuspectEnv(process.env[RETRY_ENV]),
+      suspectOf: parseSuspectReds(process.env[RETRY_ENV]),
       startedAt: Date.now(),
       asserted: false,
       // The WebGPU feature level the run really came up at, filled in by
