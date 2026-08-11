@@ -28,8 +28,8 @@ import { mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, it, expect } from 'vitest'
-import { cleanupEvidence, listWorktrees, reproveOne, runCommand, selectCleanup } from './land-point.mjs'
-import { DISPOSITION } from './land-cleanup-core.mjs'
+import { cleanupEvidence, deleteLandedBranch, listWorktrees, reproveOne, runCommand, selectCleanup } from './land-point.mjs'
+import { DISPOSITION, judgeCleanupTarget } from './land-cleanup-core.mjs'
 
 /** A child that takes a measurable, deterministic amount of time. */
 const slowChild = (ms) => ({ cmd: process.execPath, args: ['-e', `setTimeout(() => {}, ${ms})`], id: 'slow' })
@@ -136,7 +136,11 @@ describe('the cleanup evidence, against a real checkout', () => {
     const sel = select(root)
     expect(sel.remove).toEqual([own])
     expect(sel.remove).not.toContain(other)
-    expect(sel.expected[own]).toEqual({ branch: 'feat/608-x' })
+    // The expectation carries a real identity, read off the real tree.
+    expect(sel.expected[own]).toMatchObject({ branch: 'feat/608-x' })
+    expect(sel.expected[own].head).toMatch(/^[0-9a-f]{40}$/)
+    expect(sel.expected[own].gitLink).toContain('.git/worktrees/agent-own')
+    expect(sel.expected[own].gitMtime).toBeGreaterThan(0)
   })
 
   it('sees uncommitted work in the landed tree itself and keeps it', () => {
@@ -230,6 +234,79 @@ describe('the probe must not become its own evidence', () => {
     writeFileSync(join(own, 'a.txt'), 'a\n')
     const sel = select(root)
     expect(sel.remove).not.toContain(own)
+  })
+})
+
+describe('the branch deletion is a SEQUENCE, not two independent commands', () => {
+  /** A git that records every call and fails the ones it is told to. */
+  const recorder = (failing = []) => {
+    const calls = []
+    const run = (args) => {
+      calls.push(args.join(' '))
+      if (failing.some((f) => args.join(' ').includes(f))) throw new Error('git said no')
+      return ''
+    }
+    return { calls, run }
+  }
+
+  it('NEVER deletes the remote when the local deletion failed', () => {
+    // Second review, finding 3. The local `branch -d` fails precisely BECAUSE a
+    // worktree still has the branch checked out — and the remote deletion used to
+    // run anyway, taking the branch out from under the tree that was kept.
+    const { calls, run } = recorder(['branch -d'])
+    const r = deleteLandedBranch({ branch: 'feat/608-x', git: run })
+    expect(r).toMatchObject({ local: 'failed', remote: 'skipped' })
+    expect(calls.some((c) => c.includes('push origin --delete'))).toBe(false)
+    expect(r.problems.join('\n')).toMatch(/remote branch: NOT deleted/)
+  })
+
+  it('deletes the remote only after the local one succeeded, in that order', () => {
+    const { calls, run } = recorder()
+    expect(deleteLandedBranch({ branch: 'feat/608-x', git: run })).toMatchObject({ local: 'ok', remote: 'ok' })
+    expect(calls).toEqual(['branch -d feat/608-x', 'push origin --delete feat/608-x'])
+  })
+
+  it('reports a remote failure without pretending the local one failed too', () => {
+    const { run } = recorder(['push origin'])
+    const r = deleteLandedBranch({ branch: 'feat/608-x', git: run })
+    expect(r).toMatchObject({ local: 'ok', remote: 'failed' })
+    expect(r.problems).toHaveLength(1)
+  })
+
+  it('touches neither when the branch is blocked', () => {
+    const { calls, run } = recorder()
+    const r = deleteLandedBranch({ branch: 'feat/608-x', blocked: 'a worktree was kept', git: run })
+    expect(r).toMatchObject({ local: 'skipped', remote: 'skipped', problems: [] })
+    expect(calls).toEqual([])
+  })
+})
+
+describe('existence is a tri-state, because absence licenses a removal', () => {
+  it('a path that is genuinely absent reads as absent', () => {
+    const { root } = scene()
+    const gone = join(root, '.claude', 'worktrees', 'agent-never-existed')
+    const ev = cleanupEvidence([{ path: gone, branch: 'feat/608-x', head: '' }], {
+      branch: 'feat/608-x',
+      mainRoot: root,
+      mergeTarget: 'main',
+      cwd: root,
+    })
+    expect(ev[gone].exists).toBe(false)
+  })
+
+  it('a stat that FAILS for any other reason is not absence — and the tree is kept', () => {
+    // Second review, finding 4: `existsSync` cannot tell "not there" from "could
+    // not look", and `exists: false` is the one verdict that skips every other
+    // proof. A path UNDER a regular file makes the stat fail with ENOTDIR, which
+    // IS absence; a permission failure is not, and that is what this pins through
+    // the pure rule: only a proven `false` reaches `remove`.
+    expect(judgeCleanupTarget({
+      worktree: { path: `${'/repo'}/.claude/worktrees/agent-a`, branch: 'feat/1-x' },
+      branch: 'feat/1-x',
+      mainRoot: '/repo',
+      evidence: { exists: null },
+      since: Date.now(),
+    })).toMatchObject({ disposition: 'unproven' })
   })
 })
 

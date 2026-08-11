@@ -128,6 +128,42 @@ function linkedGitdirOf(path) {
 }
 
 /**
+ * THE IDENTITY OF THE `.git` FILE — what a same-path replacement cannot reuse.
+ *
+ * Measured 11.08.2026: after `git worktree remove` + `git worktree add` at the
+ * SAME path, git's admin gitdir is byte-identical (it reuses the record name once
+ * the old one is pruned) while the `.git` file's inode is not. A platform without
+ * inode numbers reports 0 for both, which the comparison reads as "no such proof"
+ * rather than as a match.
+ */
+function gitFileIdentity(path) {
+  try {
+    const st = statSync(join(path, '.git'))
+    return { ino: Number(st.ino ?? 0), dev: Number(st.dev ?? 0), gitMtime: Number(st.mtimeMs ?? 0) }
+  } catch {
+    return { ino: 0, dev: 0, gitMtime: 0 }
+  }
+}
+
+/**
+ * DOES THIS PATH EXIST? true / false / null — tri-state (second review, finding 4).
+ *
+ * `existsSync` answers false for a permission or stat error exactly as it does for
+ * genuine absence, and `exists: false` is the ONE verdict that skips every other
+ * proof and licenses a removal. So absence must be PROVEN — ENOENT/ENOTDIR — and
+ * anything else is "could not be established", which keeps the tree like every
+ * other unreadable probe here.
+ */
+function pathExists(path) {
+  try {
+    statSync(path)
+    return true
+  } catch (e) {
+    return e && (e.code === 'ENOENT' || e.code === 'ENOTDIR') ? false : null
+  }
+}
+
+/**
  * IS THIS TREE'S HEAD ALREADY INSIDE WHAT THE LANDING TAKES? true / false / null.
  *
  * The landing did not create the worktree, so it cannot prove authorship; what it
@@ -189,9 +225,22 @@ export function cleanupEvidence(worktrees, { branch, mainRoot = REPO_ROOT, merge
     // evidence would never be read — probing it would cost a `git status` on every
     // unrelated checkout for nothing.
     if (!path || (!isAgentWorktree(path, mainRoot) && String(w?.branch ?? '') !== String(branch ?? ''))) continue
-    const exists = existsSync(path)
-    if (!exists) {
-      evidence[path] = { exists: false, linkedTo: null, headMerged: null, dirty: null, activeAt: null, holderAlive: null }
+    const exists = pathExists(path)
+    if (exists !== true) {
+      // `null` here means the stat FAILED, not that the directory is absent, and
+      // the pure rule keeps the tree on it. Only a proven ENOENT licenses the
+      // "already gone" removal.
+      evidence[path] = {
+        exists,
+        linkedTo: null,
+        headMerged: null,
+        dirty: null,
+        activeAt: null,
+        holderAlive: null,
+        ino: 0,
+        dev: 0,
+        gitMtime: 0,
+      }
       continue
     }
     const stamp = worktreeActiveAt(path)
@@ -212,6 +261,7 @@ export function cleanupEvidence(worktrees, { branch, mainRoot = REPO_ROOT, merge
       dirty,
       activeAt,
       holderAlive: lockHolderAlive(w.locked),
+      ...gitFileIdentity(path),
     }
   }
   return evidence
@@ -275,6 +325,43 @@ export function reproveOne({ path, expected, since, mergeTarget = null, cwd = RE
     cwd,
   })
   return reproveRemoval({ path, expected, worktree, evidence: evidence[String(worktree?.path ?? '')] ?? null, mainRoot, since })
+}
+
+/**
+ * DELETE THE LANDED BRANCH — local FIRST, remote ONLY IF THE LOCAL ONE SUCCEEDED.
+ *
+ * THE SEQUENCE IS THE POINT (second review, finding 3). The two deletions used to
+ * run independently: a `git branch -d` that failed — and the reason it fails is
+ * precisely that a worktree still has that branch checked out — only appended to a
+ * problem list, and the `git push origin --delete` right after it went ahead and
+ * removed the remote anyway. The tree that was deliberately kept was then standing
+ * on a branch whose remote had been deleted underneath it, which is the same class
+ * of loss this whole point is about, one level up.
+ *
+ * `blocked` is the reason not to delete at all (a kept worktree, a refused or
+ * failed removal); it skips both. Exported and taking an injected `runGit` so the
+ * ORDER can be pinned by a test rather than by reading.
+ */
+export function deleteLandedBranch({ branch, blocked = '', git: runGit = git } = {}) {
+  if (blocked) return { local: 'skipped', remote: 'skipped', problems: [] }
+  try {
+    runGit(['branch', '-d', branch], { stdio: ['ignore', 'pipe', 'pipe'] })
+  } catch (e) {
+    return {
+      local: 'failed',
+      remote: 'skipped',
+      problems: [
+        `local branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0],
+        `remote branch: NOT deleted — the local deletion failed, and the usual cause is a worktree still standing on ${branch}`,
+      ],
+    }
+  }
+  try {
+    runGit(['push', 'origin', '--delete', branch], { stdio: ['ignore', 'pipe', 'pipe'] })
+  } catch (e) {
+    return { local: 'ok', remote: 'failed', problems: [`remote branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0]] }
+  }
+  return { local: 'ok', remote: 'ok', problems: [] }
 }
 
 /**
@@ -629,9 +716,9 @@ async function main(argv) {
         continue
       }
       try {
-        // The expectation travels INTO the deleting process, which proves it a
-        // third time with the tree already in its hands.
-        sh('node', [join('scripts', 'worktree-cleanup.mjs'), path, '--expect-branch', branch], {
+        // The full identity travels INTO the deleting process, which takes git's
+        // worktree LOCK and proves it a third time with the tree in its hands.
+        sh('node', [join('scripts', 'worktree-cleanup.mjs'), path, '--expect', JSON.stringify(cleanup.expected[path])], {
           stdio: ['ignore', 'pipe', 'pipe'],
         })
       } catch (e) {
@@ -651,18 +738,7 @@ async function main(argv) {
         : problems.length
           ? 'a worktree could not be removed and may still be standing on it'
           : ''
-    if (!branchBlocked) {
-      try {
-        git(['branch', '-d', branch], { stdio: ['ignore', 'pipe', 'pipe'] })
-      } catch (e) {
-        problems.push(`local branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0])
-      }
-      try {
-        git(['push', 'origin', '--delete', branch], { stdio: ['ignore', 'pipe', 'pipe'] })
-      } catch (e) {
-        problems.push(`remote branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0])
-      }
-    }
+    problems.push(...deleteLandedBranch({ branch, blocked: branchBlocked }).problems)
     if (refused.length) {
       console.log('land-point: the cleanup refused these at the moment of deletion — they changed under it:')
       for (const line of refused) console.log(line)

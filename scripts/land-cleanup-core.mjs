@@ -254,8 +254,32 @@ export function selectCleanupTargets({ worktrees = [], branch, mainRoot, evidenc
   const remove = verdicts.filter((v) => v.disposition === DISPOSITION.remove).map((v) => v.path)
   const kept = verdicts.filter((v) => v.disposition !== DISPOSITION.remove)
   const reported = kept.filter((v) => REPORTED.includes(v.disposition))
+
+  // WHAT THE DELETION STEP MUST RE-PROVE. A branch name is not an identity
+  // (second review, finding 1): branch + unlocked + clean also describes a
+  // DIFFERENT checkout that appeared at the same path. So the record carries the
+  // commit it stood on (which carries the containment proof forward — `headMerged`
+  // was established for THAT sha), git's admin record, the `.git` file's own
+  // inode, and the instant the freshness was proven against.
   const expected = Object.fromEntries(
-    verdicts.filter((v) => v.disposition === DISPOSITION.remove).map((v) => [v.path, { branch: str(branch) }]),
+    list
+      .map((w, i) => [w, verdicts[i]])
+      .filter(([, v]) => v.disposition === DISPOSITION.remove)
+      .map(([w, v]) => {
+        const ev = by[str(w?.path)] ?? {}
+        return [
+          v.path,
+          {
+            branch: str(branch),
+            head: str(w?.head),
+            gitLink: str(ev.linkedTo),
+            ino: Number(ev.ino ?? 0),
+            dev: Number(ev.dev ?? 0),
+            gitMtime: Number(ev.gitMtime ?? 0),
+            notWrittenAfter: num(since) ?? 0,
+          },
+        ]
+      }),
   )
 
   // ANY tree the landing could not clear keeps the branch — not only one that

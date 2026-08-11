@@ -317,15 +317,27 @@ describe('the re-proof at the moment of deletion (review finding 2)', () => {
     expect(reproveRemoval({}).ok).toBe(false)
   })
 
-  it('the selection HANDS the expectation over for every path it names', () => {
+  it('the selection HANDS a real IDENTITY over, not just a branch name', () => {
+    // Second review, finding 1: branch + unlocked + clean also describes a
+    // DIFFERENT checkout standing at the same path.
+    const tree = { ...own, head: 'abc123' }
+    const ev = { ...deadFor('own'), ino: 4711, dev: 66, gitMtime: 900 }
     const sel = selectCleanupTargets({
-      worktrees: [own],
+      worktrees: [tree],
       branch: 'feat/608-x',
       mainRoot: ROOT,
       since: NOW,
-      evidence: { [own.path]: deadFor('own') },
+      evidence: { [tree.path]: ev },
     })
-    expect(sel.expected[own.path]).toEqual({ branch: 'feat/608-x' })
+    expect(sel.expected[tree.path]).toEqual({
+      branch: 'feat/608-x',
+      head: 'abc123',
+      gitLink: linkOf('own'),
+      ino: 4711,
+      dev: 66,
+      gitMtime: 900,
+      notWrittenAfter: NOW,
+    })
   })
 })
 
