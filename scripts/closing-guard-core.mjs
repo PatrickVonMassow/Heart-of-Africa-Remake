@@ -34,6 +34,20 @@ export const CLOSING_STEPS = [
   { id: 'stale-doc', title: 'Stale-doc audit — design.md / CLAUDE.md / READMEs match the code' },
   { id: 'stale-comment', title: 'Stale-comment audit — comments match the code they describe' },
   { id: 'md-audit', title: '.md cruft audit — section numbers preserved, no orphaned/contradictory prose' },
+  {
+    id: 'cleanup-blind-parallel',
+    title:
+      'The legacy cleanup ran as a BLIND-PARALLEL four-eyes stage (CLAUDE.md §6) — both models ' +
+      'worked from the same inputs to their own complete result, neither seeing the other’s before ' +
+      'it was done; the union is deduplicated BY MEANING, marks what only one side found and drops ' +
+      'nothing for being unusual',
+  },
+  {
+    id: 'regression-after-cleanup',
+    title:
+      'Second full LARGE regression on BOTH backends, AFTER the last cleanup commit — the evidence ' +
+      'names the commit it ran ON ("on <sha>") or a time after the cleanup, and it is a SECOND run',
+  },
   { id: 'impl-sections', title: 'Implementation sections current — peoples-1890 §8, climate-1890 §9' },
   { id: 'graphics-detail-doc', title: 'docs/graphics-detail-levels.md matches QUALITY_PRESETS' },
   { id: 'acceptance-criteria', title: '§7.1 acceptance criteria confirmed with evidence' },
@@ -357,35 +371,350 @@ export function tickClaim({ toolName, toolInput, tasksText } = {}) {
   }
 }
 
+// THE CLOSING IS A SEQUENCE, NOT A SET (user 11.08.2026, point 631).
+//
+// "Volle Regression, dann gründliches Vier-Augen-Cleanup von Altlasten im
+// kompletten Code und allen Dokumenten und dann nochmal eine volle Regression."
+// A checklist that only asks WHETHER each step happened is satisfied by a
+// cleanup performed AFTER the one green regression — and the tag then carries
+// changes nothing ever tested. So the second regression is its own step, and its
+// POSITION is checked.
+//
+// WHAT "AFTER" CAN HONESTLY BE CHECKED AGAINST (four-eyes reviews 11.08.2026,
+// GPT-5.6 Sol, two rounds). A commit's own DATE is the wrong clock: the state is
+// keyed to the commit being tagged and the steps are recorded after that commit
+// exists, so a regression naming the very state it tested would read as "too
+// old", while any unrelated newer commit would read as fine. What CAN be judged,
+// with no git and no clock of its own:
+//   - THE COMMIT NAMED IS THE ONE BEING CLOSED. A LARGE run on the commit that
+//     will be tagged tests exactly the state that will be tagged — which is the
+//     point of running it again. A run on any OTHER commit says nothing about
+//     this one. (It does NOT prove the cleanup is inside that commit; nothing in
+//     the state can prove that. What it proves is the property the tag needs.)
+//   - THE TIMES NAMED FRAME THE RUN. The EARLIEST time the evidence names must
+//     lie after the youngest cleanup record — earliest, because "report
+//     2026-08-12: run of 2026-08-10" must not certify a pre-cleanup run by
+//     quoting a later date elsewhere in the sentence. The LATEST must not lie
+//     after the moment the step was written down, or a run dated 2099 would
+//     certify itself before it happened.
+//   - THE RECORD TIMES RUN IN THE SEQUENCE'S OWN ORDER: `large-regression` at or
+//     before the first cleanup step, the second regression at or after the last
+//     one and at or after the first regression, and the two regressions are two
+//     RUNS — the same evidence text cannot serve as both.
+// A record time is only ever a NECESSARY condition (it is an upper bound of the
+// run it describes, never a lower one), and ties are allowed throughout: two
+// steps recorded in the same millisecond are a fast hand, not a violation.
+// A step recorded WITHOUT a record time cannot be ordered at all, so it is
+// reported missing with a re-record remedy rather than waved through.
+
+/** The cleanup steps the second regression must come after. */
+export const CLEANUP_STEP_IDS = ['dead-code', 'stale-doc', 'stale-comment', 'md-audit', 'cleanup-blind-parallel']
+/** The step whose POSITION is checked, not merely its presence. */
+export const AFTER_CLEANUP_STEP_ID = 'regression-after-cleanup'
+
+/** An ISO-ish date or date-time (`2026-08-11`, `2026-08-11T14:03:00Z`, `2026-08-11 14:03`). */
+const TIMESTAMP_IN_TEXT = /\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?\b/g
+/**
+ * The commit a run was made ON: 7-40 hex characters introduced by a word that
+ * says so. Evidence is prose, and a bare hex token cannot be told from it — a
+ * digit rule read `face2face` as a commit and missed an honest `defaced`, so the
+ * CONTEXT decides instead (four-eyes review 11.08.2026). What follows the word is
+ * the RUN TARGET; a sha mentioned anywhere else ("fixes 9f3c1a2") is a remark and
+ * is ignored, so the first one named is the one judged.
+ */
+const RUN_COMMIT_IN_TEXT = /\b(?:on|commit|sha|rev|revision)\s+(?:commit\s+)?([0-9a-f]{7,40})\b/gi
+const DAY_MS = 86_400_000
+
+/** Milliseconds of an ISO-ish string, or null. Total: anything unparseable → null. */
+function parseTime(value) {
+  if (typeof value !== 'string' || !value.trim()) return null
+  const t = Date.parse(value.trim())
+  return Number.isFinite(t) ? t : null
+}
+
+/**
+ * Is `2026-02-29` a day that exists? `Date.parse` NORMALISES an impossible one
+ * (that token becomes 1 March) instead of refusing it, which would let evidence
+ * pass on a date nobody could have run anything on. Judged on the DATE part
+ * alone, so a zone offset that shifts the UTC day cannot make a real date look
+ * false (four-eyes review 11.08.2026).
+ */
+function isRealCalendarDate(datePart) {
+  const [y, m, d] = datePart.split('-').map(Number)
+  const probe = new Date(Date.UTC(y, m - 1, d))
+  return probe.getUTCFullYear() === y && probe.getUTCMonth() === m - 1 && probe.getUTCDate() === d
+}
+
+/**
+ * Milliseconds of a timestamp TOKEN, read as UTC when it carries no zone, so
+ * the same evidence is judged identically on every machine. A token naming a day
+ * that does not exist is no timestamp at all.
+ */
+function parseStamp(token) {
+  const normalized = token.replace(' ', 'T')
+  if (!isRealCalendarDate(normalized.slice(0, 10))) return { time: null, dateOnly: false }
+  const dateOnly = !normalized.includes('T')
+  if (dateOnly) return { time: parseTime(`${normalized}T00:00:00Z`), dateOnly: true }
+  const zoned = /(?:Z|[+-]\d{2}:?\d{2})$/.test(normalized) ? normalized : `${normalized}Z`
+  return { time: parseTime(zoned), dateOnly: false }
+}
+
+/**
+ * Every anchor an evidence text names: the commit shas and the timestamps, with
+ * the EARLIEST timestamp singled out (that is the one the order is judged by).
+ * Total by contract: anything unreadable → empty lists.
+ */
+export function evidenceAnchors(text) {
+  const out = { commits: [], times: [], earliest: null }
+  try {
+    const s = typeof text === 'string' ? text : ''
+    for (const m of s.matchAll(TIMESTAMP_IN_TEXT)) {
+      const { time, dateOnly } = parseStamp(m[0])
+      if (time === null) continue
+      const stamp = { token: m[0], time, dateOnly }
+      out.times.push(stamp)
+      if (!out.earliest || time < out.earliest.time) out.earliest = stamp
+    }
+    for (const m of s.matchAll(RUN_COMMIT_IN_TEXT)) {
+      const sha = m[1].toLowerCase()
+      if (!out.commits.includes(sha)) out.commits.push(sha)
+    }
+  } catch {
+    /* total by contract */
+  }
+  return out
+}
+
+const iso = (ms) => new Date(ms).toISOString()
+const RE_RECORD = (id) => `re-record it: node scripts/closing-guard.mjs --step ${id} --evidence "<proof>"`
+/**
+ * Evidence compared as CLAIMS, not as characters: case, spacing AND punctuation
+ * are noise. A trailing full stop was enough to make one run read as two.
+ */
+const claimOf = (text) =>
+  String(text ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+const sameClaim = (a, b) => claimOf(a) === claimOf(b)
+
+/** The steps whose POSITION in the sequence is checked, first to last. */
+export const ORDERED_STEP_IDS = ['large-regression', ...CLEANUP_STEP_IDS, AFTER_CLEANUP_STEP_ID]
+
+/**
+ * Which recorded steps stand in the WRONG PLACE in the closing sequence, as
+ * `Map<stepId, reason>`. A step that is not recorded at all is not judged here —
+ * its absence is `missingSteps`' business.
+ * Total by contract: anything unreadable → an empty map (a guard bug must not
+ * trap a release either).
+ */
+export function orderProblems(steps, headSha) {
+  const problems = new Map()
+  /** The FIRST problem found for a step is its reason: a later rule must not
+   *  overwrite the more fundamental one (an undated step lost its remedy that way). */
+  const add = (id, reason) => {
+    if (!problems.has(id)) problems.set(id, reason)
+  }
+  try {
+    const table = steps && typeof steps === 'object' ? steps : {}
+    const head = typeof headSha === 'string' ? headSha.toLowerCase() : ''
+    /** A step as RECORDED (evidence present), or null. */
+    const recorded = (id) => {
+      const e = table[id]
+      return e && typeof e === 'object' && typeof e.evidence === 'string' && e.evidence.trim() ? e : null
+    }
+    /** Its record time, or null — and an undatable step is reported, not trusted. */
+    const timeOf = (id) => {
+      const e = recorded(id)
+      if (!e) return null
+      const at = parseTime(e.at)
+      if (at === null) {
+        add(id, `it carries no record time, so its place in the sequence cannot be judged (a state from before the order check) — ${RE_RECORD(id)}`)
+        return null
+      }
+      return at
+    }
+
+    // NOTHING IS ORDERED UNTIL THERE IS SOMETHING TO ORDER. While the second
+    // regression is unrecorded the closing is still running, and a half-filled
+    // checklist must read as "in progress" — the freeze detector in
+    // batch-in-flight reads exactly that. The gate only decides at the tag/tick,
+    // by which time this step is recorded or missing on its own account.
+    if (!recorded(AFTER_CLEANUP_STEP_ID)) return problems
+
+    const firstAt = timeOf('large-regression')
+    let youngest = null
+    let oldest = null
+    for (const id of CLEANUP_STEP_IDS) {
+      const at = timeOf(id)
+      if (at === null) continue
+      if (youngest === null || at > youngest.at) youngest = { id, at }
+      if (oldest === null || at < oldest.at) oldest = { id, at }
+    }
+    const secondAt = timeOf(AFTER_CLEANUP_STEP_ID)
+    const second = recorded(AFTER_CLEANUP_STEP_ID)
+
+    // 1. THE FIRST REGRESSION COMES BEFORE THE CLEANUP. Recorded after it, the
+    //    "first" run is really a second one and the sequence never happened.
+    if (firstAt !== null && oldest && firstAt > oldest.at) {
+      add(
+        'large-regression',
+        `it was recorded ${iso(firstAt)}, AFTER the cleanup step "${oldest.id}" (${iso(oldest.at)}) — the first regression comes BEFORE the cleanup; record the steps in the order they happened`,
+      )
+    }
+
+    // 2. THE SECOND REGRESSION NAMES WHAT IT RAN ON.
+    const anchors = evidenceAnchors(second.evidence)
+    // EVERY COMMIT THE EVIDENCE NAMES AS A RUN TARGET MUST BE THIS ONE. Neither
+    // "any of them matches" nor "the first one decides" survives contact with
+    // prose: `on 9f3c1a2; not on <head>` passed the first rule and
+    // `commit <foreign>; on <head>` would flip the second (four-eyes rounds 4
+    // and 5). Agreement is unambiguous, and a remark that names no run target
+    // ("fixes 9f3c1a2") is not read as one in the first place.
+    const foreign = anchors.commits.filter((sha) => !(head && head.startsWith(sha)))
+    const namesHead = anchors.commits.length > 0 && foreign.length === 0
+    if (foreign.length) {
+      add(
+        AFTER_CLEANUP_STEP_ID,
+        `its evidence names commit ${foreign[0]} as a run target, and that is NOT the commit being closed (${head.slice(0, 12) || 'unknown'}) — a regression on another commit says nothing about this one, so every "on <sha>" in the evidence must be the commit being closed`,
+      )
+      return problems
+    }
+    if (!namesHead && anchors.times.length === 0) {
+      add(
+        AFTER_CLEANUP_STEP_ID,
+        `its evidence names neither the commit being closed ("on <sha>") nor a timestamp, so nothing places it after the cleanup — record it as e.g. --evidence "LARGE green on ${head.slice(0, 12) || '<sha>'}, both backends, 2026-08-11T14:00Z"`,
+      )
+      return problems
+    }
+
+    // 3. IT IS A SECOND RUN, NOT THE FIRST ONE WRITTEN DOWN TWICE.
+    const first = recorded('large-regression')
+    if (first && sameClaim(first.evidence, second.evidence)) {
+      add(
+        AFTER_CLEANUP_STEP_ID,
+        `its evidence is word for word the evidence of "large-regression" — the closing runs the regression TWICE, and one run cannot be both`,
+      )
+      return problems
+    }
+
+    // 4. ITS PLACE IN THE RECORD ORDER. Ties pass: two steps written in the same
+    //    millisecond are a fast hand, not a violation.
+    if (secondAt !== null && youngest && secondAt < youngest.at) {
+      add(
+        AFTER_CLEANUP_STEP_ID,
+        `it was recorded ${iso(secondAt)}, BEFORE the cleanup step "${youngest.id}" (${iso(youngest.at)}) — a run written down before the cleanup cannot have covered it`,
+      )
+      return problems
+    }
+    if (secondAt !== null && firstAt !== null && secondAt < firstAt) {
+      add(
+        AFTER_CLEANUP_STEP_ID,
+        `it was recorded ${iso(secondAt)}, BEFORE "large-regression" (${iso(firstAt)}) — the second regression is the LATER of the two runs`,
+      )
+      return problems
+    }
+
+    // 5. THE TIMES IT NAMES FRAME THE RUN: after the cleanup, and not in a future
+    //    it could not have seen when it was written down.
+    const earliest = anchors.earliest
+    if (earliest && youngest) {
+      if (earliest.dateOnly) {
+        if (Math.floor(earliest.time / DAY_MS) <= Math.floor(youngest.at / DAY_MS)) {
+          add(
+            AFTER_CLEANUP_STEP_ID,
+            `its evidence dates the run ${earliest.token}, the cleanup's own day or earlier ("${youngest.id}", ${iso(youngest.at)}) — a bare date cannot order two runs of one day, so name the time or the commit ${head.slice(0, 12) || ''}`.trim(),
+          )
+          return problems
+        }
+      } else if (earliest.time <= youngest.at) {
+        add(
+          AFTER_CLEANUP_STEP_ID,
+          `its evidence dates the run ${earliest.token}, which is NOT after the youngest cleanup step ("${youngest.id}", ${iso(youngest.at)}) — every time the evidence names must lie after the cleanup, so drop or fix the earlier one`,
+        )
+        return problems
+      }
+    }
+    if (secondAt !== null) {
+      const latest = anchors.times.reduce((a, b) => (a === null || b.time > a.time ? b : a), null)
+      // A bare DATE means "some moment that day", so it reads as future only once
+      // the whole day lies beyond the record — 2026-08-11 written on 2026-08-11
+      // at 09:00 is the same day, not a claim about that evening.
+      const beyond = latest && (latest.dateOnly ? Math.floor(latest.time / DAY_MS) > Math.floor(secondAt / DAY_MS) : latest.time > secondAt)
+      if (beyond) {
+        add(
+          AFTER_CLEANUP_STEP_ID,
+          `its evidence dates the run ${latest.token}, AFTER the moment it was written down (${iso(secondAt)}) — a run cannot be recorded before it happened`,
+        )
+      }
+    }
+  } catch {
+    return problems
+  }
+  return problems
+}
+
+/**
+ * Why the recorded `regression-after-cleanup` does NOT count for the closing of
+ * `headSha`, or '' when it does — the single-step view of `orderProblems`, kept
+ * because that step is the one the checklist is named after.
+ * Total by contract: anything unreadable → ''.
+ */
+export function afterCleanupProblem(steps, headSha) {
+  try {
+    return orderProblems(steps, headSha).get(AFTER_CLEANUP_STEP_ID) ?? ''
+  } catch {
+    return ''
+  }
+}
+
 /**
  * Which closing steps are NOT satisfied for `headSha`, given the recorded state.
  * A step is satisfied ONLY when the state is FOR this exact commit and the step
  * has an entry (with evidence). A state recorded for a different commit counts
  * for NOTHING — a closing is per-commit, so re-tagging a new commit needs a
- * fresh closing. Total: bad input → ALL steps missing (safest: blocks).
+ * fresh closing. A step must additionally stand in the right PLACE in the
+ * sequence (point 631, `orderProblems`); when it does not, it is reported
+ * missing WITH the reason in `note`.
+ * Total: bad input → ALL steps missing (safest: blocks).
  */
 export function missingSteps(state, headSha) {
   const done = new Set()
-  if (state && typeof state === 'object' && typeof headSha === 'string' && headSha && state.commit === headSha) {
-    const steps = state.steps && typeof state.steps === 'object' ? state.steps : {}
-    for (const id of Object.keys(steps)) {
-      const e = steps[id]
-      // A step counts only with a non-empty evidence string — no blank ticks.
-      if (STEP_IDS.has(id) && e && typeof e === 'object' && typeof e.evidence === 'string' && e.evidence.trim()) {
-        done.add(id)
+  const notes = new Map()
+  try {
+    let steps = {}
+    if (state && typeof state === 'object' && typeof headSha === 'string' && headSha && state.commit === headSha) {
+      steps = state.steps && typeof state.steps === 'object' ? state.steps : {}
+      for (const id of Object.keys(steps)) {
+        const e = steps[id]
+        // A step counts only with a non-empty evidence string — no blank ticks.
+        if (STEP_IDS.has(id) && e && typeof e === 'object' && typeof e.evidence === 'string' && e.evidence.trim()) {
+          done.add(id)
+        }
       }
     }
+    // A step in the WRONG PLACE has not been done, whatever it says: the notes
+    // travel with it so the block reason can name the position, not just the gap.
+    for (const [id, reason] of orderProblems(steps, headSha)) {
+      if (!done.has(id)) continue
+      done.delete(id)
+      notes.set(id, reason)
+    }
+  } catch {
+    done.clear() // unreadable state → nothing counts, which is the safe direction here
+    notes.clear()
   }
-  return CLOSING_STEPS.filter((s) => !done.has(s.id))
+  return CLOSING_STEPS.filter((s) => !done.has(s.id)).map((s) => (notes.has(s.id) ? { ...s, note: notes.get(s.id) } : s))
 }
 
 /** The shared tail of every block reason: what is missing and how to record it. */
 function remedy(missing, retry) {
-  const list = missing.map((s) => `  - ${s.id}: ${s.title}`).join('\n')
+  const list = missing.map((s) => `  - ${s.id}: ${s.title}${s.note ? `\n      RECORDED BUT OUT OF ORDER — ${s.note}` : ''}`).join('\n')
   return (
-    `A closing runs the FULL cycle (§7.2 / Maximum-QA Phase 8), not just the LARGE ` +
-    `regression — the dead-code/stale-doc/stale-comment cleanup and the .md audit are ` +
-    `what distinguish a closing from a regression (the v0.2 miss).\nMissing:\n${list}\n` +
+    `A closing runs the FULL cycle (§7.2 / Maximum-QA Phase 8) IN ORDER: LARGE regression, ` +
+    `then the blind-parallel cleanup of code AND documents, then a SECOND LARGE regression ` +
+    `after the last cleanup commit — the cleanup is what distinguishes a closing from a ` +
+    `regression (the v0.2 miss), and the second regression is what tests it.\nMissing:\n${list}\n` +
     `Do each step, record it with evidence:\n` +
     `  node scripts/closing-guard.mjs --step <id> --evidence "<what you did / the proof>"\n` +
     `${retry} Inspect anytime: node scripts/closing-guard.mjs --status`

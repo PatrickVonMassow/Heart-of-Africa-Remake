@@ -70,39 +70,6 @@ there exactly once; a new point joins a bundle when appended.
 
 ## Checklist
 
-- [ ] 631. THE RELEASE PROCESS DEMANDS A CLEANUP BETWEEN TWO REGRESSIONS, AND NEITHER HALF
-  IS ANCHORED (user 11.08.2026, following up on point 174: "Das ist ein Release. Dazu
-  gehört unser etablierter Release-Prozess mit Closing-Durchlauf, also insbesondere volle
-  Regression, dann gründliches Vier-Augen-Cleanup von Altlasten im kompletten Code und
-  allen Dokumenten und dann nochmal eine volle Regression" — and the cleanup runs with a
-  FOREIGN model, both models independent and blind to each other's result).
-  STATE CHECKED: `scripts/closing-guard-core.mjs` (`CLOSING_STEPS`) already carries
-  `large-regression`, `lint-audit`, `dead-code`, `stale-doc`, `stale-comment`, `md-audit`,
-  `impl-sections`, `graphics-detail-doc`, `acceptance-criteria`, `open-items` and
-  `simplifications`, and the PreToolUse guard already refuses a tag while a step is
-  missing. Exactly the two things the user stresses are NOT anchored: (1) the SECOND full
-  regression AFTER the cleanup — there is one regression step and no ORDER between it and
-  the cleanup steps, so a cleanup may happen after the only green regression and the tag
-  then carries an untested change; (2) the BLIND-PARALLEL form of the cleanup — CLAUDE.md
-  §6 prescribes it for every ENUMERATING stage (what is dead, what is stale — precisely
-  this), but no closing step demands it and point 174 does not name it.
-  FINAL STATE: (a) `CLOSING_STEPS` gains `cleanup-blind-parallel` ("clearing out legacy as
-  a BLIND-PARALLEL four-eyes stage: both models work from the same inputs to their own
-  complete result, neither seeing the other's before it is done; the union is deduplicated
-  BY MEANING, marks what only one side found and drops nothing for being unusual") and
-  `regression-after-cleanup` ("second full LARGE regression on BOTH backends, after the
-  last cleanup commit"). (b) The ORDER is checked, not merely the presence: the evidence
-  for `regression-after-cleanup` must name a commit or timestamp AFTER the youngest
-  cleanup step, or it does not count. (c) Point 174 and CLAUDE.md §9 state the sequence
-  explicitly — regression, blind-parallel cleanup, regression, and only then the user's go
-  for the tag. (d) It holds for EVERY release point, not only 174.
-  VERIFIABLE: Vitest cases over the pure closing core — a recorded
-  `regression-after-cleanup` older than the youngest cleanup step is rejected with the
-  reason, one younger is accepted, and a missing `cleanup-blind-parallel` blocks the tag;
-  plus a case that the guard still fails open on its own internal error.
-  Criticality: high — this is the mechanism that certifies a tag. Bundle: Modell &
-  Wächter.
-
 - [ ] 634. THE MERGE IS THE ONE PLACE WHERE A FINDING CAN VANISH — SO IT GOES TO A THIRD
   MODEL AND IS MADE COUNTABLE (user 11.08.2026: "Wäre es nicht sinnvoll, die
   Zusammenführung nochmal durch ein anderes Modell erledigen zu lassen? In diesem Fall
@@ -232,9 +199,13 @@ there exactly once; a new point joins a bundle when appended.
      that is the release's purpose.
   Everything else — visuals, ambience, wildlife, the big audits — ships AFTER v0.3.
   THE CLOSING RUN IS ITS OWN POINT (user 11.08.2026, on the estimate: the ~1 h here was
-  true when this meant "tag and publish"). Point 633 carries it — the first LARGE
-  regression, the blind-parallel cleanup, the second LARGE regression after it — and point
-  631 anchors that order in the closing checklist, so both run BEFORE this point. What
+  true when this meant "tag and publish"). The SEQUENCE is binding and runs BEFORE this
+  point: full LARGE regression on both backends → the blind-parallel four-eyes cleanup of
+  legacy in ALL code and ALL documents (CLAUDE.md §6, closing step
+  `cleanup-blind-parallel`) → a SECOND full LARGE regression after the last cleanup commit
+  (`regression-after-cleanup`) → and only THEN the user's go for the tag. Point 633 carries
+  that run; point 631 anchored the order in the closing checklist, which refuses a tag
+  while the second regression does not stand after the cleanup. What
   remains here is the irreversible last hour: the tag, the `poc` move, the deploy and the
   check that the URLs serve the new state. No tag is cut on an unclosed state: this point
   is never ticked without a complete closing run recorded at the very HEAD that carries

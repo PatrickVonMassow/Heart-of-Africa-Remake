@@ -169,14 +169,30 @@ Cheap automated classes first, then the visual sweep:
 - Dead-code / stale-doc / stale-comment cleanup as separate commits; audit every
   `.md` for accreted cruft (preserve section numbers). Keep the implementation
   sections current (`implementation-sections-current`).
+- **The cleanup runs BLIND-PARALLEL (user 11.08.2026, point 631; closing step
+  `cleanup-blind-parallel`).** What is dead and what is stale is an ENUMERATING
+  stage, so it takes the divergent mode of CLAUDE.md §6: both models work from the
+  same inputs to their own complete result, neither seeing the other's before it is
+  done; the union is deduplicated BY MEANING, marks what only one side found, and
+  drops nothing for being unusual. A reviewer handed a finished list checks that
+  list — which is exactly the wrong instrument for the legacy nobody thought of.
 - **Graphics detail-level doc current (user 24.07.2026):** explicitly confirm
   `docs/graphics-detail-levels.md` still matches `QUALITY_PRESETS`. The
   `src/config/qualityDoc.test.ts` sync test enforces it on every Vitest run (a
   green regression proves it), but name the check here so a preset/doc drift is
   never assumed away.
-- Full regression again: build + lint + audit + Vitest + the LARGE browser set
-  on BOTH backends, **3× flake-free** (a single retry may clear a rotating
-  staging flake; a persistent fail is a real regression).
+- Full regression again (closing step `regression-after-cleanup`): build + lint +
+  audit + Vitest + the LARGE browser set on BOTH backends, **3× flake-free** (a
+  single retry may clear a rotating staging flake; a persistent fail is a real
+  regression). It must come AFTER the last cleanup commit, and the guard checks
+  that. The evidence names either the commit being tagged, written as `on <sha>`
+  so prose cannot be mistaken for it — a run on it tests
+  exactly the state that will be tagged, which is the point of running it again —
+  or a time lying after the youngest cleanup step, where the EARLIEST time it names
+  decides and none may lie after the moment it was written down. The record times
+  must also run in the sequence's own order (first regression before the cleanup,
+  second after it), and the two regressions must be two RUNS, not one evidence text
+  used twice. A tag would otherwise carry changes nothing ever tested.
 - **Cross-browser & mobile smoke at `thorough` depth** (point 213): the
   `crossbrowser.mjs` functional smoke on Firefox + WebKit (desktop) AND the touch
   layer on WebKit-iOS + Chromium-Android (mobile/tablet) — NEVER the whole suite
@@ -188,10 +204,12 @@ Cheap automated classes first, then the visual sweep:
   run (Phase 8 — LARGE regression on BOTH backends, flake-free) is green on the
   exact commit; (2) the user has given explicit approval for THIS tag (per
   `tags-only-on-request`). No tag without both.
-- **ENFORCED (point 306):** the closing checklist is machine-checked — the
+- **ENFORCED (points 306/631):** the closing checklist is machine-checked — the
   PreToolUse guard `scripts/closing-guard.mjs` DENIES the tag/poc create-or-push
   until EVERY closing step (Phase 8, incl. the dead-code/stale-doc/stale-comment
-  cleanup + `.md` audit) is recorded done for the commit
+  cleanup + `.md` audit, its blind-parallel form, and the second regression after
+  it — whose ORDER is checked, not merely its presence) is recorded done for the
+  commit
   (`node scripts/closing-guard.mjs --status` / `--step <id> --evidence "…"`). A
   closing can no longer silently skip a step, which is what happened at v0.2.
   The same checklist gates the OTHER release act: the `[ ]`→`[x]` TICK of a point

@@ -1146,6 +1146,38 @@ Nachweis JÜNGER sein als die Änderung — sonst prüft die Liste eine Vergange
 allgemeine Regel greift nur dort, wo ein konkreter Schritt sie einfordert: §6 gilt seit
 Wochen für jede aufzählende Stufe, und der Abschluss hat sie trotzdem nie angewandt.
 
+### 3.109 Die Wiederholung als Allzweck-Beleg — in beide Richtungen
+
+Der Nutzer hat am 11.08.2026 eine Gewohnheit benannt: „Du behauptest oft, ein Fehlschlagen
+sei aufgrund von Last passiert und nicht wegen eines Bugs. Und als Beleg dafür nennst du,
+dass es jetzt x mal hintereinander geklappt hat. Das ist aber kein Beweis." Er hat recht,
+und ich hatte es am selben Morgen getan: Das Giza-Rot am Siedlungsrand wurde für Last
+erklärt, gestützt allein auf drei grüne Abschnittsläufe danach.
+
+Das ist der Spiegel von §3.48, und zusammen ergeben die beiden ein unangenehmes Bild.
+Dort hieß zweimal rot „also nicht die Last"; hier heißt dreimal grün „also war es die
+Last". Dieselbe Beobachtungsform hat in beiden Fällen genau den Schluss getragen, der
+gerade gebraucht wurde — und das ist das Kennzeichen eines Belegs, der keiner ist. Drei
+grüne Läufe sind mit einem behobenen Defekt vereinbar, mit einem seltenen, mit einem
+Wettlauf zweier Zugriffe und mit einer Maschine, die zufällig ruhig war. Sie
+unterscheiden keine dieser vier Möglichkeiten voneinander.
+
+Wie ein Beweis aussieht, stand am selben Tag daneben, im Nachbarfall: Der Agent von Punkt
+600 hat nicht aus Wiederholung argumentiert. Er hat den Fehlschlag unter einer
+CPU-Drosselung **deterministisch reproduziert** (8 von 8), den Mechanismus **benannt** —
+die Prüfung las Zustand und DOM in zwei getrennten Zugriffen und verglich unter Last eine
+volle Liste gegen eine leere —, ihn behoben und danach 0 von 8 gezeigt; dazu dieselbe
+Drosselung am alten Stand, um zu belegen, dass der Defekt älter war als der Zweig. Das ist
+eine Ursache. Der Unterschied zur Wiederholung ist nicht die Sorgfalt, sondern die
+Richtung: Die Drosselung **erzeugt** die vermutete Ursache, statt auf ihre Abwesenheit zu
+hoffen.
+
+**Lehre:** Ein Rot ist auf genau drei Wegen erledigt — seine Ursache ist benannt und
+behoben, es ist einem offenen Punkt zugeschrieben, der es besitzt, oder es wird selbst
+einer. „Es lief danach durch" ist keiner davon. Und wo eine Beobachtung beide Schlüsse
+gleich gut trägt, ist sie kein Beleg, sondern eine Erzählung: Der Prüfstein ist, ob das
+Gegenteil dieselbe Beobachtung erzeugt hätte.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -1235,7 +1267,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 11.08.2026, 09:17 · Quellen-Fingerprint: `647c0823f89d…`
+Zuletzt aktualisiert: Dienstag, 11.08.2026, 15:33 · Quellen-Fingerprint: `9cab01484839…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1317,8 +1349,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 74 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 50 Prozess-/Meta-TASKS-Punkte (davon 20 offen).
+Erfasste Quellen: 74 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 50 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
 
-<!-- RETRO-FINGERPRINT: 647c0823f89dd548538ba6ba675e02a3a6721f73952de669a417955ba31aab1a -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-11T07:17:42.292Z -->
+<!-- RETRO-FINGERPRINT: 9cab0148483975dedd45d1023a4fbd0902292dc6d1ddf20007764eee8e056bc8 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-11T13:33:57.378Z -->
 <!-- AUTO-GENERATED:END -->
