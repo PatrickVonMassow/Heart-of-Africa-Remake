@@ -19,6 +19,7 @@ import {
   stubBranchFor,
   CLEANUP_LOCK_LEGACY,
   formatCleanupLock,
+  judgeLockHeld,
   judgeLockRelease,
   matchesExpectation,
   parseCleanupLock,
@@ -658,6 +659,33 @@ describe('staleLockVerdict — may a lock in the way be broken?', () => {
 // THE RELEASE IS NOT ONE ACT AND CANNOT BE MADE ONE — git has no compare-and-
 // unlock. So the decision is pure, the gap is two syscalls wide, and every
 // uncertain case LEAVES THE LOCK STANDING and says so (fifth review, finding 3).
+// THE CHECK THAT GUARDS THE REMOVAL IS READ AT THE MOMENT OF THE REMOVAL. Every
+// answer that is not "our own reason, verbatim" refuses, because the act it guards
+// cannot be undone (seventh review, finding 4).
+describe('judgeLockHeld — do we still hold it, at the instant it matters?', () => {
+  const ours = formatCleanupLock({ pid: 4711, startedAt: 1000 })
+
+  it('passes only our own reason, verbatim', () => {
+    expect(judgeLockHeld({ held: ours, ours }).ok).toBe(true)
+    for (const held of [` ${ours}`, `${ours} `, `${ours}\n`]) {
+      expect(judgeLockHeld({ held, ours }).ok, held).toBe(false)
+    }
+  })
+
+  it('REFUSES a lock that is gone, foreign, or unreadable', () => {
+    expect(judgeLockHeld({ held: '', ours })).toMatchObject({ ok: false })
+    expect(judgeLockHeld({ held: '', ours }).reason).toMatch(/GONE/)
+    expect(judgeLockHeld({ held: 'claude agent agent-later (pid 42 start 7)', ours }).reason).toMatch(/not ours/)
+    expect(judgeLockHeld({ held: null, ours }).reason).toMatch(/could not be read/)
+    expect(judgeLockHeld({ held: undefined, ours }).ok).toBe(false)
+  })
+
+  it('has nothing to say where no lock was taken — the orphan path keeps its contract', () => {
+    expect(judgeLockHeld({ held: '', ours: '' }).ok).toBe(true)
+    expect(judgeLockHeld({}).ok).toBe(true)
+  })
+})
+
 describe('judgeLockRelease — whose lock is in place?', () => {
   const ours = formatCleanupLock({ pid: 4711, startedAt: 1000 })
 
@@ -1054,6 +1082,69 @@ describe('--expect, on a THROWAWAY repository', () => {
     expect(r.ok).toBe(false)
     expect(r.verdict.reason).toMatch(/lock this cleanup took is GONE/)
     expect(existsSync(worktree)).toBe(true)
+  })
+
+  // THE INTERLEAVING THE SEVENTH REVIEW NAMED, driven where it actually bites:
+  // the lock is stripped AFTER the verification has already read it, so the only
+  // thing that can catch it is a look taken at the moment of the removal. The
+  // easier case above (stripping right after acquisition) never exercises this —
+  // there the verification's own read still sees the loss.
+  //
+  // The strip is hung on the `git status` of the dirtiness probe, which runs AFTER
+  // `readLockReason` has produced the cached `heldRaw` and BEFORE anything is
+  // deleted. No test-only hook: that is the real call order.
+  const stripAtDirtinessProbe = (install = null) => {
+    let struck = false
+    const r = cleanupWorktree(worktree, {
+      git: (args, cwd) => {
+        const out = run(args, cwd)
+        if (!struck && args.includes('status')) {
+          struck = true
+          rmSync(cleanupLockFile(worktree), { force: true })
+          if (install) run(['worktree', 'lock', '--reason', install, worktree])
+        }
+        return out
+      },
+      expected: expectationNow(),
+    })
+    return { struck, r }
+  }
+
+  it('REFUSES when the lock is stripped after the verification read — the LAST look decides', () => {
+    const { struck, r } = stripAtDirtinessProbe()
+    expect(struck).toBe(true)
+    expect(r.ok).toBe(false)
+    expect(r.verdict.reason).toMatch(/lock-lost-before-removal/)
+    expect(r.verdict.reason).toMatch(/GONE/)
+    // THE ASSERTION THE WHOLE POINT IS ABOUT: the tree is still standing.
+    expect(existsSync(worktree)).toBe(true)
+    expect(existsSync(join(worktree, '.git'))).toBe(true)
+  })
+
+  it('REFUSES when a stranger takes the lock in that same window, and leaves it alone', () => {
+    const foreign = 'claude agent agent-later (pid 424242 start 7)'
+    const { struck, r } = stripAtDirtinessProbe(foreign)
+    expect(struck).toBe(true)
+    expect(r.ok).toBe(false)
+    expect(r.verdict.reason).toMatch(/lock-lost-before-removal/)
+    expect(r.verdict.reason).toContain(foreign)
+    expect(existsSync(worktree)).toBe(true)
+    expect(readFileSync(cleanupLockFile(worktree), 'utf8')).toBe(`${foreign}\n`)
+  })
+
+  it('the last look runs BEFORE the first destructive syscall, not after it', () => {
+    // The ordering is what makes the refusal worth anything: a check that ran
+    // after `detachLinks` would already have unlinked the tree's links.
+    const link = join(worktree, 'node_modules')
+    const target = join(tmp, 'donor')
+    mkdirSync(target, { recursive: true })
+    writeFileSync(join(target, 'kept.txt'), 'the main tree\'s dependencies')
+    symlinkSync(target, link, 'junction')
+
+    const { r } = stripAtDirtinessProbe()
+    expect(r.ok).toBe(false)
+    expect(existsSync(link)).toBe(true) // NOT detached: the guard fired first
+    expect(existsSync(join(target, 'kept.txt'))).toBe(true)
   })
 
   it('does NOT recover a FOREIGN lock, however dead its holder looks', () => {

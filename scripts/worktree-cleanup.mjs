@@ -27,6 +27,7 @@ import {
   judgeTarget,
   assertInside,
   formatCleanupLock,
+  judgeLockHeld,
   judgeLockRelease,
   matchesExpectation,
   parseCleanupLock,
@@ -134,8 +135,23 @@ export function detachLinks(root, { dry = false } = {}) {
  * that refuses.
  *
  * Exported so the Vitest case can drive exactly this path.
+ *
+ * `guard` IS THE LAST LOOK BEFORE THE FIRST DESTRUCTIVE SYSCALL (seventh review,
+ * finding 4). It lives HERE, not at the call site, so the ordering is structural:
+ * every caller of this function gets the check immediately before the walk that
+ * unlinks, and no future caller can accidentally validate a fact it read minutes
+ * earlier. A guard answering `{ ok: false }` throws — `cleanupWorktree` turns that
+ * into a refusal — and NOTHING has been touched at that point, not even a link.
  */
-export function removeTreeSafely(root, { dry = false, git: runGit = git, registered = false, weLocked = false } = {}) {
+export function removeTreeSafely(root, { dry = false, git: runGit = git, registered = false, weLocked = false, guard = null } = {}) {
+  if (!dry && typeof guard === 'function') {
+    const verdict = guard()
+    if (verdict && verdict.ok === false) {
+      const refusal = new Error(`lock-lost-before-removal: ${verdict.reason}`)
+      refusal.refusal = `lock-lost-before-removal: ${verdict.reason}`
+      throw refusal
+    }
+  }
   const detached = detachLinks(root, { dry })
   if (dry) return detached
   let removed = false
@@ -361,14 +377,27 @@ export function readLockReason(file) {
  * syscalls in one process, where it used to be a `worktree list --porcelain`
  * subprocess followed by a `worktree unlock` subprocess.
  *
- * BOUNDED, and this is what makes the residual acceptable in code whose failure
- * class is destroyed work: the worst thing this window can do is STRIP a lock
- * another cleanup installed microseconds earlier. It cannot make that cleanup
- * delete anything, because a cleanup that finds its own lock missing REFUSES —
- * `matchesExpectation` treats an absent lock under `ownLock` as a refusal (finding
- * 2), which is downstream of every path that reaches a deletion. The reachable
- * damage is therefore a refused cleanup and a worktree left standing, which costs
- * one command; a deletion without exclusion is not reachable through it.
+ * BOUNDED — BUT NOT BY THE CHECK THAT USED TO BE CLAIMED HERE. The bound was once
+ * written as "a cleanup whose lock is missing refuses, so this window cannot make
+ * anything delete", pointing at `matchesExpectation`. The seventh review defeated
+ * exactly that: the victim validates the lock reason it read EARLIER and, unless
+ * something looks again, never learns its lock was stripped — so the window ended
+ * in a removal without exclusion, which is the destroyed-work class itself.
+ *
+ * WHAT CARRIES THE BOUND NOW is the last look inside `removeTreeSafely` (`guard`,
+ * seventh review, finding 4): the lock file is re-read immediately before the first
+ * destructive syscall, and anything but our own reason REFUSES there. So a lock
+ * stripped by this window is seen by its owner at the one moment that decides, and
+ * the outcome is a refused cleanup and a tree left standing — one command's worth
+ * of debris.
+ *
+ * WHAT REMAINS is only the gap between that last read and the unlink itself: a few
+ * microseconds, no subprocess, no I/O of ours in between. It cannot be closed by
+ * any design, for the reasons above, and what it can do is bounded by what the
+ * removal itself is: a tree proven merged, clean and unwritten-into under a lock we
+ * held for every one of those proofs. Destroying WORK through it needs a writer
+ * that ignores git's lock entirely AND lands inside those microseconds — the same
+ * residual `cleanupWorktree` already states, not a second one.
  *
  * WITHOUT A LOCK FILE THERE IS NO RELEASE. The porcelain is not an acceptable
  * substitute — it TRIMS the reason, so a padded copy of ours would compare equal
@@ -546,10 +575,12 @@ export function cleanupWorktree(target, { dry = false, git: runGit = git, expect
   // and the unlink inside cannot be made one act (git's own `worktree unlock` is
   // an unconditional unlink of that same file, and POSIX has no compare-and-
   // unlink). What that window can do is STRIP a lock another cleanup installed
-  // between the two syscalls. It cannot make that cleanup delete anything: a
-  // cleanup whose own lock is missing REFUSES, three lines below this one, before
-  // any removal. So the worst reachable outcome is a refused cleanup and a tree
-  // left standing — never a deletion without exclusion.
+  // between the two syscalls — and that cleanup then REFUSES, because its last
+  // look before its own first destructive syscall re-reads this file (the `guard`
+  // handed to `removeTreeSafely` below). Do not move that check back into the
+  // verification: reading it there and deleting on the result is what the seventh
+  // review defeated, and the difference between a refused cleanup and a deletion
+  // without exclusion is exactly this ordering.
   let unlockNote = ''
   const tryUnlock = () => {
     if (!weLocked) return
@@ -602,6 +633,14 @@ export function cleanupWorktree(target, { dry = false, git: runGit = git, expect
       git: runGit,
       registered: verdict.reason === 'registered',
       weLocked,
+      // THE LAST LOOK, TAKEN INSIDE THE REMOVAL (seventh review, finding 4). The
+      // verification above read the lock and then ran `readIdentity` and a `git
+      // status` — hundreds of syscalls and a subprocess — before reaching this
+      // line, so deleting on THAT read is deleting on a cached fact. The file is
+      // read again here, and anything but our own reason refuses. This is also
+      // what makes every OTHER fact above trustworthy: they were established while
+      // we held the lock, and the last look is what says we still did.
+      guard: () => judgeLockHeld({ held: weLocked ? readLockReason(ourLockFile) : '', ours: weLocked ? ourLock : '' }),
     })
     // UNLOCK BEFORE PRUNING, or the record outlives the tree FOREVER. `git
     // worktree prune` SKIPS a locked worktree, and `removeTreeSafely` falls back
@@ -616,6 +655,11 @@ export function cleanupWorktree(target, { dry = false, git: runGit = git, expect
     return { ok: true, verdict, detached, stub, ...(notes ? { lockNote: notes } : {}) }
   } catch (e) {
     tryUnlock()
+    // A GUARD REFUSAL IS AN ANSWER, NOT A CRASH. `removeTreeSafely` throws when its
+    // last look finds the lock gone or foreign, because a return value can be
+    // ignored and a throw cannot; here it becomes the ordinary refusal verdict, so
+    // the caller sees "it changed under the cleanup" rather than a stack trace.
+    if (e && e.refusal) return refuse(`${e.refusal}${unlockNote ? ` [${unlockNote}]` : ''}`)
     throw e
   }
 }

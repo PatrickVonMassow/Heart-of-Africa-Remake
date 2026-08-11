@@ -430,6 +430,35 @@ export function judgeLockRelease({ held, ours } = {}) {
 }
 
 /**
+ * IS THE LOCK IN PLACE STILL OURS? PURE (seventh review, finding 4).
+ *
+ * THE CHECK THAT GUARDS A DESTRUCTIVE ACT IS READ AT THE MOMENT OF THAT ACT. The
+ * verification reads the lock once and then runs `readIdentity` and a `git status`
+ * before anything is deleted — so validating the deletion against THAT read is
+ * validating a cached fact. The review's interleaving: another cleanup's release
+ * strips our lock in the meantime, and because nothing looks again, the removal
+ * proceeds with no exclusion at all. That is the destroyed-work class, not a lost
+ * lock, and it is what this verdict exists to make impossible.
+ *
+ * `held` is the reason git's lock file carries VERBATIM — '' for no lock, null when
+ * it could not be read. `ours` is what we wrote, '' when we took no lock.
+ *
+ * Returns { ok, reason }. Every uncertain answer is `ok: false`, because the act it
+ * guards cannot be undone.
+ */
+export function judgeLockHeld({ held, ours } = {}) {
+  const mine = String(ours ?? '')
+  if (!mine) return { ok: true, reason: 'no lock was taken, so none can have been lost' }
+  if (held === null || held === undefined) {
+    return { ok: false, reason: "the lock this cleanup holds could not be read from git's own lock file" }
+  }
+  const there = String(held)
+  if (!there) return { ok: false, reason: 'the lock this cleanup took is GONE — something cleared it' }
+  if (there !== mine) return { ok: false, reason: `the lock in place is not ours (${there})` }
+  return { ok: true, reason: 'the lock this cleanup took is still in place' }
+}
+
+/**
  * THE SETUP BRANCH THAT COMES WITH AN AGENT WORKTREE. PURE.
  *
  * Creating the isolated tree `<repo>/.claude/worktrees/agent-<id>` also creates
