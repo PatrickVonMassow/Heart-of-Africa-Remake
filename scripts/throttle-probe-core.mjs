@@ -194,9 +194,10 @@ export function throttlePlan(input) {
  * `spawnSync` for the whole measured run, so a spinner that died during it
  * cannot have had its `exitCode` updated by the time anybody looks: reading the
  * child object would count a dead squeeze as a live one and let the report claim
- * a contention it stopped applying. `alive` is `process.kill(pid, 0)` in the
- * wrapper. Total: an unreadable pid counts as not running, which understates the
- * squeeze rather than overstating it.
+ * a contention it stopped applying. `alive` reads /proc/<pid>/stat in the
+ * wrapper — signal 0 would not do, because an unreaped ZOMBIE answers it while
+ * burning nothing. Total: an unreadable pid counts as not running, which
+ * understates the squeeze rather than overstating it.
  */
 export function countAlive(pids, alive) {
   let n = 0

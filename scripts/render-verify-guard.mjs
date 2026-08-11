@@ -440,10 +440,15 @@ if (isMainModule(import.meta.url)) {
         // record and said out loud. A bypass whose cost is invisible is one
         // nobody weighs.
         const waved = Array.isArray(result.waved) ? result.waved : []
-        if (waved.length > 0) {
-          extra.lastDeferral = { ...state.deferral, waved }
+        const wavedCount = Number.isInteger(result.wavedCount) ? result.wavedCount : waved.length
+        if (wavedCount > 0) {
+          // The COUNT is the real one even where the list is capped: a record
+          // that showed the cap would understate what was waved.
+          extra.lastDeferral = { ...state.deferral, waved, wavedCount }
           console.error(
-            `⚠ RENDER-VERIFY DEFERRAL WAVED ${waved.length} UNEXPLAINED RED(S): ` +
+            `⚠ RENDER-VERIFY DEFERRAL WAVED ${wavedCount} UNEXPLAINED RED(S)` +
+              (wavedCount > waved.length ? ` (the first ${waved.length} named)` : '') +
+              ': ' +
               waved.map((w) => `${w.backend}/${w.suite} (${w.status}) "${w.name}"`).join('; ') +
               '. The deferral REASON is now the only record of why — make it name the cause.',
           )

@@ -532,7 +532,21 @@ export function unexplainedRuns(runs, since, options) {
       const reds = verdict.status === 'suspect' ? suspectRedsOf(r) : Array.isArray(r.reds) ? r.reds : []
       if (reds.length > 0 && reds.every((red) => owned(red, suite, backend))) continue
     }
-    out.push({ backend, suite, at, status: verdict.status, unaccounted: verdict.unaccounted })
+    // The individual reds, NOT the one sentence runVerdict writes about them: a
+    // suspect run's whole first attempt is summarised into a single unaccounted
+    // entry, and a caller counting those would report two reds as one.
+    const names =
+      verdict.status === 'suspect'
+        ? suspectRedsOf(r).map((x) => x.name)
+        : verdict.unaccounted.map((u) => u.name)
+    out.push({
+      backend,
+      suite,
+      at,
+      status: verdict.status,
+      unaccounted: verdict.unaccounted,
+      reds: names.length > 0 ? names : ['(unnamed red)'],
+    })
   }
   return out.sort((a, b) => a.at - b.at)
 }
@@ -689,15 +703,17 @@ export function evaluate(input) {
     // reds through, and a record naming the first would understate exactly what
     // the reader is being asked to accept.
     const waved = []
+    let wavedCount = 0
     for (const u of unexplained) {
-      const reds = u.unaccounted.length > 0 ? u.unaccounted : [{ name: '(unnamed)' }]
-      for (const red of reds) {
-        if (waved.length >= MAX_WAVED) break
-        waved.push({ backend: u.backend, suite: u.suite, status: u.status, name: red.name ?? '(unnamed)' })
+      for (const name of u.reds) {
+        wavedCount++
+        if (waved.length < MAX_WAVED) waved.push({ backend: u.backend, suite: u.suite, status: u.status, name })
       }
     }
-    return waved.length > 0
-      ? { decision: 'allow', clear: true, deferred: true, waved }
+    // The LIST is bounded; the COUNT is not. A record that showed twenty where
+    // twenty-one were waved would understate the very thing it exists to state.
+    return wavedCount > 0
+      ? { decision: 'allow', clear: true, deferred: true, waved, wavedCount }
       : { decision: 'allow', clear: true, deferred: true }
   }
 

@@ -120,22 +120,31 @@ function startSpinners(plan) {
   return spun
 }
 
+/**
+ * Is this process still BURNING CPU? Not "does the pid exist": a spinner that
+ * exited while `spawnSync` held the event loop is an unreaped ZOMBIE, which
+ * still answers signal 0 and squeezes nothing. Linux says so in
+ * /proc/<pid>/stat, whose third field is the state — `Z` for a zombie. Anything
+ * unreadable counts as NOT running, which understates the squeeze rather than
+ * overstating it, and the comm field is skipped by cutting at the LAST ')' (a
+ * process name may contain both parentheses and spaces).
+ */
+function stillRunning(pid) {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8')
+    const state = stat.slice(stat.lastIndexOf(')') + 1).trim().split(/\s+/)[0]
+    return state !== '' && state !== 'Z' && state !== 'X'
+  } catch {
+    return false
+  }
+}
+
 /** Kill them, and say how many were STILL RUNNING when the run ended — a spinner
  *  that died early squeezed nothing for the rest of it. Liveness is asked of the
  *  OS (signal 0), because the child objects cannot have learnt of an exit while
  *  spawnSync held the event loop. */
 function stopSpinners(spun) {
-  const alive = countAlive(
-    spun.map((c) => c.pid),
-    (pid) => {
-      try {
-        process.kill(pid, 0)
-        return true
-      } catch (err) {
-        return err?.code === 'EPERM'
-      }
-    },
-  )
+  const alive = countAlive(spun.map((c) => c.pid), stillRunning)
   for (const child of spun) {
     try {
       child.kill('SIGKILL')

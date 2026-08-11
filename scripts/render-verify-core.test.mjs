@@ -867,6 +867,29 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(result.waved.map((w) => w.name)).toEqual(['the first nobody filed', 'the second nobody filed'])
   })
 
+  it('names both reds of a SUSPECT run, which runVerdict summarises into one sentence', () => {
+    const twoNames = {
+      ...run('webgpu', 1500),
+      suite: 'polish',
+      suspect: true,
+      suspectOf: [{ name: 'the goat stance', kind: 'check' }, { name: 'the eaves column', kind: 'check' }],
+    }
+    const result = evaluate(
+      renderChange({ runs: [twoNames], deferral: { head: 'def5678', reason: 'the lane was software', at: 1700 }, openPoints }),
+    )
+    expect(result.wavedCount).toBe(2)
+    expect(result.waved.map((w) => w.name)).toEqual(['the goat stance', 'the eaves column'])
+  })
+
+  it('keeps the TRUE count when the named list hits its cap', () => {
+    const many = redRun('webgpu', 1500, Array.from({ length: 25 }, (_, i) => red(`nobody filed number ${i}`)))
+    const result = evaluate(
+      renderChange({ runs: [many], deferral: { head: 'def5678', reason: 'the dev server had died', at: 1700 }, openPoints }),
+    )
+    expect(result.wavedCount).toBe(25)
+    expect(result.waved).toHaveLength(20)
+  })
+
   it('a deferral with nothing to wave says nothing — the list is evidence, not decoration', () => {
     const result = evaluate(
       renderChange({ runs: [], deferral: { head: 'def5678', reason: 'headless WebGPU washes the frame out', at: 1600 } }),
