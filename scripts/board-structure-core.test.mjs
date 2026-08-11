@@ -374,6 +374,48 @@ describe('every current-work card names its point and its subject', () => {
     expect(codes(setCardTitle(false_, 651, 'Ganz normale Arbeit: Abschlussarbeiten'))).toEqual([])
   })
 
+  // A MARKER IS HAND-WRITABLE, so neither marker may authorise a deletion on its
+  // own (four-eyes 12.08.): running work wearing the wrong marker must survive.
+  it('never deletes running work that merely wears a state marker', () => {
+    const falseIdle =
+      '<details class="now" data-state="idle">\n  <summary><span class="num">651</span>' +
+      '<span class="t">Echte Arbeit</span></summary>\n' +
+      '  <div class="body"><p>Läuft.</p></div>\n</details>'
+    // Both state writers refuse rather than swallow it: the card counts as the
+    // running point it is titled as.
+    expect(() => toNoCurrentWork(withNow(falseIdle), 'Weiter mit Punkt 656.')).toThrow(/refusing to claim/)
+    expect(() => toClosingWork(withNow(falseIdle), 651, { reason: 'X.' })).toThrow(/refusing to claim/)
+    expect(codes(withNow(falseIdle))).toContain('handover-card-shape')
+    // …and the sweep keeps it too, because it carries a number.
+    expect(dropStrayNowCards(withNow(falseIdle)).dropped).toEqual([])
+  })
+
+  it('keeps a genuine state card that lost its chip — its own command reaches it', () => {
+    const chipless =
+      '<details class="now" data-state="closing">\n  <summary><span class="t">Ein Betreff: Abschlussarbeiten</span>' +
+      '</summary>\n  <div class="body"><p>Vier-Augen fehlt.</p></div>\n</details>'
+    expect(dropStrayNowCards(withNow(chipless)).dropped).toEqual([])
+    // `closing <N>` replaces it, which is what makes keeping it safe.
+    const rewritten = toClosingWork(withNow(chipless), 651, {
+      subject: 'Ein Betreff',
+      reason: 'Nur noch die Retrospektive.',
+      stamp: '23:40',
+    })
+    expect(rewritten).not.toContain('Vier-Augen fehlt.')
+    expect(codes(rewritten)).toEqual([])
+  })
+
+  it('finds a card whose chip is separated from the summary by whitespace', () => {
+    const spaced =
+      '<details class="now">\n  <summary>\n    <span class="num">651</span>\n    <span class="t">Ein Betreff</span>' +
+      '\n  </summary>\n  <div class="body"><p>Läuft.</p></div>\n</details>'
+    const board = withNow(spaced)
+    expect(codes(board)).toEqual([])
+    // The gate accepted it, so the point commands must reach it too.
+    expect(setCardTitle(board, 651, 'Neu')).toContain('<span class="t">Neu</span>')
+    expect(toQueue(board, 651, { text: 'Zurück.' })).not.toContain('class="now"')
+  })
+
   it('drops a card that names neither a point nor a state, and says which', () => {
     const stray =
       '<details class="now">\n  <summary><span class="t">Irgendwas ohne Nummer</span></summary>\n' +

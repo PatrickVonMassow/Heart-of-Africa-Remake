@@ -338,10 +338,10 @@ describe('closeCard — archiving a point never empties the board', () => {
   })
 
   it('names the gap with --none when there is genuinely nothing to promote', () => {
-    const out = closeCard(board(), 300, { end: '16:45', text: 'Fertig.', none: 'Sitzungsgrenze, der Nachfolger übernimmt.' })
+    const out = closeCard(board(), 300, { end: '16:45', text: 'Fertig.', none: 'Sitzungsgrenze; der Nachfolger nimmt Punkt 417.' })
     expect(hasCurrentWork(out)).toBe(true)
     expect(out).toContain(NO_CURRENT_WORK_TITLE)
-    expect(out).toContain('Sitzungsgrenze, der Nachfolger übernimmt.')
+    expect(out).toContain('Sitzungsgrenze; der Nachfolger nimmt Punkt 417.')
   })
 
   it('REFUSES a bare close that would empty the section, naming both ways out', () => {
@@ -369,7 +369,7 @@ describe('closeCard — archiving a point never empties the board', () => {
     const before = new Set(auditDashboard(board(), { open: [416], done: [300] }).map((v) => v.code))
     for (const out of [
       closeCard(board(), 300, { text: 'Fertig.', end: '16:45', next: 416, nextStatus: 'Angefangen.' }),
-      closeCard(board(), 300, { text: 'Fertig.', end: '16:45', none: 'Warteschlange leer.' }),
+      closeCard(board(), 300, { text: 'Fertig.', end: '16:45', none: 'Warteschlange leer; als Nächstes Punkt 416.' }),
     ]) {
       const added = auditDashboard(out, { open: [416], done: [300] })
         .map((v) => v.code)
@@ -743,13 +743,13 @@ describe('the no-work card replaces rather than appends', () => {
 
   it('leaves exactly ONE idle card however often it is written', () => {
     let html = emptyBoard()
-    for (const reason of ['Sitzungsgrenze.', 'Immer noch Sitzungsgrenze.', 'Der Nachfolger übernimmt.']) {
+    for (const reason of ['Sitzungsgrenze; weiter mit Punkt 471.', 'Immer noch Sitzungsgrenze; Punkt 471 folgt.', 'Der Nachfolger nimmt Punkt 471.']) {
       html = toNoCurrentWork(html, reason, { stamp: '22:27' })
       expect(noCurrentWorkCards(html)).toHaveLength(1)
     }
     // …and the LAST reason is the one standing: it is a state, so it is current.
-    expect(html).toContain('Der Nachfolger übernimmt.')
-    expect(html).not.toContain('Immer noch Sitzungsgrenze.')
+    expect(html).toContain('Der Nachfolger nimmt Punkt 471.')
+    expect(html).not.toContain('Immer noch Sitzungsgrenze;')
   })
 
   it('is writable with NO point to close — the boundary case that forced the hand edit', () => {
@@ -773,13 +773,13 @@ describe('the no-work card replaces rather than appends', () => {
 
   it('refuses to claim idleness while a numbered card stands — the pair the user read', () => {
     const busy = fullBoard({ now: nowEntry(470, 'Läuft', '22:30 · ~23:00') })
-    expect(() => toNoCurrentWork(busy, 'Nichts läuft.')).toThrow(/refusing to claim that nothing is running/)
+    expect(() => toNoCurrentWork(busy, 'Nichts läuft; Punkt 471 folgt.')).toThrow(/refusing to claim that nothing is running/)
     // …and it names both sanctioned ways out rather than leaving a hand edit as the only one.
-    expect(() => toNoCurrentWork(busy, 'Nichts läuft.')).toThrow(/done 470 --none[\s\S]*queue 470/)
+    expect(() => toNoCurrentWork(busy, 'Nichts läuft; Punkt 471 folgt.')).toThrow(/done 470 --none[\s\S]*queue 470/)
   })
 
   it('is swept away the moment real work is promoted — the claim is then false', () => {
-    const idle = toNoCurrentWork(emptyBoard(), 'Sitzungsgrenze.', { stamp: '22:27' })
+    const idle = toNoCurrentWork(emptyBoard(), 'Sitzungsgrenze; weiter mit Punkt 471.', { stamp: '22:27' })
     const out = toNow(idle, 470, 'Angefangen.', { stamp: '22:30' })
     expect(noCurrentWorkCards(out)).toHaveLength(0)
     expect(claimsNoCurrentWork(out)).toBe(false)
@@ -788,10 +788,10 @@ describe('the no-work card replaces rather than appends', () => {
 
   it('closeCard --none still names the gap, and still only once', () => {
     const board = fullBoard({ now: nowEntry(300, 'Fertig', '10:07 · ~14:30') })
-    const once = closeCard(board, 300, { text: 'Fertig.', end: '16:45', none: 'Sitzungsgrenze.' })
+    const once = closeCard(board, 300, { text: 'Fertig.', end: '16:45', none: 'Sitzungsgrenze; weiter mit Punkt 301.' })
     expect(noCurrentWorkCards(once)).toHaveLength(1)
     // Writing it again over the standing one does not stack it.
-    expect(noCurrentWorkCards(toNoCurrentWork(once, 'Immer noch.'))).toHaveLength(1)
+    expect(noCurrentWorkCards(toNoCurrentWork(once, 'Immer noch; Punkt 301 folgt.'))).toHaveLength(1)
   })
 
   it('claimsNoCurrentWork reads the SECTION, not the whole document', () => {
@@ -878,7 +878,7 @@ describe('the closing card — a state that is NOT a claim to stop', () => {
   })
 
   it('REPLACES a standing idle card rather than joining it', () => {
-    const idle = toNoCurrentWork(emptyBoard(), 'Sitzungsgrenze.', { stamp: '23:30' })
+    const idle = toNoCurrentWork(emptyBoard(), 'Sitzungsgrenze; weiter mit Punkt 545.', { stamp: '23:30' })
     const out = toClosingWork(idle, 544, { reason: REASON, stamp: '23:40' })
     expect(noCurrentWorkCards(out)).toHaveLength(0)
     expect(closingWorkCards(out)).toHaveLength(1)

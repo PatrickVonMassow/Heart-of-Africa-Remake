@@ -25,7 +25,12 @@
 // alone, and spelling those titles a second time here is how the writer and the
 // gate would drift apart. board-core does not import this module, so the
 // direction cannot become a cycle.
-import { CLOSING_WORK_TITLE, NO_CURRENT_WORK_TITLE, looksLikeClosingTitle } from './board-core.mjs'
+import {
+  CLOSING_WORK_TITLE,
+  NO_CURRENT_WORK_TITLE,
+  looksLikeClosingTitle,
+  namesFollowOnWork,
+} from './board-core.mjs'
 
 /** The four sections, in the order the user's mandate fixes them. */
 export const REQUIRED_SECTIONS = [
@@ -231,20 +236,11 @@ export function stageOnlyTitle(title) {
 // same question the same way, or a card is accepted here and left standing there.
 export { looksLikeClosingTitle }
 
-/**
- * Does this handover card name the work that FOLLOWS? The one unnumbered card
- * carries no chip, so the point the successor picks up has to stand in its prose
- * — otherwise the single screen the reader has says nothing at all about what
- * happens next.
- */
-export function namesFollowOnWork(bodyText) {
-  // KNOWN LIMIT (four-eyes review, 12.08.2026): this asks that A point is named,
-  // not that it is the RIGHT one — the gate has no way to know which point just
-  // ended. It catches the card that names none at all, which is the reported
-  // defect; naming the finished point instead of the next one is a mistake only
-  // the author can avoid.
-  return /\b(?:punkt|point)\s*(\d{1,6})\b/i.test(String(bodyText ?? ''))
-}
+// Does the handover card name the work that FOLLOWS? The predicate lives in
+// board-core, beside the writer that now refuses a reason without one — a gate
+// that asked it differently from the writer would refuse what the sanctioned
+// command produces (four-eyes review, 12.08.2026).
+export { namesFollowOnWork }
 
 /**
  * (7) EVERY CURRENT-WORK CARD NAMES ITS POINT AND ITS SUBJECT (point 655).

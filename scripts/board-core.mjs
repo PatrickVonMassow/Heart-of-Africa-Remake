@@ -244,6 +244,9 @@ export function dropStrayNowCards(html) {
     if (/<span class="num">\s*\d+\s*<\/span>/.test(summary)) return card
     if (new RegExp(`<span class="t">\\s*\\d+\\s*${DASH}`).test(summary)) return card
     if (isStateCardTitle(title)) return card
+    // A genuine state card that lost its chip is still replaceable by its own
+    // command (`none`, `closing <N>`), so it is kept rather than swept.
+    if (/data-state="closing"/.test(card) && looksLikeClosingTitle(title)) return card
     dropped.push(title.trim() || '<untitled>')
     return ''
   })
@@ -327,7 +330,7 @@ function sectionBounds(html, key) {
  * unreplaceable in the first place.
  */
 const NOW_HEAD = (point) =>
-  `<details class="now"[^>]*>\\s*<summary>(?:<span class="num">${point}</span>|<span class="t">${point}\\s*${DASH})`
+  `<details class="now"[^>]*>\\s*<summary>\\s*(?:<span class="num">\\s*${point}\\s*</span>|<span class="t">\\s*${point}\\s*${DASH})`
 
 /** The current-work card for `point`, or null. */
 export function nowCard(html, point) {
@@ -557,6 +560,22 @@ const stateCardPattern = (kind) =>
     'g',
   )
 
+/**
+ * Is this card REALLY the state its marker claims (four-eyes review,
+ * 12.08.2026)? A marker is hand-writable and a state card is REPLACED, so a
+ * marker alone must never authorise a deletion: the idle card is unnumbered and
+ * carries its constant title, the closing card carries a composed closing title.
+ * Anything else keeps standing and the publish gate names it.
+ */
+function isTrulyStateCard(card, kind) {
+  const summary = (String(card).match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+  const title = ((summary.match(/<span class="t">([^<]*)<\/span>/) ?? [])[1] ?? '').trim()
+  if (kind === 'idle') {
+    return title === NO_CURRENT_WORK_TITLE && !/<span class="num">\s*\d+\s*<\/span>/.test(summary)
+  }
+  return looksLikeClosingTitle(title) || title === CLOSING_WORK_TITLE
+}
+
 const noWorkCardPattern = () => stateCardPattern('idle')
 const closingCardPattern = () => stateCardPattern('closing')
 
@@ -570,9 +589,14 @@ export function closingWorkCards(html) {
   return String(html ?? '').match(closingCardPattern()) ?? []
 }
 
-/** The document without any idle card. The state is REPLACED, never appended. */
+/**
+ * The document without any idle card. The state is REPLACED, never appended —
+ * but only where the card really IS the handover card: a numbered running card
+ * that somehow wears the idle marker is running work, and deleting it would cost
+ * exactly what the marker was introduced to protect.
+ */
 export function stripNoCurrentWork(html) {
-  return String(html ?? '').replace(noWorkCardPattern(), '')
+  return String(html ?? '').replace(noWorkCardPattern(), (card) => (isTrulyStateCard(card, 'idle') ? '' : card))
 }
 
 /**
@@ -586,10 +610,7 @@ export function stripNoCurrentWork(html) {
  * number, so `queue <N>`, `done <N>` and `title <N>` all reach it.
  */
 export function stripClosingWork(html) {
-  return String(html ?? '').replace(closingCardPattern(), (card) => {
-    const title = (card.match(/<span class="t">([^<]*)<\/span>/) ?? [])[1] ?? ''
-    return looksLikeClosingTitle(title) || title.trim() === CLOSING_WORK_TITLE ? '' : card
-  })
+  return String(html ?? '').replace(closingCardPattern(), (card) => (isTrulyStateCard(card, 'closing') ? '' : card))
 }
 
 /**
@@ -697,6 +718,16 @@ export function toNoCurrentWork(html, reason, { stamp = berlinStamp() } = {}) {
     stamp,
     emptyReason: 'board: --none needs a reason — the reader must learn WHY nothing is running',
     claim: 'that nothing is running',
+    // THE WRITER REFUSES WHAT ITS OWN GATE WOULD REFUSE (four-eyes review,
+    // 12.08.2026). `none "Sitzungsgrenze."` used to write a card the publish gate
+    // then rejected — a sanctioned command producing an unpublishable board is
+    // the worst of both, because the refusal arrives a step after the mistake.
+    precondition: (text) =>
+      namesFollowOnWork(text)
+        ? null
+        : 'board: the handover card is the one card without a number, so its reason must NAME the ' +
+          'point the batch picks up next ("… der Nachfolger nimmt Punkt 656"). The publish gate ' +
+          'refuses a handover card that names none.',
   })
 }
 
@@ -751,6 +782,18 @@ export function toClosingWork(html, point, { subject, reason, stamp = berlinStam
 }
 
 /**
+ * Does this text name a FOLLOW-ON point? It lives beside the writer that owes it,
+ * and the publish gate imports it, so the two cannot ask it differently.
+ *
+ * KNOWN LIMIT: it asks that A point is named, not that it is the RIGHT one —
+ * nothing here can know which point just ended. It catches the card that names
+ * none at all, which is the reported defect.
+ */
+export function namesFollowOnWork(text) {
+  return /\b(?:punkt|point)\s*(\d{1,6})\b/i.test(String(text ?? ''))
+}
+
+/**
  * The German subject a point is known by on this board: from its numbered chip
  * (a queue, Erledigt or current-work card) or from a title still written in the
  * pre-655 "651 — …" shape. Null when the point stands nowhere.
@@ -764,7 +807,7 @@ export function pointSubject(html, point) {
 }
 
 /** Write one state card, replacing whichever one stands. */
-function writeStateCard(html, { kind, point = null, title, text: reason, stamp, emptyReason, claim }) {
+function writeStateCard(html, { kind, point = null, title, text: reason, stamp, emptyReason, claim, precondition }) {
   const text = String(reason ?? '').trim()
   if (!text) throw new Error(emptyReason)
   const standing = standingPointCards(html)
@@ -775,6 +818,10 @@ function writeStateCard(html, { kind, point = null, title, text: reason, stamp, 
         `(done ${standing[0]} --none "<reason>") or send it back (queue ${standing[0]}).`,
     )
   }
+  // Judged AFTER the contradiction above, which is the more fundamental refusal:
+  // a card that may not be written at all owes no advice about its wording.
+  const objection = precondition ? precondition(text) : null
+  if (objection) throw new Error(objection)
   const card =
     `<details class="now"${STATE_ATTR(kind)}>\n  <summary>${point == null ? '' : numberChip(point)}` +
     `<span class="t">${title}</span>` +
@@ -946,10 +993,12 @@ export function setCardTitle(html, point, title) {
   // retitle only ever rewrites the SUBJECT — and a now-card still written in the
   // old shape ("439 — …") is lifted into the chip shape on the way.
   const bare = stripPointPrefix(text, point)
-  const chipRe = new RegExp(`(<details class="now"[^>]*>\\s*<summary><span class="num">${point}</span><span class="t">)[^<]*(</span>)`)
+  const chipRe = new RegExp(
+    `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*<span class="t">)[^<]*(</span>)`,
+  )
   if (chipRe.test(html)) return html.replace(chipRe, `$1${bare}$2`)
   const legacyRe = new RegExp(
-    `(<details class="now"[^>]*>\\s*<summary>)<span class="t">${point}\\s*${DASH}[^<]*(</span>)`,
+    `(<details class="now"[^>]*>\\s*<summary>\\s*)<span class="t">\\s*${point}\\s*${DASH}[^<]*(</span>)`,
   )
   if (legacyRe.test(html)) return html.replace(legacyRe, `$1${numberChip(point)}<span class="t">${bare}$2`)
   const queueRe = new RegExp(`(<summary><span class="num">${point}</span><span class="t">)[^<]*(</span>)`)
