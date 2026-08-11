@@ -379,44 +379,62 @@ export function cleanupWorktree(target, { dry = false, git: runGit = git, expect
     ourLock = taken.reason
     lockNote = taken.note
   }
-  const unlockOnRefusal = (reason) => {
-    if (weLocked) {
-      try {
-        runGit(['worktree', 'unlock', target])
-      } catch {
-        /* the tree stays locked and is reported; that is the safe direction */
-      }
+  const tryUnlock = () => {
+    if (!weLocked) return
+    try {
+      runGit(['worktree', 'unlock', target])
+    } catch {
+      /* already gone with the tree, or it stays and is reported — both are safe */
     }
+  }
+  const unlockOnRefusal = (reason) => {
+    tryUnlock()
     return refuse(reason)
   }
 
-  if (wants && exists) {
-    const match = matchesExpectation({
-      expected,
-      entry: worktreeEntry(target, runGit),
-      actual: readIdentity(target),
-      dirty: checkoutDirty(target, runGit),
-      ownLock: weLocked ? ourLock : '',
-    })
-    if (!match.ok) return unlockOnRefusal(`changed-under-cleanup: ${match.reason}`)
-  }
+  // A THROW MUST NOT LEAVE THE LOCK BEHIND. Every probe below catches its own
+  // failures, so this is the belt for the one nobody predicted: without it an
+  // unexpected exception would wedge the tree exactly the way a crash does, which
+  // is the failure this whole lock had to be made recoverable for.
+  try {
+    if (wants && exists) {
+      const match = matchesExpectation({
+        expected,
+        entry: worktreeEntry(target, runGit),
+        actual: readIdentity(target),
+        dirty: checkoutDirty(target, runGit),
+        ownLock: weLocked ? ourLock : '',
+      })
+      if (!match.ok) return unlockOnRefusal(`changed-under-cleanup: ${match.reason}`)
+    }
 
-  if (exists === false) {
+    if (exists === false) {
+      if (!dry) tryPrune(runGit)
+      // The stub outlives a half-finished removal too — that is exactly the state
+      // the guard used to find and report.
+      const stub = removeStubBranch(target, { dry, git: runGit })
+      return { ok: true, verdict, detached: [], stub, note: "already gone — only git's record was pruned" }
+    }
+    const detached = removeTreeSafely(target, {
+      dry,
+      git: runGit,
+      registered: verdict.reason === 'registered',
+      weLocked,
+    })
+    // UNLOCK BEFORE PRUNING, or the record outlives the tree FOREVER. `git
+    // worktree prune` SKIPS a locked worktree, and `removeTreeSafely` falls back
+    // to a plain delete whenever git's own removal refuses — so a fallback path
+    // would leave a deleted directory with a locked administrative record that no
+    // prune can ever clear. Where git's removal succeeded the lock went with it
+    // and this call simply fails, which is why it ignores its own error.
+    tryUnlock()
     if (!dry) tryPrune(runGit)
-    // The stub outlives a half-finished removal too — that is exactly the state
-    // the guard used to find and report.
     const stub = removeStubBranch(target, { dry, git: runGit })
-    return { ok: true, verdict, detached: [], stub, note: "already gone — only git's record was pruned" }
+    return { ok: true, verdict, detached, stub, ...(lockNote ? { lockNote } : {}) }
+  } catch (e) {
+    tryUnlock()
+    throw e
   }
-  const detached = removeTreeSafely(target, {
-    dry,
-    git: runGit,
-    registered: verdict.reason === 'registered',
-    weLocked,
-  })
-  if (!dry) tryPrune(runGit)
-  const stub = removeStubBranch(target, { dry, git: runGit })
-  return { ok: true, verdict, detached, stub, ...(lockNote ? { lockNote } : {}) }
 }
 
 function tryPrune(runGit = git) {
