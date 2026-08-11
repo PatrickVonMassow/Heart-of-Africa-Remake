@@ -198,7 +198,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   oder hängt an einer Rückfrage — beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
   Aufgabe. Bleib **nie mit einer Rückfrage stehen**: vernünftigste Annahme treffen, sichtbar
-  festhalten, was mich braucht, weitergehen."
+  festhalten, was mich braucht, weitergehen. Und jede Warteschleife muss auch beim **Fehler**
+  abbrechen, nicht nur beim Erfolg — sonst wartet sie geduldig auf etwas, das nie kommt."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, kurz,
@@ -405,4 +406,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 04a0f42d0f729f0db081332fb83b4f55c1765e8b84d77b54382ea911943245be -->
+<!-- GUIDE-FINGERPRINT: 60ef8689e00d17542d1921467f8afbf7c324d0aeb2d698625f13000ad6a4d1fd -->

@@ -710,6 +710,8 @@ Bemerkenswert ist die Asymmetrie. Was versioniert im Repository liegt, zieht sel
 
 **Lehre:** Eine Umgebung ist Teil des Systems, auch wenn sie nicht im Repository steht. Was ein Projekt zum Arbeiten braucht und NICHT versioniert ist, gehört auf eine ausdrückliche Liste, die ein Umzug abarbeitet — sonst ist der erste Beweis für ihre Existenz ihr Fehlen. Und die Prüfung „läuft das Projekt hier?" ist nicht dieselbe wie „arbeitet die Mechanik hier?": Die erste war in fünf Minuten grün, die zweite kostete einen halben Tag.
 
+**Nachtrag 11.08.2026 — die zweite Hälfte derselben Lücke.** Repariert wurde damals der Wächter: Er liest das Token seither aus dem Projekt. Das Kommandozeilenwerkzeug `gh` selbst blieb unangemeldet — und eine Wartestellung, die ich von Hand darauf baute, prüfte zehn Minuten lang einen Lauf ab, der längst grün war. Der Grund ist die eigentliche Lehre: Meine Schleife behandelte den Anmeldefehler wie ein „läuft noch". Ein Warten, dessen Abbruchbedingung nur den Erfolgsfall kennt, kann durch einen Fehler nie enden — es sieht von außen exakt aus wie Geduld. Wer wartet, muss den Fehlerfall genauso auswerten wie den Erfolgsfall, und wer ein Werkzeug von Hand aufruft, wo das Projekt einen eigenen Weg hat, zahlt dessen Umgebungsschulden erneut.
+
 ---
 
 ### 3.76 Ein Urteil gehört dem Stand, den es gemessen hat
@@ -1161,7 +1163,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 11.08.2026, 03:46 · Quellen-Fingerprint: `04a0f42d0f72…`
+Zuletzt aktualisiert: Dienstag, 11.08.2026, 07:44 · Quellen-Fingerprint: `60ef8689e00d…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1195,6 +1197,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is ONLY for four-eyes review and as the first fallback when Opus 5 is unavailable — never for \"hard\" tasks; Opus 5 handles those (user rule 25.07.2026, supersedes the earlier hard-task delegation) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | All journal texts (de + en) must carry emotional voice markup; English read-aloud runs via Kokoro TTS | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1242,8 +1245,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 73 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 47 Prozess-/Meta-TASKS-Punkte (davon 17 offen).
+Erfasste Quellen: 74 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 47 Prozess-/Meta-TASKS-Punkte (davon 17 offen).
 
-<!-- RETRO-FINGERPRINT: 04a0f42d0f729f0db081332fb83b4f55c1765e8b84d77b54382ea911943245be -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-11T01:46:12.853Z -->
+<!-- RETRO-FINGERPRINT: 60ef8689e00d17542d1921467f8afbf7c324d0aeb2d698625f13000ad6a4d1fd -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-11T05:44:27.108Z -->
 <!-- AUTO-GENERATED:END -->
