@@ -121,7 +121,7 @@ import { markActor } from '../actorLabelSource'
 import { RegionBorders } from './RegionBorders'
 import { Wildlife } from './Wildlife'
 import { collidableAnimalsNear } from './wildlifeCollision'
-import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, findFreeSpot, newStallState, updateStall } from '../../systems/unstuck'
+import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, escapeOutcome, findFreeSpot, newStallState, stuckHintDue, updateStall } from '../../systems/unstuck'
 
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js'
 import { releaseCascadeShadowMaps, type CascadedShadowNode } from '../../render/shadowRelease'
@@ -144,17 +144,23 @@ function travelScale(): number {
  * flora, the wildlife and the settlement footprints (design.md §11/§19). The
  * settlement circles stay ONE-WAY, so a traveller who already stands inside one
  * is never pushed out of it.
+ *
+ * `reach` is how far from (x,z) the returned set is COMPLETE, in world units: a
+ * caller that only steps one frame's distance needs a step's worth, one that may
+ * PLACE the traveller further out must ask for its own radius (work-order 610).
+ * Sampled once at the player and used over a wider ring, the set silently omits
+ * whatever stands out there, and the search lands him on a tree nobody looked at.
  */
-function travelObstacles(x: number, z: number, seed: number): Array<[number, number, number]> {
-  const out = collidableFloraNear(x, z, seed)
-  for (const a of collidableAnimalsNear(x, z, TRAVEL_PLAYER_RADIUS + 1.5)) out.push(a)
+function travelObstacles(x: number, z: number, seed: number, reach: number): Array<[number, number, number]> {
+  const out = collidableFloraNear(x, z, seed, reach + TRAVEL_PLAYER_RADIUS)
+  for (const a of collidableAnimalsNear(x, z, TRAVEL_PLAYER_RADIUS + reach)) out.push(a)
   const places = settlementColliders(
     x,
     z,
     PLACE_WORLD_POSITIONS,
     settlementCollisionRadius(balance.placeEnterRadius, balance.placeCollisionFactor),
     TRAVEL_PLAYER_RADIUS,
-    1,
+    reach,
   )
   for (const c of places) out.push(c)
   return out
@@ -1072,6 +1078,16 @@ const COLLIDABLE_FLORA: Partial<Record<Species, number>> = {
   kopje: 1.0,
 }
 
+/** The widest circle a collidable plant can carry: the largest species at the
+ *  largest per-instance scale (the `0.75 + r4 * 0.55` factor below). A query
+ *  bound needs it as slop — a trunk whose CENTRE lies just outside the radius
+ *  asked for still reaches into it. */
+const MAX_FLORA_RADIUS = Math.max(...Object.values(COLLIDABLE_FLORA).filter((r) => r !== undefined)) * 1.3
+
+/** Default reach of a dressing query: one travel frame's step with room to
+ *  spare. Callers that place the traveller further out pass their own. */
+const FLORA_QUERY_REACH = 3
+
 interface PlacedFlora {
   species: Species
   x: number
@@ -1197,21 +1213,36 @@ function evictFloraChunkCache(cx: number, cz: number, range: number): void {
  * phantom collider, and restricted to the player's chunk neighbourhood and the
  * LARGE collidable species only (small or sparse dressing never blocks — "no
  * getting stuck on a blade of grass", user decision, point 129).
+ *
+ * `reach` is the radius around (px,pz) the answer is COMPLETE for: every plant
+ * whose circle touches that disc is returned, and the chunk neighbourhood widens
+ * with it, so a caller looking further out than a step is never handed a short
+ * list (work-order 610).
  */
 // Exported for the collision tests (communicationRock.test.ts, which pins the
 // erratic's circle to the site the scene draws); not a component.
 // eslint-disable-next-line react/only-export-components
-export function collidableFloraNear(px: number, pz: number, seed: number): Array<[number, number, number]> {
+export function collidableFloraNear(
+  px: number,
+  pz: number,
+  seed: number,
+  reach = FLORA_QUERY_REACH,
+): Array<[number, number, number]> {
   const out: Array<[number, number, number]> = []
   const pcx = Math.floor(px / CHUNK_SIZE)
   const pcz = Math.floor(pz / CHUNK_SIZE)
-  const QUERY = 3 // only dressing this close can block the traveller
-  for (let dz = -1; dz <= 1; dz++) {
-    for (let dx = -1; dx <= 1; dx++) {
+  // Only dressing this close can block a candidate inside `reach`; the widest
+  // trunk is the slop on top of it.
+  const QUERY = reach + MAX_FLORA_RADIUS
+  // Enough chunks that the whole query square is covered, never fewer than the
+  // neighbours a step-sized query needs.
+  const span = Math.max(1, Math.ceil(QUERY / CHUNK_SIZE))
+  for (let dz = -span; dz <= span; dz++) {
+    for (let dx = -span; dx <= span; dx++) {
       for (const placed of placedFloraChunk(pcx + dx, pcz + dz, seed)) {
         const baseR = COLLIDABLE_FLORA[placed.species]
         if (baseR === undefined) continue
-        if (Math.abs(placed.x - px) > QUERY + 1.2 || Math.abs(placed.z - pz) > QUERY + 1.2) continue
+        if (Math.abs(placed.x - px) > QUERY || Math.abs(placed.z - pz) > QUERY) continue
         out.push([placed.x, placed.z, baseR * (0.75 + placed.r4 * 0.55)])
       }
     }
@@ -1221,7 +1252,7 @@ export function collidableFloraNear(px: number, pz: number, seed: number): Array
   // (work-order 482) — never a second, hand-kept position.
   const rock = communicationRockSite(seed)
   const rw = latLonToWorld(rock.lat, rock.lon)
-  if (Math.abs(rw.x - px) <= QUERY + rock.radius && Math.abs(rw.z - pz) <= QUERY + rock.radius) {
+  if (Math.abs(rw.x - px) <= reach + rock.radius && Math.abs(rw.z - pz) <= reach + rock.radius) {
     out.push([rw.x, rw.z, rock.radius])
   }
   return out
@@ -2916,25 +2947,41 @@ export function TravelScene() {
       if (useUi.getState().dialog) return
       const g = useGame.getState()
       const p = g.pos
-      const obstacles = travelObstacles(p.x, p.z, g.seed)
       const scale = travelScale()
+      const maxRadius = balance.unstuck.searchRadius * scale
+      // The obstacles are sampled ONCE, at the player, but the rings reach as
+      // far as `maxRadius` — so the query must reach that far too (work-order
+      // 610). Asking only for a step's worth left the outer rings blind, and a
+      // landing spot could overlap a tree the search never saw: the next frame's
+      // resolver pushes him out again, which is a hit papered over, not a place.
+      const obstacles = travelObstacles(p.x, p.z, g.seed, maxRadius)
       const free = (x: number, z: number) => {
         const ll = worldToLatLon(x, z)
         if (isBlocked(sampleTerrain(ll.lat, ll.lon, g.seed).type, ll.lat, ll.lon)) return false
         return obstacles.every(([ox, oz, r]) => Math.hypot(x - ox, z - oz) >= r + TRAVEL_PLAYER_RADIUS)
       }
-      const { pos } = findFreeSpot(p.x, p.z, {
+      const { pos, found } = findFreeSpot(p.x, p.z, {
         step: balance.unstuck.searchStep * scale,
-        maxRadius: balance.unstuck.searchRadius * scale,
+        maxRadius,
         accept: free,
         blocked: (x, z) => obstacles.some(([ox, oz, r]) => Math.hypot(x - ox, z - oz) < r),
         // Nothing within reach: he stays where he is rather than being flung
         // across the continent — the map has no entry point to fall back on.
         fallback: [p.x, p.z],
       })
-      useGame.setState({ pos: { x: pos[0], z: pos[1] } })
-      travelStall.current = newStallState(pos[0], pos[1])
-      g.setToast(getStrings().toasts.unstuckFreed)
+      // Report what happened, not what was hoped for (work-order 610): with
+      // nothing free within reach the fallback IS his own position, so no state
+      // changes — and the stall state is LEFT standing, because he is still
+      // stuck and the hint must remain true.
+      const outcome = escapeOutcome(p.x, p.z, { pos, found })
+      const t = getStrings().toasts
+      if (outcome === 'freed') {
+        useGame.setState({ pos: { x: pos[0], z: pos[1] } })
+        travelStall.current = newStallState(pos[0], pos[1])
+      }
+      g.setToast(
+        outcome === 'freed' ? t.unstuckFreed : outcome === 'alreadyFree' ? t.unstuckAlreadyFree : t.unstuckNoRoom,
+      )
     })
     return off
   }, [])
@@ -2999,7 +3046,7 @@ export function TravelScene() {
         stallSeconds: balance.unstuck.stallSeconds,
       })
       const strings = getStrings()
-      if (travelStall.current.stuck && !before) {
+      if (stuckHintDue(travelStall.current.stuck, before, movingInput, useGame.getState().toast !== null)) {
         useGame.getState().setToast(strings.toasts.stuckHint(UNSTUCK_KEY_LABEL))
       } else if (!travelStall.current.stuck && before) {
         const g = useGame.getState()

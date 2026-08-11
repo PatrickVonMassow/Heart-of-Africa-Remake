@@ -89,7 +89,7 @@ import { releasePointerLock, requestPlacePointerLock } from './pointerLock'
 import { ActorLabels } from '../ActorLabels'
 import { markActor } from '../actorLabelSource'
 import { resolveMove, standingClear, PLAYER_RADIUS } from './collision'
-import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, findFreeSpot, newStallState, updateStall } from '../../systems/unstuck'
+import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, escapeOutcome, findFreeSpot, newStallState, stuckHintDue, updateStall } from '../../systems/unstuck'
 import { buildBoundaryLut, isOutsidePlace } from './boundary'
 import {
   RIVER_HALF_LENGTH,
@@ -2504,7 +2504,7 @@ export function PlaceScene() {
       const l = layoutRef.current
       if (!l) return
       const p = player.current
-      const { pos } = findFreeSpot(p.x, p.z, {
+      const { pos, found } = findFreeSpot(p.x, p.z, {
         step: balance.unstuck.searchStep,
         maxRadius: balance.unstuck.searchRadius,
         // Free ground here is the full rule: no collider touches his footprint,
@@ -2516,16 +2516,28 @@ export function PlaceScene() {
         // Free by construction: the place's own entry point (design.md §2.3).
         fallback: [0, l.spawnZ],
       })
-      p.x = pos[0]
-      p.z = pos[1]
-      placePlayerPosition.x = p.x
-      placePlayerPosition.z = p.z
-      // Stop dead where he lands: carrying the velocity that pressed him into the
-      // wedge would walk him straight back in.
-      walk.current.velF = 0
-      walk.current.velS = 0
-      stall.current = newStallState(p.x, p.z)
-      useGame.getState().setToast(getStrings().toasts.unstuckFreed)
+      // Say what happened, never more (work-order 610): a search that carried
+      // him nowhere may not report a rescue. Here the fallback is the entry
+      // point, so a failed search still MOVES him — that is a rescue; standing
+      // free already is not.
+      const outcome = escapeOutcome(p.x, p.z, { pos, found })
+      const t = getStrings().toasts
+      if (outcome === 'freed') {
+        p.x = pos[0]
+        p.z = pos[1]
+        placePlayerPosition.x = p.x
+        placePlayerPosition.z = p.z
+        // Stop dead where he lands: carrying the velocity that pressed him into the
+        // wedge would walk him straight back in.
+        walk.current.velF = 0
+        walk.current.velS = 0
+        stall.current = newStallState(p.x, p.z)
+      }
+      useGame
+        .getState()
+        .setToast(
+          outcome === 'freed' ? t.unstuckFreed : outcome === 'alreadyFree' ? t.unstuckAlreadyFree : t.unstuckNoRoom,
+        )
     })
     return off
   }, [])
@@ -2690,9 +2702,10 @@ export function PlaceScene() {
     // on purpose would teleport him for nothing.
     {
       const before = stall.current.stuck
-      stall.current = updateStall(stall.current, p.x, p.z, tf !== 0 || ts !== 0, dt, balance.unstuck)
+      const moving = tf !== 0 || ts !== 0
+      stall.current = updateStall(stall.current, p.x, p.z, moving, dt, balance.unstuck)
       const strings = getStrings()
-      if (stall.current.stuck && !before) {
+      if (stuckHintDue(stall.current.stuck, before, moving, useGame.getState().toast !== null)) {
         useGame.getState().setToast(strings.toasts.stuckHint(UNSTUCK_KEY_LABEL))
       } else if (!stall.current.stuck && before) {
         // He moved again: the hint goes with the wedge it described.

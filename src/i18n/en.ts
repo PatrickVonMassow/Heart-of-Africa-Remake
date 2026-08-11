@@ -400,6 +400,8 @@ export const en: Strings = {
     orientationGained: 'In thanks for the gift, they point out the important buildings to me.',
     stuckHint: (key) => `Wedged in? Press ${key} to work free.`,
     unstuckFreed: 'I worked myself loose and stand on open ground again.',
+    unstuckAlreadyFree: 'Nothing holds me here — the ground under my boots is open already.',
+    unstuckNoRoom: 'I find no open ground within reach; here I must dig myself out step by step.',
   },
 
   dialogs: {

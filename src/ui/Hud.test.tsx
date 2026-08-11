@@ -7,7 +7,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { render, fireEvent } from '@testing-library/react'
 import { Hud, LoadMenu } from './Hud'
 import { en } from '../i18n/en'
+import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
+import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL } from '../systems/unstuck'
 import { useGame, canCampHere } from '../state/store'
 import { START_YEAR } from '../config/balance'
 import { MONTH_KEYS } from '../systems/season'
@@ -449,6 +451,47 @@ describe('Touch controls mount only with ui.touchActive (design.md §17.5, point
     fireEvent.click(tappable)
     window.removeEventListener('keydown', onKey)
     expect(sawSpace).toBe(true)
+  })
+
+  // Work-order 610: a touch-only player has no U key, so the hint that names it
+  // must BE the button — otherwise the escape of 604 exists but is unreachable
+  // for him, and a wedge still costs the expedition.
+  it('makes the stuck hint tappable on touch and dispatches the key it names', () => {
+    g().setToast(en.toasts.stuckHint(UNSTUCK_KEY_LABEL))
+    const { rerender } = render(<Hud />)
+    // Desktop: a plain notice, nothing to press.
+    expect(document.querySelector('.toast')?.tagName).toBe('DIV')
+    expect(document.querySelector('.toast-tappable')).toBeNull()
+    useUi.setState({ touchActive: true })
+    rerender(<Hud />)
+    const tappable = document.querySelector('.toast-tappable') as HTMLButtonElement
+    expect(tappable).not.toBeNull()
+    expect(tappable.tagName).toBe('BUTTON')
+    expect(tappable.textContent).toBe(en.toasts.stuckHint(UNSTUCK_KEY_LABEL))
+    const seen: string[] = []
+    const onKey = (e: KeyboardEvent) => seen.push(e.code)
+    window.addEventListener('keydown', onKey)
+    fireEvent.click(tappable)
+    window.removeEventListener('keydown', onKey)
+    expect(seen).toContain(UNSTUCK_KEY_CODE)
+  })
+
+  it('leaves every other toast a plain label, even on touch', () => {
+    useUi.setState({ touchActive: true })
+    g().setToast(en.toasts.unstuckFreed)
+    render(<Hud />)
+    expect(document.querySelector('.toast')?.tagName).toBe('DIV')
+    expect(document.querySelector('.toast-tappable')).toBeNull()
+  })
+
+  it('the tappable hint follows the language, so a German player taps his own text', () => {
+    useUi.setState({ touchActive: true })
+    useLocale.getState().setLang('de')
+    g().setToast(de.toasts.stuckHint(UNSTUCK_KEY_LABEL))
+    render(<Hud />)
+    const tappable = document.querySelector('.toast-tappable') as HTMLButtonElement
+    expect(tappable).not.toBeNull()
+    expect(tappable.textContent).toBe(de.toasts.stuckHint(UNSTUCK_KEY_LABEL))
   })
 })
 

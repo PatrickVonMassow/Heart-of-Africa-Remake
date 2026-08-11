@@ -69,6 +69,18 @@ await page.addInitScript(() => {
   }
   window.__colliderSize = (c) => (c.kind === 'box' ? Math.max(c.hx, c.hz) : c.r)
 })
+// A virtual standard-mapped pad (work-order 610), so the unstuck section can
+// prove the escape is reachable without a keyboard. Nothing is pressed and no
+// axis is pushed, so the deliberate-input guard keeps it dormant for every other
+// section — an idle pad steers nothing (design.md §17.5).
+await page.addInitScript(() => {
+  window.__pad = {
+    id: 'virtual', index: 0, connected: true, mapping: 'standard', timestamp: 0,
+    axes: [0, 0, 0, 0],
+    buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+  }
+  Object.defineProperty(navigator, 'getGamepads', { value: () => [window.__pad] })
+})
 // Point 375: every frame declares what it must show and the shutter projects
 // that subject before the file is written. It lives ABOVE the section blocks
 // because three of them photograph — a helper declared inside one section is
@@ -784,6 +796,51 @@ if (section('unstuck')) {
       p.pitch = 0
     })
     await shot('604-unstuck-freed', { place: 'bambara-village', label: 'the freed position' })
+
+    // AND THE PAD REACHES IT TOO (work-order 610). The escape was keyboard-only:
+    // no button carried it, so a pad-only player who was wedged still lost the
+    // expedition — the very loss it exists to prevent. The MAP is pinned in the
+    // unit layer; what only the live scene can show is that the rAF button poll
+    // turns the press into the key the handler listens for, and that the handler
+    // then frees him for real. The button is pulsed with clean edges until the
+    // key lands, never on a fixed wall-clock tap (point 184).
+    await page.evaluate((w) => {
+      window.__padKeys = []
+      window.addEventListener('keydown', (e) => window.__padKeys.push(e.code))
+      const p = window.__placePlayer
+      p.x = w.x
+      p.z = w.z
+      p.yaw = 0
+      p.pitch = 0
+      window.__game.getState().setToast(null)
+    }, wedge)
+    const L3 = 10 // left stick press: the button design.md §17.5's map leaves free
+    // Pressed ONCE and held: the poll fires on the rising edge, so the wait is on
+    // the key's own arrival, never on the wall clock (the button is released
+    // afterwards, and the handler has already run by then — it is synchronous
+    // with the keydown the poll dispatches).
+    await page.evaluate((i) => (window.__pad.buttons[i] = { pressed: true, touched: true, value: 1 }), L3)
+    const padKeyed = await page
+      .waitForFunction(() => (window.__padKeys ?? []).includes('KeyU'), null, { timeout: 30000 })
+      .then(() => true)
+      .catch(() => false)
+    await page.evaluate((i) => (window.__pad.buttons[i] = { pressed: false, touched: false, value: 0 }), L3)
+    check(
+      'PoC village: a gamepad button reaches the escape at all (L3 → the U handler)',
+      padKeyed,
+      padKeyed ? 'the poll dispatched KeyU' : 'no KeyU reached the keyboard pipeline',
+    )
+    const padFreed = await page.evaluate((w) => {
+      const p = window.__placePlayer
+      let worst = Infinity
+      for (const c of window.__placeColliders) worst = Math.min(worst, window.__clearanceTo(c, p.x, p.z) - 0.35)
+      return { clearance: worst, moved: Math.hypot(p.x - w.x, p.z - w.z), toast: document.querySelector('.toast')?.textContent ?? '' }
+    }, wedge)
+    check(
+      'PoC village: and the pad press frees him for real, not just as a message',
+      padKeyed && padFreed.clearance >= 0 && padFreed.moved > 0,
+      `clearance ${padFreed.clearance.toFixed(3)} m, moved ${padFreed.moved.toFixed(2)} m, toast "${padFreed.toast}"`,
+    )
   }
 }
 

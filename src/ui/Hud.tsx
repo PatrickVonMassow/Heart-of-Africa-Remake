@@ -23,6 +23,7 @@ import { TouchControls } from './TouchControls'
 import { dispatchSyntheticKey, onKeyPress, onTouchEngage } from '../systems/input'
 import { benchmarkFromUrl, startBenchmarkSafely } from '../systems/startBenchmark'
 import { getStrings, useStrings } from '../i18n'
+import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL } from '../systems/unstuck'
 
 function InventoryBar() {
   const t = useStrings()
@@ -138,12 +139,26 @@ function InventoryBar() {
 function Toast() {
   const toast = useGame((s) => s.toast)
   const setToast = useGame((s) => s.setToast)
+  const touchActive = useUi((s) => s.touchActive)
+  const strings = useStrings()
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => setToast(null), 3500)
     return () => clearTimeout(t)
   }, [toast, setToast])
   if (!toast) return null
+  // The stuck hint is the only route to the escape for a player with no keyboard
+  // (work-order 610), so on touch it is an ACTION, not a notice: a tap dispatches
+  // the very key it names, exactly as the interaction prompt does — one input
+  // path. It is recognised by its own text, the way the scenes that raise it
+  // clear it again. Every other toast stays a plain label.
+  if (touchActive && toast === strings.toasts.stuckHint(UNSTUCK_KEY_LABEL)) {
+    return (
+      <button className="toast toast-tappable" onClick={() => dispatchSyntheticKey(UNSTUCK_KEY_CODE)}>
+        {toast}
+      </button>
+    )
+  }
   return <div className="toast">{toast}</div>
 }
 
