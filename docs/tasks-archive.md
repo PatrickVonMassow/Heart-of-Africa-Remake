@@ -17493,3 +17493,36 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   union that accounts for every entry passes. Plus one real run: the union of a genuine
   blind-parallel stage, merged by Fable 5, accounts for every entry of both lists.
   Criticality: HIGH — it decides whether a four-eyes stage keeps what it found.
+
+- [x] 640. A RED IS NOT CLOSED BY PASSING AFTERWARDS (user 11.08.2026: "Du behauptest oft,
+  ein Fehlschlagen sei aufgrund von Last passiert und nicht wegen eines Bugs. Und als Beleg
+  dafür nennst du, dass es jetzt x mal hintereinander geklappt hat. Das ist aber kein Beweis
+  … Wenn ein Test manchmal schief läuft, ist das alarmierend"). He is right, and I did it
+  the same morning: the Giza red of 11.08.2026 was declared "load, not a defect" on the
+  strength of three green section runs and nothing else. Three greens are consistent with a
+  fixed defect, a rare defect, a timing race and a machine that happened to be idle — they
+  distinguish none of them.
+  WHAT PROOF ACTUALLY LOOKS LIKE, measured the same day on the neighbouring case: the point-600
+  agent did not argue from repetition. It REPRODUCED the failure deterministically under a CPU
+  throttle (8 of 8), NAMED the mechanism (the check read state and DOM in two separate round
+  trips, so under load it compared a full list against an empty one), FIXED it, and showed
+  0 of 8 afterwards — plus the same throttle at the old state to prove the defect predated the
+  branch. That is a cause, and it is the standard.
+  FINAL STATE:
+  1. A red may be closed in exactly three ways: its CAUSE is named and fixed; it is CHARGED to
+     an open point that owns it (`scripts/render-verify-charges.mjs`, as today); or it is filed
+     as an OPEN point of its own. "It passed on the retry" is none of them.
+  2. THE RETRY STOPS BEING AN ANSWER. The suite's one retry stays — it keeps a rotating flake
+     from blocking a run — but a run that only passed on the retry is recorded as SUSPECT with
+     the check's name, and a SUSPECT record cannot serve as the covering evidence for a
+     landing. Today the retry's "PASSED ON RETRY" line is prose in a log nobody re-reads.
+  3. THE THROTTLE PROBE BECOMES A HOUSE INSTRUMENT, not a trick one agent invented: one command
+     runs a named section under a CPU throttle N times and reports the skew rate, so "is this
+     load-dependent" is answered by a measurement in minutes instead of by an argument.
+  4. The open reds of 11.08.2026 are settled by this rule rather than by memory: the Giza
+     `settlement-edge` red gets point 641; the goat stance red stays charged to 506.
+  VERIFIABLE: Vitest over the pure record logic — a run whose first attempt failed is SUSPECT
+  even though it exited 0; a SUSPECT run is refused as covering evidence; a charged red is
+  accepted; an unexplained red is refused with the three ways out named. Plus the throttle
+  command reproducing the point-600 measurement (8/8 before the fix on the old state).
+  Criticality: HIGH — it is the difference between a verification and a ritual.
