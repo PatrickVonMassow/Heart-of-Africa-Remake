@@ -219,7 +219,44 @@ export function chargeReds(reds, { suite = '', backend = '', ledger = RED_CHARGE
 }
 
 /**
- * WHAT ONE RECORDED RUN IS WORTH (point 550). Four verdicts, and the difference
+ * THE ENV VAR THAT MARKS A RETRY (point 640). run-all.mjs sets it on the RETRY
+ * child only, carrying what the FIRST attempt failed on; the recorder stamps the
+ * record SUSPECT from it. Same principle as the section flag: the runner knows a
+ * run is a retry, the suite cannot, and a suite must not be able to forget it.
+ */
+export const RETRY_ENV = 'VERIFY_RETRY_AFTER'
+
+/** What run-all puts in that variable: the first attempt's failing check names,
+ *  newline-separated. A retry that has no names to give (a crash, a wall-timeout
+ *  kill) still says SOMETHING — the run is a retry either way, and an empty value
+ *  would read as "not a retry". Bounded, because it travels in an environment. */
+export const SUSPECT_UNNAMED = 'the first attempt failed without naming a check'
+const MAX_SUSPECT_NAMES = 8
+const MAX_SUSPECT_NAME_LEN = 200
+
+/** Format the names for the env var. Total: never throws. */
+export function formatSuspectEnv(names) {
+  const list = (Array.isArray(names) ? names : [])
+    .map((n) => String(n?.name ?? n ?? '').trim())
+    .filter(Boolean)
+    .slice(0, MAX_SUSPECT_NAMES)
+    .map((n) => n.slice(0, MAX_SUSPECT_NAME_LEN))
+  return (list.length ? list : [SUSPECT_UNNAMED]).join('\n')
+}
+
+/** Read it back. `[]` means "this run is not a retry" — an unset or blank value
+ *  must never mark an ordinary run suspect (a stale export would else condemn
+ *  every run in the shell). Total: never throws. */
+export function parseSuspectEnv(value) {
+  return String(value ?? '')
+    .split('\n')
+    .map((n) => n.trim())
+    .filter(Boolean)
+    .slice(0, MAX_SUSPECT_NAMES)
+}
+
+/**
+ * WHAT ONE RECORDED RUN IS WORTH (point 550). Five verdicts, and the difference
  * between the first two must stay visible everywhere it is reported:
  *
  *   clean     — exit 0. The picture was judged and nothing was red.
@@ -234,6 +271,18 @@ export function chargeReds(reds, { suite = '', backend = '', ledger = RED_CHARGE
  *               so the record says nothing about the rest. Judged FIRST, before
  *               the exit code, because its exit code is exactly what must not
  *               clear the gate.
+ *   suspect   — it PASSED ON THE RETRY (point 640): the first attempt of the same
+ *               suite failed, and nothing about the second run explains why. "It
+ *               worked the next time" is consistent with a fixed defect, a rare
+ *               one, a timing race and an idle machine — it distinguishes none of
+ *               them, so it proves nothing and covers nothing. Judged before the
+ *               exit code for the same reason as partial: the exit 0 is exactly
+ *               what must not clear the gate. The way OUT is a cause: fix it, or
+ *               charge the red to the open point that owns it, or file it as one.
+ *
+ * A retry that failed AGAIN is not judged here — its own reds are, below: two
+ * failures are evidence, and a red every one of whose checks a known open point
+ * owns stays ACCOUNTED FOR whether it was a retry or not.
  *
  * `openPoints` is the chargeable set (chargeablePoints); omitted, NOTHING is
  * chargeable and only a clean run covers — the strict default, so a caller that
@@ -253,6 +302,21 @@ export function runVerdict(run, { openPoints = null } = {}) {
       covers: false,
       charges: [],
       unaccounted: [{ name: `the run covered only section ${which} of the suite (--section)`, point: null }],
+    }
+  }
+  if (run.suspect === true && Number(run.exit) === 0) {
+    const names = parseSuspectEnv((Array.isArray(run.suspectOf) ? run.suspectOf : []).join('\n'))
+    const which = names.length ? names.map((n) => `"${n}"`).join('; ') : SUSPECT_UNNAMED
+    return {
+      status: 'suspect',
+      covers: false,
+      charges: [],
+      unaccounted: [
+        {
+          name: `it passed only on the RETRY — the first attempt failed on ${which}, and nothing here says why`,
+          point: null,
+        },
+      ],
     }
   }
   if (Number(run.exit) === 0) return { status: 'clean', covers: true, charges: [], unaccounted: [] }
@@ -550,10 +614,12 @@ export function evaluate(input) {
       'passing runs are recorded automatically by the suite itself), then INSPECT the frames of ' +
       'both backends. ' +
       (whyNot.length
-        ? `WHY THE LAST ATTEMPT DID NOT COUNT — ${whyNot.join(' | ')}. A red that a KNOWN open ` +
-          'point already owns is charged to it in scripts/render-verify-charges.mjs and the run ' +
-          'then counts as ACCOUNTED FOR (never as a pass); a red nobody has filed is a FINDING, ' +
-          'not a ledger entry. '
+        ? `WHY THE LAST ATTEMPT DID NOT COUNT — ${whyNot.join(' | ')}. A RED CLOSES IN EXACTLY ` +
+          'THREE WAYS (point 640): (1) its CAUSE is named and fixed; (2) it is CHARGED in ' +
+          'scripts/render-verify-charges.mjs to the OPEN point that owns it, and the run then ' +
+          'counts as ACCOUNTED FOR (never as a pass); (3) it becomes an OPEN point of its own. ' +
+          'Running it again until it passes is none of them. To ask whether it is load rather ' +
+          'than argue it: node scripts/throttle-probe.mjs <suite> --section=<name> --runs 8. '
         : '') +
       'ONLY if one backend genuinely cannot be judged headless (e.g. a washed-out ' +
       'WebGPU frame — that is a FINDING, not a pass), record a loud deferral: ' +

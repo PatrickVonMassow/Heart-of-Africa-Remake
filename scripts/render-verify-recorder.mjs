@@ -14,6 +14,12 @@
 // exit code. The flag comes from the env the runner set, never from the suite —
 // a suite cannot forget to declare its own partiality.
 //
+// A run that is the RETRY of a failed attempt is recorded SUSPECT (point 640),
+// whatever its exit code: runVerdict then refuses it as coverage, because "it
+// passed the second time" explains nothing. Like the section flag, it comes from
+// the env the runner set — the suite cannot know it is a retry, and must not be
+// able to forget it.
+//
 // A RED run is recorded with its REDS (point 550): every failing check and
 // console error it printed, each charged to the open work-order point that owns
 // it (scripts/render-verify-charges.mjs) or to nothing. That is what lets the
@@ -30,7 +36,7 @@ import { fileURLToPath } from 'node:url'
 import { recordRun } from './render-verify-state.mjs'
 import { failedChecks } from './verify/baseline-classify-core.mjs'
 import { SECTION_ENV, sectionGateWasBuilt } from './verify/sections.mjs'
-import { chargeReds } from './render-verify-core.mjs'
+import { RETRY_ENV, chargeReds, parseSuspectEnv } from './render-verify-core.mjs'
 
 // Resolved from this module's own location where that is possible, with a
 // working-directory fallback: under the test runner `import.meta.url` is not
@@ -146,6 +152,10 @@ export function armRunRecorder(backend) {
       // declare its own partiality, and the flag is what makes runVerdict refuse
       // the record as coverage. Empty/unset means the suite ran whole.
       section: String(process.env[SECTION_ENV] ?? '').trim() || null,
+      // What the FIRST attempt of this suite failed on, when this run is a retry
+      // (point 640). Empty means "not a retry" — the runner blanks the variable
+      // for a first attempt, so a stale export cannot condemn an ordinary run.
+      suspectOf: parseSuspectEnv(process.env[RETRY_ENV]),
       startedAt: Date.now(),
       asserted: false,
       // The WebGPU feature level the run really came up at, filled in by
@@ -232,6 +242,7 @@ export function armRunRecorder(backend) {
           screenshotCount: shots.length,
           screenshots: shots.slice(0, 12),
           ...(armed.section ? { partial: true, section: armed.section } : {}),
+          ...(armed.suspectOf.length ? { suspect: true, suspectOf: armed.suspectOf } : {}),
           ...(exit !== 0 ? { reds: reds.slice(0, MAX_RECORDED_REDS), crashed: armed.crashed } : {}),
         })
       } catch {

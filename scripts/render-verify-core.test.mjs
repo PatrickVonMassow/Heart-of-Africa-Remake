@@ -24,6 +24,9 @@ import {
   chargeablePoints,
   chargeFor,
   runVerdict,
+  formatSuspectEnv,
+  parseSuspectEnv,
+  SUSPECT_UNNAMED,
 } from './render-verify-core.mjs'
 import { RED_CHARGES } from './render-verify-charges.mjs'
 import { failedChecks } from './verify/baseline-classify-core.mjs'
@@ -705,6 +708,91 @@ describe('runVerdict — clean, accounted for, or red', () => {
     expect(runVerdict(null).covers).toBe(false)
     expect(runVerdict({ exit: 1, reds: 'nonsense' }, { openPoints }).covers).toBe(false)
     expect(() => runVerdict({ exit: 1, reds: [null, 7] }, { openPoints })).not.toThrow()
+  })
+})
+
+describe('runVerdict — the run that passed only on the RETRY (point 640)', () => {
+  const openPoints = [506, 546]
+  /** The record the retry writes: it exited 0, and it carries what the FIRST
+   *  attempt failed on. */
+  const suspectRun = (backend, at, names = ['the goat stance — worst travel 0.967'], overrides = {}) => ({
+    ...run(backend, at),
+    suite: 'polish',
+    suspect: true,
+    suspectOf: names,
+    ...overrides,
+  })
+
+  it('calls it SUSPECT even though it exited 0, and never lets it cover', () => {
+    const v = runVerdict(suspectRun('webgpu', 2000), { openPoints })
+    expect(v.status).toBe('suspect')
+    expect(v.covers).toBe(false)
+    expect(coveringRun([suspectRun('webgpu', 2000)], 'webgpu', 1000, { openPoints })).toBeNull()
+  })
+
+  it('names the check the first attempt failed on, so the red is not lost with the log line', () => {
+    const v = runVerdict(suspectRun('webgpu', 2000, ['the goat stance', 'the eaves column']), { openPoints })
+    expect(v.unaccounted).toHaveLength(1)
+    expect(v.unaccounted[0].name).toMatch(/"the goat stance"; "the eaves column"/)
+    expect(v.unaccounted[0].name).toMatch(/RETRY/)
+  })
+
+  it('says so even when the first attempt named no check (a crash, a timeout kill)', () => {
+    expect(runVerdict(suspectRun('webgpu', 2000, []), { openPoints }).status).toBe('suspect')
+  })
+
+  it('BLOCKS a render change whose only evidence is a retry pass, and names the three ways out', () => {
+    const result = evaluate(
+      renderChange({ runs: [suspectRun('webgpu', 2000), suspectRun('webgl', 2000)], openPoints }),
+    )
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/passed only on the RETRY/)
+    expect(result.reason).toMatch(/THREE WAYS/)
+    expect(result.reason).toMatch(/CAUSE is named and fixed/)
+    expect(result.reason).toMatch(/CHARGED/)
+    expect(result.reason).toMatch(/becomes an OPEN point/)
+    expect(result.reason).toMatch(/throttle-probe\.mjs/)
+  })
+
+  it('judges a retry that failed AGAIN on its reds, not on being a retry — a charged red still accounts', () => {
+    const again = { ...redRun('webgpu', 2000, [red('goat stance', 506)]), suspect: true, suspectOf: ['goat stance'] }
+    const v = runVerdict(again, { openPoints })
+    expect(v.status).toBe('accounted')
+    expect(v.covers).toBe(true)
+  })
+
+  it('leaves an ordinary run alone — only the recorded flag makes a run suspect', () => {
+    expect(runVerdict({ ...run('webgpu', 2000), suspectOf: [] }, { openPoints }).status).toBe('clean')
+    expect(runVerdict({ ...run('webgpu', 2000), suspect: false }, { openPoints }).status).toBe('clean')
+  })
+
+  it('is total on a malformed suspect record', () => {
+    expect(() => runVerdict({ exit: 0, suspect: true, suspectOf: 'nonsense' }, { openPoints })).not.toThrow()
+    expect(runVerdict({ exit: 0, suspect: true, suspectOf: null }, { openPoints }).covers).toBe(false)
+  })
+})
+
+describe('the retry marker travels in the environment (point 640)', () => {
+  it('formats the first attempt\'s failing checks, and reads them back', () => {
+    const value = formatSuspectEnv([{ name: 'the goat stance' }, 'the eaves column'])
+    expect(parseSuspectEnv(value)).toEqual(['the goat stance', 'the eaves column'])
+  })
+
+  it('never formats to an empty value — a nameless failure still marks the retry', () => {
+    expect(parseSuspectEnv(formatSuspectEnv([]))).toEqual([SUSPECT_UNNAMED])
+  })
+
+  it('reads an unset or blank variable as "not a retry" — a stale export condemns nothing', () => {
+    expect(parseSuspectEnv(undefined)).toEqual([])
+    expect(parseSuspectEnv('')).toEqual([])
+    expect(parseSuspectEnv('  \n \n')).toEqual([])
+  })
+
+  it('bounds what it puts in an environment variable', () => {
+    const many = Array.from({ length: 40 }, (_, i) => `check ${i} `.padEnd(500, 'x'))
+    const parsed = parseSuspectEnv(formatSuspectEnv(many))
+    expect(parsed).toHaveLength(8)
+    for (const name of parsed) expect(name.length).toBeLessThanOrEqual(200)
   })
 })
 
