@@ -704,16 +704,27 @@ export function stepChildSpeech(
   // THE LONG-RUN ALARM (point 589), judged on the utterance that was actually
   // staged — never on the cooldown that should have produced one. A group of
   // fewer than two children has nobody to speak to and is quiet by right.
-  watchProducer(state.speech, {
-    code: 'child-speech-silent',
-    dt,
-    produced: said !== null,
-    expected: view.children.length >= 2,
-    maxSilenceSeconds: cfg.silenceSeconds,
-    detail: () =>
-      `no child has spoken — ${view.children.length} children, ` +
-      `${view.playing ? 'a round is running' : 'the group is idling'}`,
-  })
+  //
+  // What this watch reaches is the SCHEDULER's output, and it says so: whether
+  // the syllables then arrive at the ear is a property of the audio chain, which
+  // no pure module can observe. That end is judged where it lives — the bus
+  // routing and the levels that actually reach the output in
+  // `src/systems/ambience.test.ts` and the live sub-bus probe of
+  // `scripts/verify/settings.mjs`.
+  //
+  // DEV-gated at the CALL SITE so a production build allocates nothing per frame.
+  if (import.meta.env.DEV) {
+    watchProducer(state.speech, {
+      code: 'child-speech-silent',
+      dt,
+      produced: said !== null,
+      expected: view.children.length >= 2,
+      maxSilenceSeconds: cfg.silenceSeconds,
+      detail: () =>
+        `no child has spoken — ${view.children.length} children, ` +
+        `${view.playing ? 'a round is running' : 'the group is idling'}`,
+    })
+  }
   return said
 }
 

@@ -436,23 +436,27 @@ export function stepTagGame(
   world: TagWorld,
   steer?: TagSteer,
 ): void {
-  const tags = s.tags
-  const wasPlaying = s.playing
-  advanceTagGame(s, dt, cfg, world, steer)
   // THE LONG-RUN ALARM (point 589), judged on what the PLAYER would have seen:
   // a catch, or a fresh round starting. Not on the timers meant to produce them
   // — a chase that runs on forever with a dead catch test keeps every timer
   // moving and still shows a group that never plays. A group of one has nobody
-  // to chase and is quiet by right.
-  watchProducer(s.play, {
-    code: 'tag-silent',
-    dt,
-    produced: s.tags !== tags || (s.playing && !wasPlaying),
-    expected: s.children.length >= 2,
-    maxSilenceSeconds: cfg.silenceSeconds,
-    detail: () =>
-      `${s.children.length} children, ${s.playing ? `chaser ${s.chaser} for ${s.chaserFor.toFixed(0)}s` : `idling for ${s.idleFor.toFixed(0)}s more`}`,
-  })
+  // to chase and is quiet by right. DEV-gated at the CALL SITE, so a production
+  // build allocates nothing per frame.
+  const dev = import.meta.env.DEV
+  const tags = dev ? s.tags : 0
+  const wasPlaying = dev ? s.playing : false
+  advanceTagGame(s, dt, cfg, world, steer)
+  if (dev) {
+    watchProducer(s.play, {
+      code: 'tag-silent',
+      dt,
+      produced: s.tags !== tags || (s.playing && !wasPlaying),
+      expected: s.children.length >= 2,
+      maxSilenceSeconds: cfg.silenceSeconds,
+      detail: () =>
+        `${s.children.length} children, ${s.playing ? `chaser ${s.chaser} for ${s.chaserFor.toFixed(0)}s` : `idling for ${s.idleFor.toFixed(0)}s more`}`,
+    })
+  }
 }
 
 function advanceTagGame(

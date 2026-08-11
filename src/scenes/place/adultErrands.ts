@@ -821,6 +821,13 @@ function hasErrandPlaces(view: ErrandView): boolean {
  * but one errand casts a speaker AND an addressee) and somewhere to send them.
  * Measured on a healthy village, the longest quiet spell is ~25 s, so the
  * default window sits well clear of it.
+ *
+ * WHAT IT REACHES, stated rather than implied (point 589, rule 1): the staged
+ * utterance, which is this module's own output. Whether the syllables then
+ * arrive at the ear is a property of the audio chain, which a pure scheduler
+ * cannot observe; that end is judged where it lives — the bus routing and the
+ * levels that actually reach the output in `src/systems/ambience.test.ts` and
+ * the live sub-bus probe of `scripts/verify/settings.mjs`.
  */
 function watchSpeaking(
   state: AdultErrandState,
@@ -892,8 +899,10 @@ export function stepAdultErrands(
   rand: () => number,
 ): SpokenErrand | null {
   const said = advanceErrands(state, view, dt, cfg, rand)
-  // Judged on the RESULT of the step, once it is known (point 589).
-  watchSpeaking(state, view, cfg, dt, said)
+  // Judged on the RESULT of the step, once it is known (point 589). Behind the
+  // DEV flag at the CALL SITE, not inside: a production build must not even
+  // allocate the step object and its detail closure, once per frame per village.
+  if (import.meta.env.DEV) watchSpeaking(state, view, cfg, dt, said)
   return said
 }
 

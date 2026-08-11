@@ -9,7 +9,7 @@ import {
   devAssert,
   resetDevAsserts,
   watchProducer,
-  LONG_RUN_STEP_CAP,
+  LONG_RUN_SUSPEND_SECONDS,
   type ProducerWatch,
 } from './devAssert'
 
@@ -153,7 +153,20 @@ describe('watchProducer (point 589 — a producer that must keep producing)', ()
       maxSilenceSeconds: 60,
     })
     expect(fired()).toEqual([])
-    expect(watch.silence).toBe(LONG_RUN_STEP_CAP)
+    expect(watch.silence).toBe(0)
+  })
+
+  it('keeps the window in ELAPSED seconds on a machine running at half a frame a second', () => {
+    // The window must not stretch with the frame time: at 2 s steps a 60 s
+    // window is still reached after 60 seconds of world, not 120.
+    const watch = createProducerWatch()
+    run(watch, 58, { step: 2, max: 60 })
+    expect(fired()).toEqual([])
+    expect(watch.silence).toBeCloseTo(58, 6)
+    run(watch, 6, { step: 2, max: 60 })
+    expect(fired().join(' ')).toContain('demo-producer')
+    // …and a step at the suspend threshold itself still counts.
+    expect(LONG_RUN_SUSPEND_SECONDS).toBeGreaterThan(2)
   })
 
   it('ignores a step that is not a positive number', () => {

@@ -1431,7 +1431,7 @@ Verifiable, by suite:
 - `scripts/verify/voice.mjs`: the automatic narration of a new entry
   (pt. 19).
 - The menu's STRUCTURE (`design.md` §21, point 393) is proved in
-  `src/ui/DebugMenu.test.tsx`: a COMPLETENESS pin names all 163
+  `src/ui/DebugMenu.test.tsx`: a COMPLETENESS pin names all 165
   controls and the group each belongs to and compares that against the
   rendered menu in BOTH directions and in both languages — a dropped
   control fails, and so does one added without being named — plus every

@@ -60,12 +60,15 @@ export function resetDevAsserts(): void {
 // week, and then it is worth nothing when the real one comes.
 
 /**
- * The longest single step the silence clock accepts, in seconds. A larger gap is
- * the FRAME LOOP standing still — a hidden tab, a breakpoint, a machine swapped
- * out under a run — not the producer falling silent, and counting it would raise
- * the alarm on a session that simply was not running.
+ * A single step longer than this is the FRAME LOOP standing still — a hidden
+ * tab, a breakpoint, a machine swapped out under a run — rather than a frame:
+ * the game was not running, the producer never got its chance, and the gap is
+ * not counted at all. Everything shorter counts in FULL, so a window of 60 s
+ * means sixty elapsed seconds at ANY frame rate a running game has. (Clamping a
+ * long step to a cap instead was the tempting version and is wrong: at sustained
+ * two-second frames a 60 s window would silently have become 120 s.)
  */
-export const LONG_RUN_STEP_CAP = 1
+export const LONG_RUN_SUSPEND_SECONDS = 5
 
 /** One long-run producer's memory. Plain data, owned by the system that
  *  produces, so a pure step function can carry it and a test can drive it. */
@@ -118,7 +121,8 @@ function record(code: string, watch: ProducerWatch, max: number, expected: boole
  * full window before anything is claimed about it.
  */
 export function watchProducer(watch: ProducerWatch, step: ProducerStep): void {
-  const dt = Number.isFinite(step.dt) && step.dt > 0 ? Math.min(step.dt, LONG_RUN_STEP_CAP) : 0
+  const dt =
+    Number.isFinite(step.dt) && step.dt > 0 && step.dt <= LONG_RUN_SUSPEND_SECONDS ? step.dt : 0
   if (step.produced) {
     watch.produced++
     watch.silence = 0
