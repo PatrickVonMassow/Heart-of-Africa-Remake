@@ -72,6 +72,20 @@ export const DEFAULT_TOPUP = [
   // The ORT-WASM runtime the TTS worker loads (the other host ttsCache.mjs owns).
   { host: 'cdn.jsdelivr.net', net24: true },
   { host: 'registry.npmjs.org', net24: false },
+  // THE REVIEWER'S HOSTS (added 11.08.2026, after a container restart cut them off).
+  // `chatgpt.com` carries the Codex endpoint every Sol review speaks to, and Sol is
+  // the project's cross-vendor reviewer — without it `review-sol.mjs` hands every
+  // review to one of our OWN models and the four-eyes rule quietly loses the
+  // decorrelation it exists for. These hosts sit behind Cloudflare and their
+  // addresses ROTATE, so a boot-time snapshot goes stale exactly the way
+  // storage.googleapis.com did: `.devcontainer/init-firewall.sh` already lists them,
+  // yet after the 22:04 restart the resolved addresses were no longer in the set and
+  // the review came back as "allowance exhausted" while the account had 96 % left.
+  // Hence /24, and hence HERE — this list is the one that is re-applied, the boot
+  // script runs once.
+  { host: 'chatgpt.com', net24: true },
+  { host: 'auth.openai.com', net24: true },
+  { host: 'api.openai.com', net24: true },
 ]
 
 /** Per-command ceiling. An `ipset add` is instant; anything slower is stuck. */

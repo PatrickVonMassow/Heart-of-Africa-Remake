@@ -233,6 +233,33 @@ function readRunLogSegment(from) {
 // server routinely is. The 600-second ceiling used to end exactly those, and
 // `state.lastPid` alone cannot track them because a handover overwrites it. A
 // leaked session holds ports, and that breaks the next session's verify suites.
+// --- THE FIREWALL TOP-UP: reachability decays while nobody looks ------------
+// The container's allowlist is an ipset of ADDRESSES, filled at boot by
+// `init-firewall.sh` from a `dig A` of each domain. Cloudflare-fronted hosts
+// rotate theirs, so that snapshot goes stale WHILE THE SESSION RUNS — no restart
+// needed. Measured 11.08.2026: after a restart at 22:04, chatgpt.com resolved to
+// addresses that were not in the set, and every Sol review silently fell back to
+// one of our own models, which costs the four-eyes rule the cross-vendor
+// decorrelation it exists for. The boot script cannot fix this: it is baked into
+// the image and runs once, and the addresses it wrote were already wrong minutes
+// later.
+//
+// So the tick re-applies it. It is additive and cannot seal the container (that
+// is the whole point of `firewall-allow.mjs`), it needs no network of its own
+// beyond DNS, and it is BEST-EFFORT: a failure is logged and the tick carries on,
+// because a launcher that stops on a firewall hiccup is worse than a stale entry.
+try {
+  const topUp = execFileSync(process.execPath, [R('firewall-allow.mjs')], {
+    cwd: REPO,
+    encoding: 'utf8',
+    timeout: 120_000,
+  })
+  const changed = topUp.split('\n').filter((l) => /\b[1-9]\d*\/\d+ added/.test(l))
+  if (changed.length > 0) log(`firewall top-up: ${changed.length} host(s) refreshed`)
+} catch (e) {
+  log(`firewall top-up skipped (${(e && e.message) || e})`)
+}
+
 // Narrow by construction (see reapableSpawns): our own spawn by pid AND start
 // time, past its boot window, not the lock owner, and superseded.
 //

@@ -124,6 +124,18 @@ describe('the default top-up set', () => {
     expect(by['registry.npmjs.org']).toBe(false)
     expect(by['api.anthropic.com']).toBe(false)
   })
+  it("keeps the REVIEWER's hosts topped up, as /24 — they rotate behind Cloudflare", () => {
+    // 11.08.2026: a container restart left chatgpt.com's boot-resolved addresses
+    // stale, so every Sol review was handed to one of our own models instead —
+    // the four-eyes rule kept running while quietly losing the cross-vendor
+    // decorrelation it exists for. A silent loss of the reviewer is the failure
+    // this entry prevents, which is why it belongs in the RE-APPLIED list and not
+    // only in the boot script.
+    const by = Object.fromEntries(DEFAULT_TOPUP.map((d) => [d.host, d.net24]))
+    for (const host of ['chatgpt.com', 'auth.openai.com', 'api.openai.com']) {
+      expect(by[host], host).toBe(true)
+    }
+  })
   it('names only well-formed hosts', () => {
     for (const { host } of DEFAULT_TOPUP) expect(isDomain(host), host).toBe(true)
   })

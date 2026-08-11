@@ -68,6 +68,29 @@ describe('classifyOutcome — how a codex run ended', () => {
     expect(out).toMatchObject({ ok: false, kind: OUTCOME.ALLOWANCE_EXHAUSTED })
   })
 
+  it('calls a dead connection unreachable, even when its text also mentions a limit', () => {
+    // 11.08.2026: the real message from a container whose firewall entry for
+    // chatgpt.com had gone stale. Reported as an exhausted allowance it sent the
+    // user to his billing page while 96 % of his weekly limit stood unused — and
+    // it hid a cause that was ours to fix.
+    const real =
+      'ERROR: Reconnecting... 5/5 | ERROR: stream disconnected before completion: ' +
+      'error sending request for url (https://chatgpt.com/backend-api/codex/responses)'
+    expect(classifyOutcome({ exitCode: 1, stderr: real })).toMatchObject({
+      ok: false,
+      kind: OUTCOME.UNREACHABLE,
+    })
+    // A transport failure wins even when a rate-limit banner rode along in the
+    // same stream: no answer arrived, so nothing was said about the account.
+    expect(
+      classifyOutcome({ exitCode: 1, stderr: 'rate limit hint\nerror sending request for url (…)' }),
+    ).toMatchObject({ kind: OUTCOME.UNREACHABLE })
+    // And a genuine quota verdict is still read as one.
+    expect(classifyOutcome({ exitCode: 1, stderr: 'You have hit your usage limit. (429)' })).toMatchObject({
+      kind: OUTCOME.ALLOWANCE_EXHAUSTED,
+    })
+  })
+
   it('names a refused model id — the id is honoured, not substituted', () => {
     const msg = 'The requested model is not supported when using Codex with a ChatGPT account.'
     expect(classifyOutcome({ exitCode: 1, stderr: msg })).toMatchObject({ kind: OUTCOME.MODEL_REFUSED })
