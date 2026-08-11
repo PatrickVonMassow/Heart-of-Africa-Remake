@@ -1121,9 +1121,9 @@ walker slide, so a chase continues past a hut corner instead of stopping against
 it; the settlement reaches the chase as ONE predicate (colliders, the fire ring
 and the walkable rim together). The pursue-and-evade half is a reusable helper
 (`src/systems/pursuit.ts`), the round the module beside the scene
-(`src/scenes/place/tagGame.ts`). All 24 values are calibratable
+(`src/scenes/place/tagGame.ts`). All 27 values are calibratable
 (`balance.villageLife.tag`) and debug-editable in both languages.
-Verifiable: the pure layer pins the whole behaviour in 103 cases
+Verifiable: the pure layer pins the whole behaviour in 118 cases
 (`src/systems/pursuit.test.ts`, `src/scenes/place/tagGame.test.ts`) — the curve
 monotone, continuous and bounded in slope; a fresh runner strictly faster than a
 fresh chaser and a spent one strictly slower; the reserve never outside its
