@@ -565,14 +565,18 @@ export function orderProblems(steps, headSha) {
 
     // 2. THE SECOND REGRESSION NAMES WHAT IT RAN ON.
     const anchors = evidenceAnchors(second.evidence)
-    // THE FIRST `on <sha>` IS THE RUN TARGET, and it alone decides. Accepting a
-    // match anywhere let `on 9f3c1a2; not on <head>` through (four-eyes review).
-    const target = anchors.commits[0] ?? null
-    const namesHead = !!target && !!head && head.startsWith(target)
-    if (target && !namesHead) {
+    // EVERY COMMIT THE EVIDENCE NAMES AS A RUN TARGET MUST BE THIS ONE. Neither
+    // "any of them matches" nor "the first one decides" survives contact with
+    // prose: `on 9f3c1a2; not on <head>` passed the first rule and
+    // `commit <foreign>; on <head>` would flip the second (four-eyes rounds 4
+    // and 5). Agreement is unambiguous, and a remark that names no run target
+    // ("fixes 9f3c1a2") is not read as one in the first place.
+    const foreign = anchors.commits.filter((sha) => !(head && head.startsWith(sha)))
+    const namesHead = anchors.commits.length > 0 && foreign.length === 0
+    if (foreign.length) {
       add(
         AFTER_CLEANUP_STEP_ID,
-        `its evidence says the run was on commit ${target}, which is NOT the commit being closed (${head.slice(0, 12) || 'unknown'}) — a regression on another commit says nothing about this one, and the FIRST commit the evidence names is the one it ran on`,
+        `its evidence names commit ${foreign[0]} as a run target, and that is NOT the commit being closed (${head.slice(0, 12) || 'unknown'}) — a regression on another commit says nothing about this one, so every "on <sha>" in the evidence must be the commit being closed`,
       )
       return problems
     }

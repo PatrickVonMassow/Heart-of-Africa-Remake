@@ -370,9 +370,14 @@ describe('the second regression must stand AFTER the cleanup', () => {
     // … but a run stated to be ON another commit is refused, however many shas
     // follow it (the bypass round three named) …
     expect(problemOf(withRegression(`LARGE green on 9f3c1a2; fixes ${HEAD}`, AFTER_CLEANUP_AT))).toMatch(/NOT the commit being closed/)
-    // … including when the second one is named in commit form too: the FIRST is
-    // the run target, so "on X; not on HEAD" cannot borrow HEAD's blessing.
+    // … including when the second one is named in commit form too: EVERY run
+    // target named must be the closed commit, so neither "on X; not on HEAD"
+    // nor "commit X; on HEAD" can borrow HEAD's blessing, in either order.
     expect(problemOf(withRegression(`LARGE green on 9f3c1a2; not on ${HEAD}`, AFTER_CLEANUP_AT))).toMatch(/NOT the commit being closed/)
+    expect(problemOf(withRegression(`commit 9f3c1a2; LARGE green on ${HEAD}`, AFTER_CLEANUP_AT))).toMatch(/NOT the commit being closed/)
+    expect(problemOf(withRegression(`commit ${HEAD}; LARGE green on 9f3c1a2`, AFTER_CLEANUP_AT))).toMatch(/NOT the commit being closed/)
+    // naming the same commit twice, however phrased, is agreement — not a clash
+    expect(problemOf(withRegression(`commit ${HEAD}: LARGE green on ${HEAD.slice(0, 7)}`, AFTER_CLEANUP_AT))).toBe('')
   })
 
   it('refuses a day that does not exist as a timestamp', () => {
