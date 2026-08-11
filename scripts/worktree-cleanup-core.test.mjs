@@ -27,6 +27,7 @@ import {
   REFUSALS,
 } from './worktree-cleanup-core.mjs'
 import {
+  WITHOUT_A_LOCK,
   cleanupLockFile,
   cleanupWorktree,
   detachLinks,
@@ -34,6 +35,7 @@ import {
   readIdentity,
   readLockReason,
   releaseCleanupLock,
+  removeTreeSafely,
   takeCleanupLock,
   parseCleanupArgs,
 } from './worktree-cleanup.mjs'
@@ -334,11 +336,25 @@ describe('the incident, replayed on a THROWAWAY repository', () => {
   })
 
   it('detachLinks alone never descends through a link', () => {
-    const detached = detachLinks(worktree)
+    // WITHOUT_A_LOCK is how "no exclusion is held" is SAID; an omission refuses.
+    const detached = detachLinks(worktree, { exclusion: WITHOUT_A_LOCK })
     expect(detached).toHaveLength(1)
     expect(existsSync(join(worktree, 'node_modules'))).toBe(false)
     expect(existsSync(probe)).toBe(true)
     expect(existsSync(join(worktree, 'dirty.txt'))).toBe(true)
+  })
+
+  it('detachLinks REFUSES to unlink anything without an exclusion it can prove', () => {
+    // Eighth review, finding 2: the check used to be an optional callback, so an
+    // omitted one PERMITTED the deletion. Nothing may be expressible as "carry on,
+    // unproven" — and the refusal happens before the first unlink, not after it.
+    for (const exclusion of [undefined, null, {}, { file: '' }, { file: '/nope' }, 'yes', () => ({ ok: true })]) {
+      expect(() => detachLinks(worktree, { exclusion }), String(exclusion)).toThrow(/lock-lost-before-removal/)
+      expect(existsSync(join(worktree, 'node_modules')), String(exclusion)).toBe(true)
+    }
+    // A dry run destroys nothing, so it needs no proof.
+    expect(detachLinks(worktree, { dry: true })).toHaveLength(1)
+    expect(existsSync(join(worktree, 'node_modules'))).toBe(true)
   })
 })
 
@@ -1130,6 +1146,53 @@ describe('--expect, on a THROWAWAY repository', () => {
     expect(r.verdict.reason).toContain(foreign)
     expect(existsSync(worktree)).toBe(true)
     expect(readFileSync(cleanupLockFile(worktree), 'utf8')).toBe(`${foreign}\n`)
+  })
+
+  it('a lock lost DURING the walk stops the removal — the proof is re-taken per act', () => {
+    // Eighth review, finding 1. The earlier shape proved the exclusion ONCE and
+    // then walked the tree — directory reads, stats, readlinks — before unlinking
+    // anything, so a lock stripped during that walk was never noticed. The cases
+    // above strip at the `git status`, which is BEFORE the walk and therefore does
+    // not exercise this at all.
+    //
+    // Getting code to run mid-walk without a test-only hook: the lock file is
+    // reached THROUGH a link that lives inside the tree, so detaching that link —
+    // the walk's own first destructive act, which its own fresh proof permits —
+    // is what makes the next proof unreadable. The mechanism under test is the
+    // real one: the read before the removal, not a read taken minutes earlier.
+    const store = join(tmp, 'lockstore')
+    mkdirSync(store, { recursive: true })
+    const ours = formatCleanupLock({ pid: 4711, startedAt: 1000 })
+    writeFileSync(join(store, 'locked'), `${ours}\n`)
+    symlinkSync(store, join(worktree, 'via-link'), 'junction')
+    const exclusion = { file: join(worktree, 'via-link', 'locked'), reason: ours }
+    expect(readLockReason(exclusion.file)).toBe(ours) // readable while the link stands
+
+    expect(() => removeTreeSafely(worktree, { git: gitOf, registered: false, exclusion })).toThrow(
+      /lock-lost-before-removal/,
+    )
+    // THE ASSERTION: the tree is still there, because the proof was re-taken.
+    expect(existsSync(worktree)).toBe(true)
+    expect(existsSync(join(worktree, '.git'))).toBe(true)
+    // The link is gone (its own proof passed) and its TARGET is untouched, which
+    // is the older contract this must not have broken.
+    expect(existsSync(join(worktree, 'via-link'))).toBe(false)
+    expect(readFileSync(join(store, 'locked'), 'utf8')).toBe(`${ours}\n`)
+  })
+
+  it('removeTreeSafely REFUSES without a provable exclusion, and deletes nothing', () => {
+    for (const exclusion of [undefined, null, {}, { reason: 'x' }, { file: join(tmp, 'nope'), reason: 'x' }]) {
+      expect(() => removeTreeSafely(worktree, { git: gitOf, registered: false, exclusion }), String(exclusion)).toThrow(
+        /lock-lost-before-removal/,
+      )
+      expect(existsSync(worktree), String(exclusion)).toBe(true)
+    }
+  })
+
+  it('WITHOUT_A_LOCK is the one way to remove unlocked — and it has to be said', () => {
+    // The orphan contract `batch-doctor` needs, expressible only on purpose.
+    expect(removeTreeSafely(worktree, { git: gitOf, registered: false, exclusion: WITHOUT_A_LOCK })).toEqual([])
+    expect(existsSync(worktree)).toBe(false)
   })
 
   it('the last look runs BEFORE the first destructive syscall, not after it', () => {
