@@ -174,11 +174,13 @@ describe('what it says', () => {
   // Audit finding, 12.08.2026: presented bare, a safe setting reads as the operator's
   // choice, and nobody repairs the file it actually came from.
   it('says when a setting is a FALLBACK rather than a choice — in the brief and on the board', () => {
-    expect(briefLine(SAFE_SETTING, { corrupt: true })).toMatch(/FALLBACK — the share state file is unusable/)
+    expect(briefLine({ setting: SAFE_SETTING, corrupt: true })).toMatch(/FALLBACK — the share state file is unusable/)
     expect(briefLine(SAFE_SETTING)).not.toMatch(/FALLBACK/)
-    expect(boardNoteSegment(SAFE_SETTING, { corrupt: true })).toMatch(/Notfall-Rückfall/)
+    expect(boardNoteSegment({ setting: SAFE_SETTING, corrupt: true })).toMatch(/Notfall-Rückfall/)
     expect(boardNoteSegment(SAFE_SETTING)).not.toMatch(/Notfall/)
-    expect(applyFooterNote('<footer>Stand: x</footer>', SAFE_SETTING, { corrupt: true })).toMatch(/Notfall-Rückfall/)
+    expect(applyFooterNote('<footer>Stand: x</footer>', { setting: SAFE_SETTING, corrupt: true })).toMatch(/Notfall-Rückfall/)
+    // …and a bare setting is still accepted, so no caller has to build a state object.
+    expect(applyFooterNote('<footer>Stand: x</footer>', SAFE_SETTING)).not.toMatch(/Notfall/)
   })
 
   it('tells a delegated agent what to hand over, at every setting', () => {

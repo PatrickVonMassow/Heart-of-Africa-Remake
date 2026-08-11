@@ -57,6 +57,21 @@ export function settingOrSafe(value) {
   return normaliseSetting(value) ?? SAFE_SETTING
 }
 
+/**
+ * The SETTING AND WHETHER IT IS A FALLBACK, from either a bare setting or a whole state
+ * object. PURE.
+ *
+ * Everything that SPEAKS about the setting takes the state rather than the setting plus a
+ * flag (fourth cross-vendor round): a separate flag is a thing a caller can forget, and a
+ * forgotten one presents a fallback as the operator's choice — which is exactly the
+ * defect the flag was added to fix. With one object there is nothing to forget.
+ */
+export function asState(value) {
+  return value && typeof value === 'object'
+    ? { setting: settingOrSafe(value.setting), corrupt: Boolean(value.corrupt) }
+    : { setting: settingOrSafe(value), corrupt: false }
+}
+
 /** Where the setting lives, relative to the checkout that owns it. */
 export const SETTING_FILE_NAME = 'sol-share.json'
 
@@ -147,14 +162,14 @@ export function readSetting(raw) {
     try {
       parsed = JSON.parse(raw)
     } catch {
-      return broken(`the state file is not JSON — falling back to \`${SAFE_SETTING}\`, which spends nothing`)
+      return broken(`the state file is not JSON — falling back to \`${SAFE_SETTING}\`, which sends nothing to the second vendor`)
     }
   }
   const setting = normaliseSetting(parsed?.setting)
   if (!setting) {
     return broken(
       `"${String(parsed?.setting ?? '')}" is not one of ${SETTINGS.join(', ')} — falling back to ` +
-        `\`${SAFE_SETTING}\`, which spends nothing`,
+        `\`${SAFE_SETTING}\`, which sends nothing to the second vendor`,
     )
   }
   // A TIMESTAMP A Date CAN HOLD, or none (audit, 12.08.2026): `1e300` is finite and
@@ -226,8 +241,8 @@ export function statusLine(setting) {
  * the lever exists cannot be blamed for not pulling it, and one line is what the brief
  * can afford.
  */
-export function briefLine(setting, { corrupt = false } = {}) {
-  const value = settingOrSafe(setting)
+export function briefLine(state) {
+  const { setting: value, corrupt } = asState(state)
   // A FALLBACK SAYS IT IS ONE (audit, 12.08.2026). Presented bare, a safe setting reads
   // as the operator's choice, and nobody repairs the file it actually came from.
   const mark = corrupt ? ' (FALLBACK — the share state file is unusable; repair it with `node scripts/sol-share.mjs --set <setting>`)' : ''
@@ -251,8 +266,8 @@ export function briefLine(setting, { corrupt = false } = {}) {
  * switch is off its default, the board says so. At the default it says nothing at all —
  * a note that is always there is a note nobody reads.
  */
-export function boardNoteSegment(setting, { corrupt = false } = {}) {
-  const value = settingOrSafe(setting)
+export function boardNoteSegment(state) {
+  const { setting: value, corrupt } = asState(state)
   // A fallback is named as one here too — on the board the reader is the user, and the
   // difference between "I set this" and "the file is broken" is the whole message.
   const mark = corrupt ? ' (Notfall-Rückfall: die Einstellungsdatei ist unlesbar)' : ''
@@ -273,7 +288,7 @@ const NOTE_MARK = /^Sol-Routing:/
  * removes without adding at the default setting. Unchanged html comes back identical,
  * so a publish does not rewrite the file for nothing.
  */
-export function applyFooterNote(html, setting, { corrupt = false } = {}) {
+export function applyFooterNote(html, state) {
   const text = String(html ?? '')
   const m = text.match(/<footer>([\s\S]*?)<\/footer>/)
   if (!m) return text
@@ -281,7 +296,7 @@ export function applyFooterNote(html, setting, { corrupt = false } = {}) {
     .split('·')
     .map((s) => s.trim())
     .filter((s) => s && !NOTE_MARK.test(s))
-  const note = boardNoteSegment(setting, { corrupt })
+  const note = boardNoteSegment(state)
   const segments = note ? [...kept, note] : kept
   const replacement = `<footer>${segments.join(' · ')}</footer>`
   return replacement === m[0] ? text : text.replace(m[0], replacement)

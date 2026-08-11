@@ -82,11 +82,21 @@ describe('the material', () => {
         { title: 'FIRST', text: 'y'.repeat(900) },
         { title: 'SECOND', text: 'z'.repeat(900) },
       ],
-      budget: 1000,
+      budget: 1250,
     })
     expect(text).toContain('OMITTED ENTIRELY (material budget spent): SECOND')
     expect(carried).toEqual(['FIRST'])
     expect(omitted).toEqual(['SECOND'])
+  })
+
+  // Fourth cross-vendor round: charging the markers made the budget honest, but the
+  // sections beyond THEM then vanished in silence — and a model that cannot see that
+  // something is missing answers as if nothing were.
+  it('COUNTS what did not even fit a marker, so nothing vanishes unseen', () => {
+    const many = Array.from({ length: 50 }, (_, i) => ({ title: `FILE: ${'p'.repeat(80)}/${i}.ts`, text: 'q'.repeat(300) }))
+    const { text } = formatAskMaterial({ sections: many, budget: 1200 })
+    expect(text).toMatch(/… \[\d+ further section\(s\) omitted entirely: the material budget is spent\]/)
+    expect(text.length).toBeLessThanOrEqual(1200)
   })
 
   // Second cross-vendor round: the caller decides whether a request carries any real

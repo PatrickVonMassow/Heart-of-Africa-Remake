@@ -73,8 +73,9 @@ try {
     revision: gitRevision(),
     // Which vendor the read-only work goes to right now (point 654). READ, never
     // assumed: the brief tells the agent what the switch actually says.
-    solShare: solShare.setting,
-    solShareCorrupt: Boolean(solShare.corrupt),
+    // The whole STATE, not just the setting: a fallback must reach the brief AS a
+    // fallback, and a separate flag is a thing a caller can forget.
+    solShare,
   })
   process.stdout.write(brief.endsWith('\n') ? brief : `${brief}\n`)
   if (showTokens || tokens > BRIEF_TOKEN_CEILING) {

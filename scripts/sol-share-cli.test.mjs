@@ -104,6 +104,29 @@ describe('sol-share.mjs', () => {
   })
 })
 
+// Fourth cross-vendor round: the fallback LABEL was pinned on the pure functions only, so
+// a consumer could stop forwarding it with every test still green. This runs the real
+// brief command against a broken state file — the guarantee where a reader meets it.
+describe('the delegation brief carries the switch', () => {
+  const BRIEF = join(dirname(fileURLToPath(import.meta.url)), 'point-brief.mjs')
+  const brief = (share) => {
+    const f = join(dir, 'brief-share.json')
+    writeFileSync(f, share)
+    const r = spawnSync(process.execPath, [BRIEF, '654'], { encoding: 'utf8', env: { ...process.env, SOL_SHARE_FILE: f }, windowsHide: true })
+    return `${r.stdout ?? ''}${r.stderr ?? ''}`
+  }
+
+  it('states the routing, and SAYS when that routing is a fallback rather than a choice', () => {
+    const chosen = brief(JSON.stringify({ setting: 'claude-only' }))
+    expect(chosen).toMatch(/SOL ROUTING is at `claude-only`/)
+    expect(chosen).not.toMatch(/FALLBACK/)
+    const fallen = brief('{ not json at all')
+    expect(fallen).toMatch(/SOL ROUTING is at `claude-only`/)
+    expect(fallen).toMatch(/FALLBACK — the share state file is unusable/)
+    expect(fallen).toMatch(/share setting is UNUSABLE/)
+  })
+})
+
 // Audit finding, 12.08.2026: nothing asserted the sentence the consumers print, so they
 // could have stopped saying that a routed setting was not the operator's choice.
 describe('settingProblemLine', () => {

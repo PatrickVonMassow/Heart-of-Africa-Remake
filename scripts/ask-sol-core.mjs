@@ -128,7 +128,15 @@ export function formatAskMaterial({ sections = [], budget = MATERIAL_BUDGET_CHAR
   // sent request past the ceiling it advertises. Every line, marker included, is charged
   // here, and once even a marker no longer fits nothing more is written. The remaining
   // titles still come back in `omitted`, so the caller can name them without sending them.
+  //
+  // A TAIL IS RESERVED so the LAST word is always affordable (fourth cross-vendor round).
+  // Charging the markers made the budget honest but let the sections beyond it disappear
+  // in silence — and a model that cannot see that something is missing answers as if
+  // nothing were. The reserve pays for one closing line that counts what never travelled.
+  const RESERVE = 160
+  const bodyCap = Math.max(0, cap - RESERVE)
   let spent = 0
+  const silent = []
   const push = (line) => {
     out.push(line)
     spent += line.length + 1
@@ -138,13 +146,15 @@ export function formatAskMaterial({ sections = [], budget = MATERIAL_BUDGET_CHAR
     const title = String(section?.title ?? 'MATERIAL')
     const text = String(section?.text ?? '')
     const header = `=== ${title} ===`
-    const room = cap - spent - header.length - 80
+    const room = bodyCap - spent - header.length - 80
     if (room <= 120) {
       const marker = `=== OMITTED ENTIRELY (material budget spent): ${title} ===`
       omitted.push(title)
-      if (spent + marker.length + 1 <= cap) {
+      if (spent + marker.length + 1 <= bodyCap) {
         push(marker)
         push('')
+      } else {
+        silent.push(title)
       }
       continue
     }
@@ -155,6 +165,8 @@ export function formatAskMaterial({ sections = [], budget = MATERIAL_BUDGET_CHAR
     if (text.trim()) carried.push(title)
     else omitted.push(title)
   }
+  // The closing count, paid for by the reserve: what did not fit is NEVER invisible.
+  if (silent.length) push(`… [${silent.length} further section(s) omitted entirely: the material budget is spent]`)
   return { text: out.join('\n'), carried, omitted }
 }
 
