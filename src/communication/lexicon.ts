@@ -36,7 +36,18 @@ export type ConceptId =
   | 'BIG_ROCK'
   | 'DIG'
 
-/** Every sequence is this long: five syllables, an even number of them high. */
+/**
+ * Every sequence is this long: five syllables, an even number of them high.
+ *
+ * FIVE and not four, and the user CONFIRMED it on 11.08.2026 after trying the
+ * length ("Fünf Silben sind in Ordnung"), so the four-syllable variant is off the
+ * table. The reason it was worth asking: eleven concepts fit into four syllables,
+ * but then some pairs necessarily differ in a SINGLE syllable — mishear one tone
+ * and you hear another valid word and are confidently wrong. At five the
+ * inventory can be chosen so any two sequences differ in at least TWO, and a
+ * misheard tone yields no word at all, which is noticeable. The price is the
+ * chief's message running 35 syllables instead of 28.
+ */
 export const SEQUENCE_LENGTH = 5
 
 /** Syllables are written out separated by this, in speech and in the save. */
