@@ -353,10 +353,29 @@ there exactly once; a new point joins a bundle when appended.
   build stamp the dev server exposes and the suite compares against the checkout it runs
   from — so an attached-to-the-wrong-server run dies loudly instead of photographing a
   stranger.
+  SECOND WAY A FRAME PROVES NOTHING: IT IS EMPTY (found 11.08.2026, landing point 610).
+  The collision suite rewrote `verification/52-collision-port-wall.png` as an ENTIRELY
+  BLACK picture on the WebGPU lane — 23 KB against 657 KB, nothing in it but the HUD bar,
+  where the frame is named for the port wall the camera is pressed against — and the run
+  exited 0 with the shutter (`scripts/verify/frameSubject.mjs`) raising nothing. The same
+  frame on the WebGL 2 lane shows the lit wall, so the picture proof was void on exactly
+  the lane the player uses. The shutter projects the SUBJECT into the frame and asks
+  whether it is in view; it never asks whether anything was DRAWN, and an empty picture
+  answers "in view" as readily as a full one.
+  FINAL STATE: the shutter refuses a frame with nothing drawn in it, on the same footing
+  as one whose subject is out of view and with the same loud message — judged by what the
+  renderer reports for the frame it just wrote (draw calls / triangles, the reading
+  `sceneReady` already takes), never by file size. WHY the WebGPU lane draws that wall
+  black while WebGL 2 draws it lit is ESTABLISHED as part of this, not guessed: either the
+  player standing at a wall sees black on his own backend — a game defect, which then gets
+  its own point — or the headless WebGPU lane cannot draw that view, which the deferral
+  path must then say out loud instead of writing a frame.
   VERIFIABLE: pure Vitest for the refusal (no BASE_URL and no own server → a non-zero exit
-  naming the remedy, never a run) and for the stamp comparison (a mismatched stamp fails);
-  plus the real proof — a suite pointed at a server from a DIFFERENT checkout must fail,
-  where today it passes green.
+  naming the remedy, never a run), for the stamp comparison (a mismatched stamp fails) and
+  for the empty-frame refusal (a renderer reading of zero drawn geometry → no frame
+  written, remedy named); plus the real proof — a suite pointed at a server from a
+  DIFFERENT checkout must fail, where today it passes green, and the black port-wall frame
+  must be refused where today it is written.
   Criticality: high — it does not break the game, but it silently voids the picture
   proof, which is the one check this project cannot replace with a test.
 
