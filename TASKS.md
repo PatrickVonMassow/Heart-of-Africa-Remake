@@ -422,7 +422,18 @@ there exactly once; a new point joins a bundle when appended.
   4. SHADOW BEFORE ARMED. 636 runs report-only through at least one real release, and its
      proposals are compared by hand with what a human would have cut. Arming is a separate,
      recorded step.
-  5. THE FOUR-EYES RECORD PER POINT. Each of 635–638 carries its own recorded review by a
+  5. EVERY RULE THESE POINTS INTRODUCE SHIPS WITH ITS ENFORCER (user 11.08.2026: "Die
+     Einhaltung sollen auch durch Mechanismen zugesichert werden"). Each of 635–638 carries
+     a table — rule, and where it is enforced: a guard, a test in the fast layer, or
+     explicitly NONE with the reason. A rule whose enforcer column is empty blocks the tick.
+     This is the lesson of point 632 applied to its own construction: a rule that exists
+     only as prose is a rule nobody keeps, and "the enforcer is named" is not the same as
+     "the enforcer stands", so the column names the FILE that enforces it, not an intention.
+     The hard cases are known in advance and none may end as prose: the tag acts only on a
+     recorded complete closing; arming a mechanism out of shadow mode is a RECORDED step and
+     the acting path refuses without that record; the backlog cannot be deleted; a point
+     belongs to exactly one block; an intent from the page is refused unless it is signed.
+  6. THE FOUR-EYES RECORD PER POINT. Each of 635–638 carries its own recorded review by a
      model that did not author it, and none is ticked on a `do-not-merge` or an unanswered
      `merge-with-fixes` — the criticality gate already enforces exactly this, and 636 is
      MAXIMUM, so it also carries the adversarial pass above.
@@ -463,6 +474,9 @@ there exactly once; a new point joins a bundle when appended.
      the block around them went.
   6. THE BACKLOG CANNOT BE DELETED. It is where a point goes when it belongs nowhere else,
      and a queue without it would have to invent one.
+  EVERY RULE ABOVE SHIPS WITH ITS ENFORCER, in the table point 639 demands — a guard, a
+  test, or an explicit "none" with its reason. A rule left as prose does not count as
+  delivered.
   VERIFIABLE: Vitest over the pure derivation — a point in no block is reported; a block
   order that disagrees with the render blocks; the within-block sequence follows TASKS.md;
   a deleted block's points arrive at the top of the backlog in their old order; a block
@@ -497,6 +511,9 @@ there exactly once; a new point joins a bundle when appended.
      cut, on which HEAD, from which recorded evidence, and does nothing. It is armed only
      after it has been right about a real release without acting. A frozen tag on a bad
      state cannot be repaired, so the cheap insurance is taken.
+  EVERY RULE ABOVE SHIPS WITH ITS ENFORCER, in the table point 639 demands — a guard, a
+  test, or an explicit "none" with its reason. A rule left as prose does not count as
+  delivered.
   VERIFIABLE: Vitest over the pure decision — a block with an open point is not finished; a
   finished block with an incomplete closing record yields NO tag and names what is missing;
   a complete record yields exactly one tag proposal with its HEAD; `poc` never appears in an
@@ -552,6 +569,9 @@ there exactly once; a new point joins a bundle when appended.
      offers no delete at all.
   5. An intent that cannot be applied (the point was ticked meanwhile, the block is gone) is
      REPORTED on the board, never silently dropped.
+  EVERY RULE ABOVE SHIPS WITH ITS ENFORCER, in the table point 639 demands — a guard, a
+  test, or an explicit "none" with its reason. A rule left as prose does not count as
+  delivered.
   VERIFIABLE: Vitest over the pure intent handling — an unsigned or replayed intent is
   refused; an intent naming a ticked point is reported; a valid between-block intent yields
   exactly one assignment change and no reordering; a within-block intent yields exactly one
