@@ -95,13 +95,11 @@ if (isMainModule(import.meta.url)) {
       // THE ARMING BASELINE, and nothing more: the order as it stands today is
       // taken as judged, with one stated reason, so a newly armed (or freshly
       // cloned) checkout does not owe an answer for history nobody in the
-      // session judged. Every point appended afterwards is decided individually.
-      const before = appendGateState(open, record)
+      // session judged. Every point appended afterwards is decided individually,
+      // and `seedRecord` refuses an already armed record so this can never be
+      // the shortcut out of an outstanding question.
       const next = writeRankRecord(seedRecord(record, open, { why, at: new Date().toISOString() }), open)
-      console.log(
-        `queue-rank: baseline armed with ${next.settled.points.length} open point(s) — "${why.trim()}"` +
-          (before.pending.length ? ` (this also settles ${before.pending.join(', ')})` : ''),
-      )
+      console.log(`queue-rank: baseline armed with ${next.settled.points.length} open point(s) — "${why.trim()}"`)
     } else {
       const state = appendGateState(open, record)
       if (state.state === 'unarmed') {

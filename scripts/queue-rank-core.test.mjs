@@ -189,6 +189,36 @@ describe('the baseline moves only when nothing is outstanding', () => {
     expect(unrankedAppends([9, 5, 4, 3], seeded)).toEqual([3])
     expect(() => seedRecord(null, [9], { why: '  ' })).toThrow(/--why/)
   })
+
+  it('--seed is NOT an escape hatch: it refuses an armed record with questions standing', () => {
+    // The hole a cross-vendor review found: the very turn the gate was blocking
+    // could reseed and settle every outstanding append on one collective reason.
+    let thrown = null
+    try {
+      seedRecord(settledAt([5, 9]), [9, 5, 4, 3], { why: 'alles passt schon', at: 't' })
+    } catch (e) {
+      thrown = e
+    }
+    expect(thrown).toBeTruthy()
+    expect(thrown.message).toMatch(/already armed/)
+    // It names what is outstanding and points at the per-point command.
+    expect(thrown.message).toMatch(/4, 3/)
+    expect(thrown.message).toMatch(/--ranked/)
+  })
+
+  it('refuses an armed record with NOTHING outstanding too, and says how to arm afresh', () => {
+    // Chosen deliberately: re-seeding a settled record expresses nothing
+    // `settleRecord` has not already written, so a second door would only have
+    // to be argued about. Arming from scratch stays possible and stays visible —
+    // move the record aside, then seed the checkout that reads as unarmed.
+    expect(() => seedRecord(settledAt([5, 9]), [9, 5], { why: 'nochmal', at: 't' })).toThrow(/already armed/)
+    expect(() => seedRecord(settledAt([5, 9]), [9, 5], { why: 'nochmal', at: 't' })).toThrow(/move the record aside/)
+    expect(() => seedRecord(settledAt([5, 9]), [9, 5], { why: 'nochmal', at: 't' })).not.toThrow(/outstanding/)
+  })
+
+  it('still refuses a torn record before it ever asks whether it is armed', () => {
+    expect(() => seedRecord(parseRankRecord('{"ranked":{'), [1, 2], { why: 'w' })).toThrow(/does not parse/)
+  })
 })
 
 describe('the rank record degrades, it never throws inside a guard', () => {

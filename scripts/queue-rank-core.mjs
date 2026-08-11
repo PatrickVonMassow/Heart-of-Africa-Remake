@@ -262,6 +262,41 @@ export function recordRank(record, point, { why = '', at = '' } = {}) {
 }
 
 /**
+ * What `--seed` is told when it is aimed at a record that is ALREADY armed
+ * (cross-vendor review, 11.08.2026).
+ *
+ * Arming exists for a record that has NO baseline. On an armed one it was an
+ * ESCAPE HATCH straight out of the gate: the very turn the gate was blocking
+ * could reseed, and every outstanding append became part of "the order as
+ * judged" on one collective reason — the opposite of the one-decision-per-point
+ * this whole mechanism is. The command even said so, printing "this also settles
+ * …" as if it were a feature.
+ *
+ * It is refused on ANY armed record, not only on one with questions standing.
+ * Re-seeding a settled record cannot express anything `settleRecord` has not
+ * already written (the guard advances the baseline to the open set at every turn
+ * end), so the only thing an allowed-but-pointless case buys is a second door
+ * that has to keep being argued about. Arming from scratch stays possible and
+ * stays VISIBLE: move the record aside, which is a deliberate act in a tracked
+ * file, and seed the checkout that then reads as unarmed.
+ */
+export function alreadyArmedMessage(pending = []) {
+  const head = `${RANK_RECORD_PATH} is already armed, so there is nothing to seed. `
+  if (pending.length) {
+    return (
+      `${head}${pending.length} appended point(s) are still outstanding: ${pending.join(', ')}. Seeding would ` +
+      'settle them all at once on one reason, which is exactly the decision the gate is asking for point by ' +
+      `point. Each is answered on its own: MOVE its block inside TASKS.md to where it belongs, or ${RANK_CMD}`
+    )
+  }
+  return (
+    `${head}Every appended point has been decided, and the guard keeps the baseline on the open set by itself. ` +
+    'To arm a baseline from scratch, move the record aside deliberately and seed the checkout that then reads ' +
+    'as unarmed.'
+  )
+}
+
+/**
  * ARM the gate: everything standing in the order today counts as judged, with one
  * stated reason for the lot.
  *
@@ -269,7 +304,8 @@ export function recordRank(record, point, { why = '', at = '' } = {}) {
  * otherwise owe a separate answer for every open point, which is a block loop
  * rather than a decision. It is a command somebody runs, never something the
  * guard does for itself, so an appended point can never be grandfathered by a
- * mechanism nobody watched.
+ * mechanism nobody watched. And it applies ONLY to a record that carries no
+ * baseline yet; see `alreadyArmedMessage` for why an armed one is refused.
  */
 export function seedRecord(record, open, { why = '', at = '' } = {}) {
   const reason = String(why ?? '').replace(/\s+/g, ' ').trim()
@@ -277,6 +313,8 @@ export function seedRecord(record, open, { why = '', at = '' } = {}) {
   const { ranked, torn } = normaliseRankRecord(record)
   if (torn) throw new Error(TORN_RECORD_MESSAGE)
   const list = pointList(open)
+  const state = appendGateState(list, record)
+  if (state.state !== 'unarmed') throw new Error(alreadyArmedMessage(state.pending))
   const points = [...list].sort((a, b) => a - b)
   return {
     ...pruneRankRecord({ ranked }, list),
