@@ -50,6 +50,7 @@ import {
   addVdzk,
   berlinStamp,
   closeCard,
+  dropStrayNowCards,
   normaliseLineEndings,
   parseClosingArgs,
   parseDoneArgs,
@@ -124,7 +125,18 @@ function edit(fn, done) {
   // their kind marker. The board is one living file — without this the only way
   // to satisfy the new publish gate would be a hand edit, the act that wrecked
   // the line endings above.
-  writeTextAtomic(BOARD, upgradeNowCards(normaliseLineEndings(fn(normaliseLineEndings(readFileSync(BOARD, 'utf8'))))))
+  // A CARD THAT NAMES NEITHER A POINT NOR A STATE IS DROPPED, on the way IN as
+  // well as out (four-eyes review, 12.08.2026): nothing else can remove one —
+  // every point command needs the number it lacks, and a numbered card standing
+  // beside it blocks the state writers — so the board would stay unpublishable.
+  // It is said out loud, because an edit that silently swallowed a card's prose
+  // would be its own defect.
+  const swept = dropStrayNowCards(normaliseLineEndings(readFileSync(BOARD, 'utf8')))
+  for (const title of swept.dropped) {
+    console.error(`board: dropped the current-work card "${title}" — it named neither a point nor a state`)
+  }
+  const edited = dropStrayNowCards(upgradeNowCards(normaliseLineEndings(fn(swept.html))))
+  writeTextAtomic(BOARD, edited.html)
   console.log(done)
   console.log(run(['scripts/board-archive-rotate.mjs']).trim().split('\n')[0])
   // THE LIVE PAGE IS PUBLISHED HERE (point 400, delta D — four-eyes finding 2).

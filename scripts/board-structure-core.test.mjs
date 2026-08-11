@@ -12,9 +12,11 @@ import {
 import {
   CLOSING_WORK_TITLE,
   NO_CURRENT_WORK_TITLE,
+  dropStrayNowCards,
   setCardTitle,
   toClosingWork,
   toNoCurrentWork,
+  toQueue,
   upgradeNowCards,
 } from './board-core.mjs'
 
@@ -338,6 +340,61 @@ describe('every current-work card names its point and its subject', () => {
     expect(closing).not.toContain('Irgendwas.')
   })
 
+  // EVERY LEGACY DASH, not only the em dash (four-eyes 12.08.): a card written
+  // with a hyphen was refused by the gate, upgraded by nothing and removable by
+  // nothing — the one shape no sanctioned command could reach.
+  it('reads, upgrades and repairs a legacy title whatever dash it uses', () => {
+    for (const dash of ['—', '–', '-']) {
+      const legacy =
+        `<details class="now">\n  <summary><span class="t">544 ${dash} Titel</span></summary>\n` +
+        '  <div class="body"><p>Text</p></div>\n</details>'
+      const board = withNow(legacy)
+      expect(nowCards(board)[0].point, dash).toBe('544')
+      expect(codes(board), dash).toContain('now-card-unnumbered')
+      const lifted = upgradeNowCards(board)
+      expect(codes(lifted), dash).toEqual([])
+      expect(nowCards(lifted)[0].chip, dash).toBe('544')
+      // …and the point commands reach it once it is lifted.
+      expect(setCardTitle(lifted, 544, 'Ein Betreff')).toContain('<span class="t">Ein Betreff</span>')
+      expect(toQueue(lifted, 544, { text: 'Zurück.' })).not.toContain('class="now"')
+    }
+  })
+
+  // A MARKER MUST NOT BE ABLE TO AUTHORISE A DELETION (four-eyes 12.08.): a
+  // state card is REPLACED, so a false closing marker over running work would
+  // cost that work at the next state write.
+  it('REFUSES a closing marker over an ordinary title, and refuses to strip it', () => {
+    const false_ = withNow(chipCard(651, 'Ganz normale Arbeit', 'closing'))
+    expect(codes(false_)).toContain('now-card-false-closing')
+    // The strip leaves it standing rather than deleting real work: the card
+    // still counts as the running point it is titled as, so the state write is
+    // refused instead of silently swallowing it.
+    expect(() => toNoCurrentWork(false_, 'Weiter mit Punkt 656.')).toThrow(/refusing to claim/)
+    // …and the card is reachable by every point command, so it is repairable.
+    expect(codes(setCardTitle(false_, 651, 'Ganz normale Arbeit: Abschlussarbeiten'))).toEqual([])
+  })
+
+  it('drops a card that names neither a point nor a state, and says which', () => {
+    const stray =
+      '<details class="now">\n  <summary><span class="t">Irgendwas ohne Nummer</span></summary>\n' +
+      '  <div class="body"><p>Prosa.</p></div>\n</details>'
+    // Beside REAL work, where no state write could ever run.
+    const board = withNow(`${chipCard(651, 'Echte Arbeit')}\n${stray}`)
+    expect(codes(board)).toContain('now-card-unnumbered')
+    const swept = dropStrayNowCards(board)
+    expect(swept.dropped).toEqual(['Irgendwas ohne Nummer'])
+    expect(codes(swept.html)).toEqual([])
+    expect(swept.html).toContain('Echte Arbeit')
+    // The genuine handover card and every numbered card survive it.
+    const handover = toNoCurrentWork(withNow(''), 'Weiter mit Punkt 656.', { stamp: '23:55' })
+    expect(dropStrayNowCards(handover).dropped).toEqual([])
+    expect(dropStrayNowCards(withNow(chipCard(651))).dropped).toEqual([])
+    for (const junk of [null, undefined, 42, {}]) {
+      expect(() => dropStrayNowCards(junk)).not.toThrow()
+      expect(dropStrayNowCards(junk).dropped).toEqual([])
+    }
+  })
+
   // The marker alone must not exempt a card from every rule (four-eyes 12.08.).
   it('REFUSES a card that wears the idle marker but is not the handover card', () => {
     const impostor =
@@ -349,6 +406,13 @@ describe('every current-work card names its point and its subject', () => {
       '<details class="now" data-state="idle">\n  <summary><span class="t">Pause</span></summary>\n' +
       '  <div class="body"><p>Weiter mit Punkt 656.</p></div>\n</details>'
     expect(codes(withNow(wrongTitle))).toContain('handover-card-shape')
+    // Its remedy holds even beside real work: the impostor carries no number, so
+    // the sweep every edit performs takes it and leaves the real card.
+    const beside = withNow(`${chipCard(651, 'Echte Arbeit')}\n${wrongTitle}`)
+    expect(codes(dropStrayNowCards(beside).html)).toEqual([])
+    // A NUMBERED impostor is sent away instead, which its message names.
+    const numbered = withNow(`${chipCard(652, 'Irgendwas', 'idle')}`)
+    expect(cardNamingViolations(numbered)[0].msg).toContain('board.mjs queue 652')
   })
 
   it('names a remedy that FITS the card: no title command for an unnumbered one', () => {

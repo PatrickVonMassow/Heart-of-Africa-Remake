@@ -25,7 +25,7 @@
 // alone, and spelling those titles a second time here is how the writer and the
 // gate would drift apart. board-core does not import this module, so the
 // direction cannot become a cycle.
-import { CLOSING_WORK_TITLE, NO_CURRENT_WORK_TITLE } from './board-core.mjs'
+import { CLOSING_WORK_TITLE, NO_CURRENT_WORK_TITLE, looksLikeClosingTitle } from './board-core.mjs'
 
 /** The four sections, in the order the user's mandate fixes them. */
 export const REQUIRED_SECTIONS = [
@@ -226,17 +226,10 @@ export function stageOnlyTitle(title) {
   return rest.length === 0
 }
 
-/**
- * Is this title the shape the CLOSING card composes — "<Betreff>: <Stage>"?
- *
- * Only the closing stage counts, not every stage word (four-eyes review,
- * 12.08.2026): "Karten: Vorbereitung" and "Parser: cleanup" are ordinary titles
- * with a real subject and must publish, while a card that says a point's closing
- * duties are what is running IS the closing state and owes the marker.
- */
-export function looksLikeClosingTitle(title) {
-  return /[:—–]\s*Abschlussarbeiten\s*$/i.test(String(title ?? '').trim())
-}
+// `looksLikeClosingTitle` is imported from board-core, where the card is
+// composed: the gate and the strip that removes a closing card must answer the
+// same question the same way, or a card is accepted here and left standing there.
+export { looksLikeClosingTitle }
 
 /**
  * Does this handover card name the work that FOLLOWS? The one unnumbered card
@@ -289,8 +282,13 @@ export function cardNamingViolations(html) {
           code: 'handover-card-shape',
           msg:
             `the card ${named} is marked as the handover card but is not one — that card is ` +
-            `unnumbered and titled "${NO_CURRENT_WORK_TITLE}". Write it with ` +
-            'node scripts/board.mjs none "<Grund>"',
+            `unnumbered and titled "${NO_CURRENT_WORK_TITLE}". ${
+              card.chip == null
+                ? 'ANY board.mjs edit drops a card that names neither a point nor a state, so ' +
+                  'the next command repairs this whatever else stands'
+                : `Send it away — node scripts/board.mjs queue ${card.chip} — and write the ` +
+                  'handover card with node scripts/board.mjs none "<Grund>"'
+            }`,
         })
       }
       if (!namesFollowOnWork(bodies[i])) {
@@ -328,6 +326,21 @@ export function cardNamingViolations(html) {
     // 12.08.2026). Without it the card reads as ordinary point work, so the two
     // state writers refuse to REPLACE it and the state can never be cleared —
     // exactly the trap the marker was introduced to avoid.
+    // …AND THE MARKER MUST BE TRUE (four-eyes review, 12.08.2026). The reverse
+    // shape is the dangerous one: a marker over an ordinary subject makes the
+    // card look like a state, and a state is REPLACED — genuine running work
+    // would be deleted by the next `none`. The strip refuses to remove such a
+    // card, and it is named here so it does not stand unnoticed either.
+    if (card.kind === 'closing' && !looksLikeClosingTitle(card.title) && card.title !== CLOSING_WORK_TITLE) {
+      out.push({
+        code: 'now-card-false-closing',
+        msg:
+          `the current-work card ${named} is marked data-state="closing" but is titled as ordinary ` +
+          `work — a state card is REPLACED, so this marker would cost real work. ${retitle} to the ` +
+          'composed form "<Betreff>: Abschlussarbeiten", or write the card with ' +
+          'node scripts/board.mjs closing <N> "<Grund>"',
+      })
+    }
     if (card.kind !== 'closing' && looksLikeClosingTitle(card.title)) {
       out.push({
         code: 'now-card-unmarked-closing',

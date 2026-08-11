@@ -183,6 +183,15 @@ export function refreshFooter(html, { openCount, now = new Date() } = {}) {
 const numberChip = (point) => `<span class="num">${point}</span>`
 
 /**
+ * THE DASH between a legacy title's number and its subject — em, en or plain.
+ * ONE definition for every matcher (four-eyes review, 12.08.2026): the strip,
+ * the upgrade, the finder and the retitle each carried their own list, and a
+ * card written with the plain hyphen fell between them — refused by the gate,
+ * upgraded by nothing, found by nothing, and removable by nothing.
+ */
+const DASH = '[—–-]'
+
+/**
  * Lift every current-work card written BEFORE point 655 into the shape this
  * module now writes: the number out of the title and into the chip, the two
  * state cards marked with their kind.
@@ -204,16 +213,47 @@ export function upgradeNowCards(html) {
     )
   }
   return out.replace(
-    /<details class="now"([^>]*)>(\s*<summary>)<span class="t">(\d+)\s*—\s*([^<]*)<\/span>/g,
+    new RegExp(`<details class="now"([^>]*)>(\\s*<summary>)<span class="t">(\\d+)\\s*${DASH}\\s*([^<]*)</span>`, 'g'),
     (_m, attrs, head, point, title) =>
       `<details class="now"${attrs}>${head}${numberChip(point)}<span class="t">${title.trim()}</span>`,
   )
 }
 
+/**
+ * The document without the current-work cards that name NEITHER a point NOR a
+ * state — the shape no command could otherwise remove (four-eyes review,
+ * 12.08.2026). Returns the cleaned document and the titles dropped, so the
+ * caller can SAY what it removed; an edit that silently swallowed a card's prose
+ * would be its own defect.
+ *
+ * Such a card is refused by the publish gate anyway, and every way of repairing
+ * it needs a number it does not have — while a numbered card standing beside it
+ * blocks the state writers. So the sanctioned edits drop it, and the board that
+ * could not be published becomes publishable by the next command, whichever it
+ * was.
+ */
+export function dropStrayNowCards(html) {
+  const dropped = []
+  const out = String(html ?? '').replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card) => {
+    const summary = (card.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+    const title = (summary.match(/<span class="t">([^<]*)<\/span>/) ?? [])[1] ?? ''
+    // A NUMBER, or the handover card's own title — nothing else is repairable:
+    // a numbered card is reached by `title`/`queue`/`done`, and the handover
+    // card by `none`. A marker alone does not save a card here either, or an
+    // impostor wearing one would be exactly as unremovable as before.
+    if (/<span class="num">\s*\d+\s*<\/span>/.test(summary)) return card
+    if (new RegExp(`<span class="t">\\s*\\d+\\s*${DASH}`).test(summary)) return card
+    if (isStateCardTitle(title)) return card
+    dropped.push(title.trim() || '<untitled>')
+    return ''
+  })
+  return { html: out, dropped }
+}
+
 /** A title without the leading "651 — " a card written before the chip carried. */
 export function stripPointPrefix(title, point) {
   return String(title ?? '')
-    .replace(new RegExp(`^\\s*${point}\\s*[—–-]\\s*`), '')
+    .replace(new RegExp(`^\\s*${point}\\s*${DASH}\\s*`), '')
     .trim()
 }
 
@@ -287,7 +327,7 @@ function sectionBounds(html, key) {
  * unreplaceable in the first place.
  */
 const NOW_HEAD = (point) =>
-  `<details class="now"[^>]*>\\s*<summary>(?:<span class="num">${point}</span>|<span class="t">${point}\\s*—)`
+  `<details class="now"[^>]*>\\s*<summary>(?:<span class="num">${point}</span>|<span class="t">${point}\\s*${DASH})`
 
 /** The current-work card for `point`, or null. */
 export function nowCard(html, point) {
@@ -455,6 +495,18 @@ const stripClosingStage = (text) =>
     .replace(new RegExp(`\\s*:\\s*${CLOSING_STAGE}\\s*$`), '')
     .trim()
 
+/**
+ * Is this title the shape the CLOSING card composes — "<Betreff>: <Stage>"?
+ *
+ * It lives HERE, beside the composer, because both the strip below and the
+ * publish gate ask it and neither may answer it differently. Only the closing
+ * stage counts, not every stage word (four-eyes review, 12.08.2026): "Karten:
+ * Vorbereitung" is an ordinary title with a real subject.
+ */
+export function looksLikeClosingTitle(title) {
+  return new RegExp(`[:—–]\\s*${CLOSING_STAGE}\\s*$`, 'i').test(String(title ?? '').trim())
+}
+
 /** "<Betreff>: Abschlussarbeiten" — what `board.mjs closing <N>` composes. */
 export function closingCardTitle(subject) {
   const text = stripClosingStage(subject)
@@ -523,9 +575,21 @@ export function stripNoCurrentWork(html) {
   return String(html ?? '').replace(noWorkCardPattern(), '')
 }
 
-/** The document without any closing card. Same rule: a state replaces. */
+/**
+ * The document without any closing card. Same rule: a state replaces.
+ *
+ * A MARKER ALONE IS NOT THE STATE (four-eyes review, 12.08.2026). A card that
+ * wears `data-state="closing"` over an ordinary subject title is not closing
+ * work, and removing it would silently delete RUNNING work — the marker is
+ * hand-writable, so it must not be able to authorise a deletion on its own. Such
+ * a card is left standing and the publish gate refuses it by name; it carries a
+ * number, so `queue <N>`, `done <N>` and `title <N>` all reach it.
+ */
 export function stripClosingWork(html) {
-  return String(html ?? '').replace(closingCardPattern(), '')
+  return String(html ?? '').replace(closingCardPattern(), (card) => {
+    const title = (card.match(/<span class="t">([^<]*)<\/span>/) ?? [])[1] ?? ''
+    return looksLikeClosingTitle(title) || title.trim() === CLOSING_WORK_TITLE ? '' : card
+  })
 }
 
 /**
@@ -551,7 +615,7 @@ function stripUnnumberedNowCards(html) {
   return String(html ?? '').replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card) => {
     const summary = (card.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
     if (/<span class="num">\s*\d+\s*<\/span>/.test(summary)) return card
-    if (/<span class="t">\s*\d+\s*[—–-]/.test(summary)) return card
+    if (new RegExp(`<span class="t">\\s*\\d+\\s*${DASH}`).test(summary)) return card
     return ''
   })
 }
@@ -694,7 +758,7 @@ export function toClosingWork(html, point, { subject, reason, stamp = berlinStam
 export function pointSubject(html, point) {
   const doc = String(html ?? '')
   const chip = doc.match(new RegExp(`<span class="num">${point}</span><span class="t">([^<]*)</span>`))
-  const legacy = chip ? null : doc.match(new RegExp(`<span class="t">${point}\\s*—\\s*([^<]*)</span>`))
+  const legacy = chip ? null : doc.match(new RegExp(`<span class="t">${point}\\s*${DASH}\\s*([^<]*)</span>`))
   const text = stripClosingStage((chip ?? legacy ?? [])[1])
   return text || null
 }
@@ -884,7 +948,9 @@ export function setCardTitle(html, point, title) {
   const bare = stripPointPrefix(text, point)
   const chipRe = new RegExp(`(<details class="now"[^>]*>\\s*<summary><span class="num">${point}</span><span class="t">)[^<]*(</span>)`)
   if (chipRe.test(html)) return html.replace(chipRe, `$1${bare}$2`)
-  const legacyRe = new RegExp(`(<details class="now"[^>]*>\\s*<summary>)<span class="t">${point}\\s*—[^<]*(</span>)`)
+  const legacyRe = new RegExp(
+    `(<details class="now"[^>]*>\\s*<summary>)<span class="t">${point}\\s*${DASH}[^<]*(</span>)`,
+  )
   if (legacyRe.test(html)) return html.replace(legacyRe, `$1${numberChip(point)}<span class="t">${bare}$2`)
   const queueRe = new RegExp(`(<summary><span class="num">${point}</span><span class="t">)[^<]*(</span>)`)
   if (queueRe.test(html)) return html.replace(queueRe, `$1${text}$2`)
