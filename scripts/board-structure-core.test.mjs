@@ -530,6 +530,30 @@ describe('every current-work card names its point and its subject', () => {
     expect(() => setCardTitle(running, 651, 'Ein Betreff: Abschlussarbeiten')).toThrow(/CLOSING card's shape/)
   })
 
+  // The gate and the sweep read a title wherever it stands in the summary, so a
+  // matcher stricter than they are would leave a card standing that nothing can
+  // replace — and `none` would then STACK a second state card (four-eyes 12.08.).
+  it('replaces a legacy state card whose title is not the summary’s first child', () => {
+    const shifted =
+      '<details class="now">\n  <summary><span class="right"><span class="meta">23:40</span></span>' +
+      '<span class="t">Gerade keine laufende Arbeit</span></summary>\n' +
+      '  <div class="body"><p>Alt; Punkt 656 folgt.</p></div>\n</details>'
+    const board = withNow(shifted)
+    expect(upgradeNowCards(board)).toContain('data-state="idle"')
+    const rewritten = toNoCurrentWork(board, 'Neu; der Nachfolger nimmt Punkt 657.', { stamp: '23:55' })
+    expect(nowCards(rewritten)).toHaveLength(1)
+    expect(rewritten).not.toContain('Alt; Punkt 656 folgt.')
+    expect(codes(rewritten)).toEqual([])
+  })
+
+  it('never lets a state match run past its own card into the next', () => {
+    const two = withNow(`${chipCard(651, 'Echte Arbeit')}\n${chipCard(652, 'Noch echte Arbeit')}`)
+    // No state card stands, so nothing may be removed — the guarded run stops at
+    // the first </details> rather than swallowing the pair.
+    expect(upgradeNowCards(two)).toBe(two)
+    expect(nowCards(two)).toHaveLength(2)
+  })
+
   it('finds and replaces a legacy state card that carries extra attributes', () => {
     const legacy =
       '<details class="now" open>\n  <summary><span class="t">Gerade keine laufende Arbeit</span></summary>\n' +

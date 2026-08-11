@@ -208,7 +208,7 @@ export function upgradeNowCards(html) {
   let out = String(html ?? '')
   for (const [kind, title] of Object.entries(LEGACY_STATE_TITLE)) {
     out = out.replace(
-      new RegExp(`<details class="now"([^>]*)>(\\s*<summary><span class="t">${title}</span>)`, 'g'),
+      new RegExp(`<details class="now"([^>]*)>(${WITHIN_CARD}<span class="t">${title}</span>)`, 'g'),
       (_m, attrs, head) => `<details class="now"${attrs.replace(/\s*data-state="[^"]*"/, '')}${STATE_ATTR(kind)}>${head}`,
     )
   }
@@ -625,6 +625,9 @@ export function stageOnlyTitle(title) {
  */
 const STATE_ATTR = (kind) => ` data-state="${kind}"`
 
+/** Any run of markup that stays INSIDE one card — never past its closing tag. */
+const WITHIN_CARD = '(?:(?!</details>)[\\s\\S])*?'
+
 /** The two state kinds: the unnumbered handover card, and the closing card. */
 export const STATE_KINDS = ['idle', 'closing']
 
@@ -653,7 +656,7 @@ export function isStateCardTitle(title) {
 const stateCardPattern = (kind) =>
   new RegExp(
     `<details class="now"[^>]*data-state="${kind}"[^>]*>[\\s\\S]*?</details>\\s*` +
-      `|<details class="now"[^>]*>\\s*<summary><span class="t">${LEGACY_STATE_TITLE[kind]}</span>[\\s\\S]*?</details>\\s*`,
+      `|<details class="now"[^>]*>${WITHIN_CARD}<span class="t">${LEGACY_STATE_TITLE[kind]}</span>[\\s\\S]*?</details>\\s*`,
     'g',
   )
 
