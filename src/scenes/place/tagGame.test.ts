@@ -1309,6 +1309,34 @@ describe('a child cornered by the settlement walks out (point 648)', () => {
     expect(stillest).toBeGreaterThan(0.2) // never froze in any half second
     expect(s.children[0].pinned).toBe(0) // never stalled long enough to be nudged
   })
+
+  it('lets the held way out AGE while the child stands, so it never sets off on a stale one', () => {
+    // The detour is a hysteresis, and a hysteresis that only ticks while the
+    // child WALKS never runs out on one that stands. A child told to stay put
+    // would keep the way out it found before it stopped and set off on it again
+    // however much later — a direction that by then means nothing.
+    const s = game([[0, -1]])
+    // Sent into the pocket until it has turned round and is holding the way out.
+    run(s, 0.2, deadEnd, CFG, 1 / 60, undefined, () => ({ heading: 0, pace: 2 }))
+    expect(s.children[0].detourFor).toBeGreaterThan(0)
+
+    // Now TOLD to stand, for longer than the window lasts.
+    run(s, CFG.detourSeconds + 0.2, deadEnd, CFG, 1 / 60, undefined, (i, st) => ({
+      heading: st.children[i].heading,
+      pace: 0,
+    }))
+    expect(s.children[0].detourFor).toBe(0)
+    expect(s.children[0].held).toBe(true)
+
+    // And set off again on the direction it is GIVEN, not the one it kept. Read
+    // in the OPEN, where nothing deflects it: the way out it was holding pointed
+    // back down the lane (−Z), so a stale one would still be showing there.
+    const before = { x: s.children[0].x, z: s.children[0].z }
+    run(s, 0.2, OPEN, CFG, 1 / 60, undefined, () => ({ heading: Math.PI / 2, pace: 2 }))
+    const c = s.children[0]
+    expect(c.x - before.x).toBeGreaterThan(0.3) // heading PI/2 is +X, as asked
+    expect(Math.abs(c.z - before.z)).toBeLessThan(0.01)
+  })
 })
 
 describe('the play ground is a disc of its own (point 481.4)', () => {

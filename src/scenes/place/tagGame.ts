@@ -395,12 +395,21 @@ function breakOffRound(s: TagState, cfg: TagConfig): void {
   }
 }
 
+/**
+ * The detour ages on the CLOCK, not on the walking, and every child is aged
+ * every frame. Ageing it only where it is USED would freeze it on a child that
+ * stands — a call obeyed, a spot held, a round break — and that child would then
+ * set off again on a way out it found half a minute earlier, in a direction that
+ * by then means nothing.
+ */
+function ageDetour(c: TagChild, dt: number): void {
+  if (c.detourFor > 0) c.detourFor = Math.max(0, c.detourFor - dt)
+}
+
 /** The heading a child really walks on this step: the one it was given, unless
  *  it is still holding the way out of a pocket (`TagConfig.detourSeconds`). */
-function walkHeading(c: TagChild, desired: number, dt: number): number {
-  if (!(c.detourFor > 0)) return desired
-  c.detourFor = Math.max(0, c.detourFor - dt)
-  return c.detour
+function walkHeading(c: TagChild, desired: number): number {
+  return c.detourFor > 0 ? c.detour : desired
 }
 
 /**
@@ -554,8 +563,9 @@ function advanceTagGame(
       c.pace = claim ? Math.max(0, claim.pace) : 0
       c.held = !!claim && c.pace <= 0
       c.effort = 'recover'
+      ageDetour(c, dt)
       if (claim && c.pace > 0) {
-        moveChild(c, walkHeading(c, claim.heading, dt), c.pace * dt, dt, cfg, world)
+        moveChild(c, walkHeading(c, claim.heading), c.pace * dt, dt, cfg, world)
         c.facing = turnToward(c.facing, c.heading, cfg.turnRate * dt)
       }
       c.reserve = advanceReserve(c.reserve, c.pace, dt, cfg, c.drainScale, c.recoverScale)
@@ -673,10 +683,11 @@ function advanceTagGame(
       ? Math.max(0, claim.pace)
       : Math.max(floor, effortPace(c.effort, c.reserve, cfg, isChaser ? 'chaser' : 'runner'))
     c.held = !!claim && c.pace <= 0
+    ageDetour(c, dt)
     // A commanded stillness moves nothing — and leaves `pinned` and `walked`
     // alone, so a standing child is never mistaken for one stuck on geometry and
     // its legs stay still.
-    if (c.pace > 0) moveChild(c, walkHeading(c, desired, dt), c.pace * dt, dt, cfg, world)
+    if (c.pace > 0) moveChild(c, walkHeading(c, desired), c.pace * dt, dt, cfg, world)
     // The BODY turns at a rate toward where it is going. The travel heading may
     // jump — a deflection round a hut corner is a real change of direction — but
     // a body that snapped to it spun about-face inside a single frame.

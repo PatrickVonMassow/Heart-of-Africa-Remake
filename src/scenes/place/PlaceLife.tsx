@@ -712,6 +712,9 @@ function Kids({
       // The game's OWN clock: the verification samples an interval of GAME,
       // never a count of frames, which buy different amounts of it per machine.
       clock: game.clock,
+      // The radius a child's BODY occupies, so a live check can judge an overlap
+      // against the real figure rather than against a guessed one (point 648).
+      bodyRadius: balance.villageLife.separation.bodyRadius * KID_SCALE,
       children: game.children.map((c) => ({
         x: c.x,
         z: c.z,
@@ -721,6 +724,10 @@ function Kids({
         press: c.press,
         pace: c.pace,
         pinned: c.pinned,
+        // Standing because it was TOLD to (point 481), not because it stalled —
+        // the difference between an obeyed stillness and the reported snag.
+        held: c.held,
+        walked: c.walked,
       })),
     })
     // What the group has SAID so far this visit (point 481), by situation — a
