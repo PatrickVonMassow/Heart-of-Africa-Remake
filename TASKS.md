@@ -177,12 +177,6 @@ there exactly once; a new point joins a bundle when appended.
   is recorded; the survivor left last by a closing is never asked; descending appends are
   all asked; a torn or reasonless record silences nothing. Plus the guard test: the turn
   that appended a point blocks, and the recorded decision releases it.
-  VERIFIABLE: Vitest over the pure core — the render order of a fixture work order matches
-  the expected sequence with each rank rule in play; a point appended at the end is
-  reported unranked until it is recorded; a board whose sequence was hand-edited is
-  detected as out of place. Plus the real proof on live data: rendering today's board from
-  the work order reproduces the sequence the user asked for, with the play-session points
-  at the head.
   MECHANISM, so the four-eyes rule applies: the other model reviews the guard and the
   ranking gate before they land (`scripts/mechanism-review.mjs --record`).
   Criticality: HIGH — the board is the only thing the user sees while the batch runs, and a
@@ -214,33 +208,6 @@ there exactly once; a new point joins a bundle when appended.
   have returned true.
   Criticality: medium — no crash, but the feature's promise is that holding Ctrl tells you
   what you are looking at, and it fails hardest at the moment the player most wants it.
-
-- [ ] 610. THE ESCAPE IS REACHABLE ONLY BY KEYBOARD, AND IT REPORTS A RESCUE THAT DID NOT
-  HAPPEN (four-eyes findings on point 604, 10.08.2026). Two things the delivery left:
-  (a) `GAMEPAD_BUTTON_KEYS` (`src/systems/input.ts` ~141-150) maps NO button to `KeyU`, and
-  the stuck hint is a toast rather than the tappable prompt — so a pad-only or touch-only
-  player who is wedged still loses the expedition, which is the exact class 604 exists to
-  close, and `design.md` §17.5 already promises that the pad's buttons map onto the existing
-  key handlers. (b) In the bird's-eye view the search can report a rescue that did not
-  happen: with `found:false` nothing moves and the game still toasts "freed".
-  FINAL STATE:
-  1. A spare pad button (L3 or R3, whichever stays free of §17.5's existing map) dispatches
-     the same synthetic key as U — one input path, as the design demands — and the stuck
-     hint becomes tappable on the touch layer, dispatching the key it names like the
-     interaction prompt does.
-  2. A search that frees nobody says so: no "freed" message where nothing moved, and in the
-     travel view the traveller is told what happened instead.
-  3. THE TRAVEL SEARCH SEES WHAT IT LANDS ON: `travelObstacles` is sampled once at the
-     player while `collidableFloraNear` reaches ~4.2 u and the scaled search reaches 6.72 u,
-     so a landing spot can overlap a tree nobody looked at (the next frame pushes him out,
-     which is a papered-over hit, not a placement). The search queries obstacles over the
-     radius it actually searches.
-  4. `docs/acceptance-evidence.md` §16 stops claiming the live check "proved he was unable
-     to walk out" — the script does not prove that; it states what the check really does.
-  VERIFIABLE: Vitest for the button map, the tappable hint and the honest report; the
-  existing `unstuck` section of `scripts/verify/collision.mjs` extended by the pad path.
-  Criticality: medium — the mechanism is there; what is missing is a way to it for two of
-  the three input devices the game supports.
 
 - [ ] 614. EXECUTE THE FOUR-EYES WORK-ORDER CLEANUP (10.08.2026; the verdict of a
   BLIND-PARALLEL analysis by two models on the 148 open points — CLAUDE.md §6, divergent
@@ -386,10 +353,29 @@ there exactly once; a new point joins a bundle when appended.
   build stamp the dev server exposes and the suite compares against the checkout it runs
   from — so an attached-to-the-wrong-server run dies loudly instead of photographing a
   stranger.
+  SECOND WAY A FRAME PROVES NOTHING: IT IS EMPTY (found 11.08.2026, landing point 610).
+  The collision suite rewrote `verification/52-collision-port-wall.png` as an ENTIRELY
+  BLACK picture on the WebGPU lane — 23 KB against 657 KB, nothing in it but the HUD bar,
+  where the frame is named for the port wall the camera is pressed against — and the run
+  exited 0 with the shutter (`scripts/verify/frameSubject.mjs`) raising nothing. The same
+  frame on the WebGL 2 lane shows the lit wall, so the picture proof was void on exactly
+  the lane the player uses. The shutter projects the SUBJECT into the frame and asks
+  whether it is in view; it never asks whether anything was DRAWN, and an empty picture
+  answers "in view" as readily as a full one.
+  FINAL STATE: the shutter refuses a frame with nothing drawn in it, on the same footing
+  as one whose subject is out of view and with the same loud message — judged by what the
+  renderer reports for the frame it just wrote (draw calls / triangles, the reading
+  `sceneReady` already takes), never by file size. WHY the WebGPU lane draws that wall
+  black while WebGL 2 draws it lit is ESTABLISHED as part of this, not guessed: either the
+  player standing at a wall sees black on his own backend — a game defect, which then gets
+  its own point — or the headless WebGPU lane cannot draw that view, which the deferral
+  path must then say out loud instead of writing a frame.
   VERIFIABLE: pure Vitest for the refusal (no BASE_URL and no own server → a non-zero exit
-  naming the remedy, never a run) and for the stamp comparison (a mismatched stamp fails);
-  plus the real proof — a suite pointed at a server from a DIFFERENT checkout must fail,
-  where today it passes green.
+  naming the remedy, never a run), for the stamp comparison (a mismatched stamp fails) and
+  for the empty-frame refusal (a renderer reading of zero drawn geometry → no frame
+  written, remedy named); plus the real proof — a suite pointed at a server from a
+  DIFFERENT checkout must fail, where today it passes green, and the black port-wall frame
+  must be refused where today it is written.
   Criticality: high — it does not break the game, but it silently voids the picture
   proof, which is the one check this project cannot replace with a test.
 
@@ -617,6 +603,17 @@ there exactly once; a new point joins a bundle when appended.
   closed point with an armed launcher; a spent budget with a written handoff and an armed
   launcher joins it. Every other stop stays illegal, so the guard can never be talked into
   an idle stop by writing a handoff for work that was never started.
+  (e) AN ORPHANED BRANCH IS SURFACED, NOT LEFT TO CHANCE (found 11.08.2026). The handoff
+  covers the session that hands over deliberately; it does nothing for the agent that dies
+  without one, and that is the case that actually cost work. Two feature branches sat in
+  the tree unreported — one carrying ~2000 lines for points that still read as untouched,
+  one fully superseded — and the only thing that found them was a resuming session running
+  `git worktree list` on a hunch. So the resume path REPORTS every branch that has commits
+  `main` does not contain and no live agent behind it, with its point, its last commit and
+  its age, exactly as it reports the work order; and a branch whose work has landed under
+  another number is ENDED at that landing rather than left to be re-triaged. VERIFIABLE by
+  Vitest on the pure core — an orphan is listed, a branch with a live agent is not, a
+  contained branch is not — plus the resume hook printing it.
   MEASURE THE RESULT, as 373 did and on the same tool: `node scripts/measure-context-cost.mjs`
   for a full day after the lever lands, in BOTH scopes, against the 0.988 %/h this point
   starts from and the 0.6 %/h that fits. The point counts as delivered when the rate is

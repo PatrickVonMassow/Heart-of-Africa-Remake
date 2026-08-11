@@ -377,9 +377,13 @@ export interface Strings {
     /** A gift unlocked the settlement orientation (design.md §17). */
     orientationGained: string
     /** The escape from a wedge (design.md §17.5): the hint that names the key,
-     *  and the confirmation that he stands free again. */
+     *  and the three honest outcomes of a press — he was carried clear, he was
+     *  standing free already, or nothing within reach was free (work-order 610).
+     *  Only the first may claim a rescue. */
     stuckHint(key: string): string
     unstuckFreed: string
+    unstuckAlreadyFree: string
+    unstuckNoRoom: string
   }
 
   dialogs: {

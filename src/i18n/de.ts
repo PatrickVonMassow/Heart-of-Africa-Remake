@@ -402,6 +402,8 @@ export const de: Strings = {
     orientationGained: 'Zum Dank für die Gabe zeigt man mir die wichtigen Gebäude.',
     stuckHint: (key) => `Festgeklemmt? ${key} befreit dich.`,
     unstuckFreed: 'Ich habe mich losgearbeitet und stehe wieder im Freien.',
+    unstuckAlreadyFree: 'Mich hält hier nichts – der Boden unter meinen Stiefeln ist schon frei.',
+    unstuckNoRoom: 'In Reichweite finde ich keinen freien Boden; hier muss ich mich Schritt für Schritt herausarbeiten.',
   },
 
   dialogs: {

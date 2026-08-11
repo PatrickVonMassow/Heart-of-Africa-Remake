@@ -499,6 +499,18 @@ textarea {
   min-height: 44px;
 }
 
+/* On touch the stuck hint is a tappable button — the only route to the escape
+   key for a player with no keyboard (work-order 610). Visually identical to the
+   plain toast, with a comfortable tap target, and ABOVE the touch layer
+   (z-index 5) so the look surface cannot swallow the tap. */
+.toast-tappable {
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  min-height: 44px;
+  z-index: 6;
+}
+
 /* Touch controls (design.md §17.5, point 84): a transparent full-screen layer;
    only the stick and the look surface capture pointer events, so the rest of
    the HUD stays clickable. Mounted only while ui.touchActive. */

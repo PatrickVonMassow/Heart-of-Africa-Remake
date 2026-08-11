@@ -1278,10 +1278,45 @@ forward, and clears the moment he moves; the outward search returns a spot no
 collider contains, prefers the nearest, refuses a spot behind a wall and falls
 back to the place's entry point when the radius holds nothing. Its four values
 live in `balance.unstuck` with a debug row each (`src/ui/DebugMenu.test.tsx`).
-Live in `scripts/verify/collision.mjs`: the traveller is set down in the
-narrowest sliver a real village layout has, is proved unable to walk out of it,
-presses U and both stands free and walks away — with the frame of the freed
-position (`604-unstuck-freed`).
+Live in `scripts/verify/collision.mjs`: the narrowest slot between two colliders
+of the real village layout is measured, the traveller is walked against the
+largest wall the village has until holding the key raises the hint that NAMES the
+escape — the stall detector firing at a state a player reaches, which is what
+that check proves — and he is then set down in that slot, presses U, stands on
+collision-free ground inside the settlement at no cost in day, provisions, health
+or journal, and walks away from the spot; with the frame of the freed position
+(`604-unstuck-freed`). It does NOT prove the slot is inescapable on foot: no
+check attempts to walk out of it, and the wedge the report showed is reproduced
+from the LAYOUT instead (the crossing-palisade sweep in
+`src/scenes/place/layout.test.ts` above).
+
+AND IT IS REACHABLE ON EVERY DEVICE, AND HONEST ABOUT WHAT IT DID (work-order
+610). The escape had one route, the U key: no pad button carried it and the hint
+was a plain notice, so a pad-only or touch-only player who was wedged still lost
+the expedition. `src/systems/gamepadMap.test.ts` pins the binding — L3, the one
+button `design.md` §17.5's map leaves free, mapped to the same key code, taking
+none of the buttons the design already spent — and `scripts/verify/collision.mjs`
+proves the live path in the same `unstuck` section: a virtual standard-mapped pad
+presses L3, the rAF poll dispatches `KeyU` into the keyboard pipeline, and the
+traveller ends clear of every collider somewhere other than the slot. On touch
+the hint IS the button (`src/ui/Hud.test.tsx`: a `.toast-tappable` in either
+language dispatching the key it names, while every other toast stays a plain
+label), and `stuckHintDue` re-raises it while he is still pushing and getting
+nowhere — without it a player who missed the one 3.5-second showing could never
+call it back, since `stuck` clears only by real movement.
+
+The report is now what happened: `escapeOutcome` separates a press that carried
+him somewhere from one that left him standing (`src/systems/unstuck.test.ts`),
+because the bird's-eye fallback is the traveller's OWN position — a search that
+found nothing moved nobody, and the game announced a rescue anyway. And the
+bird's-eye search sees what it lands on: it sampled the obstacles once, at the
+player, over a query reaching ~4.2 world units while its rings searched 6.72, so
+a landing spot could overlap a tree nobody had looked at and the next frame's
+resolver pushed him out again. `src/scenes/travel/obstacleReach.test.ts` sweeps
+seeds and points around the settlements: every plant inside the search radius is
+returned, a wider query never drops what a narrower one found — and the witness
+replays the sweep at the pre-fix reach, where blocking plants are missing from
+the list.
 
 ## 17. Localization.
 

@@ -1042,6 +1042,38 @@ Zähler existiert bereits, ihm fehlte nur der zweite Fall.
 
 ---
 
+### 3.105 Derselbe Defekt, zweimal beauftragt — und die zweite Bestellung war schneller
+
+Am 09.08.2026 wurde festgehalten, dass die Kartenreihenfolge der Tafel eine zweite,
+handgepflegte Heimat hat und deshalb immer wieder vom Arbeitsauftrag abdriftet. Einen Tag
+später fiel derselbe Defekt erneut auf — und wurde als eigener Punkt aufgeschrieben,
+gebaut und gemergt. Der erste Punkt lief unterdessen bei einem Agenten und kam mit einer
+vollständigen, viermal fremdgeprüften Lösung zurück, von der drei Viertel bereits auf
+`main` standen. Bemerkt wurde es erst beim Landen, als das Zusammenführen in Konflikten
+endete, die kein Textkonflikt waren, sondern zwei Implementierungen derselben Sache.
+
+Keine Regel war verletzt. Der Befund wurde ordentlich aufgenommen, ordentlich beauftragt,
+ordentlich geliefert. Nur fragt die Aufnahme eines neuen Punktes bis heute niemanden, ob
+die Warteschlange dieselbe Sache schon enthält — und ausgerechnet dieses Projekt hat die
+Antwort im Haus: Die Regel „ein Befund geht zuerst in ein bestehendes Bündel" existiert,
+sie greift aber beim Bündeln von Findings, nicht beim Anlegen eines Punktes. Teuer war
+nicht die doppelte Arbeit des Agenten, sondern dass die Dopplung an der Stelle sichtbar
+wurde, an der sie am meisten kostet: nach dem Bauen, nach vier Reviews, im Merge.
+
+Gerettet wurde, was nur der erste Punkt hatte — das Anhänge-Tor —, und der Auftrag wurde
+auf genau diese Hälfte zusammengestrichen. Der Nebenbefund ist lehrreicher als der
+Hauptbefund: Der zweite Punkt hatte im Alleingang auch eine Lücke im Wächter geschlossen,
+die der erste ebenfalls geschlossen hatte, und eine dritte, die nur der erste kannte,
+wäre mit dem verworfenen Zweig verschwunden.
+
+**Lehre:** Ein neuer Punkt braucht dieselbe Frage wie ein neuer Befund — steht das schon
+irgendwo? Das ist billig, solange nur die Beschreibung existiert, und wird mit jedem
+Schritt danach teurer. Und wird ein Zweig verworfen, ist die Diff-Liste das
+Übergabeprotokoll: Was er über seinen eigenen Auftrag hinaus mitgebracht hat, geht sonst
+mit ihm unter.
+
+---
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -1129,7 +1161,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 10.08.2026, 21:56 · Quellen-Fingerprint: `ffe4fdc0bde2…`
+Zuletzt aktualisiert: Dienstag, 11.08.2026, 03:46 · Quellen-Fingerprint: `04a0f42d0f72…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1142,6 +1174,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | The batch dashboard — its live GH-Pages transport, its BINDING four-section structure (never change without explicit user go) and update discipline | 11 | hoch | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | A blocked tool call means the wrong path, not a missing permission — search the repo for its own command; never hand the user manual steps | 1 | niedrig | findings-guard.mjs | ✔ Mechanismus |
+| board.mjs commands must run SEQUENTIALLY — two in one turn raced and tore the dashboard's section structure | 1 | niedrig | board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | The batch dashboard may leave the private claude.ai artifact for a publicly readable transport — privacy is no longer a constraint | 1 | niedrig | board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Take the session boundary as the LAST action and with bare commands — a pipe makes the call count as work and silently deletes the marker | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Delegate via `node scripts/point-brief.mjs <N>` — the AGENT generates its own brief; board changes go through `scripts/board.mjs`; expect 529 agent deaths and commit-per-step | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1209,8 +1242,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 47 Prozess-/Meta-TASKS-Punkte (davon 17 offen).
+Erfasste Quellen: 73 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 47 Prozess-/Meta-TASKS-Punkte (davon 17 offen).
 
-<!-- RETRO-FINGERPRINT: ffe4fdc0bde2d43af96e90ee69290b304fcc20adb5733c746b13ceb760b9b6e5 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-10T19:56:58.321Z -->
+<!-- RETRO-FINGERPRINT: 04a0f42d0f729f0db081332fb83b4f55c1765e8b84d77b54382ea911943245be -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-11T01:46:12.853Z -->
 <!-- AUTO-GENERATED:END -->

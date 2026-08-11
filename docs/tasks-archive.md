@@ -17285,3 +17285,30 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   accepts; `node scripts/mechanism-review-guard.mjs --status` green afterwards.
   Criticality: HIGH — it changes the model policy the guards enforce, so the mechanism
   review applies and can fittingly be its own first customer.
+
+- [x] 610. THE ESCAPE IS REACHABLE ONLY BY KEYBOARD, AND IT REPORTS A RESCUE THAT DID NOT
+  HAPPEN (four-eyes findings on point 604, 10.08.2026). Two things the delivery left:
+  (a) `GAMEPAD_BUTTON_KEYS` (`src/systems/input.ts` ~141-150) maps NO button to `KeyU`, and
+  the stuck hint is a toast rather than the tappable prompt — so a pad-only or touch-only
+  player who is wedged still loses the expedition, which is the exact class 604 exists to
+  close, and `design.md` §17.5 already promises that the pad's buttons map onto the existing
+  key handlers. (b) In the bird's-eye view the search can report a rescue that did not
+  happen: with `found:false` nothing moves and the game still toasts "freed".
+  FINAL STATE:
+  1. A spare pad button (L3 or R3, whichever stays free of §17.5's existing map) dispatches
+     the same synthetic key as U — one input path, as the design demands — and the stuck
+     hint becomes tappable on the touch layer, dispatching the key it names like the
+     interaction prompt does.
+  2. A search that frees nobody says so: no "freed" message where nothing moved, and in the
+     travel view the traveller is told what happened instead.
+  3. THE TRAVEL SEARCH SEES WHAT IT LANDS ON: `travelObstacles` is sampled once at the
+     player while `collidableFloraNear` reaches ~4.2 u and the scaled search reaches 6.72 u,
+     so a landing spot can overlap a tree nobody looked at (the next frame pushes him out,
+     which is a papered-over hit, not a placement). The search queries obstacles over the
+     radius it actually searches.
+  4. `docs/acceptance-evidence.md` §16 stops claiming the live check "proved he was unable
+     to walk out" — the script does not prove that; it states what the check really does.
+  VERIFIABLE: Vitest for the button map, the tappable hint and the honest report; the
+  existing `unstuck` section of `scripts/verify/collision.mjs` extended by the pad path.
+  Criticality: medium — the mechanism is there; what is missing is a way to it for two of
+  the three input devices the game supports.
