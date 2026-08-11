@@ -210,6 +210,41 @@ there exactly once; a new point joins a bundle when appended.
   Criticality: high — the user has forbidden prompts in that window outright, and a prompt
   in an unattended session is a stall nobody is there to clear. Bundle: Modell & Wächter.
 
+- [ ] 632. A LESSON COUNTS AS SERVED THE MOMENT ITS ENFORCER IS NAMED — NOT WHEN IT STANDS
+  (user 11.08.2026: "Lehren sind schön und gut, aber es muss sichergestellt werden, dass sie
+  auch eingehalten werden." MEASURED against the directory `docs/analysis_de/lesson-mechanisms.md`,
+  107 lessons: 53 class 1 (an existing enforcer widened), 30 class 2 (a new enforcer), 24
+  class 3 (a stated gap). But 29 entries name a REMAINDER that is not enforced today, mostly
+  in the words "until point NNN is built, nothing protects against this pattern" — and 9 of
+  the 12 points they name are still OPEN (602, 609, 553, 558, 560, 561, 629, 630, 631); only
+  573, 612 and 572 are built. So the 1/2/3 classification measures the DECISION about an
+  enforcer, not its EXISTENCE, and the check that forces the decision — `scripts/retro-core.test.mjs`
+  — is satisfied as soon as the line is written. That is exactly what the user saw.)
+  FINAL STATE:
+  1. EVERY DIRECTORY ENTRY CARRIES A MACHINE-READABLE ENFORCEMENT STATE — `named`, `built`
+     or `none` (a deliberate gap) — and, where it is `named`, the work-order point number
+     that would build it.
+  2. `built` IS NOT BELIEVED FROM PROSE. A check in the fast layer derives it from the TICK
+     of the named point in the work order (`scripts/tasks-source.mjs` `readTasksAll`, so an
+     archived point counts as closed), and FAILS when an entry claims `built` while its
+     point is still open.
+  3. A REPORT, NOT A BLOCKER, MAKES THE AGE VISIBLE. The closing run and the batch day's
+     first turn list every lesson whose enforcer has been merely `named` for more than a
+     calibratable N days, with its age and its point number. That number is the one nobody
+     sees today.
+  4. A REPEAT PULLS THE POINT FORWARD. The queue ranking moves such a point up as soon as
+     the SAME mistake occurs a second time: the repetition is the evidence that the gap is
+     expensive.
+  EXPLICITLY NOT a blocking guard on the mere EXISTENCE of a gap. An honestly named gap is
+  better than an invented cover (§3.32), and a gate on it would teach us to stop naming gaps
+  at all.
+  VERIFIABLE: Vitest over the directory parser and the tick derivation — an entry claiming
+  `built` against an open point fails, the same entry against a ticked point passes, an
+  archived point counts as ticked, and a `named` entry older than N days appears in the
+  report with the right age; plus the report's own output asserted on a fixture directory.
+  Criticality: high — it decides whether our whole apparatus of lessons takes effect or
+  merely records.
+
 - [ ] 614. EXECUTE THE FOUR-EYES WORK-ORDER CLEANUP (10.08.2026; the verdict of a
   BLIND-PARALLEL analysis by two models on the 148 open points — CLAUDE.md §6, divergent
   stage). Both runs were merged by MEANING; where only one model found an item it is
