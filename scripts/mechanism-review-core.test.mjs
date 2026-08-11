@@ -377,6 +377,11 @@ describe('evaluateMechanismReview', () => {
     // and the arithmetic edges the shape alone would wave through
     expect(receiptBalances('1 A + 1 B entries → 2 union entries (0 merged, 2 only A, 0 only B): every input entry accounted for')).toBe(false)
     expect(receiptBalances('0 A + 0 B entries → 3 union entries (0 merged, 0 only A, 0 only B): every input entry accounted for')).toBe(false)
+    // The union's SIZE follows from the dispositions: two entries that were not
+    // merged cannot share one union entry, and folds cannot outnumber the pairs.
+    expect(receiptBalances('1 A + 1 B entries → 1 union entries (0 merged, 1 only A, 1 only B): every input entry accounted for')).toBe(false)
+    expect(receiptBalances('2 A + 2 B entries → 4 union entries (4 merged, 0 only A, 0 only B): every input entry accounted for')).toBe(false)
+    expect(receiptBalances('2 A + 2 B entries → 2 union entries (4 merged, 0 only A, 0 only B): every input entry accounted for')).toBe(true)
     const v = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',

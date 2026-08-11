@@ -10,7 +10,7 @@
 // checkout without touching it.
 import { describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { appendRecord, buildRecord, KNOWN_FLAGS, readRecords, usage } from './mechanism-review.mjs'
@@ -278,6 +278,75 @@ describe('the mode round-trips into the ledger', () => {
       const half = build({ mode: 'blind-parallel', mergedBy: 'Fable 5', unionPath: union })
       expect(half.ok).toBe(false)
       expect(half.errors.join('\n')).toMatch(/--list-a and --list-b/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('COUNTS AND RECORDS THROUGH THE SPAWNED COMMAND, flags, exit code and ledger', () => {
+    // The build layer above proves the logic; this proves the COMMAND — its flag
+    // parsing, its plumbing and its exit code (four-eyes review, fourth round).
+    // It runs against a throwaway checkout, so the tracked ledger is untouched.
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-record-repo-'))
+    try {
+      const repo = join(dir, 'repo')
+      mkdirSync(join(repo, 'scripts'), { recursive: true })
+      for (const f of [
+        'mechanism-review.mjs',
+        'mechanism-review-core.mjs',
+        'blind-merge-core.mjs',
+        'repo-paths.mjs',
+        'is-main.mjs',
+      ]) {
+        copyFileSync(resolve(process.cwd(), 'scripts', f), join(repo, 'scripts', f))
+      }
+      const git = (...args) =>
+        spawnSync('git', args, { cwd: repo, encoding: 'utf8', windowsHide: true, env: { ...process.env, HOME: dir } })
+      git('init', '-q', '-b', 'main')
+      git('config', 'user.email', 'test@example.invalid')
+      git('config', 'user.name', 'Test')
+      writeFileSync(join(repo, 'world.txt'), 'a fixture world\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', 'Lay down the world\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      const sha = git('rev-parse', 'HEAD').stdout.trim()
+
+      const w = (name, value) => {
+        const path = join(dir, name)
+        writeFileSync(path, typeof value === 'string' ? value : JSON.stringify(value))
+        return path
+      }
+      const listA = w('A.json', { model: 'Opus 5', entries: [{ id: 'A1', file: 'x.ts', defect: 'the first defect' }] })
+      const listB = w('B.txt', '- B1 | x.ts | the first defect said differently')
+      const union = w('U.json', { entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect' }] })
+      const record = (unionPath) =>
+        spawnSync(
+          process.execPath,
+          [
+            join(repo, 'scripts', 'mechanism-review.mjs'),
+            '--record', sha,
+            '--model', 'GPT-5.6 Sol',
+            '--verdict', 'merge',
+            '--evidence', 'read both lists and the union that folded them',
+            '--mode', 'blind-parallel',
+            '--merged-by', 'Fable 5',
+            '--union', unionPath,
+            '--list-a', listA,
+            '--list-b', listB,
+          ],
+          { cwd: repo, encoding: 'utf8', windowsHide: true },
+        )
+
+      const ok = record(union)
+      expect(ok.status, `${ok.stdout}${ok.stderr}`).toBe(0)
+      const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim())
+      expect(row).toMatchObject({ sha, mergedBy: 'Fable 5', accountingSource: 'computed', mode: 'blind-parallel' })
+      expect(row.accounting).toMatch(/1 A \+ 1 B entries → 1 union entries .*every input entry accounted for/)
+
+      // …and a union that drops an entry exits non-zero and writes nothing more.
+      const bad = record(w('U-bad.json', { entries: [{ id: 'U1', from: ['A1'] }] }))
+      expect(bad.status).not.toBe(0)
+      expect(`${bad.stdout}${bad.stderr}`).toMatch(/is in NO union entry/)
+      expect(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

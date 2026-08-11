@@ -140,7 +140,15 @@ export function readEntryLines(text) {
   const unreadable = []
   for (const raw of String(text ?? '').split(/\r?\n/)) {
     const line = raw.trim().replace(/^[-*+]\s+/, '').replace(/^\|/, '').replace(/\|$/, '')
-    if (!line.includes('|')) continue
+    if (!line.includes('|')) {
+      // A line that OPENS with an entry id and then forgets the pipes is a
+      // finding written in the wrong shape, not prose (four-eyes review, fourth
+      // round): dropping it quietly let a mixed list report green while one of
+      // its entries was never counted. Ordinary prose carries no id and is
+      // ignored as before.
+      if (/^[A-Za-z]{0,3}\d+\s*[:.)\-–—]/.test(line)) unreadable.push(line)
+      continue
+    }
     // A markdown table's header and its dashed separator are furniture, not
     // entries; everything else with a pipe in it was meant to be one.
     if (/^[\s|:-]+$/.test(line)) continue

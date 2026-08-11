@@ -195,8 +195,14 @@ export function receiptBalances(line) {
   if (merged + onlyA + onlyB !== a + b) return false
   if (merged === 1) return false
   if (onlyA > a || onlyB > b) return false
-  if (union > a + b) return false
-  return a + b === 0 ? union === 0 : union >= 1
+  // THE UNION'S SIZE FOLLOWS FROM THE DISPOSITIONS (four-eyes review, fourth
+  // round). Every entry standing alone is one union entry, and the merged ones
+  // form between one fold (all of them together) and merged/2 folds (pairs) —
+  // so a count claiming fewer union entries than singles is arithmetic nobody
+  // could have produced.
+  const singles = onlyA + onlyB
+  if (!merged) return union === singles
+  return union > singles && union <= singles + Math.floor(merged / 2)
 }
 
 /**

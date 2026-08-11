@@ -96,6 +96,25 @@ describe('reading and validating the two input lists', () => {
     expect(errors.join('\n')).toMatch(/not one entry could be read/)
   })
 
+  it('REPORTS a finding written without pipes beside well-formed ones', () => {
+    // The dangerous shape is the MIXED list: one good row makes the list look
+    // readable while the other entry is silently gone (four-eyes, fourth round).
+    const list = parseListText('B', ['- B1 | src/x.ts | the ribbon tears', '- B2: the save drops gifts'].join('\n'))
+    expect(list.entries.map((e) => e.id)).toEqual(['B1'])
+    const { ok, errors } = validateList(list)
+    expect(ok).toBe(false)
+    expect(errors.join('\n')).toMatch(/B2: the save drops gifts/)
+  })
+
+  it('still ignores ordinary prose around the list', () => {
+    const list = parseListText(
+      'B',
+      ['Here is what I found in the diff:', 'B1 | src/x.ts | the ribbon tears', 'That is all.'].join('\n'),
+    )
+    expect(validateList(list).ok).toBe(true)
+    expect(list.entries).toHaveLength(1)
+  })
+
   it('an unreadable list can never be accounted for by an empty union', () => {
     const b = parseListText('B', 'no ids | nothing here')
     expect(validateInputs(parseListText('A', '[]'), b).ok).toBe(false)
