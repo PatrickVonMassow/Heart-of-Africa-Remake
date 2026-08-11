@@ -248,21 +248,28 @@ describe('runDaemon — a released lock is not waited out', () => {
   })
 
   // THE WAKE MAY NOT DEPEND ON WHEN THE FIRST POLL HAPPENS TO RUN (point 644,
-  // measured 11.08.2026). The two tests above hand the lock its new state from a
-  // 60 ms timer, and the daemon's baseline used to be whatever its first poll saw
-  // — a poll armed only after the tick's record writes are done. On the CI runner
-  // that poll is late often enough to land AFTER the change (measured there;
-  // locally the same measurement never exceeds a few ms, which is why no amount
-  // of local load reproduced it), and the ended state then became the baseline
-  // instead of an event: the daemon slept the whole interval out and vitest
-  // reported a 30 s TIMEOUT, not a missed budget — the red that put point 644 on
-  // the work order.
+  // measured 11.08.2026 — the red on `main`, CI run 31504918389).
   //
-  // This pins the property WITHOUT a race: the lock ends its ownership
-  // SYNCHRONOUSLY inside the tick, so the change is always earlier than the first
-  // poll, whatever the machine is doing. Against the old code it hangs every time
-  // on every host; the wake now comes from the baseline taken before the tick.
-  it('wakes even when ownership ends BEFORE the first poll of the sleep', { timeout: 30_000 }, async () => {
+  // The two tests above have a 40 ms margin and nothing guarding it: the daemon
+  // arms its first poll 20 ms after the tick, they hand the lock its new state at
+  // 60 ms, and the poll is armed only once the tick's record writes are done
+  // (polls measured at 20/41/61 ms here and on the runner, against a change at
+  // 60 ms). Stall the worker's event loop wider than that margin — a loaded CI
+  // runner does it by itself, and 300 in-place samples there bounded the ordinary
+  // lag at 23 ms, which is why no local load ever reproduced this — and the two
+  // swap: the daemon's baseline used to be whatever its FIRST POLL saw, so an
+  // ownership that had already ended became the baseline instead of an event,
+  // nothing changed afterwards, and the loop slept the whole interval out. Vitest
+  // reports that as a 30 s TIMEOUT, not as a missed budget, which is exactly the
+  // shape the red had.
+  //
+  // So the stall is INJECTED rather than waited for, and this pins the property on
+  // every host: 120 ms of busy loop inside the tick, after the change timer is
+  // armed. Against the old loop it times out every single time; the wake now comes
+  // from the baseline taken BEFORE the tick, so the change is an event whenever it
+  // lands. The same case arises without any stall at all when ownership ends WHILE
+  // the tick runs — a handover a second before the tick's child finishes.
+  it('wakes when a stall lets ownership end before the sleep first polls', { timeout: 30_000 }, async () => {
     const place = arena()
     try {
       let lock = { sessionId: 's1', claimedAt: Date.now(), acquiredAt: Date.now() }
@@ -279,10 +286,17 @@ describe('runDaemon — a released lock is not waited out', () => {
         tick: () => {
           ticks.push(Date.now() - started)
           if (ticks.length === 1) {
-            // Idle and long past the window, laid down inside the tick itself —
-            // exactly what a session that lapses while the tick runs produces.
-            const at = Date.now() - 6 * 60 * 1000
-            lock = { sessionId: 's1', claimedAt: at, acquiredAt: at, pid: process.pid }
+            setTimeout(() => {
+              // Took the lock, never ran a thing, and the window has passed.
+              const at = Date.now() - 6 * 60 * 1000
+              lock = { sessionId: 's1', claimedAt: at, acquiredAt: at, pid: process.pid }
+            }, 60)
+            // The starvation, made deliberate: while this runs the loop cannot arm
+            // the poll timer, so the change above is certain to land first.
+            const until = Date.now() + 120
+            while (Date.now() < until) {
+              /* busy on purpose */
+            }
           } else {
             stopFrom(place.recordPath)
           }
