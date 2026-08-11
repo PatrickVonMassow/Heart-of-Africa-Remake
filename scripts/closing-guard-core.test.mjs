@@ -7,6 +7,7 @@ import {
   AFTER_CLEANUP_STEP_ID,
   CLEANUP_STEP_IDS,
   CLOSING_STEPS,
+  ORDERED_STEP_IDS,
   STEP_IDS,
   afterCleanupProblem,
   evidenceAnchors,
@@ -251,22 +252,33 @@ describe('the second regression must stand AFTER the cleanup', () => {
       [AFTER_CLEANUP_STEP_ID]: { evidence, at },
     },
   })
-  const problemOf = (state) => {
-    const entry = missingSteps(state, HEAD).find((s) => s.id === AFTER_CLEANUP_STEP_ID)
+  const noteOf = (state, id = AFTER_CLEANUP_STEP_ID) => {
+    const entry = missingSteps(state, HEAD).find((s) => s.id === id)
     return entry ? entry.note || 'missing without a note' : ''
   }
+  const problemOf = (state) => noteOf(state)
 
-  it('carries both new steps, and the checklist READS as the sequence', () => {
+  it('carries both new steps, and the checklist is PRINTED in the sequence it enforces', () => {
     expect(STEP_IDS.has('cleanup-blind-parallel')).toBe(true)
     expect(STEP_IDS.has(AFTER_CLEANUP_STEP_ID)).toBe(true)
     expect(CLEANUP_STEP_IDS).toContain('cleanup-blind-parallel')
     const order = CLOSING_STEPS.map((s) => s.id)
     expect(order.indexOf('large-regression')).toBeLessThan(order.indexOf('cleanup-blind-parallel'))
     expect(order.indexOf('cleanup-blind-parallel')).toBeLessThan(order.indexOf(AFTER_CLEANUP_STEP_ID))
+    // the ENFORCED order is a separate list, and it holds the same three stages
+    expect(ORDERED_STEP_IDS[0]).toBe('large-regression')
+    expect(ORDERED_STEP_IDS[ORDERED_STEP_IDS.length - 1]).toBe(AFTER_CLEANUP_STEP_ID)
+    for (const id of CLEANUP_STEP_IDS) expect(ORDERED_STEP_IDS).toContain(id)
   })
 
-  it('ACCEPTS a run named by a timestamp after the cleanup', () => {
-    expect(problemOf(withRegression('LARGE green, both backends, 2026-08-11T12:30:00Z', AFTER_CLEANUP_AT))).toBe('')
+  it('ACCEPTS a run named by a timestamp between the cleanup and the record', () => {
+    expect(problemOf(withRegression('LARGE green, both backends, 2026-08-11T11:30:00Z', AFTER_CLEANUP_AT))).toBe('')
+  })
+
+  it('REJECTS a run dated after the moment it was written down', () => {
+    // The bypass the second review named: a run "in the future" certifies
+    // itself before it can have happened.
+    expect(problemOf(withRegression('LARGE green, both backends, 2099-01-01T00:00:00Z', AFTER_CLEANUP_AT))).toMatch(/AFTER the moment it was written down/)
   })
 
   it('ACCEPTS a run named by the COMMIT BEING CLOSED, in full or as a prefix', () => {
@@ -304,13 +316,40 @@ describe('the second regression must stand AFTER the cleanup', () => {
     expect(problemOf(withRegression(`LARGE green on ${HEAD}`, '2026-08-11T09:00:00.000Z'))).toMatch(/BEFORE the cleanup step/)
   })
 
-  it('REJECTS a cleanup step with no record time instead of waving it through', () => {
+  it('REJECTS a step with no record time instead of waving it through, naming that step', () => {
     const state = withRegression(`LARGE green on ${HEAD}`, AFTER_CLEANUP_AT)
     delete state.steps['stale-doc'].at // a state written before the order check existed
-    expect(problemOf(state)).toMatch(/carries no record time/)
+    expect(noteOf(state, 'stale-doc')).toMatch(/carries no record time/)
     const undatedRun = withRegression(`LARGE green on ${HEAD}`, AFTER_CLEANUP_AT)
     delete undatedRun.steps[AFTER_CLEANUP_STEP_ID].at
     expect(problemOf(undatedRun)).toMatch(/carries no record time/)
+  })
+
+  // The SEQUENCE is more than its last step (second review): the first
+  // regression comes BEFORE the cleanup, and the two regressions are two runs.
+  it('REJECTS a first regression recorded AFTER the cleanup had begun', () => {
+    const state = stateWith(HEAD, ALL_IDS)
+    state.steps['large-regression'] = { evidence: 'LARGE green, both backends', at: '2026-08-11T11:00:00.000Z' }
+    expect(noteOf(state, 'large-regression')).toMatch(/the first regression comes BEFORE the cleanup/)
+    expect(evaluate({ command: 'git tag v0.3', state, headSha: HEAD }).block).toBe(true)
+  })
+
+  it('REJECTS one run written down twice as both regressions', () => {
+    const state = stateWith(HEAD, ALL_IDS)
+    const oneRun = `LARGE green on ${HEAD}, both backends`
+    state.steps['large-regression'] = { evidence: oneRun, at: CLEANUP_AT }
+    state.steps[AFTER_CLEANUP_STEP_ID] = { evidence: `  ${oneRun.toUpperCase()}  `, at: AFTER_CLEANUP_AT }
+    expect(problemOf(state)).toMatch(/one run cannot be both/)
+  })
+
+  it('REJECTS a second regression written down before the first', () => {
+    // cleanup 10:00, "first" regression 13:00, "second" 12:00 — both steps sit
+    // in the wrong place, and each is told so in its own words
+    const state = stateWith(HEAD, ALL_IDS)
+    state.steps['large-regression'] = { evidence: 'LARGE green, both backends, first run', at: '2026-08-11T13:00:00.000Z' }
+    state.steps[AFTER_CLEANUP_STEP_ID] = { evidence: `LARGE green on ${HEAD}, second run`, at: '2026-08-11T12:00:00.000Z' }
+    expect(problemOf(state)).toMatch(/BEFORE "large-regression"/)
+    expect(noteOf(state, 'large-regression')).toMatch(/the first regression comes BEFORE the cleanup/)
   })
 
   it('does not read an all-hex English word as a commit', () => {

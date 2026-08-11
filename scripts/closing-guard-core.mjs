@@ -380,23 +380,32 @@ export function tickClaim({ toolName, toolInput, tasksText } = {}) {
 // changes nothing ever tested. So the second regression is its own step, and its
 // POSITION is checked.
 //
-// WHAT "AFTER" CAN HONESTLY BE CHECKED AGAINST (four-eyes review 11.08.2026,
-// GPT-5.6 Sol). A commit's own DATE is the wrong clock: the closing state is
-// keyed to the commit being tagged, the cleanup steps are recorded after that
-// commit exists, so a regression naming the very state it tested would read as
-// "too old", while any unrelated newer commit would read as fine. Two things
-// can be judged without git, and both are:
-//   - THE COMMIT NAMED IS THE ONE BEING CLOSED. The state is per-commit, so the
-//     cleanup recorded in it landed at or before that commit; a LARGE run on it
-//     therefore covers the cleanup. A run on any OTHER commit proves nothing.
-//   - EVERY TIME NAMED LIES AFTER THE CLEANUP. Cleanup steps are recorded when
-//     the cleanup is done, so their youngest record time is a lower bound for
-//     "the cleanup existed". The EARLIEST time the evidence names must beat it —
-//     earliest, because "report 2026-08-12: run of 2026-08-10" must not certify
-//     a pre-cleanup run by quoting a later date somewhere in the sentence.
-// The step's own record time is only ever used as a NECESSARY condition (it is
-// an upper bound of the run, never a lower one): a step recorded before a
-// cleanup step cannot describe a run that came after it.
+// WHAT "AFTER" CAN HONESTLY BE CHECKED AGAINST (four-eyes reviews 11.08.2026,
+// GPT-5.6 Sol, two rounds). A commit's own DATE is the wrong clock: the state is
+// keyed to the commit being tagged and the steps are recorded after that commit
+// exists, so a regression naming the very state it tested would read as "too
+// old", while any unrelated newer commit would read as fine. What CAN be judged,
+// with no git and no clock of its own:
+//   - THE COMMIT NAMED IS THE ONE BEING CLOSED. A LARGE run on the commit that
+//     will be tagged tests exactly the state that will be tagged — which is the
+//     point of running it again. A run on any OTHER commit says nothing about
+//     this one. (It does NOT prove the cleanup is inside that commit; nothing in
+//     the state can prove that. What it proves is the property the tag needs.)
+//   - THE TIMES NAMED FRAME THE RUN. The EARLIEST time the evidence names must
+//     lie after the youngest cleanup record — earliest, because "report
+//     2026-08-12: run of 2026-08-10" must not certify a pre-cleanup run by
+//     quoting a later date elsewhere in the sentence. The LATEST must not lie
+//     after the moment the step was written down, or a run dated 2099 would
+//     certify itself before it happened.
+//   - THE RECORD TIMES RUN IN THE SEQUENCE'S OWN ORDER: `large-regression` at or
+//     before the first cleanup step, the second regression at or after the last
+//     one and at or after the first regression, and the two regressions are two
+//     RUNS — the same evidence text cannot serve as both.
+// A record time is only ever a NECESSARY condition (it is an upper bound of the
+// run it describes, never a lower one), and ties are allowed throughout: two
+// steps recorded in the same millisecond are a fast hand, not a violation.
+// A step recorded WITHOUT a record time cannot be ordered at all, so it is
+// reported missing with a re-record remedy rather than waved through.
 
 /** The cleanup steps the second regression must come after. */
 export const CLEANUP_STEP_IDS = ['dead-code', 'stale-doc', 'stale-comment', 'md-audit', 'cleanup-blind-parallel']
@@ -460,65 +469,172 @@ export function evidenceAnchors(text) {
 }
 
 const iso = (ms) => new Date(ms).toISOString()
+const RE_RECORD = (id) => `re-record it: node scripts/closing-guard.mjs --step ${id} --evidence "<proof>"`
+/** Evidence compared as CLAIMS, not as characters: case and spacing are noise. */
+const sameClaim = (a, b) =>
+  String(a ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ') ===
+  String(b ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+
+/** The steps whose POSITION in the sequence is checked, first to last. */
+export const ORDERED_STEP_IDS = ['large-regression', ...CLEANUP_STEP_IDS, AFTER_CLEANUP_STEP_ID]
 
 /**
- * Why the recorded `regression-after-cleanup` does NOT count for the closing of
- * `headSha`, or '' when it does. Total by contract: anything unreadable → ''
- * (a guard bug must not trap a release either).
+ * Which recorded steps stand in the WRONG PLACE in the closing sequence, as
+ * `Map<stepId, reason>`. A step that is not recorded at all is not judged here —
+ * its absence is `missingSteps`' business.
+ * Total by contract: anything unreadable → an empty map (a guard bug must not
+ * trap a release either).
  */
-export function afterCleanupProblem(steps, headSha) {
+export function orderProblems(steps, headSha) {
+  const problems = new Map()
   try {
     const table = steps && typeof steps === 'object' ? steps : {}
-    const entry = table[AFTER_CLEANUP_STEP_ID]
-    if (!entry || typeof entry !== 'object') return ''
     const head = typeof headSha === 'string' ? headSha.toLowerCase() : ''
-    const anchors = evidenceAnchors(entry.evidence)
+    /** A step as RECORDED (evidence present), or null. */
+    const recorded = (id) => {
+      const e = table[id]
+      return e && typeof e === 'object' && typeof e.evidence === 'string' && e.evidence.trim() ? e : null
+    }
+    /** Its record time, or null — and an undatable step is reported, not trusted. */
+    const timeOf = (id) => {
+      const e = recorded(id)
+      if (!e) return null
+      const at = parseTime(e.at)
+      if (at === null) {
+        problems.set(id, `it carries no record time, so its place in the sequence cannot be judged (a state from before the order check) — ${RE_RECORD(id)}`)
+        return null
+      }
+      return at
+    }
+
+    // NOTHING IS ORDERED UNTIL THERE IS SOMETHING TO ORDER. While the second
+    // regression is unrecorded the closing is still running, and a half-filled
+    // checklist must read as "in progress" — the freeze detector in
+    // batch-in-flight reads exactly that. The gate only decides at the tag/tick,
+    // by which time this step is recorded or missing on its own account.
+    if (!recorded(AFTER_CLEANUP_STEP_ID)) return problems
+
+    const firstAt = timeOf('large-regression')
+    let youngest = null
+    let oldest = null
+    for (const id of CLEANUP_STEP_IDS) {
+      const at = timeOf(id)
+      if (at === null) continue
+      if (youngest === null || at > youngest.at) youngest = { id, at }
+      if (oldest === null || at < oldest.at) oldest = { id, at }
+    }
+    const secondAt = timeOf(AFTER_CLEANUP_STEP_ID)
+    const second = recorded(AFTER_CLEANUP_STEP_ID)
+
+    // 1. THE FIRST REGRESSION COMES BEFORE THE CLEANUP. Recorded after it, the
+    //    "first" run is really a second one and the sequence never happened.
+    if (firstAt !== null && oldest && firstAt > oldest.at) {
+      problems.set(
+        'large-regression',
+        `it was recorded ${iso(firstAt)}, AFTER the cleanup step "${oldest.id}" (${iso(oldest.at)}) — the first regression comes BEFORE the cleanup; record the steps in the order they happened`,
+      )
+    }
+
+    // 2. THE SECOND REGRESSION NAMES WHAT IT RAN ON.
+    const anchors = evidenceAnchors(second.evidence)
     const namesHead = anchors.commits.some((sha) => head && head.startsWith(sha))
     const foreign = anchors.commits.filter((sha) => !(head && head.startsWith(sha)))
     if (!namesHead && foreign.length) {
-      return `its evidence names commit ${foreign[0]}, which is NOT the commit being closed (${head.slice(0, 12) || 'unknown'}) — a regression on another commit says nothing about this one`
+      problems.set(
+        AFTER_CLEANUP_STEP_ID,
+        `its evidence names commit ${foreign[0]}, which is NOT the commit being closed (${head.slice(0, 12) || 'unknown'}) — a regression on another commit says nothing about this one`,
+      )
+      return problems
     }
     if (!namesHead && anchors.times.length === 0) {
-      return `its evidence names neither the commit being closed nor a timestamp, so nothing places it after the cleanup — record it as e.g. --evidence "LARGE green on ${head.slice(0, 12) || '<sha>'}, both backends, 2026-08-11T14:00Z"`
+      problems.set(
+        AFTER_CLEANUP_STEP_ID,
+        `its evidence names neither the commit being closed nor a timestamp, so nothing places it after the cleanup — record it as e.g. --evidence "LARGE green on ${head.slice(0, 12) || '<sha>'}, both backends, 2026-08-11T14:00Z"`,
+      )
+      return problems
     }
 
-    let youngest = null
-    let undated = ''
-    for (const id of CLEANUP_STEP_IDS) {
-      const cleanup = table[id]
-      if (!cleanup || typeof cleanup !== 'object' || typeof cleanup.evidence !== 'string' || !cleanup.evidence.trim()) continue
-      const at = parseTime(cleanup.at)
-      if (at === null) {
-        if (!undated) undated = id
-        continue
-      }
-      if (youngest === null || at > youngest.at) youngest = { id, at }
+    // 3. IT IS A SECOND RUN, NOT THE FIRST ONE WRITTEN DOWN TWICE.
+    const first = recorded('large-regression')
+    if (first && sameClaim(first.evidence, second.evidence)) {
+      problems.set(
+        AFTER_CLEANUP_STEP_ID,
+        `its evidence is word for word the evidence of "large-regression" — the closing runs the regression TWICE, and one run cannot be both`,
+      )
+      return problems
     }
-    // A cleanup step written by an older wrapper carries no record time. Unknown
-    // is not "fine": re-record it rather than let the order go unjudged.
-    if (undated) {
-      return `the cleanup step "${undated}" carries no record time, so nothing can be ordered against it — re-record it: node scripts/closing-guard.mjs --step ${undated} --evidence "<proof>"`
-    }
-    if (!youngest) return '' // no cleanup recorded at all — those missing steps block on their own
 
-    const recordedAt = parseTime(entry.at)
-    if (recordedAt === null) {
-      return `it carries no record time — re-record it: node scripts/closing-guard.mjs --step ${AFTER_CLEANUP_STEP_ID} --evidence "<proof>"`
+    // 4. ITS PLACE IN THE RECORD ORDER. Ties pass: two steps written in the same
+    //    millisecond are a fast hand, not a violation.
+    if (secondAt !== null && youngest && secondAt < youngest.at) {
+      problems.set(
+        AFTER_CLEANUP_STEP_ID,
+        `it was recorded ${iso(secondAt)}, BEFORE the cleanup step "${youngest.id}" (${iso(youngest.at)}) — a run written down before the cleanup cannot have covered it`,
+      )
+      return problems
     }
-    if (recordedAt <= youngest.at) {
-      return `it was recorded ${iso(recordedAt)}, BEFORE the cleanup step "${youngest.id}" (${iso(youngest.at)}) — a run written down before the cleanup cannot have covered it`
+    if (secondAt !== null && firstAt !== null && secondAt < firstAt) {
+      problems.set(
+        AFTER_CLEANUP_STEP_ID,
+        `it was recorded ${iso(secondAt)}, BEFORE "large-regression" (${iso(firstAt)}) — the second regression is the LATER of the two runs`,
+      )
+      return problems
     }
+
+    // 5. THE TIMES IT NAMES FRAME THE RUN: after the cleanup, and not in a future
+    //    it could not have seen when it was written down.
     const earliest = anchors.earliest
-    if (earliest) {
+    if (earliest && youngest) {
       if (earliest.dateOnly) {
         if (Math.floor(earliest.time / DAY_MS) <= Math.floor(youngest.at / DAY_MS)) {
-          return `its evidence dates the run ${earliest.token}, the cleanup's own day or earlier ("${youngest.id}", ${iso(youngest.at)}) — a bare date cannot order two runs of one day, so name the time or the commit ${head.slice(0, 12) || ''}`.trim()
+          problems.set(
+            AFTER_CLEANUP_STEP_ID,
+            `its evidence dates the run ${earliest.token}, the cleanup's own day or earlier ("${youngest.id}", ${iso(youngest.at)}) — a bare date cannot order two runs of one day, so name the time or the commit ${head.slice(0, 12) || ''}`.trim(),
+          )
+          return problems
         }
       } else if (earliest.time <= youngest.at) {
-        return `its evidence dates the run ${earliest.token}, which is NOT after the youngest cleanup step ("${youngest.id}", ${iso(youngest.at)}) — every time the evidence names must lie after the cleanup, so drop or fix the earlier one`
+        problems.set(
+          AFTER_CLEANUP_STEP_ID,
+          `its evidence dates the run ${earliest.token}, which is NOT after the youngest cleanup step ("${youngest.id}", ${iso(youngest.at)}) — every time the evidence names must lie after the cleanup, so drop or fix the earlier one`,
+        )
+        return problems
       }
     }
-    return ''
+    if (secondAt !== null) {
+      const latest = anchors.times.reduce((a, b) => (a === null || b.time > a.time ? b : a), null)
+      // A bare DATE means "some moment that day", so it reads as future only once
+      // the whole day lies beyond the record — 2026-08-11 written on 2026-08-11
+      // at 09:00 is the same day, not a claim about that evening.
+      const beyond = latest && (latest.dateOnly ? Math.floor(latest.time / DAY_MS) > Math.floor(secondAt / DAY_MS) : latest.time > secondAt)
+      if (beyond) {
+        problems.set(
+          AFTER_CLEANUP_STEP_ID,
+          `its evidence dates the run ${latest.token}, AFTER the moment it was written down (${iso(secondAt)}) — a run cannot be recorded before it happened`,
+        )
+      }
+    }
+  } catch {
+    return problems
+  }
+  return problems
+}
+
+/**
+ * Why the recorded `regression-after-cleanup` does NOT count for the closing of
+ * `headSha`, or '' when it does — the single-step view of `orderProblems`, kept
+ * because that step is the one the checklist is named after.
+ * Total by contract: anything unreadable → ''.
+ */
+export function afterCleanupProblem(steps, headSha) {
+  try {
+    return orderProblems(steps, headSha).get(AFTER_CLEANUP_STEP_ID) ?? ''
   } catch {
     return ''
   }
@@ -529,14 +645,14 @@ export function afterCleanupProblem(steps, headSha) {
  * A step is satisfied ONLY when the state is FOR this exact commit and the step
  * has an entry (with evidence). A state recorded for a different commit counts
  * for NOTHING — a closing is per-commit, so re-tagging a new commit needs a
- * fresh closing. `regression-after-cleanup` must additionally stand AFTER the
- * cleanup (point 631); when it does not, it is reported missing WITH the reason
- * in `note`.
+ * fresh closing. A step must additionally stand in the right PLACE in the
+ * sequence (point 631, `orderProblems`); when it does not, it is reported
+ * missing WITH the reason in `note`.
  * Total: bad input → ALL steps missing (safest: blocks).
  */
 export function missingSteps(state, headSha) {
   const done = new Set()
-  let note = ''
+  const notes = new Map()
   try {
     let steps = {}
     if (state && typeof state === 'object' && typeof headSha === 'string' && headSha && state.commit === headSha) {
@@ -549,15 +665,18 @@ export function missingSteps(state, headSha) {
         }
       }
     }
-    if (done.has(AFTER_CLEANUP_STEP_ID)) {
-      note = afterCleanupProblem(steps, headSha)
-      if (note) done.delete(AFTER_CLEANUP_STEP_ID)
+    // A step in the WRONG PLACE has not been done, whatever it says: the notes
+    // travel with it so the block reason can name the position, not just the gap.
+    for (const [id, reason] of orderProblems(steps, headSha)) {
+      if (!done.has(id)) continue
+      done.delete(id)
+      notes.set(id, reason)
     }
   } catch {
     done.clear() // unreadable state → nothing counts, which is the safe direction here
-    note = ''
+    notes.clear()
   }
-  return CLOSING_STEPS.filter((s) => !done.has(s.id)).map((s) => (s.id === AFTER_CLEANUP_STEP_ID && note ? { ...s, note } : s))
+  return CLOSING_STEPS.filter((s) => !done.has(s.id)).map((s) => (notes.has(s.id) ? { ...s, note: notes.get(s.id) } : s))
 }
 
 /** The shared tail of every block reason: what is missing and how to record it. */
