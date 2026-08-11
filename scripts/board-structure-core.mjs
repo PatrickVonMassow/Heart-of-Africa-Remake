@@ -28,8 +28,10 @@
 import {
   CLOSING_WORK_TITLE,
   NO_CURRENT_WORK_TITLE,
+  STAGE_WORDS,
   looksLikeClosingTitle,
   namesFollowOnWork,
+  stageOnlyTitle,
 } from './board-core.mjs'
 
 /** The four sections, in the order the user's mandate fixes them. */
@@ -166,70 +168,11 @@ export function structureViolations(html) {
   return out
 }
 
-/**
- * THE STAGE WORDS a card title may not consist of (point 655, user 11.08.2026,
- * both languages). A stage says WHERE in the work the session stands, never what
- * the work IS — "Abschlussarbeiten" was the whole title of a card, and the user
- * read it on his phone without learning which point had ended or what it had
- * been about.
- */
-export const STAGE_WORDS = [
-  'Abschlussarbeiten',
-  'Nacharbeit',
-  'Nacharbeiten',
-  'Vorbereitung',
-  'Vorbereitungen',
-  'Aufräumen',
-  'Aufraeumen',
-  'Aufräumarbeiten',
-  'closing work',
-  'closing duties',
-  'closing',
-  'rework',
-  'preparation',
-  'cleanup',
-  'clean-up',
-  'tidying',
-]
-
-/**
- * The words that name no subject: articles, prepositions and the words that
- * only point BACK at the point itself ("zum gerade beendeten Punkt"). They are
- * what separates the card the user complained about from a legitimate title that
- * happens to open on a stage word.
- */
-const FILLER_WORDS = new Set([
-  'zum', 'zur', 'zu', 'am', 'an', 'im', 'in', 'auf', 'für', 'fur', 'des', 'der', 'die', 'das', 'den', 'dem',
-  'ein', 'eine', 'einen', 'einem', 'eines', 'und', 'noch', 'nur', 'gerade', 'eben', 'soeben', 'letzten',
-  'letzte', 'aktuellen', 'aktuelle', 'beendeten', 'beendete', 'abgeschlossenen', 'fertigen', 'meines',
-  'meiner', 'diesem', 'diesen', 'dieses', 'punkt', 'punkts', 'punktes', 'point', 'points', 'the', 'this',
-  'that', 'of', 'for', 'to', 'on', 'at', 'just', 'now', 'current', 'finished', 'closed', 'my', 'work',
-  'works', 'duties', 'a', 'an', 'and',
-])
-
-/**
- * Does this title say only what STAGE the work is in (point 655)?
- *
- * THE RULE, and why it is not simply "begins with a stage word" (four-eyes
- * review, GPT-5.6 Sol, 12.08.2026): the title is stripped of its number prefix,
- * of every stage word and of the FILLER above — and if NOTHING is left, it named
- * no subject. "Abschlussarbeiten zum gerade beendeten Punkt" leaves nothing and
- * is refused; "Vorbereitung der Karten", "Cleanup parser for Windows" and
- * "<Betreff>: Abschlussarbeiten" all leave a subject and pass. A refusal here
- * costs a retitle, so it must fire only where the card really says nothing.
- */
-export function stageOnlyTitle(title) {
-  let text = String(title ?? '')
-    .replace(/^\s*\d+\s*[—–-]\s*/, '')
-    .trim()
-  if (!text) return true
-  for (const w of STAGE_WORDS) text = text.replace(new RegExp(`\\b${w}\\b`, 'gi'), ' ')
-  const rest = text
-    .toLowerCase()
-    .split(/[^a-zäöüß0-9-]+/i)
-    .filter((t) => t && !FILLER_WORDS.has(t))
-  return rest.length === 0
-}
+// The title vocabulary — the stage words and the filler that names nothing —
+// lives in board-core beside the writers that must not produce a title this gate
+// would refuse (four-eyes review, 12.08.2026). Re-exported, so the gate's own
+// callers still find it here.
+export { STAGE_WORDS, stageOnlyTitle }
 
 // `looksLikeClosingTitle` is imported from board-core, where the card is
 // composed: the gate and the strip that removes a closing card must answer the

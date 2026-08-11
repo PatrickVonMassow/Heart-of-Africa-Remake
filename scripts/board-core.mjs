@@ -518,6 +518,71 @@ export function closingCardTitle(subject) {
 }
 
 /**
+ * THE STAGE WORDS a card title may not consist of (point 655, user 11.08.2026,
+ * both languages). A stage says WHERE in the work the session stands, never what
+ * the work IS — "Abschlussarbeiten" was the whole title of a card, and the user
+ * read it on his phone without learning which point had ended or what it had
+ * been about.
+ */
+export const STAGE_WORDS = [
+  'Abschlussarbeiten',
+  'Nacharbeit',
+  'Nacharbeiten',
+  'Vorbereitung',
+  'Vorbereitungen',
+  'Aufräumen',
+  'Aufraeumen',
+  'Aufräumarbeiten',
+  'closing work',
+  'closing duties',
+  'closing',
+  'rework',
+  'preparation',
+  'cleanup',
+  'clean-up',
+  'tidying',
+]
+
+/**
+ * The words that name no subject: articles, prepositions and the words that
+ * only point BACK at the point itself ("zum gerade beendeten Punkt"). They are
+ * what separates the card the user complained about from a legitimate title that
+ * happens to open on a stage word.
+ */
+const FILLER_WORDS = new Set([
+  'zum', 'zur', 'zu', 'am', 'an', 'im', 'in', 'auf', 'für', 'fur', 'des', 'der', 'die', 'das', 'den', 'dem',
+  'ein', 'eine', 'einen', 'einem', 'eines', 'und', 'noch', 'nur', 'gerade', 'eben', 'soeben', 'letzten',
+  'letzte', 'aktuellen', 'aktuelle', 'beendeten', 'beendete', 'abgeschlossenen', 'fertigen', 'meines',
+  'meiner', 'diesem', 'diesen', 'dieses', 'punkt', 'punkts', 'punktes', 'point', 'points', 'the', 'this',
+  'that', 'of', 'for', 'to', 'on', 'at', 'just', 'now', 'current', 'finished', 'closed', 'my', 'work',
+  'works', 'duties', 'a', 'an', 'and',
+])
+
+/**
+ * Does this title say only what STAGE the work is in (point 655)?
+ *
+ * THE RULE, and why it is not simply "begins with a stage word" (four-eyes
+ * review, GPT-5.6 Sol, 12.08.2026): the title is stripped of its number prefix,
+ * of every stage word and of the FILLER above — and if NOTHING is left, it named
+ * no subject. "Abschlussarbeiten zum gerade beendeten Punkt" leaves nothing and
+ * is refused; "Vorbereitung der Karten", "Cleanup parser for Windows" and
+ * "<Betreff>: Abschlussarbeiten" all leave a subject and pass. A refusal here
+ * costs a retitle, so it must fire only where the card really says nothing.
+ */
+export function stageOnlyTitle(title) {
+  let text = String(title ?? '')
+    .replace(/^\s*\d+\s*[—–-]\s*/, '')
+    .trim()
+  if (!text) return true
+  for (const w of STAGE_WORDS) text = text.replace(new RegExp(`\\b${w}\\b`, 'gi'), ' ')
+  const rest = text
+    .toLowerCase()
+    .split(/[^a-zäöüß0-9-]+/i)
+    .filter((t) => t && !FILLER_WORDS.has(t))
+  return rest.length === 0
+}
+
+/**
  * THE MARKER THE STATE CARDS ARE FOUND BY (point 655). A state card is REPLACED,
  * never appended, so whatever writes one has to find the one standing — and
  * while the closing card's title was a constant, the pattern could be built from
@@ -759,6 +824,13 @@ export function toClosingWork(html, point, { subject, reason, stamp = berlinStam
     throw new Error('board: closing needs a reason — the reader must learn WHICH duties are still owed')
   }
   const name = String(subject ?? '').trim() || pointSubject(html, point) || ''
+  if (name && stageOnlyTitle(name)) {
+    throw new Error(
+      `board: "${name}" is a STAGE, not a subject — the card would read "${name}: ${CLOSING_STAGE}" and ` +
+        'say nothing about the point. Give the point\'s own subject: node scripts/board.mjs closing ' +
+        `${point} --title "<Betreff des Punktes>" "<Grund>".`,
+    )
+  }
   if (!name) {
     throw new Error(
       `board: no German subject for point ${point} stands anywhere on the board, so the card would ` +
@@ -989,10 +1061,27 @@ export function setCardTitle(html, point, title) {
   if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
   const text = String(title ?? '').trim()
   if (!text) throw new Error('board: refusing to write an empty title')
+  // A SANCTIONED WRITER MAY NOT PRODUCE WHAT THE PUBLISH GATE REFUSES (four-eyes
+  // review, 12.08.2026): a title that says only which STAGE the work is in is
+  // exactly the card point 655 ended, and writing one here would leave the board
+  // unpublishable one command later.
+  if (stageOnlyTitle(text)) {
+    throw new Error(
+      `board: "${text}" names a STAGE and no subject — a card title says what the point IS. ` +
+        `For the closing card use node scripts/board.mjs closing ${point} "<Grund>", which composes ` +
+        `"<Betreff>: ${CLOSING_STAGE}" itself.`,
+    )
+  }
   // Both sections carry the number in a chip of its own since point 655, so a
   // retitle only ever rewrites the SUBJECT — and a now-card still written in the
   // old shape ("439 — …") is lifted into the chip shape on the way.
-  const bare = stripPointPrefix(text, point)
+  // ON A CLOSING CARD THE TITLE KEEPS ITS SHAPE. The marker and the composed
+  // title are one statement; retitling only the subject would leave a card the
+  // gate reads as a false closing marker.
+  const closingMarked = new RegExp(
+    `<details class="now"[^>]*data-state="closing"[^>]*>\\s*<summary>[\\s\\S]*?<span class="num">\\s*${point}\\s*</span>`,
+  ).test(html)
+  const bare = closingMarked ? closingCardTitle(stripPointPrefix(text, point)) : stripPointPrefix(text, point)
   const chipRe = new RegExp(
     `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*<span class="t">)[^<]*(</span>)`,
   )

@@ -416,6 +416,34 @@ describe('every current-work card names its point and its subject', () => {
     expect(toQueue(board, 651, { text: 'Zurück.' })).not.toContain('class="now"')
   })
 
+  // NO SANCTIONED WRITER MAY PRODUCE WHAT THIS GATE REFUSES (four-eyes 12.08.):
+  // a command that writes an unpublishable board reports the mistake one step
+  // late, and the session then has to undo an edit it was told to make.
+  it('refuses at the WRITER every title this gate would refuse', () => {
+    const running = withNow(chipCard(651, 'Ein Betreff'))
+    expect(() => setCardTitle(running, 651, 'Abschlussarbeiten')).toThrow(/STAGE and no subject/)
+    expect(() => setCardTitle(running, 651, 'Vorbereitung')).toThrow(/STAGE and no subject/)
+    // …while a real subject goes through and publishes.
+    expect(codes(setCardTitle(running, 651, 'Vorbereitung der Karten'))).toEqual([])
+  })
+
+  it('keeps the closing card publishable when it is retitled', () => {
+    const closing = toClosingWork(withNow(''), 651, {
+      subject: 'Ein Betreff',
+      reason: 'Vier-Augen fehlt.',
+      stamp: '23:40',
+    })
+    const renamed = setCardTitle(closing, 651, 'Ein besserer Betreff')
+    expect(renamed).toContain('Ein besserer Betreff: Abschlussarbeiten')
+    expect(codes(renamed)).toEqual([])
+  })
+
+  it('refuses a closing SUBJECT that is itself only a stage', () => {
+    expect(() =>
+      toClosingWork(withNow(''), 651, { subject: 'Abschlussarbeiten', reason: 'Grund.' }),
+    ).toThrow(/STAGE, not a subject/)
+  })
+
   it('drops a card that names neither a point nor a state, and says which', () => {
     const stray =
       '<details class="now">\n  <summary><span class="t">Irgendwas ohne Nummer</span></summary>\n' +
