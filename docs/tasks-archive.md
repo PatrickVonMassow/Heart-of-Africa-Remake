@@ -17643,3 +17643,40 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   deletion, not taken from the plan. The existing suite stays green.
   Criticality: high — same subject as 629 and the same cost if it goes wrong, and it is
   live on `main` today. Bundle: Session- & Repo-Hygiene.
+
+- [x] 648. THE CHILDREN SNAG, JITTER AND CLIP THROUGH EACH OTHER (user F6 reports
+  11.08.2026, 19:08–19:11, all three from ONE state — `local/bugreports/`
+  `KindHaengtKurzFest.zip`, `KindZittertAufStelleHerum.zip`,
+  `KinderKlemmenKurzIneinander.zip`; seed 2972259115, `place` mode in the bambara-village,
+  west region, production build e1bd2fa, WebGPU, quality medium, viewport 1899×984 @dpr
+  1.25). Three symptoms of ONE system, filed as one point because they share the child
+  steering code and must not be split across branches:
+  1. "Kind hängt kurz fest" — a child stops moving for a moment and then frees itself.
+  2. "Kind zittert auf der Stelle herum" — a child jitters in place instead of walking,
+     which is the signature of a target it reaches and overshoots every frame, or of two
+     forces cancelling.
+  3. "Kinder klemmen kurz ineinander" — two children occupy the same space for a moment
+     before separating, so the separation either acts too late or is overridden.
+  THE USER IS BLOCKED ON THIS: he reported it while trying to exercise the communication
+  mechanic (§13/§19.10 — the teaching children), and jittering, snagging children make that
+  untestable. That is why it stands at the head of the work order.
+  WHERE IT LIVES: `src/scenes/place/childSituations.ts` and `lifeSpots.ts` (what a child is
+  doing and where it stands), `tagGame.ts` (the chase that moves them), `collision.ts` (the
+  swept move and the separation between inhabitants), with `inhabitantBodies.ts` for the
+  radius each one occupies. The state dump carries no per-child runtime state, so the
+  reproduction is in-game at that seed.
+  FINAL STATE: all three are traced to a NAMED cause and fixed there — not damped by
+  raising a smoothing constant until the symptom stops showing, which would leave the
+  cause and cost the next reader the same hunt. A child that reaches its target settles
+  instead of oscillating; two children never occupy one another's radius, however briefly;
+  and no child is ever held motionless by geometry it should walk around. Where two of the
+  three share one cause, that is stated rather than split into three fixes.
+  VERIFIABLE: Vitest over the pure steering — a child at its target does not oscillate
+  across frames (its position converges rather than alternating), two children pushed into
+  one another separate within one step and never overlap, and a child pathing past a
+  building corner keeps moving. Plus the browser layer at the reported seed: the children
+  are watched over a run of frames and no child's position alternates, freezes or overlaps
+  another's radius. Judge it by WATCHING them, not only by the assertions — the complaint is
+  what the player sees.
+  Criticality: high — it is what the user is blocked on, and it is the visible surface of
+  the settlement the whole communication PoC is played in. Bundle: Dorfleben.
