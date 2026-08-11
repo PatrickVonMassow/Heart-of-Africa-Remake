@@ -63,6 +63,22 @@ describe('qualifiesAsActor — what can move, or be used', () => {
   it('the same crocodile is named once it lunges', () => {
     expect(qualifiesAsActor({ kind: 'crocodile', concealed: false })).toBe(true)
   })
+
+  // Point 628, half one: a thing whose own name already stands in the picture
+  // is not named a second time — a rule about permanent labels, so it holds
+  // whichever scene draws them, and every kind obeys it.
+  it.each(ACTOR_KINDS as ActorKind[])('a permanent label of its own silences this layer: %s', (kind) => {
+    expect(qualifiesAsActor({ kind, permanentLabel: true })).toBe(false)
+    expect(qualifiesAsActor({ kind, permanentLabel: false })).toBe(true)
+  })
+
+  // Point 628, half two: the layer says what the player is looking AT, and his
+  // own boat is not that. The kind stays nameable — only this one is his.
+  it('the traveller\'s own canoe is not named, a set-down one is', () => {
+    expect(qualifiesAsActor({ kind: 'canoe', ownedByPlayer: true })).toBe(false)
+    expect(qualifiesAsActor({ kind: 'canoe' })).toBe(true)
+    expect(qualifiesAsActor({ kind: 'canoe', ownedByPlayer: false })).toBe(true)
+  })
 })
 
 describe('actorLabelText — kind, age, state, in both languages', () => {

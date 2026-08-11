@@ -77,17 +77,38 @@ export interface ActorCandidate {
    * one — that is the rule which keeps it from leaking an undiscovered name.
    */
   mapPoint?: boolean
+  /**
+   * This thing already carries a PERMANENT label of its own — one its scene
+   * draws whether the key is held or not (a pitched camp says "Camp" at all
+   * times). Naming it again stacks two identical boxes over one object, which
+   * reads as a defect rather than as an aid. Stated once here as a rule about
+   * permanent labels, so it holds whoever draws them: the village elder, whose
+   * own standing name showed the same doubling first, is simply left unmarked;
+   * this flag is for an object that must STAY in the roster for the layer's
+   * other readers.
+   */
+  permanentLabel?: boolean
+  /**
+   * Part of the TRAVELLER'S OWN outfit — the canoe he rides, or drags behind
+   * him over land. The layer's promise is "what am I looking at", and the
+   * player's own vehicle is not that. The same canoe SET DOWN in the world
+   * carries no such flag and keeps its name.
+   */
+  ownedByPlayer?: boolean
 }
 
 /**
  * Can this thing MOVE, or can the player DO something with it? That is the
  * whole test (§17.8) — and it is answered by the roster above rather than by a
  * guess, so a plant, a rock, a house wall or a horizon silhouette simply is not
- * on it.
+ * on it. The flags then take out what the roster alone cannot see: a name
+ * already standing in the picture, and the player's own gear.
  */
 export function qualifiesAsActor(c: ActorCandidate): boolean {
   if (c.mapPoint === true) return false
   if (c.concealed === true) return false
+  if (c.permanentLabel === true) return false
+  if (c.ownedByPlayer === true) return false
   return ACTOR_KIND_SET.has(c.kind)
 }
 
