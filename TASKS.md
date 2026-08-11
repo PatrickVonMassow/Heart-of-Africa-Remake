@@ -361,6 +361,26 @@ there exactly once; a new point joins a bundle when appended.
   and every write outside `.claude/` passes untouched, and a `.claude` substring inside an
   unrelated word or path does not trip it; plus a test-hygiene case that no test writes
   into `.claude/`.
+  THE CAUSE IS MEASURED (11.08.2026, and it is NOT the protection layer this point assumed).
+  Two further prompts hit the user at 19:18–19:22 while he wanted to be away from the machine
+  — an `Edit` on the memory carrier and `rm -f .claude/batch-paused` — so the permission mode
+  was raised to `bypassPermissions` in BOTH settings layers, with the dangerous-mode
+  acceptance flag already set. Prompts kept coming anyway. The session transcript settles why:
+  this window's stored `permissionMode` is `acceptEdits` — 27 occurrences, no other value.
+  `permissions.defaultMode` supplies the mode only to a session that HAS none; a session
+  resumed with `--resume` carries the mode it was created with, and `acceptEdits`
+  auto-approves Edit/Write while PROMPTING for Bash. That is exactly the split the user saw,
+  and it explains the earlier reading too: our own Node scripts write through `fs` inside
+  tools that `acceptEdits` grants, while every shell line goes to the prompt.
+  SO THE ORIGINAL DIAGNOSIS WAS WRONG in its mechanism — the trigger is not the `.claude/`
+  path, it is the tool CLASS under the session's mode. What survives is the requirement: no
+  prompt may reach that window. Since no settings key reaches a running session's stored
+  mode, the grant must happen where the prompt is raised — a `PermissionRequest` hook
+  (`scripts/permission-autogrant.mjs`), which fires only once the harness is about to ask and
+  therefore cannot overrule the PreToolUse guards, since a denied call never gets that far.
+  That hook is BUILT and wired; what remains of this point is the second half below (no test
+  writes its state into `.claude/`) plus a re-measurement of the path rule itself, now that
+  the mode is known to confound every earlier reading of it.
   Criticality: high — the user has forbidden prompts in that window outright, and a prompt
   in an unattended session is a stall nobody is there to clear. Bundle: Modell & Wächter.
 
@@ -2658,9 +2678,17 @@ Build order, chosen so no two parallel agents own the same file:
   refusal of a board missing a card for an open point. The board must rather refuse itself
   than show something false; that is the property this and point 439 (a card title falling
   silently back to "Punkt N") have in common.
+  ALSO IN THIS POINT, same gate, same reason (user 11.08.2026, asked TWICE within one
+  evening): a now-card must carry an END-TIME ESTIMATE beside its start stamp, the way
+  `20:59 · ~23:59` already reads. The card for point 648 stood for over an hour with a bare
+  start time, and the user had to ask what it would cost him — a board he must ask about is
+  not a board he can glance at. The publish gate refuses a now-card whose meta field carries
+  no `~<end>`, so the omission cannot recur silently; the estimate is the session's judgment
+  and may be restated as it learns, but it may not be absent.
   VERIFIABLE: the pure layer covers orphan detection (foreign session, stamp older than the
-  current acquisition, own live card kept) and the gate's refusal; a live handover leaves no
-  stale card behind.
+  current acquisition, own live card kept), the missing-estimate refusal (a card with only a
+  start stamp is rejected, one with `start · ~end` passes) and the gate's refusal; a live
+  handover leaves no stale card behind.
 
 - [ ] 466. THE DOC VERIFICATION CHECKS A SENTENCE THE README NO LONGER HAS (30.07.2026,
   found by the agent that shrank the always-loaded instruction file; reproduced on unmodified
