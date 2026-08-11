@@ -538,6 +538,14 @@ export function takeCleanupLock(target, { git: runGit = git, probe = probePid, r
  * lock, (b) lands after the last of these reads, and (c) is not visible in them.
  * It is bounded by the few milliseconds between the reads and the unlink, and it
  * is the smallest this design can make it without a primitive git does not have.
+ *
+ * THE ONE THING THAT IS NOT PART OF THAT RESIDUAL, since the seventh review: a
+ * writer that DOES respect the lock. The exclusion the reads above were taken
+ * under is re-proven immediately before the first destructive syscall (`guard`,
+ * `removeTreeSafely`), so the lock being stripped or replaced in the meantime
+ * REFUSES the removal instead of being missed. What is left is only the writer
+ * that ignores git's lock altogether, landing inside the microseconds after that
+ * last look — the case named above, not a second one.
  */
 export function cleanupWorktree(target, { dry = false, git: runGit = git, expected = null, probe = probePid } = {}) {
   const worktrees = listWorktrees(runGit)
