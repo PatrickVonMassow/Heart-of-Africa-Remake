@@ -42,7 +42,7 @@ import { resolve } from 'node:path'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { REPO_ROOT, STATE_PATH, readJson, mergeState } from './dashboard-state.mjs'
 import { normaliseLineEndings, refreshFooter } from './board-core.mjs'
-import { currentSetting } from './sol-share.mjs'
+import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { applyFooterNote } from './sol-share-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
 import { QUEUE_STUB_META, parseTasks } from './dashboard-guard-core.mjs'
@@ -188,9 +188,9 @@ try {
   // default, the board says so, so nobody wonders why a diagnosis came back in another
   // voice. At the default it says nothing, and a stale note is removed rather than left
   // standing — `refreshFooter` keeps every segment it does not own, this one included.
-  const refreshed = normaliseLineEndings(
-    applyFooterNote(refreshFooter(html, { openCount: open.length }), currentSetting().setting),
-  )
+  const share = currentSetting()
+  if (share.problem) console.error(settingProblemLine(share, 'board-publish'))
+  const refreshed = normaliseLineEndings(applyFooterNote(refreshFooter(html, { openCount: open.length }), share.setting))
   if (refreshed !== html) {
     // Atomic (point 443, four-eyes F3) — and this one writes the very file the
     // next lines read, hash and push to the public page.

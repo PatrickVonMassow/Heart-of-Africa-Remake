@@ -48,7 +48,7 @@ import { dirname, join, sep as sep_ } from 'node:path'
 import { createHash } from 'node:crypto'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { currentSetting } from './sol-share.mjs'
+import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { routeFor } from './sol-share-core.mjs'
 import {
   addedFilesAreCoveredByPatch,
@@ -489,6 +489,8 @@ if (isMainModule(import.meta.url)) {
     // exactly where every unavailable Sol lands: with a Claude reviewer that authored
     // none of the range, and with NO verdict, because nobody has reviewed it yet.
     const share = currentSetting()
+    // A fallback nobody is told about is a setting nobody chose (cross-vendor review).
+    if (share.problem) console.error(settingProblemLine(share, 'review-sol'))
     if (routeFor('review', share.setting) !== 'sol') {
       const base = mergeBase(flag('--since') || 'main', full, { explicit: Boolean(flag('--since')) })
       const decision = decideReview({

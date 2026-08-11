@@ -36,8 +36,12 @@ the honest state (Sol has not seen the change).
 The setting lives in the **main checkout's** `.claude/sol-share.json`, which is
 git-ignored: it is this machine's operator state, and a delegated agent working
 in a worktree resolves the same file through git's common dir, so it reads the
-setting the user actually flipped. A missing or broken file degrades to
-`default` with the problem named — it can never take down the work that asked.
+setting the user actually flipped. It can never take down the work that asked: a
+**missing** file is `default` (nothing was ever set), and a file that is there
+but **unusable** falls back to `claude-only` — the direction that spends nothing —
+with the problem printed by every consumer that read it. Falling back to
+`default` instead would let a corrupted `claude-only` state quietly resume
+spending the allowance the operator had moved away from.
 
 While the setting is off its default, the board's footer says so, so nobody
 wonders why a diagnosis came back in another voice.
@@ -77,7 +81,11 @@ allowance out of habit.
 without its shape, and a model that says it could not see the material all end
 the same way — one line naming the cause, the work handed back to the Claude
 chain, exit 3. A caller can therefore tell "Sol answered" from "Sol did not"
-without reading prose.
+without reading prose. For the same reason a request whose material could not be
+read at all is refused before it is sent (exit 2): an unreadable file travels as
+"(could not be read: …)", and that is text a model will answer *about* — a shaped
+answer about nothing. A read that failed is named even when the rest went
+through.
 
 ## What is never routed, at any setting
 
@@ -97,14 +105,21 @@ Measured over 47,258 turns from 391 transcripts (03.–11.08.2026, weighted):
 | | share |
 | --- | --- |
 | verification, of the whole spend | 41.9 % |
-| — harness (runs a suite) | 46.0 % of it |
-| — text (reads a log, a script, a report) | 41.8 % of it |
+| — text (reads a log, a script, a report) | 45.6 % of it |
+| — harness (runs a suite) | 42.1 % of it |
 | — eyes (looks at a frame) | 7.5 % of it |
 | — authoring (edits the verification code) | 4.7 % of it |
+| — unclear (never guessed into a half) | 0.1 % of it |
 
-So the routable text half is **17.5 % of the entire spend**, and 40.7 % of the
+So the routable text half is **19.0 % of the entire spend**, and 45.0 % of the
 delegated agents' own verification — which is what makes part A worth having and
 what any decision about part B should be argued against.
+
+Two classification errors were found by the cross-vendor review of this very
+branch and are fixed in these figures: an unplaceable call used to be dropped
+instead of voting (so a turn that read one log and did one unplaceable thing read
+as wholly routable), and `node --check` on a verify script counted as a suite
+run. The `unclear` row exists so the residue is visible rather than distributed.
 
 ## The first real run
 

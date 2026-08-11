@@ -49,34 +49,32 @@ export function readStdin() {
 /**
  * The material sections, in the order they are worth the budget: what the caller piped
  * in first (it chose to), then the logs, then the diff, then the files.
+ *
+ * EVERY SECTION SAYS WHETHER IT REALLY CARRIES ITS ARTEFACT (`ok`). A file that could not
+ * be read used to travel as the sentence "(could not be read: …)", which is material a
+ * model can answer ABOUT — shaped, plausible, and about nothing (cross-vendor review,
+ * 12.08.2026). The caller refuses a request whose material is entirely such placeholders,
+ * and names the ones that failed even when the rest went through.
  */
 export function gatherSections({ stdin = '', logs = [], diff = '', files = [] } = {}) {
   const sections = []
-  if (stdin.trim()) sections.push({ title: 'MATERIAL (stdin)', text: stdin })
-  for (const path of logs) {
-    let text = null
+  const read = (title, path) => {
     try {
-      text = readFileSync(path, 'utf8')
+      return { title, text: readFileSync(path, 'utf8'), ok: true }
     } catch (e) {
-      text = `(could not be read: ${e.message})`
+      return { title, text: `(could not be read: ${e.message})`, ok: false, problem: `${path}: ${e.message}` }
     }
-    sections.push({ title: `LOG: ${path}`, text })
   }
+  if (stdin.trim()) sections.push({ title: 'MATERIAL (stdin)', text: stdin, ok: true })
+  for (const path of logs) sections.push(read(`LOG: ${path}`, path))
   if (diff) {
     const stat = git(['diff', '--stat', diff])
     const patch = git(['diff', diff])
-    sections.push({ title: `DIFFSTAT ${diff}`, text: stat ?? '(the range could not be read)' })
-    sections.push({ title: `PATCH ${diff}`, text: patch ?? '(the range could not be read)' })
+    const failed = stat === null || patch === null
+    sections.push({ title: `DIFFSTAT ${diff}`, text: stat ?? '(the range could not be read)', ok: !failed, problem: failed ? `--diff ${diff}: git could not read the range` : '' })
+    sections.push({ title: `PATCH ${diff}`, text: patch ?? '(the range could not be read)', ok: !failed })
   }
-  for (const path of files) {
-    let text = null
-    try {
-      text = readFileSync(path, 'utf8')
-    } catch (e) {
-      text = `(could not be read: ${e.message})`
-    }
-    sections.push({ title: `FILE (current content): ${path}`, text })
-  }
+  for (const path of files) sections.push(read(`FILE (current content): ${path}`, path))
   return sections
 }
 
@@ -126,20 +124,32 @@ if (isMainModule(import.meta.url)) {
       process.exit(3)
     }
 
+    // THE MATERIAL IS GATHERED BEFORE THE PROBE (cross-vendor review, 12.08.2026): a
+    // request that turns out to have nothing to send must cost no codex call at all,
+    // and the probe is a codex call.
+    const sections = gatherSections({ stdin: readStdin(), logs: flags('--log'), diff: flag('--diff'), files: flags('--file') })
+    const material = formatAskMaterial({ sections, budget: MATERIAL_BUDGET_CHARS })
+    if (!material.trim()) {
+      console.error('ask-sol: no material at all — give it a --file, a --log, a --diff or something on stdin.')
+      process.exit(2)
+    }
+    // A REQUEST WHOSE MATERIAL IS ALL PLACEHOLDERS IS NOT A REQUEST. An unreadable file
+    // travels as "(could not be read: …)", which is text a model will happily answer
+    // ABOUT — a shaped answer about nothing, reported as an answer.
+    const failed = sections.filter((s) => !s.ok)
+    if (failed.length) {
+      for (const s of failed) console.error(`ask-sol: material MISSING — ${s.problem ?? s.title}`)
+      if (!sections.some((s) => s.ok)) {
+        console.error('ask-sol: NONE of the material could be read — refusing to send a request that carries only placeholders.')
+        process.exit(2)
+      }
+    }
+
     // The identity is PROVEN before a word is attributed to Sol: nothing in a run's
     // output names the model that answered, so the whole attribution rests on the server
     // refusing an unknown id (see review-sol.mjs --probe).
     if (!ensureModelProven({ who: 'ask-sol' })) {
       console.error(`ask-sol: the model id is not proven honoured — refusing to attribute an answer to ${SOL_MODEL_NAME}.`)
-      process.exit(2)
-    }
-
-    const material = formatAskMaterial({
-      sections: gatherSections({ stdin: readStdin(), logs: flags('--log'), diff: flag('--diff'), files: flags('--file') }),
-      budget: MATERIAL_BUDGET_CHARS,
-    })
-    if (!material.trim()) {
-      console.error('ask-sol: no material at all — give it a --file, a --log, a --diff or something on stdin.')
       process.exit(2)
     }
     console.error(`ask-sol: asking ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) for a ${kind} — ${material.length} characters of material …`)

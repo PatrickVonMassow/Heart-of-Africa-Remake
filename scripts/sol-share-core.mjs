@@ -25,6 +25,22 @@ export const SETTINGS = Object.freeze(['claude-only', 'default', 'prefer-sol'])
 /** What the file says when nothing has been set — today's behaviour. */
 export const DEFAULT_SETTING = 'default'
 
+/**
+ * What a file that EXISTS but cannot be read falls back to (cross-vendor review,
+ * 12.08.2026).
+ *
+ * NOT the default. The default routes reviews to Sol, so a corrupted `claude-only` state
+ * would quietly start spending the very allowance the operator had moved away from —
+ * fail-open in the one direction this switch exists to prevent. A file that is there and
+ * unusable is an anomaly, and the conservative reading of an anomaly is to spend nothing:
+ * the work falls to the Claude chain, which is always reachable, and every consumer
+ * PRINTS the problem so the state gets repaired instead of silently standing.
+ *
+ * A file that is simply ABSENT is not an anomaly — nothing was ever set — and stays at
+ * the default.
+ */
+export const SAFE_SETTING = 'claude-only'
+
 /** Where the setting lives, relative to the checkout that owns it. */
 export const SETTING_FILE_NAME = 'sol-share.json'
 
@@ -92,35 +108,35 @@ export function normaliseSetting(value) {
 /**
  * The setting a state file holds. PURE.
  *
- * A file that cannot be read, or holds something that is not a setting, yields the
- * DEFAULT with the problem NAMED — never a guessed setting and never a throw. The switch
- * exists to be cheap; a broken state file must degrade to today's behaviour, which is the
- * behaviour everything already handles.
+ * NEVER throws and never guesses: an absent file is the DEFAULT, and a file that is there
+ * but unusable is the SAFE setting with the problem NAMED (see SAFE_SETTING for why the
+ * two differ). `corrupt` says which case it was, so a consumer can print the problem
+ * rather than act on a state nobody chose.
  */
 export function readSetting(raw) {
-  if (raw == null || raw === '') return { setting: DEFAULT_SETTING, changedAt: null, changedBy: '', problem: '' }
+  const broken = (problem) => ({ setting: SAFE_SETTING, changedAt: null, changedBy: '', problem, corrupt: true })
+  if (raw == null || raw === '') return { setting: DEFAULT_SETTING, changedAt: null, changedBy: '', problem: '', corrupt: false }
   let parsed = raw
   if (typeof raw === 'string') {
     try {
       parsed = JSON.parse(raw)
     } catch {
-      return { setting: DEFAULT_SETTING, changedAt: null, changedBy: '', problem: 'the state file is not JSON — falling back to `default`' }
+      return broken(`the state file is not JSON — falling back to \`${SAFE_SETTING}\`, which spends nothing`)
     }
   }
   const setting = normaliseSetting(parsed?.setting)
   if (!setting) {
-    return {
-      setting: DEFAULT_SETTING,
-      changedAt: null,
-      changedBy: '',
-      problem: `"${String(parsed?.setting ?? '')}" is not one of ${SETTINGS.join(', ')} — falling back to \`default\``,
-    }
+    return broken(
+      `"${String(parsed?.setting ?? '')}" is not one of ${SETTINGS.join(', ')} — falling back to ` +
+        `\`${SAFE_SETTING}\`, which spends nothing`,
+    )
   }
   return {
     setting,
     changedAt: Number.isFinite(Number(parsed?.changedAt)) && Number(parsed?.changedAt) > 0 ? Number(parsed.changedAt) : null,
     changedBy: String(parsed?.changedBy ?? ''),
     problem: '',
+    corrupt: false,
   }
 }
 

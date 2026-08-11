@@ -447,6 +447,31 @@ describe('verification split', () => {
     expect(turnVerificationKinds([bash('rm -rf verification/tmp')])).toEqual({ unclear: 1 })
   })
 
+  // Cross-vendor review, 12.08.2026: dropping the unclear votes made a turn that read one
+  // log and did one unplaceable thing read as 100 % routable text — overstating the very
+  // number this split exists to report.
+  it('lets an UNCLEAR call vote beside a clear one instead of vanishing', () => {
+    const split = turnVerificationKinds([bash('tail -50 verification/out.log'), bash('rm -rf verification/tmp')])
+    expect(split.text).toBeCloseTo(0.5, 6)
+    expect(split.unclear).toBeCloseTo(0.5, 6)
+  })
+
+  it('does not overwrite a PARTLY unclear turn with its neighbour’s split', () => {
+    const turns = [
+      { at: NOW, usage: usage(), session: 's', tools: [bash('npm test')] },
+      { at: NOW + MIN, usage: usage(), session: 's', tools: [bash('tail -5 verification/out.log'), bash('rm -rf verification/tmp')] },
+    ]
+    const splits = verificationSplits(turns)
+    expect(splits.get(turns[1]).text).toBeCloseTo(0.5, 6)
+    expect(splits.get(turns[1]).harness).toBeUndefined()
+  })
+
+  // Same review: the runner's `node …` form swallowed a command that only PARSES a verify
+  // script, which starts no browser and is plain text work.
+  it('calls `node --check` on a verify script text, not a suite run', () => {
+    expect(classifyVerificationBash('node --check scripts/verify/place.mjs')).toBe('text')
+  })
+
   it('splits a turn in proportion to the halves its calls vote for', () => {
     const split = turnVerificationKinds([
       bash('npm test'),

@@ -27,9 +27,9 @@ import { writeJsonAtomic } from './atomic-write.mjs'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
-  DEFAULT_SETTING,
   KIND_NOTES,
   NEVER_ROUTED,
+  SAFE_SETTING,
   SETTINGS,
   SETTING_NOTES,
   normaliseSetting,
@@ -62,18 +62,31 @@ export const SETTING_FILE =
 /**
  * The setting in force, and what (if anything) was wrong with the file.
  *
- * A missing or broken file is the DEFAULT with the problem named — never a throw. Every
- * caller of this is on the path of some other piece of work, and a switch that can break
- * a diagnosis is worse than no switch.
+ * A MISSING file is the default (nothing was ever set); a file that is there and unusable
+ * is SAFE_SETTING with the problem named — never a throw. Every caller of this is on the
+ * path of some other piece of work, and a switch that can break a diagnosis is worse than
+ * no switch.
  */
 export function currentSetting(file = SETTING_FILE) {
   let raw = null
   try {
     raw = existsSync(file) ? readFileSync(file, 'utf8') : null
   } catch (e) {
-    return { setting: DEFAULT_SETTING, changedAt: null, changedBy: '', problem: `the state file could not be read (${e.message})` }
+    // A file that is there and unreadable is the anomaly SAFE_SETTING exists for.
+    return { setting: SAFE_SETTING, changedAt: null, changedBy: '', problem: `the state file could not be read (${e.message})`, corrupt: true }
   }
   return readSetting(raw)
+}
+
+/**
+ * The line a consumer prints when the state file is broken, or ''.
+ *
+ * It exists because a fallback nobody is told about is a setting nobody chose (cross-
+ * vendor review, 12.08.2026): `review-sol.mjs` and `board-publish.mjs` read the setting,
+ * so they must also say when it is not the operator's.
+ */
+export function settingProblemLine(state, who = 'sol-share') {
+  return state?.problem ? `${who}: the share setting is UNUSABLE — ${state.problem}. Repair it: node scripts/sol-share.mjs --set <setting>` : ''
 }
 
 /** Where one kind of work goes right now — the one call every consumer needs. */

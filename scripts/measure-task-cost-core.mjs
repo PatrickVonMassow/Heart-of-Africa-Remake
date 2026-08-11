@@ -182,10 +182,19 @@ const VERIFICATION_RUNNER =
 /** A shell command that only READS what a run left behind. */
 const VERIFICATION_READER = /(^|[|;&]\s*|\s)(cat|head|tail|grep|rg|wc|jq|ls|find|diff|sed|awk|node --check)\b/
 
+/**
+ * A command that NAMES a verify script without running it. Asked before the runner, or
+ * the runner's `node …` form would swallow it (cross-vendor review, 12.08.2026:
+ * `node --check scripts/verify/place.mjs` was filed as a suite run, which it is not —
+ * it parses the file and starts no browser).
+ */
+const VERIFICATION_NOT_A_RUN = /\bnode\s+--check\b/
+
 /** Which half a verification shell command is evidence for, or null. PURE. */
 export function classifyVerificationBash(command = '') {
   const cmd = String(command)
-  // THE RUNNER IS ASKED FIRST: `npm test 2>&1 | tail -40` both runs and reads, and what
+  if (VERIFICATION_NOT_A_RUN.test(cmd)) return 'text'
+  // THE RUNNER IS ASKED NEXT: `npm test 2>&1 | tail -40` both runs and reads, and what
   // it costs is the run. Asking the reader first would file every piped suite as text
   // and report the routable half far too large — the one error this split must not make.
   if (VERIFICATION_RUNNER.test(cmd)) return 'harness'
@@ -208,13 +217,21 @@ export function classifyVerificationToolCall({ name = '', input = {} } = {}) {
   return 'unclear'
 }
 
-/** How ONE turn's verification cost divides across the halves: shares summing to 1. PURE. */
+/**
+ * How ONE turn's verification cost divides across the halves: shares summing to 1. PURE.
+ *
+ * AN UNCLEAR CALL VOTES TOO (cross-vendor review, 12.08.2026). Dropping it made a turn
+ * that read one log and did one unplaceable thing read as 100 % routable text, which
+ * overstates exactly the number this split exists to report. It is a kind like the
+ * others; only a turn with NO verification call at all is wholly unclear, and that one
+ * is what the carry may fill.
+ */
 export function turnVerificationKinds(tools = []) {
   const votes = new Map()
   let total = 0
   for (const t of Array.isArray(tools) ? tools : []) {
     const kind = classifyVerificationToolCall(t)
-    if (!kind || kind === 'unclear') continue
+    if (!kind) continue
     votes.set(kind, (votes.get(kind) ?? 0) + 1)
     total += 1
   }
@@ -232,6 +249,11 @@ export function turnVerificationKinds(tools = []) {
  * `empty` names the key that marks "no evidence". Backwards first — the prose after a
  * `npm run build` belongs to that gate episode — forwards only where nothing precedes,
  * and never across a gap of `idleGapMs`, which is a new episode rather than the same one.
+ *
+ * "No evidence" means the split is WHOLLY that key: a turn that is PARTLY unclear still
+ * saw something, and overwriting its split with a neighbour's would throw that away
+ * (cross-vendor review, 12.08.2026). For the phase split the two readings coincide, since
+ * `turnPhases` only ever yields `{ unattributed: 1 }`.
  */
 function fillFromNeighbours(list, direct, { idleGapMs = IDLE_GAP_MS, empty = 'unattributed' } = {}) {
   const out = new Map(direct)
@@ -242,7 +264,7 @@ function fillFromNeighbours(list, direct, { idleGapMs = IDLE_GAP_MS, empty = 'un
     arr.push(t)
     bySession.set(key, arr)
   }
-  const hasEvidence = (t) => !direct.get(t)?.[empty]
+  const hasEvidence = (t) => direct.get(t)?.[empty] !== 1
   for (const arr of bySession.values()) {
     arr.sort((a, b) => a.at - b.at)
     const filled = new Array(arr.length).fill(null)

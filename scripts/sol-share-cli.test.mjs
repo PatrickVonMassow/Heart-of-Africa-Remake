@@ -73,11 +73,15 @@ describe('sol-share.mjs', () => {
     expect(state().setting).toBe('prefer-sol')
   })
 
-  it('DEGRADES to the default on a broken state file instead of failing the caller', () => {
+  // Cross-vendor review, 12.08.2026: a broken file used to read as `default`, which
+  // sends reviews to Sol — so corrupting a `claude-only` state started spending the very
+  // allowance the operator had moved away from.
+  it('DEGRADES to the setting that spends nothing on a broken state file, and says so', () => {
     writeFileSync(file, '{ this is not json')
     const r = run('--status')
     expect(r.status).toBe(0)
-    expect(r.stdout).toMatch(/^sol-share: default —/)
+    expect(r.stdout).toMatch(/^sol-share: claude-only —/)
+    expect(r.stdout).toMatch(/to GPT-5\.6 Sol: nothing/)
     expect(r.out).toMatch(/NOTE: .*not JSON/)
   })
 })

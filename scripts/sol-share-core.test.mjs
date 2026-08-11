@@ -3,7 +3,8 @@
 //   - a setting that routes work to Sol without saying so, or says so without routing it;
 //   - `--more` wrapping around at an end, which would move load to the very vendor the
 //     user was trying to spare;
-//   - a broken state file taking the whole path down instead of degrading to `default`;
+//   - a broken state file taking the whole path down, or degrading in the SPENDING
+//     direction instead of the safe one;
 //   - a stale board note surviving a setting change, so the board says one thing while
 //     the switch does another;
 //   - a consumer keeping its own copy of the table instead of asking this core.
@@ -14,6 +15,7 @@ import {
   KINDS,
   KIND_NOTES,
   NEVER_ROUTED,
+  SAFE_SETTING,
   SETTINGS,
   SETTING_NOTES,
   applyFooterNote,
@@ -102,12 +104,21 @@ describe('the state file', () => {
     expect(readSetting(JSON.stringify(state))).toMatchObject({ setting: 'prefer-sol', changedAt: 1_700_000_000_000, changedBy: 'test', problem: '' })
   })
 
-  it('DEGRADES to the default and names the problem — never throws, never guesses', () => {
-    expect(readSetting(null)).toMatchObject({ setting: 'default', problem: '' })
-    expect(readSetting('{not json')).toMatchObject({ setting: 'default' })
+  it('reads an ABSENT file as the default — nothing was ever set', () => {
+    expect(readSetting(null)).toMatchObject({ setting: 'default', problem: '', corrupt: false })
+    expect(readSetting('')).toMatchObject({ setting: 'default', corrupt: false })
+  })
+
+  // Cross-vendor review, 12.08.2026: falling back to `default` meant a CORRUPTED
+  // `claude-only` state quietly began sending reviews to Sol again — fail-open in exactly
+  // the direction this switch exists to prevent.
+  it('reads a BROKEN file as the setting that spends nothing, and names the problem', () => {
+    expect(readSetting('{not json')).toMatchObject({ setting: SAFE_SETTING, corrupt: true })
     expect(readSetting('{not json').problem).toMatch(/not JSON/)
-    expect(readSetting('{"setting":"sol-only"}')).toMatchObject({ setting: 'default' })
+    expect(readSetting('{"setting":"sol-only"}')).toMatchObject({ setting: SAFE_SETTING, corrupt: true })
     expect(readSetting('{"setting":"sol-only"}').problem).toMatch(/not one of/)
+    expect(SAFE_SETTING).toBe('claude-only')
+    for (const kind of KINDS) expect(routeFor(kind, SAFE_SETTING)).toBe('claude')
     expect(readSetting('{"setting":"prefer-sol","changedAt":"soon"}').changedAt).toBeNull()
   })
 

@@ -117,10 +117,35 @@ describe('what it refuses before spending anything', () => {
   it('refuses to send an empty request when nothing was given as material', () => {
     setting('prefer-sol')
     clearCalls()
+    // Even with NO probe receipt: a request with nothing to send must cost no codex call
+    // at all, and the probe is a codex call (cross-vendor review, 12.08.2026).
+    rmSync(join(stateDir, 'review-sol-probe.json'), { force: true })
     const r = run(['--kind', 'explain', '--brief', 'what does it do?'])
     expect(r.status).toBe(2)
     expect(r.stderr).toMatch(/no material at all/)
     expect(calls()).toEqual([])
+  })
+
+  // Same review: an unreadable file used to travel as "(could not be read: …)", which is
+  // text a model will happily answer ABOUT — a shaped answer about nothing.
+  it('refuses a request whose material is ENTIRELY placeholders, naming what failed', () => {
+    setting('prefer-sol')
+    clearCalls()
+    rmSync(join(stateDir, 'review-sol-probe.json'), { force: true })
+    const r = run(['--kind', 'diagnose', '--brief', 'why?', '--log', join(dir, 'does-not-exist.log')])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toMatch(/material MISSING/)
+    expect(r.stderr).toMatch(/NONE of the material could be read/)
+    expect(calls()).toEqual([])
+  })
+
+  it('names a failed read but still runs when the rest of the material is real', () => {
+    setting('prefer-sol')
+    clearCalls()
+    const r = run(['--kind', 'diagnose', '--brief', 'why?', '--file', materialFile, '--log', join(dir, 'does-not-exist.log')])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).toMatch(/material MISSING/)
+    expect(calls()).toContain('gpt-5.6-sol')
   })
 })
 
