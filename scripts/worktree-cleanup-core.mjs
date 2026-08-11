@@ -127,32 +127,103 @@ export function assertInside(path, root) {
 /**
  * IS THE TREE IN FRONT OF THE DELETION THE TREE THE CALLER MEANT? PURE (point 629).
  *
- * A caller that knows which branch it is cleaning up passes `--expect-branch`, and
- * the removal is refused unless the checkout STILL matches — same branch, no lock,
- * no uncommitted work. This is the last of three re-proofs and the only one inside
- * the process that actually deletes: the landing's selection and its per-path
- * re-check both answer BEFORE this command is spawned, and the window between
- * their answer and the `rm` is exactly where a worktree can be picked up again.
+ * A caller that knows exactly which tree it selected passes `--expect <json>`, and
+ * the removal is refused unless the checkout in front of this command is STILL
+ * that tree. This is the last of three re-proofs and the only one inside the
+ * process that actually deletes: the landing's selection and its per-path re-check
+ * both answer BEFORE this command is spawned.
  *
- * WITHOUT `--expect-branch` nothing changes. `batch-doctor` removes ORPHANS, which
- * by definition have no branch and no registration to compare against; making the
+ * A BRANCH NAME IS NOT AN IDENTITY (second review, finding 1). Branch + unlocked +
+ * clean also describes a DIFFERENT checkout that appeared at the same path, and a
+ * same-path replacement even reuses git's admin record name — measured 11.08.2026:
+ * after `worktree remove` + `worktree add` at the same path, the admin gitdir is
+ * byte-identical while the `.git` FILE's inode is not. So the expectation carries:
+ *   branch   — what it was checked out on
+ *   head     — the commit it stood on. This also carries the containment proof
+ *              forward: `headMerged` was established for THIS sha, so an unchanged
+ *              head means an unchanged verdict, and a changed one refuses.
+ *   gitLink  — the admin gitdir its `.git` pointed at (still a linked worktree of
+ *              the same repository)
+ *   ino/dev/gitMtime — the identity of that `.git` file. The inode alone is not
+ *              enough: a filesystem hands a freed inode straight back, so a
+ *              same-path replacement often gets the same number. The write time
+ *              does not come back, and git writes that file once.
+ *   notWrittenAfter — the instant the caller's freshness proof was taken against
+ *
+ * Every carried field must be re-read and must MATCH; a field the caller carried
+ * and the re-read could not answer refuses, exactly as everywhere else in this
+ * rule. `ino`/`dev` are exempt from that one-sidedness only where the platform
+ * reports 0 for both, which is its way of saying it has no such number.
+ *
+ * WITHOUT an expectation nothing changes. `batch-doctor` removes ORPHANS, which by
+ * definition have no branch and no registration to compare against; making the
  * check unconditional would refuse the one case that command exists for.
  *
- * Inputs are plain data: the expected branch, what `git worktree list` now says
- * about the path (`null` when it lists nothing), and whether the checkout is dirty
- * (`null` when it could not be read). Returns { ok, reason }.
+ * `ownLock` is the lock reason the caller set on the tree ITSELF before re-reading
+ * (see `cleanupWorktree`): under it, that exact reason is expected and ANY other
+ * lock refuses.
+ *
+ * Returns { ok, reason }.
  */
-export function matchesExpectation({ expectBranch, entry, dirty } = {}) {
-  const want = String(expectBranch ?? '').trim()
-  if (!want) return { ok: true, reason: 'nothing was expected' }
+export function matchesExpectation({ expected, entry, actual = null, dirty, ownLock = '' } = {}) {
+  const want = expected && typeof expected === 'object' ? expected : null
+  const branch = String(want?.branch ?? '').trim()
+  if (!want || !branch) return { ok: true, reason: 'nothing was expected' }
   if (!entry) return { ok: false, reason: 'git no longer lists it as a worktree' }
+
   const has = String(entry.branch ?? '').trim()
-  if (!has) return { ok: false, reason: `expected ${want}, but it is on a detached HEAD` }
-  if (has !== want) return { ok: false, reason: `expected ${want}, but it is on ${has}` }
-  if (String(entry.locked ?? '').trim()) return { ok: false, reason: `it is git-locked: ${String(entry.locked).trim()}` }
+  if (!has) return { ok: false, reason: `expected ${branch}, but it is on a detached HEAD` }
+  if (has !== branch) return { ok: false, reason: `expected ${branch}, but it is on ${has}` }
+
+  const lock = String(entry.locked ?? '').trim()
+  const own = String(ownLock ?? '').trim()
+  if (lock && lock !== own) return { ok: false, reason: `it is git-locked: ${lock}` }
+
+  const got = actual && typeof actual === 'object' ? actual : {}
+  const mismatch = (name, wanted, found) => {
+    if (wanted === null || wanted === undefined || wanted === '') return null // not carried
+    if (found === null || found === undefined || found === '') return `${name} could not be re-read`
+    return String(found) === String(wanted) ? null : `${name} changed (${wanted} -> ${found})`
+  }
+  for (const [name, wanted, found] of [
+    ['head', want.head, entry.head ?? got.head],
+    ['gitLink', want.gitLink, got.gitLink],
+  ]) {
+    const bad = mismatch(name, wanted, found)
+    if (bad) return { ok: false, reason: bad }
+  }
+  // THE `.git` FILE'S IDENTITY — inode, device AND the moment it was written.
+  //
+  // The inode ALONE is not enough, and that is measured rather than assumed
+  // (11.08.2026): a worktree removed and re-added at the same path frequently gets
+  // the inode back, because the filesystem had just freed it. The write TIME
+  // cannot be reused that way — git writes that one-line file when it creates the
+  // tree and never touches it again — so the two together identify the file. A
+  // platform that reports nothing for all three has no such proof to give, and a
+  // check that could not be made is not a check that passed: it is named in the
+  // reason so the reader sees which proofs actually held.
+  const IDENTITY = ['ino', 'dev', 'gitMtime']
+  const carried = IDENTITY.map((k) => Number(want[k] ?? 0))
+  const found = IDENTITY.map((k) => Number(got[k] ?? 0))
+  let identity = 'no file identity on this platform'
+  if (carried.some((v) => v)) {
+    if (found.some((v, i) => v !== carried[i])) {
+      return { ok: false, reason: 'the checkout at that path was REPLACED (its .git is a different file)' }
+    }
+    identity = 'same .git file'
+  }
+
   if (dirty === true) return { ok: false, reason: 'it holds uncommitted changes' }
   if (dirty !== false) return { ok: false, reason: 'whether it holds uncommitted work could not be established' }
-  return { ok: true, reason: `still on ${want}, unlocked and clean` }
+
+  const after = Number(want.notWrittenAfter ?? 0)
+  if (after) {
+    const at = Number(got.activeAt ?? NaN)
+    if (!Number.isFinite(at)) return { ok: false, reason: 'when it was last written could not be re-read' }
+    if (at > after) return { ok: false, reason: `it was written into ${Math.max(1, Math.round((at - after) / 1000))}s after the caller's proof` }
+  }
+
+  return { ok: true, reason: `still on ${branch}, ${identity}, unlocked by anyone else and clean` }
 }
 
 /**

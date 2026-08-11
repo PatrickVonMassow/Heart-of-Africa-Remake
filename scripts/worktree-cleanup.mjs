@@ -3,10 +3,13 @@
 //
 //   node scripts/worktree-cleanup.mjs <path>        remove one worktree safely
 //   node scripts/worktree-cleanup.mjs <path> --dry  say what it would do
-//   node scripts/worktree-cleanup.mjs <path> --expect-branch <ref>
+//   node scripts/worktree-cleanup.mjs <path> --expect '<json>'
 //                                                   refuse unless the checkout is
-//                                                   STILL on <ref>, unlocked and
-//                                                   clean (point 629)
+//                                                   STILL the one the caller
+//                                                   selected — branch, HEAD, the
+//                                                   .git file's identity, nobody
+//                                                   else's lock, clean, and not
+//                                                   written into since (point 629)
 //
 // Call this instead of `git worktree remove` and instead of `rm -rf`. Both of
 // those follow the `node_modules` junction into the MAIN tree and delete the
@@ -14,11 +17,12 @@
 // what makes it safe: DETACH every reparse point inside the tree first (the
 // link goes, its target does not), then remove the tree, then prune git's
 // administrative record.
-import { lstatSync, readdirSync, readlinkSync, rmSync, unlinkSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { lstatSync, readdirSync, readlinkSync, readFileSync, rmSync, statSync, unlinkSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
+import { worktreeActiveAt } from './batch-in-flight.mjs'
 import {
   judgeTarget,
   assertInside,
@@ -126,13 +130,17 @@ export function detachLinks(root, { dry = false } = {}) {
  *
  * Exported so the Vitest case can drive exactly this path.
  */
-export function removeTreeSafely(root, { dry = false, git: runGit = git, registered = false } = {}) {
+export function removeTreeSafely(root, { dry = false, git: runGit = git, registered = false, weLocked = false } = {}) {
   const detached = detachLinks(root, { dry })
   if (dry) return detached
   let removed = false
   if (registered) {
     try {
-      runGit(['worktree', 'remove', '--force', root])
+      // `--force` twice ONLY where we took the lock ourselves a moment ago (see
+      // `cleanupWorktree`): git refuses to remove a locked tree, and the lock in
+      // the way is then our own. It is never used to override somebody else's —
+      // a foreign lock refuses the removal long before this line.
+      runGit(weLocked ? ['worktree', 'remove', '--force', '--force', root] : ['worktree', 'remove', '--force', root])
       removed = true
     } catch {
       /* a dirty or already-half-gone tree: fall through to the plain delete */
@@ -154,7 +162,7 @@ export function listWorktrees(runGit = git) {
     .map((l) => l.slice(9).trim())
 }
 
-/** What `git worktree list` says about ONE path right now — { path, branch,
+/** What `git worktree list` says about ONE path right now — { path, branch, head,
  *  locked } — or null when it lists nothing there. */
 export function worktreeEntry(target, runGit = git) {
   const want = normPathOf(target)
@@ -162,7 +170,9 @@ export function worktreeEntry(target, runGit = git) {
   for (const line of runGit(['worktree', 'list', '--porcelain']).split(/\r?\n/)) {
     if (line.startsWith('worktree ')) {
       if (cur && normPathOf(cur.path) === want) return cur
-      cur = { path: line.slice(9).trim(), branch: '', locked: null }
+      cur = { path: line.slice(9).trim(), branch: '', head: '', locked: null }
+    } else if (line.startsWith('HEAD ') && cur) {
+      cur.head = line.slice(5).trim()
     } else if (line.startsWith('branch ') && cur) {
       cur.branch = line.slice(7).trim().replace(/^refs\/heads\//, '')
     } else if (cur && (line === 'locked' || line.startsWith('locked '))) {
@@ -188,6 +198,56 @@ export function checkoutDirty(path, runGit = git) {
   } catch {
     return null
   }
+}
+
+/**
+ * DOES THIS PATH EXIST? true / false / null — tri-state, deliberately.
+ *
+ * `existsSync` answers false for a permission or stat error exactly as it does
+ * for genuine absence (second review, finding 4), and "already gone" is a verdict
+ * that SKIPS every other proof. Only ENOENT/ENOTDIR is absence; anything else is
+ * "could not be established", which keeps the tree like every other unreadable
+ * probe in this rule.
+ */
+export function pathExists(path) {
+  try {
+    statSync(path)
+    return true
+  } catch (e) {
+    return e && (e.code === 'ENOENT' || e.code === 'ENOTDIR') ? false : null
+  }
+}
+
+/**
+ * THE IDENTITY OF THE CHECKOUT AT THIS PATH, as `matchesExpectation` wants it.
+ *
+ * `gitLink` is the admin gitdir its `.git` points at; `ino`/`dev` identify that
+ * `.git` FILE itself, which is what a same-path replacement cannot reuse (measured
+ * 11.08.2026: after `worktree remove` + `worktree add` at the same path the admin
+ * gitdir is byte-identical and the inode is not). `activeAt` is the project's own
+ * freshness probe, so the caller's "nothing was written after" survives into this
+ * process. Every field answers null when it cannot be read, and null refuses.
+ */
+export function readIdentity(path) {
+  const out = { gitLink: null, ino: 0, dev: 0, gitMtime: 0, activeAt: null }
+  const dot = join(path, '.git')
+  try {
+    const st = statSync(dot)
+    out.ino = Number(st.ino ?? 0)
+    out.dev = Number(st.dev ?? 0)
+    out.gitMtime = Number(st.mtimeMs ?? 0)
+    out.gitLink = st.isDirectory() ? dot : (readFileSync(dot, 'utf8').match(/^gitdir:\s*(.+)$/m)?.[1]?.trim() ?? null)
+    if (out.gitLink && !st.isDirectory()) out.gitLink = resolve(path, out.gitLink)
+  } catch {
+    return out
+  }
+  try {
+    const stamp = worktreeActiveAt(path)
+    out.activeAt = typeof stamp === 'number' ? stamp : typeof stamp?.at === 'number' ? stamp.at : null
+  } catch {
+    /* an unreadable freshness answers null, which refuses */
+  }
+  return out
 }
 
 /**
@@ -218,36 +278,87 @@ export function removeStubBranch(target, { dry = false, git: runGit = git } = {}
   }
 }
 
-/** The whole operation: judge, detach, remove, prune, drop the stub branch.
- *  Returns a report. `git` is injectable so the Vitest case can run it against
- *  a throwaway repository instead of this one. */
-export function cleanupWorktree(target, { dry = false, git: runGit = git, expectBranch = '' } = {}) {
+/** The reason this command writes into git's worktree lock while it verifies and
+ *  deletes. It is recognisable, so a lock left behind by a crash says who left it. */
+export const CLEANUP_LOCK_REASON = 'worktree-cleanup: verifying and deleting'
+
+/**
+ * THE LAST RE-PROOF, INSIDE THE PROCESS THAT DELETES (point 629) — AND ITS
+ * RESIDUAL WINDOW, WHICH IS NOT CLOSED.
+ *
+ * WHAT IS CLOSED. git's worktree LOCK is a real mutual-exclusion primitive:
+ * `git worktree lock` FAILS on an already-locked tree (measured 11.08.2026 —
+ * "fatal: … is already locked"). So this command TAKES the lock first, and only
+ * then re-reads the tree. Everything that respects the lock — the isolation
+ * harness, which locks a tree while an agent holds it, and every git command that
+ * refuses a locked worktree — cannot enter after that point. A tree already held
+ * by somebody else fails the acquisition and is refused, so the foreign-lock check
+ * and the exclusion are the same atomic act rather than two.
+ *
+ * WHAT IS NOT, AND MUST NOT BE DESCRIBED AS CLOSED (second review, finding 2).
+ * git offers no compare-and-delete: between taking the lock, reading the entry,
+ * reading the dirtiness, reading the identity and unlinking the tree, several
+ * separate syscalls pass. A writer that does NOT consult the lock — a stray
+ * process writing files into the checkout, an editor saving on a timer — is not
+ * excluded by any of it. The residual is therefore: a write that (a) ignores git's
+ * lock, (b) lands after the last of these reads, and (c) is not visible in them.
+ * It is bounded by the few milliseconds between the reads and the unlink, and it
+ * is the smallest this design can make it without a primitive git does not have.
+ */
+export function cleanupWorktree(target, { dry = false, git: runGit = git, expected = null } = {}) {
   const worktrees = listWorktrees(runGit)
   const verdict = judgeTarget({ target, mainRoot: worktrees[0] ?? REPO_ROOT, worktrees })
   if (!verdict.ok) return { ok: false, verdict, detached: [] }
-  // THE LAST RE-PROOF, INSIDE THE PROCESS THAT DELETES (point 629). Everything the
-  // caller checked, it checked before spawning this command; between that answer
-  // and the removal below a worktree can be picked up again, which is the window
-  // the whole failure class lives in. Only a caller that NAMES what it expects
-  // gets this check — an orphan removal has nothing to compare against.
-  if (String(expectBranch ?? '').trim() && existsSync(target)) {
-    const match = matchesExpectation({
-      expectBranch,
-      entry: worktreeEntry(target, runGit),
-      dirty: checkoutDirty(target, runGit),
-    })
-    if (!match.ok) {
-      return { ok: false, verdict: { ...verdict, ok: false, reason: `changed-under-cleanup: ${match.reason}` }, detached: [] }
+  const refuse = (reason) => ({ ok: false, verdict: { ...verdict, ok: false, reason }, detached: [] })
+
+  const exists = pathExists(target)
+  if (exists === null) return refuse('unreadable-path: whether anything is at that path could not be established')
+
+  const wants = expected && typeof expected === 'object' && String(expected.branch ?? '').trim()
+  let weLocked = false
+  if (wants && exists && !dry) {
+    try {
+      runGit(['worktree', 'lock', '--reason', CLEANUP_LOCK_REASON, target])
+      weLocked = true
+    } catch (e) {
+      return refuse(`could-not-take-the-lock: ${`${(e && (e.stderr || e.message)) || e}`.split('\n')[0]}`)
     }
   }
-  if (!existsSync(target)) {
+  const unlockOnRefusal = (reason) => {
+    if (weLocked) {
+      try {
+        runGit(['worktree', 'unlock', target])
+      } catch {
+        /* the tree stays locked and is reported; that is the safe direction */
+      }
+    }
+    return refuse(reason)
+  }
+
+  if (wants && exists) {
+    const match = matchesExpectation({
+      expected,
+      entry: worktreeEntry(target, runGit),
+      actual: readIdentity(target),
+      dirty: checkoutDirty(target, runGit),
+      ownLock: weLocked ? CLEANUP_LOCK_REASON : '',
+    })
+    if (!match.ok) return unlockOnRefusal(`changed-under-cleanup: ${match.reason}`)
+  }
+
+  if (exists === false) {
     if (!dry) tryPrune(runGit)
     // The stub outlives a half-finished removal too — that is exactly the state
     // the guard used to find and report.
     const stub = removeStubBranch(target, { dry, git: runGit })
     return { ok: true, verdict, detached: [], stub, note: "already gone — only git's record was pruned" }
   }
-  const detached = removeTreeSafely(target, { dry, git: runGit, registered: verdict.reason === 'registered' })
+  const detached = removeTreeSafely(target, {
+    dry,
+    git: runGit,
+    registered: verdict.reason === 'registered',
+    weLocked,
+  })
   if (!dry) tryPrune(runGit)
   const stub = removeStubBranch(target, { dry, git: runGit })
   return { ok: true, verdict, detached, stub }
@@ -264,11 +375,19 @@ function tryPrune(runGit = git) {
 if (isMainModule(import.meta.url)) {
   const args = process.argv.slice(2)
   const dry = args.includes('--dry')
-  const expectAt = args.indexOf('--expect-branch')
-  const expectBranch = expectAt >= 0 ? (args[expectAt + 1] ?? '') : ''
+  const expectAt = args.indexOf('--expect')
+  let expected = null
+  if (expectAt >= 0) {
+    try {
+      expected = JSON.parse(args[expectAt + 1] ?? '')
+    } catch {
+      console.error('worktree-cleanup: --expect needs the caller\'s identity record as JSON')
+      process.exit(2)
+    }
+  }
   const target = args.filter((a, i) => !a.startsWith('--') && i !== expectAt + 1)[0]
   try {
-    const result = cleanupWorktree(target, { dry, expectBranch })
+    const result = cleanupWorktree(target, { dry, expected })
     if (!result.ok) {
       console.error(formatRefusal(result.verdict))
       process.exit(2)
