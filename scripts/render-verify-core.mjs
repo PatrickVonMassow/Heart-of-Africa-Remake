@@ -518,15 +518,19 @@ export function coveringRun(runs, backend, since, options) {
  * That is also what lets the throttle probe reproduce a red eight times over
  * without blocking anybody's turn.
  *
- * KNOWN LIMIT, stated rather than hidden (four-eyes, 11.08.2026): the window is
- * the last RENDER-file edit, so a red older than the current code is treated as
- * fixed. Two consequences. A no-op render edit followed by a green run therefore
- * clears a red without naming its cause — an evader can always do that, as they
- * can always `--defer`; the rule is aimed at the honest "it passed three times
- * since", not at somebody determined to get round it. And a fix confined OUTSIDE
- * the render set does not move the window, so route (1) is not open to it: such
- * a fix is recorded by naming it in `--defer "<the cause, and where it was
- * fixed>"`, which is the same statement in a place that is kept.
+ * WHAT COUNTS AS FIXED, and what does not (four-eyes, 11.08.2026). Route (1) is
+ * not "an edit happened": it is the red's OWN suite, on its OWN backend, coming
+ * up covering on code that postdates it. An unrelated edit plus a green run of
+ * another suite therefore proves nothing, and neither does a green run with no
+ * edit at all — with nothing newer than the red, no run can resolve it.
+ *
+ * KNOWN LIMIT, stated rather than hidden: a fix confined OUTSIDE the render set
+ * moves no window, so route (1) cannot be demonstrated for it; that fix names
+ * itself in `--defer "<the cause, and where it was fixed>"`, which signs for the
+ * red rather than closing it. And a deliberate no-op render edit followed by a
+ * green run of the reddened suite will still release it — an evader can always
+ * do that, as they can always `--defer`; the rule is aimed at the honest "it
+ * passed three times since".
  *
  * THE CHARGE IS READ AS IT STANDS NOW, not as it stood when the run was recorded
  * (four-eyes finding, 11.08.2026). The recorder stamps the charge at record time
@@ -542,6 +546,30 @@ export function coveringRun(runs, backend, since, options) {
 export function unexplainedRuns(runs, since, options) {
   const { openPoints = null, ledger = RED_CHARGES } = options ?? {}
   const from = Number.isFinite(since) ? since : 0
+  const all = Array.isArray(runs) ? runs : []
+  /**
+   * Was this red DEMONSTRATED GONE? Only its own suite on its own backend can
+   * say so, and only on code that came after it: a covering run of that pair
+   * which started after the last render edit, where that edit itself came after
+   * the red. The edit alone used to be enough — so an unrelated render change
+   * plus a green run of ANY suite dropped the red, which is the fourth closing
+   * wearing a fix's clothes (four-eyes, 11.08.2026). Repetition still proves
+   * nothing: with no edit after the red, `from` cannot postdate it and no run
+   * can resolve it.
+   */
+  const shownGone = (r) => {
+    const when = Number(r?.startedAt ?? r?.at)
+    if (!Number.isFinite(when) || from <= when) return false
+    return all.some(
+      (later) =>
+        later &&
+        later.partial !== true &&
+        later.backend === r.backend &&
+        later.suite === r.suite &&
+        sawCodeSince(later, from) &&
+        runVerdict(later, { openPoints, ledger }).covers,
+    )
+  }
   const open = new Set(Array.isArray(openPoints) ? openPoints : openPoints ? [...openPoints] : [])
   /** Is this red owned by an OPEN point — by the charge it was recorded with, or
    *  by one the ledger carries today? */
@@ -557,7 +585,11 @@ export function unexplainedRuns(runs, since, options) {
   for (const r of Array.isArray(runs) ? runs : []) {
     if (!r || typeof r !== 'object') continue
     const at = Number(r.at ?? 0)
-    if (!Number.isFinite(at) || !sawCodeSince(r, from)) continue
+    if (!Number.isFinite(at)) continue
+    // A red is carried until its own suite is shown green on newer code. Runs
+    // that saw the current code are judged directly; older ones only leave the
+    // list once that demonstration exists.
+    if (!sawCodeSince(r, from) && shownGone(r)) continue
     const verdict = runVerdict(r, { openPoints })
     if (verdict.status !== 'red' && verdict.status !== 'suspect') continue
     const suite = typeof r.suite === 'string' && r.suite ? r.suite : 'unknown'
@@ -601,9 +633,11 @@ export function latestRun(runs, backend, since) {
   let best = null
   for (const r of runs) {
     if (!r || r.backend !== backend) continue
-    const at = Number(r.at ?? 0)
-    if (at < since) continue
-    if (!best || at > Number(best.at ?? 0)) best = r
+    // The same freshness reading the rest of the file uses: a run that BEGAN
+    // before the edit tested the old code, so quoting its red as "why the last
+    // attempt did not count" would point at the wrong code.
+    if (!sawCodeSince(r, since)) continue
+    if (!best || Number(r.at ?? 0) > Number(best.at ?? 0)) best = r
   }
   return best
 }

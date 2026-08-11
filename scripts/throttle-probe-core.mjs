@@ -250,11 +250,16 @@ export function classifyRun(input) {
   // — and an exit-0 harness failure counted as green would quietly dilute the
   // very rate this instrument exists to report.
   if (exit === 0) {
-    // Exit 0 while the summary reports failures is the runner CONTRADICTING
-    // itself. Neither reading may be preferred — a green would dilute the rate,
-    // a red would invent one — so the run measured nothing.
+    // A GREEN has to agree with itself: the runner exited 0, its summary says
+    // exit 0 with no failures and no console errors, it reached at least one
+    // check, and no FAIL line was parsed out of the log. Any disagreement is a
+    // run that measured nothing — a green would dilute the rate, a red would
+    // invent one.
     if (!summary) return 'broken'
-    return summary.fail > 0 || summary.consoleErrors > 0 ? 'broken' : 'green'
+    const named = (Array.isArray(checks) ? checks : []).length
+    const agrees =
+      summary.fail === 0 && summary.consoleErrors === 0 && summary.exit === 0 && summary.pass > 0 && named === 0
+    return agrees ? 'green' : 'broken'
   }
   if (summary && (summary.fail > 0 || summary.consoleErrors > 0)) return 'red'
   if ((Array.isArray(checks) ? checks : []).length > 0) return 'red'

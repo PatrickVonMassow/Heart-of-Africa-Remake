@@ -191,15 +191,22 @@ describe('reading a run-all log', () => {
 
 describe('classifyRun — three of the four outcomes are NOT "the check failed"', () => {
   it('calls exit 0 green only when the runner REPORTED its checks', () => {
-    expect(classifyRun({ exit: 0, summary: { fail: 0, consoleErrors: 0 } })).toBe('green')
+    expect(classifyRun({ exit: 0, summary: { pass: 8, fail: 0, consoleErrors: 0, exit: 0 } })).toBe('green')
     // An exit-0 launch that reported nothing measured nothing — counting it as a
     // green would dilute the very rate this instrument reports.
     expect(classifyRun({ exit: 0, summary: null })).toBe('broken')
   })
 
   it('calls a runner that contradicts itself BROKEN, neither green nor red', () => {
-    expect(classifyRun({ exit: 0, summary: { fail: 2, consoleErrors: 0 } })).toBe('broken')
-    expect(classifyRun({ exit: 0, summary: { fail: 0, consoleErrors: 3 } })).toBe('broken')
+    const green = { pass: 8, fail: 0, consoleErrors: 0, exit: 0 }
+    expect(classifyRun({ exit: 0, summary: { ...green, fail: 2 } })).toBe('broken')
+    expect(classifyRun({ exit: 0, summary: { ...green, consoleErrors: 3 } })).toBe('broken')
+    // The summary's own exit disagreeing with the process's, no check reached at
+    // all, and a FAIL line parsed out of a run that exited 0 — each is a run
+    // whose report cannot be believed.
+    expect(classifyRun({ exit: 0, summary: { ...green, exit: 1 } })).toBe('broken')
+    expect(classifyRun({ exit: 0, summary: { ...green, pass: 0 } })).toBe('broken')
+    expect(classifyRun({ exit: 0, summary: green, checks: ['a red printed by a run that exited 0'] })).toBe('broken')
   })
 
   it('calls a reported failure red', () => {

@@ -826,7 +826,24 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(reason).toMatch(/--defer/)
   })
 
-  it('lets the FIX through: the red predates the last render edit, so it is out of the window', () => {
+  it('lets the FIX through — but only once the suite that reddened is shown green on the new code', () => {
+    // The red is in `polish`; the two clean runs below are `polish` too, after
+    // an edit that came after the red. That is a fix demonstrated, not asserted.
+    const green = (backend, at) => ({ ...run(backend, at), suite: 'polish' })
+    const result = evaluate(
+      renderChange({
+        latestChangeAt: 3000,
+        runs: [unfiled('webgpu', 1500), green('webgpu', 3500), green('webgl', 3600)],
+        openPoints,
+      }),
+    )
+    expect(result).toEqual({ decision: 'allow', clear: true })
+  })
+
+  it('does NOT let an unrelated edit plus a green of ANOTHER suite drop the red', () => {
+    // The old rule dropped every red older than the newest render edit, so an
+    // edit that had nothing to do with it plus any covering run closed it —
+    // silently, and without a cause.
     const result = evaluate(
       renderChange({
         latestChangeAt: 3000,
@@ -834,7 +851,16 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
         openPoints,
       }),
     )
-    expect(result).toEqual({ decision: 'allow', clear: true })
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/UNEXPLAINED RED/)
+  })
+
+  it('does NOT let a green of the same suite on the SAME code drop it — that is repetition', () => {
+    const green = (backend, at) => ({ ...run(backend, at), suite: 'polish' })
+    const result = evaluate(
+      renderChange({ runs: [unfiled('webgpu', 1500), green('webgpu', 2000), green('webgl', 2100)], openPoints }),
+    )
+    expect(result.decision).toBe('block')
   })
 
   it('lets a CHARGED red through — it is explained, and the run still accounts', () => {
@@ -955,9 +981,11 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(coveringRun([straddling], 'webgpu', 1000, { openPoints })).toBeNull()
   })
 
-  it('does not let a red from a run that BEGAN before the edit condemn the code that followed', () => {
+  it('carries a red from a run that STRADDLED the edit until that suite is shown green', () => {
     const straddling = { ...unfiled('webgpu', 2000), startedAt: 500 }
-    expect(unexplainedRuns([straddling], 1000, { openPoints })).toEqual([])
+    expect(unexplainedRuns([straddling], 1000, { openPoints })).toHaveLength(1)
+    const shownGone = { ...run('webgpu', 3000), suite: 'polish' }
+    expect(unexplainedRuns([straddling, shownGone], 1000, { openPoints })).toEqual([])
   })
 
   it('unexplainedRuns is total, and reports oldest first', () => {
