@@ -106,6 +106,18 @@ describe('what it refuses before spending anything', () => {
     expect(calls()).toEqual([])
   })
 
+  // Audit finding, 12.08.2026: a consumer that reads the setting but not the problem
+  // presents a fallback as the operator's choice. This is the guarantee, at the consumer.
+  it('SAYS SO when the setting it acted on came from a broken file', () => {
+    writeFileSync(shareFile, '{ not json at all')
+    clearCalls()
+    const r = run(['--kind', 'diagnose', '--brief', 'why?', '--file', materialFile])
+    expect(r.stderr).toMatch(/share setting is UNUSABLE/)
+    // …and it acted on the safe setting, so nothing was sent.
+    expect(r.status).toBe(3)
+    expect(calls()).toEqual([])
+  })
+
   it('runs anyway on an explicit --anyway, the override being deliberate', () => {
     setting('default')
     clearCalls()

@@ -26,6 +26,7 @@ import {
   readSetting,
   routeFor,
   routingTable,
+  settingOrSafe,
   settingPathFrom,
   statusLine,
   step,
@@ -68,9 +69,20 @@ describe('routing', () => {
     expect(kindsToSol('claude-only')).toEqual([])
   })
 
-  it('answers `claude` for an unknown kind and an unknown setting rather than throwing', () => {
+  // Audit finding, 12.08.2026: an unknown setting used to route as the DEFAULT, and the
+  // default sends reviews to Sol — so a garbled value spent the second vendor's
+  // allowance. The old case only asked about `diagnose`, whose default route is Claude
+  // anyway, and so proved nothing.
+  it('routes an unknown setting as the SAFE one — the review included, which is where it hid', () => {
+    for (const kind of KINDS) expect(routeFor(kind, 'whatever'), kind).toBe('claude')
+    expect(routeFor('review', 'whatever')).toBe('claude')
+    expect(routeFor('review', undefined)).toBe('claude')
+    expect(settingOrSafe('whatever')).toBe(SAFE_SETTING)
+    expect(settingOrSafe('prefer-sol')).toBe('prefer-sol')
+  })
+
+  it('answers `claude` for an unknown kind rather than throwing', () => {
     expect(routeFor('author', 'prefer-sol')).toBe('claude')
-    expect(routeFor('diagnose', 'whatever')).toBe('claude')
   })
 
   it('offers the whole table, so no consumer has to keep its own copy', () => {
@@ -93,7 +105,7 @@ describe('stepping the ladder', () => {
   })
 
   it('starts from the default when the state says something unusable, and refuses a non-direction', () => {
-    expect(step('nonsense', 'more').from).toBe('default')
+    expect(step('nonsense', 'more').from).toBe(SAFE_SETTING)
     expect(() => step('default', 'sideways')).toThrow()
   })
 })
@@ -106,7 +118,24 @@ describe('the state file', () => {
 
   it('reads an ABSENT file as the default — nothing was ever set', () => {
     expect(readSetting(null)).toMatchObject({ setting: 'default', problem: '', corrupt: false })
-    expect(readSetting('')).toMatchObject({ setting: 'default', corrupt: false })
+    expect(readSetting(undefined)).toMatchObject({ setting: 'default', corrupt: false })
+  })
+
+  // Audit finding, 12.08.2026: an EMPTY file is not an absent one — it is what a torn
+  // write leaves behind, and reading it as "never set" resumed spending on a state the
+  // operator had chosen.
+  it('reads an EMPTY file as broken, not as never-set', () => {
+    expect(readSetting('')).toMatchObject({ setting: SAFE_SETTING, corrupt: true })
+    expect(readSetting('   \n').problem).toMatch(/EMPTY/)
+  })
+
+  // Same audit: `1e300` is finite and positive, and `new Date(1e300).toISOString()`
+  // THROWS — taking down the status report of a switch that promises not to break its
+  // caller.
+  it('drops a timestamp no Date can hold, so the status report cannot crash on it', () => {
+    expect(readSetting('{"setting":"prefer-sol","changedAt":1e300}').changedAt).toBeNull()
+    expect(readSetting('{"setting":"prefer-sol","changedAt":-5}').changedAt).toBeNull()
+    expect(readSetting('{"setting":"prefer-sol","changedAt":1700000000000}').changedAt).toBe(1_700_000_000_000)
   })
 
   // Cross-vendor review, 12.08.2026: falling back to `default` meant a CORRUPTED
@@ -140,6 +169,16 @@ describe('what it says', () => {
     expect(line).toMatch(/to Claude: diagnose/)
     expect(statusLine('claude-only')).toMatch(/to GPT-5\.6 Sol: nothing/)
     expect(statusLine('prefer-sol')).toMatch(/to Claude: nothing/)
+  })
+
+  // Audit finding, 12.08.2026: presented bare, a safe setting reads as the operator's
+  // choice, and nobody repairs the file it actually came from.
+  it('says when a setting is a FALLBACK rather than a choice — in the brief and on the board', () => {
+    expect(briefLine(SAFE_SETTING, { corrupt: true })).toMatch(/FALLBACK — the share state file is unusable/)
+    expect(briefLine(SAFE_SETTING)).not.toMatch(/FALLBACK/)
+    expect(boardNoteSegment(SAFE_SETTING, { corrupt: true })).toMatch(/Notfall-Rückfall/)
+    expect(boardNoteSegment(SAFE_SETTING)).not.toMatch(/Notfall/)
+    expect(applyFooterNote('<footer>Stand: x</footer>', SAFE_SETTING, { corrupt: true })).toMatch(/Notfall-Rückfall/)
   })
 
   it('tells a delegated agent what to hand over, at every setting', () => {

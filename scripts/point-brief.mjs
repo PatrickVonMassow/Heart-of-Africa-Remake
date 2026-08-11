@@ -74,6 +74,7 @@ try {
     // Which vendor the read-only work goes to right now (point 654). READ, never
     // assumed: the brief tells the agent what the switch actually says.
     solShare: solShare.setting,
+    solShareCorrupt: Boolean(solShare.corrupt),
   })
   process.stdout.write(brief.endsWith('\n') ? brief : `${brief}\n`)
   if (showTokens || tokens > BRIEF_TOKEN_CEILING) {

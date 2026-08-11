@@ -190,7 +190,7 @@ try {
   // standing — `refreshFooter` keeps every segment it does not own, this one included.
   const share = currentSetting()
   if (share.problem) console.error(settingProblemLine(share, 'board-publish'))
-  const refreshed = normaliseLineEndings(applyFooterNote(refreshFooter(html, { openCount: open.length }), share.setting))
+  const refreshed = normaliseLineEndings(applyFooterNote(refreshFooter(html, { openCount: open.length }), share.setting, { corrupt: share.corrupt }))
   if (refreshed !== html) {
     // Atomic (point 443, four-eyes F3) — and this one writes the very file the
     // next lines read, hash and push to the public page.

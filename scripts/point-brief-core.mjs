@@ -883,8 +883,8 @@ const HOUSE_FACTS = [
  * readers to skip the line. The setting itself is READ from `.claude/sol-share.json` by
  * the wrapper — nothing here keeps its own copy of the routing table.
  */
-export function headerLines(solShare = DEFAULT_SOL_SHARE) {
-  return [...HOUSE_FACTS, solBriefLine(solShare), '', ...CALL_DISCIPLINE]
+export function headerLines(solShare = DEFAULT_SOL_SHARE, { solShareCorrupt = false } = {}) {
+  return [...HOUSE_FACTS, solBriefLine(solShare, { corrupt: solShareCorrupt }), '', ...CALL_DISCIPLINE]
 }
 
 /**
@@ -972,13 +972,14 @@ export function assembleBrief({
   adoptionCap = ADOPTION_DEPTH_CAP,
   sliceDocs = [],
   solShare = DEFAULT_SOL_SHARE,
+  solShareCorrupt = false,
 }) {
   const out = [
     `=== DELEGATION BRIEF — WORK-ORDER POINT ${point.number} (${point.done ? 'DONE/ARCHIVED' : 'OPEN'}) ===`,
     'Assembled by scripts/point-brief.mjs from the work order, design.md and the research docs.',
     formatRevisionLine(revision ?? {}),
     '',
-    ...headerLines(solShare),
+    ...headerLines(solShare, { solShareCorrupt }),
     '',
     `--- THE POINT (verbatim, work-order point ${point.number}) ---`,
     point.body,
@@ -1069,7 +1070,7 @@ export function assembleBrief({
  * The whole job: point number → brief text. Throws BriefError on an unknown point
  * number and on a `§` that resolves in none of the documents searched.
  */
-export function buildBrief({ tasksText, designText, claudeText = '', docs = [], number, registry, revision = {}, solShare = DEFAULT_SOL_SHARE }) {
+export function buildBrief({ tasksText, designText, claudeText = '', docs = [], number, registry, revision = {}, solShare = DEFAULT_SOL_SHARE, solShareCorrupt = false }) {
   const all = parseWorkOrderPoints(tasksText)
   const point = all.find((p) => p.number === Number(number)) ?? null
   if (!point) {
@@ -1275,6 +1276,7 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
     adoptionBeyond,
     sliceDocs,
     solShare,
+    solShareCorrupt,
   })
   return {
     brief,

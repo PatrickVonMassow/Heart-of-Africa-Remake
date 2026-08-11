@@ -37,11 +37,18 @@ The setting lives in the **main checkout's** `.claude/sol-share.json`, which is
 git-ignored: it is this machine's operator state, and a delegated agent working
 in a worktree resolves the same file through git's common dir, so it reads the
 setting the user actually flipped. It can never take down the work that asked: a
-**missing** file is `default` (nothing was ever set), and a file that is there
-but **unusable** falls back to `claude-only` — the direction that spends nothing —
-with the problem printed by every consumer that read it. Falling back to
-`default` instead would let a corrupted `claude-only` state quietly resume
-spending the allowance the operator had moved away from.
+**missing** file is `default` (nothing was ever set), while a file that is there
+but **unusable** — unreadable, empty from a torn write, or holding something that
+is not a setting — falls back to `claude-only`, and so does any unrecognised
+value anywhere. Falling back to `default` instead would let a corrupted
+`claude-only` state quietly resume spending the allowance the operator had moved
+away from. That fallback is not neutral, and it does not pretend to be: a
+corrupted `prefer-sol` state lands on the vendor THAT operator was sparing. There
+is no setting that spends nothing on both, so the narrow claim is the honest one
+— nothing goes to the SECOND vendor, and the work stays where it would be without
+the switch at all. Every consumer prints the problem, and the board note and the
+brief line SAY that the setting is a fallback rather than a choice, so it gets
+repaired instead of lived with.
 
 While the setting is off its default, the board's footer says so, so nobody
 wonders why a diagnosis came back in another voice.

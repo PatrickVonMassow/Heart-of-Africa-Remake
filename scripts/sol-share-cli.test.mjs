@@ -4,7 +4,7 @@
 // temp file, so nothing here touches the developer's own setting.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -37,8 +37,13 @@ describe('sol-share.mjs', () => {
     expect(existsSync(file)).toBe(false)
   })
 
-  it('steps towards Sol, persists it, and says so in the one line', () => {
-    expect(run('--more').status).toBe(0)
+  // The mutation's OWN output is read, not a later --status (audit, 12.08.2026): asserting
+  // the file and then asking again would pass even if the command printed one setting and
+  // saved another.
+  it('steps towards Sol, persists it, and says so in the SAME invocation', () => {
+    const r = run('--more')
+    expect(r.status).toBe(0)
+    expect(r.stdout).toMatch(/^sol-share: prefer-sol —/)
     expect(state().setting).toBe('prefer-sol')
     expect(run('--status').stdout).toMatch(/^sol-share: prefer-sol — to GPT-5\.6 Sol: review, diagnose/)
   })
@@ -50,16 +55,16 @@ describe('sol-share.mjs', () => {
     expect(state().setting).toBe('prefer-sol')
   })
 
-  it('steps back down again, two steps to the escape hatch', () => {
-    run('--less')
+  it('steps back down again, two steps to the escape hatch, printing what it saved', () => {
+    expect(run('--less').stdout).toMatch(/^sol-share: default —/)
     expect(state().setting).toBe('default')
-    run('--less')
+    expect(run('--less').stdout).toMatch(/^sol-share: claude-only —/)
     expect(state().setting).toBe('claude-only')
     expect(run('--status').out).toMatch(/to GPT-5\.6 Sol: nothing/)
   })
 
   it('sets a named setting and answers --json machine-readably', () => {
-    expect(run('--set', 'prefer-sol').status).toBe(0)
+    expect(run('--set', 'prefer-sol').stdout).toMatch(/^sol-share: prefer-sol —/)
     const json = JSON.parse(run('--status', '--json').stdout)
     expect(json.setting).toBe('prefer-sol')
     expect(json.routing.find((r) => r.kind === 'diagnose').to).toBe('sol')
@@ -83,5 +88,31 @@ describe('sol-share.mjs', () => {
     expect(r.stdout).toMatch(/^sol-share: claude-only —/)
     expect(r.stdout).toMatch(/to GPT-5\.6 Sol: nothing/)
     expect(r.out).toMatch(/NOTE: .*not JSON/)
+  })
+
+  // Audit finding, 12.08.2026: only MALFORMED JSON was covered, so the unreadable-file
+  // branch could have been changed back to `default` — resuming Sol spending — with the
+  // suite still green. A directory is a file that exists and cannot be read.
+  it('DEGRADES the same way when the file cannot be read at all', () => {
+    rmSync(file, { force: true })
+    mkdirSync(file, { recursive: true })
+    const r = run('--status')
+    expect(r.status).toBe(0)
+    expect(r.stdout).toMatch(/^sol-share: claude-only —/)
+    expect(r.stdout).toMatch(/NOTE: .*could not be read/)
+    rmSync(file, { recursive: true, force: true })
+  })
+})
+
+// Audit finding, 12.08.2026: nothing asserted the sentence the consumers print, so they
+// could have stopped saying that a routed setting was not the operator's choice.
+describe('settingProblemLine', () => {
+  it('names the problem and the repair, and says nothing when there is none', async () => {
+    const { settingProblemLine } = await import('./sol-share.mjs')
+    const line = settingProblemLine({ setting: 'claude-only', problem: 'the state file is not JSON', corrupt: true }, 'review-sol')
+    expect(line).toMatch(/^review-sol: the share setting is UNUSABLE — the state file is not JSON/)
+    expect(line).toMatch(/sol-share\.mjs --set/)
+    expect(settingProblemLine({ setting: 'default', problem: '' })).toBe('')
+    expect(settingProblemLine(null)).toBe('')
   })
 })
