@@ -139,9 +139,14 @@ function linkedGitdirOf(path) {
 function gitFileIdentity(path) {
   try {
     const st = statSync(join(path, '.git'))
-    return { ino: Number(st.ino ?? 0), dev: Number(st.dev ?? 0), gitMtime: Number(st.mtimeMs ?? 0) }
+    return {
+      ino: Number(st.ino ?? 0),
+      dev: Number(st.dev ?? 0),
+      gitMtime: Number(st.mtimeMs ?? 0),
+      gitBirth: Number(st.birthtimeMs ?? 0),
+    }
   } catch {
-    return { ino: 0, dev: 0, gitMtime: 0 }
+    return { ino: 0, dev: 0, gitMtime: 0, gitBirth: 0 }
   }
 }
 
@@ -240,6 +245,7 @@ export function cleanupEvidence(worktrees, { branch, mainRoot = REPO_ROOT, merge
         ino: 0,
         dev: 0,
         gitMtime: 0,
+        gitBirth: 0,
       }
       continue
     }

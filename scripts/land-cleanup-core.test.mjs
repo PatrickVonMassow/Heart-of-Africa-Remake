@@ -321,7 +321,7 @@ describe('the re-proof at the moment of deletion (review finding 2)', () => {
     // Second review, finding 1: branch + unlocked + clean also describes a
     // DIFFERENT checkout standing at the same path.
     const tree = { ...own, head: 'abc123' }
-    const ev = { ...deadFor('own'), ino: 4711, dev: 66, gitMtime: 900 }
+    const ev = { ...deadFor('own'), ino: 4711, dev: 66, gitMtime: 900, gitBirth: 880 }
     const sel = selectCleanupTargets({
       worktrees: [tree],
       branch: 'feat/608-x',
@@ -336,6 +336,7 @@ describe('the re-proof at the moment of deletion (review finding 2)', () => {
       ino: 4711,
       dev: 66,
       gitMtime: 900,
+      gitBirth: 880,
       notWrittenAfter: NOW,
     })
   })

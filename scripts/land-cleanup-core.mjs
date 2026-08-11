@@ -276,6 +276,7 @@ export function selectCleanupTargets({ worktrees = [], branch, mainRoot, evidenc
             ino: Number(ev.ino ?? 0),
             dev: Number(ev.dev ?? 0),
             gitMtime: Number(ev.gitMtime ?? 0),
+            gitBirth: Number(ev.gitBirth ?? 0),
             notWrittenAfter: num(since) ?? 0,
           },
         ]
