@@ -1076,6 +1076,52 @@ mit ihm unter.
 
 ---
 
+### 3.106 Unsere eigene Aufräumung hat fremde Arbeit vernichtet
+
+Am 11.08.2026 landete ein Punkt mit dem Sammelbefehl, dessen letzter Schritt Zweig und
+Arbeitsbaum löscht. Gelöscht wurde auch der Arbeitsbaum eines Agenten, der an einem
+ANDEREN Punkt mitten in der Arbeit war; von da an wies jeder seiner Befehle sich selbst
+ab. Verloren war seine fertige, getestete, viermal gegengeprüfte, aber nicht committete
+Antwort auf sechs Prüfbefunde. Kein Absturz, kein Fremdeinfluss — die Werkstatt hat ihr
+eigenes Werkstück weggeräumt.
+
+Zwei Ursachen, und die zweite ist die unbequemere. Die Aufräumung handelte nach einem
+NAMEN, nicht nach einem Eigentumsnachweis, und fragte nirgends, ob in dem Baum noch
+jemand arbeitet — obwohl das Projekt die Lebendprüfung dafür längst besitzt und sie im
+Wartemechanismus täglich benutzt. Und der Agent stand überhaupt erst deshalb ungeschützt
+da, weil er seine Arbeit als EINEN Block bis zur Grünmeldung führte: Die Regel, nach jedem
+abgeschlossenen Schritt zu committen und zu pushen, existiert seit Wochen und war hier
+nicht befolgt. Sie ist genau für diesen Fall geschrieben.
+
+**Lehre:** Ein löschender Schritt braucht einen Eigentumsnachweis, keinen plausiblen Namen
+— und wo er ihn nicht führen kann, lässt er stehen und sagt es. Das gilt doppelt, wo
+parallel gearbeitet wird: Zerstörungsrisiko und Nebenläufigkeit treffen sich genau dann,
+wenn der Betrieb am produktivsten ist. Die zweite Hälfte ist billiger und wird trotzdem
+übersprungen: Nicht gepushte Arbeit ist der einzige Zustand, den nichts retten kann.
+
+---
+
+### 3.107 Die Schicht über den eigenen Einstellungen
+
+Der Nutzer verlangte, dass in seinem Editor niemals eine Rückfrage erscheint — und es
+erschienen welche, obwohl beide Einstellungsdateien das Werkzeug als GANZES erlauben. Die
+Messung schied den Verdacht sauber aus: Dieselbe Schreibzeile läuft in jeden Ordner still
+durch und fragt nur bei `.claude/` nach, und unsere Node-Skripte, die exakt dieselben
+Dateien schreiben, fragten die ganze Nacht kein einziges Mal. Die Sperre sitzt also
+oberhalb unserer Erlaubnisliste und ist durch einen Eintrag dort nicht abzustellen.
+
+Die Lösung liegt deshalb nicht in den Einstellungen, sondern eine Stufe früher: Ein
+Wächter verweigert solche Shell-Zeilen selbst und nennt den richtigen Weg. Eine
+Verweigerung kommt VOR der Rückfrage — aus einer Frage an den Nutzer wird eine Anweisung
+an den Agenten.
+
+**Lehre:** Wenn eine Konfiguration nachweislich das Richtige sagt und das Verhalten
+trotzdem abweicht, ist die nächste Frage nicht „welcher Eintrag fehlt", sondern „wer
+entscheidet oberhalb davon". Und wo eine fremde Schicht nicht zu konfigurieren ist, kann
+man ihr oft zuvorkommen, statt gegen sie anzuschreiben.
+
+---
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -1163,7 +1209,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 11.08.2026, 07:44 · Quellen-Fingerprint: `60ef8689e00d…`
+Zuletzt aktualisiert: Dienstag, 11.08.2026, 07:56 · Quellen-Fingerprint: `592ed585a55b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1245,8 +1291,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 74 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 47 Prozess-/Meta-TASKS-Punkte (davon 17 offen).
+Erfasste Quellen: 74 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 48 Prozess-/Meta-TASKS-Punkte (davon 18 offen).
 
-<!-- RETRO-FINGERPRINT: 60ef8689e00d17542d1921467f8afbf7c324d0aeb2d698625f13000ad6a4d1fd -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-11T05:44:27.108Z -->
+<!-- RETRO-FINGERPRINT: 592ed585a55b03b7caf10534bbc7347a6f213b65dfa638b32bf7d63cfcc49a8e -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-11T05:56:10.662Z -->
 <!-- AUTO-GENERATED:END -->
