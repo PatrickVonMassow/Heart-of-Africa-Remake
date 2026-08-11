@@ -234,6 +234,10 @@ export const RETRY_ENV = 'VERIFY_RETRY_AFTER'
  *  would read as "not a retry". Bounded, because it travels in an environment. */
 export const SUSPECT_UNNAMED = 'the first attempt failed without naming a check'
 const MAX_SUSPECT_NAMES = 8
+/** The kind of the entry that stands for the reds the marker could not carry.
+ *  Deliberately outside the two kinds a charge may name, so nothing can own it:
+ *  what was never carried cannot be charged, and must keep the run blocked. */
+export const TRUNCATED_KIND = 'truncated'
 const MAX_SUSPECT_NAME_LEN = 200
 
 /** A value as text, or '' — `String(x)` itself throws on an object whose
@@ -265,7 +269,10 @@ export function formatSuspectEnv(reds) {
   // blocking once the eight that fitted are charged. Deliberately worded so no
   // ledger entry can match it: what is missing cannot be charged.
   if (all.length > MAX_SUSPECT_NAMES) {
-    list.push(`check\t${all.length - MAX_SUSPECT_NAMES} further red(s) of the first attempt were NOT carried`)
+    // Its own KIND, not a check: a truncation is not a red anybody can own, and
+    // a ledger entry with a broad enough regex would otherwise charge it away
+    // together with the eight that fitted.
+    list.push(`${TRUNCATED_KIND}\t${all.length - MAX_SUSPECT_NAMES} further red(s) of the first attempt were NOT carried`)
   }
   return (list.length ? list : [`check\t${SUSPECT_UNNAMED}`]).join('\n')
 }
@@ -278,7 +285,8 @@ export function parseSuspectReds(value) {
   const out = []
   for (const line of text(value).split('\n')) {
     const [head, ...rest] = line.split('\t')
-    const kind = rest.length && (head === 'console' || head === 'check') ? head : 'check'
+    const kind =
+      rest.length && (head === 'console' || head === 'check' || head === TRUNCATED_KIND) ? head : 'check'
     const name = (rest.length ? rest.join('\t') : head).trim()
     if (!name) continue
     out.push({ name, kind })
@@ -303,7 +311,8 @@ export function suspectRedsOf(run) {
   for (const entry of list) {
     const name = text(entry?.name) || text(entry)
     if (!name.trim()) continue
-    out.push({ name: name.trim(), kind: entry?.kind === 'console' ? 'console' : 'check' })
+    const kind = entry?.kind === 'console' || entry?.kind === TRUNCATED_KIND ? entry.kind : 'check'
+    out.push({ name: name.trim(), kind })
   }
   // One more than the marker carries: the last may be the "further red(s) … NOT
   // carried" entry, which is the one that must never be dropped.
@@ -519,6 +528,8 @@ export function unexplainedRuns(runs, since, options) {
   /** Is this red owned by an OPEN point — by the charge it was recorded with, or
    *  by one the ledger carries today? */
   const owned = (red, suite, backend) => {
+    // Reds that never reached the record cannot be owned by anything.
+    if (red?.kind === TRUNCATED_KIND) return false
     const recorded = Number.isInteger(red?.point) ? red.point : null
     if (recorded !== null && open.has(recorded)) return true
     const now = chargeFor(red, { suite, backend, ledger })

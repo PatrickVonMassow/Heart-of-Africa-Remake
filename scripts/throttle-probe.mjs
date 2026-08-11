@@ -248,10 +248,12 @@ function killTree(child) {
  *  process's own tree. A second pass covers a slow reparent. */
 async function sweepAfterKill() {
   let killed = 0
+  // BOTH passes, always: the dev server and the browser reparent at their own
+  // speeds, so stopping at the first success is how the slower one survives to
+  // contaminate the next measurement.
   for (const wait of [1500, 2000]) {
     await new Promise((r) => setTimeout(r, wait))
     killed += await sweepStrays()
-    if (killed > 0) break
   }
   return killed
 }

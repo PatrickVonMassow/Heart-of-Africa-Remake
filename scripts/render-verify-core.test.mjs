@@ -1016,7 +1016,9 @@ describe('the retry marker travels in the environment (point 640)', () => {
     const openPoints = [506]
     const marker = formatSuspectEnv(Array.from({ length: 12 }, (_, i) => ({ name: `red number ${i}` })))
     const suspectMany = { ...run('webgpu', 1500), suite: 'polish', suspect: true, suspectOf: parseSuspectReds(marker) }
-    const ledger = [{ point: 506, match: /^red number \d+$/, why: 'every carried red charged' }]
+    // A DELIBERATELY BROAD charge: even one that matches the truncation entry's
+    // wording cannot own it, because what was never carried is not chargeable.
+    const ledger = [{ point: 506, match: /red|further|first attempt/, why: 'as broad as a ledger entry gets' }]
     const runs = [suspectMany, run('webgpu', 2000), run('webgl', 2100)]
     const result = evaluate(renderChange({ runs, openPoints, ledger }))
     expect(result.decision).toBe('block')
