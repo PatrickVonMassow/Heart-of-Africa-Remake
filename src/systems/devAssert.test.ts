@@ -180,6 +180,19 @@ describe('watchProducer (point 589 — a producer that must keep producing)', ()
     expect(LONG_RUN_SUSPEND_SECONDS).toBeLessThan(6)
   })
 
+  it('and reports it on a loop crawling in BURSTS, where the long steps do not follow each other', () => {
+    // Six seconds, one fast frame, six seconds: a stall must not be able to hide
+    // behind a pattern, only behind a loop that genuinely stood still.
+    const watch = createProducerWatch()
+    const step = (dt: number) =>
+      watchProducer(watch, { code: 'demo-producer', dt, produced: false, expected: true, maxSilenceSeconds: 60 })
+    for (let i = 0; i < 40; i++) {
+      step(6)
+      step(1 / 60)
+    }
+    expect(fired().join(' ')).toContain('demo-producer')
+  })
+
   it('keeps the window in ELAPSED seconds on a machine running at half a frame a second', () => {
     // The window must not stretch with the frame time: at 2 s steps a 60 s
     // window is still reached after 60 seconds of world, not 120.
