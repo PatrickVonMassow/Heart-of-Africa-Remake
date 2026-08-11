@@ -4182,15 +4182,41 @@ if (section('ctrl-actor-labels')) {
     .waitForFunction(() => (window.__actorLabels?.() ?? []).length > 0, null, { timeout: 20000 })
     .then(() => true)
     .catch(() => false)
-  const held = await page.evaluate(() => (window.__actorLabels ? window.__actorLabels() : null))
-  const rendered = await page.evaluate(() =>
-    [...document.querySelectorAll('.actor-label')].map((el) => el.textContent ?? ''),
+  // BOTH readings must describe the SAME moment — the bird's-eye half of this
+  // check already reads them that way (enrichments.mjs) and this half was the
+  // one still reading them apart, one round trip at a time. The probe reports
+  // the list the layer last rendered FROM, while every new label reaches the
+  // DOM through drei's own portal root, which commits on its own schedule.
+  // Measured 11.08.2026 under a 20× CPU throttle, on this branch and on `main`
+  // alike: the settlement's ~20 labels then arrive roughly ONE PER FRAME, so a
+  // state read one round trip before the DOM read reported 24 labels against 2
+  // drawn — which is exactly how this check went red on the loaded WebGL 2 lane
+  // while every label was correct. So: poll on the app's own frames until the
+  // two agree and snapshot them in the SAME tick. If they never converge the
+  // snapshot still comes back and the check below fails on it, which is the
+  // defect this assertion is really for.
+  const snapshot = await page.evaluate(
+    () =>
+      new Promise((res) => {
+        let frames = 0
+        const step = () => {
+          const labels = window.__actorLabels ? window.__actorLabels() : null
+          if (labels === null) return res(null)
+          const rendered = [...document.querySelectorAll('.actor-label')].map((el) => el.textContent ?? '')
+          if (rendered.length === labels.length || ++frames > 240) return res({ labels, rendered, frames })
+          requestAnimationFrame(step)
+        }
+        requestAnimationFrame(step)
+      }),
   )
+  const held = snapshot === null ? null : snapshot.labels
+  const rendered = snapshot === null ? [] : snapshot.rendered
   check(
     "holding Ctrl names the settlement's people and animals (point 342)",
     !!held && held.length > 0 && rendered.length === held.length,
     held
-      ? `${held.length} labels [${held.map((l) => l.kind).join(', ')}]: ${rendered.slice(0, 4).join(' | ')}`
+      ? `${held.length} labels, ${rendered.length} drawn after ${snapshot.frames} frame(s) ` +
+        `[${held.map((l) => l.kind).join(', ')}]: ${rendered.slice(0, 4).join(' | ')}`
       : `no layer (appeared: ${appeared})`,
   )
   // A settlement's actors are its INHABITANTS and their animals — nothing else
