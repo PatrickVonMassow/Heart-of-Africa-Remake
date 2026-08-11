@@ -22,6 +22,18 @@
 // overshoots — the push is exactly the penetration, so the pair lands on the
 // contact distance and the dead band then holds it there.
 //
+// AND WHY THE GROUP IS SWEPT MORE THAN ONCE: one body at a time is a
+// Gauss-Seidel sweep, and a sweep resolves a PAIR but not a CHAIN. Pushing body
+// B out of C can press it back into A, which was resolved already and is not
+// looked at again — so with three or more figures in one cluster a residual
+// overlap survives every frame. Measured over 600 s of the children's game at
+// the reported seed: a single sweep left 192–537 overlapping pair-frames, the
+// worst of them 0.07 m of a 0.264 m contact; TWO sweeps left none at all
+// (work-order 648, the second half of the user's "Kinder klemmen kurz
+// ineinander"). `separateGroup` therefore sweeps until a sweep moves nothing,
+// bounded by the calibratable `passes` — which costs nothing in the ordinary
+// case, where the first sweep already moves no one.
+//
 // It used to take a FRACTION per frame instead, damped against a tremble that
 // the dead band already prevents, and capped at a push SPEED. That was the
 // defect behind the user's "Kinder klemmen kurz ineinander" (work-order 648):
@@ -84,6 +96,11 @@ export interface SeparationConfig {
   maxSpeed: number
   /** Seconds of being unable to push free before the escape nudge is asked for. */
   wedgeSeconds: number
+  /** How many sweeps `separateGroup` may take over one cluster in a frame, so a
+   *  CHAIN of three or more figures comes apart in the frame it formed rather
+   *  than leaving a residual overlap the player sees. Bounded, and the sweeping
+   *  stops the moment one moves nobody — the ordinary frame pays for one. */
+  passes: number
 }
 
 /** What the settlement refuses, and where it sends a body that cannot get out.
@@ -169,6 +186,23 @@ export function separateBody(
   cfg: SeparationConfig,
   world: SeparationWorld = {},
 ): boolean {
+  return pushBody(set, self, dt, dt, cfg, world)
+}
+
+/**
+ * The push itself. `wedgeDt` is the time the WEDGE timer is charged, which is
+ * the frame's — not the sweep's: a refining sweep resolves the same frame over
+ * again, so charging it a second time would trip the escape nudge as many times
+ * faster as the solver sweeps, and teleport a figure that was never stuck.
+ */
+function pushBody(
+  set: InhabitantSet,
+  self: InhabitantBody,
+  dt: number,
+  wedgeDt: number,
+  cfg: SeparationConfig,
+  world: SeparationWorld = {},
+): boolean {
   if (!(dt > 0) || self.fixed || !self.active) return false
   const selfIndex = set.bodies.indexOf(self)
   const selfRadius = cfg.bodyRadius * self.scale
@@ -233,8 +267,8 @@ export function separateBody(
     return true
   }
   // Pressed between a collider and another body: bounded, not for ever.
-  self.wedged += dt
-  if (self.wedged >= cfg.wedgeSeconds && world.nudge) {
+  self.wedged += Math.max(0, wedgeDt)
+  if (wedgeDt > 0 && self.wedged >= cfg.wedgeSeconds && world.nudge) {
     const free = world.nudge(self.x, self.z)
     if (free.found) {
       self.x = free.x
@@ -245,14 +279,42 @@ export function separateBody(
   return false
 }
 
-/** Every non-fixed body of the set, once. Handy for a caller that owns the whole
- *  set (and for the tests); a scene component separates its own bodies where it
- *  moved them, so the figure it draws is the body that was resolved. */
+/**
+ * Resolves ONE GROUP of bodies — the caller's own figures — against the whole
+ * settlement, sweeping until a sweep moves nobody or `cfg.passes` is spent.
+ *
+ * This is what a caller that moves several figures per frame owes them, and the
+ * order matters: write EVERY body of the group first, then call this. A loop
+ * that writes and separates one figure at a time resolves each against where its
+ * neighbours stood a frame ago, and leaves the chain above unresolved on top of
+ * it.
+ */
+export function separateGroup(
+  set: InhabitantSet,
+  bodies: readonly InhabitantBody[],
+  dt: number,
+  cfg: SeparationConfig,
+  world: SeparationWorld = {},
+): void {
+  const passes = Math.max(1, Math.floor(cfg.passes))
+  for (let p = 0; p < passes; p++) {
+    let moved = false
+    // Only the FIRST sweep charges the wedge timer: the later ones are the same
+    // frame, resolved more exactly.
+    for (const b of bodies) if (pushBody(set, b, dt, p === 0 ? dt : 0, cfg, world)) moved = true
+    if (!moved) return
+  }
+}
+
+/** Every non-fixed body of the set, resolved as one group. Handy for a caller
+ *  that owns the whole set (and for the tests); a scene component separates its
+ *  own bodies where it moved them, so the figure it draws is the body that was
+ *  resolved. */
 export function separateAll(
   set: InhabitantSet,
   dt: number,
   cfg: SeparationConfig,
   world: SeparationWorld = {},
 ): void {
-  for (const b of set.bodies) separateBody(set, b, dt, cfg, world)
+  separateGroup(set, set.bodies, dt, cfg, world)
 }

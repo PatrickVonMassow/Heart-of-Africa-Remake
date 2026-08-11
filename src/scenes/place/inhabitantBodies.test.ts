@@ -11,6 +11,8 @@ import {
   releaseBodies,
   separateAll,
   separateBody,
+  separateGroup,
+  type InhabitantBody,
   type SeparationConfig,
 } from './inhabitantBodies'
 import { createTagGame, stepTagGame, type TagWorld } from './tagGame'
@@ -85,21 +87,29 @@ describe('inhabitant bodies', () => {
     const dt = 1 / 60
     let closest = Infinity
     let violations = 0
+    let worst = 0
     // 600 s of game — long enough for several rounds, catches and idle breaks.
     for (let step = 0; step < 600 / dt; step++) {
       stepTagGame(game, dt, cfg, world)
-      for (let i = 0; i < game.children.length; i++) {
-        const c = game.children[i]
-        const b = bodies[i]
-        b.x = c.x
-        b.z = c.z
-        separateBody(set, b, dt, SEP, world)
-        c.x = b.x
-        c.z = b.z
+      // EVERY body written, THEN the group resolved: a loop that wrote and
+      // separated one child at a time would resolve each against where its
+      // neighbours stood a frame ago (point 648).
+      for (let i = 0; i < bodies.length; i++) {
+        bodies[i].x = game.children[i].x
+        bodies[i].z = game.children[i].z
       }
-      // After the first half second (the stack is coming apart) no pair may be
-      // nearer than their two bodies — EXCEPT inside the catch distance, where
-      // the tag is being made and wins over the separation (point 578.4).
+      separateGroup(set, bodies, dt, SEP, world)
+      for (let i = 0; i < bodies.length; i++) {
+        game.children[i].x = bodies[i].x
+        game.children[i].z = bodies[i].z
+      }
+      // After the first half second (the stack is coming apart) NO pair may be
+      // nearer than their two bodies. There is no exemption for the catch: the
+      // catch fires at 0.8 m, three times the 0.264 m at which the bodies meet,
+      // so a chaser has always made its tag long before anything touches — which
+      // is why the condition that USED to except it (`d > catchDistance`, with
+      // catchDistance ABOVE the contact distance) could never fire at all, and
+      // let the user's "Kinder klemmen kurz ineinander" through (point 648).
       if (step * dt > 0.5) {
         for (let i = 0; i < game.children.length; i++) {
           for (let j = i + 1; j < game.children.length; j++) {
@@ -108,17 +118,104 @@ describe('inhabitant bodies', () => {
               game.children[i].z - game.children[j].z,
             )
             closest = Math.min(closest, d)
-            if (d < CHILD_R * 2 - SEP.slop - 1e-6 && d > cfg.catchDistance) violations++
+            if (d < CHILD_R * 2 - SEP.slop - 1e-6) {
+              violations++
+              worst = Math.max(worst, CHILD_R * 2 - SEP.slop - d)
+            }
           }
         }
       }
     }
-    expect(violations).toBe(0)
+    expect({ violations, worst }).toEqual({ violations: 0, worst: 0 })
     // The bodies really do touch — a separation that never engaged would prove
     // nothing at all.
     expect(closest).toBeLessThan(cfg.catchDistance)
     // NO DEADLOCK: the chase still catches its runner.
     expect(game.tags).toBeGreaterThan(0)
+  })
+
+  it('never lets two children closing head-on end a frame inside one another (point 648)', () => {
+    // The reported "Kinder klemmen kurz ineinander". The pair the game can build
+    // fastest is a chaser at the sprint speed meeting a runner at its boosted
+    // one, head-on: they ADD, and the correction has to undo that much in the
+    // frame it appeared. The pre-648 pass took half of the remaining overlap and
+    // was capped at 1.2 m/s, several times less than the pair closed at, so it
+    // fell behind and the two stayed merged for the whole crossing.
+    const tag = balance.villageLife.tag
+    const closing = tag.sprintSpeed + tag.sprintSpeed * tag.runnerBoost
+    const set = createInhabitantSet()
+    const [a, b] = claimBodies(set, 2, { scale: KID_SCALE })
+    a.x = -3
+    b.x = 3
+    const dt = 1 / 60
+    let worst = 0
+    for (let i = 0; i < 400; i++) {
+      a.x += (closing / 2) * dt
+      b.x -= (closing / 2) * dt
+      separateGroup(set, [a, b], dt, SEP)
+      worst = Math.max(worst, CHILD_R * 2 - SEP.slop - Math.hypot(a.x - b.x, a.z - b.z))
+    }
+    expect(worst).toBeLessThan(1e-9) // nothing an eye or a renderer could read
+    // The cap is what makes that possible, so it is stated: it must stay above
+    // the fastest pair that can close, or it throttles the ordinary crossing.
+    expect(SEP.maxSpeed).toBeGreaterThan(closing)
+  })
+
+  it('takes a CHAIN of three apart in the frame it formed, which one sweep cannot (point 648)', () => {
+    // Why the group is swept more than once. Resolved one body at a time, the
+    // middle of three is pushed out of one neighbour straight into the other —
+    // which was resolved already and is not looked at again, so a residual
+    // overlap survives every frame. That is the second half of the reported
+    // clipping, and no single-sweep pass of any stiffness can close it.
+    const overlaps = (bodies: readonly InhabitantBody[]) => {
+      let worst = 0
+      for (let i = 0; i < bodies.length; i++) {
+        for (let j = i + 1; j < bodies.length; j++) {
+          const d = Math.hypot(bodies[i].x - bodies[j].x, bodies[i].z - bodies[j].z)
+          worst = Math.max(worst, SEP.bodyRadius * 2 - SEP.slop - d)
+        }
+      }
+      return worst
+    }
+    const dt = 1 / 60
+
+    // ONE sweep — what `separateBody` per figure does — leaves the chain behind.
+    const one = createInhabitantSet()
+    const oneBodies = claimBodies(one, 3)
+    const gap = SEP.bodyRadius * 2 - SEP.slop - 0.02
+    oneBodies[0].x = -gap
+    oneBodies[2].x = gap
+    for (const b of oneBodies) separateBody(one, b, dt, SEP)
+    expect(overlaps(oneBodies)).toBeGreaterThan(1e-6)
+
+    // The group solve closes it inside the same frame.
+    const many = createInhabitantSet()
+    const manyBodies = claimBodies(many, 3)
+    manyBodies[0].x = -gap
+    manyBodies[2].x = gap
+    separateGroup(many, manyBodies, dt, SEP)
+    expect(overlaps(manyBodies)).toBeLessThanOrEqual(1e-9)
+  })
+
+  it('charges the wedge timer per FRAME, not per sweep, so a solver pass never teleports', () => {
+    // The escape nudge is a teleport, and it is meant for a figure that has been
+    // unable to move for `wedgeSeconds`. Charging it once per sweep would fire it
+    // `passes` times as fast on a figure that was never stuck that long.
+    const world = {
+      blocked: (x: number, z: number) => x > 1e-4 || Math.abs(z) > 1e-4,
+      nudge: () => ({ x: 5, z: 5, found: true }),
+    }
+    const set = createInhabitantSet()
+    claimBodies(set, 1, { x: -0.1, z: 0, fixed: true })
+    const [stuck] = claimBodies(set, 1, { x: 0, z: 0 })
+    const dt = 1 / 60
+    let seconds = 0
+    while (stuck.x === 0 && seconds < SEP.wedgeSeconds * 3) {
+      separateGroup(set, [stuck], dt, SEP, world)
+      seconds += dt
+    }
+    expect(seconds).toBeGreaterThan(SEP.wedgeSeconds - 0.05)
+    expect(seconds).toBeLessThanOrEqual(SEP.wedgeSeconds + 0.05)
   })
 
   it('states the catch against the body, so a chaser can always reach its tag', () => {

@@ -162,6 +162,7 @@ const TAG_FIELDS: ReadonlyArray<{
   { key: 'trendLeave', label: 'tagTrendLeave', step: 0.02, min: 0 },
   { key: 'variation', label: 'tagVariation', step: 0.05, min: 0, max: 0.9 },
   { key: 'unstuckSeconds', label: 'tagUnstuck', step: 0.5, min: 0.1 },
+  { key: 'detourSeconds', label: 'tagDetour', step: 0.05, min: 0 },
   { key: 'silenceSeconds', label: 'tagSilence', step: 5, min: 1 },
   { key: 'leanAtSprint', label: 'tagLean', step: 0.02, min: 0 },
   { key: 'turnRate', label: 'tagTurnRate', step: 0.2, min: 0.1 },
@@ -231,6 +232,7 @@ const SEPARATION_FIELDS: ReadonlyArray<{
   { key: 'stiffness', label: 'separationStiffness', step: 0.05, min: 0.05, max: 1 },
   { key: 'maxSpeed', label: 'separationSpeed', step: 0.1, min: 0.1 },
   { key: 'wedgeSeconds', label: 'separationWedge', step: 0.5, min: 0.1 },
+  { key: 'passes', label: 'separationPasses', step: 1, min: 1, max: 8 },
 ]
 
 function NumberField({

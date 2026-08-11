@@ -737,6 +737,9 @@ export interface BalanceConfig {
       maxSpeed: number
       /** Seconds wedged before the escape nudge is asked for. */
       wedgeSeconds: number
+      /** Sweeps a group may take in one frame, so a CHAIN of three or more
+       *  figures comes apart in the frame it formed. */
+      passes: number
     }
   }
   /** Village speech and drums (design.md §13.4, docs/communication-poc-spec.md). */
@@ -1233,12 +1236,20 @@ export const balance: BalanceConfig = {
     //    pair that can close (a chaser at 3.4 and a runner at 3.81 = 7.21 m/s),
     //    so it can never again throttle an ordinary crossing, while a stack of
     //    two adults still unwinds over a couple of frames rather than snapping.
+    //  - PASSES is the chain half. One sweep resolves a PAIR; pushing the middle
+    //    of THREE out of one neighbour presses it back into the other, which was
+    //    resolved already, so a cluster kept a residual overlap for ever.
+    //    Measured over 600 s of the children's game: one sweep left 192–537
+    //    overlapping pair-frames (worst 0.07 m of a 0.264 m contact), two left
+    //    NONE. The second sweep is only ever paid for when the first one moved
+    //    somebody, and at two the deep spawn stack still comes apart as a step.
     separation: {
       bodyRadius: 0.24,
       slop: 0.01,
       stiffness: 1,
       maxSpeed: 8,
       wedgeSeconds: 1.5,
+      passes: 2,
     },
   },
   communication: {
