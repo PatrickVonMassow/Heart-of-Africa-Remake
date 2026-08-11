@@ -24,7 +24,7 @@
 // `land-cleanup-core.mjs` assumes — the lock line, the dirtiness, and above all
 // WITHOUT its own look becoming the evidence (point 629).
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, it, expect } from 'vitest'
@@ -225,25 +225,24 @@ describe('the probe must not become its own evidence', () => {
     expect(second[own].activeAt).toBe(first[own].activeAt)
   })
 
-  it('reads a stat-dirty file conservatively — the safe direction', () => {
-    // A tracked file rewritten with IDENTICAL content is stat-dirty, and a status
-    // that may not refresh the index reports it as modified. That keeps the tree
-    // rather than deleting it, which is the direction this whole rule leans; it is
-    // recorded here so a later reader does not take it for a bug.
+  it('keeps a tree holding uncommitted work, against a real repository', () => {
+    // The property that matters: uncommitted work is the one state nothing can
+    // rescue, so a tree holding it is never removed. `land-cleanup-core` pins the
+    // pure rule; this asks a REAL git the same question.
     //
-    // THE TIMESTAMP IS SET, NOT HOPED FOR. Rewriting the file alone made this test
-    // pass here and FAIL on the CI runner (11.08.2026, run 31517313867): a rewrite
-    // that lands inside the filesystem's timestamp granularity leaves the stat
-    // unchanged, the file is then not stat-dirty at all, the tree reads clean and
-    // is removed. So the mtime is moved explicitly, and the precondition is
-    // asserted — a test that silently stopped exercising its own subject is worth
-    // less than one that fails.
+    // IT USED TO ASK A DIFFERENT ONE, AND THAT IS WHY IT BROKE. The case rewrote a
+    // tracked file with IDENTICAL content and asserted the tree was kept, on the
+    // premise that the file is then "stat-dirty" and reported as modified. It is
+    // not: git compares the CONTENT once the stat differs and reports the file
+    // clean — `--no-optional-locks` only stops it writing the refreshed index back.
+    // The case passed here and failed on the CI runner (11.08.2026, runs
+    // 31517313867 and 31518095810), and forcing the mtime did not save it, because
+    // the premise was wrong rather than the timing. So it now writes DIFFERENT
+    // content, which is genuinely uncommitted work, and asserts the precondition
+    // rather than trusting it.
     const { root, own } = scene()
-    const file = join(own, 'a.txt')
-    writeFileSync(file, 'a\n')
-    const later = new Date(Date.now() + 10_000)
-    utimesSync(file, later, later)
-    expect(git(['--no-optional-locks', 'status', '--porcelain'], own).trim()).not.toBe('')
+    writeFileSync(join(own, 'a.txt'), 'work that was never committed\n')
+    expect(git(['status', '--porcelain'], own).trim()).not.toBe('')
 
     const sel = select(root)
     expect(sel.remove).not.toContain(own)
