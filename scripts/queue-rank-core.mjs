@@ -332,9 +332,15 @@ export function recordRank(record, point, { why = '', at = '' } = {}) {
  * Re-seeding a settled record cannot express anything `settleRecord` has not
  * already written (the guard advances the baseline to the open set at every turn
  * end), so the only thing an allowed-but-pointless case buys is a second door
- * that has to keep being argued about. Arming from scratch stays possible and
- * stays VISIBLE: move the record aside, which is a deliberate act in a tracked
- * file, and seed the checkout that then reads as unarmed.
+ * that has to keep being argued about.
+ *
+ * AND THE REFUSAL PRINTS NO WAY ROUND ITSELF (cross-vendor review, 11.08.2026).
+ * It used to close by naming one: move the record aside, and the checkout reads
+ * as unarmed, and `--seed` takes the whole current order — outstanding appends
+ * included — on one collective reason. That is the escape hatch this message was
+ * added to shut, spelled out as a procedure. A refusal states WHY it refuses and
+ * what answers the question it is guarding; the removal route is closed in
+ * `seedRecord` (see `REMOVED_RECORD_MESSAGE`) and named nowhere.
  */
 export function alreadyArmedMessage(pending = []) {
   const head = `${RANK_RECORD_PATH} is already armed, so there is nothing to seed. `
@@ -346,11 +352,28 @@ export function alreadyArmedMessage(pending = []) {
     )
   }
   return (
-    `${head}Every appended point has been decided, and the guard keeps the baseline on the open set by itself. ` +
-    'To arm a baseline from scratch, move the record aside deliberately and seed the checkout that then reads ' +
-    'as unarmed.'
+    `${head}Every appended point has been decided, and the guard keeps the baseline on the open set by itself, ` +
+    'so there is nothing left for an arming to state.'
   )
 }
+
+/**
+ * What arming is told when the record is missing from the WORKING TREE while the
+ * repository still carries it (cross-vendor review, 11.08.2026).
+ *
+ * `--seed` exists for a checkout that never had a baseline. The record is
+ * TRACKED, so every clone inherits one and that case arises exactly once in the
+ * repository's life — which means a checkout reading as unarmed today is a record
+ * that was REMOVED, and removing it is precisely how an outstanding question was
+ * escaped: the gate blocks, the file goes aside, the seed takes the whole current
+ * order on one reason, and the appended point nobody judged is now part of "the
+ * order as judged". So a record the repository knows is RESTORED, never re-armed,
+ * and the caller is told the one command that does it.
+ */
+export const REMOVED_RECORD_MESSAGE =
+  `${RANK_RECORD_PATH} is missing here, but this repository carries it — so this checkout HAS a baseline and ` +
+  'is not arming a first one. A record that exists is restored, not re-armed, or every question outstanding ' +
+  `when it went missing would count as answered by the arming: git checkout -- ${RANK_RECORD_PATH}`
 
 /**
  * ARM the gate: everything standing in the order today counts as judged, with one
@@ -362,8 +385,16 @@ export function alreadyArmedMessage(pending = []) {
  * guard does for itself, so an appended point can never be grandfathered by a
  * mechanism nobody watched. And it applies ONLY to a record that carries no
  * baseline yet; see `alreadyArmedMessage` for why an armed one is refused.
+ *
+ * `tracked` is the caller's answer to "does this repository carry the record at
+ * all" (index or history — `scripts/queue-rank.mjs` asks git). It closes the
+ * REMOVAL route: an unarmed reading of a record the repository knows is a file
+ * that was moved aside, not a repository that never had a baseline. The caller
+ * decides it because this module is pure; it FAILS CLOSED there, since the only
+ * legitimate arming in a git checkout happens before the record is ever
+ * committed.
  */
-export function seedRecord(record, open, { why = '', at = '' } = {}) {
+export function seedRecord(record, open, { why = '', at = '', tracked = false } = {}) {
   const reason = String(why ?? '').replace(/\s+/g, ' ').trim()
   if (!reason) throw new Error('--why is required — one line saying why the order as it stands is right')
   const { ranked, torn } = normaliseRankRecord(record)
@@ -371,6 +402,7 @@ export function seedRecord(record, open, { why = '', at = '' } = {}) {
   const list = pointList(open)
   const state = appendGateState(list, record)
   if (state.state !== 'unarmed') throw new Error(alreadyArmedMessage(state.pending))
+  if (tracked) throw new Error(REMOVED_RECORD_MESSAGE)
   const points = [...list].sort((a, b) => a - b)
   return {
     ...pruneRankRecord({ ranked }, list),

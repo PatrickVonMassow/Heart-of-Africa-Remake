@@ -15,6 +15,7 @@ import { openPointsOf } from './board-queue-core.mjs'
 import { readTasksOpen } from './tasks-source.mjs'
 import {
   RANK_RECORD_PATH,
+  alreadyArmedMessage,
   appendGateState,
   normaliseRankRecord,
   parseRankRecord,
@@ -219,14 +220,39 @@ describe('the baseline moves only when nothing is outstanding', () => {
     expect(thrown.message).toMatch(/--ranked/)
   })
 
-  it('refuses an armed record with NOTHING outstanding too, and says how to arm afresh', () => {
+  it('refuses an armed record with NOTHING outstanding too', () => {
     // Chosen deliberately: re-seeding a settled record expresses nothing
     // `settleRecord` has not already written, so a second door would only have
-    // to be argued about. Arming from scratch stays possible and stays visible —
-    // move the record aside, then seed the checkout that reads as unarmed.
+    // to be argued about.
     expect(() => seedRecord(settledAt([5, 9]), [9, 5], { why: 'nochmal', at: 't' })).toThrow(/already armed/)
-    expect(() => seedRecord(settledAt([5, 9]), [9, 5], { why: 'nochmal', at: 't' })).toThrow(/move the record aside/)
     expect(() => seedRecord(settledAt([5, 9]), [9, 5], { why: 'nochmal', at: 't' })).not.toThrow(/outstanding/)
+  })
+
+  it('refuses to arm a record the repository still carries — that was the way round the refusal', () => {
+    // The escape the refusal itself used to describe: the gate blocks, the
+    // tracked record goes aside, the checkout reads as unarmed, and --seed takes
+    // the WHOLE current order — outstanding appends included — on one collective
+    // reason. Arming is for a repository that never had a baseline; a record it
+    // knows is restored instead.
+    let thrown = null
+    try {
+      seedRecord(null, [9, 5, 4], { why: 'alles passt schon', at: 't', tracked: true })
+    } catch (e) {
+      thrown = e
+    }
+    expect(thrown).toBeTruthy()
+    expect(thrown.message).toMatch(/git checkout -- \.claude\/queue-rank\.json/)
+    // The genuine first arming — a repository that has never carried the record —
+    // is untouched.
+    expect(seedRecord(null, [9, 5, 4], { why: 'arming', at: 't' }).settled.points).toEqual([4, 5, 9])
+  })
+
+  it('hands out no recipe for getting round itself', () => {
+    // A refusal that names the bypass is the bypass. Neither branch may describe
+    // moving, deleting or re-creating the record.
+    for (const message of [alreadyArmedMessage([]), alreadyArmedMessage([4, 3])]) {
+      expect(message).not.toMatch(/aside|delete|remove|rename|unarmed/i)
+    }
   })
 
   it('still refuses a torn record before it ever asks whether it is armed', () => {

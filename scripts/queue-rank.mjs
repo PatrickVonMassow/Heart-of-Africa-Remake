@@ -24,9 +24,10 @@
 // Decisions about points that are no longer open are dropped on every write — the
 // archive keeps the history, this file keeps the live judgments.
 import { existsSync, readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { isMainModule } from './is-main.mjs'
-import { repoPath } from './repo-paths.mjs'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { readTasksOpen } from './tasks-source.mjs'
 import { QUEUE_REBUILD_CMD, openPointsOf } from './board-queue-core.mjs'
 import {
@@ -70,6 +71,33 @@ function writeRankRecord(record, open, path = RECORD) {
   return next
 }
 
+/**
+ * Does this repository carry the rank record AT ALL — in the index, or anywhere
+ * in the history of this branch?
+ *
+ * `seedRecord` needs the answer to tell "a checkout that never had a baseline"
+ * from "a tracked record somebody moved aside", which is the shape of the escape
+ * out of an outstanding rank question. Both halves are asked because either alone
+ * is half an answer: a plain `mv` leaves the path in the index, a `git rm` does
+ * not but leaves it in the history.
+ *
+ * IT FAILS CLOSED. Where git says nothing usable — not installed, not a
+ * repository, a broken index — the answer is "carried". The one legitimate
+ * arming happens before the record is ever committed, so refusing wrongly costs a
+ * message that names the restore, while allowing wrongly is the hole itself.
+ */
+function recordKnownToRepo(path = RANK_RECORD_PATH) {
+  const git = (args) => spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' })
+  try {
+    if (git(['ls-files', '--error-unmatch', '--', path]).status === 0) return true
+    const history = git(['log', '-1', '--format=%H', '--', path])
+    if (history.status !== 0) return true
+    return Boolean(String(history.stdout ?? '').trim())
+  } catch {
+    return true
+  }
+}
+
 function flagValue(argv, flag) {
   const at = argv.indexOf(flag)
   if (at < 0) return null
@@ -96,9 +124,13 @@ if (isMainModule(import.meta.url)) {
       // taken as judged, with one stated reason, so a newly armed (or freshly
       // cloned) checkout does not owe an answer for history nobody in the
       // session judged. Every point appended afterwards is decided individually,
-      // and `seedRecord` refuses an already armed record so this can never be
-      // the shortcut out of an outstanding question.
-      const next = writeRankRecord(seedRecord(record, open, { why, at: new Date().toISOString() }), open)
+      // and `seedRecord` refuses an already armed record — and a record the
+      // repository still carries — so this can never be the shortcut out of an
+      // outstanding question, by re-seeding or by removal.
+      const next = writeRankRecord(
+        seedRecord(record, open, { why, at: new Date().toISOString(), tracked: recordKnownToRepo() }),
+        open,
+      )
       console.log(`queue-rank: baseline armed with ${next.settled.points.length} open point(s) — "${why.trim()}"`)
     } else {
       const state = appendGateState(open, record)
