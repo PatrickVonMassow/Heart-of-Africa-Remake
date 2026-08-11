@@ -335,35 +335,35 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Nicht jedes Rot ist deins.** Eine Prüfung, die nur „rot" und „grün" kennt, schiebt fremde
   Ausfälle deinem Code zu.
-  → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — nach der Beobachtung: **lief
-  überhaupt ein eigener Schritt?** Liegt sie außerhalb, nenn den **echten Griff** dort; und wer auf
-  einen fremden Dienst wartet, gibt beim Aufgeben das **Angefangene zurück**."
+  → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — **lief überhaupt ein eigener
+  Schritt?** Liegt sie außerhalb, nenn den **echten Griff** dort."
 
 - **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er sitzt
   — Netz, Rechte, Umgebung —, verliert mit dem Fehlschlag die nächste Reparatur mit.
-  → *Prompt:* „Bevor du deine eigene Umgebung änderst: Gibt es eine **kleinere Handlung**,
-  die nur **ergänzt**? Sonst bau sie. Und lass jeden Neuaufbau nach **offen** scheitern —
-  ein zu offener Stand ist reparierbar, ein zugesperrter nicht."
+  → *Prompt:* „Bevor du deine eigene Umgebung änderst: Gibt es eine **kleinere Handlung**, die nur
+  **ergänzt**? Und lass jeden Neuaufbau nach **offen** scheitern — ein zugesperrter Stand ist
+  nicht mehr reparierbar."
 
-- **Verschlucken sieht aus wie Erfolg — und ein Werkzeug, das nie startete, wie ein strenges.**
-  Ein Fehlschlag, der innen zum Ersatzwert wird, läuft als Lüge weiter. Und ein nie gestarteter
-  Prozess liefert den Fehlercode eines korrekten Ablehnens.
+- **Verschlucken sieht aus wie Erfolg — und ein Werkzeug, das nie startete, wie ein strenges.** Ein
+  Fehlschlag, der innen zum Ersatzwert wird, läuft als Lüge weiter; ein nie gestarteter Prozess
+  liefert den Fehlercode eines korrekten Ablehnens.
   → *Prompt:* „Ein Ersatzwert im `catch` darf nur verschluckt werden, wenn er zu **weniger** Aktion
-  führt. Lass **eine** Prüfung gegen den **echten Bestand** laufen — zeig, dass **gelesen** wurde.
-  ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
+  führt. ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
 
-- **Einigkeit ist keine Evidenz.** Mehrere Modelle können sich über eine Ursache einig
-  sein und gemeinsam danebenliegen; die Einigkeit fühlt sich dann an wie ein Beweis.
-  → *Prompt:* „Bevor du eine Liste von Versuchen vorschlägst: Welcher **eine Test** macht
-  die Ursache **sichtbar**? Führ ihn zuerst aus. Und sag mir, ob schon ein **anderer Weg
-  läuft**, der dasselbe trägt — statt den blockierten zu reparieren."
+- **Einigkeit ist keine Evidenz.** Mehrere Modelle können sich über eine Ursache einig sein und
+  gemeinsam danebenliegen; die Einigkeit fühlt sich dann an wie ein Beweis.
+  → *Prompt:* „Bevor du Versuche vorschlägst: Welcher **eine Test** macht die Ursache **sichtbar**?"
 
-- **Gebaut heißt nicht auffindbar.** Ein Feature kann korrekt sein und trotzdem als fehlend gemeldet
-  werden, weil seine Bedienung unter der falschen Überschrift steht. Dein Test fragt „wirkt es?", der
-  Nutzer „komme ich dorthin?".
-  → *Prompt:* „Meldet er etwas erneut, das repariert ist, nimm an, er **erreicht** es nicht. Prüf bei
-  allem, was er finden muss, die **Nachbarschaft** — und wo das als Test schreibbar ist (‚jede
-  Lautstärke in der Ton-Gruppe'), schreib es als Test."
+- **Zwei Aufträge für einen Fehler.** Fällt derselbe Mangel erneut auf, schreibst du ihn arglos
+  ein zweites Mal auf — sichtbar wird das erst, wenn beide Ergebnisse aufeinandertreffen.
+  → *Prompt:* „Vor jedem neuen Punkt: Such die offenen nach demselben Problem ab — gibt es einen,
+  **erweitere ihn**. Wird ein Zweig verworfen, rette, was er über seinen Auftrag hinaus mitbrachte."
+
+- **Gebaut heißt nicht auffindbar.** Ein Feature kann korrekt sein und trotzdem als fehlend
+  gemeldet werden, weil seine Bedienung unter der falschen Überschrift steht: Dein Test fragt
+  „wirkt es?", der Nutzer „komme ich dorthin?".
+  → *Prompt:* „Meldet er etwas erneut, das repariert ist, nimm an, er **erreicht** es nicht. Prüf
+  die **Nachbarschaft** — und wo das als Test schreibbar ist, schreib es als Test."
 
 ---
 
@@ -405,4 +405,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: ffe4fdc0bde2d43af96e90ee69290b304fcc20adb5733c746b13ceb760b9b6e5 -->
+<!-- GUIDE-FINGERPRINT: 04a0f42d0f729f0db081332fb83b4f55c1765e8b84d77b54382ea911943245be -->
