@@ -173,6 +173,22 @@ describe('a kept worktree keeps its branch', () => {
   it('deletes the branch when no worktree has it at all', () => {
     expect(selectCleanupTargets({ ...base, worktrees: [] }).branch.delete).toBe(true)
   })
+
+  it('finds EVERY dead tree on the branch, not the first — a restarted agent leaves two', () => {
+    const a = wt('a', 'feat/608-x')
+    const b = wt('b', 'feat/608-x')
+    const sel = selectCleanupTargets({ ...base, worktrees: [a, b], evidence: { [a.path]: dead, [b.path]: dead } })
+    expect(sel.remove).toEqual([a.path, b.path])
+    expect(sel.branch.delete).toBe(true)
+  })
+
+  it('keeps the branch when ONE of two trees on it is still alive', () => {
+    const a = wt('a', 'feat/608-x')
+    const b = wt('b', 'feat/608-x', 'claude agent agent-b (pid 7 start 1)')
+    const sel = selectCleanupTargets({ ...base, worktrees: [a, b], evidence: { [a.path]: dead, [b.path]: dead } })
+    expect(sel.remove).toEqual([a.path])
+    expect(sel.branch.delete).toBe(false)
+  })
 })
 
 describe('robustness of the inputs', () => {

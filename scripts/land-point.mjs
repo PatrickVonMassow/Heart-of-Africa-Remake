@@ -33,6 +33,9 @@ import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
+import { formatCleanupNotes, isAgentWorktree, selectCleanupTargets } from './land-cleanup-core.mjs'
+import { worktreeActiveAt } from './batch-in-flight.mjs'
+import { probePid } from './batch-singleton.mjs'
 import {
   GATE_COMMANDS,
   LandingError,
@@ -51,7 +54,6 @@ import {
   tickAndArchive,
   tickCommitMessage,
   transitionAccepted,
-  worktreesForBranch,
 } from './land-point-core.mjs'
 
 const TASKS = join(REPO_ROOT, 'TASKS.md')
@@ -74,21 +76,109 @@ const readJson = (path) => {
   }
 }
 
-/** `git worktree list --porcelain` → [{ path, branch }]. */
-function listWorktrees() {
-  const out = git(['worktree', 'list', '--porcelain'])
+/**
+ * `git worktree list --porcelain` → [{ path, branch, locked }].
+ *
+ * THE LOCK IS THE POINT (629). The isolation harness locks an agent's worktree
+ * while the agent works in it — `locked claude agent agent-<id> (pid … start …)`
+ * — and releases it when the agent exits. That line is the cheapest and most
+ * direct answer to "is somebody still in there", and it was available on the day
+ * a landing deleted a working agent's tree without ever asking. A bare `locked`
+ * with no reason is still a lock; it is named so, never dropped.
+ */
+export function listWorktrees({ cwd = REPO_ROOT } = {}) {
+  const out = git(['worktree', 'list', '--porcelain'], { cwd })
   const trees = []
   let cur = null
   for (const line of out.split('\n')) {
     if (line.startsWith('worktree ')) {
       if (cur) trees.push(cur)
-      cur = { path: line.slice('worktree '.length).trim(), branch: '' }
+      cur = { path: line.slice('worktree '.length).trim(), branch: '', locked: null }
     } else if (line.startsWith('branch ') && cur) {
       cur.branch = line.slice('branch '.length).trim().replace(/^refs\/heads\//, '')
+    } else if (cur && (line === 'locked' || line.startsWith('locked '))) {
+      cur.locked = line.slice('locked'.length).trim() || 'a holder that recorded no reason'
     }
   }
   if (cur) trees.push(cur)
   return trees
+}
+
+/**
+ * THE LIVENESS EVIDENCE THE CLEANUP DECISION IS TAKEN ON — the I/O half of
+ * `land-cleanup-core.mjs`. One record per worktree path.
+ *
+ * THE ORDER OF THE TWO PROBES IS LOAD-BEARING. `worktreeActiveAt` dates the
+ * newest of the git metadata and the working files; a `git status` REFRESHES the
+ * index, so asking about dirtiness first would make this command's own look the
+ * evidence that something just happened there — every tree would then read as
+ * live and nothing would ever be cleaned up. The freshness is taken first, and
+ * the status runs with `--no-optional-locks` so it does not rewrite the index at
+ * all (the same flag `batch-in-flight.mjs` uses, for the same reason).
+ *
+ * Anything that cannot be established answers null, which the pure rule treats as
+ * "not proven dead" — never as "fine to delete".
+ */
+export function cleanupEvidence(worktrees, { branch, mainRoot = REPO_ROOT } = {}) {
+  const evidence = {}
+  for (const w of Array.isArray(worktrees) ? worktrees : []) {
+    const path = String(w?.path ?? '')
+    // Only a PLAUSIBLE candidate is probed: an agent worktree, or one already on
+    // the landed branch. Everything else is refused on ownership alone and its
+    // evidence would never be read — probing it would cost a `git status` on every
+    // unrelated checkout for nothing.
+    if (!path || (!isAgentWorktree(path, mainRoot) && String(w?.branch ?? '') !== String(branch ?? ''))) continue
+    const exists = existsSync(path)
+    if (!exists) {
+      evidence[path] = { exists: false, dirty: null, activeAt: null, holderAlive: null }
+      continue
+    }
+    const stamp = worktreeActiveAt(path)
+    const activeAt = typeof stamp === 'number' ? stamp : typeof stamp?.at === 'number' ? stamp.at : null
+    let dirty = null
+    try {
+      dirty = sh('git', ['--no-optional-locks', '-C', path, 'status', '--porcelain', '--ignore-submodules=all'], {
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).length > 0
+    } catch {
+      /* an unreadable checkout answers null — the rule then keeps it */
+    }
+    evidence[path] = { exists: true, dirty, activeAt, holderAlive: lockHolderAlive(w.locked) }
+  }
+  return evidence
+}
+
+/**
+ * Is the process named in a worktree lock still running? REPORTED ONLY — a lock
+ * whose holder is gone still keeps the tree, because "nobody released it" is not
+ * evidence that nobody is there. It changes the sentence the landing prints, so
+ * the reader knows whether to unlock it.
+ */
+function lockHolderAlive(reason) {
+  const m = /\bpid\s+(\d+)/i.exec(String(reason ?? ''))
+  if (!m) return null
+  const probe = probePid(Number(m[1]))
+  return probe && typeof probe.exists === 'boolean' ? probe.exists : null
+}
+
+/**
+ * List, probe, decide — the whole cleanup selection, taken FRESH.
+ *
+ * It runs twice: once for the plan (so `--dry` shows what would be removed and
+ * what would be left standing) and once immediately before the deletions, minutes
+ * later. The second run is not redundant: a pool agent can pick up a tree between
+ * the two, and the decision that matters is the one taken at the moment of the
+ * removal.
+ */
+export function selectCleanup({ branch, since, cwd = REPO_ROOT, mainRoot = REPO_ROOT } = {}) {
+  const trees = listWorktrees({ cwd })
+  return selectCleanupTargets({
+    worktrees: trees,
+    branch,
+    mainRoot,
+    evidence: cleanupEvidence(trees, { branch, mainRoot }),
+    since,
+  })
 }
 
 /**
@@ -233,14 +323,17 @@ async function main(argv) {
 
   let plan
   let branch
-  let worktrees
+  let cleanup
   let gate
   let audit
   let board
+  // WHEN THE LANDING BEGAN. A working file written into a worktree AFTER this
+  // instant means somebody is in there right now, whatever else the evidence says.
+  const since = Date.now()
   try {
     const branches = git(['for-each-ref', '--format=%(refname:short)', 'refs/heads']).split('\n')
     branch = branchArg || resolveBranch({ branches, number })
-    worktrees = worktreesForBranch({ worktrees: listWorktrees(), branch, mainRoot: REPO_ROOT })
+    cleanup = selectCleanup({ branch, since })
 
     // What the merge will bring in decides whether the audit runs (rider a).
     const changed = git(['diff', '--name-only', `main...${branch}`]).split('\n').filter(Boolean)
@@ -260,7 +353,7 @@ async function main(argv) {
     })
     board = boardDecision(preview.tasks)
 
-    plan = planLanding({ number, branch, audit, board, gate, worktrees })
+    plan = planLanding({ number, branch, audit, board, gate, worktrees: cleanup.remove })
   } catch (e) {
     if (e instanceof LandingError) {
       console.error(`land-point: ${e.message}`)
@@ -275,6 +368,7 @@ async function main(argv) {
     for (const s of plan.steps) {
       console.log(`  ${s.run ? 'RUN ' : 'SKIP'} ${s.id.padEnd(8)} ${s.label}${s.reason ? ` — ${s.reason}` : ''}`)
     }
+    for (const line of formatCleanupNotes(cleanup)) console.log(line)
     return 0
   }
 
@@ -418,24 +512,38 @@ async function main(argv) {
 
     // 7. CLEANUP: worktrees first (a tree holding the branch blocks its deletion),
     // then the local branch, then the remote.
+    //
+    // THE SELECTION IS TAKEN AGAIN, HERE (point 629). Everything above took
+    // minutes, and this is the step that deletes; a decision made before the merge
+    // would be acting on what the pool looked like then. Only what is PROVEN to be
+    // this point's own DEAD worktree is removed, and what is left standing is said
+    // out loud rather than silently skipped.
+    cleanup = selectCleanup({ branch, since })
     const problems = []
-    for (const path of worktrees) {
+    for (const path of cleanup.remove) {
       try {
         sh('node', [join('scripts', 'worktree-cleanup.mjs'), path], { stdio: ['ignore', 'pipe', 'pipe'] })
       } catch (e) {
         problems.push(`worktree ${path}: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0])
       }
     }
-    try {
-      git(['branch', '-d', branch], { stdio: ['ignore', 'pipe', 'pipe'] })
-    } catch (e) {
-      problems.push(`local branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0])
+    // A KEPT WORKTREE KEEPS ITS BRANCH. git refuses `branch -d` on a branch a
+    // worktree has checked out, and deleting the remote would break the pushes of
+    // whatever is still working there — so this is not attempted-and-failed as
+    // "debris", it is not attempted at all, with the reason printed.
+    if (cleanup.branch.delete) {
+      try {
+        git(['branch', '-d', branch], { stdio: ['ignore', 'pipe', 'pipe'] })
+      } catch (e) {
+        problems.push(`local branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0])
+      }
+      try {
+        git(['push', 'origin', '--delete', branch], { stdio: ['ignore', 'pipe', 'pipe'] })
+      } catch (e) {
+        problems.push(`remote branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0])
+      }
     }
-    try {
-      git(['push', 'origin', '--delete', branch], { stdio: ['ignore', 'pipe', 'pipe'] })
-    } catch (e) {
-      problems.push(`remote branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0])
-    }
+    for (const line of formatCleanupNotes(cleanup)) console.log(line)
     if (problems.length) {
       // NOT a failure of the landing — the point IS on main, ticked and archived.
       // Reported loudly as debris, because `branch-hygiene-guard` is the backstop
@@ -447,7 +555,12 @@ async function main(argv) {
       })
       throw error
     }
-    step('cleanup', VERDICT.ok, worktrees.length ? `branch + ${worktrees.length} worktree(s)` : 'branch')
+    const keptNote = cleanup.reported.length ? `, ${cleanup.reported.length} kept on purpose` : ''
+    step(
+      'cleanup',
+      VERDICT.ok,
+      `${cleanup.branch.delete ? 'branch' : 'branch KEPT'}${cleanup.remove.length ? ` + ${cleanup.remove.length} worktree(s)` : ''}${keptNote}`,
+    )
   } catch (e) {
     if (!(e instanceof LandingError)) {
       error = new LandingError(`${(e && e.message) || e}`, { step: 'unknown' })

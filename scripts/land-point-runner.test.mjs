@@ -18,8 +18,18 @@
 // make the CHILD slower, which widens the gap rather than narrowing it — the
 // failure mode of this test is a machine so loaded that spawning a process takes
 // 150 ms, which is not a state any gate verdict would survive anyway.
-import { describe, it, expect } from 'vitest'
-import { runCommand } from './land-point.mjs'
+//
+// The second half of this file measures the OTHER property no decision test can
+// reach: does the cleanup's evidence gathering read a real git checkout the way
+// `land-cleanup-core.mjs` assumes — the lock line, the dirtiness, and above all
+// WITHOUT its own look becoming the evidence (point 629).
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterAll, describe, it, expect } from 'vitest'
+import { cleanupEvidence, listWorktrees, runCommand, selectCleanup } from './land-point.mjs'
+import { DISPOSITION } from './land-cleanup-core.mjs'
 
 /** A child that takes a measurable, deterministic amount of time. */
 const slowChild = (ms) => ({ cmd: process.execPath, args: ['-e', `setTimeout(() => {}, ${ms})`], id: 'slow' })
@@ -70,5 +80,82 @@ describe('the gate runner', () => {
     expect(r.ok).toBe(false)
     expect(r.output.split('\n').length).toBeLessThanOrEqual(5)
     expect(r.output).toContain('line 199')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// A THROWAWAY REPOSITORY, because this is the half that touches the filesystem.
+const roots = []
+const git = (args, cwd) =>
+  execFileSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+
+/** A repo with `main`, a landed branch and two agent worktrees on it. */
+function scene() {
+  const root = mkdtempSync(join(tmpdir(), 'land-cleanup-'))
+  roots.push(root)
+  git(['init', '--initial-branch=main', '-q', '.'], root)
+  git(['config', 'user.email', 't@example.com'], root)
+  git(['config', 'user.name', 'T'], root)
+  writeFileSync(join(root, 'a.txt'), 'a\n')
+  git(['add', '.'], root)
+  git(['commit', '-q', '-m', 'first'], root)
+  mkdirSync(join(root, '.claude', 'worktrees'), { recursive: true })
+  const own = join(root, '.claude', 'worktrees', 'agent-own')
+  const other = join(root, '.claude', 'worktrees', 'agent-other')
+  git(['worktree', 'add', '-q', '-b', 'feat/608-x', own], root)
+  git(['worktree', 'add', '-q', '-b', 'feat/590-y', other], root)
+  return { root, own, other }
+}
+
+afterAll(() => {
+  for (const r of roots) rmSync(r, { recursive: true, force: true })
+})
+
+describe('the cleanup evidence, against a real checkout', () => {
+  it('reads git\'s lock line, and the pure rule then keeps that worktree', () => {
+    const { root, own } = scene()
+    git(['worktree', 'lock', '--reason', 'claude agent agent-own (pid 999999 start 1)', own], root)
+    const listed = listWorktrees({ cwd: root }).find((w) => w.path === own)
+    expect(listed.locked).toContain('claude agent agent-own')
+
+    const sel = selectCleanup({ branch: 'feat/608-x', since: Date.now(), cwd: root, mainRoot: root })
+    expect(sel.remove).toEqual([])
+    expect(sel.reported.map((r) => r.disposition)).toContain(DISPOSITION.live)
+    expect(sel.branch.delete).toBe(false)
+  })
+
+  it('removes the landed point\'s own quiet worktree — and NEVER the other agent\'s', () => {
+    const { root, own, other } = scene()
+    // The other agent is mid-work: an uncommitted file, exactly what was lost.
+    writeFileSync(join(other, 'in-progress.txt'), 'not committed yet\n')
+    const sel = selectCleanup({ branch: 'feat/608-x', since: Date.now(), cwd: root, mainRoot: root })
+    expect(sel.remove).toEqual([own])
+    expect(sel.remove).not.toContain(other)
+  })
+
+  it('sees uncommitted work in the landed tree itself and keeps it', () => {
+    const { root, own } = scene()
+    writeFileSync(join(own, 'unpushed.txt'), 'work\n')
+    const sel = selectCleanup({ branch: 'feat/608-x', since: Date.now(), cwd: root, mainRoot: root })
+    expect(sel.remove).toEqual([])
+    expect(sel.reported[0].reason).toMatch(/uncommitted/)
+  })
+
+  it('does NOT date its own look — the probe must not make every tree read as live', () => {
+    // THE BUG THIS PINS: `worktreeActiveAt` reads the git metadata, and a plain
+    // `git status` refreshes the index. Probe dirtiness first and every worktree
+    // looks "written since the landing began", so nothing is ever cleaned up.
+    const { root, own } = scene()
+    const since = Date.now()
+    const ev = cleanupEvidence(listWorktrees({ cwd: root }), { branch: 'feat/608-x', mainRoot: root })
+    expect(ev[own]).toMatchObject({ exists: true, dirty: false })
+    expect(ev[own].activeAt === null || ev[own].activeAt <= since).toBe(true)
+  })
+
+  it('probes only the plausible candidates, never every checkout in the repository', () => {
+    const { root, other } = scene()
+    const ev = cleanupEvidence(listWorktrees({ cwd: root }), { branch: 'feat/608-x', mainRoot: root })
+    expect(ev[root]).toBeUndefined() // the main checkout is never a candidate
+    expect(ev[other]).toBeDefined() // an agent tree is, so it can be judged and named
   })
 })

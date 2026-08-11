@@ -157,20 +157,12 @@ export function resolveBranch({ branches = [], number } = {}) {
   })
 }
 
-/**
- * The worktrees whose checked-out branch is the one being landed. Plural by
- * design: an agent that was restarted can leave a second tree on the same branch,
- * and cleaning up one while the other keeps the branch alive is how the debris of
- * 28.07.2026 accumulated.
- */
-export function worktreesForBranch({ worktrees = [], branch, mainRoot } = {}) {
-  const want = String(branch ?? '')
-  const main = String(mainRoot ?? '')
-  return (Array.isArray(worktrees) ? worktrees : [])
-    .filter((w) => w && String(w.branch ?? '') === want)
-    .filter((w) => String(w.path ?? '') && String(w.path) !== main)
-    .map((w) => String(w.path))
-}
+// WHICH WORKTREES THE CLEANUP MAY REMOVE lives in scripts/land-cleanup-core.mjs
+// (point 629). A branch match alone used to decide it, and on 11.08.2026 that
+// deleted the worktree of an agent still working on another point, uncommitted
+// work included. The decision now demands PROVEN ownership and PROVEN death, and
+// it was moved out rather than grown here, because it is a rule about the pool
+// rather than a step of the chain.
 
 // ── Rider (a): the audit runs on a lockfile change ───────────────────────────
 
