@@ -144,10 +144,10 @@ export function assertInside(path, root) {
  *              head means an unchanged verdict, and a changed one refuses.
  *   gitLink  — the admin gitdir its `.git` pointed at (still a linked worktree of
  *              the same repository)
- *   ino/dev/gitMtime — the identity of that `.git` file. The inode alone is not
- *              enough: a filesystem hands a freed inode straight back, so a
- *              same-path replacement often gets the same number. The write time
- *              does not come back, and git writes that file once.
+ *   ino/dev/gitMtime/gitBirth — the identity of that `.git` file. The inode alone
+ *              is not enough: a filesystem hands a freed inode straight back, so a
+ *              same-path replacement often gets the same number. The creation
+ *              times do not come back, and git writes that file once.
  *   notWrittenAfter — the instant the caller's freshness proof was taken against
  *
  * Every carried field must be re-read and must MATCH; a field the caller carried
@@ -192,26 +192,48 @@ export function matchesExpectation({ expected, entry, actual = null, dirty, ownL
     const bad = mismatch(name, wanted, found)
     if (bad) return { ok: false, reason: bad }
   }
-  // THE `.git` FILE'S IDENTITY — inode, device AND the moment it was written.
+  // THE `.git` FILE'S IDENTITY — inode, device, and the two times it was created.
   //
   // The inode ALONE is not enough, and that is measured rather than assumed
   // (11.08.2026): a worktree removed and re-added at the same path frequently gets
-  // the inode back, because the filesystem had just freed it. The write TIME
-  // cannot be reused that way — git writes that one-line file when it creates the
-  // tree and never touches it again — so the two together identify the file. A
-  // platform that reports nothing for all three has no such proof to give, and a
-  // check that could not be made is not a check that passed: it is named in the
-  // reason so the reader sees which proofs actually held.
-  const IDENTITY = ['ino', 'dev', 'gitMtime']
+  // the inode straight back, because the filesystem had just freed it. Git writes
+  // that one-line file when it creates the tree and never touches it again, so its
+  // write time and its BIRTH time are creation stamps; birth is the strongest of
+  // the four where the platform has it, because no userspace API can set it
+  // (`utimes` reaches mtime, nothing reaches birthtime).
+  //
+  // AN ABSENT IDENTITY REFUSES (third review, finding A). This comparison used to
+  // skip itself when nothing was carried and fall through to `ok: true` — the very
+  // fail-open this point exists to remove, sitting in the one check that is meant
+  // to prove the tree is the tree that was selected. No proof means refusal, and
+  // the refusal NAMES what was unavailable so a platform that genuinely cannot
+  // supply it gets an answer it can act on rather than a silent pass.
+  //
+  // THE RESIDUAL, STATED. These are (device, inode, two timestamps). POSIX exposes
+  // no file GENERATION number through Node, so a filesystem that hands back the
+  // same inode AND reproduces both creation times to the nanosecond would defeat
+  // it. That is the honest bound; it sits behind the branch, HEAD and admin-record
+  // checks above and behind the lock this command holds while it asks.
+  const IDENTITY = ['ino', 'dev', 'gitMtime', 'gitBirth']
   const carried = IDENTITY.map((k) => Number(want[k] ?? 0))
   const found = IDENTITY.map((k) => Number(got[k] ?? 0))
-  let identity = 'no file identity on this platform'
-  if (carried.some((v) => v)) {
-    if (found.some((v, i) => v !== carried[i])) {
-      return { ok: false, reason: 'the checkout at that path was REPLACED (its .git is a different file)' }
+  const held = IDENTITY.filter((_, i) => carried[i])
+  if (!held.length) {
+    return {
+      ok: false,
+      reason:
+        'the caller carried NO file identity (no inode, device or creation time), so nothing here can tell this ' +
+        'checkout from a replacement standing at the same path',
     }
-    identity = 'same .git file'
   }
+  const unreadable = IDENTITY.filter((k, i) => carried[i] && !found[i])
+  if (unreadable.length) {
+    return { ok: false, reason: `the file identity could not be re-read (${unreadable.join(', ')})` }
+  }
+  if (IDENTITY.some((_, i) => carried[i] && found[i] !== carried[i])) {
+    return { ok: false, reason: 'the checkout at that path was REPLACED (its .git is a different file)' }
+  }
+  const identity = `same .git file (${held.join(', ')})`
 
   if (dirty === true) return { ok: false, reason: 'it holds uncommitted changes' }
   if (dirty !== false) return { ok: false, reason: 'whether it holds uncommitted work could not be established' }
@@ -224,6 +246,73 @@ export function matchesExpectation({ expected, entry, actual = null, dirty, ownL
   }
 
   return { ok: true, reason: `still on ${branch}, ${identity}, unlocked by anyone else and clean` }
+}
+
+// ── The lock this command holds, and how a crashed one is recovered ──────────
+//
+// A LOCK THAT NAMES ONLY ITSELF WEDGES THE TREE FOREVER (third review, finding B,
+// and it was introduced by the fix for finding 2). Kill the process between
+// `git worktree lock` and the unlink and the lock survives; every later cleanup
+// then fails to acquire it and refuses, and no automation can ever remove that
+// worktree again. The orderly refusal path unlocks — process death is not an
+// orderly refusal.
+//
+// So the reason names the RUN, not the command: pid AND process start time, the
+// same identity shape the batch lock uses, because a pid alone is recycled within
+// hours on a busy machine and would let a stranger's process pass as the holder.
+//
+// THE ASYMMETRY DECIDES EVERY UNCERTAIN CASE. A stale lock is a WEDGE — annoying,
+// visible, fixable by a human, and it destroys nothing. Breaking a LIVE lock
+// destroys work. So only a lock this command itself wrote, whose holder is
+// PROVABLY gone, is ever recovered; a foreign lock, an unparseable one, and one
+// whose holder cannot be judged all stay exactly where they are and are reported.
+
+/** How this command signs the worktree lock it holds while verifying and
+ *  deleting. `pid`/`start` make it a RUN rather than a command name. */
+export const CLEANUP_LOCK_PREFIX = 'worktree-cleanup'
+
+export const formatCleanupLock = ({ pid, startedAt } = {}) =>
+  `${CLEANUP_LOCK_PREFIX} verifying and deleting (pid ${Number(pid) || 0} start ${Number(startedAt) || 0})`
+
+/** `{ ours, pid, startedAt }` for a lock reason — `ours: false` for anything this
+ *  command did not write, which is never recovered. PURE. */
+export function parseCleanupLock(reason) {
+  const text = String(reason ?? '').trim()
+  if (!text.startsWith(CLEANUP_LOCK_PREFIX)) return { ours: false, pid: 0, startedAt: 0 }
+  const m = /\(pid\s+(\d+)\s+start\s+(-?\d+)\)/.exec(text)
+  return { ours: true, pid: m ? Number(m[1]) : 0, startedAt: m ? Number(m[2]) : 0 }
+}
+
+/**
+ * MAY A LOCK IN THE WAY BE BROKEN? PURE.
+ *
+ * `probe` is `{ exists, startedAt }` for the pid named in the lock — the same
+ * shape `probePid` answers — or null when nothing probed it.
+ *
+ * Returns { recoverable, why }. `recoverable: true` only where the holder is
+ * PROVABLY gone: the process no longer exists, or a process with that pid exists
+ * whose start time is not the recorded one, which means the pid was recycled and
+ * the original holder is dead. Everything else keeps the lock.
+ */
+export function staleLockVerdict({ reason, probe = null, tolerance = 5000 } = {}) {
+  const text = String(reason ?? '').trim()
+  if (!text) return { recoverable: false, why: 'there is no lock reason to judge' }
+  const lock = parseCleanupLock(text)
+  if (!lock.ours) return { recoverable: false, why: `the lock is not this command's: ${text}` }
+  if (!lock.pid || !lock.startedAt) {
+    return { recoverable: false, why: `this command's lock names no run (${text}) — remove it by hand once you are sure` }
+  }
+  if (!probe || typeof probe.exists !== 'boolean') {
+    return { recoverable: false, why: `the holder of ${text} could not be judged` }
+  }
+  if (probe.exists === false) return { recoverable: true, why: `its holder (pid ${lock.pid}) is gone` }
+  if (typeof probe.startedAt !== 'number') {
+    return { recoverable: false, why: `pid ${lock.pid} exists and its start time could not be read` }
+  }
+  if (Math.abs(probe.startedAt - lock.startedAt) > tolerance) {
+    return { recoverable: true, why: `pid ${lock.pid} was recycled by another process — the holder is gone` }
+  }
+  return { recoverable: false, why: `its holder (pid ${lock.pid}) is still running` }
 }
 
 /**

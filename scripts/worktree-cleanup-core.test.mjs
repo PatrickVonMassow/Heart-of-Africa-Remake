@@ -17,7 +17,10 @@ import {
   assertInside,
   formatRefusal,
   stubBranchFor,
+  formatCleanupLock,
   matchesExpectation,
+  parseCleanupLock,
+  staleLockVerdict,
   REFUSALS,
 } from './worktree-cleanup-core.mjs'
 import { cleanupWorktree, detachLinks, pathExists, readIdentity } from './worktree-cleanup.mjs'
@@ -336,7 +339,7 @@ describe('the incident, replayed on a THROWAWAY repository', () => {
 // expectation carries the head, the admin gitdir and the `.git` file's inode.
 describe('matchesExpectation — pure', () => {
   const entry = { path: '/repo/.claude/worktrees/agent-a', branch: 'feat/608-x', head: 'abc123', locked: null }
-  const actual = { gitLink: '/repo/.git/worktrees/agent-a', ino: 4711, dev: 66, gitMtime: 900, activeAt: 1000 }
+  const actual = { gitLink: '/repo/.git/worktrees/agent-a', ino: 4711, dev: 66, gitMtime: 900, gitBirth: 880, activeAt: 1000 }
   const expected = {
     branch: 'feat/608-x',
     head: 'abc123',
@@ -344,6 +347,7 @@ describe('matchesExpectation — pure', () => {
     ino: 4711,
     dev: 66,
     gitMtime: 900,
+    gitBirth: 880,
     notWrittenAfter: 5000,
   }
   const ask = (over = {}) => matchesExpectation({ expected, entry, actual, dirty: false, ...over })
@@ -399,15 +403,34 @@ describe('matchesExpectation — pure', () => {
     expect(ask({ actual: { ...actual, activeAt: null } }).ok).toBe(false)
   })
 
-  it('says so when the platform has no file identity to give, rather than claiming the proof', () => {
+  it('REFUSES when no file identity was carried at all — no proof is not permission', () => {
+    // Third review, finding A: this comparison used to SKIP itself when nothing
+    // was carried and fall through to ok, and the old test pinned that pass. An
+    // absent proof refuses, and the refusal names what was missing so a platform
+    // that genuinely cannot supply it gets an answer it can act on.
     const r = matchesExpectation({
-      expected: { ...expected, ino: 0, dev: 0, gitMtime: 0 },
+      expected: { ...expected, ino: 0, dev: 0, gitMtime: 0, gitBirth: 0 },
       entry,
-      actual: { ...actual, ino: 0, dev: 0, gitMtime: 0 },
+      actual: { ...actual, ino: 0, dev: 0, gitMtime: 0, gitBirth: 0 },
       dirty: false,
     })
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/carried NO file identity/)
+  })
+
+  it('REFUSES when a carried identity field cannot be re-read, naming which', () => {
+    const r = ask({ actual: { ...actual, gitMtime: 0 } })
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/could not be re-read \(gitMtime\)/)
+  })
+
+  it('names which identity proofs actually held', () => {
+    expect(ask().reason).toMatch(/same \.git file \(ino, dev, gitMtime, gitBirth\)/)
+    // A platform that gives only some of them proves only those, and says so.
+    const partial = { ...expected, ino: 0, dev: 0 }
+    const r = matchesExpectation({ expected: partial, entry, actual: { ...actual, ino: 0, dev: 0 }, dirty: false })
     expect(r.ok).toBe(true)
-    expect(r.reason).toMatch(/no file identity/)
+    expect(r.reason).toMatch(/same \.git file \(gitMtime, gitBirth\)/)
   })
 
   it('catches a replacement that got the SAME inode back — the write time cannot be reused', () => {
@@ -427,6 +450,56 @@ describe('matchesExpectation — pure', () => {
   it('refuses on uncommitted work, and on a dirtiness that could not be read', () => {
     expect(ask({ dirty: true }).ok).toBe(false)
     expect(ask({ dirty: null }).ok).toBe(false)
+  })
+})
+
+// A LOCK THAT NAMES ONLY ITSELF WEDGES THE TREE FOREVER (third review, finding B).
+// The asymmetry these cases enforce: a stale lock is annoying and a human can
+// clear it; breaking a LIVE one destroys work. So only OUR lock, whose holder is
+// PROVABLY gone, is ever recovered.
+describe('staleLockVerdict — may a lock in the way be broken?', () => {
+  const ours = formatCleanupLock({ pid: 4711, startedAt: 1000 })
+
+  it('signs the lock with the RUN, not just the command name', () => {
+    expect(ours).toMatch(/pid 4711 start 1000/)
+    expect(parseCleanupLock(ours)).toEqual({ ours: true, pid: 4711, startedAt: 1000 })
+  })
+
+  it('NEVER breaks a foreign lock — that is an agent still holding its tree', () => {
+    const r = staleLockVerdict({ reason: 'claude agent agent-x (pid 4711 start 1000)', probe: { exists: false } })
+    expect(r.recoverable).toBe(false)
+    expect(r.why).toMatch(/not this command's/)
+    expect(parseCleanupLock('claude agent agent-x (pid 1 start 2)').ours).toBe(false)
+  })
+
+  it('breaks OUR lock when its process is gone', () => {
+    const r = staleLockVerdict({ reason: ours, probe: { exists: false, startedAt: null } })
+    expect(r.recoverable).toBe(true)
+    expect(r.why).toMatch(/pid 4711\) is gone/)
+  })
+
+  it('breaks OUR lock when the pid was recycled by a different process', () => {
+    const r = staleLockVerdict({ reason: ours, probe: { exists: true, startedAt: 999_000 } })
+    expect(r.recoverable).toBe(true)
+    expect(r.why).toMatch(/recycled/)
+  })
+
+  it('KEEPS our lock while its holder is still running', () => {
+    const r = staleLockVerdict({ reason: ours, probe: { exists: true, startedAt: 1000 } })
+    expect(r.recoverable).toBe(false)
+    expect(r.why).toMatch(/still running/)
+  })
+
+  it('KEEPS every lock it cannot judge — wedge over destruction', () => {
+    for (const probe of [null, {}, { exists: true, startedAt: null }]) {
+      expect(staleLockVerdict({ reason: ours, probe }).recoverable).toBe(false)
+    }
+    // One of ours from before the identity existed: unparseable, so it stays and
+    // says how to clear it.
+    const old = staleLockVerdict({ reason: 'worktree-cleanup: verifying and deleting', probe: { exists: false } })
+    expect(old.recoverable).toBe(false)
+    expect(old.why).toMatch(/by hand/)
+    expect(staleLockVerdict({ reason: '' }).recoverable).toBe(false)
   })
 })
 
@@ -469,6 +542,7 @@ describe('--expect, on a THROWAWAY repository', () => {
       ino: identity.ino,
       dev: identity.dev,
       gitMtime: identity.gitMtime,
+      gitBirth: identity.gitBirth,
       notWrittenAfter: Date.now() + 60_000,
     }
   }
@@ -535,5 +609,46 @@ describe('--expect, on a THROWAWAY repository', () => {
     // review, finding 4). `pathExists` is the tri-state probe that decides it.
     expect(pathExists(worktree)).toBe(true)
     expect(pathExists(join(worktree, 'nothing-here'))).toBe(false)
+  })
+
+  it('RECOVERS its own lock left behind by a crashed run — the tree is not wedged', () => {
+    // Third review, finding B: a process killed between `worktree lock` and the
+    // unlink used to make the worktree permanently un-cleanable.
+    const expected = expectationNow()
+    run(['worktree', 'lock', '--reason', formatCleanupLock({ pid: 999_999, startedAt: 1 }), worktree])
+    const r = cleanupWorktree(worktree, {
+      git: gitOf,
+      expected,
+      probe: () => ({ exists: false, startedAt: null }), // the crashed run is gone
+    })
+    expect(r.ok).toBe(true)
+    expect(r.lockNote).toMatch(/cleared a dead lock/)
+    expect(existsSync(worktree)).toBe(false)
+  })
+
+  it('does NOT recover its own lock while that run is still alive', () => {
+    const expected = expectationNow()
+    run(['worktree', 'lock', '--reason', formatCleanupLock({ pid: 4711, startedAt: 1000 }), worktree])
+    const r = cleanupWorktree(worktree, {
+      git: gitOf,
+      expected,
+      probe: () => ({ exists: true, startedAt: 1000 }),
+    })
+    expect(r.ok).toBe(false)
+    expect(r.verdict.reason).toMatch(/still running/)
+    expect(existsSync(worktree)).toBe(true)
+  })
+
+  it('does NOT recover a FOREIGN lock, however dead its holder looks', () => {
+    const expected = expectationNow()
+    run(['worktree', 'lock', '--reason', 'claude agent agent-x (pid 999999 start 1)', worktree])
+    const r = cleanupWorktree(worktree, {
+      git: gitOf,
+      expected,
+      probe: () => ({ exists: false, startedAt: null }),
+    })
+    expect(r.ok).toBe(false)
+    expect(r.verdict.reason).toMatch(/not this command's/)
+    expect(existsSync(worktree)).toBe(true)
   })
 })

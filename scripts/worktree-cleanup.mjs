@@ -26,12 +26,16 @@ import { worktreeActiveAt } from './batch-in-flight.mjs'
 import {
   judgeTarget,
   assertInside,
+  formatCleanupLock,
   matchesExpectation,
+  parseCleanupLock,
   shouldDetach,
+  staleLockVerdict,
   formatRefusal,
   insideRoot,
   stubBranchFor,
 } from './worktree-cleanup-core.mjs'
+import { probePid } from './batch-singleton.mjs'
 
 /**
  * lstat as the pure rule wants to see it.
@@ -229,13 +233,14 @@ export function pathExists(path) {
  * process. Every field answers null when it cannot be read, and null refuses.
  */
 export function readIdentity(path) {
-  const out = { gitLink: null, ino: 0, dev: 0, gitMtime: 0, activeAt: null }
+  const out = { gitLink: null, ino: 0, dev: 0, gitMtime: 0, gitBirth: 0, activeAt: null }
   const dot = join(path, '.git')
   try {
     const st = statSync(dot)
     out.ino = Number(st.ino ?? 0)
     out.dev = Number(st.dev ?? 0)
     out.gitMtime = Number(st.mtimeMs ?? 0)
+    out.gitBirth = Number(st.birthtimeMs ?? 0)
     out.gitLink = st.isDirectory() ? dot : (readFileSync(dot, 'utf8').match(/^gitdir:\s*(.+)$/m)?.[1]?.trim() ?? null)
     if (out.gitLink && !st.isDirectory()) out.gitLink = resolve(path, out.gitLink)
   } catch {
@@ -278,9 +283,58 @@ export function removeStubBranch(target, { dry = false, git: runGit = git } = {}
   }
 }
 
-/** The reason this command writes into git's worktree lock while it verifies and
- *  deletes. It is recognisable, so a lock left behind by a crash says who left it. */
-export const CLEANUP_LOCK_REASON = 'worktree-cleanup: verifying and deleting'
+/**
+ * THE REASON THIS COMMAND WRITES INTO GIT'S WORKTREE LOCK — naming the RUN.
+ *
+ * pid AND process start time, so a later run can tell a crashed predecessor's
+ * lock from a live one (third review, finding B). Without them a process killed
+ * between `worktree lock` and the unlink wedges that worktree permanently: every
+ * later cleanup fails to acquire and refuses, forever.
+ */
+export function cleanupLockReason(pid = process.pid) {
+  return formatCleanupLock({ pid, startedAt: probePid(pid)?.startedAt ?? 0 })
+}
+
+/**
+ * TAKE THE LOCK, RECOVERING ONLY A PROVABLY DEAD ONE OF OUR OWN.
+ *
+ * The acquisition itself is the exclusion: `git worktree lock` FAILS on a tree
+ * somebody already holds. On that failure the lock in the way is judged — and the
+ * asymmetry decides every uncertain case, because a stale lock is a WEDGE a human
+ * can clear while breaking a live one DESTROYS WORK. A foreign lock (the isolation
+ * harness's, an agent's) is NEVER broken; one of ours is broken only where the
+ * holder is provably gone.
+ *
+ * Returns { locked, reason, note } — `locked: false` means refuse.
+ */
+export function takeCleanupLock(target, { git: runGit = git, probe = probePid, reason = null } = {}) {
+  const mine = reason ?? cleanupLockReason()
+  const tryLock = () => {
+    try {
+      runGit(['worktree', 'lock', '--reason', mine, target])
+      return null
+    } catch (e) {
+      return `${(e && (e.stderr || e.message)) || e}`.split('\n')[0]
+    }
+  }
+  const first = tryLock()
+  if (!first) return { locked: true, reason: mine, note: '' }
+
+  const entry = worktreeEntry(target, runGit)
+  const held = String(entry?.locked ?? '').trim()
+  const verdict = staleLockVerdict({ reason: held, probe: probe(parseCleanupLock(held).pid) })
+  if (!verdict.recoverable) return { locked: false, reason: mine, note: `${verdict.why}` }
+  try {
+    runGit(['worktree', 'unlock', target])
+  } catch (e) {
+    return { locked: false, reason: mine, note: `a dead lock could not be cleared: ${(e && e.message) || e}` }
+  }
+  const second = tryLock()
+  // A second failure means somebody took it in between — theirs, and it stays.
+  return second
+    ? { locked: false, reason: mine, note: `the lock was taken again while a dead one was cleared: ${second}` }
+    : { locked: true, reason: mine, note: `cleared a dead lock — ${verdict.why}` }
+}
 
 /**
  * THE LAST RE-PROOF, INSIDE THE PROCESS THAT DELETES (point 629) — AND ITS
@@ -305,7 +359,7 @@ export const CLEANUP_LOCK_REASON = 'worktree-cleanup: verifying and deleting'
  * It is bounded by the few milliseconds between the reads and the unlink, and it
  * is the smallest this design can make it without a primitive git does not have.
  */
-export function cleanupWorktree(target, { dry = false, git: runGit = git, expected = null } = {}) {
+export function cleanupWorktree(target, { dry = false, git: runGit = git, expected = null, probe = probePid } = {}) {
   const worktrees = listWorktrees(runGit)
   const verdict = judgeTarget({ target, mainRoot: worktrees[0] ?? REPO_ROOT, worktrees })
   if (!verdict.ok) return { ok: false, verdict, detached: [] }
@@ -316,13 +370,14 @@ export function cleanupWorktree(target, { dry = false, git: runGit = git, expect
 
   const wants = expected && typeof expected === 'object' && String(expected.branch ?? '').trim()
   let weLocked = false
+  let ourLock = ''
+  let lockNote = ''
   if (wants && exists && !dry) {
-    try {
-      runGit(['worktree', 'lock', '--reason', CLEANUP_LOCK_REASON, target])
-      weLocked = true
-    } catch (e) {
-      return refuse(`could-not-take-the-lock: ${`${(e && (e.stderr || e.message)) || e}`.split('\n')[0]}`)
-    }
+    const taken = takeCleanupLock(target, { git: runGit, probe })
+    if (!taken.locked) return refuse(`could-not-take-the-lock: ${taken.note}`)
+    weLocked = true
+    ourLock = taken.reason
+    lockNote = taken.note
   }
   const unlockOnRefusal = (reason) => {
     if (weLocked) {
@@ -341,7 +396,7 @@ export function cleanupWorktree(target, { dry = false, git: runGit = git, expect
       entry: worktreeEntry(target, runGit),
       actual: readIdentity(target),
       dirty: checkoutDirty(target, runGit),
-      ownLock: weLocked ? CLEANUP_LOCK_REASON : '',
+      ownLock: weLocked ? ourLock : '',
     })
     if (!match.ok) return unlockOnRefusal(`changed-under-cleanup: ${match.reason}`)
   }
@@ -361,7 +416,7 @@ export function cleanupWorktree(target, { dry = false, git: runGit = git, expect
   })
   if (!dry) tryPrune(runGit)
   const stub = removeStubBranch(target, { dry, git: runGit })
-  return { ok: true, verdict, detached, stub }
+  return { ok: true, verdict, detached, stub, ...(lockNote ? { lockNote } : {}) }
 }
 
 function tryPrune(runGit = git) {
