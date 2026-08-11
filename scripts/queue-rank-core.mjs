@@ -143,22 +143,34 @@ export function normaliseRankRecord(raw) {
 /**
  * The rank record from the file's raw bytes.
  *
- * ABSENT IS NOT TORN (cross-vendor review, 10.08.2026). An absent or empty file
- * means "nothing recorded yet" and the gate applies; bytes that do not parse mean
- * the state is UNREADABLE, and a guard may draw no verdict from that — every
- * guard here is fail-OPEN by CLAUDE.md §7.2 decree, so an unreadable record must
- * not be able to block a turn. The flag travels with the record so the CLI can be
- * LOUD about the same file the guard is quiet about, and so nothing overwrites a
- * torn file with a fresh one (the point-530 lesson: a file that does not parse is
- * not empty).
+ * ABSENT IS NOT TORN (cross-vendor review, 10.08.2026). An absent file means
+ * "nothing recorded yet" and the gate applies; bytes that do not parse mean the
+ * state is UNREADABLE, and a guard may draw no verdict from that — every guard
+ * here is fail-OPEN by CLAUDE.md §7.2 decree, so an unreadable record must not be
+ * able to block a turn. The flag travels with the record so the CLI can be LOUD
+ * about the same file the guard is quiet about, and so nothing overwrites a torn
+ * file with a fresh one (the point-530 lesson: a file that does not parse is not
+ * empty).
+ *
+ * AND AN EXISTING EMPTY FILE IS TORN, NOT ABSENT (cross-vendor review,
+ * 11.08.2026). A zero-byte or whitespace-only record used to read as "nothing
+ * recorded yet", which got both halves exactly backwards: the guard blocked as
+ * UNARMED while the CLI cheerfully wrote over the file. The parser cannot tell
+ * absence from an empty file — but the READER can, and it already says so in the
+ * only vocabulary needed: `null` when the file is not there, a STRING when it is.
+ * So `null`/`undefined` is the one and only absence, and any string that does not
+ * parse — the empty one included — is torn. Every reader here already passes
+ * `existsSync(path) ? readFileSync(path) : null`.
  */
 export function parseRankRecord(text) {
   const empty = { ranked: {}, settled: null, torn: false }
   const broken = { ranked: {}, settled: null, torn: true }
-  if (text === null || text === undefined || !String(text).trim()) return empty
+  if (text === null || text === undefined) return empty
+  // Anything that is not the file's own bytes is not a record either.
+  if (typeof text !== 'string' || !text.trim()) return broken
   let parsed
   try {
-    parsed = JSON.parse(String(text))
+    parsed = JSON.parse(text)
   } catch {
     return broken
   }

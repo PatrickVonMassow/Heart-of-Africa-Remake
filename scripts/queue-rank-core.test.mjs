@@ -138,6 +138,11 @@ describe('PROVENANCE — which points are new since the order was last settled',
   it('refuses to write over a torn record instead of replacing every decision in it', () => {
     expect(() => recordRank(parseRankRecord('{"ranked":{'), 615, { why: 'w' })).toThrow(/does not parse/)
     expect(() => seedRecord(parseRankRecord('{"ranked":{'), [1, 2], { why: 'w' })).toThrow(/does not parse/)
+    // An EXISTING empty file is the same class: the CLI used to overwrite it
+    // while the guard blocked as if the gate had never been armed.
+    expect(() => recordRank(parseRankRecord(''), 615, { why: 'w' })).toThrow(/does not parse/)
+    expect(() => seedRecord(parseRankRecord(''), [1, 2], { why: 'w' })).toThrow(/does not parse/)
+    expect(appendGateState([1, 2], parseRankRecord('')).state).toBe('torn')
   })
   it('is pure — recording does not mutate what it was given', () => {
     const before = settledAt([615], { 615: { at: '', why: 'w' } })
@@ -236,10 +241,19 @@ describe('the rank record degrades, it never throws inside a guard', () => {
   it('separates ABSENT from TORN — the one asks for the baseline, the other stays quiet', () => {
     // Both used to read as "nothing recorded yet", which made an unreadable file
     // BLOCK every appended point; now one is unarmed and the other no verdict.
-    for (const raw of [null, undefined, '  \n ']) {
+    // ABSENCE IS `null` AND NOTHING ELSE: the reader passes `existsSync(p) ?
+    // readFileSync(p) : null`, so a string — even an empty one — means the file
+    // is THERE.
+    for (const raw of [null, undefined]) {
       expect(parseRankRecord(raw)).toEqual({ ranked: {}, settled: null, torn: false })
     }
     for (const raw of [
+      // An EXISTING zero-byte or whitespace-only file. It used to read as absent,
+      // which had both halves backwards: the guard blocked as unarmed while the
+      // CLI wrote straight over the file.
+      '',
+      '   ',
+      '\n\t \n',
       '{"ranked":{',
       'not json at all',
       '[]',

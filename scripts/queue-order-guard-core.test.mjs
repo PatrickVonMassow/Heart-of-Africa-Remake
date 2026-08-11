@@ -560,7 +560,10 @@ describe('the APPEND GATE — a new point is ranked once, deliberately', () => {
   it('stays QUIET on a TORN record rather than trapping the session', () => {
     // Every guard here is fail-OPEN by decree: an unreadable record is not a
     // verdict, and the CLI is the loud half (it refuses to write over it).
-    for (const rankRecordJson of ['{"ranked":{', 'not json', '[]', '{"settled":{"points":"kaputt"}}']) {
+    // An EXISTING zero-byte file belongs in this list, not in the unarmed one
+    // below: the guard used to block it as "never armed" while the CLI wrote
+    // straight over it — both halves backwards.
+    for (const rankRecordJson of ['', '   ', '{"ranked":{', 'not json', '[]', '{"settled":{"points":"kaputt"}}']) {
       expect(evaluate({ dashboardHtml: board, tasksMd: appended, rankRecordJson }).block).toBe(false)
     }
   })
@@ -570,7 +573,9 @@ describe('the APPEND GATE — a new point is ranked once, deliberately', () => {
     // and falling silent there is the exemption that swallowed an unranked
     // append. One command answers the whole order — and an EMPTIED `ranked` is
     // not "never armed": armedness is read off `settled` alone.
-    for (const rankRecordJson of [null, '', '{"ranked":{}}', '{"ranked":{"300":{}}}']) {
+    // `null` is the ONLY absence — that is what the reader passes when the file
+    // is not there. An existing empty file is torn, and tested above.
+    for (const rankRecordJson of [null, undefined, '{"ranked":{}}', '{"ranked":{"300":{}}}']) {
       const r = evaluate({ dashboardHtml: board, tasksMd: appended, rankRecordJson })
       expect(r.block).toBe(true)
       expect(r.reason).toMatch(/QUEUE RANK BASELINE MISSING/)
