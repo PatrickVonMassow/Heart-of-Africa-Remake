@@ -176,9 +176,29 @@ export function matchesExpectation({ expected, entry, actual = null, dirty, ownL
   if (!has) return { ok: false, reason: `expected ${branch}, but it is on a detached HEAD` }
   if (has !== branch) return { ok: false, reason: `expected ${branch}, but it is on ${has}` }
 
-  const lock = String(entry.locked ?? '').trim()
-  const own = String(ownLock ?? '').trim()
-  if (lock && lock !== own) return { ok: false, reason: `it is git-locked: ${lock}` }
+  // THE EXCLUSION MUST STILL BE IN PLACE — AN EMPTY LOCK IS A REFUSAL, NOT A PASS
+  // (fifth review, finding 2). This used to reject only a NON-EMPTY foreign lock,
+  // so the one state where the caller holds NOTHING slipped through as "unlocked,
+  // fine": a concurrent stale-lock recovery clears our lock and pauses before
+  // retaking it, and the deletion then proceeds with no exclusion at all. git
+  // offers no way to HOLD exclusion across that gap — `worktree unlock` names no
+  // lock, so a third party can always clear ours — but the deletion path closes
+  // regardless: where `ownLock` says we took a lock, exactly that reason must be
+  // in place, and its absence refuses as loudly as a stranger's.
+  const lock = String(entry.locked ?? '')
+  const own = String(ownLock ?? '')
+  if (own) {
+    if (!lock) {
+      return {
+        ok: false,
+        reason:
+          'the lock this cleanup took is GONE — something cleared it, so the exclusion this verification runs under no longer holds',
+      }
+    }
+    if (lock !== own) return { ok: false, reason: `it is git-locked: ${lock}` }
+  } else if (lock.trim()) {
+    return { ok: false, reason: `it is git-locked: ${lock.trim()}` }
+  }
 
   const got = actual && typeof actual === 'object' ? actual : {}
   const mismatch = (name, wanted, found) => {

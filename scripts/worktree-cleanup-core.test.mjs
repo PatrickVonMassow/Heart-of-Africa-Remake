@@ -380,6 +380,33 @@ describe('matchesExpectation — pure', () => {
     expect(ask({ entry: locked, ownLock: 'ours' }).ok).toBe(false)
   })
 
+  it('REFUSES when the lock we took is GONE — an empty lock is not "unlocked, fine"', () => {
+    // Fifth review, finding 2: only a NON-EMPTY foreign lock used to refuse, so a
+    // concurrent recovery that cleared our lock and paused before retaking it left
+    // NO lock at all — and the verification read that as a pass and deleted
+    // without any exclusion.
+    for (const locked of [null, undefined, '']) {
+      const r = ask({ entry: { ...entry, locked }, ownLock: 'ours' })
+      expect(r.ok, String(locked)).toBe(false)
+      expect(r.reason).toMatch(/lock this cleanup took is GONE/)
+    }
+  })
+
+  it('REFUSES a lock that is merely a padded copy of ours — the comparison is verbatim', () => {
+    const ours = formatCleanupLock({ pid: 4711, startedAt: 1000 })
+    expect(ask({ entry: { ...entry, locked: ours }, ownLock: ours }).ok).toBe(true)
+    for (const locked of [` ${ours}`, `${ours} `, '   ']) {
+      const r = ask({ entry: { ...entry, locked }, ownLock: ours })
+      expect(r.ok, locked).toBe(false)
+      expect(r.reason).toMatch(/git-locked/)
+    }
+  })
+
+  it('without a lock of our own an unlocked tree still passes — the orphan contract is untouched', () => {
+    expect(ask({ entry: { ...entry, locked: null } }).ok).toBe(true)
+    expect(ask({ entry: { ...entry, locked: '   ' } }).ok).toBe(true)
+  })
+
   it('refuses a checkout whose HEAD moved — the containment proof was taken on that sha', () => {
     const r = ask({ entry: { ...entry, head: 'def456' } })
     expect(r.ok).toBe(false)
@@ -787,6 +814,30 @@ describe('--expect, on a THROWAWAY repository', () => {
     expect(r.verdict.reason).toMatch(/LEFT ALONE/) // and said it did not touch it
     // And the other party's lock is STILL THERE, untouched.
     expect(run(['worktree', 'list', '--porcelain'])).toContain(foreign)
+    expect(existsSync(worktree)).toBe(true)
+  })
+
+  it('REFUSES to delete once our lock has been cleared and NOTHING took its place', () => {
+    // Fifth review, finding 2, on a real repository: the competing party clears
+    // our lock and pauses before retaking it, so the verification runs with no
+    // exclusion at all. The empty interval was never exercised because every race
+    // case installed the competing lock immediately.
+    const expected = expectationNow()
+    let cleared = false
+    const r = cleanupWorktree(worktree, {
+      git: (args, cwd) => {
+        const out = run(args, cwd)
+        if (!cleared && args[0] === 'worktree' && args[1] === 'lock') {
+          cleared = true
+          run(['worktree', 'unlock', worktree]) // and nothing takes it: no lock at all
+        }
+        return out
+      },
+      expected,
+    })
+    expect(cleared).toBe(true)
+    expect(r.ok).toBe(false)
+    expect(r.verdict.reason).toMatch(/lock this cleanup took is GONE/)
     expect(existsSync(worktree)).toBe(true)
   })
 
