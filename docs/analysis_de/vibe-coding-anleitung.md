@@ -282,8 +282,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Einträge, ein Teil der Tests lud nicht, dem Prüfer wurde die Hälfte nie gereicht. Nicht
   geliefert ist nicht rot, sondern abwesend — und liest sich *grüner* als ein Fehlschlag.
   → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
-  Anzahl. Melde die **Abdeckung** mit; ein Urteil über unvollständigem Material ist eine
-  **Teilprüfung**."
+  Anzahl. Melde die **Abdeckung** mit; ein Urteil über unvollständigem Material ist **Teilprüfung**."
 
 - **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren dieselbe Regel
   getrennt — eines schreibt, eines prüft; das blockiert *alle* Arbeit.
@@ -356,12 +355,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Ein Ersatzwert im `catch` darf nur verschluckt werden, wenn er zu **weniger** Aktion
   führt. ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
 
-- **Einigkeit ist keine Evidenz.** Mehrere Modelle können sich über eine Ursache einig sein und
-  gemeinsam danebenliegen; die Einigkeit fühlt sich dann an wie ein Beweis.
+- **Einigkeit ist keine Evidenz.** Mehrere Modelle können sich einig sein und gemeinsam
+  danebenliegen; die Einigkeit fühlt sich dann an wie ein Beweis.
   → *Prompt:* „Bevor du Versuche vorschlägst: Welcher **eine Test** macht die Ursache **sichtbar**?"
 
-- **Der Erfolg beweist den Weg nicht.** Es lief durch, also greift die neue Einstellung — nur
-  hattest du den Dialog weggeklickt. Gemessen wurde; die Messung trennte die Erklärungen nicht.
+- **Der Erfolg beweist den Weg nicht.** Es lief durch — nur hattest du den Dialog weggeklickt.
   → *Prompt:* „Sag **vor** der Messung, welches Ergebnis welche Erklärung **ausschließen** würde."
 
 - **Zwei Aufträge für einen Fehler.** Fällt derselbe Mangel erneut auf, schreibst du ihn arglos ein
@@ -370,8 +368,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   **erweitere ihn**. Verwirfst du einen Zweig, rette, was er über seinen Auftrag hinaus mitbrachte."
 
 - **Gebaut heißt nicht auffindbar.** Ein Feature ist korrekt und wird trotzdem als fehlend
-  gemeldet, weil seine Bedienung falsch einsortiert ist: Dein Test fragt „wirkt es?", der
-  Nutzer „komme ich dorthin?".
+  gemeldet, weil seine Bedienung falsch einsortiert ist: Dein Test fragt „wirkt es?", der Nutzer
+  „komme ich dorthin?".
   → *Prompt:* „Meldet er etwas erneut, das repariert ist, nimm an, er **erreicht** es nicht. Prüf
   die **Nachbarschaft** — und wo das als Test schreibbar ist, schreib es als Test."
 
