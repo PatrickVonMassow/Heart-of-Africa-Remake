@@ -28,8 +28,16 @@ import { mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, it, expect } from 'vitest'
-import { cleanupEvidence, deleteLandedBranch, listWorktrees, reproveOne, runCommand, selectCleanup } from './land-point.mjs'
-import { DISPOSITION, judgeCleanupTarget } from './land-cleanup-core.mjs'
+import {
+  cleanupEvidence,
+  deleteLandedBranch,
+  listWorktrees,
+  localBranchExists,
+  reproveOne,
+  runCommand,
+  selectCleanup,
+} from './land-point.mjs'
+import { DISPOSITION, branchDeletionBlocker, judgeCleanupTarget } from './land-cleanup-core.mjs'
 
 /** A child that takes a measurable, deterministic amount of time. */
 const slowChild = (ms) => ({ cmd: process.execPath, args: ['-e', `setTimeout(() => {}, ${ms})`], id: 'slow' })
@@ -290,6 +298,95 @@ describe('the branch deletion is a SEQUENCE, not two independent commands', () =
     const r = deleteLandedBranch({ branch: 'feat/608-x', blocked: 'a worktree was kept', git: run })
     expect(r).toMatchObject({ local: 'skipped', remote: 'skipped', problems: [] })
     expect(calls).toEqual([])
+  })
+
+  it('SKIPS the remote when the state changed between the two commands', () => {
+    // Whole-branch review, finding 6: the two deletions are two commands, and a
+    // live tree that recreates the local branch after `branch -d` — or one that
+    // appears in that instant — would keep its local branch and lose its remote.
+    const { calls, run } = recorder()
+    const r = deleteLandedBranch({
+      branch: 'feat/608-x',
+      git: run,
+      recheck: () => 'the local branch exists again',
+    })
+    expect(r).toMatchObject({ local: 'ok', remote: 'skipped', problems: [] })
+    expect(r.note).toMatch(/remote branch feat\/608-x was NOT deleted/)
+    expect(calls).toEqual(['branch -d feat/608-x'])
+  })
+
+  it('a recheck that THROWS blocks the remote too — an unanswerable question is not permission', () => {
+    const { calls, run } = recorder()
+    const r = deleteLandedBranch({
+      branch: 'feat/608-x',
+      git: run,
+      recheck: () => {
+        throw new Error('git is unreachable')
+      },
+    })
+    expect(r).toMatchObject({ local: 'ok', remote: 'skipped' })
+    expect(r.note).toMatch(/could not be re-read/)
+    expect(calls).toEqual(['branch -d feat/608-x'])
+  })
+
+  it('runs the recheck AFTER the local deletion and before the remote one, and deletes when it is clear', () => {
+    const { calls, run } = recorder()
+    const r = deleteLandedBranch({
+      branch: 'feat/608-x',
+      git: run,
+      recheck: () => {
+        calls.push('recheck')
+        return ''
+      },
+    })
+    expect(r).toMatchObject({ local: 'ok', remote: 'ok' })
+    expect(calls).toEqual(['branch -d feat/608-x', 'recheck', 'push origin --delete feat/608-x'])
+  })
+
+  it('never asks the recheck when the deletion was blocked outright', () => {
+    let asked = false
+    const { run } = recorder()
+    deleteLandedBranch({
+      branch: 'feat/608-x',
+      blocked: 'a worktree was kept',
+      git: run,
+      recheck: () => {
+        asked = true
+        return ''
+      },
+    })
+    expect(asked).toBe(false)
+  })
+})
+
+describe('the branch blocker is read at the moment of deletion, not from the plan', () => {
+  it('a worktree that appears AFTER the selection blocks BOTH branch deletions', () => {
+    // The plan is taken minutes before the deletion. A checkout that appears in
+    // between — DETACHED above all, which reports no branch at all — was invisible
+    // to it, and the branch went out from under it.
+    const { root, own } = scene()
+    const planned = select(root)
+    expect(branchDeletionBlocker({ selection: planned })).toBe('')
+
+    // A manual checkout appears, detached on the landed branch's commit.
+    const late = join(root, 'local', 'rebasing')
+    mkdirSync(join(root, 'local'), { recursive: true })
+    git(['worktree', 'add', '-q', '--detach', late, 'feat/608-x'], root)
+
+    const now = select(root)
+    expect(branchDeletionBlocker({ selection: now })).toMatch(/rebasing/)
+    // …while the landed point's OWN dead tree is still removable: the branch is
+    // what is kept, not the cleanup.
+    expect(now.remove).toEqual([own])
+  })
+
+  it('reads the local branch back, and an unanswerable question reads as PRESENT', () => {
+    const { root } = scene()
+    expect(localBranchExists('feat/608-x', { cwd: root })).toBe(true)
+    expect(localBranchExists('feat/there-is-no-such-branch', { cwd: root })).toBe(false)
+    // Not a repository at all: git fails with something other than exit 1, and the
+    // answer is "present", which BLOCKS the remote deletion.
+    expect(localBranchExists('feat/608-x', { cwd: tmpdir() })).toBe(true)
   })
 })
 

@@ -33,7 +33,13 @@ import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
-import { formatCleanupNotes, isAgentWorktree, reproveRemoval, selectCleanupTargets } from './land-cleanup-core.mjs'
+import {
+  branchDeletionBlocker,
+  formatCleanupNotes,
+  isAgentWorktree,
+  reproveRemoval,
+  selectCleanupTargets,
+} from './land-cleanup-core.mjs'
 import { worktreeActiveAt } from './batch-in-flight.mjs'
 import { probePid } from './batch-singleton.mjs'
 import {
@@ -350,27 +356,74 @@ export function reproveOne({ path, expected, since, mergeTarget = null, cwd = RE
  * `blocked` is the reason not to delete at all (a kept worktree, a refused or
  * failed removal); it skips both. Exported and taking an injected `runGit` so the
  * ORDER can be pinned by a test rather than by reading.
+ *
+ * AND THE SECOND DELETION IS GATED AGAIN, ON A STATE READ AFTER THE FIRST ONE
+ * (whole-branch review, finding 6). The two commands are not one act, and the gap
+ * between them is a real window: a live tree that recreates the local branch after
+ * `branch -d` — or one that appears in that instant — would still lose its REMOTE,
+ * which is the same loss by the other half. `recheck` is called between them and
+ * any reason it returns SKIPS the remote deletion. A recheck that throws blocks
+ * too: an unanswerable question is not permission.
  */
-export function deleteLandedBranch({ branch, blocked = '', git: runGit = git } = {}) {
-  if (blocked) return { local: 'skipped', remote: 'skipped', problems: [] }
+export function deleteLandedBranch({ branch, blocked = '', recheck = null, git: runGit = git } = {}) {
+  if (blocked) return { local: 'skipped', remote: 'skipped', problems: [], note: '' }
   try {
     runGit(['branch', '-d', branch], { stdio: ['ignore', 'pipe', 'pipe'] })
   } catch (e) {
     return {
       local: 'failed',
       remote: 'skipped',
+      note: '',
       problems: [
         `local branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0],
         `remote branch: NOT deleted — the local deletion failed, and the usual cause is a worktree still standing on ${branch}`,
       ],
     }
   }
+  let stop = ''
+  if (typeof recheck === 'function') {
+    try {
+      stop = String(recheck() ?? '')
+    } catch (e) {
+      stop = `the state could not be re-read before the remote deletion: ${`${(e && e.message) || e}`.split('\n')[0]}`
+    }
+  }
+  if (stop) {
+    return {
+      local: 'ok',
+      remote: 'skipped',
+      problems: [],
+      note: `the remote branch ${branch} was NOT deleted — ${stop}`,
+    }
+  }
   try {
     runGit(['push', 'origin', '--delete', branch], { stdio: ['ignore', 'pipe', 'pipe'] })
   } catch (e) {
-    return { local: 'ok', remote: 'failed', problems: [`remote branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0]] }
+    return {
+      local: 'ok',
+      remote: 'failed',
+      note: '',
+      problems: [`remote branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0]],
+    }
   }
-  return { local: 'ok', remote: 'ok', problems: [] }
+  return { local: 'ok', remote: 'ok', problems: [], note: '' }
+}
+
+/**
+ * DOES THIS LOCAL BRANCH EXIST RIGHT NOW? Asked between the two deletions.
+ *
+ * `rev-parse --verify --quiet` exits 1 for a ref that is not there, and that exit
+ * code is the ONLY thing read as absence: any other failure means the question
+ * could not be answered, which reads as PRESENT and blocks the remote deletion,
+ * like every other unproven fact in this cleanup.
+ */
+export function localBranchExists(branch, { cwd = REPO_ROOT } = {}) {
+  try {
+    git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+    return true
+  } catch (e) {
+    return !(e && e.status === 1)
+  }
 }
 
 /**
@@ -734,31 +787,44 @@ async function main(argv) {
         problems.push(`worktree ${path}: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0])
       }
     }
-    // A KEPT WORKTREE KEEPS ITS BRANCH, and so does one that could not be removed
-    // (review finding 6): git refuses `branch -d` on a branch a worktree has
-    // checked out, and the REMOTE deletion is independent — it would succeed while
-    // the local one failed, deleting the branch the retained tree is standing on.
-    // Both are therefore gated on the same three conditions, and skipped with the
-    // reason printed rather than attempted and reported as debris.
-    const branchBlocked = !cleanup.branch.delete
-      ? cleanup.branch.reason
-      : refused.length
-        ? 'a worktree was refused at the last moment and may still be standing on it'
-        : problems.length
-          ? 'a worktree could not be removed and may still be standing on it'
-          : ''
-    problems.push(...deleteLandedBranch({ branch, blocked: branchBlocked }).problems)
+    // A KEPT WORKTREE KEEPS ITS BRANCH, and so does one that could not be removed:
+    // git refuses `branch -d` on a branch a worktree has checked out, and the
+    // REMOTE deletion is independent — it would succeed while the local one failed,
+    // deleting the branch the retained tree is standing on.
+    //
+    // AND THE STATE IS READ AGAIN HERE (whole-branch review, finding 6). `cleanup`
+    // was taken before the removals ran; a checkout that appeared since — a
+    // DETACHED one above all, which reports no branch at all — was invisible to it,
+    // and the branch would have gone out from under it. So the worktrees are listed
+    // again for this decision, and once more between the local deletion and the
+    // remote one, where a live tree can recreate the local branch.
+    const atDeletion = selectCleanup({ branch, since, mergeTarget: 'HEAD' })
+    const branchBlocked = branchDeletionBlocker({
+      selection: atDeletion,
+      refused: refused.length,
+      failed: problems.length,
+    })
+    const branchResult = deleteLandedBranch({
+      branch,
+      blocked: branchBlocked,
+      recheck: () =>
+        branchDeletionBlocker({
+          selection: selectCleanup({ branch, since, mergeTarget: 'HEAD' }),
+          recreated: localBranchExists(branch),
+        }),
+    })
+    problems.push(...branchResult.problems)
     if (refused.length) {
       console.log('land-point: the cleanup refused these at the moment of deletion — they changed under it:')
       for (const line of refused) console.log(line)
     }
-    // `formatCleanupNotes` already speaks for the selection's own reason; this line
-    // covers the two the selection could not know about (a last-moment refusal, a
-    // removal that failed), so it is not printed twice for the same cause.
-    if (branchBlocked && branchBlocked !== cleanup.branch.reason) {
-      console.log(`land-point: the branch ${branch} was NOT deleted — ${branchBlocked}`)
+    if (branchResult.note) console.log(`land-point: ${branchResult.note}`)
+    // The kept TREES come from the selection the removals ran against; the branch
+    // line carries the blocker taken at the deletion, so the reason printed is the
+    // one that actually decided and it is never printed twice.
+    for (const line of formatCleanupNotes({ ...cleanup, branch: { delete: !branchBlocked, reason: branchBlocked } })) {
+      console.log(line)
     }
-    for (const line of formatCleanupNotes(cleanup)) console.log(line)
     if (problems.length) {
       // NOT a failure of the landing — the point IS on main, ticked and archived.
       // Reported loudly as debris, because `branch-hygiene-guard` is the backstop
@@ -774,7 +840,7 @@ async function main(argv) {
     step(
       'cleanup',
       VERDICT.ok,
-      `${branchBlocked ? 'branch KEPT' : 'branch'}${
+      `${branchBlocked ? 'branch KEPT' : branchResult.remote === 'ok' ? 'branch' : 'branch (remote KEPT)'}${
         cleanup.remove.length - refused.length > 0 ? ` + ${cleanup.remove.length - refused.length} worktree(s)` : ''
       }${kept ? `, ${kept} kept on purpose` : ''}`,
     )

@@ -314,6 +314,43 @@ export function selectCleanupTargets({ worktrees = [], branch, mainRoot, evidenc
 }
 
 /**
+ * MAY THE BRANCH BE DELETED — JUDGED AT THE MOMENT OF DELETION? PURE.
+ *
+ * WHY THIS IS NOT SIMPLY `selection.branch` (whole-branch review, finding 6). The
+ * landing used the selection it took MINUTES earlier and never listed the
+ * worktrees again before deleting, so a checkout that appeared in between — a
+ * detached one above all, which reports no branch at all — was invisible to the
+ * decision that then removed the branch it was standing on. So the caller takes a
+ * FRESH selection for this question, and asks it TWICE: once before the local
+ * deletion and once before the remote one, because `git branch -d` and `git push
+ * --delete` are two commands and a live tree can recreate the local branch between
+ * them.
+ *
+ * Inputs (every one of them a reason to STOP):
+ *   selection  a selection taken NOW — its `branch.delete` already folds in every
+ *              tree that was kept
+ *   refused    how many removals were refused at the last moment
+ *   failed     how many removals reported a problem
+ *   recreated  the local branch exists again after it was deleted — asked only
+ *              before the REMOTE deletion
+ *
+ * Returns the reason not to delete, or '' when nothing stands in the way. A
+ * selection that could not be taken at all blocks: an unlistable worktree set is
+ * exactly the state in which nothing can be proven.
+ */
+export function branchDeletionBlocker({ selection = null, refused = 0, failed = 0, recreated = false } = {}) {
+  const branch = selection && typeof selection === 'object' ? selection.branch : null
+  if (!branch || typeof branch !== 'object') {
+    return 'the worktrees could not be listed at the moment of deletion, so nothing proves the branch is free'
+  }
+  if (branch.delete === false) return str(branch.reason) || 'a worktree was kept and may still be standing on it'
+  if (recreated) return 'the local branch exists again — something recreated it after the deletion, so the remote is left alone'
+  if (Number(refused) > 0) return 'a worktree was refused at the last moment and may still be standing on it'
+  if (Number(failed) > 0) return 'a worktree could not be removed and may still be standing on it'
+  return ''
+}
+
+/**
  * THE RE-PROOF AT THE MOMENT OF DELETION. PURE.
  *
  * The selection is a SNAPSHOT: minutes pass between it and the removal, and in
