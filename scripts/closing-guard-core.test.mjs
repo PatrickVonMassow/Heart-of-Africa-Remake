@@ -368,8 +368,22 @@ describe('the second regression must stand AFTER the cleanup', () => {
     // A remark about another commit weakens no claim …
     expect(problemOf(withRegression(`LARGE green on ${HEAD}, both backends; fixes 9f3c1a2`, AFTER_CLEANUP_AT))).toBe('')
     // … but a run stated to be ON another commit is refused, however many shas
-    // follow it (the bypass round three named).
+    // follow it (the bypass round three named) …
     expect(problemOf(withRegression(`LARGE green on 9f3c1a2; fixes ${HEAD}`, AFTER_CLEANUP_AT))).toMatch(/NOT the commit being closed/)
+    // … including when the second one is named in commit form too: the FIRST is
+    // the run target, so "on X; not on HEAD" cannot borrow HEAD's blessing.
+    expect(problemOf(withRegression(`LARGE green on 9f3c1a2; not on ${HEAD}`, AFTER_CLEANUP_AT))).toMatch(/NOT the commit being closed/)
+  })
+
+  it('refuses a day that does not exist as a timestamp', () => {
+    // Date.parse NORMALISES 2026-02-29 into 1 March, which would date a run to a
+    // day nobody ran anything on.
+    expect(evidenceAnchors('LARGE green 2026-02-29T12:00:00Z').times).toEqual([])
+    expect(evidenceAnchors('LARGE green 2026-02-29').earliest).toBe(null)
+    expect(evidenceAnchors('LARGE green 2024-02-29T12:00:00Z').times).toHaveLength(1) // a real leap day counts
+    expect(problemOf(withRegression('LARGE green, both backends, 2026-02-29T12:00:00Z', AFTER_CLEANUP_AT))).toMatch(/names neither the commit being closed/)
+    // and a zone that shifts the UTC day must not make a real date look false
+    expect(evidenceAnchors('LARGE green 2026-08-11T23:00:00-05:00').times).toHaveLength(1)
   })
 
   it('reads one run written twice as one run, whatever the punctuation', () => {

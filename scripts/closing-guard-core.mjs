@@ -433,11 +433,26 @@ function parseTime(value) {
 }
 
 /**
+ * Is `2026-02-29` a day that exists? `Date.parse` NORMALISES an impossible one
+ * (that token becomes 1 March) instead of refusing it, which would let evidence
+ * pass on a date nobody could have run anything on. Judged on the DATE part
+ * alone, so a zone offset that shifts the UTC day cannot make a real date look
+ * false (four-eyes review 11.08.2026).
+ */
+function isRealCalendarDate(datePart) {
+  const [y, m, d] = datePart.split('-').map(Number)
+  const probe = new Date(Date.UTC(y, m - 1, d))
+  return probe.getUTCFullYear() === y && probe.getUTCMonth() === m - 1 && probe.getUTCDate() === d
+}
+
+/**
  * Milliseconds of a timestamp TOKEN, read as UTC when it carries no zone, so
- * the same evidence is judged identically on every machine.
+ * the same evidence is judged identically on every machine. A token naming a day
+ * that does not exist is no timestamp at all.
  */
 function parseStamp(token) {
   const normalized = token.replace(' ', 'T')
+  if (!isRealCalendarDate(normalized.slice(0, 10))) return { time: null, dateOnly: false }
   const dateOnly = !normalized.includes('T')
   if (dateOnly) return { time: parseTime(`${normalized}T00:00:00Z`), dateOnly: true }
   const zoned = /(?:Z|[+-]\d{2}:?\d{2})$/.test(normalized) ? normalized : `${normalized}Z`
@@ -550,12 +565,14 @@ export function orderProblems(steps, headSha) {
 
     // 2. THE SECOND REGRESSION NAMES WHAT IT RAN ON.
     const anchors = evidenceAnchors(second.evidence)
-    const namesHead = anchors.commits.some((sha) => head && head.startsWith(sha))
-    const foreign = anchors.commits.filter((sha) => !(head && head.startsWith(sha)))
-    if (!namesHead && foreign.length) {
+    // THE FIRST `on <sha>` IS THE RUN TARGET, and it alone decides. Accepting a
+    // match anywhere let `on 9f3c1a2; not on <head>` through (four-eyes review).
+    const target = anchors.commits[0] ?? null
+    const namesHead = !!target && !!head && head.startsWith(target)
+    if (target && !namesHead) {
       add(
         AFTER_CLEANUP_STEP_ID,
-        `its evidence names commit ${foreign[0]}, which is NOT the commit being closed (${head.slice(0, 12) || 'unknown'}) — a regression on another commit says nothing about this one`,
+        `its evidence says the run was on commit ${target}, which is NOT the commit being closed (${head.slice(0, 12) || 'unknown'}) — a regression on another commit says nothing about this one, and the FIRST commit the evidence names is the one it ran on`,
       )
       return problems
     }
