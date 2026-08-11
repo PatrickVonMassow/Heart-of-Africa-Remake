@@ -3,6 +3,10 @@
 //
 //   node scripts/worktree-cleanup.mjs <path>        remove one worktree safely
 //   node scripts/worktree-cleanup.mjs <path> --dry  say what it would do
+//   node scripts/worktree-cleanup.mjs <path> --expect-branch <ref>
+//                                                   refuse unless the checkout is
+//                                                   STILL on <ref>, unlocked and
+//                                                   clean (point 629)
 //
 // Call this instead of `git worktree remove` and instead of `rm -rf`. Both of
 // those follow the `node_modules` junction into the MAIN tree and delete the
@@ -15,7 +19,15 @@ import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { judgeTarget, assertInside, shouldDetach, formatRefusal, insideRoot, stubBranchFor } from './worktree-cleanup-core.mjs'
+import {
+  judgeTarget,
+  assertInside,
+  matchesExpectation,
+  shouldDetach,
+  formatRefusal,
+  insideRoot,
+  stubBranchFor,
+} from './worktree-cleanup-core.mjs'
 
 /**
  * lstat as the pure rule wants to see it.
@@ -142,6 +154,42 @@ export function listWorktrees(runGit = git) {
     .map((l) => l.slice(9).trim())
 }
 
+/** What `git worktree list` says about ONE path right now — { path, branch,
+ *  locked } — or null when it lists nothing there. */
+export function worktreeEntry(target, runGit = git) {
+  const want = normPathOf(target)
+  let cur = null
+  for (const line of runGit(['worktree', 'list', '--porcelain']).split(/\r?\n/)) {
+    if (line.startsWith('worktree ')) {
+      if (cur && normPathOf(cur.path) === want) return cur
+      cur = { path: line.slice(9).trim(), branch: '', locked: null }
+    } else if (line.startsWith('branch ') && cur) {
+      cur.branch = line.slice(7).trim().replace(/^refs\/heads\//, '')
+    } else if (cur && (line === 'locked' || line.startsWith('locked '))) {
+      cur.locked = line.slice(6).trim() || 'a holder that recorded no reason'
+    }
+  }
+  return cur && normPathOf(cur.path) === want ? cur : null
+}
+
+const normPathOf = (p) =>
+  String(p ?? '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/\/+$/, '')
+    .toLowerCase()
+
+/** Does this checkout hold uncommitted or untracked work? null when unreadable.
+ *  `--no-optional-locks` so the question does not rewrite the index it asks about;
+ *  submodules deliberately NOT ignored — hidden dirty work is what this guards. */
+export function checkoutDirty(path, runGit = git) {
+  try {
+    return runGit(['--no-optional-locks', '-C', path, 'status', '--porcelain']).trim().length > 0
+  } catch {
+    return null
+  }
+}
+
 /**
  * THE STUB BRANCH GOES WITH THE TREE (point 613).
  *
@@ -173,10 +221,25 @@ export function removeStubBranch(target, { dry = false, git: runGit = git } = {}
 /** The whole operation: judge, detach, remove, prune, drop the stub branch.
  *  Returns a report. `git` is injectable so the Vitest case can run it against
  *  a throwaway repository instead of this one. */
-export function cleanupWorktree(target, { dry = false, git: runGit = git } = {}) {
+export function cleanupWorktree(target, { dry = false, git: runGit = git, expectBranch = '' } = {}) {
   const worktrees = listWorktrees(runGit)
   const verdict = judgeTarget({ target, mainRoot: worktrees[0] ?? REPO_ROOT, worktrees })
   if (!verdict.ok) return { ok: false, verdict, detached: [] }
+  // THE LAST RE-PROOF, INSIDE THE PROCESS THAT DELETES (point 629). Everything the
+  // caller checked, it checked before spawning this command; between that answer
+  // and the removal below a worktree can be picked up again, which is the window
+  // the whole failure class lives in. Only a caller that NAMES what it expects
+  // gets this check — an orphan removal has nothing to compare against.
+  if (String(expectBranch ?? '').trim() && existsSync(target)) {
+    const match = matchesExpectation({
+      expectBranch,
+      entry: worktreeEntry(target, runGit),
+      dirty: checkoutDirty(target, runGit),
+    })
+    if (!match.ok) {
+      return { ok: false, verdict: { ...verdict, ok: false, reason: `changed-under-cleanup: ${match.reason}` }, detached: [] }
+    }
+  }
   if (!existsSync(target)) {
     if (!dry) tryPrune(runGit)
     // The stub outlives a half-finished removal too — that is exactly the state
@@ -201,9 +264,11 @@ function tryPrune(runGit = git) {
 if (isMainModule(import.meta.url)) {
   const args = process.argv.slice(2)
   const dry = args.includes('--dry')
-  const target = args.find((a) => !a.startsWith('--'))
+  const expectAt = args.indexOf('--expect-branch')
+  const expectBranch = expectAt >= 0 ? (args[expectAt + 1] ?? '') : ''
+  const target = args.filter((a, i) => !a.startsWith('--') && i !== expectAt + 1)[0]
   try {
-    const result = cleanupWorktree(target, { dry })
+    const result = cleanupWorktree(target, { dry, expectBranch })
     if (!result.ok) {
       console.error(formatRefusal(result.verdict))
       process.exit(2)

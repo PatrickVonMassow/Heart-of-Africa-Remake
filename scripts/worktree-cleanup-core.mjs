@@ -125,6 +125,37 @@ export function assertInside(path, root) {
 }
 
 /**
+ * IS THE TREE IN FRONT OF THE DELETION THE TREE THE CALLER MEANT? PURE (point 629).
+ *
+ * A caller that knows which branch it is cleaning up passes `--expect-branch`, and
+ * the removal is refused unless the checkout STILL matches — same branch, no lock,
+ * no uncommitted work. This is the last of three re-proofs and the only one inside
+ * the process that actually deletes: the landing's selection and its per-path
+ * re-check both answer BEFORE this command is spawned, and the window between
+ * their answer and the `rm` is exactly where a worktree can be picked up again.
+ *
+ * WITHOUT `--expect-branch` nothing changes. `batch-doctor` removes ORPHANS, which
+ * by definition have no branch and no registration to compare against; making the
+ * check unconditional would refuse the one case that command exists for.
+ *
+ * Inputs are plain data: the expected branch, what `git worktree list` now says
+ * about the path (`null` when it lists nothing), and whether the checkout is dirty
+ * (`null` when it could not be read). Returns { ok, reason }.
+ */
+export function matchesExpectation({ expectBranch, entry, dirty } = {}) {
+  const want = String(expectBranch ?? '').trim()
+  if (!want) return { ok: true, reason: 'nothing was expected' }
+  if (!entry) return { ok: false, reason: 'git no longer lists it as a worktree' }
+  const has = String(entry.branch ?? '').trim()
+  if (!has) return { ok: false, reason: `expected ${want}, but it is on a detached HEAD` }
+  if (has !== want) return { ok: false, reason: `expected ${want}, but it is on ${has}` }
+  if (String(entry.locked ?? '').trim()) return { ok: false, reason: `it is git-locked: ${String(entry.locked).trim()}` }
+  if (dirty === true) return { ok: false, reason: 'it holds uncommitted changes' }
+  if (dirty !== false) return { ok: false, reason: 'whether it holds uncommitted work could not be established' }
+  return { ok: true, reason: `still on ${want}, unlocked and clean` }
+}
+
+/**
  * THE SETUP BRANCH THAT COMES WITH AN AGENT WORKTREE. PURE.
  *
  * Creating the isolated tree `<repo>/.claude/worktrees/agent-<id>` also creates

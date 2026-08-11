@@ -17,6 +17,7 @@ import {
   assertInside,
   formatRefusal,
   stubBranchFor,
+  matchesExpectation,
   REFUSALS,
 } from './worktree-cleanup-core.mjs'
 import { cleanupWorktree, detachLinks } from './worktree-cleanup.mjs'
@@ -322,5 +323,110 @@ describe('the incident, replayed on a THROWAWAY repository', () => {
     expect(existsSync(join(worktree, 'node_modules'))).toBe(false)
     expect(existsSync(probe)).toBe(true)
     expect(existsSync(join(worktree, 'dirty.txt'))).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE RE-PROOF INSIDE THE PROCESS THAT DELETES (point 629). The caller checked
+// before it spawned this command; between that answer and the removal a worktree
+// can be picked up again, and only a check INSIDE this process can see that.
+describe('matchesExpectation — pure', () => {
+  const entry = { path: '/repo/.claude/worktrees/agent-a', branch: 'feat/608-x', locked: null }
+
+  it('passes an unlocked, clean checkout still on the expected branch', () => {
+    expect(matchesExpectation({ expectBranch: 'feat/608-x', entry, dirty: false })).toMatchObject({ ok: true })
+  })
+
+  it('changes nothing when the caller expects nothing — orphan removal has no branch to compare', () => {
+    expect(matchesExpectation({ entry: null, dirty: null }).ok).toBe(true)
+    expect(matchesExpectation({ expectBranch: '  ', entry: null }).ok).toBe(true)
+  })
+
+  it('refuses a path git no longer lists', () => {
+    const r = matchesExpectation({ expectBranch: 'feat/608-x', entry: null, dirty: false })
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/no longer lists/)
+  })
+
+  it('refuses a checkout that moved to another branch, or detached', () => {
+    const moved = { ...entry, branch: 'feat/590-y' }
+    expect(matchesExpectation({ expectBranch: 'feat/608-x', entry: moved, dirty: false }).ok).toBe(false)
+    expect(matchesExpectation({ expectBranch: 'feat/608-x', entry: { ...entry, branch: '' }, dirty: false }).ok).toBe(
+      false,
+    )
+  })
+
+  it('refuses a checkout that was locked since', () => {
+    const locked = { ...entry, locked: 'claude agent (pid 7)' }
+    const r = matchesExpectation({ expectBranch: 'feat/608-x', entry: locked, dirty: false })
+    expect(r.ok).toBe(false)
+    expect(r.reason).toMatch(/git-locked/)
+  })
+
+  it('refuses on uncommitted work, and on a dirtiness that could not be read', () => {
+    expect(matchesExpectation({ expectBranch: 'feat/608-x', entry, dirty: true }).ok).toBe(false)
+    expect(matchesExpectation({ expectBranch: 'feat/608-x', entry, dirty: null }).ok).toBe(false)
+  })
+})
+
+describe('--expect-branch, on a THROWAWAY repository', () => {
+  let tmp
+  let repo
+  let worktree
+  const run = (args, cwd) => execFileSync('git', args, { cwd: cwd ?? repo, encoding: 'utf8', windowsHide: true })
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'hoa-wt-expect-'))
+    repo = join(tmp, 'main')
+    mkdirSync(repo, { recursive: true })
+    run(['init', '-q', '-b', 'main'])
+    run(['config', 'user.email', 'test@example.invalid'])
+    run(['config', 'user.name', 'test'])
+    writeFileSync(join(repo, 'a.txt'), 'a')
+    run(['add', '-A'])
+    run(['commit', '-qm', 'init'])
+    worktree = join(tmp, 'wt')
+    run(['worktree', 'add', '-q', '-b', 'feat/608-x', worktree])
+  })
+
+  afterEach(() => {
+    try {
+      rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+    } catch {
+      /* the OS's problem, not the suite's */
+    }
+  })
+
+  const cleanup = (opts) => cleanupWorktree(worktree, { git: (args, cwd) => run(args, cwd), ...opts })
+
+  it('removes the tree when the expectation still holds', () => {
+    expect(cleanup({ expectBranch: 'feat/608-x' }).ok).toBe(true)
+    expect(existsSync(worktree)).toBe(false)
+  })
+
+  it("REFUSES a tree that was locked between the caller's check and this command", () => {
+    run(['worktree', 'lock', '--reason', 'claude agent agent-x (pid 999999 start 1)', worktree])
+    const r = cleanup({ expectBranch: 'feat/608-x' })
+    expect(r.ok).toBe(false)
+    expect(r.verdict.reason).toMatch(/changed-under-cleanup/)
+    expect(existsSync(worktree)).toBe(true) // the whole point: it is still standing
+  })
+
+  it('REFUSES a tree carrying uncommitted work', () => {
+    writeFileSync(join(worktree, 'in-progress.txt'), 'the state nothing can rescue')
+    expect(cleanup({ expectBranch: 'feat/608-x' }).ok).toBe(false)
+    expect(existsSync(join(worktree, 'in-progress.txt'))).toBe(true)
+  })
+
+  it('REFUSES a tree that moved to another branch', () => {
+    run(['checkout', '-q', '-b', 'feat/590-y'], worktree)
+    expect(cleanup({ expectBranch: 'feat/608-x' }).ok).toBe(false)
+    expect(existsSync(worktree)).toBe(true)
+  })
+
+  it('still removes a dirty tree when NO expectation is given — the old contract is untouched', () => {
+    writeFileSync(join(worktree, 'leftovers.txt'), 'what a finished agent leaves')
+    expect(cleanup({}).ok).toBe(true)
+    expect(existsSync(worktree)).toBe(false)
   })
 })
