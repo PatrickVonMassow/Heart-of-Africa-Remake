@@ -70,49 +70,6 @@ there exactly once; a new point joins a bundle when appended.
 
 ## Checklist
 
-- [ ] 655. EVERY BOARD CARD NAMES ITS POINT NUMBER AND ITS SUBJECT (user 11.08.2026, with a
-  screenshot of the card "Abschlussarbeiten zum gerade beendeten Punkt": "Oft sehen Karten von
-  dir so aus. Da steht noch nicht einmal die Nummer des Punktes, geschweige denn, worum es in
-  dem Punkt geht. Beides muss immer zwangsweise drin stehen. Das dauerhaft per Mechanismus
-  zusichern."). The board is read on a phone, at a glance, by someone who does not carry the
-  work order in his head: a card whose title is a STAGE ("closing duties for the point just
-  finished", "currently no running work") tells him neither WHICH point nor WHAT it was about,
-  so the one screen he has says nothing. Queue cards already carry both — the numbered chip and
-  a German title — and the gap is in the cards the session writes at a transition: the now-card
-  written by `board.mjs now|status`, the closing card, and the handover card.
-  IT IS THE HEADER THAT MUST CARRY IT, not the body (user, same evening, after the number alone
-  had been added to the text: "Die Punktnummer ist hinzugekommen, aber es fehlt weiterhin der
-  Titel des Punktes im Header und die Beschreibung des Punktes im Body."). So: the SUMMARY line
-  carries the number AND the point's German title, and the BODY says what the point is about
-  before it says what stage it is in. Writing the number into the body while the header stays a
-  stage word does not satisfy this — that was tried and rejected. The obstacle to fix is in
-  `board-core.mjs`: `CLOSING_WORK_TITLE` is a CONSTANT and the regex that finds the card is
-  built from it, so a per-point title needs the matcher to key on a stable marker (a class or a
-  data attribute) instead of the literal text — change both together or the card becomes
-  unfindable and the state can never be replaced.
-  FINAL STATE:
-  1. Every card in "Woran ich gerade arbeite" carries its POINT NUMBER in the same numbered chip
-     the queue cards use, and a TITLE naming the subject, not the stage. "Abschlussarbeiten"
-     becomes "651 — Das Trommelbett ist eine 1,9-Sekunden-Schleife: Abschlussarbeiten": the
-     number, the subject, then the stage.
-  2. The one deliberate exception stays exactly one and is NAMED as such: the handover card that
-     says nothing is running belongs to NO point (that is the whole content of point 434(7), and
-     the topic guard reads a point reference inside it as a foreign one). It keeps its unnumbered
-     form and gains nothing else — but it must then say what the batch does NEXT, i.e. name the
-     point the successor picks up, in prose rather than as a chip.
-  3. The PUBLISH GATE refuses a board that breaks either: a now-card without a numbered chip, or
-     one whose title carries only a stage word ("Abschlussarbeiten", "Nacharbeit", "Vorbereitung",
-     "Aufräumen" and their English forms) with no subject behind it. The refusal names the card.
-     `board.mjs closing` therefore takes the point it closes and composes the title itself, so the
-     caller cannot get it wrong.
-  VERIFIABLE: Vitest over the pure gate — a now-card without a chip is refused; a title that is
-  only a stage word is refused; "651 — <subject>: Abschlussarbeiten" passes; the unnumbered
-  handover card passes but is refused when it names no follow-on work; and `board.mjs closing 651`
-  renders exactly the composed title. Plus one rendering check that the chip appears in the
-  phone-width layout of a now-card, where it never has before.
-  Criticality: medium — it cannot break the game, but the board is the user's only window into
-  an unattended batch, and a card he cannot decode is the same as no card. Bundle: Chat & Tafel.
-
 - [ ] 656. THE CHILDREN'S SHUFFLE GATE CANNOT SEE THE SYMPTOM IT WAS BUILT FOR (found
   11.08.2026 by the cross-vendor review of point 648 — GPT-5.6 Sol at effort high, verdict
   do-not-merge, recorded against `d1ed0d27`; the behaviour fixes of 648 are on `main` and are
