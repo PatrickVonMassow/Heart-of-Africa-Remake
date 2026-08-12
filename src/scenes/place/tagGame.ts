@@ -160,6 +160,16 @@ export interface TagChild {
   /** Distance actually WALKED — the gait phase rides it, so a teleport nudge is
    *  deliberately excluded and the legs never flail through a correction. */
   walked: number
+  /**
+   * AND HOW MUCH OF IT WAS WALKED WHILE THE ROUND WAS ON (point 656). The
+   * settlement knows when it is playing, so it counts the metres itself rather
+   * than leaving a watcher to guess from a `playing` flag sampled beside a
+   * position: a frame's movement is recorded at the sample AFTER it happened,
+   * so an outside reconstruction credits the wrong side of a round's first or
+   * last frame. Cumulative, and free of the teleport for the same reason
+   * `walked` is.
+   */
+  walkedWhilePlaying: number
   /** Seconds without real movement. */
   pinned: number
   /**
@@ -225,6 +235,12 @@ export interface TagState {
   /** Seconds left of the idle break. */
   idleFor: number
   playing: boolean
+  /**
+   * SIM seconds of this group's clock that were actually PLAYED (point 656).
+   * The settlement counts them itself, so a check need not decide from a
+   * sampled flag which side of a round's first frame an interval belongs to.
+   */
+  playedClock: number
   /** Catches so far — a probe for the tests and the live check. */
   tags: number
   /**
@@ -306,6 +322,7 @@ export function createTagGame(
       recoverScale: spread(rand, cfg.variation),
       pace: 0,
       walked: 0,
+      walkedWhilePlaying: 0,
       pinned: 0,
       nudges: 0,
       carried: 0,
@@ -329,6 +346,7 @@ export function createTagGame(
     chaserFor: 0,
     idleFor: 0,
     playing: false,
+    playedClock: 0,
     tags: 0,
     clock: 0,
     play: createProducerWatch(),
@@ -757,6 +775,11 @@ function advanceTagGame(
   }
 
   s.chaserFor += dt
+  // The game's own count of the seconds it was PLAYED (point 656), for the same
+  // reason as the metres below: a watcher reconstructing it from a sampled flag
+  // has to decide which side of a round's first frame the interval belongs to,
+  // and the settlement need not guess.
+  s.playedClock += dt
   if (s.immuneFor > 0) {
     s.immuneFor = Math.max(0, s.immuneFor - dt)
     if (s.immuneFor === 0) s.immune = -1
@@ -799,6 +822,7 @@ function advanceTagGame(
   const floor = floorPace(cfg)
   for (let i = 0; i < n; i++) {
     const c = s.children[i]
+    const walkedBefore = c.walked
     const isChaser = i === s.chaser
     let wants: boolean
     let desired: number
@@ -871,6 +895,8 @@ function advanceTagGame(
     // its legs stay still.
     if (c.pace > 0) moveChild(c, desired, c.pace * dt, dt, cfg, world)
     trackProgress(c, dt, cfg, world)
+    // Whatever its legs did this frame, they did it while the round was on.
+    c.walkedWhilePlaying += c.walked - walkedBefore
     // The BODY turns at a rate toward where it is going. The travel heading may
     // jump — a deflection round a hut corner is a real change of direction — but
     // a body that snapped to it spun about-face inside a single frame.

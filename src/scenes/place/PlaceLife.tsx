@@ -712,6 +712,10 @@ function Kids({
       // The game's OWN clock: the verification samples an interval of GAME,
       // never a count of frames, which buy different amounts of it per machine.
       clock: game.clock,
+      // Of that clock, the part actually PLAYED (point 656) — the game's own
+      // count, so a check need not decide from a sampled flag which side of a
+      // round's first frame an interval falls on.
+      playedClock: game.playedClock,
       // The radius a child's BODY occupies, so a live check can judge an overlap
       // against the real figure rather than against a guessed one (point 648).
       bodyRadius: balance.villageLife.separation.bodyRadius * KID_SCALE,
@@ -738,6 +742,9 @@ function Kids({
         // the difference between an obeyed stillness and the reported snag.
         held: c.held,
         walked: c.walked,
+        // And how much of that walking happened while the round was ON — the
+        // settlement's own counter, for the same reason (point 656).
+        walkedWhilePlaying: c.walkedWhilePlaying,
       })),
     })
     // What the group has SAID so far this visit (point 481), by situation — a

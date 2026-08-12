@@ -3382,12 +3382,19 @@ if (section('children-motion')) {
             log.push({
               clock: t.clock,
               playing: t.playing,
+              // Of that clock, the seconds actually played — likewise the
+              // game's own count.
+              playedClock: t.playedClock,
               c: t.children.map((k) => ({
                 x: k.x,
                 z: k.z,
                 pace: k.pace,
                 held: k.held,
                 walked: k.walked,
+                // The metres walked while the round was ON, the game's own
+                // counter (point 656): a watcher outside cannot say which side
+                // of a round's first frame a step belongs to.
+                walkedWhilePlaying: k.walkedWhilePlaying,
                 heading: k.heading,
                 // How often the settlement has had to pick this child up
                 // (point 656): the rescue is what ENDS a snag, so without it
@@ -3426,7 +3433,7 @@ if (section('children-motion')) {
     // condition is now the shared `holdsAGame`, which asks the game CLOCK and
     // the QUIETEST child's legs.
     const tracks = Array.from({ length: n }, (_, k) =>
-      log.map((f) => ({ ...f.c[k], clock: f.clock, playing: f.playing })),
+      log.map((f) => ({ ...f.c[k], clock: f.clock, playing: f.playing, playedClock: f.playedClock })),
     )
     const live = traceLiveness(tracks)
     check(

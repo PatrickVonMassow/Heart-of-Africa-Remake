@@ -425,6 +425,15 @@ export function shuffleWindows(tracks, cfg = {}) {
  * break and then stood still through 31 seconds of play satisfied both bars at
  * once without ever having walked while the game was on.
  *
+ * AND BOTH FIGURES ARE THE GAME'S OWN COUNTERS (the sixth review): `playedClock`
+ * and `TagChild.walkedWhilePlaying`, the same "ask the settlement, do not
+ * reconstruct" move that fixed the carry counting. A frame's movement is
+ * recorded at the sample AFTER it happened, so classifying that step by the
+ * `playing` flag of either endpoint credits the wrong side of a round's first
+ * and last frame. The settlement knows which it was; a watcher outside has to
+ * guess. A trace that does not publish them reports `countersPublished: false`
+ * and is refused rather than read as nothing-walked.
+ *
  * Note what a MISSING `playing` field does: it reads as not playing, so a trace
  * that cannot show a game in it does not pass for one. A number that is not a
  * number is the same kind of nothing: `numbersFinite` says whether the clock and
@@ -442,10 +451,18 @@ export function traceLiveness(tracks) {
   // Nothing said is not good news: an empty set of tracks reports no readable
   // numbers rather than a clean set of them.
   let numbersFinite = real.length > 0
-  // PER CHILD, because the floor is per child: one motionless child among three
-  // busy ones is invisible in a sum, and it scores perfectly on every upper
-  // bound there is — nothing walked is nothing shuffled, nothing stuck and
-  // nothing carried.
+  // THE GAME'S OWN COUNTERS, NEVER A RECONSTRUCTION FROM THE FLAG. A missing one
+  // is reported, never read as zero — and the whole set is checked BEFORE any of
+  // it is used, or an early track would be measured on a promise a later one
+  // breaks.
+  let countersPublished = real.length > 0
+  for (const track of real) {
+    for (const s of track) {
+      if (!Number.isFinite(s.walkedWhilePlaying) || !Number.isFinite(s.playedClock)) {
+        countersPublished = false
+      }
+    }
+  }
   const perChild = tracks.map(() => ({
     seconds: 0,
     playedSeconds: 0,
@@ -462,18 +479,13 @@ export function traceLiveness(tracks) {
     }
     if (!track.every((s) => Number.isFinite(s.clock) && Number.isFinite(s.walked))) continue
     const own = perChild[k]
-    own.seconds = track[track.length - 1].clock - track[0].clock
-    for (let i = 0; i < track.length - 1; i++) {
-      const step = Math.max(0, track[i + 1].walked - track[i].walked)
-      own.walked += step
-      // WHILE THE GAME WAS ON, and not merely somewhere in the trace. Walking and
-      // playing were counted over different stretches, so a group that walked
-      // 30 m before the round began and then stood still through it satisfied
-      // both bars at once (the fifth cross-vendor review).
-      if (track[i].playing) {
-        own.playedSeconds += track[i + 1].clock - track[i].clock
-        own.walkedWhilePlaying += step
-      }
+    const first = track[0]
+    const last = track[track.length - 1]
+    own.seconds = last.clock - first.clock
+    own.walked = Math.max(0, last.walked - first.walked)
+    if (countersPublished) {
+      own.playedSeconds = Math.max(0, last.playedClock - first.playedClock)
+      own.walkedWhilePlaying = Math.max(0, last.walkedWhilePlaying - first.walkedWhilePlaying)
     }
     own.walkedPerMinute = own.seconds > 0 ? own.walked / (own.seconds / 60) : 0
     own.walkedPerPlayedMinute =
@@ -497,6 +509,7 @@ export function traceLiveness(tracks) {
   return {
     children: real.length,
     numbersFinite,
+    countersPublished,
     seconds,
     playedSeconds,
     playedShare: seconds > 0 ? playedSeconds / seconds : 0,
@@ -529,6 +542,7 @@ export function holdsAGame(live, cfg = {}) {
   const { playedGate, walkFloor } = { ...CHILD_MOTION, ...cfg }
   return (
     live.numbersFinite &&
+    live.countersPublished &&
     live.children >= 2 &&
     live.playedShare > playedGate &&
     live.quietestWalkedPerPlayedMinute > walkFloor

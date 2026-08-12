@@ -352,6 +352,8 @@ interface Track extends ChildMotionSample {
   pace: number
   held: boolean
   playing: boolean
+  walkedWhilePlaying: number
+  playedClock: number
 }
 
 /** One sample of every child, in the shape the shared metric judges. */
@@ -362,6 +364,8 @@ function sample(v: ReturnType<typeof village>, paths: Track[][]): void {
       x: c.x,
       z: c.z,
       walked: c.walked,
+      walkedWhilePlaying: c.walkedWhilePlaying,
+      playedClock: v.game.playedClock,
       nudges: c.nudges,
       carried: c.carried,
       pace: c.pace,
@@ -755,7 +759,12 @@ describe('and the replay refuses a trace with no game in it (point 656)', () => 
         x: k * 2,
         z: 0,
         walked: 0,
+        // The settlement's own counters: it says it is playing (or not), and
+        // says its legs did nothing either way.
+        walkedWhilePlaying: 0,
+        playedClock: playing ? i / 60 : 0,
         nudges: 0,
+        carried: 0,
         pace: 0,
         held: false,
         playing,
@@ -778,7 +787,9 @@ describe('and the replay refuses a trace with no game in it (point 656)', () => 
     // game that never started. The browser check waits for `playing` and asserts
     // it; this is the same assertion on the pure side.
     const idle = play('bambara-village', 2972259115, 60).map((path) =>
-      path.map((f) => ({ ...f, playing: false })),
+      // No round ever ran: the game's own play counters stand at nothing,
+      // whatever the children's legs did.
+      path.map((f) => ({ ...f, playing: false, playedClock: 0, walkedWhilePlaying: 0 })),
     )
     expect(shuffleWindows(idle).share).toBeLessThan(CHILD_MOTION.shareGate)
     expect(() => expectLively(idle)).toThrow()

@@ -13,6 +13,11 @@ export interface ChildMotionSample {
   nudges?: number
   /** `TagChild.carried` — cumulative metres the settlement teleported it. */
   carried?: number
+  /** `TagChild.walkedWhilePlaying` — cumulative metres walked while the round
+   *  was on, counted by the game itself. */
+  walkedWhilePlaying?: number
+  /** `TagState.playedClock` — cumulative seconds of play, likewise. */
+  playedClock?: number
   /** Whether the GROUP was playing at that moment; missing reads as not. */
   playing?: boolean
 }
@@ -30,6 +35,9 @@ export interface ChildLiveness {
 
 export interface TraceLiveness {
   children: number
+  /** False if any sample lacks the game's own play counters — never read as
+   *  nothing-walked. */
+  countersPublished: boolean
   /** False if any clock or walked distance is not a finite number, and false for
    *  an empty set — nothing said is not good news. */
   numbersFinite: boolean

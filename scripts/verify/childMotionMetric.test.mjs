@@ -14,10 +14,14 @@ import {
 
 const DT = 1 / 60
 
-/** A trace of one child from a function of the frame index. */
-function trace(frames, at) {
+/** A trace of one child from a function of the frame index. The game's own play
+ *  counters ride along: `playing(i)` says whether the round was ON for the step
+ *  that frame RECORDS, which is the step taken before it. */
+function trace(frames, at, playing = () => true) {
   const out = []
   let walked = 0
+  let walkedWhilePlaying = 0
+  let playedClock = 0
   let carried = 0
   let x = 0
   let z = 0
@@ -30,9 +34,23 @@ function trace(frames, at) {
       nudges++
       carried += Math.hypot(step.x - x, step.z - z)
     } else walked += Math.hypot(step.x - x, step.z - z)
+    if (i > 0 && playing(i)) {
+      playedClock += DT
+      walkedWhilePlaying += step.rescue ? 0 : Math.hypot(step.x - x, step.z - z)
+    }
     x = step.x
     z = step.z
-    out.push({ clock: i * DT, x, z, walked, carried, nudges })
+    out.push({
+      clock: i * DT,
+      x,
+      z,
+      walked,
+      walkedWhilePlaying,
+      playedClock,
+      carried,
+      nudges,
+      playing: playing(i),
+    })
   }
   return out
 }
@@ -394,7 +412,7 @@ describe('a trace has to hold a game before it proves anything', () => {
     // so every ceiling was satisfied — by a settlement standing perfectly still.
     const statue = () => trace(420, () => ({ x: 0, z: 0 })).map((s) => ({ ...s, playing: true }))
     const still = traceLiveness([statue(), statue(), statue(), statue()])
-    expect(still.playedShare).toBe(1) // it says it is playing the whole seven seconds
+    expect(still.playedShare).toBeCloseTo(1, 6) // it says it played the whole seven seconds
     expect(shuffleWindows([statue(), statue(), statue(), statue()]).share).toBe(0)
     expect(rescueRate([statue(), statue(), statue(), statue()]).worstPerChildMinute).toBe(0)
     expect(holdsAGame(still)).toBe(false) // and it is refused, on the legs
@@ -432,25 +450,11 @@ describe('a trace has to hold a game before it proves anything', () => {
     // perfectly still through thirty-one seconds that are. Walking and playing
     // were counted over different parts of the trace, so both bars were
     // satisfied at once — by a group that never took a step while the game was
-    // on.
-    const disjoint = (walkBeforeTheRound) => {
-      const t = []
-      let walked = 0
-      let x = 0
-      for (let i = 0; i < 3600; i++) {
-        const clock = i * DT
-        const playing = clock >= 29
-        // The walking happens in the stretch this trace puts it in.
-        if (playing !== walkBeforeTheRound) {
-          walked += 1.5 * DT
-          x += 1.5 * DT
-        }
-        t.push({ clock, x, z: 0, walked, carried: 0, nudges: 0, playing })
-      }
-      return t
-    }
-    const before = disjoint(true) // walks only BEFORE the round starts
-    const during = disjoint(false) // walks only WHILE it is played
+    // on. The counters below are the settlement's own, so the question is not
+    // reconstructed from anything.
+    const playing = (i) => i * DT >= 29
+    const before = trace(3600, (i, at) => (playing(i) ? at : { x: at.x + 1.5 * DT, z: 0 }), playing)
+    const during = trace(3600, (i, at) => (playing(i) ? { x: at.x + 1.5 * DT, z: 0 } : at), playing)
     const idleGame = traceLiveness([before, before])
     expect(idleGame.playedShare).toBeGreaterThan(CHILD_MOTION.playedGate) // it says it played
     expect(idleGame.walkedPerChildMinute).toBeGreaterThan(CHILD_MOTION.walkFloor) // and it walked
@@ -463,19 +467,64 @@ describe('a trace has to hold a game before it proves anything', () => {
     expect(holdsAGame(played)).toBe(true)
   })
 
+  it('and takes the metres from the GAME where the flag flips at the step', () => {
+    // THE TRANSITION ITSELF (sixth cross-vendor review). A frame's movement is
+    // recorded at the sample AFTER it happened, so a watcher that classifies
+    // that step by the `playing` flag of an endpoint credits the wrong side of
+    // every frame the round turns over on. Here the round is on for two frames
+    // in three and the child walks ONLY on the third — never while playing — and
+    // each of those walking steps is recorded at a sample whose predecessor says
+    // "playing". The settlement's counter says nothing was walked in play; the
+    // reconstruction says all of it was.
+    const played = (i) => i % 3 !== 0
+    const t = trace(3600, (i, at) => (played(i) ? at : { x: at.x + 0.025, z: 0 }), played)
+    const walkedAt = t.findIndex((s, i) => i > 0 && s.walked > t[i - 1].walked)
+    expect(t[walkedAt].playing).toBe(false) // the step was taken with the round off
+    expect(t[walkedAt - 1].playing).toBe(true) // and the sample before it says otherwise
+    // What the flag-based reading made of it, on this very trace: every metre
+    // credited to play.
+    let reconstructed = 0
+    for (let i = 0; i < t.length - 1; i++) {
+      if (t[i].playing) reconstructed += t[i + 1].walked - t[i].walked
+    }
+    expect(reconstructed).toBeCloseTo(t[t.length - 1].walked - t[0].walked, 6)
+    const live = traceLiveness([t, t])
+    expect(live.playedShare).toBeGreaterThan(CHILD_MOTION.playedGate) // it really did play
+    expect(live.walkedPerChildMinute).toBeGreaterThan(CHILD_MOTION.walkFloor) // and really walked
+    expect(live.quietestWalkedPerPlayedMinute).toBe(0) // but never while playing
+    expect(holdsAGame(live)).toBe(false)
+  })
+
+  it('and refuses a trace that does not publish those counters at all', () => {
+    // A missing counter is not "nothing walked while playing"; it is nothing
+    // said, and it is refused as such.
+    const bare = trace(3600, (i) => ({ x: i * DT * 1.5, z: 0 })).map(
+      ({ walkedWhilePlaying: _w, playedClock: _p, ...rest }) => rest,
+    )
+    const live = traceLiveness([bare, bare])
+    expect(live.countersPublished).toBe(false)
+    expect(holdsAGame(live)).toBe(false)
+  })
+
   it('and it reads the played share off the CLOCK, not the frame count', () => {
     // Frames are not evenly spaced — this trace's own live frames run from 20 ms
     // to over a second — so a majority of the frames is not a majority of the
-    // minute. Here two thirds of the SAMPLES are playing and they hold a tenth
-    // of the game: a frame count says yes, the clock says no.
+    // minute. Two thirds of these SAMPLES are playing and they hold a tenth of
+    // the game.
     const t = []
     let clock = 0
     let walked = 0
+    let playedClock = 0
+    let walkedWhilePlaying = 0
     for (let i = 0; i < 300; i++) {
       const playing = i % 3 !== 0
       const dt = playing ? 0.01 : 0.18
       walked += 1.5 * dt
-      t.push({ clock, x: walked, z: 0, walked, carried: 0, nudges: 0, playing })
+      if (playing) {
+        playedClock += dt
+        walkedWhilePlaying += 1.5 * dt
+      }
+      t.push({ clock, x: walked, z: 0, walked, walkedWhilePlaying, playedClock, carried: 0, nudges: 0, playing })
       clock += dt
     }
     const live = traceLiveness([t, t])
@@ -500,8 +549,8 @@ describe('a trace has to hold a game before it proves anything', () => {
     const still = trace(3600, () => ({ x: 0, z: 0 })).map((s) => ({ ...s, playing: true }))
     expect(traceLiveness([still]).walkedPerChildMinute).toBe(0)
     expect(shuffleWindows([still]).share).toBe(0)
-    const unplayed = trace(3600, (i) => ({ x: i * DT * 1.5, z: 0 }))
-    expect(traceLiveness([unplayed]).playedShare).toBe(0) // a missing flag is not a game
+    const unplayed = trace(3600, (i) => ({ x: i * DT * 1.5, z: 0 }), () => false)
+    expect(traceLiveness([unplayed]).playedShare).toBe(0) // a round that never ran is no game
   })
 })
 
