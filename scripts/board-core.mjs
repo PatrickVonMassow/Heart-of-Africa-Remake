@@ -253,6 +253,9 @@ export function upgradeNowCards(html) {
  * could not be published becomes publishable by the next command, whichever it
  * was.
  */
+/** A card as the plain text it showed — what a removal hands back to be printed. */
+const cardText = (card) => String(card).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+
 export function dropStrayNowCards(html) {
   const dropped = []
   const doc = String(html ?? '')
@@ -275,16 +278,22 @@ export function dropStrayNowCards(html) {
     // a numbered card is reached by `title`/`queue`/`done`, and the handover
     // card by `none`. A marker alone does not save a card here either, or an
     // impostor wearing one would be exactly as unremovable as before.
+    // OUTSIDE THE SECTION NOTHING IS REACHABLE (four-eyes review, 12.08.2026):
+    // every writer and every state removal works inside the current-work section,
+    // so a card that has drifted out — numbered or not — can be repaired by
+    // nothing. It is swept HERE, where the removal is reported, and the
+    // `now-card-outside` violation goes with it.
+    if (!inSection(at)) {
+      dropped.push({ title: title.trim() || '<untitled>', text: cardText(card) })
+      return ''
+    }
     const { chip, legacy } = summaryPoint(summary)
     if (chip || legacy) return card
-    if (isStateCardTitle(title) && inSection(at)) return card
+    if (isStateCardTitle(title)) return card
     // A genuine state card that lost its chip is still replaceable by its own
     // command (`none`, `closing <N>`), so it is kept rather than swept.
-    if (/data-state="closing"/.test(card) && looksLikeClosingTitle(title) && inSection(at)) return card
-    dropped.push({
-      title: title.trim() || '<untitled>',
-      text: card.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
-    })
+    if (/data-state="closing"/.test(card) && looksLikeClosingTitle(title)) return card
+    dropped.push({ title: title.trim() || '<untitled>', text: cardText(card) })
     return ''
   })
   return { html: out, dropped }

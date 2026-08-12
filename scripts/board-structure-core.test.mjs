@@ -593,6 +593,12 @@ describe('every current-work card names its point and its subject', () => {
     const titled = setCardTitle(drifted, 651, 'Neuer Betreff')
     expect(titled).toContain('<span class="t">Verirrte Kopie</span>')
     expect(titled).toContain('<span class="t">Neuer Betreff</span>')
+    // …and the stray copy IS repairable: the sweep takes what no writer can
+    // reach, and reports it, so the board is publishable again.
+    const swept = dropStrayNowCards(drifted)
+    expect(swept.dropped.map((d) => d.title)).toEqual(['Verirrte Kopie'])
+    expect(swept.dropped[0].text).toContain('Alte Prosa.')
+    expect(codes(swept.html)).toEqual([])
   })
 
   // A REPLACEMENT STRING IS NOT TEXT (four-eyes 12.08.): `$&`, "$'", '$`' and
