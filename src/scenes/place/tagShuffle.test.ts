@@ -23,8 +23,9 @@
 // and both copies summed frame-to-frame POSITIONS as the path walked — so the
 // rescue teleport that ENDS a snag was counted as the child walking out of its
 // own pocket, and the window was longer than the rescue that tidied the symptom
-// away. The metric now takes the walked distance from the game itself, leaves
-// the carry out of the ground path, and gates the rescues on their own account.
+// away. The metric now takes the walked distance from the game itself, BREAKS
+// the trace where the settlement carried a child rather than guessing what its
+// legs did across the carry, and gates the rescues on their own account.
 // AND ITS WINDOWS WEIGH EQUALLY IN GAME TIME rather than one per sample, so the
 // frame cadence cannot move the share — shown here on a recorded trace read at
 // five cadences, not merely claimed.
@@ -441,7 +442,8 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       // AND THE VERDICT RESTS ON THE TRACE, not on a corner of it: a silence
       // longer than the window is judged by nobody and reported as unjudged, so
       // a share is only worth what `judgedShare` says it covers. Measured here:
-      // 0.983, the missing part being the tail no window can reach into.
+      // 0.92-0.95, the missing part being the tail no window can reach into and
+      // the second before each of the settlement's few rescues.
       expect(r.judgedShare).toBeGreaterThan(0.8)
       expect(r.share).toBeLessThan(CHILD_MOTION.shareGate)
       // AND NOBODY IS BEING CARRIED (point 656): the rescue teleport is what
@@ -580,11 +582,12 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // unevener renderer would have seen the very same play, evenly at 60, 20 and
     // 7.5 frames a second and irregularly at cadences swinging by a factor of
     // eight and of eleven, which is the spread a headless frame really shows.
-    // TOLERANCE: within 15 % of the 60 fps reading. Measured, base 1.123 %:
-    // 1.123 / 1.123 / 1.072 / 1.101 / 1.130 %, a spread of 4.5 %.
+    // TOLERANCE: within 20 % of the 60 fps reading. Measured, base 0.462 %:
+    // 0.462 / 0.425 / 0.418 / 0.461 / 0.463 %, a spread of 9.5 %, with 93 % of
+    // every one of those traces judgeable.
     const shares = CADENCES.map(([, step]) => shuffleWindows(resample(paths, step, 4242)).share)
-    expect(shares[0]).toBeGreaterThan(0.005) // a real share to be invariant about
-    for (const s of shares) expect(Math.abs(s - shares[0])).toBeLessThan(shares[0] * 0.15)
+    expect(shares[0]).toBeGreaterThan(0.003) // a real share to be invariant about
+    for (const s of shares) expect(Math.abs(s - shares[0])).toBeLessThan(shares[0] * 0.2)
   })
 })
 
@@ -593,12 +596,14 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
  * the deflection needs a couple of body radii of clear ground ahead before it
  * will take a step at all — and no room to get anywhere, and the settlement
  * carries it 3 m clear whenever its stall watch runs out. Measured over 40 s at
- * these numbers: 22.5 rescues per child-minute, every one of them a carry, and
- * 3.3 % of the judged game time walked without getting anywhere — thirteen times
- * the gate. THE MEASURE THIS ONE REPLACED sees 0.35 % of the same trace and
- * would have passed it at its own 1 % gate, because every one of its two-second
- * windows holds a 3 m carry: it counted the teleport as the child walking, and
- * as ground the child covered.
+ * these numbers: 22.5 rescues per child-minute, every one of them carrying the
+ * child, and 1.94 % of the judged game time walked without getting anywhere —
+ * nearly eight times the gate. Two fifths of that trace is not judged at all,
+ * because a window that spans a carry is refused rather than guessed at; the
+ * carries are what the rescue gate answers for. THE MEASURE THIS ONE REPLACED
+ * sees 0.35 % of the same trace and would have passed it at its own 1 % gate,
+ * because every one of its two-second windows holds a 3 m carry: it counted the
+ * teleport as the child walking, and as ground the child covered.
  */
 const PEN_RADIUS = 0.8
 const PEN_CARRY = 3
@@ -655,28 +660,37 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     expect(r.share).toBeGreaterThan(asItWas.share * 5)
   })
 
-  it('and reads that ONE recorded trace the same at any frame cadence', () => {
+  it('and says the same thing about that ONE recorded trace at any frame cadence', () => {
     // THE VERDICT MUST NOT MOVE WITH THE FRAME RATE — the whole reason the
     // reversal count was thrown out (1.4 % of steps at 60 fps against 3.2 % at
     // 14). ONE recorded trace of the penned child, resampled as a slower or
     // unevener renderer would have seen the very same play; nothing about the
     // settlement changes, only how often it was looked at.
     //
-    // TOLERANCE: within 40 % of the 60 fps reading. Measured, base 3.25 %:
-    // 3.25 / 2.82 / 2.39 / 4.18 / 3.42 %, a spread of 29 % — and this trace is
-    // the WORST case the metric has, a child CARRIED out of its pen every two
-    // seconds. Every carry is a hole in the ground path that has to be
-    // reconstructed from the walked distance, so the rescue-heavy trace is where
-    // the reconstruction's error lives; a recorded minute of ordinary play holds
-    // to 6 % (the case above, in the first block). What matters for a gate is the
-    // second assertion: RED at every one of the five cadences, by a factor of
-    // ten, where the sample-weighted measure it replaced could not even finish
-    // an irregular trace.
+    // WHAT IS PINNED HERE IS THE VERDICT, NOT THE NUMBER, and the difference is
+    // deliberate. This child is CARRIED every two and a half seconds, and a
+    // window that spans a carry is refused rather than guessed at — so only
+    // three fifths of the trace can be judged at all (measured judgedShare
+    // 0.58-0.60 at every cadence), and what survives is a scatter of short
+    // continuous stretches whose share swings with which of them a cadence
+    // happens to sample: 1.94 / 1.69 / 2.29 / 3.24 / 2.49 %. The one thing that
+    // does NOT swing is the answer the gate reads — every cadence is RED by a
+    // factor of at least six — and the rescue rate below, which counts the very
+    // carries that made the trace unjudgeable, is red by a factor of three at
+    // all of them. A rescue-free minute of ordinary play holds its share to
+    // 9.5 % (the crowded case in the first block); this is the worst case the
+    // metric has, and it is stated rather than smoothed over.
     const penned = [wedged()[0]]
-    const shares = CADENCES.map(([, step]) => shuffleWindows(resample(penned, step, 31337)).share)
-    const base = shares[0]
-    for (const s of shares) expect(Math.abs(s - base)).toBeLessThan(base * 0.4)
-    for (const s of shares) expect(s).toBeGreaterThan(CHILD_MOTION.shareGate * 4)
+    const read = CADENCES.map(([, step]) => shuffleWindows(resample(penned, step, 31337)))
+    for (const r of read) {
+      expect(r.share).toBeGreaterThan(CHILD_MOTION.shareGate * 6)
+      expect(r.judgedShare).toBeGreaterThan(0.5)
+    }
+    for (const [, step] of CADENCES) {
+      expect(rescueRate(resample(penned, step, 31337)).perChildMinute).toBeGreaterThan(
+        CHILD_MOTION.rescueGate * 3,
+      )
+    }
   })
 
   it('and it is the PENNED child the report names', () => {

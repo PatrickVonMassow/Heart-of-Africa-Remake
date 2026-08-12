@@ -70,7 +70,7 @@ export declare const CHILD_MOTION: {
 
 export declare function groundPath(
   track: ReadonlyArray<{ x: number; z: number; nudges?: number }>,
-): { x: number[]; z: number[] }
+): { x: number[]; z: number[]; broken: boolean[] }
 
 export declare function shuffleWindows(
   tracks: ReadonlyArray<ReadonlyArray<ChildMotionSample>>,

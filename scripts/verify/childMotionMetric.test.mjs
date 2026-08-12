@@ -73,6 +73,39 @@ describe('the walked distance is the game’s own', () => {
     expect(corrected.share).toBeGreaterThan(0.5)
   })
 
+  it('and never credits a carry as ground covered, at any cadence', () => {
+    // THE CASE THE RECONSTRUCTION GOT WRONG (second cross-vendor review). Sampled
+    // every half second, ONE gap holds both a metre of pacing — which ends where
+    // it began — and a 0.8 m carry. `walked` is a scalar, so nothing in it says
+    // which way the legs went, and crediting the gap's own vector as ground
+    // covered would read as a child that got 0.8 m somewhere: the shuffle
+    // HIDDEN by the correction that ended it. The gap is a break instead, and
+    // the windows across it are unjudged.
+    const t = []
+    let walked = 0
+    let base = 0
+    let nudges = 0
+    for (let i = 0; i <= 24; i++) {
+      const clock = i * 0.5
+      if (i > 0) walked += 0.75 // 1.5 m/s of pacing, all of it inside 0.1 m
+      if (clock === 6) {
+        base += 0.8 // carried clear, and it goes on pacing where it was put
+        nudges++
+      }
+      t.push({ clock, x: base + (i % 2 === 0 ? 0 : 0.1), z: 0, walked, nudges })
+    }
+    const r = shuffleWindows([t])
+    expect(r.share).toBe(1) // every judged window is the shuffle it really is
+    // The two half-second windows that span the break, plus the half-second
+    // tail: 1.5 s of the twelve, and every second of it named as unjudged.
+    expect(r.unjudged).toBeCloseTo(1.5, 6)
+    // AND WHAT CREDITING THE VECTOR WOULD HAVE SAID, on the very same trace:
+    // the carry reads as ground covered and those windows come out CLEAN.
+    const asCredited = shuffleWindows([t.map((s) => ({ ...s, nudges: 0 }))])
+    expect(asCredited.share).toBeLessThan(1)
+    expect(asCredited.windows).toBeGreaterThan(r.windows)
+  })
+
   it('leaves the tail of a trace alone when it is shorter than one window', () => {
     const t = trace(30, () => ({ x: 0, z: 0 })) // half a second in all
     expect(shuffleWindows([t]).windows).toBe(0)

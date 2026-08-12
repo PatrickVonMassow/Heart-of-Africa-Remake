@@ -19,12 +19,13 @@
 //     correction that HIDES the symptom was being read as the child walking out
 //     of its own pocket.
 //
-//  2. GROUND COVERED IGNORES THE TELEPORT TOO. The displacement is measured
-//     along a path that is FROZEN through every frame in which the settlement
-//     picked the child up (`nudges` rose), so being carried out of a pocket is
-//     not ground the child covered. The error this leaves behind is the real
-//     walking of that one frame — at the chase's floor pace some two
-//     centimetres, against a circle of half a metre.
+//  2. AND A RESCUE BREAKS THE TRACE RATHER THAN BEING SUBTRACTED FROM IT. The
+//     frame vector across a rescue mixes the legs with the teleport, and the
+//     game publishes only the scalar `walked` — which cannot say which way the
+//     legs went. So the gap is marked broken, no window that spans it is
+//     judged, and the seconds are reported as UNJUDGED. Being picked up is not
+//     forgiven by that: `rescueRate` counts every rescue and gates them on
+//     their own account.
 //
 //  3. AND THE WINDOW IS SHORTER THAN THE RESCUE (`unstuckSeconds`, 1.5 s).
 //     The user's report was "hängt KURZ fest" — the short episode IS the bug —
@@ -102,46 +103,51 @@ export const CHILD_MOTION = {
 }
 
 /**
- * The path the child WALKED, with every rescue taken back out of it: the sample
- * gap in which `nudges` rose holds a teleport, and being carried is not ground
- * the child covered. Returns arrays parallel to the samples.
+ * The path the child WALKED, and where that path BREAKS.
  *
- * WHAT IS TAKEN OUT IS THE CARRY, NOT THE GAP. A gap that holds a rescue is
- * credited with what the child's LEGS did in it (`walked`, which the game keeps
- * free of the teleport), never with the jump. Frame by frame the two are the
- * same thing — the rescue frame's own walking is a centimetre — but a trace
- * sampled eight frames apart holds real walking beside the teleport, and
- * dropping that would make the measure move with the frame cadence again.
+ * A RESCUE IS A DISCONTINUITY, NOT A CORRECTION (the second cross-vendor review,
+ * 12.08.2026). The frame vector across a rescue gap mixes two motions — what the
+ * legs did and where the settlement put the child — and the game publishes only
+ * the SCALAR `walked`, which cannot say which way the legs went. Every attempt
+ * to reconstruct the leg displacement from it is an invented direction, and it
+ * invents in the worst possible way: a child that paces a metre back to where it
+ * started and is then carried 0.8 m would have had the whole carry credited as
+ * ground covered, HIDING the very shuffle the measure exists to see; where the
+ * two motions oppose each other the real displacement is under-credited instead.
  *
- * @param {ReadonlyArray<{x:number,z:number,walked?:number,nudges?:number}>} track
- * @returns {{x:number[],z:number[]}}
+ * So nothing is reconstructed. The gap is marked BROKEN and the caller refuses
+ * to judge any window that spans it. Across a break the path simply does not
+ * advance — an arbitrary choice, and a safe one precisely because no judged
+ * window ever reads across a break; what the rescue itself means is answered by
+ * `rescueRate`, which counts every one of them and gates them on their own
+ * account.
+ *
+ * @param {ReadonlyArray<{x:number,z:number,nudges?:number}>} track
+ * @returns {{x:number[],z:number[],broken:boolean[]}} `broken[i]` marks the gap
+ *   that ENDS at sample `i`.
  */
 export function groundPath(track) {
   const x = []
   const z = []
+  const broken = []
   let px = 0
   let pz = 0
   for (let i = 0; i < track.length; i++) {
+    let cut = false
     if (i === 0) {
       px = track[i].x
       pz = track[i].z
+    } else if ((track[i].nudges ?? 0) > (track[i - 1].nudges ?? 0)) {
+      cut = true
     } else {
-      let dx = track[i].x - track[i - 1].x
-      let dz = track[i].z - track[i - 1].z
-      if ((track[i].nudges ?? 0) > (track[i - 1].nudges ?? 0)) {
-        const jump = Math.hypot(dx, dz)
-        const legs = Math.max(0, (track[i].walked ?? 0) - (track[i - 1].walked ?? 0))
-        const keep = jump > legs ? legs / (jump || 1) : 1
-        dx *= keep
-        dz *= keep
-      }
-      px += dx
-      pz += dz
+      px += track[i].x - track[i - 1].x
+      pz += track[i].z - track[i - 1].z
     }
     x.push(px)
     z.push(pz)
+    broken.push(cut)
   }
-  return { x, z }
+  return { x, z, broken }
 }
 
 /**
@@ -178,6 +184,9 @@ export function groundPath(track) {
  *     longer than the question being asked is inventing the answer, not
  *     measuring it.
  *
+ * A window that SPANS A RESCUE is refused for the same reason: the path breaks
+ * there, and what the legs did across the break is not something the game says.
+ *
  * Whatever is not judged is REPORTED as unjudged rather than quietly dropped, so
  * a trace full of holes cannot look clean OR dirty: `judgedShare` says how much
  * of the traced clock any verdict actually rests on, and the callers gate on it.
@@ -200,6 +209,14 @@ export function shuffleWindows(tracks, cfg = {}) {
     if (track.length < 2) continue
     const ground = groundPath(track)
     const last = track.length - 1
+    // How many rescues broke the path up to each sample, so "does this window
+    // straddle one?" is a subtraction rather than a scan.
+    const breaks = new Array(track.length)
+    let cuts = 0
+    for (let m = 0; m < track.length; m++) {
+      if (ground.broken[m]) cuts++
+      breaks[m] = cuts
+    }
     // `j` walks forward with `i` — the windows only ever move to the right, so
     // the far end is never searched from the beginning again.
     let j = 0
@@ -221,11 +238,15 @@ export function shuffleWindows(tracks, cfg = {}) {
       unjudged += ahead - weight
       // The far end, interpolated AT the span between the two samples that
       // bracket it — but only where that gap is short enough to interpolate
-      // across. Across a rescue frame the ground path stands still, so the
-      // interpolation stands still with it; longer than the span, nothing is
-      // known about the inside of it at all.
+      // across. Longer than the span, nothing is known about the inside of it.
       const gap = track[j + 1].clock - track[j].clock
-      if (gap > span) {
+      // A RESCUE INSIDE THE WINDOW ENDS IT, unjudged. The path is broken there
+      // and nothing may be interpolated across the break — the settlement moved
+      // the child, and by how much in which direction the game does not say.
+      // The rescue is not thereby forgiven: `rescueRate` counts every one and
+      // gates them on their own account, which is where a child that has to be
+      // picked up is a finding.
+      if (gap > span || breaks[j + 1] > breaks[i]) {
         unjudged += weight
         continue
       }
