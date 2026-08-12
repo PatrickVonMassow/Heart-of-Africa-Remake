@@ -11,6 +11,19 @@ export interface ChildMotionSample {
   walked: number
   /** `TagChild.nudges` — cumulative count of rescues. */
   nudges?: number
+  /** Whether the GROUP was playing at that moment; missing reads as not. */
+  playing?: boolean
+}
+
+export interface TraceLiveness {
+  children: number
+  /** The stretch of game clock the trace covers. */
+  seconds: number
+  playedSeconds: number
+  playedShare: number
+  /** What the children's legs did over the whole trace, summed. */
+  walked: number
+  walkedPerChildMinute: number
 }
 
 export interface ShuffleWindows {
@@ -55,6 +68,10 @@ export declare function shuffleWindows(
   tracks: ReadonlyArray<ReadonlyArray<ChildMotionSample>>,
   cfg?: Partial<typeof CHILD_MOTION>,
 ): ShuffleWindows
+
+export declare function traceLiveness(
+  tracks: ReadonlyArray<ReadonlyArray<{ clock: number; walked: number; playing?: boolean }>>,
+): TraceLiveness
 
 export declare function rescueRate(
   tracks: ReadonlyArray<ReadonlyArray<{ clock: number; x: number; z: number; nudges?: number }>>,

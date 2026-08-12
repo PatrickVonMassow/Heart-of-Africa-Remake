@@ -33,6 +33,7 @@ import {
   CHILD_MOTION,
   rescueRate,
   shuffleWindows,
+  traceLiveness,
   type ChildMotionSample,
 } from '../../../scripts/verify/childMotionMetric.mjs'
 import { balance } from '../../config/balance'
@@ -348,6 +349,7 @@ function frame(v: ReturnType<typeof village>, dt: number): void {
 interface Track extends ChildMotionSample {
   pace: number
   held: boolean
+  playing: boolean
 }
 
 /** One sample of every child, in the shape the shared metric judges. */
@@ -361,6 +363,9 @@ function sample(v: ReturnType<typeof village>, paths: Track[][]): void {
       nudges: c.nudges,
       pace: c.pace,
       held: c.held,
+      // Whether the GROUP was playing (point 656) — the trace has to be able to
+      // show that there was a game in it at all.
+      playing: v.game.playing,
     })
   })
 }
@@ -398,6 +403,26 @@ function play(placeId: string, seed: number, seconds: number, dt = 1 / 60): Trac
   return paths
 }
 
+/**
+ * AND THERE WAS A GAME IN THE TRACE (point 656). Every gate below is a bound on
+ * something BAD, so a settlement standing perfectly still passes all of them: an
+ * idle group walks nowhere, so no window is bad and the share is 0, and it is
+ * never stuck, so nobody is carried. The live browser check asserts that the
+ * group is playing before it judges anything; the pure proof of the user's own
+ * bug had no such assertion at all, and would have gone green on a trace with no
+ * game in it. The bars are measured on the four settlements replayed below —
+ * four children, the whole minute played, 107-115 m walked per child-minute —
+ * and set far below them: they separate a game from NOTHING, not a good game
+ * from a poor one.
+ */
+function expectLively(paths: Track[][]): void {
+  const live = traceLiveness(paths)
+  expect(live.children).toBeGreaterThan(1)
+  expect(live.seconds).toBeGreaterThan(30)
+  expect(live.playedShare).toBeGreaterThan(0.5)
+  expect(live.walkedPerChildMinute).toBeGreaterThan(20)
+}
+
 // The reported village and seed first; the others are there because the causes
 // were general and one settlement's layout proves nothing about the next.
 const PLACES: Array<[string, number]> = [
@@ -410,8 +435,9 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
   for (const [placeId, seed] of PLACES) {
     it(`${placeId} at seed ${seed} keeps every child covering ground`, () => {
       const paths = play(placeId, seed, 60)
+      expectLively(paths)
       const r = shuffleWindows(paths)
-      expect(r.windows).toBeGreaterThan(5000) // a real stretch of the game
+      expect(r.seconds).toBeGreaterThan(200) // a real stretch of the game, in child-seconds
       expect(r.share).toBeLessThan(CHILD_MOTION.shareGate)
       // AND NOBODY IS BEING CARRIED (point 656): the rescue teleport is what
       // ENDS a snag, so a village that keeps its share down only by picking its
@@ -435,6 +461,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       frame(v, dt)
       sample(v, paths)
     }
+    expectLively(paths)
     expect(shuffleWindows(paths).share).toBeLessThan(CHILD_MOTION.shareGate)
     expect(rescueRate(paths).carriedPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
     expect(rescueRate(paths).perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
@@ -528,6 +555,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     expect(worstDepth).toBeLessThan(0.02)
     expect(overlaps).toBeLessThan(60)
     // AND NOBODY IS CARRIED. The children still play their own game among them.
+    expectLively(paths)
     expect(rescueRate(paths).carriedPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
     // OPEN (found by this case, 12.08.2026): the chase does NOT treat another
     // inhabitant's body as something to walk round — `TagWorld.blocked` is the
@@ -655,6 +683,48 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     expect(all.worst.child).toBe(0)
     const rescues = rescueRate(paths)
     expect(rescues.worstChild).toBe(0)
+  })
+})
+
+describe('and the replay refuses a trace with no game in it (point 656)', () => {
+  // THE VACUOUS PASS, DEMONSTRATED. Every gate above bounds something BAD, so
+  // the emptier the trace the better it scores. These two are what the pure
+  // proof used to accept in silence.
+
+  /** Four children standing where they were put, for a minute. */
+  function standingStill(playing: boolean): Track[][] {
+    return Array.from({ length: 4 }, (_, k) =>
+      Array.from({ length: 3600 }, (_, i) => ({
+        clock: i / 60,
+        x: k * 2,
+        z: 0,
+        walked: 0,
+        nudges: 0,
+        pace: 0,
+        held: false,
+        playing,
+      })),
+    )
+  }
+
+  it('a group that stands still passes every other gate — and fails this one', () => {
+    const still = standingStill(true)
+    expect(shuffleWindows(still).share).toBe(0)
+    expect(rescueRate(still).perChildMinute).toBe(0)
+    expect(rescueRate(still).carriedPerChildMinute).toBe(0)
+    expect(() => expectLively(still)).toThrow()
+  })
+
+  it('and so does a settlement in which no round ever plays', () => {
+    // The children really walked here — it is the reported village's own minute
+    // — but the group never played a round, which in the real settlement is a
+    // game that never started. The browser check waits for `playing` and asserts
+    // it; this is the same assertion on the pure side.
+    const idle = play('bambara-village', 2972259115, 60).map((path) =>
+      path.map((f) => ({ ...f, playing: false })),
+    )
+    expect(shuffleWindows(idle).share).toBeLessThan(CHILD_MOTION.shareGate)
+    expect(() => expectLively(idle)).toThrow()
   })
 })
 

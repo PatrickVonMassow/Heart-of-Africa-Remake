@@ -226,6 +226,48 @@ export function shuffleWindows(tracks, cfg = {}) {
 }
 
 /**
+ * WAS THERE A GAME IN THE TRACE AT ALL (point 656)? Every gate here is a bound
+ * on something BAD, so a trace in which nothing happens satisfies all of them:
+ * an idle group walks nowhere, so no window is bad and the share is 0, and it is
+ * never stuck, so nobody is carried. The live check learned to assert that the
+ * group was playing; the replay had no such assertion, and the pure proof of the
+ * user's bug could have gone green on a settlement standing perfectly still.
+ *
+ * Note what a MISSING `playing` field does: it reads as not playing, so a trace
+ * that cannot show a game in it does not pass for one.
+ *
+ * @param {ReadonlyArray<ReadonlyArray<{clock:number,walked:number,playing?:boolean}>>} tracks
+ * @returns {{children:number,seconds:number,playedSeconds:number,playedShare:number,walked:number,walkedPerChildMinute:number}}
+ */
+export function traceLiveness(tracks) {
+  const real = tracks.filter((t) => t.length >= 2)
+  let seconds = 0
+  let walked = 0
+  for (const track of real) {
+    // The children share one clock, so the group's stretch of game is the
+    // longest of theirs — never their sum.
+    seconds = Math.max(seconds, track[track.length - 1].clock - track[0].clock)
+    walked += Math.max(0, track[track.length - 1].walked - track[0].walked)
+  }
+  let playedSeconds = 0
+  const first = real[0]
+  if (first) {
+    for (let i = 0; i < first.length - 1; i++) {
+      if (first[i].playing) playedSeconds += first[i + 1].clock - first[i].clock
+    }
+  }
+  const childMinutes = (real.length * seconds) / 60
+  return {
+    children: real.length,
+    seconds,
+    playedSeconds,
+    playedShare: seconds > 0 ? playedSeconds / seconds : 0,
+    walked,
+    walkedPerChildMinute: childMinutes > 0 ? walked / childMinutes : 0,
+  }
+}
+
+/**
  * How often the settlement had to pick a child up, per child and minute of GAME
  * clock — the game's own clock, never a count of frames, which buy different
  * amounts of game on a fast machine and a loaded one.

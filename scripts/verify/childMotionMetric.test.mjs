@@ -3,7 +3,13 @@
 // so what it can and cannot see is pinned here, on traces built by hand where
 // the right answer is known before the measurement is taken.
 import { describe, expect, it } from 'vitest'
-import { CHILD_MOTION, groundPath, rescueRate, shuffleWindows } from './childMotionMetric.mjs'
+import {
+  CHILD_MOTION,
+  groundPath,
+  rescueRate,
+  shuffleWindows,
+  traceLiveness,
+} from './childMotionMetric.mjs'
 
 const DT = 1 / 60
 
@@ -165,6 +171,26 @@ describe('the windows carry equal weight in game time', () => {
     const base = shares[0]
     expect(base).toBeGreaterThan(0.6) // there is a real share to be invariant ABOUT
     for (const s of shares) expect(Math.abs(s - base)).toBeLessThan(0.02)
+  })
+})
+
+describe('a trace has to hold a game before it proves anything', () => {
+  it('measures what was played and what was walked', () => {
+    const walker = trace(3600, (i) => ({ x: i * DT * 1.5, z: 0 })).map((s) => ({ ...s, playing: true }))
+    const live = traceLiveness([walker, walker])
+    expect(live.children).toBe(2)
+    expect(live.seconds).toBeCloseTo(59.98, 1) // the group's clock, never the sum
+    expect(live.playedShare).toBeCloseTo(1, 2)
+    expect(live.walkedPerChildMinute).toBeCloseTo(90, 0) // 1.5 m/s
+  })
+
+  it('and reports an idle group as idle, whichever way it is idle', () => {
+    // Both are traces every OTHER gate passes with full marks.
+    const still = trace(3600, () => ({ x: 0, z: 0 })).map((s) => ({ ...s, playing: true }))
+    expect(traceLiveness([still]).walkedPerChildMinute).toBe(0)
+    expect(shuffleWindows([still]).share).toBe(0)
+    const unplayed = trace(3600, (i) => ({ x: i * DT * 1.5, z: 0 }))
+    expect(traceLiveness([unplayed]).playedShare).toBe(0) // a missing flag is not a game
   })
 })
 
