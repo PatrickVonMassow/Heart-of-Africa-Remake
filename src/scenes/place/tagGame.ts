@@ -173,6 +173,16 @@ export interface TagChild {
    * made the symptom invisible to a check that watched positions.
    */
   nudges: number
+  /**
+   * AND HOW FAR IT WAS CARRIED DOING SO (point 656), in metres, cumulative. The
+   * teleport's own distance, taken where the teleport happens, because nothing
+   * outside can work it out: a check watching positions sees one vector per
+   * frame with the child's walking and the settlement's correction added
+   * together, and `walked` is a SCALAR that cannot say which way the legs went.
+   * A rescue that only handed the child back the ground it was standing on adds
+   * nothing here; one that really moved it adds exactly what it moved it.
+   */
+  carried: number
   /** Which way round the obstacle in front of it this child is going: +1 for
    *  the turns that add to its heading, −1 for the ones that subtract, 0 while
    *  nothing is in the way. See `TagConfig.edgeSeconds`. */
@@ -298,6 +308,7 @@ export function createTagGame(
       walked: 0,
       pinned: 0,
       nudges: 0,
+      carried: 0,
       edgeSide: 0,
       edgeFor: 0,
       anchorX: p.x,
@@ -505,6 +516,8 @@ const PROGRESS_AWAY = 3
 function escapeNudge(c: TagChild, world: TagWorld): void {
   const free = world.nudge(c.x, c.z)
   if (free.found) {
+    // How far the settlement moved it, recorded where it is known (point 656).
+    c.carried += Math.hypot(free.x - c.x, free.z - c.z)
     c.x = free.x
     c.z = free.z
   }

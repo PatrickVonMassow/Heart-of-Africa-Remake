@@ -1507,6 +1507,31 @@ describe('the rescue is a finding, not an escape (point 656)', () => {
     expect(s.children[0].pinned).toBe(0)
   })
 
+  it('and records HOW FAR it carried it, which nothing outside could work out', () => {
+    // The counter the checks read (point 656). A watcher outside sees one vector
+    // per frame with the child's walking and the settlement's correction added
+    // together, and `walked` is a scalar that cannot say which way the legs
+    // went — so the distance is taken HERE, at the teleport, where it is known.
+    const world = island(0.05)
+    const s = game([
+      [0, 0],
+      [0.02, 0.01],
+    ])
+    const c = s.children[0]
+    expect(c.carried).toBe(0)
+    let before = { x: c.x, z: c.z }
+    for (let i = 0; i < 240 && c.nudges === 0; i++) {
+      before = { x: c.x, z: c.z }
+      stepTagGame(s, 1 / 60, CFG, world)
+    }
+    expect(c.nudges).toBe(1)
+    // On this island the child is blocked on every probe, so the frame that
+    // freed it moved it by the teleport and by nothing else.
+    expect(c.carried).toBeCloseTo(Math.hypot(c.x - before.x, c.z - before.z), 6)
+    expect(c.carried).toBeGreaterThan(10) // it really was carried, to open ground
+    expect(c.walked).toBe(0) // and not a centimetre of it counts as walking
+  })
+
   it('counts the teleport that frees a child which walks without getting anywhere', () => {
     // The reported symptom itself: a child at a full walking pace whose heading
     // is turned right round every quarter second, so it paces a few centimetres

@@ -3393,6 +3393,9 @@ if (section('children-motion')) {
                 // (point 656): the rescue is what ENDS a snag, so without it
                 // the correction reads as the child getting somewhere.
                 nudges: k.nudges,
+                // And how far it carried it, the game's own counter — no watcher
+                // outside can tell a carry from a walk in one frame vector.
+                carried: k.carried,
               })),
             })
             if (log.length < frames) requestAnimationFrame(tick)
@@ -3534,11 +3537,13 @@ if (section('children-motion')) {
     const rescues = rescueRate(tracks)
     check(
       'and no child has to be carried out of the settlement’s own geometry',
-      rescues.carriedPerChildMinute < CHILD_MOTION.carryGate &&
+      rescues.carriedPublished &&
+        rescues.carriedMetresPerChildMinute < CHILD_MOTION.carryGate &&
         rescues.perChildMinute < CHILD_MOTION.rescueGate,
-      `${rescues.rescues} rescues (${rescues.carries} of them carrying the child) in ` +
+      `${rescues.rescues} rescues (${rescues.carriedMetres.toFixed(2)} m carried in all` +
+        `${rescues.carriedPublished ? '' : ', NOT PUBLISHED BY THE GAME'}) in ` +
         `${rescues.childMinutes.toFixed(2)} child-minutes = ${rescues.perChildMinute.toFixed(2)}/child-min, ` +
-        `carried ${rescues.carriedPerChildMinute.toFixed(2)}/child-min` +
+        `carried ${rescues.carriedMetresPerChildMinute.toFixed(2)} m/child-min` +
         (rescues.worstChild >= 0 ? ` — worst child ${rescues.worstChild} with ${rescues.worstRescues}` : ''),
     )
 

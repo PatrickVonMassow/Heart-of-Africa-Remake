@@ -11,6 +11,8 @@ export interface ChildMotionSample {
   walked: number
   /** `TagChild.nudges` — cumulative count of rescues. */
   nudges?: number
+  /** `TagChild.carried` — cumulative metres the settlement teleported it. */
+  carried?: number
   /** Whether the GROUP was playing at that moment; missing reads as not. */
   playing?: boolean
 }
@@ -49,11 +51,14 @@ export interface ShuffleWindows {
 
 export interface RescueRate {
   rescues: number
-  /** Rescues that actually set the child down somewhere else. */
-  carries: number
+  /** Metres the settlement carried the children, from the game's own counter. */
+  carriedMetres: number
+  /** False if any sample failed to publish `carried` — a missing field is not
+   *  a carry-free trace, and the gates demand this. */
+  carriedPublished: boolean
   childMinutes: number
   perChildMinute: number
-  carriedPerChildMinute: number
+  carriedMetresPerChildMinute: number
   worstChild: number
   worstRescues: number
 }
@@ -65,7 +70,6 @@ export declare const CHILD_MOTION: {
   shareGate: number
   carryGate: number
   rescueGate: number
-  carryDistance: number
 }
 
 export declare function groundPath(
@@ -82,6 +86,5 @@ export declare function traceLiveness(
 ): TraceLiveness
 
 export declare function rescueRate(
-  tracks: ReadonlyArray<ReadonlyArray<{ clock: number; x: number; z: number; nudges?: number }>>,
-  cfg?: Partial<typeof CHILD_MOTION>,
+  tracks: ReadonlyArray<ReadonlyArray<{ clock: number; nudges?: number; carried?: number }>>,
 ): RescueRate

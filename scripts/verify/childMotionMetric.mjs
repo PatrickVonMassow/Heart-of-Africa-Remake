@@ -77,29 +77,30 @@
  *    while the penned child sits at 7.8 % — three orders of magnitude clear.
  *  - `shareGate` 0.25 %: between the worst shipped village (0.007 %, a factor of
  *    36 below the bar) and the pen (7.8 %, a factor of 31 above it).
- *  - `carryGate` 0.5 carries per child-minute: a rescue that actually SET THE
- *    CHILD DOWN somewhere else (`carryDistance` below). Measured on the shipped
- *    villages, 0.00–0.25 per child-minute (one carry in twelve child-minutes);
- *    the penned child is carried some 30 times a minute.
+ *  - `carryGate` 2 METRES carried per child-minute, read off the game's own
+ *    counter (`TagChild.carried`, accumulated at the teleport itself, because
+ *    no watcher outside can tell a carry from a walk in one frame vector).
+ *    Measured on the shipped villages: 0.00 / 0.00 / 0.60 m per child-minute —
+ *    the settlement frees its children a few times a minute and almost never
+ *    has to MOVE one to do it — against 67.5 m per child-minute for the penned
+ *    child. The bar sits three times above the worst village and thirty times
+ *    below the pen.
  *  - `rescueGate` 6 rescues per child-minute, counting every rescue whether it
  *    moved the child or not. Measured on the shipped villages: 1.75–3.75 per
- *    child-minute, and NONE of them carries the child anywhere — they are the
- *    progress watch firing on a child that walked a curve at the floor pace and
- *    happened not to reach 0.9 m from where it started (its threshold), which is
- *    ordinary play. That is why the carry above is the tight gate and this one
- *    is the loose backstop; the penned child trips it at 35.
+ *    child-minute, carrying the child 0.6 m per child-minute at the very most —
+ *    they are the progress watch firing on a child that walked a curve at the
+ *    floor pace and happened not to reach 0.9 m from where it started (its
+ *    threshold), which is ordinary play. That is why the carry above is the
+ *    tight gate and this one is the loose backstop; the penned child trips it
+ *    at 22.5.
  */
 export const CHILD_MOTION = {
   span: 1,
   minPath: 1,
   circle: 0.35,
   shareGate: 0.0025,
-  carryGate: 0.5,
+  carryGate: 2,
   rescueGate: 6,
-  /** How far a rescue must set the child down for it to count as a CARRY: one
-   *  child's own footprint (0.3 m). Below it the settlement handed the child
-   *  back the ground it was already standing on. */
-  carryDistance: 0.3,
 }
 
 /**
@@ -333,8 +334,8 @@ export function traceLiveness(tracks) {
 }
 
 /**
- * How often the settlement had to pick a child up, per child and minute of GAME
- * clock — the game's own clock, never a count of frames, which buy different
+ * How often the settlement had to pick a child up, and how far it carried it —
+ * both per child and minute of GAME clock, never per frame, which buys different
  * amounts of game on a fast machine and a loaded one.
  *
  * TWO RATES, because the rescues are two different events. A CARRY set the child
@@ -344,24 +345,38 @@ export function traceLiveness(tracks) {
  * already standing on, and the player sees nothing at all. Gate them apart, or
  * the loose one hides the tight one.
  *
- * @param {ReadonlyArray<ReadonlyArray<{clock:number,x:number,z:number,nudges?:number}>>} tracks
+ * BOTH COME FROM THE GAME'S OWN COUNTERS, and the carry one had to be added to
+ * the game for it (point 656, second cross-vendor review). Every RISE of `nudges`
+ * is a rescue, however many share one sample gap. The carry was INFERRED from the
+ * frame's position delta, and that vector cannot answer it: it mixes the child's
+ * walking with the teleport, it shows one displacement however many rescues fell
+ * inside the gap, and walking that happens to lead back the way the child was
+ * carried hides it altogether. `TagChild.carried` is now accumulated at the
+ * teleport itself, where the distance is known exactly, and this reads it.
+ *
+ * A trace that does not publish `carried` is NOT reported as carry-free —
+ * `carriedPublished` says so, and the gates demand it. A missing field must
+ * never read as good news.
+ *
+ * @param {ReadonlyArray<ReadonlyArray<{clock:number,nudges?:number,carried?:number}>>} tracks
  * @param {Partial<typeof CHILD_MOTION>} [cfg]
  */
-export function rescueRate(tracks, cfg = {}) {
-  const { carryDistance } = { ...CHILD_MOTION, ...cfg }
+export function rescueRate(tracks) {
   let rescues = 0
-  let carries = 0
+  let carriedMetres = 0
   let seconds = 0
   let worstChild = -1
   let worstRescues = 0
+  let published = true
   for (let k = 0; k < tracks.length; k++) {
     const track = tracks[k]
     if (track.length < 2) continue
     let mine = 0
     for (let i = 1; i < track.length; i++) {
+      if (typeof track[i].carried !== 'number') published = false
+      else carriedMetres += Math.max(0, track[i].carried - (track[i - 1].carried ?? 0))
       if ((track[i].nudges ?? 0) <= (track[i - 1].nudges ?? 0)) continue
       mine += (track[i].nudges ?? 0) - (track[i - 1].nudges ?? 0)
-      if (Math.hypot(track[i].x - track[i - 1].x, track[i].z - track[i - 1].z) > carryDistance) carries++
     }
     rescues += mine
     seconds += track[track.length - 1].clock - track[0].clock
@@ -373,10 +388,11 @@ export function rescueRate(tracks, cfg = {}) {
   const childMinutes = seconds / 60
   return {
     rescues,
-    carries,
+    carriedMetres,
+    carriedPublished: published,
     childMinutes,
     perChildMinute: childMinutes > 0 ? rescues / childMinutes : 0,
-    carriedPerChildMinute: childMinutes > 0 ? carries / childMinutes : 0,
+    carriedMetresPerChildMinute: childMinutes > 0 ? carriedMetres / childMinutes : 0,
     worstChild,
     worstRescues,
   }

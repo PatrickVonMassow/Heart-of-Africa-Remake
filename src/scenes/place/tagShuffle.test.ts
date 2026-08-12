@@ -362,6 +362,7 @@ function sample(v: ReturnType<typeof village>, paths: Track[][]): void {
       z: c.z,
       walked: c.walked,
       nudges: c.nudges,
+      carried: c.carried,
       pace: c.pace,
       held: c.held,
       // Whether the GROUP was playing (point 656) — the trace has to be able to
@@ -448,9 +449,12 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       expect(r.share).toBeLessThan(CHILD_MOTION.shareGate)
       // AND NOBODY IS BEING CARRIED (point 656): the rescue teleport is what
       // ENDS a snag, so a village that keeps its share down only by picking its
-      // children up out of the pockets they walk into fails here instead.
+      // children up out of the pockets they walk into fails here instead. The
+      // distance is the GAME's, not a watcher's guess at it — and a trace that
+      // does not publish it fails rather than counting as carry-free.
       const rescues = rescueRate(paths)
-      expect(rescues.carriedPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
+      expect(rescues.carriedPublished).toBe(true)
+      expect(rescues.carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
       expect(rescues.perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
     })
   }
@@ -470,7 +474,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     }
     expectLively(paths)
     expect(shuffleWindows(paths).share).toBeLessThan(CHILD_MOTION.shareGate)
-    expect(rescueRate(paths).carriedPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
+    expect(rescueRate(paths).carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
     expect(rescueRate(paths).perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
   })
 
@@ -563,7 +567,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     expect(overlaps).toBeLessThan(60)
     // AND NOBODY IS CARRIED. The children still play their own game among them.
     expectLively(paths)
-    expect(rescueRate(paths).carriedPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
+    expect(rescueRate(paths).carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
     // OPEN (found by this case, 12.08.2026): the chase does NOT treat another
     // inhabitant's body as something to walk round — `TagWorld.blocked` is the
     // settlement's geometry only, and a child is kept out of an adult by the
@@ -646,7 +650,7 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     // and is carried out of its yard some thirty times a minute.
     expect(r.share).toBeGreaterThan(CHILD_MOTION.shareGate * 4)
     expect(rescues.perChildMinute).toBeGreaterThan(CHILD_MOTION.rescueGate * 2)
-    expect(rescues.carriedPerChildMinute).toBeGreaterThan(CHILD_MOTION.carryGate * 4)
+    expect(rescues.carriedMetresPerChildMinute).toBeGreaterThan(CHILD_MOTION.carryGate * 4)
 
     // AND THE OLD MEASURE WOULD HAVE PASSED THE SAME TRACE. A window of two
     // seconds, the path summed from frame-to-frame POSITIONS and the ground
@@ -730,7 +734,7 @@ describe('and the replay refuses a trace with no game in it (point 656)', () => 
     const still = standingStill(true)
     expect(shuffleWindows(still).share).toBe(0)
     expect(rescueRate(still).perChildMinute).toBe(0)
-    expect(rescueRate(still).carriedPerChildMinute).toBe(0)
+    expect(rescueRate(still).carriedMetresPerChildMinute).toBe(0)
     expect(() => expectLively(still)).toThrow()
   })
 

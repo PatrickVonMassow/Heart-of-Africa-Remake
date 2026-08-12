@@ -17,18 +17,21 @@ const DT = 1 / 60
 function trace(frames, at) {
   const out = []
   let walked = 0
+  let carried = 0
   let x = 0
   let z = 0
   let nudges = 0
   for (let i = 0; i < frames; i++) {
     const step = at(i, { x, z })
     // A walked step moves the child AND adds to `walked`; a rescue moves it and
-    // does not — exactly as the game keeps them apart.
-    if (step.rescue) nudges++
-    else walked += Math.hypot(step.x - x, step.z - z)
+    // adds to `carried` instead — exactly as the game keeps them apart.
+    if (step.rescue) {
+      nudges++
+      carried += Math.hypot(step.x - x, step.z - z)
+    } else walked += Math.hypot(step.x - x, step.z - z)
     x = step.x
     z = step.z
-    out.push({ clock: i * DT, x, z, walked, nudges })
+    out.push({ clock: i * DT, x, z, walked, carried, nudges })
   }
   return out
 }
@@ -284,6 +287,43 @@ describe('the rescues are counted on their own account', () => {
     expect(r.perChildMinute).toBeCloseTo(1, 1)
     expect(r.worstChild).toBe(0)
     expect(r.worstRescues).toBe(2)
+    // And how FAR it was carried, from the game's own counter: a metre each time.
+    expect(r.carriedPublished).toBe(true)
+    expect(r.carriedMetres).toBeCloseTo(2, 6)
+    expect(r.carriedMetresPerChildMinute).toBeCloseTo(1, 1)
+  })
+
+  it('counts every rise of the counter, however many share one sample gap', () => {
+    // A coarse trace: between two samples the settlement freed the child THREE
+    // times and moved it 5 m in all. Read off the frame vector, that was one
+    // carry of whatever the net displacement happened to be.
+    const t = [
+      { clock: 0, x: 0, z: 0, walked: 0, carried: 0, nudges: 0 },
+      { clock: 30, x: 1, z: 0, walked: 4, carried: 5, nudges: 3 },
+    ]
+    const r = rescueRate([t])
+    expect(r.rescues).toBe(3)
+    expect(r.carriedMetres).toBeCloseTo(5, 6)
+  })
+
+  it('and sees a carry that the child’s own walking led back from', () => {
+    // Carried two metres and walked the two metres back inside the same gap:
+    // the positions say nothing happened, the game says it was carried.
+    const t = [
+      { clock: 0, x: 0, z: 0, walked: 0, carried: 0, nudges: 0 },
+      { clock: 1, x: 0, z: 0, walked: 2, carried: 2, nudges: 1 },
+    ]
+    expect(rescueRate([t]).carriedMetres).toBeCloseTo(2, 6)
+    expect(Math.hypot(t[1].x - t[0].x, t[1].z - t[0].z)).toBe(0) // what a watcher saw
+  })
+
+  it('and refuses to call a trace carry-free when the game never said', () => {
+    // A missing counter is not good news. It is reported as unpublished, and
+    // the gates demand the field rather than reading zero as a clean bill.
+    const silent = trace(600, (i) => ({ x: i * DT, z: 0 })).map(({ carried: _drop, ...rest }) => rest)
+    const r = rescueRate([silent])
+    expect(r.carriedPublished).toBe(false)
+    expect(r.carriedMetres).toBe(0)
   })
 
   it('reports nothing for a trace too short to judge', () => {
