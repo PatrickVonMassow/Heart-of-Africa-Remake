@@ -93,4 +93,16 @@ export const RED_CHARGES = [
       'sitting, so the charge is scoped to WebGPU and a WebGL 2 red stays a real red. Point 627 ' +
       'owns it until the cause — an unsettled jump or a real placement change — is named.',
   },
+  {
+    point: 657,
+    suite: 'polish',
+    kind: 'check',
+    match: /no child walks without getting anywhere/i,
+    why:
+      'Measured 12.08.2026 at seed 2972259115 on a machine with nothing else on it: red in 3 of ' +
+      '5 WebGL 2 traces (92 of 4652 one-second windows, 1.98 %; 14 of 4640, 0.30 %) and in 1 of ' +
+      '3 on WebGPU (26 of 4676, 0.56 %) against the 0.25 % gate, while the carry and rescue ' +
+      'checks stayed green throughout — so the shuffle is the settlement\'s, not the check\'s, ' +
+      'and it is point 657. Both backends on purpose: it was seen on both.',
+  },
 ]
