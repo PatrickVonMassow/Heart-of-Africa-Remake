@@ -577,6 +577,22 @@ describe('every current-work card names its point and its subject', () => {
     expect(dropStrayNowCards(proper).dropped).toEqual([])
   })
 
+  // A REPLACEMENT STRING IS NOT TEXT (four-eyes 12.08.): `$&`, "$'", '$`' and
+  // `$1` expand against the match, so a title or a status carrying one could
+  // duplicate whole stretches of the board into the card.
+  it('writes a title and a status containing $ tokens verbatim', () => {
+    const running = withNow(chipCard(651, 'Ein Betreff'))
+    for (const token of ['$1', '$&', "$'", '$`', '$$']) {
+      const titled = setCardTitle(running, 651, `Parser ${token} handling`)
+      // The token survives as text; only the `&` is HTML-escaped, as any & is.
+      expect(titled, token).toContain(`<span class="t">Parser ${token.replace('&', '&amp;')} handling</span>`)
+      expect(codes(titled), token).toEqual([])
+      const stated = setCardStatus(running, 651, `Stand mit ${token} darin.`, '09:00')
+      expect(stated, token).toContain(`Stand mit ${token} darin.`)
+      expect(codes(stated), token).toEqual([])
+    }
+  })
+
   // A card the PRE-escaping writer left with a raw bracket in its title must
   // still be migratable and retitleable — otherwise the escaping above fixes the
   // future and strands the past (four-eyes 12.08.).

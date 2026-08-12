@@ -165,7 +165,7 @@ export function refreshFooter(html, { openCount, now = new Date() } = {}) {
     .filter((s) => s && !/^Stand:/.test(s) && !/^\d+\s+offene[rn]?\s+Punkte?$/.test(s))
   const count = openCount === 1 ? '1 offener Punkt' : `${openCount} offene Punkte`
   const segments = [`Stand: ${berlinDateStamp(now)} (Europe/Berlin)`, count, ...(kept.length ? kept : [FOOTER_TAIL])]
-  return html.replace(m[0], `<footer>${segments.join(' · ')}</footer>`)
+  return html.replace(m[0], () => `<footer>${segments.join(' · ')}</footer>`)
 }
 
 /**
@@ -1141,7 +1141,7 @@ export function setCardStatus(html, point, text, stamp = berlinStamp()) {
   const re = new RegExp(`(${NOW_HEAD(point)}${WITHIN_CARD}<div class="body">)${WITHIN_CARD}(</div>\\s*</details>)`)
   if (!re.test(html)) throw new Error(`board: no current-work card for point ${point} — add the card first`)
   const body = renderCardBody(text, { stamp })
-  return html.replace(re, `$1\n${body}\n  $2`)
+  return html.replace(re, (_m, head, tail) => `${head}\n${body}\n  ${tail}`)
 }
 
 /**
@@ -1195,11 +1195,13 @@ export function setCardTitle(html, point, title) {
     `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*<span class="t">)` +
       `(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
-  if (chipRe.test(html)) return html.replace(chipRe, `$1${bare}$2`)
+  if (chipRe.test(html)) return html.replace(chipRe, (_m, head, tail) => `${head}${bare}${tail}`)
   const legacyRe = new RegExp(
     `(<details class="now"[^>]*>\\s*<summary>\\s*)<span class="t">\\s*${point}\\s*${DASH}(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
-  if (legacyRe.test(html)) return html.replace(legacyRe, `$1${numberChip(point)}<span class="t">${bare}$2`)
+  if (legacyRe.test(html)) {
+    return html.replace(legacyRe, (_m, head, tail) => `${head}${numberChip(point)}<span class="t">${bare}${tail}`)
+  }
   // SCOPED TO THE QUEUE (four-eyes review, 12.08.2026): the archived cards carry
   // the very same markup, so an unscoped fallback retitled FINISHED work for a
   // point that had no card left in either live section — silently, since the
@@ -1212,7 +1214,8 @@ export function setCardTitle(html, point, title) {
     const { from, end } = sectionBounds(html, 'queue')
     const section = html.slice(from, end)
     if (queueRe.test(section)) {
-      return html.slice(0, from) + section.replace(queueRe, `$1${escapeCardTitle(text)}$2`) + html.slice(end)
+      const rewritten = section.replace(queueRe, (_m, head, tail) => `${head}${escapeCardTitle(text)}${tail}`)
+      return html.slice(0, from) + rewritten + html.slice(end)
     }
   } catch {
     /* no queue section — the refusal below is the honest answer */
