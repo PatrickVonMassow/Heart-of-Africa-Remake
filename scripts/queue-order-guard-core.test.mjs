@@ -104,6 +104,16 @@ describe('parseQueueCards / parseNowCard', () => {
     expect(parseNowCard(html)).toMatchObject({ point: 210 })
     expect(parseNowCard(boardHtml({ nowTitle: 'Closing-Zyklus' })).point).toBeNull()
   })
+  // Point 655: a now-card's number lives in the numbered chip; the legacy
+  // "N — Titel" title is still read, so an older board is not misjudged.
+  it('reads a now-card point from the numbered chip as well as the legacy title', () => {
+    const chipBoard = html.replace(
+      '<span class="t">210 —',
+      '<span class="num">210</span><span class="t">',
+    )
+    expect(parseNowCard(chipBoard).point).toBe(210)
+    expect(parseNowCards(chipBoard).map((c) => c.point)).toEqual([210])
+  })
   it('is total on missing sections / non-string input', () => {
     expect(parseQueueCards('<p>no board</p>')).toEqual([])
     expect(parseQueueCards(null)).toEqual([])

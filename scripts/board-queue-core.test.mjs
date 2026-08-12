@@ -751,7 +751,8 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
   it('lets the one-command loop find and promote a card', () => {
     const { html } = built([439, 465])
     expect(queueCard(html, 439)).toContain('<span class="num">439</span>')
-    expect(toNow(html, 439, 'Läuft.', { stamp: '16:20' })).toContain('<span class="t">439 — ')
+    // The promoted card keeps the chip the queue card carried (point 655).
+    expect(toNow(html, 439, 'Läuft.', { stamp: '16:20' })).toContain('<span class="num">439</span><span class="t">')
   })
 
   it('reads its own cards back on import, paragraph split intact', () => {

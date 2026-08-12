@@ -236,7 +236,7 @@ export function noWorkClaimReason(segment = '') {
     'Do ONE of these:\n' +
     `  - ${NOW_CARD_CMD} <N> "<was gerade läuft>"   → puts a card up for the work; it REPLACES the ` +
     'claim, and this call goes through.\n' +
-    `  - ${CLOSING_CARD_CMD} "<welche Abschlussarbeiten noch offen sind>"   → for the state between ` +
+    `  - ${CLOSING_CARD_CMD} <N> "<welche Abschlussarbeiten noch offen sind>"   → for the state between ` +
     'the two: the point is merged and TICKED, and its closing duties (the four-eyes record, the ' +
     'retrospective) are still owed. That is neither idle nor a numbered point, and it is what this ' +
     'card is for.\n' +

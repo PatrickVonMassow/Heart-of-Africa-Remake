@@ -70,48 +70,53 @@ there exactly once; a new point joins a bundle when appended.
 
 ## Checklist
 
-- [ ] 655. EVERY BOARD CARD NAMES ITS POINT NUMBER AND ITS SUBJECT (user 11.08.2026, with a
-  screenshot of the card "Abschlussarbeiten zum gerade beendeten Punkt": "Oft sehen Karten von
-  dir so aus. Da steht noch nicht einmal die Nummer des Punktes, geschweige denn, worum es in
-  dem Punkt geht. Beides muss immer zwangsweise drin stehen. Das dauerhaft per Mechanismus
-  zusichern."). The board is read on a phone, at a glance, by someone who does not carry the
-  work order in his head: a card whose title is a STAGE ("closing duties for the point just
-  finished", "currently no running work") tells him neither WHICH point nor WHAT it was about,
-  so the one screen he has says nothing. Queue cards already carry both — the numbered chip and
-  a German title — and the gap is in the cards the session writes at a transition: the now-card
-  written by `board.mjs now|status`, the closing card, and the handover card.
-  IT IS THE HEADER THAT MUST CARRY IT, not the body (user, same evening, after the number alone
-  had been added to the text: "Die Punktnummer ist hinzugekommen, aber es fehlt weiterhin der
-  Titel des Punktes im Header und die Beschreibung des Punktes im Body."). So: the SUMMARY line
-  carries the number AND the point's German title, and the BODY says what the point is about
-  before it says what stage it is in. Writing the number into the body while the header stays a
-  stage word does not satisfy this — that was tried and rejected. The obstacle to fix is in
-  `board-core.mjs`: `CLOSING_WORK_TITLE` is a CONSTANT and the regex that finds the card is
-  built from it, so a per-point title needs the matcher to key on a stable marker (a class or a
-  data attribute) instead of the literal text — change both together or the card becomes
-  unfindable and the state can never be replaced.
+- [ ] 656. THE CHILDREN'S SHUFFLE GATE CANNOT SEE THE SYMPTOM IT WAS BUILT FOR (found
+  11.08.2026 by the cross-vendor review of point 648 — GPT-5.6 Sol at effort high, verdict
+  do-not-merge, recorded against `d1ed0d27`; the behaviour fixes of 648 are on `main` and are
+  not in question, its PROOF is). Point 648 replaced a frame-rate-dependent reversal count with
+  the user's own complaint — a child that walks over 2 m in a 2-second window without leaving a
+  0.5 m circle. Measured against the code that runs beside it, that gate is largely blind:
+  1. `trackProgress` in `src/scenes/place/tagGame.ts` teleports a child that has not left
+     `childRadius * 3` for `unstuckSeconds` (1.5 s) to free ground. The window is 2 s. So the
+     exact failure the gate looks for is ENDED half a second before its window can close, and
+     the user's report was "hängt KURZ fest" — the short episode is the bug.
+  2. Both the browser check (`scripts/verify/polish.mjs`, section `children-motion`) and
+     `src/scenes/place/tagShuffle.test.ts` sum FRAME-TO-FRAME POSITION DELTAS as the path
+     walked. The teleport is a position delta, so the correction that hides the symptom is
+     counted as the child walking out of the circle — twice blind, in the same window.
+  3. The browser check waits for `window.__placeTag().playing` but discards the result and
+     never asserts it. A group that never plays produces no stalls and no shuffle windows and
+     satisfies the gate vacuously.
+  4. `tagShuffle.test.ts` claims only the CHILDREN in a fresh `InhabitantSet`, so the
+     multi-pass separation is never exercised against the adults, porters and errand walkers
+     whose bodies share the production registry — the very crowding that made more than one
+     pass necessary.
+
   FINAL STATE:
-  1. Every card in "Woran ich gerade arbeite" carries its POINT NUMBER in the same numbered chip
-     the queue cards use, and a TITLE naming the subject, not the stage. "Abschlussarbeiten"
-     becomes "651 — Das Trommelbett ist eine 1,9-Sekunden-Schleife: Abschlussarbeiten": the
-     number, the subject, then the stage.
-  2. The one deliberate exception stays exactly one and is NAMED as such: the handover card that
-     says nothing is running belongs to NO point (that is the whole content of point 434(7), and
-     the topic guard reads a point reference inside it as a foreign one). It keeps its unnumbered
-     form and gains nothing else — but it must then say what the batch does NEXT, i.e. name the
-     point the successor picks up, in prose rather than as a chip.
-  3. The PUBLISH GATE refuses a board that breaks either: a now-card without a numbered chip, or
-     one whose title carries only a stage word ("Abschlussarbeiten", "Nacharbeit", "Vorbereitung",
-     "Aufräumen" and their English forms) with no subject behind it. The refusal names the card.
-     `board.mjs closing` therefore takes the point it closes and composes the title itself, so the
-     caller cannot get it wrong.
-  VERIFIABLE: Vitest over the pure gate — a now-card without a chip is refused; a title that is
-  only a stage word is refused; "651 — <subject>: Abschlussarbeiten" passes; the unnumbered
-  handover card passes but is refused when it names no follow-on work; and `board.mjs closing 651`
-  renders exactly the composed title. Plus one rendering check that the chip appears in the
-  phone-width layout of a now-card, where it never has before.
-  Criticality: medium — it cannot break the game, but the board is the user's only window into
-  an unattended batch, and a card he cannot decode is the same as no card. Bundle: Chat & Tafel.
+
+  1. The shuffle metric measures the game's OWN walked distance (`walked`, which deliberately
+     excludes the nudge) against ground covered, in both the browser check and the pure test —
+     never a summed position delta.
+  2. A NUDGE IS A FINDING, NOT AN ESCAPE. The teleport is counted and reported: a child freed by
+     it was, by definition, going nowhere. The gate fails on a nudge rate above a stated
+     threshold, and the window is shorter than `unstuckSeconds` so an episode the player sees
+     is inside it, with the chosen window and threshold justified by a measurement in the
+     comment.
+  3. The browser check ASSERTS that the group is playing, and a trace with no play at all fails
+     rather than passes.
+  4. The pure integration test builds the body set the settlement really has — children,
+     adults, porters, errand walkers — and the separation is judged against all of them.
+  5. `pinned` is cleared wherever the round is broken off or a child is commanded to stand
+     (`breakOffRound`, the held branch, after a progress nudge), so a stale count from before a
+     hold cannot fire a teleport on the first blocked frame after it.
+
+  VERIFIABLE: Vitest over a replayed settlement in which a child is deliberately wedged — the
+  gate must go RED with the nudge left on, and the same trace must show the shuffle it was
+  hiding; a trace with a permanently idle group fails; a trace with adults crowding the children
+  is judged like the children. Plus the live section at seed 2972259115 on both backends, whose
+  report NAMES the nudge count it observed.
+  Criticality: high — it is the proof that the user's own bug report stays fixed.
+  Bundle: Dorfleben.
 
 - [ ] 581. THE SETTLEMENT BOUNDARY IS TOO FAINT, AND ITS SLIDER IS ALREADY AT THE CEILING
   (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
@@ -332,6 +337,12 @@ there exactly once; a new point joins a bundle when appended.
   3. A GATE keeps the pattern out: a pure test over the verify sources refuses a comparison
      assembled from two separate `page.evaluate` calls. The agent that found this case left
      the gate undone on purpose and asked for the decision — this point is the decision.
+  THE NAMED CASES the sweep starts from, all three measured on `polish` (12.08.2026): the
+  goat's planted foot and "fire shadows ON" both red on WebGL 2 at 00:34, taken while a
+  WebGPU `polish` run and two building agents shared the machine, and both green on the same
+  commit at 05:50 on a quiet one; the water rim's "handover zone" red once at 05:36 and green
+  on its own retry. Each must come out of the sweep classified — repaired as a state check,
+  or declared timing and reported UNMEASURED under load.
   VERIFIABLE: the sweep names every site it changed and every one it deliberately left,
   with which kind it is; the gate fails on a re-introduced two-round-trip comparison and
   passes on the fixed shape; and the throttle probe of point 640 shows 0/8 skew for each
@@ -6291,51 +6302,3 @@ to land than a mechanism that needs a review.
   catches "the text is STALE", not "the text is WRONG" — a section rewritten carelessly still
   passes. It would have caught this case, because `src/communication/` is young and the section
   is old.
-
-- [ ] 656. THE CHILDREN'S SHUFFLE GATE CANNOT SEE THE SYMPTOM IT WAS BUILT FOR (found
-  11.08.2026 by the cross-vendor review of point 648 — GPT-5.6 Sol at effort high, verdict
-  do-not-merge, recorded against `d1ed0d27`; the behaviour fixes of 648 are on `main` and are
-  not in question, its PROOF is). Point 648 replaced a frame-rate-dependent reversal count with
-  the user's own complaint — a child that walks over 2 m in a 2-second window without leaving a
-  0.5 m circle. Measured against the code that runs beside it, that gate is largely blind:
-  1. `trackProgress` in `src/scenes/place/tagGame.ts` teleports a child that has not left
-     `childRadius * 3` for `unstuckSeconds` (1.5 s) to free ground. The window is 2 s. So the
-     exact failure the gate looks for is ENDED half a second before its window can close, and
-     the user's report was "hängt KURZ fest" — the short episode is the bug.
-  2. Both the browser check (`scripts/verify/polish.mjs`, section `children-motion`) and
-     `src/scenes/place/tagShuffle.test.ts` sum FRAME-TO-FRAME POSITION DELTAS as the path
-     walked. The teleport is a position delta, so the correction that hides the symptom is
-     counted as the child walking out of the circle — twice blind, in the same window.
-  3. The browser check waits for `window.__placeTag().playing` but discards the result and
-     never asserts it. A group that never plays produces no stalls and no shuffle windows and
-     satisfies the gate vacuously.
-  4. `tagShuffle.test.ts` claims only the CHILDREN in a fresh `InhabitantSet`, so the
-     multi-pass separation is never exercised against the adults, porters and errand walkers
-     whose bodies share the production registry — the very crowding that made more than one
-     pass necessary.
-
-  FINAL STATE:
-
-  1. The shuffle metric measures the game's OWN walked distance (`walked`, which deliberately
-     excludes the nudge) against ground covered, in both the browser check and the pure test —
-     never a summed position delta.
-  2. A NUDGE IS A FINDING, NOT AN ESCAPE. The teleport is counted and reported: a child freed by
-     it was, by definition, going nowhere. The gate fails on a nudge rate above a stated
-     threshold, and the window is shorter than `unstuckSeconds` so an episode the player sees
-     is inside it, with the chosen window and threshold justified by a measurement in the
-     comment.
-  3. The browser check ASSERTS that the group is playing, and a trace with no play at all fails
-     rather than passes.
-  4. The pure integration test builds the body set the settlement really has — children,
-     adults, porters, errand walkers — and the separation is judged against all of them.
-  5. `pinned` is cleared wherever the round is broken off or a child is commanded to stand
-     (`breakOffRound`, the held branch, after a progress nudge), so a stale count from before a
-     hold cannot fire a teleport on the first blocked frame after it.
-
-  VERIFIABLE: Vitest over a replayed settlement in which a child is deliberately wedged — the
-  gate must go RED with the nudge left on, and the same trace must show the shuffle it was
-  hiding; a trace with a permanently idle group fails; a trace with adults crowding the children
-  is judged like the children. Plus the live section at seed 2972259115 on both backends, whose
-  report NAMES the nudge count it observed.
-  Criticality: high — it is the proof that the user's own bug report stays fixed.
-  Bundle: Dorfleben.
