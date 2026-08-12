@@ -117,14 +117,24 @@ export const CHILD_MOTION = {
   judgedGate: 0.75,
   /**
    * THE ONLY FLOOR AMONG ALL THESE CEILINGS: metres the QUIETEST child must have
-   * walked in its own minute. Every other bar here is an upper bound, and a
+   * walked per minute OF PLAY. Every other bar here is an upper bound, and a
    * child that never moves clears all of them at once — nothing walked is
    * nothing shuffled, nothing stuck, nothing carried and a trace judgeable end
    * to end. Measured on the three shipped villages, the quietest child of each
-   * walks 102.2 / 112.5 / 109.2 m per its own minute (the groups 106.8-115.0),
+   * walks 102.2 / 112.5 / 109.2 m per played minute (the groups 106.8-115.0),
    * so the bar sits four times below the quietest legitimate play on record —
-   * low enough for a child that stands out a stretch of a round, and a
-   * stationary child reads 0.
+   * low enough for a child that stands out a stretch of a round.
+   *
+   * AND IT IS A STATUE DETECTOR, NOT A DEFECT DETECTOR. Say it plainly, because
+   * the number invites the opposite reading: the defect this whole file exists
+   * for is a child that WALKS and gets nowhere, and such a child walks as much
+   * as a healthy one. Measured on the deliberately penned child, which is the
+   * defect in its purest form: 109.6 m per played minute — inside the healthy
+   * band, above this floor, and no floor could separate the two without
+   * failing ordinary play. What catches it is the per-child shuffle share,
+   * which reads 1.94 % on that same child against a 0.25 % gate. The floor
+   * answers one question only: did this child's legs move at all while the
+   * game was on?
    */
   walkFloor: 25,
   /** How much of the traced CLOCK the group must have spent playing. Between

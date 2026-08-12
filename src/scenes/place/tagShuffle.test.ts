@@ -682,6 +682,15 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     // as walking and as ground covered, and the episode it ended was over
     // before the window could close on it. This is the blindness the point was
     // opened for, and it is measured here rather than argued.
+    // AND THE WALKING FLOOR CANNOT SEE THIS AT ALL, which is why the share
+    // exists. The penned child's legs move exactly as much as a healthy child's
+    // — measured 109.6 m per played minute, inside the shipped villages' own
+    // 102-113 band — so no floor could separate the two without failing
+    // ordinary play. The floor answers "did it move?"; the share answers "did
+    // it get anywhere?", and only the second one is the reported bug.
+    const legs = traceLiveness(penned)
+    expect(legs.perChild[0].walkedPerPlayedMinute).toBeGreaterThan(CHILD_MOTION.walkFloor * 3)
+    expect(holdsAGame(traceLiveness(paths))).toBe(true)
     const asItWas = oldMeasure(penned, 2, 2, 0.5)
     expect(asItWas.windows).toBeGreaterThan(1000) // it really did look
     expect(asItWas.share).toBeLessThan(0.01) // and it would have passed its gate

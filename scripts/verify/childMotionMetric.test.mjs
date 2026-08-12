@@ -404,6 +404,28 @@ describe('a trace has to hold a game before it proves anything', () => {
     expect(holdsAGame(traceLiveness([walker(), walker(), walker(), walker()]))).toBe(true)
   })
 
+  it('is a STATUE detector — the walking defect is caught by the share', () => {
+    // WHAT THE FLOOR CANNOT DO, measured rather than assumed. A child pacing at
+    // a full walking pace inside a fifth of a metre is the reported defect, and
+    // its legs move exactly as much as a healthy child's: it sails over the
+    // floor and `holdsAGame` accepts the group. The companion measure is what
+    // refuses it — the per-child shuffle share, which reads 100 % of its judged
+    // time. (In the settlement itself the same pair reads 109.6 m per played
+    // minute and 1.94 %; that case is in the replay test beside the pen.)
+    const pacing = trace(3600, (i, at) => ({
+      x: at.x + (Math.floor(i / 8) % 2 === 0 ? 0.025 : -0.025),
+      z: 0,
+    })).map((s) => ({ ...s, playing: true }))
+    const walker = trace(3600, (i) => ({ x: i * DT * 1.5, z: 0 })).map((s) => ({ ...s, playing: true }))
+    const live = traceLiveness([pacing, walker, walker, walker])
+    expect(live.perChild[0].walkedPerPlayedMinute).toBeGreaterThan(CHILD_MOTION.walkFloor * 3)
+    expect(holdsAGame(live)).toBe(true) // the legs moved, so this bar says nothing
+    const r = shuffleWindows([pacing, walker, walker, walker])
+    expect(r.worstShare).toBeGreaterThan(CHILD_MOTION.shareGate) // and this one refuses it
+    expect(r.worstShareChild).toBe(0)
+    expect(r.perChild[1].share).toBe(0) // its siblings are fine, and are not blamed
+  })
+
   it('and demands the walking happen WHILE the game is played', () => {
     // SOL'S DISJOINT TRACE (fifth cross-vendor review). Two children walk thirty
     // metres during a twenty-nine-second stretch that is NOT play, then stand
