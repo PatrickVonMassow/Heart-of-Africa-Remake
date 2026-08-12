@@ -2684,9 +2684,12 @@ if (section('settlement-edge')) {
   /** The gap between two reads of one shot (point 641): far enough apart to be
    *  DIFFERENT PICTURES of the same scene. Both conditions are needed. Frames,
    *  because on a throttled machine time passes while the picture does not; and
-   *  the page's own elapsed time, because a §19.13 rain streak lingers in the
-   *  crop for ~0.7 s and twelve frames at 60 fps are 0.2 s — three reads that
-   *  close together are one streak three times over. This polls the PAGE's
+   *  the page's own elapsed time, because a fast machine could draw twelve
+   *  frames in a fraction of a second. MEASURED here (cropLuma.mjs): a §19.13
+   *  streak stays in the crop under 135 ms and the scene draws ~6.8 fps headless
+   *  at giza, so twelve frames are ~1.75 s — the frame condition alone already
+   *  outlasts the streak thirteen times over, and the 600 ms is the floor that
+   *  keeps that true on a machine that draws faster. This polls the PAGE's
    *  clock, which is the clock the rain falls on, not a sleep in the harness. */
   const readGap = (ms = READ_GAP_MS, frames = READ_GAP_FRAMES) =>
     page.evaluate(

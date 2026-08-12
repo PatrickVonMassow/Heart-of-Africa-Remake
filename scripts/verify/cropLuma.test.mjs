@@ -14,7 +14,9 @@
 // is set so the crop's MEAN moves by the +11.37 % measured there
 // (102.56 → 114.22). Every reading on record then falls out of the arithmetic to
 // three decimals, which is what `reproduces the red` has to mean.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
+import sharp from 'sharp'
+import { join } from 'node:path'
 import {
   READ_COUNT,
   READ_GAP_FRAMES,
@@ -252,11 +254,13 @@ describe('shotReading — the repaired statistic', () => {
     // one pixel in three of the five reads. That is a per-pixel event, and the
     // reading is a mean over 6900 of them — so the question is not whether a
     // pixel survives contaminated but what a share of them does to the number.
-    // A pixel needs THREE of the five, so it needs two separate streaks inside
-    // the 2.4 s a shot spans, both across that pixel: at the measured rate of
-    // ~11 crossings in 150 s that is ~1.4 % of shots, and the streak is 9 % of
-    // the crop's width, so ~0.13 % of pixels. Half a percent is four times that
-    // and moves the reading 0.6 %, a quarter of the bar.
+    // A pixel needs THREE of the five, and one streak now reaches only ONE
+    // read, so it needs THREE separate crossings inside the ~7 s a shot spans,
+    // all three over that same pixel. At the measured 30 crossings per 150 s a
+    // read is contaminated ~28 % of the time and the streak covers ~7 % of the
+    // crop, so a pixel is hit with p = 0.02 and three times with p = 1e-4:
+    // ~1 pixel of the 6900. Half a percent of the crop is 30 times that, and
+    // moves the reading 0.6 % — a quarter of the bar.
     const c = clean()
     const contaminate = (share) => {
       const reads = [0, 1, 2, 3, 4].map(() => Float64Array.from(c))
@@ -339,17 +343,89 @@ describe('the reads are spaced so a streak cannot reach the median', () => {
     expect(READ_COUNT).toBe(5)
     expect(READ_GAP_MS).toBe(600)
     expect(READ_GAP_FRAMES).toBe(12)
-    expect(STREAK_LINGER_MS).toBe(700)
-    expect(maxContaminatedReads()).toBe(2)
+    expect(STREAK_LINGER_MS).toBe(135)
+    expect(maxContaminatedReads()).toBe(1)
     expect(readsNeededToSurvive()).toBe(3)
   })
 
-  it('fails for the two edits that would silently break it', () => {
-    // Three reads: two contaminated ones ARE the median.
-    expect(maxContaminatedReads(STREAK_LINGER_MS, READ_GAP_MS)).not.toBeLessThan(readsNeededToSurvive(3))
+  it('fails for the edits that would silently break it', () => {
     // No gap at all: one streak spans every read.
     expect(maxContaminatedReads(STREAK_LINGER_MS, 0)).toBe(Infinity)
-    // A gap under half the streak's life lets it reach three of the five.
-    expect(maxContaminatedReads(STREAK_LINGER_MS, 300)).not.toBeLessThan(readsNeededToSurvive())
+    // A gap under half the streak's life lets it reach three of five, whatever
+    // that life turns out to be — the inequality, not today's numbers.
+    expect(maxContaminatedReads(700, 300)).not.toBeLessThan(readsNeededToSurvive())
+    // Three reads with a streak that outlives the gap: two ARE the median.
+    expect(maxContaminatedReads(700, 600)).not.toBeLessThan(readsNeededToSurvive(3))
+  })
+
+  it('holds with a wide margin at the measured lifetime, not just barely', () => {
+    // The gap outlasts the streak four times over, so the bound does not sit on
+    // the measurement's own resolution.
+    expect(READ_GAP_MS / STREAK_LINGER_MS).toBeGreaterThan(4)
+  })
+})
+
+
+// THE REAL CROPS, not a fixture built to argue (work-order 641). Two 150x46
+// frames captured at giza in the rains by local/streak-probe.mjs: the cleanest
+// and the most contaminated read of a 120 s series, same camera, same scene, one
+// with a §19.13 streak falling through it. Everything above reasons on a
+// generated crop, which is what makes the cases placeable; this block puts the
+// same statistics on pixels nobody chose.
+describe('the captured frames', () => {
+  const load = async (name) => {
+    // From the project root: under jsdom `import.meta.url` is not a file URL.
+    const path = join(process.cwd(), 'scripts', 'verify', 'fixtures', `${name}.png`)
+    const { data, info } = await sharp(path).raw().toBuffer({ resolveWithObject: true })
+    return luminanceSamples(data, info)
+  }
+  let clean
+  let streaked
+  beforeAll(async () => {
+    clean = await load('edge-crop-clean')
+    streaked = await load('edge-crop-streaked')
+  })
+
+  it('is the crop the suite measures, at the luminance the frames showed', () => {
+    expect(clean.length).toBe(WIDTH * HEIGHT)
+    expect(mean(clean)).toBeCloseTo(102.68, 1)
+    expect(mean(streaked)).toBeCloseTo(110.34, 1)
+  })
+
+  it('carries a streak over a MINORITY of the crop, which is the whole premise', () => {
+    let lifted = 0
+    for (let i = 0; i < clean.length; i++) if (streaked[i] - clean[i] > 20) lifted++
+    expect(lifted / clean.length).toBeGreaterThan(0.02)
+    expect(lifted / clean.length).toBeLessThan(0.5)
+  })
+
+  it('REDS the old single-picture mean, on real pixels', () => {
+    // What the check reported before this point: the streak in one shot of the
+    // on/off/on triple, on ground the band cannot reach.
+    expect(1 - ratio(mean(clean), mean(streaked), mean(clean))).toBeGreaterThan(OUTSIDE_BAR)
+    expect(ratio(mean(streaked), mean(clean), mean(clean)) - 1).toBeGreaterThan(OUTSIDE_BAR)
+  })
+
+  it('leaves the repaired statistic at the clean reading exactly', () => {
+    const clean5 = shotReading([clean, clean, clean, clean, clean])
+    expect(clean5).toBeCloseTo(mean(clean), 10)
+    for (const reads of [
+      [streaked, clean, clean, clean, clean],
+      [clean, clean, streaked, clean, clean],
+      [clean, clean, clean, clean, streaked],
+      [streaked, streaked, clean, clean, clean], // two of five, the measured bound
+    ]) {
+      expect(shotReading(reads)).toBeCloseTo(clean5, 10)
+    }
+  })
+
+  it('barely moves the settle reading, so the wait is not restarted by rain', () => {
+    expect(settleReading(streaked) / settleReading(clean) - 1).toBeLessThan(0.005)
+  })
+
+  it('is what the generated fixture stands in for', () => {
+    // The generated crop must be the same ground, or the placeable cases above
+    // are arguing about a different picture.
+    expect(Math.abs(mean(samples(groundAt(1))) - mean(clean))).toBeLessThan(0.5)
   })
 })

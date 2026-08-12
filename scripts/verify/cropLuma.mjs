@@ -57,23 +57,36 @@
 // The decisions are pure and pinned in cropLuma.test.mjs; the browser side only
 // hands the pixels over.
 
-/** How many reads one shot takes, and how far apart. The gap is BOTH, because
- *  frames alone are 0.2 s on a fast machine and time alone is no picture at all
- *  on a throttled one. `STREAK_LINGER_MS` is measured, not assumed, and
- *  cropLuma.test.mjs pins the inequality these four have to satisfy — which is
+/** How many reads one shot takes, and how far apart. The gap is BOTH conditions,
+ *  because neither alone is a picture: frames alone can be milliseconds on a fast
+ *  machine, and elapsed time alone is no new frame on a throttled one.
+ *  cropLuma.test.mjs pins the inequality these four have to satisfy, which is
  *  what stops a later edit from quietly taking the reads back to three or
  *  closing the gap. */
 export const READ_COUNT = 5
 export const READ_GAP_MS = 600
 export const READ_GAP_FRAMES = 12
-export const STREAK_LINGER_MS = 700
+
+/** How long one §19.13 streak stays in the crop — MEASURED, not assumed, at
+ *  giza in the rains (local/streak-probe.mjs, local/streak-lifetime.mjs).
+ *  Sampling the crop once per animation frame for 120 s, twice: of 52 crossings
+ *  not ONE spanned two consecutive samples 134 ms apart, so the dwell is under
+ *  one frame here and this is an upper bound the sampler could still resolve.
+ *  The rate is ~30 crossings per 150 s.
+ *
+ *  The earlier figure of ~700 ms was inherited and is wrong by a factor of five;
+ *  the bound below was safe anyway, and is now safe by a much wider margin. */
+export const STREAK_LINGER_MS = 135
 
 /** The gap gives up after this many frames, so a scene that stops drawing
  *  cannot hang the suite in it. Generous against the 12 it normally waits: it is
  *  a net, not a schedule. */
 export const READ_GAP_FRAME_CAP = 600
 
-/** How many consecutive reads one streak can reach, at that spacing. */
+/** How many consecutive reads one streak can reach, at that spacing. At the
+ *  measured lifetime it is ONE: the gap outlasts the streak four times over,
+ *  and on this host a 12-frame gap is ~1.75 s (the scene draws ~6.8 fps
+ *  headless at giza), so the frame condition alone already clears it. */
 export function maxContaminatedReads(lingerMs = STREAK_LINGER_MS, gapMs = READ_GAP_MS) {
   if (!(gapMs > 0)) return Infinity
   return Math.floor(lingerMs / gapMs) + 1
