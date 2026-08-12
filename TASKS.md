@@ -102,6 +102,15 @@ put it is the mistake this line exists to stop.
   walked out of; two children resolving each other in opposite directions on alternating frames;
   and a walk target that sits inside another body, so the child never arrives and keeps pressing
   into it. Which one it is goes into the commit message and the code comment.
+  THE STRONGEST CANDIDATE IS ALREADY NAMED, by GPT-5.6 Sol's re-review of point 648's behaviour
+  (12.08.2026, verdict merge-with-fixes on that one finding): `separateGroup` in
+  `src/scenes/place/inhabitantBodies.ts` calls `pushBody(..., dt, …)` in EVERY sweep, so the
+  per-frame `maxSpeed` is applied once PER PASS — with the shipped values (8 m/s, 4 passes) a
+  body can be corrected at an effective 32 m/s, against a cap the code documents as per frame.
+  A deep stack therefore snaps apart instead of easing apart, which is exactly what a child
+  walking hard into a pocket would look like from outside. The fix is ONE shared per-body
+  movement budget spent across all sweeps; it is part of this point, and its Vitest case pins
+  that no body moves further in a frame than the cap allows, whatever the pass count.
   VERIFIABLE: the live `children-motion` section runs five times per backend with no red, and a
   Vitest replay reproduces the named cause from a recorded trace and shows it gone after the fix
   — the replay fails against the code as it stands today. While this point is open, the live
