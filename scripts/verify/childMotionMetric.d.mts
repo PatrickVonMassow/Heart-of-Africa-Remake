@@ -19,6 +19,9 @@ export interface ChildMotionSample {
 
 export interface TraceLiveness {
   children: number
+  /** False if any clock or walked distance is not a finite number, and false for
+   *  an empty set — nothing said is not good news. */
+  numbersFinite: boolean
   /** The stretch of game clock the trace covers. */
   seconds: number
   playedSeconds: number

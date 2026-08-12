@@ -419,6 +419,7 @@ function play(placeId: string, seed: number, seconds: number, dt = 1 / 60): Trac
  */
 function expectLively(paths: Track[][]): void {
   const live = traceLiveness(paths)
+  expect(live.numbersFinite).toBe(true)
   expect(live.children).toBeGreaterThan(1)
   expect(live.seconds).toBeGreaterThan(30)
   expect(live.playedShare).toBeGreaterThan(0.5)

@@ -109,6 +109,45 @@ describe('the walked distance is the game’s own', () => {
     expect(asCredited.windows).toBeGreaterThan(r.windows)
   })
 
+  it('calls a sample whose numbers are not numbers UNJUDGEABLE, never clean', () => {
+    // The vacuum this closes: NaN loses every comparison it is in, so `out <
+    // circle` came out false, every window counted as judged and GOOD, and
+    // `judgedShare` climbed towards 1 on a trace that says nothing at all — a
+    // clean bill of health from numbers nobody can read. Valid clocks and a
+    // valid, rising walked distance, and not one usable coordinate.
+    const t = []
+    for (let i = 0; i < 600; i++) t.push({ clock: i * DT, x: NaN, z: 0, walked: i * 0.025, nudges: 0 })
+    const r = shuffleWindows([t])
+    expect(r.windows).toBe(0)
+    expect(r.seconds).toBe(0)
+    expect(r.judgedShare).toBe(0)
+    expect(r.unjudged).toBeCloseTo(9.98, 1) // and the trace is accounted for
+  })
+
+  it('and one unreadable sample does not carry the rest of the trace with it', () => {
+    // A single bad coordinate used to poison every LATER position — the ground
+    // path is cumulative, and `px += NaN` stays NaN for good — so the whole
+    // remainder read clean. It is a break now: the windows that touch it are
+    // refused and the ones after it are judged again.
+    const t = trace(600, (i) => ({ x: i * DT * 1.5, z: 0 }))
+    const holed = t.map((s, i) => (i === 300 ? { ...s, x: NaN } : s))
+    const r = shuffleWindows([holed])
+    expect(Number.isFinite(r.share)).toBe(true)
+    expect(r.seconds).toBeGreaterThan(7) // most of it still judged
+    expect(r.judgedShare).toBeLessThan(shuffleWindows([t]).judgedShare)
+    expect(r.bad).toBe(0)
+  })
+
+  it('and a clock that is not a number leaves the whole track unjudged', () => {
+    const t = trace(600, (i) => ({ x: i * DT * 1.5, z: 0 })).map((s, i) =>
+      i === 200 ? { ...s, clock: NaN } : s,
+    )
+    const r = shuffleWindows([t])
+    expect(r.windows).toBe(0)
+    expect(r.judgedShare).toBe(0)
+    expect(r.covered).toBeCloseTo(9.98, 1)
+  })
+
   it('leaves the tail of a trace alone when it is shorter than one window', () => {
     const t = trace(30, () => ({ x: 0, z: 0 })) // half a second in all
     expect(shuffleWindows([t]).windows).toBe(0)
@@ -264,6 +303,17 @@ describe('a trace has to hold a game before it proves anything', () => {
     expect(live.seconds).toBeCloseTo(59.98, 1) // the group's clock, never the sum
     expect(live.playedShare).toBeCloseTo(1, 2)
     expect(live.walkedPerChildMinute).toBeCloseTo(90, 0) // 1.5 m/s
+  })
+
+  it('and refuses to read a trace whose numbers are not numbers', () => {
+    // The same rule for the liveness helper: NaN loses its comparisons, so a
+    // bar like "20 m per child-minute" would simply be false rather than
+    // failing loudly. It is said outright instead.
+    const broken = trace(600, (i) => ({ x: i * DT, z: 0 })).map((s) => ({ ...s, walked: NaN, playing: true }))
+    expect(traceLiveness([broken]).numbersFinite).toBe(false)
+    expect(traceLiveness([]).numbersFinite).toBe(false) // nothing said is not good news
+    const good = trace(600, (i) => ({ x: i * DT, z: 0 })).map((s) => ({ ...s, playing: true }))
+    expect(traceLiveness([good]).numbersFinite).toBe(true)
   })
 
   it('and reports an idle group as idle, whichever way it is idle', () => {

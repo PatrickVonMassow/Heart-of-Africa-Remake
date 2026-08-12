@@ -123,6 +123,12 @@ export const CHILD_MOTION = {
  * `rescueRate`, which counts every one of them and gates them on their own
  * account.
  *
+ * A STEP THAT IS NOT A NUMBER BREAKS THE PATH TOO. Left to accumulate, one
+ * non-finite coordinate poisons every later position — `px += NaN` stays NaN for
+ * the rest of the trace — and NaN LOSES EVERY COMPARISON, so `out < circle` came
+ * out false and each of those windows was counted as judged and CLEAN. The break
+ * keeps the path finite and refuses the windows that touch it.
+ *
  * @param {ReadonlyArray<{x:number,z:number,nudges?:number}>} track
  * @returns {{x:number[],z:number[],broken:boolean[]}} `broken[i]` marks the gap
  *   that ENDS at sample `i`.
@@ -136,13 +142,18 @@ export function groundPath(track) {
   for (let i = 0; i < track.length; i++) {
     let cut = false
     if (i === 0) {
-      px = track[i].x
-      pz = track[i].z
+      px = Number.isFinite(track[i].x) ? track[i].x : 0
+      pz = Number.isFinite(track[i].z) ? track[i].z : 0
+      cut = !Number.isFinite(track[i].x) || !Number.isFinite(track[i].z)
     } else if ((track[i].nudges ?? 0) > (track[i - 1].nudges ?? 0)) {
       cut = true
     } else {
-      px += track[i].x - track[i - 1].x
-      pz += track[i].z - track[i - 1].z
+      const dx = track[i].x - track[i - 1].x
+      const dz = track[i].z - track[i - 1].z
+      if (Number.isFinite(dx) && Number.isFinite(dz)) {
+        px += dx
+        pz += dz
+      } else cut = true
     }
     x.push(px)
     z.push(pz)
@@ -187,6 +198,8 @@ export function groundPath(track) {
  *
  * A window that SPANS A RESCUE is refused for the same reason: the path breaks
  * there, and what the legs did across the break is not something the game says.
+ * So is one that touches a sample whose numbers are not numbers — a non-finite
+ * coordinate or walked distance is UNJUDGEABLE, and never a clean window.
  *
  * Whatever is not judged is REPORTED as unjudged rather than quietly dropped, so
  * a trace full of holes cannot look clean OR dirty: `judgedShare` says how much
@@ -208,15 +221,35 @@ export function shuffleWindows(tracks, cfg = {}) {
   for (let k = 0; k < tracks.length; k++) {
     const track = tracks[k]
     if (track.length < 2) continue
+    // A SAMPLE THE NUMBERS CANNOT SPEAK FOR IS UNJUDGEABLE, NEVER CLEAN. NaN
+    // loses every comparison it is in, so `out < circle` came out false and the
+    // window counted as judged AND good — a clean bill of health issued by a
+    // trace that says nothing at all, and `judgedShare` rising towards 1 on it.
+    const usable = track.map(
+      (s) =>
+        Number.isFinite(s.clock) &&
+        Number.isFinite(s.x) &&
+        Number.isFinite(s.z) &&
+        Number.isFinite(s.walked),
+    )
+    // A clock that is not a number cannot even be ORDERED, so nothing in this
+    // track can be placed in a window at all. What is still known is how much
+    // game it covered, and that is booked as unjudged.
+    if (track.some((s) => !Number.isFinite(s.clock))) {
+      const clocks = track.map((s) => s.clock).filter((c) => Number.isFinite(c))
+      if (clocks.length > 1) unjudged += Math.max(...clocks) - Math.min(...clocks)
+      continue
+    }
     const ground = groundPath(track)
     const last = track.length - 1
-    // How many rescues broke the path up to each sample, so "does this window
-    // straddle one?" is a subtraction rather than a scan.
-    const breaks = new Array(track.length)
+    // How many flaws — a rescue, or a sample the numbers cannot speak for —
+    // stand up to each sample, so "does this window touch one?" is a subtraction
+    // rather than a scan.
+    const flaws = new Array(track.length)
     let cuts = 0
     for (let m = 0; m < track.length; m++) {
-      if (ground.broken[m]) cuts++
-      breaks[m] = cuts
+      if (ground.broken[m] || !usable[m]) cuts++
+      flaws[m] = cuts
     }
     // `j` walks forward with `i` — the windows only ever move to the right, so
     // the far end is never searched from the beginning again.
@@ -241,13 +274,14 @@ export function shuffleWindows(tracks, cfg = {}) {
       // bracket it — but only where that gap is short enough to interpolate
       // across. Longer than the span, nothing is known about the inside of it.
       const gap = track[j + 1].clock - track[j].clock
-      // A RESCUE INSIDE THE WINDOW ENDS IT, unjudged. The path is broken there
+      // A RESCUE OR AN UNREADABLE SAMPLE INSIDE THE WINDOW ENDS IT, unjudged.
+      // For the rescue: the path is broken there
       // and nothing may be interpolated across the break — the settlement moved
       // the child, and by how much in which direction the game does not say.
       // The rescue is not thereby forgiven: `rescueRate` counts every one and
       // gates them on their own account, which is where a child that has to be
       // picked up is a finding.
-      if (gap > span || breaks[j + 1] > breaks[i]) {
+      if (gap > span || !usable[i] || flaws[j + 1] > flaws[i]) {
         unjudged += weight
         continue
       }
@@ -300,16 +334,26 @@ export function shuffleWindows(tracks, cfg = {}) {
  * user's bug could have gone green on a settlement standing perfectly still.
  *
  * Note what a MISSING `playing` field does: it reads as not playing, so a trace
- * that cannot show a game in it does not pass for one.
+ * that cannot show a game in it does not pass for one. A number that is not a
+ * number is the same kind of nothing: `numbersFinite` says whether the clock and
+ * the walked distance can be read at all, and the callers demand it rather than
+ * comparing against a NaN, which loses every comparison it is in.
  *
  * @param {ReadonlyArray<ReadonlyArray<{clock:number,walked:number,playing?:boolean}>>} tracks
- * @returns {{children:number,seconds:number,playedSeconds:number,playedShare:number,walked:number,walkedPerChildMinute:number}}
+ * @returns {{children:number,seconds:number,playedSeconds:number,playedShare:number,walked:number,walkedPerChildMinute:number,numbersFinite:boolean}}
  */
 export function traceLiveness(tracks) {
   const real = tracks.filter((t) => t.length >= 2)
   let seconds = 0
   let walked = 0
+  // Nothing said is not good news: an empty set of tracks reports no readable
+  // numbers rather than a clean set of them.
+  let numbersFinite = real.length > 0
   for (const track of real) {
+    for (const s of track) {
+      if (!Number.isFinite(s.clock) || !Number.isFinite(s.walked)) numbersFinite = false
+    }
+    if (!track.every((s) => Number.isFinite(s.clock) && Number.isFinite(s.walked))) continue
     // The children share one clock, so the group's stretch of game is the
     // longest of theirs — never their sum.
     seconds = Math.max(seconds, track[track.length - 1].clock - track[0].clock)
@@ -325,6 +369,7 @@ export function traceLiveness(tracks) {
   const childMinutes = (real.length * seconds) / 60
   return {
     children: real.length,
+    numbersFinite,
     seconds,
     playedSeconds,
     playedShare: seconds > 0 ? playedSeconds / seconds : 0,
