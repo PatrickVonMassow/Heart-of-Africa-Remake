@@ -617,7 +617,11 @@ export function traceLiveness(tracks) {
  */
 export function judgedEnough(r, cfg = {}) {
   const { judgedGate, minJudgedSeconds } = { ...CHILD_MOTION, ...cfg }
-  return r.seconds > minJudgedSeconds && r.leastJudged > judgedGate
+  // A MINIMUM ADMITS ITS OWN VALUE: `minJudgedSeconds` says how much judged
+  // game there must BE, so exactly that much is enough — `>=`, not `>`, which
+  // quietly rejected the very amount the name promises to accept (the eighth
+  // cross-vendor review).
+  return r.seconds >= minJudgedSeconds && r.leastJudged > judgedGate
 }
 
 /**

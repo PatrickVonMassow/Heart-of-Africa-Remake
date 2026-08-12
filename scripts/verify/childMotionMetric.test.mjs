@@ -520,6 +520,25 @@ describe('a trace has to hold a game before it proves anything', () => {
     )
   })
 
+  it('and exactly the minimum of judged game IS enough — the bar is a minimum', () => {
+    // THE BOUNDARY ITSELF (the eighth cross-vendor review): `minJudgedSeconds`
+    // names a MINIMUM, so a result that judged exactly that much game clears
+    // the bar. Written `>`, the comparison rejected the very amount the name
+    // promises to accept. The results are built by hand because only a hand
+    // can put `seconds` on the boundary exactly — a stepped trace lands there
+    // only up to float error — and `judgedEnough` reads nothing but these two
+    // fields, both of which real `shuffleWindows` results carry.
+    const at = (seconds) => ({ seconds, leastJudged: 1 })
+    expect(judgedEnough(at(CHILD_MOTION.minJudgedSeconds))).toBe(true)
+    expect(judgedEnough(at(CHILD_MOTION.minJudgedSeconds - 1e-9))).toBe(false)
+    expect(judgedEnough(at(CHILD_MOTION.minJudgedSeconds + 1e-9))).toBe(true)
+    // And the other half of the conjunction still binds at the boundary: the
+    // judged-share gate is untouched by this fix.
+    expect(
+      judgedEnough({ seconds: CHILD_MOTION.minJudgedSeconds, leastJudged: CHILD_MOTION.judgedGate }),
+    ).toBe(false)
+  })
+
   it('is a STATUE detector — the walking defect is caught by the share', () => {
     // WHAT THE FLOOR CANNOT DO, measured rather than assumed. A child pacing at
     // a full walking pace inside a fifth of a metre is the reported defect, and
