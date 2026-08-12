@@ -255,7 +255,20 @@ export function upgradeNowCards(html) {
  */
 export function dropStrayNowCards(html) {
   const dropped = []
-  const out = String(html ?? '').replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card) => {
+  const doc = String(html ?? '')
+  // WHERE the card stands decides whether being a state card saves it: the state
+  // writers replace only inside the current-work section, so an unnumbered state
+  // card that has drifted OUT of it is reachable by nothing else and would stand
+  // for ever (four-eyes review, 12.08.2026). Here it is removed and reported,
+  // which is the whole point of this being the one removal path.
+  let inSection = () => true
+  try {
+    const { from, end } = sectionBounds(doc, 'now')
+    inSection = (at) => at >= from && at < end
+  } catch {
+    /* no section — judge the fragment as it stands */
+  }
+  const out = doc.replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card, at) => {
     const summary = (card.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
     const title = (summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? ''
     // A NUMBER, or the handover card's own title — nothing else is repairable:
@@ -264,10 +277,10 @@ export function dropStrayNowCards(html) {
     // impostor wearing one would be exactly as unremovable as before.
     const { chip, legacy } = summaryPoint(summary)
     if (chip || legacy) return card
-    if (isStateCardTitle(title)) return card
+    if (isStateCardTitle(title) && inSection(at)) return card
     // A genuine state card that lost its chip is still replaceable by its own
     // command (`none`, `closing <N>`), so it is kept rather than swept.
-    if (/data-state="closing"/.test(card) && looksLikeClosingTitle(title)) return card
+    if (/data-state="closing"/.test(card) && looksLikeClosingTitle(title) && inSection(at)) return card
     dropped.push({
       title: title.trim() || '<untitled>',
       text: card.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),

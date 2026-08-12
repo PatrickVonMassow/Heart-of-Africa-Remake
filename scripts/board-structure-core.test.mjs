@@ -557,6 +557,26 @@ describe('every current-work card names its point and its subject', () => {
     expect(codes(rewritten)).toEqual([])
   })
 
+  // The state writers replace only inside the section, so a state card that has
+  // drifted OUT of it is reachable by nothing else — the sweep takes it and
+  // reports it, which is why the sweep is the one removal path (four-eyes 12.08.).
+  it('sweeps an unnumbered state card that has drifted out of the section', () => {
+    const drifted = withNow('').replace(
+      `<details class="sect"><summary><h2>${REQUIRED_SECTIONS[3]}</h2></summary>\n`,
+      `<details class="sect"><summary><h2>${REQUIRED_SECTIONS[3]}</h2></summary>\n` +
+        '<details class="now" data-state="idle">\n  <summary><span class="t">Gerade keine laufende Arbeit</span>' +
+        '</summary>\n  <div class="body"><p>Verirrt; Punkt 656 folgt.</p></div>\n</details>\n',
+    )
+    expect(codes(drifted)).toContain('now-card-outside')
+    const swept = dropStrayNowCards(drifted)
+    expect(swept.dropped.map((d) => d.title)).toEqual(['Gerade keine laufende Arbeit'])
+    expect(swept.dropped[0].text).toContain('Verirrt')
+    expect(codes(swept.html)).not.toContain('now-card-outside')
+    // …while the same card INSIDE the section is the handover card and stays.
+    const proper = toNoCurrentWork(withNow(''), 'Weiter mit Punkt 656.', { stamp: '23:55' })
+    expect(dropStrayNowCards(proper).dropped).toEqual([])
+  })
+
   // A card the PRE-escaping writer left with a raw bracket in its title must
   // still be migratable and retitleable — otherwise the escaping above fixes the
   // future and strands the past (four-eyes 12.08.).
