@@ -795,6 +795,113 @@ describe('the settlement: the chase runs THROUGH it, never into it', () => {
   })
 })
 
+describe('another inhabitant’s body is ground to walk round (point 657)', () => {
+  const SEP = balance.villageLife.separation
+  const KID_SCALE = 0.55
+  /** An adult standing in the ground, judged the way the settlement judges it:
+   *  contact radius plus the mover footprint. */
+  const adultReach = SEP.bodyRadius + CHILD_R
+  /** The settlement's own wiring in miniature: every other child's body at its
+   *  live position, self and the tag partner excluded. */
+  const childrenOccupy =
+    (s: TagState, extra?: { x: number; z: number }) =>
+    (self: number, partner: number, x: number, z: number): boolean => {
+      if (extra && Math.hypot(x - extra.x, z - extra.z) < adultReach) return true
+      const reach = SEP.bodyRadius * KID_SCALE + CHILD_R
+      return s.children.some(
+        (o, j) => j !== self && j !== partner && Math.hypot(x - o.x, z - o.z) < reach,
+      )
+    }
+
+  it('an errand walks ROUND a standing body instead of pressing into it', () => {
+    // The cause of point 657 in one child: the way to where it was sent passes
+    // straight through a body. With `occupied` the step deflects round it — the
+    // child never enters the body's ground and still arrives; without it, this
+    // very walk pressed into the body and was pushed back out frame after frame.
+    const s = game([[0, 0]])
+    const world: TagWorld = {
+      ...OPEN,
+      occupied: (_self, _partner, x, z) => Math.hypot(x - 3, z) < adultReach,
+    }
+    let nearest = Infinity
+    run(
+      s,
+      10,
+      world,
+      CFG,
+      1 / 60,
+      (st) => {
+        const c = st.children[0]
+        nearest = Math.min(nearest, Math.hypot(c.x - 3, c.z))
+      },
+      (i, st) => {
+        const c = st.children[i]
+        // Arrived: the claim ends and the child stands, like a real errand.
+        if (Math.hypot(6 - c.x, c.z) < 0.5) return null
+        return { heading: Math.atan2(6 - c.x, 0 - c.z), pace: 1.2 }
+      },
+    )
+    const c = s.children[0]
+    // It got there — past the body, not onto it.
+    expect(Math.hypot(c.x - 6, c.z)).toBeLessThan(1)
+    expect(nearest).toBeGreaterThanOrEqual(adultReach - 1e-6)
+    // And the walk was a detour, not a struggle: little more than the straight
+    // six metres, nothing walked on the spot against the body.
+    expect(c.walked).toBeLessThan(6 * 1.6)
+  })
+
+  it('the chase flows ROUND an adult standing in its ground, and the game still catches', () => {
+    const s = game(FOUR)
+    const adult = { x: 7, z: 6.5 } // amid the four spawn spots
+    const world: TagWorld = { ...OPEN, occupied: childrenOccupy(s, adult) }
+    let nearest = Infinity
+    run(s, 60, world, CFG, 1 / 60, (st) => {
+      for (const c of st.children) nearest = Math.min(nearest, Math.hypot(c.x - adult.x, c.z - adult.z))
+    })
+    // Nobody ever stood on the adult's ground: every landed step was probed
+    // against it, so the chase went round the body the way it rounds a hut.
+    expect(nearest).toBeGreaterThanOrEqual(adultReach - 1e-6)
+    // And the avoidance is not rescue-driven: the hover watch fires its
+    // centimetre-scale correction about once per child-minute in the OPEN world
+    // too (measured, 3 in this same minute without `occupied`), so the bound is
+    // that scale, far under the live gate of 6 per child-minute.
+    for (const c of s.children) expect(c.nudges).toBeLessThanOrEqual(2)
+    expect(s.tags).toBeGreaterThan(0)
+  })
+
+  it('the pair is never walled off from its own catch: first catches still arrive early', () => {
+    // The mirror of the bare-world catch test above, with every body standing in
+    // the way — self and partner excluded, exactly as the settlement wires it.
+    // Treating the quarry as a wall would hold the chaser at arm's length here.
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const s = game(FOUR, seed)
+      const world: TagWorld = { ...OPEN, occupied: childrenOccupy(s) }
+      let first = Infinity
+      run(s, CFG.resolveCapSeconds, world, CFG, 1 / 60, (st, t) => {
+        if (st.tags > 0 && first === Infinity) first = t
+      })
+      expect(first).toBeLessThan(CFG.resolveCapSeconds * 0.6)
+    }
+  })
+
+  it('a catch past a third child’s body counts — occupied steers, it is not a wall', () => {
+    // `lineClear` stays a WALL test on purpose: a tag reached past a bystander
+    // is a tag, through a hut it is not. The bystander stands exactly on the
+    // line at the moment of the catch.
+    const s = game([
+      [0, 0],
+      [0.7, 0],
+      [0.35, 0.05],
+    ])
+    const world: TagWorld = { ...OPEN, occupied: childrenOccupy(s) }
+    s.playing = true
+    s.chaser = 0
+    s.target = 1
+    stepTagGame(s, 1 / 60, CFG, world)
+    expect(s.tags).toBe(1)
+  })
+})
+
 describe('the paces the eye reads', () => {
   it('nobody ever falls below the floor while a chase runs — winded, never frozen', () => {
     const s = game(FOUR)

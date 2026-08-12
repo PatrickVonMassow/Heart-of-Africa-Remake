@@ -257,9 +257,9 @@ export interface TagState {
   play: ProducerWatch
 }
 
-/** The settlement as the chase sees it. `blocked` answers for the FULL set —
- *  colliders, the fire ring and the walkable rim alike — so one predicate keeps
- *  the children inside the settlement, out of the fire and clear of every body. */
+/** The settlement as the chase sees it. `blocked` answers for the STATIC set —
+ *  colliders, the fire ring and the walkable rim — and `occupied` for the
+ *  inhabitants standing about, so a child walks ROUND a body like round a hut. */
 export interface TagWorld {
   /** Radius of the play ground the children keep to. */
   radius: number
@@ -273,6 +273,28 @@ export interface TagWorld {
   childRadius: number
   blocked: (x: number, z: number) => boolean
   nudge: (x: number, z: number) => { x: number; z: number; found: boolean }
+  /**
+   * ANOTHER INHABITANT'S BODY IS GROUND TO WALK ROUND, NOT SOMETHING TO
+   * DISCOVER BY COLLISION (point 657). Without this, `blocked` knew only the
+   * geometry: a chase whose heading crossed an adult standing in the ground
+   * read the way as open, walked into the body, and the separation pass pushed
+   * it straight back out — `walked` grew, ground covered did not, which is the
+   * measured walking-on-the-spot of the user's report.
+   *
+   * Answers whether a body OTHER than child `self`'s stands at (x, z), judged
+   * with the child's own footprint. `partner` is the child the round pairs
+   * `self` with this step — the chaser's quarry, the quarry's chaser, −1 for
+   * everyone else — and the predicate must NOT count that one: a chaser that
+   * treated its target as a wall would deflect round it at arm's length and
+   * never close the catch. The pair needs no steering anyway — each aims at or
+   * away from the other — and the separation still keeps their bodies apart.
+   *
+   * DELIBERATELY NOT part of `blocked`: the catch's `lineClear` must stay a
+   * wall test (a tag past a third child is a tag, through a wall it is not),
+   * and the `tag-inside` invariant judges where a child may STAND, which a
+   * moving body it is being pushed clear of must not fail.
+   */
+  occupied?: (self: number, partner: number, x: number, z: number) => boolean
 }
 
 /**
@@ -499,12 +521,19 @@ const OPEN_AHEAD = 8
 const OPEN_SAMPLES = 4
 
 /** Whether the child could really set off on `heading` from where it stands:
- *  clear over the whole opening distance, not merely at the next step. */
-function wayOpen(c: TagChild, heading: number, world: TagWorld): boolean {
+ *  clear over the whole opening distance, not merely at the next step.
+ *  `blockedAt` is the predicate THIS child steers by — the static world plus
+ *  the other inhabitants' bodies (point 657), the same one its steps probe. */
+function wayOpen(
+  c: TagChild,
+  heading: number,
+  world: TagWorld,
+  blockedAt: (x: number, z: number) => boolean,
+): boolean {
   const reach = world.childRadius * OPEN_AHEAD
   for (let i = 1; i <= OPEN_SAMPLES; i++) {
     const d = (reach * i) / OPEN_SAMPLES
-    if (world.blocked(c.x + Math.sin(heading) * d, c.z + Math.cos(heading) * d)) return false
+    if (blockedAt(c.x + Math.sin(heading) * d, c.z + Math.cos(heading) * d)) return false
   }
   return true
 }
@@ -651,14 +680,24 @@ function moveChild(
   dt: number,
   cfg: TagConfig,
   world: TagWorld,
+  /** The other inhabitants' bodies as THIS child must steer round them (point
+   *  657): self and the tag partner already excluded. Layered over the static
+   *  `blocked` for every probe of the step, so a body is walked round exactly
+   *  the way a hut is — and left out of `escapeNudge`, whose target the static
+   *  world answers for (a rescue beside a moving body is resolved by the
+   *  separation the frame after). */
+  occupied?: (x: number, z: number) => boolean,
 ): void {
+  const blockedAt = occupied
+    ? (x: number, z: number) => world.blocked(x, z) || occupied(x, z)
+    : world.blocked
   const maxStep = Math.max(0.05, world.childRadius * 0.9)
   const steps = Math.max(1, Math.ceil(distance / maxStep))
   const len = distance / steps
   const look = Math.max(len, world.childRadius * 2)
   // Going round something and the way it wants has opened: it is past whatever
   // it was going round, and takes its own heading again.
-  if (c.edgeFor > 0 && wayOpen(c, desired, world)) {
+  if (c.edgeFor > 0 && wayOpen(c, desired, world, blockedAt)) {
     c.edgeSide = 0
     c.edgeFor = 0
   }
@@ -676,7 +715,7 @@ function moveChild(
     // the user's "hängt kurz fest": measured at his seed, every single stalled
     // frame had free ground 105–150° off the heading it wanted, just outside
     // what the probe could see.
-    const r = deflectedStep(c.x, c.z, heading, len, world.blocked, look, 12, course, c.edgeSide)
+    const r = deflectedStep(c.x, c.z, heading, len, blockedAt, look, 12, course, c.edgeSide)
     if (!r.moved) break
     c.walked += Math.hypot(r.x - c.x, r.z - c.z)
     c.x = r.x
@@ -759,6 +798,10 @@ function advanceTagGame(
   steer?: TagSteer,
 ): void {
   const n = s.children.length
+  // The other inhabitants' bodies, as ground each child steers round (point
+  // 657). Bound per child below, so every probe of a step already excludes the
+  // child itself and its tag partner.
+  const occ = world.occupied
   // Judged on the state as RECEIVED, before anything below repairs it — a step
   // that quietly mends a broken state and then asserts would report nothing.
   assertRoundSound(s, dt, cfg)
@@ -792,7 +835,9 @@ function advanceTagGame(
       c.effort = 'recover'
       ageEdge(c, dt)
       if (claim && c.pace > 0) {
-        moveChild(c, claim.heading, c.pace * dt, dt, cfg, world)
+        // No round runs, so no child has a tag partner: every other body is
+        // ground this errand walks round (point 657).
+        moveChild(c, claim.heading, c.pace * dt, dt, cfg, world, occ && ((x, z) => occ(i, -1, x, z)))
         c.facing = turnToward(c.facing, c.heading, cfg.turnRate * dt)
       }
       trackProgress(c, dt, cfg, world)
@@ -924,10 +969,16 @@ function advanceTagGame(
       : Math.max(floor, effortPace(c.effort, c.reserve, cfg, isChaser ? 'chaser' : 'runner'))
     c.held = !!claim && c.pace <= 0
     ageEdge(c, dt)
+    // The tag pair steers freely at one another; everyone else's body is ground
+    // to walk round (point 657). For the chaser the partner is its quarry, for
+    // the quarry its chaser — treating those as walls would hold the catch at
+    // arm's length for ever.
+    const partner = isChaser ? s.target : i === s.target ? s.chaser : -1
     // A commanded stillness moves nothing — and leaves `pinned` and `walked`
     // alone, so a standing child is never mistaken for one stuck on geometry and
     // its legs stay still.
-    if (c.pace > 0) moveChild(c, desired, c.pace * dt, dt, cfg, world)
+    if (c.pace > 0)
+      moveChild(c, desired, c.pace * dt, dt, cfg, world, occ && ((x, z) => occ(i, partner, x, z)))
     trackProgress(c, dt, cfg, world)
     // Whatever its legs did this frame, they did it while the round was on.
     c.walkedWhilePlaying += c.walked - walkedBefore

@@ -177,6 +177,45 @@ export function releaseBodies(set: InhabitantSet, bodies: readonly InhabitantBod
   }
 }
 
+/**
+ * True where another inhabitant's body occupies the ground a mover of
+ * `moverRadius` wants to step to (work-order point 657).
+ *
+ * THE SEPARATION IS A CORRECTION, NOT A STEERING: it fires only after a stepper
+ * has already walked its figure into a body, and the child's chase probed a
+ * `blocked` that knew huts, fences and the rim but no body — so occupied ground
+ * read OPEN, the child pressed in, the pass pushed it back out, and `walked`
+ * grew while ground covered did not. That IS the reported walking-on-the-spot.
+ * This predicate is what lets a stepper walk ROUND a body instead of
+ * discovering it by collision; the separation stays as the safety net for the
+ * contacts steering cannot avoid.
+ *
+ * The radius is the body's contact radius plus the mover's own footprint — the
+ * same convention `standingClear` uses for the static colliders — so a point
+ * this predicate calls free really is ground the mover can stand on without
+ * the separation firing. `self` is the mover's own body; `ignore` is a body the
+ * mover is deliberately allowed to reach (the tag partner — a chaser that
+ * treated its quarry as a wall could never close the catch).
+ */
+export function groundOccupied(
+  set: InhabitantSet,
+  self: InhabitantBody | null,
+  x: number,
+  z: number,
+  cfg: SeparationConfig,
+  moverRadius: number,
+  ignore: InhabitantBody | null = null,
+): boolean {
+  for (const b of set.bodies) {
+    if (b === self || b === ignore || !b.active) continue
+    const r = cfg.bodyRadius * b.scale + moverRadius
+    const dx = x - b.x
+    const dz = z - b.z
+    if (dx * dx + dz * dz < r * r) return true
+  }
+  return false
+}
+
 /** A deterministic escape bearing for two bodies at EXACTLY the same point (a
  *  spawn stack, a catch resolved on the spot): the golden angle off the body's
  *  own index, so the pair never picks the same way out and a stack comes apart

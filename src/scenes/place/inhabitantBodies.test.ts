@@ -8,6 +8,7 @@ import {
   claimBodies,
   createBodies,
   createInhabitantSet,
+  groundOccupied,
   releaseBodies,
   separateAll,
   separateBody,
@@ -388,4 +389,35 @@ describe('inhabitant bodies', () => {
     expect(travel(4)).toBeLessThanOrEqual(travel(1) + 1e-9)
   })
 
+  describe('the ground another body stands on (point 657)', () => {
+    it('reads occupied inside the contact-plus-footprint radius and free beyond it', () => {
+      const set = createInhabitantSet()
+      const [adult] = claimBodies(set, 1, { x: 2, z: 0 })
+      const moverR = 0.3
+      const reach = SEP.bodyRadius * adult.scale + moverR
+      expect(groundOccupied(set, null, 2 + reach - 1e-3, 0, SEP, moverR)).toBe(true)
+      expect(groundOccupied(set, null, 2 + reach + 1e-3, 0, SEP, moverR)).toBe(false)
+    })
+
+    it('judges each body at its own scale — a child occupies less ground than an adult', () => {
+      const set = createInhabitantSet()
+      claimBodies(set, 1, { x: 2, z: 0, scale: KID_SCALE })
+      const moverR = 0.3
+      const kidReach = SEP.bodyRadius * KID_SCALE + moverR
+      const adultReach = SEP.bodyRadius + moverR
+      expect(groundOccupied(set, null, 2 + kidReach - 1e-3, 0, SEP, moverR)).toBe(true)
+      expect(groundOccupied(set, null, 2 + adultReach - 1e-3, 0, SEP, moverR)).toBe(false)
+    })
+
+    it('never counts the mover itself, the ignored partner, or an inactive body', () => {
+      const set = createInhabitantSet()
+      const [self, partner, sleeper] = claimBodies(set, 3, { x: 0, z: 0 })
+      sleeper.active = false
+      // All three stand on the very spot asked about; none of them counts.
+      expect(groundOccupied(set, self, 0, 0, SEP, 0.3, partner)).toBe(false)
+      // A fourth, unrelated body on the spot does.
+      claimBodies(set, 1, { x: 0, z: 0 })
+      expect(groundOccupied(set, self, 0, 0, SEP, 0.3, partner)).toBe(true)
+    })
+  })
 })
