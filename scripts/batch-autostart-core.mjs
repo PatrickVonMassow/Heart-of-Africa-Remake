@@ -830,3 +830,36 @@ export function judgeSpawnOutcome({
 export function announceSpawn({ quota = null } = {}) {
   return !quota
 }
+
+/**
+ * SHOULD THIS TICK START A FIREWALL TOP-UP? PURE.
+ *
+ * The container's egress allowance is an ipset of RESOLVED IPs, so it ages out
+ * under a running container and the tick re-resolves it. Only one top-up may run
+ * at a time, and the previous one's pid is written down — but a MISSING record is
+ * the normal first tick of a fresh container, not a fault. Reading it threw there,
+ * which took the whole spawn with it and made the first failure permanent: the pid
+ * file is only written after a spawn that never happened. Measured 12.08.2026 —
+ * the top-up had not run once since the container came up, and the allowance for
+ * api.openai.com aged out twice under it.
+ *
+ * A LIVE PID IS NOT PROOF OF OUR CHILD either: after pid reuse an unrelated
+ * long-lived process would suppress the top-up for as long as IT lives. So the
+ * record only counts while the process it names really IS a top-up.
+ *
+ * @param {{pidText: string|null, cmdlineOf: (pid: number) => string|null}} io
+ *   `pidText` is the recorded pid file's content (null when there is none);
+ *   `cmdlineOf` answers what a pid actually is (null when it cannot be read).
+ * @returns {{start: boolean, reason: string, pid: number}}
+ */
+export function firewallTopUpDecision({ pidText = null, cmdlineOf = () => null } = {}) {
+  const pid = Number(String(pidText ?? '').trim()) || 0
+  if (pid > 0) {
+    const cmdline = cmdlineOf(pid)
+    if (cmdline && cmdline.includes('firewall-allow')) {
+      return { start: false, reason: `still running (pid ${pid})`, pid }
+    }
+    return { start: true, reason: `the recorded pid ${pid} is not a top-up any more`, pid }
+  }
+  return { start: true, reason: 'no top-up on record', pid: 0 }
+}
