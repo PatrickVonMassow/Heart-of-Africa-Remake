@@ -44,12 +44,41 @@
 // spaces them by both frames and the page's own elapsed time, because a streak
 // lingers ~0.7 s and twelve frames can be 0.2 s.
 //
-// The spatial median keeps ONE job: deciding when the crop has stopped moving
-// (`cropMedian`). That loop wants a reading a passing streak cannot restart, and
-// it measures nothing.
+// THE SETTLE LOOP NEEDS THE SAME TWO PROPERTIES, and gets them a different way.
+// It reads one picture at a time, so it has no time axis to reject a streak in —
+// and a spatial median would make it blind in exactly the way described above:
+// it would call a crop settled while a leak was still arriving in the near rows.
+// A rain streak is BRIGHT and a band leak is DARK, so the settle reading drops
+// the brightest fifth of the crop and averages the rest (`settleReading`).
+// Measured on the fixtures: a 14 px streak moves it by 0.27 % and a 25 px one by
+// 0.53 %, while the 8-row leak the spatial median reports as ×1.000 moves it by
+// 3.8 %. A streak can still cost the loop an iteration; it cannot end it early.
 //
 // The decisions are pure and pinned in cropLuma.test.mjs; the browser side only
 // hands the pixels over.
+
+/** How many reads one shot takes, and how far apart. The gap is BOTH, because
+ *  frames alone are 0.2 s on a fast machine and time alone is no picture at all
+ *  on a throttled one. `STREAK_LINGER_MS` is measured, not assumed, and
+ *  cropLuma.test.mjs pins the inequality these four have to satisfy — which is
+ *  what stops a later edit from quietly taking the reads back to three or
+ *  closing the gap. */
+export const READ_COUNT = 5
+export const READ_GAP_MS = 600
+export const READ_GAP_FRAMES = 12
+export const STREAK_LINGER_MS = 700
+
+/** How many consecutive reads one streak can reach, at that spacing. */
+export function maxContaminatedReads(lingerMs = STREAK_LINGER_MS, gapMs = READ_GAP_MS) {
+  if (!(gapMs > 0)) return Infinity
+  return Math.floor(lingerMs / gapMs) + 1
+}
+
+/** How many of the reads a value must occupy to reach the per-pixel median —
+ *  the number `maxContaminatedReads` has to stay below. */
+export function readsNeededToSurvive(readCount = READ_COUNT) {
+  return Math.floor(readCount / 2) + 1
+}
 
 /** Rec-601-ish weights, kept byte for byte from the measurement they replace, so
  *  the numbers this suite reports stay comparable across the change. */
@@ -86,11 +115,29 @@ export function mean(values) {
   return sum / n
 }
 
-/** The SETTLE reading of one crop: the spatial median, whose only job is to say
- *  whether the picture has stopped moving. A rain streak must not restart that
- *  loop, and no band strength is being compared here. */
-export function cropMedian(samples) {
-  return median(samples)
+/** The share of the crop the settle reading drops — the bright end, where the
+ *  rain is. A 14 px streak is 9.3 % of the crop's pixels and a 25 px one 16.7 %,
+ *  so a fifth clears both with room to spare, while a DARKENING leak is
+ *  untouched by a bright-end trim however far it reaches. */
+export const SETTLE_DROP_BRIGHTEST = 0.2
+
+/** The mean of the crop with its brightest `dropBrightest` share removed. */
+export function trimmedMean(samples, dropBrightest = SETTLE_DROP_BRIGHTEST) {
+  const n = samples.length
+  if (n === 0) return null
+  const sorted = Float64Array.from(samples).sort()
+  const keep = Math.max(1, Math.round(n * (1 - dropBrightest)))
+  let sum = 0
+  for (let i = 0; i < keep; i++) sum += sorted[i]
+  return sum / keep
+}
+
+/** The SETTLE reading of one crop, whose job is to say whether the picture has
+ *  stopped moving. A rain streak must not end that loop early and must not
+ *  restart it forever; a band leak arriving in part of the crop MUST hold it
+ *  open, which is what a spatial median here would not do. */
+export function settleReading(samples) {
+  return trimmedMean(samples)
 }
 
 /**

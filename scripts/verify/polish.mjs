@@ -14,7 +14,7 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
-import { cropMedian, luminanceSamples, shotReading } from './cropLuma.mjs'
+import { READ_COUNT, READ_GAP_FRAMES, READ_GAP_MS, luminanceSamples, settleReading, shotReading } from './cropLuma.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -2625,12 +2625,13 @@ if (section('settlement-edge')) {
     return luminanceSamples(data, info)
   }
 
-  /** The crop's SETTLE reading — the spatial median, so a streak crossing the
-   *  crop cannot restart the wait. It compares the picture with itself; it never
-   *  measures the band. */
+  /** The crop's SETTLE reading (cropLuma.mjs): the crop's mean with its
+   *  brightest fifth dropped, so a rain streak cannot end the wait early and a
+   *  band leak arriving over part of the crop still holds it open. It compares
+   *  the picture with itself; it never measures the band. */
   const groundLuma = async (buf, ndc, w, h) => {
     const samples = await groundSamples(buf, ndc, w, h)
-    return samples === null ? null : cropMedian(samples)
+    return samples === null ? null : settleReading(samples)
   }
 
   /** Aim the camera at a ground point ahead by bisecting the pitch on the
@@ -2687,7 +2688,7 @@ if (section('settlement-edge')) {
    *  crop for ~0.7 s and twelve frames at 60 fps are 0.2 s — three reads that
    *  close together are one streak three times over. This polls the PAGE's
    *  clock, which is the clock the rain falls on, not a sleep in the harness. */
-  const readGap = (ms = 600, frames = 12) =>
+  const readGap = (ms = READ_GAP_MS, frames = READ_GAP_FRAMES) =>
     page.evaluate(
       ([wait, n]) =>
         new Promise((res) => {
@@ -2754,12 +2755,11 @@ if (section('settlement-edge')) {
     // leak over 8 of the 46 rows reads ×0.968 on the mean and ×1.000 on the
     // spatial median). Five reads, so a streak surviving into two of them still
     // cannot reach the middle value.
-    const READS = 5
     const shot = async (strength) => {
       await page.evaluate((s) => { window.__balance.placeEdgeBand.strength = s }, strength)
       if ((await settledLuma(ndc, 0.2)) === null) return null
       const reads = []
-      for (let i = 0; i < READS; i++) {
+      for (let i = 0; i < READ_COUNT; i++) {
         if (i > 0) await readGap()
         const cur = await groundSamples(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
         if (cur === null) return null

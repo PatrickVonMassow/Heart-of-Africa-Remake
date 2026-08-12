@@ -15,7 +15,21 @@
 // (102.56 → 114.22). Every reading on record then falls out of the arithmetic to
 // three decimals, which is what `reproduces the red` has to mean.
 import { describe, it, expect } from 'vitest'
-import { cropMedian, luminance, luminanceSamples, mean, median, shotReading } from './cropLuma.mjs'
+import {
+  READ_COUNT,
+  READ_GAP_FRAMES,
+  READ_GAP_MS,
+  SETTLE_DROP_BRIGHTEST,
+  STREAK_LINGER_MS,
+  luminance,
+  luminanceSamples,
+  maxContaminatedReads,
+  mean,
+  median,
+  readsNeededToSurvive,
+  settleReading,
+  shotReading,
+} from './cropLuma.mjs'
 
 const WIDTH = 150
 const HEIGHT = 46
@@ -56,10 +70,10 @@ const withStreak = (base, pixels = 14, value = 227) => (x, y) =>
 const withLeak = (base, rows, tone = 0.18) => (x, y) =>
   y >= HEIGHT - rows ? base(x, y) * (1 - tone) : base(x, y)
 
-/** The statistic that was tried and rejected: the crop's spatial median. Kept
- *  here as the counter-example, since `cropMedian` still serves the settle
- *  loop and nothing else. */
-const spatialMedian = (s) => cropMedian(s)
+/** The statistic that was tried and REJECTED — the crop's spatial median. It is
+ *  kept here as the counter-example each test measures against, and nothing in
+ *  the suite reads a crop with it. */
+const spatialMedian = (s) => median(s)
 
 /** The measured contamination of the saved frames: 114.22 / 102.56. */
 const MEASURED_CONTAMINATION = 1.1137
@@ -99,10 +113,24 @@ describe('median and mean', () => {
 })
 
 describe('the fixture reproduces the frames it is calibrated to', () => {
+  // Pinned in ABSOLUTE luminance, not only as a ratio: a fixture with the right
+  // ratio but the wrong crop brightness is not the crop the frames showed, and
+  // every reading below is derived from these two numbers.
+  it('is the crop the saved frames measured — 102.56 clean, 114.22 with the streak', () => {
+    // Against the saved frames' own numbers, not against the fixture's: both
+    // sit within 0.15 of a luminance point of what the browser measured.
+    expect(Math.abs(mean(samples(groundAt(1))) - 102.56)).toBeLessThan(0.2)
+    expect(Math.abs(mean(samples(withStreak(groundAt(1)))) - 114.22)).toBeLessThan(0.2)
+  })
+
   it('moves the crop mean by the measured +11.37 %', () => {
     const clean = samples(groundAt(1))
     const streaked = samples(withStreak(groundAt(1)))
     expect(mean(streaked) / mean(clean)).toBeCloseTo(MEASURED_CONTAMINATION, 3)
+  })
+
+  it('puts the streak on the share of the crop the frames showed', () => {
+    expect(14 / WIDTH).toBeCloseTo(0.093, 3)
   })
 })
 
@@ -227,10 +255,59 @@ describe('shotReading — the repaired statistic', () => {
   })
 })
 
-describe('cropMedian — the settle reading', () => {
-  it('a streak crossing the crop barely moves it, so the settle loop is not restarted', () => {
-    const clean = samples(groundAt(1))
-    const streaked = samples(withStreak(groundAt(1)))
-    expect(Math.abs(spatialMedian(streaked) / spatialMedian(clean) - 1)).toBeLessThan(0.01)
+describe('settleReading — when the crop has stopped moving', () => {
+  const clean = () => samples(groundAt(1))
+
+  it('drops the bright end, so a rain streak cannot end the wait early', () => {
+    const c = clean()
+    for (const [pixels, bar] of [[14, 0.005], [25, 0.01]]) {
+      const streaked = samples(withStreak(groundAt(1), pixels))
+      expect(Math.abs(settleReading(streaked) / settleReading(c) - 1)).toBeLessThan(bar)
+    }
+  })
+
+  it('SEES a leak arriving in part of the crop, which is what holds the wait open', () => {
+    // The blindness a spatial median would have put in the settle loop: it would
+    // call the crop settled while the leak was still arriving, and the reads
+    // taken afterwards could then contain the finished leak in a minority.
+    const c = clean()
+    const leaked = samples(withLeak(groundAt(1), 8))
+    expect(1 - settleReading(leaked) / settleReading(c)).toBeGreaterThan(0.025)
+    expect(spatialMedian(leaked) / spatialMedian(c)).toBeCloseTo(1, 4)
+  })
+
+  it('trims the bright end only, so it cannot be a MEASUREMENT of the band', () => {
+    // It is deliberately not the reading the check judges: the trim biases it.
+    // This pins that nobody may quietly promote it to one.
+    const c = clean()
+    expect(settleReading(c)).toBeLessThan(mean(c))
+    expect(SETTLE_DROP_BRIGHTEST).toBeGreaterThan(25 / 150) // clears the widest streak seen
+  })
+})
+
+describe('the reads are spaced so a streak cannot reach the median', () => {
+  // What stops a later edit from taking the reads back to three or closing the
+  // gap: both would leave every test above green while making the statistic
+  // fail on the very transient it was built for.
+  it('one streak can reach fewer reads than the median needs', () => {
+    expect(maxContaminatedReads()).toBeLessThan(readsNeededToSurvive())
+  })
+
+  it('the recorded constants are the ones that satisfy it', () => {
+    expect(READ_COUNT).toBe(5)
+    expect(READ_GAP_MS).toBe(600)
+    expect(READ_GAP_FRAMES).toBe(12)
+    expect(STREAK_LINGER_MS).toBe(700)
+    expect(maxContaminatedReads()).toBe(2)
+    expect(readsNeededToSurvive()).toBe(3)
+  })
+
+  it('fails for the two edits that would silently break it', () => {
+    // Three reads: two contaminated ones ARE the median.
+    expect(maxContaminatedReads(STREAK_LINGER_MS, READ_GAP_MS)).not.toBeLessThan(readsNeededToSurvive(3))
+    // No gap at all: one streak spans every read.
+    expect(maxContaminatedReads(STREAK_LINGER_MS, 0)).toBe(Infinity)
+    // A gap under half the streak's life lets it reach three of the five.
+    expect(maxContaminatedReads(STREAK_LINGER_MS, 300)).not.toBeLessThan(readsNeededToSurvive())
   })
 })
