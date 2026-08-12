@@ -258,23 +258,44 @@ export function stepRoundBodies(
   const selfRadius = cfg.bodyRadius * self.scale
   const notMe = (b: InhabitantBody) => b === self
   const occupiedAt = (x: number, z: number) => groundOccupied(set, x, z, cfg, selfRadius, notMe)
-  // THE WHOLE SEGMENT IS TESTED, NOT THE ENDPOINT (GPT-5.6 Sol, 12.08.2026):
-  // a step whose endpoint lies BEYOND a body used to cross it without the
-  // deflection ever waking — the porters are the worst case, their wanted
-  // point comes from the route clock rather than a distance-bounded step, so
-  // one long frame walked them clean through a child. Sampled at sub-body
-  // spacing, like the chase's own substeps, so nothing fits between samples.
-  const dx = toX - fromX
-  const dz = toZ - fromZ
-  const dist = Math.hypot(dx, dz)
+  // THE WHOLE SEGMENT IS TESTED, NOT THE ENDPOINT, AND CONTINUOUSLY, NOT BY
+  // SAMPLES (GPT-5.6 Sol, 12.08.2026, both findings): a step whose endpoint
+  // lay beyond a body used to cross it without the deflection ever waking —
+  // the porters are the worst case, their wanted point comes from the route
+  // clock rather than a distance-bounded step — and a SAMPLED sweep still let
+  // a near-tangent crossing slip through, because a graze's chord through the
+  // occupied disc can be shorter than any sampling gap. The test is the
+  // closed-form distance from the body's centre to the segment against the
+  // pair's contact radius: no gap for anything to fall into.
+  //
+  // A mover ALREADY at contact (the separation settles pairs a slop inside
+  // it) is allowed every step that does not press DEEPER: without that
+  // allowance its every move — including the one walking away — would read as
+  // a crossing, and a settled pair could never part again.
   const crosses = (ax: number, az: number, bx: number, bz: number): boolean => {
-    const d = Math.hypot(bx - ax, bz - az)
-    const steps = Math.max(1, Math.ceil(d / Math.max(0.05, selfRadius)))
-    for (let i = 1; i <= steps; i++) {
-      if (occupiedAt(ax + ((bx - ax) * i) / steps, az + ((bz - az) * i) / steps)) return true
+    const dxx = bx - ax
+    const dzz = bz - az
+    const len2 = dxx * dxx + dzz * dzz
+    for (const b of set.bodies) {
+      if (!b.active || b === self) continue
+      const r = cfg.bodyRadius * b.scale + selfRadius
+      const startD2 = (ax - b.x) * (ax - b.x) + (az - b.z) * (az - b.z)
+      if (startD2 < r * r) {
+        // Already in contact: only going deeper counts as a crossing.
+        const endD2 = (bx - b.x) * (bx - b.x) + (bz - b.z) * (bz - b.z)
+        if (endD2 < startD2) return true
+        continue
+      }
+      const t = len2 > 0 ? Math.max(0, Math.min(1, ((b.x - ax) * dxx + (b.z - az) * dzz) / len2)) : 0
+      const px = ax + dxx * t - b.x
+      const pz = az + dzz * t - b.z
+      if (px * px + pz * pz < r * r) return true
     }
     return false
   }
+  const dx = toX - fromX
+  const dz = toZ - fromZ
+  const dist = Math.hypot(dx, dz)
   if (!crosses(fromX, fromZ, toX, toZ)) return { x: toX, z: toZ }
   if (!(dist > 1e-9)) return { x: fromX, z: fromZ }
   const both = (x: number, z: number) => blocked(x, z) || occupiedAt(x, z)

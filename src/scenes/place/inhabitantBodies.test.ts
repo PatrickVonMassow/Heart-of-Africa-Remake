@@ -451,6 +451,29 @@ describe('inhabitant bodies', () => {
       }
     })
 
+    it('a GRAZING crossing is caught — the test is continuous, not sampled', () => {
+      // GPT-5.6 Sol (12.08.2026): a sampled sweep let a near-tangent crossing
+      // slip through, because a graze's chord through the occupied disc can be
+      // shorter than any sampling gap. This body dips 12 mm into the straight
+      // line, centred between where the old sub-body samples fell (0.2308 m
+      // spacing put them 0.378 m from the centre, just outside the 0.372 m
+      // reach) — the sampled version walked straight through it.
+      const set = createInhabitantSet()
+      const [self] = claimBodies(set, 1, { x: 0, z: 0 })
+      const [child] = claimBodies(set, 1, { x: 1.2692, z: 0.36, scale: KID_SCALE })
+      const reach = SEP.bodyRadius * (1 + KID_SCALE)
+      const open = () => false
+      const r = stepRoundBodies(set, self, 0, 0, 3, 0, SEP, open)
+      // The raw destination is refused …
+      expect(r.x === 3 && r.z === 0).toBe(false)
+      // … and the move that IS returned clears the body continuously: the
+      // closed-form segment-to-centre distance never dips under the reach.
+      const len2 = r.x * r.x + r.z * r.z
+      const t = len2 > 0 ? Math.max(0, Math.min(1, (child.x * r.x + child.z * r.z) / len2)) : 0
+      const d = Math.hypot(r.x * t - child.x, r.z * t - child.z)
+      expect(d).toBeGreaterThanOrEqual(reach - 1e-9)
+    })
+
     it('never counts an excluded body or an inactive one', () => {
       const set = createInhabitantSet()
       const [self, partner, sleeper] = claimBodies(set, 3, { x: 0, z: 0 })
