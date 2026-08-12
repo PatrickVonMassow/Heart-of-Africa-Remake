@@ -415,7 +415,9 @@ function play(placeId: string, seed: number, seconds: number, dt = 1 / 60): Trac
  * game in it. The bars are measured on the four settlements replayed below —
  * four children, the whole minute played, 107-115 m walked per child-minute —
  * and set far below them: they separate a game from NOTHING, not a good game
- * from a poor one.
+ * from a poor one — and the walking bar is asked of the QUIETEST child, because
+ * a group of four with one statue in it walks three quarters as far as a group
+ * of four that all play.
  */
 function expectLively(paths: Track[][]): void {
   const live = traceLiveness(paths)
@@ -424,6 +426,11 @@ function expectLively(paths: Track[][]): void {
   expect(live.seconds).toBeGreaterThan(30)
   expect(live.playedShare).toBeGreaterThan(0.5)
   expect(live.walkedPerChildMinute).toBeGreaterThan(20)
+  // AND EVERY CHILD WALKED, not the group on average (the fourth review). One
+  // motionless child among three busy ones is invisible in a sum and scores
+  // perfectly on every ceiling there is. Measured here: the quietest child of
+  // each village walks 102-113 m in its own minute.
+  expect(live.quietestWalkedPerChildMinute).toBeGreaterThan(CHILD_MOTION.walkFloor)
 }
 
 // The reported village and seed first; the others are there because the causes

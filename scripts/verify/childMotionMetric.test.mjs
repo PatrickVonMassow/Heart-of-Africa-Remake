@@ -352,6 +352,26 @@ describe('a trace has to hold a game before it proves anything', () => {
     expect(live.walkedPerChildMinute).toBeCloseTo(90, 0) // 1.5 m/s
   })
 
+  it('and reports the QUIETEST child, not the group’s walking', () => {
+    // THE ONE FLOOR AMONG THE CEILINGS. Three children playing and one standing
+    // perfectly still: the statue clears every upper bound there is — it
+    // shuffles nowhere, is never stuck, is never carried, and its trace is
+    // judgeable end to end — and the group's walking hides it, three quarters
+    // of four still being plenty.
+    const walker = () => trace(3600, (i) => ({ x: i * DT * 1.5, z: 0 })).map((s) => ({ ...s, playing: true }))
+    const statue = () => trace(3600, () => ({ x: 0, z: 0 })).map((s) => ({ ...s, playing: true }))
+    const live = traceLiveness([walker(), walker(), walker(), statue()])
+    expect(live.walkedPerChildMinute).toBeGreaterThan(CHILD_MOTION.walkFloor) // the group looks busy
+    expect(live.quietestWalkedPerChildMinute).toBe(0) // and one of them never moved
+    expect(live.quietestChild).toBe(3)
+    expect(live.perChild[0].walkedPerMinute).toBeCloseTo(90, 0)
+    // Sol's live construction: ALL of them standing still, which is what the
+    // live proof used to accept as a game.
+    const still = traceLiveness([statue(), statue(), statue(), statue()])
+    expect(still.quietestWalkedPerChildMinute).toBe(0)
+    expect(still.playedShare).toBe(1) // it says it is playing, and nothing moves
+  })
+
   it('and refuses to read a trace whose numbers are not numbers', () => {
     // The same rule for the liveness helper: NaN loses its comparisons, so a
     // bar like "20 m per child-minute" would simply be false rather than

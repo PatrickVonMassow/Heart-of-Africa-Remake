@@ -17,6 +17,12 @@ export interface ChildMotionSample {
   playing?: boolean
 }
 
+export interface ChildLiveness {
+  seconds: number
+  walked: number
+  walkedPerMinute: number
+}
+
 export interface TraceLiveness {
   children: number
   /** False if any clock or walked distance is not a finite number, and false for
@@ -29,6 +35,11 @@ export interface TraceLiveness {
   /** What the children's legs did over the whole trace, summed. */
   walked: number
   walkedPerChildMinute: number
+  perChild: ChildLiveness[]
+  /** The LEAST-walking child's own metres per minute — the floor the callers
+   *  gate on, because a sum hides a child that never moved. */
+  quietestWalkedPerChildMinute: number
+  quietestChild: number
 }
 
 export interface ChildWindows {
@@ -110,6 +121,7 @@ export declare const CHILD_MOTION: {
   worstChildRescueGate: number
   worstChildCarryGate: number
   judgedGate: number
+  walkFloor: number
 }
 
 export declare function groundPath(

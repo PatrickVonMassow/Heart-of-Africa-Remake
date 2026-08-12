@@ -115,6 +115,18 @@ export const CHILD_MOTION = {
   worstChildRescueGate: 12,
   worstChildCarryGate: 8,
   judgedGate: 0.75,
+  /**
+   * THE ONLY FLOOR AMONG ALL THESE CEILINGS: metres the QUIETEST child must have
+   * walked in its own minute. Every other bar here is an upper bound, and a
+   * child that never moves clears all of them at once — nothing walked is
+   * nothing shuffled, nothing stuck, nothing carried and a trace judgeable end
+   * to end. Measured on the three shipped villages, the quietest child of each
+   * walks 102.2 / 112.5 / 109.2 m per its own minute (the groups 106.8-115.0),
+   * so the bar sits four times below the quietest legitimate play on record —
+   * low enough for a child that stands out a stretch of a round, and a
+   * stationary child reads 0.
+   */
+  walkFloor: 25,
 }
 
 /**
@@ -387,6 +399,13 @@ export function shuffleWindows(tracks, cfg = {}) {
  * group was playing; the replay had no such assertion, and the pure proof of the
  * user's bug could have gone green on a settlement standing perfectly still.
  *
+ * AND THE FLOOR IS PER CHILD (the fourth cross-vendor review, 12.08.2026). Every
+ * other gate on the children is an UPPER bound, and a child that never moves
+ * satisfies all of them at once: it shuffles nowhere, it is never stuck, it is
+ * never carried, and its trace is judgeable end to end. Summed over the group,
+ * one such child is hidden by three busy siblings — so the bar is what the
+ * QUIETEST child walked in its own minute.
+ *
  * Note what a MISSING `playing` field does: it reads as not playing, so a trace
  * that cannot show a game in it does not pass for one. A number that is not a
  * number is the same kind of nothing: `numbersFinite` says whether the clock and
@@ -394,7 +413,7 @@ export function shuffleWindows(tracks, cfg = {}) {
  * comparing against a NaN, which loses every comparison it is in.
  *
  * @param {ReadonlyArray<ReadonlyArray<{clock:number,walked:number,playing?:boolean}>>} tracks
- * @returns {{children:number,seconds:number,playedSeconds:number,playedShare:number,walked:number,walkedPerChildMinute:number,numbersFinite:boolean}}
+ * @returns {{children:number,seconds:number,playedSeconds:number,playedShare:number,walked:number,walkedPerChildMinute:number,numbersFinite:boolean,perChild:object[],quietestWalkedPerChildMinute:number,quietestChild:number}}
  */
 export function traceLiveness(tracks) {
   const real = tracks.filter((t) => t.length >= 2)
@@ -403,15 +422,26 @@ export function traceLiveness(tracks) {
   // Nothing said is not good news: an empty set of tracks reports no readable
   // numbers rather than a clean set of them.
   let numbersFinite = real.length > 0
-  for (const track of real) {
+  // PER CHILD, because the floor is per child: one motionless child among three
+  // busy ones is invisible in a sum, and it scores perfectly on every upper
+  // bound there is — nothing walked is nothing shuffled, nothing stuck and
+  // nothing carried.
+  const perChild = tracks.map(() => ({ seconds: 0, walked: 0, walkedPerMinute: 0 }))
+  for (let k = 0; k < tracks.length; k++) {
+    const track = tracks[k]
+    if (track.length < 2) continue
     for (const s of track) {
       if (!Number.isFinite(s.clock) || !Number.isFinite(s.walked)) numbersFinite = false
     }
     if (!track.every((s) => Number.isFinite(s.clock) && Number.isFinite(s.walked))) continue
+    const own = perChild[k]
+    own.seconds = track[track.length - 1].clock - track[0].clock
+    own.walked = Math.max(0, track[track.length - 1].walked - track[0].walked)
+    own.walkedPerMinute = own.seconds > 0 ? own.walked / (own.seconds / 60) : 0
     // The children share one clock, so the group's stretch of game is the
     // longest of theirs — never their sum.
-    seconds = Math.max(seconds, track[track.length - 1].clock - track[0].clock)
-    walked += Math.max(0, track[track.length - 1].walked - track[0].walked)
+    seconds = Math.max(seconds, own.seconds)
+    walked += own.walked
   }
   let playedSeconds = 0
   const first = real[0]
@@ -421,6 +451,15 @@ export function traceLiveness(tracks) {
     }
   }
   const childMinutes = (real.length * seconds) / 60
+  let quietestWalkedPerChildMinute = perChild.length > 0 ? Infinity : 0
+  let quietestChild = -1
+  perChild.forEach((c, k) => {
+    if (c.walkedPerMinute <= quietestWalkedPerChildMinute) {
+      quietestWalkedPerChildMinute = c.walkedPerMinute
+      quietestChild = k
+    }
+  })
+  if (quietestWalkedPerChildMinute === Infinity) quietestWalkedPerChildMinute = 0
   return {
     children: real.length,
     numbersFinite,
@@ -429,6 +468,11 @@ export function traceLiveness(tracks) {
     playedShare: seconds > 0 ? playedSeconds / seconds : 0,
     walked,
     walkedPerChildMinute: childMinutes > 0 ? walked / childMinutes : 0,
+    perChild,
+    /** The LEAST-walking child's own metres per minute — the floor the callers
+     *  gate on, because a sum hides a child that never moved. */
+    quietestWalkedPerChildMinute,
+    quietestChild,
   }
 }
 
