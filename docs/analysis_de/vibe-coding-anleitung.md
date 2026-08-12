@@ -302,8 +302,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   und scheitert **sichtbar**, statt einen plausiblen Ersatz einzusetzen; jeder Rückfall wird
   **gemeldet**, mit dem Befehl, der ihn behebt."
 
-- **Die Gegenprüfung wurde angestoßen, nie abgeschlossen.** Der Helfer ist fertig, bevor das Urteil
-  kommt — der Zweig sieht geprüft aus.
+- **Die Gegenprüfung wurde angestoßen, nie abgeschlossen** — der Zweig sieht geprüft aus.
   → *Prompt:* „Wer eine Gegenprüfung beauftragt, bleibt dran, bis sie da ist. Ein ‚nicht
   zusammenführen' ist erst durch ein **späteres** Urteil über den korrigierten Stand erledigt."
 
@@ -313,15 +312,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Prüf die Erholung mit Abbrüchen zu **zufälligen** Zeiten und frag: ‚läuft es **dort** weiter, wo
   es sollte?'"
 
-- **Der Umzug nimmt nur mit, was versioniert ist.** Das Projekt kommt an, die Mechanik nicht:
-  Aufgaben, Geheimnisse, Werkzeuge — und die **Scharfstellung** der Wächter. Ein stummer
-  Wächter ist schlimmer als keiner: die Regel gilt als durchgesetzt.
+- **Der Umzug nimmt nur mit, was versioniert ist.** Das Projekt kommt an, die Mechanik nicht —
+  und ein stummer Wächter ist schlimmer als keiner: die Regel gilt als durchgesetzt.
   → *Prompt:* „Führe eine Liste dessen, was das Projekt braucht und **nicht** im Repository
   liegt, und prüfe sie bei jedem Start gegen eine **Beobachtung**."
 
 - **Der Alarm, der nie spricht.** Fällt die Quelle aus, meldet ein Alarm auf ein *Ereignis*
-  nichts; und ein Ersatzkanal, den du für scharf hältst, hat oft nie gefeuert. Wer anhalten
-  darf, addiert zudem auf — eine flackernde Leitung erreicht jede Schwelle, nur später.
+  nichts; und ein Ersatzkanal, den du für scharf hältst, hat oft nie gefeuert.
   → *Prompt:* „Überwache den **Zustand** statt des Ereignisses. Bevor du eine Meldung dämpfst,
   **löse den verbleibenden Kanal einmal echt aus**. Und was den Betrieb anhalten darf,
   wiederholt erst und eskaliert nur auf **aufeinanderfolgende** Fehlschläge."
@@ -349,9 +346,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   **ergänzt**? Und lass jeden Neuaufbau nach **offen** scheitern — ein zugesperrter Stand ist
   nicht mehr reparierbar."
 
-- **Verschlucken sieht aus wie Erfolg — und ein Werkzeug, das nie startete, wie ein strenges.** Ein
-  Fehlschlag, der innen zum Ersatzwert wird, läuft als Lüge weiter; ein nie gestarteter Prozess
-  liefert den Fehlercode eines korrekten Ablehnens.
+- **Verschlucken sieht aus wie Erfolg — und ein nie gestartetes Werkzeug wie ein strenges.**
   → *Prompt:* „Ein Ersatzwert im `catch` darf nur verschluckt werden, wenn er zu **weniger** Aktion
   führt. ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
 
@@ -362,8 +357,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Der Erfolg beweist den Weg nicht.** Es lief durch — nur hattest du den Dialog weggeklickt.
   → *Prompt:* „Sag **vor** der Messung, welches Ergebnis welche Erklärung **ausschließen** würde."
 
-- **Zwei Aufträge für einen Fehler.** Fällt derselbe Mangel erneut auf, schreibst du ihn arglos ein
-  zweites Mal auf — sichtbar wird das erst, wenn beide Ergebnisse aufeinandertreffen.
+- **Zwei Aufträge für einen Fehler.** Derselbe Mangel wird arglos ein zweites Mal aufgeschrieben.
   → *Prompt:* „Vor jedem neuen Punkt: Such die offenen nach demselben Problem ab — gibt es einen,
   **erweitere ihn**. Verwirfst du einen Zweig, rette, was er über seinen Auftrag hinaus mitbrachte."
 
@@ -373,13 +367,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Meldet er etwas erneut, das repariert ist, nimm an, er **erreicht** es nicht. Prüf
   die **Nachbarschaft** — und wo das als Test schreibbar ist, schreib es als Test."
 
-- **Der erste Fehlschlag macht sich selbst dauerhaft.** Eine wiederkehrende Aufgabe liest beim
-  Start ihre eigene Spur — eine Merkdatei, ein Protokoll —, die es beim allerersten Lauf noch gar
-  nicht gibt. Sie bricht ab, schreibt die Spur deshalb nie, und bricht ab jetzt für immer ab. Von
-  außen steht in jedem Takt brav „übersprungen".
-  → *Prompt:* „Prüf jede wiederkehrende Aufgabe gegen den **leeren Zustand** — keine Merkdatei,
-  kein Protokoll, keine Vorgeschichte —, denn so beginnt sie nach jedem Neustart. Und ‚übersprungen'
-  ist **kein Betriebszustand**: Was sie nicht tut, muss sie laut melden."
+- **Der erste Fehlschlag macht sich selbst dauerhaft.** Eine wiederkehrende Aufgabe liest ihre
+  eigene Spur, die es beim ersten Lauf nicht gibt — sie bricht ab, schreibt die Spur nie und
+  bricht ab jetzt immer ab. Von außen: „übersprungen".
+  → *Prompt:* „Prüf jede wiederkehrende Aufgabe gegen den **leeren Zustand**; so beginnt sie nach
+  jedem Neustart. ‚Übersprungen' ist **kein Betriebszustand** — was sie nicht tut, meldet sie laut."
 
 ---
 
