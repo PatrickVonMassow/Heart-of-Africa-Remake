@@ -31,6 +31,17 @@ export interface TraceLiveness {
   walkedPerChildMinute: number
 }
 
+export interface ChildWindows {
+  windows: number
+  bad: number
+  seconds: number
+  badSeconds: number
+  unjudged: number
+  covered: number
+  share: number
+  judgedShare: number
+}
+
 export interface ShuffleWindows {
   /** How many windows were judged — a count of samples, reported not gated. */
   windows: number
@@ -49,7 +60,25 @@ export interface ShuffleWindows {
   judgedShare: number
   /** `badSeconds / seconds` — time-weighted, so the frame cadence cannot move it. */
   share: number
+  /** The same numbers per child, because the defect is per child. */
+  perChild: ChildWindows[]
+  /** The worst child's share, which is what the gates read — an average divides
+   *  one wedged child by its healthy siblings. */
+  worstShare: number
+  worstShareChild: number
+  /** The least judgeable child's `judgedShare`: a child whose every shuffle ends
+   *  in a rescue has most of its trace unjudged, and nobody else's. */
+  leastJudged: number
+  leastJudgedChild: number
   worst: { path: number; out: number; child: number; clock: number }
+}
+
+export interface ChildRescues {
+  rescues: number
+  carriedMetres: number
+  minutes: number
+  perMinute: number
+  carriedPerMinute: number
 }
 
 export interface RescueRate {
@@ -62,6 +91,11 @@ export interface RescueRate {
   childMinutes: number
   perChildMinute: number
   carriedMetresPerChildMinute: number
+  perChild: ChildRescues[]
+  /** The most-rescued child's OWN rate — what the gates read, because an average
+   *  divides one persistently rescued child by its healthy siblings. */
+  worstPerChildMinute: number
+  worstCarriedMetresPerChildMinute: number
   worstChild: number
   worstRescues: number
 }
@@ -73,6 +107,9 @@ export declare const CHILD_MOTION: {
   shareGate: number
   carryGate: number
   rescueGate: number
+  worstChildRescueGate: number
+  worstChildCarryGate: number
+  judgedGate: number
 }
 
 export declare function groundPath(

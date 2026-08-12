@@ -3513,16 +3513,22 @@ if (section('children-motion')) {
       // and a half of it. 20 child-seconds is the same floor the trace check
       // above sets (5 s of game, four children), read in the unit the share is
       // weighted in.
-      // AND THE VERDICT MUST REST ON THE TRACE. A live frame gap longer than the
-      // window is judged by nobody — interpolating across a silence longer than
-      // the question would invent the answer — so a share is worth exactly what
-      // `judgedShare` says it covers, and a trace of holes fails here instead of
-      // reading clean.
-      shuffle.seconds > 20 && shuffle.judgedShare > 0.8 && shuffle.share < CHILD_MOTION.shareGate,
-      `${shuffle.bad} of ${shuffle.windows} ${CHILD_MOTION.span}s windows, ` +
-        `${(shuffle.share * 100).toFixed(2)} % of ${shuffle.seconds.toFixed(1)} judged child-seconds ` +
-        `(${(shuffle.judgedShare * 100).toFixed(1)} % of ${shuffle.covered.toFixed(1)} traced) ` +
-        `with over ${CHILD_MOTION.minPath} m walked inside ${CHILD_MOTION.circle} m` +
+      // AND THE VERDICT MUST REST ON THE TRACE, CHILD BY CHILD. A live frame gap
+      // longer than the window is judged by nobody — interpolating across a
+      // silence longer than the question would invent the answer — so a share is
+      // worth exactly what `judgedShare` says it covers. Both are read off the
+      // WORST child rather than the group: one child snagging into a rescue
+      // every three seconds while its three siblings play leaves every group
+      // average clean, which is the whole of it divided by four.
+      shuffle.seconds > 20 &&
+        shuffle.leastJudged > CHILD_MOTION.judgedGate &&
+        shuffle.worstShare < CHILD_MOTION.shareGate,
+      `worst child ${shuffle.worstShareChild} at ${(shuffle.worstShare * 100).toFixed(2)} % of its own ` +
+        `judged time; group ${(shuffle.share * 100).toFixed(2)} % (${shuffle.bad} of ${shuffle.windows} ` +
+        `${CHILD_MOTION.span}s windows, ${shuffle.seconds.toFixed(1)} judged child-seconds). ` +
+        `Least judgeable child ${shuffle.leastJudgedChild} at ${(shuffle.leastJudged * 100).toFixed(1)} %, ` +
+        `group ${(shuffle.judgedShare * 100).toFixed(1)} % of ${shuffle.covered.toFixed(1)} traced. ` +
+        `Bad = over ${CHILD_MOTION.minPath} m walked inside ${CHILD_MOTION.circle} m` +
         (shuffle.worst.child >= 0
           ? ` — worst child ${shuffle.worst.child} at ${shuffle.worst.clock.toFixed(1)}s, ${shuffle.worst.path.toFixed(2)} m walked inside ${shuffle.worst.out.toFixed(2)} m`
           : ''),
@@ -3539,12 +3545,17 @@ if (section('children-motion')) {
       'and no child has to be carried out of the settlement’s own geometry',
       rescues.carriedPublished &&
         rescues.carriedMetresPerChildMinute < CHILD_MOTION.carryGate &&
-        rescues.perChildMinute < CHILD_MOTION.rescueGate,
-      `${rescues.rescues} rescues (${rescues.carriedMetres.toFixed(2)} m carried in all` +
+        rescues.perChildMinute < CHILD_MOTION.rescueGate &&
+        // AND THE WORST CHILD ON ITS OWN CLOCK: a rate averaged over the group
+        // divides one persistently rescued child by its healthy siblings.
+        rescues.worstPerChildMinute < CHILD_MOTION.worstChildRescueGate &&
+        rescues.worstCarriedMetresPerChildMinute < CHILD_MOTION.worstChildCarryGate,
+      `worst child ${rescues.worstChild} picked up ${rescues.worstPerChildMinute.toFixed(2)}/min and ` +
+        `carried ${rescues.worstCarriedMetresPerChildMinute.toFixed(2)} m/min; group ` +
+        `${rescues.rescues} rescues (${rescues.carriedMetres.toFixed(2)} m carried in all` +
         `${rescues.carriedPublished ? '' : ', NOT PUBLISHED BY THE GAME'}) in ` +
         `${rescues.childMinutes.toFixed(2)} child-minutes = ${rescues.perChildMinute.toFixed(2)}/child-min, ` +
-        `carried ${rescues.carriedMetresPerChildMinute.toFixed(2)} m/child-min` +
-        (rescues.worstChild >= 0 ? ` — worst child ${rescues.worstChild} with ${rescues.worstRescues}` : ''),
+        `carried ${rescues.carriedMetresPerChildMinute.toFixed(2)} m/child-min`,
     )
 
     // AND A LOOK AT THEM. The complaint is what the player SEES, so the run

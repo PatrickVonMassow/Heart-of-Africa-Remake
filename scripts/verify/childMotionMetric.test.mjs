@@ -295,6 +295,53 @@ describe('the windows carry equal weight in game time', () => {
   })
 })
 
+describe('the gate reads the WORST child, not the average one', () => {
+  /**
+   * SOL'S CONSTRUCTION (third cross-vendor review). Four children. ONE of them
+   * snags for six tenths of a second, is picked up — and set down where it
+   * stood, so nothing is carried — and does it again three seconds later, twenty
+   * times a minute. The other three play. Every aggregate reads clean: the
+   * group's rescue rate is a quarter of that child's, the group's share is
+   * nothing at all because each of its bad windows ends in the rescue that makes
+   * the window unjudgeable, and the group's judged share is near nine tenths.
+   */
+  const CYCLE = 180 // frames — three seconds
+  const SNAG = 36 // of them spent going nowhere, then the settlement frees it
+  const snagged = () =>
+    trace(3600, (i, at) => {
+      if (i > 0 && i % CYCLE === 0) return { x: at.x, z: 0, rescue: true } // freed where it stands
+      return i % CYCLE >= CYCLE - SNAG
+        ? { x: at.x + (Math.floor(i / 8) % 2 === 0 ? 0.025 : -0.025), z: 0 } // pacing on the spot
+        : { x: at.x + 1.5 * DT, z: 0 } // walking properly
+    })
+  const walker = () => trace(3600, (i) => ({ x: i * DT * 1.5, z: 0 }))
+  const group = () => [snagged(), walker(), walker(), walker()]
+
+  it('shows the group of four as clean, which is what it looks like', () => {
+    const r = shuffleWindows(group())
+    const rescues = rescueRate(group())
+    expect(r.share).toBeLessThan(CHILD_MOTION.shareGate) // no shuffle to be seen
+    expect(r.judgedShare).toBeGreaterThan(0.8) // and plenty of trace to see it in
+    expect(rescues.perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate) // 5 against 6
+    expect(rescues.carriedMetresPerChildMinute).toBe(0) // nobody moved an inch
+  })
+
+  it('and the child itself as the finding it is', () => {
+    const r = shuffleWindows(group())
+    const rescues = rescueRate(group())
+    // Two thirds of that child's minute is spent in windows that end in a
+    // rescue, so no verdict on it can be given at all.
+    expect(r.leastJudged).toBeLessThan(0.8)
+    expect(r.leastJudgedChild).toBe(0)
+    expect(r.perChild[1].judgedShare).toBeGreaterThan(0.95) // its siblings are fine
+    // And it is picked up every three seconds — nineteen times in this minute,
+    // on its own clock, against a gate of six.
+    expect(rescues.worstPerChildMinute).toBeGreaterThan(CHILD_MOTION.rescueGate)
+    expect(rescues.perChild[0].perMinute).toBeCloseTo(19, 0)
+    expect(rescues.perChild[1].perMinute).toBe(0)
+  })
+})
+
 describe('a trace has to hold a game before it proves anything', () => {
   it('measures what was played and what was walked', () => {
     const walker = trace(3600, (i) => ({ x: i * DT * 1.5, z: 0 })).map((s) => ({ ...s, playing: true }))

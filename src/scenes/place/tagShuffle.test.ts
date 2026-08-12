@@ -441,13 +441,16 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       expectLively(paths)
       const r = shuffleWindows(paths)
       expect(r.seconds).toBeGreaterThan(200) // a real stretch of the game, in child-seconds
-      // AND THE VERDICT RESTS ON THE TRACE, not on a corner of it: a silence
-      // longer than the window is judged by nobody and reported as unjudged, so
-      // a share is only worth what `judgedShare` says it covers. Measured here:
-      // 0.92-0.95, the missing part being the tail no window can reach into and
-      // the second before each of the settlement's few rescues.
-      expect(r.judgedShare).toBeGreaterThan(0.8)
-      expect(r.share).toBeLessThan(CHILD_MOTION.shareGate)
+      // AND THE VERDICT RESTS ON THE TRACE, CHILD BY CHILD. A silence longer
+      // than the window is judged by nobody and reported as unjudged, so a share
+      // is only worth what `judgedShare` says it covers — and both are read off
+      // the WORST child, because one snagging child among three healthy ones is
+      // divided by four in every group average. Measured here: the least
+      // judgeable child 0.88-0.90 (the missing part being the tail no window can
+      // reach into and the second before each of that child's few rescues), the
+      // worst child's share 0.00-0.03 %.
+      expect(r.leastJudged).toBeGreaterThan(CHILD_MOTION.judgedGate)
+      expect(r.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
       // AND NOBODY IS BEING CARRIED (point 656): the rescue teleport is what
       // ENDS a snag, so a village that keeps its share down only by picking its
       // children up out of the pockets they walk into fails here instead. The
@@ -457,6 +460,10 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       expect(rescues.carriedPublished).toBe(true)
       expect(rescues.carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
       expect(rescues.perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
+      // The worst child on its own clock: 5-6 rescues in its minute here, and
+      // 0.00-2.40 m carried.
+      expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
+      expect(rescues.worstCarriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildCarryGate)
     })
   }
 
@@ -648,7 +655,13 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     const rescues = rescueRate(penned)
 
     // The gate bites: the penned child walks and gets nowhere, over and over,
-    // and is carried out of its yard some thirty times a minute.
+    // and is carried out of its yard some thirty times a minute. Read on the
+    // WHOLE village, the same trace fails on the per-child gates and would have
+    // been diluted by three healthy siblings without them.
+    const village = shuffleWindows(paths)
+    expect(village.worstShare).toBeGreaterThan(CHILD_MOTION.shareGate)
+    expect(village.leastJudged).toBeLessThan(CHILD_MOTION.judgedGate)
+    expect(rescueRate(paths).worstPerChildMinute).toBeGreaterThan(CHILD_MOTION.worstChildRescueGate)
     expect(r.share).toBeGreaterThan(CHILD_MOTION.shareGate * 4)
     expect(rescues.perChildMinute).toBeGreaterThan(CHILD_MOTION.rescueGate * 2)
     expect(rescues.carriedMetresPerChildMinute).toBeGreaterThan(CHILD_MOTION.carryGate * 4)

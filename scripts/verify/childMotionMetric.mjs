@@ -85,6 +85,17 @@
  *    has to MOVE one to do it — against 67.5 m per child-minute for the penned
  *    child. The bar sits three times above the worst village and thirty times
  *    below the pen.
+ *  - `worstChildRescueGate` 12, `worstChildCarryGate` 8 and `judgedGate` 0.75:
+ *    the same three questions asked of the WORST CHILD rather than the group,
+ *    because the defect is one child's (the third cross-vendor review). Measured
+ *    per child on the shipped villages: the most-rescued child of each is picked
+ *    up 5.00 / 5.00 / 6.00 times in its own minute and carried 0.00 / 0.00 /
+ *    2.40 m, and the least judgeable child's trace is 0.899 / 0.899 / 0.882
+ *    judgeable. So one child of a group may legitimately be rescued rather more
+ *    often than the group's average, and the bars sit at twice and three times
+ *    the worst play seen — while the construction they exist for (one child of
+ *    four snagging and being freed every three seconds) reads 19 rescues per
+ *    child-minute and 0.66 judgeable, and the penned child 22.5 and 67.5 m.
  *  - `rescueGate` 6 rescues per child-minute, counting every rescue whether it
  *    moved the child or not. Measured on the shipped villages: 1.75–3.75 per
  *    child-minute, carrying the child 0.6 m per child-minute at the very most —
@@ -101,6 +112,9 @@ export const CHILD_MOTION = {
   shareGate: 0.0025,
   carryGate: 2,
   rescueGate: 6,
+  worstChildRescueGate: 12,
+  worstChildCarryGate: 8,
+  judgedGate: 0.75,
 }
 
 /**
@@ -205,21 +219,30 @@ export function groundPath(track) {
  * a trace full of holes cannot look clean OR dirty: `judgedShare` says how much
  * of the traced clock any verdict actually rests on, and the callers gate on it.
  *
+ * AND EVERY ONE OF THOSE NUMBERS IS KEPT PER CHILD (the third cross-vendor
+ * review, 12.08.2026), because the defect is per child: one child wedged in a
+ * pocket while its three siblings play. Averaged over the group, that child is
+ * divided by four — a child that shuffles into a rescue twenty times a minute
+ * leaves the GROUP's rescue rate at five against a gate of six, the group's
+ * share at nothing at all (its own bad windows all end in the rescue that makes
+ * them unjudgeable) and the group's `judgedShare` near 0.9. Its own numbers say
+ * 20, and 0.66. So the callers gate `worstShare` and `leastJudged`, which are
+ * that child's, and `perChild` carries the rest.
+ *
  * @param {ReadonlyArray<ReadonlyArray<{clock:number,x:number,z:number,walked:number,nudges?:number}>>} tracks
  *   one sample array per child, one sample per frame.
  * @param {Partial<typeof CHILD_MOTION>} [cfg]
- * @returns {{windows:number,bad:number,seconds:number,badSeconds:number,unjudged:number,covered:number,judgedShare:number,share:number,worst:{path:number,out:number,child:number,clock:number}}}
+ * @returns {{windows:number,bad:number,seconds:number,badSeconds:number,unjudged:number,covered:number,judgedShare:number,share:number,perChild:object[],worstShare:number,worstShareChild:number,leastJudged:number,leastJudgedChild:number,worst:{path:number,out:number,child:number,clock:number}}}
  */
 export function shuffleWindows(tracks, cfg = {}) {
   const { span, minPath, circle } = { ...CHILD_MOTION, ...cfg }
-  let windows = 0
-  let bad = 0
-  let seconds = 0
-  let badSeconds = 0
-  let unjudged = 0
   const worst = { path: 0, out: 0, child: -1, clock: 0 }
+  /** One entry per child, because the defect is per child. */
+  const perChild = []
   for (let k = 0; k < tracks.length; k++) {
     const track = tracks[k]
+    const mine = { windows: 0, bad: 0, seconds: 0, badSeconds: 0, unjudged: 0 }
+    perChild.push(mine)
     if (track.length < 2) continue
     // A SAMPLE THE NUMBERS CANNOT SPEAK FOR IS UNJUDGEABLE, NEVER CLEAN. NaN
     // loses every comparison it is in, so `out < circle` came out false and the
@@ -237,7 +260,7 @@ export function shuffleWindows(tracks, cfg = {}) {
     // game it covered, and that is booked as unjudged.
     if (track.some((s) => !Number.isFinite(s.clock))) {
       const clocks = track.map((s) => s.clock).filter((c) => Number.isFinite(c))
-      if (clocks.length > 1) unjudged += Math.max(...clocks) - Math.min(...clocks)
+      if (clocks.length > 1) mine.unjudged += Math.max(...clocks) - Math.min(...clocks)
       continue
     }
     const ground = groundPath(track)
@@ -269,20 +292,20 @@ export function shuffleWindows(tracks, cfg = {}) {
       // no window at all and is booked as unjudged.
       const ahead = Math.max(0, track[i + 1].clock - track[i].clock)
       const weight = Math.min(span, ahead)
-      unjudged += ahead - weight
+      mine.unjudged += ahead - weight
       // The far end, interpolated AT the span between the two samples that
       // bracket it — but only where that gap is short enough to interpolate
       // across. Longer than the span, nothing is known about the inside of it.
       const gap = track[j + 1].clock - track[j].clock
       // A RESCUE OR AN UNREADABLE SAMPLE INSIDE THE WINDOW ENDS IT, unjudged.
-      // For the rescue: the path is broken there
-      // and nothing may be interpolated across the break — the settlement moved
-      // the child, and by how much in which direction the game does not say.
-      // The rescue is not thereby forgiven: `rescueRate` counts every one and
-      // gates them on their own account, which is where a child that has to be
-      // picked up is a finding.
+      // For the rescue: the path is broken there and nothing may be interpolated
+      // across the break — the settlement moved the child, and by how much in
+      // which direction the game does not say. The rescue is not thereby
+      // forgiven: `rescueRate` counts every one and gates them PER CHILD, and
+      // the unjudged seconds pile up on the child they belong to, where
+      // `judgedShare` shows a child whose every shuffle ends in a rescue.
       if (gap > span || !usable[i] || flaws[j + 1] > flaws[i]) {
-        unjudged += weight
+        mine.unjudged += weight
         continue
       }
       const f = gap > 0 ? Math.min(1, Math.max(0, (stop - track[j].clock) / gap)) : 0
@@ -295,11 +318,11 @@ export function shuffleWindows(tracks, cfg = {}) {
       // The game's OWN walked distance, which is cumulative — a difference, not
       // a sum, and the rescue teleport is not in it.
       const walked = track[j].walked + (track[j + 1].walked - track[j].walked) * f - track[i].walked
-      windows++
-      seconds += weight
+      mine.windows++
+      mine.seconds += weight
       if (walked > minPath && out < circle) {
-        bad++
-        badSeconds += weight
+        mine.bad++
+        mine.badSeconds += weight
         if (walked / Math.max(0.01, out) > worst.path / Math.max(0.01, worst.out)) {
           worst.path = walked
           worst.out = out
@@ -309,18 +332,49 @@ export function shuffleWindows(tracks, cfg = {}) {
       }
     }
     // The tail no window can reach into: unjudged, and said so.
-    unjudged += track[last].clock - track[Math.min(i, last)].clock
+    mine.unjudged += track[last].clock - track[Math.min(i, last)].clock
   }
-  const covered = seconds + unjudged
+
+  for (const c of perChild) {
+    c.covered = c.seconds + c.unjudged
+    c.share = c.seconds > 0 ? c.badSeconds / c.seconds : 0
+    c.judgedShare = c.covered > 0 ? c.seconds / c.covered : 0
+  }
+  const sum = (f) => perChild.reduce((t, c) => t + f(c), 0)
+  const seconds = sum((c) => c.seconds)
+  const covered = sum((c) => c.covered)
+  // THE WORST CHILD, NOT THE AVERAGE ONE. The defect is per child — one child
+  // wedged in a pocket while its three siblings play — and an aggregate divides
+  // it by the group: Sol's construction has one child of four shuffling into a
+  // rescue twenty times a minute and every aggregate here reads clean.
+  let worstShare = 0
+  let worstShareChild = -1
+  let leastJudged = perChild.length > 0 ? 1 : 0
+  let leastJudgedChild = -1
+  perChild.forEach((c, k) => {
+    if (c.share > worstShare) {
+      worstShare = c.share
+      worstShareChild = k
+    }
+    if (c.judgedShare <= leastJudged) {
+      leastJudged = c.judgedShare
+      leastJudgedChild = k
+    }
+  })
   return {
-    windows,
-    bad,
+    windows: sum((c) => c.windows),
+    bad: sum((c) => c.bad),
     seconds,
-    badSeconds,
-    unjudged,
+    badSeconds: sum((c) => c.badSeconds),
+    unjudged: sum((c) => c.unjudged),
     covered,
     judgedShare: covered > 0 ? seconds / covered : 0,
-    share: seconds > 0 ? badSeconds / seconds : 0,
+    share: seconds > 0 ? sum((c) => c.badSeconds) / seconds : 0,
+    perChild,
+    worstShare,
+    worstShareChild,
+    leastJudged,
+    leastJudgedChild,
     worst,
   }
 }
@@ -390,6 +444,11 @@ export function traceLiveness(tracks) {
  * already standing on, and the player sees nothing at all. Gate them apart, or
  * the loose one hides the tight one.
  *
+ * BOTH ARE READ PER CHILD AND GATED ON THE WORST OF THEM. A rate averaged over
+ * the group divides one persistently rescued child by its healthy siblings:
+ * twenty rescues a minute for one child of four reads as five, under a gate of
+ * six, while the child itself is picked up every three seconds.
+ *
  * BOTH COME FROM THE GAME'S OWN COUNTERS, and the carry one had to be added to
  * the game for it (point 656, second cross-vendor review). Every RISE of `nudges`
  * is a rescue, however many share one sample gap. The carry was INFERRED from the
@@ -427,23 +486,37 @@ export function rescueRate(tracks) {
     }
   }
   if (samples === 0) published = false
+  // PER CHILD, because one child rescued every three seconds is the defect and
+  // the group's average is not: three healthy siblings divide it away.
+  const perChild = []
   for (let k = 0; k < tracks.length; k++) {
     const track = tracks[k]
+    const own = { rescues: 0, carriedMetres: 0, minutes: 0, perMinute: 0, carriedPerMinute: 0 }
+    perChild.push(own)
     if (track.length < 2) continue
-    let mine = 0
     for (let i = 1; i < track.length; i++) {
-      if (published) carriedMetres += Math.max(0, track[i].carried - track[i - 1].carried)
+      if (published) own.carriedMetres += Math.max(0, track[i].carried - track[i - 1].carried)
       if ((track[i].nudges ?? 0) <= (track[i - 1].nudges ?? 0)) continue
-      mine += (track[i].nudges ?? 0) - (track[i - 1].nudges ?? 0)
+      own.rescues += (track[i].nudges ?? 0) - (track[i - 1].nudges ?? 0)
     }
-    rescues += mine
+    own.minutes = (track[track.length - 1].clock - track[0].clock) / 60
+    own.perMinute = own.minutes > 0 ? own.rescues / own.minutes : 0
+    own.carriedPerMinute = own.minutes > 0 ? own.carriedMetres / own.minutes : 0
+    rescues += own.rescues
+    carriedMetres += own.carriedMetres
     seconds += track[track.length - 1].clock - track[0].clock
-    if (mine > worstRescues) {
-      worstRescues = mine
+    if (own.rescues > worstRescues) {
+      worstRescues = own.rescues
       worstChild = k
     }
   }
   const childMinutes = seconds / 60
+  let worstPerChildMinute = 0
+  let worstCarriedMetresPerChildMinute = 0
+  for (const c of perChild) {
+    worstPerChildMinute = Math.max(worstPerChildMinute, c.perMinute)
+    worstCarriedMetresPerChildMinute = Math.max(worstCarriedMetresPerChildMinute, c.carriedPerMinute)
+  }
   return {
     rescues,
     carriedMetres,
@@ -451,6 +524,10 @@ export function rescueRate(tracks) {
     childMinutes,
     perChildMinute: childMinutes > 0 ? rescues / childMinutes : 0,
     carriedMetresPerChildMinute: childMinutes > 0 ? carriedMetres / childMinutes : 0,
+    perChild,
+    /** The most-rescued child's OWN rate, which is what the gates read. */
+    worstPerChildMinute,
+    worstCarriedMetresPerChildMinute,
     worstChild,
     worstRescues,
   }
