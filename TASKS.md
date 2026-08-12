@@ -114,11 +114,19 @@ put it is the mistake this line exists to stop.
   moment of the visit (10.7-12.0 s) run after run, which is when the errand walkers pass; and
   making the separation gentler (below) made the symptom MORE visible, not less, because a child
   pressed into a body is now released slowly instead of being flung out.
-  THE FIX therefore belongs in what the chase probes: another inhabitant's body is an obstacle to
-  walk ROUND, like a hut — the deflection already does that correctly once it knows. Whatever
-  shape it takes, it must not make the children avoid each other so widely that the game of tag
-  cannot be caught (`catchDistance` still has to be reachable), and the adults' own walkers need
-  the same treatment or they will walk through the children instead.
+  THE FIX for that cause is BUILT on `feat/657-separation-speed-cap` (Fable 5, 12.08.2026): a
+  dynamic `occupied` layer over the static `blocked` — the chase and the adults' walkers steer
+  round bodies, the tag pair is excluded so catching stays possible, and playmate-vs-playmate
+  contact deliberately stays with the separation pass (four playmate-wall shapes were measured
+  and every one degraded healthy villages, 0.46-1.33 % against the 0.25 % gate). Proven: the
+  crowded-adults replay reads 0.00 % with the fix against 1.88 % without.
+  WHAT REMAINS, measured on that branch (~1 red in 4 idle-machine runs): a SECOND mechanism —
+  a recovering child paces in the DEAD-END WEDGE where the hut at (13.5, -6.4) r 2.35 straddles
+  the bambara play-ground rim; every probed red window sits at (10.4-10.7, -5.6..-5.8), the
+  nearest adult 2.6 m away, nothing carried. The cure is one of: play grounds that never
+  dead-end against a rim-straddling collider (lifeSpots), or a cornered-evade behaviour — both
+  re-roll every village and need their own measurement round. The charge stays restored with
+  exactly this evidence until the wedge is closed.
   A SECOND, SMALLER DEFECT rides along, named by GPT-5.6 Sol's re-review of point 648's behaviour
   (12.08.2026, verdict merge-with-fixes on that one finding): `separateGroup` in
   `src/scenes/place/inhabitantBodies.ts` calls `pushBody(..., dt, …)` in EVERY sweep, so the
