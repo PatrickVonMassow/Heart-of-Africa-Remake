@@ -50,22 +50,24 @@ export const RED_CHARGES = [
     kind: 'check',
     match: /no child walks without getting anywhere/i,
     why:
-      'RESIDUAL after the point-657 carve and behaviour work (measured 13.08.2026, quiet ' +
-      'machine, ten live section runs). The carve plus the tag-back orbit and the peel took the ' +
-      'live worst-child shares from red-in-3-of-10 (to 1.53 %) to WebGL 2 ' +
-      '0.00/0.00/0.00/0.00/0.44 % and WebGPU 0.00/0.00/0.00/0.00/0.23 % — one red left, and the ' +
-      'replay panel from 6/24 to 1/24 red dt-seeds (worst exactly 0.25 %). What remains is the ' +
-      'U-TURN AT A CARVED MOUTH: an evader walks into the converging bay in front of a carve ' +
-      'line (ahead shut, both slides shut on the funnel walls), reverses, and walks out on the ' +
-      'same bearing — 1.29 m of floor-pace legs inside 0.28-0.34 m, one clean about-face, no ' +
-      'rescue, 0.00 m carried, scattered over the ground (traced at (8.25,-5.45), (10.42,-5.30) ' +
-      'and four other bays; the group logger shows two co-walking evaders turning together at ' +
-      't=144.1-144.3, dt-seed 14). In a ~30 s live trace ONE such event is ~0.4 % of a child\'s ' +
-      'judged time, so the section reds on it roughly once in five runs per backend. Nine ' +
-      'steering shapes are already measured and rejected on this branch (wedgeCarve.ts header); ' +
-      'a cure for the mouth — carving the funnel approach or a sideways break on a blocked ' +
-      'reversal — re-rolls the villages and needs its own measurement round, which stays with ' +
-      'point 657.',
+      'RESIDUAL after the point-657 second round (measured 13.08.2026 on the deterministic ' +
+      'replay panel). The first-round carve, orbit and peel took the live worst-child shares ' +
+      'from red-in-3-of-10 (to 1.53 %) to one red in ten (WebGL 2 0.44 %, WebGPU worst 0.23 %); ' +
+      'the second round traced that red to the evade commitment RELEASING ON A CLIFF ' +
+      '(evadeHeading: the un-wrap vanished whole below the 150-degree band, a 2*pi*t heading ' +
+      'jump — two co-walking evaders flipped 197 degrees together in open ground) and cured it ' +
+      'with the release ramp, pinned by the deterministic dt-seed-14 replay (red at exactly ' +
+      '0.25 % before, inside every gate after). What remains, measured over 40 live-cadence ' +
+      'replay seeds (1/24 bambara red at 0.31 %, maasai and swahili 0/8): SINGLE LEGITIMATE ' +
+      'EVENTS the one-second window reads as pacing when one lands on a child — a catch that ' +
+      'reverses the new chaser exactly along its own approach line (the quarry\'s position ' +
+      'dictates the out-leg; traced at t=90.3-91.0, dt-seed 1, the rim at (10.5,-16.9)) and a ' +
+      'playmate-contact walk (nearKid 0.25 m, deliberately left to the separation — four ' +
+      'playmate-wall shapes degraded healthy villages, and two more downstream cures were ' +
+      'measured and rejected this round, recorded in evadeHeading). At a ~30 s live trace one ' +
+      'such event is over the 0.25 % gate on its own, so a rare live red of this composition ' +
+      'remains possible; it is closed by reading the trace (a catch or a contact at the worst ' +
+      'window, no rescue, 0.00 m carried), not by retrying.',
   },
   {
     point: 506,

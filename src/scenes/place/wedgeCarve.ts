@@ -10,8 +10,10 @@
 // single evaders pacing the pinch, and whole groups herding into the corridor
 // and compressing there. Steering remedies were measured first and rejected
 // one after another (the work-order records four; this branch measured five
-// more): a rule strong enough to keep a child out of a wedge also bends the
-// game everywhere there is no wedge.
+// more, and the second round two further — a rate-limited banked turn and a
+// committed breakaway, recorded with their measurements in `evadeHeading`'s
+// ramp comment): a rule strong enough to keep a child out of a wedge also
+// bends the game everywhere there is no wedge.
 //
 // So the GROUND gives the wedge up: any point that lies BETWEEN two boundaries
 // that pinch below a real passage is carved out of the walkable ground. The
