@@ -189,7 +189,8 @@ landing over the figure the scene drew) is the polish suite below:
   gestures only where it can be heard, across the whole distance range, following
   the debug-menu radius while the game runs, and the arms stop when the player
   walks out of earshot.
-- `src/communication/speechLabel.test.ts` and `speechTarget.test.ts` — the note
+- `src/communication/speechLabel.test.ts` and
+  `src/communication/speechTarget.test.ts` — the note
   over the head carries the player's own reading or `???`, one per atom in
   spoken order, rides on the SPEAKER'S OWN height (point 582), never accumulates;
   and the click goes to the NEAREST speaker, a tie held rather than flickering,
