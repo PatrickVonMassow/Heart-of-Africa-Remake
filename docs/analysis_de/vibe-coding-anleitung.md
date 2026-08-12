@@ -373,6 +373,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Meldet er etwas erneut, das repariert ist, nimm an, er **erreicht** es nicht. Prüf
   die **Nachbarschaft** — und wo das als Test schreibbar ist, schreib es als Test."
 
+- **Der erste Fehlschlag macht sich selbst dauerhaft.** Eine wiederkehrende Aufgabe liest beim
+  Start ihre eigene Spur — eine Merkdatei, ein Protokoll —, die es beim allerersten Lauf noch gar
+  nicht gibt. Sie bricht ab, schreibt die Spur deshalb nie, und bricht ab jetzt für immer ab. Von
+  außen steht in jedem Takt brav „übersprungen".
+  → *Prompt:* „Prüf jede wiederkehrende Aufgabe gegen den **leeren Zustand** — keine Merkdatei,
+  kein Protokoll, keine Vorgeschichte —, denn so beginnt sie nach jedem Neustart. Und ‚übersprungen'
+  ist **kein Betriebszustand**: Was sie nicht tut, muss sie laut melden."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -412,4 +420,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Sie setzt auf, woran alles andere hängt: eine Wahrheit, eine Arbeitsordnung, zwei
 Testschichten, den Reflex zum Check. Die Fallstricke oben ersetzt sie nicht.
 
-<!-- GUIDE-FINGERPRINT: 2276626ca090ece14fe05ba9eda0535fc5e4020fadc1f30446a77b247fbfc7fe -->
+<!-- GUIDE-FINGERPRINT: 42dccc19cb2f7fad1c131535e53cfc0887debf087eaea9515141361409bf7455 -->
