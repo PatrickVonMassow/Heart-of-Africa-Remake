@@ -470,13 +470,30 @@ describe('a trace has to hold a game before it proves anything', () => {
     expect(shuffleWindows([burstTrace(0.0193)], CHILD_MOTION.short).worstShare).toBeGreaterThan(
       CHILD_MOTION.shareGate * 20,
     )
-    // AND ORDINARY WALKING IS NOT CAUGHT BY IT. A child walking its line, and
-    // one turning right round once inside the half second — the legitimate turn
-    // the ratio is calibrated to allow.
+    // AND ORDINARY WALKING IS NOT CAUGHT BY IT — the case that proves the bar
+    // safe, so it has to be a REAL turn: the child walks out at a full pace and
+    // walks back, continuously, reversing every quarter second, so every
+    // half-second window holds one whole out-and-back. That is 0.75 m walked
+    // against 0.375 m covered, a ratio of 2.0 against a bar of 5, and it reads
+    // clean. (Written as a position that jumped 0.8 m in one frame it proved
+    // nothing at all: covered equalled walked and the ratio was never touched.)
+    const outAndBack = (halfPeriod) =>
+      trace(3600, (i, at) => ({
+        x: at.x + (Math.floor(i / halfPeriod) % 2 === 0 ? 0.025 : -0.025),
+        z: 0,
+      }))
     const straight = trace(3600, (i) => ({ x: i * DT * 1.5, z: 0 }))
-    const turning = trace(3600, (i) => ({ x: (Math.floor(i / 30) % 2 === 0 ? 1 : -1) * 0.4, z: 0 }))
+    const turning = outAndBack(15) // a reversal every 0.25 s
+    expect(turning[14].x).toBeCloseTo(0.375, 6) // it really did walk out
+    expect(turning[29].x).toBeCloseTo(0, 6) // and really did walk back
+    expect(turning[29].walked).toBeCloseTo(0.75, 6) // half a second's walking
     expect(shuffleWindows([straight], CHILD_MOTION.short).worstShare).toBe(0)
     expect(shuffleWindows([turning], CHILD_MOTION.short).worstShare).toBe(0)
+    // AND WHERE THE BAR ACTUALLY SITS, on the same shape: reversing three times
+    // a second inside a quarter of a metre — which no chase does — reads 18.5 %.
+    // The calibration point lies between these two, not out beyond the honest
+    // one.
+    expect(shuffleWindows([outAndBack(10)], CHILD_MOTION.short).worstShare).toBeGreaterThan(0.15)
   })
 
   it('and a trace too coarse for the burst window is refused, not read as clean', () => {
