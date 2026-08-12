@@ -31,14 +31,10 @@
     "653": {
       "at": "2026-08-11T21:10:45.801Z",
       "why": "Last is right for the mechanism; the ONE stale section it names (criterion 7) is corrected inside point 174, which gates the release anyway."
-    },
-    "655": {
-      "at": "2026-08-11T21:15:43.331Z",
-      "why": "Last is right: the board is legible enough to run the batch today, and every point ahead of it either fixes something the user SEES in the game or gates the release."
     }
   },
   "settled": {
-    "at": "2026-08-12T00:06:22.409Z",
+    "at": "2026-08-12T07:56:53.837Z",
     "points": [
       174,
       184,
@@ -202,8 +198,9 @@
       651,
       652,
       653,
-      655,
-      656
+      656,
+      657,
+      658
     ]
   }
 }
