@@ -416,6 +416,23 @@ put it is the mistake this line exists to stop.
   door it walks through.
   Bundle: unbundled (infrastructure).
 
+- [ ] 663. THE DEPLOY DIES ON A FROZEN TAG'S FLAKY DOWNLOAD (measured 12.08.2026, twice on
+  run 31636330165). The GH-Pages deploy rebuilds EVERY version tag on every `main` push, and
+  the frozen v0.2 tree's `onnxruntime-node` postinstall downloads a GPU tarball from GitHub
+  releases at install time — that download ECONNRESET twice, so a pure network flake in a
+  FROZEN tree blocked the whole deploy, including the fresh `main` build, and the CI gate held
+  every turn end behind it.
+  FINAL STATE: a tag whose content cannot change does not re-run a network-dependent install
+  on every deploy. Either the workflow caches each tag's built `dist/` keyed by the tag sha
+  (build once, reuse forever — a frozen tag's site is immutable by definition), or at least
+  caches its `node_modules`/npm cache so the flaky postinstall runs rarely; plus one automatic
+  retry around the per-tag install step. A tag build that still fails must name the tag and
+  not take main's own deploy down with it where the workflow can publish partially.
+  VERIFIABLE: the workflow run shows the cache hit for an unchanged tag (no onnxruntime
+  download in the log), and a forced cache miss still succeeds via the retry.
+  Criticality: medium — it stalls every landing behind a dice roll on a runner's network.
+  Bundle: unbundled (infrastructure).
+
 - [ ] 633. THE RELEASE'S CLOSING RUN — TWO REGRESSIONS WITH THE CLEANUP BETWEEN THEM (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
   zu sein"). 174 carried the whole release in one card estimated at ~1 h, which was true
