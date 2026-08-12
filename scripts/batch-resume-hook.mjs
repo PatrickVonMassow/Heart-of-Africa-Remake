@@ -164,9 +164,9 @@ const RESUME_BODY =
   'backends); TASKS.md is MAIN-only — tick the point on main at the merge; cross-cutting ' +
   'changes (guards, docs, dashboard, process files) go directly to main. MAXIMAL ' +
   'DELEGATION (user decision 22.07.2026): delegate implementation AND infra/guard/doc/' +
-  'dashboard work to parallel WORKTREE-ISOLATED subagents on NON-OVERLAPPING files — with ' +
-  'OPUS 5, per the model policy stated below; Fable only reviews or stands in ' +
-  '(each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
+  'dashboard work to parallel WORKTREE-ISOLATED subagents on NON-OVERLAPPING files — under ' +
+  'the model policy stated below, so the hard cases go to Fable 5 from the start and the rest ' +
+  'to Opus 5 (each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
   'session keeps only the picture-verification on both backends, the serial merge -> ' +
   'fast-gate -> tick -> deploy -> cleanup, and the board publish. Every defect the user ' +
   'reports on the deployed build during the batch is APPENDED as its own implementation-ready ' +
