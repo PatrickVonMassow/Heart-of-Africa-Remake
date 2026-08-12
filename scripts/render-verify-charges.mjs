@@ -96,16 +96,20 @@ export const RED_CHARGES = [
   {
     point: 657,
     suite: 'polish',
+    backend: 'webgpu',
     kind: 'check',
     match: /no child walks without getting anywhere/i,
     why:
-      'RE-MEASURED 12.08.2026 with the TIME-WEIGHTED measure, because the first charge rested ' +
-      'on a sample-weighted one whose share moved with the frame cadence and could not settle ' +
-      'the question. Seed 2972259115, idle machine, five traces per backend: WebGL 2 red in 2 ' +
-      'of 5 (0.35 % and 0.67 % of the traced child-seconds, worst window 2.94 m walked inside ' +
-      '0.00 m) and WebGPU in 1 of 5 (0.38 %, worst 1.29 m inside 0.09 m) against the 0.25 % ' +
-      'gate; the other seven read 0.00-0.16 %. NO child was carried in any of the ten runs, so ' +
-      'the rescue teleport is not making the number — the children really do walk on the spot, ' +
-      'which is point 657. Both backends on purpose: it was seen on both.',
+      'RE-MEASURED 12.08.2026 after the MEASURE itself was repaired (each window weighted in ' +
+      'game time and capped at the span it was measured over; a window spanning a rescue left ' +
+      'UNJUDGED instead of interpolated across a teleport). Every earlier reading of this check ' +
+      '— 0.30-1.98 % — was taken before that and is void. Seed 2972259115, idle machine, five ' +
+      'traces per backend: WebGPU red ONCE (0.31 % of 131 judged child-seconds, worst window ' +
+      '3.11 m walked inside 0.00 m) and 0.00-0.04 % in the other four; WebGL 2 green all five ' +
+      '(0.00-0.02 %). That worst window holds no rescue and no gap longer than the second it ' +
+      'measures, and the game\'s own carry counter reports 0.00 m per child-minute in all ten ' +
+      'runs — so nothing hides behind a teleport: a child walked three metres and ended where ' +
+      'it started, which is point 657. Scoped to WebGPU because that is where the repaired ' +
+      'measure saw it; a WebGL 2 red is new evidence, not this charge.',
   },
 ]
