@@ -92,6 +92,18 @@ describe('parseNowCardPoints', () => {
     const html = boardHtml({ nowCards: ['Automatik absichern'], klaerung: [206], queue: [211, 204] })
     expect(parseNowCardPoints(html).size).toBe(0)
   })
+  // Point 655: the now-card carries its number in the same numbered chip the
+  // queue cards use, and its title names the subject. Both shapes are read, so
+  // a board written before the chip existed keeps being understood.
+  it('reads the point from the numbered CHIP of a now-card', () => {
+    const chip =
+      '<details class="now"><summary><span class="num">655</span>' +
+      '<span class="t">Jede Karte nennt ihren Punkt</span>' +
+      '<span class="right"><span class="meta">09:00</span></span></summary>' +
+      '<div class="body"><p>Kurzstand.</p></div></details>'
+    const html = boardHtml({ nowCards: [226] }).replace('<h2>Woran ich gerade arbeite</h2></summary>', `<h2>Woran ich gerade arbeite</h2></summary>\n${chip}`)
+    expect([...parseNowCardPoints(html)].sort((a, b) => a - b)).toEqual([226, 655])
+  })
   it('is empty on a missing section and non-string input', () => {
     expect(parseNowCardPoints('<h2>Warteschlange</h2>').size).toBe(0)
     expect(parseNowCardPoints(null).size).toBe(0)

@@ -130,8 +130,15 @@ export function nowCardTitles(html) {
   const nextH2 = html.indexOf('<h2>', nowStart + 1)
   const section = html.slice(nowStart, nextH2 < 0 ? undefined : nextH2)
   const titles = []
-  for (const m of section.matchAll(/class="t">([^<]*)</g)) {
-    const parsed = parseCardTitle(m[1])
+  // PER CARD, not per title span (point 655): a now-card carries its point in
+  // the numbered CHIP now, so the number and the label live in two spans. They
+  // are re-joined in the notation `parseCardTitle` reads, which keeps every
+  // caller — and every card written before the chip existed — working unchanged.
+  for (const chunk of section.split(/<details\b/).slice(1)) {
+    const t = chunk.match(/class="t">([^<]*)</)
+    if (!t) continue
+    const num = chunk.match(/class="num">\s*(\d+)/)
+    const parsed = parseCardTitle(num ? `${num[1]} — ${t[1].trim()}` : t[1])
     if (parsed && parsed.raw) titles.push(parsed)
   }
   return titles

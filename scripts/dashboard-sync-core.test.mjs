@@ -114,6 +114,15 @@ describe('parseCardTitle / cardTitle', () => {
     expect(all.map((c) => c.point)).toEqual([306, null])
   })
 
+  // Point 655: the number moved into the numbered chip, so the point and the
+  // label now live in two spans and are re-joined before parsing.
+  it('reads the point from a now-card CHIP and keeps the label free of it', () => {
+    const chipBoard = boardHtml(['A']).replace('<span class="t">A</span>', '<span class="num">655</span><span class="t">Jede Karte nennt ihren Punkt</span>')
+    const [card] = nowCardTitles(chipBoard)
+    expect(card.point).toBe(655)
+    expect(card.label).toBe('Jede Karte nennt ihren Punkt')
+  })
+
   it('is total on malformed input: missing .now section and non-string → null/[]', () => {
     expect(cardTitle('<main><h2>Warteschlange</h2></main>')).toBeNull()
     expect(cardTitle(null)).toBeNull()

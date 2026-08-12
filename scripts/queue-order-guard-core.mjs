@@ -138,10 +138,19 @@ export function parseNowCards(html) {
   if (section === null) return []
   const cards = []
   for (const chunk of section.split(/<details\b/).slice(1)) {
-    const m = chunk.match(/class="t">\s*(\d+)/)
-    cards.push({ point: m ? Number(m[1]) : null, text: stripTags(chunk) })
+    cards.push({ point: nowCardPoint(chunk), text: stripTags(chunk) })
   }
   return cards
+}
+
+/**
+ * One now-card's point: the numbered CHIP it carries since point 655, or — for
+ * a card written before that — the leading number of its title. Null for the
+ * unnumbered handover card and any other non-point work.
+ */
+function nowCardPoint(chunk) {
+  const m = chunk.match(/class="num">\s*(\d+)/) ?? chunk.match(/class="t">\s*(\d+)/)
+  return m ? Number(m[1]) : null
 }
 
 /**
@@ -155,7 +164,7 @@ export function parseNowCards(html) {
 export function parseNowCard(html) {
   const section = nowSection(html)
   if (section === null) return null
-  const m = section.match(/class="t">\s*(\d+)/)
+  const m = section.match(/class="(?:num|t)">\s*(\d+)/)
   return { point: m ? Number(m[1]) : null, text: stripTags(section) }
 }
 

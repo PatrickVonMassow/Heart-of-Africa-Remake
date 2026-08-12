@@ -41,7 +41,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { REPO_ROOT, STATE_PATH, readJson, mergeState } from './dashboard-state.mjs'
-import { normaliseLineEndings, refreshFooter } from './board-core.mjs'
+import { normaliseLineEndings, refreshFooter, upgradeNowCards } from './board-core.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { applyFooterNote } from './sol-share-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
@@ -190,12 +190,20 @@ try {
   // standing — `refreshFooter` keeps every segment it does not own, this one included.
   const share = currentSetting()
   if (share.problem) console.error(settingProblemLine(share, 'board-publish'))
-  const refreshed = normaliseLineEndings(applyFooterNote(refreshFooter(html, { openCount: open.length }), share))
+  // UPGRADED LAST (point 655). The naming gate below demands the numbered chip
+  // strictly, and the board is one living file whose cards may still carry their
+  // number inside the title. `board.mjs` lifts them on every edit; doing it here
+  // too means a board that was last written by an older version can still be
+  // published — a strict gate must never be reachable without a way out.
+  const refreshed = normaliseLineEndings(
+    upgradeNowCards(applyFooterNote(refreshFooter(html, { openCount: open.length }), share)),
+  )
   if (refreshed !== html) {
     // Atomic (point 443, four-eyes F3) — and this one writes the very file the
     // next lines read, hash and push to the public page.
     writeTextAtomic(boardFile, refreshed)
     console.log(`footer refreshed: ${open.length} open point(s)`)
+    if (upgradeNowCards(html) !== html) console.log('current-work card(s) lifted into the numbered chip')
   }
 } catch (e) {
   // A publish must never be blocked by the footer; the audit still catches a
