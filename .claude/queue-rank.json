@@ -8,10 +8,6 @@
       "at": "2026-08-11T15:00:17.845Z",
       "why": "Not release-blocking: the closing run proves the build with two full regressions rather than relying on a released red, and 643 refines a mechanism that only landed today. It waits behind the release work."
     },
-    "645": {
-      "at": "2026-08-11T18:08:06.942Z",
-      "why": "Nachweistext-Hygiene: wichtig vor Abschluss und Tag, aber kein Spielfehler und niemand ist darauf blockiert"
-    },
     "646": {
       "at": "2026-08-11T18:08:06.988Z",
       "why": "Zweite Tuer zum selben Loeschen wie 629 — hinter den Spielfehlern, aber vor der Release-Mechanik"
@@ -34,7 +30,7 @@
     }
   },
   "settled": {
-    "at": "2026-08-12T07:56:53.837Z",
+    "at": "2026-08-12T08:54:17.505Z",
     "points": [
       174,
       184,
@@ -191,7 +187,6 @@
       641,
       642,
       643,
-      645,
       646,
       647,
       650,
