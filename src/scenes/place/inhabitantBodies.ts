@@ -46,6 +46,8 @@
 // `maxSpeed` therefore only bounds how fast a DEEP stack — two bodies spawned on
 // one spot — unwinds.
 
+import { deflectedStep } from '../travel/wildlifeBehavior'
+
 /** One inhabitant's body in the shared set — mutated in place each frame, so a
  *  settlement never rebuilds the array. */
 export interface InhabitantBody {
@@ -177,6 +179,135 @@ export function releaseBodies(set: InhabitantSet, bodies: readonly InhabitantBod
   }
 }
 
+/**
+ * True where another inhabitant's body occupies the ground a mover of
+ * `moverRadius` wants to step to (work-order point 657).
+ *
+ * THE SEPARATION IS A CORRECTION, NOT A STEERING: it fires only after a stepper
+ * has already walked its figure into a body, and the child's chase probed a
+ * `blocked` that knew huts, fences and the rim but no body — so occupied ground
+ * read OPEN, the child pressed in, the pass pushed it back out, and `walked`
+ * grew while ground covered did not. That IS the reported walking-on-the-spot.
+ * This predicate is what lets a stepper walk ROUND a body instead of
+ * discovering it by collision; the separation stays as the safety net for the
+ * contacts steering cannot avoid.
+ *
+ * The radius is the PAIR'S CONTACT distance: the standing body's contact radius
+ * plus `moverBodyRadius`, the mover's own — the exact line below which the
+ * separation would start correcting, and NOT the wider walker footprint. That
+ * width was measured and rejected: at footprint width four children read each
+ * other as 0.43 m walls on a 20 m ground and the game itself degraded (the
+ * quietest child of one shipped village fell from ~110 to 22 walked metres per
+ * played minute).
+ *
+ * `exclude` names the bodies this mover may reach — its own at the least, and
+ * whatever its owner's steering rules leave to the separation pass (the tag
+ * game's rules live at its wiring in `PlaceLife`). A body it returns true for
+ * is not ground, whatever stands there.
+ */
+export function groundOccupied(
+  set: InhabitantSet,
+  x: number,
+  z: number,
+  cfg: SeparationConfig,
+  moverBodyRadius: number,
+  exclude?: (b: InhabitantBody) => boolean,
+): boolean {
+  for (const b of set.bodies) {
+    if (!b.active || exclude?.(b)) continue
+    const r = cfg.bodyRadius * b.scale + moverBodyRadius
+    const dx = x - b.x
+    const dz = z - b.z
+    if (dx * dx + dz * dz < r * r) return true
+  }
+  return false
+}
+
+/**
+ * One walking step that goes ROUND the other inhabitants (point 657, the
+ * adults' half): where the wanted step would land in another body, the heading
+ * deflects round it — the wildlife's own deflection, static ground and bodies
+ * judged together — and the caller sweeps its own move to the returned point
+ * exactly as before. Without this the errand walkers and porters steered by
+ * colliders alone and walked straight THROUGH the children, who then had
+ * nothing to walk round but a body already pressing on them.
+ *
+ * Cheap on the ordinary frame: everything beyond one `groundOccupied` probe
+ * runs only when the direct step really lands in a body.
+ *
+ * FULLY BOXED IN, THE ORIGIN COMES BACK — never the occupied destination
+ * (GPT-5.6 Sol, 12.08.2026). The wanted point used to be returned unchanged,
+ * and the caller's static `resolveMove` — which knows nothing of bodies —
+ * then happily walked the figure INTO the body: the move read as successful,
+ * the caller's stuck counter reset, and the separation pushed the figure back
+ * out — the exact walk-in/push-out loop this helper exists to end, restarted
+ * one layer up. With the origin returned, the caller's own moved-distance
+ * check reads the frame as blocked, its stuck counter accumulates, and its
+ * ordinary give-up path (waypoint skip, replan, nudge) takes over.
+ */
+export function stepRoundBodies(
+  set: InhabitantSet,
+  self: InhabitantBody,
+  fromX: number,
+  fromZ: number,
+  toX: number,
+  toZ: number,
+  cfg: SeparationConfig,
+  blocked: (x: number, z: number) => boolean,
+): { x: number; z: number } {
+  const selfRadius = cfg.bodyRadius * self.scale
+  const notMe = (b: InhabitantBody) => b === self
+  const occupiedAt = (x: number, z: number) => groundOccupied(set, x, z, cfg, selfRadius, notMe)
+  // THE WHOLE SEGMENT IS TESTED, NOT THE ENDPOINT, AND CONTINUOUSLY, NOT BY
+  // SAMPLES (GPT-5.6 Sol, 12.08.2026, both findings): a step whose endpoint
+  // lay beyond a body used to cross it without the deflection ever waking —
+  // the porters are the worst case, their wanted point comes from the route
+  // clock rather than a distance-bounded step — and a SAMPLED sweep still let
+  // a near-tangent crossing slip through, because a graze's chord through the
+  // occupied disc can be shorter than any sampling gap. The test is the
+  // closed-form distance from the body's centre to the segment against the
+  // pair's contact radius: no gap for anything to fall into.
+  //
+  // A mover ALREADY at contact (the separation settles pairs a slop inside
+  // it) is allowed every step that does not press DEEPER: without that
+  // allowance its every move — including the one walking away — would read as
+  // a crossing, and a settled pair could never part again.
+  const crosses = (ax: number, az: number, bx: number, bz: number): boolean => {
+    const dxx = bx - ax
+    const dzz = bz - az
+    const len2 = dxx * dxx + dzz * dzz
+    for (const b of set.bodies) {
+      if (!b.active || b === self) continue
+      const r = cfg.bodyRadius * b.scale + selfRadius
+      const startD2 = (ax - b.x) * (ax - b.x) + (az - b.z) * (az - b.z)
+      if (startD2 < r * r) {
+        // Already in contact: only going deeper counts as a crossing.
+        const endD2 = (bx - b.x) * (bx - b.x) + (bz - b.z) * (bz - b.z)
+        if (endD2 < startD2) return true
+        continue
+      }
+      const t = len2 > 0 ? Math.max(0, Math.min(1, ((b.x - ax) * dxx + (b.z - az) * dzz) / len2)) : 0
+      const px = ax + dxx * t - b.x
+      const pz = az + dzz * t - b.z
+      if (px * px + pz * pz < r * r) return true
+    }
+    return false
+  }
+  const dx = toX - fromX
+  const dz = toZ - fromZ
+  const dist = Math.hypot(dx, dz)
+  if (!crosses(fromX, fromZ, toX, toZ)) return { x: toX, z: toZ }
+  if (!(dist > 1e-9)) return { x: fromX, z: fromZ }
+  const both = (x: number, z: number) => blocked(x, z) || occupiedAt(x, z)
+  const r = deflectedStep(fromX, fromZ, Math.atan2(dx, dz), dist, both, Math.max(dist, selfRadius * 2))
+  // The deflected step is swept by the same rule: `deflectedStep` probes its
+  // target and lookahead POINTS, so a long deflected jump could cross a second
+  // body sideways. A crossing deflection is refused — the figure waits the
+  // frame out and retries against the bodies' next positions.
+  if (!r.moved || crosses(fromX, fromZ, r.x, r.z)) return { x: fromX, z: fromZ }
+  return { x: r.x, z: r.z }
+}
+
 /** A deterministic escape bearing for two bodies at EXACTLY the same point (a
  *  spawn stack, a catch resolved on the spot): the golden angle off the body's
  *  own index, so the pair never picks the same way out and a stack comes apart
@@ -203,7 +334,7 @@ export function separateBody(
   cfg: SeparationConfig,
   world: SeparationWorld = {},
 ): boolean {
-  return pushBody(set, self, dt, dt, cfg, world)
+  return pushBody(set, self, dt, dt, cfg, world, Math.max(0, cfg.maxSpeed) * dt) > 0
 }
 
 /**
@@ -211,6 +342,10 @@ export function separateBody(
  * the frame's — not the sweep's: a refining sweep resolves the same frame over
  * again, so charging it a second time would trip the escape nudge as many times
  * faster as the solver sweeps, and teleport a figure that was never stuck.
+ *
+ * `budget` is how far this body may still be moved THIS FRAME, in metres, and it
+ * is the caller's to spend across the sweeps (see `separateGroup`). Returns the
+ * distance actually moved, so the caller can subtract it.
  */
 function pushBody(
   set: InhabitantSet,
@@ -219,8 +354,9 @@ function pushBody(
   wedgeDt: number,
   cfg: SeparationConfig,
   world: SeparationWorld = {},
-): boolean {
-  if (!(dt > 0) || self.fixed || !self.active) return false
+  budget = Math.max(0, cfg.maxSpeed) * dt,
+): number {
+  if (!(dt > 0) || self.fixed || !self.active) return 0
   const selfIndex = set.bodies.indexOf(self)
   const selfRadius = cfg.bodyRadius * self.scale
   let px = 0
@@ -259,9 +395,9 @@ function pushBody(
   const want = Math.hypot(px, pz)
   if (want <= 1e-9) {
     self.wedged = 0
-    return false
+    return 0
   }
-  const cap = Math.max(0, cfg.maxSpeed) * dt
+  const cap = Math.max(0, Math.min(budget, Math.max(0, cfg.maxSpeed) * dt))
   const scale = (Math.min(want, cap) / want) * Math.max(0, Math.min(1, cfg.stiffness))
   const stepX = px * scale
   const stepZ = pz * scale
@@ -281,7 +417,7 @@ function pushBody(
     self.x = nx
     self.z = nz
     self.wedged = 0
-    return true
+    return Math.hypot(mx, mz)
   }
   // Pressed between a collider and another body: bounded, not for ever.
   self.wedged += Math.max(0, wedgeDt)
@@ -299,7 +435,7 @@ function pushBody(
     self.nudges++
     self.wedged = 0
   }
-  return false
+  return 0
 }
 
 /**
@@ -320,11 +456,29 @@ export function separateGroup(
   world: SeparationWorld = {},
 ): void {
   const passes = Math.max(1, Math.floor(cfg.passes))
+  // ONE MOVEMENT BUDGET PER BODY PER FRAME (GPT-5.6 Sol, 12.08.2026). Every sweep
+  // used to hand `pushBody` the whole frame's `maxSpeed * dt`, so a body could be
+  // corrected once PER PASS — at the shipped 8 m/s and 4 passes, an effective
+  // 32 m/s against a cap the type documents as per frame. A deep stack then SNAPS
+  // apart instead of easing apart, which from outside is a figure jumping. The
+  // budget is spent ACROSS the sweeps, so more passes buy a more exact
+  // resolution, never a faster one.
+  const cap = Math.max(0, cfg.maxSpeed) * dt
+  const left = new Map<InhabitantBody, number>()
+  for (const b of bodies) left.set(b, cap)
   for (let p = 0; p < passes; p++) {
     let moved = false
     // Only the FIRST sweep charges the wedge timer: the later ones are the same
     // frame, resolved more exactly.
-    for (const b of bodies) if (pushBody(set, b, dt, p === 0 ? dt : 0, cfg, world)) moved = true
+    for (const b of bodies) {
+      const budget = left.get(b) ?? 0
+      if (!(budget > 0)) continue
+      const step = pushBody(set, b, dt, p === 0 ? dt : 0, cfg, world, budget)
+      if (step > 0) {
+        left.set(b, Math.max(0, budget - step))
+        moved = true
+      }
+    }
     if (!moved) return
   }
 }

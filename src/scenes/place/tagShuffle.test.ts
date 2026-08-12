@@ -53,8 +53,10 @@ import {
 import { childSteer, createChildSpeech, stepChildSpeech, type SituationView } from './childSituations'
 import {
   claimBodies,
+  groundOccupied,
   separateBody,
   separateGroup,
+  stepRoundBodies,
   createInhabitantSet,
   type InhabitantBody,
   type InhabitantSet,
@@ -180,13 +182,18 @@ function crowd(
       routes.forEach((r, i) => {
         const b = porters[i]
         const u = (Math.sin(clock * r.speed + r.phase) + 1) / 2
-        const [x, z] = resolveMove(
-          colliders,
+        // Point 657, as `Porters` walks it: a body on the route is walked round.
+        const want = stepRoundBodies(
+          set,
+          b,
+          b.x,
+          b.z,
           r.ax + (r.bx - r.ax) * u,
           r.az + (r.bz - r.az) * u,
-          NPC_RADIUS,
-          [b.x, b.z],
+          sep,
+          world.blocked,
         )
+        const [x, z] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [b.x, b.z])
         b.x = x
         b.z = z
         separateBody(set, b, dt, sep, world)
@@ -204,13 +211,19 @@ function crowd(
           return
         }
         const pace = balance.villageLife.adultErrands.pace
-        const [x, z] = resolveMove(
-          colliders,
+        // Point 657, as `ErrandVillagers` walks it: a child on the straight
+        // line is walked ROUND, not pressed on until the separation resolves it.
+        const want = stepRoundBodies(
+          set,
+          b,
+          b.x,
+          b.z,
           b.x + ((e.to[0] - b.x) / d) * pace * dt,
           b.z + ((e.to[1] - b.z) / d) * pace * dt,
-          NPC_RADIUS,
-          [b.x, b.z],
+          sep,
+          world.blocked,
         )
+        const [x, z] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [b.x, b.z])
         // Pressed against a fence on the way: it gives that stroll up and picks
         // another, the way the real one replans rather than leaning there.
         e.stuck = Math.hypot(x - b.x, z - b.z) < pace * dt * 0.25 ? e.stuck + dt : 0
@@ -311,6 +324,20 @@ function village(
     localSeed,
     options.adultsAmongTheChildren ? { x: ground.x, z: ground.z, radius: ground.radius } : undefined,
   )
+  // The other inhabitants' bodies as ground the chase walks round (point 657),
+  // wired exactly as `PlaceLife` wires it: everybody OUTSIDE the game, never a
+  // playmate — see the wiring comment there for the measurements behind both.
+  const kidBodies = new Set(bodies)
+  world.occupied = (_self, _partner, x, z) =>
+    groundOccupied(
+      set,
+      x,
+      z,
+      balance.villageLife.separation,
+      // The child's OWN body radius, so the line is the pair's contact.
+      balance.villageLife.separation.bodyRadius * KID_SCALE,
+      (b) => kidBodies.has(b),
+    )
   const view: SituationView = {
     playing: false,
     chaser: -1,
@@ -503,8 +530,8 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     const rand = mulberry32(4242)
     const v = village('bambara-village', 2972259115)
     const paths: Track[][] = v.game.children.map(() => [])
-    for (let t = 0; t < 60; ) {
-      const dt = 0.05 + rand() * 0.05
+    for (let t = 0; t < 150; ) {
+      const dt = 0.07 + rand() * 0.03
       t += dt
       frame(v, dt)
       sample(v, paths)
@@ -605,30 +632,40 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // AND NOBODY IS CARRIED. The children still play their own game among them.
     expectLively(paths)
     expect(rescueRate(paths).carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
-    // OPEN (found by this case, 12.08.2026): the chase does NOT treat another
-    // inhabitant's body as something to walk round — `TagWorld.blocked` is the
-    // settlement's geometry only, and a child is kept out of an adult by the
-    // separation pass afterwards. So a child whose chase heading points through
-    // an adult standing in its ground walks against it until the pass has
-    // pushed it aside: measured 1.14 % of one-second windows here against
-    // 0.00–0.01 % where the adults keep to their own work. It is the reported
-    // symptom in miniature and belongs in its own point; this bar holds the
-    // measured state so a regression that doubles it fails.
-    expect(shuffleWindows(paths).share).toBeLessThan(0.02)
+    // THE CAUSE OF POINT 657, REPLAYED AT ITS OWN GATES. This case is what
+    // named it: the chase probed a `blocked` of geometry only, so a child whose
+    // heading crossed an adult standing in its ground read the way as OPEN,
+    // walked into the body, and the separation pushed it back out — measured
+    // here before the fix, 1.14 % of one-second windows (the group), the worst
+    // child 3.5 % of its half-second bursts, against 0.00-0.03 % where the
+    // adults keep to their own work; a held bar of 2 % stood here in place of a
+    // gate. Now the chase steers round the other inhabitants' bodies
+    // (`TagWorld.occupied`) and the walkers steer round the children
+    // (`stepRoundBodies`), and this crowded minute must read INSIDE the same
+    // gates as a quiet one — measured after the fix: not one bad window at
+    // either scale. The bars are the shipped gates, so the old code fails here.
+    const crowded = shuffleWindows(paths)
+    const crowdedBurst = shuffleWindows(paths, CHILD_MOTION.short)
+    expect(judgedEnough(crowded)).toBe(true)
+    expect(judgedEnough(crowdedBurst)).toBe(true)
+    expect(crowded.leastJudged).toBeGreaterThan(CHILD_MOTION.judgedGate)
+    expect(crowded.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
+    expect(crowdedBurst.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
 
     // AND THAT SAME RECORDED MINUTE READS THE SAME AT ANY FRAME CADENCE (point
-    // 656). The measure has to be free of the frame rate — that is what the
-    // reversal count it replaced was thrown out for — and the claim is shown
-    // here rather than asserted: ONE recorded trace, resampled as a slower or
-    // unevener renderer would have seen the very same play, evenly at 60, 20 and
-    // 7.5 frames a second and irregularly at cadences swinging by a factor of
-    // eight and of eleven, which is the spread a headless frame really shows.
-    // TOLERANCE: within 20 % of the 60 fps reading. Measured, base 0.462 %:
-    // 0.462 / 0.425 / 0.418 / 0.461 / 0.463 %, a spread of 9.5 %, with 93 % of
-    // every one of those traces judgeable.
-    const shares = CADENCES.map(([, step]) => shuffleWindows(resample(paths, step, 4242)).share)
-    expect(shares[0]).toBeGreaterThan(0.003) // a real share to be invariant about
-    for (const s of shares) expect(Math.abs(s - shares[0])).toBeLessThan(shares[0] * 0.2)
+    // 656): resampled as a slower or unevener renderer would have seen the very
+    // same play, evenly at 60, 20 and 7.5 frames a second and irregularly at
+    // cadences swinging by a factor of eight and of eleven. What is pinned here
+    // since point 657 is the VERDICT — clean at every cadence — because the
+    // share this block used to be numerically invariant about (0.46 %) was the
+    // defect, and it is gone; a 20 % band around nothing is noise. The
+    // penned-child block below keeps the numeric invariance demonstration on a
+    // trace that still has a real share to be invariant about.
+    for (const [, step] of CADENCES) {
+      expect(shuffleWindows(resample(paths, step, 4242)).worstShare).toBeLessThan(
+        CHILD_MOTION.shareGate,
+      )
+    }
   })
 })
 

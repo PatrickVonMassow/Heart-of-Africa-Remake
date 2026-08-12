@@ -45,6 +45,28 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 657,
+    suite: 'polish',
+    kind: 'check',
+    match: /no child walks without getting anywhere/i,
+    why:
+      'REMAINING MECHANISM after the point-657 steering fix (12.08.2026). The FIRST mechanism — ' +
+      'the chase probing a blocked() that knew no bodies, so children pressed on crossing adults ' +
+      '— is fixed and pinned: the crowded replay fell from 1.14 % (worst child 1.88 %, bursts ' +
+      '3.5 %) to 0.00 % at the shipped gates. What still reds, measured at the fixed steering ' +
+      'over 24 idle traces at seed 2972259115 — WebGL 2 four of ten (0.51-2.14 %, bursts to ' +
+      '3.56 %), WebGPU three of fourteen (0.38-1.15 %) — is a child pacing in the DEAD-END ' +
+      'WEDGE the bambara play ground carries where the hut at (13.5, -6.4) r 2.35 straddles the ' +
+      'ground rim: every probed red window sits at (10.4-10.7, -5.6 to -5.8), a recovering ' +
+      'evader at pace 1.29 walking 1.3-2.9 m for 0.00 m gained, nearest adult 2.6 m away ' +
+      '(__placeBodies). Its rescue carries it 0.00 m because the wedge floor is statically free ' +
+      'ground. Four steering remedies were measured and rejected for degrading healthy villages ' +
+      'against the 0.25 % gate (playmates as mutual walls 0.48 %, a one-sided yield 0.70 %, a ' +
+      'centre-ward stall kick 1.33 %, touch-gated walls 0.46-0.63 %); the cure is a ground that ' +
+      'does not dead-end against a rim-straddling hut, or an evade that gives a cornered child ' +
+      'a way past — that decision stays with point 657.',
+  },
+  {
     point: 506,
     suite: 'polish',
     backend: 'webgpu',
@@ -92,27 +114,5 @@ export const RED_CHARGES = [
       'frames of the same run pass — and the SAME suite on WebGL 2 passes all seven in the same ' +
       'sitting, so the charge is scoped to WebGPU and a WebGL 2 red stays a real red. Point 627 ' +
       'owns it until the cause — an unsettled jump or a real placement change — is named.',
-  },
-  {
-    point: 657,
-    suite: 'polish',
-    kind: 'check',
-    match: /no child walks without getting anywhere/i,
-    why:
-      'MEASURED 12.08.2026 over SIX sittings of ten traces at seed 2972259115 on an idle ' +
-      'machine, five per backend, with the per-child measure: 18 red of 60. Sittings 1-3 ' +
-      '(one-second windows only): 7 of 30, WebGL 2 twice and WebGPU five times, 0.34-1.53 %. ' +
-      'Sitting 4, with the half-second BURST measure added: 3 of 10, all three invisible to the ' +
-      'one-second window (bursts 0.27-0.89 %). Sitting 5, with both measures gated on having ' +
-      'judged anything: 6 of 10 — WebGPU red in ALL FIVE (worst child 0.39-1.84 %, three of them ' +
-      'also 1.30-1.86 % in bursts, the worst window at 10.7-10.8 s of the visit in three separate ' +
-      'runs) and WebGL 2 once (0.31 %). Sitting 6, with the separation wedge rescues now counted ' +
-      'too: 2 of 10 — WebGL 2 once (burst only, 0.48 %) and WebGPU once (1.83 %, burst 3.18 %, ' +
-      'the worst window 1.57 m walked inside 0.02 m). So it shows at both scales and on both ' +
-      'backends, intermittently. The red windows hold no rescue and no gap longer than the span ' +
-      'they are judged over — the worst walks 1.3-3.2 m to end 0.00-0.35 m from where it started ' +
-      "— and the game's own carry counter reads 0.00 m per minute for every child of all sixty " +
-      'runs, now including the separation wedge escapes, so nothing hides inside a teleport. ' +
-      'That is point 657.',
   },
 ]
