@@ -397,11 +397,25 @@ function sectionBounds(html, key) {
 const NOW_HEAD = (point) =>
   `<details class="now"[^>]*>\\s*<summary>\\s*(?:<span class="num">\\s*${point}\\s*</span>|<span class="t">\\s*${point}\\s*${DASH})`
 
-/** The current-work card for `point`, or null. */
+/** The current-work card for `point`, or null. Searched in its own section. */
 export function nowCard(html, point) {
   const re = new RegExp(`${NOW_HEAD(point)}[\\s\\S]*?</details>\\s*`)
-  const m = String(html ?? '').match(re)
+  const m = nowSectionSlice(html).text.match(re)
   return m ? m[0] : null
+}
+
+/**
+ * The current-work SECTION as `{ from, end, text }` — the whole document when
+ * the section cannot be found, which is what a fragment gives a caller.
+ */
+function nowSectionSlice(html) {
+  const text = String(html ?? '')
+  try {
+    const { from, end } = sectionBounds(text, 'now')
+    return { from, end, text: text.slice(from, end) }
+  } catch {
+    return { from: 0, end: text.length, text }
+  }
 }
 
 /** "~2,5 h · Feature" → 2.5; anything without an hour figure → null. */
@@ -1139,9 +1153,11 @@ export function setCardStatus(html, point, text, stamp = berlinStamp()) {
   // point's text, with markup that still looked plausible afterwards. A card
   // without a body is now simply not found, and the refusal says so.
   const re = new RegExp(`(${NOW_HEAD(point)}${WITHIN_CARD}<div class="body">)${WITHIN_CARD}(</div>\\s*</details>)`)
-  if (!re.test(html)) throw new Error(`board: no current-work card for point ${point} — add the card first`)
+  const { from, end, text: section } = nowSectionSlice(html)
+  if (!re.test(section)) throw new Error(`board: no current-work card for point ${point} — add the card first`)
   const body = renderCardBody(text, { stamp })
-  return html.replace(re, (_m, head, tail) => `${head}\n${body}\n  ${tail}`)
+  const rewritten = section.replace(re, (_m, head, tail) => `${head}\n${body}\n  ${tail}`)
+  return html.slice(0, from) + rewritten + html.slice(end)
 }
 
 /**
@@ -1176,9 +1192,10 @@ export function setCardTitle(html, point, title) {
   // ON A CLOSING CARD THE TITLE KEEPS ITS SHAPE. The marker and the composed
   // title are one statement; retitling only the subject would leave a card the
   // gate reads as a false closing marker.
+  const now = nowSectionSlice(html)
   const closingMarked = new RegExp(
     `<details class="now"[^>]*data-state="closing"[^>]*>\\s*<summary>[\\s\\S]*?<span class="num">\\s*${point}\\s*</span>`,
-  ).test(html)
+  ).test(now.text)
   // A CLOSING SHAPE IS THE CLOSING STATE (four-eyes review, 12.08.2026). Writing
   // that title onto an ordinary card would produce the unmarked closing card the
   // gate refuses — and the command that writes the state properly is one line
@@ -1195,12 +1212,19 @@ export function setCardTitle(html, point, title) {
     `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*<span class="t">)` +
       `(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
-  if (chipRe.test(html)) return html.replace(chipRe, (_m, head, tail) => `${head}${bare}${tail}`)
+  if (chipRe.test(now.text)) {
+    const rewritten = now.text.replace(chipRe, (_m, head, tail) => `${head}${bare}${tail}`)
+    return html.slice(0, now.from) + rewritten + html.slice(now.end)
+  }
   const legacyRe = new RegExp(
     `(<details class="now"[^>]*>\\s*<summary>\\s*)<span class="t">\\s*${point}\\s*${DASH}(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
-  if (legacyRe.test(html)) {
-    return html.replace(legacyRe, (_m, head, tail) => `${head}${numberChip(point)}<span class="t">${bare}${tail}`)
+  if (legacyRe.test(now.text)) {
+    const rewritten = now.text.replace(
+      legacyRe,
+      (_m, head, tail) => `${head}${numberChip(point)}<span class="t">${bare}${tail}`,
+    )
+    return html.slice(0, now.from) + rewritten + html.slice(now.end)
   }
   // SCOPED TO THE QUEUE (four-eyes review, 12.08.2026): the archived cards carry
   // the very same markup, so an unscoped fallback retitled FINISHED work for a

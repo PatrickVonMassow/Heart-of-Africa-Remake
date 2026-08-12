@@ -577,6 +577,24 @@ describe('every current-work card names its point and its subject', () => {
     expect(dropStrayNowCards(proper).dropped).toEqual([])
   })
 
+  // A card that has drifted out of the section is a violation the gate reports;
+  // a status or a retitle must not land on it and leave the real card untouched
+  // (four-eyes 12.08.). Every current-work finder looks in its own section.
+  it('writes to the card in the section, not to a stray copy outside it', () => {
+    const drifted = withNow(chipCard(651, 'Echte Arbeit')).replace(
+      `<details class="sect"><summary><h2>${REQUIRED_SECTIONS[3]}</h2></summary>\n`,
+      `<details class="sect"><summary><h2>${REQUIRED_SECTIONS[3]}</h2></summary>\n` +
+        '<details class="now">\n  <summary><span class="num">651</span><span class="t">Verirrte Kopie</span>' +
+        '</summary>\n  <div class="body"><p>Alte Prosa.</p></div>\n</details>\n',
+    )
+    const stated = setCardStatus(drifted, 651, 'Neuer Stand.', '09:00')
+    expect(stated).toContain('Alte Prosa.')
+    expect(stated.slice(0, stated.indexOf(REQUIRED_SECTIONS[1]))).toContain('Neuer Stand.')
+    const titled = setCardTitle(drifted, 651, 'Neuer Betreff')
+    expect(titled).toContain('<span class="t">Verirrte Kopie</span>')
+    expect(titled).toContain('<span class="t">Neuer Betreff</span>')
+  })
+
   // A REPLACEMENT STRING IS NOT TEXT (four-eyes 12.08.): `$&`, "$'", '$`' and
   // `$1` expand against the match, so a title or a status carrying one could
   // duplicate whole stretches of the board into the card.
