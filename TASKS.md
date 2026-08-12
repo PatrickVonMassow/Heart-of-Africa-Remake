@@ -101,7 +101,25 @@ put it is the mistake this line exists to stop.
   walked out of; two children resolving each other in opposite directions on alternating frames;
   and a walk target that sits inside another body, so the child never arrives and keeps pressing
   into it. Which one it is goes into the commit message and the code comment.
-  THE STRONGEST CANDIDATE IS ALREADY NAMED, by GPT-5.6 Sol's re-review of point 648's behaviour
+  THE CAUSE, NAMED AND EVIDENCED (12.08.2026, from the point-656 measurements plus a read of the
+  code): THE CHASE CANNOT SEE ANOTHER INHABITANT'S BODY. `TagWorld.blocked`, which every step of
+  `moveChild` probes and which the whole deflection is built on, is assembled in
+  `src/scenes/place/PlaceLife.tsx` from the play-ground rim and `standingClear(colliders, …)` —
+  huts, fences, the fire ring. It does not know that a child, an adult, a porter or an errand
+  walker is standing where the child wants to go. So the way reads OPEN, the child walks into the
+  body, and the separation pass pushes it straight back out; `walked` grows, ground covered does
+  not, and that is precisely the measure's definition of walking without getting anywhere. Three
+  measurements agree: the replay reads 3.5 % on the burst measure when adults cross the children's
+  ground against 0.03 % when they keep to their own work; the live red windows sit at the same
+  moment of the visit (10.7-12.0 s) run after run, which is when the errand walkers pass; and
+  making the separation gentler (below) made the symptom MORE visible, not less, because a child
+  pressed into a body is now released slowly instead of being flung out.
+  THE FIX therefore belongs in what the chase probes: another inhabitant's body is an obstacle to
+  walk ROUND, like a hut — the deflection already does that correctly once it knows. Whatever
+  shape it takes, it must not make the children avoid each other so widely that the game of tag
+  cannot be caught (`catchDistance` still has to be reachable), and the adults' own walkers need
+  the same treatment or they will walk through the children instead.
+  A SECOND, SMALLER DEFECT rides along, named by GPT-5.6 Sol's re-review of point 648's behaviour
   (12.08.2026, verdict merge-with-fixes on that one finding): `separateGroup` in
   `src/scenes/place/inhabitantBodies.ts` calls `pushBody(..., dt, …)` in EVERY sweep, so the
   per-frame `maxSpeed` is applied once PER PASS — with the shipped values (8 m/s, 4 passes) a
