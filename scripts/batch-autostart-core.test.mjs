@@ -16,6 +16,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildSpawnArgs,
+  firewallTopUpDecision,
   buildSpawnOptions,
   recordSpawn,
   reapableSpawns,
@@ -1019,5 +1020,50 @@ describe('the call-discipline paragraph (point 593)', () => {
     }
     const ids = callDisciplineTopics().map((t) => t.id)
     expect(new Set(ids).size).toBe(ids.length)
+  })
+})
+
+// THE TOP-UP THAT NEVER RAN — 12.08.2026. The egress allowance is an ipset of
+// resolved IPs; it ages out under a running container, and the tick re-resolves
+// it. It had not done so once since the container came up, because the pid file
+// that bounds it to one child at a time does not exist on a fresh container and
+// reading it threw. The first failure made itself permanent: the record is only
+// written after a spawn that then never happened.
+describe('the firewall top-up decision', () => {
+  const ours = () => 'node /workspace/hoa/scripts/firewall-allow.mjs '
+
+  it('starts when there is no record at all — the fresh container case', () => {
+    const d = firewallTopUpDecision({ pidText: null, cmdlineOf: () => null })
+    expect(d.start).toBe(true)
+    expect(d.reason).toMatch(/no top-up on record/)
+  })
+
+  it('starts when the record is empty or unreadable rather than a number', () => {
+    for (const pidText of ['', '   ', 'not-a-pid', '0']) {
+      expect(firewallTopUpDecision({ pidText, cmdlineOf: () => null }).start).toBe(true)
+    }
+  })
+
+  it('does not start a second while our own top-up is still running', () => {
+    const d = firewallTopUpDecision({ pidText: '4711', cmdlineOf: () => ours() })
+    expect(d.start).toBe(false)
+    expect(d.reason).toMatch(/still running \(pid 4711\)/)
+  })
+
+  it('starts anyway when the recorded pid belongs to something else — pid reuse', () => {
+    // A live pid is not proof of our child: without this, one reused number
+    // would suppress the top-up for as long as that unrelated process lives.
+    const d = firewallTopUpDecision({ pidText: '4711', cmdlineOf: () => '/usr/bin/vim ' })
+    expect(d.start).toBe(true)
+    expect(d.reason).toMatch(/not a top-up any more/)
+  })
+
+  it('starts when the pid cannot be identified at all — the non-Linux case', () => {
+    // A redundant top-up is the safe direction: it is idempotent and short.
+    expect(firewallTopUpDecision({ pidText: '4711', cmdlineOf: () => null }).start).toBe(true)
+  })
+
+  it('trims the record the way a written pid file reads back', () => {
+    expect(firewallTopUpDecision({ pidText: '4711\n', cmdlineOf: () => ours() }).start).toBe(false)
   })
 })

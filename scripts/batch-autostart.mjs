@@ -73,6 +73,7 @@ import {
   detectQuotaSignature,
   judgeSpawnOutcome,
   announceSpawn,
+  firewallTopUpDecision,
   RUNAWAY_FAIL_LIMIT,
 } from './batch-autostart-core.mjs'
 import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
@@ -272,20 +273,32 @@ function readRunLogSegment(from) {
 // bounds.
 try {
   const PIDFILE = C('firewall-topup.pid')
-  const prev = Number(readFileSync(PIDFILE, 'utf8')) || 0
-  let busy = false
-  if (prev > 0) {
+  // A MISSING RECORD IS THE NORMAL FIRST TICK, NOT A FAILURE (measured 12.08.2026).
+  // This read sat unguarded inside the outer try, so the ENOENT of a container that
+  // had just come up took the WHOLE block with it: every tick logged "firewall
+  // top-up skipped (ENOENT …)" and the top-up never ran once — the pid file is
+  // written only after a spawn, so the first failure made itself permanent. The
+  // firewall it was meant to top up then aged out under the container twice, which
+  // is how it was found. The decision itself is pure and swept by the Vitest layer.
+  let pidText = null
+  try {
+    pidText = readFileSync(PIDFILE, 'utf8')
+  } catch {
+    pidText = null
+  }
+  // The identity check, not just liveness. Linux only; elsewhere the read throws
+  // and the decision falls to "start" — a redundant top-up is the safe direction,
+  // since it is idempotent and short.
+  const cmdlineOf = (pid) => {
     try {
-      // The identity check, not just liveness. Linux only; elsewhere the read throws
-      // and `busy` stays false — starting a redundant top-up is the safe direction,
-      // since it is idempotent and short.
-      busy = readFileSync(`/proc/${prev}/cmdline`, 'utf8').includes('firewall-allow')
+      return readFileSync(`/proc/${pid}/cmdline`, 'utf8')
     } catch {
-      busy = false
+      return null
     }
   }
-  if (busy) {
-    log(`firewall top-up still running (pid ${prev}) — not starting a second`)
+  const decision = firewallTopUpDecision({ pidText, cmdlineOf })
+  if (!decision.start) {
+    log(`firewall top-up ${decision.reason} — not starting a second`)
   } else {
     const out = openSync(C('firewall-topup.log'), 'a')
     const child = spawn(process.execPath, [R('firewall-allow.mjs')], {
