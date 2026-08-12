@@ -96,20 +96,20 @@ export const RED_CHARGES = [
   {
     point: 657,
     suite: 'polish',
-    backend: 'webgpu',
     kind: 'check',
     match: /no child walks without getting anywhere/i,
     why:
-      'RE-MEASURED 12.08.2026 after the MEASURE itself was repaired (each window weighted in ' +
-      'game time and capped at the span it was measured over; a window spanning a rescue left ' +
-      'UNJUDGED instead of interpolated across a teleport). Every earlier reading of this check ' +
-      '— 0.30-1.98 % — was taken before that and is void. Seed 2972259115, idle machine, five ' +
-      'traces per backend: WebGPU red ONCE (0.31 % of 131 judged child-seconds, worst window ' +
-      '3.11 m walked inside 0.00 m) and 0.00-0.04 % in the other four; WebGL 2 green all five ' +
-      '(0.00-0.02 %). That worst window holds no rescue and no gap longer than the second it ' +
-      'measures, and the game\'s own carry counter reports 0.00 m per child-minute in all ten ' +
-      'runs — so nothing hides behind a teleport: a child walked three metres and ended where ' +
-      'it started, which is point 657. Scoped to WebGPU because that is where the repaired ' +
-      'measure saw it; a WebGL 2 red is new evidence, not this charge.',
+      'RE-MEASURED 12.08.2026 with the repaired measure, now read PER CHILD (a group average ' +
+      'divided one shuffling child by three healthy siblings). Every earlier reading of this ' +
+      'check is void: 0.30-1.98 % came from a measure that interpolated across a teleport, and ' +
+      'the 0.00-0.31 % after that was the group\'s. Seed 2972259115, idle machine, five traces ' +
+      'per backend, worst child\'s own share: WebGL 2 red twice (1.29 % and 0.34 %, others ' +
+      '0.00-0.09 %), WebGPU red once (1.53 %, others 0.00-0.24 %) against the 0.25 % gate. The ' +
+      'red windows have a child walk 1.3-2.9 m and end 0.00-0.05 m from where it started, none ' +
+      'of them holds a rescue or a gap longer than the second it measures, and no child was ' +
+      'carried at all in any of the ten runs — the game\'s own counter reads 0.00 m per minute ' +
+      'for the WORST child of every run, so no shuffle is hiding inside a teleport either. That ' +
+      'is the settlement walking on the spot, which is point 657. Both backends: with the ' +
+      'per-child gate it was seen on both.',
   },
 ]
