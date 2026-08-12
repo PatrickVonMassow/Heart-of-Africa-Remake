@@ -576,6 +576,31 @@ describe('a trace has to hold a game before it proves anything', () => {
     expect(holdsAGame(live)).toBe(false)
   })
 
+  it('and refuses counters that do not behave like counters', () => {
+    // FINITE IS NOT SOUND (seventh cross-vendor review). Sol's case is the first
+    // of these three: two children standing perfectly still while a rising
+    // `walkedWhilePlaying` claims they walked. Each shape below breaks one rule
+    // — the metres in play exceed the metres walked at all, the played seconds
+    // outrun the clock they are part of, a counter runs backwards — and each is
+    // refused rather than believed.
+    const honest = () => trace(3600, (i) => ({ x: i * DT * 1.5, z: 0 }))
+    const statue = () => trace(3600, () => ({ x: 0, z: 0 }))
+    const claimsToWalk = statue().map((s, i) => ({ ...s, walkedWhilePlaying: i * 0.025 }))
+    const outrunsTheClock = honest().map((s, i) => ({ ...s, playedClock: i * DT * 2 }))
+    const runsBackwards = honest().map((s, i) => ({ ...s, playedClock: (3600 - i) * DT }))
+    for (const bad of [claimsToWalk, outrunsTheClock, runsBackwards]) {
+      const live = traceLiveness([bad, bad])
+      expect(live.countersPublished).toBe(false)
+      expect(holdsAGame(live)).toBe(false)
+    }
+    // Sol's own reading of the first one: it walks 90 m per played minute and
+    // would otherwise have passed for a game.
+    expect(claimsToWalk[3599].walkedWhilePlaying).toBeGreaterThan(80)
+    expect(claimsToWalk[3599].walked).toBe(0)
+    // And the honest trace is a game.
+    expect(holdsAGame(traceLiveness([honest(), honest()]))).toBe(true)
+  })
+
   it('and refuses a trace that does not publish those counters at all', () => {
     // A missing counter is not "nothing walked while playing"; it is nothing
     // said, and it is refused as such.

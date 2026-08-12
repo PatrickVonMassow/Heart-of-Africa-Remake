@@ -35,7 +35,9 @@ export interface ChildLiveness {
 
 export interface TraceLiveness {
   children: number
-  /** False if any sample lacks the game's own play counters — never read as
+  /** False if any sample lacks the game's own play counters, or if they do not
+   *  behave like counters (running backwards, outrunning the clock, or claiming
+   *  more metres in play than were walked at all) — never read as
    *  nothing-walked. */
   countersPublished: boolean
   /** False if any clock or walked distance is not a finite number, and false for

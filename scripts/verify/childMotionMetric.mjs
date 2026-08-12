@@ -488,8 +488,10 @@ export function shuffleWindows(tracks, cfg = {}) {
  * recorded at the sample AFTER it happened, so classifying that step by the
  * `playing` flag of either endpoint credits the wrong side of a round's first
  * and last frame. The settlement knows which it was; a watcher outside has to
- * guess. A trace that does not publish them reports `countersPublished: false`
- * and is refused rather than read as nothing-walked.
+ * guess. A trace that does not publish them — or publishes numbers that do not
+ * behave like counters: running backwards, outrunning the clock they are part
+ * of, or claiming more metres in play than the legs walked at all — reports
+ * `countersPublished: false` and is refused rather than read as nothing-walked.
  *
  * Note what a MISSING `playing` field does: it reads as not playing, so a trace
  * that cannot show a game in it does not pass for one. A number that is not a
@@ -516,6 +518,26 @@ export function traceLiveness(tracks) {
   for (const track of real) {
     for (const s of track) {
       if (!Number.isFinite(s.walkedWhilePlaying) || !Number.isFinite(s.playedClock)) {
+        countersPublished = false
+      }
+    }
+    // AND THEY MUST BEHAVE LIKE THE COUNTERS THEY CLAIM TO BE (the seventh
+    // cross-vendor review). Finite is not the same as sound: two children
+    // standing perfectly still, publishing a rising `walkedWhilePlaying`,
+    // satisfied every bar there was. A counter runs FORWARD, the seconds of play
+    // cannot outrun the clock they are part of, and the metres walked in play
+    // cannot exceed the metres walked. Checked interval by interval, so a
+    // stretch that breaks the rule cannot be averaged away by the rest.
+    const EPS = 1e-6
+    for (let i = 1; i < track.length; i++) {
+      const a = track[i - 1]
+      const b = track[i]
+      if (
+        b.playedClock < a.playedClock - EPS ||
+        b.walkedWhilePlaying < a.walkedWhilePlaying - EPS ||
+        b.playedClock - a.playedClock > b.clock - a.clock + EPS ||
+        b.walkedWhilePlaying - a.walkedWhilePlaying > b.walked - a.walked + EPS
+      ) {
         countersPublished = false
       }
     }
