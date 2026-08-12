@@ -233,9 +233,17 @@ export function groundOccupied(
  * nothing to walk round but a body already pressing on them.
  *
  * Cheap on the ordinary frame: everything beyond one `groundOccupied` probe
- * runs only when the direct step really lands in a body. Fully boxed in, the
- * wanted point is returned unchanged — the caller's own slide-and-skip
- * behaviour stays exactly what it was.
+ * runs only when the direct step really lands in a body.
+ *
+ * FULLY BOXED IN, THE ORIGIN COMES BACK — never the occupied destination
+ * (GPT-5.6 Sol, 12.08.2026). The wanted point used to be returned unchanged,
+ * and the caller's static `resolveMove` — which knows nothing of bodies —
+ * then happily walked the figure INTO the body: the move read as successful,
+ * the caller's stuck counter reset, and the separation pushed the figure back
+ * out — the exact walk-in/push-out loop this helper exists to end, restarted
+ * one layer up. With the origin returned, the caller's own moved-distance
+ * check reads the frame as blocked, its stuck counter accumulates, and its
+ * ordinary give-up path (waypoint skip, replan, nudge) takes over.
  */
 export function stepRoundBodies(
   set: InhabitantSet,
@@ -253,11 +261,11 @@ export function stepRoundBodies(
   const dx = toX - fromX
   const dz = toZ - fromZ
   const dist = Math.hypot(dx, dz)
-  if (!(dist > 1e-9)) return { x: toX, z: toZ }
+  if (!(dist > 1e-9)) return { x: fromX, z: fromZ }
   const both = (x: number, z: number) =>
     blocked(x, z) || groundOccupied(set, x, z, cfg, selfRadius, notMe)
   const r = deflectedStep(fromX, fromZ, Math.atan2(dx, dz), dist, both, Math.max(dist, selfRadius * 2))
-  return r.moved ? { x: r.x, z: r.z } : { x: toX, z: toZ }
+  return r.moved ? { x: r.x, z: r.z } : { x: fromX, z: fromZ }
 }
 
 /** A deterministic escape bearing for two bodies at EXACTLY the same point (a

@@ -13,6 +13,7 @@ import {
   separateAll,
   separateBody,
   separateGroup,
+  stepRoundBodies,
   type InhabitantBody,
   type SeparationConfig,
 } from './inhabitantBodies'
@@ -407,6 +408,25 @@ describe('inhabitant bodies', () => {
       const adultReach = SEP.bodyRadius + moverBody
       expect(groundOccupied(set, 2 + kidReach - 1e-3, 0, SEP, moverBody)).toBe(true)
       expect(groundOccupied(set, 2 + adultReach - 1e-3, 0, SEP, moverBody)).toBe(false)
+    })
+
+    it('a boxed-in walker gets its ORIGIN back, never the occupied destination', () => {
+      // The walk-in/push-out loop, one layer up (GPT-5.6 Sol, 12.08.2026): a
+      // returned OCCUPIED destination reads as a successful move to the
+      // caller's static resolveMove, its stuck counter resets, and the
+      // separation shoves the figure back — for ever. Here the destination is
+      // inside another body and every deflection heading is statically
+      // blocked, so the only honest answer is "you stay where you stand".
+      const set = createInhabitantSet()
+      const [self] = claimBodies(set, 1, { x: 0, z: 0 })
+      claimBodies(set, 1, { x: 0.4, z: 0 }) // dead ahead, inside one step
+      const wall = (x: number, z: number) => Math.hypot(x, z) > 0.05 // everything but the origin
+      const r = stepRoundBodies(set, self, 0, 0, 0.4, 0, SEP, wall)
+      expect(r.x).toBe(0)
+      expect(r.z).toBe(0)
+      // And a caller measuring its own progress reads the frame as BLOCKED —
+      // the distance its stuck counter judges is zero, not a body-deep step.
+      expect(Math.hypot(r.x - 0, r.z - 0)).toBe(0)
     })
 
     it('never counts an excluded body or an inactive one', () => {
