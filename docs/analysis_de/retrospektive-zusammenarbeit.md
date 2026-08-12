@@ -1308,7 +1308,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 11.08.2026, 23:37 · Quellen-Fingerprint: `2276626ca090…`
+Zuletzt aktualisiert: Mittwoch, 12.08.2026, 09:22 · Quellen-Fingerprint: `42dccc19cb2f…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1366,6 +1366,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Before the 224 demo checkpoint queue ONLY bugfixes + almost-done points; new features go to v0.3 (after 224) | 2 | mittel | queue-order-guard.mjs | ✔ Mechanismus |
 | Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Queue order for this release — communication mechanic first, then 633 (closing), then 174 (tag); a new point of that kind is moved to the front in the same turn | 1 | niedrig | lock-release-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 3 | mittel | model-guard.mjs | ✔ Mechanismus |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1392,10 +1393,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 76 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 52 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
+Erfasste Quellen: 77 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 52 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
 
-<!-- RETRO-FINGERPRINT: 2276626ca090ece14fe05ba9eda0535fc5e4020fadc1f30446a77b247fbfc7fe -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-11T21:37:46.665Z -->
+<!-- RETRO-FINGERPRINT: 42dccc19cb2f7fad1c131535e53cfc0887debf087eaea9515141361409bf7455 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-12T07:22:53.756Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1431,3 +1432,26 @@ die eigene Ausgabe wertlos — geprüft wird gegen die dokumentierte Gegenseite,
 Schlüsselsatz wird festgenagelt (welche Felder genau, nicht nur welcher Wert). Und ein
 Durchsetzer, dessen Wirkung man nicht am Verhalten sieht, braucht einen Beleg, dass er
 nicht nur LIEF, sondern etwas BEWIRKT hat.
+
+### 3.113 Der erste Fehlschlag macht sich selbst dauerhaft
+
+Die Netzfreigabe des Containers merkt sich aufgelöste IP-Adressen. Weil die Adressen hinter
+`api.openai.com` im Tagesverlauf wechseln, hält der Startlauf nur eine Momentaufnahme — die
+Auffrischung alle 15 Minuten war genau dafür gebaut. Sie hat seit dem Containerstart kein
+einziges Mal gelaufen: Ihre Datei mit der Kennnummer des vorigen Laufs existiert auf einem
+frischen Container nicht, das Lesen warf, und der Fang lag um den GANZEN Block. Geschrieben
+wird diese Datei erst nach einem Start — der damit nie stattfand. Der erste Fehlschlag hat
+sich also selbst verewigt, und das Protokoll meldete brav bei jedem Takt „übersprungen
+(ENOENT)", vier Wochen lang gelesen von niemandem.
+
+Das ist nicht §3.112 (die falsche Sprache zur Gegenseite), sondern die Klasse davor: Der
+Mechanismus spricht mit sich selbst — sein eigener ZUSTAND ist die Vorbedingung seines
+ersten Laufs. Verwandt mit „ein Wächter, der nie auslösen kann", nur entsteht die Lähmung
+hier erst im Betrieb, beim Start aus dem Nichts. Zwei Sitzungen haben die Freigabe danach
+von Hand nachgezogen und die Störung damit als erledigt gelesen — die Handreparatur ist der
+zuverlässigste Weg, eine tote Automatik unsichtbar zu halten.
+
+**Lehre:** Ein wiederkehrender Mechanismus wird gegen den LEEREN Zustand geprüft — kein
+Protokoll, keine Kennnummer, keine Vorgeschichte —, denn genau so beginnt er nach jedem
+Neustart. Und „übersprungen" ist kein Betriebszustand: Was ein Durchsetzer nicht tut, gehört
+laut gemeldet, sonst ist sein Schweigen von Erfolg nicht zu unterscheiden.
