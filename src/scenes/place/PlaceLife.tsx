@@ -106,6 +106,7 @@ import {
   type DrumGeometry,
 } from './drummerPose'
 import { childPlayGround, PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations } from './lifeSpots'
+import { buildWedgeCarve } from './wedgeCarve'
 import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
 
 /** Collision radius of inhabitants (matches the player's). */
@@ -554,10 +555,18 @@ function Kids({
   // straight back out — walking on the spot, the user's own report.
   const world = useMemo<TagWorld>(() => {
     const rim = Math.max(1, radius - NPC_RADIUS * 2)
+    // The ground between two boundaries that pinch below a passage is not
+    // offered to the chase at all (point 657): the reported village carried a
+    // dead-end slot between two hut clearances and a corridor a
+    // rim-straddling hut closes to nothing, and every live red window of the
+    // measurement sat in one of the two — evaders pacing the pinch, groups
+    // herding into the corridor. See `buildWedgeCarve`.
+    const carve = buildWedgeCarve(colliders, NPC_RADIUS, { x, z, radius: playRadius })
     const blocked = (px: number, pz: number) =>
       Math.hypot(px, pz) > rim ||
       Math.hypot(px - x, pz - z) > playRadius ||
-      !standingClear(colliders, px, pz, NPC_RADIUS)
+      !standingClear(colliders, px, pz, NPC_RADIUS) ||
+      carve(px, pz)
     return {
       radius: playRadius,
       centerX: x,
