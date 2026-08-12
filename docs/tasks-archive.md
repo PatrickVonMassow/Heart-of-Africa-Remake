@@ -17805,3 +17805,30 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   phone-width layout of a now-card, where it never has before.
   Criticality: medium — it cannot break the game, but the board is the user's only window into
   an unattended batch, and a card he cannot decode is the same as no card. Bundle: Chat & Tafel.
+
+- [x] 645. CRITERION 7 DESCRIBES THE PLACEHOLDER, NOT THE COMMUNICATION MECHANICS THAT WERE
+  BUILT (found 11.08.2026 in conversation with the user while the batch was paused).
+  `docs/acceptance-criteria-detail.md` §7 and the short form in CLAUDE.md §7.1 point 7 still
+  describe the OLD placeholder — the village elder handing out a glossary and direction
+  words — together with the OPEN note against `design.md` §13.4 saying the real mechanic is
+  undecided and nothing should be built on it. What is built and shipped on `main` is the
+  mechanic the user specified: `src/communication/` with `lexicon`, `speaking`, `heard`,
+  `speechLabel`, `speechTarget`, `spokenGesture`, `drumMessage` and `chiefReply`, plus the
+  teaching adults and children of the Bambara village (points 580–583, 588 and their
+  successors).
+  WHY IT MATTERS: the detail section is the PROOF text read at the closing run and at the
+  v0.3 tag. As it stands it would sign off a built mechanic as a placeholder, and its
+  sentence "do not build on it, but do not protect it either" invites sacrificing that
+  mechanic when something else changes.
+  FINAL STATE: criterion 7 and its detail section describe the mechanic that exists, naming
+  its files; the evidence chain in `docs/acceptance-evidence.md` §7 points at the tests that
+  actually prove it; and what is GENUINELY still open from `design.md` §13.4 — the invented
+  language per region — stands as a clearly bounded remainder rather than as a blanket
+  "undecided".
+  VERIFIABLE: no runtime invariant — this is proof-document hygiene. The proof is that every
+  file and test §7 names exists and covers what the section claims; check each claim against
+  the code that owns it. CLAUDE.md §7.1, the detail section and the evidence section change
+  in the SAME commit, per the rule each of them states.
+  Criticality: medium — no player sees it, but it is the document the closing run and the
+  release tag read as proof, and it currently misreports delivered work as unbuilt.
+  Bundle: Dokumentation.
