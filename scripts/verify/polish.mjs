@@ -14,7 +14,7 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
-import { cropLuminance, shotReading } from './cropLuma.mjs'
+import { cropMedian, luminanceSamples, shotReading } from './cropLuma.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -2611,19 +2611,26 @@ if (section('settlement-edge')) {
       return null
     })
 
-  /** Luminance of a crop centred on a ground point — the MEDIAN of its pixels,
-   *  not the mean (point 641). The band tones the whole crop, so the median
-   *  carries its effect exactly, while the §19.13 rain streaks that fall through
-   *  this crop cover a minority of it and cannot move the reading. Measured at
-   *  giza: a streak moved the mean +11.4 % and the median +0.68 %. The reasoning
-   *  and its fixtures live in cropLuma.mjs / cropLuma.test.mjs. */
-  const groundLuma = async (buf, ndc, w, h) => {
+  /** Every pixel's luminance in a crop centred on a ground point. The reads are
+   *  kept per PIXEL (point 641): the shot's reading rejects the §19.13 rain
+   *  streaks across the reads and then measures the band across the pixels, and
+   *  neither is possible once a read has been collapsed to one number.
+   *  cropLuma.mjs carries the reasoning and cropLuma.test.mjs pins it. */
+  const groundSamples = async (buf, ndc, w, h) => {
     const view = page.viewportSize()
     const left = Math.round(((ndc.x + 1) / 2) * view.width - w / 2)
     const top = Math.round(((1 - ndc.y) / 2) * view.height - h / 2)
     if (left < 0 || top < 0 || left + w > view.width || top + h > view.height) return null
     const { data, info } = await sharp(buf).extract({ left, top, width: w, height: h }).raw().toBuffer({ resolveWithObject: true })
-    return cropLuminance(data, info)
+    return luminanceSamples(data, info)
+  }
+
+  /** The crop's SETTLE reading — the spatial median, so a streak crossing the
+   *  crop cannot restart the wait. It compares the picture with itself; it never
+   *  measures the band. */
+  const groundLuma = async (buf, ndc, w, h) => {
+    const samples = await groundSamples(buf, ndc, w, h)
+    return samples === null ? null : cropMedian(samples)
   }
 
   /** Aim the camera at a ground point ahead by bisecting the pitch on the
@@ -2673,6 +2680,25 @@ if (section('settlement-edge')) {
       frames,
     )
 
+  /** The gap between two reads of one shot (point 641): far enough apart to be
+   *  DIFFERENT PICTURES of the same scene. Both conditions are needed. Frames,
+   *  because on a throttled machine time passes while the picture does not; and
+   *  the page's own elapsed time, because a §19.13 rain streak lingers in the
+   *  crop for ~0.7 s and twelve frames at 60 fps are 0.2 s — three reads that
+   *  close together are one streak three times over. This polls the PAGE's
+   *  clock, which is the clock the rain falls on, not a sleep in the harness. */
+  const readGap = (ms = 600, frames = 12) =>
+    page.evaluate(
+      ([wait, n]) =>
+        new Promise((res) => {
+          const t0 = performance.now()
+          let i = 0
+          const step = () => (++i >= n && performance.now() - t0 >= wait ? res() : requestAnimationFrame(step))
+          requestAnimationFrame(step)
+        }),
+      [ms, frames],
+    )
+
   const enterFor = async (id) => {
     await page.evaluate((want) => {
       const g = window.__game.getState()
@@ -2718,20 +2744,24 @@ if (section('settlement-edge')) {
     // The measured spread of `capetown (wet)` across five runs was 6.5 luminance
     // points on an unchanged scene, straddling its own 0.04 bar.
     //
-    // Point 641: the three reads are combined by their MEDIAN, and they are
-    // spaced far enough apart to be different pictures. A rain streak lingers in
-    // the crop for up to ~0.7 s — measured — so reads two frames apart were the
-    // same streak three times; twelve frames apart they are not, and the median
-    // then drops the contaminated one outright instead of averaging a ninth of
-    // its value into the shot.
+    // Point 641: a shot is FIVE reads of the crop, kept per pixel, combined by
+    // the per-pixel median across the reads and then by the crop's mean
+    // (cropLuma.mjs). The rain is a transient in TIME and the band is not, so
+    // the streak is rejected across the reads while every pixel still counts
+    // towards the measurement — a spatial median would reject the streak too,
+    // and with it a genuine band leak over part of the crop, which at 0.3 m of
+    // clearance is the first real defect this check has to catch (measured: a
+    // leak over 8 of the 46 rows reads ×0.968 on the mean and ×1.000 on the
+    // spatial median). Five reads, so a streak surviving into two of them still
+    // cannot reach the middle value.
+    const READS = 5
     const shot = async (strength) => {
       await page.evaluate((s) => { window.__balance.placeEdgeBand.strength = s }, strength)
-      const first = await settledLuma(ndc, 0.2)
-      if (first === null) return null
-      const reads = [first]
-      for (let i = 0; i < 2; i++) {
-        await settleFrames(12)
-        const cur = await groundLuma(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
+      if ((await settledLuma(ndc, 0.2)) === null) return null
+      const reads = []
+      for (let i = 0; i < READS; i++) {
+        if (i > 0) await readGap()
+        const cur = await groundSamples(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
         if (cur === null) return null
         reads.push(cur)
       }
@@ -2851,10 +2881,13 @@ if (section('settlement-edge')) {
   // constant, and its MEAN jumped from 102.5 to 114.0 — +11.4 % — about every
   // 13 s. The saved frames name it: a §19.13 rain streak, bright and ~14 px
   // wide, falling straight through the 150×46 crop. In one of the three shots a
-  // ratio takes, that is the whole red — a streak in an ON shot gives ×1.057
-  // (the reading on record, to three decimals), one in the OFF shot ×0.90, a
-  // partial hit the ×0.963. The reading is the crop's MEDIAN now and a shot is
-  // the median of its reads (cropLuma.mjs), which the streak cannot move.
+  // ratio takes, that is the whole red — with the measured ×1.1137
+  // contamination, a streak in an ON shot gives ×1.057 (the reading on record,
+  // to three decimals), one in the OFF shot ×0.898, and a 4–5 px sliver the
+  // ×0.963. A shot is now five reads of the crop, combined per PIXEL by their
+  // median across the reads and then by the crop's mean (cropLuma.mjs): the
+  // streak is transient and is dropped, while a band effect over any part of
+  // the crop is still measured at full strength.
   // The geometry was measured and ruled out in the same pass: at giza the
   // outside crop's near row sits at radius+2.7 m and the band reaches at most
   // radius+2.4 m, the per-row ON/OFF profile reads 1.000 across every row of the
