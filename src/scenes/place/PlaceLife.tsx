@@ -729,6 +729,11 @@ function Kids({
         // ENDS a snag, so without the count the correction reads as the child
         // having walked out of the pocket by itself.
         nudges: c.nudges,
+        // And how far it was carried doing so (point 656). Nothing outside the
+        // game can work this out: one frame vector holds the child's walking and
+        // the settlement's correction added together, and `walked` is a scalar
+        // that cannot say which way the legs went.
+        carried: c.carried,
         // Standing because it was TOLD to (point 481), not because it stalled —
         // the difference between an obeyed stillness and the reported snag.
         held: c.held,
