@@ -119,6 +119,9 @@ export const CHILD_MOTION = {
   worstChildRescueGate: 12,
   worstChildCarryGate: 8,
   judgedGate: 0.75,
+  /** And how much judged game there must BE, in child-seconds: a measure that
+   *  judged nothing reports a share of 0, which reads exactly like a clean one. */
+  minJudgedSeconds: 20,
   /**
    * THE ONLY FLOOR AMONG ALL THESE CEILINGS: metres the QUIETEST child must have
    * walked per minute OF PLAY. Every other bar here is an upper bound, and a
@@ -563,6 +566,22 @@ export function traceLiveness(tracks) {
     quietestWalkedPerPlayedMinute,
     quietestChild,
   }
+}
+
+/**
+ * DID THIS MEASURE ACTUALLY JUDGE THE TRACE? A share of 0 is what a measure
+ * reports when nothing was bad AND when nothing was looked at, and the two must
+ * never be confused. The case is not hypothetical: at a sample every 0.6 s the
+ * one-second windows are still judgeable while EVERY half-second window is
+ * refused as a gap, so the burst half of the verdict passed on nothing at all
+ * (the seventh cross-vendor review). Both consumers ask this of BOTH measures.
+ *
+ * @param {ReturnType<typeof shuffleWindows>} r
+ * @param {Partial<typeof CHILD_MOTION>} [cfg]
+ */
+export function judgedEnough(r, cfg = {}) {
+  const { judgedGate, minJudgedSeconds } = { ...CHILD_MOTION, ...cfg }
+  return r.seconds > minJudgedSeconds && r.leastJudged > judgedGate
 }
 
 /**

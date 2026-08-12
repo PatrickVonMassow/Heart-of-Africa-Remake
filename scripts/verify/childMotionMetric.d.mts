@@ -141,6 +141,7 @@ export declare const CHILD_MOTION: {
   worstChildRescueGate: number
   worstChildCarryGate: number
   judgedGate: number
+  minJudgedSeconds: number
   walkFloor: number
   playedGate: number
   ratio: number
@@ -161,6 +162,11 @@ export declare function shuffleWindows(
 export declare function traceLiveness(
   tracks: ReadonlyArray<ReadonlyArray<{ clock: number; walked: number; playing?: boolean }>>,
 ): TraceLiveness
+
+export declare function judgedEnough(
+  r: ShuffleWindows,
+  cfg?: Partial<typeof CHILD_MOTION>,
+): boolean
 
 export declare function holdsAGame(
   live: TraceLiveness,

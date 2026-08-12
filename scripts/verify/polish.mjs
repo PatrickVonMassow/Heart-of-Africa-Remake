@@ -14,7 +14,14 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
-import { CHILD_MOTION, holdsAGame, rescueRate, shuffleWindows, traceLiveness } from './childMotionMetric.mjs'
+import {
+  CHILD_MOTION,
+  holdsAGame,
+  judgedEnough,
+  rescueRate,
+  shuffleWindows,
+  traceLiveness,
+} from './childMotionMetric.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -3548,8 +3555,13 @@ if (section('children-motion')) {
       // WORST child rather than the group: one child snagging into a rescue
       // every three seconds while its three siblings play leaves every group
       // average clean, which is the whole of it divided by four.
-      shuffle.seconds > 20 &&
-        shuffle.leastJudged > CHILD_MOTION.judgedGate &&
+      // BOTH measures must have judged something, and both must be clean. A
+      // share of 0 is what either reports when nothing was bad AND when nothing
+      // was looked at: at a live frame gap of 0.6 s the one-second windows still
+      // stand while every half-second one is refused, so the burst half would
+      // pass on nothing at all.
+      judgedEnough(shuffle) &&
+        judgedEnough(burst) &&
         shuffle.worstShare < CHILD_MOTION.shareGate &&
         burst.worstShare < CHILD_MOTION.shareGate,
       `worst child ${shuffle.worstShareChild} at ${(shuffle.worstShare * 100).toFixed(2)} % of its own ` +
@@ -3558,7 +3570,9 @@ if (section('children-motion')) {
         `Least judgeable child ${shuffle.leastJudgedChild} at ${(shuffle.leastJudged * 100).toFixed(1)} %, ` +
         `group ${(shuffle.judgedShare * 100).toFixed(1)} % of ${shuffle.covered.toFixed(1)} traced. ` +
         `In ${CHILD_MOTION.short.span}s bursts: worst child ${burst.worstShareChild} at ` +
-        `${(burst.worstShare * 100).toFixed(2)} %, group ${(burst.share * 100).toFixed(2)} %. ` +
+        `${(burst.worstShare * 100).toFixed(2)} %, group ${(burst.share * 100).toFixed(2)} % of ` +
+        `${burst.seconds.toFixed(1)} judged child-seconds, least judgeable child ` +
+        `${burst.leastJudgedChild} at ${(burst.leastJudged * 100).toFixed(1)} %. ` +
         `Bad = over ${CHILD_MOTION.minPath} m walked inside ${CHILD_MOTION.circle} m ` +
         `(burst: over ${CHILD_MOTION.short.minPath} m walked for a ${CHILD_MOTION.short.ratio}th of it covered)` +
         (shuffle.worst.child >= 0

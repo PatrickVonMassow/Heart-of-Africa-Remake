@@ -7,6 +7,7 @@ import {
   CHILD_MOTION,
   groundPath,
   holdsAGame,
+  judgedEnough,
   rescueRate,
   shuffleWindows,
   traceLiveness,
@@ -378,6 +379,34 @@ describe('the gate reads the WORST child, not the average one', () => {
   })
 })
 
+/** SOL'S INTERMITTENT SNAG: six tenths of a second pacing on the spot, half a
+ *  second standing, over and over — the user's own "die Kinder hängen KURZ
+ *  fest", and the shape the one-second window cannot see. */
+function burstTrace(step) {
+  const t = []
+  let walked = 0
+  let x = 0
+  for (let i = 0; i < 3600; i++) {
+    if (i % 66 < 36) {
+      const d = Math.floor(i / 6) % 2 === 0 ? step : -step
+      x += d
+      walked += Math.abs(d)
+    }
+    t.push({
+      clock: i * DT,
+      x,
+      z: 0,
+      walked,
+      walkedWhilePlaying: walked,
+      playedClock: i * DT,
+      carried: 0,
+      nudges: 0,
+      playing: true,
+    })
+  }
+  return t
+}
+
 describe('a trace has to hold a game before it proves anything', () => {
   it('measures what was played and what was walked', () => {
     const walker = trace(3600, (i) => ({ x: i * DT * 1.5, z: 0 })).map((s) => ({ ...s, playing: true }))
@@ -430,31 +459,7 @@ describe('a trace has to hold a game before it proves anything', () => {
     // one-second window it lies in ever collects the metre of walking `minPath`
     // asks for, so the long measure sees nothing at all. The half-second measure
     // reads 18 % of the child's judged time.
-    const burst = (step) => {
-      const t = []
-      let walked = 0
-      let x = 0
-      for (let i = 0; i < 3600; i++) {
-        if (i % 66 < 36) {
-          const d = Math.floor(i / 6) % 2 === 0 ? step : -step
-          x += d
-          walked += Math.abs(d)
-        }
-        t.push({
-          clock: i * DT,
-          x,
-          z: 0,
-          walked,
-          walkedWhilePlaying: walked,
-          playedClock: i * DT,
-          carried: 0,
-          nudges: 0,
-          playing: true,
-        })
-      }
-      return t
-    }
-    const paced = burst(0.025) // a full walking pace
+    const paced = burstTrace(0.025) // a full walking pace
     const live = traceLiveness([paced, paced])
     expect(live.quietestWalkedPerPlayedMinute).toBeGreaterThan(CHILD_MOTION.walkFloor)
     expect(holdsAGame(live)).toBe(true) // the legs moved, and the round was on
@@ -462,7 +467,7 @@ describe('a trace has to hold a game before it proves anything', () => {
     const short = shuffleWindows([paced], CHILD_MOTION.short)
     expect(short.worstShare).toBeGreaterThan(CHILD_MOTION.shareGate * 20)
     // At the chase's own floor pace too, which is the slowest it can happen at.
-    expect(shuffleWindows([burst(0.0193)], CHILD_MOTION.short).worstShare).toBeGreaterThan(
+    expect(shuffleWindows([burstTrace(0.0193)], CHILD_MOTION.short).worstShare).toBeGreaterThan(
       CHILD_MOTION.shareGate * 20,
     )
     // AND ORDINARY WALKING IS NOT CAUGHT BY IT. A child walking its line, and
@@ -472,6 +477,30 @@ describe('a trace has to hold a game before it proves anything', () => {
     const turning = trace(3600, (i) => ({ x: (Math.floor(i / 30) % 2 === 0 ? 1 : -1) * 0.4, z: 0 }))
     expect(shuffleWindows([straight], CHILD_MOTION.short).worstShare).toBe(0)
     expect(shuffleWindows([turning], CHILD_MOTION.short).worstShare).toBe(0)
+  })
+
+  it('and a trace too coarse for the burst window is refused, not read as clean', () => {
+    // THE VACUUM THE BURST HALF LEFT (seventh cross-vendor review). At a sample
+    // every 0.6 s the one-second windows are still judgeable, but every
+    // half-second window ends inside a gap longer than itself and is refused —
+    // so the burst measure judged NOTHING and reported a share of 0, which reads
+    // exactly like a clean bill. The trace below is the intermittent snag, so
+    // "clean" would be a lie about a settlement that really is shuffling.
+    const paced = burstTrace(0.025)
+    const coarse = [paced.filter((_, i) => i % 36 === 0)] // 0.6 s apart
+    const short = shuffleWindows(coarse, CHILD_MOTION.short)
+    expect(short.seconds).toBe(0)
+    expect(short.share).toBe(0) // and this is why a share alone proves nothing
+    expect(short.leastJudged).toBe(0)
+    expect(judgedEnough(short)).toBe(false)
+    // The one-second measure DOES still judge that trace, which is what made the
+    // hole invisible: half the verdict looked fine because the other half was.
+    expect(judgedEnough(shuffleWindows(coarse))).toBe(true)
+    // Sampled finely, the same trace is judged by both and the burst one bites.
+    expect(judgedEnough(shuffleWindows([paced], CHILD_MOTION.short))).toBe(true)
+    expect(shuffleWindows([paced], CHILD_MOTION.short).worstShare).toBeGreaterThan(
+      CHILD_MOTION.shareGate,
+    )
   })
 
   it('is a STATUE detector — the walking defect is caught by the share', () => {
