@@ -1015,6 +1015,15 @@ function advanceTagGame(
         }
       }
     }
+    // What was SAID overrides where the chase would go — for a runner only, and
+    // only for the moment the action lasts (point 481). THE FLOOR IS THE CHASE'S
+    // OWN, not a claim's: it forbids a child the chase is steering from standing
+    // still mid-game, but a child that was TOLD to stand — the refusal, the held
+    // spot, an errand target reached — is obeying, and the stillness is the
+    // reading. Forcing the floor on it walked a standing child forward at 1.16
+    // m/s into whatever was in front of it, where the blocked-step fallback then
+    // turned it a quarter every frame: the child spun on the spot instead of
+    // standing (measured at the user's seed, 3930 of 3931 commanded-still frames).
     const claim = isChaser ? null : (steer?.(i, s) ?? null)
     if (claim) desired = claim.heading
     c.sprinting = wants
