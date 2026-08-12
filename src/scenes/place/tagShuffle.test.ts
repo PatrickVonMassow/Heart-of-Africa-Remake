@@ -1,33 +1,57 @@
 // THE CHILDREN DO NOT SHUFFLE ON THE SPOT (work-order 648, the user's "Kind
-// zittert auf der Stelle herum").
+// zittert auf der Stelle herum"; the gate itself repaired under 656).
 //
 // The pure modules are pinned one by one beside this file; what this one pins is
 // the WHOLE of what the player watches, in the settlements he watches it in: the
 // shipped layout, its play ground, the chase, what the children say to one
-// another and the body separation, stepped exactly as `PlaceLife` steps them.
-// Every one of the three causes behind the report only showed as an interaction
-// — a chase heading against a hut, a role running round a knot, a body pushed
-// into a slot — so a test of any one module alone would have caught none of it.
+// another and the body separation, stepped exactly as `PlaceLife` steps them —
+// and against the WHOLE settlement's bodies, not the children's alone. Every one
+// of the three causes behind the report only showed as an interaction — a chase
+// heading against a hut, a role running round a knot, a body pushed into a slot
+// — so a test of any one module alone would have caught none of it.
 //
-// THE MEASURE IS THE COMPLAINT ITSELF, not a proxy: over a window of two
-// seconds, does a child WALK a real distance without LEAVING a small circle?
-// A chase is full of legitimate turns — a runner doubling back at the rim, a
-// chaser cutting a corner — so counting direction changes measures the game, not
-// the bug (measured: the bare reversal rate also depends on the frame rate, 1.4 %
-// at 60 fps against 3.2 % at 14, which is why it could never gate anything). Ground
-// covered against ground walked is frame-rate free and says what the user said.
+// THE MEASURE IS THE COMPLAINT ITSELF, not a proxy: does a child WALK a real
+// distance without LEAVING a small circle? A chase is full of legitimate turns —
+// a runner doubling back at the rim, a chaser cutting a corner — so counting
+// direction changes measures the game, not the bug (measured: the bare reversal
+// rate also depends on the frame rate, 1.4 % at 60 fps against 3.2 % at 14,
+// which is why it could never gate anything). Ground covered against ground
+// walked is frame-rate free and says what the user said.
 //
-// MEASURED at the settlement/seed pairs below, 120 s each: 11383 bad windows of
-// 567360 before the fix, worst village 33.5 %, against 40 after, worst 0.06 %.
-// The gate is one in a hundred — two hundred times what the fix leaves and a
-// fiftieth of what the defect produced.
+// THE MEASURE LIVES IN ONE PLACE (point 656): `scripts/verify/childMotionMetric.mjs`,
+// which the LIVE browser check judges by too. Both used to carry their own copy,
+// and both copies summed frame-to-frame POSITIONS as the path walked — so the
+// rescue teleport that ENDS a snag was counted as the child walking out of its
+// own pocket, and the window was longer than the rescue that tidied the symptom
+// away. The metric now takes the walked distance from the game itself, freezes
+// the ground path across a rescue, and gates the rescues on their own account.
 import { describe, expect, it } from 'vitest'
+import {
+  CHILD_MOTION,
+  rescueRate,
+  shuffleWindows,
+  type ChildMotionSample,
+} from '../../../scripts/verify/childMotionMetric.mjs'
 import { balance } from '../../config/balance'
 import { mulberry32 } from '../../world/noise'
-import { nudgeWhere, spawnPointFree, standingClear, WALKER_RADIUS } from './collision'
+import {
+  nudgeToFree,
+  nudgeWhere,
+  resolveMove,
+  spawnPointFree,
+  standingClear,
+  WALKER_RADIUS,
+} from './collision'
 import { childSteer, createChildSpeech, stepChildSpeech, type SituationView } from './childSituations'
-import { claimBodies, createInhabitantSet, separateGroup } from './inhabitantBodies'
-import { buildLayout, builtFabric } from './layout'
+import {
+  claimBodies,
+  separateBody,
+  separateGroup,
+  createInhabitantSet,
+  type InhabitantBody,
+  type InhabitantSet,
+} from './inhabitantBodies'
+import { buildLayout, builtFabric, type PlaceLayout } from './layout'
 import { childPlayGround, villageAdultStations } from './lifeSpots'
 import { createTagGame, stepTagGame, type TagWorld } from './tagGame'
 
@@ -36,8 +60,178 @@ const KID_SCALE = 0.55
 const NPC_RADIUS = WALKER_RADIUS
 const FIRE: [number, number] = [-3.5, 2.5]
 
-/** A settlement's children exactly as the scene mounts them. */
-function village(placeId: string, seed: number, count = balance.villageLife.tag.childCount) {
+/**
+ * THE REST OF THE SETTLEMENT (point 656.4). The separation was only ever
+ * exercised against the children, and the children are the smallest bodies in
+ * the village: the adults at their stations never give way, the porters cross
+ * the open ground at a walk and the errand villagers stroll clear across the
+ * settlement. That crowd is what made more than one separation sweep necessary
+ * in the first place, and all of it shares ONE registry with the children — so a
+ * replay that claims only the children proves nothing about the frame the player
+ * actually watches.
+ *
+ * The steppers are the scene's own, kept to what MOVES a body: the vignette
+ * adults stand fixed at the stations `childPlayGround` keeps the play ground
+ * clear of, the porters ping-pong along their routes as `Porters` walks them,
+ * and the errand villagers walk to the layout's own errand points and pause
+ * there as `ErrandVillagers` does. Nothing here draws or speaks — only bodies.
+ */
+interface Crowd {
+  standing: InhabitantBody[]
+  porters: InhabitantBody[]
+  walkers: InhabitantBody[]
+  step: (dt: number, clock: number) => void
+}
+
+function crowd(
+  set: InhabitantSet,
+  layout: PlaceLayout,
+  seed: number,
+  /** Where the errand villagers stroll, when the case wants them somewhere
+   *  particular — the children's own ground, for one. */
+  focus?: { x: number; z: number; radius: number },
+): Crowd {
+  const colliders = layout.colliders
+  const rim = Math.max(1, layout.radius - NPC_RADIUS * 2)
+  const world = {
+    blocked: (x: number, z: number) =>
+      Math.hypot(x, z) > rim || !standingClear(colliders, x, z, NPC_RADIUS),
+    nudge: (x: number, z: number) => {
+      const free = nudgeToFree(colliders, x, z, NPC_RADIUS)
+      return { x: free[0], z: free[1], found: true }
+    },
+  }
+  const sep = balance.villageLife.separation
+
+  // The vignette adults: they push the passers-by aside and never give way.
+  const stations = villageAdultStations(FIRE)
+  const standing = claimBodies(set, stations.length, { fixed: true })
+  stations.forEach(([x, z], i) => {
+    standing[i].x = x
+    standing[i].z = z
+  })
+
+  // The porters, on the routes `Porters` builds from the settlement's buildings.
+  const rand = mulberry32((seed + 4711) >>> 0)
+  const stops = layout.interactives.filter((it) => it.type !== 'villager').map((it) => it.pos)
+  const routes = Array.from({ length: Math.min(3, Math.max(1, stops.length)) }, (_, i) => {
+    const a = stops[i % stops.length]
+    const px = (rand() - 0.5) * 7
+    const pz = (rand() - 0.5) * 7
+    const toCenter = Math.hypot(a[0], a[1]) || 1
+    return {
+      ax: a[0] * (1 - 3.2 / toCenter),
+      az: a[1] * (1 - 3.2 / toCenter),
+      bx: px,
+      bz: pz,
+      phase: rand() * Math.PI * 2,
+      speed: 0.55 + rand() * 0.2,
+    }
+  })
+  const porters = claimBodies(set, routes.length)
+  routes.forEach((r, i) => {
+    porters[i].x = r.ax
+    porters[i].z = r.az
+  })
+
+  // The errand villagers, spawned on the ring `ErrandVillagers` spawns them on
+  // and strolling as it strolls: to one of the settlement's own named places, or
+  // — every other stroll — to a free point anywhere in it, which is what takes
+  // an ADULT BODY straight across the children's ground.
+  const errandCount = balance.villageLife.adultErrands.villagerCount
+  const named: Array<[number, number]> = [
+    ...layout.errands,
+    ...layout.digSites.map((d): [number, number] => [d.x, d.z]),
+    ...(layout.teachingStone ? [[layout.teachingStone.x, layout.teachingStone.z] as [number, number]] : []),
+  ]
+  const walkers = claimBodies(set, errandCount)
+  const stroll = (): [number, number] => {
+    if (focus) {
+      const a = rand() * Math.PI * 2
+      const d = rand() * focus.radius
+      return nudgeToFree(colliders, focus.x + Math.cos(a) * d, focus.z + Math.sin(a) * d, NPC_RADIUS)
+    }
+    if (rand() < 0.55 && named.length > 0) return named[Math.floor(rand() * named.length) % named.length]
+    const a = rand() * Math.PI * 2
+    const d = 4 + rand() * Math.max(1, rim - 6)
+    return nudgeToFree(colliders, Math.cos(a) * d, Math.sin(a) * d, NPC_RADIUS)
+  }
+  const errands = Array.from({ length: errandCount }, (_, i) => {
+    const a = (i / Math.max(1, errandCount)) * Math.PI * 2
+    const [x, z] = nudgeToFree(colliders, Math.cos(a) * 7, Math.sin(a) * 7, NPC_RADIUS)
+    walkers[i].x = x
+    walkers[i].z = z
+    return { to: stroll(), pause: 1 + i * 0.7, stuck: 0 }
+  })
+
+  return {
+    standing,
+    porters,
+    walkers,
+    step(dt: number, clock: number) {
+      routes.forEach((r, i) => {
+        const b = porters[i]
+        const u = (Math.sin(clock * r.speed + r.phase) + 1) / 2
+        const [x, z] = resolveMove(
+          colliders,
+          r.ax + (r.bx - r.ax) * u,
+          r.az + (r.bz - r.az) * u,
+          NPC_RADIUS,
+          [b.x, b.z],
+        )
+        b.x = x
+        b.z = z
+        separateBody(set, b, dt, sep, world)
+      })
+      errands.forEach((e, i) => {
+        const b = walkers[i]
+        if (e.pause > 0) {
+          e.pause -= dt
+          return
+        }
+        const d = Math.hypot(e.to[0] - b.x, e.to[1] - b.z)
+        if (d <= 0.9) {
+          e.to = stroll()
+          e.pause = 3
+          return
+        }
+        const pace = balance.villageLife.adultErrands.pace
+        const [x, z] = resolveMove(
+          colliders,
+          b.x + ((e.to[0] - b.x) / d) * pace * dt,
+          b.z + ((e.to[1] - b.z) / d) * pace * dt,
+          NPC_RADIUS,
+          [b.x, b.z],
+        )
+        // Pressed against a fence on the way: it gives that stroll up and picks
+        // another, the way the real one replans rather than leaning there.
+        e.stuck = Math.hypot(x - b.x, z - b.z) < pace * dt * 0.25 ? e.stuck + dt : 0
+        if (e.stuck > 1.5) {
+          e.to = stroll()
+          e.stuck = 0
+        }
+        b.x = x
+        b.z = z
+      })
+      separateGroup(set, walkers, dt, sep, world)
+    },
+  }
+}
+
+/** A settlement's children exactly as the scene mounts them, in the body set the
+ *  settlement really has. */
+function village(
+  placeId: string,
+  seed: number,
+  count = balance.villageLife.tag.childCount,
+  options: {
+    /** Send the errand villagers into the children's own ground. */
+    adultsAmongTheChildren?: boolean
+    /** A hostile pen round one child — see the wedge case at the foot of this
+     *  file. `blocked` refuses everything between `r` and `r + 1.5` of it. */
+    pen?: { r: number; carry: number }
+  } = {},
+) {
   const layout = buildLayout(placeId, seed)
   const colliders = layout.colliders
   let hash = 0
@@ -51,7 +245,16 @@ function village(placeId: string, seed: number, count = balance.villageLife.tag.
     { free: (x, z) => standingClear(colliders, x, z, NPC_RADIUS), fabric: builtFabric(layout) },
   )
   const rim = Math.max(1, layout.radius - NPC_RADIUS * 2)
+  // THE PEN, when the case asks for one: a wall thrown up round one child, with
+  // just enough room inside to keep walking and not enough to get anywhere.
+  const pen = { x: 0, z: 0, on: false }
+  const penned = (x: number, z: number) => {
+    if (!options.pen || !pen.on) return false
+    const d = Math.hypot(x - pen.x, z - pen.z)
+    return d > options.pen.r && d < options.pen.r + 1.5
+  }
   const blocked = (x: number, z: number) =>
+    penned(x, z) ||
     Math.hypot(x, z) > rim ||
     Math.hypot(x - ground.x, z - ground.z) > ground.radius ||
     !standingClear(colliders, x, z, NPC_RADIUS)
@@ -62,6 +265,18 @@ function village(placeId: string, seed: number, count = balance.villageLife.tag.
     childRadius: NPC_RADIUS,
     blocked,
     nudge: (x, z) => {
+      // A penned child is CARRIED clear of its wall — the settlement freeing it,
+      // and the very position jump that made the symptom invisible.
+      if (options.pen && pen.on && Math.hypot(x - pen.x, z - pen.z) <= options.pen.r) {
+        const out = nudgeWhere(
+          x,
+          z,
+          (ax, az) => !blocked(ax, az) && Math.hypot(ax - pen.x, az - pen.z) > options.pen!.carry,
+          0.6,
+          20,
+        )
+        if (out.found) return { x: out.pos[0], z: out.pos[1], found: true }
+      }
       const roomy = nudgeWhere(x, z, (ax, az) => !blocked(ax, az) && spawnPointFree(colliders, ax, az, NPC_RADIUS))
       const r = roomy.found ? roomy : nudgeWhere(x, z, (ax, az) => !blocked(ax, az))
       return { x: r.pos[0], z: r.pos[1], found: r.found }
@@ -78,6 +293,16 @@ function village(placeId: string, seed: number, count = balance.villageLife.tag.
   const speechRand = mulberry32((localSeed + 7717) >>> 0)
   const set = createInhabitantSet()
   const bodies = claimBodies(set, count, { scale: KID_SCALE })
+  bodies.forEach((b, i) => {
+    b.x = spots[i].x
+    b.z = spots[i].z
+  })
+  const others = crowd(
+    set,
+    layout,
+    localSeed,
+    options.adultsAmongTheChildren ? { x: ground.x, z: ground.z, radius: ground.radius } : undefined,
+  )
   const view: SituationView = {
     playing: false,
     chaser: -1,
@@ -85,13 +310,18 @@ function village(placeId: string, seed: number, count = balance.villageLife.tag.
     immune: -1,
     children: game.children,
     ground: { x: ground.x, z: ground.z, radius: ground.radius },
+    // What THERE points at, exactly as `PlaceLife` sets it: the settlement's own
+    // middle, well outside the play ground. It was missing here, so the one
+    // situation that reads it could never have been replayed.
+    farMark: { x: 0, z: 0 },
   }
-  return { game, speech, speechRand, world, set, bodies, view }
+  return { game, speech, speechRand, world, set, bodies, view, others, layout, ground, pen }
 }
 
 /** One frame of the settlement, in `PlaceLife`'s own order: what was said steers
  *  the chase, the chase moves the children, the bodies are all written and then
- *  separated as one group. */
+ *  separated as one group — and the rest of the settlement moves through the
+ *  same registry after them, as the vignettes mounted below the children do. */
 function frame(v: ReturnType<typeof village>, dt: number): void {
   const cfg = balance.villageLife.childSpeech
   v.view.playing = v.game.playing
@@ -108,16 +338,28 @@ function frame(v: ReturnType<typeof village>, dt: number): void {
     v.game.children[i].x = v.bodies[i].x
     v.game.children[i].z = v.bodies[i].z
   }
+  v.others.step(dt, v.game.clock)
   stepChildSpeech(v.speech, v.view, dt, cfg, v.speechRand)
 }
 
-interface Track {
-  x: number
-  z: number
-  walked: number
+interface Track extends ChildMotionSample {
   pace: number
   held: boolean
-  clock: number
+}
+
+/** One sample of every child, in the shape the shared metric judges. */
+function sample(v: ReturnType<typeof village>, paths: Track[][]): void {
+  v.game.children.forEach((c, i) => {
+    paths[i].push({
+      clock: v.game.clock,
+      x: c.x,
+      z: c.z,
+      walked: c.walked,
+      nudges: c.nudges,
+      pace: c.pace,
+      held: c.held,
+    })
+  })
 }
 
 /** Every child's path through `seconds` of the game, sampled every frame. */
@@ -126,40 +368,9 @@ function play(placeId: string, seed: number, seconds: number, dt = 1 / 60): Trac
   const paths: Track[][] = v.game.children.map(() => [])
   for (let t = 0; t < seconds; t += dt) {
     frame(v, dt)
-    v.game.children.forEach((c, i) => {
-      paths[i].push({ x: c.x, z: c.z, walked: c.walked, pace: c.pace, held: c.held, clock: v.game.clock })
-    })
+    sample(v, paths)
   }
   return paths
-}
-
-/** The share of two-second windows in which a child walks more than `minPath`
- *  without ever leaving a circle of `radius` — walking, and getting nowhere. */
-function shuffleShare(paths: Track[][], span = 2, minPath = 2, radius = 0.5) {
-  let windows = 0
-  let bad = 0
-  let worst = { path: 0, radius: 0 }
-  for (const path of paths) {
-    for (let i = 0; i < path.length; i++) {
-      let j = i
-      let walked = 0
-      let out = 0
-      while (j < path.length - 1 && path[j + 1].clock - path[i].clock < span) {
-        walked += Math.hypot(path[j + 1].x - path[j].x, path[j + 1].z - path[j].z)
-        j++
-        out = Math.max(out, Math.hypot(path[j].x - path[i].x, path[j].z - path[i].z))
-      }
-      if (path[j].clock - path[i].clock < span * 0.9) break
-      windows++
-      if (walked > minPath && out < radius) {
-        bad++
-        if (walked / Math.max(0.01, out) > worst.path / Math.max(0.01, worst.radius)) {
-          worst = { path: walked, radius: out }
-        }
-      }
-    }
-  }
-  return { share: windows > 0 ? bad / windows : 0, bad, windows, worst }
 }
 
 // The reported village and seed first; the others are there because the causes
@@ -170,13 +381,19 @@ const PLACES: Array<[string, number]> = [
   ['swahili-village', 99],
 ]
 
-describe('the children never shuffle on the spot (point 648)', () => {
+describe('the children never shuffle on the spot (points 648/656)', () => {
   for (const [placeId, seed] of PLACES) {
     it(`${placeId} at seed ${seed} keeps every child covering ground`, () => {
       const paths = play(placeId, seed, 60)
-      const r = shuffleShare(paths)
+      const r = shuffleWindows(paths)
       expect(r.windows).toBeGreaterThan(5000) // a real stretch of the game
-      expect(r.share).toBeLessThan(0.01)
+      expect(r.share).toBeLessThan(CHILD_MOTION.shareGate)
+      // AND NOBODY IS BEING CARRIED (point 656): the rescue teleport is what
+      // ENDS a snag, so a village that keeps its share down only by picking its
+      // children up out of the pockets they walk into fails here instead.
+      const rescues = rescueRate(paths)
+      expect(rescues.carriedPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
+      expect(rescues.perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
     })
   }
 
@@ -191,23 +408,30 @@ describe('the children never shuffle on the spot (point 648)', () => {
       const dt = 0.05 + rand() * 0.05
       t += dt
       frame(v, dt)
-      v.game.children.forEach((c, i) => {
-        paths[i].push({ x: c.x, z: c.z, walked: c.walked, pace: c.pace, held: c.held, clock: v.game.clock })
-      })
+      sample(v, paths)
     }
-    expect(shuffleShare(paths).share).toBeLessThan(0.01)
+    expect(shuffleWindows(paths).share).toBeLessThan(CHILD_MOTION.shareGate)
+    expect(rescueRate(paths).carriedPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
+    expect(rescueRate(paths).perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
   })
 
-  it('and none of them is ever held motionless or left inside another', () => {
+  it('and none of them is ever held motionless or left inside ANY inhabitant', () => {
     // The other two symptoms of the same report, on the same run: a child
-    // commanded to move that covers no ground, and two bodies in one place.
+    // commanded to move that covers no ground, and two bodies in one place —
+    // and the second is judged against every body in the settlement's registry
+    // (point 656.4), not the children's alone. An adult is drawn at full scale,
+    // so a child owes it a wider berth than it owes another child.
     const v = village('bambara-village', 2972259115)
     const n = v.game.children.length
-    const contact = balance.villageLife.separation.bodyRadius * KID_SCALE * 2 - balance.villageLife.separation.slop
+    const sep = balance.villageLife.separation
+    const kidPair = sep.bodyRadius * KID_SCALE * 2 - sep.slop
+    const adultPair = sep.bodyRadius * KID_SCALE + sep.bodyRadius - sep.slop
+    const adults = [...v.others.standing, ...v.others.porters, ...v.others.walkers]
     let longestStall = 0
-    let stall = new Array<number>(n).fill(0)
+    const stall = new Array<number>(n).fill(0)
     let overlaps = 0
-    let last = v.game.children.map((c) => c.walked)
+    let nearestAdult = Infinity
+    const last = v.game.children.map((c) => c.walked)
     for (let t = 0; t < 60; t += 1 / 60) {
       frame(v, 1 / 60)
       v.game.children.forEach((c, i) => {
@@ -218,14 +442,180 @@ describe('the children never shuffle on the spot (point 648)', () => {
         last[i] = c.walked
       })
       for (let i = 0; i < n; i++) {
+        const a = v.game.children[i]
         for (let j = i + 1; j < n; j++) {
-          const a = v.game.children[i]
           const b = v.game.children[j]
-          if (Math.hypot(a.x - b.x, a.z - b.z) < contact - 1e-6) overlaps++
+          if (Math.hypot(a.x - b.x, a.z - b.z) < kidPair - 1e-6) overlaps++
+        }
+        for (const b of adults) {
+          const d = Math.hypot(a.x - b.x, a.z - b.z)
+          nearestAdult = Math.min(nearestAdult, d)
+          if (d < adultPair - 1e-6) overlaps++
         }
       }
     }
     expect(longestStall).toBeLessThan(0.25)
     expect(overlaps).toBe(0)
+    // AND THE REST OF THE SETTLEMENT WAS REALLY THERE. Measured: the nearest an
+    // adult comes to a child in this village is 0.64 m — the play ground is a
+    // corner of the settlement and the adults keep to their own work — so the
+    // bar here is the settlement's own scale, and the case below is what puts an
+    // adult body INSIDE the ground.
+    expect(adults.length).toBeGreaterThan(10)
+    expect(nearestAdult).toBeLessThan(3)
+  })
+
+  it('and holds when the adults walk through the children’s own ground', () => {
+    // THE CROWDING ITSELF (point 656.4). The shipped play ground is a corner of
+    // the settlement, so the adults' errands rarely reach it — and a separation
+    // judged only where nobody meets proves nothing about the frame the player
+    // watches. Here every errand villager strolls INSIDE the ground: adult
+    // bodies at full scale, crossing and standing among the children, which is
+    // the crowding that made the multi-pass sweep necessary.
+    const v = village('bambara-village', 2972259115, undefined, { adultsAmongTheChildren: true })
+    const paths: Track[][] = v.game.children.map(() => [])
+    const sep = balance.villageLife.separation
+    const adultPair = sep.bodyRadius * KID_SCALE + sep.bodyRadius - sep.slop
+    const adults = [...v.others.standing, ...v.others.porters, ...v.others.walkers]
+    let overlaps = 0
+    let touching = 0
+    let worstDepth = 0
+    for (let t = 0; t < 60; t += 1 / 60) {
+      frame(v, 1 / 60)
+      sample(v, paths)
+      for (const c of v.game.children) {
+        for (const b of adults) {
+          const d = Math.hypot(c.x - b.x, c.z - b.z)
+          if (d < adultPair - 1e-6) {
+            overlaps++
+            worstDepth = Math.max(worstDepth, adultPair - d)
+          }
+          if (d < adultPair + 0.2) touching++
+        }
+      }
+    }
+    expect(touching).toBeGreaterThan(100) // they really did meet, and often
+    // NOBODY IS EVER VISIBLY INSIDE ANYBODY. Measured over this minute: 6
+    // pair-frames of contact at all, the deepest 0.9 cm of a 37 cm contact —
+    // a walker that could not step out of a child because a fence was behind
+    // it, resolved the frame after. The bars are set an order of magnitude
+    // above that, so a real merge (the point-648 defect was 21 cm) fails here.
+    expect(worstDepth).toBeLessThan(0.02)
+    expect(overlaps).toBeLessThan(60)
+    // AND NOBODY IS CARRIED. The children still play their own game among them.
+    expect(rescueRate(paths).carriedPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
+    // OPEN (found by this case, 12.08.2026): the chase does NOT treat another
+    // inhabitant's body as something to walk round — `TagWorld.blocked` is the
+    // settlement's geometry only, and a child is kept out of an adult by the
+    // separation pass afterwards. So a child whose chase heading points through
+    // an adult standing in its ground walks against it until the pass has
+    // pushed it aside: measured 1.14 % of one-second windows here against
+    // 0.00–0.01 % where the adults keep to their own work. It is the reported
+    // symptom in miniature and belongs in its own point; this bar holds the
+    // measured state so a regression that doubles it fails.
+    expect(shuffleWindows(paths).share).toBeLessThan(0.02)
   })
 })
+
+/**
+ * The pen, measured. A yard of 0.8 m leaves the child room to keep WALKING —
+ * the deflection needs a couple of body radii of clear ground ahead before it
+ * will take a step at all — and no room to get anywhere, and the settlement
+ * carries it 3 m clear whenever its stall watch runs out. Measured over 40 s at
+ * these numbers: 22.5 rescues per child-minute, every one of them a carry, and
+ * 3.5 % of one-second windows walked without getting anywhere — fourteen times
+ * the gate. THE MEASURE THIS ONE REPLACED sees 0.35 % of the same trace and
+ * would have passed it at its own 1 % gate, because every one of its
+ * two-second windows holds a 3 m carry: it counted the teleport as the child
+ * walking, and as ground the child covered.
+ */
+const PEN_RADIUS = 0.8
+const PEN_CARRY = 3
+
+describe('and the gate SEES a child that is wedged (point 656)', () => {
+  /** The reported settlement with one child penned: a wall thrown up round it
+   *  with room to keep walking and none to get anywhere, and a settlement that
+   *  carries it clear of the wall when its stall watch runs out. The pen follows
+   *  the child, so the trace holds episode after episode rather than one. */
+  function wedged(seconds = 40, r = PEN_RADIUS, carry = PEN_CARRY) {
+    const v = village('bambara-village', 2972259115, undefined, { pen: { r, carry } })
+    const paths: Track[][] = v.game.children.map(() => [])
+    for (let t = 0; t < seconds; t += 1 / 60) {
+      frame(v, 1 / 60)
+      const c = v.game.children[0]
+      // Penned once the game is running, and re-penned wherever it is carried.
+      // Never over ANOTHER child, though: the wall is ground nobody may stand
+      // on, and building it round a passer-by would leave that child inside a
+      // collider — a broken settlement rather than a wedged child.
+      const clear = v.game.children.every(
+        (o, i) => i === 0 || Math.hypot(o.x - c.x, o.z - c.z) > r + 1.6,
+      )
+      if (clear && v.game.clock > 3 && (!v.pen.on || Math.hypot(c.x - v.pen.x, c.z - v.pen.z) > r)) {
+        v.pen.x = c.x
+        v.pen.z = c.z
+        v.pen.on = true
+      }
+      sample(v, paths)
+    }
+    return paths
+  }
+
+  it('goes RED on it — and the measure it replaced would have passed', () => {
+    const paths = wedged()
+    const penned = [paths[0]]
+    const r = shuffleWindows(penned)
+    const rescues = rescueRate(penned)
+
+    // The gate bites: the penned child walks and gets nowhere, over and over,
+    // and is carried out of its yard some thirty times a minute.
+    expect(r.share).toBeGreaterThan(CHILD_MOTION.shareGate * 4)
+    expect(rescues.perChildMinute).toBeGreaterThan(CHILD_MOTION.rescueGate * 2)
+    expect(rescues.carriedPerChildMinute).toBeGreaterThan(CHILD_MOTION.carryGate * 4)
+
+    // AND THE OLD MEASURE WOULD HAVE PASSED THE SAME TRACE. A window of two
+    // seconds, the path summed from frame-to-frame POSITIONS and the ground
+    // covered read off the raw ones — so the carry out of the pen counted both
+    // as walking and as ground covered, and the episode it ended was over
+    // before the window could close on it. This is the blindness the point was
+    // opened for, and it is measured here rather than argued.
+    const asItWas = oldMeasure(penned, 2, 2, 0.5)
+    expect(asItWas.windows).toBeGreaterThan(1000) // it really did look
+    expect(asItWas.share).toBeLessThan(0.01) // and it would have passed its gate
+    expect(r.share).toBeGreaterThan(asItWas.share * 5)
+  })
+
+  it('and it is the PENNED child the report names', () => {
+    // A gate that went red for the whole village whenever anything at all
+    // happened would name nothing. The worst window belongs to the penned child,
+    // and the rescues are its own.
+    const paths = wedged()
+    const all = shuffleWindows(paths)
+    expect(all.worst.child).toBe(0)
+    const rescues = rescueRate(paths)
+    expect(rescues.worstChild).toBe(0)
+  })
+})
+
+/** The measure as point 648 left it, kept for exactly one purpose: to show on a
+ *  real trace what it could not see. Summed position deltas as the path walked,
+ *  raw positions as the ground covered, a two-second window. */
+function oldMeasure(paths: Track[][], span: number, minPath: number, circle: number) {
+  let windows = 0
+  let bad = 0
+  for (const path of paths) {
+    for (let i = 0; i < path.length; i++) {
+      let j = i
+      let walked = 0
+      let out = 0
+      while (j < path.length - 1 && path[j + 1].clock - path[i].clock < span) {
+        walked += Math.hypot(path[j + 1].x - path[j].x, path[j + 1].z - path[j].z)
+        j++
+        out = Math.max(out, Math.hypot(path[j].x - path[i].x, path[j].z - path[i].z))
+      }
+      if (path[j].clock - path[i].clock < span * 0.9) break
+      windows++
+      if (walked > minPath && out < circle) bad++
+    }
+  }
+  return { windows, bad, share: windows > 0 ? bad / windows : 0 }
+}

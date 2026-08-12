@@ -37,32 +37,54 @@
 // window before it, so a nudge is a FINDING and never an escape.
 
 /**
- * The calibration, and the measurements behind it (60 s per settlement, the
- * three shipped villages of the replay test at 60 fps, plus the live Bambara
- * village at the reported seed 2972259115):
+ * The calibration, and the measurements behind every number of it. Measured over
+ * 60 s of each of the three shipped villages the replay test steps
+ * (bambara/2972259115, maasai/42, swahili/99, 14184 windows each), against 40 s
+ * of the same Bambara village with one child deliberately penned:
  *
- *  - `span` 1 s: shorter than the 1.5 s rescue window, so an episode the player
- *    sees lies INSIDE a window rather than being ended before one can close.
+ *  - `span` 1 s: SHORTER THAN THE RESCUE (`unstuckSeconds`, 1.5 s), which is the
+ *    whole repair. The user's report was "hängt KURZ fest" and the teleport ends
+ *    the episode at 1.5 s, so a two-second window closed after the only thing it
+ *    was looking for had been tidied away.
  *  - `minPath` 1 m: the chase's floor pace is 1.156 m/s (sprint 3.4 × floor
- *    0.34), so a child that is playing at all walks past this bar in every
- *    window — the bar exists to exclude the idle break between rounds, not to
- *    decide anything.
- *  - `circle` 0.5 m: the user's own circle, unchanged from point 648. Getting
- *    less than half a metre from where you started while walking a metre and a
- *    half is the complaint itself.
- *  - `shareGate` 1 %: measured on the shipped villages, 0 bad windows of 42876
- *    (0.00 %) at this span; the deliberately wedged replay produces 4.6 %.
- *  - `rescueGate` 0.5 rescues per child-minute: measured on the shipped
- *    villages, 0.00–0.17 per child-minute (worst: swahili-village at seed 99,
- *    2 rescues in 4 child-minutes); the deliberately wedged replay produces 9.5.
- *    The bar sits between the two, nearer the shipped state.
+ *    0.34), so a child that is playing at all walks past this bar inside one
+ *    second. The bar excludes the idle break between rounds; it decides nothing
+ *    else.
+ *  - `circle` 0.35 m: the discriminating number, and it is NOT the 0.5 m of the
+ *    two-second window. A shorter window sees more of the chase's legitimate
+ *    turns — a runner cornered at the rim, a chaser cutting in — so the ratio
+ *    has to be tighter to say the same thing. Measured share of bad windows on
+ *    the three shipped villages, at span 1 s:
+ *        circle 0.50 → 0.416 % / 1.128 % / 1.036 %   (legitimate turns)
+ *        circle 0.40 → 0.056 % / 0.092 % / 0.071 %
+ *        circle 0.35 → 0.000 % / 0.007 % / 0.000 %   ← chosen
+ *        circle 0.30 → 0.000 % / 0.000 % / 0.000 %
+ *    while the penned child sits at 7.8 % — three orders of magnitude clear.
+ *  - `shareGate` 0.25 %: between the worst shipped village (0.007 %, a factor of
+ *    36 below the bar) and the pen (7.8 %, a factor of 31 above it).
+ *  - `carryGate` 0.5 carries per child-minute: a rescue that actually SET THE
+ *    CHILD DOWN somewhere else (`carryDistance` below). Measured on the shipped
+ *    villages, 0.00–0.25 per child-minute (one carry in twelve child-minutes);
+ *    the penned child is carried some 30 times a minute.
+ *  - `rescueGate` 6 rescues per child-minute, counting every rescue whether it
+ *    moved the child or not. Measured on the shipped villages: 1.75–3.75 per
+ *    child-minute, and NONE of them carries the child anywhere — they are the
+ *    progress watch firing on a child that walked a curve at the floor pace and
+ *    happened not to reach 0.9 m from where it started (its threshold), which is
+ *    ordinary play. That is why the carry above is the tight gate and this one
+ *    is the loose backstop; the penned child trips it at 35.
  */
 export const CHILD_MOTION = {
   span: 1,
   minPath: 1,
-  circle: 0.5,
-  shareGate: 0.01,
-  rescueGate: 0.5,
+  circle: 0.35,
+  shareGate: 0.0025,
+  carryGate: 0.5,
+  rescueGate: 6,
+  /** How far a rescue must set the child down for it to count as a CARRY: one
+   *  child's own footprint (0.3 m). Below it the settlement handed the child
+   *  back the ground it was already standing on. */
+  carryDistance: 0.3,
 }
 
 /**
@@ -140,18 +162,32 @@ export function shuffleWindows(tracks, cfg = {}) {
  * clock — the game's own clock, never a count of frames, which buy different
  * amounts of game on a fast machine and a loaded one.
  *
- * @param {ReadonlyArray<ReadonlyArray<{clock:number,nudges?:number}>>} tracks
- * @returns {{rescues:number,childMinutes:number,perChildMinute:number,worstChild:number,worstRescues:number}}
+ * TWO RATES, because the rescues are two different events. A CARRY set the child
+ * down somewhere else, and only a child that was really shut in needs one. The
+ * rest are the progress watch firing on a child that walked its curve without
+ * reaching the 0.9 m it wants — the settlement hands it back the ground it was
+ * already standing on, and the player sees nothing at all. Gate them apart, or
+ * the loose one hides the tight one.
+ *
+ * @param {ReadonlyArray<ReadonlyArray<{clock:number,x:number,z:number,nudges?:number}>>} tracks
+ * @param {Partial<typeof CHILD_MOTION>} [cfg]
  */
-export function rescueRate(tracks) {
+export function rescueRate(tracks, cfg = {}) {
+  const { carryDistance } = { ...CHILD_MOTION, ...cfg }
   let rescues = 0
+  let carries = 0
   let seconds = 0
   let worstChild = -1
   let worstRescues = 0
   for (let k = 0; k < tracks.length; k++) {
     const track = tracks[k]
     if (track.length < 2) continue
-    const mine = (track[track.length - 1].nudges ?? 0) - (track[0].nudges ?? 0)
+    let mine = 0
+    for (let i = 1; i < track.length; i++) {
+      if ((track[i].nudges ?? 0) <= (track[i - 1].nudges ?? 0)) continue
+      mine += (track[i].nudges ?? 0) - (track[i - 1].nudges ?? 0)
+      if (Math.hypot(track[i].x - track[i - 1].x, track[i].z - track[i - 1].z) > carryDistance) carries++
+    }
     rescues += mine
     seconds += track[track.length - 1].clock - track[0].clock
     if (mine > worstRescues) {
@@ -162,8 +198,10 @@ export function rescueRate(tracks) {
   const childMinutes = seconds / 60
   return {
     rescues,
+    carries,
     childMinutes,
     perChildMinute: childMinutes > 0 ? rescues / childMinutes : 0,
+    carriedPerChildMinute: childMinutes > 0 ? carries / childMinutes : 0,
     worstChild,
     worstRescues,
   }

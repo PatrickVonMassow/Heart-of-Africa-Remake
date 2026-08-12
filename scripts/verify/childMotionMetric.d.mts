@@ -22,8 +22,11 @@ export interface ShuffleWindows {
 
 export interface RescueRate {
   rescues: number
+  /** Rescues that actually set the child down somewhere else. */
+  carries: number
   childMinutes: number
   perChildMinute: number
+  carriedPerChildMinute: number
   worstChild: number
   worstRescues: number
 }
@@ -33,7 +36,9 @@ export declare const CHILD_MOTION: {
   minPath: number
   circle: number
   shareGate: number
+  carryGate: number
   rescueGate: number
+  carryDistance: number
 }
 
 export declare function groundPath(
@@ -46,5 +51,6 @@ export declare function shuffleWindows(
 ): ShuffleWindows
 
 export declare function rescueRate(
-  tracks: ReadonlyArray<ReadonlyArray<{ clock: number; nudges?: number }>>,
+  tracks: ReadonlyArray<ReadonlyArray<{ clock: number; x: number; z: number; nudges?: number }>>,
+  cfg?: Partial<typeof CHILD_MOTION>,
 ): RescueRate
