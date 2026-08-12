@@ -1109,6 +1109,10 @@ describe('the launcher calls out a published now-card ETA older than a tick (poi
     expect(staleEtaLogLine({ overdue: [] })).toBeNull()
     expect(staleEtaLogLine({ overdue: 'garbage' })).toBeNull()
     expect(staleEtaLogLine({ overdue: [{ points: [1], meta: 'm', minutesPast: 'NaN' }] })).toBeNull()
+    // A numeric STRING is malformed too — no coercion into an alert (Sol review).
+    expect(staleEtaLogLine({ overdue: [{ points: [1], meta: 'm', minutesPast: '50' }] })).toBeNull()
+    expect(staleEtaLogLine({ overdue: [{ points: [1], meta: 'm', minutesPast: Infinity }] })).toBeNull()
+    expect(staleEtaLogLine({ overdue: [{ points: [1], meta: 'm' }] })).toBeNull()
     expect(staleEtaLogLine()).toBeNull()
   })
 })

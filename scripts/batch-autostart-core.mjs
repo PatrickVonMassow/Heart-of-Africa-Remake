@@ -888,13 +888,17 @@ export const ETA_OVERDUE_ALERT_MIN = 15
  * not trusted structure).
  */
 export function staleEtaLogLine({ overdue, tickMin = ETA_OVERDUE_ALERT_MIN } = {}) {
-  const stale = (Array.isArray(overdue) ? overdue : []).filter((c) => Number(c?.minutesPast) > tickMin)
+  // No coercion (Sol review, point 661): a numeric STRING is malformed child
+  // output, and malformed answers nothing — `Number("16")` would alert on it.
+  const stale = (Array.isArray(overdue) ? overdue : []).filter(
+    (c) => typeof c?.minutesPast === 'number' && Number.isFinite(c.minutesPast) && c.minutesPast > tickMin,
+  )
   if (stale.length === 0) return null
   const cards = stale
     .map(
       (c) =>
         `${Array.isArray(c.points) && c.points.length ? c.points.join(', ') : '?'} ` +
-        `("${c.meta ?? ''}", ${Math.round(Number(c.minutesPast))} min past)`,
+        `("${c.meta ?? ''}", ${Math.round(c.minutesPast)} min past)`,
     )
     .join('; ')
   return (
