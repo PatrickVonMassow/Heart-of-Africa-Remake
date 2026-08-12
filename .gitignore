@@ -43,6 +43,11 @@ scripts/.tile-cache
 # runtime state, keyed by session ids that mean nothing in a clone.
 .claude/fence-notice.json
 .claude/fence-notice.json.tmp-*
+# The firewall top-up's pid record (scripts/batch-autostart.mjs): a live process
+# number on THIS machine, meaningless in a clone — and its absence is the normal
+# state of a container that has just come up.
+.claude/firewall-topup.pid
+.claude/firewall-topup.log
 .batch-dashboard.html
 .batch-dashboard-archive.html
 # The derived queue's prose and order (point 400, delta C) — session state that
