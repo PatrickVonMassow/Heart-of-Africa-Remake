@@ -99,17 +99,17 @@ export const RED_CHARGES = [
     kind: 'check',
     match: /no child walks without getting anywhere/i,
     why:
-      'MEASURED 12.08.2026 over FOUR sittings of ten traces at seed 2972259115 on an idle ' +
-      "machine, five per backend, with the per-child measure. Sittings 1-3 (one-second windows " +
-      'only): 7 red of 30 — WebGL 2 twice (1.29 %, 0.34 %), WebGPU five times (1.53, 0.74, 0.89, ' +
-      '1.30, 0.82 %) against the 0.25 % gate. Sitting 4 added the half-second BURST measure and ' +
-      'changed the picture: 3 red of 10 — WebGL 2 twice (bursts 0.54 %, 0.89 %), WebGPU once ' +
-      '(0.27 %) — and ALL THREE were invisible to the one-second window, which stayed under the ' +
-      'gate in all ten (worst 0.23 %). So the shuffle is mostly SHORT, which is the user\'s own ' +
-      'report behind point 648 ("die Kinder hängen kurz fest"). The red windows hold no rescue ' +
-      'and no gap longer than the span, the worst of them walking 1.3-3.2 m to end 0.00-0.35 m ' +
-      "from where it started, and the game's own carry counter reads 0.00 m per minute for every " +
-      'child of all forty runs — nothing hides inside a teleport. That is point 657. Both ' +
-      'backends, on both measures.',
+      'MEASURED 12.08.2026 over FIVE sittings of ten traces at seed 2972259115 on an idle ' +
+      'machine, five per backend, with the per-child measure: 16 red of 50. Sittings 1-3 ' +
+      '(one-second windows only): 7 of 30, WebGL 2 twice and WebGPU five times, 0.34-1.53 %. ' +
+      'Sitting 4, with the half-second BURST measure added: 3 of 10, all three invisible to the ' +
+      'one-second window (bursts 0.27-0.89 %). Sitting 5, with both measures gated on having ' +
+      'judged anything: 6 of 10 — WebGPU red in ALL FIVE (worst child 0.39-1.84 %, three of them ' +
+      'also 1.30-1.86 % in bursts, the worst window at 10.7-10.8 s of the visit in three separate ' +
+      'runs) and WebGL 2 once (0.31 %). So it shows at both scales and is far commoner on WebGPU. ' +
+      'The red windows hold no rescue and no gap longer than the span they are judged over — the ' +
+      "worst walks 1.3-3.2 m to end 0.00-0.35 m from where it started — and the game's own carry " +
+      'counter reads 0.00 m per minute for every child of all fifty runs, so nothing hides inside ' +
+      'a teleport. That is point 657.',
   },
 ]
