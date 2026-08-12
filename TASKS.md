@@ -216,57 +216,6 @@ put it is the mistake this line exists to stop.
   Criticality: medium — the boundary is what tells the player where the settlement ends
   and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
 
-- [ ] 453. WHAT IS THE LION EATING? (user bug report 30.07.2026,
-  `local/WasFrisstDerLoewe.zip`, seed 1608676381, east region at the river, WebGPU/high:
-  "Er scheint zu fressen und die Geier kreisen, aber ich sehe keine Beute"; bundle Kadaver &
-  Geier). In the frame the lion stands head-down in its feeding pose, vulture shadows circle
-  over the ground — and there is no prey body anywhere. Two candidates, both consistent with
-  the code: (a) the carcass was consumed (`carcassSeconds` reached 0 and it was removed) while
-  the feeding pose and the vulture staging carry on — a state that does not clear when its
-  subject disappears; (b) what remains is the prey remnant of `Wildlife.tsx` (the scrap left at
-  the kill site), which renders as a small white sphere and reads to a human as nothing at all.
-  Find out which by reproducing from the seed, then fix so that the picture always answers the
-  question: while a predator feeds, something recognisable as prey lies under it; when the
-  carcass is gone, the pose and the vultures end with it.
-  VERIFIABLE: Vitest on the behaviour — a predator's feeding state cannot outlive its carcass,
-  and a remnant that keeps vultures on station is itself renderable; plus a browser frame from
-  that seed showing predator and prey together, on both backends.
-
-- [ ] 628. THE HOLD-CTRL LAYER LABELS A CAMP TWICE AND NAMES THE PLAYER'S OWN BOAT
-  (found 11.08.2026 while re-testing the roster for point 600, and deliberately not fixed
-  there: both halves are a judgment about what the layer PROMISES, not a defect in the
-  state coverage that point closed).
-  FINAL STATE:
-  1. A PITCHED CAMP CARRIES EXACTLY ONE LABEL. `CampMarkers` in
-     `src/scenes/travel/TravelScene.tsx` draws a permanent `map-label` reading
-     `labels.camp` AND registers the same object with the hold-Ctrl layer, whose text is
-     that same word — so holding Ctrl stacks two identical boxes over one camp. The camp
-     STAYS in point 342's roster, which names "a pitched camp, a set-down canoe"
-     explicitly, so the cure is the one the elder already uses: an object that carries a
-     permanent label of its own is not offered a second time by the Ctrl layer, whoever
-     draws it. Stating that as a rule about permanent labels, not a per-object exception,
-     is the point — a second exception list would rot the way the first one nearly did.
-  2. THE TRAVELLER'S OWN CANOE IS NOT NAMED. The marked canoe groups at the same call site
-     are the boat the player rides or drags. The layer's promise is "what am I looking
-     at", and the player's own vehicle is not that. A canoe SET DOWN in the world keeps
-     its label, per the same roster line.
-  3. TWO LABELS NEVER OVERLAP INTO ONE UNREADABLE BOX (seen 11.08.2026 in
-     `verification/148-ctrl-actor-labels-village.png`, the point-600 evidence frame). Where
-     two villagers stand close, their boxes overlap and the picture reads "Villager llager"
-     and "Villa Villager" — each label is correct, the PICTURE is not, and no test looks at
-     it because every check asks the DOM whether the text is present. The layer therefore
-     declutters: boxes that would overlap are offset, or the further one is dropped while
-     the nearer keeps its name. Which of the two is a judgment to make at the picture, on a
-     crowd, not in the abstract.
-  VERIFIABLE: the pure source/roster test gains both cases — a pitched camp yields exactly
-  one offered label, a ridden or dragged canoe yields none while a set-down one yields its
-  own; the declutter is judged AT THE FRAME on a crowded village, since a DOM assertion is
-  exactly the proxy that let this through; plus the browser check that asks the scene what
-  it DREW asserts that no two labels of identical text stand at one position.
-  Criticality: low — nothing breaks, but a doubled box is exactly the noise the elder
-  exception exists to prevent, and naming the player's own boat makes the layer read as
-  though it labels everything indiscriminately.
-
 - [ ] 651. THE VILLAGE DRUM BED IS A 1.9-SECOND LOOP (user 11.08.2026, testing the deployed
   `main`, build e1bd2fa, in the Bambara village: "Das monotone Trommel-Ambient-Geräusch nervt
   übrigens total.").
@@ -315,45 +264,6 @@ put it is the mistake this line exists to stop.
   three runs each, on a quiet machine AND under throttle.
   Criticality: medium — no player sees it, but an unexplained red on the release branch makes
   the picture gate untrustworthy exactly where the release needs it.
-
-- [ ] 658. THE EGRESS ALLOWANCE MUST SURVIVE A CONTAINER RESTART AND THE HOURS AFTER IT (user
-  12.08.2026: "Das ist auch schon zum zweiten Mal passiert. Sorge dafür, dass das den
-  Container-Neustart überlebt. Deine bisherige Maßnahme scheint also nicht wirksam gewesen zu
-  sein."). MEASURED, and confirmed independently by GPT-5.6 Sol at effort high (diagnose,
-  12.08.2026): the container's egress allowance is an ipset of RESOLVED IP LITERALS, written
-  once by `.devcontainer/init-firewall.sh` at container start. `api.openai.com` is in that
-  domain list, so the boot run is not what is missing — the addresses behind that name ROTATE,
-  and the set keeps the snapshot. `api.github.com` survives because GitHub publishes CIDRs and
-  the script adds those. The periodic top-up that was meant to re-resolve never ran once (fixed
-  12.08.2026 in `scripts/batch-autostart.mjs`: a missing pid file on a fresh container threw out
-  of the whole block), and even now it runs on the launcher's 15-minute tick.
-  FINAL STATE: a cross-vendor review, a model call or a package fetch never fails on a stale
-  allowance, on a container that has just come up or one that has run for a day. Concretely:
-  1. The refresh is TTL-AWARE, not tick-shaped: it re-resolves at about half the shortest TTL
-     of the names it holds (single-digit minutes for these hosts, not 15), with jitter.
-  2. It is ARMED BY THE CONTAINER'S OWN START, not by whoever happens to open a session — the
-     same boot path that arms the batch launcher, so a restart restores it unattended.
-  3. It does not GROW without bound: the dynamic names live in their own set, refreshed by
-     generation or by entry timeout, so a day of rotation does not leave a day of addresses
-     standing. The static, published-CIDR names stay where they are.
-  4. Every failure is LOUD, never skipped: the refresher not starting or dying, `sudo -n`
-     refused, the set missing, DNS returning nothing, an insert failing, or the post-refresh
-     probe still unreachable. A DNS failure keeps the last entries for a bounded grace period
-     and is reported as a failure, never as a successful refresh.
-  NOT IN SCOPE, recorded so it is not re-derived: name-based matching in netfilter itself does
-  not exist — a hostname in a rule is resolved once into literals. The only real name policy is
-  a DNS-coupled set (dnsmasq `ipset=`/`nftset=` populating the set as answers are issued) or an
-  egress proxy that enforces CONNECT/SNI; both need the privileged startup lifecycle to recreate
-  them, which is why (2) is the load-bearing half. Sol's full answer, with its judgement of /24
-  widening (worse than exact refresh: 256 addresses per answer, unrelated CDN tenants, and the
-  present OUTPUT rule permits every port to them), is the design input.
-  VERIFIABLE: a restart of the container, then a probe of `api.openai.com` immediately and again
-  after the rotation window that broke it twice — both reachable with no manual step; the
-  refresher's own log shows the re-resolves; a forced DNS failure produces the loud report and
-  keeps the grace-period entries; and a unit test pins the schedule and the failure reports.
-  Criticality: high — it takes out the cross-vendor review the four-eyes rule depends on, and it
-  did so twice unnoticed.
-  Bundle: unbundled (infrastructure).
 
 - [ ] 660. ONE SESSION, TWO IDENTITIES: THE FENCE LOCKS OUT THE SESSION THAT IS WORKING
   (measured 12.08.2026, 18:02-18:20). The launcher spawned session 6cd11926 at 17:57 (fence
@@ -414,6 +324,23 @@ put it is the mistake this line exists to stop.
   case refuses the continue-path and allows the boundary path.
   Criticality: high — 91 % of the project's spend sits above 150k context, and this is the
   door it walks through.
+  Bundle: unbundled (infrastructure).
+
+- [ ] 663. THE DEPLOY DIES ON A FROZEN TAG'S FLAKY DOWNLOAD (measured 12.08.2026, twice on
+  run 31636330165). The GH-Pages deploy rebuilds EVERY version tag on every `main` push, and
+  the frozen v0.2 tree's `onnxruntime-node` postinstall downloads a GPU tarball from GitHub
+  releases at install time — that download ECONNRESET twice, so a pure network flake in a
+  FROZEN tree blocked the whole deploy, including the fresh `main` build, and the CI gate held
+  every turn end behind it.
+  FINAL STATE: a tag whose content cannot change does not re-run a network-dependent install
+  on every deploy. Either the workflow caches each tag's built `dist/` keyed by the tag sha
+  (build once, reuse forever — a frozen tag's site is immutable by definition), or at least
+  caches its `node_modules`/npm cache so the flaky postinstall runs rarely; plus one automatic
+  retry around the per-tag install step. A tag build that still fails must name the tag and
+  not take main's own deploy down with it where the workflow can publish partially.
+  VERIFIABLE: the workflow run shows the cache hit for an unchanged tag (no onnxruntime
+  download in the log), and a forced cache miss still succeeds via the retry.
+  Criticality: medium — it stalls every landing behind a dice roll on a runner's network.
   Bundle: unbundled (infrastructure).
 
 - [ ] 633. THE RELEASE'S CLOSING RUN — TWO REGRESSIONS WITH THE CLEANUP BETWEEN THEM (user
@@ -488,6 +415,96 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
+
+- [ ] 453. WHAT IS THE LION EATING? (user bug report 30.07.2026,
+  `local/WasFrisstDerLoewe.zip`, seed 1608676381, east region at the river, WebGPU/high:
+  "Er scheint zu fressen und die Geier kreisen, aber ich sehe keine Beute"; bundle Kadaver &
+  Geier). In the frame the lion stands head-down in its feeding pose, vulture shadows circle
+  over the ground — and there is no prey body anywhere. Two candidates, both consistent with
+  the code: (a) the carcass was consumed (`carcassSeconds` reached 0 and it was removed) while
+  the feeding pose and the vulture staging carry on — a state that does not clear when its
+  subject disappears; (b) what remains is the prey remnant of `Wildlife.tsx` (the scrap left at
+  the kill site), which renders as a small white sphere and reads to a human as nothing at all.
+  Find out which by reproducing from the seed, then fix so that the picture always answers the
+  question: while a predator feeds, something recognisable as prey lies under it; when the
+  carcass is gone, the pose and the vultures end with it.
+  VERIFIABLE: Vitest on the behaviour — a predator's feeding state cannot outlive its carcass,
+  and a remnant that keeps vultures on station is itself renderable; plus a browser frame from
+  that seed showing predator and prey together, on both backends.
+
+- [ ] 628. THE HOLD-CTRL LAYER LABELS A CAMP TWICE AND NAMES THE PLAYER'S OWN BOAT
+  (found 11.08.2026 while re-testing the roster for point 600, and deliberately not fixed
+  there: both halves are a judgment about what the layer PROMISES, not a defect in the
+  state coverage that point closed).
+  FINAL STATE:
+  1. A PITCHED CAMP CARRIES EXACTLY ONE LABEL. `CampMarkers` in
+     `src/scenes/travel/TravelScene.tsx` draws a permanent `map-label` reading
+     `labels.camp` AND registers the same object with the hold-Ctrl layer, whose text is
+     that same word — so holding Ctrl stacks two identical boxes over one camp. The camp
+     STAYS in point 342's roster, which names "a pitched camp, a set-down canoe"
+     explicitly, so the cure is the one the elder already uses: an object that carries a
+     permanent label of its own is not offered a second time by the Ctrl layer, whoever
+     draws it. Stating that as a rule about permanent labels, not a per-object exception,
+     is the point — a second exception list would rot the way the first one nearly did.
+  2. THE TRAVELLER'S OWN CANOE IS NOT NAMED. The marked canoe groups at the same call site
+     are the boat the player rides or drags. The layer's promise is "what am I looking
+     at", and the player's own vehicle is not that. A canoe SET DOWN in the world keeps
+     its label, per the same roster line.
+  3. TWO LABELS NEVER OVERLAP INTO ONE UNREADABLE BOX (seen 11.08.2026 in
+     `verification/148-ctrl-actor-labels-village.png`, the point-600 evidence frame). Where
+     two villagers stand close, their boxes overlap and the picture reads "Villager llager"
+     and "Villa Villager" — each label is correct, the PICTURE is not, and no test looks at
+     it because every check asks the DOM whether the text is present. The layer therefore
+     declutters: boxes that would overlap are offset, or the further one is dropped while
+     the nearer keeps its name. Which of the two is a judgment to make at the picture, on a
+     crowd, not in the abstract.
+  VERIFIABLE: the pure source/roster test gains both cases — a pitched camp yields exactly
+  one offered label, a ridden or dragged canoe yields none while a set-down one yields its
+  own; the declutter is judged AT THE FRAME on a crowded village, since a DOM assertion is
+  exactly the proxy that let this through; plus the browser check that asks the scene what
+  it DREW asserts that no two labels of identical text stand at one position.
+  Criticality: low — nothing breaks, but a doubled box is exactly the noise the elder
+  exception exists to prevent, and naming the player's own boat makes the layer read as
+  though it labels everything indiscriminately.
+
+- [ ] 658. THE EGRESS ALLOWANCE MUST SURVIVE A CONTAINER RESTART AND THE HOURS AFTER IT (user
+  12.08.2026: "Das ist auch schon zum zweiten Mal passiert. Sorge dafür, dass das den
+  Container-Neustart überlebt. Deine bisherige Maßnahme scheint also nicht wirksam gewesen zu
+  sein."). MEASURED, and confirmed independently by GPT-5.6 Sol at effort high (diagnose,
+  12.08.2026): the container's egress allowance is an ipset of RESOLVED IP LITERALS, written
+  once by `.devcontainer/init-firewall.sh` at container start. `api.openai.com` is in that
+  domain list, so the boot run is not what is missing — the addresses behind that name ROTATE,
+  and the set keeps the snapshot. `api.github.com` survives because GitHub publishes CIDRs and
+  the script adds those. The periodic top-up that was meant to re-resolve never ran once (fixed
+  12.08.2026 in `scripts/batch-autostart.mjs`: a missing pid file on a fresh container threw out
+  of the whole block), and even now it runs on the launcher's 15-minute tick.
+  FINAL STATE: a cross-vendor review, a model call or a package fetch never fails on a stale
+  allowance, on a container that has just come up or one that has run for a day. Concretely:
+  1. The refresh is TTL-AWARE, not tick-shaped: it re-resolves at about half the shortest TTL
+     of the names it holds (single-digit minutes for these hosts, not 15), with jitter.
+  2. It is ARMED BY THE CONTAINER'S OWN START, not by whoever happens to open a session — the
+     same boot path that arms the batch launcher, so a restart restores it unattended.
+  3. It does not GROW without bound: the dynamic names live in their own set, refreshed by
+     generation or by entry timeout, so a day of rotation does not leave a day of addresses
+     standing. The static, published-CIDR names stay where they are.
+  4. Every failure is LOUD, never skipped: the refresher not starting or dying, `sudo -n`
+     refused, the set missing, DNS returning nothing, an insert failing, or the post-refresh
+     probe still unreachable. A DNS failure keeps the last entries for a bounded grace period
+     and is reported as a failure, never as a successful refresh.
+  NOT IN SCOPE, recorded so it is not re-derived: name-based matching in netfilter itself does
+  not exist — a hostname in a rule is resolved once into literals. The only real name policy is
+  a DNS-coupled set (dnsmasq `ipset=`/`nftset=` populating the set as answers are issued) or an
+  egress proxy that enforces CONNECT/SNI; both need the privileged startup lifecycle to recreate
+  them, which is why (2) is the load-bearing half. Sol's full answer, with its judgement of /24
+  widening (worse than exact refresh: 256 addresses per answer, unrelated CDN tenants, and the
+  present OUTPUT rule permits every port to them), is the design input.
+  VERIFIABLE: a restart of the container, then a probe of `api.openai.com` immediately and again
+  after the rotation window that broke it twice — both reachable with no manual step; the
+  refresher's own log shows the re-resolves; a forced DNS failure produces the loud report and
+  keeps the grace-period entries; and a unit test pins the schedule and the failure reports.
+  Criticality: high — it takes out the cross-vendor review the four-eyes rule depends on, and it
+  did so twice unnoticed.
+  Bundle: unbundled (infrastructure).
 
 - [ ] 642. EVERY CHECK THAT CAN BE LOAD-PROOF IS MADE LOAD-PROOF, AND THE REST SAYS SO (user
   11.08.2026: "Was ist mit dem Problem, dass nicht alle Tests Last-resistent sind? … Das muss
