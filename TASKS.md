@@ -118,6 +118,51 @@ put it is the mistake this line exists to stop.
   settlement.
   Bundle: Dorfleben.
 
+- [ ] 659. THE WHOLE COMMUNICATION CHAIN, PLAYED THROUGH AND JUDGED BY WHAT REACHES THE
+  PLAYER — A SIX-EYES ALL-ROUND REVIEW (user 12.08.2026: "Danach will ich endlich mal
+  erfolgreich die ganze Kette der Kommunikationsmechanik in diesem Dorf durchspielen können,
+  ohne bei jedem Schritt sofort auf blockierende Bugs zu stoßen, obwohl du bereits mehrfach
+  getestet und nachgebessert hast. Die QS war bei diesem Feature bisher offensichtlich völlig
+  unzureichend."). THE RECORD BEARS HIM OUT: every part of this feature passed its own tests
+  and the player still could not get through it, and the cross-vendor review of the children's
+  proof needed four rounds before the proof could see the symptom at all (points 648, 656,
+  657). What failed was not any single check but the SHAPE of the checking: partial chains
+  verified in isolation, each green, with nobody walking the whole way as a player.
+
+  THE METHOD IS SIX EYES (CLAUDE.md §6). The ENUMERATING half — what can break, what a player
+  must be able to do, which step could silently not arrive — runs BLIND PARALLEL across THREE
+  models, none seeing another's list, and the union is merged BY THE MODEL THAT WROTE NEITHER
+  LIST, counted entry by entry (`scripts/blind-merge.mjs`, `mechanism-review.mjs --merged-by`).
+  The JUDGING half — does this play-through really work — is convergent and keeps the ordinary
+  cross-vendor review, the reviewer reading the artefact before the author's rationale.
+
+  WHAT IS COVERED — the whole chain a player walks, not its parts:
+  1. Arriving in the village and HEARING the speech: the syllables are actually audible at the
+     shipped defaults over drums and ambience, measured on the audio path, not merely "the call
+     was made".
+  2. The children's staged situations and the adults' errands: from the scene alone, can a
+     player recognise WHAT is being expressed — the gesture, the object, the direction — or
+     only that something was said?
+  3. The guess: hypothesis label, the invitation, the dialog, and what the journal keeps of it.
+  4. The chief: the culturally correct gift, his reply, and the hint it yields.
+  5. The direction words, the glossary and the retroactive deciphering in either order.
+  6. Search, excavation and the return — the goal chain to the victory state.
+
+  HOW IT IS JUDGED: by what ARRIVES. Every step is played through as a player plays it — one
+  continuous session per run, not a per-check probe — on BOTH backends, and each step is judged
+  by the rendered picture, by the sound measured where it leaves the audio path, and by the text
+  actually shown. A step that works internally but does not reach the player is a DEFECT, and
+  the report says which of the two it was.
+
+  VERIFIABLE: a complete play-through of the chain from entering the village to the victory
+  state, with no blocking defect, evidenced by the frames of each step, an audio measurement at
+  the shipped defaults, and the journal it wrote; every defect found is listed with its severity
+  and either fixed here or filed as its own point, and the blocking ones are fixed before this
+  point is ticked. The enumerating lists, their merge and the counted union are recorded.
+  Criticality: high — this is the feature the release exists for, and the user is the one who
+  keeps hitting the bugs.
+  Bundle: Verständigung.
+
 - [ ] 656. THE CHILDREN'S SHUFFLE GATE CANNOT SEE THE SYMPTOM IT WAS BUILT FOR (found
   11.08.2026 by the cross-vendor review of point 648 — GPT-5.6 Sol at effort high, verdict
   do-not-merge, recorded against `d1ed0d27`; the behaviour fixes of 648 are on `main` and are
