@@ -3564,11 +3564,16 @@ if (section('children-motion')) {
         // divides one persistently rescued child by its healthy siblings.
         rescues.worstPerChildMinute < CHILD_MOTION.worstChildRescueGate &&
         rescues.worstCarriedMetresPerChildMinute < CHILD_MOTION.worstChildCarryGate,
-      // Each maximum with ITS OWN child: they are three questions and need not
-      // have the same answer.
-      `most-often-picked-up child ${rescues.worstRescueChild} at ${rescues.worstPerChildMinute.toFixed(2)}/min; ` +
-        `furthest-carried child ${rescues.worstCarriedChild} at ` +
-        `${rescues.worstCarriedMetresPerChildMinute.toFixed(2)} m/min; group ` +
+      // EACH FIGURE WITH THE CHILD IT BELONGS TO, AND CALLED WHAT IT IS. Three
+      // different questions with three possibly different answers: the highest
+      // RATE (what the gate reads), the most rescues in ABSOLUTE count, and the
+      // furthest CARRIED. The rate used to be printed as "most-often-picked-up",
+      // which is the count's name, and the count was not printed at all.
+      `highest rescue rate: child ${rescues.worstRescueChild} at ` +
+        `${rescues.worstPerChildMinute.toFixed(2)}/min. Most rescues in all: child ` +
+        `${rescues.worstChild} with ${rescues.worstRescues}. Furthest carried: child ` +
+        `${rescues.worstCarriedChild} at ${rescues.worstCarriedMetresPerChildMinute.toFixed(2)} m/min. ` +
+        `Group ` +
         `${rescues.rescues} rescues (${rescues.carriedMetres.toFixed(2)} m carried in all` +
         `${rescues.carriedPublished ? '' : ', NOT PUBLISHED BY THE GAME'}) in ` +
         `${rescues.childMinutes.toFixed(2)} child-minutes = ${rescues.perChildMinute.toFixed(2)}/child-min, ` +
