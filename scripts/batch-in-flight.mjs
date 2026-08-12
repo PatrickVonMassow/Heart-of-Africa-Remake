@@ -53,11 +53,14 @@ import {
   closingFreezeActive,
   declaredAgentCount,
   openPointSpecs,
+  waitEtaRefusal,
   IN_FLIGHT_MAX_AGE_MS,
   POOL_CAP,
   RESPAWN_GRACE_MS,
 } from './batch-in-flight-core.mjs'
 import { readTasksOpen, TASKS_PATH } from './tasks-source.mjs'
+import { boardFilePath } from './dashboard-state.mjs'
+import { berlinMinutes } from './dashboard-guard.mjs'
 
 export { IN_FLIGHT_PATH }
 
@@ -654,6 +657,21 @@ if (isMain) {
     // same discipline the evidence check above follows.
     const slots = gatherSlots(declaration)
     if (slots.needsReason) fail(`${slotsRemedy({ slots, cap: POOL_CAP })}\nNothing recorded.`)
+    // THE BOARD'S PROMISE MUST NOT AGE UNDER THIS WAIT (point 661): a wait is
+    // this session's licence to produce no turn end for up to an hour, so the
+    // `now-eta-past` audit would sleep exactly that long. Refuse the wait while
+    // a current-work "~HH:MM" already lies in the past — every re-declaration
+    // then bounds the staleness. FAIL-OPEN on an unreadable or absent board
+    // (html null → no refusal): a broken board must not trap the session.
+    const boardHtml = (() => {
+      try {
+        return readFileSync(boardFilePath(), 'utf8')
+      } catch {
+        return null
+      }
+    })()
+    const etaRefusal = waitEtaRefusal({ html: boardHtml, nowMinutes: berlinMinutes() })
+    if (etaRefusal) fail(etaRefusal)
     writeDeclaration(declaration)
     // THE DECLARATION EXTENDS THE LEASE (point 556, and the piece
     // docs/batch-resilience.md §3 left explicitly unbuilt: "nothing yet WRITES a
