@@ -77,26 +77,25 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 657. THE CHILDREN STILL SHUFFLE ON THE SPOT IN THE LIVE SETTLEMENT (measured 12.08.2026
+- [ ] 657. THE CHILDREN STILL WALK ON THE SPOT IN THE LIVE SETTLEMENT (measured 12.08.2026
   with the gate point 656 delivers, at seed 2972259115, on a machine with nothing else on it,
-  on BOTH backends). WebGL 2 went red in 3 of 5 traces — 92 of 4652 one-second windows
-  (1.98 %) and 14 of 4640 (0.30 %) — and WebGPU in 1 of 3, 26 of 4676 (0.56 %), against a gate
-  of 0.25 %. The worst window has a child WALK 2.95 m and end 0.06 m from where it started.
-  The rescue teleport is NOT what produces this: the carry and rescue checks stayed green in
-  every one of those traces, so nobody is being picked up — the children are walking on the
-  spot, which is the symptom of the user's own report behind point 648 ("die Kinder hängen kurz
-  fest, zittern"). That point's behaviour fix made it rarer; it did not end it.
+  on BOTH backends). The figures are the ones the REPAIRED measure reads — time-weighted, the
+  trace broken at a rescue instead of guessed across, and judged PER CHILD rather than in the
+  group's average, after three rounds of cross-vendor review threw out the earlier ones. Worst
+  child's own share against the 0.25 % gate: WebGL 2 0.00 / 1.29 / 0.09 / 0.34 / 0.00 %,
+  WebGPU 0.00 / 0.24 / 0.00 / 1.53 / 0.00 % — RED in 3 of 10 traces, on both backends. The
+  worst windows have a child WALK 2.92 m and end 0.00 m from where it started, and 3.08 m
+  ending 0.23 m away. The rescue teleport is not what produces this: the game's own counter
+  reads 0.00 m carried per minute for the WORST child of every one of the ten runs, and no red
+  window holds a rescue or a sample gap longer than the second it measures. This is the symptom
+  of the user's own report behind point 648 ("die Kinder hängen kurz fest, zittern"); that
+  point's behaviour fix made it rarer and did not end it.
+
   FINAL STATE: a child that is commanded to walk gets somewhere. In the live settlement at that
   seed, the share of one-second windows in which a child walks more than 1 m without leaving a
   0.35 m circle stays under the 0.25 % gate across repeated traces on BOTH backends — with the
   gate untouched, and with the carry and rescue rates staying under their own gates, so the
   symptom is gone rather than tidied away.
-  THE EVIDENCE IS RE-TAKEN FIRST. GPT-5.6 Sol's review of point 656 (12.08.2026) found the
-  metric those numbers came from to be SAMPLE-weighted rather than time-weighted: it counts one
-  window per rendered frame, so an irregular headless frame cadence moves the share. So this
-  point begins by re-measuring with the corrected measure point 656 must deliver; if the share
-  then stays under the gate across repeated traces on both backends, this point closes as a
-  measurement artefact and says so, and the charge below goes with it.
   THE CAUSE IS NAMED BEFORE IT IS FIXED. The measurement leaves three candidates open and the
   trace can tell them apart: the separation pass pushing a child back into the pocket it just
   walked out of; two children resolving each other in opposite directions on alternating frames;
@@ -118,6 +117,7 @@ put it is the mistake this line exists to stop.
   Criticality: high — it is the user's own bug report and the most visible surface of the
   settlement.
   Bundle: Dorfleben.
+
 - [ ] 656. THE CHILDREN'S SHUFFLE GATE CANNOT SEE THE SYMPTOM IT WAS BUILT FOR (found
   11.08.2026 by the cross-vendor review of point 648 — GPT-5.6 Sol at effort high, verdict
   do-not-merge, recorded against `d1ed0d27`; the behaviour fixes of 648 are on `main` and are
