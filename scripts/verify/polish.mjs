@@ -3590,6 +3590,7 @@ if (section('children-motion')) {
     check(
       'and no child has to be carried out of the settlement’s own geometry',
       rescues.carriedPublished &&
+        rescues.nudgesPublished &&
         rescues.carriedMetresPerChildMinute < CHILD_MOTION.carryGate &&
         rescues.perChildMinute < CHILD_MOTION.rescueGate &&
         // AND THE WORST CHILD ON ITS OWN CLOCK: a rate averaged over the group
@@ -3607,7 +3608,7 @@ if (section('children-motion')) {
         `${rescues.worstCarriedChild} at ${rescues.worstCarriedMetresPerChildMinute.toFixed(2)} m/min. ` +
         `Group ` +
         `${rescues.rescues} rescues (${rescues.carriedMetres.toFixed(2)} m carried in all` +
-        `${rescues.carriedPublished ? '' : ', NOT PUBLISHED BY THE GAME'}) in ` +
+        `${rescues.carriedPublished && rescues.nudgesPublished ? '' : ', A COUNTER NOT PUBLISHED BY THE GAME'}) in ` +
         `${rescues.childMinutes.toFixed(2)} child-minutes = ${rescues.perChildMinute.toFixed(2)}/child-min, ` +
         `carried ${rescues.carriedMetresPerChildMinute.toFixed(2)} m/child-min`,
     )

@@ -219,11 +219,23 @@ export function groundPath(track) {
   let pz = 0
   for (let i = 0; i < track.length; i++) {
     let cut = false
+    // AN UNSAID RESCUE COUNT IS NOT A RESCUE-FREE FRAME (the seventh
+    // cross-vendor review). Read as zero, a missing or unreadable `nudges`
+    // erases both the rescue AND the break it should have made, which is
+    // precisely the blind spot the break exists to close. It breaks the path
+    // instead, and `shuffleWindows` refuses the windows that touch it.
+    if (!Number.isFinite(track[i].nudges)) {
+      cut = true
+      x.push(px)
+      z.push(pz)
+      broken.push(cut)
+      continue
+    }
     if (i === 0) {
       px = Number.isFinite(track[i].x) ? track[i].x : 0
       pz = Number.isFinite(track[i].z) ? track[i].z : 0
       cut = !Number.isFinite(track[i].x) || !Number.isFinite(track[i].z)
-    } else if ((track[i].nudges ?? 0) > (track[i - 1].nudges ?? 0)) {
+    } else if (!Number.isFinite(track[i - 1].nudges) || track[i].nudges > track[i - 1].nudges) {
       cut = true
     } else {
       const dx = track[i].x - track[i - 1].x
@@ -317,7 +329,9 @@ export function shuffleWindows(tracks, cfg = {}) {
         Number.isFinite(s.clock) &&
         Number.isFinite(s.x) &&
         Number.isFinite(s.z) &&
-        Number.isFinite(s.walked),
+        Number.isFinite(s.walked) &&
+        // The rescue count too: unsaid is not rescue-free.
+        Number.isFinite(s.nudges),
     )
     // A clock that is not a number cannot even be ORDERED, so nothing in this
     // track can be placed in a window at all. What is still known is how much
@@ -634,7 +648,9 @@ export function holdsAGame(live, cfg = {}) {
  * carried hides it altogether. `TagChild.carried` is now accumulated at the
  * teleport itself, where the distance is known exactly, and this reads it.
  *
- * A trace that does not publish `carried` is NOT reported as carry-free —
+ * NEITHER COUNTER MAY BE MISSING. A trace that does not publish `carried` is NOT
+ * reported as carry-free, and one that does not publish `nudges` is not reported
+ * as never-rescued —
  * `carriedPublished` says so, and the gates demand it. A missing field must
  * never read as good news, and the check for it covers the WHOLE track: sample
  * zero, which the stepping loop never looks at, and tracks too short to hold a
@@ -655,13 +671,21 @@ export function rescueRate(tracks) {
   // nothing published: silence is not a clean bill.
   let samples = 0
   let published = true
+  let nudgesPublished = true
   for (const track of tracks) {
     for (const s of track) {
       samples++
       if (!Number.isFinite(s.carried)) published = false
+      // THE SAME CONTRACT FOR THE RESCUE COUNT. Read as zero, a missing or
+      // unreadable `nudges` erases every rescue in the trace and reports a
+      // settlement that never had to pick a child up.
+      if (!Number.isFinite(s.nudges)) nudgesPublished = false
     }
   }
-  if (samples === 0) published = false
+  if (samples === 0) {
+    published = false
+    nudgesPublished = false
+  }
   // PER CHILD, because one child rescued every three seconds is the defect and
   // the group's average is not: three healthy siblings divide it away.
   const perChild = []
@@ -672,8 +696,8 @@ export function rescueRate(tracks) {
     if (track.length < 2) continue
     for (let i = 1; i < track.length; i++) {
       if (published) own.carriedMetres += Math.max(0, track[i].carried - track[i - 1].carried)
-      if ((track[i].nudges ?? 0) <= (track[i - 1].nudges ?? 0)) continue
-      own.rescues += (track[i].nudges ?? 0) - (track[i - 1].nudges ?? 0)
+      if (!nudgesPublished || track[i].nudges <= track[i - 1].nudges) continue
+      own.rescues += track[i].nudges - track[i - 1].nudges
     }
     own.minutes = (track[track.length - 1].clock - track[0].clock) / 60
     own.perMinute = own.minutes > 0 ? own.rescues / own.minutes : 0
@@ -709,6 +733,7 @@ export function rescueRate(tracks) {
     rescues,
     carriedMetres,
     carriedPublished: published,
+    nudgesPublished,
     childMinutes,
     perChildMinute: childMinutes > 0 ? rescues / childMinutes : 0,
     carriedMetresPerChildMinute: childMinutes > 0 ? carriedMetres / childMinutes : 0,

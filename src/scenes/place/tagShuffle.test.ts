@@ -484,6 +484,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       // does not publish it fails rather than counting as carry-free.
       const rescues = rescueRate(paths)
       expect(rescues.carriedPublished).toBe(true)
+      expect(rescues.nudgesPublished).toBe(true)
       expect(rescues.carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
       expect(rescues.perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
       // The worst child on its own clock: 5-6 rescues in its minute here, and

@@ -113,6 +113,8 @@ export interface RescueRate {
   /** False if any sample failed to publish `carried` — a missing field is not
    *  a carry-free trace, and the gates demand this. */
   carriedPublished: boolean
+  /** The same for `nudges`: unsaid is not rescue-free. */
+  nudgesPublished: boolean
   childMinutes: number
   perChildMinute: number
   carriedMetresPerChildMinute: number

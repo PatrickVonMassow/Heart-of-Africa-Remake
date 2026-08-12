@@ -685,6 +685,34 @@ describe('the rescues are counted on their own account', () => {
     expect(r.carriedMetres).toBe(0)
   })
 
+  it('and says the same about the rescue COUNT — unsaid is not rescue-free', () => {
+    // THE COUNTER THE BREAKS THEMSELVES REST ON (seventh cross-vendor review).
+    // Read as zero, a missing or unreadable `nudges` erases every rescue in the
+    // trace AND every break in the ground path — so the teleport walks back in
+    // as ground the child covered, which is the blind spot the break exists to
+    // close. Both shapes are refused: the field absent, and the field NaN.
+    const carriedOff = trace(600, (i, at) =>
+      i > 0 && i % 90 === 0 ? { x: at.x + 1, z: 0, rescue: true } : { x: at.x + 0.02, z: 0 },
+    )
+    expect(rescueRate([carriedOff]).rescues).toBe(6) // what the trace really holds
+    const silent = carriedOff.map(({ nudges: _drop, ...rest }) => rest)
+    const broken = carriedOff.map((s) => ({ ...s, nudges: NaN }))
+    for (const bad of [silent, broken]) {
+      const r = rescueRate([bad])
+      expect(r.nudgesPublished).toBe(false)
+      expect(r.rescues).toBe(0) // and this zero is why the flag has to be read
+      // The windows are refused rather than judged on a path with no breaks in
+      // it: nothing is measured, so nothing can come out clean.
+      const w = shuffleWindows([bad])
+      expect(w.seconds).toBe(0)
+      expect(judgedEnough(w)).toBe(false)
+    }
+    // A trace that publishes it is judged as before — a whole ten seconds of it,
+    // minus the windows its six rescues break.
+    expect(rescueRate([carriedOff]).nudgesPublished).toBe(true)
+    expect(shuffleWindows([carriedOff]).seconds).toBeGreaterThan(2)
+  })
+
   it('and reads the WHOLE track for that, sample zero included', () => {
     // The check used to start at sample ONE, where the stepping loop starts, so
     // a track whose FIRST sample lacked the counter — the very sample every
