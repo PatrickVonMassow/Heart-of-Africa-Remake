@@ -435,10 +435,10 @@ detail section change in the SAME commit.
    Detail: docs/acceptance-criteria-detail.md §6.
    Evidence: docs/acceptance-evidence.md §6.
 
-7. **Language/direction system.** The full system of `design.md` §13 is
-   implemented: the regional direction systems and glossary taught by the
-   village elder, hints of landmark, direction word and coordinate, deciphered
-   retroactively in either order.
+7. **Language and communication.** The tonal village speech of `design.md`
+   §13.4 is implemented — heard, guessed at, never translated — beside the
+   §13.1–13.3 direction words, glossary and retroactively deciphered hints,
+   which still stand.
    Detail: docs/acceptance-criteria-detail.md §7.
    Evidence: docs/acceptance-evidence.md §7.
 

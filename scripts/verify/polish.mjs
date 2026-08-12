@@ -14,6 +14,14 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
+import {
+  CHILD_MOTION,
+  holdsAGame,
+  judgedEnough,
+  rescueRate,
+  shuffleWindows,
+  traceLiveness,
+} from './childMotionMetric.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -3363,9 +3371,14 @@ if (section('children-motion')) {
   check('the reported village publishes its live game of tag', live)
   if (live) {
     await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-    await page
+    // AND IT MUST REALLY BE PLAYING (point 656). The wait's result used to be
+    // thrown away: a group that never played produced no stalls, no shuffle
+    // windows and no rescues, and satisfied every check below VACUOUSLY.
+    const playing = await page
       .waitForFunction(() => window.__placeTag().playing, null, { timeout: 40000 })
+      .then(() => true)
       .catch(() => false)
+    check('the group is really playing before the trace is taken', playing)
     const FRAMES = 1200
     const trace = await page.evaluate(
       (frames) =>
@@ -3376,13 +3389,27 @@ if (section('children-motion')) {
             log.push({
               clock: t.clock,
               playing: t.playing,
+              // Of that clock, the seconds actually played — likewise the
+              // game's own count.
+              playedClock: t.playedClock,
               c: t.children.map((k) => ({
                 x: k.x,
                 z: k.z,
                 pace: k.pace,
                 held: k.held,
                 walked: k.walked,
+                // The metres walked while the round was ON, the game's own
+                // counter (point 656): a watcher outside cannot say which side
+                // of a round's first frame a step belongs to.
+                walkedWhilePlaying: k.walkedWhilePlaying,
                 heading: k.heading,
+                // How often the settlement has had to pick this child up
+                // (point 656): the rescue is what ENDS a snag, so without it
+                // the correction reads as the child getting somewhere.
+                nudges: k.nudges,
+                // And how far it carried it, the game's own counter — no watcher
+                // outside can tell a carry from a walk in one frame vector.
+                carried: k.carried,
               })),
             })
             if (log.length < frames) requestAnimationFrame(tick)
@@ -3398,6 +3425,32 @@ if (section('children-motion')) {
       'the trace covers a real stretch of the game, frame by frame',
       log.length >= FRAMES && n >= 2 && log[log.length - 1].clock - log[0].clock > 5,
       `${log.length} frames, ${n} children, ${(log[log.length - 1].clock - log[0].clock).toFixed(1)}s`,
+    )
+    // AND THE TRACE ITSELF HOLDS A GAME (point 656). Between rounds the group
+    // idles for a calibratable break, which is legitimate — but a trace that is
+    // ALL break has nothing in it to judge: no chase, no pockets walked into, no
+    // shuffle windows.
+    //
+    // TWO REPAIRS HERE, both from the fourth cross-vendor review. The bar was a
+    // majority of the FRAMES, which is not a majority of the minute — frames are
+    // not evenly spaced, and this trace's own run from 20 ms to over a second.
+    // And nothing required a child to WALK: four stationary children reporting
+    // themselves as playing passed this check, the shuffle share (nothing walked
+    // is nothing shuffled), the judged share, and both rescue rates. The
+    // condition is now the shared `holdsAGame`, which asks the game CLOCK and
+    // the QUIETEST child's legs.
+    const tracks = Array.from({ length: n }, (_, k) =>
+      log.map((f) => ({ ...f.c[k], clock: f.clock, playing: f.playing, playedClock: f.playedClock })),
+    )
+    const live = traceLiveness(tracks)
+    check(
+      'and the trace holds a game rather than a break',
+      holdsAGame(live),
+      `${live.playedSeconds.toFixed(1)}s of ${live.seconds.toFixed(1)}s played ` +
+        `(${(live.playedShare * 100).toFixed(0)} %), quietest child ${live.quietestChild} walked ` +
+        `${live.quietestWalkedPerPlayedMinute.toFixed(1)} m per played minute ` +
+        `(floor ${CHILD_MOTION.walkFloor}), ` +
+        `group ${live.walkedPerChildMinute.toFixed(1)} m/child-min`,
     )
 
     // 3. THEY NEVER OCCUPY ONE ANOTHER. Judged against the body the game itself
@@ -3448,60 +3501,118 @@ if (section('children-motion')) {
     )
 
     // 2. NOTHING SHUFFLES ON THE SPOT — the user's own words, measured as he
-    // would judge them: over a window of two SECONDS, does a child WALK a real
-    // distance without LEAVING a small circle?
+    // would judge them: over a window of one second, does a child WALK a real
+    // distance without GETTING anywhere?
+    //
+    // THE MEASURE IS NOT THIS FILE'S (point 656). It is
+    // scripts/verify/childMotionMetric.mjs, which the replay test
+    // (src/scenes/place/tagShuffle.test.ts) judges by too — because when each
+    // side carried its own copy, both copies had the same two blind spots: they
+    // summed frame-to-frame POSITIONS as the path walked, so the rescue teleport
+    // that ENDS a snag counted as the child walking out of its own pocket, and
+    // their window was longer than the 1.5 s rescue that tidied the symptom
+    // away. The walked distance now comes from the game itself, the ground
+    // covered leaves out the carry, and the rescues are counted.
+    //
+    // AND THE SHARE IS WEIGHTED IN GAME TIME, which matters most HERE: the
+    // headless frame times in this very trace run from 20 ms to over a second,
+    // and one window per FRAME would have let the fast stretches of a run
+    // outvote the slow ones — the same fault, in a new place. Each window now
+    // counts for the game time it stands for, so the number below is the share
+    // of the traced minute the children spent shuffling.
     //
     // It used to count REVERSALS — a step that undoes the one before — and that
-    // check could never hold, for two reasons found by replaying this same game
-    // in the pure layer (src/scenes/place/tagShuffle.test.ts). A chase is FULL of
-    // legitimate reversals: a runner doubling back at the rim, a chaser cutting
-    // in as its quarry dodges. And their rate rides on the FRAME RATE — 1.4 % of
-    // steps at 60 fps against 3.2 % at 14, because a slower frame turns a longer
-    // step — so on this machine, where a headless frame takes anything from 20 ms
-    // to over a second, one run passed a 3 % gate and the next failed it on the
-    // same code. Ground covered against ground walked has neither fault.
+    // check could never hold either. A chase is FULL of legitimate reversals: a
+    // runner doubling back at the rim, a chaser cutting in as its quarry dodges.
+    // And their rate rides on the FRAME RATE — 1.4 % of steps at 60 fps against
+    // 3.2 % at 14, because a slower frame turns a longer step — so on this
+    // machine, where a headless frame takes anything from 20 ms to over a
+    // second, one run passed a 3 % gate and the next failed it on the same code.
+    // Ground covered against ground walked has neither fault.
     //
-    // The gate is the pure layer's, and this run is the proof that the LIVE
+    // The gate is the replay's own, and this run is the proof that the LIVE
     // settlement — real frame times, the speech, the bodies, the player standing
-    // in it — behaves as the replay says. Measured before the fix at this seed:
-    // 33 % of windows in the worst village, 0.5 % here; after it, none at all.
-    const SPAN = 2
-    const MIN_PATH = 2
-    const CIRCLE = 0.5
-    let windows = 0
-    let stuckWindows = 0
-    let worst = { path: 0, out: 0, child: -1, clock: 0 }
-    for (let k = 0; k < n; k++) {
-      for (let i = 0; i < log.length; i++) {
-        let j = i
-        let walked = 0
-        let out = 0
-        while (j < log.length - 1 && log[j + 1].clock - log[i].clock < SPAN) {
-          walked += Math.hypot(log[j + 1].c[k].x - log[j].c[k].x, log[j + 1].c[k].z - log[j].c[k].z)
-          j++
-          out = Math.max(out, Math.hypot(log[j].c[k].x - log[i].c[k].x, log[j].c[k].z - log[i].c[k].z))
-        }
-        // The tail of the trace is shorter than a window: nothing to judge.
-        if (log[j].clock - log[i].clock < SPAN * 0.9) break
-        windows++
-        if (walked > MIN_PATH && out < CIRCLE) {
-          stuckWindows++
-          if (walked / Math.max(0.01, out) > worst.path / Math.max(0.01, worst.out)) {
-            worst = { path: walked, out, child: k, clock: log[i].clock }
-          }
-        }
-      }
-    }
-    const share = windows > 0 ? stuckWindows / windows : 0
+    // in it — behaves as the replay says.
+    const shuffle = shuffleWindows(tracks)
+    // AND THE SHORT BURST BESIDE IT (point 656): the user's report was "die
+    // Kinder hängen KURZ fest", and a child that paces on the spot for six
+    // tenths of a second between spells of walking never collects the metre of
+    // walking a one-second window asks for. The same windows over half a second,
+    // with the ground bar a ratio of the distance walked. Both verdicts are ONE
+    // check, because they are one question asked at two scales.
+    const burst = shuffleWindows(tracks, CHILD_MOTION.short)
     check(
       'no child walks without getting anywhere',
-      windows > 200 && share < 0.01,
-      `${stuckWindows} of ${windows} two-second windows (${(share * 100).toFixed(2)} %) with over ${MIN_PATH} m walked ` +
-        `inside ${CIRCLE} m` +
-        (worst.child >= 0
-          ? ` — worst child ${worst.child} at ${worst.clock.toFixed(1)}s, ${worst.path.toFixed(2)} m inside ${worst.out.toFixed(2)} m`
+      // The bar is CHILD-SECONDS of game, not a count of frames: this trace is
+      // 1200 rendered frames and buys anything from 20 s of game to a minute
+      // and a half of it. 20 child-seconds is the same floor the trace check
+      // above sets (5 s of game, four children), read in the unit the share is
+      // weighted in.
+      // AND THE VERDICT MUST REST ON THE TRACE, CHILD BY CHILD. A live frame gap
+      // longer than the window is judged by nobody — interpolating across a
+      // silence longer than the question would invent the answer — so a share is
+      // worth exactly what `judgedShare` says it covers. Both are read off the
+      // WORST child rather than the group: one child snagging into a rescue
+      // every three seconds while its three siblings play leaves every group
+      // average clean, which is the whole of it divided by four.
+      // BOTH measures must have judged something, and both must be clean. A
+      // share of 0 is what either reports when nothing was bad AND when nothing
+      // was looked at: at a live frame gap of 0.6 s the one-second windows still
+      // stand while every half-second one is refused, so the burst half would
+      // pass on nothing at all.
+      judgedEnough(shuffle) &&
+        judgedEnough(burst) &&
+        shuffle.worstShare < CHILD_MOTION.shareGate &&
+        burst.worstShare < CHILD_MOTION.shareGate,
+      `worst child ${shuffle.worstShareChild} at ${(shuffle.worstShare * 100).toFixed(2)} % of its own ` +
+        `judged time; group ${(shuffle.share * 100).toFixed(2)} % (${shuffle.bad} of ${shuffle.windows} ` +
+        `${CHILD_MOTION.span}s windows, ${shuffle.seconds.toFixed(1)} judged child-seconds). ` +
+        `Least judgeable child ${shuffle.leastJudgedChild} at ${(shuffle.leastJudged * 100).toFixed(1)} %, ` +
+        `group ${(shuffle.judgedShare * 100).toFixed(1)} % of ${shuffle.covered.toFixed(1)} traced. ` +
+        `In ${CHILD_MOTION.short.span}s bursts: worst child ${burst.worstShareChild} at ` +
+        `${(burst.worstShare * 100).toFixed(2)} %, group ${(burst.share * 100).toFixed(2)} % of ` +
+        `${burst.seconds.toFixed(1)} judged child-seconds, least judgeable child ` +
+        `${burst.leastJudgedChild} at ${(burst.leastJudged * 100).toFixed(1)} %. ` +
+        `Bad = over ${CHILD_MOTION.minPath} m walked inside ${CHILD_MOTION.circle} m ` +
+        `(burst: over ${CHILD_MOTION.short.minPath} m walked for a ${CHILD_MOTION.short.ratio}th of it covered)` +
+        (shuffle.worst.child >= 0
+          ? ` — worst child ${shuffle.worst.child} at ${shuffle.worst.clock.toFixed(1)}s, ${shuffle.worst.path.toFixed(2)} m walked inside ${shuffle.worst.out.toFixed(2)} m`
           : ''),
     )
+
+    // 2b. AND NOBODY IS BEING CARRIED (point 656). The stall watch teleports a
+    // child that has got nowhere for 1.5 s onto free ground, and that teleport
+    // is the reported episode ENDING — so it is a finding in its own right and
+    // is reported by name here, whatever the windows above say. A CARRY is a
+    // rescue that really set the child down somewhere else; the rest handed it
+    // back the ground it was already standing on.
+    const rescues = rescueRate(tracks)
+    check(
+      'and no child has to be carried out of the settlement’s own geometry',
+      rescues.carriedPublished &&
+        rescues.nudgesPublished &&
+        rescues.carriedMetresPerChildMinute < CHILD_MOTION.carryGate &&
+        rescues.perChildMinute < CHILD_MOTION.rescueGate &&
+        // AND THE WORST CHILD ON ITS OWN CLOCK: a rate averaged over the group
+        // divides one persistently rescued child by its healthy siblings.
+        rescues.worstPerChildMinute < CHILD_MOTION.worstChildRescueGate &&
+        rescues.worstCarriedMetresPerChildMinute < CHILD_MOTION.worstChildCarryGate,
+      // EACH FIGURE WITH THE CHILD IT BELONGS TO, AND CALLED WHAT IT IS. Three
+      // different questions with three possibly different answers: the highest
+      // RATE (what the gate reads), the most rescues in ABSOLUTE count, and the
+      // furthest CARRIED. The rate used to be printed as "most-often-picked-up",
+      // which is the count's name, and the count was not printed at all.
+      `highest rescue rate: child ${rescues.worstRescueChild} at ` +
+        `${rescues.worstPerChildMinute.toFixed(2)}/min. Most rescues in all: child ` +
+        `${rescues.worstChild} with ${rescues.worstRescues}. Furthest carried: child ` +
+        `${rescues.worstCarriedChild} at ${rescues.worstCarriedMetresPerChildMinute.toFixed(2)} m/min. ` +
+        `Group ` +
+        `${rescues.rescues} rescues (${rescues.carriedMetres.toFixed(2)} m carried in all` +
+        `${rescues.carriedPublished && rescues.nudgesPublished ? '' : ', A COUNTER NOT PUBLISHED BY THE GAME'}) in ` +
+        `${rescues.childMinutes.toFixed(2)} child-minutes = ${rescues.perChildMinute.toFixed(2)}/child-min, ` +
+        `carried ${rescues.carriedMetresPerChildMinute.toFixed(2)} m/child-min`,
+    )
+
     // AND A LOOK AT THEM. The complaint is what the player SEES, so the run
     // leaves a frame of the children themselves — the traveller stepped back to
     // the group and turned to face it, the shutter projecting their centroid so

@@ -77,26 +77,25 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 657. THE CHILDREN STILL SHUFFLE ON THE SPOT IN THE LIVE SETTLEMENT (measured 12.08.2026
+- [ ] 657. THE CHILDREN STILL WALK ON THE SPOT IN THE LIVE SETTLEMENT (measured 12.08.2026
   with the gate point 656 delivers, at seed 2972259115, on a machine with nothing else on it,
-  on BOTH backends). WebGL 2 went red in 3 of 5 traces — 92 of 4652 one-second windows
-  (1.98 %) and 14 of 4640 (0.30 %) — and WebGPU in 1 of 3, 26 of 4676 (0.56 %), against a gate
-  of 0.25 %. The worst window has a child WALK 2.95 m and end 0.06 m from where it started.
-  The rescue teleport is NOT what produces this: the carry and rescue checks stayed green in
-  every one of those traces, so nobody is being picked up — the children are walking on the
-  spot, which is the symptom of the user's own report behind point 648 ("die Kinder hängen kurz
-  fest, zittern"). That point's behaviour fix made it rarer; it did not end it.
+  on BOTH backends). The figures are the ones the REPAIRED measure reads — time-weighted, the
+  trace broken at a rescue instead of guessed across, and judged PER CHILD rather than in the
+  group's average, after three rounds of cross-vendor review threw out the earlier ones. Worst
+  child's own share against the 0.25 % gate: WebGL 2 0.00 / 1.29 / 0.09 / 0.34 / 0.00 %,
+  WebGPU 0.00 / 0.24 / 0.00 / 1.53 / 0.00 % — RED in 3 of 10 traces, on both backends. The
+  worst windows have a child WALK 2.92 m and end 0.00 m from where it started, and 3.08 m
+  ending 0.23 m away. The rescue teleport is not what produces this: the game's own counter
+  reads 0.00 m carried per minute for the WORST child of every one of the ten runs, and no red
+  window holds a rescue or a sample gap longer than the second it measures. This is the symptom
+  of the user's own report behind point 648 ("die Kinder hängen kurz fest, zittern"); that
+  point's behaviour fix made it rarer and did not end it.
+
   FINAL STATE: a child that is commanded to walk gets somewhere. In the live settlement at that
   seed, the share of one-second windows in which a child walks more than 1 m without leaving a
   0.35 m circle stays under the 0.25 % gate across repeated traces on BOTH backends — with the
   gate untouched, and with the carry and rescue rates staying under their own gates, so the
   symptom is gone rather than tidied away.
-  THE EVIDENCE IS RE-TAKEN FIRST. GPT-5.6 Sol's review of point 656 (12.08.2026) found the
-  metric those numbers came from to be SAMPLE-weighted rather than time-weighted: it counts one
-  window per rendered frame, so an irregular headless frame cadence moves the share. So this
-  point begins by re-measuring with the corrected measure point 656 must deliver; if the share
-  then stays under the gate across repeated traces on both backends, this point closes as a
-  measurement artefact and says so, and the charge below goes with it.
   THE CAUSE IS NAMED BEFORE IT IS FIXED. The measurement leaves three candidates open and the
   trace can tell them apart: the separation pass pushing a child back into the pocket it just
   walked out of; two children resolving each other in opposite directions on alternating frames;
@@ -118,80 +117,53 @@ put it is the mistake this line exists to stop.
   Criticality: high — it is the user's own bug report and the most visible surface of the
   settlement.
   Bundle: Dorfleben.
-- [ ] 656. THE CHILDREN'S SHUFFLE GATE CANNOT SEE THE SYMPTOM IT WAS BUILT FOR (found
-  11.08.2026 by the cross-vendor review of point 648 — GPT-5.6 Sol at effort high, verdict
-  do-not-merge, recorded against `d1ed0d27`; the behaviour fixes of 648 are on `main` and are
-  not in question, its PROOF is). Point 648 replaced a frame-rate-dependent reversal count with
-  the user's own complaint — a child that walks over 2 m in a 2-second window without leaving a
-  0.5 m circle. Measured against the code that runs beside it, that gate is largely blind:
-  1. `trackProgress` in `src/scenes/place/tagGame.ts` teleports a child that has not left
-     `childRadius * 3` for `unstuckSeconds` (1.5 s) to free ground. The window is 2 s. So the
-     exact failure the gate looks for is ENDED half a second before its window can close, and
-     the user's report was "hängt KURZ fest" — the short episode is the bug.
-  2. Both the browser check (`scripts/verify/polish.mjs`, section `children-motion`) and
-     `src/scenes/place/tagShuffle.test.ts` sum FRAME-TO-FRAME POSITION DELTAS as the path
-     walked. The teleport is a position delta, so the correction that hides the symptom is
-     counted as the child walking out of the circle — twice blind, in the same window.
-  3. The browser check waits for `window.__placeTag().playing` but discards the result and
-     never asserts it. A group that never plays produces no stalls and no shuffle windows and
-     satisfies the gate vacuously.
-  4. `tagShuffle.test.ts` claims only the CHILDREN in a fresh `InhabitantSet`, so the
-     multi-pass separation is never exercised against the adults, porters and errand walkers
-     whose bodies share the production registry — the very crowding that made more than one
-     pass necessary.
 
-  FINAL STATE:
+- [ ] 659. THE WHOLE COMMUNICATION CHAIN, PLAYED THROUGH AND JUDGED BY WHAT REACHES THE
+  PLAYER — A SIX-EYES ALL-ROUND REVIEW (user 12.08.2026: "Danach will ich endlich mal
+  erfolgreich die ganze Kette der Kommunikationsmechanik in diesem Dorf durchspielen können,
+  ohne bei jedem Schritt sofort auf blockierende Bugs zu stoßen, obwohl du bereits mehrfach
+  getestet und nachgebessert hast. Die QS war bei diesem Feature bisher offensichtlich völlig
+  unzureichend."). THE RECORD BEARS HIM OUT: every part of this feature passed its own tests
+  and the player still could not get through it, and the cross-vendor review of the children's
+  proof needed four rounds before the proof could see the symptom at all (points 648, 656,
+  657). What failed was not any single check but the SHAPE of the checking: partial chains
+  verified in isolation, each green, with nobody walking the whole way as a player.
 
-  1. The shuffle metric measures the game's OWN walked distance (`walked`, which deliberately
-     excludes the nudge) against ground covered, in both the browser check and the pure test —
-     never a summed position delta.
-  2. A NUDGE IS A FINDING, NOT AN ESCAPE. The teleport is counted and reported: a child freed by
-     it was, by definition, going nowhere. The gate fails on a nudge rate above a stated
-     threshold, and the window is shorter than `unstuckSeconds` so an episode the player sees
-     is inside it, with the chosen window and threshold justified by a measurement in the
-     comment.
-  3. The browser check ASSERTS that the group is playing, and a trace with no play at all fails
-     rather than passes.
-  4. The pure integration test builds the body set the settlement really has — children,
-     adults, porters, errand walkers — and the separation is judged against all of them.
-  5. `pinned` is cleared wherever the round is broken off or a child is commanded to stand
-     (`breakOffRound`, the held branch, after a progress nudge), so a stale count from before a
-     hold cannot fire a teleport on the first blocked frame after it.
+  THE METHOD IS SIX EYES, and the user named the three pairs (12.08.2026): the ENUMERATING half
+  — what can break, what a player must be able to do, which step could silently not arrive —
+  is collected BLIND PARALLEL by FABLE 5 and GPT-5.6 SOL, neither seeing the other's list, and
+  OPUS 5 merges the two into one counted union, accounting for every entry as `only A`, `only B`
+  or `merged with <id>` (`scripts/blind-merge.mjs`, `mechanism-review.mjs --merged-by`). That is
+  the CLAUDE.md §6 rule with the models we actually have: the merger wrote neither list. The
+  JUDGING half — does this play-through really work — is convergent and keeps the ordinary
+  cross-vendor review, the reviewer reading the artefact before the author's rationale.
 
-  VERIFIABLE: Vitest over a replayed settlement in which a child is deliberately wedged — the
-  gate must go RED with the nudge left on, and the same trace must show the shuffle it was
-  hiding; a trace with a permanently idle group fails; a trace with adults crowding the children
-  is judged like the children. Plus the live section at seed 2972259115 on both backends, whose
-  report NAMES the nudge count it observed.
-  Criticality: high — it is the proof that the user's own bug report stays fixed.
-  Bundle: Dorfleben.
+  WHAT IS COVERED — the whole chain a player walks, not its parts:
+  1. Arriving in the village and HEARING the speech: the syllables are actually audible at the
+     shipped defaults over drums and ambience, measured on the audio path, not merely "the call
+     was made".
+  2. The children's staged situations and the adults' errands: from the scene alone, can a
+     player recognise WHAT is being expressed — the gesture, the object, the direction — or
+     only that something was said?
+  3. The guess: hypothesis label, the invitation, the dialog, and what the journal keeps of it.
+  4. The chief: the culturally correct gift, his reply, and the hint it yields.
+  5. The direction words, the glossary and the retroactive deciphering in either order.
+  6. Search, excavation and the return — the goal chain to the victory state.
 
-- [ ] 645. CRITERION 7 DESCRIBES THE PLACEHOLDER, NOT THE COMMUNICATION MECHANICS THAT WERE
-  BUILT (found 11.08.2026 in conversation with the user while the batch was paused).
-  `docs/acceptance-criteria-detail.md` §7 and the short form in CLAUDE.md §7.1 point 7 still
-  describe the OLD placeholder — the village elder handing out a glossary and direction
-  words — together with the OPEN note against `design.md` §13.4 saying the real mechanic is
-  undecided and nothing should be built on it. What is built and shipped on `main` is the
-  mechanic the user specified: `src/communication/` with `lexicon`, `speaking`, `heard`,
-  `speechLabel`, `speechTarget`, `spokenGesture`, `drumMessage` and `chiefReply`, plus the
-  teaching adults and children of the Bambara village (points 580–583, 588 and their
-  successors).
-  WHY IT MATTERS: the detail section is the PROOF text read at the closing run and at the
-  v0.3 tag. As it stands it would sign off a built mechanic as a placeholder, and its
-  sentence "do not build on it, but do not protect it either" invites sacrificing that
-  mechanic when something else changes.
-  FINAL STATE: criterion 7 and its detail section describe the mechanic that exists, naming
-  its files; the evidence chain in `docs/acceptance-evidence.md` §7 points at the tests that
-  actually prove it; and what is GENUINELY still open from `design.md` §13.4 — the invented
-  language per region — stands as a clearly bounded remainder rather than as a blanket
-  "undecided".
-  VERIFIABLE: no runtime invariant — this is proof-document hygiene. The proof is that every
-  file and test §7 names exists and covers what the section claims; check each claim against
-  the code that owns it. CLAUDE.md §7.1, the detail section and the evidence section change
-  in the SAME commit, per the rule each of them states.
-  Criticality: medium — no player sees it, but it is the document the closing run and the
-  release tag read as proof, and it currently misreports delivered work as unbuilt.
-  Bundle: Dokumentation.
+  HOW IT IS JUDGED: by what ARRIVES. Every step is played through as a player plays it — one
+  continuous session per run, not a per-check probe — on BOTH backends, and each step is judged
+  by the rendered picture, by the sound measured where it leaves the audio path, and by the text
+  actually shown. A step that works internally but does not reach the player is a DEFECT, and
+  the report says which of the two it was.
+
+  VERIFIABLE: a complete play-through of the chain from entering the village to the victory
+  state, with no blocking defect, evidenced by the frames of each step, an audio measurement at
+  the shipped defaults, and the journal it wrote; every defect found is listed with its severity
+  and either fixed here or filed as its own point, and the blocking ones are fixed before this
+  point is ticked. The enumerating lists, their merge and the counted union are recorded.
+  Criticality: high — this is the feature the release exists for, and the user is the one who
+  keeps hitting the bugs.
+  Bundle: Verständigung.
 
 - [ ] 581. THE SETTLEMENT BOUNDARY IS TOO FAINT, AND ITS SLIDER IS ALREADY AT THE CEILING
   (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die

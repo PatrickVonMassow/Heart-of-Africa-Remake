@@ -50,7 +50,7 @@ import { nudgeToFree, nudgeWhere, resolveMove, spawnPointFree, standingClear, tr
 import { insidePlace } from './boundary'
 import type { PlaceRiverBank } from './riverBank'
 import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, type NavPoint } from './routing'
-import { createTagGame, stepTagGame, type TagChild, type TagWorld } from './tagGame'
+import { absorbSeparation, createTagGame, stepTagGame, type TagChild, type TagWorld } from './tagGame'
 import {
   childSteer,
   createChildSpeech,
@@ -669,8 +669,10 @@ function Kids({
     for (let i = 0; i < game.children.length; i++) {
       const b = bodies[i]
       if (!b) continue
-      game.children[i].x = b.x
-      game.children[i].z = b.z
+      // The resolved position AND whatever the separation's own wedge escape
+      // did (point 656 follow-up): its teleport is a rescue like any other, and
+      // uncounted it read as the child walking out of its pocket.
+      absorbSeparation(game.children[i], b)
     }
     const said = stepChildSpeech(speech, view, dt, cfg, speechRand)
     if (said) speakSituation(said, game.children[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
@@ -712,6 +714,10 @@ function Kids({
       // The game's OWN clock: the verification samples an interval of GAME,
       // never a count of frames, which buy different amounts of it per machine.
       clock: game.clock,
+      // Of that clock, the part actually PLAYED (point 656) — the game's own
+      // count, so a check need not decide from a sampled flag which side of a
+      // round's first frame an interval falls on.
+      playedClock: game.playedClock,
       // The radius a child's BODY occupies, so a live check can judge an overlap
       // against the real figure rather than against a guessed one (point 648).
       bodyRadius: balance.villageLife.separation.bodyRadius * KID_SCALE,
@@ -724,10 +730,23 @@ function Kids({
         press: c.press,
         pace: c.pace,
         pinned: c.pinned,
+        // How often the settlement had to pick this child up and set it down on
+        // free ground (point 656). A live check needs it: the teleport is what
+        // ENDS a snag, so without the count the correction reads as the child
+        // having walked out of the pocket by itself.
+        nudges: c.nudges,
+        // And how far it was carried doing so (point 656). Nothing outside the
+        // game can work this out: one frame vector holds the child's walking and
+        // the settlement's correction added together, and `walked` is a scalar
+        // that cannot say which way the legs went.
+        carried: c.carried,
         // Standing because it was TOLD to (point 481), not because it stalled —
         // the difference between an obeyed stillness and the reported snag.
         held: c.held,
         walked: c.walked,
+        // And how much of that walking happened while the round was ON — the
+        // settlement's own counter, for the same reason (point 656).
+        walkedWhilePlaying: c.walkedWhilePlaying,
       })),
     })
     // What the group has SAID so far this visit (point 481), by situation — a
