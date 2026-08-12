@@ -400,6 +400,105 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+- [ ] 336. THE WHOLE CROCODILE STAGING FAMILY IS FRAGILE — REBUILD IT, NOT ONE CASE
+  AT A TIME (escalated 25.07.2026 after four consecutive runs each failed a DIFFERENT
+  crocodile check). History: the lunge case was found resting on an unpinned
+  assumption (its red turned out to be machine load, proven by a quiet-machine
+  repeat) and was pinned; the next run failed the TOO-LATE case, where the parent
+  arrived in time after all and the crocodile took it instead of the calf; that was
+  pinned too; the next run failed the VANISH case with gripped:false — the crocodile
+  never seized at all (diag: drink true, dist 0.1, crocLunge false). Fixing one case
+  per run is a treadmill: the family shares one `crocDrama` helper whose five modes
+  each depend on a different implicit precondition (a distance, an arrival time, a
+  drink state, a lunge that must fire), and every one of them is a separate way for
+  the staging to miss while the GAME behaves correctly.
+  DO INSTEAD — one rebuild of the helper: (a) every mode states its preconditions
+  EXPLICITLY and asserts them before measuring, so a miss reports "staging did not
+  reach its precondition" instead of accusing the product; (b) every mode pins its
+  outcome roll (rescue, lunge and too-late now do; vanish and sacrifice must too);
+  (c) the seizure itself is established deterministically — poll for the grip with a
+  generous sim budget and FAIL THE STAGING, not the behaviour, if it never happens;
+  (d) each mode gets its own tiny setup helper instead of one branching function, so
+  a change to one ending cannot shift another's timing (the point-311 lesson at test
+  level). VERIFIABLE: enrichments green on BOTH backends THREE times in a row on a
+  quiet machine — the flake-free bar the closing gate needs; a staging miss produces
+  a distinct, self-naming failure message; the five §19.16 endings still each assert
+  their real outcome (no masking). RELATED: this is the concrete first slice of point
+  200's flake work, and point 294's auto-classification would have labelled all four
+  reds "staging, not product" without a manual repeat each time.
+
+- [ ] 595. THE VERIFICATION LADDER (point 572's measure 5). While a render point is still
+  being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
+  full proof — both backends where they can differ, LARGE where the change warrants it —
+  runs exactly ONCE, on the EXACT MERGE CANDIDATE — `main` merged into the branch, the tree
+  that will land — with the recorded `git HEAD` of that run as the evidence that the verified
+  tree IS the merged one. Nothing enforces or measures that today. The expensive browser
+  suites abort at the FIRST failure during that iteration (a red run is never credited
+  anyway) and run to completion only for the final proof. The rule is a brief building block
+  for render points, so it is applied rather than remembered.
+  A RED IS A RED. No "critical versus cosmetic" class is introduced to decide what may be
+  aborted on — the classification buys nothing here, because an iteration run is not credited
+  either way, and it would open the door to waving a red through.
+  THE SHARED FINAL RUN IS ALREADY DECIDED, and this point must not be read as contradicting
+  it: `docs/work-packages.md` settled that several FINISHED per-point branches may be merged
+  together and ONE regression run over the merged result — "the only sizeable saving left".
+  What that shared run may replace is the repeated full REGRESSION. The both-backend PICTURE
+  proof stays on the branch, BEFORE the merge, exactly as it is today; merging first to
+  verify afterwards cost about thirty turns of a block-loop on 24.07.2026.
+  THE UNIT LAYER HAS THE SAME LADDER: `vitest --changed` or a path filter and
+  `tsc --incremental` are legal WHILE REPAIRING, and an incremental green is never an
+  acceptance — the full fast gate stays the proof. One rule covering both layers, not two
+  half-rules.
+  MEASURED TARGET: verification is 47.0 % of the weighted spend and 37.4 % of the machine
+  hours, the ten costliest points hold 64.4 % of all point-assigned verification tokens,
+  and eight of ten recorded `enrichments` runs failed while still writing all 37 frames at
+  951–1029 s each.
+  THE LADDER'S CHEAPEST RUNG ALREADY EXISTS AND IS UNUSED (user question 09.08.2026: "Und
+  die neuen Möglichkeiten für differenziertes Testen durch 566 werden auch inzwischen bei
+  den Feature- und Bugtests eingesetzt?"). Point 566 built `--section=<name>`, and
+  `enrichments` declares nine of them; the resolver, the PARTIAL marking and the refusal to
+  count a partial run as coverage all work. CHECKED 09.08.2026: nothing routes anyone to
+  it. It appears in `scripts/verify/README.md` and in `tiers.mjs`, in no delegation brief,
+  in no agent prompt and in no rule text — the three agents commissioned that same evening
+  were not told about it either — and the recorded render-verify runs contain no partial
+  run at all. So the ladder's bottom rung is not a thing to invent here; it is a built
+  tool to PUT IN THE PATH. This point therefore also: (a) makes `--section` the stated
+  iteration rung for a render point in the delegation brief's building block, so an agent
+  reaches for it before replaying a whole pass; (b) SECTIONS the remaining render suites,
+  which 566 deferred ("enrichments first, then the other render suites"); and (c) states
+  in the same building block that the final proof is whole-suite, so the cheap rung can
+  never be mistaken for the acceptance.
+  WORK FOR 595–598 ALREADY STANDS ON A BRANCH (11.08.2026). A session that died left
+  `feat/595-598-verification-ladder-brief` PUSHED at 0d555552 — four commits plus a merge of
+  `origin/main`, covering all four points — with its worktree
+  `.claude/worktrees/agent-a7b6ba2cc654e6411` still in the tree. It was never reported,
+  verified or landed. Whoever takes these points STARTS FROM THAT BRANCH and verifies it
+  against the specs here; rebuilding from scratch throws away finished work. Cleaning that
+  worktree away before the branch has been judged is what point 629 exists to prevent.
+  Criticality: medium — it reorders the proof but must not dilute it; the both-backend
+  picture proof stays exactly as binding as it is today.
+
+- [ ] 598. THE BRIEF ORIENTS IN THE CODE, NOT ONLY IN THE SPEC (point 572's measure 8).
+  The delegation brief carries a GENERATED orientation: the paths the specification itself
+  names, and a per-directory line of responsibility derived from the tree and its file
+  headers. It is marked as a HINT, never as an instruction ("the specification names these
+  paths", not "change these files"), and it is generated on every run so it cannot go
+  stale.
+  AND IT NAMES THE PLANNED CHECK: which suite, and which `--section` of it, will verify this
+  point — derived from the diff→suite mapping and the ladder rung, generated like the rest so
+  it cannot go stale, and marked as a hint like the path list. This is the cheapest possible
+  answer to what the ladder point found: a rung that is built and routed to nobody gets used
+  when it stands in the artefact the agent reads FIRST, not in a rule it must remember.
+  MEASURED TARGET: search/read is 25.2 % of the weighted spend and the first responses of
+  a delegated agent are almost always search; five saved responses per point is ~2 % of a
+  median point.
+  NOT THE OPPOSITE DIRECTION: shrinking the brief was weighed and rejected on the arithmetic.
+  Removing 1.5k tokens saves ~35.7k weighted per point, while a single reference the agent
+  must then look up costs 22.9k — it breaks even at 1.5 extra lookups and goes negative
+  after. The brief is 1.9 % of the spend and exists to avoid the ~108k wholesale read.
+  Criticality: low — a wrong list would misdirect, which generation-from-the-tree and the
+  hint framing address.
+
 - [ ] 453. WHAT IS THE LION EATING? (user bug report 30.07.2026,
   `local/WasFrisstDerLoewe.zip`, seed 1608676381, east region at the river, WebGPU/high:
   "Er scheint zu fressen und die Geier kreisen, aber ich sehe keine Beute"; bundle Kadaver &
@@ -1054,78 +1153,6 @@ put it is the mistake this line exists to stop.
   judgments belongs before them, not after.
   Criticality: low — pure measurement; it changes no behaviour, and it is the precondition
   for judging the remaining structural levers.
-
-- [ ] 595. THE VERIFICATION LADDER (point 572's measure 5). While a render point is still
-  being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
-  full proof — both backends where they can differ, LARGE where the change warrants it —
-  runs exactly ONCE, on the EXACT MERGE CANDIDATE — `main` merged into the branch, the tree
-  that will land — with the recorded `git HEAD` of that run as the evidence that the verified
-  tree IS the merged one. Nothing enforces or measures that today. The expensive browser
-  suites abort at the FIRST failure during that iteration (a red run is never credited
-  anyway) and run to completion only for the final proof. The rule is a brief building block
-  for render points, so it is applied rather than remembered.
-  A RED IS A RED. No "critical versus cosmetic" class is introduced to decide what may be
-  aborted on — the classification buys nothing here, because an iteration run is not credited
-  either way, and it would open the door to waving a red through.
-  THE SHARED FINAL RUN IS ALREADY DECIDED, and this point must not be read as contradicting
-  it: `docs/work-packages.md` settled that several FINISHED per-point branches may be merged
-  together and ONE regression run over the merged result — "the only sizeable saving left".
-  What that shared run may replace is the repeated full REGRESSION. The both-backend PICTURE
-  proof stays on the branch, BEFORE the merge, exactly as it is today; merging first to
-  verify afterwards cost about thirty turns of a block-loop on 24.07.2026.
-  THE UNIT LAYER HAS THE SAME LADDER: `vitest --changed` or a path filter and
-  `tsc --incremental` are legal WHILE REPAIRING, and an incremental green is never an
-  acceptance — the full fast gate stays the proof. One rule covering both layers, not two
-  half-rules.
-  MEASURED TARGET: verification is 47.0 % of the weighted spend and 37.4 % of the machine
-  hours, the ten costliest points hold 64.4 % of all point-assigned verification tokens,
-  and eight of ten recorded `enrichments` runs failed while still writing all 37 frames at
-  951–1029 s each.
-  THE LADDER'S CHEAPEST RUNG ALREADY EXISTS AND IS UNUSED (user question 09.08.2026: "Und
-  die neuen Möglichkeiten für differenziertes Testen durch 566 werden auch inzwischen bei
-  den Feature- und Bugtests eingesetzt?"). Point 566 built `--section=<name>`, and
-  `enrichments` declares nine of them; the resolver, the PARTIAL marking and the refusal to
-  count a partial run as coverage all work. CHECKED 09.08.2026: nothing routes anyone to
-  it. It appears in `scripts/verify/README.md` and in `tiers.mjs`, in no delegation brief,
-  in no agent prompt and in no rule text — the three agents commissioned that same evening
-  were not told about it either — and the recorded render-verify runs contain no partial
-  run at all. So the ladder's bottom rung is not a thing to invent here; it is a built
-  tool to PUT IN THE PATH. This point therefore also: (a) makes `--section` the stated
-  iteration rung for a render point in the delegation brief's building block, so an agent
-  reaches for it before replaying a whole pass; (b) SECTIONS the remaining render suites,
-  which 566 deferred ("enrichments first, then the other render suites"); and (c) states
-  in the same building block that the final proof is whole-suite, so the cheap rung can
-  never be mistaken for the acceptance.
-  WORK FOR 595–598 ALREADY STANDS ON A BRANCH (11.08.2026). A session that died left
-  `feat/595-598-verification-ladder-brief` PUSHED at 0d555552 — four commits plus a merge of
-  `origin/main`, covering all four points — with its worktree
-  `.claude/worktrees/agent-a7b6ba2cc654e6411` still in the tree. It was never reported,
-  verified or landed. Whoever takes these points STARTS FROM THAT BRANCH and verifies it
-  against the specs here; rebuilding from scratch throws away finished work. Cleaning that
-  worktree away before the branch has been judged is what point 629 exists to prevent.
-  Criticality: medium — it reorders the proof but must not dilute it; the both-backend
-  picture proof stays exactly as binding as it is today.
-
-- [ ] 598. THE BRIEF ORIENTS IN THE CODE, NOT ONLY IN THE SPEC (point 572's measure 8).
-  The delegation brief carries a GENERATED orientation: the paths the specification itself
-  names, and a per-directory line of responsibility derived from the tree and its file
-  headers. It is marked as a HINT, never as an instruction ("the specification names these
-  paths", not "change these files"), and it is generated on every run so it cannot go
-  stale.
-  AND IT NAMES THE PLANNED CHECK: which suite, and which `--section` of it, will verify this
-  point — derived from the diff→suite mapping and the ladder rung, generated like the rest so
-  it cannot go stale, and marked as a hint like the path list. This is the cheapest possible
-  answer to what the ladder point found: a rung that is built and routed to nobody gets used
-  when it stands in the artefact the agent reads FIRST, not in a rule it must remember.
-  MEASURED TARGET: search/read is 25.2 % of the weighted spend and the first responses of
-  a delegated agent are almost always search; five saved responses per point is ~2 % of a
-  median point.
-  NOT THE OPPOSITE DIRECTION: shrinking the brief was weighed and rejected on the arithmetic.
-  Removing 1.5k tokens saves ~35.7k weighted per point, while a single reference the agent
-  must then look up costs 22.9k — it breaks even at 1.5 extra lookups and goes negative
-  after. The brief is 1.9 % of the spend and exists to avoid the ~108k wholesale read.
-  Criticality: low — a wrong list would misdirect, which generation-from-the-tree and the
-  hint framing address.
 
 - [ ] 597. LARGE TOOL OUTPUT NEVER ENTERS THE CONTEXT WHOLE (point 572's measure 7). The
   bounded-output discipline `scripts/verify/run-logged.mjs` already applies to verify runs
@@ -2700,33 +2727,6 @@ Build order, chosen so no two parallel agents own the same file:
   (ii) docs get written against the TASKS SPEC rather than the shipped code — the
   cited `panoramaVicinityRadius` never existed in any commit, it came from a spec
   draft; a doc's symbol citations must be checked against the code that shipped.
-
-- [ ] 336. THE WHOLE CROCODILE STAGING FAMILY IS FRAGILE — REBUILD IT, NOT ONE CASE
-  AT A TIME (escalated 25.07.2026 after four consecutive runs each failed a DIFFERENT
-  crocodile check). History: the lunge case was found resting on an unpinned
-  assumption (its red turned out to be machine load, proven by a quiet-machine
-  repeat) and was pinned; the next run failed the TOO-LATE case, where the parent
-  arrived in time after all and the crocodile took it instead of the calf; that was
-  pinned too; the next run failed the VANISH case with gripped:false — the crocodile
-  never seized at all (diag: drink true, dist 0.1, crocLunge false). Fixing one case
-  per run is a treadmill: the family shares one `crocDrama` helper whose five modes
-  each depend on a different implicit precondition (a distance, an arrival time, a
-  drink state, a lunge that must fire), and every one of them is a separate way for
-  the staging to miss while the GAME behaves correctly.
-  DO INSTEAD — one rebuild of the helper: (a) every mode states its preconditions
-  EXPLICITLY and asserts them before measuring, so a miss reports "staging did not
-  reach its precondition" instead of accusing the product; (b) every mode pins its
-  outcome roll (rescue, lunge and too-late now do; vanish and sacrifice must too);
-  (c) the seizure itself is established deterministically — poll for the grip with a
-  generous sim budget and FAIL THE STAGING, not the behaviour, if it never happens;
-  (d) each mode gets its own tiny setup helper instead of one branching function, so
-  a change to one ending cannot shift another's timing (the point-311 lesson at test
-  level). VERIFIABLE: enrichments green on BOTH backends THREE times in a row on a
-  quiet machine — the flake-free bar the closing gate needs; a staging miss produces
-  a distinct, self-naming failure message; the five §19.16 endings still each assert
-  their real outcome (no masking). RELATED: this is the concrete first slice of point
-  200's flake work, and point 294's auto-classification would have labelled all four
-  reds "staging, not product" without a manual repeat each time.
 
 - [ ] 347. THE STARTING QUALITY LEVEL FROM THE URL (user 25.07.2026; design.md §21.1
   states the target). `?quality=low|medium|high` on any deployment URL — the GH-Pages
