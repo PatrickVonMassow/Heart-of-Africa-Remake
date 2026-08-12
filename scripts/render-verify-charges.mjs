@@ -99,15 +99,17 @@ export const RED_CHARGES = [
     kind: 'check',
     match: /no child walks without getting anywhere/i,
     why:
-      'MEASURED 12.08.2026 over THREE sittings of ten traces each at seed 2972259115 on an idle ' +
-      'machine, five per backend, with the per-child measure (a group average divided one ' +
-      'shuffling child by three healthy siblings; every reading from before that is void). The ' +
-      "worst child's own share against the 0.25 % gate: 7 red of 30 — WebGL 2 twice in 15 " +
-      '(1.29 %, 0.34 %), WebGPU five times in 15 (1.53, 0.74, 0.89, 1.30, 0.82 %), the other 23 ' +
-      'traces 0.00-0.24 %. The red windows have a child walk 1.3-3.2 m and end 0.00-0.35 m from ' +
-      'where it started; none holds a rescue or a gap longer than the second it measures; and ' +
-      "the game's own carry counter reads 0.00 m per minute for every child of all thirty runs, " +
-      'so nothing is hiding inside a teleport. That is the settlement walking on the spot, which ' +
-      'is point 657. Both backends, at different rates: seen on each, oftener on WebGPU.',
+      'MEASURED 12.08.2026 over FOUR sittings of ten traces at seed 2972259115 on an idle ' +
+      "machine, five per backend, with the per-child measure. Sittings 1-3 (one-second windows " +
+      'only): 7 red of 30 — WebGL 2 twice (1.29 %, 0.34 %), WebGPU five times (1.53, 0.74, 0.89, ' +
+      '1.30, 0.82 %) against the 0.25 % gate. Sitting 4 added the half-second BURST measure and ' +
+      'changed the picture: 3 red of 10 — WebGL 2 twice (bursts 0.54 %, 0.89 %), WebGPU once ' +
+      '(0.27 %) — and ALL THREE were invisible to the one-second window, which stayed under the ' +
+      'gate in all ten (worst 0.23 %). So the shuffle is mostly SHORT, which is the user\'s own ' +
+      'report behind point 648 ("die Kinder hängen kurz fest"). The red windows hold no rescue ' +
+      'and no gap longer than the span, the worst of them walking 1.3-3.2 m to end 0.00-0.35 m ' +
+      "from where it started, and the game's own carry counter reads 0.00 m per minute for every " +
+      'child of all forty runs — nothing hides inside a teleport. That is point 657. Both ' +
+      'backends, on both measures.',
   },
 ]
