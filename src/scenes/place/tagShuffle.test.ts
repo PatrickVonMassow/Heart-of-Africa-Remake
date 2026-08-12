@@ -32,6 +32,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CHILD_MOTION,
+  holdsAGame,
   rescueRate,
   shuffleWindows,
   traceLiveness,
@@ -424,13 +425,14 @@ function expectLively(paths: Track[][]): void {
   expect(live.numbersFinite).toBe(true)
   expect(live.children).toBeGreaterThan(1)
   expect(live.seconds).toBeGreaterThan(30)
-  expect(live.playedShare).toBeGreaterThan(0.5)
   expect(live.walkedPerChildMinute).toBeGreaterThan(20)
-  // AND EVERY CHILD WALKED, not the group on average (the fourth review). One
+  // THE SAME CONDITION THE LIVE GATE USES, from the same place (point 656): the
+  // group played a majority of the game CLOCK, and every child walked — one
   // motionless child among three busy ones is invisible in a sum and scores
   // perfectly on every ceiling there is. Measured here: the quietest child of
   // each village walks 102-113 m in its own minute.
   expect(live.quietestWalkedPerChildMinute).toBeGreaterThan(CHILD_MOTION.walkFloor)
+  expect(holdsAGame(live)).toBe(true)
 }
 
 // The reported village and seed first; the others are there because the causes
@@ -757,6 +759,7 @@ describe('and the replay refuses a trace with no game in it (point 656)', () => 
     expect(rescueRate(still).perChildMinute).toBe(0)
     expect(rescueRate(still).carriedMetresPerChildMinute).toBe(0)
     expect(() => expectLively(still)).toThrow()
+    expect(holdsAGame(traceLiveness(still))).toBe(false)
   })
 
   it('and so does a settlement in which no round ever plays', () => {

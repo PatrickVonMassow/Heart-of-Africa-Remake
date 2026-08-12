@@ -122,6 +122,7 @@ export declare const CHILD_MOTION: {
   worstChildCarryGate: number
   judgedGate: number
   walkFloor: number
+  playedGate: number
 }
 
 export declare function groundPath(
@@ -136,6 +137,11 @@ export declare function shuffleWindows(
 export declare function traceLiveness(
   tracks: ReadonlyArray<ReadonlyArray<{ clock: number; walked: number; playing?: boolean }>>,
 ): TraceLiveness
+
+export declare function holdsAGame(
+  live: TraceLiveness,
+  cfg?: Partial<typeof CHILD_MOTION>,
+): boolean
 
 export declare function rescueRate(
   tracks: ReadonlyArray<ReadonlyArray<{ clock: number; nudges?: number; carried?: number }>>,

@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CHILD_MOTION,
   groundPath,
+  holdsAGame,
   rescueRate,
   shuffleWindows,
   traceLiveness,
@@ -365,11 +366,46 @@ describe('a trace has to hold a game before it proves anything', () => {
     expect(live.quietestWalkedPerChildMinute).toBe(0) // and one of them never moved
     expect(live.quietestChild).toBe(3)
     expect(live.perChild[0].walkedPerMinute).toBeCloseTo(90, 0)
-    // Sol's live construction: ALL of them standing still, which is what the
-    // live proof used to accept as a game.
+    expect(holdsAGame(live)).toBe(false) // and the live gate refuses the group
+  })
+
+  it('and the live gate REFUSES four children standing still', () => {
+    // SOL'S LIVE CONSTRUCTION (fourth cross-vendor review), which the live
+    // section passed on every check it made: four children that report
+    // themselves as playing and never move. Nothing walked is nothing shuffled,
+    // nothing stuck and nothing carried, and the trace is judgeable end to end,
+    // so every ceiling was satisfied — by a settlement standing perfectly still.
+    const statue = () => trace(420, () => ({ x: 0, z: 0 })).map((s) => ({ ...s, playing: true }))
     const still = traceLiveness([statue(), statue(), statue(), statue()])
-    expect(still.quietestWalkedPerChildMinute).toBe(0)
-    expect(still.playedShare).toBe(1) // it says it is playing, and nothing moves
+    expect(still.playedShare).toBe(1) // it says it is playing the whole seven seconds
+    expect(shuffleWindows([statue(), statue(), statue(), statue()]).share).toBe(0)
+    expect(rescueRate([statue(), statue(), statue(), statue()]).worstPerChildMinute).toBe(0)
+    expect(holdsAGame(still)).toBe(false) // and it is refused, on the legs
+    // A trace of the same shape in which they really play is accepted.
+    const walker = () =>
+      trace(420, (i) => ({ x: i * DT * 1.5, z: 0 })).map((s) => ({ ...s, playing: true }))
+    expect(holdsAGame(traceLiveness([walker(), walker(), walker(), walker()]))).toBe(true)
+  })
+
+  it('and it reads the played share off the CLOCK, not the frame count', () => {
+    // Frames are not evenly spaced — this trace's own live frames run from 20 ms
+    // to over a second — so a majority of the frames is not a majority of the
+    // minute. Here two thirds of the SAMPLES are playing and they hold a tenth
+    // of the game: a frame count says yes, the clock says no.
+    const t = []
+    let clock = 0
+    let walked = 0
+    for (let i = 0; i < 300; i++) {
+      const playing = i % 3 !== 0
+      const dt = playing ? 0.01 : 0.18
+      walked += 1.5 * dt
+      t.push({ clock, x: walked, z: 0, walked, carried: 0, nudges: 0, playing })
+      clock += dt
+    }
+    const live = traceLiveness([t, t])
+    expect(live.playedShare).toBeLessThan(0.15)
+    expect(t.filter((s) => s.playing).length / t.length).toBeCloseTo(0.667, 2)
+    expect(holdsAGame(live)).toBe(false)
   })
 
   it('and refuses to read a trace whose numbers are not numbers', () => {

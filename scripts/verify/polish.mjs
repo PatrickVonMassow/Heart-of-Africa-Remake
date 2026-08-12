@@ -14,7 +14,7 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
-import { CHILD_MOTION, rescueRate, shuffleWindows } from './childMotionMetric.mjs'
+import { CHILD_MOTION, holdsAGame, rescueRate, shuffleWindows, traceLiveness } from './childMotionMetric.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -3415,13 +3415,27 @@ if (section('children-motion')) {
     // AND THE TRACE ITSELF HOLDS A GAME (point 656). Between rounds the group
     // idles for a calibratable break, which is legitimate — but a trace that is
     // ALL break has nothing in it to judge: no chase, no pockets walked into, no
-    // shuffle windows. The bar is a clear majority of the frames, well above the
-    // idle break's share of one round (8 s of a tenure that runs to 45).
-    const playedFrames = log.filter((f) => f.playing).length
+    // shuffle windows.
+    //
+    // TWO REPAIRS HERE, both from the fourth cross-vendor review. The bar was a
+    // majority of the FRAMES, which is not a majority of the minute — frames are
+    // not evenly spaced, and this trace's own run from 20 ms to over a second.
+    // And nothing required a child to WALK: four stationary children reporting
+    // themselves as playing passed this check, the shuffle share (nothing walked
+    // is nothing shuffled), the judged share, and both rescue rates. The
+    // condition is now the shared `holdsAGame`, which asks the game CLOCK and
+    // the QUIETEST child's legs.
+    const tracks = Array.from({ length: n }, (_, k) =>
+      log.map((f) => ({ ...f.c[k], clock: f.clock, playing: f.playing })),
+    )
+    const live = traceLiveness(tracks)
     check(
       'and the trace holds a game rather than a break',
-      playedFrames > log.length * 0.5,
-      `${playedFrames} of ${log.length} frames playing`,
+      holdsAGame(live),
+      `${live.playedSeconds.toFixed(1)}s of ${live.seconds.toFixed(1)}s played ` +
+        `(${(live.playedShare * 100).toFixed(0)} %), quietest child ${live.quietestChild} walked ` +
+        `${live.quietestWalkedPerChildMinute.toFixed(1)} m/min (floor ${CHILD_MOTION.walkFloor}), ` +
+        `group ${live.walkedPerChildMinute.toFixed(1)} m/child-min`,
     )
 
     // 3. THEY NEVER OCCUPY ONE ANOTHER. Judged against the body the game itself
@@ -3504,7 +3518,6 @@ if (section('children-motion')) {
     // The gate is the replay's own, and this run is the proof that the LIVE
     // settlement — real frame times, the speech, the bodies, the player standing
     // in it — behaves as the replay says.
-    const tracks = Array.from({ length: n }, (_, k) => log.map((f) => ({ ...f.c[k], clock: f.clock })))
     const shuffle = shuffleWindows(tracks)
     check(
       'no child walks without getting anywhere',

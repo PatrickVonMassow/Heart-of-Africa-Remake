@@ -127,6 +127,11 @@ export const CHILD_MOTION = {
    * stationary child reads 0.
    */
   walkFloor: 25,
+  /** How much of the traced CLOCK the group must have spent playing. Between
+   *  rounds it idles for a calibratable break, which is legitimate; a trace
+   *  that is all break has no chase in it to judge. Measured live: the group
+   *  plays the whole of every 30-40 s trace. */
+  playedGate: 0.5,
 }
 
 /**
@@ -474,6 +479,29 @@ export function traceLiveness(tracks) {
     quietestWalkedPerChildMinute,
     quietestChild,
   }
+}
+
+/**
+ * DOES THIS TRACE HOLD A GAME? The condition BOTH proofs use, kept here rather
+ * than written out in the browser script, so that the very predicate the live
+ * gate reads can be pinned on a trace built by hand (the fourth cross-vendor
+ * review: four stationary children reporting themselves as playing satisfied
+ * every other check the live section makes).
+ *
+ * The played share is a share of the GAME CLOCK, never of the frames: frames are
+ * not evenly spaced, so a majority of them is not a majority of the minute.
+ *
+ * @param {ReturnType<typeof traceLiveness>} live
+ * @param {Partial<typeof CHILD_MOTION>} [cfg]
+ */
+export function holdsAGame(live, cfg = {}) {
+  const { playedGate, walkFloor } = { ...CHILD_MOTION, ...cfg }
+  return (
+    live.numbersFinite &&
+    live.children >= 2 &&
+    live.playedShare > playedGate &&
+    live.quietestWalkedPerChildMinute > walkFloor
+  )
 }
 
 /**
