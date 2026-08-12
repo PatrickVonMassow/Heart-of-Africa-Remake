@@ -88,9 +88,11 @@ import {
   addBodies,
   createBodies,
   createInhabitantSet,
+  groundOccupied,
   releaseBodies,
   separateBody,
   separateGroup,
+  stepRoundBodies,
   type InhabitantBody,
   type InhabitantSet,
 } from './inhabitantBodies'
@@ -534,10 +536,20 @@ function Kids({
   const legLength = FIGURE_LIMBS.hipY * KID_SCALE
   const cadence = useMemo(() => gaitCadence(legLength), [legLength])
 
+  // The body each child presents to every other inhabitant (point 578), and the
+  // whole settlement's registry — claimed BEFORE the world below, because the
+  // chase steers by both (point 657).
+  const bodySet = useContext(InhabitantBodiesContext)
+  const bodies = useInhabitantBodies(count, { scale: KID_SCALE })
+
   // The settlement as the chase sees it: ONE predicate for the colliders, the
   // fire ring (a collider like any other), the walkable rim and the PLAY GROUND
   // — so a child can never end a step where a walker may not stand, and never
-  // wander out of its group into the adults' earshot (point 481.4).
+  // wander out of its group into the adults' earshot (point 481.4) — and beside
+  // it the OTHER INHABITANTS' BODIES as ground the chase walks round (point
+  // 657): without that, a child whose way crossed an adult standing in the
+  // ground read it as open, walked into the body, and the separation pushed it
+  // straight back out — walking on the spot, the user's own report.
   const world = useMemo<TagWorld>(() => {
     const rim = Math.max(1, radius - NPC_RADIUS * 2)
     const blocked = (px: number, pz: number) =>
@@ -550,6 +562,25 @@ function Kids({
       centerZ: z,
       childRadius: NPC_RADIUS,
       blocked,
+      // THE GROUP'S OWN CHILDREN ARE NOT EACH OTHER'S WALLS — the whole group
+      // is excluded, not merely self and partner. Measured on the shipped
+      // villages: with the playmates included the game itself degraded (maasai
+      // worst child 0.48 % against the 0.25 % gate; a mover and its moving
+      // obstacle re-decide against each other every frame), while child-child
+      // contact was never the symptom — the separation pass alone held it at
+      // 0.00-0.03 %. The bodies a child steers round are the OTHERS: adults,
+      // porters, errand walkers — the standing and slow-crossing figures the
+      // measured red windows coincide with.
+      occupied: (_self, _partner, px, pz) =>
+        groundOccupied(
+          bodySet,
+          bodies,
+          px,
+          pz,
+          balance.villageLife.separation,
+          // The child's OWN body radius, so the line is the pair's contact.
+          balance.villageLife.separation.bodyRadius * KID_SCALE,
+        ),
       // The escape lands on ground the GAME calls free, not merely out of the
       // huts: a collider-only nudge teleported a child clean out of its own play
       // ground once the ground moved in among the buildings (point 524), and the
@@ -565,7 +596,7 @@ function Kids({
         return { x: r.pos[0], z: r.pos[1], found: r.found }
       },
     }
-  }, [colliders, radius, x, z, playRadius])
+  }, [colliders, radius, x, z, playRadius, bodySet, bodies])
 
   // The group, spawned on validated ground (point 155): a play spot covered by a
   // hut is nudged to the nearest free one before the first frame — INSIDE the
@@ -604,13 +635,6 @@ function Kids({
     }),
     [game, x, z, playRadius],
   )
-  // The body each child presents to every other inhabitant (point 578). The
-  // chase collides with the huts and the fences but never with the other
-  // children, which is why a converging chase used to leave three of them
-  // standing inside one another.
-  const bodySet = useContext(InhabitantBodiesContext)
-  const bodies = useInhabitantBodies(count, { scale: KID_SCALE })
-
   const gestures = useRef<Array<RefObject<GestureState>>>([])
   if (gestures.current.length !== count) {
     gestures.current = Array.from(
@@ -995,10 +1019,15 @@ function Porters({
       const z = r.az + (r.bz - r.az) * u
       const dir = Math.cos(t * r.speed + r.phase) >= 0 ? 1 : -1
       const p = (pos.current[i] ??= { x, z })
-      const [px0, pz0] = resolveMove(colliders, x, z, NPC_RADIUS, [p.x, p.z])
+      const b = bodies[i]
+      // Point 657: where the route's next step lands in another inhabitant, the
+      // porter walks ROUND the body instead of discovering it by collision.
+      const want = b
+        ? stepRoundBodies(bodySet, b, p.x, p.z, x, z, balance.villageLife.separation, separationWorld.blocked)
+        : { x, z }
+      const [px0, pz0] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [p.x, p.z])
       p.x = px0
       p.z = pz0
-      const b = bodies[i]
       if (b) {
         b.x = p.x
         b.z = p.z
@@ -1475,7 +1504,12 @@ function TaskWalker({
       s.z += (dz / d) * step
       s.yaw = Math.atan2(dx, dz)
     } else {
-      const [nx, nz] = resolveMove(colliders, s.x + (dx / d) * step, s.z + (dz / d) * step, NPC_RADIUS, [s.x, s.z])
+      // Point 657: another inhabitant on the way to the field is walked round,
+      // not walked into.
+      const want = body
+        ? stepRoundBodies(bodySet, body, s.x, s.z, s.x + (dx / d) * step, s.z + (dz / d) * step, balance.villageLife.separation, separationWorld.blocked)
+        : { x: s.x + (dx / d) * step, z: s.z + (dz / d) * step }
+      const [nx, nz] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [s.x, s.z])
       if (Math.hypot(nx - s.x, nz - s.z) < step * 0.25) s.seg++ // blocked: skip ahead
       s.x = nx
       s.z = nz
@@ -1714,8 +1748,13 @@ function Walkers({
         s.yaw = Math.atan2(dx, dz)
       } else {
         // Solid objects block inhabitants too; slide along and skip the
-        // waypoint if blocked for too long (design.md §2 collision).
-        const [nx, nz] = resolveMove(colliders, s.x + (dx / d) * step, s.z + (dz / d) * step, NPC_RADIUS, [s.x, s.z])
+        // waypoint if blocked for too long (design.md §2 collision) — and
+        // another inhabitant's body is walked ROUND like one (point 657).
+        const b657 = bodies[i]
+        const want = b657
+          ? stepRoundBodies(bodySet, b657, s.x, s.z, s.x + (dx / d) * step, s.z + (dz / d) * step, balance.villageLife.separation, separationWorld.blocked)
+          : { x: s.x + (dx / d) * step, z: s.z + (dz / d) * step }
+        const [nx, nz] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [s.x, s.z])
         const moved = Math.hypot(nx - s.x, nz - s.z)
         s.x = nx
         s.z = nz
@@ -2029,8 +2068,17 @@ function ErrandVillagers({
           const az = aim.z - me.z
           const ad = Math.hypot(ax, az) || 1
           const step = Math.max(0, cfg.pace) * dt
-          const wantX = me.x + (ax / ad) * step
-          const wantZ = me.z + (az / ad) * step
+          // Point 657: a child (or anyone else) standing on the straight line is
+          // walked ROUND — these strolls cross the children's play ground, and a
+          // walker that discovered a body only by pressing on it is what the
+          // children then could not get past.
+          const b657 = bodies[i]
+          const direct = { x: me.x + (ax / ad) * step, z: me.z + (az / ad) * step }
+          const want = b657
+            ? stepRoundBodies(bodySet, b657, me.x, me.z, direct.x, direct.z, balance.villageLife.separation, separationWorld.blocked)
+            : direct
+          const wantX = want.x
+          const wantZ = want.z
           // The WALKABLE SHAPE, not a circle of its own (work-order 482): the
           // errands send a villager out onto the bank lobe, and a circular rim
           // would have frozen it at the plain radius short of the water.

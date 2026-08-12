@@ -93,26 +93,4 @@ export const RED_CHARGES = [
       'sitting, so the charge is scoped to WebGPU and a WebGL 2 red stays a real red. Point 627 ' +
       'owns it until the cause — an unsettled jump or a real placement change — is named.',
   },
-  {
-    point: 657,
-    suite: 'polish',
-    kind: 'check',
-    match: /no child walks without getting anywhere/i,
-    why:
-      'MEASURED 12.08.2026 over SIX sittings of ten traces at seed 2972259115 on an idle ' +
-      'machine, five per backend, with the per-child measure: 18 red of 60. Sittings 1-3 ' +
-      '(one-second windows only): 7 of 30, WebGL 2 twice and WebGPU five times, 0.34-1.53 %. ' +
-      'Sitting 4, with the half-second BURST measure added: 3 of 10, all three invisible to the ' +
-      'one-second window (bursts 0.27-0.89 %). Sitting 5, with both measures gated on having ' +
-      'judged anything: 6 of 10 — WebGPU red in ALL FIVE (worst child 0.39-1.84 %, three of them ' +
-      'also 1.30-1.86 % in bursts, the worst window at 10.7-10.8 s of the visit in three separate ' +
-      'runs) and WebGL 2 once (0.31 %). Sitting 6, with the separation wedge rescues now counted ' +
-      'too: 2 of 10 — WebGL 2 once (burst only, 0.48 %) and WebGPU once (1.83 %, burst 3.18 %, ' +
-      'the worst window 1.57 m walked inside 0.02 m). So it shows at both scales and on both ' +
-      'backends, intermittently. The red windows hold no rescue and no gap longer than the span ' +
-      'they are judged over — the worst walks 1.3-3.2 m to end 0.00-0.35 m from where it started ' +
-      "— and the game's own carry counter reads 0.00 m per minute for every child of all sixty " +
-      'runs, now including the separation wedge escapes, so nothing hides inside a teleport. ' +
-      'That is point 657.',
-  },
 ]

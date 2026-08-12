@@ -46,6 +46,8 @@
 // `maxSpeed` therefore only bounds how fast a DEEP stack — two bodies spawned on
 // one spot — unwinds.
 
+import { deflectedStep } from '../travel/wildlifeBehavior'
+
 /** One inhabitant's body in the shared set — mutated in place each frame, so a
  *  settlement never rebuilds the array. */
 export interface InhabitantBody {
@@ -190,30 +192,73 @@ export function releaseBodies(set: InhabitantSet, bodies: readonly InhabitantBod
  * discovering it by collision; the separation stays as the safety net for the
  * contacts steering cannot avoid.
  *
- * The radius is the body's contact radius plus the mover's own footprint — the
- * same convention `standingClear` uses for the static colliders — so a point
- * this predicate calls free really is ground the mover can stand on without
- * the separation firing. `self` is the mover's own body; `ignore` is a body the
- * mover is deliberately allowed to reach (the tag partner — a chaser that
- * treated its quarry as a wall could never close the catch).
+ * The radius is the PAIR'S CONTACT distance: the standing body's contact radius
+ * plus `moverBodyRadius`, the mover's own — the exact line below which the
+ * separation would start correcting, and NOT the wider walker footprint. That
+ * width was measured and rejected: at footprint width four children read each
+ * other as 0.43 m walls on a 20 m ground and the game itself degraded (the
+ * quietest child of one shipped village fell from ~110 to 22 walked metres per
+ * played minute). At contact width a landed step never triggers the separation
+ * and never robs the game of more room than the bodies truly take. `self` is
+ * the mover's own body; `ignore` is a body the mover is deliberately allowed to
+ * reach (the tag partner — a chaser that treated its quarry as a wall could
+ * never close the catch).
  */
 export function groundOccupied(
   set: InhabitantSet,
-  self: InhabitantBody | null,
+  self: InhabitantBody | readonly InhabitantBody[] | null,
   x: number,
   z: number,
   cfg: SeparationConfig,
-  moverRadius: number,
+  moverBodyRadius: number,
   ignore: InhabitantBody | null = null,
 ): boolean {
+  const selfMany = Array.isArray(self) ? (self as readonly InhabitantBody[]) : null
   for (const b of set.bodies) {
     if (b === self || b === ignore || !b.active) continue
-    const r = cfg.bodyRadius * b.scale + moverRadius
+    if (selfMany && selfMany.includes(b)) continue
+    const r = cfg.bodyRadius * b.scale + moverBodyRadius
     const dx = x - b.x
     const dz = z - b.z
     if (dx * dx + dz * dz < r * r) return true
   }
   return false
+}
+
+/**
+ * One walking step that goes ROUND the other inhabitants (point 657, the
+ * adults' half): where the wanted step would land in another body, the heading
+ * deflects round it — the wildlife's own deflection, static ground and bodies
+ * judged together — and the caller sweeps its own move to the returned point
+ * exactly as before. Without this the errand walkers and porters steered by
+ * colliders alone and walked straight THROUGH the children, who then had
+ * nothing to walk round but a body already pressing on them.
+ *
+ * Cheap on the ordinary frame: everything beyond one `groundOccupied` probe
+ * runs only when the direct step really lands in a body. Fully boxed in, the
+ * wanted point is returned unchanged — the caller's own slide-and-skip
+ * behaviour stays exactly what it was.
+ */
+export function stepRoundBodies(
+  set: InhabitantSet,
+  self: InhabitantBody,
+  fromX: number,
+  fromZ: number,
+  toX: number,
+  toZ: number,
+  cfg: SeparationConfig,
+  blocked: (x: number, z: number) => boolean,
+): { x: number; z: number } {
+  const selfRadius = cfg.bodyRadius * self.scale
+  if (!groundOccupied(set, self, toX, toZ, cfg, selfRadius)) return { x: toX, z: toZ }
+  const dx = toX - fromX
+  const dz = toZ - fromZ
+  const dist = Math.hypot(dx, dz)
+  if (!(dist > 1e-9)) return { x: toX, z: toZ }
+  const both = (x: number, z: number) =>
+    blocked(x, z) || groundOccupied(set, self, x, z, cfg, selfRadius)
+  const r = deflectedStep(fromX, fromZ, Math.atan2(dx, dz), dist, both, Math.max(dist, selfRadius * 2))
+  return r.moved ? { x: r.x, z: r.z } : { x: toX, z: toZ }
 }
 
 /** A deterministic escape bearing for two bodies at EXACTLY the same point (a

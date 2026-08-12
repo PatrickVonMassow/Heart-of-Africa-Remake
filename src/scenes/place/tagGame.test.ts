@@ -798,16 +798,17 @@ describe('the settlement: the chase runs THROUGH it, never into it', () => {
 describe('another inhabitant’s body is ground to walk round (point 657)', () => {
   const SEP = balance.villageLife.separation
   const KID_SCALE = 0.55
+  const KID_BODY = SEP.bodyRadius * KID_SCALE
   /** An adult standing in the ground, judged the way the settlement judges it:
-   *  contact radius plus the mover footprint. */
-  const adultReach = SEP.bodyRadius + CHILD_R
+   *  the PAIR'S contact distance — the adult's contact radius plus the child's. */
+  const adultReach = SEP.bodyRadius + KID_BODY
   /** The settlement's own wiring in miniature: every other child's body at its
    *  live position, self and the tag partner excluded. */
   const childrenOccupy =
     (s: TagState, extra?: { x: number; z: number }) =>
     (self: number, partner: number, x: number, z: number): boolean => {
       if (extra && Math.hypot(x - extra.x, z - extra.z) < adultReach) return true
-      const reach = SEP.bodyRadius * KID_SCALE + CHILD_R
+      const reach = KID_BODY * 2
       return s.children.some(
         (o, j) => j !== self && j !== partner && Math.hypot(x - o.x, z - o.z) < reach,
       )

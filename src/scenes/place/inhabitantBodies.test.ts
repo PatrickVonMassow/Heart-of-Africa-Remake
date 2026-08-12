@@ -390,23 +390,23 @@ describe('inhabitant bodies', () => {
   })
 
   describe('the ground another body stands on (point 657)', () => {
-    it('reads occupied inside the contact-plus-footprint radius and free beyond it', () => {
+    it('reads occupied inside the pair’s contact distance and free beyond it', () => {
       const set = createInhabitantSet()
       const [adult] = claimBodies(set, 1, { x: 2, z: 0 })
-      const moverR = 0.3
-      const reach = SEP.bodyRadius * adult.scale + moverR
-      expect(groundOccupied(set, null, 2 + reach - 1e-3, 0, SEP, moverR)).toBe(true)
-      expect(groundOccupied(set, null, 2 + reach + 1e-3, 0, SEP, moverR)).toBe(false)
+      const moverBody = SEP.bodyRadius * KID_SCALE
+      const reach = SEP.bodyRadius * adult.scale + moverBody
+      expect(groundOccupied(set, null, 2 + reach - 1e-3, 0, SEP, moverBody)).toBe(true)
+      expect(groundOccupied(set, null, 2 + reach + 1e-3, 0, SEP, moverBody)).toBe(false)
     })
 
     it('judges each body at its own scale — a child occupies less ground than an adult', () => {
       const set = createInhabitantSet()
       claimBodies(set, 1, { x: 2, z: 0, scale: KID_SCALE })
-      const moverR = 0.3
-      const kidReach = SEP.bodyRadius * KID_SCALE + moverR
-      const adultReach = SEP.bodyRadius + moverR
-      expect(groundOccupied(set, null, 2 + kidReach - 1e-3, 0, SEP, moverR)).toBe(true)
-      expect(groundOccupied(set, null, 2 + adultReach - 1e-3, 0, SEP, moverR)).toBe(false)
+      const moverBody = SEP.bodyRadius * KID_SCALE
+      const kidReach = SEP.bodyRadius * KID_SCALE + moverBody
+      const adultReach = SEP.bodyRadius + moverBody
+      expect(groundOccupied(set, null, 2 + kidReach - 1e-3, 0, SEP, moverBody)).toBe(true)
+      expect(groundOccupied(set, null, 2 + adultReach - 1e-3, 0, SEP, moverBody)).toBe(false)
     })
 
     it('never counts the mover itself, the ignored partner, or an inactive body', () => {
