@@ -32,17 +32,17 @@ nicht des Projekts.
 
 Lege **zwei** Modelle fest und gib ihnen klare Rollen:
 
-- Ein **primäres Modell** macht die Arbeit — bei *jeder* Schwierigkeit. Nimm die
-  jeweils stärkste verfügbare Version.
-- Ein **sekundäres, anderes Modell** ist für das **Vier-Augen-Prinzip** da (in welcher
-  Form, sagt der Fallstrick weiter unten) und springt als **Ausweichstufe** ein, wenn
-  das primäre nicht in seiner höchsten Version verfügbar ist.
+- Ein **primäres Modell** macht die gewöhnliche Arbeit. Nimm die jeweils stärkste
+  verfügbare Version.
+- Ein **sekundäres, anderes Modell** übernimmt das **Vier-Augen-Prinzip**, die
+  **Ausweichstufe** — und die **harten Fälle**: als schwierig/fehleranfällig
+  Eingeschätztes, und was nach einer Nachbesserung immer noch durchfällt.
 
-> *Prompt:* „Arbeite grundsätzlich mit **\<primäres Modell\>**, unabhängig von der
-> Schwierigkeit. **\<sekundäres Modell\>** setzt du nur für das Vier-Augen-Prinzip ein
-> oder als Ausweichstufe. Etabliere einen Mechanismus, der ein Arbeitsergebnis eines
-> **anderen** Modells erkennt und die Arbeit stoppt, statt sie stillschweigend zu
-> übernehmen."
+> *Prompt:* „Gewöhnliche Arbeit macht **\<primäres Modell\>**. **\<sekundäres Modell\>**
+> übernimmt Vier-Augen, Ausweichstufe und als schwierig/fehleranfällig eingeschätzte
+> Aufgaben — ebenso Arbeit, die nach einer Nachbesserung erneut durchfällt. Etabliere
+> einen Mechanismus, der ein Arbeitsergebnis eines **anderen** Modells erkennt und die
+> Arbeit stoppt, statt sie stillschweigend zu übernehmen."
 
 Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere blinde
 Flecken** hat. Die **Obergrenze** zieht die **Sichtbarkeit des Fehlers**: Was den Ablauf
@@ -412,4 +412,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Sie setzt auf, woran alles andere hängt: eine Wahrheit, eine Arbeitsordnung, zwei
 Testschichten, den Reflex zum Check. Die Fallstricke oben ersetzt sie nicht.
 
-<!-- GUIDE-FINGERPRINT: 42dccc19cb2f7fad1c131535e53cfc0887debf087eaea9515141361409bf7455 -->
+<!-- GUIDE-FINGERPRINT: 0a04f8ecb8bd3891b7cfcec82f7e747416dc7206fea27079f57ab22b8a7f4110 -->

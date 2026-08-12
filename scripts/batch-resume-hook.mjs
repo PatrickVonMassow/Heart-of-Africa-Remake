@@ -164,9 +164,9 @@ const RESUME_BODY =
   'backends); TASKS.md is MAIN-only — tick the point on main at the merge; cross-cutting ' +
   'changes (guards, docs, dashboard, process files) go directly to main. MAXIMAL ' +
   'DELEGATION (user decision 22.07.2026): delegate implementation AND infra/guard/doc/' +
-  'dashboard work to parallel WORKTREE-ISOLATED subagents on NON-OVERLAPPING files — with ' +
-  'OPUS 5, per the model policy stated below; Fable only reviews or stands in ' +
-  '(each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
+  'dashboard work to parallel WORKTREE-ISOLATED subagents on NON-OVERLAPPING files — under ' +
+  'the model policy stated below, so the hard cases go to Fable 5 from the start and the rest ' +
+  'to Opus 5 (each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
   'session keeps only the picture-verification on both backends, the serial merge -> ' +
   'fast-gate -> tick -> deploy -> cleanup, and the board publish. Every defect the user ' +
   'reports on the deployed build during the batch is APPENDED as its own implementation-ready ' +
@@ -218,9 +218,11 @@ try {
     // forbidden commit.
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
-      'MODEL POLICY (25.07.2026): Opus 5 is the WORKER at any difficulty; the fallback chain ' +
-      'is Opus 5 -> Fable 5 -> Opus 4.8. Fable is used ONLY for four-eyes review (one model ' +
-      'plans/builds, the other checks) or as that fallback — never because a task looks hard. ' +
+      'MODEL POLICY (25.07./12.08.2026): Opus 5 is the ORDINARY worker; the fallback chain ' +
+      'is Opus 5 -> Fable 5 -> Opus 4.8. FABLE 5 AUTHORS THE HARD CASES: work judged ' +
+      'difficult, complex or error-prone goes to Fable from the start, and Opus work moves ' +
+      'to Fable once Sol still finds problems after a re-work (CLAUDE.md par.6). Fable is ' +
+      'not the default (smaller volume); it also serves four-eyes review and the fallback. ' +
       'Sonnet, Haiku and every other model are NOT acceptable: if the serving model is not one ' +
       'of the three, do NOT work — create .claude/batch-paused (reason: forbidden serving ' +
       'model) and send an ntfy alert via scripts/notify.mjs instead.'

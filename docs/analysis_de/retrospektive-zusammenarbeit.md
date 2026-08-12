@@ -1308,7 +1308,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 12.08.2026, 09:23 · Quellen-Fingerprint: `42dccc19cb2f…`
+Zuletzt aktualisiert: Mittwoch, 12.08.2026, 18:10 · Quellen-Fingerprint: `0a04f8ecb8bd…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1328,7 +1328,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | F6 bug-report zips the user hands over are saved into the repo's git-ignored local/ folder — search there first, not only Downloads | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A newly found problem goes into an EXISTING bundle point first; a new standalone point is the exception, and may instead re-cut the bundles | 1 | niedrig | bundle-first-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
 | Work packages are SPOKEN by name, never by letter — the user cannot read \"bundle H\"; the letter stays only as an internal ID | 1 | niedrig | bundle-first-guard.mjs | ✔ Mechanismus |
-| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 12 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
+| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 7 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
@@ -1341,7 +1341,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 2 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Fable is ONLY for four-eyes review and as the first fallback when Opus 5 is unavailable — never for \"hard\" tasks; Opus 5 handles those (user rule 25.07.2026, supersedes the earlier hard-task delegation) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Fable 5 authors work judged difficult/complex/error-prone from the start, and takes over Opus work once Sol still finds problems after a re-work; Fable is NOT the default (smaller volume) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Fable is ONLY for four-eyes review and as the first fallback when Opus 5 is unavailable — never for \"hard\" tasks; Opus 5 handles those (user rule 25.07.2026, supersedes the earlier hard-task delegation) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1374,7 +1375,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix; a cut vX.Y is frozen | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | TASKS.md and all new entries in it are written in English | 1 | niedrig | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | TASKS.md entries state the final correct target directly — never keep a 'first defined wrong, then clarified/corrected' trail in the spec | 1 | niedrig | batch-doctor-states.mjs, tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
-| TASKS.md points get [*] when started and a tracking line (start, finish, minutes, ~tokens) when done — mandated 2026-07-14 | 3 | mittel | tasks-archive-guard.mjs, tasks-spec-guard.mjs, timestamp-guard.mjs | ✔ Mechanismus |
+| TASKS.md points get [*] when started and a tracking line (start, finish, minutes, ~tokens) when done — mandated 2026-07-14 | 6 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs, timestamp-guard.mjs | ✔ Mechanismus |
 | Think harder about what to test; when in doubt add MORE tests — never skimp on fast browserless Vitest cases | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Tests and probes must use IN-GAME-achievable zoom (non-debug 0.125–0.5 at least), never a debug-only zoom — testing at an unrealistic zoom has passed while the player still saw the bug, repeatedly | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Permissions are deliberately maximally broad (whole-tool allows incl. Bash); NEVER narrow or \"tidy\" them again — standing user directive | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1389,14 +1390,14 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 1 | niedrig | container-ask-guard.mjs | ✔ Mechanismus |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 77 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 52 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
+Erfasste Quellen: 78 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 52 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
 
-<!-- RETRO-FINGERPRINT: 42dccc19cb2f7fad1c131535e53cfc0887debf087eaea9515141361409bf7455 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-12T07:23:02.202Z -->
+<!-- RETRO-FINGERPRINT: 0a04f8ecb8bd3891b7cfcec82f7e747416dc7206fea27079f57ab22b8a7f4110 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-12T16:10:02.555Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1455,3 +1456,28 @@ zuverlässigste Weg, eine tote Automatik unsichtbar zu halten.
 Protokoll, keine Kennnummer, keine Vorgeschichte —, denn genau so beginnt er nach jedem
 Neustart. Und „übersprungen" ist kein Betriebszustand: Was ein Durchsetzer nicht tut, gehört
 laut gemeldet, sonst ist sein Schweigen von Erfolg nicht zu unterscheiden.
+
+---
+
+### 3.114 Der Messlauf überlebte seinen Agenten — im flüchtigen Verzeichnis
+
+Der Beweis für Punkt 657 besteht aus zehn Live-Läufen auf einer bewusst unbelasteten
+Maschine; sie sind der teure Teil der Arbeit, nicht der Code. Der bearbeitende Agent startete
+sie im Hintergrund, wartete blockierend — und starb während des Wartens an einem Serverfehler
+der Modell-API. Neun der zehn Läufe liefen zu Ende. Ihr Ergebnis existierte, vollständig und
+korrekt, aber ausschließlich in der Ausgabedatei des Hintergrundlaufs unter `/tmp`. Die
+Nachfolgesitzung hat es von Hand geborgen; ohne diese Bergung wäre zwanzig Minuten
+Messzeit ein zweites Mal bezahlt worden.
+
+Gerettet hat es die In-Flight-Deklaration: Sie benennt Zweig, Arbeitsbaum und Protokollpfad
+als BELEG, und genau dieser Beleg war die Spur zum Ergebnis. Das ist die gute Hälfte. Die
+schlechte: Der Ablageort war `/tmp`. Dieses Projekt weiß aus eigener Erfahrung, dass ein
+Neustart der Entwicklungsumgebung den ganzen Container mitnimmt — dann wäre mit dem Agenten
+auch sein fertiges Messergebnis verschwunden, und niemand hätte gewusst, dass es je existiert
+hat. Ein Ergebnis, das den Erzeuger überlebt, aber nur an einem Ort liegt, den der nächste
+Neustart löscht, ist nicht gesichert, sondern bloß noch nicht verloren.
+
+**Lehre:** Was lange läuft, schreibt sein Ergebnis dorthin, wo die Arbeitsordnung es
+wiederfindet — in das git-ignorierte `local/` des Repositories, nicht nur in den Kratzraum des
+Prozesses. Und die Wartedeklaration ist der richtige Zeiger darauf: Sie ist ohnehin das
+Einzige, was eine tote Sitzung über ihre laufende Arbeit hinterlässt.

@@ -347,6 +347,29 @@ put it is the mistake this line exists to stop.
   did so twice unnoticed.
   Bundle: unbundled (infrastructure).
 
+- [ ] 660. ONE SESSION, TWO IDENTITIES: THE FENCE LOCKS OUT THE SESSION THAT IS WORKING
+  (measured 12.08.2026, 18:02-18:20). The launcher spawned session 6cd11926 at 17:57 (fence
+  281), which took the batch and worked. At 18:02 the identity 986df9ff claimed the same batch
+  (fence 282) — the SAME process id 1020, i.e. the same OS process under the session id it was
+  RESUMED from. From then on the PreToolUse fence read 6cd11926 and refused push, merge, tick
+  and board publish, while the PostToolUse heartbeat wrote the lease as 986df9ff — the working
+  session was locked out of exactly the four paths that make its work durable, with no second
+  window in existence that could have released it, and batch-claim waiting on a turn end of
+  that same process. Two commits sat local-only until the next session pushed them, and a
+  delegated agent's report carried the confusion ("the batch was handed over mid-task, the
+  fence refuses the push").
+  FINAL STATE: the fence and the lock/heartbeat read the SAME identity source, so a session can
+  never fence itself out. Concretely: one function answers "which session id is this process",
+  used by the fence, the heartbeat, batch-claim and the guards alike; a resume that changes the
+  session id either carries the fence forward or re-fences under the new id in the same step;
+  and a fence naming a session whose pid equals the CURRENT process is treated as OUR OWN, never
+  as a foreign owner. VERIFIABLE: a Vitest over the identity function pins the resumed-session
+  case (same pid, different id) as self, and a replayed fence/heartbeat sequence from this
+  incident's timestamps ends with the working session allowed to push.
+  Criticality: high — it silently strands finished work locally, which is the one state nothing
+  can rescue.
+  Bundle: unbundled (infrastructure).
+
 - [ ] 633. THE RELEASE'S CLOSING RUN — TWO REGRESSIONS WITH THE CLEANUP BETWEEN THEM (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
   zu sein"). 174 carried the whole release in one card estimated at ~1 h, which was true
