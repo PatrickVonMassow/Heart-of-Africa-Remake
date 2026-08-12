@@ -378,6 +378,44 @@ put it is the mistake this line exists to stop.
   can rescue.
   Bundle: unbundled (infrastructure).
 
+- [ ] 661. A CARD'S END TIME MUST NOT AGE SILENTLY BETWEEN TURNS (user 12.08.2026: "Die
+  Endzeit der aktuellen Karte ist 50 min in der Vergangenheit. Ich denke wir haben einen
+  Mechanismus, dass eine Schätzung maximal um ein paar Minuten veralten kann."). THE GAP,
+  measured that evening: the `now-eta-past` audit fires only inside `--synced`/`attest` — i.e.
+  at a TURN END. A session waiting on a delegated agent produces no turn end for an hour, so
+  the promise on the published board expired 50 minutes deep while every mechanism held green.
+  FINAL STATE: the ETA is checked and refreshed wherever the session's waiting heartbeat
+  already runs — the in-flight re-declaration (`batch-in-flight.mjs`) refuses to record a wait
+  whose now-card ETA lies in the past, naming the card, so every ~45-minute re-declaration
+  bounds the staleness; and the launcher tick alerts on a published board whose now-card ETA is
+  older than one tick, catching the ownerless case too. VERIFIABLE: Vitest over the pure
+  decision (a wait with a past ETA is refused, a future one passes), and the launcher-tick
+  check pinned like its board-behind sibling.
+  Criticality: medium — the board is the user's only window into the batch.
+  Bundle: Chat & Tafel.
+
+- [ ] 662. THE CONTEXT BOUNDARY MUST ALSO FIRE WITHOUT A TICK (user 12.08.2026: "Außerdem ist
+  der Kontext dieser Session wieder ziemlich groß geworden. Hättest du in der Zwischenzeit
+  nicht mal an eine andere übergeben können? So bekommen wir das sonst nie in den Griff.").
+  THE GAP: the boundary duty (batch-boundary + batch-progress-guard) is keyed to a TICKED
+  point. A point that lands in HALVES — 657's first half merged without a tick — or a day of
+  review rounds on one branch never produces a tick, so one session carried the batch for ~14
+  hours and >150k context while every rule held. The 656 landing WAS a tickable boundary and
+  the session pulled the next point in anyway; nothing blocked that.
+  FINAL STATE: the boundary becomes reachable and OWED at safe moments even without a tick:
+  (1) after any MERGE to main (ticked or not) with no delegated agent in flight, the
+  batch-progress-guard demands the boundary exactly as it does after a tick — a merge is a
+  clean handover point by definition; (2) a session that has held the batch longer than a
+  measured ceiling (calibrate from the cost data: hours or landed merges, not tokens the
+  scripts cannot read) must take the next safe handover instead of choosing to continue; the
+  guard blocks "continue the next queue item" once the ceiling is passed. Attended sessions
+  ask for /clear at the same moments. VERIFIABLE: Vitest over the guard core — a merge without
+  tick and no agent in flight demands the boundary; under the ceiling it does not; the ceiling
+  case refuses the continue-path and allows the boundary path.
+  Criticality: high — 91 % of the project's spend sits above 150k context, and this is the
+  door it walks through.
+  Bundle: unbundled (infrastructure).
+
 - [ ] 633. THE RELEASE'S CLOSING RUN — TWO REGRESSIONS WITH THE CLEANUP BETWEEN THEM (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
   zu sein"). 174 carried the whole release in one card estimated at ~1 h, which was true
