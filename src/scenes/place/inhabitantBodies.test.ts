@@ -264,6 +264,50 @@ describe('inhabitant bodies', () => {
     expect(stuck.x).toBe(5)
   })
 
+  it('counts the wedge rescue on the body, so a trace can see the teleport', () => {
+    // THE THIRD RESCUE PATH (point 656 follow-up). The chase's own two rescues
+    // raise the child's `nudges` where they fire; the escape above fires a
+    // layer below and used to be counted by NOBODY — a child freed this way
+    // jumped in the trace while its rescue count stood still, and the motion
+    // metric, which breaks the walked path at every rise of `nudges`, read the
+    // settlement's correction as the child walking out of its own pocket.
+    const world = {
+      blocked: (x: number, z: number) => x > 1e-4 || Math.abs(z) > 1e-4,
+      nudge: () => ({ x: 5, z: 5, found: true }),
+    }
+    const set = createInhabitantSet()
+    claimBodies(set, 1, { x: -0.1, z: 0, fixed: true })
+    const [stuck] = claimBodies(set, 1, { x: 0, z: 0 })
+    expect(stuck.nudges).toBe(0)
+    expect(stuck.carried).toBe(0)
+    let seconds = 0
+    while (stuck.nudges === 0 && seconds < SEP.wedgeSeconds * 3) {
+      separateBody(set, stuck, 1 / 60, SEP, world)
+      seconds += 1 / 60
+    }
+    expect(stuck.nudges).toBe(1)
+    // And the carry is the teleport's own distance, taken where it is known.
+    expect(stuck.carried).toBeCloseTo(Math.hypot(5, 5), 6)
+
+    // An escape that found NO free ground still counts — the body stood its
+    // whole window unable to move, which is the finding — only nothing was
+    // carried, because nothing moved.
+    const nowhere = {
+      blocked: world.blocked,
+      nudge: () => ({ x: 0, z: 0, found: false }),
+    }
+    const set2 = createInhabitantSet()
+    claimBodies(set2, 1, { x: -0.1, z: 0, fixed: true })
+    const [stillStuck] = claimBodies(set2, 1, { x: 0, z: 0 })
+    seconds = 0
+    while (stillStuck.nudges === 0 && seconds < SEP.wedgeSeconds * 3) {
+      separateBody(set2, stillStuck, 1 / 60, SEP, nowhere)
+      seconds += 1 / 60
+    }
+    expect(stillStuck.nudges).toBe(1)
+    expect(stillStuck.carried).toBe(0)
+  })
+
   it('separates a child from an adult at the two OWN girths, live off the config', () => {
     const set = createInhabitantSet()
     const [adult] = claimBodies(set, 1, { x: 0, z: 0, fixed: true })

@@ -550,6 +550,40 @@ function escapeNudge(c: TagChild, world: TagWorld): void {
 }
 
 /**
+ * Read one child's position back from its resolved BODY, and with it whatever
+ * the separation's own escape did (point 656 follow-up). `separateGroup` has a
+ * third rescue path neither of the chase's watches sees: a body pressed between
+ * a collider and another body past its wedge window is teleported to free
+ * ground by the separation itself. Uncounted, that jump stood in the trace as
+ * the child walking out of its pocket — the exact blind spot point 656 closed
+ * for `escapeNudge`, open again one layer down. The body counts what the
+ * separation did where it does it; this folds the count and the carried metres
+ * into the child's own `nudges`/`carried`, which is where every consumer
+ * already reads rescues, and re-takes the anchor exactly as `escapeNudge` does,
+ * so the frame that freed the child cannot charge it a second rescue from the
+ * progress watch. BOTH settlements use it — the live scene and the replay —
+ * because a write-back done by hand in one of them is how the two fell apart
+ * before.
+ */
+export function absorbSeparation(
+  c: TagChild,
+  body: { x: number; z: number; nudges: number; carried: number },
+): void {
+  c.x = body.x
+  c.z = body.z
+  if (body.nudges > 0 || body.carried > 0) {
+    c.nudges += body.nudges
+    c.carried += body.carried
+    body.nudges = 0
+    body.carried = 0
+    c.pinned = 0
+    c.anchorX = c.x
+    c.anchorZ = c.z
+    c.anchorFor = 0
+  }
+}
+
+/**
  * A CHILD THAT WALKS WITHOUT GETTING ANYWHERE IS STUCK (point 648), and it took
  * the reported bug to see it: the stall watch only ever counted the frames in
  * which a child could not move AT ALL, so a child wedged in a hand's breadth of

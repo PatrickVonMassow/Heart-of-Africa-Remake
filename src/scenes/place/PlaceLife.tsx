@@ -50,7 +50,7 @@ import { nudgeToFree, nudgeWhere, resolveMove, spawnPointFree, standingClear, tr
 import { insidePlace } from './boundary'
 import type { PlaceRiverBank } from './riverBank'
 import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, type NavPoint } from './routing'
-import { createTagGame, stepTagGame, type TagChild, type TagWorld } from './tagGame'
+import { absorbSeparation, createTagGame, stepTagGame, type TagChild, type TagWorld } from './tagGame'
 import {
   childSteer,
   createChildSpeech,
@@ -669,8 +669,10 @@ function Kids({
     for (let i = 0; i < game.children.length; i++) {
       const b = bodies[i]
       if (!b) continue
-      game.children[i].x = b.x
-      game.children[i].z = b.z
+      // The resolved position AND whatever the separation's own wedge escape
+      // did (point 656 follow-up): its teleport is a rescue like any other, and
+      // uncounted it read as the child walking out of its pocket.
+      absorbSeparation(game.children[i], b)
     }
     const said = stepChildSpeech(speech, view, dt, cfg, speechRand)
     if (said) speakSituation(said, game.children[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])

@@ -32,6 +32,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CHILD_MOTION,
+  groundPath,
   holdsAGame,
   judgedEnough,
   rescueRate,
@@ -60,7 +61,7 @@ import {
 } from './inhabitantBodies'
 import { buildLayout, builtFabric, type PlaceLayout } from './layout'
 import { childPlayGround, villageAdultStations } from './lifeSpots'
-import { createTagGame, stepTagGame, type TagWorld } from './tagGame'
+import { absorbSeparation, createTagGame, stepTagGame, type TagWorld } from './tagGame'
 
 // The two numbers `PlaceLife` holds for the children it draws.
 const KID_SCALE = 0.55
@@ -342,8 +343,9 @@ function frame(v: ReturnType<typeof village>, dt: number): void {
   }
   separateGroup(v.set, v.bodies, dt, balance.villageLife.separation, v.world)
   for (let i = 0; i < v.game.children.length; i++) {
-    v.game.children[i].x = v.bodies[i].x
-    v.game.children[i].z = v.bodies[i].z
+    // The resolved position AND the separation's own wedge rescues (point 656
+    // follow-up), exactly as `PlaceLife` reads them back.
+    absorbSeparation(v.game.children[i], v.bodies[i])
   }
   v.others.step(dt, v.game.clock)
   stepChildSpeech(v.speech, v.view, dt, cfg, v.speechRand)
@@ -756,6 +758,71 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     expect(all.worst.child).toBe(0)
     const rescues = rescueRate(paths)
     expect(rescues.worstChild).toBe(0)
+  })
+
+  it('and a rescue by the SEPARATION is a rescue the trace can see', () => {
+    // THE THIRD RESCUE PATH (point 656 follow-up). `escapeNudge` counts the
+    // chase's two stall watches where they fire — but the separation has an
+    // escape of its own: a body pressed between a collider and another body
+    // past `wedgeSeconds` is teleported to free ground by `separateGroup`
+    // itself. Uncounted, that jump stood in the trace as the child walking out
+    // of its pocket — the exact hole this whole point closed, open again one
+    // layer down, and reachable in a real session (a child chased against a
+    // hut with an adult body pressing on it). Here the wedge fires through the
+    // PRODUCTION separation, the write-back is the settlement's own
+    // (`absorbSeparation`, the same call `PlaceLife` makes), and the child's
+    // published counters must carry the rescue so the shared metric breaks the
+    // path at it instead of crediting the carry as ground covered.
+    const game = createTagGame([{ x: 0, z: 0 }], mulberry32(9), balance.villageLife.tag)
+    const child = game.children[0]
+    const sep = balance.villageLife.separation
+    const set = createInhabitantSet()
+    claimBodies(set, 1, { x: -0.1, z: 0, fixed: true })
+    const [body] = claimBodies(set, 1, { x: 0, z: 0, scale: KID_SCALE })
+    const world = {
+      blocked: (x: number, z: number) => x > 1e-4 || Math.abs(z) > 1e-4,
+      nudge: () => ({ x: 5, z: 5, found: true }),
+    }
+    const dt = 1 / 60
+    let clock = 0
+    const at = (): ChildMotionSample => ({
+      clock,
+      x: child.x,
+      z: child.z,
+      walked: child.walked,
+      nudges: child.nudges,
+      carried: child.carried,
+    })
+    const track: ChildMotionSample[] = [at()]
+    for (let i = 0; i < Math.ceil((sep.wedgeSeconds + 0.5) / dt); i++) {
+      clock += dt
+      body.x = child.x
+      body.z = child.z
+      separateGroup(set, [body], dt, sep, world)
+      absorbSeparation(child, body)
+      track.push(at())
+    }
+    // The settlement really did pick the child up and set it down on free
+    // ground — and the write-back re-took the anchor there, like the chase's
+    // own rescue does, so the progress watch cannot charge a second rescue for
+    // the same episode.
+    expect(child.x).toBe(5)
+    expect(child.z).toBe(5)
+    expect(child.anchorX).toBe(5)
+    expect(child.anchorZ).toBe(5)
+    // The rescue reached the child's own counters through the write-back …
+    expect(child.nudges).toBe(1)
+    expect(child.carried).toBeCloseTo(Math.hypot(5, 5), 6)
+    // … so the shared metric sees a rescue, not a child that got somewhere:
+    // the rate reports it, and the walked path BREAKS at the jump instead of
+    // carrying seven metres of teleport as ground the child covered.
+    const rescues = rescueRate([track])
+    expect(rescues.nudgesPublished).toBe(true)
+    expect(rescues.carriedPublished).toBe(true)
+    expect(rescues.rescues).toBe(1)
+    const path = groundPath(track)
+    expect(path.broken.some(Boolean)).toBe(true)
+    expect(Math.max(...path.x.map(Math.abs), ...path.z.map(Math.abs))).toBeLessThan(1)
   })
 })
 
