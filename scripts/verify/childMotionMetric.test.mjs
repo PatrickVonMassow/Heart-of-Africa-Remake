@@ -376,6 +376,24 @@ describe('the rescues are counted on their own account', () => {
     expect(r.carriedMetres).toBe(0)
   })
 
+  it('and reads the WHOLE track for that, sample zero included', () => {
+    // The check used to start at sample ONE, where the stepping loop starts, so
+    // a track whose FIRST sample lacked the counter — the very sample every
+    // difference below is measured from — was reported as fully published.
+    const t = trace(600, (i) => ({ x: i * DT, z: 0 }))
+    const { carried: _drop, ...first } = t[0]
+    expect(rescueRate([[first, ...t.slice(1)]]).carriedPublished).toBe(false)
+    // And a track too short to hold a single step was skipped before the check
+    // ran at all, so it passed for published as well.
+    expect(rescueRate([[{ clock: 0, nudges: 0 }]]).carriedPublished).toBe(false)
+    // Nor does silence count: no samples at all is not "nothing was carried".
+    expect(rescueRate([]).carriedPublished).toBe(false)
+    expect(rescueRate([[]]).carriedPublished).toBe(false)
+    // A short track that DOES publish is published — the rule is the counter,
+    // not the length.
+    expect(rescueRate([[{ clock: 0, nudges: 0, carried: 0 }]]).carriedPublished).toBe(true)
+  })
+
   it('reports nothing for a trace too short to judge', () => {
     expect(rescueRate([[]]).perChildMinute).toBe(0)
     expect(rescueRate([]).rescues).toBe(0)

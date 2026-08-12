@@ -401,7 +401,10 @@ export function traceLiveness(tracks) {
  *
  * A trace that does not publish `carried` is NOT reported as carry-free —
  * `carriedPublished` says so, and the gates demand it. A missing field must
- * never read as good news.
+ * never read as good news, and the check for it covers the WHOLE track: sample
+ * zero, which the stepping loop never looks at, and tracks too short to hold a
+ * step at all, which it skips outright. A set with no samples in it says
+ * nothing, which is also not the same as nothing having been carried.
  *
  * @param {ReadonlyArray<ReadonlyArray<{clock:number,nudges?:number,carried?:number}>>} tracks
  * @param {Partial<typeof CHILD_MOTION>} [cfg]
@@ -412,14 +415,24 @@ export function rescueRate(tracks) {
   let seconds = 0
   let worstChild = -1
   let worstRescues = 0
+  // THE CONTRACT FIRST, over every sample there is — not over the ones the
+  // stepping loop below happens to visit. A set with no samples at all reports
+  // nothing published: silence is not a clean bill.
+  let samples = 0
   let published = true
+  for (const track of tracks) {
+    for (const s of track) {
+      samples++
+      if (!Number.isFinite(s.carried)) published = false
+    }
+  }
+  if (samples === 0) published = false
   for (let k = 0; k < tracks.length; k++) {
     const track = tracks[k]
     if (track.length < 2) continue
     let mine = 0
     for (let i = 1; i < track.length; i++) {
-      if (typeof track[i].carried !== 'number') published = false
-      else carriedMetres += Math.max(0, track[i].carried - (track[i - 1].carried ?? 0))
+      if (published) carriedMetres += Math.max(0, track[i].carried - track[i - 1].carried)
       if ((track[i].nudges ?? 0) <= (track[i - 1].nudges ?? 0)) continue
       mine += (track[i].nudges ?? 0) - (track[i - 1].nudges ?? 0)
     }
