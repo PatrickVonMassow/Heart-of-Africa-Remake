@@ -284,38 +284,40 @@ coverage map live in `scripts/verify/README.md`.
   <point>` and stop. `batch-progress-guard` BLOCKS a stop that closed a point
   without that marker, allows one only against the work order and an armed
   launcher (`scripts/batch-launcher.mjs --start` on Linux, the
-  `HoA-Batch-Autostart` task on Windows), then marks the lock HANDED OVER so it spawns
-  the successor — five hours were lost to a session that stopped holding it.
+  `HoA-Batch-Autostart` task on Windows), then marks the lock HANDED OVER so
+  it spawns the successor.
   Attended, ask for `/clear`. OWNERSHIP IS A LEASE (30.07.2026): `leaseUntil` on
   the lock, renewed BEFORE each call; an owner that stops renewing stops owning
-  the batch — arithmetic, nothing killed. A PreToolUse fence then refuses it
-  merge/push, the tick, the board publish and `dashboard-state.json`.
+  the batch. A PreToolUse fence then refuses it merge/push, the tick, the board
+  publish and `dashboard-state.json`.
   THE WAY BACK (28.07.2026): a returning window runs `node
   scripts/batch-claim.mjs --session <id>`; the owner sees it at its next hook,
   finishes — never mid-merge, never with an agent or a verification running —
-  releases, and the same command takes it. A claim expires, a dead claimant's is
-  ignored, one session ever wins.
+  releases, and the same command takes it. A claim expires, a dead claimant's
+  is ignored, one session wins.
   A MESSAGE WAKES IT TOO (29.07.2026): `scripts/chat-watcher.mjs` spawns a light
   responder from the chat inbox — only with no live owner and no honoured claim,
   under a bounded claim; the launcher tick supervises it.
 - **Model policy (users 25.07./10.08.2026, points 309/624). AUTHOR AND REVIEWER
   ARE SEPARATE ROLES.** AUTHORS: **Opus 5**, then **Fable 5**, then **Opus
-  4.8** — the chain `scripts/batch-autostart.mjs` launches. DIFFICULTY IS NO
-  REASON to hand work to Fable: Opus 5 works at any difficulty. REVIEWERS (both
+  4.8** — the chain `scripts/batch-autostart.mjs` launches. **FABLE 5 AUTHORS
+  THE HARD CASES** (user 12.08.2026): work judged difficult, complex or
+  error-prone goes to Fable FROM THE START, and Opus work MOVES to Fable once
+  Sol still finds problems after a re-work. Fable is not the default — its
+  volume is the smaller one. REVIEWERS (both
   modes): **GPT-5.6 Sol** at effort HIGH, else the first of **Fable 5**, **Opus
   5**, **Opus 4.8** that authored none of it. A reviewer is bought for its
-  DIFFERENT errors, and another VENDOR decorrelates further than our own; never
-  "simplify" that away. Reviews run through `node scripts/review-sol.mjs`,
-  never a hand-typed `codex` line: it names the cause, HANDS the review on, and
-  RECORDS who ran it. Sonnet and Haiku are NOT acceptable: a degraded session
+  DIFFERENT errors, and another VENDOR decorrelates further than our own.
+  Reviews run through `node scripts/review-sol.mjs`, never a hand-typed
+  `codex` line: it names the cause, hands the review on, and records who ran
+  it. Sonnet and Haiku are NOT acceptable: a degraded session
   is a capability breach; the batch STOPS. Every commit NAMES its author model
   in a `Co-Authored-By` trailer the `commit-msg` hook enforces;
   `scripts/model-guard-core.mjs` holds the AUTHOR allowlist (`ALLOWED`) and
   `scripts/model-guard.mjs` blocks the turn end on any commit after its
   baseline authored outside it: HARD on a NAMED forbidden model (pause),
-  resolvably on an UNNAMED one, which transcripts settle. (History: a degraded
-  session merged three defective Haiku deliveries in 14 minutes; only the
-  trailers could have caught it.)
+  resolvably on an UNNAMED one, which transcripts settle. (A degraded session
+  once merged three defective Haiku deliveries in 14 minutes.)
 - **The four-eyes principle has TWO MODES, chosen by the STAGE (user
   25.07.2026). This is its normative wording; everywhere else refers here.** A
   DIVERGENT stage — what could go wrong, which cases to test, which designs are
