@@ -48,6 +48,8 @@
 import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
 import { CLOSING_STEPS, missingSteps } from './closing-guard-core.mjs'
 import { parseGateLine } from './user-gate-core.mjs'
+import { SECTION_TITLES, sliceSections, parseCards, etaStatus } from './dashboard-guard-core.mjs'
+import { NOW_CARD_CMD, REPUBLISH } from './board-remedy.mjs'
 
 /** How old a declaration may be before the guard stops honouring it — where
  *  nothing in it is producing OUTPUT (point 434 (6b); a declaration whose branch
@@ -998,4 +1000,57 @@ export function describeInFlight(assessment, declaration) {
       ? ` [silent but NOT counted as dead: ${assessment.ignored.join('; ')}]`
       : ''
   return `${what}${age}: ${assessment?.summary || 'no evidence'} — judged on ${on}${ignored}`
+}
+
+// --- THE BOARD'S PROMISE MUST NOT AGE UNDER A DECLARED WAIT (point 661) --------
+// The "~HH:MM" on a current-work card is a promise to a reader on a phone, and
+// the `now-eta-past` audit speaks only at a turn end (`--synced`/attest). A
+// session waiting on a delegated agent produces no turn end for an hour —
+// measured 12.08.2026: the published promise stood 50 minutes past while every
+// mechanism held green. The waiting heartbeat that DOES still run is the
+// re-declaration (`batch-in-flight.mjs --waiting-on`, at most `IN_FLIGHT_MAX_AGE_MS`
+// apart), so that is where the check lives: a wait whose now-card ETA already
+// lies in the past is refused until the estimate is refreshed, which bounds the
+// staleness by the re-declaration interval.
+
+/**
+ * The current-work cards whose "~HH:MM" promise has already PASSED. PURE.
+ * `html` is the board's content, `nowMinutes` minutes since midnight in
+ * Europe/Berlin (the clock the board is written against). Anything unreadable —
+ * no html, no clock, no current-work section — answers []: a broken board must
+ * never trap the session; only a READABLE promise that broke may refuse.
+ * @returns {{points: number[], title: string, meta: string|null, minutesPast: number}[]}
+ */
+export function pastEtaCards({ html, nowMinutes } = {}) {
+  if (typeof html !== 'string' || !Number.isFinite(nowMinutes)) return []
+  const nowSection = sliceSections(html).sections[SECTION_TITLES[0]]
+  if (typeof nowSection !== 'string') return []
+  const out = []
+  for (const card of parseCards(nowSection)) {
+    const status = etaStatus({ meta: card.meta, nowMinutes })
+    if (status && status.state === 'past') {
+      out.push({ points: card.points, title: card.title, meta: card.meta, minutesPast: -status.minutesLeft })
+    }
+  }
+  return out
+}
+
+/**
+ * MAY THIS WAIT BE RECORDED against this board? Null = yes; otherwise the
+ * refusal message, naming each broken card and the remedy. Decided here so the
+ * Vitest layer sweeps the refusal exactly as the wrapper prints it.
+ */
+export function waitEtaRefusal({ html, nowMinutes } = {}) {
+  const past = pastEtaCards({ html, nowMinutes })
+  if (past.length === 0) return null
+  const cards = past
+    .map((c) => `  point ${c.points.length ? c.points.join(', ') : '?'} — "${c.meta}" (${c.minutesPast} min past)`)
+    .join('\n')
+  return (
+    'the current-work card\'s "~HH:MM" promise has ALREADY PASSED, and a declared wait would let it age ' +
+    'unwatched until the next re-declaration:\n' +
+    `${cards}\n` +
+    `Give each card a realistic new "~HH:MM" (${NOW_CARD_CMD} …), ${REPUBLISH}, then re-declare this wait. ` +
+    'Nothing recorded.'
+  )
 }
