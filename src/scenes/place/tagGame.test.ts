@@ -802,9 +802,19 @@ describe('another inhabitant’s body is ground to walk round (point 657)', () =
   /** An adult standing in the ground, judged the way the settlement judges it:
    *  the PAIR'S contact distance — the adult's contact radius plus the child's. */
   const adultReach = SEP.bodyRadius + KID_BODY
-  /** The settlement's own wiring in miniature: every other child's body at its
-   *  live position, self and the tag partner excluded. */
-  const childrenOccupy =
+  /** THE SHIPPED WIRING in miniature (PlaceLife's Kids): bodies OUTSIDE the
+   *  game are walls, a playmate never is — see the wiring comment there for
+   *  the measurements behind that rule. */
+  const adultsOccupy =
+    (adults: ReadonlyArray<{ x: number; z: number }>) =>
+    (_self: number, _partner: number, x: number, z: number): boolean =>
+      adults.some((a) => Math.hypot(x - a.x, z - a.z) < adultReach)
+  /** STRICTER THAN SHIPPED, on purpose: every playmate a wall, only self and
+   *  the tag partner excluded. The shipped wiring walls NO playmate (aligned
+   *  with production per GPT-5.6 Sol's review) — the cases below that use this
+   *  pin the tagGame LAYER's partner parameter, the contract any future
+   *  wiring that does wall playmates would lean on for the catch. */
+  const layerWalls =
     (s: TagState, extra?: { x: number; z: number }) =>
     (self: number, partner: number, x: number, z: number): boolean => {
       if (extra && Math.hypot(x - extra.x, z - extra.z) < adultReach) return true
@@ -854,7 +864,8 @@ describe('another inhabitant’s body is ground to walk round (point 657)', () =
   it('the chase flows ROUND an adult standing in its ground, and the game still catches', () => {
     const s = game(FOUR)
     const adult = { x: 7, z: 6.5 } // amid the four spawn spots
-    const world: TagWorld = { ...OPEN, occupied: childrenOccupy(s, adult) }
+    // The SHIPPED policy: the adult is a wall, the playmates are not.
+    const world: TagWorld = { ...OPEN, occupied: adultsOccupy([adult]) }
     let nearest = Infinity
     run(s, 60, world, CFG, 1 / 60, (st) => {
       for (const c of st.children) nearest = Math.min(nearest, Math.hypot(c.x - adult.x, c.z - adult.z))
@@ -871,12 +882,13 @@ describe('another inhabitant’s body is ground to walk round (point 657)', () =
   })
 
   it('the pair is never walled off from its own catch: first catches still arrive early', () => {
-    // The mirror of the bare-world catch test above, with every body standing in
-    // the way — self and partner excluded, exactly as the settlement wires it.
-    // Treating the quarry as a wall would hold the chaser at arm's length here.
+    // THE LAYER CONTRACT, not the shipped wiring (which walls no playmate):
+    // under a wiring that walls EVERY playmate, the occupied signature's
+    // partner parameter is the one thing that keeps the catch reachable —
+    // treating the quarry as a wall would hold the chaser at arm's length.
     for (const seed of [1, 2, 3, 4, 5]) {
       const s = game(FOUR, seed)
-      const world: TagWorld = { ...OPEN, occupied: childrenOccupy(s) }
+      const world: TagWorld = { ...OPEN, occupied: layerWalls(s) }
       let first = Infinity
       run(s, CFG.resolveCapSeconds, world, CFG, 1 / 60, (st, t) => {
         if (st.tags > 0 && first === Infinity) first = t
@@ -888,13 +900,15 @@ describe('another inhabitant’s body is ground to walk round (point 657)', () =
   it('a catch past a third child’s body counts — occupied steers, it is not a wall', () => {
     // `lineClear` stays a WALL test on purpose: a tag reached past a bystander
     // is a tag, through a hut it is not. The bystander stands exactly on the
-    // line at the moment of the catch.
+    // line at the moment of the catch — under the stricter layer wiring, so
+    // the pin holds even for a wiring that walls playmates (the shipped one
+    // does not, and passes a fortiori).
     const s = game([
       [0, 0],
       [0.7, 0],
       [0.35, 0.05],
     ])
-    const world: TagWorld = { ...OPEN, occupied: childrenOccupy(s) }
+    const world: TagWorld = { ...OPEN, occupied: layerWalls(s) }
     s.playing = true
     s.chaser = 0
     s.target = 1
