@@ -429,6 +429,28 @@ describe('inhabitant bodies', () => {
       expect(Math.hypot(r.x - 0, r.z - 0)).toBe(0)
     })
 
+    it('a long step is judged along its WHOLE segment, not at its endpoint', () => {
+      // The porter case (GPT-5.6 Sol, 12.08.2026): the wanted point comes from
+      // the route clock, so one long frame can put the endpoint BEYOND a body
+      // with the body in between — endpoint-only, the step crossed the child
+      // without the deflection ever waking. The destination here is free; the
+      // body sits mid-segment; the returned step must not cross it.
+      const set = createInhabitantSet()
+      const [self] = claimBodies(set, 1, { x: 0, z: 0 })
+      const [child] = claimBodies(set, 1, { x: 1.5, z: 0, scale: KID_SCALE })
+      const open = () => false
+      const r = stepRoundBodies(set, self, 0, 0, 3, 0, SEP, open)
+      // Not the raw destination (the straight line is refused) …
+      const reach = SEP.bodyRadius * (1 + KID_SCALE)
+      // … and no point of the returned move enters the child's ground.
+      const steps = 30
+      for (let i = 1; i <= steps; i++) {
+        const px = (r.x * i) / steps
+        const pz = (r.z * i) / steps
+        expect(Math.hypot(px - child.x, pz - child.z)).toBeGreaterThanOrEqual(reach - 1e-6)
+      }
+    })
+
     it('never counts an excluded body or an inactive one', () => {
       const set = createInhabitantSet()
       const [self, partner, sleeper] = claimBodies(set, 3, { x: 0, z: 0 })

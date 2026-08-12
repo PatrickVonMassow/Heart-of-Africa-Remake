@@ -257,15 +257,34 @@ export function stepRoundBodies(
 ): { x: number; z: number } {
   const selfRadius = cfg.bodyRadius * self.scale
   const notMe = (b: InhabitantBody) => b === self
-  if (!groundOccupied(set, toX, toZ, cfg, selfRadius, notMe)) return { x: toX, z: toZ }
+  const occupiedAt = (x: number, z: number) => groundOccupied(set, x, z, cfg, selfRadius, notMe)
+  // THE WHOLE SEGMENT IS TESTED, NOT THE ENDPOINT (GPT-5.6 Sol, 12.08.2026):
+  // a step whose endpoint lies BEYOND a body used to cross it without the
+  // deflection ever waking — the porters are the worst case, their wanted
+  // point comes from the route clock rather than a distance-bounded step, so
+  // one long frame walked them clean through a child. Sampled at sub-body
+  // spacing, like the chase's own substeps, so nothing fits between samples.
   const dx = toX - fromX
   const dz = toZ - fromZ
   const dist = Math.hypot(dx, dz)
+  const crosses = (ax: number, az: number, bx: number, bz: number): boolean => {
+    const d = Math.hypot(bx - ax, bz - az)
+    const steps = Math.max(1, Math.ceil(d / Math.max(0.05, selfRadius)))
+    for (let i = 1; i <= steps; i++) {
+      if (occupiedAt(ax + ((bx - ax) * i) / steps, az + ((bz - az) * i) / steps)) return true
+    }
+    return false
+  }
+  if (!crosses(fromX, fromZ, toX, toZ)) return { x: toX, z: toZ }
   if (!(dist > 1e-9)) return { x: fromX, z: fromZ }
-  const both = (x: number, z: number) =>
-    blocked(x, z) || groundOccupied(set, x, z, cfg, selfRadius, notMe)
+  const both = (x: number, z: number) => blocked(x, z) || occupiedAt(x, z)
   const r = deflectedStep(fromX, fromZ, Math.atan2(dx, dz), dist, both, Math.max(dist, selfRadius * 2))
-  return r.moved ? { x: r.x, z: r.z } : { x: fromX, z: fromZ }
+  // The deflected step is swept by the same rule: `deflectedStep` probes its
+  // target and lookahead POINTS, so a long deflected jump could cross a second
+  // body sideways. A crossing deflection is refused — the figure waits the
+  // frame out and retries against the bodies' next positions.
+  if (!r.moved || crosses(fromX, fromZ, r.x, r.z)) return { x: fromX, z: fromZ }
+  return { x: r.x, z: r.z }
 }
 
 /** A deterministic escape bearing for two bodies at EXACTLY the same point (a
