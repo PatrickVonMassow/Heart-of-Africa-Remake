@@ -380,6 +380,12 @@ there exactly once; a new point joins a bundle when appended.
   3. A GATE keeps the pattern out: a pure test over the verify sources refuses a comparison
      assembled from two separate `page.evaluate` calls. The agent that found this case left
      the gate undone on purpose and asked for the decision — this point is the decision.
+  THE NAMED CASES the sweep starts from, all three measured on `polish` (12.08.2026): the
+  goat's planted foot and "fire shadows ON" both red on WebGL 2 at 00:34, taken while a
+  WebGPU `polish` run and two building agents shared the machine, and both green on the same
+  commit at 05:50 on a quiet one; the water rim's "handover zone" red once at 05:36 and green
+  on its own retry. Each must come out of the sweep classified — repaired as a state check,
+  or declared timing and reported UNMEASURED under load.
   VERIFIABLE: the sweep names every site it changed and every one it deliberately left,
   with which kind it is; the gate fails on a re-introduced two-round-trip comparison and
   passes on the fixed shape; and the throttle probe of point 640 shows 0/8 skew for each
