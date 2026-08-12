@@ -6302,3 +6302,30 @@ to land than a mechanism that needs a review.
   catches "the text is STALE", not "the text is WRONG" — a section rewritten carelessly still
   passes. It would have caught this case, because `src/communication/` is young and the section
   is old.
+
+- [ ] 657. THE CHILDREN STILL SHUFFLE ON THE SPOT IN THE LIVE SETTLEMENT (measured 12.08.2026
+  with the gate point 656 delivers, at seed 2972259115, on a machine with nothing else on it,
+  on BOTH backends). WebGL 2 went red in 3 of 5 traces — 92 of 4652 one-second windows
+  (1.98 %) and 14 of 4640 (0.30 %) — and WebGPU in 1 of 3, 26 of 4676 (0.56 %), against a gate
+  of 0.25 %. The worst window has a child WALK 2.95 m and end 0.06 m from where it started.
+  The rescue teleport is NOT what produces this: the carry and rescue checks stayed green in
+  every one of those traces, so nobody is being picked up — the children are walking on the
+  spot, which is the symptom of the user's own report behind point 648 ("die Kinder hängen kurz
+  fest, zittern"). That point's behaviour fix made it rarer; it did not end it.
+  FINAL STATE: a child that is commanded to walk gets somewhere. In the live settlement at that
+  seed, the share of one-second windows in which a child walks more than 1 m without leaving a
+  0.35 m circle stays under the 0.25 % gate across repeated traces on BOTH backends — with the
+  gate untouched, and with the carry and rescue rates staying under their own gates, so the
+  symptom is gone rather than tidied away.
+  THE CAUSE IS NAMED BEFORE IT IS FIXED. The measurement leaves three candidates open and the
+  trace can tell them apart: the separation pass pushing a child back into the pocket it just
+  walked out of; two children resolving each other in opposite directions on alternating frames;
+  and a walk target that sits inside another body, so the child never arrives and keeps pressing
+  into it. Which one it is goes into the commit message and the code comment.
+  VERIFIABLE: the live `children-motion` section runs five times per backend with no red, and a
+  Vitest replay reproduces the named cause from a recorded trace and shows it gone after the fix
+  — the replay fails against the code as it stands today. While this point is open, the live
+  red is charged to it in `scripts/render-verify-charges.mjs`, and the charge dies with the tick.
+  Criticality: high — it is the user's own bug report and the most visible surface of the
+  settlement.
+  Bundle: Dorfleben.
