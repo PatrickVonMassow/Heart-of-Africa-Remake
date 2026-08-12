@@ -298,7 +298,7 @@ coverage map live in `scripts/verify/README.md`.
   A MESSAGE WAKES IT TOO (29.07.2026): `scripts/chat-watcher.mjs` spawns a light
   responder from the chat inbox — only with no live owner and no honoured claim,
   under a bounded claim; the launcher tick supervises it.
-- **Model policy (users 25.07./10.08.2026, points 309/624). AUTHOR AND REVIEWER
+- **Model policy (users 25.07./10.08./12.08.2026, points 309/624). AUTHOR AND REVIEWER
   ARE SEPARATE ROLES.** AUTHORS: **Opus 5**, then **Fable 5**, then **Opus
   4.8** — the chain `scripts/batch-autostart.mjs` launches. **FABLE 5 AUTHORS
   THE HARD CASES** (user 12.08.2026): work judged difficult, complex or
