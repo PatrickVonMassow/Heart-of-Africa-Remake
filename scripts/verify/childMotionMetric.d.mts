@@ -103,10 +103,16 @@ export interface RescueRate {
   perChildMinute: number
   carriedMetresPerChildMinute: number
   perChild: ChildRescues[]
-  /** The most-rescued child's OWN rate — what the gates read, because an average
-   *  divides one persistently rescued child by its healthy siblings. */
+  /** The highest rate any ONE child was picked up at — what the gates read,
+   *  because an average divides a persistently rescued child by its siblings —
+   *  and the child it belongs to. */
   worstPerChildMinute: number
+  worstRescueChild: number
+  /** The furthest any ONE child was carried per its own minute, and whose. */
   worstCarriedMetresPerChildMinute: number
+  worstCarriedChild: number
+  /** The child picked up most often in ABSOLUTE count: a third question, whose
+   *  answer need not be either child above. */
   worstChild: number
   worstRescues: number
 }

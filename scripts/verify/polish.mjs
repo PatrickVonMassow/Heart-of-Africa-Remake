@@ -3563,8 +3563,11 @@ if (section('children-motion')) {
         // divides one persistently rescued child by its healthy siblings.
         rescues.worstPerChildMinute < CHILD_MOTION.worstChildRescueGate &&
         rescues.worstCarriedMetresPerChildMinute < CHILD_MOTION.worstChildCarryGate,
-      `worst child ${rescues.worstChild} picked up ${rescues.worstPerChildMinute.toFixed(2)}/min and ` +
-        `carried ${rescues.worstCarriedMetresPerChildMinute.toFixed(2)} m/min; group ` +
+      // Each maximum with ITS OWN child: they are three questions and need not
+      // have the same answer.
+      `most-often-picked-up child ${rescues.worstRescueChild} at ${rescues.worstPerChildMinute.toFixed(2)}/min; ` +
+        `furthest-carried child ${rescues.worstCarriedChild} at ` +
+        `${rescues.worstCarriedMetresPerChildMinute.toFixed(2)} m/min; group ` +
         `${rescues.rescues} rescues (${rescues.carriedMetres.toFixed(2)} m carried in all` +
         `${rescues.carriedPublished ? '' : ', NOT PUBLISHED BY THE GAME'}) in ` +
         `${rescues.childMinutes.toFixed(2)} child-minutes = ${rescues.perChildMinute.toFixed(2)}/child-min, ` +

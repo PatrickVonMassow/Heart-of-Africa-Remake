@@ -583,12 +583,24 @@ export function rescueRate(tracks) {
     }
   }
   const childMinutes = seconds / 60
+  // EACH MAXIMUM CARRIES ITS OWN CHILD. They are three different questions —
+  // who was picked up most often in all, who at the highest rate, who was moved
+  // furthest — and they need not have the same answer. Reported under one index
+  // they made the diagnostic lie about which child was which.
   let worstPerChildMinute = 0
+  let worstRescueChild = -1
   let worstCarriedMetresPerChildMinute = 0
-  for (const c of perChild) {
-    worstPerChildMinute = Math.max(worstPerChildMinute, c.perMinute)
-    worstCarriedMetresPerChildMinute = Math.max(worstCarriedMetresPerChildMinute, c.carriedPerMinute)
-  }
+  let worstCarriedChild = -1
+  perChild.forEach((c, k) => {
+    if (c.perMinute > worstPerChildMinute) {
+      worstPerChildMinute = c.perMinute
+      worstRescueChild = k
+    }
+    if (c.carriedPerMinute > worstCarriedMetresPerChildMinute) {
+      worstCarriedMetresPerChildMinute = c.carriedPerMinute
+      worstCarriedChild = k
+    }
+  })
   return {
     rescues,
     carriedMetres,
@@ -597,9 +609,14 @@ export function rescueRate(tracks) {
     perChildMinute: childMinutes > 0 ? rescues / childMinutes : 0,
     carriedMetresPerChildMinute: childMinutes > 0 ? carriedMetres / childMinutes : 0,
     perChild,
-    /** The most-rescued child's OWN rate, which is what the gates read. */
+    /** The highest rate any ONE child was picked up at, and whose it is. */
     worstPerChildMinute,
+    worstRescueChild,
+    /** The furthest any ONE child was carried per its own minute, and whose. */
     worstCarriedMetresPerChildMinute,
+    worstCarriedChild,
+    /** The child picked up most often in ABSOLUTE count — a third question,
+     *  whose answer need not be either child above. */
     worstChild,
     worstRescues,
   }

@@ -340,6 +340,23 @@ describe('the gate reads the WORST child, not the average one', () => {
     expect(rescues.worstPerChildMinute).toBeGreaterThan(CHILD_MOTION.rescueGate)
     expect(rescues.perChild[0].perMinute).toBeCloseTo(19, 0)
     expect(rescues.perChild[1].perMinute).toBe(0)
+    expect(rescues.worstRescueChild).toBe(0)
+  })
+
+  it('and each maximum names the child it actually belongs to', () => {
+    // Three questions, three answers, and they need not agree: one child is
+    // picked up most OFTEN in absolute count over a long trace, another at the
+    // highest RATE over a short one, a third is CARRIED furthest. Printed under
+    // a single index, the diagnostic named the wrong child for two of them.
+    const often = trace(3600, (i, at) => (i > 0 && i % 600 === 0 ? { x: at.x, z: 0, rescue: true } : at)) // 5 in a minute
+    const fast = trace(300, (i, at) => (i > 0 && i % 100 === 0 ? { x: at.x, z: 0, rescue: true } : at)) // 2 in 5 s = 24/min
+    const carried = trace(3600, (i, at) => (i === 600 ? { x: at.x + 9, z: 0, rescue: true } : at)) // one long carry
+    const r = rescueRate([often, fast, carried])
+    expect(r.worstChild).toBe(0) // most rescues in all: five
+    expect(r.worstRescueChild).toBe(1) // highest rate: twenty-four a minute
+    expect(r.worstCarriedChild).toBe(2) // furthest carried: nine metres
+    expect(r.worstPerChildMinute).toBeGreaterThan(20)
+    expect(r.worstCarriedMetresPerChildMinute).toBeCloseTo(9, 0)
   })
 })
 
