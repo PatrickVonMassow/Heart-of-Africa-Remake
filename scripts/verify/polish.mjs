@@ -3510,9 +3510,15 @@ if (section('children-motion')) {
       // and a half of it. 20 child-seconds is the same floor the trace check
       // above sets (5 s of game, four children), read in the unit the share is
       // weighted in.
-      shuffle.seconds > 20 && shuffle.share < CHILD_MOTION.shareGate,
+      // AND THE VERDICT MUST REST ON THE TRACE. A live frame gap longer than the
+      // window is judged by nobody — interpolating across a silence longer than
+      // the question would invent the answer — so a share is worth exactly what
+      // `judgedShare` says it covers, and a trace of holes fails here instead of
+      // reading clean.
+      shuffle.seconds > 20 && shuffle.judgedShare > 0.8 && shuffle.share < CHILD_MOTION.shareGate,
       `${shuffle.bad} of ${shuffle.windows} ${CHILD_MOTION.span}s windows, ` +
-        `${(shuffle.share * 100).toFixed(2)} % of ${shuffle.seconds.toFixed(1)} child-seconds ` +
+        `${(shuffle.share * 100).toFixed(2)} % of ${shuffle.seconds.toFixed(1)} judged child-seconds ` +
+        `(${(shuffle.judgedShare * 100).toFixed(1)} % of ${shuffle.covered.toFixed(1)} traced) ` +
         `with over ${CHILD_MOTION.minPath} m walked inside ${CHILD_MOTION.circle} m` +
         (shuffle.worst.child >= 0
           ? ` — worst child ${shuffle.worst.child} at ${shuffle.worst.clock.toFixed(1)}s, ${shuffle.worst.path.toFixed(2)} m walked inside ${shuffle.worst.out.toFixed(2)} m`

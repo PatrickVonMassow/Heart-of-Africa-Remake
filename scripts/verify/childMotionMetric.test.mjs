@@ -148,6 +148,52 @@ describe('the windows carry equal weight in game time', () => {
     expect(r.share).toBeLessThan(0.55)
   })
 
+  it('lets no single verdict stand for a silence longer than the window', () => {
+    // THE COUNTEREXAMPLE, verbatim: two samples ten seconds apart. Whatever
+    // happened in between, ONE classification used to be charged all ten
+    // seconds of it — nine that no window had looked at and one that is the
+    // tail no window can reach. Both readings of that shape are refused: the
+    // one that would look filthy (20 m walked, back where it started) and the
+    // one that would look spotless (20 m walked, 20 m away). A trace of holes
+    // is not allowed to be evidence either way.
+    const at = (clock, x, walked) => ({ clock, x, z: 0, walked, nudges: 0 })
+    const wouldLookBad = shuffleWindows([[at(0, 0, 0), at(10, 0, 20)]])
+    const wouldLookGood = shuffleWindows([[at(0, 0, 0), at(10, 20, 20)]])
+    for (const r of [wouldLookBad, wouldLookGood]) {
+      expect(r.windows).toBe(0)
+      expect(r.seconds).toBe(0)
+      expect(r.share).toBe(0)
+      expect(r.judgedShare).toBe(0)
+      expect(r.unjudged).toBeCloseTo(10, 6)
+    }
+  })
+
+  it('and refuses the window whose far end falls inside a long gap', () => {
+    // Samples at 0, 0.5 and 5 s. The window at 0 s ends inside a four-and-a-half
+    // second silence, so its far end could only be invented: unjudged, and the
+    // 0.5 s it would have spoken for is booked as such. What remains is the
+    // tail — the whole trace, judged nowhere.
+    const at = (clock, x, walked) => ({ clock, x, z: 0, walked, nudges: 0 })
+    const r = shuffleWindows([[at(0, 0, 0), at(0.5, 0, 3), at(5, 0.1, 9)]])
+    expect(r.windows).toBe(0)
+    expect(r.judgedShare).toBe(0)
+    expect(r.covered).toBeCloseTo(5, 6)
+  })
+
+  it('and says how much of a holey trace it could judge at all', () => {
+    // Ten seconds of real play with a five-second silence dropped in the middle
+    // of it. The play is judged, the silence is not, and the caller can see the
+    // difference: a gate on `judgedShare` is what stops a trace of holes from
+    // proving anything.
+    const dense = trace(300, (i) => ({ x: i * DT * 1.5, z: 0 })) // 5 s, walking
+    const after = dense.map((s) => ({ ...s, clock: s.clock + 10 }))
+    const r = shuffleWindows([[...dense, ...after]])
+    expect(r.seconds).toBeGreaterThan(7)
+    expect(r.judgedShare).toBeGreaterThan(0.45)
+    expect(r.judgedShare).toBeLessThan(0.6)
+    expect(shuffleWindows([dense]).judgedShare).toBeGreaterThan(0.75)
+  })
+
   it('gives one recorded trace the same share at any cadence', () => {
     // THE INVARIANCE ITSELF. One recorded trace, resampled six ways — evenly at
     // 60, 20 and 7.5 frames a second, and irregularly at cadences that swing by

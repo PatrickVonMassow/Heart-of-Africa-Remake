@@ -30,10 +30,18 @@ export interface ShuffleWindows {
   /** How many windows were judged — a count of samples, reported not gated. */
   windows: number
   bad: number
-  /** The GAME TIME the judged windows stand for, in seconds. */
+  /** The GAME TIME the judged windows stand for, in seconds — each capped at
+   *  the span it was measured over. */
   seconds: number
   /** The part of it spent walking without getting anywhere. */
   badSeconds: number
+  /** Traced clock no window could speak for: silences longer than the span, the
+   *  surplus of a gap beyond it, and the tail. */
+  unjudged: number
+  /** `seconds + unjudged` — the whole traced clock, summed over the children. */
+  covered: number
+  /** `seconds / covered`. How much of the trace any verdict rests on. */
+  judgedShare: number
   /** `badSeconds / seconds` — time-weighted, so the frame cadence cannot move it. */
   share: number
   worst: { path: number; out: number; child: number; clock: number }

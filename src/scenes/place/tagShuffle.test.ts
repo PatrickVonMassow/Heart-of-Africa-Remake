@@ -438,6 +438,11 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       expectLively(paths)
       const r = shuffleWindows(paths)
       expect(r.seconds).toBeGreaterThan(200) // a real stretch of the game, in child-seconds
+      // AND THE VERDICT RESTS ON THE TRACE, not on a corner of it: a silence
+      // longer than the window is judged by nobody and reported as unjudged, so
+      // a share is only worth what `judgedShare` says it covers. Measured here:
+      // 0.983, the missing part being the tail no window can reach into.
+      expect(r.judgedShare).toBeGreaterThan(0.8)
       expect(r.share).toBeLessThan(CHILD_MOTION.shareGate)
       // AND NOBODY IS BEING CARRIED (point 656): the rescue teleport is what
       // ENDS a snag, so a village that keeps its share down only by picking its
@@ -589,11 +594,11 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
  * will take a step at all — and no room to get anywhere, and the settlement
  * carries it 3 m clear whenever its stall watch runs out. Measured over 40 s at
  * these numbers: 22.5 rescues per child-minute, every one of them a carry, and
- * 3.5 % of one-second windows walked without getting anywhere — fourteen times
+ * 3.3 % of the judged game time walked without getting anywhere — thirteen times
  * the gate. THE MEASURE THIS ONE REPLACED sees 0.35 % of the same trace and
- * would have passed it at its own 1 % gate, because every one of its
- * two-second windows holds a 3 m carry: it counted the teleport as the child
- * walking, and as ground the child covered.
+ * would have passed it at its own 1 % gate, because every one of its two-second
+ * windows holds a 3 m carry: it counted the teleport as the child walking, and
+ * as ground the child covered.
  */
 const PEN_RADIUS = 0.8
 const PEN_CARRY = 3

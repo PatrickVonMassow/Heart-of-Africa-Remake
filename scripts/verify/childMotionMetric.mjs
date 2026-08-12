@@ -161,13 +161,31 @@ export function groundPath(track) {
  * the sample, a coarse trace measured 0.6 s of walking against a one-second bar
  * — and the ground covered and the path walked are both interpolated there, so
  * the same second of game is judged the same whether it arrived in six frames or
- * sixty. A trace whose samples are sparser than the span is judged to its end;
- * only the last `span` of any trace is left alone, because no window fits in it.
+ * sixty.
+ *
+ * AND A GAP MAY ONLY STAND FOR WHAT IT WAS MEASURED OVER (found 12.08.2026 by
+ * the second cross-vendor review). Two bounds, both of them the same rule seen
+ * from either side:
+ *
+ *   - A window's verdict counts for AT MOST `span` of game — the stretch it was
+ *     actually measured over. Weighting a sample by the whole gap to the next
+ *     one let a single classification stand for an arbitrarily long silence:
+ *     clocks [0, 10] classified ONE window and charged it ten seconds, nine of
+ *     which no window had ever looked at, and the tenth of which is the tail a
+ *     window cannot reach into at all.
+ *   - A window whose far end falls inside a gap LONGER than the span is not
+ *     judged. Interpolating a position and a walked distance across a silence
+ *     longer than the question being asked is inventing the answer, not
+ *     measuring it.
+ *
+ * Whatever is not judged is REPORTED as unjudged rather than quietly dropped, so
+ * a trace full of holes cannot look clean OR dirty: `judgedShare` says how much
+ * of the traced clock any verdict actually rests on, and the callers gate on it.
  *
  * @param {ReadonlyArray<ReadonlyArray<{clock:number,x:number,z:number,walked:number,nudges?:number}>>} tracks
  *   one sample array per child, one sample per frame.
  * @param {Partial<typeof CHILD_MOTION>} [cfg]
- * @returns {{windows:number,bad:number,seconds:number,badSeconds:number,share:number,worst:{path:number,out:number,child:number,clock:number}}}
+ * @returns {{windows:number,bad:number,seconds:number,badSeconds:number,unjudged:number,covered:number,judgedShare:number,share:number,worst:{path:number,out:number,child:number,clock:number}}}
  */
 export function shuffleWindows(tracks, cfg = {}) {
   const { span, minPath, circle } = { ...CHILD_MOTION, ...cfg }
@@ -175,6 +193,7 @@ export function shuffleWindows(tracks, cfg = {}) {
   let bad = 0
   let seconds = 0
   let badSeconds = 0
+  let unjudged = 0
   const worst = { path: 0, out: 0, child: -1, clock: 0 }
   for (let k = 0; k < tracks.length; k++) {
     const track = tracks[k]
@@ -184,7 +203,8 @@ export function shuffleWindows(tracks, cfg = {}) {
     // `j` walks forward with `i` — the windows only ever move to the right, so
     // the far end is never searched from the beginning again.
     let j = 0
-    for (let i = 0; i < last; i++) {
+    let i = 0
+    for (; i < last; i++) {
       const stop = track[i].clock + span
       // The trace's last `span` holds no whole window, and no later start does
       // either. Note what this is NOT: it is not "the samples are too far apart
@@ -193,10 +213,22 @@ export function shuffleWindows(tracks, cfg = {}) {
       if (track[last].clock < stop) break
       if (j < i) j = i
       while (track[j + 1].clock < stop) j++
+      // WHAT THIS SAMPLE MAY SPEAK FOR: the game time until the next one, but
+      // never more than the window it was measured over. The surplus was inside
+      // no window at all and is booked as unjudged.
+      const ahead = Math.max(0, track[i + 1].clock - track[i].clock)
+      const weight = Math.min(span, ahead)
+      unjudged += ahead - weight
       // The far end, interpolated AT the span between the two samples that
-      // bracket it. Across a rescue frame the ground path stands still, so the
-      // interpolation stands still with it.
+      // bracket it — but only where that gap is short enough to interpolate
+      // across. Across a rescue frame the ground path stands still, so the
+      // interpolation stands still with it; longer than the span, nothing is
+      // known about the inside of it at all.
       const gap = track[j + 1].clock - track[j].clock
+      if (gap > span) {
+        unjudged += weight
+        continue
+      }
       const f = gap > 0 ? Math.min(1, Math.max(0, (stop - track[j].clock) / gap)) : 0
       const ex = ground.x[j] + (ground.x[j + 1] - ground.x[j]) * f
       const ez = ground.z[j] + (ground.z[j + 1] - ground.z[j]) * f
@@ -207,7 +239,6 @@ export function shuffleWindows(tracks, cfg = {}) {
       // The game's OWN walked distance, which is cumulative — a difference, not
       // a sum, and the rescue teleport is not in it.
       const walked = track[j].walked + (track[j + 1].walked - track[j].walked) * f - track[i].walked
-      const weight = Math.max(0, track[i + 1].clock - track[i].clock)
       windows++
       seconds += weight
       if (walked > minPath && out < circle) {
@@ -221,8 +252,21 @@ export function shuffleWindows(tracks, cfg = {}) {
         }
       }
     }
+    // The tail no window can reach into: unjudged, and said so.
+    unjudged += track[last].clock - track[Math.min(i, last)].clock
   }
-  return { windows, bad, seconds, badSeconds, share: seconds > 0 ? badSeconds / seconds : 0, worst }
+  const covered = seconds + unjudged
+  return {
+    windows,
+    bad,
+    seconds,
+    badSeconds,
+    unjudged,
+    covered,
+    judgedShare: covered > 0 ? seconds / covered : 0,
+    share: seconds > 0 ? badSeconds / seconds : 0,
+    worst,
+  }
 }
 
 /**
