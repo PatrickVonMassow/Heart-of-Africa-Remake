@@ -45,6 +45,29 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 657,
+    suite: 'polish',
+    kind: 'check',
+    match: /no child walks without getting anywhere/i,
+    why:
+      'RESIDUAL after the point-657 carve and behaviour work (measured 13.08.2026, quiet ' +
+      'machine, ten live section runs). The carve plus the tag-back orbit and the peel took the ' +
+      'live worst-child shares from red-in-3-of-10 (to 1.53 %) to WebGL 2 ' +
+      '0.00/0.00/0.00/0.00/0.44 % and WebGPU 0.00/0.00/0.00/0.00/0.23 % — one red left, and the ' +
+      'replay panel from 6/24 to 1/24 red dt-seeds (worst exactly 0.25 %). What remains is the ' +
+      'U-TURN AT A CARVED MOUTH: an evader walks into the converging bay in front of a carve ' +
+      'line (ahead shut, both slides shut on the funnel walls), reverses, and walks out on the ' +
+      'same bearing — 1.29 m of floor-pace legs inside 0.28-0.34 m, one clean about-face, no ' +
+      'rescue, 0.00 m carried, scattered over the ground (traced at (8.25,-5.45), (10.42,-5.30) ' +
+      'and four other bays; the group logger shows two co-walking evaders turning together at ' +
+      't=144.1-144.3, dt-seed 14). In a ~30 s live trace ONE such event is ~0.4 % of a child\'s ' +
+      'judged time, so the section reds on it roughly once in five runs per backend. Nine ' +
+      'steering shapes are already measured and rejected on this branch (wedgeCarve.ts header); ' +
+      'a cure for the mouth — carving the funnel approach or a sideways break on a blocked ' +
+      'reversal — re-rolls the villages and needs its own measurement round, which stays with ' +
+      'point 657.',
+  },
+  {
     point: 506,
     suite: 'polish',
     backend: 'webgpu',
