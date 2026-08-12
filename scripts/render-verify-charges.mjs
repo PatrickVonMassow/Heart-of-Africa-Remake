@@ -99,10 +99,13 @@ export const RED_CHARGES = [
     kind: 'check',
     match: /no child walks without getting anywhere/i,
     why:
-      'Measured 12.08.2026 at seed 2972259115 on a machine with nothing else on it: red in 3 of ' +
-      '5 WebGL 2 traces (92 of 4652 one-second windows, 1.98 %; 14 of 4640, 0.30 %) and in 1 of ' +
-      '3 on WebGPU (26 of 4676, 0.56 %) against the 0.25 % gate, while the carry and rescue ' +
-      'checks stayed green throughout — so the shuffle is the settlement\'s, not the check\'s, ' +
-      'and it is point 657. Both backends on purpose: it was seen on both.',
+      'RE-MEASURED 12.08.2026 with the TIME-WEIGHTED measure, because the first charge rested ' +
+      'on a sample-weighted one whose share moved with the frame cadence and could not settle ' +
+      'the question. Seed 2972259115, idle machine, five traces per backend: WebGL 2 red in 2 ' +
+      'of 5 (0.35 % and 0.67 % of the traced child-seconds, worst window 2.94 m walked inside ' +
+      '0.00 m) and WebGPU in 1 of 5 (0.38 %, worst 1.29 m inside 0.09 m) against the 0.25 % ' +
+      'gate; the other seven read 0.00-0.16 %. NO child was carried in any of the ten runs, so ' +
+      'the rescue teleport is not making the number — the children really do walk on the spot, ' +
+      'which is point 657. Both backends on purpose: it was seen on both.',
   },
 ]
