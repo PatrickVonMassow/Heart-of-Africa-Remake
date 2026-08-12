@@ -69,6 +69,7 @@ export const NON_RENDER_VERIFY = new Set([
   'backend-lane-core.mjs', // WHICH lanes exist and whether a renderer is software; the check drives the browser
   'baseline-classify-core.mjs',
   'baseline-classify.mjs',
+  'childMotionMetric.mjs', // the children's shuffle/rescue verdict over a recorded trace; polish.mjs and the replay test record it
   'docs.mjs',
   'eavesColumn.mjs', // the head-clearance verdict over a recorded window; polish.mjs records it
   'fixedWaits.mjs',
