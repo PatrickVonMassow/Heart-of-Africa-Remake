@@ -58,6 +58,8 @@ import {
   repoTrustKeys,
   claudeConfigPath,
   CLAUDE_CLI_ENV,
+  ETA_OVERDUE_ALERT_MIN,
+  staleEtaLogLine,
 } from './batch-autostart-core.mjs'
 import { isOwnSpawn } from './batch-singleton.mjs'
 
@@ -1065,5 +1067,48 @@ describe('the firewall top-up decision', () => {
 
   it('trims the record the way a written pid file reads back', () => {
     expect(firewallTopUpDecision({ pidText: '4711\n', cmdlineOf: () => ours() }).start).toBe(false)
+  })
+})
+
+// Point 661, the ownerless half: the launcher tick calls out a PUBLISHED board
+// whose now-card "~HH:MM" lies more than one tick in the past — the in-flight
+// refusal only bounds the staleness while a session exists to re-declare.
+describe('the launcher calls out a published now-card ETA older than a tick (point 661)', () => {
+  it('logs the card once its promise is more than one tick past, naming point and meta', () => {
+    const line = staleEtaLogLine({ overdue: [{ points: [388], meta: '10:44 · ~11:15', minutesPast: 50 }] })
+    expect(line).toContain('388')
+    expect(line).toContain('10:44 · ~11:15')
+    expect(line).toContain('50 min past')
+    expect(line).toMatch(/^board: /)
+  })
+
+  it('stays quiet inside the tick: the audit or the wait refusal may not have spoken yet', () => {
+    expect(staleEtaLogLine({ overdue: [{ points: [388], meta: 'm', minutesPast: 10 }] })).toBeNull()
+    expect(staleEtaLogLine({ overdue: [{ points: [388], meta: 'm', minutesPast: ETA_OVERDUE_ALERT_MIN }] })).toBeNull()
+    expect(staleEtaLogLine({ overdue: [{ points: [388], meta: 'm', minutesPast: ETA_OVERDUE_ALERT_MIN + 1 }] })).not.toBeNull()
+  })
+
+  it('names only the cards past the tick when several are overdue', () => {
+    const line = staleEtaLogLine({
+      overdue: [
+        { points: [388], meta: 'a', minutesPast: 40 },
+        { points: [401], meta: 'b', minutesPast: 8 },
+      ],
+    })
+    expect(line).toContain('388')
+    expect(line).not.toContain('401')
+  })
+
+  it('a pointless card is still named, by its placeholder', () => {
+    expect(staleEtaLogLine({ overdue: [{ points: [], meta: 'idle', minutesPast: 30 }] })).toContain('?')
+  })
+
+  it('FAIL-OPEN on anything malformed — the child output is data, not trusted structure', () => {
+    expect(staleEtaLogLine({ overdue: undefined })).toBeNull()
+    expect(staleEtaLogLine({ overdue: null })).toBeNull()
+    expect(staleEtaLogLine({ overdue: [] })).toBeNull()
+    expect(staleEtaLogLine({ overdue: 'garbage' })).toBeNull()
+    expect(staleEtaLogLine({ overdue: [{ points: [1], meta: 'm', minutesPast: 'NaN' }] })).toBeNull()
+    expect(staleEtaLogLine()).toBeNull()
   })
 })

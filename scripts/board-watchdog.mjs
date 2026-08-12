@@ -48,6 +48,8 @@ import {
   probeResult,
   probeVerdict,
 } from './board-probe-core.mjs'
+import { pastEtaCards } from './batch-in-flight-core.mjs'
+import { berlinMinutes } from './dashboard-guard.mjs'
 
 const REPO = fileURLToPath(new URL('..', import.meta.url))
 const args = process.argv.slice(2)
@@ -114,6 +116,14 @@ try {
   const liveHtml = currency.ok ? currency.body : null
   const fetchError = currency.ok ? null : currency.error
 
+  // THE PUBLISHED PROMISE (point 661): the now-cards of the LIVE page whose
+  // "~HH:MM" has already passed, judged here because this child is the only tick
+  // layer that holds the page. Pure and fail-open — no page, no clock or no
+  // now-card all answer [] — and the LAUNCHER decides what is worth a line
+  // (staleEtaLogLine, batch-autostart-core.mjs), so the threshold lives in one
+  // place beside its sibling checks.
+  const etaOverdue = pastEtaCards({ html: liveHtml, nowMinutes: berlinMinutes() })
+
   const state = readJson(join(REPO, '.claude', 'dashboard-state.json')) ?? {}
   let expected = null
   try {
@@ -161,6 +171,9 @@ try {
     // makes an alternating sequence unable to climb.
     streak,
     probe: kind,
+    // The live page's now-cards whose "~HH:MM" has passed (point 661); the
+    // launcher filters and logs.
+    etaOverdue,
     // A retry that RESCUED the probe is worth a log line and nothing else.
     rescued: !!(currency.rescued || viewer?.rescued),
   })

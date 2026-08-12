@@ -74,6 +74,7 @@ import {
   judgeSpawnOutcome,
   announceSpawn,
   firewallTopUpDecision,
+  staleEtaLogLine,
   RUNAWAY_FAIL_LIMIT,
 } from './batch-autostart-core.mjs'
 import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
@@ -551,6 +552,10 @@ try {
   state.boardProbeStreak = Number(r.streak) || 0
   if (r.rescued) log('board: a probe failed and its immediate retry succeeded — a flicker, not a fault')
   if (r.verdict !== 'current') log(`board: ${r.verdict}${r.reason ? ` — ${r.reason}` : ''} (${BOARD_PAGE_URL})`)
+  // The PUBLISHED promise must not age unwatched (point 661): the child hands
+  // back the live page's overdue "~HH:MM" cards, the pure sibling decides.
+  const etaLine = staleEtaLogLine({ overdue: r.etaOverdue })
+  if (etaLine) log(`${etaLine} (${BOARD_PAGE_URL})`)
   if (r.notified) {
     log(`BOARD ALERT: ${r.message}`)
     state.boardWatchKey = r.key
