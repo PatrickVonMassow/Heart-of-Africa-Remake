@@ -79,10 +79,24 @@ export function classifyBash(command = '') {
   return null
 }
 
+/**
+ * A file that is a PICTURE — read with eyes, never routed, whatever its format and
+ * WHEREVER it lies (third cross-vendor round).
+ *
+ * It beats the scratch rule below: a frame saved to the scratchpad and then looked at is
+ * still a frame being judged, and giving it no vote let the turn's other, textual call
+ * carry the whole verification share — inflating exactly the routable number this module
+ * reports. Only scratch TEXT keeps its no-vote rule; a picture is unambiguous evidence.
+ */
+const VERIFICATION_IMAGE = /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|svg)$/i
+
 /** File rules, FIRST MATCH WINS. `read` separates a spec LOOKUP from a spec EDIT. */
 const SPEC_DOCS = /^(TASKS\.md|design\.md|CLAUDE\.md|docs\/tasks-archive\.md|docs\/acceptance-(criteria-detail|evidence)\.md)$/
 const FILE_RULES = [
-  ['verification', /^(scripts\/verify\/|verification\/|scripts\/(render-verify|picture-|measure-picture))|\.png$/],
+  // WHERE THE FRAMES ARE, not "any image file" (final round). Every screenshot this
+  // repository takes is written under `verification/` by the shutter, so the old global
+  // `\.png$` bought nothing and made `src/assets/logo.png` verification work.
+  ['verification', /^(scripts\/verify\/|verification\/|scripts\/(render-verify|picture-|measure-picture))/],
   ['bookkeeping', /^(\.batch-dashboard\.html|TASKS\.md|scripts\/(board|batch|focus|dashboard|finding|mechanism-review|chat-)|docs\/batch-autonomy\.md)|[a-z-]*-guard(-core)?(\.test)?\.mjs$/],
   ['implementation', /^(src\/|scripts\/|docs\/|public\/|index\.html|package\.json|vite\.config|tsconfig|\.github\/)|\.md$/],
 ]
@@ -95,7 +109,13 @@ const FILE_RULES = [
  */
 export function classifyFile(path = '', { read = false } = {}) {
   const rel = normalisePath(path)
-  if (rel.startsWith('/tmp/') || rel.startsWith('/home/')) return null
+  const scratch = rel.startsWith('/tmp/') || rel.startsWith('/home/')
+  // A PICTURE IN SCRATCH IS STILL A FRAME — see VERIFICATION_IMAGE. It outranks the
+  // scratch rule below, but ONLY there: a picture inside the repository is placed by the
+  // rules like any other file, or editing `src/assets/logo.svg` would count as
+  // verification (final cross-vendor round).
+  if (scratch && VERIFICATION_IMAGE.test(rel)) return 'verification'
+  if (scratch) return null
   if (read && SPEC_DOCS.test(rel)) return 'brief'
   for (const [phase, re] of FILE_RULES) if (re.test(rel)) return phase
   return null
@@ -140,35 +160,159 @@ export function turnPhases(tools = []) {
 }
 
 /**
- * The phase of EVERY turn, with the evidence-free ones filled from their neighbours.
- * PURE. Returns a Map(turn → split).
+ * WHICH HALF OF THE VERIFICATION PHASE a call belongs to (point 654). PURE data.
  *
- * WHY A FILL IS NEEDED AT ALL, and why it is reported as a band rather than a number:
- * measured on this repository's transcripts, 77 % of the weighted cost sits on turns
- * that issue no tool call the classifier recognises — the model thinking, reading a
- * result, writing prose. Those turns cost nearly what a tool-calling turn costs, because
- * the bill is dominated by the context carried, not by the call. Attributing only the
- * tool-calling turns therefore measures a fifth of the spend and calls it the whole.
+ * The phase attribution above answers "how much of the spend is verification" (43.3 %
+ * measured, 03.–11.08.2026) but says nothing about which PART of it could be done by a
+ * model that has no browser and no eyes — which is the only question that decides
+ * whether routing read-only work to another vendor is worth building further.
  *
- * The fill: a turn with no evidence takes the phase of the nearest evidence-bearing turn
- * in the SAME session, looking backwards first (the prose that follows a `npm run build`
- * belongs to that gate episode) and forwards only when nothing precedes it. It never
- * crosses a gap longer than `idleGapMs` — across an idle night the next turn is a new
- * episode, not a continuation. What no neighbour reaches stays `unattributed`.
- *
- * With `carry: false` the same function returns the STRICT attribution, which is a
- * floor per phase. Both are reported; the difference between them is the error bar.
+ *   harness   — the browser suites, the render-verify runs, the preview: work that
+ *               needs THIS machine's harness and cannot leave it.
+ *   eyes      — looking at a frame. Judging a picture is explicitly not routed.
+ *   text      — reading a log, a verify script, a report: pure text, no harness, no
+ *               picture. THIS is the half a read-only model can take.
+ *   authoring — editing the verification code itself. Text work, but authoring stays
+ *               with the Claude chain (the commit trailer names an author), so it is
+ *               counted apart rather than folded into `text`.
+ *   unclear   — a verification call whose half its arguments do not settle. Never
+ *               guessed into one, for the same reason `unattributed` exists.
  */
-export function phaseSplits(turns = [], { carry = true, idleGapMs = IDLE_GAP_MS } = {}) {
-  const list = (Array.isArray(turns) ? turns : []).filter((t) => Number.isFinite(t?.at))
-  const out = new Map()
-  const direct = new Map()
-  for (const t of list) {
-    const split = turnPhases(t.tools)
-    direct.set(t, split)
-    out.set(t, split)
+export const VERIFICATION_KINDS = ['harness', 'eyes', 'text', 'authoring', 'unclear']
+
+export const VERIFICATION_KIND_NOTES = {
+  harness: 'runs a suite / the preview — needs this machine',
+  eyes: 'looks at a frame — judgment by picture',
+  text: 'reads a log, a script, a report — pure text',
+  authoring: 'edits the verification code — text, but authorship',
+  unclear: 'a verification call its arguments do not place — NOT guessed',
+}
+
+/** The half a read-only model could take. Everything else stays here. */
+export const ROUTABLE_VERIFICATION_KINDS = ['text']
+
+/**
+ * A shell command that STARTS a suite: the cost is the run, whatever it pipes into.
+ *
+ * A script PATH alone is not a run — `grep -n FAIL scripts/verify/place.mjs` merely names
+ * the file and is text work — so the script forms demand the `node` that executes them.
+ */
+const VERIFICATION_RUNNER =
+  /npm (run )?test:(small|large)|npm test\b|npm run preview|VERIFY_GL=|playwright|\bnode\s[^|;&]*(scripts\/verify\/[a-z0-9-]+\.mjs|render-verify[a-z-]*\.mjs|picture-stability|throttle-probe|measure-picture-cost)/i
+/** A shell command that only READS what a run left behind. */
+const VERIFICATION_READER = /(^|[|;&]\s*|\s)(cat|head|tail|grep|rg|wc|jq|ls|find|diff|sed|awk|node --check)\b/
+
+/**
+ * The commands that only ever READ, whatever their arguments NAME (final cross-vendor
+ * round): `rg playwright scripts/verify/x.mjs` searches for a word — it starts no suite —
+ * and reading the runner pattern off its arguments turned a search into a browser run.
+ * So the first word of a segment, after its environment assignments, decides first.
+ */
+const READER_COMMANDS = /^(cat|less|head|tail|grep|rg|wc|jq|ls|find|diff|sed|awk|nl|sort|uniq|cut|tr)$/
+
+/**
+ * A command that NAMES a verify script without running it — it parses the file and
+ * starts no browser (cross-vendor review, 12.08.2026: `node --check scripts/verify/x.mjs`
+ * was filed as a suite run, which it is not).
+ */
+const VERIFICATION_NOT_A_RUN = /\bnode\s+--check\b/
+
+/**
+ * Which half a verification shell command is evidence for, or null. PURE.
+ *
+ * DECIDED PER SEGMENT, not over the whole line (second cross-vendor round). A shell line
+ * is several commands, and the exceptions cut across them: asking `node --check` of the
+ * WHOLE line filed `node --check x.mjs && npm test` as text, which runs the suite. Each
+ * segment votes, and HARNESS WINS wherever one of them starts a run — the run is what the
+ * turn costs, whatever else the line does with its output.
+ */
+export function classifyVerificationBash(command = '') {
+  // QUOTED TEXT IS AN ARGUMENT, NOT A COMMAND (final round): `rg 'playwright|npm test'
+  // scripts/verify/` was split INSIDE its search pattern, and the fragment that fell out
+  // matched the runner — a search reported as a suite run. Quoted runs are removed before
+  // anything is split or matched, so nothing inside them can look like a command.
+  const segments = String(command)
+    .replace(/'[^']*'/g, ' ')
+    .replace(/"[^"]*"/g, ' ')
+    .split(/&&|\|\||;|\|/)
+  let text = false
+  for (const segment of segments) {
+    // THE FIRST WORD DECIDES BEFORE ITS ARGUMENTS DO. A reader's arguments name whatever
+    // it is searching for, and reading the runner pattern out of them made a `grep` for
+    // "playwright" into a suite run.
+    const first = segment.trim().replace(/^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*/, '').split(/\s+/)[0] ?? ''
+    if (READER_COMMANDS.test(first.replace(/^.*\//, ''))) {
+      text = true
+      continue
+    }
+    if (VERIFICATION_NOT_A_RUN.test(segment)) {
+      text = true
+      continue
+    }
+    if (VERIFICATION_RUNNER.test(segment)) return 'harness'
+    if (VERIFICATION_READER.test(segment)) text = true
   }
-  if (!carry) return out
+  return text ? 'text' : null
+}
+
+/**
+ * Which half ONE tool call is evidence for. PURE.
+ *
+ * Returns null for a call that is not verification at all (it has no vote here), and
+ * 'unclear' for one that is verification but does not say which half.
+ */
+export function classifyVerificationToolCall({ name = '', input = {} } = {}) {
+  if (classifyToolCall({ name, input }) !== 'verification') return null
+  if (name === 'Bash') return classifyVerificationBash(input?.command ?? '') ?? 'unclear'
+  const rel = normalisePath(input?.file_path ?? '')
+  // EVERY picture format, not only PNG (second cross-vendor round): a frame read as a
+  // JPEG or a WebP is still a picture being judged, and counting it as text inflated
+  // exactly the share this split reports.
+  if (name === 'Read') return VERIFICATION_IMAGE.test(rel) ? 'eyes' : 'text'
+  if (name === 'Edit' || name === 'Write' || name === 'NotebookEdit') return 'authoring'
+  return 'unclear'
+}
+
+/**
+ * How ONE turn's verification cost divides across the halves: shares summing to 1. PURE.
+ *
+ * AN UNCLEAR CALL VOTES TOO (cross-vendor review, 12.08.2026). Dropping it made a turn
+ * that read one log and did one unplaceable thing read as 100 % routable text, which
+ * overstates exactly the number this split exists to report. It is a kind like the
+ * others; only a turn with NO verification call at all is wholly unclear, and that one
+ * is what the carry may fill.
+ */
+export function turnVerificationKinds(tools = []) {
+  const votes = new Map()
+  let total = 0
+  for (const t of Array.isArray(tools) ? tools : []) {
+    const kind = classifyVerificationToolCall(t)
+    if (!kind) continue
+    votes.set(kind, (votes.get(kind) ?? 0) + 1)
+    total += 1
+  }
+  if (total === 0) return { unclear: 1 }
+  const out = {}
+  for (const [kind, n] of votes) out[kind] = n / total
+  return out
+}
+
+/**
+ * Fill the evidence-free entries of `direct` from their neighbours in the same session.
+ * PURE, and shared by the phase split and the verification split so the two cannot
+ * drift apart in the one place both are easy to get wrong.
+ *
+ * `empty` names the key that marks "no evidence". Backwards first — the prose after a
+ * `npm run build` belongs to that gate episode — forwards only where nothing precedes,
+ * and never across a gap of `idleGapMs`, which is a new episode rather than the same one.
+ *
+ * "No evidence" means the split is WHOLLY that key: a turn that is PARTLY unclear still
+ * saw something, and overwriting its split with a neighbour's would throw that away
+ * (cross-vendor review, 12.08.2026). For the phase split the two readings coincide, since
+ * `turnPhases` only ever yields `{ unattributed: 1 }`.
+ */
+function fillFromNeighbours(list, direct, { idleGapMs = IDLE_GAP_MS, empty = 'unattributed' } = {}) {
+  const out = new Map(direct)
   const bySession = new Map()
   for (const t of list) {
     const key = t.session ?? t.file ?? '(none)'
@@ -176,7 +320,7 @@ export function phaseSplits(turns = [], { carry = true, idleGapMs = IDLE_GAP_MS 
     arr.push(t)
     bySession.set(key, arr)
   }
-  const hasEvidence = (t) => !direct.get(t).unattributed
+  const hasEvidence = (t) => direct.get(t)?.[empty] !== 1
   for (const arr of bySession.values()) {
     arr.sort((a, b) => a.at - b.at)
     const filled = new Array(arr.length).fill(null)
@@ -203,6 +347,95 @@ export function phaseSplits(turns = [], { carry = true, idleGapMs = IDLE_GAP_MS 
     for (let i = 0; i < arr.length; i++) if (filled[i]) out.set(arr[i], filled[i])
   }
   return out
+}
+
+/**
+ * The verification half of EVERY turn, carried across the evidence-free ones exactly as
+ * the phase split is. PURE. Returns a Map(turn → split over VERIFICATION_KINDS).
+ */
+export function verificationSplits(turns = [], { carry = true, idleGapMs = IDLE_GAP_MS } = {}) {
+  const list = (Array.isArray(turns) ? turns : []).filter((t) => Number.isFinite(t?.at))
+  const direct = new Map(list.map((t) => [t, turnVerificationKinds(t.tools)]))
+  if (!carry) return direct
+  return fillFromNeighbours(list, direct, { idleGapMs, empty: 'unclear' })
+}
+
+/**
+ * THE SPLIT THE ROUTING DECISION RESTS ON (point 654). PURE.
+ *
+ * Every turn's VERIFICATION share (from the phase attribution) is divided again over the
+ * halves above, so the totals here sum to exactly the verification phase — a figure that
+ * cannot be compared with the phase table is worth nothing.
+ *
+ * `routableShare` is the `text` half as a fraction of the verification phase: the ceiling
+ * of what routing read-only verification work to another vendor could ever move, before
+ * any judgement about whether it should be.
+ */
+export function verificationBreakdown({ turns = [], idleGapMs = IDLE_GAP_MS, carry = true } = {}) {
+  const list = (Array.isArray(turns) ? turns : []).filter((t) => Number.isFinite(t?.at))
+  const durations = turnDurations(list, { idleGapMs })
+  const phases = phaseSplits(list, { carry, idleGapMs })
+  const halves = verificationSplits(list, { carry, idleGapMs })
+  const kinds = Object.fromEntries(VERIFICATION_KINDS.map((k) => [k, emptyBucket()]))
+  const byScope = {
+    'top-level': Object.fromEntries(VERIFICATION_KINDS.map((k) => [k, emptyBucket()])),
+    subagent: Object.fromEntries(VERIFICATION_KINDS.map((k) => [k, emptyBucket()])),
+  }
+  let weighted = 0
+  for (const t of list) {
+    const cost = turnCost(t.usage)
+    if (!(cost.weighted > 0)) continue
+    const share = (phases.get(t) ?? {}).verification ?? 0
+    if (!(share > 0)) continue
+    const u = t.usage ?? {}
+    const raw =
+      (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.output_tokens ?? 0)
+    const ms = durations.get(t) ?? 0
+    const scope = t.scope === 'subagent' ? 'subagent' : 'top-level'
+    weighted += cost.weighted * share
+    for (const [kind, part] of Object.entries(halves.get(t) ?? { unclear: 1 })) {
+      const cell = { weighted: cost.weighted, raw, ms, share: share * part, usage: u }
+      addTo(kinds[kind], cell)
+      addTo(byScope[scope][kind], cell)
+    }
+  }
+  const routable = ROUTABLE_VERIFICATION_KINDS.reduce((a, k) => a + kinds[k].weighted, 0)
+  return {
+    weighted: Math.round(weighted),
+    kinds: Object.fromEntries(VERIFICATION_KINDS.map((k) => [k, roundBucket(kinds[k])])),
+    byScope: {
+      'top-level': Object.fromEntries(VERIFICATION_KINDS.map((k) => [k, roundBucket(byScope['top-level'][k])])),
+      subagent: Object.fromEntries(VERIFICATION_KINDS.map((k) => [k, roundBucket(byScope.subagent[k])])),
+    },
+    routableShare: weighted > 0 ? +(routable / weighted).toFixed(4) : null,
+  }
+}
+
+/**
+ * The phase of EVERY turn, with the evidence-free ones filled from their neighbours.
+ * PURE. Returns a Map(turn → split).
+ *
+ * WHY A FILL IS NEEDED AT ALL, and why it is reported as a band rather than a number:
+ * measured on this repository's transcripts, 77 % of the weighted cost sits on turns
+ * that issue no tool call the classifier recognises — the model thinking, reading a
+ * result, writing prose. Those turns cost nearly what a tool-calling turn costs, because
+ * the bill is dominated by the context carried, not by the call. Attributing only the
+ * tool-calling turns therefore measures a fifth of the spend and calls it the whole.
+ *
+ * The fill: a turn with no evidence takes the phase of the nearest evidence-bearing turn
+ * in the SAME session, looking backwards first (the prose that follows a `npm run build`
+ * belongs to that gate episode) and forwards only when nothing precedes it. It never
+ * crosses a gap longer than `idleGapMs` — across an idle night the next turn is a new
+ * episode, not a continuation. What no neighbour reaches stays `unattributed`.
+ *
+ * With `carry: false` the same function returns the STRICT attribution, which is a
+ * floor per phase. Both are reported; the difference between them is the error bar.
+ */
+export function phaseSplits(turns = [], { carry = true, idleGapMs = IDLE_GAP_MS } = {}) {
+  const list = (Array.isArray(turns) ? turns : []).filter((t) => Number.isFinite(t?.at))
+  const direct = new Map(list.map((t) => [t, turnPhases(t.tools)]))
+  if (!carry) return direct
+  return fillFromNeighbours(list, direct, { idleGapMs, empty: 'unattributed' })
 }
 
 /**

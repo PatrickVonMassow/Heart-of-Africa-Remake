@@ -90,6 +90,7 @@ import {
   createInhabitantSet,
   releaseBodies,
   separateBody,
+  separateGroup,
   type InhabitantBody,
   type InhabitantSet,
 } from './inhabitantBodies'
@@ -649,19 +650,27 @@ function Kids({
     // the collisions, the stamina and the floor pace.
     stepTagGame(game, dt, balance.villageLife.tag, world, (i) => childSteer(speech, view, i, cfg))
     // THE BODIES (point 578), resolved where the chase left them and before
-    // anything is drawn: a child's body is its own scale's, the push is damped
-    // so a separated pair does not tremble, and it is far smaller than the catch
-    // distance — the tag always wins over the separation.
+    // anything is drawn: a child's body is its own scale's, and it is far
+    // smaller than the catch distance — the tag always wins over the separation.
+    //
+    // EVERY body is written FIRST and the group resolved as one (point 648).
+    // Writing and separating one child at a time resolved each against where its
+    // neighbours stood a frame ago, and a single sweep cannot take a chain of
+    // three apart at all — together that was the user's "Kinder klemmen kurz
+    // ineinander". `separateGroup` sweeps until nobody moves.
     const sep = balance.villageLife.separation
     for (let i = 0; i < game.children.length; i++) {
-      const c = game.children[i]
       const b = bodies[i]
       if (!b) continue
-      b.x = c.x
-      b.z = c.z
-      separateBody(bodySet, b, dt, sep, world)
-      c.x = b.x
-      c.z = b.z
+      b.x = game.children[i].x
+      b.z = game.children[i].z
+    }
+    separateGroup(bodySet, bodies, dt, sep, world)
+    for (let i = 0; i < game.children.length; i++) {
+      const b = bodies[i]
+      if (!b) continue
+      game.children[i].x = b.x
+      game.children[i].z = b.z
     }
     const said = stepChildSpeech(speech, view, dt, cfg, speechRand)
     if (said) speakSituation(said, game.children[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
@@ -703,6 +712,9 @@ function Kids({
       // The game's OWN clock: the verification samples an interval of GAME,
       // never a count of frames, which buy different amounts of it per machine.
       clock: game.clock,
+      // The radius a child's BODY occupies, so a live check can judge an overlap
+      // against the real figure rather than against a guessed one (point 648).
+      bodyRadius: balance.villageLife.separation.bodyRadius * KID_SCALE,
       children: game.children.map((c) => ({
         x: c.x,
         z: c.z,
@@ -712,6 +724,10 @@ function Kids({
         press: c.press,
         pace: c.pace,
         pinned: c.pinned,
+        // Standing because it was TOLD to (point 481), not because it stalled —
+        // the difference between an obeyed stillness and the reported snag.
+        held: c.held,
+        walked: c.walked,
       })),
     })
     // What the group has SAID so far this visit (point 481), by situation — a

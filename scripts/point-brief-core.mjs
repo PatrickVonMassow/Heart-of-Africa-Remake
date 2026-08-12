@@ -32,6 +32,7 @@
 // This module is pure: text in, text out, no I/O. scripts/point-brief.mjs is the
 // I/O wrapper (same split as doc-budget-core.mjs / doc-budget-guard.mjs).
 import { createHash } from 'node:crypto'
+import { DEFAULT_SETTING as DEFAULT_SOL_SHARE, briefLine as solBriefLine } from './sol-share-core.mjs'
 
 /** Thrown for a failure the reader must see: unknown point, dangling section. */
 export class BriefError extends Error {
@@ -825,7 +826,7 @@ export const CALL_DISCIPLINE = [
   '  session or another agent has written since.',
 ]
 
-const HEADER = [
+const HOUSE_FACTS = [
   'HOW TO USE THIS BRIEF — READ THIS FIRST',
   '- This brief IS your spec. Do NOT read TASKS.md or docs/tasks-archive.md or design.md',
   '  WHOLESALE: measured, that is ~59k + ~46k tokens per agent, uncached, and avoiding it is',
@@ -872,9 +873,19 @@ const HEADER = [
   '  `Co-Authored-By: Claude <noreply@anthropic.com>` names no model and trips the tripwire,',
   '  which STOPS the batch. Write your own model:',
   '  `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.',
-  '',
-  ...CALL_DISCIPLINE,
 ]
+
+/**
+ * The header, with the SOL ROUTING line the current switch setting dictates (point 654).
+ *
+ * It is one line at EVERY setting, the default included: an agent that is never told the
+ * lever exists cannot pull it, and a brief that named it only sometimes would train its
+ * readers to skip the line. The setting itself is READ from `.claude/sol-share.json` by
+ * the wrapper — nothing here keeps its own copy of the routing table.
+ */
+export function headerLines(solShare = DEFAULT_SOL_SHARE) {
+  return [...HOUSE_FACTS, solBriefLine(solShare), '', ...CALL_DISCIPLINE]
+}
 
 /**
  * The brief's closing block: what the agent writes BACK (point 458).
@@ -960,13 +971,14 @@ export function assembleBrief({
   adoptionBeyond = [],
   adoptionCap = ADOPTION_DEPTH_CAP,
   sliceDocs = [],
+  solShare = DEFAULT_SOL_SHARE,
 }) {
   const out = [
     `=== DELEGATION BRIEF — WORK-ORDER POINT ${point.number} (${point.done ? 'DONE/ARCHIVED' : 'OPEN'}) ===`,
     'Assembled by scripts/point-brief.mjs from the work order, design.md and the research docs.',
     formatRevisionLine(revision ?? {}),
     '',
-    ...HEADER,
+    ...headerLines(solShare),
     '',
     `--- THE POINT (verbatim, work-order point ${point.number}) ---`,
     point.body,
@@ -1057,7 +1069,7 @@ export function assembleBrief({
  * The whole job: point number → brief text. Throws BriefError on an unknown point
  * number and on a `§` that resolves in none of the documents searched.
  */
-export function buildBrief({ tasksText, designText, claudeText = '', docs = [], number, registry, revision = {} }) {
+export function buildBrief({ tasksText, designText, claudeText = '', docs = [], number, registry, revision = {}, solShare = DEFAULT_SOL_SHARE }) {
   const all = parseWorkOrderPoints(tasksText)
   const point = all.find((p) => p.number === Number(number)) ?? null
   if (!point) {
@@ -1262,6 +1274,7 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
     adopted,
     adoptionBeyond,
     sliceDocs,
+    solShare,
   })
   return {
     brief,

@@ -70,43 +70,6 @@ there exactly once; a new point joins a bundle when appended.
 
 ## Checklist
 
-- [ ] 648. THE CHILDREN SNAG, JITTER AND CLIP THROUGH EACH OTHER (user F6 reports
-  11.08.2026, 19:08–19:11, all three from ONE state — `local/bugreports/`
-  `KindHaengtKurzFest.zip`, `KindZittertAufStelleHerum.zip`,
-  `KinderKlemmenKurzIneinander.zip`; seed 2972259115, `place` mode in the bambara-village,
-  west region, production build e1bd2fa, WebGPU, quality medium, viewport 1899×984 @dpr
-  1.25). Three symptoms of ONE system, filed as one point because they share the child
-  steering code and must not be split across branches:
-  1. "Kind hängt kurz fest" — a child stops moving for a moment and then frees itself.
-  2. "Kind zittert auf der Stelle herum" — a child jitters in place instead of walking,
-     which is the signature of a target it reaches and overshoots every frame, or of two
-     forces cancelling.
-  3. "Kinder klemmen kurz ineinander" — two children occupy the same space for a moment
-     before separating, so the separation either acts too late or is overridden.
-  THE USER IS BLOCKED ON THIS: he reported it while trying to exercise the communication
-  mechanic (§13/§19.10 — the teaching children), and jittering, snagging children make that
-  untestable. That is why it stands at the head of the work order.
-  WHERE IT LIVES: `src/scenes/place/childSituations.ts` and `lifeSpots.ts` (what a child is
-  doing and where it stands), `tagGame.ts` (the chase that moves them), `collision.ts` (the
-  swept move and the separation between inhabitants), with `inhabitantBodies.ts` for the
-  radius each one occupies. The state dump carries no per-child runtime state, so the
-  reproduction is in-game at that seed.
-  FINAL STATE: all three are traced to a NAMED cause and fixed there — not damped by
-  raising a smoothing constant until the symptom stops showing, which would leave the
-  cause and cost the next reader the same hunt. A child that reaches its target settles
-  instead of oscillating; two children never occupy one another's radius, however briefly;
-  and no child is ever held motionless by geometry it should walk around. Where two of the
-  three share one cause, that is stated rather than split into three fixes.
-  VERIFIABLE: Vitest over the pure steering — a child at its target does not oscillate
-  across frames (its position converges rather than alternating), two children pushed into
-  one another separate within one step and never overlap, and a child pathing past a
-  building corner keeps moving. Plus the browser layer at the reported seed: the children
-  are watched over a run of frames and no child's position alternates, freezes or overlaps
-  another's radius. Judge it by WATCHING them, not only by the assertions — the complaint is
-  what the player sees.
-  Criticality: high — it is what the user is blocked on, and it is the visible surface of
-  the settlement the whole communication PoC is played in. Bundle: Dorfleben.
-
 - [ ] 655. EVERY BOARD CARD NAMES ITS POINT NUMBER AND ITS SUBJECT (user 11.08.2026, with a
   screenshot of the card "Abschlussarbeiten zum gerade beendeten Punkt": "Oft sehen Karten von
   dir so aus. Da steht noch nicht einmal die Nummer des Punktes, geschweige denn, worum es in
@@ -150,87 +113,53 @@ there exactly once; a new point joins a bundle when appended.
   Criticality: medium — it cannot break the game, but the board is the user's only window into
   an unattended batch, and a card he cannot decode is the same as no card. Bundle: Chat & Tafel.
 
-- [ ] 654. THE WORK THAT NEEDS NO WRITE ACCESS GOES TO SOL, WITH A CHEAP SWITCH OVER IT (user 11.08.2026).
-  INSERT AT THE TOP OF THE QUEUE. The user pays two vendors whose allowances run out at
-  different times and wants to be able to move load to OpenAI BEFORE the Anthropic volume is
-  nearly spent, in his own words: "Mir reicht ein günstig zu bauender Schalter, mit dem ich die
-  Last mehr zu OpenAI hin verlegen kann, wenn das Anthropic-Volumen knapp wird. Ich muss ja
-  nicht warten, bis vom Anthropic-Volumen nur noch 1 % übrig ist, sondern kann schon früher
-  umschalten."
-  
-  MEASURED FIRST (`node scripts/measure-task-cost.mjs`, 45,078 turns from 371 transcripts,
-  03.08.–11.08.2026, weighted share): verification 43.3 %, bookkeeping 26.9 %, implementation
-  15.6 %, gates 10.4 %, brief 2.1 %, merge 1.6 %. Subagents burn 69.1 % of the whole and 55.5 % of
-  THEIR spend is verification; the top-level session puts 63.5 % of its own into bookkeeping. The
-  volume sits in the delegated work.
-  
-  THE FOUNDATION EXISTS: `scripts/review-sol.mjs` (519 lines over a 577-line pure core, ~1050
-  lines of tests) runs `codex exec` non-interactively in a READ-ONLY sandbox with the artefact on
-  stdin, because this container cannot create user namespaces. It is proven daily — the last 12
-  recorded mechanism reviews in `.claude/mechanism-reviews.jsonl` all carry `"model":"GPT-5.6
-  Sol"`, with no silent fallback.
-  
-  === PART A — BUILD NOW ===
-  
-  A1. `scripts/ask-sol.mjs`: the read-only path generalised beyond reviews. It takes a TASK KIND,
-      a brief and the material (files, diff, logs — on stdin, exactly as `review-sol.mjs` ships
-      it), runs the same proven `codex exec` path at effort HIGH, and returns the result in the
-      shape its caller records. KINDS, all pure text work: DIAGNOSE (name the cause of a red from
-      log plus diff), AUDIT (the enumerating plausibility and bug-finding sweeps), ENUMERATE
-      (risk, test-case and option lists — BOTH halves of a blind-parallel divergent stage per
-      CLAUDE.md §6), EXPLAIN (what a subsystem does, where something is handled). Login handling,
-      the unavailability path and the model-id freshness probe are REUSED from
-      `review-sol-core.mjs`, not rebuilt. When Sol is unavailable it says so in ONE line, names
-      the cause and hands back to the Claude chain — never silently, never recorded as Sol's work.
-  
-  A2. THE CHEAP SWITCH, which is cheap precisely because Sol AUTHORS NOTHING here: no commit
-      carries Sol's trailer, so the author allowlist, the `commit-msg` hook and `model-guard` are
-      untouched, and none of the auditability machinery a role swap would need is required.
-      `node scripts/sol-share.mjs --status | --more | --less` over `.claude/sol-share.json` with
-      three settings:
-        · `default` — today's behaviour: reviews to Sol, everything else to Claude.
-        · `prefer-sol` — every kind A1 supports goes to Sol; Claude keeps authoring, driving the
-          suites, judging pictures and landing.
-        · `claude-only` — the escape hatch when the ChatGPT side is the scarce one.
-      `--status` prints in ONE line what goes where right now; the dashboard shows a non-default
-      setting while it is on, so nobody wonders why a diagnosis came back in another voice. The
-      delegation prompt and the guards READ this file rather than keeping their own copy.
-  
-  A3. The delegated-agent prompt and `docs/` name the switch, so an agent asks Sol for its
-      diagnosis or enumeration when the setting says so, instead of doing it in its own context.
-  
-  === PART B — DEFERRED, NOT DROPPED (do not start without the user's word) ===
-  
-  B1. Authoring as a PATCH round-trip (`author-sol.mjs`): Sol gets the brief plus the current file
-      contents and returns a UNIFIED DIFF; a script applies it in the worktree, runs the fast gate,
-      commits with Sol's trailer on green, feeds the gate output back for a bounded 2 rounds on
-      red, and hands the point to a Claude author afterwards with Sol's work attached.
-  B2. Only B1 makes Sol an AUTHOR, and only then does the role swap at guard level become
-      necessary: `model-roles.mjs --swap`, every consumer reading one core, the swap never
-      retroactive (a commit is judged against the roles in force at ITS commit time), a refusal of
-      any setting that puts the same vendor on both sides of a four-eyes stage, and the history
-      kept with timestamps.
-  WHY DEFERRED: B is where the effort and the uncertainty sit (the quality of Sol's diffs is
-  unproven here, and B2 widens the guard that exists to stop a degraded session), while A already
-  delivers the lever the user asked for.
-  
-  MEASUREMENT OWED, FIRST STEP OF THIS POINT (small): the verification phase is 43.3 % but the
-  tool does not split it into TEXT work (reading logs, diagnosing) and work needing the harness or
-  eyes (driving suites, judging screenshots). Measure that split from the verification turns' tool
-  calls; it decides how much further A is worth pushing and whether B is worth starting at all.
-  
-  WHAT IS EXPLICITLY NOT ROUTED: driving the browser suites and JUDGING THE PICTURE, the landing
-  (`land-point.mjs`), and the main session's bookkeeping — that share answers to reduction (point
-  boundary, brief), not to a change of vendor.
-  
-  VERIFIABLE: Vitest over the pure cores — the kind→prompt mapping, the unavailability path and
-  its one-line report, the three switch settings and what each routes, `--status`'s wording, the
-  consumers asked through the core rather than a constant, and the dashboard note while a
-  non-default setting is on. Plus ONE recorded end-to-end run: a real DIAGNOSE through
-  `ask-sol.mjs` on an actual red, named in the point's commit.
-  
-  CRITICALITY: MEDIUM for part A (it routes work; it does not touch the model guard, and a failure
-  degrades to Claude). HIGH for part B when it is started.
+- [ ] 656. THE CHILDREN'S SHUFFLE GATE CANNOT SEE THE SYMPTOM IT WAS BUILT FOR (found
+  11.08.2026 by the cross-vendor review of point 648 — GPT-5.6 Sol at effort high, verdict
+  do-not-merge, recorded against `d1ed0d27`; the behaviour fixes of 648 are on `main` and are
+  not in question, its PROOF is). Point 648 replaced a frame-rate-dependent reversal count with
+  the user's own complaint — a child that walks over 2 m in a 2-second window without leaving a
+  0.5 m circle. Measured against the code that runs beside it, that gate is largely blind:
+  1. `trackProgress` in `src/scenes/place/tagGame.ts` teleports a child that has not left
+     `childRadius * 3` for `unstuckSeconds` (1.5 s) to free ground. The window is 2 s. So the
+     exact failure the gate looks for is ENDED half a second before its window can close, and
+     the user's report was "hängt KURZ fest" — the short episode is the bug.
+  2. Both the browser check (`scripts/verify/polish.mjs`, section `children-motion`) and
+     `src/scenes/place/tagShuffle.test.ts` sum FRAME-TO-FRAME POSITION DELTAS as the path
+     walked. The teleport is a position delta, so the correction that hides the symptom is
+     counted as the child walking out of the circle — twice blind, in the same window.
+  3. The browser check waits for `window.__placeTag().playing` but discards the result and
+     never asserts it. A group that never plays produces no stalls and no shuffle windows and
+     satisfies the gate vacuously.
+  4. `tagShuffle.test.ts` claims only the CHILDREN in a fresh `InhabitantSet`, so the
+     multi-pass separation is never exercised against the adults, porters and errand walkers
+     whose bodies share the production registry — the very crowding that made more than one
+     pass necessary.
+
+  FINAL STATE:
+
+  1. The shuffle metric measures the game's OWN walked distance (`walked`, which deliberately
+     excludes the nudge) against ground covered, in both the browser check and the pure test —
+     never a summed position delta.
+  2. A NUDGE IS A FINDING, NOT AN ESCAPE. The teleport is counted and reported: a child freed by
+     it was, by definition, going nowhere. The gate fails on a nudge rate above a stated
+     threshold, and the window is shorter than `unstuckSeconds` so an episode the player sees
+     is inside it, with the chosen window and threshold justified by a measurement in the
+     comment.
+  3. The browser check ASSERTS that the group is playing, and a trace with no play at all fails
+     rather than passes.
+  4. The pure integration test builds the body set the settlement really has — children,
+     adults, porters, errand walkers — and the separation is judged against all of them.
+  5. `pinned` is cleared wherever the round is broken off or a child is commanded to stand
+     (`breakOffRound`, the held branch, after a progress nudge), so a stale count from before a
+     hold cannot fire a teleport on the first blocked frame after it.
+
+  VERIFIABLE: Vitest over a replayed settlement in which a child is deliberately wedged — the
+  gate must go RED with the nudge left on, and the same trace must show the shuffle it was
+  hiding; a trace with a permanently idle group fails; a trace with adults crowding the children
+  is judged like the children. Plus the live section at seed 2972259115 on both backends, whose
+  report NAMES the nudge count it observed.
+  Criticality: high — it is the proof that the user's own bug report stays fixed.
+  Bundle: Dorfleben.
 
 - [ ] 581. THE SETTLEMENT BOUNDARY IS TOO FAINT, AND ITS SLIDER IS ALREADY AT THE CEILING
   (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
@@ -451,6 +380,12 @@ there exactly once; a new point joins a bundle when appended.
   3. A GATE keeps the pattern out: a pure test over the verify sources refuses a comparison
      assembled from two separate `page.evaluate` calls. The agent that found this case left
      the gate undone on purpose and asked for the decision — this point is the decision.
+  THE NAMED CASES the sweep starts from, all three measured on `polish` (12.08.2026): the
+  goat's planted foot and "fire shadows ON" both red on WebGL 2 at 00:34, taken while a
+  WebGPU `polish` run and two building agents shared the machine, and both green on the same
+  commit at 05:50 on a quiet one; the water rim's "handover zone" red once at 05:36 and green
+  on its own retry. Each must come out of the sweep classified — repaired as a state check,
+  or declared timing and reported UNMEASURED under load.
   VERIFIABLE: the sweep names every site it changed and every one it deliberately left,
   with which kind it is; the gate fails on a re-introduced two-round-trip comparison and
   passes on the fixed shape; and the throttle probe of point 640 shows 0/8 skew for each

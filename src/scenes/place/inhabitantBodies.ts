@@ -14,15 +14,37 @@
 // different behaviours (the chase, the errand walkers, the routine walkers, the
 // porters, the task loop), each with its own stepper, and every one of them
 // would have had to learn to exclude its own body from the set it resolves
-// against. One damped pass over a shared body registry, run right after each
-// behaviour has moved its own figures, gives all five the same rule.
+// against. One pass over a shared body registry, run right after each behaviour
+// has moved its own figures, gives all five the same rule.
 //
-// AND WHY DAMPED: a pair that overlaps and is pushed fully apart every frame
-// oscillates, and a child vibrating on the spot reads as broken rather than as
-// playing (the user's "festklemmen und rumzittern"). The correction therefore
-// takes only a FRACTION of the remaining overlap, never overshoots it, and stops
-// completely inside a slop band — so a separated pair stays separated without a
-// tremble.
+// AND WHY ONE PUSH TAKES THE WHOLE OVERLAP: the correction stops dead inside a
+// slop band, so it cannot ring — the push is exactly the penetration, the pair
+// lands on the contact distance, and the dead band holds it there.
+//
+// AND WHY THE GROUP IS SWEPT MORE THAN ONCE: one body at a time is a
+// Gauss-Seidel sweep, and a sweep resolves a PAIR but not a CHAIN. Pushing body
+// B out of C can press it back into A, which was resolved already and is not
+// looked at again — so with three or more figures in one cluster a residual
+// overlap survives every frame. Measured over 600 s of the children's game at
+// the reported seed: a single sweep left 192–537 overlapping pair-frames, the
+// worst of them 0.07 m of a 0.264 m contact; two sweeps left none at all, and
+// four are needed once the adults, the porters and the routine walkers share the
+// set (work-order 648, the second half of the user's "Kinder klemmen kurz
+// ineinander"). `separateGroup` therefore sweeps until a sweep moves nothing,
+// bounded by the calibratable `passes` — which costs nothing in the ordinary
+// case, where the first sweep already moves no one.
+//
+// It used to take a FRACTION per frame instead, damped against a tremble that
+// the dead band already prevents, and capped at a push SPEED of 1.2 m/s. That
+// was the first half of the user's "Kinder klemmen kurz ineinander" (work-order
+// 648): two children close on one another at up to sprint plus runner speed,
+// which is six times what that cap let the correction undo, so every frame added
+// more overlap than the pass took out. Measured on one head-on crossing at the
+// speed the game can really build, the pair ended five consecutive frames inside
+// one another, at worst 0.21 m into a 0.26 m contact — all but merged; with the
+// whole overlap taken at a cap above the closing speed, not one frame.
+// `maxSpeed` therefore only bounds how fast a DEEP stack — two bodies spawned on
+// one spot — unwinds.
 
 /** One inhabitant's body in the shared set — mutated in place each frame, so a
  *  settlement never rebuilds the array. */
@@ -58,16 +80,26 @@ export interface SeparationConfig {
    *  wide enough to be a wall has the village shouldering itself all day. */
   bodyRadius: number
   /** Overlap tolerated before anything is corrected at all. The dead band is
-   *  what stops a resting pair from trading micro-corrections for ever. */
+   *  what stops a resting pair from trading micro-corrections for ever, and it
+   *  is what makes a FULL correction safe. */
   slop: number
-  /** Fraction of the remaining overlap taken out per frame (0..1). Below 1 it
-   *  cannot overshoot, which is what makes the pass settle instead of ring. */
+  /** Fraction of the remaining overlap taken out per step (0..1). At 1 the
+   *  overlap is gone in the step it appeared, which is the point: below 1 the
+   *  pass falls behind two movers closing on each other and the pair stays
+   *  visibly inside one another. It never overshoots at any value. */
   stiffness: number
-  /** Cap on how fast a body may be pushed (m/s), so a deep overlap (a spawn
-   *  stack) comes apart as a step rather than as a teleport. */
+  /** Cap on how fast a body may be pushed (m/s), so a DEEP overlap (a spawn
+   *  stack) comes apart as a step rather than as a teleport. It must stay above
+   *  the fastest pair that can close on one another, or it throttles the
+   *  ordinary crossing instead of only the stack. */
   maxSpeed: number
   /** Seconds of being unable to push free before the escape nudge is asked for. */
   wedgeSeconds: number
+  /** How many sweeps `separateGroup` may take over one cluster in a frame, so a
+   *  CHAIN of three or more figures comes apart in the frame it formed rather
+   *  than leaving a residual overlap the player sees. Bounded, and the sweeping
+   *  stops the moment one moves nobody — the ordinary frame pays for one. */
+  passes: number
 }
 
 /** What the settlement refuses, and where it sends a body that cannot get out.
@@ -153,6 +185,23 @@ export function separateBody(
   cfg: SeparationConfig,
   world: SeparationWorld = {},
 ): boolean {
+  return pushBody(set, self, dt, dt, cfg, world)
+}
+
+/**
+ * The push itself. `wedgeDt` is the time the WEDGE timer is charged, which is
+ * the frame's — not the sweep's: a refining sweep resolves the same frame over
+ * again, so charging it a second time would trip the escape nudge as many times
+ * faster as the solver sweeps, and teleport a figure that was never stuck.
+ */
+function pushBody(
+  set: InhabitantSet,
+  self: InhabitantBody,
+  dt: number,
+  wedgeDt: number,
+  cfg: SeparationConfig,
+  world: SeparationWorld = {},
+): boolean {
   if (!(dt > 0) || self.fixed || !self.active) return false
   const selfIndex = set.bodies.indexOf(self)
   const selfRadius = cfg.bodyRadius * self.scale
@@ -177,11 +226,16 @@ export function separateBody(
       ux = Math.cos(a)
       uz = Math.sin(a)
     }
-    // A fixed body gives nothing, so the mover owes the whole overlap; two
-    // movers split it, and the pair closes it together.
-    const share = other.fixed ? 1 : 0.5
-    px += ux * overlap * share
-    pz += uz * overlap * share
+    // THE MOVER OWES THE WHOLE OVERLAP, against a fixed body and against another
+    // mover alike. Splitting it in halves looks fairer and does not work: the
+    // bodies are resolved one after another, so the second of a pair sees only
+    // what the first left and takes half of THAT — a quarter of the overlap
+    // survives every pass, for ever, and two children walking into one another
+    // stay visibly merged (point 648). Resolved whole, the first of the pair
+    // steps out and the second then has nothing to correct, so the overlap is
+    // gone at the end of the pass rather than decaying across frames.
+    px += ux * overlap
+    pz += uz * overlap
   }
 
   const want = Math.hypot(px, pz)
@@ -212,8 +266,8 @@ export function separateBody(
     return true
   }
   // Pressed between a collider and another body: bounded, not for ever.
-  self.wedged += dt
-  if (self.wedged >= cfg.wedgeSeconds && world.nudge) {
+  self.wedged += Math.max(0, wedgeDt)
+  if (wedgeDt > 0 && self.wedged >= cfg.wedgeSeconds && world.nudge) {
     const free = world.nudge(self.x, self.z)
     if (free.found) {
       self.x = free.x
@@ -224,14 +278,42 @@ export function separateBody(
   return false
 }
 
-/** Every non-fixed body of the set, once. Handy for a caller that owns the whole
- *  set (and for the tests); a scene component separates its own bodies where it
- *  moved them, so the figure it draws is the body that was resolved. */
+/**
+ * Resolves ONE GROUP of bodies — the caller's own figures — against the whole
+ * settlement, sweeping until a sweep moves nobody or `cfg.passes` is spent.
+ *
+ * This is what a caller that moves several figures per frame owes them, and the
+ * order matters: write EVERY body of the group first, then call this. A loop
+ * that writes and separates one figure at a time resolves each against where its
+ * neighbours stood a frame ago, and leaves the chain above unresolved on top of
+ * it.
+ */
+export function separateGroup(
+  set: InhabitantSet,
+  bodies: readonly InhabitantBody[],
+  dt: number,
+  cfg: SeparationConfig,
+  world: SeparationWorld = {},
+): void {
+  const passes = Math.max(1, Math.floor(cfg.passes))
+  for (let p = 0; p < passes; p++) {
+    let moved = false
+    // Only the FIRST sweep charges the wedge timer: the later ones are the same
+    // frame, resolved more exactly.
+    for (const b of bodies) if (pushBody(set, b, dt, p === 0 ? dt : 0, cfg, world)) moved = true
+    if (!moved) return
+  }
+}
+
+/** Every non-fixed body of the set, resolved as one group. Handy for a caller
+ *  that owns the whole set (and for the tests); a scene component separates its
+ *  own bodies where it moved them, so the figure it draws is the body that was
+ *  resolved. */
 export function separateAll(
   set: InhabitantSet,
   dt: number,
   cfg: SeparationConfig,
   world: SeparationWorld = {},
 ): void {
-  for (const b of set.bodies) separateBody(set, b, dt, cfg, world)
+  separateGroup(set, set.bodies, dt, cfg, world)
 }

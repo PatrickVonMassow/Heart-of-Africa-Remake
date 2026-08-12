@@ -17643,3 +17643,122 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   deletion, not taken from the plan. The existing suite stays green.
   Criticality: high — same subject as 629 and the same cost if it goes wrong, and it is
   live on `main` today. Bundle: Session- & Repo-Hygiene.
+
+- [x] 648. THE CHILDREN SNAG, JITTER AND CLIP THROUGH EACH OTHER (user F6 reports
+  11.08.2026, 19:08–19:11, all three from ONE state — `local/bugreports/`
+  `KindHaengtKurzFest.zip`, `KindZittertAufStelleHerum.zip`,
+  `KinderKlemmenKurzIneinander.zip`; seed 2972259115, `place` mode in the bambara-village,
+  west region, production build e1bd2fa, WebGPU, quality medium, viewport 1899×984 @dpr
+  1.25). Three symptoms of ONE system, filed as one point because they share the child
+  steering code and must not be split across branches:
+  1. "Kind hängt kurz fest" — a child stops moving for a moment and then frees itself.
+  2. "Kind zittert auf der Stelle herum" — a child jitters in place instead of walking,
+     which is the signature of a target it reaches and overshoots every frame, or of two
+     forces cancelling.
+  3. "Kinder klemmen kurz ineinander" — two children occupy the same space for a moment
+     before separating, so the separation either acts too late or is overridden.
+  THE USER IS BLOCKED ON THIS: he reported it while trying to exercise the communication
+  mechanic (§13/§19.10 — the teaching children), and jittering, snagging children make that
+  untestable. That is why it stands at the head of the work order.
+  WHERE IT LIVES: `src/scenes/place/childSituations.ts` and `lifeSpots.ts` (what a child is
+  doing and where it stands), `tagGame.ts` (the chase that moves them), `collision.ts` (the
+  swept move and the separation between inhabitants), with `inhabitantBodies.ts` for the
+  radius each one occupies. The state dump carries no per-child runtime state, so the
+  reproduction is in-game at that seed.
+  FINAL STATE: all three are traced to a NAMED cause and fixed there — not damped by
+  raising a smoothing constant until the symptom stops showing, which would leave the
+  cause and cost the next reader the same hunt. A child that reaches its target settles
+  instead of oscillating; two children never occupy one another's radius, however briefly;
+  and no child is ever held motionless by geometry it should walk around. Where two of the
+  three share one cause, that is stated rather than split into three fixes.
+  VERIFIABLE: Vitest over the pure steering — a child at its target does not oscillate
+  across frames (its position converges rather than alternating), two children pushed into
+  one another separate within one step and never overlap, and a child pathing past a
+  building corner keeps moving. Plus the browser layer at the reported seed: the children
+  are watched over a run of frames and no child's position alternates, freezes or overlaps
+  another's radius. Judge it by WATCHING them, not only by the assertions — the complaint is
+  what the player sees.
+  Criticality: high — it is what the user is blocked on, and it is the visible surface of
+  the settlement the whole communication PoC is played in. Bundle: Dorfleben.
+
+- [x] 654. THE WORK THAT NEEDS NO WRITE ACCESS GOES TO SOL, WITH A CHEAP SWITCH OVER IT (user 11.08.2026).
+  INSERT AT THE TOP OF THE QUEUE. The user pays two vendors whose allowances run out at
+  different times and wants to be able to move load to OpenAI BEFORE the Anthropic volume is
+  nearly spent, in his own words: "Mir reicht ein günstig zu bauender Schalter, mit dem ich die
+  Last mehr zu OpenAI hin verlegen kann, wenn das Anthropic-Volumen knapp wird. Ich muss ja
+  nicht warten, bis vom Anthropic-Volumen nur noch 1 % übrig ist, sondern kann schon früher
+  umschalten."
+  
+  MEASURED FIRST (`node scripts/measure-task-cost.mjs`, 45,078 turns from 371 transcripts,
+  03.08.–11.08.2026, weighted share): verification 43.3 %, bookkeeping 26.9 %, implementation
+  15.6 %, gates 10.4 %, brief 2.1 %, merge 1.6 %. Subagents burn 69.1 % of the whole and 55.5 % of
+  THEIR spend is verification; the top-level session puts 63.5 % of its own into bookkeeping. The
+  volume sits in the delegated work.
+  
+  THE FOUNDATION EXISTS: `scripts/review-sol.mjs` (519 lines over a 577-line pure core, ~1050
+  lines of tests) runs `codex exec` non-interactively in a READ-ONLY sandbox with the artefact on
+  stdin, because this container cannot create user namespaces. It is proven daily — the last 12
+  recorded mechanism reviews in `.claude/mechanism-reviews.jsonl` all carry `"model":"GPT-5.6
+  Sol"`, with no silent fallback.
+  
+  === PART A — BUILD NOW ===
+  
+  A1. `scripts/ask-sol.mjs`: the read-only path generalised beyond reviews. It takes a TASK KIND,
+      a brief and the material (files, diff, logs — on stdin, exactly as `review-sol.mjs` ships
+      it), runs the same proven `codex exec` path at effort HIGH, and returns the result in the
+      shape its caller records. KINDS, all pure text work: DIAGNOSE (name the cause of a red from
+      log plus diff), AUDIT (the enumerating plausibility and bug-finding sweeps), ENUMERATE
+      (risk, test-case and option lists — BOTH halves of a blind-parallel divergent stage per
+      CLAUDE.md §6), EXPLAIN (what a subsystem does, where something is handled). Login handling,
+      the unavailability path and the model-id freshness probe are REUSED from
+      `review-sol-core.mjs`, not rebuilt. When Sol is unavailable it says so in ONE line, names
+      the cause and hands back to the Claude chain — never silently, never recorded as Sol's work.
+  
+  A2. THE CHEAP SWITCH, which is cheap precisely because Sol AUTHORS NOTHING here: no commit
+      carries Sol's trailer, so the author allowlist, the `commit-msg` hook and `model-guard` are
+      untouched, and none of the auditability machinery a role swap would need is required.
+      `node scripts/sol-share.mjs --status | --more | --less` over `.claude/sol-share.json` with
+      three settings:
+        · `default` — today's behaviour: reviews to Sol, everything else to Claude.
+        · `prefer-sol` — every kind A1 supports goes to Sol; Claude keeps authoring, driving the
+          suites, judging pictures and landing.
+        · `claude-only` — the escape hatch when the ChatGPT side is the scarce one.
+      `--status` prints in ONE line what goes where right now; the dashboard shows a non-default
+      setting while it is on, so nobody wonders why a diagnosis came back in another voice. The
+      delegation prompt and the guards READ this file rather than keeping their own copy.
+  
+  A3. The delegated-agent prompt and `docs/` name the switch, so an agent asks Sol for its
+      diagnosis or enumeration when the setting says so, instead of doing it in its own context.
+  
+  === PART B — DEFERRED, NOT DROPPED (do not start without the user's word) ===
+  
+  B1. Authoring as a PATCH round-trip (`author-sol.mjs`): Sol gets the brief plus the current file
+      contents and returns a UNIFIED DIFF; a script applies it in the worktree, runs the fast gate,
+      commits with Sol's trailer on green, feeds the gate output back for a bounded 2 rounds on
+      red, and hands the point to a Claude author afterwards with Sol's work attached.
+  B2. Only B1 makes Sol an AUTHOR, and only then does the role swap at guard level become
+      necessary: `model-roles.mjs --swap`, every consumer reading one core, the swap never
+      retroactive (a commit is judged against the roles in force at ITS commit time), a refusal of
+      any setting that puts the same vendor on both sides of a four-eyes stage, and the history
+      kept with timestamps.
+  WHY DEFERRED: B is where the effort and the uncertainty sit (the quality of Sol's diffs is
+  unproven here, and B2 widens the guard that exists to stop a degraded session), while A already
+  delivers the lever the user asked for.
+  
+  MEASUREMENT OWED, FIRST STEP OF THIS POINT (small): the verification phase is 43.3 % but the
+  tool does not split it into TEXT work (reading logs, diagnosing) and work needing the harness or
+  eyes (driving suites, judging screenshots). Measure that split from the verification turns' tool
+  calls; it decides how much further A is worth pushing and whether B is worth starting at all.
+  
+  WHAT IS EXPLICITLY NOT ROUTED: driving the browser suites and JUDGING THE PICTURE, the landing
+  (`land-point.mjs`), and the main session's bookkeeping — that share answers to reduction (point
+  boundary, brief), not to a change of vendor.
+  
+  VERIFIABLE: Vitest over the pure cores — the kind→prompt mapping, the unavailability path and
+  its one-line report, the three switch settings and what each routes, `--status`'s wording, the
+  consumers asked through the core rather than a constant, and the dashboard note while a
+  non-default setting is on. Plus ONE recorded end-to-end run: a real DIAGNOSE through
+  `ask-sol.mjs` on an actual red, named in the point's commit.
+  
+  CRITICALITY: MEDIUM for part A (it routes work; it does not touch the model guard, and a failure
+  degrades to Claude). HIGH for part B when it is started.

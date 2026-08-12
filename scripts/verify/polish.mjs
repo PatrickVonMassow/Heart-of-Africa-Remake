@@ -3326,6 +3326,295 @@ if (section('children-tag')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 
+// --- How the children MOVE (work-order 648) ----------------------------------
+// The user reported three things from one state in the Bambara village: a child
+// hangs briefly, a child jitters on the spot, two children clip through each
+// other. All three are the same system, and the pure layer pins each cause
+// (src/scenes/place/tagGame.test.ts, inhabitantBodies.test.ts). What needs a
+// real browser is the state itself: this settlement, at HIS seed, with its own
+// huts, fences, fire and lanes in the collision set — the pockets that stalled a
+// child are drawn by THAT layout, and no synthetic world can stand in for it.
+//
+// The trace is taken INSIDE the page, one entry per rendered frame. The defects
+// are per-frame — an alternation, a single stalled step, a moment of overlap —
+// and a sampling loop that crosses the process boundary between readings would
+// step straight over them.
+if (section('children-motion')) {
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  // HIS seed: the settlement layout is derived from place + seed, so this is the
+  // village he was standing in and not merely one of the same people. Put back
+  // afterwards — every section after this one would otherwise be reading a world
+  // it did not ask for.
+  const bootSeed = await page.evaluate(() => window.__game.getState().seed)
+  await page.evaluate(() => window.__game.setState({ seed: 2972259115 }))
+  await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+  const live = await page
+    .waitForFunction(
+      () => window.__game.getState().placeId === 'bambara-village' && !!window.__placeTag,
+      null,
+      { timeout: 40000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  check('the reported village publishes its live game of tag', live)
+  if (live) {
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    await page
+      .waitForFunction(() => window.__placeTag().playing, null, { timeout: 40000 })
+      .catch(() => false)
+    const FRAMES = 1200
+    const trace = await page.evaluate(
+      (frames) =>
+        new Promise((resolve) => {
+          const log = []
+          const tick = () => {
+            const t = window.__placeTag()
+            log.push({
+              clock: t.clock,
+              playing: t.playing,
+              c: t.children.map((k) => ({
+                x: k.x,
+                z: k.z,
+                pace: k.pace,
+                held: k.held,
+                walked: k.walked,
+                heading: k.heading,
+              })),
+            })
+            if (log.length < frames) requestAnimationFrame(tick)
+            else resolve({ bodyRadius: t.bodyRadius, log })
+          }
+          requestAnimationFrame(tick)
+        }),
+      FRAMES,
+    )
+    const log = trace.log
+    const n = log[0]?.c.length ?? 0
+    check(
+      'the trace covers a real stretch of the game, frame by frame',
+      log.length >= FRAMES && n >= 2 && log[log.length - 1].clock - log[0].clock > 5,
+      `${log.length} frames, ${n} children, ${(log[log.length - 1].clock - log[0].clock).toFixed(1)}s`,
+    )
+
+    // 3. THEY NEVER OCCUPY ONE ANOTHER. Judged against the body the game itself
+    // publishes, not an assumed radius (§7.2) — and against the distance the
+    // separation actually settles a resting pair at, which is the contact
+    // distance less the deliberate slop band. Judging it against the bare
+    // contact distance would call every settled pair an overlap.
+    const contact = trace.bodyRadius * 2 - (await page.evaluate(() => window.__balance.villageLife.separation.slop))
+    let worstOverlap = 0
+    let overlapFrames = 0
+    for (const f of log) {
+      let bad = false
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          const d = Math.hypot(f.c[i].x - f.c[j].x, f.c[i].z - f.c[j].z)
+          if (contact - d > worstOverlap) worstOverlap = contact - d
+          if (contact - d > 1e-6) bad = true
+        }
+      }
+      if (bad) overlapFrames++
+    }
+    check(
+      'no two children are ever inside one another, in any frame',
+      overlapFrames === 0,
+      `${overlapFrames} of ${log.length} frames, worst ${Math.max(0, worstOverlap).toFixed(4)} m inside a ${contact.toFixed(3)} m contact`,
+    )
+
+    // 1. NOTHING SNAGS. A child COMMANDED to move that covers no ground is the
+    // reported hang; a child standing at a pace of zero, or standing because it
+    // was told to, is not — that is the game idling or a call being obeyed.
+    let longestStall = 0
+    for (let k = 0; k < n; k++) {
+      let run = 0
+      for (let i = 1; i < log.length; i++) {
+        const before = log[i - 1].c[k]
+        const now = log[i].c[k]
+        const moving = now.pace > 1e-6 && !now.held
+        if (moving && now.walked - before.walked < 1e-4) {
+          run += log[i].clock - log[i - 1].clock
+          longestStall = Math.max(longestStall, run)
+        } else run = 0
+      }
+    }
+    check(
+      'no child that is walking is held motionless by the settlement',
+      longestStall < 0.25,
+      `longest stall while commanded to move ${longestStall.toFixed(2)}s`,
+    )
+
+    // 2. NOTHING SHUFFLES ON THE SPOT — the user's own words, measured as he
+    // would judge them: over a window of two SECONDS, does a child WALK a real
+    // distance without LEAVING a small circle?
+    //
+    // It used to count REVERSALS — a step that undoes the one before — and that
+    // check could never hold, for two reasons found by replaying this same game
+    // in the pure layer (src/scenes/place/tagShuffle.test.ts). A chase is FULL of
+    // legitimate reversals: a runner doubling back at the rim, a chaser cutting
+    // in as its quarry dodges. And their rate rides on the FRAME RATE — 1.4 % of
+    // steps at 60 fps against 3.2 % at 14, because a slower frame turns a longer
+    // step — so on this machine, where a headless frame takes anything from 20 ms
+    // to over a second, one run passed a 3 % gate and the next failed it on the
+    // same code. Ground covered against ground walked has neither fault.
+    //
+    // The gate is the pure layer's, and this run is the proof that the LIVE
+    // settlement — real frame times, the speech, the bodies, the player standing
+    // in it — behaves as the replay says. Measured before the fix at this seed:
+    // 33 % of windows in the worst village, 0.5 % here; after it, none at all.
+    const SPAN = 2
+    const MIN_PATH = 2
+    const CIRCLE = 0.5
+    let windows = 0
+    let stuckWindows = 0
+    let worst = { path: 0, out: 0, child: -1, clock: 0 }
+    for (let k = 0; k < n; k++) {
+      for (let i = 0; i < log.length; i++) {
+        let j = i
+        let walked = 0
+        let out = 0
+        while (j < log.length - 1 && log[j + 1].clock - log[i].clock < SPAN) {
+          walked += Math.hypot(log[j + 1].c[k].x - log[j].c[k].x, log[j + 1].c[k].z - log[j].c[k].z)
+          j++
+          out = Math.max(out, Math.hypot(log[j].c[k].x - log[i].c[k].x, log[j].c[k].z - log[i].c[k].z))
+        }
+        // The tail of the trace is shorter than a window: nothing to judge.
+        if (log[j].clock - log[i].clock < SPAN * 0.9) break
+        windows++
+        if (walked > MIN_PATH && out < CIRCLE) {
+          stuckWindows++
+          if (walked / Math.max(0.01, out) > worst.path / Math.max(0.01, worst.out)) {
+            worst = { path: walked, out, child: k, clock: log[i].clock }
+          }
+        }
+      }
+    }
+    const share = windows > 0 ? stuckWindows / windows : 0
+    check(
+      'no child walks without getting anywhere',
+      windows > 200 && share < 0.01,
+      `${stuckWindows} of ${windows} two-second windows (${(share * 100).toFixed(2)} %) with over ${MIN_PATH} m walked ` +
+        `inside ${CIRCLE} m` +
+        (worst.child >= 0
+          ? ` — worst child ${worst.child} at ${worst.clock.toFixed(1)}s, ${worst.path.toFixed(2)} m inside ${worst.out.toFixed(2)} m`
+          : ''),
+    )
+    // AND A LOOK AT THEM. The complaint is what the player SEES, so the run
+    // leaves a frame of the children themselves — the traveller stepped back to
+    // the group and turned to face it, the shutter projecting their centroid so
+    // a frame named after them cannot photograph an empty lane (point 375).
+    // THE STANDPOINT IS SEARCHED, AND SO IS THE MOMENT. Where the children
+    // stand decides what any standpoint can see of them: their ground is 13 m
+    // across with the huts standing in it, so while the chase has them strung
+    // out through the lanes, the best vantage in the settlement still sees one
+    // of them past a wall — a photograph of an empty village with a figure in
+    // it. The search below is therefore run EVERY frame and the shutter waits,
+    // bounded, for a moment worth photographing; if the game never offers one it
+    // shoots the best it found rather than skipping the picture.
+    await page.evaluate(() => {
+      window.__pickChildVantage = () => {
+        const kids = window.__placeTag().children
+        if (kids.length === 0) return null
+        const cx = kids.reduce((s, k) => s + k.x, 0) / kids.length
+        const cz = kids.reduce((s, k) => s + k.z, 0) / kids.length
+        // A vantage the huts do not stand in. Merely stepping back from where
+        // the traveller happened to be put the camera inside a dwelling, and the
+        // shutter cannot see that: the centroid still PROJECTED into the frame,
+        // behind a wall. So the standpoint is chosen against the layout — clear
+        // of every dwelling, and with a clear line to the children.
+        const huts = window.__placeLayout.dwellings
+        const blocks = (ax, az, bx, bz, pad) =>
+          huts.some((h) => {
+            const dx = bx - ax
+            const dz = bz - az
+            const len2 = dx * dx + dz * dz || 1
+            const t = Math.max(0, Math.min(1, ((h.x - ax) * dx + (h.z - az) * dz) / len2))
+            return Math.hypot(ax + t * dx - h.x, az + t * dz - h.z) < h.r + pad
+          })
+        const room = (sx, sz) =>
+          huts.length > 0 ? Math.min(...huts.map((h) => Math.hypot(sx - h.x, sz - h.z) - h.r)) : Infinity
+        let best = null
+        let bestScore = -Infinity
+        for (let i = 0; i < 24; i++) {
+          const a = (i / 24) * Math.PI * 2
+          for (const dist of [6, 8, 10]) {
+            const sx = cx + Math.sin(a) * dist
+            const sz = cz + Math.cos(a) * dist
+            if (Math.hypot(sx, sz) > window.__placeLayout.radius - 2) continue
+            if (blocks(sx, sz, sx, sz, 2)) continue // standing inside a hut
+            // How many children it can actually SEE: a thatch roof is opaque,
+            // and a subject that merely projects into the frame can sit behind
+            // one. The roof overhangs the wall, so the sightline is tested
+            // against a hut generously wider than its footprint.
+            const seen = kids.filter((k) => !blocks(sx, sz, k.x, k.z, 1.2))
+            if (seen.length === 0) continue
+            // Then ELBOW ROOM, then nearness. Seeing them was not enough on its
+            // own: the first standpoint that did stood in the alley between two
+            // dwellings, and at eye height a wall a metre away fills half the
+            // picture whatever the sightline says. Room counts up to four metres
+            // and no further — beyond that the wall is out of the picture, and
+            // what is left to decide is that the children are figures rather
+            // than specks.
+            const clear = Math.min(room(sx, sz), 4)
+            const score = seen.length * 1000 + clear * 50 - dist
+            if (score > bestScore) {
+              bestScore = score
+              best = { sx, sz, seen: seen.length, of: kids.length, clear, dist }
+              const vx = seen.reduce((s, k) => s + k.x, 0) / seen.length
+              const vz = seen.reduce((s, k) => s + k.z, 0) / seen.length
+              best.vx = vx
+              best.vz = vz
+            }
+          }
+        }
+        return best
+      }
+    })
+    // Worth photographing: most of the group in the clear, and the camera in the
+    // open rather than up against a wall.
+    await stepUntil(() => {
+      const b = window.__pickChildVantage()
+      return !!b && b.seen >= Math.min(3, b.of) && b.clear >= 2.5
+    }, null, 300)
+    const aimed = await page.evaluate(() => {
+      const p = window.__placePlayer
+      const best = window.__pickChildVantage()
+      if (!p || !best) return null
+      const pose = { x: p.x, z: p.z, yaw: p.yaw }
+      p.x = best.sx
+      p.z = best.sz
+      // Look at what is actually visible, and hand the shutter the same point.
+      p.yaw = Math.atan2(-(best.vx - p.x), -(best.vz - p.z))
+      return { pose, cx: best.vx, cz: best.vz, seen: best.seen, of: best.of }
+    })
+    if (aimed) {
+      await nextFrames(2)
+      await frame('648-village-children', {
+        local: { x: aimed.cx, y: 0.8, z: aimed.cz },
+        label: `the children at their game of tag (${aimed.seen} of ${aimed.of} in the clear)`,
+      })
+      await page.evaluate((pose) => {
+        const p = window.__placePlayer
+        if (!p) return
+        p.x = pose.x
+        p.z = pose.z
+        p.yaw = pose.yaw
+      }, aimed.pose)
+    }
+    // The world goes back as it was found, the injected search included — every
+    // section after this one would otherwise read a page this one left behind.
+    await page.evaluate(() => {
+      delete window.__pickChildVantage
+    })
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  await page.evaluate((seed) => window.__game.setState({ seed }), bootSeed)
+}
+
 // --- The adults' errands (work-order point 483) -------------------------------
 // What needs a real browser here is the WALK: the catalogue, the fair queue and
 // every teaching rule are pinned in src/scenes/place/adultErrands.test.ts, but

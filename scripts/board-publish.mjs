@@ -42,6 +42,8 @@ import { resolve } from 'node:path'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { REPO_ROOT, STATE_PATH, readJson, mergeState } from './dashboard-state.mjs'
 import { normaliseLineEndings, refreshFooter, upgradeNowCards } from './board-core.mjs'
+import { currentSetting, settingProblemLine } from './sol-share.mjs'
+import { applyFooterNote } from './sol-share-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
 import { QUEUE_STUB_META, parseTasks } from './dashboard-guard-core.mjs'
 import { ESTIMATE_CMD, TITLE_CMD, boardTitleReport, parseTaskTitles } from './board-queue-core.mjs'
@@ -182,12 +184,20 @@ try {
   // go out, so whatever wrote the file before — a hand edit in Windows text mode
   // included — the published board and the local one agree on their newlines,
   // and the archive rotation can still find its section next time.
-  // UPGRADED FIRST (point 655). The naming gate below demands the numbered chip
+  // …and the SOL ROUTING note beside it (point 654): while the share switch is off its
+  // default, the board says so, so nobody wonders why a diagnosis came back in another
+  // voice. At the default it says nothing, and a stale note is removed rather than left
+  // standing — `refreshFooter` keeps every segment it does not own, this one included.
+  const share = currentSetting()
+  if (share.problem) console.error(settingProblemLine(share, 'board-publish'))
+  // UPGRADED LAST (point 655). The naming gate below demands the numbered chip
   // strictly, and the board is one living file whose cards may still carry their
   // number inside the title. `board.mjs` lifts them on every edit; doing it here
   // too means a board that was last written by an older version can still be
   // published — a strict gate must never be reachable without a way out.
-  const refreshed = normaliseLineEndings(upgradeNowCards(refreshFooter(html, { openCount: open.length })))
+  const refreshed = normaliseLineEndings(
+    upgradeNowCards(applyFooterNote(refreshFooter(html, { openCount: open.length }), share)),
+  )
   if (refreshed !== html) {
     // Atomic (point 443, four-eyes F3) — and this one writes the very file the
     // next lines read, hash and push to the public page.
