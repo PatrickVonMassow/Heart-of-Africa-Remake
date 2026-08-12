@@ -325,17 +325,18 @@ function village(
     options.adultsAmongTheChildren ? { x: ground.x, z: ground.z, radius: ground.radius } : undefined,
   )
   // The other inhabitants' bodies as ground the chase walks round (point 657),
-  // wired exactly as `PlaceLife` wires it: the whole settlement's registry,
-  // self and the tag partner excluded.
+  // wired exactly as `PlaceLife` wires it: everybody OUTSIDE the game, never a
+  // playmate — see the wiring comment there for the measurements behind both.
+  const kidBodies = new Set(bodies)
   world.occupied = (_self, _partner, x, z) =>
     groundOccupied(
       set,
-      bodies,
       x,
       z,
       balance.villageLife.separation,
       // The child's OWN body radius, so the line is the pair's contact.
       balance.villageLife.separation.bodyRadius * KID_SCALE,
+      (b) => kidBodies.has(b),
     )
   const view: SituationView = {
     playing: false,
@@ -529,8 +530,8 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     const rand = mulberry32(4242)
     const v = village('bambara-village', 2972259115)
     const paths: Track[][] = v.game.children.map(() => [])
-    for (let t = 0; t < 60; ) {
-      const dt = 0.05 + rand() * 0.05
+    for (let t = 0; t < 150; ) {
+      const dt = 0.07 + rand() * 0.03
       t += dt
       frame(v, dt)
       sample(v, paths)

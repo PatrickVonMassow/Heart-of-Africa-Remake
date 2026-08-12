@@ -395,8 +395,8 @@ describe('inhabitant bodies', () => {
       const [adult] = claimBodies(set, 1, { x: 2, z: 0 })
       const moverBody = SEP.bodyRadius * KID_SCALE
       const reach = SEP.bodyRadius * adult.scale + moverBody
-      expect(groundOccupied(set, null, 2 + reach - 1e-3, 0, SEP, moverBody)).toBe(true)
-      expect(groundOccupied(set, null, 2 + reach + 1e-3, 0, SEP, moverBody)).toBe(false)
+      expect(groundOccupied(set, 2 + reach - 1e-3, 0, SEP, moverBody)).toBe(true)
+      expect(groundOccupied(set, 2 + reach + 1e-3, 0, SEP, moverBody)).toBe(false)
     })
 
     it('judges each body at its own scale — a child occupies less ground than an adult', () => {
@@ -405,19 +405,19 @@ describe('inhabitant bodies', () => {
       const moverBody = SEP.bodyRadius * KID_SCALE
       const kidReach = SEP.bodyRadius * KID_SCALE + moverBody
       const adultReach = SEP.bodyRadius + moverBody
-      expect(groundOccupied(set, null, 2 + kidReach - 1e-3, 0, SEP, moverBody)).toBe(true)
-      expect(groundOccupied(set, null, 2 + adultReach - 1e-3, 0, SEP, moverBody)).toBe(false)
+      expect(groundOccupied(set, 2 + kidReach - 1e-3, 0, SEP, moverBody)).toBe(true)
+      expect(groundOccupied(set, 2 + adultReach - 1e-3, 0, SEP, moverBody)).toBe(false)
     })
 
-    it('never counts the mover itself, the ignored partner, or an inactive body', () => {
+    it('never counts an excluded body or an inactive one', () => {
       const set = createInhabitantSet()
       const [self, partner, sleeper] = claimBodies(set, 3, { x: 0, z: 0 })
       sleeper.active = false
       // All three stand on the very spot asked about; none of them counts.
-      expect(groundOccupied(set, self, 0, 0, SEP, 0.3, partner)).toBe(false)
+      expect(groundOccupied(set, 0, 0, SEP, 0.3, (b) => b === self || b === partner)).toBe(false)
       // A fourth, unrelated body on the spot does.
       claimBodies(set, 1, { x: 0, z: 0 })
-      expect(groundOccupied(set, self, 0, 0, SEP, 0.3, partner)).toBe(true)
+      expect(groundOccupied(set, 0, 0, SEP, 0.3, (b) => b === self || b === partner)).toBe(true)
     })
   })
 })

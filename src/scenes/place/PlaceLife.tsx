@@ -541,6 +541,8 @@ function Kids({
   // chase steers by both (point 657).
   const bodySet = useContext(InhabitantBodiesContext)
   const bodies = useInhabitantBodies(count, { scale: KID_SCALE })
+  // Which bodies are the game's own playmates, for the world's occupied rules.
+  const kidIndex = useMemo(() => new Set(bodies), [bodies])
 
   // The settlement as the chase sees it: ONE predicate for the colliders, the
   // fire ring (a collider like any other), the walkable rim and the PLAY GROUND
@@ -562,24 +564,24 @@ function Kids({
       centerZ: z,
       childRadius: NPC_RADIUS,
       blocked,
-      // THE GROUP'S OWN CHILDREN ARE NOT EACH OTHER'S WALLS — the whole group
-      // is excluded, not merely self and partner. Measured on the shipped
-      // villages: with the playmates included the game itself degraded (maasai
-      // worst child 0.48 % against the 0.25 % gate; a mover and its moving
-      // obstacle re-decide against each other every frame), while child-child
-      // contact was never the symptom — the separation pass alone held it at
-      // 0.00-0.03 %. The bodies a child steers round are the OTHERS: adults,
-      // porters, errand walkers — the standing and slow-crossing figures the
-      // measured red windows coincide with.
+      // WHICH BODIES ARE A CHILD'S WALLS: everybody OUTSIDE the game — adults,
+      // porters, errand walkers, the standing and slow-crossing figures the
+      // measured red windows coincided with — and NEVER a playmate. Both
+      // alternatives were measured and rejected (12.08.2026): playmates as
+      // mutual walls degraded the game itself (maasai worst child 0.48 %
+      // against the 0.25 % gate — two movers re-decide against each other
+      // every frame and dance in place), and a one-sided yield read 0.70 % on
+      // bambara. Child-child contact stays the separation pass's job, which
+      // held it at 0.00-0.03 % on every shipped village.
       occupied: (_self, _partner, px, pz) =>
         groundOccupied(
           bodySet,
-          bodies,
           px,
           pz,
           balance.villageLife.separation,
           // The child's OWN body radius, so the line is the pair's contact.
           balance.villageLife.separation.bodyRadius * KID_SCALE,
+          (b) => kidIndex.has(b),
         ),
       // The escape lands on ground the GAME calls free, not merely out of the
       // huts: a collider-only nudge teleported a child clean out of its own play
@@ -2391,6 +2393,25 @@ export function PlaceLife({
   // per mounted settlement: every vignette claims its slots from it and gives
   // them back when it goes.
   const inhabitantBodies = useMemo(() => createInhabitantSet(), [])
+
+  // Dev hook for the headless verification and for diagnosing motion defects
+  // (point 657): the whole body registry, so a live trace can say WHAT stood
+  // where a figure pressed. Dev-only, like `__placeTag`.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placeBodies = () =>
+      inhabitantBodies.bodies.map((b) => ({
+        x: b.x,
+        z: b.z,
+        scale: b.scale,
+        active: b.active,
+        fixed: b.fixed,
+      }))
+    return () => {
+      delete w.__placeBodies
+    }
+  }, [inhabitantBodies])
 
   // The cold-weather dress of §19.13, from THIS settlement's own place and the
   // date — like the settlement's weather, and for the same reason. Almost every

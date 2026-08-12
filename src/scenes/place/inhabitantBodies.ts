@@ -198,25 +198,23 @@ export function releaseBodies(set: InhabitantSet, bodies: readonly InhabitantBod
  * width was measured and rejected: at footprint width four children read each
  * other as 0.43 m walls on a 20 m ground and the game itself degraded (the
  * quietest child of one shipped village fell from ~110 to 22 walked metres per
- * played minute). At contact width a landed step never triggers the separation
- * and never robs the game of more room than the bodies truly take. `self` is
- * the mover's own body; `ignore` is a body the mover is deliberately allowed to
- * reach (the tag partner — a chaser that treated its quarry as a wall could
- * never close the catch).
+ * played minute).
+ *
+ * `exclude` names the bodies this mover may reach — its own at the least, and
+ * whatever its owner's steering rules leave to the separation pass (the tag
+ * game's rules live at its wiring in `PlaceLife`). A body it returns true for
+ * is not ground, whatever stands there.
  */
 export function groundOccupied(
   set: InhabitantSet,
-  self: InhabitantBody | readonly InhabitantBody[] | null,
   x: number,
   z: number,
   cfg: SeparationConfig,
   moverBodyRadius: number,
-  ignore: InhabitantBody | null = null,
+  exclude?: (b: InhabitantBody) => boolean,
 ): boolean {
-  const selfMany = Array.isArray(self) ? (self as readonly InhabitantBody[]) : null
   for (const b of set.bodies) {
-    if (b === self || b === ignore || !b.active) continue
-    if (selfMany && selfMany.includes(b)) continue
+    if (!b.active || exclude?.(b)) continue
     const r = cfg.bodyRadius * b.scale + moverBodyRadius
     const dx = x - b.x
     const dz = z - b.z
@@ -250,13 +248,14 @@ export function stepRoundBodies(
   blocked: (x: number, z: number) => boolean,
 ): { x: number; z: number } {
   const selfRadius = cfg.bodyRadius * self.scale
-  if (!groundOccupied(set, self, toX, toZ, cfg, selfRadius)) return { x: toX, z: toZ }
+  const notMe = (b: InhabitantBody) => b === self
+  if (!groundOccupied(set, toX, toZ, cfg, selfRadius, notMe)) return { x: toX, z: toZ }
   const dx = toX - fromX
   const dz = toZ - fromZ
   const dist = Math.hypot(dx, dz)
   if (!(dist > 1e-9)) return { x: toX, z: toZ }
   const both = (x: number, z: number) =>
-    blocked(x, z) || groundOccupied(set, self, x, z, cfg, selfRadius)
+    blocked(x, z) || groundOccupied(set, x, z, cfg, selfRadius, notMe)
   const r = deflectedStep(fromX, fromZ, Math.atan2(dx, dz), dist, both, Math.max(dist, selfRadius * 2))
   return r.moved ? { x: r.x, z: r.z } : { x: toX, z: toZ }
 }
