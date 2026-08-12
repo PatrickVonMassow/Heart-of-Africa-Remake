@@ -724,6 +724,11 @@ function Kids({
         press: c.press,
         pace: c.pace,
         pinned: c.pinned,
+        // How often the settlement had to pick this child up and set it down on
+        // free ground (point 656). A live check needs it: the teleport is what
+        // ENDS a snag, so without the count the correction reads as the child
+        // having walked out of the pocket by itself.
+        nudges: c.nudges,
         // Standing because it was TOLD to (point 481), not because it stalled —
         // the difference between an obeyed stillness and the reported snag.
         held: c.held,

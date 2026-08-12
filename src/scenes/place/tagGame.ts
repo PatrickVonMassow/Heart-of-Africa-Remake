@@ -162,6 +162,17 @@ export interface TagChild {
   walked: number
   /** Seconds without real movement. */
   pinned: number
+  /**
+   * HOW OFTEN THIS CHILD HAD TO BE FREED (point 656). Every teleport to free
+   * ground — the one a child that cannot move at all is given, and the one a
+   * child that walks without getting anywhere is given — is counted here and
+   * never reset, because a nudge is a FINDING, not an escape: a child the
+   * settlement had to pick up was, by definition, going nowhere for the whole
+   * `unstuckSeconds` before it. The count is what lets a check see the episode
+   * at all; the correction itself is a position jump, which is exactly what
+   * made the symptom invisible to a check that watched positions.
+   */
+  nudges: number
   /** Which way round the obstacle in front of it this child is going: +1 for
    *  the turns that add to its heading, −1 for the ones that subtract, 0 while
    *  nothing is in the way. See `TagConfig.edgeSeconds`. */
@@ -286,6 +297,7 @@ export function createTagGame(
       pace: 0,
       walked: 0,
       pinned: 0,
+      nudges: 0,
       edgeSide: 0,
       edgeFor: 0,
       anchorX: p.x,
@@ -416,6 +428,10 @@ function breakOffRound(s: TagState, cfg: TagConfig): void {
     c.effort = 'recover'
     c.sprinting = false
     c.held = false
+    // The round is over and nobody is walking into anything: whatever this child
+    // had run up against belongs to the round that just ended (point 656). Kept,
+    // it would teleport a child on the first blocked frame of the NEXT one.
+    c.pinned = 0
   }
 }
 
@@ -471,6 +487,38 @@ function wayOpen(c: TagChild, heading: number, world: TagWorld): boolean {
 const PROGRESS_AWAY = 3
 
 /**
+ * THE ESCAPE, AND THE FINDING IT LEAVES BEHIND (point 656). Both stall watches
+ * end here — the one for a child that cannot move at all and the one for a child
+ * that walks without getting anywhere — so the settlement picks it up in exactly
+ * one place and every such rescue is counted in exactly one place.
+ *
+ * The count is the point. The teleport ENDS the reported episode ("hängt kurz
+ * fest") half a second before a two-second window could close on it, and it ends
+ * it with a position jump, which any check that watches positions reads as the
+ * child walking out of its own pocket. Counting it turns the correction from an
+ * alibi into the evidence. `walked` is deliberately left alone: the gait rides
+ * it, and the legs must not flail through a correction the eye never sees.
+ *
+ * The anchor is re-taken here too, so the frame that freed a child cannot charge
+ * it a second rescue from the other watch a few lines later.
+ */
+function escapeNudge(c: TagChild, world: TagWorld): void {
+  const free = world.nudge(c.x, c.z)
+  if (free.found) {
+    c.x = free.x
+    c.z = free.z
+  }
+  // Counted whether or not free ground was found: the child stood its whole
+  // window without getting anywhere either way, and a settlement that cannot
+  // even offer it a way out is the worse finding of the two.
+  c.nudges++
+  c.pinned = 0
+  c.anchorX = c.x
+  c.anchorZ = c.z
+  c.anchorFor = 0
+}
+
+/**
  * A CHILD THAT WALKS WITHOUT GETTING ANYWHERE IS STUCK (point 648), and it took
  * the reported bug to see it: the stall watch only ever counted the frames in
  * which a child could not move AT ALL, so a child wedged in a hand's breadth of
@@ -489,6 +537,12 @@ function trackProgress(c: TagChild, dt: number, cfg: TagConfig, world: TagWorld)
     c.anchorX = c.x
     c.anchorZ = c.z
     c.anchorFor = 0
+    // A child that is not walking is not stuck on anything — it is standing
+    // because the round is over or because it was TOLD to (point 656). Leaving
+    // the count of the frames before it standing would fire a teleport on the
+    // first blocked frame after the hold, on a child that had just been asked
+    // to stand still.
+    c.pinned = 0
     return
   }
   if (Math.hypot(c.x - c.anchorX, c.z - c.anchorZ) > world.childRadius * PROGRESS_AWAY) {
@@ -502,16 +556,7 @@ function trackProgress(c: TagChild, dt: number, cfg: TagConfig, world: TagWorld)
     c.edgeSide = 0
     c.edgeFor = 0
   }
-  if (c.anchorFor >= cfg.unstuckSeconds) {
-    const free = world.nudge(c.x, c.z)
-    if (free.found) {
-      c.x = free.x
-      c.z = free.z
-    }
-    c.anchorX = c.x
-    c.anchorZ = c.z
-    c.anchorFor = 0
-  }
+  if (c.anchorFor >= cfg.unstuckSeconds) escapeNudge(c, world)
 }
 
 /**
@@ -590,19 +635,11 @@ function moveChild(
   }
   // Blocked on every probe: turn a quarter — to the side it is already going
   // round, so the two rules never pull against each other — and try again next
-  // frame; and if it is still standing there past its window, nudge it to free
-  // ground. The nudge is a teleport, so its distance is deliberately NOT added
-  // to `walked`: the legs must not flail through a correction the eye never sees.
+  // frame; and if it is still standing there past its window, it is picked up
+  // and set down on free ground — counted, see `escapeNudge`.
   c.heading = desired + (c.edgeSide < 0 ? -Math.PI / 2 : Math.PI / 2)
   c.pinned += dt
-  if (c.pinned > cfg.unstuckSeconds) {
-    const free = world.nudge(c.x, c.z)
-    if (free.found) {
-      c.x = free.x
-      c.z = free.z
-    }
-    c.pinned = 0
-  }
+  if (c.pinned > cfg.unstuckSeconds) escapeNudge(c, world)
 }
 
 /**
