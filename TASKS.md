@@ -165,54 +165,6 @@ put it is the mistake this line exists to stop.
   keeps hitting the bugs.
   Bundle: Verständigung.
 
-- [ ] 656. THE CHILDREN'S SHUFFLE GATE CANNOT SEE THE SYMPTOM IT WAS BUILT FOR (found
-  11.08.2026 by the cross-vendor review of point 648 — GPT-5.6 Sol at effort high, verdict
-  do-not-merge, recorded against `d1ed0d27`; the behaviour fixes of 648 are on `main` and are
-  not in question, its PROOF is). Point 648 replaced a frame-rate-dependent reversal count with
-  the user's own complaint — a child that walks over 2 m in a 2-second window without leaving a
-  0.5 m circle. Measured against the code that runs beside it, that gate is largely blind:
-  1. `trackProgress` in `src/scenes/place/tagGame.ts` teleports a child that has not left
-     `childRadius * 3` for `unstuckSeconds` (1.5 s) to free ground. The window is 2 s. So the
-     exact failure the gate looks for is ENDED half a second before its window can close, and
-     the user's report was "hängt KURZ fest" — the short episode is the bug.
-  2. Both the browser check (`scripts/verify/polish.mjs`, section `children-motion`) and
-     `src/scenes/place/tagShuffle.test.ts` sum FRAME-TO-FRAME POSITION DELTAS as the path
-     walked. The teleport is a position delta, so the correction that hides the symptom is
-     counted as the child walking out of the circle — twice blind, in the same window.
-  3. The browser check waits for `window.__placeTag().playing` but discards the result and
-     never asserts it. A group that never plays produces no stalls and no shuffle windows and
-     satisfies the gate vacuously.
-  4. `tagShuffle.test.ts` claims only the CHILDREN in a fresh `InhabitantSet`, so the
-     multi-pass separation is never exercised against the adults, porters and errand walkers
-     whose bodies share the production registry — the very crowding that made more than one
-     pass necessary.
-
-  FINAL STATE:
-
-  1. The shuffle metric measures the game's OWN walked distance (`walked`, which deliberately
-     excludes the nudge) against ground covered, in both the browser check and the pure test —
-     never a summed position delta.
-  2. A NUDGE IS A FINDING, NOT AN ESCAPE. The teleport is counted and reported: a child freed by
-     it was, by definition, going nowhere. The gate fails on a nudge rate above a stated
-     threshold, and the window is shorter than `unstuckSeconds` so an episode the player sees
-     is inside it, with the chosen window and threshold justified by a measurement in the
-     comment.
-  3. The browser check ASSERTS that the group is playing, and a trace with no play at all fails
-     rather than passes.
-  4. The pure integration test builds the body set the settlement really has — children,
-     adults, porters, errand walkers — and the separation is judged against all of them.
-  5. `pinned` is cleared wherever the round is broken off or a child is commanded to stand
-     (`breakOffRound`, the held branch, after a progress nudge), so a stale count from before a
-     hold cannot fire a teleport on the first blocked frame after it.
-
-  VERIFIABLE: Vitest over a replayed settlement in which a child is deliberately wedged — the
-  gate must go RED with the nudge left on, and the same trace must show the shuffle it was
-  hiding; a trace with a permanently idle group fails; a trace with adults crowding the children
-  is judged like the children. Plus the live section at seed 2972259115 on both backends, whose
-  report NAMES the nudge count it observed.
-  Criticality: high — it is the proof that the user's own bug report stays fixed.
-  Bundle: Dorfleben.
-
 - [ ] 581. THE SETTLEMENT BOUNDARY IS TOO FAINT, AND ITS SLIDER IS ALREADY AT THE CEILING
   (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
   Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
