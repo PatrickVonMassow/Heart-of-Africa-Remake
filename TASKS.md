@@ -205,16 +205,6 @@ put it is the mistake this line exists to stop.
      (`breakOffRound`, the held branch, after a progress nudge), so a stale count from before a
      hold cannot fire a teleport on the first blocked frame after it.
 
-  WHERE THIS POINT STOPS (12.08.2026, after seven refusals). The rounds have not been aimless:
-  each one named a construction, the fix was pinned by a case that fails against the code it
-  replaced, and round seven found the SYMPTOM ITSELF — the short snag between standstills, which
-  no one-second window could see and which is what the user reported. But the later findings have
-  moved from "the proof cannot see the bug" to "the proof can be fooled by a trace built by hand".
-  So the line is drawn here: a finding counts against THIS point while it concerns something the
-  running game can actually produce — a real trace, a real cadence, a real settlement. A finding
-  that needs an input the settlement cannot emit (an impossible counter, a sample the game never
-  writes) is real, but it becomes its OWN point rather than holding this one open. The next
-  refusal that names only such inputs is filed and this point lands.
   VERIFIABLE: Vitest over a replayed settlement in which a child is deliberately wedged — the
   gate must go RED with the nudge left on, and the same trace must show the shuffle it was
   hiding; a trace with a permanently idle group fails; a trace with adults crowding the children
