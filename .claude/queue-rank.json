@@ -28,10 +28,6 @@
       "at": "2026-08-11T21:10:45.801Z",
       "why": "Last is right for the mechanism; the ONE stale section it names (criterion 7) is corrected inside point 174, which gates the release anyway."
     },
-    "661": {
-      "at": "2026-08-12T20:10:55.572Z",
-      "why": "Prozessluecke hinter den Release-Punkten; wichtig, aber niemand blockiert"
-    },
     "662": {
       "at": "2026-08-12T20:10:55.614Z",
       "why": "Prozessluecke mit hoher Kostenwirkung, aber hinter der Verstaendigungs-Kette; vor 633 einsortiert bei den Infrastruktur-Nachbarn"
@@ -42,7 +38,7 @@
     }
   },
   "settled": {
-    "at": "2026-08-12T20:20:48.211Z",
+    "at": "2026-08-12T21:03:02.249Z",
     "points": [
       174,
       184,
@@ -209,7 +205,6 @@
       658,
       659,
       660,
-      661,
       662,
       663
     ]
