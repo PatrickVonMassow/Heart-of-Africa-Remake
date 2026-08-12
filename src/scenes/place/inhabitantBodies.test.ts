@@ -298,4 +298,50 @@ describe('inhabitant bodies', () => {
     addBodies(set, bodies)
     expect(set.bodies).toHaveLength(2)
   })
+
+  // THE CAP IS PER FRAME, NOT PER SWEEP (GPT-5.6 Sol's re-review of point 648,
+  // 12.08.2026). Every sweep used to be handed the whole frame's allowance, so a
+  // body in a deep stack could be corrected `passes` times the documented ceiling
+  // — at the shipped 8 m/s and 4 passes an effective 32 m/s — and a stack snapped
+  // apart instead of easing apart. Pinned against the pass count, since that is
+  // the knob that broke it.
+  it('never moves a body further in one frame than the cap allows, whatever the pass count', () => {
+    const dt = 1 / 60
+    for (const passes of [1, 2, 4, 12]) {
+      const cfg: SeparationConfig = { ...SEP, passes }
+      const set = createInhabitantSet()
+      // Five bodies on ONE spot: the deepest stack the settlement can produce,
+      // and the case where the sweeps have most to undo.
+      const bodies = claimBodies(set, 5, { x: 0, z: 0 })
+      for (const b of bodies) {
+        b.x = 0
+        b.z = 0
+      }
+      const before = bodies.map((b) => ({ x: b.x, z: b.z }))
+      separateGroup(set, bodies, dt, cfg)
+      const cap = cfg.maxSpeed * dt
+      for (let i = 0; i < bodies.length; i++) {
+        const moved = Math.hypot(bodies[i].x - before[i].x, bodies[i].z - before[i].z)
+        expect(moved).toBeLessThanOrEqual(cap + 1e-9)
+      }
+      releaseBodies(set, bodies)
+    }
+  })
+
+  it('spends more passes on a better resolution, not on a faster one', () => {
+    const dt = 1 / 60
+    const travel = (passes: number) => {
+      const set = createInhabitantSet()
+      const bodies = claimBodies(set, 4, { x: 0, z: 0 })
+      for (const b of bodies) {
+        b.x = 0
+        b.z = 0
+      }
+      separateGroup(set, bodies, dt, { ...SEP, passes })
+      return Math.max(...bodies.map((b) => Math.hypot(b.x, b.z)))
+    }
+    // Four sweeps may not carry a body further than one sweep's allowance does.
+    expect(travel(4)).toBeLessThanOrEqual(travel(1) + 1e-9)
+  })
+
 })

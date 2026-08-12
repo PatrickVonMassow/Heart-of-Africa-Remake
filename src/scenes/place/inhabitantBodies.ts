@@ -185,7 +185,7 @@ export function separateBody(
   cfg: SeparationConfig,
   world: SeparationWorld = {},
 ): boolean {
-  return pushBody(set, self, dt, dt, cfg, world)
+  return pushBody(set, self, dt, dt, cfg, world, Math.max(0, cfg.maxSpeed) * dt) > 0
 }
 
 /**
@@ -193,6 +193,10 @@ export function separateBody(
  * the frame's — not the sweep's: a refining sweep resolves the same frame over
  * again, so charging it a second time would trip the escape nudge as many times
  * faster as the solver sweeps, and teleport a figure that was never stuck.
+ *
+ * `budget` is how far this body may still be moved THIS FRAME, in metres, and it
+ * is the caller's to spend across the sweeps (see `separateGroup`). Returns the
+ * distance actually moved, so the caller can subtract it.
  */
 function pushBody(
   set: InhabitantSet,
@@ -201,8 +205,9 @@ function pushBody(
   wedgeDt: number,
   cfg: SeparationConfig,
   world: SeparationWorld = {},
-): boolean {
-  if (!(dt > 0) || self.fixed || !self.active) return false
+  budget = Math.max(0, cfg.maxSpeed) * dt,
+): number {
+  if (!(dt > 0) || self.fixed || !self.active) return 0
   const selfIndex = set.bodies.indexOf(self)
   const selfRadius = cfg.bodyRadius * self.scale
   let px = 0
@@ -241,9 +246,9 @@ function pushBody(
   const want = Math.hypot(px, pz)
   if (want <= 1e-9) {
     self.wedged = 0
-    return false
+    return 0
   }
-  const cap = Math.max(0, cfg.maxSpeed) * dt
+  const cap = Math.max(0, Math.min(budget, Math.max(0, cfg.maxSpeed) * dt))
   const scale = (Math.min(want, cap) / want) * Math.max(0, Math.min(1, cfg.stiffness))
   const stepX = px * scale
   const stepZ = pz * scale
@@ -263,7 +268,7 @@ function pushBody(
     self.x = nx
     self.z = nz
     self.wedged = 0
-    return true
+    return Math.hypot(mx, mz)
   }
   // Pressed between a collider and another body: bounded, not for ever.
   self.wedged += Math.max(0, wedgeDt)
@@ -275,7 +280,7 @@ function pushBody(
     }
     self.wedged = 0
   }
-  return false
+  return 0
 }
 
 /**
@@ -296,11 +301,29 @@ export function separateGroup(
   world: SeparationWorld = {},
 ): void {
   const passes = Math.max(1, Math.floor(cfg.passes))
+  // ONE MOVEMENT BUDGET PER BODY PER FRAME (GPT-5.6 Sol, 12.08.2026). Every sweep
+  // used to hand `pushBody` the whole frame's `maxSpeed * dt`, so a body could be
+  // corrected once PER PASS — at the shipped 8 m/s and 4 passes, an effective
+  // 32 m/s against a cap the type documents as per frame. A deep stack then SNAPS
+  // apart instead of easing apart, which from outside is a figure jumping. The
+  // budget is spent ACROSS the sweeps, so more passes buy a more exact
+  // resolution, never a faster one.
+  const cap = Math.max(0, cfg.maxSpeed) * dt
+  const left = new Map<InhabitantBody, number>()
+  for (const b of bodies) left.set(b, cap)
   for (let p = 0; p < passes; p++) {
     let moved = false
     // Only the FIRST sweep charges the wedge timer: the later ones are the same
     // frame, resolved more exactly.
-    for (const b of bodies) if (pushBody(set, b, dt, p === 0 ? dt : 0, cfg, world)) moved = true
+    for (const b of bodies) {
+      const budget = left.get(b) ?? 0
+      if (!(budget > 0)) continue
+      const step = pushBody(set, b, dt, p === 0 ? dt : 0, cfg, world, budget)
+      if (step > 0) {
+        left.set(b, Math.max(0, budget - step))
+        moved = true
+      }
+    }
     if (!moved) return
   }
 }
