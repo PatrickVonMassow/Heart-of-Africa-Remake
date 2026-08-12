@@ -598,7 +598,7 @@ function Kids({
         return { x: r.pos[0], z: r.pos[1], found: r.found }
       },
     }
-  }, [colliders, radius, x, z, playRadius, bodySet, bodies])
+  }, [colliders, radius, x, z, playRadius, bodySet, kidIndex])
 
   // The group, spawned on validated ground (point 155): a play spot covered by a
   // hut is nudged to the nearest free one before the first frame — INSIDE the
