@@ -474,6 +474,22 @@ describe('inhabitant bodies', () => {
       expect(d).toBeGreaterThanOrEqual(reach - 1e-9)
     })
 
+    it('a deflection that would cross a SECOND body is refused — the figure waits', () => {
+      // GPT-5.6 Sol (12.08.2026): the one-body case never exercised this path.
+      // The straight way is shut by body A near the endpoint; the first
+      // point-clear deflection (+15°) passes RIGHT THROUGH body B standing
+      // mid-way on it — the swept test must refuse it, and with the static
+      // walls closing the mirror side, the figure stays where it stands.
+      const set = createInhabitantSet()
+      const [self] = claimBodies(set, 1, { x: 0, z: 0 })
+      claimBodies(set, 1, { x: -0.1, z: 2.05 }) // A: shuts the straight endpoint
+      claimBodies(set, 1, { x: 0.26, z: 0.97, scale: KID_SCALE }) // B: mid-deflection
+      const corridor = (x: number) => Math.abs(x) > 0.7
+      const r = stepRoundBodies(set, self, 0, 0, 0, 2, SEP, (x) => corridor(x))
+      expect(r.x).toBe(0)
+      expect(r.z).toBe(0)
+    })
+
     it('never counts an excluded body or an inactive one', () => {
       const set = createInhabitantSet()
       const [self, partner, sleeper] = claimBodies(set, 3, { x: 0, z: 0 })
