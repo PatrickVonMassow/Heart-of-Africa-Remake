@@ -91,6 +91,12 @@ put it is the mistake this line exists to stop.
   0.35 m circle stays under the 0.25 % gate across repeated traces on BOTH backends — with the
   gate untouched, and with the carry and rescue rates staying under their own gates, so the
   symptom is gone rather than tidied away.
+  THE EVIDENCE IS RE-TAKEN FIRST. GPT-5.6 Sol's review of point 656 (12.08.2026) found the
+  metric those numbers came from to be SAMPLE-weighted rather than time-weighted: it counts one
+  window per rendered frame, so an irregular headless frame cadence moves the share. So this
+  point begins by re-measuring with the corrected measure point 656 must deliver; if the share
+  then stays under the gate across repeated traces on both backends, this point closes as a
+  measurement artefact and says so, and the charge below goes with it.
   THE CAUSE IS NAMED BEFORE IT IS FIXED. The measurement leaves three candidates open and the
   trace can tell them apart: the separation pass pushing a child back into the pocket it just
   walked out of; two children resolving each other in opposite directions on alternating frames;
@@ -302,6 +308,45 @@ put it is the mistake this line exists to stop.
   three runs each, on a quiet machine AND under throttle.
   Criticality: medium — no player sees it, but an unexplained red on the release branch makes
   the picture gate untrustworthy exactly where the release needs it.
+
+- [ ] 658. THE EGRESS ALLOWANCE MUST SURVIVE A CONTAINER RESTART AND THE HOURS AFTER IT (user
+  12.08.2026: "Das ist auch schon zum zweiten Mal passiert. Sorge dafür, dass das den
+  Container-Neustart überlebt. Deine bisherige Maßnahme scheint also nicht wirksam gewesen zu
+  sein."). MEASURED, and confirmed independently by GPT-5.6 Sol at effort high (diagnose,
+  12.08.2026): the container's egress allowance is an ipset of RESOLVED IP LITERALS, written
+  once by `.devcontainer/init-firewall.sh` at container start. `api.openai.com` is in that
+  domain list, so the boot run is not what is missing — the addresses behind that name ROTATE,
+  and the set keeps the snapshot. `api.github.com` survives because GitHub publishes CIDRs and
+  the script adds those. The periodic top-up that was meant to re-resolve never ran once (fixed
+  12.08.2026 in `scripts/batch-autostart.mjs`: a missing pid file on a fresh container threw out
+  of the whole block), and even now it runs on the launcher's 15-minute tick.
+  FINAL STATE: a cross-vendor review, a model call or a package fetch never fails on a stale
+  allowance, on a container that has just come up or one that has run for a day. Concretely:
+  1. The refresh is TTL-AWARE, not tick-shaped: it re-resolves at about half the shortest TTL
+     of the names it holds (single-digit minutes for these hosts, not 15), with jitter.
+  2. It is ARMED BY THE CONTAINER'S OWN START, not by whoever happens to open a session — the
+     same boot path that arms the batch launcher, so a restart restores it unattended.
+  3. It does not GROW without bound: the dynamic names live in their own set, refreshed by
+     generation or by entry timeout, so a day of rotation does not leave a day of addresses
+     standing. The static, published-CIDR names stay where they are.
+  4. Every failure is LOUD, never skipped: the refresher not starting or dying, `sudo -n`
+     refused, the set missing, DNS returning nothing, an insert failing, or the post-refresh
+     probe still unreachable. A DNS failure keeps the last entries for a bounded grace period
+     and is reported as a failure, never as a successful refresh.
+  NOT IN SCOPE, recorded so it is not re-derived: name-based matching in netfilter itself does
+  not exist — a hostname in a rule is resolved once into literals. The only real name policy is
+  a DNS-coupled set (dnsmasq `ipset=`/`nftset=` populating the set as answers are issued) or an
+  egress proxy that enforces CONNECT/SNI; both need the privileged startup lifecycle to recreate
+  them, which is why (2) is the load-bearing half. Sol's full answer, with its judgement of /24
+  widening (worse than exact refresh: 256 addresses per answer, unrelated CDN tenants, and the
+  present OUTPUT rule permits every port to them), is the design input.
+  VERIFIABLE: a restart of the container, then a probe of `api.openai.com` immediately and again
+  after the rotation window that broke it twice — both reachable with no manual step; the
+  refresher's own log shows the re-resolves; a forced DNS failure produces the loud report and
+  keeps the grace-period entries; and a unit test pins the schedule and the failure reports.
+  Criticality: high — it takes out the cross-vendor review the four-eyes rule depends on, and it
+  did so twice unnoticed.
+  Bundle: unbundled (infrastructure).
 
 - [ ] 633. THE RELEASE'S CLOSING RUN — TWO REGRESSIONS WITH THE CLEANUP BETWEEN THEM (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
