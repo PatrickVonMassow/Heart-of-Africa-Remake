@@ -99,17 +99,15 @@ export const RED_CHARGES = [
     kind: 'check',
     match: /no child walks without getting anywhere/i,
     why:
-      'RE-MEASURED 12.08.2026 with the repaired measure, now read PER CHILD (a group average ' +
-      'divided one shuffling child by three healthy siblings). Every earlier reading of this ' +
-      'check is void: 0.30-1.98 % came from a measure that interpolated across a teleport, and ' +
-      'the 0.00-0.31 % after that was the group\'s. Seed 2972259115, idle machine, five traces ' +
-      'per backend, worst child\'s own share: WebGL 2 red twice (1.29 % and 0.34 %, others ' +
-      '0.00-0.09 %), WebGPU red once (1.53 %, others 0.00-0.24 %) against the 0.25 % gate. The ' +
-      'red windows have a child walk 1.3-2.9 m and end 0.00-0.05 m from where it started, none ' +
-      'of them holds a rescue or a gap longer than the second it measures, and no child was ' +
-      'carried at all in any of the ten runs — the game\'s own counter reads 0.00 m per minute ' +
-      'for the WORST child of every run, so no shuffle is hiding inside a teleport either. That ' +
-      'is the settlement walking on the spot, which is point 657. Both backends: with the ' +
-      'per-child gate it was seen on both.',
+      'MEASURED 12.08.2026 over THREE sittings of ten traces each at seed 2972259115 on an idle ' +
+      'machine, five per backend, with the per-child measure (a group average divided one ' +
+      'shuffling child by three healthy siblings; every reading from before that is void). The ' +
+      "worst child's own share against the 0.25 % gate: 7 red of 30 — WebGL 2 twice in 15 " +
+      '(1.29 %, 0.34 %), WebGPU five times in 15 (1.53, 0.74, 0.89, 1.30, 0.82 %), the other 23 ' +
+      'traces 0.00-0.24 %. The red windows have a child walk 1.3-3.2 m and end 0.00-0.35 m from ' +
+      'where it started; none holds a rescue or a gap longer than the second it measures; and ' +
+      "the game's own carry counter reads 0.00 m per minute for every child of all thirty runs, " +
+      'so nothing is hiding inside a teleport. That is the settlement walking on the spot, which ' +
+      'is point 657. Both backends, at different rates: seen on each, oftener on WebGPU.',
   },
 ]
