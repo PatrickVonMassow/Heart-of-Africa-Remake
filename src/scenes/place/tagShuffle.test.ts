@@ -23,8 +23,11 @@
 // and both copies summed frame-to-frame POSITIONS as the path walked — so the
 // rescue teleport that ENDS a snag was counted as the child walking out of its
 // own pocket, and the window was longer than the rescue that tidied the symptom
-// away. The metric now takes the walked distance from the game itself, freezes
-// the ground path across a rescue, and gates the rescues on their own account.
+// away. The metric now takes the walked distance from the game itself, leaves
+// the carry out of the ground path, and gates the rescues on their own account.
+// AND ITS WINDOWS WEIGH EQUALLY IN GAME TIME rather than one per sample, so the
+// frame cadence cannot move the share — shown here on a recorded trace read at
+// five cadences, not merely claimed.
 import { describe, expect, it } from 'vitest'
 import {
   CHILD_MOTION,
@@ -362,6 +365,28 @@ function sample(v: ReturnType<typeof village>, paths: Track[][]): void {
   })
 }
 
+/** THE SAME RECORDED TRACE, SEEN BY A SLOWER RENDERER (point 656). Positions,
+ *  `walked` and `nudges` are all the game's own state AT that moment, so leaving
+ *  samples out is exactly what a machine drawing fewer frames would have
+ *  recorded of the same play. Every child gets its own cadence, as it would. */
+function resample(paths: Track[][], step: (rand: () => number) => number, seed: number): Track[][] {
+  return paths.map((path, k) => {
+    const rand = mulberry32((seed + k * 977) >>> 0)
+    const out: Track[] = []
+    for (let i = 0; i < path.length; i += Math.max(1, step(rand))) out.push(path[i])
+    return out
+  })
+}
+
+/** 60, 20 and 7.5 frames a second, then two irregular ones. */
+const CADENCES: Array<[string, (rand: () => number) => number]> = [
+  ['60 fps', () => 1],
+  ['20 fps', () => 3],
+  ['7.5 fps', () => 8],
+  ['1-8 frames', (rand) => 1 + Math.floor(rand() * 8)],
+  ['2-12 frames', (rand) => 2 + Math.floor(rand() * 11)],
+]
+
 /** Every child's path through `seconds` of the game, sampled every frame. */
 function play(placeId: string, seed: number, seconds: number, dt = 1 / 60): Track[][] {
   const v = village(placeId, seed)
@@ -514,6 +539,19 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // symptom in miniature and belongs in its own point; this bar holds the
     // measured state so a regression that doubles it fails.
     expect(shuffleWindows(paths).share).toBeLessThan(0.02)
+
+    // AND THAT SAME RECORDED MINUTE READS THE SAME AT ANY FRAME CADENCE (point
+    // 656). The measure has to be free of the frame rate — that is what the
+    // reversal count it replaced was thrown out for — and the claim is shown
+    // here rather than asserted: ONE recorded trace, resampled as a slower or
+    // unevener renderer would have seen the very same play, evenly at 60, 20 and
+    // 7.5 frames a second and irregularly at cadences swinging by a factor of
+    // eight and of eleven, which is the spread a headless frame really shows.
+    // TOLERANCE: within 15 % of the 60 fps reading. Measured, base 1.123 %:
+    // 1.123 / 1.123 / 1.072 / 1.101 / 1.130 %, a spread of 4.5 %.
+    const shares = CADENCES.map(([, step]) => shuffleWindows(resample(paths, step, 4242)).share)
+    expect(shares[0]).toBeGreaterThan(0.005) // a real share to be invariant about
+    for (const s of shares) expect(Math.abs(s - shares[0])).toBeLessThan(shares[0] * 0.15)
   })
 })
 
@@ -582,6 +620,30 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     expect(asItWas.windows).toBeGreaterThan(1000) // it really did look
     expect(asItWas.share).toBeLessThan(0.01) // and it would have passed its gate
     expect(r.share).toBeGreaterThan(asItWas.share * 5)
+  })
+
+  it('and reads that ONE recorded trace the same at any frame cadence', () => {
+    // THE VERDICT MUST NOT MOVE WITH THE FRAME RATE — the whole reason the
+    // reversal count was thrown out (1.4 % of steps at 60 fps against 3.2 % at
+    // 14). ONE recorded trace of the penned child, resampled as a slower or
+    // unevener renderer would have seen the very same play; nothing about the
+    // settlement changes, only how often it was looked at.
+    //
+    // TOLERANCE: within 40 % of the 60 fps reading. Measured, base 3.25 %:
+    // 3.25 / 2.82 / 2.39 / 4.18 / 3.42 %, a spread of 29 % — and this trace is
+    // the WORST case the metric has, a child CARRIED out of its pen every two
+    // seconds. Every carry is a hole in the ground path that has to be
+    // reconstructed from the walked distance, so the rescue-heavy trace is where
+    // the reconstruction's error lives; a recorded minute of ordinary play holds
+    // to 6 % (the case above, in the first block). What matters for a gate is the
+    // second assertion: RED at every one of the five cadences, by a factor of
+    // ten, where the sample-weighted measure it replaced could not even finish
+    // an irregular trace.
+    const penned = [wedged()[0]]
+    const shares = CADENCES.map(([, step]) => shuffleWindows(resample(penned, step, 31337)).share)
+    const base = shares[0]
+    for (const s of shares) expect(Math.abs(s - base)).toBeLessThan(base * 0.4)
+    for (const s of shares) expect(s).toBeGreaterThan(CHILD_MOTION.shareGate * 4)
   })
 
   it('and it is the PENNED child the report names', () => {

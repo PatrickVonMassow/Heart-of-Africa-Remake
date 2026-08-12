@@ -3480,7 +3480,14 @@ if (section('children-motion')) {
     // that ENDS a snag counted as the child walking out of its own pocket, and
     // their window was longer than the 1.5 s rescue that tidied the symptom
     // away. The walked distance now comes from the game itself, the ground
-    // covered is frozen across a rescue frame, and the rescues are counted.
+    // covered leaves out the carry, and the rescues are counted.
+    //
+    // AND THE SHARE IS WEIGHTED IN GAME TIME, which matters most HERE: the
+    // headless frame times in this very trace run from 20 ms to over a second,
+    // and one window per FRAME would have let the fast stretches of a run
+    // outvote the slow ones — the same fault, in a new place. Each window now
+    // counts for the game time it stands for, so the number below is the share
+    // of the traced minute the children spent shuffling.
     //
     // It used to count REVERSALS — a step that undoes the one before — and that
     // check could never hold either. A chase is FULL of legitimate reversals: a
@@ -3498,8 +3505,14 @@ if (section('children-motion')) {
     const shuffle = shuffleWindows(tracks)
     check(
       'no child walks without getting anywhere',
-      shuffle.windows > 200 && shuffle.share < CHILD_MOTION.shareGate,
-      `${shuffle.bad} of ${shuffle.windows} ${CHILD_MOTION.span}s windows (${(shuffle.share * 100).toFixed(2)} %) ` +
+      // The bar is CHILD-SECONDS of game, not a count of frames: this trace is
+      // 1200 rendered frames and buys anything from 20 s of game to a minute
+      // and a half of it. 20 child-seconds is the same floor the trace check
+      // above sets (5 s of game, four children), read in the unit the share is
+      // weighted in.
+      shuffle.seconds > 20 && shuffle.share < CHILD_MOTION.shareGate,
+      `${shuffle.bad} of ${shuffle.windows} ${CHILD_MOTION.span}s windows, ` +
+        `${(shuffle.share * 100).toFixed(2)} % of ${shuffle.seconds.toFixed(1)} child-seconds ` +
         `with over ${CHILD_MOTION.minPath} m walked inside ${CHILD_MOTION.circle} m` +
         (shuffle.worst.child >= 0
           ? ` — worst child ${shuffle.worst.child} at ${shuffle.worst.clock.toFixed(1)}s, ${shuffle.worst.path.toFixed(2)} m walked inside ${shuffle.worst.out.toFixed(2)} m`

@@ -32,6 +32,17 @@
 //     half a second after the only thing it was looking for had already been
 //     tidied away. One second fits inside the rescue with room to spare.
 //
+//  4. AND EVERY WINDOW WEIGHS THE SAME IN GAME TIME, not one per SAMPLE
+//     (found 12.08.2026 by the cross-vendor review of this branch). Counting
+//     one window per rendered frame hands the busy stretches of a trace more
+//     say than the slow ones — on this machine a headless frame takes anything
+//     from 20 ms to over a second — so the share moved with the frame cadence,
+//     which is precisely the fault the reversal count was thrown out for. Each
+//     window now carries the game time its start stands for, its far end is
+//     read AT the span by interpolation rather than at the last sample before
+//     it, and a sparsely sampled trace is judged to its end instead of being
+//     abandoned at the first window no single sample gap could fill.
+//
 // The rescues are counted and gated on their own account (`rescueRate`): a child
 // the settlement had to pick up was, by definition, going nowhere for the whole
 // window before it, so a nudge is a FINDING and never an escape.
@@ -40,7 +51,10 @@
  * The calibration, and the measurements behind every number of it. Measured over
  * 60 s of each of the three shipped villages the replay test steps
  * (bambara/2972259115, maasai/42, swahili/99, 14184 windows each), against 40 s
- * of the same Bambara village with one child deliberately penned:
+ * of the same Bambara village with one child deliberately penned. Every number
+ * below was taken at the replay's uniform 1/60 cadence, where weighting the
+ * windows by game time and counting them one per sample give the same answer;
+ * what the weighting buys is the LIVE trace, whose frames are not evenly spaced:
  *
  *  - `span` 1 s: SHORTER THAN THE RESCUE (`unstuckSeconds`, 1.5 s), which is the
  *    whole repair. The user's report was "hängt KURZ fest" and the teleport ends
@@ -88,11 +102,18 @@ export const CHILD_MOTION = {
 }
 
 /**
- * The path the child WALKED, with every rescue taken back out of it: the frame
- * in which `nudges` rose contributed a teleport, so it contributes no
- * displacement here. Returns arrays parallel to the samples.
+ * The path the child WALKED, with every rescue taken back out of it: the sample
+ * gap in which `nudges` rose holds a teleport, and being carried is not ground
+ * the child covered. Returns arrays parallel to the samples.
  *
- * @param {ReadonlyArray<{x:number,z:number,nudges?:number}>} track
+ * WHAT IS TAKEN OUT IS THE CARRY, NOT THE GAP. A gap that holds a rescue is
+ * credited with what the child's LEGS did in it (`walked`, which the game keeps
+ * free of the teleport), never with the jump. Frame by frame the two are the
+ * same thing — the rescue frame's own walking is a centimetre — but a trace
+ * sampled eight frames apart holds real walking beside the teleport, and
+ * dropping that would make the measure move with the frame cadence again.
+ *
+ * @param {ReadonlyArray<{x:number,z:number,walked?:number,nudges?:number}>} track
  * @returns {{x:number[],z:number[]}}
  */
 export function groundPath(track) {
@@ -104,9 +125,18 @@ export function groundPath(track) {
     if (i === 0) {
       px = track[i].x
       pz = track[i].z
-    } else if ((track[i].nudges ?? 0) <= (track[i - 1].nudges ?? 0)) {
-      px += track[i].x - track[i - 1].x
-      pz += track[i].z - track[i - 1].z
+    } else {
+      let dx = track[i].x - track[i - 1].x
+      let dz = track[i].z - track[i - 1].z
+      if ((track[i].nudges ?? 0) > (track[i - 1].nudges ?? 0)) {
+        const jump = Math.hypot(dx, dz)
+        const legs = Math.max(0, (track[i].walked ?? 0) - (track[i - 1].walked ?? 0))
+        const keep = jump > legs ? legs / (jump || 1) : 1
+        dx *= keep
+        dz *= keep
+      }
+      px += dx
+      pz += dz
     }
     x.push(px)
     z.push(pz)
@@ -115,36 +145,74 @@ export function groundPath(track) {
 }
 
 /**
- * The share of windows in which a child walks without getting anywhere.
+ * The share of GAME TIME spent in windows in which a child walks without getting
+ * anywhere.
+ *
+ * THE SHARE IS TIME-WEIGHTED, and that is the whole point of it. A window opens
+ * at every sample, but it counts for the game time that sample stands for — the
+ * gap to the next one — so the answer is the fraction of the traced minute the
+ * children spent shuffling, not the fraction of the RENDERED FRAMES that fell
+ * inside a shuffle. Frames are not evenly spaced: headless, on a loaded machine,
+ * they run from 20 ms to over a second, and a per-frame count lets the fast
+ * stretches outvote the slow ones. `windows` and `bad` are kept as plain counts
+ * because they say how much was looked at, but nothing is gated on them.
+ *
+ * THE FAR END OF A WINDOW IS THE SPAN, not the last sample before it. Read at
+ * the sample, a coarse trace measured 0.6 s of walking against a one-second bar
+ * — and the ground covered and the path walked are both interpolated there, so
+ * the same second of game is judged the same whether it arrived in six frames or
+ * sixty. A trace whose samples are sparser than the span is judged to its end;
+ * only the last `span` of any trace is left alone, because no window fits in it.
  *
  * @param {ReadonlyArray<ReadonlyArray<{clock:number,x:number,z:number,walked:number,nudges?:number}>>} tracks
  *   one sample array per child, one sample per frame.
  * @param {Partial<typeof CHILD_MOTION>} [cfg]
- * @returns {{windows:number,bad:number,share:number,worst:{path:number,out:number,child:number,clock:number}}}
+ * @returns {{windows:number,bad:number,seconds:number,badSeconds:number,share:number,worst:{path:number,out:number,child:number,clock:number}}}
  */
 export function shuffleWindows(tracks, cfg = {}) {
   const { span, minPath, circle } = { ...CHILD_MOTION, ...cfg }
   let windows = 0
   let bad = 0
+  let seconds = 0
+  let badSeconds = 0
   const worst = { path: 0, out: 0, child: -1, clock: 0 }
   for (let k = 0; k < tracks.length; k++) {
     const track = tracks[k]
+    if (track.length < 2) continue
     const ground = groundPath(track)
-    for (let i = 0; i < track.length; i++) {
-      let j = i
-      let out = 0
-      while (j < track.length - 1 && track[j + 1].clock - track[i].clock < span) {
-        j++
-        out = Math.max(out, Math.hypot(ground.x[j] - ground.x[i], ground.z[j] - ground.z[i]))
+    const last = track.length - 1
+    // `j` walks forward with `i` — the windows only ever move to the right, so
+    // the far end is never searched from the beginning again.
+    let j = 0
+    for (let i = 0; i < last; i++) {
+      const stop = track[i].clock + span
+      // The trace's last `span` holds no whole window, and no later start does
+      // either. Note what this is NOT: it is not "the samples are too far apart
+      // to fill a window", which used to end the walk over a sparsely sampled
+      // trace at its first window and throw the rest of it away.
+      if (track[last].clock < stop) break
+      if (j < i) j = i
+      while (track[j + 1].clock < stop) j++
+      // The far end, interpolated AT the span between the two samples that
+      // bracket it. Across a rescue frame the ground path stands still, so the
+      // interpolation stands still with it.
+      const gap = track[j + 1].clock - track[j].clock
+      const f = gap > 0 ? Math.min(1, Math.max(0, (stop - track[j].clock) / gap)) : 0
+      const ex = ground.x[j] + (ground.x[j + 1] - ground.x[j]) * f
+      const ez = ground.z[j] + (ground.z[j + 1] - ground.z[j]) * f
+      let out = Math.hypot(ex - ground.x[i], ez - ground.z[i])
+      for (let m = i + 1; m <= j; m++) {
+        out = Math.max(out, Math.hypot(ground.x[m] - ground.x[i], ground.z[m] - ground.z[i]))
       }
-      // The tail of the trace is shorter than one window: nothing to judge.
-      if (track[j].clock - track[i].clock < span * 0.9) break
       // The game's OWN walked distance, which is cumulative — a difference, not
       // a sum, and the rescue teleport is not in it.
-      const walked = track[j].walked - track[i].walked
+      const walked = track[j].walked + (track[j + 1].walked - track[j].walked) * f - track[i].walked
+      const weight = Math.max(0, track[i + 1].clock - track[i].clock)
       windows++
+      seconds += weight
       if (walked > minPath && out < circle) {
         bad++
+        badSeconds += weight
         if (walked / Math.max(0.01, out) > worst.path / Math.max(0.01, worst.out)) {
           worst.path = walked
           worst.out = out
@@ -154,7 +222,7 @@ export function shuffleWindows(tracks, cfg = {}) {
       }
     }
   }
-  return { windows, bad, share: windows > 0 ? bad / windows : 0, worst }
+  return { windows, bad, seconds, badSeconds, share: seconds > 0 ? badSeconds / seconds : 0, worst }
 }
 
 /**
