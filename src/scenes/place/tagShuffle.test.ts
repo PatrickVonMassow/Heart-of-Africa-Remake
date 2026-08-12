@@ -674,9 +674,11 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
  * the deflection needs a couple of body radii of clear ground ahead before it
  * will take a step at all — and no room to get anywhere, and the settlement
  * carries it 3 m clear whenever its stall watch runs out. Measured over 40 s at
- * these numbers: 22.5 rescues per child-minute, every one of them carrying the
- * child, and 1.94 % of the judged game time walked without getting anywhere —
- * nearly eight times the gate. Two fifths of that trace is not judged at all,
+ * these numbers (re-measured after the point-657 cornered evade, which changes
+ * how the penned child paces its yard but not that it is trapped): 28.5
+ * rescues per child-minute, every one of them carrying the child, and 7.4 % of
+ * the judged game time walked without getting anywhere — thirty times the
+ * gate. Half of that trace is not judged at all,
  * because a window that spans a carry is refused rather than guessed at; the
  * carries are what the rescue gate answers for. THE MEASURE THIS ONE REPLACED
  * sees 0.35 % of the same trace and would have passed it at its own 1 % gate,
@@ -761,23 +763,23 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     // settlement changes, only how often it was looked at.
     //
     // WHAT IS PINNED HERE IS THE VERDICT, NOT THE NUMBER, and the difference is
-    // deliberate. This child is CARRIED every two and a half seconds, and a
+    // deliberate. This child is CARRIED every two seconds, and a
     // window that spans a carry is refused rather than guessed at — so only
-    // three fifths of the trace can be judged at all (measured judgedShare
-    // 0.58-0.60 at every cadence), and what survives is a scatter of short
+    // half of the trace can be judged at all (measured judgedShare
+    // 0.478-0.507 across the cadences, re-measured after the point-657
+    // cornered evade), and what survives is a scatter of short
     // continuous stretches whose share swings with which of them a cadence
-    // happens to sample: 1.94 / 1.69 / 2.29 / 3.24 / 2.49 %. The one thing that
-    // does NOT swing is the answer the gate reads — every cadence is RED by a
-    // factor of at least six — and the rescue rate below, which counts the very
-    // carries that made the trace unjudgeable, is red by a factor of three at
-    // all of them. A rescue-free minute of ordinary play holds its share to
-    // 9.5 % (the crowded case in the first block); this is the worst case the
+    // happens to sample: 7.40 / 8.10 / 10.34 / 10.37 / 10.03 %. The one thing
+    // that does NOT swing is the answer the gate reads — every cadence is RED
+    // by a factor of at least twenty-nine — and the rescue rate below, which
+    // counts the very carries that made the trace unjudgeable, is red by a
+    // factor of four at all of them. This is the worst case the
     // metric has, and it is stated rather than smoothed over.
     const penned = [wedged()[0]]
     const read = CADENCES.map(([, step]) => shuffleWindows(resample(penned, step, 31337)))
     for (const r of read) {
       expect(r.share).toBeGreaterThan(CHILD_MOTION.shareGate * 6)
-      expect(r.judgedShare).toBeGreaterThan(0.5)
+      expect(r.judgedShare).toBeGreaterThan(0.4)
     }
     for (const [, step] of CADENCES) {
       expect(rescueRate(resample(penned, step, 31337)).perChildMinute).toBeGreaterThan(

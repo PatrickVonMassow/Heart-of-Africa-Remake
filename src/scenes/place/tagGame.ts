@@ -23,7 +23,7 @@
 // frame at a debug-raised sprint speed would otherwise land cleanly on the far
 // side of a fence panel, overlapping nothing.
 
-import { deflectedStep } from '../travel/wildlifeBehavior'
+import { deflectedStep, escapeCorridorHeading } from '../travel/wildlifeBehavior'
 import {
   createProducerWatch,
   devAssert,
@@ -193,6 +193,26 @@ export interface TagChild {
    * nothing here; one that really moved it adds exactly what it moved it.
    */
   carried: number
+  /**
+   * THE WAY OUT OF A DEAD END (point 657): the escape heading an evader whose
+   * flee dead-ends has committed to, or NaN while none is held. The flee
+   * heading knows only where the chaser is, not where the ground goes — so at
+   * the reported seed a whole group of runners fled INTO the converging slot
+   * between a rim-straddling hut and the play-ground rim, compressed there and
+   * paced (measured live: 1.3-2.9 m walked for 0.00 m gained, run after run at
+   * the same spot). An evader whose flee is shut for a real distance ahead now
+   * picks the longest OPEN corridor instead (the point-188 chooser the hunted
+   * calf already flees by), and STICKS to it until it stands a real distance
+   * clear of the corner — dropping it the moment the flee reads open again was
+   * measured to walk the child straight back in, pocket-mouth pacing in a
+   * tight loop.
+   */
+  corridor: number
+  /** Where that escape was triggered: the corner being left behind. The
+   *  commitment ends by DISTANCE from here, so the escape cannot be talked out
+   *  of one step outside the pocket's mouth. */
+  cornerX: number
+  cornerZ: number
   /** Which way round the obstacle in front of it this child is going: +1 for
    *  the turns that add to its heading, −1 for the ones that subtract, 0 while
    *  nothing is in the way. See `TagConfig.edgeSeconds`. */
@@ -348,6 +368,9 @@ export function createTagGame(
       pinned: 0,
       nudges: 0,
       carried: 0,
+      corridor: NaN,
+      cornerX: 0,
+      cornerZ: 0,
       edgeSide: 0,
       edgeFor: 0,
       anchorX: p.x,
@@ -483,6 +506,9 @@ function breakOffRound(s: TagState, cfg: TagConfig): void {
     // had run up against belongs to the round that just ended (point 656). Kept,
     // it would teleport a child on the first blocked frame of the NEXT one.
     c.pinned = 0
+    // And nobody flees between rounds: a held escape way belongs to the chase
+    // that needed it (point 657).
+    c.corridor = NaN
   }
 }
 
@@ -545,6 +571,27 @@ function wayOpen(
 const PROGRESS_AWAY = 3
 
 /**
+ * When an evader counts as CORNERED, as a fraction of the unstuck window
+ * (point 657): covering no ground for this long while the flee is shut ahead
+ * is a pocket being paced, not a chase. It must sit BELOW the ~0.78 s a
+ * healthy child needs to walk the progress distance at the floor pace (so the
+ * escape starts before a one-second window can fill with pacing), yet high
+ * enough that ordinary cornering — a runner turning at the rim — resets the
+ * anchor first. 0.4 of the shipped 1.5 s window is 0.6 s.
+ */
+const CORNERED_FRACTION = 0.4
+
+/** The escape pick's probe: stride and count (metres of reach), and how much
+ *  the flee-ward bias is worth in clear metres. The reach spans the biggest
+ *  play ground, and the bias is a QUARTER of it — a tie-break between two real
+ *  ways out, never a match for one: at a third (weight 3 of reach 9) a two-
+ *  metre stub toward the flee outscored the true way out of the reported
+ *  pocket, and the child locked onto the stub. */
+const ESCAPE_STEP = 0.75
+const ESCAPE_STEPS = 12
+const ESCAPE_FLEE_WEIGHT = 2.25
+
+/**
  * THE ESCAPE, AND THE FINDING IT LEAVES BEHIND (point 656). Both stall watches
  * end here — the one for a child that cannot move at all and the one for a child
  * that walks without getting anywhere — so the settlement picks it up in exactly
@@ -573,6 +620,9 @@ function escapeNudge(c: TagChild, world: TagWorld): void {
   // even offer it a way out is the worse finding of the two.
   c.nudges++
   c.pinned = 0
+  // The child stands somewhere else now: an escape way held where it WAS would
+  // steer it by ground it is no longer in (point 657).
+  c.corridor = NaN
   c.anchorX = c.x
   c.anchorZ = c.z
   c.anchorFor = 0
@@ -903,6 +953,12 @@ function advanceTagGame(
     const c = s.children[i]
     const walkedBefore = c.walked
     const isChaser = i === s.chaser
+    // The tag pair steers freely at one another; everyone else's body is ground
+    // to walk round (point 657). For the chaser the partner is its quarry, for
+    // the quarry its chaser — treating those as walls would hold the catch at
+    // arm's length for ever.
+    const partner = isChaser ? s.target : i === s.target ? s.chaser : -1
+    const occAt = occ && ((x: number, z: number) => occ(i, partner, x, z))
     let wants: boolean
     let desired: number
     if (isChaser) {
@@ -918,6 +974,26 @@ function advanceTagGame(
           cfg.commitDistance,
         )
       desired = target ? headingToward(c.x, c.z, target.x, target.z, c.heading) : c.heading
+      // A CHASER THAT MAY NOT CATCH DOES NOT PRESS (point 657). While the
+      // tag-back window runs, the catch is forbidden — but the chaser still
+      // aimed at its quarry, so one that was already AT it walked into the
+      // body at the floor pace for the whole window: 1.4 s × 1.29 m/s of legs
+      // pumping against the separation with no ground covered, a guaranteed
+      // red window (measured at both reported seeds, every frozen pair in the
+      // traces was this). Where it is that close it ORBITS the quarry instead
+      // — real ground covered, visibly circling for the tag it is owed — and
+      // presses again the moment the window ends.
+      if (target && s.immuneFor > 0 && gap < cfg.catchDistance + world.childRadius * 2) {
+        const to = headingToward(c.x, c.z, target.x, target.z, c.heading)
+        const side = Math.sin(c.heading - to) >= 0 ? 1 : -1
+        // A quarter-turn off the line to the quarry orbits it; inside the
+        // catch ring the turn opens a little further, so the circle drifts
+        // outward instead of grinding along the body.
+        desired = to + side * (Math.PI / 2 + (gap < cfg.catchDistance ? 0.35 : 0))
+      }
+      // The round belongs to the chaser: it aims at its quarry and holds no
+      // escape way of its own.
+      c.corridor = NaN
     } else {
       const gapToChaser = dist(c, chaser)
       wants = runnerPresses(gapToChaser, cfg.pressureDistance)
@@ -949,6 +1025,62 @@ function advanceTagGame(
         : Math.hypot(c.x - cx, c.z - cz) > cfg.pressureDistance
           ? headingToward(c.x, c.z, cx, cz, c.heading)
           : c.heading
+      // A CORNERED EVADER COMMITS TO LEAVING (point 657, and see
+      // `TagChild.corridor`). The trigger is the SYMPTOM, not the geometry
+      // alone: an evader that has covered no real ground for a while
+      // (`anchorFor`, the same watch the rescue reads) AND whose flee is shut
+      // for a real distance ahead is pacing a pocket. It then escapes along
+      // the longest OPEN corridor — the point-188 chooser the hunted calf
+      // flees by, clear distance dominant so a short stub toward the flee can
+      // never outscore the real way out — and holds that commitment until it
+      // stands a full opening-distance clear of the corner. Three softer
+      // shapes were measured and rejected: overriding every shut flee turned
+      // the whole rim into escape runs (maasai worst child 1.11 % against the
+      // 0.25 % gate), judging with the moving bodies flipped healthy runners
+      // into escape mode every few frames (0.47 %), and releasing as soon as
+      // the flee read open walked the child straight back into the pocket
+      // (bambara 0.87 %). The judgments read the STATIC world only: a dead
+      // end is geometry, bodies stay the separation pass's business.
+      if (c.evading) {
+        if (Number.isFinite(c.corridor)) {
+          if (Math.hypot(c.x - c.cornerX, c.z - c.cornerZ) >= world.childRadius * OPEN_AHEAD) {
+            c.corridor = NaN
+          } else {
+            if (!wayOpen(c, c.corridor, world, world.blocked)) {
+              c.corridor = escapeCorridorHeading(
+                c.x,
+                c.z,
+                desired,
+                world.blocked,
+                ESCAPE_STEP,
+                ESCAPE_STEPS,
+                16,
+                ESCAPE_FLEE_WEIGHT,
+              )
+            }
+            desired = c.corridor
+          }
+        } else if (
+          c.anchorFor >= cfg.unstuckSeconds * CORNERED_FRACTION &&
+          !wayOpen(c, desired, world, world.blocked)
+        ) {
+          c.cornerX = c.x
+          c.cornerZ = c.z
+          c.corridor = escapeCorridorHeading(
+            c.x,
+            c.z,
+            desired,
+            world.blocked,
+            ESCAPE_STEP,
+            ESCAPE_STEPS,
+            16,
+            ESCAPE_FLEE_WEIGHT,
+          )
+          desired = c.corridor
+        }
+      } else {
+        c.corridor = NaN
+      }
     }
     // What was SAID overrides where the chase would go — for a runner only, and
     // only for the moment the action lasts (point 481). THE FLOOR IS THE CHASE'S
@@ -960,7 +1092,12 @@ function advanceTagGame(
     // turned it a quarter every frame: the child spun on the spot instead of
     // standing (measured at the user's seed, 3930 of 3931 commanded-still frames).
     const claim = isChaser ? null : (steer?.(i, s) ?? null)
-    if (claim) desired = claim.heading
+    if (claim) {
+      desired = claim.heading
+      // What was said overrides the chase, and with it any escape way the
+      // chase was holding — stale by the time the claim lets go.
+      c.corridor = NaN
+    }
     c.sprinting = wants
     c.press = pressState(c.press, c.reserve, cfg)
     c.effort = chooseEffort(c.press, wants)
@@ -969,16 +1106,10 @@ function advanceTagGame(
       : Math.max(floor, effortPace(c.effort, c.reserve, cfg, isChaser ? 'chaser' : 'runner'))
     c.held = !!claim && c.pace <= 0
     ageEdge(c, dt)
-    // The tag pair steers freely at one another; everyone else's body is ground
-    // to walk round (point 657). For the chaser the partner is its quarry, for
-    // the quarry its chaser — treating those as walls would hold the catch at
-    // arm's length for ever.
-    const partner = isChaser ? s.target : i === s.target ? s.chaser : -1
     // A commanded stillness moves nothing — and leaves `pinned` and `walked`
     // alone, so a standing child is never mistaken for one stuck on geometry and
     // its legs stay still.
-    if (c.pace > 0)
-      moveChild(c, desired, c.pace * dt, dt, cfg, world, occ && ((x, z) => occ(i, partner, x, z)))
+    if (c.pace > 0) moveChild(c, desired, c.pace * dt, dt, cfg, world, occAt)
     trackProgress(c, dt, cfg, world)
     // Whatever its legs did this frame, they did it while the round was on.
     c.walkedWhilePlaying += c.walked - walkedBefore
