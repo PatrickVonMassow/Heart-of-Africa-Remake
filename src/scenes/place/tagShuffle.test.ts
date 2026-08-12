@@ -427,11 +427,12 @@ function expectLively(paths: Track[][]): void {
   expect(live.seconds).toBeGreaterThan(30)
   expect(live.walkedPerChildMinute).toBeGreaterThan(20)
   // THE SAME CONDITION THE LIVE GATE USES, from the same place (point 656): the
-  // group played a majority of the game CLOCK, and every child walked — one
-  // motionless child among three busy ones is invisible in a sum and scores
-  // perfectly on every ceiling there is. Measured here: the quietest child of
-  // each village walks 102-113 m in its own minute.
-  expect(live.quietestWalkedPerChildMinute).toBeGreaterThan(CHILD_MOTION.walkFloor)
+  // group played a majority of the game CLOCK, and every child walked WHILE it
+  // was played — one motionless child among three busy ones is invisible in a
+  // sum, and walking counted over the whole trace would take a group's warm-up
+  // for a game. Measured here: the quietest child of each village walks 102-113 m
+  // per minute of play.
+  expect(live.quietestWalkedPerPlayedMinute).toBeGreaterThan(CHILD_MOTION.walkFloor)
   expect(holdsAGame(live)).toBe(true)
 }
 

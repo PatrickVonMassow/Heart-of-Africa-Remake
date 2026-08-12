@@ -380,7 +380,7 @@ describe('a trace has to hold a game before it proves anything', () => {
     const statue = () => trace(3600, () => ({ x: 0, z: 0 })).map((s) => ({ ...s, playing: true }))
     const live = traceLiveness([walker(), walker(), walker(), statue()])
     expect(live.walkedPerChildMinute).toBeGreaterThan(CHILD_MOTION.walkFloor) // the group looks busy
-    expect(live.quietestWalkedPerChildMinute).toBe(0) // and one of them never moved
+    expect(live.quietestWalkedPerPlayedMinute).toBe(0) // and one of them never moved
     expect(live.quietestChild).toBe(3)
     expect(live.perChild[0].walkedPerMinute).toBeCloseTo(90, 0)
     expect(holdsAGame(live)).toBe(false) // and the live gate refuses the group
@@ -402,6 +402,43 @@ describe('a trace has to hold a game before it proves anything', () => {
     const walker = () =>
       trace(420, (i) => ({ x: i * DT * 1.5, z: 0 })).map((s) => ({ ...s, playing: true }))
     expect(holdsAGame(traceLiveness([walker(), walker(), walker(), walker()]))).toBe(true)
+  })
+
+  it('and demands the walking happen WHILE the game is played', () => {
+    // SOL'S DISJOINT TRACE (fifth cross-vendor review). Two children walk thirty
+    // metres during a twenty-nine-second stretch that is NOT play, then stand
+    // perfectly still through thirty-one seconds that are. Walking and playing
+    // were counted over different parts of the trace, so both bars were
+    // satisfied at once — by a group that never took a step while the game was
+    // on.
+    const disjoint = (walkBeforeTheRound) => {
+      const t = []
+      let walked = 0
+      let x = 0
+      for (let i = 0; i < 3600; i++) {
+        const clock = i * DT
+        const playing = clock >= 29
+        // The walking happens in the stretch this trace puts it in.
+        if (playing !== walkBeforeTheRound) {
+          walked += 1.5 * DT
+          x += 1.5 * DT
+        }
+        t.push({ clock, x, z: 0, walked, carried: 0, nudges: 0, playing })
+      }
+      return t
+    }
+    const before = disjoint(true) // walks only BEFORE the round starts
+    const during = disjoint(false) // walks only WHILE it is played
+    const idleGame = traceLiveness([before, before])
+    expect(idleGame.playedShare).toBeGreaterThan(CHILD_MOTION.playedGate) // it says it played
+    expect(idleGame.walkedPerChildMinute).toBeGreaterThan(CHILD_MOTION.walkFloor) // and it walked
+    expect(idleGame.perChild[0].walked).toBeGreaterThan(40) // really walked, over the trace
+    expect(idleGame.quietestWalkedPerPlayedMinute).toBe(0) // but not one step of it in play
+    expect(holdsAGame(idleGame)).toBe(false)
+    // The same trace with the walking inside the played stretch is a game.
+    const played = traceLiveness([during, during])
+    expect(played.quietestWalkedPerPlayedMinute).toBeGreaterThan(CHILD_MOTION.walkFloor)
+    expect(holdsAGame(played)).toBe(true)
   })
 
   it('and it reads the played share off the CLOCK, not the frame count', () => {

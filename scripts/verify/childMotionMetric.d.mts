@@ -19,8 +19,13 @@ export interface ChildMotionSample {
 
 export interface ChildLiveness {
   seconds: number
+  /** Of those seconds, the ones the group spent playing. */
+  playedSeconds: number
   walked: number
+  /** Of those metres, the ones walked while the game was on. */
+  walkedWhilePlaying: number
   walkedPerMinute: number
+  walkedPerPlayedMinute: number
 }
 
 export interface TraceLiveness {
@@ -36,9 +41,10 @@ export interface TraceLiveness {
   walked: number
   walkedPerChildMinute: number
   perChild: ChildLiveness[]
-  /** The LEAST-walking child's own metres per minute — the floor the callers
-   *  gate on, because a sum hides a child that never moved. */
-  quietestWalkedPerChildMinute: number
+  /** The LEAST-walking child's metres per minute OF PLAY — the floor the callers
+   *  gate on, because a sum hides a child that never moved and a whole-trace
+   *  average hides a group that did its walking before the round began. */
+  quietestWalkedPerPlayedMinute: number
   quietestChild: number
 }
 

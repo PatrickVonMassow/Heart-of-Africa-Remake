@@ -3434,7 +3434,8 @@ if (section('children-motion')) {
       holdsAGame(live),
       `${live.playedSeconds.toFixed(1)}s of ${live.seconds.toFixed(1)}s played ` +
         `(${(live.playedShare * 100).toFixed(0)} %), quietest child ${live.quietestChild} walked ` +
-        `${live.quietestWalkedPerChildMinute.toFixed(1)} m/min (floor ${CHILD_MOTION.walkFloor}), ` +
+        `${live.quietestWalkedPerPlayedMinute.toFixed(1)} m per played minute ` +
+        `(floor ${CHILD_MOTION.walkFloor}), ` +
         `group ${live.walkedPerChildMinute.toFixed(1)} m/child-min`,
     )
 
