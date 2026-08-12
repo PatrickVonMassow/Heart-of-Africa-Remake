@@ -68,6 +68,11 @@ export const READ_GAP_MS = 600
 export const READ_GAP_FRAMES = 12
 export const STREAK_LINGER_MS = 700
 
+/** The gap gives up after this many frames, so a scene that stops drawing
+ *  cannot hang the suite in it. Generous against the 12 it normally waits: it is
+ *  a net, not a schedule. */
+export const READ_GAP_FRAME_CAP = 600
+
 /** How many consecutive reads one streak can reach, at that spacing. */
 export function maxContaminatedReads(lingerMs = STREAK_LINGER_MS, gapMs = READ_GAP_MS) {
   if (!(gapMs > 0)) return Infinity
@@ -132,10 +137,24 @@ export function trimmedMean(samples, dropBrightest = SETTLE_DROP_BRIGHTEST) {
   return sum / keep
 }
 
-/** The SETTLE reading of one crop, whose job is to say whether the picture has
- *  stopped moving. A rain streak must not end that loop early and must not
- *  restart it forever; a band leak arriving in part of the crop MUST hold it
- *  open, which is what a spatial median here would not do. */
+/**
+ * The SETTLE reading of one crop, whose job is to say whether the picture has
+ * stopped moving. A rain streak must not end that loop early and must not
+ * restart it forever; a band leak arriving in part of the crop MUST hold it
+ * open, which is what a spatial median here would not do.
+ *
+ * THE TRIM IS ONE-SIDED ON PURPOSE. Trimming both ends would be symmetric and
+ * would put the blindness straight back: a leak DARKENS the crop, so the darkest
+ * pixels are the defect and a low-end trim would drop exactly them. The bright
+ * end is where the rain is and the dark end is where the defect is, so only the
+ * bright end goes.
+ *
+ * What that costs is bounded and covered elsewhere: a defect that BRIGHTENS a
+ * fifth of the crop or less can hide from this reading — but not from the
+ * measurement, which is a plain mean and reads both directions, against a bar
+ * (`|1 - outside| < 0.025`) that is likewise two-sided. The settle loop can be a
+ * few frames early on such a defect; the check still reports it.
+ */
 export function settleReading(samples) {
   return trimmedMean(samples)
 }

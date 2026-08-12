@@ -14,7 +14,7 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
-import { READ_COUNT, READ_GAP_FRAMES, READ_GAP_MS, luminanceSamples, settleReading, shotReading } from './cropLuma.mjs'
+import { READ_COUNT, READ_GAP_FRAMES, READ_GAP_FRAME_CAP, READ_GAP_MS, luminanceSamples, settleReading, shotReading } from './cropLuma.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -2690,14 +2690,20 @@ if (section('settlement-edge')) {
    *  clock, which is the clock the rain falls on, not a sleep in the harness. */
   const readGap = (ms = READ_GAP_MS, frames = READ_GAP_FRAMES) =>
     page.evaluate(
-      ([wait, n]) =>
+      ([wait, n, cap]) =>
         new Promise((res) => {
           const t0 = performance.now()
           let i = 0
-          const step = () => (++i >= n && performance.now() - t0 >= wait ? res() : requestAnimationFrame(step))
+          const step = () => {
+            // BOUNDED, so a scene that stops drawing cannot hang the suite here:
+            // the gap gives up after `cap` frames and the reads are then merely
+            // closer together than intended, which the reading survives.
+            if ((++i >= n && performance.now() - t0 >= wait) || i >= cap) return res()
+            requestAnimationFrame(step)
+          }
           requestAnimationFrame(step)
         }),
-      [ms, frames],
+      [ms, frames, READ_GAP_FRAME_CAP],
     )
 
   const enterFor = async (id) => {

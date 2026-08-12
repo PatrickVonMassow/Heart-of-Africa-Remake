@@ -247,6 +247,35 @@ describe('shotReading — the repaired statistic', () => {
     expect(1 - inside).toBeGreaterThan(0.04)
   })
 
+  it('is unmoved by the pixels a burst of streaks can still contaminate', () => {
+    // The residual the bound does not cover: several SEPARATE streaks can hit
+    // one pixel in three of the five reads. That is a per-pixel event, and the
+    // reading is a mean over 6900 of them — so the question is not whether a
+    // pixel survives contaminated but what a share of them does to the number.
+    // A pixel needs THREE of the five, so it needs two separate streaks inside
+    // the 2.4 s a shot spans, both across that pixel: at the measured rate of
+    // ~11 crossings in 150 s that is ~1.4 % of shots, and the streak is 9 % of
+    // the crop's width, so ~0.13 % of pixels. Half a percent is four times that
+    // and moves the reading 0.6 %, a quarter of the bar.
+    const c = clean()
+    const contaminate = (share) => {
+      const reads = [0, 1, 2, 3, 4].map(() => Float64Array.from(c))
+      const every = Math.round(1 / share)
+      for (let i = 0; i < c.length; i += every) {
+        for (const r of [reads[0], reads[1], reads[2]]) r[i] = 227 // three of five: it survives
+      }
+      return shotReading(reads)
+    }
+    const clean5 = shotReading([c, c, c, c, c])
+    expect(Math.abs(contaminate(0.005) / clean5 - 1)).toBeLessThan(0.01)
+    // AND WHERE IT WOULD STOP HOLDING, recorded rather than left to be found:
+    // the residual reaches the bar at about 2 % of the crop's pixels, fifteen
+    // times the expected share. A browser run that ever reddens here should be
+    // measured against this number first.
+    expect(Math.abs(contaminate(0.02) / clean5 - 1)).toBeLessThan(OUTSIDE_BAR)
+    expect(Math.abs(contaminate(0.03) / clean5 - 1)).toBeGreaterThan(OUTSIDE_BAR)
+  })
+
   it('reads back null rather than a number when the reads cannot be combined', () => {
     expect(shotReading([])).toBeNull()
     expect(shotReading(null)).toBeNull()
@@ -274,6 +303,19 @@ describe('settleReading — when the crop has stopped moving', () => {
     const leaked = samples(withLeak(groundAt(1), 8))
     expect(1 - settleReading(leaked) / settleReading(c)).toBeGreaterThan(0.025)
     expect(spatialMedian(leaked) / spatialMedian(c)).toBeCloseTo(1, 4)
+  })
+
+  it('is blind to a BRIGHTENING defect, which the measurement then still reports', () => {
+    // The bounded cost of the one-sided trim, named and pinned rather than left
+    // to be discovered: a defect that brightens a fifth of the crop or less can
+    // hide from the settle reading. It cannot hide from the check, whose bar is
+    // two-sided — so the loop may read a few frames early and the red still
+    // comes out.
+    const c = clean()
+    const brightened = samples((x, y) => (y >= HEIGHT - 8 ? groundAt(1)(x, y) * 1.18 : groundAt(1)(x, y)))
+    expect(Math.abs(settleReading(brightened) / settleReading(c) - 1)).toBeLessThan(0.005) // hidden here
+    const seen = shotReading([brightened, brightened, brightened, brightened, brightened]) / shotReading([c, c, c, c, c])
+    expect(seen - 1).toBeGreaterThan(OUTSIDE_BAR) // and reported there
   })
 
   it('trims the bright end only, so it cannot be a MEASUREMENT of the band', () => {
