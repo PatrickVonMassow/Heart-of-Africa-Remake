@@ -1469,3 +1469,115 @@ describe('the play ground is a disc of its own (point 481.4)', () => {
     expect(s.tags).toBeGreaterThan(0)
   })
 })
+
+describe('the rescue is a finding, not an escape (point 656)', () => {
+  /** A world whose only free ground is a small island — everything else is
+   *  refused, and a rescue sets the child down at a known free spot. */
+  function island(radius: number, cx = 0, cz = 0, escape: [number, number] = [12, 12]): TagWorld {
+    return {
+      radius: RADIUS,
+      childRadius: CHILD_R,
+      // The island, and the open ground a rescue sets the child down on — so a
+      // freed child is really free and does not simply stall again where it
+      // landed.
+      blocked: (x, z) =>
+        Math.hypot(x - cx, z - cz) > radius && Math.hypot(x - escape[0], z - escape[1]) > 4,
+      nudge: () => ({ x: escape[0], z: escape[1], found: true }),
+    }
+  }
+
+  it('counts the teleport that frees a child which cannot move at all', () => {
+    // The island is narrower than one probe, so every direction reads shut and
+    // the child stands: the stall watch of the MOVE is the one that fires.
+    const world = island(0.05)
+    const s = game([
+      [0, 0],
+      [0.02, 0.01],
+    ])
+    run(s, 1.4, world, CFG)
+    expect(s.children[0].nudges).toBe(0) // still inside its window
+    expect(s.children[0].pinned).toBeGreaterThan(1.2)
+    run(s, 0.3, world, CFG)
+    // Freed exactly ONCE, though both watches were running out together: the
+    // rescue re-takes the anchor, so the frame that picked the child up cannot
+    // be charged a second time by the progress watch a few lines later.
+    expect(s.children[0].nudges).toBe(1)
+    // Set down on the open ground and walking again from there.
+    expect(Math.hypot(s.children[0].x - 12, s.children[0].z - 12)).toBeLessThan(2)
+    expect(s.children[0].pinned).toBe(0)
+  })
+
+  it('and records HOW FAR it carried it, which nothing outside could work out', () => {
+    // The counter the checks read (point 656). A watcher outside sees one vector
+    // per frame with the child's walking and the settlement's correction added
+    // together, and `walked` is a scalar that cannot say which way the legs
+    // went — so the distance is taken HERE, at the teleport, where it is known.
+    const world = island(0.05)
+    const s = game([
+      [0, 0],
+      [0.02, 0.01],
+    ])
+    const c = s.children[0]
+    expect(c.carried).toBe(0)
+    let before = { x: c.x, z: c.z }
+    for (let i = 0; i < 240 && c.nudges === 0; i++) {
+      before = { x: c.x, z: c.z }
+      stepTagGame(s, 1 / 60, CFG, world)
+    }
+    expect(c.nudges).toBe(1)
+    // On this island the child is blocked on every probe, so the frame that
+    // freed it moved it by the teleport and by nothing else.
+    expect(c.carried).toBeCloseTo(Math.hypot(c.x - before.x, c.z - before.z), 6)
+    expect(c.carried).toBeGreaterThan(10) // it really was carried, to open ground
+    expect(c.walked).toBe(0) // and not a centimetre of it counts as walking
+  })
+
+  it('counts the teleport that frees a child which walks without getting anywhere', () => {
+    // The reported symptom itself: a child at a full walking pace whose heading
+    // is turned right round every quarter second, so it paces a few centimetres
+    // to and fro on open ground. Nothing blocks it — `pinned` never moves — and
+    // the PROGRESS watch is the only one that can see it.
+    // A lone child, so the group idles and the claim is the only thing steering
+    // it: the role can never move to the child under test half way through.
+    const s = game([[0, 0]])
+    const steer: TagSteer = (_i, st) => ({
+      heading: Math.floor(st.clock * 4) % 2 === 0 ? 0 : Math.PI,
+      pace: 1.5,
+    })
+    run(s, 4, OPEN, CFG, 1 / 60, undefined, steer)
+    const c = s.children[0]
+    expect(c.pinned).toBe(0) // never blocked by anything
+    expect(c.walked).toBeGreaterThan(4) // and walking the whole time
+    expect(c.nudges).toBeGreaterThanOrEqual(2) // rescued once per window
+  })
+
+  it('a child told to stand loses the stall it walked in with', () => {
+    // A stale count from BEFORE a hold would fire a teleport on the first
+    // blocked frame after it, on a child that had just been asked to stand.
+    const s = game([
+      [0, 0],
+      [3, 0],
+    ])
+    stepTagGame(s, 1 / 60, CFG, OPEN)
+    const still = s.children.findIndex((_, i) => i !== s.chaser)
+    s.children[still].pinned = CFG.unstuckSeconds * 0.99
+    const hold: TagSteer = (i) => (i === still ? { heading: 0, pace: 0 } : null)
+    stepTagGame(s, 1 / 60, CFG, OPEN, hold)
+    expect(s.children[still].held).toBe(true)
+    expect(s.children[still].pinned).toBe(0)
+    expect(s.children[still].nudges).toBe(0)
+  })
+
+  it('and the round breaking off clears it for everyone', () => {
+    const s = game(FOUR)
+    run(s, 0.5)
+    for (const c of s.children) c.pinned = CFG.unstuckSeconds * 0.99
+    s.chaserFor = CFG.resolveCapSeconds
+    stepTagGame(s, 1 / 60, CFG, OPEN)
+    expect(s.playing).toBe(false)
+    for (const c of s.children) {
+      expect(c.pinned).toBe(0)
+      expect(c.nudges).toBe(0)
+    }
+  })
+})

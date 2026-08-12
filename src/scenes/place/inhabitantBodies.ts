@@ -65,6 +65,22 @@ export interface InhabitantBody {
   /** Seconds this body has been overlapping without being able to push free —
    *  the wedge timer point 578.3 bounds. */
   wedged: number
+  /**
+   * How often the wedge escape had to pick this body up (point 656 follow-up).
+   * The escape below is a TELEPORT, exactly like the chase's own rescue — and
+   * it was counted by nobody: a child freed this way jumped in the trace while
+   * its published `nudges` stood still, so the motion metric read the
+   * settlement's correction as the child walking out of its pocket — the
+   * precise blind spot point 656 closed for the other two rescue paths, open
+   * in a third. The owner of a traced figure DRAINS these into its own
+   * counters each frame (`absorbSeparation`); for the untraced rest they are
+   * simply never read.
+   */
+  nudges: number
+  /** And how far it was carried doing so, in metres, cumulative — taken where
+   *  the teleport happens, because nothing outside can tell a carry from a
+   *  walk in one frame vector. */
+  carried: number
 }
 
 /** The settlement's inhabitants, all kinds together. */
@@ -131,6 +147,8 @@ export function createBodies(
     active: true,
     fixed: options.fixed ?? false,
     wedged: 0,
+    nudges: 0,
+    carried: 0,
   }))
 }
 
@@ -270,9 +288,15 @@ function pushBody(
   if (wedgeDt > 0 && self.wedged >= cfg.wedgeSeconds && world.nudge) {
     const free = world.nudge(self.x, self.z)
     if (free.found) {
+      // How far the settlement moved it, recorded where it is known (point 656
+      // follow-up): the teleport must never read as the body's own motion.
+      self.carried += Math.hypot(free.x - self.x, free.z - self.z)
       self.x = free.x
       self.z = free.z
     }
+    // Counted whether or not free ground was found, like the chase's own
+    // escape: the body stood its whole window unable to move either way.
+    self.nudges++
     self.wedged = 0
   }
   return false
