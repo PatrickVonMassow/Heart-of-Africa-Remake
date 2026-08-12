@@ -3527,6 +3527,13 @@ if (section('children-motion')) {
     // settlement — real frame times, the speech, the bodies, the player standing
     // in it — behaves as the replay says.
     const shuffle = shuffleWindows(tracks)
+    // AND THE SHORT BURST BESIDE IT (point 656): the user's report was "die
+    // Kinder hängen KURZ fest", and a child that paces on the spot for six
+    // tenths of a second between spells of walking never collects the metre of
+    // walking a one-second window asks for. The same windows over half a second,
+    // with the ground bar a ratio of the distance walked. Both verdicts are ONE
+    // check, because they are one question asked at two scales.
+    const burst = shuffleWindows(tracks, CHILD_MOTION.short)
     check(
       'no child walks without getting anywhere',
       // The bar is CHILD-SECONDS of game, not a count of frames: this trace is
@@ -3543,13 +3550,17 @@ if (section('children-motion')) {
       // average clean, which is the whole of it divided by four.
       shuffle.seconds > 20 &&
         shuffle.leastJudged > CHILD_MOTION.judgedGate &&
-        shuffle.worstShare < CHILD_MOTION.shareGate,
+        shuffle.worstShare < CHILD_MOTION.shareGate &&
+        burst.worstShare < CHILD_MOTION.shareGate,
       `worst child ${shuffle.worstShareChild} at ${(shuffle.worstShare * 100).toFixed(2)} % of its own ` +
         `judged time; group ${(shuffle.share * 100).toFixed(2)} % (${shuffle.bad} of ${shuffle.windows} ` +
         `${CHILD_MOTION.span}s windows, ${shuffle.seconds.toFixed(1)} judged child-seconds). ` +
         `Least judgeable child ${shuffle.leastJudgedChild} at ${(shuffle.leastJudged * 100).toFixed(1)} %, ` +
         `group ${(shuffle.judgedShare * 100).toFixed(1)} % of ${shuffle.covered.toFixed(1)} traced. ` +
-        `Bad = over ${CHILD_MOTION.minPath} m walked inside ${CHILD_MOTION.circle} m` +
+        `In ${CHILD_MOTION.short.span}s bursts: worst child ${burst.worstShareChild} at ` +
+        `${(burst.worstShare * 100).toFixed(2)} %, group ${(burst.share * 100).toFixed(2)} %. ` +
+        `Bad = over ${CHILD_MOTION.minPath} m walked inside ${CHILD_MOTION.circle} m ` +
+        `(burst: over ${CHILD_MOTION.short.minPath} m walked for a ${CHILD_MOTION.short.ratio}th of it covered)` +
         (shuffle.worst.child >= 0
           ? ` — worst child ${shuffle.worst.child} at ${shuffle.worst.clock.toFixed(1)}s, ${shuffle.worst.path.toFixed(2)} m walked inside ${shuffle.worst.out.toFixed(2)} m`
           : ''),

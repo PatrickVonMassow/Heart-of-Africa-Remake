@@ -143,6 +143,10 @@ export declare const CHILD_MOTION: {
   judgedGate: number
   walkFloor: number
   playedGate: number
+  ratio: number
+  /** The half-second companion measure: same windows, ground judged as a ratio
+   *  of the distance walked. */
+  short: { span: number; minPath: number; circle: number; ratio: number }
 }
 
 export declare function groundPath(

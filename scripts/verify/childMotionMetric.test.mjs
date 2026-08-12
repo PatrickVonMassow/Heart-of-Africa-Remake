@@ -422,6 +422,58 @@ describe('a trace has to hold a game before it proves anything', () => {
     expect(holdsAGame(traceLiveness([walker(), walker(), walker(), walker()]))).toBe(true)
   })
 
+  it('and the SHORT burst the one-second window cannot see', () => {
+    // SOL'S INTERMITTENT TRACE (sixth cross-vendor review), and it is the user's
+    // own report: "die Kinder hängen KURZ fest". Six tenths of a second pacing
+    // on the spot at a full walking pace, half a second standing, over and over.
+    // It walks 49 m per played minute, so the floor is satisfied; and no
+    // one-second window it lies in ever collects the metre of walking `minPath`
+    // asks for, so the long measure sees nothing at all. The half-second measure
+    // reads 18 % of the child's judged time.
+    const burst = (step) => {
+      const t = []
+      let walked = 0
+      let x = 0
+      for (let i = 0; i < 3600; i++) {
+        if (i % 66 < 36) {
+          const d = Math.floor(i / 6) % 2 === 0 ? step : -step
+          x += d
+          walked += Math.abs(d)
+        }
+        t.push({
+          clock: i * DT,
+          x,
+          z: 0,
+          walked,
+          walkedWhilePlaying: walked,
+          playedClock: i * DT,
+          carried: 0,
+          nudges: 0,
+          playing: true,
+        })
+      }
+      return t
+    }
+    const paced = burst(0.025) // a full walking pace
+    const live = traceLiveness([paced, paced])
+    expect(live.quietestWalkedPerPlayedMinute).toBeGreaterThan(CHILD_MOTION.walkFloor)
+    expect(holdsAGame(live)).toBe(true) // the legs moved, and the round was on
+    expect(shuffleWindows([paced]).worstShare).toBe(0) // the one-second window: nothing
+    const short = shuffleWindows([paced], CHILD_MOTION.short)
+    expect(short.worstShare).toBeGreaterThan(CHILD_MOTION.shareGate * 20)
+    // At the chase's own floor pace too, which is the slowest it can happen at.
+    expect(shuffleWindows([burst(0.0193)], CHILD_MOTION.short).worstShare).toBeGreaterThan(
+      CHILD_MOTION.shareGate * 20,
+    )
+    // AND ORDINARY WALKING IS NOT CAUGHT BY IT. A child walking its line, and
+    // one turning right round once inside the half second — the legitimate turn
+    // the ratio is calibrated to allow.
+    const straight = trace(3600, (i) => ({ x: i * DT * 1.5, z: 0 }))
+    const turning = trace(3600, (i) => ({ x: (Math.floor(i / 30) % 2 === 0 ? 1 : -1) * 0.4, z: 0 }))
+    expect(shuffleWindows([straight], CHILD_MOTION.short).worstShare).toBe(0)
+    expect(shuffleWindows([turning], CHILD_MOTION.short).worstShare).toBe(0)
+  })
+
   it('is a STATUE detector — the walking defect is caught by the share', () => {
     // WHAT THE FLOOR CANNOT DO, measured rather than assumed. A child pacing at
     // a full walking pace inside a fifth of a metre is the reported defect, and

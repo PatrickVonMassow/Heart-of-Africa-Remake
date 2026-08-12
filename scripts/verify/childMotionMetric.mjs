@@ -110,6 +110,10 @@ export const CHILD_MOTION = {
   minPath: 1,
   circle: 0.35,
   shareGate: 0.0025,
+  /** Ground covered may also be judged as a SHARE of the distance walked. Zero
+   *  means no such bar, which leaves the one-second measure on its circle alone,
+   *  exactly as it was calibrated. */
+  ratio: 0,
   carryGate: 2,
   rescueGate: 6,
   worstChildRescueGate: 12,
@@ -137,6 +141,36 @@ export const CHILD_MOTION = {
    * game was on?
    */
   walkFloor: 25,
+  /**
+   * THE SHORT BURST, which the one-second window cannot see (the sixth
+   * cross-vendor review, and it is the user's own words: "die Kinder hängen KURZ
+   * fest"). A child that paces on the spot for six tenths of a second and then
+   * stands for half a second walks 49 m per played minute — over the floor —
+   * while NO one-second window it lies in ever collects the 1 m of walking that
+   * `minPath` asks for. It is invisible to every bar above.
+   *
+   * So the same windows are judged a second time over half a second, with the
+   * ground bar as a RATIO of the distance walked rather than a fixed circle: a
+   * child may not walk five times as far as it gets. The ratio is what makes a
+   * short window judgeable at all — over half a second the honest distances are
+   * so small that any fixed circle either catches ordinary turns or nothing.
+   *
+   * MEASURED, worst child of each shipped village at span 0.5 s and minPath
+   * 0.5 m (a child walking at all): ratio 3 gives 0.176 / 0.997 / 0.883 % — too
+   * near the gate, because one legitimate reversal inside half a second already
+   * walks twice what it covers; ratio 4 gives 0.000 / 0.285 / 0.228 %; ratio 5
+   * gives 0.000 / 0.028 / 0.028 %, nine times under the 0.25 % gate the long
+   * measure uses. Five reversals' worth of walking inside half a second is not
+   * a chase turn. Against that, the intermittent trace above reads 18.4 % at a
+   * full walking pace and 15.9 % at the chase's floor pace — sixty times the
+   * gate — and the crowded village where adults stand in the children's ground
+   * (a known open defect, see the replay test) reads 3.5 %.
+   *
+   * The two measures answer different scales and both are needed: the wedged
+   * child in its 0.8 m pen reads 1.94 % on the one-second measure and only
+   * 0.16 % here, because over half a second it does get somewhere.
+   */
+  short: { span: 0.5, minPath: 0.5, circle: Infinity, ratio: 5 },
   /** How much of the traced CLOCK the group must have spent playing. Between
    *  rounds it idles for a calibratable break, which is legitimate; a trace
    *  that is all break has no chase in it to judge. Measured live: the group
@@ -262,7 +296,7 @@ export function groundPath(track) {
  * @returns {{windows:number,bad:number,seconds:number,badSeconds:number,unjudged:number,covered:number,judgedShare:number,share:number,perChild:object[],worstShare:number,worstShareChild:number,leastJudged:number,leastJudgedChild:number,worst:{path:number,out:number,child:number,clock:number}}}
  */
 export function shuffleWindows(tracks, cfg = {}) {
-  const { span, minPath, circle } = { ...CHILD_MOTION, ...cfg }
+  const { span, minPath, circle, ratio } = { ...CHILD_MOTION, ...cfg }
   const worst = { path: 0, out: 0, child: -1, clock: 0 }
   /** One entry per child, because the defect is per child. */
   const perChild = []
@@ -347,7 +381,13 @@ export function shuffleWindows(tracks, cfg = {}) {
       const walked = track[j].walked + (track[j + 1].walked - track[j].walked) * f - track[i].walked
       mine.windows++
       mine.seconds += weight
-      if (walked > minPath && out < circle) {
+      // HOW LITTLE GROUND IS TOO LITTLE: a fixed circle, or a share of what the
+      // child walked, whichever is tighter. The circle alone is the one-second
+      // question; the ratio is what lets a SHORTER window ask the same thing
+      // without a length of its own to calibrate (`ratio` is Infinity by
+      // default, which leaves the circle exactly as it was).
+      const bar = ratio > 0 ? Math.min(circle, walked / ratio) : circle
+      if (walked > minPath && out < bar) {
         mine.bad++
         mine.badSeconds += weight
         if (walked / Math.max(0.01, out) > worst.path / Math.max(0.01, worst.out)) {

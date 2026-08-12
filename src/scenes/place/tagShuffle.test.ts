@@ -465,6 +465,11 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       // worst child's share 0.00-0.03 %.
       expect(r.leastJudged).toBeGreaterThan(CHILD_MOTION.judgedGate)
       expect(r.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
+      // AND THE SHORT BURST the one-second window cannot see (point 656): a
+      // child that paces on the spot for six tenths of a second between spells
+      // of walking never collects the metre a one-second window asks for.
+      // Measured here, worst child: 0.000 / 0.028 / 0.028 %.
+      expect(shuffleWindows(paths, CHILD_MOTION.short).worstShare).toBeLessThan(CHILD_MOTION.shareGate)
       // AND NOBODY IS BEING CARRIED (point 656): the rescue teleport is what
       // ENDS a snag, so a village that keeps its share down only by picking its
       // children up out of the pockets they walk into fails here instead. The
