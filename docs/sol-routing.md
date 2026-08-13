@@ -1,15 +1,21 @@
-# Sol routing — moving read-only work between the two vendors
+# Sol routing — moving work between the two vendors
 
-Work-order point 654. We pay two vendors whose allowances run out at different
-times. This is the lever that shifts load towards OpenAI **before** the
-Anthropic volume is nearly spent, rather than at the last percent.
+Work-order points 654 and 667. We pay two vendors whose allowances run out at
+different times. This is the lever that shifts load towards OpenAI **before**
+the Anthropic volume is nearly spent, rather than at the last percent.
 
-It is deliberately cheap, and the reason it is cheap is the one rule everything
-here rests on: **Sol authors nothing.** No commit carries its trailer, so the
-author allowlist (`scripts/model-guard-core.mjs`), the `commit-msg` hook and the
-model guard are untouched, and none of the auditability machinery a role swap
-would need is required. The moment Sol authors, all of that becomes necessary —
-that is part B of the point, and it is not built.
+Point 654 built the cheap half: the READ-ONLY kinds, where Sol authored nothing
+and no commit carried its trailer, so the author allowlist, the `commit-msg`
+hook and the model guard could all stay as they were. That half is described
+first below, and it is unchanged.
+
+Point 667 built the other half, because the read-only lever had reached its
+maximum while the largest single item of the spend — the AUTHORING of delegated
+points, ~58 % of the weighted total — was still entirely Anthropic's. Sol now
+authors suitable points, under a role swap that keeps four eyes: **where Sol
+authors, Claude reviews, runs the suites, judges the picture and lands.** Every
+point still has two vendors on it and neither model reviews its own work. See
+[Authoring](#authoring-point-667) for what that costs and what it does not buy.
 
 ## The switch
 
@@ -95,9 +101,75 @@ read at all is refused before it is sent (exit 2): an unreadable file travels as
 answer about nothing. A read that failed is named even when the rest went
 through.
 
+## Authoring (point 667)
+
+```
+node scripts/author-sol.mjs --routing --all        # which lane owns each open point, and why
+node scripts/author-sol.mjs --routing --point 651  # one point
+node scripts/author-sol.mjs --point 651            # author it here, on this branch
+node scripts/author-sol.mjs --point 651 --dry-run  # the prompt and the argv, nothing spent
+node scripts/author-sol.mjs --point 651 --findings f.md   # the second leg: answer the review
+```
+
+**The cut is a function, not a taste.** `scripts/author-routing-core.mjs` reads
+the point's own text: the hard cases (difficult, complex, error-prone, or tagged
+HIGH criticality) stay with Fable, a point whose VERIFICATION is the work stays
+with the main session that judges pictures anyway, and what is left —
+mechanical and mid-difficulty — is Sol's. Measured over the whole open queue on
+13.08.2026: **170 points → 57 Sol / 40 Fable / 73 main session.** A point may
+override the function with `Author lane: sol|fable|opus` **on a line of its
+own** in its spec; `--reworked` says Sol has already been round this point and
+the review still found problems, which sends it to Fable whatever the text says.
+
+**The lane runs like any delegated agent**: an isolated worktree, its own
+`feat/` branch, the point handed over as a BRIEF rather than a reading
+assignment, and a commit per self-contained step. The child is given no
+credential, so the WRAPPER pushes for it — every two minutes while the run
+continues and again when it ends. That is a **residual, not compliance**: §6
+says immediately, and a container dying inside those two minutes loses exactly
+what the rule protects; it is the smallest gap available without handing a push
+token to a run that has no sandbox.
+
+The author runs the three cheap gates on its own work (`test:unit`, `build`,
+`lint`) and must name each of them in its closing report — a gate it does not
+name is read as one it did not run. What it does **not** do is verify: the
+browser suites, the picture and the verdict are the reviewer's, which re-runs
+the gates rather than believing the report. It merges nothing.
+
+**The sandbox is off, and it has to be.** This container cannot create
+unprivileged user namespaces, so codex's bubblewrap launcher dies before any
+command of the model's runs — `codex sandbox read-only -- echo hi` prints the
+bwrap error and nothing else. A reviewer works around that by having its
+material fed to it; an author that cannot run `git commit` cannot author. So the
+run uses `--dangerously-bypass-approvals-and-sandbox`, whose own documentation
+names the condition we are in ("intended solely for running in environments that
+are externally sandboxed").
+
+What is still done is **hygiene, not containment**, and the difference is worth
+stating plainly: the child's environment is stripped of everything that reads
+like a credential (`childEnv`), and the run is refused outright unless it is on
+a `feat/` branch in a worktree that is not the main checkout, with a clean tree.
+**The residual, named rather than implied:** inside this container the run has
+the filesystem access this session has — it can read `.secrets/`, use a
+credential helper and push, and no regex over environment names prevents any of
+that. What the stripping buys is that nothing leaks by *accident*: a token in
+the environment is spent by any command that happens to look there, a token in a
+file is spent only by a run that goes for it deliberately. The container is the
+trust boundary; if that is not enough for a piece of work, that work is not this
+lane's. Afterwards the wrapper checks that the run ended on the branch it
+started on, because commits made elsewhere cannot be attributed to the point.
+
+**Nothing is taken on trust afterwards.** What counts is what is in git — the
+commits that appeared, their trailers, the tree left behind — never the run's
+own account of itself. A run that reports success and committed nothing is
+reported as having authored nothing.
+
 ## What is never routed, at any setting
 
-- Authoring a commit — the trailer names an author, and only the allowlist may.
+- The HARD cases and any point whose verification is the work (the routing
+  function decides, and `--anyway` is the deliberate override).
+- REVIEWING what Sol itself authored — no model reviews its own work, so
+  `review-sol.mjs` refuses such a range before it spends a call on it.
 - Driving the browser suites and **judging the picture**.
 - The landing (`scripts/land-point.mjs`) and the main session's bookkeeping.
 

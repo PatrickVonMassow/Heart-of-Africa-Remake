@@ -41,8 +41,10 @@ describe('the settings themselves', () => {
     expect(NEVER_ROUTED.length).toBeGreaterThan(0)
   })
 
-  it('carry every kind ask-sol can actually do, and no kind nothing can route', () => {
-    expect(KINDS).toEqual(['review', ...ASK_KINDS])
+  it('carry every kind that can actually be routed, and no kind nothing can', () => {
+    // `author` joined the table when scripts/author-sol.mjs made it routable
+    // (point 667) — the switch's biggest lever, and the reason it exists.
+    expect(KINDS).toEqual(['review', ...ASK_KINDS, 'author'])
     for (const kind of KINDS) expect(KIND_NOTES[kind]).toBeTruthy()
   })
 
@@ -82,7 +84,18 @@ describe('routing', () => {
   })
 
   it('answers `claude` for an unknown kind rather than throwing', () => {
-    expect(routeFor('author', 'prefer-sol')).toBe('claude')
+    expect(routeFor('landing', 'prefer-sol')).toBe('claude')
+    expect(routeFor('', 'prefer-sol')).toBe('claude')
+  })
+
+  it('routes AUTHORING only at prefer-sol — the lane the operator can turn off', () => {
+    // The whole OpenAI authoring lane hangs off this row (point 667): at the two
+    // lower settings the work stays with Claude, exactly as it did before.
+    expect(routeFor('author', 'prefer-sol')).toBe('sol')
+    expect(routeFor('author', 'default')).toBe('claude')
+    expect(routeFor('author', 'claude-only')).toBe('claude')
+    // …and an unusable state falls back to the setting that spends nothing new.
+    expect(routeFor('author', 'garbled')).toBe('claude')
   })
 
   it('offers the whole table, so no consumer has to keep its own copy', () => {

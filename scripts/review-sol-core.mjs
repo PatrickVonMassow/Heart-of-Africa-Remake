@@ -39,6 +39,18 @@ export const FALLBACK_MODEL_NAME = 'Fable 5'
 export const SECOND_FALLBACK_MODEL_NAME = 'Opus 5'
 export const FALLBACK_CHAIN = Object.freeze([FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, 'Opus 4.8'])
 
+/**
+ * …and the chain for the OTHER direction (point 667): who reviews what SOL
+ * AUTHORED.
+ *
+ * A separate order, deliberately. The chain above answers "Sol is unreachable,
+ * who else can look at this?" and starts at Fable, the second-opinion model.
+ * This one answers "Sol wrote it, who takes it from here?" — and under the role
+ * swap that reviewer ALSO runs the suites, judges the picture and lands the
+ * point, which is the main authoring session's job. So it starts at Opus 5.
+ */
+export const CLAUDE_REVIEW_CHAIN = Object.freeze(['Opus 5', 'Fable 5', 'Opus 4.8'])
+
 /** The binary, and the ceiling a review may take before it counts as stuck. */
 export const CODEX_BIN = 'codex'
 export const REVIEW_TIMEOUT_MS = 15 * 60_000
@@ -62,6 +74,9 @@ export const OUTCOME = Object.freeze({
   // in the same place every failure does — the review handed to a Claude reviewer with NO
   // verdict — because that is the honest state either way: Sol has not seen this change.
   SWITCHED_OFF: 'switched-off',
+  // Also not a failure, and not even a fallback: Sol AUTHORED this range, so the review
+  // was never Sol's to give (point 667). It ends in the same place for the same reason.
+  SELF_REVIEW: 'self-review',
 })
 
 /** One human sentence per kind — what the reader is told went wrong. */
@@ -75,6 +90,7 @@ const CAUSE_TEXT = Object.freeze({
   [OUTCOME.ERROR_EXIT]: 'codex exited with an error',
   [OUTCOME.NO_VERDICT]: 'the run produced no parseable verdict',
   [OUTCOME.SWITCHED_OFF]: 'the share switch is at `claude-only` (node scripts/sol-share.mjs --status)',
+  [OUTCOME.SELF_REVIEW]: `${SOL_MODEL_NAME} AUTHORED part of this range — no model reviews its own work`,
 })
 
 /** The cause sentence of one outcome kind — for the callers that skip classifyOutcome. */
@@ -291,6 +307,24 @@ export function parseVerdict(text) {
  * seen the change yet. `ready` says whether a record may be written at all.
  */
 export function decideReview({ outcome = {}, parsed = {}, authorModel = '' } = {}) {
+  // THE REVERSED DIRECTION IS DECIDED BEFORE ANYTHING ELSE (point 667). Sol now
+  // AUTHORS as well as reviews, and a model may not review its own work — so a
+  // Sol run over a Sol-authored range is not a review whatever it answered, and
+  // recording it would put a self-review in front of a gate that then reads
+  // green. The runner asks the same question before it spends a codex call; this
+  // is the backstop for every caller that does not.
+  if (solAuthored(authorModel)) {
+    return {
+      model: claudeReviewerFor(authorModel),
+      ranBy: '',
+      verdict: '',
+      evidence: '',
+      fellBack: true,
+      ready: false,
+      kind: OUTCOME.SELF_REVIEW,
+      cause: CAUSE_TEXT[OUTCOME.SELF_REVIEW],
+    }
+  }
   if (outcome.ok && parsed.ok) {
     return {
       model: SOL_MODEL_NAME,
@@ -339,8 +373,41 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '' } = {
  * the review waits for Sol rather than being recorded by an author of the work.
  */
 export function fallbackReviewerFor(authorModels = '') {
-  const authors = (Array.isArray(authorModels) ? authorModels : [authorModels]).filter(Boolean)
-  return FALLBACK_CHAIN.find((candidate) => !authors.some((a) => sameModel(candidate, a))) ?? ''
+  return firstNonAuthor(FALLBACK_CHAIN, authorModels)
+}
+
+/** Every model designation of an author list, however it was handed over. */
+function authorList(authorModels) {
+  return (Array.isArray(authorModels) ? authorModels : [authorModels]).filter(Boolean)
+}
+
+/** The first candidate of a chain that authored no part of the range, or ''. */
+function firstNonAuthor(chain, authorModels) {
+  const authors = authorList(authorModels)
+  return chain.find((candidate) => !authors.some((a) => sameModel(candidate, a))) ?? ''
+}
+
+/**
+ * Did GPT-5.6 Sol author any part of this range (point 667)?
+ *
+ * Judged by `sameModel`, so every spelling of the one model answers alike — the
+ * trailer's "GPT-5.6 Sol", a bare "Sol", the raw id. A range Sol wrote is a
+ * range Sol may not review.
+ */
+export function solAuthored(authorModels = '') {
+  return authorList(authorModels).some((a) => sameModel(a, SOL_MODEL_NAME))
+}
+
+/**
+ * The Claude reviewer for work SOL AUTHORED — the first of CLAUDE_REVIEW_CHAIN
+ * that authored no part of the range, or '' when every one of them did.
+ *
+ * Empty is a real answer and is reported as one: a range written by Sol AND by
+ * all three Claude models has no reviewer that is not also an author, and
+ * saying so beats recording a self-review.
+ */
+export function claudeReviewerFor(authorModels = '') {
+  return firstNonAuthor(CLAUDE_REVIEW_CHAIN, authorModels)
 }
 
 /** How much material one review may carry — the patch plus the changed files —
@@ -604,6 +671,25 @@ export function formatReviewReport({ decision = {}, sha = '', mode = 'review', p
   // "hand it to Fable" beside a command naming Opus is how a self-review gets
   // recorded (four-eyes finding, second round, 10.08.2026).
   const who = decision.model
+  // THE ROLE SWAP IS NOT A FALLBACK (point 667), and calling it one would read as
+  // something having gone wrong. Sol authored this range; the review was always
+  // Claude's, together with the suites, the picture and the landing.
+  if (decision.kind === OUTCOME.SELF_REVIEW) {
+    if (!who) {
+      return [
+        `review-sol: ROLE SWAP — ${SOL_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
+        `  And every model of ${CLAUDE_REVIEW_CHAIN.join(', ')} authored part of it too, so none of them`,
+        '  may either. The review is NOT done and cannot be recorded: review a narrower range.',
+      ].join('\n')
+    }
+    return [
+      `review-sol: ROLE SWAP — ${SOL_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.`,
+      `  The review is ${who}'s, which also runs the suites, judges the picture and lands the point.`,
+      '  Record what IT says — never a verdict this command invented:',
+      '',
+      `     ${cmd}`,
+    ].join('\n')
+  }
   if (!who) {
     return [
       `review-sol: FALLBACK — ${SOL_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,

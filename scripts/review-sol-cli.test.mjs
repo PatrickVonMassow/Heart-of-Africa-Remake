@@ -52,8 +52,10 @@ const SCRIPT_FILES = [
   'mechanism-review.mjs',
   'mechanism-review-core.mjs',
   // …which counts a blind-parallel union itself (point 634), so its accounting
-  // core travels with it.
+  // core travels with it, and asks the AUTHOR allowlist what a model trailer
+  // looks like (point 667), so that one does too.
   'blind-merge-core.mjs',
+  'model-guard-core.mjs',
   'repo-paths.mjs',
   'is-main.mjs',
   // The share switch the command asks BEFORE it spends an allowance (point 654), and
@@ -73,6 +75,7 @@ let script = ''
 let mainSha = ''
 let headSha = ''
 let fableSha = ''
+let solSha = ''
 let orphanSha = ''
 /** An EMPTY git template: a host `init.templateDir` must not seed the fixture. */
 let emptyTemplate = ''
@@ -259,6 +262,13 @@ beforeAll(() => {
 
   git('checkout', '-q', '-b', 'fable-work', 'main')
   fableSha = commit('fable.txt', 'written by the fallback reviewer\n', 'Write something as Fable', 'Fable 5')
+
+  // …and a branch SOL authored (point 667), which Sol may therefore not review.
+  git('checkout', '-q', '-b', 'sol-work', 'main')
+  writeFileSync(join(repo, 'sol.txt'), 'written in the OpenAI authoring lane\n')
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', 'Write something as Sol\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
+  solSha = git('rev-parse', 'HEAD')
 
   // A history sharing no ancestor with the rest: the third form of "not a proper
   // ancestor", which merge-base answers with nothing at all.
@@ -544,5 +554,24 @@ describe('the saved login', () => {
     expect(r.status).toBe(1)
     expect(r.stderr).toMatch(/nothing saved/)
     expect(r.stderr).toMatch(/--save-login/)
+  })
+})
+
+// POINT 667: Sol authors too, so the command must recognise the range it may not
+// judge — and must recognise it BEFORE it spends an allowance on it.
+describe('a range SOL authored', () => {
+  it('refuses to review its own work, spends no codex call, and names the Claude reviewer', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', solSha, '--point', '667', '--brief', 'judge the authoring lane'])
+    expect(r.status, r.stderr).toBe(3)
+    expect(r.stdout).toMatch(/ROLE SWAP/)
+    expect(r.stdout).toMatch(/AUTHORED part of/)
+    expect(r.stdout).toContain('--model "Opus 5"')
+    // Not one call — not even the model-id probe: the question is answered from
+    // the trailers, and paying for a review Sol may not give is the waste this
+    // ordering exists to prevent.
+    expect(calls()).toEqual([])
+    // And no verdict is invented: the record command still carries the placeholder.
+    expect(r.stdout).toMatch(/--verdict <merge\|/)
   })
 })

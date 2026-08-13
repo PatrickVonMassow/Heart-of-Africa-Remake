@@ -894,7 +894,11 @@ describe('the sol-routing line', () => {
     const brief = briefAt('prefer-sol')
     expect(brief).toMatch(/hand diagnose\/audit\/enumerate\/explain/)
     expect(brief).toMatch(/ask-sol\.mjs --kind/)
-    expect(brief).toMatch(/You keep authoring, the gates, the suites and the pictures/)
+    expect(brief).toMatch(/You keep the gates, the suites and the pictures/)
+    // The reader of a brief is ALREADY the author, whichever lane it is in
+    // (point 667), so the line offers it the READING kinds and no other.
+    expect(brief).not.toMatch(/--kind author/)
+    expect(brief).not.toMatch(/enumerate\/explain\/author/)
   })
 
   it('tells it to stay off Sol entirely at claude-only', () => {

@@ -71,6 +71,7 @@ import {
   PROBE_MAX_AGE_MS,
   REVIEW_TIMEOUT_MS,
   savedAuthPathFrom,
+  solAuthored,
   SOL_MODEL_ID,
   SOL_MODEL_NAME,
   SOL_REASONING_EFFORT,
@@ -502,6 +503,23 @@ if (isMainModule(import.meta.url)) {
       process.exit(3)
     }
 
+    // WHO WROTE IT DECIDES WHO MAY JUDGE IT, and that is asked BEFORE a codex
+    // call is paid for (point 667). Sol AUTHORS now, and a review it may not
+    // give is not worth an allowance: a Sol-authored range goes straight to the
+    // Claude reviewer that also runs the suites, judges the picture and lands.
+    const sinceFlag = flag('--since')
+    const base = mergeBase(sinceFlag || 'main', full, { explicit: Boolean(sinceFlag) })
+    const rangeAuthors = authorsIn(full, base)
+    if (solAuthored(rangeAuthors)) {
+      const decision = decideReview({
+        outcome: { ok: false, kind: OUTCOME.SELF_REVIEW, cause: causeTextFor(OUTCOME.SELF_REVIEW) },
+        parsed: { ok: false },
+        authorModel: rangeAuthors,
+      })
+      console.log(formatReviewReport({ decision, sha: full, mode, point, partial: null }))
+      process.exit(3)
+    }
+
     console.error(
       `review-sol: asking ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) to review ${full.slice(0, 7)} …`,
     )
@@ -517,15 +535,13 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
 
-    const since = flag('--since')
-    const base = mergeBase(since || 'main', full, { explicit: Boolean(since) })
     // What a record at this sha would CLEAR: everything back to where the branch
     // left `main`. A narrower review is allowed, but it may not be recorded.
     // FAILING TO ANSWER IS NOT AN ANSWER OF "FULL COVERAGE" (fourth round): a
     // sha with no merge base against `main` used to leave this empty, which
     // switched the check OFF and printed a record for a range nobody bounded.
     // The decision itself is pure and tested (coverageDecision).
-    const coverageBase = since ? git(['merge-base', 'main', full], { required: false }) : base
+    const coverageBase = sinceFlag ? git(['merge-base', 'main', full], { required: false }) : base
     const partial = coverageDecision({ reviewedBase: base, coverageBase })
     const material = gatherMaterial(full, base)
     console.error(
@@ -538,7 +554,7 @@ if (isMainModule(import.meta.url)) {
     // WHO AUTHORED IT decides who may review it if Sol is unavailable: Fable
     // cannot review its own commit (see fallbackReviewerFor), and the record
     // covers the whole range, so every author in it counts.
-    const decision = decideReview({ outcome, parsed, authorModel: authorsIn(full, base) })
+    const decision = decideReview({ outcome, parsed, authorModel: rangeAuthors })
     // THE FINDINGS ARE THE POINT, not the verdict word: a `do-not-merge` whose
     // reasons were never printed cannot be acted on, and the evidence line the
     // ledger carries is one sentence by design. So the reviewer's whole answer
