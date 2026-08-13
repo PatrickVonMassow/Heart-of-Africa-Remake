@@ -27,7 +27,12 @@
 // solve runs through the leaning trunk, the way the scene graph draws it.
 
 import { FIGURE_LIMBS } from '../../render/figures'
-import { armAim, type ArmPose } from '../../render/gesture'
+import { armAim, REST_POSE, type ArmPose, type FigurePose } from '../../render/gesture'
+import {
+  drumStrikeAt,
+  drumStrikeProgress,
+  type DrumMessagePlan,
+} from '../../communication/drumMessage'
 
 /** How deep a struck drum head sinks under the hand, in metres. */
 export const DRUM_HEAD_DIP = 0.05
@@ -176,6 +181,9 @@ export function drumStroke(drum: DrumGeometry, lean = DRUMMER_LEAN): DrumStroke 
   }
 }
 
+const LOW_DRUM_STROKE = drumStroke(LOW_DRUM)
+const HIGH_DRUM_STROKE = drumStroke(HIGH_DRUM)
+
 /** The arm pose at a swing (0 = on the head, 1 = the top of the lift). */
 export function drumHandPose(stroke: DrumStroke, swing: number): ArmPose {
   return armAim(stroke.bearing, elevationAt(stroke, swing))
@@ -195,4 +203,43 @@ function elevationAt(stroke: DrumStroke, swing: number): number {
     stroke.strikeElevation +
     (stroke.liftElevation - stroke.strikeElevation) * clamp01(swing)
   )
+}
+
+/** One animation frame for the drummer and both drum heads. With no message he
+ *  uses the figure's genuine rest arms and both skins are undisturbed. During a
+ *  message, the exact plan passed to WebAudio selects the falling hand and its
+ *  progress; the other waits raised over its own drum. */
+export interface DrummerPoseFrame {
+  pose: FigurePose
+  lowSwing: number
+  highSwing: number
+}
+
+export function drummerPoseAt(plan: DrumMessagePlan | null, elapsed: number): DrummerPoseFrame {
+  if (!plan) {
+    return {
+      pose: {
+        left: { ...REST_POSE.left },
+        right: { ...REST_POSE.right },
+        lean: DRUMMER_LEAN,
+        turn: 0,
+      },
+      lowSwing: 1,
+      highSwing: 1,
+    }
+  }
+
+  const strike = drumStrikeAt(plan, elapsed)
+  const swing = strike ? drumStrikeProgress(strike, elapsed) : 1
+  const lowSwing = strike?.drum === 'low' ? swing : 1
+  const highSwing = strike?.drum === 'high' ? swing : 1
+  const pose: FigurePose = {
+    left: { ...REST_POSE.left },
+    right: { ...REST_POSE.right },
+    lean: DRUMMER_LEAN,
+    turn: 0,
+  }
+  Object.assign(pose[LOW_DRUM_STROKE.side], drumHandPose(LOW_DRUM_STROKE, lowSwing))
+  Object.assign(pose[HIGH_DRUM_STROKE.side], drumHandPose(HIGH_DRUM_STROKE, highSwing))
+  return { pose, lowSwing, highSwing }
 }
