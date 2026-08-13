@@ -91,10 +91,14 @@
     "684": {
       "at": "2026-08-13T20:19:40.069Z",
       "why": "Betrifft die Abdeckung jeder Gegenpruefung, aber kein ausgeliefertes Spielverhalten — nach den Release-Bugfixes"
+    },
+    "685": {
+      "at": "2026-08-13T21:09:57.053Z",
+      "why": "Kleine Nachbesserung am gerade gelieferten Symbol; sie kostet nichts, wenn sie hinter den Release-Bugfixes wartet"
     }
   },
   "settled": {
-    "at": "2026-08-13T20:19:40.070Z",
+    "at": "2026-08-13T21:09:57.053Z",
     "points": [
       174,
       184,
@@ -276,7 +280,8 @@
       681,
       682,
       683,
-      684
+      684,
+      685
     ]
   }
 }
