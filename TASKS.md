@@ -6550,3 +6550,17 @@ to land than a mechanism that needs a review.
   catches "the text is STALE", not "the text is WRONG" — a section rewritten carelessly still
   passes. It would have caught this case, because `src/communication/` is young and the section
   is old.
+
+- [ ] 668. THE LANDING GATE PROVES THE CHARGES ONLY WHILE THE POINT IS STILL OPEN (measured
+  13.08.2026 at the 657 landing). `land-point.mjs` runs its fast gate BEFORE the tick, so the
+  charges rule of `scripts/render-verify-core.test.mjs` ("charges only points the work order
+  still holds OPEN") is proven on a state where the landing point is still open — and turns red
+  only at the main push, AFTER tick and archive move are committed locally. The chain then stops
+  at "push" and leaves the tick unpushed; the repair (move the charge to its heir, as 666 was
+  filed to receive 657's residual) is obvious but manual and after the fact.
+  FINAL STATE: the tick step itself refuses to tick a point while any `RED_CHARGES` entry in
+  `scripts/render-verify-charges.mjs` still names it, and the refusal names the remedy (move the
+  charge to the heir point, or drop it with its evidence). A Vitest case pins the refusal (a
+  charge on the landing point blocks the tick; a charge on any other point does not).
+  Criticality: low — the defect is loud and self-explaining at the push; this removes the manual
+  after-the-fact repair, nothing else.
