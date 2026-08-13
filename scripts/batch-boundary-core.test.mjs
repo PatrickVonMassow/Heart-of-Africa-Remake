@@ -925,6 +925,11 @@ describe('unpreparedRefusal — --commit refuses what --prepare never prepared (
     expect(
       unpreparedRefusal({ receipt: { ...fresh(), cardsBefore: 'nope' }, sid: SID, point: 675, now: NOW }),
     ).toContain('older shape')
+    // …including an ARRAY whose contents are not card text: a Set built from it
+    // would match no region, and every standing card would count as new.
+    expect(
+      unpreparedRefusal({ receipt: { ...fresh(), cardsBefore: [{ card: 'x' }] }, sid: SID, point: 675, now: NOW }),
+    ).toContain('older shape')
     // A claim appearing between the phases changes the card's text, so the old
     // board reading no longer covers it.
     const prepared = preparedReceipt({
@@ -1160,6 +1165,22 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
     ).toBe(true)
     // A board that carried no such card at preparation time proves it outright.
     expect(boardCarriesCard(leftover, frags, { sinceMs: prepared, nowMs: now, knownRegions: [] }).carries).toBe(true)
+  })
+
+  it('cuts the region back to the CARD, so an edit around it does not make a stale card look new (Sol on 04cea00)', () => {
+    const section = (head) => `<details class="sect"><summary><h2>${head}</h2></summary>${stamped('02:10')}</details>`
+    const known = cardRegions(section('Aktuell'), frags)
+    expect(known.length).toBe(1)
+    expect(known[0].startsWith('<details class="card"')).toBe(true)
+    // The section header changes; the card does not — and it is still the card
+    // the preparation saw.
+    const proof = boardCarriesCard(section('Aktuelle Arbeit'), frags, {
+      sinceMs: Date.UTC(2026, 9, 25, 0, 55),
+      nowMs: Date.UTC(2026, 9, 25, 1, 10),
+      knownRegions: known,
+    })
+    expect(proof.carries).toBe(false)
+    expect(proof.stale).toBe(true)
   })
 
   it('refuses the card the PREVIOUS handover left standing (Sol on 9096fb7)', () => {

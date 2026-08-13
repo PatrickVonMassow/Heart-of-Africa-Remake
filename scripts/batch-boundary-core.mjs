@@ -350,8 +350,12 @@ export function unpreparedRefusal({
   // A receipt of an OLDER SHAPE proves less than the commit now asks — without
   // its board reading the stale-card check has nothing to compare against, so it
   // is refused rather than silently downgraded (Sol's review of 7ecebed).
-  if (receipt.v !== PREPARED_RECEIPT_V || !Array.isArray(receipt.cardsBefore)) {
-    return refuse('the receipt is of an older shape and carries no board reading')
+  if (
+    receipt.v !== PREPARED_RECEIPT_V ||
+    !Array.isArray(receipt.cardsBefore) ||
+    !receipt.cardsBefore.every((r) => typeof r === 'string')
+  ) {
+    return refuse('the receipt is of an older shape and carries no usable board reading')
   }
   if (!sid || receipt.sessionId !== sid) return refuse(`the receipt belongs to session ${receipt.sessionId || '?'}`)
   if (destination !== null && receipt.destination !== destination) {
@@ -398,6 +402,10 @@ export const BOUNDARY_CARD_HEADS = Object.freeze({
 /** Where one board card ENDS: every card is a `<details>` block, so this is the
  *  real boundary the proof is cut at, not a guessed distance. */
 export const CARD_END = '</details>'
+
+/** …and where one begins, so a region is cut back to the card itself rather than
+ *  to whatever stood between it and the card before it. */
+export const CARD_START = '<details'
 
 /** The fallback for a board carrying no card markup at all — one card's length
  *  (the longest card is ~900 characters, the slack covers its surroundings).
@@ -524,7 +532,17 @@ export function cardRegions(boardText, fragments = [], { windowChars = CARD_PROO
       regions.push(text.slice(at, at + windowChars))
     }
   }
-  return regions.filter((r) => r.includes(head) && rest.every((f) => r.includes(f)))
+  return regions
+    .filter((r) => r.includes(head) && rest.every((f) => r.includes(f)))
+    // THE REGION IS THE CARD, not what precedes it (Sol's review of 04cea00):
+    // split at the card ends, a region also carries whatever stood between the
+    // previous card and this one — a section header, another card's tail — so an
+    // unrelated edit there would make an UNCHANGED stale card look new. Each
+    // region is therefore cut back to its own opening tag.
+    .map((r) => {
+      const start = r.lastIndexOf(CARD_START, r.indexOf(head))
+      return start >= 0 ? r.slice(start) : r
+    })
 }
 
 export function boardCarriesCard(

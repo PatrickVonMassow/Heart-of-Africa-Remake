@@ -605,8 +605,12 @@ if (isMain) {
         )
         process.exit(0)
       }
+      // READ ONCE, JUDGE THAT ONE (Sol's review of 04cea00): a second read could
+      // hand the card proof a different receipt — or none — and a missing one
+      // silently restores the bypass the first read just refused.
+      const receipt = readPrepared()
       const unprepared = unpreparedRefusal({
-        receipt: readPrepared(),
+        receipt,
         sid,
         cause: BOUNDARY_CAUSES.CONTEXT,
         destination: handover.destination,
@@ -624,6 +628,7 @@ if (isMain) {
         what: 'THE WATERMARK CARD',
         prepare: '--prepare --context --transcript <path>',
         fail,
+        receipt,
       })
       // Transfer FIRST, marker LAST (Sol review of 807c2bf, finding 1) —
       // `commitSealedBoundary` pins the order, and a failed transfer refuses
@@ -762,8 +767,10 @@ if (isMain) {
       process.exit(0)
     }
 
+    // Read once, judge that one (Sol's review of 04cea00).
+    const receipt = readPrepared()
     const unprepared = unpreparedRefusal({
-      receipt: readPrepared(),
+      receipt,
       sid,
       cause: BOUNDARY_CAUSES.POINT,
       point,
@@ -781,6 +788,7 @@ if (isMain) {
       what: 'THE HANDOVER CARD',
       prepare: `--prepare ${point}`,
       fail,
+      receipt,
     })
 
     if (pointCardStanding(point)) {
