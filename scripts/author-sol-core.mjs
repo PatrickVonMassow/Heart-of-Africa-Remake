@@ -1,0 +1,300 @@
+// THE OPENAI AUTHORING LANE, decided (point 667). Pure half.
+//
+// `scripts/review-sol.mjs` and `scripts/ask-sol.mjs` send Sol work it may only
+// READ. This lane sends it work it WRITES: a point, on its own branch, in its
+// own worktree, committed step by step. Claude then reviews it, runs the suites,
+// judges the picture and lands it — the role swap of CLAUDE.md §6, which keeps
+// two vendors on every point and lets neither review itself.
+//
+// TWO THINGS ARE DIFFERENT FROM THE READ-ONLY PATHS, and both are load-bearing:
+//
+// 1. THE SANDBOX IS OFF, and it has to be. Measured 13.08.2026 (and again on
+//    every earlier Sol path): this container cannot create unprivileged user
+//    namespaces, so codex's bubblewrap launcher dies before ANY command of the
+//    model's runs — `codex sandbox read-only -- echo hi` prints the bwrap error
+//    and nothing else. A read-only reviewer works around it by having the
+//    artefact FED to it; an author that cannot run `git commit` cannot author.
+//    So the run uses `--dangerously-bypass-approvals-and-sandbox`, whose own
+//    documentation names the condition we are in: "intended solely for running
+//    in environments that are externally sandboxed". The container is that
+//    sandbox. What this file can still control, it does — see `childEnv` and
+//    `readinessProblems` — and what it cannot is written down rather than
+//    implied: inside this container the run has the filesystem access the
+//    session itself has.
+//
+// 2. NOTHING IS TAKEN ON TRUST AFTERWARDS. The read-only paths refuse to record
+//    an answer nobody gave; this one refuses to report work nobody did. What
+//    counts is what is IN GIT — the commits that appeared, their trailers, the
+//    tree left behind — never what the run said about itself (`judgeAuthoring`).
+//
+// Side-effect free: the spawn, the git work and the push belong to
+// scripts/author-sol.mjs. Pinned by author-sol-core.test.mjs.
+
+import { ALLOWED_TRAILERS, classifyTrailer } from './model-guard-core.mjs'
+import { SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
+
+export { SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
+
+/** The trailer every commit of this lane carries — the allowlist's own spelling,
+ *  so the `commit-msg` gate and the serving-model tripwire both accept it. */
+export const SOL_TRAILER = ALLOWED_TRAILERS.find((t) => /sol/i.test(t)) ?? ''
+
+/** An authoring run may take longer than a review: it builds and tests. */
+export const AUTHOR_TIMEOUT_MS = 60 * 60_000
+
+/**
+ * The environment the authoring child gets: this one MINUS anything that reads
+ * like a credential.
+ *
+ * The one enforcement left once the sandbox is off, and it is worth having: a
+ * token in the environment is what turns filesystem access into an action
+ * outside the container — a push, an API call, a spend on another account. The
+ * repository's own automation reads its GitHub token from a FILE when it needs
+ * one, so nothing in this lane is broken by the removal, and the wrapper pushes
+ * the branch itself afterwards rather than handing over the means to.
+ *
+ * Fails towards dropping: an unknown variable that merely LOOKS like a secret
+ * costs nothing to remove, while one wrongly kept is the whole risk.
+ */
+export const SENSITIVE_ENV = /(TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|PRIVATE_KEY|API_KEY|_PAT$|AUTH_)/i
+
+export function childEnv(env = {}) {
+  const out = {}
+  for (const [key, value] of Object.entries(env ?? {})) {
+    if (!SENSITIVE_ENV.test(key)) out[key] = value
+  }
+  return out
+}
+
+/** The names `childEnv` removed, so the run can SAY what it withheld. */
+export function withheldEnvNames(env = {}) {
+  return Object.keys(env ?? {}).filter((key) => SENSITIVE_ENV.test(key)).sort()
+}
+
+/**
+ * The `codex exec` command line for an AUTHORING run.
+ *
+ * Same shape as the review path's `codexArgs`, with the two differences the lane
+ * needs: the sandbox is bypassed (see the header) and the working root is the
+ * POINT'S WORKTREE, so every relative path the model uses lands there.
+ */
+export function authoringCodexArgs({
+  modelId = SOL_MODEL_ID,
+  effort = SOL_REASONING_EFFORT,
+  cwd = '',
+  outputFile = '',
+  prompt = '',
+} = {}) {
+  const args = [
+    'exec',
+    '--color',
+    'never',
+    '--dangerously-bypass-approvals-and-sandbox',
+    '-m',
+    String(modelId),
+    '-c',
+    `model_reasoning_effort=${String(effort)}`,
+  ]
+  if (cwd) args.push('-C', String(cwd))
+  if (outputFile) args.push('-o', String(outputFile))
+  args.push(String(prompt))
+  return args
+}
+
+/**
+ * May this run start at all? Returns the refusals, empty when it may.
+ *
+ * The checks are the ones whose absence is unrecoverable rather than merely
+ * annoying. Authoring straight onto `main`, or into the main checkout, would put
+ * an unreviewed model's commits on the deployed branch — and a dirty tree makes
+ * "what did Sol write" unanswerable afterwards, which is the question every
+ * check below it depends on.
+ */
+export function readinessProblems({ branch = '', worktree = '', mainCheckout = '', dirty = '' } = {}) {
+  const problems = []
+  const b = String(branch ?? '').trim()
+  if (!b) problems.push('the branch could not be read — refusing to author into an unknown ref')
+  else if (b === 'main' || b === 'HEAD') problems.push(`the branch is \`${b}\` — every point is authored on its own feat/ branch`)
+  const tree = String(worktree ?? '').replace(/[/\\]+$/, '')
+  const main = String(mainCheckout ?? '').replace(/[/\\]+$/, '')
+  if (!tree) problems.push('no worktree path was given')
+  else if (main && tree === main) {
+    problems.push('this is the MAIN checkout — the lane authors in an isolated worktree, never here')
+  }
+  if (String(dirty ?? '').trim()) {
+    problems.push('the tree already has uncommitted changes — what Sol then wrote could not be told apart from them')
+  }
+  return problems
+}
+
+/** The house rules the authoring prompt states, one per line. Exported so the
+ *  test pins them: a rule that quietly falls out of the prompt is a rule the
+ *  lane stops following, and nothing else would notice. */
+export const HOUSE_RULES = Object.freeze([
+  `Every commit ends with the trailer \`${SOL_TRAILER}\` — it is the ONLY machine-readable`,
+  '  record of who authored it, and a commit without it is REFUSED by a git hook.',
+  'COMMIT AT EVERY SELF-CONTAINED STEP, not at the end. An uncommitted tree is the one state',
+  '  nothing can rescue: if this run is killed, only what is committed survives.',
+  'Commit messages describe the CHANGE ITSELF, never the point number, and are written in English.',
+  'Do NOT push, do NOT merge, do NOT create or move a tag, and do NOT touch TASKS.md,',
+  '  the dashboard, .claude/settings.json or the git hooks. The branch is pushed for you.',
+  'Add or extend a test for everything you build, in the layer that can assert it:',
+  '  Vitest (jsdom, `npm run test:unit`) for logic, state and pure functions; the browser',
+  '  suites are NOT yours to run.',
+  'Before you finish: `npm run test:unit`, `npm run build` and `npm run lint` must all be green.',
+  '  Report their real result — a gate you did not run is reported as not run, never as green.',
+  'Where the brief is insufficient or contradicts the code, STOP and say what is missing.',
+  '  A guessed spec costs a rebuild, which is more expensive than the question.',
+])
+
+/**
+ * The prompt an authoring run is given.
+ *
+ * It carries the BRIEF rather than a reading assignment (point 365): the work
+ * order and design.md whole are ~108k tokens, the brief ~1.8k, and the whole
+ * saving of this lane would be spent on reading if it were not handed over.
+ *
+ * `findings` turns the same prompt into the SECOND leg of the loop — Claude has
+ * reviewed, and these are the findings to answer. That is where the four eyes
+ * actually close, so it is the same command rather than a separate one.
+ */
+export function buildAuthoringPrompt({ point = '', brief = '', branch = '', findings = '' } = {}) {
+  const answering = String(findings ?? '').trim()
+  return [
+    `You are AUTHORING work-order point ${point} for this repository as ${SOL_MODEL_NAME}.`,
+    'You were chosen for it: this project runs two authoring lanes from different vendors, and',
+    'the mechanical and mid-difficulty points are yours. A Claude session then REVIEWS what you',
+    'wrote, runs the browser suites, judges the rendered picture and lands it — so write for a',
+    'reviewer who will read every line, and leave nothing you would not defend.',
+    '',
+    `YOUR BRANCH: ${branch} — it is already checked out in the working directory, which is an`,
+    'isolated git worktree of the repository. Work only there.',
+    '',
+    'THE HOUSE RULES, which are not negotiable:',
+    // A rule that runs over one line continues INDENTED, not as a second bullet.
+    ...HOUSE_RULES.map((rule) => (/^\s/.test(rule) ? `    ${rule.trim()}` : `  - ${rule}`)),
+    '',
+    answering
+      ? [
+          'THIS IS THE SECOND LEG: your work was REVIEWED and the findings are below. Answer every',
+          'one of them — fix it, or say plainly why it is not a defect. Do not re-open what was not',
+          'questioned, and commit each answer as its own step.',
+          '',
+          '=== THE REVIEW FINDINGS ===',
+          answering,
+          '=== END OF FINDINGS ===',
+        ].join('\n')
+      : [
+          'THE SPEC IS THE BRIEF BELOW, in full. Do NOT read TASKS.md, docs/tasks-archive.md or',
+          'design.md whole — that is ~108k tokens and avoiding it is the point of the brief. Any',
+          'file or section the brief NAMES you may read on demand.',
+          '',
+          '=== THE BRIEF ===',
+          String(brief ?? '').trim() || '(no brief was attached — stop and report that)',
+          '=== END OF BRIEF ===',
+        ].join('\n'),
+    '',
+    'WHEN YOU ARE DONE, end your final message with exactly these lines and nothing after them:',
+    'DONE: <what you built, in one line>',
+    'GATES: <the result of test:unit, build and lint, in one line>',
+    'OPEN: <what you left undone or escalated, or the single word none>',
+  ].join('\n')
+}
+
+/** The closing lines of an authoring answer, read off the END of the message. */
+export function parseAuthoringAnswer(text) {
+  const clean = String(text ?? '').replace(/[*`_#>]/g, '')
+  const tail = clean.split('\n').map((l) => l.trim()).filter(Boolean).slice(-3)
+  const field = (line, name) => (new RegExp(`^[-*]?\\s*${name}\\s*:\\s*(.+)$`, 'i').exec(line ?? '')?.[1] ?? '').trim()
+  const done = field(tail[0], 'DONE')
+  const gates = field(tail[1], 'GATES')
+  const open = field(tail[2], 'OPEN')
+  if (!done || !gates || !open) return { ok: false, error: 'the message does not end in the DONE/GATES/OPEN lines' }
+  if (/^</.test(done) || /^</.test(gates)) return { ok: false, error: 'the closing lines are the placeholders echoed back' }
+  return { ok: true, done, gates, open, error: '' }
+}
+
+/**
+ * WHAT ACTUALLY HAPPENED, judged from git rather than from the run's own account.
+ *
+ * `commits` are the ones that appeared on the branch, newest first, each
+ * `{ sha, subject, trailers }`. The run's message is an input, never the
+ * verdict: a model that reports success while having committed nothing is the
+ * exact failure this lane must not paper over, and a stalled run that DID commit
+ * is worth keeping rather than throwing away.
+ */
+export function judgeAuthoring({ outcome = {}, commits = [], parsed = {}, dirty = '' } = {}) {
+  const list = Array.isArray(commits) ? commits : []
+  const problems = []
+  if (!list.length) {
+    problems.push('NOTHING WAS COMMITTED — the branch is where it started, so there is nothing to review')
+  }
+  for (const commit of list) {
+    const verdict = classifyTrailer(commit?.trailers ?? '')
+    if (verdict === 'forbidden') {
+      problems.push(`${short(commit.sha)} names a model outside the author allowlist (${String(commit.trailers).trim()})`)
+    } else if (verdict === 'unidentified') {
+      problems.push(`${short(commit.sha)} carries a trailer naming no single model — it cannot show who wrote it`)
+    } else if (!/sol/i.test(String(commit?.trailers ?? ''))) {
+      problems.push(`${short(commit.sha)} does not name ${SOL_MODEL_NAME} as its author — this lane's commits must`)
+    }
+  }
+  if (String(dirty ?? '').trim()) {
+    problems.push('the run left UNCOMMITTED changes behind — commit or discard them before the review')
+  }
+  if (!outcome?.ok) problems.push(`the codex run did not finish cleanly: ${outcome?.cause || 'no cause was reported'}`)
+  else if (!parsed?.ok) problems.push(`the run gave no usable closing report (${parsed?.error || 'no reason given'})`)
+  return {
+    // DELIVERED means reviewable work exists, which is not the same as a clean
+    // run: commits that survived a timeout are still the point's work.
+    delivered: list.length > 0,
+    clean: problems.length === 0,
+    problems,
+    commits: list,
+  }
+}
+
+const short = (sha) => String(sha ?? '').slice(0, 7)
+
+/**
+ * What the session is told, and what it must do next.
+ *
+ * The next steps are printed even after a bad run, because the state they act on
+ * is real either way — commits that exist are reviewed and landed or thrown
+ * away deliberately, never left lying on a branch nobody looked at.
+ */
+export function formatAuthoringReport({ point = '', branch = '', judged = {}, parsed = {}, reviewer = 'Opus 5', pushed = null } = {}) {
+  const lines = []
+  const commits = judged.commits ?? []
+  if (judged.delivered) {
+    lines.push(
+      `author-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) authored ${commits.length} commit(s) on ${branch}:`,
+      ...commits.map((c) => `    ${short(c.sha)}  ${c.subject ?? ''}`),
+    )
+  } else {
+    lines.push(`author-sol: ${SOL_MODEL_NAME} authored NOTHING on ${branch}.`)
+  }
+  if (parsed?.ok) {
+    lines.push(`  DONE:  ${parsed.done}`, `  GATES: ${parsed.gates}`, `  OPEN:  ${parsed.open}`)
+  }
+  if (pushed === true) lines.push(`  the branch is pushed — nothing of it lives only in this worktree.`)
+  if (pushed === false) lines.push('  PUSH FAILED — the work is committed but only local. Push it before anything else.')
+  if (judged.problems?.length) {
+    lines.push('', '  PROBLEMS with this run — none of them is closed by ignoring it:')
+    lines.push(...judged.problems.map((p) => `    · ${p}`))
+  }
+  if (!judged.delivered) return lines.join('\n')
+  lines.push(
+    '',
+    `  IT IS NOT REVIEWED, AND ${SOL_MODEL_NAME} MAY NOT REVIEW IT. The role swap makes the rest yours`,
+    `  (${reviewer}), in this order:`,
+    '    1. READ the diff and judge it — you are the second pair of eyes, so read the change',
+    '       before any explanation of it,',
+    '    2. run the gates and, for a render change, the picture on both backends,',
+    `    3. hand the findings back for a second leg:  node scripts/author-sol.mjs --point ${point} --findings <file>`,
+    '    4. record the review where a mechanism was touched:',
+    `       node scripts/mechanism-review.mjs --record <sha> --model "${reviewer}" --verdict <v> --evidence "<what you read>" --point ${point}`,
+    `    5. then land it:  node scripts/land-point.mjs ${point} --model "${SOL_MODEL_NAME}"`,
+  )
+  return lines.join('\n')
+}

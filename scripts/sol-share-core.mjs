@@ -90,12 +90,17 @@ export function settingPathFrom(gitCommonDir, repoRoot, { sep = '/' } = {}) {
 /**
  * Every kind of work this switch has an opinion about.
  *
- * `review` is the four-eyes review that already goes to Sol (point 624); the others are
- * the read-only kinds `scripts/ask-sol.mjs` can carry. AUTHORING is deliberately absent:
- * it is not routable under part A at all, and a kind listed here that nothing can route
- * would be a promise the switch does not keep.
+ * `review` is the four-eyes review that already goes to Sol (point 624), the middle ones
+ * are the read-only kinds `scripts/ask-sol.mjs` can carry, and `author` is the writing
+ * lane of point 667 — deliberately absent while nothing could route it, and added the
+ * moment `scripts/author-sol.mjs` existed to. It matters most: authoring is the largest
+ * single item of the spend, so the switch that exists to move load between two vendors
+ * would be missing its biggest lever without it.
  */
-export const KINDS = Object.freeze(['review', ...ASK_KINDS])
+export const KINDS = Object.freeze(['review', ...ASK_KINDS, 'author'])
+
+/** The kinds `scripts/ask-sol.mjs` carries — every kind that is pure reading. */
+export const READ_ONLY_KINDS = Object.freeze([...ASK_KINDS])
 
 export const KIND_NOTES = Object.freeze({
   review: 'the four-eyes review of a diff (scripts/review-sol.mjs)',
@@ -103,6 +108,7 @@ export const KIND_NOTES = Object.freeze({
   audit: 'the enumerating plausibility and bug-finding sweeps',
   enumerate: 'risk, test-case and option lists (a blind-parallel half)',
   explain: 'what a subsystem does, where something is handled',
+  author: 'authoring a mechanical or mid-difficulty point (scripts/author-sol.mjs)',
 })
 
 /**
@@ -111,21 +117,22 @@ export const KIND_NOTES = Object.freeze({
  * one, which is the point's "read this file rather than keeping their own copy".
  */
 const ROUTING = Object.freeze({
-  'claude-only': Object.freeze({ review: 'claude', diagnose: 'claude', audit: 'claude', enumerate: 'claude', explain: 'claude' }),
-  default: Object.freeze({ review: 'sol', diagnose: 'claude', audit: 'claude', enumerate: 'claude', explain: 'claude' }),
-  'prefer-sol': Object.freeze({ review: 'sol', diagnose: 'sol', audit: 'sol', enumerate: 'sol', explain: 'sol' }),
+  'claude-only': Object.freeze({ review: 'claude', diagnose: 'claude', audit: 'claude', enumerate: 'claude', explain: 'claude', author: 'claude' }),
+  default: Object.freeze({ review: 'sol', diagnose: 'claude', audit: 'claude', enumerate: 'claude', explain: 'claude', author: 'claude' }),
+  'prefer-sol': Object.freeze({ review: 'sol', diagnose: 'sol', audit: 'sol', enumerate: 'sol', explain: 'sol', author: 'sol' }),
 })
 
 /** One line per setting, saying what it is FOR — printed by `--status` and by `--help`. */
 export const SETTING_NOTES = Object.freeze({
   'claude-only': 'the escape hatch when the ChatGPT side is the scarce one — nothing goes to Sol',
   default: "today's behaviour: reviews to Sol, everything else to Claude",
-  'prefer-sol': 'every read-only kind goes to Sol; Claude keeps authoring, the suites, the pictures and the landing',
+  'prefer-sol': 'every read-only kind AND the authoring of a mechanical point goes to Sol; Claude reviews it, runs the suites, judges the picture and lands',
 })
 
 /** WHAT IS NEVER ROUTED, whatever the setting says. Printed, so nobody has to ask. */
 export const NEVER_ROUTED = Object.freeze([
-  'authoring a commit — the trailer names an author, and only the allowlist may',
+  'the HARD cases and anything whose verification is the work (scripts/author-routing-core.mjs decides)',
+  'REVIEWING what Sol itself authored — no model reviews its own work',
   'driving the browser suites and JUDGING the picture',
   'the landing (scripts/land-point.mjs) and the main session bookkeeping',
 ])
@@ -247,10 +254,12 @@ export function briefLine(state) {
   // as the operator's choice, and nobody repairs the file it actually came from.
   const mark = corrupt ? ' (FALLBACK — the share state file is unusable; repair it with `node scripts/sol-share.mjs --set <setting>`)' : ''
   if (value === 'prefer-sol') {
+    // The brief speaks to a DELEGATED agent, which is authoring already — so it is told
+    // about the reading kinds it can hand over, not about the authoring lane it is in.
     return (
-      `- SOL ROUTING is at \`prefer-sol\`: hand ${kindsToSol(value).filter((k) => k !== 'review').join('/')} to ` +
+      `- SOL ROUTING is at \`prefer-sol\`: hand ${kindsToSol(value).filter((k) => READ_ONLY_KINDS.includes(k)).join('/')} to ` +
       '`node scripts/ask-sol.mjs --kind <kind> --brief "…"` (material on stdin) instead of doing it in your own\n' +
-      `  context. You keep authoring, the gates, the suites and the pictures. Sol writes no commit.${mark}`
+      `  context. You keep the gates, the suites and the pictures; a read-only ask writes no commit.${mark}`
     )
   }
   if (value === 'claude-only') {

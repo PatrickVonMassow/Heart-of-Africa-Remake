@@ -304,7 +304,9 @@ coverage map live in `scripts/verify/README.md`.
   AUTHORS THE HARD CASES** (12.08.2026): difficult, complex or error-prone work goes to
   Fable FROM THE START, and Opus work MOVES there once Sol still finds problems after a
   re-work. OPENAI: **GPT-5.6 Sol** AUTHORS the MECHANICAL and MID-DIFFICULTY points
-  (13.08.2026) — never a hard case, never one whose verification IS the work. REVIEWERS:
+  through `node scripts/author-sol.mjs` (13.08.2026), the cut made by
+  `scripts/author-routing-core.mjs` — never a hard case, never one whose verification IS
+  the work. REVIEWERS:
   the OTHER vendor, never an author of the range —
   Sol at effort HIGH on Claude's work; where SOL authored, CLAUDE reviews, runs the
   suites, judges the picture and lands. Reviews run through `node
