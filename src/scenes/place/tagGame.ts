@@ -199,11 +199,13 @@ export interface TagChild {
   edgeSide: number
   /** Seconds left on that commitment. */
   edgeFor: number
-  /** Where this child last GOT somewhere, and how long ago — a child that walks
-   *  without covering ground is as stuck as one that cannot move at all
-   *  (point 648). See `trackProgress`. */
+  /** The start, walked distance and furthest reach of the current progress
+   *  window — a child that walks without covering ground is as stuck as one
+   *  that cannot move at all (point 648). See `trackProgress`. */
   anchorX: number
   anchorZ: number
+  anchorWalked: number
+  anchorOut: number
   anchorFor: number
   /** Eased posture, 0 = upright, `leanAtSprint` = flat out. */
   lean: number
@@ -352,6 +354,8 @@ export function createTagGame(
       edgeFor: 0,
       anchorX: p.x,
       anchorZ: p.z,
+      anchorWalked: 0,
+      anchorOut: 0,
       anchorFor: 0,
       lean: 0,
       held: false,
@@ -544,6 +548,12 @@ function wayOpen(
  *  only one that is going nowhere ever reaches it. */
 const PROGRESS_AWAY = 3
 
+/** How much farther the legs may travel than the ground they cover before the
+ *  progress watch calls it shuffling. This is the rescue-side form of the
+ *  short trace measure's path/ground ratio: ordinary turns cover well over a
+ *  fifth of their path, while a fast shiver repeatedly spends the same ground. */
+const PROGRESS_RATIO = 5
+
 /** How far off the straight flee the freshly-tagged child breaks away while
  *  its immunity runs — 60°: enough that the inbound and outbound legs of the
  *  tag U-turn no longer cancel inside a one-second window, small enough that
@@ -582,8 +592,19 @@ function nearWalkable(
  * The anchor is re-taken here too, so the frame that freed a child cannot charge
  * it a second rescue from the other watch a few lines later.
  */
-function escapeNudge(c: TagChild, world: TagWorld): void {
-  const free = world.nudge(c.x, c.z)
+function escapeNudge(c: TagChild, world: TagWorld, fromProgress = false): void {
+  // A child that is physically pinned asks for free ground around where it is.
+  // A child shuffling on otherwise-open ground is already standing somewhere
+  // valid, so asking about that same point returns it unchanged and cannot
+  // break the steering loop. Put the progress rescue beyond the whole observed
+  // oscillation before resolving that requested point against the ground. One
+  // old anchor-radius (0.9 m) left the reported seed in the same loop (26
+  // rescues in 90 s); two radii ended it with one rescue, carrying 2.30 m.
+  let free = world.nudge(c.x, c.z)
+  if (fromProgress && (!free.found || Math.hypot(free.x - c.x, free.z - c.z) < 1e-6)) {
+    const away = world.childRadius * PROGRESS_AWAY * 2
+    free = world.nudge(c.x + Math.sin(c.heading) * away, c.z + Math.cos(c.heading) * away)
+  }
   if (free.found) {
     // How far the settlement moved it, recorded where it is known (point 656).
     c.carried += Math.hypot(free.x - c.x, free.z - c.z)
@@ -597,6 +618,8 @@ function escapeNudge(c: TagChild, world: TagWorld): void {
   c.pinned = 0
   c.anchorX = c.x
   c.anchorZ = c.z
+  c.anchorWalked = c.walked
+  c.anchorOut = 0
   c.anchorFor = 0
 }
 
@@ -630,8 +653,19 @@ export function absorbSeparation(
     c.pinned = 0
     c.anchorX = c.x
     c.anchorZ = c.z
+    c.anchorWalked = c.walked
+    c.anchorOut = 0
     c.anchorFor = 0
   }
+}
+
+/** Begin a fresh, complete progress window at the child's current ground. */
+function resetProgress(c: TagChild): void {
+  c.anchorX = c.x
+  c.anchorZ = c.z
+  c.anchorWalked = c.walked
+  c.anchorOut = 0
+  c.anchorFor = 0
 }
 
 /**
@@ -646,13 +680,19 @@ export function absorbSeparation(
  * So progress is watched instead of motion. Half the window without covering
  * ground gives up whatever way round the child had committed to — the cheap
  * answer, and usually enough. The whole window asks the settlement for free
- * ground, the same escape a child that cannot move at all is given.
+ * ground when the child's legs travelled a real distance but reached less than
+ * a fifth of it, the same standard as the trace measure.
+ *
+ * THE WINDOW MUST FINISH BEFORE ITS ANCHOR MOVES (point 666). Resetting it the
+ * instant the child crossed `childRadius * PROGRESS_AWAY` made the rescue blind
+ * to a shiver wider than that radius: every swing re-took the anchor and set
+ * `anchorFor` back to zero, so the rescue could be postponed forever. A healthy
+ * walk now renews the anchor only at the end of the window; a wide, fast
+ * out-and-back spends the same ground for that whole window and is rescued.
  */
 function trackProgress(c: TagChild, dt: number, cfg: TagConfig, world: TagWorld): void {
   if (!(c.pace > 0) || c.held) {
-    c.anchorX = c.x
-    c.anchorZ = c.z
-    c.anchorFor = 0
+    resetProgress(c)
     // A child that is not walking is not stuck on anything — it is standing
     // because the round is over or because it was TOLD to (point 656). Leaving
     // the count of the frames before it standing would fire a teleport on the
@@ -661,18 +701,22 @@ function trackProgress(c: TagChild, dt: number, cfg: TagConfig, world: TagWorld)
     c.pinned = 0
     return
   }
-  if (Math.hypot(c.x - c.anchorX, c.z - c.anchorZ) > world.childRadius * PROGRESS_AWAY) {
-    c.anchorX = c.x
-    c.anchorZ = c.z
-    c.anchorFor = 0
-    return
-  }
+  c.anchorOut = Math.max(c.anchorOut, Math.hypot(c.x - c.anchorX, c.z - c.anchorZ))
   c.anchorFor += dt
-  if (c.anchorFor >= cfg.unstuckSeconds * 0.5 && c.edgeFor > 0) {
+  if (
+    c.anchorFor >= cfg.unstuckSeconds * 0.5 &&
+    c.anchorOut <= world.childRadius * PROGRESS_AWAY &&
+    c.edgeFor > 0
+  ) {
     c.edgeSide = 0
     c.edgeFor = 0
   }
-  if (c.anchorFor >= cfg.unstuckSeconds) escapeNudge(c, world)
+  if (c.anchorFor < cfg.unstuckSeconds) return
+
+  const walked = Math.max(0, c.walked - c.anchorWalked)
+  const walkedEnough = walked > world.childRadius * PROGRESS_AWAY
+  if (walkedEnough && c.anchorOut * PROGRESS_RATIO < walked) escapeNudge(c, world, true)
+  else resetProgress(c)
 }
 
 /**

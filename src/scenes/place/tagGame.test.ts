@@ -1673,6 +1673,45 @@ describe('the rescue is a finding, not an escape (point 656)', () => {
     expect(c.nudges).toBeGreaterThanOrEqual(2) // rescued once per window
   })
 
+  it('finishes the progress window when a shiver crosses the old anchor radius', () => {
+    // The shipped failure (point 666): at sprint pace each 0.28 s leg crosses
+    // the old 0.9 m anchor radius, then reverses. Re-taking the anchor on every
+    // crossing reset `anchorFor` forever even though five metres of walking
+    // covered barely one metre of ground in each rescue window.
+    const s = game([[0, 0]])
+    const steer: TagSteer = (_i, st) => ({
+      heading: Math.floor(st.clock / 0.28) % 2 === 0 ? 0 : Math.PI,
+      pace: CFG.sprintSpeed,
+    })
+    let crossedOldRadius = false
+    run(s, CFG.unstuckSeconds + 0.3, OPEN, CFG, 1 / 60, (st) => {
+      const c = st.children[0]
+      crossedOldRadius ||= Math.hypot(c.x - c.anchorX, c.z - c.anchorZ) > CHILD_R * 3
+    }, steer)
+    const c = s.children[0]
+    expect(crossedOldRadius).toBe(true)
+    expect(c.walked).toBeGreaterThan(CFG.sprintSpeed * CFG.unstuckSeconds)
+    expect(c.pinned).toBe(0) // it moved every frame; only progress can see it
+    expect(c.nudges).toBe(1)
+  })
+
+  it('does not rescue an efficient walk merely because its window completed', () => {
+    const s = game([[0, 0]])
+    run(
+      s,
+      CFG.unstuckSeconds * 3,
+      OPEN,
+      CFG,
+      1 / 60,
+      undefined,
+      () => ({ heading: 0, pace: CFG.sprintSpeed }),
+    )
+    const c = s.children[0]
+    expect(c.walked).toBeGreaterThan(CFG.sprintSpeed * CFG.unstuckSeconds * 2)
+    expect(c.nudges).toBe(0)
+    expect(c.anchorFor).toBeLessThan(CFG.unstuckSeconds)
+  })
+
   it('a child told to stand loses the stall it walked in with', () => {
     // A stale count from BEFORE a hold would fire a teleport on the first
     // blocked frame after it, on a child that had just been asked to stand.
