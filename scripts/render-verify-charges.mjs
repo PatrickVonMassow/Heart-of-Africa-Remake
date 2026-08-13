@@ -45,11 +45,12 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
-    point: 657,
+    point: 666,
     suite: 'polish',
     kind: 'check',
     match: /no child walks without getting anywhere/i,
     why:
+      'Inherited by 666 at the 657 tick (13.08.2026), exactly as 666 was filed to do. ' +
       'RESIDUAL after the point-657 second round (measured 13.08.2026 on the deterministic ' +
       'replay panel). The first-round carve, orbit and peel took the live worst-child shares ' +
       'from red-in-3-of-10 (to 1.53 %) to one red in ten (WebGL 2 0.44 %, WebGPU worst 0.23 %); ' +
