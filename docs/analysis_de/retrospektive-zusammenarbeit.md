@@ -47,6 +47,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 09.08. | Ein Punkt wartete auf ein Tor, das nicht aufgehen konnte: die Zuordnung der Fehlschläge war getroffen, aber nie in das Register eingetragen, das der Wächter liest (§3.97) |
 | 09.08. abends | Spielsitzung: zwölf Defekte in einer Mechanik, deren zwölf Punkte alle abgenommen waren — grün gegen einen Stellvertreter (Punkt 589); die veröffentlichte Reihenfolge zweimal falsch, weil sie eine zweite Heimat hat (Punkt 590, Rückfall in §3.77); ein abgehakter Punkt mit unerfülltem drittem Liefergegenstand, gefunden durch eine Nutzerfrage (§3.99) |
 
+| 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1308,7 +1309,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 12.08.2026, 18:10 · Quellen-Fingerprint: `0a04f8ecb8bd…`
+Zuletzt aktualisiert: Donnerstag, 13.08.2026, 14:49 · Quellen-Fingerprint: `a464e8345c6e…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1361,6 +1362,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Always take the point boundary autonomously at a closed point — never ask the user whether to hand over or /clear | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
 | Per-point QA runs scoped (Vitest always, browser suites by diff mapping, flake-retry single suites) — WATCHDOG duty to report any bug that slips through | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Edits to .claude/settings.json and .git/hooks ALWAYS trigger a permission prompt (harness safety layer, allowlist cannot override); never schedule such work for unattended night batches | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| How to read Patrick's two usage dashboards, and the standing order to spend OpenAI volume before Anthropic | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | hoa uses a feature-branch workflow — each TASKS point on feat/<point>-<slug>, push the branch after every commit, merge to main only when done+verified; cross-cutting changes go straight to main | 2 | mittel | commit-scope-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Direct pushes to main are approved despite GitHub's branch protection — never ask about switching to pull requests again | 1 | niedrig | push-arrival-guard.mjs | ✔ Mechanismus |
 | Order the TASKS/queue so known-bug fixes + user-requested extensions come BEFORE the big bug-FINDING / QA-framework tickets | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
@@ -1394,10 +1396,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 78 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 52 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
+Erfasste Quellen: 79 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 52 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
 
-<!-- RETRO-FINGERPRINT: 0a04f8ecb8bd3891b7cfcec82f7e747416dc7206fea27079f57ab22b8a7f4110 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-12T16:10:02.555Z -->
+<!-- RETRO-FINGERPRINT: a464e8345c6e35cea98d189a023efd62b5f6a8ffb57d19852cb94f3a1b18931c -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-13T12:49:53.690Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1481,3 +1483,30 @@ Neustart löscht, ist nicht gesichert, sondern bloß noch nicht verloren.
 wiederfindet — in das git-ignorierte `local/` des Repositories, nicht nur in den Kratzraum des
 Prozesses. Und die Wartedeklaration ist der richtige Zeiger darauf: Sie ist ohnehin das
 Einzige, was eine tote Sitzung über ihre laufende Arbeit hinterlässt.
+
+### 3.115 Der Prüfer fand den Fehler — und die Kur war schlechter als der Fehler
+
+Punkt 657 war gelandet, gemessen und am Bild geprüft, als die Nachprüfung durch das
+Fremdmodell eine zweite Klippe im geheilten Mechanismus benannte: Der Vorzeichen-Test, der
+entscheidet, welchen Weg herum ein fliehendes Kind nimmt, hat seine eigene Sprungstelle, und
+die liegt mitten im Bereich, den die Kur der zweiten Runde gerade geglättet hatte. Der Befund
+war richtig — nachgerechnet, reproduziert, kein Fehlalarm.
+
+Der reflexhafte nächste Schritt wäre gewesen, ihn zu beheben: Die Korrektur ist klein, sie
+schließt die Klippe nachweislich, und ein grüner Test hätte sie bestätigt. Gemessen wurde
+trotzdem, über zehn Dorf-Minuten und fünf Varianten der Kur — und jede einzelne verschlechterte
+gesunde Dörfer um ein Viertel mehr Rettungseingriffe bei weniger Fängen. Es ist dieselbe
+Messlatte, an der in derselben Woche schon zwei andere Kuren gescheitert sind: Eine Regel, die
+stark genug ist, ein seltenes Fehlverhalten zu unterbinden, verbiegt das Spiel überall dort,
+wo es nichts zu unterbinden gibt.
+
+Der Ausgang ist deshalb kein Fix, sondern eine Buchung: Der Auslöser hängt an der bestehenden
+Zuschreibung des Rest-Rots, die Messwerte stehen im Code neben der Stelle, die sie betreffen,
+und ein neuer Test schützt die intakte Hälfte des Mechanismus gegen späteres Abdriften. Das
+Fremdmodell hat diese Entscheidung in der zweiten Runde ausdrücklich freigegeben.
+
+**Lehre:** Ein bestätigter Prüferbefund verpflichtet zur Untersuchung, nicht zur Änderung. Die
+Frage ist nie „lässt sich das beheben?", sondern „was kostet die Behebung an anderer Stelle?" —
+und die Antwort darauf ist eine Messung, kein Urteil. Ein Befund, dessen Kur teurer ist als er
+selbst, wird mit seinem Mechanismus und seinen Zahlen aktenkundig gemacht und dem Punkt
+zugeschrieben, der ihn erbt; verschwiegen werden darf er nicht, still behoben aber auch nicht.
