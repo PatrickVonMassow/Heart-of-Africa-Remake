@@ -14,7 +14,7 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
-import { READ_COUNT, READ_GAP_FRAMES, READ_GAP_NET_MS, READ_GAP_MS, SHOT_DRIFT_BAR, luminanceSamples, settleReading, shotDrift, shotReading } from './cropLuma.mjs'
+import { READ_COUNT, READ_GAP_FRAMES, CONFIRM_READS, READ_GAP_NET_MS, READ_GAP_MS, SHOT_DRIFT_BAR, luminanceSamples, settleReading, shotDrift, shotReading } from './cropLuma.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -2686,11 +2686,12 @@ if (section('settlement-edge')) {
    *  because on a throttled machine time passes while the picture does not; and
    *  the page's own elapsed time, because a fast machine could draw twelve
    *  frames in a fraction of a second. MEASURED here (cropLuma.mjs): a §19.13
-   *  streak stays in the crop under 135 ms and the scene draws ~6.8 fps headless
-   *  at giza, so twelve frames are ~1.75 s — the frame condition alone already
-   *  outlasts the streak thirteen times over, and the 600 ms is the floor that
-   *  keeps that true on a machine that draws faster. This polls the PAGE's
-   *  clock, which is the clock the rain falls on, not a sleep in the harness. */
+   *  streak stays in the crop under 270 ms — the bound the sampling actually
+   *  proves — and the scene draws ~6.8 fps headless at giza, so twelve frames are
+   *  ~1.75 s and the frame condition alone outlasts the streak about six times
+   *  over. The 600 ms is the floor that keeps that true on a machine that draws
+   *  faster. This polls the PAGE's clock, which is the clock the rain falls on,
+   *  not a sleep in the harness. */
   const readGap = (ms = READ_GAP_MS, frames = READ_GAP_FRAMES) =>
     page.evaluate(
       ([wait, n, netMs]) =>
@@ -2782,7 +2783,7 @@ if (section('settlement-edge')) {
       await page.evaluate((s) => { window.__balance.placeEdgeBand.strength = s }, strength)
       if ((await settledLuma(ndc, 0.2)) === null) return null
       const reads = []
-      for (let i = 0; i < READ_COUNT; i++) {
+      for (let i = 0; i < READ_COUNT + CONFIRM_READS; i++) {
         // A starved gap is a FAILED shot, not a faster one: reads that are not
         // far enough apart are not independent pictures, and the rain rejection
         // is exactly what that independence buys.
@@ -2802,7 +2803,8 @@ if (section('settlement-edge')) {
         console.log(`# shot REJECTED — the crop moved ${(drift * 100).toFixed(3)} % between its first and last reads (bar ${(SHOT_DRIFT_BAR * 100).toFixed(1)} %)`)
         return null
       }
-      return shotReading(reads)
+      // The confirmation read is the guard's, not the measurement's.
+      return shotReading(reads.slice(0, READ_COUNT))
     }
     // ON, OFF, ON — and the two ONs averaged. In the rains the ground SOAKS
     // while the shots are taken (the §19.13 wet accumulation keeps darkening

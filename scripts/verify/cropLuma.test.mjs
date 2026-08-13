@@ -21,6 +21,7 @@ import {
   READ_COUNT,
   READ_GAP_FRAMES,
   READ_GAP_MS,
+  CONFIRM_READS,
   SETTLE_DROP_BRIGHTEST,
   SHOT_DRIFT_BAR,
   STREAK_LINGER_MS,
@@ -448,44 +449,74 @@ describe('shotDrift — the scene must not move while the shot is taken', () => 
 
   it('is zero on a scene that stood still', () => {
     const c = clean()
-    expect(shotDrift([c, c, c, c, c])).toBeCloseTo(0, 12)
+    expect(shotDrift([c, c, c, c, c, c])).toBeCloseTo(0, 12)
+  })
+
+  it('needs the confirmation read, and says so rather than guessing', () => {
+    // Five reads cannot be split into two non-overlapping halves of three, and
+    // a smaller half is not rain-robust. The guard reads back null instead of a
+    // number it cannot stand behind.
+    const c = clean()
+    expect(CONFIRM_READS).toBe(1)
+    expect(shotDrift([c, c, c, c, c])).toBeNull()
   })
 
   it('is unmoved by the rain, which is what lets it be a bar at all', () => {
     const c = clean()
     const s = streaked()
     for (const reads of [
-      [s, c, c, c, c],
-      [c, c, s, c, c],
-      [c, c, c, c, s],
-      [s, c, c, c, s],
+      [s, c, c, c, c, c],
+      [c, c, s, c, c, c],
+      [c, c, c, c, c, s],
+      [s, c, c, c, c, s],
+      [c, c, c, s, c, c],
     ]) {
       expect(shotDrift(reads)).toBeLessThan(SHOT_DRIFT_BAR)
     }
   })
 
-  it('CATCHES a defect arriving in the last two reads, in either sign', () => {
+  it('CATCHES a defect arriving in the last two measured reads, in either sign', () => {
     const c = clean()
     for (const late of [brighter(), darker()]) {
-      const reads = [c, c, c, late, late]
+      const reads = [c, c, c, late, late, late]
       // The reading alone cannot see it — that is precisely the hole.
-      expect(shotReading(reads)).toBeCloseTo(shotReading([c, c, c, c, c]), 10)
+      expect(shotReading(reads.slice(0, 5))).toBeCloseTo(shotReading([c, c, c, c, c]), 10)
       // The drift does, and the shot is refused rather than measured.
       expect(shotDrift(reads)).toBeGreaterThan(SHOT_DRIFT_BAR)
     }
   })
 
+  it('CATCHES one that reaches only the LAST measured read — what the confirmation read is for', () => {
+    // The case the overlapping split was blind to: with halves [1,2,3] and
+    // [4,5,6], a change arriving at read 5 and staying is two of the last three
+    // and cannot be dropped by that half's median.
+    const c = clean()
+    for (const late of [brighter(), darker()]) {
+      const reads = [c, c, c, c, late, late]
+      expect(shotReading(reads.slice(0, 5))).toBeCloseTo(shotReading([c, c, c, c, c]), 10)
+      expect(shotDrift(reads)).toBeGreaterThan(SHOT_DRIFT_BAR)
+    }
+  })
+
+  it('treats a change seen ONLY in the confirmation read as the rain it cannot be told from', () => {
+    // Read six is not in the measurement, so a single differing read there
+    // changes nothing that was measured — and one read is exactly what a streak
+    // looks like. Refusing the shot on it would reject good shots for rain.
+    const c = clean()
+    expect(shotDrift([c, c, c, c, c, brighter()])).toBeLessThan(SHOT_DRIFT_BAR)
+  })
+
   it('catches it arriving mid-shot as well as at the end', () => {
     const c = clean()
     const late = brighter()
-    expect(shotDrift([c, c, late, late, late])).toBeGreaterThan(SHOT_DRIFT_BAR)
+    expect(shotDrift([c, c, late, late, late, late])).toBeGreaterThan(SHOT_DRIFT_BAR)
   })
 
   it('does not fire on a defect that was there for the whole shot', () => {
     // Present throughout is not drift — it is the measurement, and it must
     // reach the criterion rather than be thrown away as an unstable shot.
     const leaked = darker()
-    expect(shotDrift([leaked, leaked, leaked, leaked, leaked])).toBeCloseTo(0, 12)
+    expect(shotDrift([leaked, leaked, leaked, leaked, leaked, leaked])).toBeCloseTo(0, 12)
   })
 
   it('sits well clear of what a settled scene actually does', () => {
@@ -498,5 +529,6 @@ describe('shotDrift — the scene must not move while the shot is taken', () => 
     expect(shotDrift([])).toBeNull()
     expect(shotDrift(null)).toBeNull()
     expect(shotDrift([new Float64Array(3), new Float64Array(3)])).toBeNull()
+    expect(shotDrift(new Array(6).fill(new Float64Array(0)))).toBeNull()
   })
 })

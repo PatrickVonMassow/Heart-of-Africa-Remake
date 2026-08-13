@@ -212,22 +212,36 @@ export function shotReading(reads) {
  * one-sided (`settleReading`), so a BRIGHTENING that begins after the settle and
  * covers part of the crop could slip in unseen.
  *
- * This is the second defence, and it is sign-agnostic: read the first three and
- * the last three separately. Each sub-window is still rain-robust — a streak
+ * This is the second defence, and it is sign-agnostic: read the first half and
+ * the last half separately. Each sub-window is still rain-robust — a streak
  * reaches one of three and the median drops it — so a crossing does not move
  * either half, while anything that ARRIVES and STAYS moves the second and not
  * the first. Returned as a fraction of the reading, so it compares against the
  * same bar the criterion uses.
  */
 export function shotDrift(reads) {
-  if (!Array.isArray(reads) || reads.length < 3) return null
-  const half = Math.ceil(reads.length / 2)
+  // The halves must not OVERLAP and each must hold three, or the guard has the
+  // hole it exists to close. With five reads and overlapping halves the last
+  // window was [3,4,5] and a change present only in read 5 was one of three —
+  // dropped by that window's own median, so the drift read zero on exactly the
+  // late arrival this is for. Hence the CONFIRMATION read (`READ_COUNT + 1`):
+  // the halves are [1,2,3] and [4,5,6], a change arriving at read 4 or 5 and
+  // staying is two of the last three and cannot be dropped, and one that appears
+  // only in read 6 never entered the measurement at all — read 6 is not part of
+  // it. Three per half is the floor at which a single streak is still a minority.
+  if (!Array.isArray(reads) || reads.length < 6) return null
+  const half = Math.floor(reads.length / 2)
+  if (half < 3) return null
   const first = shotReading(reads.slice(0, half))
   const last = shotReading(reads.slice(reads.length - half))
   const whole = shotReading(reads)
   if (first === null || last === null || !(whole > 0)) return null
   return Math.abs(first - last) / whole
 }
+
+/** The extra read taken AFTER the ones that are measured, so the last measured
+ *  read has something to be confirmed against. It never enters the reading. */
+export const CONFIRM_READS = 1
 
 /**
  * How much drift is still the scene standing still. MEASURED over 54 shots of a
