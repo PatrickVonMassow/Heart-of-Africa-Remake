@@ -17880,3 +17880,19 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   report NAMES the nudge count it observed.
   Criticality: high — it is the proof that the user's own bug report stays fixed.
   Bundle: Dorfleben.
+
+- [x] 661. A CARD'S END TIME MUST NOT AGE SILENTLY BETWEEN TURNS (user 12.08.2026: "Die
+  Endzeit der aktuellen Karte ist 50 min in der Vergangenheit. Ich denke wir haben einen
+  Mechanismus, dass eine Schätzung maximal um ein paar Minuten veralten kann."). THE GAP,
+  measured that evening: the `now-eta-past` audit fires only inside `--synced`/`attest` — i.e.
+  at a TURN END. A session waiting on a delegated agent produces no turn end for an hour, so
+  the promise on the published board expired 50 minutes deep while every mechanism held green.
+  FINAL STATE: the ETA is checked and refreshed wherever the session's waiting heartbeat
+  already runs — the in-flight re-declaration (`batch-in-flight.mjs`) refuses to record a wait
+  whose now-card ETA lies in the past, naming the card, so every ~45-minute re-declaration
+  bounds the staleness; and the launcher tick alerts on a published board whose now-card ETA is
+  older than one tick, catching the ownerless case too. VERIFIABLE: Vitest over the pure
+  decision (a wait with a past ETA is refused, a future one passes), and the launcher-tick
+  check pinned like its board-behind sibling.
+  Criticality: medium — the board is the user's only window into the batch.
+  Bundle: Chat & Tafel.

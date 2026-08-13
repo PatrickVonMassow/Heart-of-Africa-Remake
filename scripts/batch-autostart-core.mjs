@@ -866,3 +866,43 @@ export function firewallTopUpDecision({ pidText = null, cmdlineOf = () => null }
   }
   return { start: true, reason: 'no top-up on record', pid: 0 }
 }
+
+// --- THE PUBLISHED PROMISE MUST NOT AGE UNWATCHED (point 661) ------------------
+// The in-flight refusal (batch-in-flight-core.mjs) bounds the staleness of a
+// now-card's "~HH:MM" while a session is waiting — but only while a session
+// exists to re-declare. The launcher tick is the layer that still speaks in the
+// ownerless case, so it calls out a PUBLISHED board whose current-work promise
+// lies more than one tick in the past. A log line in the board watchdog's style,
+// never a spawn reason and never a failure: the launcher's job is resurrecting
+// the batch, and a stale promise may not get in that job's way.
+
+/** How far past a published "~HH:MM" may stand before the tick calls it out:
+ *  one launcher tick — anything younger may simply not have been seen yet. */
+export const ETA_OVERDUE_ALERT_MIN = 15
+
+/**
+ * The launcher's log line for overdue published promises, or null when there is
+ * nothing to say. PURE, pinned like its board-behind sibling. `overdue` is the
+ * watchdog child's `etaOverdue` — `pastEtaCards` of the LIVE page — and anything
+ * malformed answers null (the child is a separate process; its output is data,
+ * not trusted structure).
+ */
+export function staleEtaLogLine({ overdue, tickMin = ETA_OVERDUE_ALERT_MIN } = {}) {
+  // No coercion (Sol review, point 661): a numeric STRING is malformed child
+  // output, and malformed answers nothing — `Number("16")` would alert on it.
+  const stale = (Array.isArray(overdue) ? overdue : []).filter(
+    (c) => typeof c?.minutesPast === 'number' && Number.isFinite(c.minutesPast) && c.minutesPast > tickMin,
+  )
+  if (stale.length === 0) return null
+  const cards = stale
+    .map(
+      (c) =>
+        `${Array.isArray(c.points) && c.points.length ? c.points.join(', ') : '?'} ` +
+        `("${c.meta ?? ''}", ${Math.round(c.minutesPast)} min past)`,
+    )
+    .join('; ')
+  return (
+    `board: the published now-card ETA has passed by more than a tick — point ${cards}. ` +
+    'The reader sees a stalled batch; the working session must refresh the "~HH:MM" and republish.'
+  )
+}

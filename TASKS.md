@@ -216,57 +216,6 @@ put it is the mistake this line exists to stop.
   Criticality: medium — the boundary is what tells the player where the settlement ends
   and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
 
-- [ ] 453. WHAT IS THE LION EATING? (user bug report 30.07.2026,
-  `local/WasFrisstDerLoewe.zip`, seed 1608676381, east region at the river, WebGPU/high:
-  "Er scheint zu fressen und die Geier kreisen, aber ich sehe keine Beute"; bundle Kadaver &
-  Geier). In the frame the lion stands head-down in its feeding pose, vulture shadows circle
-  over the ground — and there is no prey body anywhere. Two candidates, both consistent with
-  the code: (a) the carcass was consumed (`carcassSeconds` reached 0 and it was removed) while
-  the feeding pose and the vulture staging carry on — a state that does not clear when its
-  subject disappears; (b) what remains is the prey remnant of `Wildlife.tsx` (the scrap left at
-  the kill site), which renders as a small white sphere and reads to a human as nothing at all.
-  Find out which by reproducing from the seed, then fix so that the picture always answers the
-  question: while a predator feeds, something recognisable as prey lies under it; when the
-  carcass is gone, the pose and the vultures end with it.
-  VERIFIABLE: Vitest on the behaviour — a predator's feeding state cannot outlive its carcass,
-  and a remnant that keeps vultures on station is itself renderable; plus a browser frame from
-  that seed showing predator and prey together, on both backends.
-
-- [ ] 628. THE HOLD-CTRL LAYER LABELS A CAMP TWICE AND NAMES THE PLAYER'S OWN BOAT
-  (found 11.08.2026 while re-testing the roster for point 600, and deliberately not fixed
-  there: both halves are a judgment about what the layer PROMISES, not a defect in the
-  state coverage that point closed).
-  FINAL STATE:
-  1. A PITCHED CAMP CARRIES EXACTLY ONE LABEL. `CampMarkers` in
-     `src/scenes/travel/TravelScene.tsx` draws a permanent `map-label` reading
-     `labels.camp` AND registers the same object with the hold-Ctrl layer, whose text is
-     that same word — so holding Ctrl stacks two identical boxes over one camp. The camp
-     STAYS in point 342's roster, which names "a pitched camp, a set-down canoe"
-     explicitly, so the cure is the one the elder already uses: an object that carries a
-     permanent label of its own is not offered a second time by the Ctrl layer, whoever
-     draws it. Stating that as a rule about permanent labels, not a per-object exception,
-     is the point — a second exception list would rot the way the first one nearly did.
-  2. THE TRAVELLER'S OWN CANOE IS NOT NAMED. The marked canoe groups at the same call site
-     are the boat the player rides or drags. The layer's promise is "what am I looking
-     at", and the player's own vehicle is not that. A canoe SET DOWN in the world keeps
-     its label, per the same roster line.
-  3. TWO LABELS NEVER OVERLAP INTO ONE UNREADABLE BOX (seen 11.08.2026 in
-     `verification/148-ctrl-actor-labels-village.png`, the point-600 evidence frame). Where
-     two villagers stand close, their boxes overlap and the picture reads "Villager llager"
-     and "Villa Villager" — each label is correct, the PICTURE is not, and no test looks at
-     it because every check asks the DOM whether the text is present. The layer therefore
-     declutters: boxes that would overlap are offset, or the further one is dropped while
-     the nearer keeps its name. Which of the two is a judgment to make at the picture, on a
-     crowd, not in the abstract.
-  VERIFIABLE: the pure source/roster test gains both cases — a pitched camp yields exactly
-  one offered label, a ridden or dragged canoe yields none while a set-down one yields its
-  own; the declutter is judged AT THE FRAME on a crowded village, since a DOM assertion is
-  exactly the proxy that let this through; plus the browser check that asks the scene what
-  it DREW asserts that no two labels of identical text stand at one position.
-  Criticality: low — nothing breaks, but a doubled box is exactly the noise the elder
-  exception exists to prevent, and naming the player's own boat makes the layer read as
-  though it labels everything indiscriminately.
-
 - [ ] 651. THE VILLAGE DRUM BED IS A 1.9-SECOND LOOP (user 11.08.2026, testing the deployed
   `main`, build e1bd2fa, in the Bambara village: "Das monotone Trommel-Ambient-Geräusch nervt
   übrigens total.").
@@ -316,45 +265,6 @@ put it is the mistake this line exists to stop.
   Criticality: medium — no player sees it, but an unexplained red on the release branch makes
   the picture gate untrustworthy exactly where the release needs it.
 
-- [ ] 658. THE EGRESS ALLOWANCE MUST SURVIVE A CONTAINER RESTART AND THE HOURS AFTER IT (user
-  12.08.2026: "Das ist auch schon zum zweiten Mal passiert. Sorge dafür, dass das den
-  Container-Neustart überlebt. Deine bisherige Maßnahme scheint also nicht wirksam gewesen zu
-  sein."). MEASURED, and confirmed independently by GPT-5.6 Sol at effort high (diagnose,
-  12.08.2026): the container's egress allowance is an ipset of RESOLVED IP LITERALS, written
-  once by `.devcontainer/init-firewall.sh` at container start. `api.openai.com` is in that
-  domain list, so the boot run is not what is missing — the addresses behind that name ROTATE,
-  and the set keeps the snapshot. `api.github.com` survives because GitHub publishes CIDRs and
-  the script adds those. The periodic top-up that was meant to re-resolve never ran once (fixed
-  12.08.2026 in `scripts/batch-autostart.mjs`: a missing pid file on a fresh container threw out
-  of the whole block), and even now it runs on the launcher's 15-minute tick.
-  FINAL STATE: a cross-vendor review, a model call or a package fetch never fails on a stale
-  allowance, on a container that has just come up or one that has run for a day. Concretely:
-  1. The refresh is TTL-AWARE, not tick-shaped: it re-resolves at about half the shortest TTL
-     of the names it holds (single-digit minutes for these hosts, not 15), with jitter.
-  2. It is ARMED BY THE CONTAINER'S OWN START, not by whoever happens to open a session — the
-     same boot path that arms the batch launcher, so a restart restores it unattended.
-  3. It does not GROW without bound: the dynamic names live in their own set, refreshed by
-     generation or by entry timeout, so a day of rotation does not leave a day of addresses
-     standing. The static, published-CIDR names stay where they are.
-  4. Every failure is LOUD, never skipped: the refresher not starting or dying, `sudo -n`
-     refused, the set missing, DNS returning nothing, an insert failing, or the post-refresh
-     probe still unreachable. A DNS failure keeps the last entries for a bounded grace period
-     and is reported as a failure, never as a successful refresh.
-  NOT IN SCOPE, recorded so it is not re-derived: name-based matching in netfilter itself does
-  not exist — a hostname in a rule is resolved once into literals. The only real name policy is
-  a DNS-coupled set (dnsmasq `ipset=`/`nftset=` populating the set as answers are issued) or an
-  egress proxy that enforces CONNECT/SNI; both need the privileged startup lifecycle to recreate
-  them, which is why (2) is the load-bearing half. Sol's full answer, with its judgement of /24
-  widening (worse than exact refresh: 256 addresses per answer, unrelated CDN tenants, and the
-  present OUTPUT rule permits every port to them), is the design input.
-  VERIFIABLE: a restart of the container, then a probe of `api.openai.com` immediately and again
-  after the rotation window that broke it twice — both reachable with no manual step; the
-  refresher's own log shows the re-resolves; a forced DNS failure produces the loud report and
-  keeps the grace-period entries; and a unit test pins the schedule and the failure reports.
-  Criticality: high — it takes out the cross-vendor review the four-eyes rule depends on, and it
-  did so twice unnoticed.
-  Bundle: unbundled (infrastructure).
-
 - [ ] 660. ONE SESSION, TWO IDENTITIES: THE FENCE LOCKS OUT THE SESSION THAT IS WORKING
   (measured 12.08.2026, 18:02-18:20). The launcher spawned session 6cd11926 at 17:57 (fence
   281), which took the batch and worked. At 18:02 the identity 986df9ff claimed the same batch
@@ -377,6 +287,131 @@ put it is the mistake this line exists to stop.
   Criticality: high — it silently strands finished work locally, which is the one state nothing
   can rescue.
   Bundle: unbundled (infrastructure).
+
+- [ ] 662. THE CONTEXT BOUNDARY MUST ALSO FIRE WITHOUT A TICK (user 12.08.2026: "Außerdem ist
+  der Kontext dieser Session wieder ziemlich groß geworden. Hättest du in der Zwischenzeit
+  nicht mal an eine andere übergeben können? So bekommen wir das sonst nie in den Griff.").
+  THE GAP: the boundary duty (batch-boundary + batch-progress-guard) is keyed to a TICKED
+  point. A point that lands in HALVES — 657's first half merged without a tick — or a day of
+  review rounds on one branch never produces a tick, so one session carried the batch for ~14
+  hours and >150k context while every rule held. The 656 landing WAS a tickable boundary and
+  the session pulled the next point in anyway; nothing blocked that.
+  FINAL STATE: the boundary becomes reachable and OWED at safe moments even without a tick:
+  (1) after any MERGE to main (ticked or not) with no delegated agent in flight, the
+  batch-progress-guard demands the boundary exactly as it does after a tick — a merge is a
+  clean handover point by definition; (2) a session that has held the batch longer than a
+  measured ceiling (calibrate from the cost data: hours or landed merges, not tokens the
+  scripts cannot read) must take the next safe handover instead of choosing to continue; the
+  guard blocks "continue the next queue item" once the ceiling is passed. Attended sessions
+  ask for /clear at the same moments. VERIFIABLE: Vitest over the guard core — a merge without
+  tick and no agent in flight demands the boundary; under the ceiling it does not; the ceiling
+  case refuses the continue-path and allows the boundary path.
+  Criticality: high — 91 % of the project's spend sits above 150k context, and this is the
+  door it walks through.
+  Bundle: unbundled (infrastructure).
+
+- [ ] 663. THE DEPLOY DIES ON A FROZEN TAG'S FLAKY DOWNLOAD (measured 12.08.2026, twice on
+  run 31636330165). The GH-Pages deploy rebuilds EVERY version tag on every `main` push, and
+  the frozen v0.2 tree's `onnxruntime-node` postinstall downloads a GPU tarball from GitHub
+  releases at install time — that download ECONNRESET twice, so a pure network flake in a
+  FROZEN tree blocked the whole deploy, including the fresh `main` build, and the CI gate held
+  every turn end behind it.
+  FINAL STATE: a tag whose content cannot change does not re-run a network-dependent install
+  on every deploy. Either the workflow caches each tag's built `dist/` keyed by the tag sha
+  (build once, reuse forever — a frozen tag's site is immutable by definition), or at least
+  caches its `node_modules`/npm cache so the flaky postinstall runs rarely; plus one automatic
+  retry around the per-tag install step. A tag build that still fails must name the tag and
+  not take main's own deploy down with it where the workflow can publish partially.
+  VERIFIABLE: the workflow run shows the cache hit for an unchanged tag (no onnxruntime
+  download in the log), and a forced cache miss still succeeds via the retry.
+  Criticality: medium — it stalls every landing behind a dice roll on a runner's network.
+  Bundle: unbundled (infrastructure).
+
+- [ ] 664. THE ESTIMATE ON THE BOARD EXPIRES UNSEEN, AND EVERY CARD SAYS "STAND" TWICE (user
+  13.08.2026: "Wieso ist die Endzeitschätzung der Karten wieder so veraltet? Ich denke, dagegen
+  gibt es einen Mechanismus. Außerdem steht inzwischen immer 2x Stand drin - z. B. Stand 04:48
+  Stand 04:49"). Two defects in the board, both MEASURED on the published page at 07:42 on
+  13.08.2026.
+  
+  FIRST, THE STALE ESTIMATE. The mechanism the user remembers exists — `etaStatus` in
+  `scripts/dashboard-guard-core.mjs` with `ETA_MARGIN_MIN` 15, read by the `eta` rule
+  (`dashboard-guard-core.mjs`) and by `scripts/batch-in-flight-core.mjs` — but it speaks ONLY at
+  the owning session's TURN END, so it says nothing while that session sits inside one long turn,
+  and nothing at all once the session stalls or dies. Measured: the two now-cards read
+  `22:59 · ~06:30` and `23:00 · ~05:30` while the clock read 07:42 — 72 and 132 minutes past,
+  with no turn end in between. Point 411 already shifted the comparison forward by a margin for
+  exactly this reason; the margin cannot help when nothing ticks. THE FIX MUST NOT DEPEND ON A
+  SESSION: the promised end travels to the reader as DATA on the card (a `data-eta` attribute
+  beside the rendered meta, written by `renderQueueCard`/`setCardStatus` from the same parse
+  `etaMinutes` performs), and the board's own viewer script — which already runs in the reader's
+  browser and whose clock always ticks (`scripts/board-refresher-core.mjs`) — renders an expired
+  promise AS expired ("seit 1 h überfällig", German like the rest of the board), so the phone
+  never shows a promise the page itself knows is gone. The session-side rule STAYS as it is; it
+  is the second line, not the first. Additionally the launcher tick (`scripts/batch-autostart.mjs`,
+  which already compares the published page against the repository) reports a card past its
+  margin, so an owner that is alive is told before the reader notices.
+  
+  SECOND, THE DOUBLED STAMP. `renderCardBody` (`scripts/board-core.mjs`) prepends
+  `<span class="stamp">Stand HH:MM</span>` to the first paragraph, while sessions additionally
+  type "Stand HH:MM:" at the start of the text they hand in — the live board shows
+  `<p><span class="stamp">Stand 04:48</span> Stand 04:49: Nach einer halben Stunde …</p>`, and the
+  two times differ, so the reader cannot tell which one is the card's. `renderCardBody` therefore
+  STRIPS a leading `Stand HH:MM` (with an optional trailing colon, dash or period) from the text
+  it is given, and when that stripped time is LATER than the stamp it was called with, that time
+  becomes the stamp — the writer's own reading is the more recent one and must not be silently
+  discarded. One stamp per card, always, whichever way the text was written.
+  
+  TESTS: Vitest cases in `scripts/board-core.test.mjs` for the strip (leading stamp with and
+  without colon, a later and an earlier one, prose that merely CONTAINS "Stand" mid-sentence,
+  which must survive untouched) and in `scripts/board-refresher-core.test.mjs` for the
+  viewer-side overdue rendering (before the end, inside the margin, hours past, and across
+  midnight — `etaMinutes` already lifts a wrapped end onto the card's day and the viewer must use
+  that same function, not a second parser). A rule in `scripts/dashboard-guard-core.mjs` refuses a
+  card body whose first paragraph still opens with a second `Stand HH:MM`, so the strip cannot
+  quietly stop working.
+
+- [ ] 665. EVERY BOARD CARD NAMES ITS PROBLEM BEFORE ITS STATUS — AND A MECHANISM ENFORCES IT
+  (user 12.08.2026, 23:21–23:24, asking about the 641 now-card).
+  
+  MEASURED 12.08.2026 23:24 on the published board: the 641 now-card body reads, in full,
+  "Der Zweig zum ungeklärten Rot am Giza-Rand liegt seit einer gestorbenen Sitzung gebaut,
+  aber ungeprüft im Baum. Ein zweites Modell nimmt ihn auf, urteilt zuerst über den
+  erreichten Stand und schließt das Rot über eine benannte Ursache — nicht über einen
+  späteren grünen Lauf. Berührt keine Datei der Kinder-Kur." — pure fix status. A reader
+  cannot tell WHAT the unexplained red is (the `polish` suite's Giza settlement-edge
+  picture check reds on WebGPU in one of three full runs; nobody knows the cause yet).
+  The user had to ask in chat what the point is about; the board exists so he never has to.
+  
+  FINAL STATE:
+  1. IMMEDIATE REPAIR: the 641 card (and any other card currently in the same state) is
+     rewritten so its body OPENS with one sentence saying what the point is about, in
+     terms the user recognises — the problem, not the branch state — with the status
+     following. For 641 that sentence is roughly: "Der Bildcheck am Giza-Siedlungsrand
+     (gefegter Boden messbar dunkler als das offene Land) wird auf WebGPU sporadisch rot,
+     Ursache unbekannt."
+  2. THE RULE: every card on the board — now-cards, queue cards, decision cards alike —
+     opens with WHAT the point is about before any status. A body consisting only of
+     status prose is not a valid card.
+  3. THE MECHANISM (the user's explicit demand: "vor allem, dass es eine Mechanik dafür
+     braucht, damit das nicht wieder passiert" — enforce, don't remind): the check must be
+     STRUCTURAL, not a prose heuristic. The suggested shape — the author decides the final
+     design, under mechanism review as usual: `board.mjs`'s card-writing commands take the
+     problem statement as its own REQUIRED field, stored distinctly in the card structure;
+     the renderer places it as the body's opening; a card whose problem field is missing,
+     empty, or identical to its status text is REFUSED at write time, and the board guard
+     in the Stop chain blocks a publish containing such a card (same family as the
+     one-topic-per-card guard). Cards already published get a migration pass that fills
+     the field from TASKS.md's point titles/first lines where possible and flags the rest.
+  
+  VERIFIABLE: Vitest over the board core — writing a card without the problem field (or
+  with an empty one, or one equal to the status) is refused; the guard core flags a
+  published card missing it; and the live board shows the 641 card opening with its
+  problem sentence.
+  
+  Criticality: medium — the board is the user's only window into the batch; a status-only
+  card hides what the work is FOR, and this is the second card-content rule that had to be
+  retrofitted (after one-topic-per-card), so the class needs a structural gate, not
+  another reminder.
 
 - [ ] 633. THE RELEASE'S CLOSING RUN — TWO REGRESSIONS WITH THE CLEANUP BETWEEN THEM (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
@@ -450,6 +485,195 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
+
+- [ ] 336. THE WHOLE CROCODILE STAGING FAMILY IS FRAGILE — REBUILD IT, NOT ONE CASE
+  AT A TIME (escalated 25.07.2026 after four consecutive runs each failed a DIFFERENT
+  crocodile check). History: the lunge case was found resting on an unpinned
+  assumption (its red turned out to be machine load, proven by a quiet-machine
+  repeat) and was pinned; the next run failed the TOO-LATE case, where the parent
+  arrived in time after all and the crocodile took it instead of the calf; that was
+  pinned too; the next run failed the VANISH case with gripped:false — the crocodile
+  never seized at all (diag: drink true, dist 0.1, crocLunge false). Fixing one case
+  per run is a treadmill: the family shares one `crocDrama` helper whose five modes
+  each depend on a different implicit precondition (a distance, an arrival time, a
+  drink state, a lunge that must fire), and every one of them is a separate way for
+  the staging to miss while the GAME behaves correctly.
+  DO INSTEAD — one rebuild of the helper: (a) every mode states its preconditions
+  EXPLICITLY and asserts them before measuring, so a miss reports "staging did not
+  reach its precondition" instead of accusing the product; (b) every mode pins its
+  outcome roll (rescue, lunge and too-late now do; vanish and sacrifice must too);
+  (c) the seizure itself is established deterministically — poll for the grip with a
+  generous sim budget and FAIL THE STAGING, not the behaviour, if it never happens;
+  (d) each mode gets its own tiny setup helper instead of one branching function, so
+  a change to one ending cannot shift another's timing (the point-311 lesson at test
+  level). VERIFIABLE: enrichments green on BOTH backends THREE times in a row on a
+  quiet machine — the flake-free bar the closing gate needs; a staging miss produces
+  a distinct, self-naming failure message; the five §19.16 endings still each assert
+  their real outcome (no masking). RELATED: this is the concrete first slice of point
+  200's flake work, and point 294's auto-classification would have labelled all four
+  reds "staging, not product" without a manual repeat each time.
+
+- [ ] 595. THE VERIFICATION LADDER (point 572's measure 5). While a render point is still
+  being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
+  full proof — both backends where they can differ, LARGE where the change warrants it —
+  runs exactly ONCE, on the EXACT MERGE CANDIDATE — `main` merged into the branch, the tree
+  that will land — with the recorded `git HEAD` of that run as the evidence that the verified
+  tree IS the merged one. Nothing enforces or measures that today. The expensive browser
+  suites abort at the FIRST failure during that iteration (a red run is never credited
+  anyway) and run to completion only for the final proof. The rule is a brief building block
+  for render points, so it is applied rather than remembered.
+  A RED IS A RED. No "critical versus cosmetic" class is introduced to decide what may be
+  aborted on — the classification buys nothing here, because an iteration run is not credited
+  either way, and it would open the door to waving a red through.
+  THE SHARED FINAL RUN IS ALREADY DECIDED, and this point must not be read as contradicting
+  it: `docs/work-packages.md` settled that several FINISHED per-point branches may be merged
+  together and ONE regression run over the merged result — "the only sizeable saving left".
+  What that shared run may replace is the repeated full REGRESSION. The both-backend PICTURE
+  proof stays on the branch, BEFORE the merge, exactly as it is today; merging first to
+  verify afterwards cost about thirty turns of a block-loop on 24.07.2026.
+  THE UNIT LAYER HAS THE SAME LADDER: `vitest --changed` or a path filter and
+  `tsc --incremental` are legal WHILE REPAIRING, and an incremental green is never an
+  acceptance — the full fast gate stays the proof. One rule covering both layers, not two
+  half-rules.
+  MEASURED TARGET: verification is 47.0 % of the weighted spend and 37.4 % of the machine
+  hours, the ten costliest points hold 64.4 % of all point-assigned verification tokens,
+  and eight of ten recorded `enrichments` runs failed while still writing all 37 frames at
+  951–1029 s each.
+  THE LADDER'S CHEAPEST RUNG ALREADY EXISTS AND IS UNUSED (user question 09.08.2026: "Und
+  die neuen Möglichkeiten für differenziertes Testen durch 566 werden auch inzwischen bei
+  den Feature- und Bugtests eingesetzt?"). Point 566 built `--section=<name>`, and
+  `enrichments` declares nine of them; the resolver, the PARTIAL marking and the refusal to
+  count a partial run as coverage all work. CHECKED 09.08.2026: nothing routes anyone to
+  it. It appears in `scripts/verify/README.md` and in `tiers.mjs`, in no delegation brief,
+  in no agent prompt and in no rule text — the three agents commissioned that same evening
+  were not told about it either — and the recorded render-verify runs contain no partial
+  run at all. So the ladder's bottom rung is not a thing to invent here; it is a built
+  tool to PUT IN THE PATH. This point therefore also: (a) makes `--section` the stated
+  iteration rung for a render point in the delegation brief's building block, so an agent
+  reaches for it before replaying a whole pass; (b) SECTIONS the remaining render suites,
+  which 566 deferred ("enrichments first, then the other render suites"); and (c) states
+  in the same building block that the final proof is whole-suite, so the cheap rung can
+  never be mistaken for the acceptance.
+  WORK FOR 595–598 ALREADY STANDS ON A BRANCH (11.08.2026). A session that died left
+  `feat/595-598-verification-ladder-brief` PUSHED at 0d555552 — four commits plus a merge of
+  `origin/main`, covering all four points — with its worktree
+  `.claude/worktrees/agent-a7b6ba2cc654e6411` still in the tree. It was never reported,
+  verified or landed. Whoever takes these points STARTS FROM THAT BRANCH and verifies it
+  against the specs here; rebuilding from scratch throws away finished work. Cleaning that
+  worktree away before the branch has been judged is what point 629 exists to prevent.
+  Criticality: medium — it reorders the proof but must not dilute it; the both-backend
+  picture proof stays exactly as binding as it is today.
+
+- [ ] 598. THE BRIEF ORIENTS IN THE CODE, NOT ONLY IN THE SPEC (point 572's measure 8).
+  The delegation brief carries a GENERATED orientation: the paths the specification itself
+  names, and a per-directory line of responsibility derived from the tree and its file
+  headers. It is marked as a HINT, never as an instruction ("the specification names these
+  paths", not "change these files"), and it is generated on every run so it cannot go
+  stale.
+  AND IT NAMES THE PLANNED CHECK: which suite, and which `--section` of it, will verify this
+  point — derived from the diff→suite mapping and the ladder rung, generated like the rest so
+  it cannot go stale, and marked as a hint like the path list. This is the cheapest possible
+  answer to what the ladder point found: a rung that is built and routed to nobody gets used
+  when it stands in the artefact the agent reads FIRST, not in a rule it must remember.
+  MEASURED TARGET: search/read is 25.2 % of the weighted spend and the first responses of
+  a delegated agent are almost always search; five saved responses per point is ~2 % of a
+  median point.
+  NOT THE OPPOSITE DIRECTION: shrinking the brief was weighed and rejected on the arithmetic.
+  Removing 1.5k tokens saves ~35.7k weighted per point, while a single reference the agent
+  must then look up costs 22.9k — it breaks even at 1.5 extra lookups and goes negative
+  after. The brief is 1.9 % of the spend and exists to avoid the ~108k wholesale read.
+  Criticality: low — a wrong list would misdirect, which generation-from-the-tree and the
+  hint framing address.
+
+- [ ] 453. WHAT IS THE LION EATING? (user bug report 30.07.2026,
+  `local/WasFrisstDerLoewe.zip`, seed 1608676381, east region at the river, WebGPU/high:
+  "Er scheint zu fressen und die Geier kreisen, aber ich sehe keine Beute"; bundle Kadaver &
+  Geier). In the frame the lion stands head-down in its feeding pose, vulture shadows circle
+  over the ground — and there is no prey body anywhere. Two candidates, both consistent with
+  the code: (a) the carcass was consumed (`carcassSeconds` reached 0 and it was removed) while
+  the feeding pose and the vulture staging carry on — a state that does not clear when its
+  subject disappears; (b) what remains is the prey remnant of `Wildlife.tsx` (the scrap left at
+  the kill site), which renders as a small white sphere and reads to a human as nothing at all.
+  Find out which by reproducing from the seed, then fix so that the picture always answers the
+  question: while a predator feeds, something recognisable as prey lies under it; when the
+  carcass is gone, the pose and the vultures end with it.
+  VERIFIABLE: Vitest on the behaviour — a predator's feeding state cannot outlive its carcass,
+  and a remnant that keeps vultures on station is itself renderable; plus a browser frame from
+  that seed showing predator and prey together, on both backends.
+
+- [ ] 628. THE HOLD-CTRL LAYER LABELS A CAMP TWICE AND NAMES THE PLAYER'S OWN BOAT
+  (found 11.08.2026 while re-testing the roster for point 600, and deliberately not fixed
+  there: both halves are a judgment about what the layer PROMISES, not a defect in the
+  state coverage that point closed).
+  FINAL STATE:
+  1. A PITCHED CAMP CARRIES EXACTLY ONE LABEL. `CampMarkers` in
+     `src/scenes/travel/TravelScene.tsx` draws a permanent `map-label` reading
+     `labels.camp` AND registers the same object with the hold-Ctrl layer, whose text is
+     that same word — so holding Ctrl stacks two identical boxes over one camp. The camp
+     STAYS in point 342's roster, which names "a pitched camp, a set-down canoe"
+     explicitly, so the cure is the one the elder already uses: an object that carries a
+     permanent label of its own is not offered a second time by the Ctrl layer, whoever
+     draws it. Stating that as a rule about permanent labels, not a per-object exception,
+     is the point — a second exception list would rot the way the first one nearly did.
+  2. THE TRAVELLER'S OWN CANOE IS NOT NAMED. The marked canoe groups at the same call site
+     are the boat the player rides or drags. The layer's promise is "what am I looking
+     at", and the player's own vehicle is not that. A canoe SET DOWN in the world keeps
+     its label, per the same roster line.
+  3. TWO LABELS NEVER OVERLAP INTO ONE UNREADABLE BOX (seen 11.08.2026 in
+     `verification/148-ctrl-actor-labels-village.png`, the point-600 evidence frame). Where
+     two villagers stand close, their boxes overlap and the picture reads "Villager llager"
+     and "Villa Villager" — each label is correct, the PICTURE is not, and no test looks at
+     it because every check asks the DOM whether the text is present. The layer therefore
+     declutters: boxes that would overlap are offset, or the further one is dropped while
+     the nearer keeps its name. Which of the two is a judgment to make at the picture, on a
+     crowd, not in the abstract.
+  VERIFIABLE: the pure source/roster test gains both cases — a pitched camp yields exactly
+  one offered label, a ridden or dragged canoe yields none while a set-down one yields its
+  own; the declutter is judged AT THE FRAME on a crowded village, since a DOM assertion is
+  exactly the proxy that let this through; plus the browser check that asks the scene what
+  it DREW asserts that no two labels of identical text stand at one position.
+  Criticality: low — nothing breaks, but a doubled box is exactly the noise the elder
+  exception exists to prevent, and naming the player's own boat makes the layer read as
+  though it labels everything indiscriminately.
+
+- [ ] 658. THE EGRESS ALLOWANCE MUST SURVIVE A CONTAINER RESTART AND THE HOURS AFTER IT (user
+  12.08.2026: "Das ist auch schon zum zweiten Mal passiert. Sorge dafür, dass das den
+  Container-Neustart überlebt. Deine bisherige Maßnahme scheint also nicht wirksam gewesen zu
+  sein."). MEASURED, and confirmed independently by GPT-5.6 Sol at effort high (diagnose,
+  12.08.2026): the container's egress allowance is an ipset of RESOLVED IP LITERALS, written
+  once by `.devcontainer/init-firewall.sh` at container start. `api.openai.com` is in that
+  domain list, so the boot run is not what is missing — the addresses behind that name ROTATE,
+  and the set keeps the snapshot. `api.github.com` survives because GitHub publishes CIDRs and
+  the script adds those. The periodic top-up that was meant to re-resolve never ran once (fixed
+  12.08.2026 in `scripts/batch-autostart.mjs`: a missing pid file on a fresh container threw out
+  of the whole block), and even now it runs on the launcher's 15-minute tick.
+  FINAL STATE: a cross-vendor review, a model call or a package fetch never fails on a stale
+  allowance, on a container that has just come up or one that has run for a day. Concretely:
+  1. The refresh is TTL-AWARE, not tick-shaped: it re-resolves at about half the shortest TTL
+     of the names it holds (single-digit minutes for these hosts, not 15), with jitter.
+  2. It is ARMED BY THE CONTAINER'S OWN START, not by whoever happens to open a session — the
+     same boot path that arms the batch launcher, so a restart restores it unattended.
+  3. It does not GROW without bound: the dynamic names live in their own set, refreshed by
+     generation or by entry timeout, so a day of rotation does not leave a day of addresses
+     standing. The static, published-CIDR names stay where they are.
+  4. Every failure is LOUD, never skipped: the refresher not starting or dying, `sudo -n`
+     refused, the set missing, DNS returning nothing, an insert failing, or the post-refresh
+     probe still unreachable. A DNS failure keeps the last entries for a bounded grace period
+     and is reported as a failure, never as a successful refresh.
+  NOT IN SCOPE, recorded so it is not re-derived: name-based matching in netfilter itself does
+  not exist — a hostname in a rule is resolved once into literals. The only real name policy is
+  a DNS-coupled set (dnsmasq `ipset=`/`nftset=` populating the set as answers are issued) or an
+  egress proxy that enforces CONNECT/SNI; both need the privileged startup lifecycle to recreate
+  them, which is why (2) is the load-bearing half. Sol's full answer, with its judgement of /24
+  widening (worse than exact refresh: 256 addresses per answer, unrelated CDN tenants, and the
+  present OUTPUT rule permits every port to them), is the design input.
+  VERIFIABLE: a restart of the container, then a probe of `api.openai.com` immediately and again
+  after the rotation window that broke it twice — both reachable with no manual step; the
+  refresher's own log shows the re-resolves; a forced DNS failure produces the loud report and
+  keeps the grace-period entries; and a unit test pins the schedule and the failure reports.
+  Criticality: high — it takes out the cross-vendor review the four-eyes rule depends on, and it
+  did so twice unnoticed.
+  Bundle: unbundled (infrastructure).
 
 - [ ] 642. EVERY CHECK THAT CAN BE LOAD-PROOF IS MADE LOAD-PROOF, AND THE REST SAYS SO (user
   11.08.2026: "Was ist mit dem Problem, dass nicht alle Tests Last-resistent sind? … Das muss
@@ -1016,78 +1240,6 @@ put it is the mistake this line exists to stop.
   Criticality: low — pure measurement; it changes no behaviour, and it is the precondition
   for judging the remaining structural levers.
 
-- [ ] 595. THE VERIFICATION LADDER (point 572's measure 5). While a render point is still
-  being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
-  full proof — both backends where they can differ, LARGE where the change warrants it —
-  runs exactly ONCE, on the EXACT MERGE CANDIDATE — `main` merged into the branch, the tree
-  that will land — with the recorded `git HEAD` of that run as the evidence that the verified
-  tree IS the merged one. Nothing enforces or measures that today. The expensive browser
-  suites abort at the FIRST failure during that iteration (a red run is never credited
-  anyway) and run to completion only for the final proof. The rule is a brief building block
-  for render points, so it is applied rather than remembered.
-  A RED IS A RED. No "critical versus cosmetic" class is introduced to decide what may be
-  aborted on — the classification buys nothing here, because an iteration run is not credited
-  either way, and it would open the door to waving a red through.
-  THE SHARED FINAL RUN IS ALREADY DECIDED, and this point must not be read as contradicting
-  it: `docs/work-packages.md` settled that several FINISHED per-point branches may be merged
-  together and ONE regression run over the merged result — "the only sizeable saving left".
-  What that shared run may replace is the repeated full REGRESSION. The both-backend PICTURE
-  proof stays on the branch, BEFORE the merge, exactly as it is today; merging first to
-  verify afterwards cost about thirty turns of a block-loop on 24.07.2026.
-  THE UNIT LAYER HAS THE SAME LADDER: `vitest --changed` or a path filter and
-  `tsc --incremental` are legal WHILE REPAIRING, and an incremental green is never an
-  acceptance — the full fast gate stays the proof. One rule covering both layers, not two
-  half-rules.
-  MEASURED TARGET: verification is 47.0 % of the weighted spend and 37.4 % of the machine
-  hours, the ten costliest points hold 64.4 % of all point-assigned verification tokens,
-  and eight of ten recorded `enrichments` runs failed while still writing all 37 frames at
-  951–1029 s each.
-  THE LADDER'S CHEAPEST RUNG ALREADY EXISTS AND IS UNUSED (user question 09.08.2026: "Und
-  die neuen Möglichkeiten für differenziertes Testen durch 566 werden auch inzwischen bei
-  den Feature- und Bugtests eingesetzt?"). Point 566 built `--section=<name>`, and
-  `enrichments` declares nine of them; the resolver, the PARTIAL marking and the refusal to
-  count a partial run as coverage all work. CHECKED 09.08.2026: nothing routes anyone to
-  it. It appears in `scripts/verify/README.md` and in `tiers.mjs`, in no delegation brief,
-  in no agent prompt and in no rule text — the three agents commissioned that same evening
-  were not told about it either — and the recorded render-verify runs contain no partial
-  run at all. So the ladder's bottom rung is not a thing to invent here; it is a built
-  tool to PUT IN THE PATH. This point therefore also: (a) makes `--section` the stated
-  iteration rung for a render point in the delegation brief's building block, so an agent
-  reaches for it before replaying a whole pass; (b) SECTIONS the remaining render suites,
-  which 566 deferred ("enrichments first, then the other render suites"); and (c) states
-  in the same building block that the final proof is whole-suite, so the cheap rung can
-  never be mistaken for the acceptance.
-  WORK FOR 595–598 ALREADY STANDS ON A BRANCH (11.08.2026). A session that died left
-  `feat/595-598-verification-ladder-brief` PUSHED at 0d555552 — four commits plus a merge of
-  `origin/main`, covering all four points — with its worktree
-  `.claude/worktrees/agent-a7b6ba2cc654e6411` still in the tree. It was never reported,
-  verified or landed. Whoever takes these points STARTS FROM THAT BRANCH and verifies it
-  against the specs here; rebuilding from scratch throws away finished work. Cleaning that
-  worktree away before the branch has been judged is what point 629 exists to prevent.
-  Criticality: medium — it reorders the proof but must not dilute it; the both-backend
-  picture proof stays exactly as binding as it is today.
-
-- [ ] 598. THE BRIEF ORIENTS IN THE CODE, NOT ONLY IN THE SPEC (point 572's measure 8).
-  The delegation brief carries a GENERATED orientation: the paths the specification itself
-  names, and a per-directory line of responsibility derived from the tree and its file
-  headers. It is marked as a HINT, never as an instruction ("the specification names these
-  paths", not "change these files"), and it is generated on every run so it cannot go
-  stale.
-  AND IT NAMES THE PLANNED CHECK: which suite, and which `--section` of it, will verify this
-  point — derived from the diff→suite mapping and the ladder rung, generated like the rest so
-  it cannot go stale, and marked as a hint like the path list. This is the cheapest possible
-  answer to what the ladder point found: a rung that is built and routed to nobody gets used
-  when it stands in the artefact the agent reads FIRST, not in a rule it must remember.
-  MEASURED TARGET: search/read is 25.2 % of the weighted spend and the first responses of
-  a delegated agent are almost always search; five saved responses per point is ~2 % of a
-  median point.
-  NOT THE OPPOSITE DIRECTION: shrinking the brief was weighed and rejected on the arithmetic.
-  Removing 1.5k tokens saves ~35.7k weighted per point, while a single reference the agent
-  must then look up costs 22.9k — it breaks even at 1.5 extra lookups and goes negative
-  after. The brief is 1.9 % of the spend and exists to avoid the ~108k wholesale read.
-  Criticality: low — a wrong list would misdirect, which generation-from-the-tree and the
-  hint framing address.
-
 - [ ] 597. LARGE TOOL OUTPUT NEVER ENTERS THE CONTEXT WHOLE (point 572's measure 7). The
   bounded-output discipline `scripts/verify/run-logged.mjs` already applies to verify runs
   extends to the other big producers: `git diff` (`--stat` first), `grep` (`-c` or a head
@@ -1128,6 +1280,20 @@ put it is the mistake this line exists to stop.
   carried 89 % verification — not because a loop ran away.
   A WALL-CLOCK TRIGGER may join the token trigger once point 599 delivers an honest calendar
   decomposition; until then there is no honest wall-clock per point to trigger on.
+  A SILENT RUN IS THE THIRD TRIGGER, AND IT IS THE ONE THAT ACTUALLY BLED (measured
+  13.08.2026, ~09:00). On point 657 the third measurement recording produced NO BYTE of
+  output from 02:32 onwards, and the owning session waited on it in 30-second polls past
+  09:00 — six and a half hours spent on a task that was already dead. Nothing puts a
+  DEADLINE on a background recording, nothing harvests a task that stopped writing, and the
+  hand-over the board card itself promised ("should the agent fail again, the fallback model
+  takes it") had no enforcer behind it. So: a delegated run that has written nothing for
+  longer than a calibratable silence window is REPORTED as stalled at the next hook (with
+  its task id, its last output time and its point), the owner is handed the two legal moves
+  — re-run or hand to the fallback model — and the stall lands where the successor looks,
+  on the work order or the board, exactly as the red-three-times diagnosis does. This is NOT
+  the refused automatic abort: nothing is killed on a timer, the silence is only made
+  VISIBLE, because the cost here was not the dead task but the six hours nobody was told.
+  Point 567 (remains of killed runs) owns the reaping; this point owns the report.
   Criticality: medium — a cap that let a red state pass as green would be worse than the
   cost it saves, so the escalation path is the mechanism and the abort is not.
 
@@ -2661,33 +2827,6 @@ Build order, chosen so no two parallel agents own the same file:
   (ii) docs get written against the TASKS SPEC rather than the shipped code — the
   cited `panoramaVicinityRadius` never existed in any commit, it came from a spec
   draft; a doc's symbol citations must be checked against the code that shipped.
-
-- [ ] 336. THE WHOLE CROCODILE STAGING FAMILY IS FRAGILE — REBUILD IT, NOT ONE CASE
-  AT A TIME (escalated 25.07.2026 after four consecutive runs each failed a DIFFERENT
-  crocodile check). History: the lunge case was found resting on an unpinned
-  assumption (its red turned out to be machine load, proven by a quiet-machine
-  repeat) and was pinned; the next run failed the TOO-LATE case, where the parent
-  arrived in time after all and the crocodile took it instead of the calf; that was
-  pinned too; the next run failed the VANISH case with gripped:false — the crocodile
-  never seized at all (diag: drink true, dist 0.1, crocLunge false). Fixing one case
-  per run is a treadmill: the family shares one `crocDrama` helper whose five modes
-  each depend on a different implicit precondition (a distance, an arrival time, a
-  drink state, a lunge that must fire), and every one of them is a separate way for
-  the staging to miss while the GAME behaves correctly.
-  DO INSTEAD — one rebuild of the helper: (a) every mode states its preconditions
-  EXPLICITLY and asserts them before measuring, so a miss reports "staging did not
-  reach its precondition" instead of accusing the product; (b) every mode pins its
-  outcome roll (rescue, lunge and too-late now do; vanish and sacrifice must too);
-  (c) the seizure itself is established deterministically — poll for the grip with a
-  generous sim budget and FAIL THE STAGING, not the behaviour, if it never happens;
-  (d) each mode gets its own tiny setup helper instead of one branching function, so
-  a change to one ending cannot shift another's timing (the point-311 lesson at test
-  level). VERIFIABLE: enrichments green on BOTH backends THREE times in a row on a
-  quiet machine — the flake-free bar the closing gate needs; a staging miss produces
-  a distinct, self-naming failure message; the five §19.16 endings still each assert
-  their real outcome (no masking). RELATED: this is the concrete first slice of point
-  200's flake work, and point 294's auto-classification would have labelled all four
-  reds "staging, not product" without a manual repeat each time.
 
 - [ ] 347. THE STARTING QUALITY LEVEL FROM THE URL (user 25.07.2026; design.md §21.1
   states the target). `?quality=low|medium|high` on any deployment URL — the GH-Pages
@@ -6410,4 +6549,3 @@ to land than a mechanism that needs a review.
   catches "the text is STALE", not "the text is WRONG" — a section rewritten carelessly still
   passes. It would have caught this case, because `src/communication/` is young and the section
   is old.
-
