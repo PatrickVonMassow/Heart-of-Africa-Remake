@@ -330,6 +330,14 @@ export function unpreparedRefusal({
  * marker, a foreign one, a legacy one — denies nothing: the deny is a seal on a
  * deliberate `--commit`, never a trap, and its reason names the one-command way
  * back. Returns { deny, reason }.
+ *
+ * THE SEAL EXPIRES WITH THE MARKER, deliberately (Sol's review of 4e93933 called
+ * this a fail-open route; it is the fail-open RULE). A marker past `freshMs` no
+ * longer authorises a stop either — `assessBoundary` calls it `marker-stale` —
+ * so a session that outsits its own seal has not handed over and kept working:
+ * its handover lapsed and must be re-taken from `--prepare`. The alternative, a
+ * seal without end, is the one thing a guard here may never be: a session
+ * trapped by a marker nothing can time out.
  */
 export function sealedBoundaryDeny({
   marker,
@@ -356,6 +364,16 @@ export function sealedBoundaryDeny({
   }
 }
 
+// THE CLOSING SET IS CLASSIFIED BY TARGET, NOT BY OPERATION, and that is the
+// design rather than a hole in it (Sol's review of 4e93933). These files and
+// scripts are precisely what a BLOCKED Stop demands of a session that has
+// already committed: publish the board, file the finding it uncovered, record
+// the review. Denying them would put the session back in the loop the two-phase
+// boundary closes — blocked from ending, forced into a call that deletes the
+// marker. What the seal denies is everything that is not ending: a commit, a
+// test run, a source edit, a merge. The residual is that the closing set can be
+// used for more bookkeeping than the boundary strictly needs; that costs a few
+// closing calls, while the alternative costs the handover.
 /** Files whose modification is part of ENDING the batch, by basename. */
 export const CLOSING_SET_FILES = new Set([
   'batch-dashboard.html',
