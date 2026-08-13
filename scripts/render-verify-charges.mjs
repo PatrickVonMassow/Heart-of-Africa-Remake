@@ -158,4 +158,16 @@ export const RED_CHARGES = [
       'sitting, so the charge is scoped to WebGPU and a WebGL 2 red stays a real red. Point 627 ' +
       'owns it until the cause — an unsettled jump or a real placement change — is named.',
   },
+  {
+    point: 603,
+    suite: 'settings',
+    backend: 'webgl',
+    kind: 'check',
+    match: /first-person ground shows micro-detail/i,
+    why:
+      'Measured 13.08.2026 on main at 238d786f, WebGL 2: both attempts read a Laplacian mean of ' +
+      '1.08 and 1.09 against the bar of 1.1 while every other check of the suite passed, which is ' +
+      'the red point 603 declares itself the owner of ("UNTIL THEN this point is where that red is ' +
+      'charged") and which only the WebGPU half of the ledger had entered, under point 514.',
+  },
 ]
