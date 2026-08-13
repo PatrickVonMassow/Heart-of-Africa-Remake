@@ -238,8 +238,9 @@ const SEPARATION_FIELDS: ReadonlyArray<{
 /** Every numeric choice in the non-semantic village drum bed. The patterns
  *  themselves are musical figures; all timing, dynamics, voice and variation
  *  around those figures are live calibration values. */
+type DrumBedNumberKey = Exclude<keyof typeof balance.drumBed, 'enabled'>
 const DRUM_BED_FIELDS: ReadonlyArray<{
-  key: keyof typeof balance.drumBed
+  key: DrumBedNumberKey
   label: DebugLabelKey
   step: number
   min: number
@@ -780,6 +781,11 @@ export function DebugMenu() {
         refreshAmbienceVolume()
         bump()
       }, 0.1),
+      check(t.debug.drumBedEnabled, balance.drumBed.enabled, (v) => {
+        balance.drumBed.enabled = v
+        refreshAmbienceVolume()
+        bump()
+      }),
       ...tableRows(DRUM_BED_FIELDS, (f) => balance.drumBed[f.key], (f, v) => {
         balance.drumBed[f.key] = f.integer ? Math.round(v) : v
         // Gain edits affect the standing layer immediately; the other values

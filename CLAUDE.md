@@ -445,7 +445,8 @@ detail section change in the SAME commit.
 7. **Language and communication.** The tonal village speech of `design.md`
    §13.4 is implemented — heard, guessed at, never translated — beside the
    §13.1–13.3 direction words, glossary and retroactively deciphered hints,
-   which still stand.
+   which still stand. The village has no standing drum bed; only the chief's
+   message makes the waiting drummer strike, from the message's own plan.
    Detail: docs/acceptance-criteria-detail.md §7.
    Evidence: docs/acceptance-evidence.md §7.
 

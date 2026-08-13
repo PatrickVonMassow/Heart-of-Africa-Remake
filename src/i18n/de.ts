@@ -525,6 +525,7 @@ export const de: Strings = {
     ambientVolume: 'Übrige Ambiente-Lautstärke',
     birdsongVolume: 'Vogelgezwitscher-Lautstärke',
     speechVolume: 'Dorfsprache-Lautstärke',
+    drumBedEnabled: 'Ambient-Trommelbett (Debug-Probe)',
     drumBedStep: 'Trommelbett: Schrittlänge (s)',
     drumBedPhraseBars: 'Trommelbett: Takte pro Phrase',
     drumBedGapMin: 'Trommelbett: Phrasenpause min. (s)',

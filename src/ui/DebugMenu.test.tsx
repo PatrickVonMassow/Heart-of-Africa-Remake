@@ -445,6 +445,16 @@ describe('DebugMenu remaining boolean toggles write through (design.md §21, poi
     expect(useUi.getState().journalDnd).toBe(true)
   })
 
+  it('ships the ambient drum bed off and exposes its debug audition switch', () => {
+    render(<DebugMenu />)
+    const field = screen.getByText(en.debug.drumBedEnabled).closest('label')?.querySelector('input') as HTMLInputElement
+    expect(balance.drumBed.enabled).toBe(false)
+    expect(field.checked).toBe(false)
+    fireEvent.click(field)
+    expect(balance.drumBed.enabled).toBe(true)
+    expect(field.checked).toBe(true)
+  })
+
   it('the inverted vertical look ships CHECKED and toggles both ways (point 392)', () => {
     render(<DebugMenu />)
     const invert = screen.getByText(en.debug.invertLook).closest('label')?.querySelector('input') as HTMLInputElement
@@ -881,6 +891,7 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.detailLevel', 'debug.flatGround', 'debug.startupFreezeBudget', 'debug.labelOverlayMax',
     'debug.ambienceVolume',
     'debug.footstepVolume', 'debug.ambientVolume', 'debug.birdsongVolume', 'debug.speechVolume',
+    'debug.drumBedEnabled',
     'debug.drumBedStep', 'debug.drumBedPhraseBars', 'debug.drumBedGapMin', 'debug.drumBedGapMax',
     'debug.drumBedTempoSpread', 'debug.drumBedPitchSpread', 'debug.drumBedPitchStart',
     'debug.drumBedPitchEnd', 'debug.drumBedHitSeconds', 'debug.drumBedAccentShift',
@@ -961,12 +972,12 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 181 controls in total, and none twice', () => {
+  it('carries all 182 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(181)
+    expect(labels.length).toBe(182)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
@@ -1013,7 +1024,7 @@ describe('DebugMenu completeness: every control is present, in its group (point 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(181)
+    expect(rows.length).toBe(182)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -1067,7 +1078,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(181)
+    expect(renderedRowLabels().length).toBe(182)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -1115,7 +1126,7 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     typeFilter('croc')
     expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(181)
+    expect(renderedRowLabels().length).toBe(182)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 

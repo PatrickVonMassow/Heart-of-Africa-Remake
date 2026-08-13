@@ -519,6 +519,7 @@ export interface Strings {
     ambientVolume: string
     birdsongVolume: string
     speechVolume: string
+    drumBedEnabled: string
     drumBedStep: string
     drumBedPhraseBars: string
     drumBedGapMin: string
