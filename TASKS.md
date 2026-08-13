@@ -285,11 +285,33 @@ put it is the mistake this line exists to stop.
   actually shown. A step that works internally but does not reach the player is a DEFECT, and
   the report says which of the two it was.
 
+  THREE CAUSES ARE ALREADY NAMED AND MUST BE FIXED HERE, not merely re-measured (user
+  observation on the deployed build, 13.08.2026, with the debug switch "language: show terms
+  instead of syllables" ON — the adults' actions make no sense even WITH the words visible):
+  1. THE TEACHING ROCK STANDS IN THE MIDDLE OF THE VILLAGE, NOT AT THE RIVER. `layout.ts` places
+     it 6.5–13.6 m from the village centre on the golden-angle sweep, while
+     `docs/communication-poc-spec.md` (rule 3) says "The rock lies upstream". Document and code
+     contradict each other, and for the player it is a purposeless boulder on the village square
+     that everyone walks to — and it is NOT the rock of the chief's drum message.
+  2. THE ERRANDS HAVE NO VISIBLE PURPOSE. `walkToTarget`/`walkToSpeaker`/`followToTarget` end in
+     standing about (`dwellSeconds` 6): nobody carries anything, fetches anything or works. Only
+     the three DIG errands end in visible work. A word cannot be inferred from an errand that
+     produces no result.
+  3. THERE IS NO TEACHING ORDER. `ErrandView` knows villagers and geography, not what the player
+     has already heard. The spec's method ("leaves exactly one unknown") presumes the six
+     children's terms are already learned, and nothing enforces or encourages that — so the
+     player hears two unknowns at once.
+  ALSO OBSERVED, to be judged in the same pass: upstream and downstream are barely
+  distinguishable at the bank ("recognisable with a lot of goodwill"), and the errand sequence
+  reads as a fixed loop (a fair queue over few fillable errands).
   VERIFIABLE: a complete play-through of the chain from entering the village to the victory
   state, with no blocking defect, evidenced by the frames of each step, an audio measurement at
-  the shipped defaults, and the journal it wrote; every defect found is listed with its severity
-  and either fixed here or filed as its own point, and the blocking ones are fixed before this
-  point is ticked. The enumerating lists, their merge and the counted union are recorded.
+  the shipped defaults, and the journal it wrote; the three causes above demonstrably closed —
+  the rock upstream and consistent with the spec document, every errand ending in a visible
+  result, and a teaching order that does not present two unknowns at once; every further defect
+  found is listed with its severity and either fixed here or filed as its own point, and the
+  blocking ones are fixed before this point is ticked. The enumerating lists, their merge and the
+  counted union are recorded.
   Criticality: high — this is the feature the release exists for, and the user is the one who
   keeps hitting the bugs.
   Bundle: Verständigung.
