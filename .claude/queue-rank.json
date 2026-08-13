@@ -79,10 +79,14 @@
     "679": {
       "at": "2026-08-13T18:27:57.189Z",
       "why": "Kleine, vom Nutzer direkt gewuenschte Ergaenzung ohne Abhaengigkeit; sie kostet nichts, wenn sie wartet, und die Release-Punkte gehen vor"
+    },
+    "680": {
+      "at": "2026-08-13T18:48:25.602Z",
+      "why": "Es blockiert 666 nicht sofort — die Diagnose kann auch aus dem Seed nachgestellt werden —, aber jeder weitere Bericht dieser Art bleibt ohne es undiagnostizierbar; Release-Punkte gehen trotzdem vor"
     }
   },
   "settled": {
-    "at": "2026-08-13T18:27:57.190Z",
+    "at": "2026-08-13T18:48:25.603Z",
     "points": [
       174,
       184,
@@ -261,7 +265,8 @@
       676,
       677,
       678,
-      679
+      679,
+      680
     ]
   }
 }

@@ -191,8 +191,17 @@ put it is the mistake this line exists to stop.
   go red) and the ten post-cure traces (must go green on both backends); for (b), the charge
   naming the composition and its rate, plus a Vitest case pinning that a red NOT of that shape
   is still uncovered.
-  Criticality: medium — no player sees this window; it is the picture gate's trustworthiness on
-  the release branch that is at stake.
+  A PLAYER HAS NOW SEEN IT, WHICH RETIRES THE "ONLY A MEASUREMENT WINDOW" READING (user bug
+  report 13.08.2026, "Kind hängt wieder fest", F6 dump in `local/KindHaengtWieder/`): production
+  build 7bd0147, WEBGPU, NVIDIA Lovelace, medium, 127 FPS, `bambara-village` at −59.62/−131.19,
+  day 0, seed 236333330. The residual was carried as a WebGL 2 measurement limit (0.39 % against
+  0.25 %); this occurrence is on the OTHER backend, on the SHIPPED build, and visible to the
+  player. So option (b) — accepting the composition with a rate — may only be chosen if it also
+  explains a player-visible standstill on WebGPU; if it cannot, the answer is (a) or a behaviour
+  fix, not a charge. The report alone does NOT permit a diagnosis, because the dump describes the
+  wildlife and nothing of the settlement's inhabitants — that gap is its own point.
+  Criticality: high — raised 13.08.2026: it is no longer only the picture gate's trustworthiness,
+  it is the player watching a child stand still in the shipped build.
   Bundle: Dorfleben.
 
 - [ ] 672. THE VILLAGE HAS NO AMBIENT DRUM, AND THE DRUMMER HOLDS STILL (user 13.08.2026,
@@ -6869,3 +6878,40 @@ to land than a mechanism that needs a review.
   19:25 (»Lasse Sol das machen, um Volumen zu sparen«). Mechanical and low-risk, and its
   verification is not the work.
   Criticality: low — it costs nothing if it waits, but the user asked for it directly.
+
+- [ ] 680. THE BUG REPORT CARRIES THE SETTLEMENT'S LIFE, NOT ONLY THE WILDLIFE (measured
+  13.08.2026 on the user's report "Kind hängt wieder fest", `local/KindHaengtWieder/`). The
+  archive holds a picture, the game state, the balance and UI values — and a WILDLIFE section
+  reading "0 animals, 0 carcasses, 0 flocks", because the report was taken inside a village.
+  About the child the report is ABOUT, and about every other inhabitant, it holds nothing: no
+  position, no state, no tag role, no errand. The one report kind a settlement produces is the
+  one the dump cannot describe, so a stuck-inhabitant report can only ever be answered by trying
+  to reproduce it from the seed.
+  FINAL STATE: a new bounded `placeLife` section in the state JSON, built like
+  `src/systems/wildlifeDump.ts` and named in the archive listing (`.txt`) in BOTH languages,
+  written whenever the report is taken in `place` mode and absent otherwise. It holds, all in
+  world coordinates so it can be replayed against the layout: every INHABITANT within a stated
+  radius — kind (child / adult / porter / errand walker), position, velocity, pose, and for a
+  child its tag role (chaser/target/free), whether it is pinned, the seconds without progress and
+  how often the unstuck nudge fired on it this visit; for an adult the errand it is on (situation
+  id, target place, arrived, remaining dwell). Beside them the TAG GAME state as `__placeTag`
+  reports it (playing, chaser, target, tags, chaserFor), the errand scheduler state as
+  `__placeErrands` reports it (staged counts, last situation, silence), and the settlement's
+  teaching GEOGRAPHY: bank, upstream, downstream, the teaching stone and every dig site. Same
+  bounding discipline as the wildlife section — a stated radius, a cap, and the count of what was
+  left out.
+  IT MUST WORK IN A PRODUCTION BUILD. `__placeTag` and `__placeErrands` are
+  `import.meta.env.DEV`-gated (`src/scenes/place/PlaceLife.tsx`), so today they are absent from
+  exactly the build the player reports from. The dump therefore reads the same state through a
+  channel that SHIPS — a registered snapshot callback, not a debug hook — while the DEV hooks
+  stay as they are for the headless suites, and production gains no debug surface beyond the
+  snapshot the report itself reads. Nothing player-visible changes; the report grows by one
+  section.
+  VERIFIABLE: Vitest over the pure dump builder — a settlement view with more inhabitants than
+  the cap yields the cap plus a correct left-out count, a child with a pinned state and a nudge
+  count round-trips, and the section is absent in travel mode — plus the existing report test
+  extended so the archive listing names the new section in both languages.
+  AUTHOR: the OpenAI lane (Sol) fits — mechanical, bounded, and its verification is not the work.
+  Criticality: medium — nothing is broken by its absence, but every stuck-inhabitant report the
+  user sends is undiagnosable without it, and point 666 is waiting on exactly that.
+  Bundle: Dorfleben.
