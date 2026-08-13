@@ -14,6 +14,7 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
+import { READ_COUNT, READ_GAP_FRAMES, CONFIRM_READS, READ_GAP_NET_MS, READ_GAP_MS, SHOT_DRIFT_BAR, luminanceSamples, settleReading, shotDrift, shotReading } from './cropLuma.mjs'
 import {
   CHILD_MOTION,
   holdsAGame,
@@ -2618,18 +2619,27 @@ if (section('settlement-edge')) {
       return null
     })
 
-  /** Mean luminance of a crop centred on a ground point. */
-  const groundLuma = async (buf, ndc, w, h) => {
+  /** Every pixel's luminance in a crop centred on a ground point. The reads are
+   *  kept per PIXEL (point 641): the shot's reading rejects the §19.13 rain
+   *  streaks across the reads and then measures the band across the pixels, and
+   *  neither is possible once a read has been collapsed to one number.
+   *  cropLuma.mjs carries the reasoning and cropLuma.test.mjs pins it. */
+  const groundSamples = async (buf, ndc, w, h) => {
     const view = page.viewportSize()
     const left = Math.round(((ndc.x + 1) / 2) * view.width - w / 2)
     const top = Math.round(((1 - ndc.y) / 2) * view.height - h / 2)
     if (left < 0 || top < 0 || left + w > view.width || top + h > view.height) return null
     const { data, info } = await sharp(buf).extract({ left, top, width: w, height: h }).raw().toBuffer({ resolveWithObject: true })
-    let sum = 0
-    for (let i = 0; i < info.width * info.height; i++) {
-      sum += 0.35 * data[i * info.channels] + 0.5 * data[i * info.channels + 1] + 0.15 * data[i * info.channels + 2]
-    }
-    return sum / (info.width * info.height)
+    return luminanceSamples(data, info)
+  }
+
+  /** The crop's SETTLE reading (cropLuma.mjs): the crop's mean with its
+   *  brightest fifth dropped, so a rain streak cannot end the wait early and a
+   *  band leak arriving over part of the crop still holds it open. It compares
+   *  the picture with itself; it never measures the band. */
+  const groundLuma = async (buf, ndc, w, h) => {
+    const samples = await groundSamples(buf, ndc, w, h)
+    return samples === null ? null : settleReading(samples)
   }
 
   /** Aim the camera at a ground point ahead by bisecting the pitch on the
@@ -2679,6 +2689,49 @@ if (section('settlement-edge')) {
       frames,
     )
 
+  /** The gap between two reads of one shot (point 641): far enough apart to be
+   *  DIFFERENT PICTURES of the same scene. Both conditions are needed. Frames,
+   *  because on a throttled machine time passes while the picture does not; and
+   *  the page's own elapsed time, because a fast machine could draw twelve
+   *  frames in a fraction of a second. MEASURED here (cropLuma.mjs): a §19.13
+   *  streak stays in the crop under 270 ms — the bound the sampling actually
+   *  proves — and the scene draws ~6.8 fps headless at giza, so twelve frames are
+   *  ~1.75 s and the frame condition alone outlasts the streak about six times
+   *  over. The 600 ms is the floor that keeps that true on a machine that draws
+   *  faster. This polls the PAGE's clock, which is the clock the rain falls on,
+   *  not a sleep in the harness. */
+  const readGap = (ms = READ_GAP_MS, frames = READ_GAP_FRAMES) =>
+    page.evaluate(
+      ([wait, n, netMs]) =>
+        new Promise((res) => {
+          // The net is WALL CLOCK and lives OUTSIDE the frame loop. Counting
+          // frames cannot bound a scene that has stopped drawing them: the
+          // counter simply never advances. And a gap that gives up must not
+          // pretend it waited — it reports STARVED, and the shot fails rather
+          // than measuring reads that sit closer together than the rain needs
+          // them to.
+          const t0 = performance.now()
+          let i = 0
+          let done = false
+          const finish = (ok) => {
+            if (done) return
+            done = true
+            res(ok)
+          }
+          const net = setTimeout(() => finish(false), netMs)
+          const step = () => {
+            if (done) return
+            if (++i >= n && performance.now() - t0 >= wait) {
+              clearTimeout(net)
+              return finish(true)
+            }
+            requestAnimationFrame(step)
+          }
+          requestAnimationFrame(step)
+        }),
+      [ms, frames, READ_GAP_NET_MS],
+    )
+
   const enterFor = async (id) => {
     await page.evaluate((want) => {
       const g = window.__game.getState()
@@ -2718,23 +2771,48 @@ if (section('settlement-edge')) {
    *  the live proof that the calibratable strength lands without a reload. */
   const bandRatio = async (ndc) => {
     // Point 549: three frames were not the band arriving, they were three frames.
-    // Each shot now waits for the crop to STOP MOVING on the new strength and
-    // then averages three reads of it — the rains draw over the ground and TRAA
-    // jitters it, so a single frame samples that noise instead of measuring the
-    // band. The measured spread of `capetown (wet)` across five runs was 6.5
-    // luminance points on an unchanged scene, straddling its own 0.04 bar.
+    // Each shot waits for the crop to STOP MOVING on the new strength and then
+    // takes three reads of it — the rains draw over the ground and TRAA jitters
+    // it, so a single frame samples that noise instead of measuring the band.
+    // The measured spread of `capetown (wet)` across five runs was 6.5 luminance
+    // points on an unchanged scene, straddling its own 0.04 bar.
+    //
+    // Point 641: a shot is FIVE reads of the crop, kept per pixel, combined by
+    // the per-pixel median across the reads and then by the crop's mean
+    // (cropLuma.mjs). The rain is a transient in TIME and the band is not, so
+    // the streak is rejected across the reads while every pixel still counts
+    // towards the measurement — a spatial median would reject the streak too,
+    // and with it a genuine band leak over part of the crop, which at 0.3 m of
+    // clearance is the first real defect this check has to catch (measured: a
+    // leak over 8 of the 46 rows reads ×0.968 on the mean and ×1.000 on the
+    // spatial median). Five reads, so a streak surviving into two of them still
+    // cannot reach the middle value.
     const shot = async (strength) => {
       await page.evaluate((s) => { window.__balance.placeEdgeBand.strength = s }, strength)
-      const first = await settledLuma(ndc, 0.2)
-      if (first === null) return null
-      const reads = [first]
-      for (let i = 0; i < 2; i++) {
-        await settleFrames(2)
-        const cur = await groundLuma(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
+      if ((await settledLuma(ndc, 0.2)) === null) return null
+      const reads = []
+      for (let i = 0; i < READ_COUNT + CONFIRM_READS; i++) {
+        // A starved gap is a FAILED shot, not a faster one: reads that are not
+        // far enough apart are not independent pictures, and the rain rejection
+        // is exactly what that independence buys.
+        if (i > 0 && !(await readGap())) return null
+        const cur = await groundSamples(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
         if (cur === null) return null
         reads.push(cur)
       }
-      return reads.reduce((a, b) => a + b, 0) / reads.length
+      // A scene that changed WHILE the shot was taken is not a shot. The
+      // per-pixel median would erase a defect arriving in a minority of the
+      // reads exactly as it erases the rain, and the settle loop ahead of it is
+      // one-sided — so the two halves of the shot are compared, each still
+      // rain-robust, and a disagreement fails the shot instead of averaging it
+      // away.
+      const drift = shotDrift(reads)
+      if (drift === null || drift > SHOT_DRIFT_BAR) {
+        console.log(`# shot REJECTED — the crop moved ${(drift * 100).toFixed(3)} % between its first and last reads (bar ${(SHOT_DRIFT_BAR * 100).toFixed(1)} %)`)
+        return null
+      }
+      // The confirmation read is the guard's, not the measurement's.
+      return shotReading(reads.slice(0, READ_COUNT))
     }
     // ON, OFF, ON — and the two ONs averaged. In the rains the ground SOAKS
     // while the shots are taken (the §19.13 wet accumulation keeps darkening
@@ -2765,7 +2843,16 @@ if (section('settlement-edge')) {
         const s = window.__placeSeason()
         return { wetness: s.wetness, groundWet: s.groundWet, sun: s.sun, hemi: s.hemi }
       },
-      { settleMs: 400, samples: 3, timeout: 60000 },
+      // A LOAD-PROOF budget, not a tight one (point 641). The soak advances per
+      // FRAME, so a machine that draws a quarter of the frames needs about four
+      // times the wall clock for the same drying — and the 60 s this used to
+      // allow is only 1.7× the 34.9 s the dry settle takes on a quiet machine.
+      // Measured under `throttle-probe … --rate 4`: 1 of 3 runs failed here at
+      // 60 051 ms with groundWet at 0.133 and still falling — a budget expiring
+      // on a converging reading, not a scene that had stopped. The ceiling stays
+      // as a net for a settle that genuinely never comes; it costs a green run
+      // nothing.
+      { settleMs: 400, samples: 3, timeout: 240000 },
     )
     check(
       `${id} (${seasonName}): the ground's wet state settles before the band is measured`,
@@ -2831,9 +2918,29 @@ if (section('settlement-edge')) {
   // Both were reading a wet state still on its way in. With the soak and the
   // light on it polled until they stop, four consecutive WebGL 2 runs reported
   // capetown inside ×0.946, ×0.944, ×0.944, ×0.946 (spread 0.002) and giza
-  // inside ×0.905, ×0.906, ×0.906. The outside half is steady but not yet
-  // perfectly still: giza read ×1.000, ×1.000, ×0.980 — inside the ±0.025 bar,
-  // and the one reading worth watching if this check ever rotates again.
+  // inside ×0.905, ×0.906, ×0.906.
+  //
+  // WHAT STILL ROTATED, AND WHY (point 641). The outside half kept moving —
+  // ×1.000, ×1.000, ×0.980, and on 11.08.2026 `giza (wet)` went red at ×0.963,
+  // in one of three full runs while the same section passed 3/3 in isolation.
+  // The wet state was not the cause and neither was load: the crop was sampled
+  // 284 times over 90 s at giza with the band strength fixed and the light
+  // constant, and its MEAN jumped from 102.5 to 114.0 — +11.4 % — about every
+  // 13 s. The saved frames name it: a §19.13 rain streak, bright and ~14 px
+  // wide, falling straight through the 150×46 crop. In one of the three shots a
+  // ratio takes, that is the whole red — with the measured ×1.1137
+  // contamination, a streak in an ON shot gives ×1.057 (the reading on record,
+  // to three decimals), one in the OFF shot ×0.898, and a 4–5 px sliver the
+  // ×0.963. A shot is now five reads of the crop, combined per PIXEL by their
+  // median across the reads and then by the crop's mean (cropLuma.mjs): the
+  // streak is transient and is dropped, while a band effect over any part of
+  // the crop is still measured at full strength.
+  // The geometry was measured and ruled out in the same pass: at giza the
+  // outside crop's near row sits at radius+2.7 m and the band reaches at most
+  // radius+2.4 m, the per-row ON/OFF profile reads 1.000 across every row of the
+  // crop, and the aim is reproducible to 16 digits between runs — clear, though
+  // by only 0.3 m, which is the number to look at first if the offsets or the
+  // band's width are ever recalibrated.
   const kinds = [
     { id: 'maasai-village', shoot: { name: '488-village-edge-band', label: 'the swept village ground giving way at the edge' } },
     { id: 'capetown', shoot: { name: '488-port-edge-band', label: 'the port ground giving way at the edge' } },
