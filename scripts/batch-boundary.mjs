@@ -350,8 +350,23 @@ export function boundaryHandover({ sid = readOwnerLock()?.sessionId ?? '' } = {}
  */
 export function commitSealedBoundary({ transfer, marker, write = writeBoundary } = {}) {
   let transferred = null
-  if (transfer && typeof transfer.commit === 'function') transferred = transfer.commit()
-  write(marker)
+  if (transfer && typeof transfer.commit === 'function') {
+    try {
+      transferred = transfer.commit()
+    } catch (cause) {
+      // STAGE-TAGGED (Sol round 3): a failure here means NOTHING was recorded…
+      throw Object.assign(new Error(String(cause?.message ?? cause)), { stage: 'transfer', cause })
+    }
+  }
+  try {
+    write(marker)
+  } catch (cause) {
+    // …while a failure HERE means the transfer already stands and only the
+    // marker is missing — reporting it as "nothing recorded" would send the
+    // session to re-do a transfer that is done and to distrust a state that is
+    // half-taken. The caller says which half, honestly.
+    throw Object.assign(new Error(String(cause?.message ?? cause)), { stage: 'marker', cause, transferred })
+  }
   return transferred
 }
 
@@ -495,8 +510,12 @@ if (isMain) {
         })
       } catch (e) {
         fail(
-          `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
-            'Retry, or check `node scripts/batch-in-flight.mjs --status`.',
+          e?.stage === 'marker'
+            ? `the transfer stage succeeded${e.transferred ? ` (${e.transferred})` : ''} but the boundary MARKER ` +
+                `could not be written (${e?.message ?? e}) — the boundary is NOT taken. Retry this exact commit: ` +
+                'it is idempotent (an already-transferred declaration is not re-judged), and only the marker is missing.'
+            : `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
+                'Retry, or check `node scripts/batch-in-flight.mjs --status`.',
         )
       }
       console.log(
@@ -603,8 +622,12 @@ if (isMain) {
       })
     } catch (e) {
       fail(
-        `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
-          'Retry, or check `node scripts/batch-in-flight.mjs --status`.',
+        e?.stage === 'marker'
+          ? `the transfer stage succeeded${e.transferred ? ` (${e.transferred})` : ''} but the boundary MARKER ` +
+              `could not be written (${e?.message ?? e}) — the boundary is NOT taken. Retry this exact commit: ` +
+              'it is idempotent (an already-transferred declaration is not re-judged), and only the marker is missing.'
+          : `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
+              'Retry, or check `node scripts/batch-in-flight.mjs --status`.',
       )
     }
     const transferLine = transferred

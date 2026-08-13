@@ -749,9 +749,10 @@ describe('commitSealedBoundary — the marker is the LAST write (Sol findings 1/
     expect(out).toBe('feat/x@abcd')
   })
 
-  it('a THROWING transfer leaves NO marker behind', () => {
+  it('a THROWING transfer leaves NO marker behind, and names its stage', () => {
     let wrote = false
-    expect(() =>
+    let caught = null
+    try {
       commitSealedBoundary({
         transfer: {
           commit: () => {
@@ -762,9 +763,33 @@ describe('commitSealedBoundary — the marker is the LAST write (Sol findings 1/
         write: () => {
           wrote = true
         },
-      }),
-    ).toThrow('declaration unwritable')
+      })
+    } catch (e) {
+      caught = e
+    }
+    expect(caught?.message).toBe('declaration unwritable')
+    expect(caught?.stage).toBe('transfer')
     expect(wrote).toBe(false)
+  })
+
+  it('a THROWING marker write is reported as the MARKER stage, with the transfer kept (Sol round 3)', () => {
+    let caught = null
+    try {
+      commitSealedBoundary({
+        transfer: { commit: () => 'feat/x@abcd' },
+        marker: { v: 2 },
+        write: () => {
+          throw new Error('disk says no')
+        },
+      })
+    } catch (e) {
+      caught = e
+    }
+    // The transfer already stands — reporting "nothing recorded" here would
+    // send the session to redo a done transfer and distrust a half-taken state.
+    expect(caught?.stage).toBe('marker')
+    expect(caught?.transferred).toBe('feat/x@abcd')
+    expect(caught?.message).toBe('disk says no')
   })
 
   it('no transfer at all still writes the marker', () => {
