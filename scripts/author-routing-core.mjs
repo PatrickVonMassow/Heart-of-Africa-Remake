@@ -105,8 +105,11 @@ export const VERIFICATION_MARKERS = Object.freeze([
 export function laneTagIn(body) {
   let found = ''
   for (const line of String(body ?? '').split(/\r?\n/)) {
-    // A list marker or blockquote may precede it; a quote character may not.
-    const m = /^[\s>*-]*author lane:\s*(sol|fable|opus)\b/i.exec(line)
+    // A list marker or blockquote may precede it; a quote character may not. The
+    // line must also END there (second cross-vendor round): without the closing
+    // anchor, `Author lane: sol is the example spelling` was still an operative
+    // tag, which is the same sentence-inside-a-document case one round on.
+    const m = /^[\s>*-]*author lane:\s*(sol|fable|opus)\s*[.;,)`'"]*\s*$/i.exec(line)
     if (m) found = m[1].toLowerCase()
   }
   return found

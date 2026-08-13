@@ -20,7 +20,7 @@
 // The ONE import: what a co-author trailer naming a MODEL looks like. It is the
 // author allowlist's own answer (scripts/model-guard-core.mjs, which imports
 // nothing), so "who authored this" cannot drift from "who may author at all".
-import { MODEL_TRAILER } from './model-guard-core.mjs'
+import { modelNamesIn } from './model-guard-core.mjs'
 
 /** The verdicts a review may end in, weakest refusal last. */
 export const VERDICTS = Object.freeze(['merge', 'merge-with-fixes', 'do-not-merge'])
@@ -432,7 +432,11 @@ export function modelFromTrailers(field) {
 export function modelsFromTrailers(field) {
   const out = []
   for (const part of String(field ?? '').split(/[;,\n]/)) {
-    if (MODEL_TRAILER.test(part) && part.trim()) out.push(part.trim())
+    // ASKED OF THE PARSED NAME, not the raw line (second cross-vendor round of
+    // point 667): the raw line carries the ADDRESS, so a human co-author writing
+    // from `build@sol.example` was returned as a model author — and would then
+    // block a legitimate review as a self-review.
+    if (part.trim() && modelNamesIn(part).length) out.push(part.trim())
   }
   return out
 }

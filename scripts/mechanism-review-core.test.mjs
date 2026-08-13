@@ -157,6 +157,11 @@ describe('model identity', () => {
     expect(modelsFromTrailers('Patrick von Massow <p@example.com>;GPT-5.6 Sol <n@o.com>')).toEqual([
       'GPT-5.6 Sol <n@o.com>',
     ])
+    // A HUMAN IS STILL NOT A MODEL, however their address reads (2nd round):
+    // the test used to run against the raw trailer, so `<build@sol.example>`
+    // made a person a model author — and would refuse their reviewer as a self.
+    expect(modelsFromTrailers('Patrick <build@sol.example>')).toEqual([])
+    expect(modelFromTrailers('Patrick <build@sol.example>')).toBe('')
     // Both halves of Sol's name are the same model, whichever is written.
     expect(sameModel('GPT-5.6 Sol <noreply@openai.com>', 'Sol')).toBe(true)
     expect(sameModel('GPT-5.6 Sol', 'GPT-5.6 Sol')).toBe(true)

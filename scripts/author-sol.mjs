@@ -35,8 +35,10 @@ import {
   childEnv,
   formatAuthoringReport,
   judgeAuthoring,
+  KILL_GRACE_MS,
   parseAuthoringAnswer,
   PUSH_INTERVAL_MS,
+  PUSH_TIMEOUT_MS,
   readinessProblems,
   SOL_MODEL_ID,
   SOL_MODEL_NAME,
@@ -77,22 +79,40 @@ function briefFor(number) {
   return res.status === 0 && !res.error ? (res.stdout ?? '').trim() : ''
 }
 
-/** The commits that appeared on this branch since `base`, newest first. */
-export function commitsSince(base, { cwd = process.cwd() } = {}) {
+/**
+ * The commits that appeared since `base`, newest first.
+ *
+ * READ FROM THE BRANCH REF, not from HEAD (second cross-vendor round): a run
+ * that committed on the approved branch and then checked out something else
+ * would otherwise have its work discarded from the inspection, left unpushed,
+ * and reported as "nothing was committed" while it sat on the branch all along.
+ */
+export function commitsSince(base, { cwd = process.cwd(), ref = 'HEAD' } = {}) {
   const field = '%H%x1f%s%x1f%(trailers:key=Co-Authored-By,valueonly,separator=;)'
-  const log = git(['log', `--format=${field}`, `${base}..HEAD`], { cwd }) ?? ''
+  const log = git(['log', `--format=${field}`, `${base}..${ref}`], { cwd }) ?? ''
   return log
     .split('\n')
     .filter(Boolean)
     .map((line) => {
-      const [sha, subject, trailers] = line.split('')
-      return { sha, subject, trailers: trailers ?? '' }
+      const [sha, subject, trailers] = line.split(UNIT)
+      return { sha, subject: subject ?? '', trailers: trailers ?? '' }
     })
 }
 
+/** git's unit separator, so a subject holding any punctuation still parses. */
+const UNIT = String.fromCharCode(31)
+
 /** Push the branch, quietly. Returns true only on a real success. */
-export function pushBranch(branch, { cwd = process.cwd() } = {}) {
-  const res = spawnSync('git', ['push', '-u', 'origin', branch], { cwd, encoding: 'utf8', windowsHide: true })
+export function pushBranch(branch, { cwd = process.cwd(), timeoutMs = PUSH_TIMEOUT_MS } = {}) {
+  // TIMED, because the interim push runs on the event loop the kill timer lives
+  // on (second cross-vendor round): a push that hangs on the network would
+  // otherwise block the timeout that is supposed to bound the whole run.
+  const res = spawnSync('git', ['push', '-u', 'origin', branch], {
+    cwd,
+    encoding: 'utf8',
+    windowsHide: true,
+    timeout: timeoutMs,
+  })
   return { ok: res.status === 0 && !res.error, why: (res.stderr || res.error?.message || '').trim() }
 }
 
@@ -133,16 +153,27 @@ export async function runAuthoringCodex({
   })
 
   let timedOut = false
+  let settle = () => {}
+  const escalations = []
   const killer = setTimeout(() => {
     timedOut = true
     child.kill('SIGTERM')
+    // A BOUND, NOT A REQUEST (second cross-vendor round): a child that ignores
+    // SIGTERM gets SIGKILL, and if its pipes are still held open by a grandchild
+    // after that, the wrapper stops waiting rather than hanging for ever. What
+    // was committed is on the branch either way, and that is what gets judged.
+    escalations.push(setTimeout(() => child.kill('SIGKILL'), KILL_GRACE_MS))
+    escalations.push(setTimeout(() => settle({ spawnError: null, exitCode: 1 }), KILL_GRACE_MS * 2))
   }, timeoutMs)
   // The interim push only runs while the branch has moved, so an idle run costs
-  // no network calls at all.
-  let lastPushed = git(['rev-parse', 'HEAD'], { cwd })
+  // no network calls at all. It starts at NOTHING pushed rather than at the
+  // current head: assuming the branch is already on the remote would skip the
+  // one push that matters if it is not.
+  let lastPushed = null
+  const tip = () => git(['rev-parse', branch ? `refs/heads/${branch}` : 'HEAD'], { cwd })
   const pusher = branch && pushEveryMs > 0
     ? setInterval(() => {
-        const head = git(['rev-parse', 'HEAD'], { cwd })
+        const head = tip()
         if (!head || head === lastPushed) return
         const { ok, why } = pushBranch(branch, { cwd })
         if (ok) lastPushed = head
@@ -151,10 +182,12 @@ export async function runAuthoringCodex({
     : null
 
   const { spawnError, exitCode } = await new Promise((resolve) => {
+    settle = resolve
     child.on('error', (error) => resolve({ spawnError: error, exitCode: 1 }))
     child.on('close', (code) => resolve({ spawnError: null, exitCode: code ?? 1 }))
   })
   clearTimeout(killer)
+  for (const t of escalations) clearTimeout(t)
   if (pusher) clearInterval(pusher)
 
   let last = ''
@@ -174,6 +207,10 @@ export async function runAuthoringCodex({
     stdout,
     stderr,
     timedOut,
+    // What the interim pushes already made durable, so a transient failure of
+    // the FINAL push cannot report work as local-only that is on the remote
+    // (second cross-vendor round).
+    lastPushed,
     finalMessage: last || stdout || '',
   }
 }
@@ -343,7 +380,10 @@ if (isMainModule(import.meta.url)) {
     // from checking out another branch, and the commits below would then belong
     // to something else entirely (cross-vendor review, P1).
     const branchAfter = git(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd }) ?? ''
-    const commits = branchAfter === branch ? commitsSince(base, { cwd }) : []
+    // READ OFF THE BRANCH, not off HEAD: a run that wandered elsewhere still
+    // committed its work here, and discarding it would lose it (second
+    // cross-vendor round). That it wandered is a PROBLEM, reported as one.
+    const commits = commitsSince(base, { cwd, ref: `refs/heads/${branch}` })
 
     // PUSHED BEFORE ANYTHING IS JUDGED: whatever the run did, what is committed
     // must not live only in a worktree that a landing may delete underneath it.
@@ -351,8 +391,15 @@ if (isMainModule(import.meta.url)) {
     let pushed = null
     if (commits.length) {
       const res = pushBranch(branch, { cwd })
-      pushed = res.ok
-      if (!pushed) console.error(`author-sol: PUSH FAILED — ${res.why}`)
+      // A failed FINAL push over work the interval ALREADY pushed is not
+      // local-only work, and saying so would send the reader after a problem
+      // that is not there.
+      const tip = git(['rev-parse', `refs/heads/${branch}`], { cwd })
+      pushed = res.ok || (Boolean(tip) && tip === run.lastPushed)
+      if (!res.ok) {
+        console.error(`author-sol: final push failed — ${res.why}`)
+        if (pushed) console.error('  (the interim push already carried this commit to the remote)')
+      }
     }
 
     const judged = judgeAuthoring({

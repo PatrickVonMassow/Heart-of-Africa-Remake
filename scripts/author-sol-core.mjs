@@ -56,6 +56,18 @@ export const AUTHOR_TIMEOUT_MS = 60 * 60_000
  */
 export const PUSH_INTERVAL_MS = 2 * 60_000
 
+/** How long ONE push may take before it is given up on. The interim push runs on
+ *  the same event loop as the run's kill timer, so an unbounded one would block
+ *  the bound (second cross-vendor round). */
+export const PUSH_TIMEOUT_MS = 60_000
+
+/** After SIGTERM, how long the run gets to exit before it is SIGKILLed — and
+ *  after that, how long its pipes get to close before the wrapper stops waiting.
+ *  A timeout that only asks politely is not a bound: a child ignoring SIGTERM,
+ *  or a grandchild holding the pipes open, left the promise waiting for ever
+ *  (second cross-vendor round). */
+export const KILL_GRACE_MS = 20_000
+
 /**
  * The environment the authoring child gets: this one MINUS anything that reads
  * like a credential.
@@ -74,19 +86,37 @@ export const PUSH_INTERVAL_MS = 2 * 60_000
  * does not.
  */
 export const SENSITIVE_ENV =
-  /(?:^|_)(TOKENS?|SECRETS?|PASSWORDS?|PASSWD|CREDENTIALS?|PAT|KEYS?|AUTH|ASKPASS|COOKIE|SESSION|JWT)(?:_|$)|API_?KEYS?|DATABASE_URL|CONNECTION_STRING/i
+  /(?:^|_)(TOKENS?|SECRETS?|PASSWORDS?|PASSWD|CREDENTIALS?|PAT|KEYS?|AUTH|ASKPASS|COOKIE|SESSION|JWT)(?:_|$)|API_?KEYS?|DATABASE_URL|CONNECTION_STRING|PGPASSWORD|_PWD$/i
+
+/**
+ * …and the whole `GIT_CONFIG_*` family goes together, whatever it is called.
+ *
+ * `GIT_CONFIG_KEY_0` matches the rule above and `GIT_CONFIG_COUNT` does not, so
+ * filtering name by name left git a COUNT with no KEY — a malformed tuple that
+ * makes every git command in the run fail (second cross-vendor round). They are
+ * also configuration injected from the environment, which a run in an isolated
+ * worktree has no business inheriting: the fixture suites drop them for exactly
+ * that reason.
+ */
+export const GIT_CONFIG_ENV = /^GIT_CONFIG/i
+
+/** Is this variable withheld from the authoring child? */
+export function isWithheldEnv(key) {
+  const name = String(key ?? '')
+  return SENSITIVE_ENV.test(name) || GIT_CONFIG_ENV.test(name)
+}
 
 export function childEnv(env = {}) {
   const out = {}
   for (const [key, value] of Object.entries(env ?? {})) {
-    if (!SENSITIVE_ENV.test(key)) out[key] = value
+    if (!isWithheldEnv(key)) out[key] = value
   }
   return out
 }
 
 /** The names `childEnv` removed, so the run can SAY what it withheld. */
 export function withheldEnvNames(env = {}) {
-  return Object.keys(env ?? {}).filter((key) => SENSITIVE_ENV.test(key)).sort()
+  return Object.keys(env ?? {}).filter(isWithheldEnv).sort()
 }
 
 /**
@@ -228,6 +258,11 @@ export function buildAuthoringPrompt({ point = '', brief = '', branch = '', find
   ].join('\n')
 }
 
+/** What a GATES line says when the gates are not green. Deliberately broad: the
+ *  cost of a false positive is one line of explanation in a report a human reads
+ *  anyway, the cost of a false negative is a red delivery reported as clean. */
+const NOT_GREEN = /\b(not run|didn'?t run|un-?run|skipped|failing|failed|fails|red|error|broken|unverified|pending)\b/i
+
 /** The closing lines of an authoring answer, read off the END of the message. */
 export function parseAuthoringAnswer(text) {
   const clean = String(text ?? '').replace(/[*`_#>]/g, '')
@@ -291,6 +326,14 @@ export function judgeAuthoring({ outcome = {}, commits = [], parsed = {}, dirty 
   }
   if (!outcome?.ok) problems.push(`the codex run did not finish cleanly: ${outcome?.cause || 'no cause was reported'}`)
   else if (!parsed?.ok) problems.push(`the run gave no usable closing report (${parsed?.error || 'no reason given'})`)
+  // A RUN THAT SAYS ITS GATES ARE NOT GREEN IS NOT A CLEAN RUN (second
+  // cross-vendor round). `GATES: not run` parsed perfectly well and the command
+  // exited 0 — reporting as a delivery something the prompt's own rules refuse.
+  // The reviewer runs the gates itself regardless; this is about the exit code
+  // a script chains on.
+  else if (NOT_GREEN.test(String(parsed.gates ?? ''))) {
+    problems.push(`the run reports its own gates as NOT green ("${String(parsed.gates).trim()}")`)
+  }
   return {
     // DELIVERED means reviewable work exists, which is not the same as a clean
     // run: commits that survived a timeout are still the point's work.

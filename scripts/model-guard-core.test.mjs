@@ -522,6 +522,41 @@ describe('the GPT-5.6 Sol authoring lane', () => {
     expect(modelNamesIn('Patrick von Massow <patrick@example.com>')).toEqual([])
   })
 
+  it('reads a model out of a SUFFIX instead of stripping the claim away (2nd round)', () => {
+    // The `(1M context)` / `[1m]` strip took a forbidden name with it, so a
+    // suffix was a place to hide one: these read as the allowed `Opus 5`.
+    expect(classifyTrailer('Claude Opus 5 (Haiku 4.5) <x@y>')).toBe('forbidden')
+    expect(classifyTrailer('Claude Opus 5 [Sonnet 5] <x@y>')).toBe('forbidden')
+    // …while the suffixes it exists for still vanish.
+    expect(classifyTrailer('Claude Opus 5 (1M context) <x@y>')).toBe('allowed')
+    expect(classifyTrailer('Claude claude-opus-5[1m] <x@y>')).toBe('allowed')
+    // …and a bracketed name that IDENTIFIES the model is kept, not dropped.
+    expect(classifyTrailer('GPT-5.6 (Sol) <noreply@openai.com>')).toBe('allowed')
+  })
+
+  it('knows a model by its VENDOR ADDRESS when the name means nothing to it (2nd round)', () => {
+    // No word list can hold every future family: `o3`, `ChatGPT-4o`, `GPT4o`
+    // matched none of it, so an unknown OpenAI model was not model evidence.
+    for (const t of ['OpenAI o3 <noreply@openai.com>', 'some-new-model-9 <noreply@openai.com>', 'ChatGPT-4o <x@y>', 'GPT4o <x@y>']) {
+      expect(classifyTrailer(t), t).toBe('forbidden')
+    }
+    // The bare vendor trailer names nothing — resolvable, not a breach.
+    expect(classifyTrailer('<noreply@openai.com>')).toBe('unidentified')
+  })
+
+  it('does not redden a HUMAN whose name happens to be a family word (2nd round)', () => {
+    // The widened recognition cut the other way: a family word ALONE made
+    // `Sol Smith` a forbidden model. A non-Claude trailer is model evidence only
+    // with a version beside the word, or a vendor address.
+    for (const t of ['Sol Smith <s@example.com>', 'Grok Andersen <g@example.com>', 'Patrick von Massow <p@example.com>']) {
+      expect(classifyTrailer(t), t).toBe('allowed')
+      expect(modelNamesIn(t), t).toEqual([])
+    }
+    // A version, or the vendor's own address, still identifies the model.
+    expect(classifyTrailer('Sol <noreply@openai.com>')).toBe('allowed')
+    expect(classifyTrailer('Haiku 4.5 <s@example.com>')).toBe('forbidden')
+  })
+
   it('finds a forbidden non-Claude commit in the log window', () => {
     const log = [
       line('aaaaaaa', '2026-08-13T09:00:00Z', 'GPT-5.6 Sol <noreply@openai.com>'),

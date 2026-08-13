@@ -15,6 +15,7 @@ import {
   childEnv,
   formatAuthoringReport,
   HOUSE_RULES,
+  isWithheldEnv,
   judgeAuthoring,
   parseAuthoringAnswer,
   PUSH_INTERVAL_MS,
@@ -113,6 +114,20 @@ describe('childEnv — the one enforcement left once the sandbox is off', () => 
     ])
     expect(childEnv()).toEqual({})
     expect(withheldEnvNames()).toEqual([])
+  })
+
+  it('withholds the credentials the second round named, and the whole GIT_CONFIG family', () => {
+    // PGPASSWORD and MYSQL_PWD matched no segment and travelled.
+    for (const key of ['PGPASSWORD', 'MYSQL_PWD', 'GITHUB_TOKEN', 'SSH_AUTH_SOCK']) {
+      expect(isWithheldEnv(key), key).toBe(true)
+    }
+    // GIT_CONFIG_KEY_0 matched and GIT_CONFIG_COUNT did not, which leaves git a
+    // COUNT with no KEY — a malformed tuple that fails every git command in the
+    // run. They go together, or not at all.
+    const env = { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.x', GIT_CONFIG_VALUE_0: 'y', PATH: '/usr/bin' }
+    expect(childEnv(env)).toEqual({ PATH: '/usr/bin' })
+    // …and the working directory is not a credential.
+    for (const key of ['PWD', 'PATH', 'HOME', 'GIT_AUTHOR_NAME', 'CI']) expect(isWithheldEnv(key), key).toBe(false)
   })
 
   it('is hygiene, not containment — and the file says so', () => {
@@ -260,6 +275,19 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
     expect(
       judgeAuthoring({ outcome: okRun, commits: [solCommit('d'.repeat(40))], parsed: answered, branch: 'b', branchAfter: 'b' }).problems,
     ).toEqual([])
+  })
+
+  it('refuses to call a run clean when it says its own gates are not green (2nd round)', () => {
+    // `GATES: not run` parsed perfectly and the command exited 0 — a delivery
+    // reported as clean while breaking the prompt's own mandatory rule.
+    for (const gates of ['not run', 'unit green, build FAILED', 'lint red', 'skipped the suites', 'pending']) {
+      const parsed = parseAuthoringAnswer(`DONE: a thing\nGATES: ${gates}\nOPEN: none`)
+      const j = judgeAuthoring({ outcome: okRun, commits: [solCommit('a'.repeat(40))], parsed })
+      expect(j.clean, gates).toBe(false)
+      expect(j.problems.join(' '), gates).toMatch(/gates as NOT green/)
+    }
+    // A green report stays clean.
+    expect(judgeAuthoring({ outcome: okRun, commits: [solCommit('b'.repeat(40))], parsed: answered }).clean).toBe(true)
   })
 
   it('keeps the work of a run that died, and still names what went wrong', () => {

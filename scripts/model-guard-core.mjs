@@ -74,7 +74,40 @@ export const CLAUDE_TRAILER = /\bclaude\b/i
  * here becomes evidence the ALLOWLIST then judges, and only Opus, Fable and Sol
  * survive that.
  */
-export const MODEL_FAMILY_WORD = /\b(claude|opus|fable|sonnet|haiku|gpt|sol|codex|gemini|grok|llama|mistral|qwen|deepseek)\b/i
+export const MODEL_FAMILY_WORD =
+  /\b(claude|opus|fable|sonnet|haiku|sol|codex|gemini|grok|llama|mistral|qwen|deepseek|o\d(?:-\w+)?)\b|gpt|chatgpt/i
+
+/**
+ * The addresses the two vendors' models commit under. A trailer carrying one is
+ * model evidence WHATEVER it calls itself, which is what catches the family this
+ * list has never heard of — `OpenAI o3 <noreply@openai.com>`.
+ */
+export const MODEL_VENDOR_ADDRESS = /@(?:anthropic|openai)\.com\b/i
+
+/**
+ * Does a NON-Claude trailer name a model rather than a person?
+ *
+ * A family word alone is not enough in both directions, and the second
+ * cross-vendor round found each: `Sol Smith <s@example.com>` is a human this
+ * guard would have reddened, while `OpenAI o3 <noreply@openai.com>` is a model
+ * no word list will contain. So a non-Claude trailer counts as a model when it
+ * carries a VENDOR ADDRESS, or when its family word is followed by a VERSION —
+ * which every model designation in this project's history is, and which a human
+ * name is not.
+ *
+ * RESIDUAL, stated rather than implied: recognition is a heuristic and the
+ * allowlist is not. Everything RECOGNISED fails closed; a model that calls
+ * itself nothing on the list and commits from a private address is not
+ * recognised at all. The Claude branch below is unchanged and needs none of
+ * this — the word is in every trailer our own harness writes.
+ */
+export function namesNonClaudeModel(cleaned, raw = cleaned) {
+  const text = String(cleaned ?? '')
+  if (!MODEL_FAMILY_WORD.test(text)) return MODEL_VENDOR_ADDRESS.test(String(raw ?? ''))
+  if (MODEL_VENDOR_ADDRESS.test(String(raw ?? ''))) return true
+  // A version beside the family word: `Haiku 4.5`, `GPT-5.6 Sol`, `llama-3`.
+  return /\d/.test(text)
+}
 
 /** A co-author trailer this guard treats as naming a MODEL rather than a human. */
 export const MODEL_TRAILER = MODEL_FAMILY_WORD
@@ -113,10 +146,17 @@ function bareName(segment) {
  * it because every test wrote the forbidden model second.
  */
 export function modelNamesIn(trailer) {
-  const cleaned = String(trailer ?? '')
+  const raw = String(trailer ?? '')
+  // A SUFFIX IS DROPPED ONLY WHERE IT NAMES NO MODEL (second cross-vendor round).
+  // The strip exists for `(1M context)` and `[1m]`, and it took the claim with
+  // it: `Claude Opus 5 (Haiku 4.5)` and `Claude Opus 5 [Sonnet 5]` were reduced
+  // to the allowed `Opus 5` before anything judged them, while a plausible
+  // `GPT-5.6 (Sol)` lost the very word that identifies it.
+  const dropEmpty = (_, inner) => (MODEL_FAMILY_WORD.test(inner) ? ` ${inner} ` : ' ')
+  const cleaned = raw
     .replace(/<[^>]*>/g, ' ')
-    .replace(/\([^)]*\)/g, ' ')
-    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/\(([^)]*)\)/g, dropEmpty)
+    .replace(/\[([^\]]*)\]/g, dropEmpty)
     .replace(/\bco-authored-by:/gi, ' ')
   if (CLAUDE_TRAILER.test(cleaned)) {
     const parts = cleaned.split(/\bclaude\b/gi)
@@ -127,7 +167,7 @@ export function modelNamesIn(trailer) {
     if (head && MODEL_FAMILY_WORD.test(head)) names.unshift(head)
     return names
   }
-  if (MODEL_FAMILY_WORD.test(cleaned)) {
+  if (namesNonClaudeModel(cleaned, raw)) {
     const name = bareName(cleaned)
     return name ? [name] : []
   }
@@ -159,7 +199,11 @@ export const CLASSES = Object.freeze(['forbidden', 'unidentified', 'allowed'])
 export function judgeTrailer(trailer) {
   const names = modelNamesIn(trailer)
   if (!names.length) {
-    return { verdict: MODEL_TRAILER.test(String(trailer ?? '')) ? 'unidentified' : 'allowed', names }
+    // A trailer that IS model evidence but names nothing readable — the bare
+    // `Claude <…>` — is unidentified; anything else is a human co-author.
+    const text = String(trailer ?? '')
+    const isModel = CLAUDE_TRAILER.test(text) || MODEL_VENDOR_ADDRESS.test(text)
+    return { verdict: isModel ? 'unidentified' : 'allowed', names }
   }
   if (names.some((name) => !isAllowedModelName(name))) return { verdict: 'forbidden', names }
   return { verdict: names.length > 1 ? 'unidentified' : 'allowed', names }
