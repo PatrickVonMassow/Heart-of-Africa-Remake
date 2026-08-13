@@ -484,12 +484,15 @@ describe('the wrapper (spawned the way the hook spawns it)', () => {
         env: { ...process.env, VITEST: 'true', HOA_TEST_BATCH_LOCK_PATH: lockPath },
       })
       const after = readFileSync(lockPath, 'utf8')
+      const cachePath = resolve(dirname(lockPath), 'session-process.json')
+      const cache = existsSync(cachePath) ? JSON.parse(readFileSync(cachePath, 'utf8')) : {}
       console.log(JSON.stringify({
         status: child.status,
         stdout: child.stdout,
         stderr: child.stderr,
         unchanged: after === before,
         alert: existsSync(resolve(dirname(lockPath), 'parallel-alert.json')),
+        matchedAncestorPid: cache.x?.pid === process.pid,
       }))
     `
     try {
@@ -499,7 +502,14 @@ describe('the wrapper (spawned the way the hook spawns it)', () => {
       })
       expect(parent.status, parent.stderr).toBe(0)
       const result = JSON.parse(parent.stdout.trim())
-      expect(result).toEqual({ status: 0, stdout: '', stderr: '', unchanged: true, alert: false })
+      expect(result).toEqual({
+        status: 0,
+        stdout: '',
+        stderr: '',
+        unchanged: true,
+        alert: false,
+        matchedAncestorPid: true,
+      })
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
