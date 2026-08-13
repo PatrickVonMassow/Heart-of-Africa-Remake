@@ -56,10 +56,6 @@
       "at": "2026-08-13T16:20:28.320Z",
       "why": "Calibrated against the mix that 672 leaves, so it follows it immediately"
     },
-    "674": {
-      "at": "2026-08-13T16:23:56.446Z",
-      "why": "It pauses the batch and recurs on every unit run in the owner's tree, so it protects everything queued behind it"
-    },
     "676": {
       "at": "2026-08-13T17:13:15.401Z",
       "why": "Grosse Infrastruktur, kein Bugfix: vor dem Demo-Checkpoint gilt Bugfixes zuerst, und 675 deckt die drei mechanischen Niederlagen der Uebergabe bereits ohne diese Ebene ab"
@@ -98,7 +94,7 @@
     }
   },
   "settled": {
-    "at": "2026-08-13T21:09:57.053Z",
+    "at": "2026-08-13T22:02:26.927Z",
     "points": [
       174,
       184,
@@ -272,7 +268,6 @@
       670,
       672,
       673,
-      674,
       676,
       677,
       678,
@@ -281,7 +276,14 @@
       682,
       683,
       684,
-      685
+      685,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692
     ]
   }
 }
