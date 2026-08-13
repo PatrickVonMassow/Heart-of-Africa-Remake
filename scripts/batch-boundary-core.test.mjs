@@ -27,6 +27,7 @@ import {
   describeWithdrawalTrigger,
   hookCallTimestamp,
   boardCarriesCard,
+  cardProofFragments,
   markerFresh,
   markerPhase,
   preparedReceipt,
@@ -42,7 +43,7 @@ import {
   topicViolations,
 } from './dashboard-card-topic-guard-core.mjs'
 import { progressGuardDecision } from './batch-singleton.mjs'
-import { commitSealedBoundary } from './batch-boundary.mjs'
+import { clearBoundary, commitSealedBoundary } from './batch-boundary.mjs'
 
 const NOW = 1_785_000_000_000
 const SID = 'session-abc'
@@ -944,6 +945,39 @@ describe('unpreparedRefusal — --commit refuses what --prepare never prepared (
   })
 })
 
+describe('clearBoundary — a partial withdrawal leaves the SEAL, never the receipt (Sol on 389bbc7)', () => {
+  const run = (failOn) => {
+    const removed = []
+    const out = clearBoundary('marker.json', {
+      preparedPath: 'receipt.json',
+      remove: (p) => {
+        if (p === failOn) throw new Error('EPERM')
+        removed.push(p)
+      },
+    })
+    return { out, removed }
+  }
+
+  it('removes both, receipt first', () => {
+    const { out, removed } = run(null)
+    expect(out).toEqual({ marker: true, prepared: true })
+    expect(removed).toEqual(['receipt.json', 'marker.json'])
+  })
+
+  it('keeps the MARKER when the receipt cannot go — the bypass is the other order', () => {
+    // Marker gone + fresh receipt = no seal and a prepared commit: exactly what
+    // the withdrawal must never leave behind.
+    const { out, removed } = run('receipt.json')
+    expect(out).toEqual({ marker: false, prepared: false })
+    expect(removed).toEqual([])
+  })
+
+  it('reports a marker that could not be removed', () => {
+    const { out } = run('marker.json')
+    expect(out).toEqual({ marker: false, prepared: true })
+  })
+})
+
 describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced handover (Sol on ffa0a78)', () => {
   it('calls a FUTURE-dated marker unfresh at every predicate that reads one', () => {
     const future = marker({ at: NOW + 60_000 })
@@ -965,17 +999,49 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
     expect(markerFresh(null, NOW)).toBe(false)
   })
 
-  it('reads the watermark card off the board, and never traps on a board it cannot read', () => {
-    const card = boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })
-    expect(boardCarriesCard(`<div><p>${card}</p></div>`, BOUNDARY_CAUSES.CONTEXT)).toBe(true)
-    // A point card is NOT a watermark card: it claims a closure that never happened.
+  it('proves each real card by fragments that are actually in it — for both causes and both destinations', () => {
+    for (const cause of [BOUNDARY_CAUSES.CONTEXT, BOUNDARY_CAUSES.POINT]) {
+      for (const destination of [BOUNDARY_DESTINATIONS.FRESH_SESSION, BOUNDARY_DESTINATIONS.CLAIMING_WINDOW]) {
+        const card = boundaryCardText({ destination, claimantSid: 'window-7', cause })
+        const proof = boardCarriesCard(`<div><p>${card}</p></div>`, cardProofFragments({ cause, destination }))
+        expect(proof).toEqual({ carries: true, verifiable: true, missing: [] })
+      }
+    }
+    // The fragments stay ASCII: the card crosses the board's HTML, and a check
+    // hanging on an umlaut would block a correct boundary the day it is escaped.
+    for (const cause of [BOUNDARY_CAUSES.CONTEXT, BOUNDARY_CAUSES.POINT]) {
+      for (const f of cardProofFragments({ cause, destination: BOUNDARY_DESTINATIONS.FRESH_SESSION })) {
+        expect(f).toMatch(/^[\x20-\x7e]+$/)
+      }
+    }
+  })
+
+  it('refuses the WRONG card, and the wrong destination', () => {
+    const pointCard = boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.POINT })
+    // A point card is no watermark card: it claims a closure that never happened.
+    const asContext = boardCarriesCard(
+      pointCard,
+      cardProofFragments({ cause: BOUNDARY_CAUSES.CONTEXT, destination: BOUNDARY_DESTINATIONS.FRESH_SESSION }),
+    )
+    expect(asContext.carries).toBe(false)
+    expect(asContext.missing[0]).toContain('Wasserstandsmarke')
+    // …and a card announcing a fresh session does not prove one that must name
+    // the claiming window the launcher will actually hand the batch to.
     expect(
       boardCarriesCard(
-        boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.POINT }),
-        BOUNDARY_CAUSES.CONTEXT,
-      ),
+        pointCard,
+        cardProofFragments({ cause: BOUNDARY_CAUSES.POINT, destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW }),
+      ).carries,
     ).toBe(false)
-    expect(boardCarriesCard('', BOUNDARY_CAUSES.CONTEXT)).toBe(true)
-    expect(boardCarriesCard(null, BOUNDARY_CAUSES.CONTEXT)).toBe(true)
+  })
+
+  it('never traps on a board it cannot read — but says it could not verify', () => {
+    for (const text of ['', '   ', null, undefined, 42]) {
+      expect(boardCarriesCard(text, cardProofFragments({}))).toEqual({
+        carries: true,
+        verifiable: false,
+        missing: [],
+      })
+    }
   })
 })

@@ -350,26 +350,49 @@ export const BOUNDARY_CARD_HEADS = Object.freeze({
 })
 
 /**
- * DOES THE BOARD CARRY THE BOUNDARY CARD for this cause? PURE over the board's
- * text (Sol's review of ffa0a78: the receipt proves `--prepare` ran, not that
- * the bookkeeping it printed was done).
+ * WHAT PROVES THIS CARD IS ON THE BOARD? PURE — the fragments that identify a
+ * card of exactly this cause AND destination (Sol's reviews of ffa0a78/389bbc7:
+ * the receipt proves `--prepare` ran, not that the bookkeeping it printed was
+ * done, and the absence of the OLD card is no evidence for the new one).
  *
- * Used for the CONTEXT cause only, where the head is a whole distinctive
- * sentence and the card IS the mechanism's visible half — defeat 3 requires the
- * reader to see WHY the batch handed over without a closed point. The POINT
- * cause keeps its own check (the old current-work card must be gone): its head
- * is one short sentence that other cards may legitimately contain, and a false
- * positive there would only wave the commit through while a false negative would
- * block a correct boundary.
- *
- * An unreadable board returns TRUE — a board this cannot read must not be able
- * to trap the session at its boundary.
+ * The fragments are deliberately ASCII: the card goes through the board's HTML,
+ * and a check that hangs on an umlaut would block a correct boundary the day
+ * that pipeline starts escaping one. They are pinned against the real card text
+ * by a test, so a reworded card breaks the test rather than the mechanism.
  */
-export function boardCarriesCard(boardText, cause = BOUNDARY_CAUSES.CONTEXT) {
-  if (typeof boardText !== 'string' || !boardText.trim()) return true
-  const head = BOUNDARY_CARD_HEADS[cause]
-  if (!head) return true
-  return boardText.includes(head)
+export function cardProofFragments({ cause = BOUNDARY_CAUSES.POINT, destination } = {}) {
+  const head =
+    cause === BOUNDARY_CAUSES.CONTEXT
+      ? 'Der Kontext dieser Sitzung hat die Wasserstandsmarke erreicht'
+      : 'Der Punkt ist abgeschlossen.'
+  // The head alone identifies a WATERMARK card; a point head is one short
+  // sentence, so the destination sentence carries the identification there.
+  const where =
+    destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
+      ? 'Der Stapel geht NICHT an eine frische Sitzung'
+      : 'Der Launcher startet sie innerhalb seines Intervalls'
+  return [head, where]
+}
+
+/**
+ * DOES THE BOARD CARRY THAT CARD? PURE. Returns
+ * { carries, verifiable, missing } — `verifiable` false for a board that could
+ * not be read at all.
+ *
+ * An unreadable board does NOT refuse: a session that cannot reach its board
+ * must still be able to hand over, or a missing file ends the batch instead of
+ * a session. The caller SAYS SO rather than passing in silence — the one
+ * outcome this whole point forbids.
+ *
+ * RESIDUAL, named because no check here can close it: a card left standing from
+ * a PREVIOUS handover satisfies these fragments. Telling this handover's card
+ * from the last one needs an identity on the card itself, which is the board's
+ * user-owned structure, not this mechanism's to change.
+ */
+export function boardCarriesCard(boardText, fragments = []) {
+  if (typeof boardText !== 'string' || !boardText.trim()) return { carries: true, verifiable: false, missing: [] }
+  const missing = (Array.isArray(fragments) ? fragments : []).filter((f) => f && !boardText.includes(f))
+  return { carries: missing.length === 0, verifiable: true, missing }
 }
 
 /**

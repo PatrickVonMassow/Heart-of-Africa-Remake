@@ -42,6 +42,7 @@ import {
   assessBoundary,
   boardCarriesCard,
   boundaryCardCommand,
+  cardProofFragments,
   boundaryCardText,
   boundaryDestination,
   boundaryDueFrom,
@@ -112,16 +113,21 @@ export function writePrepared(receipt, path = PREPARED_PATH) {
  * of that kind is left; a caller that swallows a false re-opens the bypass, so
  * the CLI says so LOUDLY.
  */
-export function clearBoundary(path = BOUNDARY_PATH, { preparedPath = PREPARED_PATH } = {}) {
+export function clearBoundary(path = BOUNDARY_PATH, { preparedPath = PREPARED_PATH, remove = rmSync } = {}) {
   const gone = (p) => {
     try {
-      rmSync(p, { force: true })
+      remove(p, { force: true })
       return true
     } catch {
       return false
     }
   }
-  return { marker: gone(path), prepared: gone(preparedPath) }
+  // THE RECEIPT GOES FIRST (Sol's review of 389bbc7): with the marker deleted
+  // first, a failing receipt removal would leave exactly the bypass this closes
+  // — no seal, and a fresh receipt the next `--commit` accepts. This order
+  // leaves the seal STANDING on a partial failure, which is the safe half.
+  const prepared = gone(preparedPath)
+  return { prepared, marker: prepared ? gone(path) : false }
 }
 
 /**
@@ -350,6 +356,30 @@ export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } =
  * Any read failure answers false — the pointless `--none` is the one that can
  * fail; `board.mjs none` works in both states, so it is the safe default.
  */
+/**
+ * THE COMMIT ASKS THE BOARD, not the printout it hoped was followed (Sol's
+ * reviews of ffa0a78/389bbc7). Refuses with the command that fixes it; a board
+ * that cannot be READ waves the commit through but SAYS so — a missing file must
+ * not end the batch, and an unverified check must never pass in silence.
+ */
+export function requireBoardCard({ cause, destination, what, prepare, fail, path = repoPath(BOARD_FILE_DEFAULT) }) {
+  const proof = boardCarriesCard(readText(path), cardProofFragments({ cause, destination }))
+  if (!proof.verifiable) {
+    console.error(
+      `WARNING: the board (${path}) could not be read, so ${what} could NOT be verified — the commit proceeds, ` +
+        'but check by hand that the card is up and published.',
+    )
+    return
+  }
+  if (!proof.carries) {
+    fail(
+      `THE BOARD DOES NOT CARRY ${what} — a handover the board does not explain leaves the reader with a ` +
+        `session that vanished for no stated reason. Put up the card \`node scripts/batch-boundary.mjs ${prepare}\` ` +
+        `printed and publish it (\`${PUBLISH_CMD}\`), then commit. Nothing recorded.`,
+    )
+  }
+}
+
 export function pointCardStanding(point, { path = repoPath(BOARD_FILE_DEFAULT) } = {}) {
   try {
     return nowCard(readFileSync(path, 'utf8'), point) != null
@@ -425,13 +455,14 @@ if (isMain) {
     // from the first phase, bookkeeping included, not committed on the strength
     // of an attempt the session deliberately abandoned.
     const cleared = clearBoundary()
-    if (!cleared.marker || !cleared.prepared) {
+    if (!cleared.prepared || !cleared.marker) {
       // NOT swallowed (Sol's review of ffa0a78): a surviving receipt would let
       // the next `--commit` run on a preparation this session just abandoned.
       fail(
-        `the boundary was only PARTLY withdrawn — ${!cleared.marker ? `the marker (${BOUNDARY_PATH})` : `the prepare receipt (${PREPARED_PATH})`} ` +
-          'could not be deleted. Remove it by hand and run `--clear` again; until then treat neither the ' +
-          'boundary as withdrawn nor a commit as prepared.',
+        `the boundary was NOT withdrawn — ${!cleared.prepared ? `the prepare receipt (${PREPARED_PATH})` : `the marker (${BOUNDARY_PATH})`} ` +
+          'could not be deleted' +
+          (cleared.prepared ? '' : ', so the marker was left in place rather than half-withdrawing the boundary') +
+          '. Remove the file by hand and run `--clear` again; until then the boundary still stands.',
       )
     }
     console.log('boundary marker cleared — the ordinary "do not stop the batch" rule applies again.')
@@ -549,15 +580,14 @@ if (isMain) {
       // ffa0a78). The card is the visible half of defeat 3 — the reader must see
       // that the handover happened because the context passed the mark — so the
       // commit reads the board for it rather than trusting the printout was
-      // followed. An unreadable board waves it through: it may not trap a
-      // session at its boundary.
-      if (!boardCarriesCard(readText(repoPath(BOARD_FILE_DEFAULT)), BOUNDARY_CAUSES.CONTEXT)) {
-        fail(
-          'THE BOARD DOES NOT CARRY THE WATERMARK CARD — a context handover the board does not explain leaves ' +
-            'the reader with a session that vanished for no stated reason. Put up the card `--prepare --context` ' +
-            `printed and publish it (\`${PUBLISH_CMD}\`), then commit. Nothing recorded.`,
-        )
-      }
+      // followed.
+      requireBoardCard({
+        cause: BOUNDARY_CAUSES.CONTEXT,
+        destination: handover.destination,
+        what: 'THE WATERMARK CARD',
+        prepare: '--prepare --context --transcript <path>',
+        fail,
+      })
       // Transfer FIRST, marker LAST (Sol review of 807c2bf, finding 1) —
       // `commitSealedBoundary` pins the order, and a failed transfer refuses
       // before anything is recorded.
@@ -694,6 +724,17 @@ if (isMain) {
       now: Date.now(),
     })
     if (unprepared) fail(unprepared)
+
+    // The OLD card being gone is no evidence that the NEW one is up (Sol's
+    // review of 389bbc7) — both are asked, in the order that names the likelier
+    // omission first.
+    requireBoardCard({
+      cause: BOUNDARY_CAUSES.POINT,
+      destination: handover.destination,
+      what: 'THE HANDOVER CARD',
+      prepare: `--prepare ${point}`,
+      fail,
+    })
 
     if (pointCardStanding(point)) {
       fail(
