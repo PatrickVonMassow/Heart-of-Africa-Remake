@@ -18058,3 +18058,37 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   UNMEASURED under load. Nothing is lost by the fold: the red is charged to 642 in
   `scripts/render-verify-charges.mjs`, backend-scoped to WebGL 2 so point 506 can never swallow
   a hardware-lane occurrence, and the two charge tests pin that pairing.
+
+- [x] 675. THE HANDOVER MUST FIRE ON CONTEXT, NOT ONLY ON A CLOSED POINT (user 13.08.2026, the
+  THIRD time in one day: "Der Kontext dieser Sitzung ist schon wieder sehr groß geworden. Kannst
+  du nicht mal an eine neue abgeben? Das passiert immer wieder. Dagegen brauchen wir einen
+  Mechanismus."). MEASURED, this session: it landed three points, answered eleven user messages,
+  ran two cross-vendor reviews and filed six points — and handed over none of it, because every
+  handover it attempted was defeated by one of three things, all of them mechanical rather than
+  careless.
+  THE THREE DEFEATS, each to be closed:
+  1. THE MARKER IS DELETED BY THE WORK THE BOUNDARY ITSELF DEMANDS. `batch-boundary.mjs` records
+     a marker and then instructs the session to publish the handover card; that publish, and every
+     guard remedy a blocked turn forces, counts as work and clears the marker. Measured twice
+     today; once it left the batch idle for forty minutes. The boundary becomes TWO-PHASE:
+     `--prepare` does all bookkeeping, `--commit` is the last repository action and nothing may
+     follow it, with any post-commit mutation an explicit error rather than a silent deletion.
+  2. THE CONDITION IS THE WRONG ONE. A handover is allowed only when no delegated agent is in
+     flight, so a session that keeps the pool busy can never hand over. The condition becomes
+     "the point I was LANDING is landed", with running authors ADOPTED by the successor through
+     the in-flight declaration rather than waited out.
+  3. NOTHING WATCHES THE CONTEXT. The boundary fires on a closed point and on nothing else, so a
+     session that answers questions and files points for hours never reaches one. A watermark
+     does: past it, the session finishes the step it is in, hands over, and says so — and the
+     board shows the reader that this is why.
+  THIS POINT IS THE MECHANISM the user asked for; the ARCHITECTURE behind (1) and (2) is
+  specified separately by the blind-parallel stage of 13.08.2026 (proposals in `local/`), and
+  this point implements whatever that specification settles on. It is filed separately because
+  the watermark of (3) is small, standalone and needed regardless.
+  VERIFIABLE: Vitest over the two-phase boundary (a mutation after `--commit` errors; the marker
+  survives everything `--prepare` does), over the changed condition, and over the watermark
+  decision; plus one observed handover in which a running author survives the session that
+  spawned it and the successor adopts it.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes the boundary and the batch guard.
+  Criticality: high — it is the cost driver the whole boundary rule exists for, and it has now
+  failed three times in one day under the user's direct observation.

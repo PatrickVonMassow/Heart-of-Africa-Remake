@@ -114,6 +114,8 @@ scripts/.tile-cache
 .claude/decision-card-guard-state.json
 .claude/batch-boundary.json
 .claude/batch-boundary.json.tmp-*
+.claude/batch-boundary-prepared.json
+.claude/batch-boundary-prepared.json.tmp-*
 .claude/batch-in-flight.json
 .claude/batch-in-flight.json.tmp-*
 .claude/batch-claim.json

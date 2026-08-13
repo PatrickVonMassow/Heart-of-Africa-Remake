@@ -267,13 +267,14 @@ export function turnCalls(transcriptText, turnStartedAt) {
 }
 
 /**
- * Does this turn TAKE the session boundary? (point 462)
+ * Does this turn TAKE the session boundary? (point 462; two-phase since 675)
  *
- * `batch-boundary.mjs <point>` records the boundary; `--status`, `--clear` and
- * the bare call only read. The distinction matters because the request gate
- * below fires at the boundary and nowhere else: it is the one moment an owner
- * may write TASKS.md, and a gate that fired on every turn end would demand
- * something a mid-branch owner cannot do.
+ * `batch-boundary.mjs --commit …` records the boundary; `--prepare`, the bare
+ * `<point>` (now a prepare alias), `--status` and `--clear` only read or
+ * withdraw. The distinction matters because the request gate below fires at the
+ * boundary and nowhere else: it is the one moment an owner may write TASKS.md,
+ * and a gate that fired on every turn end would demand something a mid-branch
+ * owner cannot do.
  */
 export function turnTakesBoundary(calls = []) {
   for (const call of Array.isArray(calls) ? calls : []) {
@@ -282,10 +283,10 @@ export function turnTakesBoundary(calls = []) {
       if (!/^(?:\S*node\s+)?\S*batch-boundary\.mjs\b/.test(segment)) continue
       const words = segment.split(/\s+/).filter(Boolean)
       const at = words.findIndex((w) => /batch-boundary\.mjs$/.test(w))
-      // The quotes come off first: a PowerShell caller writes `… "462"`, and a
-      // gate that stood down on that would be silently off for half the shells
-      // (four-eyes finding 3, Fable 5).
-      if (words.slice(at + 1).some((w) => /^\d+$/.test(w.replace(/^["']|["']$/g, '')))) return true
+      // The quotes come off first: a PowerShell caller writes `… "--commit"`,
+      // and a gate that stood down on that would be silently off for half the
+      // shells (four-eyes finding 3, Fable 5).
+      if (words.slice(at + 1).some((w) => w.replace(/^["']|["']$/g, '') === '--commit')) return true
     }
   }
   return false

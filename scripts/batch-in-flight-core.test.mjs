@@ -46,6 +46,10 @@ import {
   declarationShields,
   pastEtaCards,
   waitEtaRefusal,
+  adoptionAssessment,
+  assessTransfer,
+  markTransferred,
+  transferBlockMessage,
   POOL_CAP,
 } from './batch-in-flight-core.mjs'
 import {
@@ -60,10 +64,15 @@ import {
 import { LEASE_MS } from './batch-lease-core.mjs'
 import {
   absPath,
+  adoptTransferred,
+  gatherHandoverTransfer,
   gatherInFlight,
   maxAgeMs,
   readDeclaration,
   resolveRefName,
+  sealedCommitRefusal,
+  selfAdoptionRefusal,
+  transferredMutationRefusal,
   writeDeclaration,
   clearDeclaration,
   worktreeBranch,
@@ -709,8 +718,30 @@ describe('progressGuardDecision — the declaration relaxes the two unsatisfiabl
     expect(progressGuardDecision({ ...base, inFlight: true })).toBe('allow-in-flight')
   })
 
-  it('also passes the DUE boundary — ending mid-flight would throw the agents’ work away', () => {
-    expect(progressGuardDecision({ ...base, inFlight: true, boundaryDue: 388 })).toBe('allow-in-flight')
+  // POINT 675 (defeat 2) REVERSED the old rule here: a due boundary is no longer
+  // waited out behind a TRANSFERABLE wait — the successor adopts that work.
+  // Only work WITHOUT a committed-and-pushed checkpoint still shields the wait.
+  it('a DUE boundary is demanded through a TRANSFERABLE wait — the successor adopts the work (point 675)', () => {
+    expect(progressGuardDecision({ ...base, inFlight: true, boundaryDue: 388 })).toBe('block-take-boundary')
+    expect(progressGuardDecision({ ...base, inFlight: true, inFlightTransferable: true, boundaryDue: 388 })).toBe(
+      'block-take-boundary',
+    )
+  })
+
+  it('NON-transferable work still passes the DUE boundary — ending on it would throw it away', () => {
+    expect(progressGuardDecision({ ...base, inFlight: true, inFlightTransferable: false, boundaryDue: 388 })).toBe(
+      'allow-in-flight',
+    )
+    // …and the slots demand still outranks the wait there.
+    expect(
+      progressGuardDecision({
+        ...base,
+        inFlight: true,
+        inFlightTransferable: false,
+        boundaryDue: 388,
+        slotsNeedReason: true,
+      }),
+    ).toBe('block-slots-free')
   })
 
   it('never overrides a parallel-session alert — remediation cannot wait on an agent', () => {
@@ -1818,5 +1849,371 @@ describe('a wait is refused while the board promises an end time that has passed
     const past = pastEtaCards({ html: board('23:40 · ~00:30'), nowMinutes: 50 })
     expect(past).toHaveLength(1)
     expect(past[0].minutesPast).toBe(20)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE TRANSFERABLE ADOPTION RECORD (point 675, defeat 2; merged proposal
+// M4/M7/M28–M34). Written from the failure side: what must BLOCK a handover,
+// and what a successor must be TOLD rather than silently spared.
+// ---------------------------------------------------------------------------
+describe('assessTransfer — committed-and-pushed checkpoints decide transferability', () => {
+  const pushed = { ref: 'feat/700-x', localSha: 'a'.repeat(40), remoteSha: 'a'.repeat(40) }
+
+  it('a branch whose tip is on origin is transferable, and its checkpoint is recorded', () => {
+    const t = assessTransfer({ items: [{ kind: 'branch', describe: 'branch feat/700-x', checkpoint: pushed }] })
+    expect(t.transferable).toBe(true)
+    expect(t.checkpoints).toEqual([{ ref: 'feat/700-x', sha: 'a'.repeat(40) }])
+  })
+
+  it('unpushed commits BLOCK — the successor could not verify or rescue them', () => {
+    const t = assessTransfer({
+      items: [
+        { kind: 'branch', describe: 'branch feat/700-x', checkpoint: { ...pushed, remoteSha: 'b'.repeat(40) } },
+      ],
+    })
+    expect(t.transferable).toBe(false)
+    expect(t.blockers[0].why).toContain('unpushed commits')
+  })
+
+  it('a never-pushed branch and an unreadable checkpoint both block, by name', () => {
+    expect(
+      assessTransfer({ items: [{ kind: 'branch', describe: 'b', checkpoint: { ...pushed, remoteSha: null } }] })
+        .blockers[0].why,
+    ).toContain('never pushed')
+    expect(
+      assessTransfer({ items: [{ kind: 'worktree', describe: 'w', checkpoint: null }] }).blockers[0].why,
+    ).toContain('no committed checkpoint')
+  })
+
+  it('a declaration of ONLY pids/logs is non-transferable — nothing a successor could adopt (M29)', () => {
+    const t = assessTransfer({
+      items: [
+        { kind: 'pid', describe: 'pid 123', checkpoint: null },
+        { kind: 'log', describe: 'log x.log', checkpoint: null },
+      ],
+    })
+    expect(t.transferable).toBe(false)
+    expect(t.blockers[0].why).toContain('only pids/logs')
+  })
+
+  it('pid/log evidence RIDES beside a pushed branch without blocking', () => {
+    const t = assessTransfer({
+      items: [
+        { kind: 'branch', describe: 'branch feat/700-x', checkpoint: pushed },
+        { kind: 'pid', describe: 'pid 123', checkpoint: null },
+      ],
+    })
+    expect(t.transferable).toBe(true)
+  })
+
+  it('an EMPTY declaration blocks nothing — there is nothing to lose', () => {
+    expect(assessTransfer({ items: [] }).transferable).toBe(true)
+  })
+
+  it('the refusal names every blocker and all four recovery choices (M29)', () => {
+    const msg = transferBlockMessage({
+      blockers: [{ describe: 'branch feat/700-x', why: 'unpushed commits' }],
+    })
+    expect(msg).toContain('feat/700-x')
+    for (const word of ['CHECKPOINT', 'DRAIN', 'RE-DECLARE', 'ABANDON']) expect(msg).toContain(word)
+  })
+})
+
+describe('markTransferred — the adoption record stays probeable (M4/M7)', () => {
+  it('keeps the declaration intact and records who, when and which checkpoints', () => {
+    const declaration = { v: 1, sessionId: 's1', at: 1, waitingOn: 'agent', evidence: [{ kind: 'branch', ref: 'b' }] }
+    const t = markTransferred({ declaration, bySid: 's1', now: 99, checkpoints: [{ ref: 'b', sha: 'x' }] })
+    expect(t.evidence).toEqual(declaration.evidence)
+    expect(t.transfer).toEqual({ v: 1, by: 's1', at: 99, checkpoints: [{ ref: 'b', sha: 'x' }] })
+  })
+
+  it('a RE-TRANSFER supersedes the old adoption, so the record stays protected (Sol re-review, finding 1)', () => {
+    const adoptedOnce = {
+      v: 1,
+      sessionId: 's2',
+      at: 5,
+      waitingOn: 'agent',
+      evidence: [{ kind: 'branch', ref: 'b' }],
+      transfer: { v: 1, by: 's1', at: 2, checkpoints: [] },
+      adopted: { from: 's1', at: 3 },
+    }
+    const again = markTransferred({ declaration: adoptedOnce, bySid: 's2', now: 9, checkpoints: [] })
+    expect(again.adopted).toBeUndefined()
+    expect(again.transfer.by).toBe('s2')
+    // …and the mutation refusal therefore covers the whole second handover too.
+    const marker = { v: 2, phase: 'committed', cause: 'point', sessionId: 's2', point: 1, at: 10 }
+    expect(transferredMutationRefusal({ declaration: again, marker, now: 11 })).not.toBeNull()
+  })
+})
+
+describe('sealedCommitRefusal — no NEW wait behind a committed boundary (Sol re-review, finding 2)', () => {
+  const sealed = { v: 2, phase: 'committed', cause: 'point', sessionId: SID, point: 675, at: NOW - 1000 }
+
+  it('refuses a fresh --waiting-on for the committing session, naming the way back', () => {
+    const msg = sealedCommitRefusal({ marker: sealed, sid: SID, now: NOW })
+    expect(msg).toContain('COMMITTED')
+    expect(msg).toContain('batch-boundary.mjs --clear')
+  })
+
+  it('refuses nothing for a stale, foreign, legacy or absent marker', () => {
+    expect(sealedCommitRefusal({ marker: null, sid: SID, now: NOW })).toBeNull()
+    expect(sealedCommitRefusal({ marker: { ...sealed, phase: undefined }, sid: SID, now: NOW })).toBeNull()
+    expect(sealedCommitRefusal({ marker: sealed, sid: 'someone-else', now: NOW })).toBeNull()
+    expect(sealedCommitRefusal({ marker: sealed, sid: '', now: NOW })).toBeNull()
+    expect(
+      sealedCommitRefusal({ marker: { ...sealed, at: NOW - 2 * 60 * 60 * 1000 }, sid: SID, now: NOW }),
+    ).toBeNull()
+  })
+})
+
+describe('adoptionAssessment — expired or contradictory evidence ALERTS, never silently unblocks (M7)', () => {
+  const live = { ok: true, kind: 'branch', describe: 'branch b', detail: 'tip 2 min old' }
+  const dead = { ok: false, kind: 'pid', describe: 'pid 42', detail: 'process-gone' }
+  const sha = 'c'.repeat(40)
+
+  it('adopts live evidence, DROPS and NAMES what expired', () => {
+    const a = adoptionAssessment({ items: [live, dead], checkpointStates: [] })
+    expect(a.adopt).toBe(true)
+    expect(a.kept).toHaveLength(1)
+    expect(a.dropped).toHaveLength(1)
+    expect(a.alerts[0]).toContain('pid 42')
+  })
+
+  it('REFUSES when nothing survives — with an alert, not silence', () => {
+    const a = adoptionAssessment({ items: [dead], checkpointStates: [] })
+    expect(a.adopt).toBe(false)
+    expect(a.alerts.some((l) => l.includes('NOTHING'))).toBe(true)
+  })
+
+  it('a branch REWOUND below its recorded checkpoint contradicts the record and refuses', () => {
+    const a = adoptionAssessment({
+      items: [live],
+      checkpointStates: [{ ref: 'b', recordedSha: sha, localSha: 'd'.repeat(40), ancestor: false }],
+    })
+    expect(a.adopt).toBe(false)
+    expect(a.alerts.some((l) => l.includes('CONTRADICTED'))).toBe(true)
+  })
+
+  it('a branch that moved FORWARD from its checkpoint is still the handed-over work', () => {
+    const a = adoptionAssessment({
+      items: [live],
+      checkpointStates: [{ ref: 'b', recordedSha: sha, localSha: 'd'.repeat(40), ancestor: true }],
+    })
+    expect(a.adopt).toBe(true)
+  })
+
+  it('a GONE checkpoint branch refuses loudly', () => {
+    const a = adoptionAssessment({
+      items: [live],
+      checkpointStates: [{ ref: 'b', recordedSha: sha, localSha: null }],
+    })
+    expect(a.adopt).toBe(false)
+    expect(a.alerts.some((l) => l.includes('gone'))).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE TRANSFER'S LIFECYCLE (Sol review of 807c2bf, findings 4 and 6): the
+// transfer is session-bound and idempotent, and a transferred record under a
+// live committed boundary may not be cleared or overwritten from this side.
+// ---------------------------------------------------------------------------
+describe('gatherHandoverTransfer — session-bound and idempotent', () => {
+  const withTempLock = (fn) => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-transfer-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    try {
+      fn({ lockPath, path: statePathsFor(lockPath).inFlightPath })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  it('an ALREADY-TRANSFERRED declaration is not re-judged — commit only repeats its summary', () => {
+    withTempLock(({ lockPath, path }) => {
+      writeDeclaration(
+        declaration({ transfer: { v: 1, by: SID, at: 1, checkpoints: [{ ref: 'feat/x', sha: 'a'.repeat(40) }] } }),
+        path,
+      )
+      const t = gatherHandoverTransfer(SID, { lockPath })
+      expect(t.blocked).toBe(false)
+      expect(t.note).toContain('already awaits adoption')
+      expect(t.commit()).toContain('feat/x@aaaaaaaa')
+      // Nothing was rewritten: the original transfer stamp survives.
+      expect(readDeclaration(path).transfer.at).toBe(1)
+    })
+  })
+
+  it('a FOREIGN declaration neither blocks this owner nor gets transferred (finding 6)', () => {
+    withTempLock(({ lockPath, path }) => {
+      writeDeclaration(
+        declaration({ sessionId: 'someone-else', evidence: [{ kind: 'branch', ref: 'feat/unpushed' }] }),
+        path,
+      )
+      const t = gatherHandoverTransfer(SID, { lockPath })
+      expect(t.blocked).toBe(false)
+      expect(t.note).toContain('foreign')
+      expect(t.commit).toBeNull()
+      expect(readDeclaration(path).transfer).toBeUndefined()
+    })
+  })
+
+  it('the OWN pid/log-only declaration still blocks with the named recovery choices', () => {
+    withTempLock(({ lockPath, path }) => {
+      writeDeclaration(declaration({ evidence: [{ kind: 'pid', pid: 1234, startedAt: 1 }] }), path)
+      const t = gatherHandoverTransfer(SID, { lockPath })
+      expect(t.blocked).toBe(true)
+      expect(t.message).toContain('only pids/logs')
+      expect(t.message).toContain('CHECKPOINT')
+    })
+  })
+
+  it('the PREDECESSOR may not adopt its own handover while its committed marker stands (Sol final round)', () => {
+    withTempLock(({ lockPath, path }) => {
+      writeDeclaration(
+        declaration({ transfer: { v: 1, by: SID, at: 1, checkpoints: [] } }),
+        path,
+      )
+      writeFileSync(
+        statePathsFor(lockPath).boundaryPath,
+        JSON.stringify({ v: 2, phase: 'committed', cause: 'point', sessionId: SID, point: 675, at: Date.now() }),
+      )
+      const a = adoptTransferred(SID, { lockPath })
+      expect(a.adopted).toBe(false)
+      expect(a.reason).toBe('own-commit')
+      expect(a.alerts[0]).toContain('batch-boundary.mjs --clear')
+      // The record itself is untouched — nothing was stamped adopted.
+      expect(readDeclaration(path).adopted).toBeUndefined()
+    })
+  })
+
+  it('…and not once its marker is STALE or GONE either — the transfer stamp names the transferrer', () => {
+    // THE OPEN FINDING of the rescue commit: tying the refusal to a FRESH
+    // committed marker leaves the defect open twice over — a marker one hour
+    // old, and a marker deleted by anything that rewrites the state file. The
+    // record's own `transfer.by` is what does not expire.
+    for (const marker of [null, { v: 2, phase: 'committed', cause: 'point', sessionId: SID, point: 675, at: 1 }]) {
+      withTempLock(({ lockPath, path }) => {
+        writeDeclaration(declaration({ transfer: { v: 1, by: SID, at: 1, checkpoints: [] } }), path)
+        if (marker) writeFileSync(statePathsFor(lockPath).boundaryPath, JSON.stringify(marker))
+        const a = adoptTransferred(SID, { lockPath })
+        expect(a.adopted).toBe(false)
+        expect(a.reason).toBe('own-transfer')
+        expect(a.alerts[0]).toContain('--waiting-on')
+        expect(readDeclaration(path).adopted).toBeUndefined()
+      })
+    }
+  })
+
+  it('a SUCCESSOR is not caught by the self-adoption rule', () => {
+    withTempLock(({ lockPath, path }) => {
+      writeDeclaration(declaration({ transfer: { v: 1, by: SID, at: 1, checkpoints: [] } }), path)
+      writeFileSync(
+        statePathsFor(lockPath).boundaryPath,
+        JSON.stringify({ v: 2, phase: 'committed', cause: 'point', sessionId: SID, point: 675, at: Date.now() }),
+      )
+      // Its evidence is a dead session's, so the ordinary assessment refuses —
+      // but NOT as a self-adoption: the successor is judged on the work, not
+      // on who transferred it.
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(['own-commit', 'own-transfer']).not.toContain(a.reason)
+    })
+  })
+})
+
+describe('selfAdoptionRefusal — the transferrer is never the adopter (point 675)', () => {
+  const transferred = declaration({ transfer: { v: 1, by: SID, at: 1, checkpoints: [] } })
+  const sealed = { v: 2, phase: 'committed', cause: 'point', sessionId: SID, point: 675, at: NOW - 1000 }
+
+  it('names the COMMIT while the marker stands, and the TRANSFER once it does not', () => {
+    expect(selfAdoptionRefusal({ declaration: transferred, marker: sealed, sid: SID, now: NOW }).reason).toBe(
+      'own-commit',
+    )
+    expect(selfAdoptionRefusal({ declaration: transferred, marker: null, sid: SID, now: NOW }).reason).toBe(
+      'own-transfer',
+    )
+    expect(
+      selfAdoptionRefusal({ declaration: transferred, marker: { ...sealed, at: NOW - 3 * 60 * 60 * 1000 }, sid: SID, now: NOW })
+        .reason,
+    ).toBe('own-transfer')
+  })
+
+  it('lets every other session through, and never fires without a transfer', () => {
+    expect(selfAdoptionRefusal({ declaration: transferred, marker: sealed, sid: 'session-successor', now: NOW })).toBeNull()
+    expect(selfAdoptionRefusal({ declaration: declaration({}), marker: sealed, sid: SID, now: NOW })).toBeNull()
+    expect(selfAdoptionRefusal({ declaration: null, marker: sealed, sid: SID, now: NOW })).toBeNull()
+    // A transfer stamped by nobody (an empty `by`) must not swallow every session.
+    expect(
+      selfAdoptionRefusal({
+        declaration: declaration({ transfer: { v: 1, by: '', at: 1, checkpoints: [] } }),
+        marker: null,
+        sid: SID,
+        now: NOW,
+      }),
+    ).toBeNull()
+    // …and neither may a stranger's transfer, once no committed marker stands.
+    expect(
+      selfAdoptionRefusal({
+        declaration: declaration({ transfer: { v: 1, by: 'session-predecessor', at: 1, checkpoints: [] } }),
+        marker: null,
+        sid: SID,
+        now: NOW,
+      }),
+    ).toBeNull()
+  })
+
+  it('under this session\'s OWN fresh commit it refuses whoever transferred — without claiming it did (Sol on fa11223d)', () => {
+    // Adoption writes the declaration under this session's identity, which IS
+    // declaring a wait — the very thing `sealedCommitRefusal` denies behind a
+    // committed marker. So the seal refuses; only the WORDING may not lie.
+    for (const by of ['session-predecessor', '']) {
+      const r = selfAdoptionRefusal({
+        declaration: declaration({ transfer: { v: 1, by, at: 1, checkpoints: [] } }),
+        marker: sealed,
+        sid: SID,
+        now: NOW,
+      })
+      expect(r.reason).toBe('sealed-commit')
+      expect(r.alert).not.toContain('this session COMMITTED the boundary that transferred')
+      expect(r.alert).toContain('--clear')
+    }
+  })
+})
+
+describe('transferredMutationRefusal — the adoption record is not this side’s to destroy (finding 4)', () => {
+  const transferred = declaration({ transfer: { v: 1, by: SID, at: 1, checkpoints: [] } })
+  const sealed = { v: 2, phase: 'committed', cause: 'point', sessionId: SID, point: 675, at: NOW - 1000 }
+
+  it('refuses --clear/--waiting-on while a transferred record sits under a live committed marker', () => {
+    const msg = transferredMutationRefusal({ declaration: transferred, marker: sealed, now: NOW })
+    expect(msg).toContain('adoption record')
+    expect(msg).toContain('--adopt')
+    expect(msg).toContain('batch-boundary.mjs --clear')
+  })
+
+  it('allows mutation once the marker is gone, stale, or merely legacy', () => {
+    expect(transferredMutationRefusal({ declaration: transferred, marker: null, now: NOW })).toBeNull()
+    expect(
+      transferredMutationRefusal({
+        declaration: transferred,
+        marker: { ...sealed, at: NOW - 2 * 60 * 60 * 1000 },
+        now: NOW,
+      }),
+    ).toBeNull()
+    expect(
+      transferredMutationRefusal({ declaration: transferred, marker: { ...sealed, phase: undefined }, now: NOW }),
+    ).toBeNull()
+  })
+
+  it('allows mutation for an untransferred or already-adopted declaration', () => {
+    expect(transferredMutationRefusal({ declaration: declaration({}), marker: sealed, now: NOW })).toBeNull()
+    expect(
+      transferredMutationRefusal({
+        declaration: { ...transferred, adopted: { from: SID, at: NOW } },
+        marker: sealed,
+        now: NOW,
+      }),
+    ).toBeNull()
+    expect(transferredMutationRefusal({ declaration: null, marker: sealed, now: NOW })).toBeNull()
   })
 })

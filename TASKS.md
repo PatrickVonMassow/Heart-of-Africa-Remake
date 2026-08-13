@@ -77,41 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 675. THE HANDOVER MUST FIRE ON CONTEXT, NOT ONLY ON A CLOSED POINT (user 13.08.2026, the
-  THIRD time in one day: "Der Kontext dieser Sitzung ist schon wieder sehr groß geworden. Kannst
-  du nicht mal an eine neue abgeben? Das passiert immer wieder. Dagegen brauchen wir einen
-  Mechanismus."). MEASURED, this session: it landed three points, answered eleven user messages,
-  ran two cross-vendor reviews and filed six points — and handed over none of it, because every
-  handover it attempted was defeated by one of three things, all of them mechanical rather than
-  careless.
-  THE THREE DEFEATS, each to be closed:
-  1. THE MARKER IS DELETED BY THE WORK THE BOUNDARY ITSELF DEMANDS. `batch-boundary.mjs` records
-     a marker and then instructs the session to publish the handover card; that publish, and every
-     guard remedy a blocked turn forces, counts as work and clears the marker. Measured twice
-     today; once it left the batch idle for forty minutes. The boundary becomes TWO-PHASE:
-     `--prepare` does all bookkeeping, `--commit` is the last repository action and nothing may
-     follow it, with any post-commit mutation an explicit error rather than a silent deletion.
-  2. THE CONDITION IS THE WRONG ONE. A handover is allowed only when no delegated agent is in
-     flight, so a session that keeps the pool busy can never hand over. The condition becomes
-     "the point I was LANDING is landed", with running authors ADOPTED by the successor through
-     the in-flight declaration rather than waited out.
-  3. NOTHING WATCHES THE CONTEXT. The boundary fires on a closed point and on nothing else, so a
-     session that answers questions and files points for hours never reaches one. A watermark
-     does: past it, the session finishes the step it is in, hands over, and says so — and the
-     board shows the reader that this is why.
-  THIS POINT IS THE MECHANISM the user asked for; the ARCHITECTURE behind (1) and (2) is
-  specified separately by the blind-parallel stage of 13.08.2026 (proposals in `local/`), and
-  this point implements whatever that specification settles on. It is filed separately because
-  the watermark of (3) is small, standalone and needed regardless.
-  VERIFIABLE: Vitest over the two-phase boundary (a mutation after `--commit` errors; the marker
-  survives everything `--prepare` does), over the changed condition, and over the watermark
-  decision; plus one observed handover in which a running author survives the session that
-  spawned it and the successor adopts it.
-  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes the boundary and the batch guard.
-  Criticality: high — it is the cost driver the whole boundary rule exists for, and it has now
-  failed three times in one day under the user's direct observation.
-
-
 - [ ] 674. A TEST'S DUMMY SESSION ID CAN TAKE OVER THE LIVE BATCH LOCK (measured 13.08.2026,
   18:00 — it PAUSED the batch). `.claude/parallel-alert.json` recorded `ownerSid: "x"` and named
   the one legitimate session as the parallel one; the escalation then sent five unanswered
@@ -191,8 +156,36 @@ put it is the mistake this line exists to stop.
   go red) and the ten post-cure traces (must go green on both backends); for (b), the charge
   naming the composition and its rate, plus a Vitest case pinning that a red NOT of that shape
   is still uncovered.
-  Criticality: medium — no player sees this window; it is the picture gate's trustworthiness on
-  the release branch that is at stake.
+  A PLAYER HAS NOW SEEN IT, WHICH RETIRES THE "ONLY A MEASUREMENT WINDOW" READING (user bug
+  report 13.08.2026, "Kind hängt wieder fest", F6 dump in `local/KindHaengtWieder/`): production
+  build 7bd0147, WEBGPU, NVIDIA Lovelace, medium, 127 FPS, `bambara-village` at −59.62/−131.19,
+  day 0, seed 236333330. The residual was carried as a WebGL 2 measurement limit (0.39 % against
+  0.25 %); this occurrence is on the OTHER backend, on the SHIPPED build, and visible to the
+  player. So option (b) — accepting the composition with a rate — may only be chosen if it also
+  explains a player-visible standstill on WebGPU; if it cannot, the answer is (a) or a behaviour
+  fix, not a charge. The report alone does NOT permit a diagnosis, because the dump describes the
+  wildlife and nothing of the settlement's inhabitants — that gap is its own point.
+  A SECOND REPORT FIVE MINUTES LATER NAMES THE MECHANISM (same seed, same player position, dump
+  in `local/SelbesKindHaengtImmernochFest/`, user's title "Selbes Kind — hängt seit Minuten fest
+  und zittert herum"). MINUTES, with visible shivering: that is a permanent state on WebGPU in
+  the production build, not a window. READ IN THE CODE (`src/scenes/place/tagGame.ts`,
+  `trackProgress` from line 651): the rescue nudge hangs on an ANCHOR RADIUS. When the child
+  leaves the circle `childRadius * PROGRESS_AWAY` (0.3 × 3 = 0.9 m) around its anchor, the anchor
+  is MOVED and `anchorFor` reset to 0, while `escapeNudge` fires only once `anchorFor` reaches
+  `unstuckSeconds` (1.5 s). A shiver that swings back and forth across 0.9 m therefore resets the
+  anchor every cycle, the counter never reaches 1.5 s, and THE RESCUE CANNOT FIRE BY
+  CONSTRUCTION, for arbitrarily long — exactly what the user describes. Point 656 removed this
+  blindness from the MEASURING gate (distance walked against ground covered, instead of position
+  deltas); the RESCUE still tests only the anchor radius. From the frames: the child stands in
+  open ground in both reports, no obstacle within reach, so the cause lies in the steering
+  (reversal/evasion) rather than in a geometry trap. Reproducible at seed 236333330,
+  `bambara-village`, medium, WebGPU; the headless run at that seed is still owed.
+  SO THE FINAL STATE ABOVE IS NOT THE WHOLE ANSWER: the rescue's own progress test is fixed here
+  too, by the same standard point 656 met — it must see a shiver as a lack of progress — and the
+  fix is proven at the reported seed, not only on the panel.
+  Criticality: high — raised 13.08.2026: it is no longer only the picture gate's trustworthiness,
+  it is the player watching a child shiver in place for minutes in the shipped build, with the
+  rescue unable to fire.
   Bundle: Dorfleben.
 
 - [ ] 672. THE VILLAGE HAS NO AMBIENT DRUM, AND THE DRUMMER HOLDS STILL (user 13.08.2026,
@@ -285,11 +278,33 @@ put it is the mistake this line exists to stop.
   actually shown. A step that works internally but does not reach the player is a DEFECT, and
   the report says which of the two it was.
 
+  THREE CAUSES ARE ALREADY NAMED AND MUST BE FIXED HERE, not merely re-measured (user
+  observation on the deployed build, 13.08.2026, with the debug switch "language: show terms
+  instead of syllables" ON — the adults' actions make no sense even WITH the words visible):
+  1. THE TEACHING ROCK STANDS IN THE MIDDLE OF THE VILLAGE, NOT AT THE RIVER. `layout.ts` places
+     it 6.5–13.6 m from the village centre on the golden-angle sweep, while
+     `docs/communication-poc-spec.md` (rule 3) says "The rock lies upstream". Document and code
+     contradict each other, and for the player it is a purposeless boulder on the village square
+     that everyone walks to — and it is NOT the rock of the chief's drum message.
+  2. THE ERRANDS HAVE NO VISIBLE PURPOSE. `walkToTarget`/`walkToSpeaker`/`followToTarget` end in
+     standing about (`dwellSeconds` 6): nobody carries anything, fetches anything or works. Only
+     the three DIG errands end in visible work. A word cannot be inferred from an errand that
+     produces no result.
+  3. THERE IS NO TEACHING ORDER. `ErrandView` knows villagers and geography, not what the player
+     has already heard. The spec's method ("leaves exactly one unknown") presumes the six
+     children's terms are already learned, and nothing enforces or encourages that — so the
+     player hears two unknowns at once.
+  ALSO OBSERVED, to be judged in the same pass: upstream and downstream are barely
+  distinguishable at the bank ("recognisable with a lot of goodwill"), and the errand sequence
+  reads as a fixed loop (a fair queue over few fillable errands).
   VERIFIABLE: a complete play-through of the chain from entering the village to the victory
   state, with no blocking defect, evidenced by the frames of each step, an audio measurement at
-  the shipped defaults, and the journal it wrote; every defect found is listed with its severity
-  and either fixed here or filed as its own point, and the blocking ones are fixed before this
-  point is ticked. The enumerating lists, their merge and the counted union are recorded.
+  the shipped defaults, and the journal it wrote; the three causes above demonstrably closed —
+  the rock upstream and consistent with the spec document, every errand ending in a visible
+  result, and a teaching order that does not present two unknowns at once; every further defect
+  found is listed with its severity and either fixed here or filed as its own point, and the
+  blocking ones are fixed before this point is ticked. The enumerating lists, their merge and the
+  counted union are recorded.
   Criticality: high — this is the feature the release exists for, and the user is the one who
   keeps hitting the bugs.
   Bundle: Verständigung.
@@ -6841,9 +6856,217 @@ to land than a mechanism that needs a review.
   VERIFIABLE: a Vitest/jsdom case beside the existing injection cases in
   `scripts/chat-viewer.test.mjs` drives the injection twice and asserts exactly one
   `link[rel~="icon"]` with the expected href, and that a swapped-in document which lost its head
-  gets the link back; plus the PICTURE — the silhouette judged in the tab at 16 px and 32 px, not by
-  reading the SVG source. A silhouette unrecognisable at 16 px fails the point.
+  gets the link back; plus the PICTURE — the silhouette rasterised and LOOKED AT, not judged from
+  the SVG source. The condition is RECOGNISABLE at 32 px and DISTINCTIVE at 16 px: measured
+  13.08.2026 over four drawn paths, no monochrome continent silhouette is legible at 16 px, so
+  demanding it there costs redraw rounds without ever being reachable. What 16 px must deliver is a
+  dark shape nobody confuses with the browser's generic globe.
   AUTHOR: the OpenAI lane (`node scripts/author-sol.mjs --point 679`) — user decision 13.08.2026,
   19:25 (»Lasse Sol das machen, um Volumen zu sparen«). Mechanical and low-risk, and its
   verification is not the work.
   Criticality: low — it costs nothing if it waits, but the user asked for it directly.
+
+- [ ] 680. THE BUG REPORT CARRIES THE SETTLEMENT'S LIFE, NOT ONLY THE WILDLIFE (measured
+  13.08.2026 on the user's report "Kind hängt wieder fest", `local/KindHaengtWieder/`). The
+  archive holds a picture, the game state, the balance and UI values — and a WILDLIFE section
+  reading "0 animals, 0 carcasses, 0 flocks", because the report was taken inside a village.
+  About the child the report is ABOUT, and about every other inhabitant, it holds nothing: no
+  position, no state, no tag role, no errand. The one report kind a settlement produces is the
+  one the dump cannot describe, so a stuck-inhabitant report can only ever be answered by trying
+  to reproduce it from the seed.
+  FINAL STATE: a new bounded `placeLife` section in the state JSON, built like
+  `src/systems/wildlifeDump.ts` and named in the archive listing (`.txt`) in BOTH languages,
+  written whenever the report is taken in `place` mode and absent otherwise. It holds, all in
+  world coordinates so it can be replayed against the layout: every INHABITANT within a stated
+  radius — kind (child / adult / porter / errand walker), position, velocity, pose, and for a
+  child its tag role (chaser/target/free), whether it is pinned, the seconds without progress and
+  how often the unstuck nudge fired on it this visit; for an adult the errand it is on (situation
+  id, target place, arrived, remaining dwell). Beside them the TAG GAME state as `__placeTag`
+  reports it (playing, chaser, target, tags, chaserFor), the errand scheduler state as
+  `__placeErrands` reports it (staged counts, last situation, silence), and the settlement's
+  teaching GEOGRAPHY: bank, upstream, downstream, the teaching stone and every dig site. Same
+  bounding discipline as the wildlife section — a stated radius, a cap, and the count of what was
+  left out.
+  IT MUST WORK IN A PRODUCTION BUILD. `__placeTag` and `__placeErrands` are
+  `import.meta.env.DEV`-gated (`src/scenes/place/PlaceLife.tsx`), so today they are absent from
+  exactly the build the player reports from. The dump therefore reads the same state through a
+  channel that SHIPS — a registered snapshot callback, not a debug hook — while the DEV hooks
+  stay as they are for the headless suites, and production gains no debug surface beyond the
+  snapshot the report itself reads. Nothing player-visible changes; the report grows by one
+  section.
+  VERIFIABLE: Vitest over the pure dump builder — a settlement view with more inhabitants than
+  the cap yields the cap plus a correct left-out count, a child with a pinned state and a nudge
+  count round-trips, and the section is absent in travel mode — plus the existing report test
+  extended so the archive listing names the new section in both languages.
+  AUTHOR: the OpenAI lane (Sol) fits — mechanical, bounded, and its verification is not the work.
+  Criticality: medium — nothing is broken by its absence, but every stuck-inhabitant report the
+  user sends is undiagnosable without it, and point 666 is waiting on exactly that.
+  Bundle: Dorfleben.
+
+- [ ] 681. THE TEACHING STONE STANDS ON THE BANK UPSTREAM, AND THE GROUND WORK LEAVES THE VILLAGE MIDDLE (user 13.08.2026, playing the deployed state)
+  User decision 13.08.2026, from playing the deployed state with the debug switch
+  "Speech: show concepts instead of syllables" on: the errands taught him nothing.
+  A boulder on the village square that everybody walks to for no reason, and people
+  digging next to it, read as meaningless — and the settlement's rock is not the
+  rock the chief's message means. docs/communication-poc-spec.md already assumes the
+  stone lies upstream; only the code put it in the village (layout.ts placed it 6.5
+  to 13.6 m from the village centre). This is cause (1) of the carrier finding "Die
+  Erwachsenen-Botengaenge lehren nichts" (target 659); causes (2) and (3) — errands
+  without a visible result, and no teaching order — stay with that finding.
+  The teaching stone stands ON THE RIVER BANK UPSTREAM of the settlement, and the
+  village's ground work no longer sits in the middle of the village.
+
+  Final state:
+
+  1. PLACEMENT. `layout.ts` places the teaching stone on the settlement's UPSTREAM
+     bank stretch — on the open bank beside the water, clear of the wade depth and
+     of every lane and compound, visible from the village and reachable on foot by
+     an errand walker. It keeps its seeded, deterministic placement and its errand
+     parking spot. A settlement with no bank carries no teaching stone (as it
+     already carries no bank errands), and the two BIG_ROCK errands are then simply
+     not castable.
+  2. IT LOOKS LIKE WHAT THE MESSAGE MEANS. The stone is drawn as an upright erratic
+     of the same shape family as the goal boulder of `src/world/communicationRock.ts`
+     at settlement scale, so the object the word is learnt on is the same KIND of
+     thing the chief's message points at.
+  3. THE ROCK/DIRECTION DISCRIMINATOR IS REBUILT — this is why the old placement
+     existed, so moving the stone must replace it, not drop it. With the stone on
+     the upstream stretch, "go upstream" and "go to the rock" would otherwise be the
+     same picture. Therefore:
+     - At least one BIG_ROCK errand carries NO walk along the bank at all: it is
+       spoken AT the stone and points at it ("BIG_ROCK + HERE"), with nobody walking
+       the river.
+     - At least one BIG_ROCK errand is walked STRAIGHT from the village to the
+       stone, not along the bank, so the picture differs from the upstream errands
+       in its path as well as its target.
+     - The UPSTREAM errands target a bank point that is NOT the stone and far enough
+       from it that the two destinations read as different places.
+     - `involvesUpstream`, the catalogue's comments and `MIRRORED_ERRANDS` are
+       brought in line, and the tests pin the new discriminator instead of the old.
+  4. THE GROUND WORK MOVES OUT OF THE MIDDLE. The three dig sites (store pit, post
+     hole, turned patch) are placed where such work belongs — at a compound edge,
+     beside a lane, at the edge of the worked ground — never on the open central
+     ground of the village, and never within a stated clearance of the teaching
+     stone or of its parking spot. The drawn spoil and the digging stick stay as
+     they are.
+  5. DOCUMENTATION. `docs/communication-poc-spec.md` rule 3 is rewritten to the
+     discriminator actually built (it currently states the premise "The rock lies
+     upstream" while the code placed the stone in the village — the two must agree),
+     and the placement comment in `layout.ts` says where the stone stands and why.
+     If design.md §13.4 names the stone's location, it changes in the same commit.
+
+  Test: Vitest over the layout — the stone lies on the upstream side of the bank,
+  clear of lanes, compounds and water; no dig site lies within the central radius or
+  within the stated clearance of the stone; the placement is stable for a seed.
+  Vitest over `adultErrands` — at least one BIG_ROCK errand with no bank walk, at
+  least one walked from the village, and the upstream targets distinct from the
+  stone. Picture check on BOTH backends (a render-set change): the stone is visible
+  from the village and reads as a rock by the water, and the dig sites read as work.
+  CONSTRAINTS:
+  - Difficulty is MEDIUM, not mechanical: placement geometry, the errand catalogue
+    and their tests move together, and the picture decides. Route accordingly; the
+    user's 13.08.2026 instruction allows Sol where Fable is unavailable.
+  - Do not drop the contrast rule while moving the stone — the rule is the reason
+    the old placement existed.
+  - The goal boulder of src/world/communicationRock.ts is untouched: it stays the
+    world-scale erratic ~1.6 to 2.4 degrees upstream on the Niger.
+  - Settlements without a bank keep working, with no stone and no rock errands.
+  QUOTED:
+  Nutzer, 13.08.2026 20:46: »Der Lehrstein soll flussaufwärts wandern. Ein großer Felsbrocken mitten im Dorf macht keinen Sinn - ebensowenig, wie dort zugraben.«
+  Nutzer, 13.08.2026 20:41 (die Beobachtung dahinter): »dann sagt er GO_THERE BIG_ROCK und zeigt in die Dorfmitte, wo der große Felsen liegt (warum auch immer) … sie bleiben am Felsbrocken stehen und machen nichts«
+
+- [ ] 682. THE CHILDREN'S GAME IS A GAME OF TAG AGAIN, AND THE TEACHING RIDES ON IT (user 13.08.2026: »Beim Kinderspiel kann ich auch nichts lernen. Ich erkenne da kein Fangspiel.«)
+  User, 13.08.2026, from playing the deployed state: "Beim Kinderspiel kann ich auch
+  nichts lernen. Ich erkenne da kein Fangspiel." The children read as running about
+  at random and calling out instructions that do not serve the game; the tag game
+  that was there originally has been diluted by the situations added to teach COME,
+  THERE, FOLLOW and the rest, and the sending about looks like an end in itself.
+  Measured against the code: a situation is staged every 6 s (spread 0.35) and its
+  action steers a child for 5 s at pace 1.6, while the chase runs at 3.4 (runner
+  3.8); six of the twelve situations make a child stand still and four more walk it.
+  With four children the teaching layer therefore occupies the group nearly all the
+  time, which is exactly the picture the user describes.
+  The children play a RECOGNISABLE game of tag again, and the teaching rides ON
+  that game instead of replacing it.
+
+  The rule the player must be able to read without a word of explanation: one child
+  is IT and chases, the others flee, whoever is caught becomes IT. Everything the
+  children say serves that picture or waits for a break in it.
+
+  Final state:
+
+  1. THE ROUND OUTRANKS THE SITUATION. While a round is running, only situations
+     whose action is what the child would be doing ANYWAY may be staged: FOLLOW
+     (the caller is fleeing and is followed), THERE (pointing at the chaser while
+     fleeing), HERE (claimed at the moment of a catch), NO (a refusal, which costs
+     no movement). The SENDING situations — COME's gathering, GO_THERE's errands —
+     are staged in the BREAK between rounds, where children arranging themselves is
+     exactly what a game of tag looks like.
+  2. NO STAGED ACTION SLOWS A PLAYING CHILD. `actionPace` no longer overrides the
+     chase: a fleeing or chasing child keeps its chase speed and the situation only
+     chooses the DIRECTION where the chase leaves it free. An action that makes a
+     child STAND (holdTheSpot, noOneMoves, refuserStaysPut) is cast only on a child
+     that is not currently chasing or being chased.
+  3. THE TEACHING HAS A DUTY CYCLE, AND IT IS BOUNDED. At most one situation runs
+     in a group at a time, and over the played clock at most a stated fraction may
+     carry a staged action — a balance value, debug-editable, starting at one third.
+     Measured today: a situation every 6 s (spread 0.35) with a 5 s action over four
+     children means the teaching layer is running almost continuously, half of the
+     twelve situations make a child STAND STILL and four more walk it at pace 1.6
+     against a chase speed of 3.4–3.8. That is why no game is visible.
+  4. THE CATCH IS THE LOUDEST MOMENT. The catch and the handover of the role are
+     staged so the rule reads: the caught child claims the spot (HERE), the new
+     chaser is visibly the one just caught, and the others scatter. Nothing else is
+     staged in the seconds around it.
+  5. EVERY CONCEPT IS STILL TAUGHT. The six stay with the children and every one
+     keeps at least two situations; what changes is WHEN they may be staged, not
+     which they are. The look-alike rules of the catalogue (COME against FOLLOW,
+     GO_THERE against THERE) hold unchanged.
+  6. DOCUMENTATION. `docs/communication-poc-spec.md` and design.md §13.4 state the
+     precedence — the round is the carrier, the teaching rides on it — in the same
+     commit.
+
+  Test: Vitest over a replayed round — no standing action is ever cast on a child
+  in the chase; no staged action reduces a playing child's pace; the duty-cycle
+  bound holds over a long replay; every concept is still staged at least twice.
+  A live section in the browser layer reports, over a minute of play, the fraction
+  of clock with a staged action, the number of catches, and the fraction of clock
+  in which the chaser is actually pursuing — and fails when the game is not
+  recognisable by those numbers.
+  CONSTRAINTS:
+  - This is a DESIGN change to §13.4's children's game, decided by the user; it is
+    not a tuning pass. Difficulty medium-high: catalogue, scheduler, steering and
+    the tests move together, and the picture decides.
+  - Do not drop a concept to buy legibility — the six must still be learnable, and
+    the catalogue's look-alike contrast rules stay.
+  - The stuck/trembling child is a SEPARATE defect (carrier findings on 666); do not
+    fold it in here, but the legibility gate must not be measured on a group whose
+    children are wedged.
+  QUOTED:
+  Nutzer, 13.08.2026 20:51: »Beim Kinderspiel kann ich auch nichts lernen. Ich erkenne da kein Fangspiel. Für mich laufen die Kinder mehr oder weniger zufällig hin und her (wenn sie mal nicht festhängen) und werfen mit Anweisungen um sich, die dem Spiel nicht dienlich sind. Ursprünglich war es mal ein Fangspiel, bei dem einer die anderen fangen muss und der Gefangene dadurch zum Fänger wird. Durch die ganzen neuen Situationen, die zur Erklärung der Kommunikationskonzepte COME, THERE, FOLLOW, usw. hinzugekommen sind, ist das Kinderspiel völlig verwässert. Das Herumschicken wirkt wie zum Selbstzweck eingeführt und macht das Fangspiel nicht mehr erkennbar.«
+
+- [ ] 683. THE SEAL LETS THE WORK ORDER THROUGH, BECAUSE IT CLASSIFIES BY TARGET (Sol's
+  closing review of point 675, 13.08.2026, the one finding left standing by decision). After
+  `batch-boundary.mjs --commit` the marker is sealed and every further repository mutation is
+  denied — except the closing set, which is a list of TARGETS rather than of operations, and
+  that list carries `tasks.md` and `tasks-archive.md`. They belong there for a reason: a
+  blocked Stop can demand the archive move or a tick of a session that has already committed,
+  and denying it would restore exactly the loop the two-phase boundary was built to close. The
+  cost is that the sealed session may still append a point, rewrite a spec or tick an
+  unrelated point — real work, wearing the clothes of ending — and nothing says a word.
+  FINAL STATE: the work-order files stay in the closing set, but what may be done to them
+  after the seal is narrowed to the ENDING operations: the tick of the point the marker names
+  and that point's move into the archive. A work-order mutation that touches any OTHER point —
+  a new point appended, a spec edited, a foreign tick — is DENIED with the same loud refusal
+  every other post-seal mutation gets, naming the point the marker covers and the point that
+  was touched. The classification therefore stops being purely by target for these two files:
+  the guard reads the diff it is about to allow. `batch-boundary-core.mjs` carries the rule
+  beside `CLOSING_SET_FILES`, with the comment there stating what the narrowing buys and what
+  it deliberately still permits.
+  VERIFIABLE: Vitest over the narrowed rule — the marker's own tick and its archive move pass;
+  an appended point, an edited spec and a foreign tick are each denied by name; a work-order
+  edit BEFORE the seal is untouched; and a diff the guard cannot parse fails OPEN, as every
+  guard here does.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes the boundary seal.
+  Criticality: medium — the seal holds against every other mutation, so this is the last gap
+  in it rather than an open door.

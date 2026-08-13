@@ -277,15 +277,20 @@ coverage map live in `scripts/verify/README.md`.
   resolves nowhere, and where one section number exists in two documents it
   prints BOTH — no resolver can decide that, so the reader is told. Every brief
   carries the revision it was cut from; regenerate rather than reuse an old one.
-- **Context boundary at a point boundary (users 27./28.07.2026).** 87–94 % of
-  the spend sat above 150k context, one session carrying point after
-  point. A batch session ENDS at its boundary, and the boundary is
-  TAKEN: after merge and tick run `node scripts/batch-boundary.mjs
-  <point>` and stop. `batch-progress-guard` BLOCKS a stop that closed a point
-  without that marker, allows one only against the work order and an armed
-  launcher (`scripts/batch-launcher.mjs --start` on Linux, the
-  `HoA-Batch-Autostart` task on Windows), then marks the lock HANDED OVER so
-  it spawns the successor.
+- **Context boundary at a point boundary (users 27./28.07.2026; rebuilt by point
+  675).** 87–94 % of the spend sat above 150k context, one session carrying
+  point after point. A batch session ENDS at its boundary, TAKEN in TWO PHASES:
+  after merge and tick, `batch-boundary.mjs --prepare <point>`, the bookkeeping
+  it names, then `--commit <point>` LAST, and stop — a committed marker is
+  SEALED: later mutations are denied loudly (`--clear` withdraws), never a
+  silent deletion. The condition is "the point I was LANDING is landed": work
+  with pushed checkpoints is transferred at the commit and ADOPTED by the
+  successor (`batch-in-flight.mjs --adopt`); unpushed work drains first. Past
+  the CONTEXT WATERMARK (150k measured tokens, `context-watermark.mjs`) the
+  same handover fires with `--context`, and the board card says so. The guard
+  enforces all three against an armed launcher (`batch-launcher.mjs --start` on
+  Linux, the `HoA-Batch-Autostart` task on Windows), then marks the lock HANDED
+  OVER so it spawns the successor.
   Attended, ask for `/clear`. OWNERSHIP IS A LEASE (30.07.2026): `leaseUntil` on
   the lock, renewed BEFORE each call; an owner that stops renewing stops owning
   the batch. A PreToolUse fence then refuses it merge/push, the tick, the board
@@ -672,9 +677,9 @@ After completion and after every major system:
   behind (30.07.2026). The families: the BOARD (published,
   concise, one topic per card, consistent with the real state, every decision
   asked of the user standing as a card); the BATCH (no idle wait or idle stop,
-  the §6 model allowlist — a named breach pauses, an unnamed author is looked
-  up — a red CI, a branch already contained in `main`, the retrospective's
-  currency, the chat timestamp); the WORK ORDER (queue order, final-state-only specs,
+  the §6 context watermark and model allowlist — a named breach pauses, an
+  unnamed author is looked up — a red CI, a branch already in `main`, the
+  retrospective's currency, the chat timestamp); the WORK ORDER (queue order, final-state-only specs,
   the open/archived split, the measured doc ceilings in
   `scripts/doc-budget-core.mjs`); the FINDING (a turn that investigated and left
   nothing durable, and a carrier the owner has not drained); and the

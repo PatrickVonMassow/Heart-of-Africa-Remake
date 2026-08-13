@@ -126,11 +126,14 @@ export const RESUME_PROMPT =
   'ein Wort. Sichtbar bleibt die Wartestellung trotzdem — der PostToolUse-Hook setzt die ' +
   'In-Flight-Markierung, solange ein Lauf nachweislich laeuft, und nimmt sie zurueck, sobald er vorbei ist. ' +
   'Dauert der Lauf laenger, als ein blockierender Aufruf dauern darf, deklariere die ' +
-  'Wartestellung mit `node scripts/batch-in-flight.mjs --waiting-on ...`. PUNKT-GRENZE (27.07.2026): der ' +
-  'Kontext ist der groesste Kostenfaktor des Batches — wenn der gemergte und abgehakte Punkt fertig ist ' +
-  'UND kein delegierter Agent mehr laeuft (Pool erst leerlaufen lassen), fuehre `node ' +
-  'scripts/batch-boundary.mjs <punkt>` aus und BEENDE die Session, statt den naechsten Punkt in denselben ' +
-  'Kontext zu ziehen; der OS-Task startet die naechste Session. Halte sonst NICHT still an. Wenn ein git ' +
+  'Wartestellung mit `node scripts/batch-in-flight.mjs --waiting-on ...`. PUNKT-GRENZE (27.07.2026, ' +
+  'zweiphasig seit Punkt 675): der Kontext ist der groesste Kostenfaktor des Batches — sobald der Punkt, ' +
+  'den du gelandet hast, gemergt und abgehakt ist, fuehre `node scripts/batch-boundary.mjs --prepare ' +
+  '<punkt>` aus, erledige dessen Buchhaltung, dann `--commit <punkt>` als LETZTE Repository-Aktion, und ' +
+  'BEENDE die Session, statt den naechsten Punkt in denselben Kontext zu ziehen; ein noch bauender Agent ' +
+  'mit gepushten Checkpoints wird dabei an den Nachfolger uebergeben (`--adopt`), und die ' +
+  'Kontext-Wassermarke erzwingt dieselbe Uebergabe auch ohne gelandeten Punkt (`--context`). Der OS-Task ' +
+  'startet die naechste Session. Halte sonst NICHT still an. Wenn ein git ' +
   'push scheitert, schreibe .claude/push-failed und benachrichtige via scripts/notify.mjs. WICHTIG: Wenn ' +
   'der SessionStart-Hook meldet, dass eine ANDERE Session den Batch-Lock haelt (STAND DOWN), dann arbeite ' +
   'NICHT am Batch und beende dich sofort. Wenn alles erledigt ist: Closing fahren. ' +
