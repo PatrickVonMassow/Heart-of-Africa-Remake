@@ -18159,3 +18159,47 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes the batch singleton.
   Criticality: high — it is the lock that keeps two sessions apart, the failure PAUSES the batch,
   and it recurs on every unit run in the owner's own tree.
+
+- [x] 672. THE VILLAGE HAS NO AMBIENT DRUM, AND THE DRUMMER HOLDS STILL (user 13.08.2026,
+  testing the deployed state: "Und das Ambient-Trommeln nervt immer noch und außerdem irritiert
+  es, weil es mit Kommunikation verwechselt werden kann. Deaktiviere es komplett. Außerdem soll
+  der Trommler dann auch still halten. Aktuell passen seine Bewegungen auch gar nicht zu dem
+  Trommelgeräuschen. Ich hoffe, das tun sie, wenn man mit dem Häuptling kommuniziert.").
+  WHY SILENCE AND NOT VARIATION: an ambient drum a player can mistake for the drum MESSAGE
+  damages the mechanic this release exists for. No amount of variation removes that confusion —
+  only silence does.
+  FINAL STATE:
+  1. THE BED IS SILENT by default: no ambient drum phrase is emitted, in a village or near one
+     (`emitDrumPhrase`/`startDrumEmitter` and the `drums` layer targets in
+     `src/systems/ambience.ts`, driven by `balance.drumBed` in `src/config/balance.ts`). The
+     switch is a debug-menu value like every other calibratable, defaulting to off, so the bed
+     can be heard again without a rebuild and a later design keeps its planner.
+  2. THE DRUM MESSAGE PATH STAYS FUNCTIONAL. `playDrumMessage` and the chief's answer keep
+     PLAYING; this point touches neither their content nor their wording, which the
+     communication rebuild (points 686–692) rewrites. The silence around them is what makes
+     the message unmistakable.
+  3. THE DRUMMER HOLDS STILL while nothing is drummed: his hands rest
+     (`src/scenes/place/drummerPose.ts`) instead of miming strikes that make no sound. An idle
+     drummer standing at his drum is the picture.
+  4. THE DRUMMER MOVES WITH THE MESSAGE, AND EACH STRIKE FALLS ON THE DRUM OF ITS TONE (user
+     13.08.2026). While a drum message plays, his strikes follow the plan's strike TIMES — the
+     same plan `playDrumMessage` renders — AND every single strike lands on the drum matching
+     that syllable's tone: the large low drum for a low tone, the small high drum for a high
+     one, beaten by the hand standing over that drum, with that drum's head dipping. So the
+     hand the player sees teaches the same tone the player hears.
+     STATE OF THE CODE (measured 13.08.2026): the pitch-matched path already EXISTS from point
+     576 — `src/communication/drumMessage.ts` carries a `DrumId` per strike and the Drummer in
+     `src/scenes/place/PlaceLife.tsx` drives its swings off `strike.drum`. So VERIFY the
+     behaviour rather than rebuilding it, and say so if it holds.
+     Test additionally: a Vitest case walks a whole `drumMessagePlan()` and asserts PER STRIKE
+     that the swinging hand and dipping head are the ones belonging to `strike.drum` and that
+     the other drum stays at rest — not merely that a strike happened at the right time.
+  5. design.md §19's ambience list and CLAUDE.md are updated in the SAME commit wherever they
+     name the drum bed as a standing ambience layer.
+  VERIFIABLE: Vitest for the silent default (no phrase emitted with the switch off, the message
+  path still emits), for the drummer's rest pose while nothing plays, and for his strike times
+  matching the message plan; plus the ambience browser check that no drum sounds in a village at
+  the default preset. The user's judgment at the deployed state closes it.
+  Criticality: high — it is the user's second report on the same ambience, and it stands directly
+  in front of the communication mechanic this release exists to let him test.
+  Bundle: Dorfleben.
