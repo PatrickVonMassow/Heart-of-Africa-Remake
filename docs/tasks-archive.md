@@ -18022,3 +18022,28 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): this changes the model guard and the model policy.
   Criticality: medium — it moves spend to the quota that has room, and it touches the guard that
   protects the batch from a degraded session, so the guard half is the risky half.
+
+- [x] 651. THE VILLAGE DRUM BED IS A 1.9-SECOND LOOP (user 11.08.2026, testing the deployed
+  `main`, build e1bd2fa, in the Bambara village: "Das monotone Trommel-Ambient-Geräusch nervt
+  übrigens total.").
+  MEASURED: `emitDrums` in `src/systems/ambience.ts` plays ONE hard-wired bar — step 0.24 s,
+  pattern [1, 0, 0.6, 0, 1, 0, 0.6, 0.4], always the same 130→55 Hz sine envelope — and the
+  emitter fires it every 2.2 s for as long as the player is in the village
+  (`emitter('drums', 2.2, 2.2, emitDrums)`, target volume 0.5 in the village, 0.18 nearby).
+  There is no second figure, no rest between bars, no dynamics, no randomness. What the player
+  hears is exactly that: a 1.9-second loop running for the whole visit.
+  THE CONSTRAINT THAT DECIDES THE SHAPE: the drums are not only ambience. The drum MESSAGE
+  (`src/communication/drumMessage.ts`) carries meaning, and the player must be able to tell the
+  meaningless bed from the message. Any fix that merely makes the bed more varied must not blur
+  that line — the bed stays recognisably the bed.
+  FINAL STATE: the bed has rests and variation — several patterns, shifting accents, silence
+  between phrases, slight tempo/pitch spread per village — and stays timbrally separate from the
+  message drumming. It thins out the longer the player stays. Every value is calibratable in
+  `src/config/balance.ts` and adjustable at runtime in the debug menu (CLAUDE.md §2).
+  VERIFIABLE: Vitest over the pure pattern selection — variation across N bars, a guaranteed
+  share of rests, never the same pattern twice in a row, the per-village spread — plus the
+  existing mix check that the speech syllables stay audible over the bed (DRUM_BEAT_PEAK,
+  point 605). Whether it still annoys him is the user's judgement against the deployed build,
+  asked once this lands.
+  Criticality: medium — it is a sound the player cannot escape while in a village, and it sits
+  next to the mechanic he is meant to be listening to. Bundle: Ton.
