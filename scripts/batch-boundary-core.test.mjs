@@ -27,7 +27,10 @@ import {
   describeWithdrawalTrigger,
   hookCallTimestamp,
   markerPhase,
+  preparedReceipt,
   sealedBoundaryDeny,
+  unpreparedRefusal,
+  BOUNDARY_CAUSES,
   WITHDRAWAL_TRIGGER_MAX,
 } from './batch-boundary-core.mjs'
 import { NO_CURRENT_WORK_TITLE } from './board-core.mjs'
@@ -871,5 +874,59 @@ describe('progressGuardDecision — the context watermark demands a handover (po
     expect(progressGuardDecision({ ...base, ownership: 'held', contextPastWatermark: true })).toBe('stand-down')
     expect(progressGuardDecision({ ...base, paused: true, contextPastWatermark: true })).toBe('allow')
     expect(progressGuardDecision({ ...base, openCount: 0, contextPastWatermark: true })).toBe('allow')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE PREPARE RECEIPT (Sol's review of 4e93933): two phases are only two phases
+// if the first one is required. `--commit --context` could be called with no
+// `--prepare` at all — so the board card that says WHY the batch handed over
+// could be skipped in silence — and the point commit checked only that the OLD
+// current-work card was gone.
+// ---------------------------------------------------------------------------
+describe('unpreparedRefusal — --commit refuses what --prepare never prepared (point 675)', () => {
+  const fresh = (over = {}) => ({ ...preparedReceipt({ sid: SID, point: 675, now: NOW - 1000 }), ...over })
+
+  it('lets the matching receipt through, for both causes', () => {
+    expect(unpreparedRefusal({ receipt: fresh(), sid: SID, point: 675, now: NOW })).toBeNull()
+    expect(
+      unpreparedRefusal({
+        receipt: preparedReceipt({ sid: SID, cause: BOUNDARY_CAUSES.CONTEXT, now: NOW - 1000 }),
+        sid: SID,
+        cause: BOUNDARY_CAUSES.CONTEXT,
+        now: NOW,
+      }),
+    ).toBeNull()
+  })
+
+  it('refuses a MISSING receipt and names the one command that fixes it', () => {
+    const point = unpreparedRefusal({ receipt: null, sid: SID, point: 675, now: NOW })
+    expect(point).toContain('NOT PREPARED')
+    expect(point).toContain('--prepare 675')
+    // The context refusal must name the context form, or it sends the session
+    // to a command that cannot prepare a watermark boundary.
+    expect(
+      unpreparedRefusal({ receipt: null, sid: SID, cause: BOUNDARY_CAUSES.CONTEXT, now: NOW }),
+    ).toContain('--prepare --context --transcript')
+  })
+
+  it('refuses a FOREIGN, a STALE, a WRONG-CAUSE and a WRONG-POINT receipt', () => {
+    expect(unpreparedRefusal({ receipt: fresh({ sessionId: 'other' }), sid: SID, point: 675, now: NOW })).toContain(
+      'belongs to session other',
+    )
+    expect(
+      unpreparedRefusal({ receipt: fresh({ at: NOW - BOUNDARY_FRESH_MS - 1 }), sid: SID, point: 675, now: NOW }),
+    ).toContain('stale')
+    // A context commit may not ride on a point preparation, whose bookkeeping
+    // names a closed point rather than the watermark — and the reverse.
+    expect(
+      unpreparedRefusal({ receipt: fresh(), sid: SID, cause: BOUNDARY_CAUSES.CONTEXT, now: NOW }),
+    ).toContain('POINT boundary')
+    expect(unpreparedRefusal({ receipt: fresh(), sid: SID, point: 676, now: NOW })).toContain('point 675, not point 676')
+  })
+
+  it('is not satisfied by a receipt with no time at all', () => {
+    expect(unpreparedRefusal({ receipt: fresh({ at: 'now-ish' }), sid: SID, point: 675, now: NOW })).toContain('stale')
+    expect(unpreparedRefusal({ receipt: fresh({ at: NaN }), sid: SID, point: 675, now: NOW })).toContain('stale')
   })
 })

@@ -345,7 +345,11 @@ How it works:
    (point 675 closed the marker-deletion defeat): `node scripts/batch-boundary.mjs
    --prepare <point>` validates the condition and names ALL the bookkeeping (the
    card, the publish) while writing NO marker — so the bookkeeping can no longer
-   delete one — and `--commit <point>` is the session's LAST repository action:
+   delete one, only a RECEIPT (`.claude/batch-boundary-prepared.json`) that
+   `--commit` requires for its own session, cause and point, since a phase that
+   can be skipped is not a phase; a withdrawal (`--clear`) drops it, so a
+   re-taken boundary starts at phase one again — and `--commit <point>` is the
+   session's LAST repository action:
    it writes a SEALED `.claude/batch-boundary.json` (phase `committed`), and any
    later mutation is DENIED loudly (`--clear` is the deliberate way back; the
    user's own prompt still withdraws). Both refuse unless the work order

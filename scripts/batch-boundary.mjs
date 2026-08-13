@@ -47,7 +47,9 @@ import {
   classifyLauncherState,
   markerPhase,
   pointClosure,
+  preparedReceipt,
   tickedPointsInDiff,
+  unpreparedRefusal,
 } from './batch-boundary-core.mjs'
 import { launcherRemedy } from './batch-launcher-core.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
@@ -81,6 +83,24 @@ export function readBoundary(path = BOUNDARY_PATH) {
  *  is what authorises the stop, and a lost one costs the batch a whole session. */
 export function writeBoundary(marker, path = BOUNDARY_PATH) {
   writeJsonAtomic(path, marker)
+}
+
+/** Where `--prepare` leaves its receipt for `--commit` (Sol's review of 4e93933).
+ *  Beside the marker, but NOT a marker: nothing withdraws it and no guard reads
+ *  it, so it cannot become a second thing work can delete. */
+export const PREPARED_PATH = repoPath('.claude/batch-boundary-prepared.json')
+
+export function readPrepared(path = PREPARED_PATH) {
+  try {
+    const r = JSON.parse(readFileSync(path, 'utf8'))
+    return r && typeof r === 'object' ? r : null
+  } catch {
+    return null
+  }
+}
+
+export function writePrepared(receipt, path = PREPARED_PATH) {
+  writeJsonAtomic(path, receipt)
 }
 
 export function clearBoundary(path = BOUNDARY_PATH) {
@@ -390,6 +410,14 @@ if (isMain) {
 
   if (arg === '--clear') {
     clearBoundary()
+    // The prepare receipt goes with it: a withdrawn boundary is re-TAKEN from
+    // the first phase, bookkeeping included, not committed on the strength of
+    // an attempt the session deliberately abandoned.
+    try {
+      rmSync(PREPARED_PATH, { force: true })
+    } catch {
+      /* best effort — a receipt we cannot delete is caught by its own freshness */
+    }
     console.log('boundary marker cleared — the ordinary "do not stop the batch" rule applies again.')
   } else if (arg === '--status' || !arg) {
     const g = gatherBoundary(sid)
@@ -479,6 +507,9 @@ if (isMain) {
         `  ${boundaryCardCommand({ point: null, pointCardStanding: false })}   (the German goes in on stdin)\n` +
         `  ${PUBLISH_CMD}\n`
       if (phaseFlag === '--prepare') {
+        // The RECEIPT, not a marker: it proves phase one ran, and `--commit`
+        // refuses without it (Sol's review of 4e93933).
+        writePrepared(preparedReceipt({ sid, cause: BOUNDARY_CAUSES.CONTEXT, now: Date.now() }))
         console.log(
           `PREPARED (nothing recorded yet): the context measures ${wm.tokens} tokens against the ` +
             `${wm.watermark} watermark, the launcher is armed` +
@@ -491,6 +522,13 @@ if (isMain) {
         )
         process.exit(0)
       }
+      const unprepared = unpreparedRefusal({
+        receipt: readPrepared(),
+        sid,
+        cause: BOUNDARY_CAUSES.CONTEXT,
+        now: Date.now(),
+      })
+      if (unprepared) fail(unprepared)
       // Transfer FIRST, marker LAST (Sol review of 807c2bf, finding 1) —
       // `commitSealedBoundary` pins the order, and a failed transfer refuses
       // before anything is recorded.
@@ -602,6 +640,7 @@ if (isMain) {
       // with none of the promised board bookkeeping, which is defeat 1 with a
       // shorter fuse. The bare form keeps WORKING — it starts the two-phase
       // flow and says exactly what to do.
+      writePrepared(preparedReceipt({ sid, cause: BOUNDARY_CAUSES.POINT, point, now: Date.now() }))
       console.log(
         (phaseFlag === null
           ? `NOTE: the one-shot form is retired (point 675) — this call ran --prepare ${point} instead, and ` +
@@ -617,6 +656,15 @@ if (isMain) {
       )
       process.exit(0)
     }
+
+    const unprepared = unpreparedRefusal({
+      receipt: readPrepared(),
+      sid,
+      cause: BOUNDARY_CAUSES.POINT,
+      point,
+      now: Date.now(),
+    })
+    if (unprepared) fail(unprepared)
 
     if (pointCardStanding(point)) {
       fail(

@@ -266,6 +266,62 @@ export function markerPhase(marker) {
 }
 
 /**
+ * THE PREPARE RECEIPT (Sol's review of 4e93933): two phases are only two phases
+ * if the first one is REQUIRED. `--commit --context` could be called with no
+ * `--prepare` at all, so the board card that says WHY the batch handed over —
+ * the part of defeat 3 the reader actually sees — could be skipped silently; the
+ * point commit checked only that the OLD current-work card was gone.
+ *
+ * `--prepare` therefore leaves a receipt, and `--commit` refuses without a fresh
+ * one of its own session, cause and point. The receipt is NOT a marker: nothing
+ * withdraws it and no guard reads it, so it cannot revive defeat 1 (work
+ * deleting what the boundary needs), and its refusal names a ONE-COMMAND way
+ * back — `--prepare` is runnable whenever `--commit` would be, so this can
+ * refuse a session but never trap one.
+ *
+ * RESIDUAL, deliberately: a session that prepares, then works for a while, then
+ * commits within the freshness window still passes. The receipt proves the
+ * bookkeeping phase RAN, not that nothing followed it; what follows the commit
+ * is the sealed marker's business.
+ */
+export function preparedReceipt({ sid, cause = BOUNDARY_CAUSES.POINT, point = null, now }) {
+  return { v: 1, sessionId: String(sid ?? ''), cause, point: point ?? null, at: Number(now) }
+}
+
+/** May `--commit` run at all? PURE. Null = prepared; otherwise the refusal. */
+export function unpreparedRefusal({
+  receipt,
+  sid,
+  cause = BOUNDARY_CAUSES.POINT,
+  point = null,
+  now,
+  freshMs = BOUNDARY_FRESH_MS,
+} = {}) {
+  const how =
+    cause === BOUNDARY_CAUSES.CONTEXT
+      ? 'node scripts/batch-boundary.mjs --prepare --context --transcript <path>'
+      : `node scripts/batch-boundary.mjs --prepare ${point ?? '<point>'}`
+  const refuse = (why) =>
+    `THE COMMIT IS NOT PREPARED (${why}) — the boundary is TWO-PHASE, and the first phase is where the board ` +
+    `card, the publish and the checks happen. Run \`${how}\`, do the bookkeeping it names, then commit. ` +
+    'Nothing recorded.'
+  if (!receipt || typeof receipt !== 'object') return refuse('no --prepare receipt exists')
+  if (!sid || receipt.sessionId !== sid) return refuse(`the receipt belongs to session ${receipt.sessionId || '?'}`)
+  if (receipt.cause !== cause) {
+    return refuse(
+      `the receipt prepared ${receipt.cause === BOUNDARY_CAUSES.CONTEXT ? 'a CONTEXT boundary' : 'a POINT boundary'}`,
+    )
+  }
+  if (cause === BOUNDARY_CAUSES.POINT && Number(receipt.point) !== Number(point)) {
+    return refuse(`the receipt prepared point ${receipt.point ?? '?'}, not point ${point ?? '?'}`)
+  }
+  if (!(typeof receipt.at === 'number' && Number.isFinite(receipt.at) && now - receipt.at < freshMs)) {
+    return refuse('the receipt is stale — the bookkeeping it named is no longer this turn\'s')
+  }
+  return null
+}
+
+/**
  * MUST THIS CALL BE DENIED BECAUSE THE BOUNDARY IS COMMITTED? PURE.
  *
  * Only a fresh, committed marker belonging to the asking session denies, and only
