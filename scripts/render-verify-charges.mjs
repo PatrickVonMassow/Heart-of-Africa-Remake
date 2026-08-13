@@ -67,7 +67,13 @@ export const RED_CHARGES = [
       'measured and rejected this round, recorded in evadeHeading). At a ~30 s live trace one ' +
       'such event is over the 0.25 % gate on its own, so a rare live red of this composition ' +
       'remains possible; it is closed by reading the trace (a catch or a contact at the worst ' +
-      'window, no rescue, 0.00 m carried), not by retrying.',
+      'window, no rescue, 0.00 m carried), not by retrying. The post-ramp LIVE panel ' +
+      '(13.08.2026, merged state 389440ea, quiet machine, 5 runs per backend) confirms it: ' +
+      'WebGPU 5/5 green (worst child 0.09 %), WebGL 2 4/5 green and ONE red of exactly this ' +
+      'composition — child 3 at 0.39 %, worst window 8.9 s, 1.29 m walked inside 0.32 m, no ' +
+      'rescue at the window, 0.00 m carried in the whole run. The 1.29 m walk is the single ' +
+      'event\'s own signature: green runs on both backends carry the SAME 1.29 m window under ' +
+      'gate (0.09-0.11 %); red is only where one lands on a child whose judged share is small.',
   },
   {
     point: 506,
