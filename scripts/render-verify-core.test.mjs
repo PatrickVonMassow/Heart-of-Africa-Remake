@@ -1155,6 +1155,7 @@ describe('the shipped charge ledger', () => {
       expect(String(c.why).length).toBeGreaterThan(40)
       if (c.backend) expect(BACKENDS).toContain(c.backend)
       if (c.kind) expect(['check', 'console']).toContain(c.kind)
+      if (c.detailMatch) expect(c.detailMatch).toBeInstanceOf(RegExp)
     }
   })
 
@@ -1174,6 +1175,25 @@ describe('the shipped charge ledger', () => {
     const goat = red('settlement walker (goat): the planted foot holds its ground spot')
     expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu' }).point).toBe(506)
     expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' })).toBeNull()
+  })
+
+  it('charges only the measured children composition and leaves every other red uncovered', () => {
+    const child = (detail) => ({
+      ...red('no child walks without getting anywhere'),
+      detail,
+    })
+    const measured = child(
+      'worst child 3 at 0.39 % of its own judged time — worst child 3 at 8.9s, 1.29 m walked inside 0.32 m',
+    )
+    expect(chargeFor(measured, { suite: 'polish', backend: 'webgl' }).point).toBe(666)
+
+    // The player-reported permanent shiver has the same check label, but not
+    // the accepted single-event signature. Missing details are equally unsafe,
+    // and the evidence names WebGL 2 only: all three remain real reds.
+    const shiver = child('worst child 3 at 99.89 % — worst child 3 at 0.1s, 3.41 m walked inside 0.14 m')
+    expect(chargeFor(shiver, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(red('no child walks without getting anywhere'), { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(measured, { suite: 'polish', backend: 'webgpu' })).toBeNull()
   })
 
   it('charges the fixed render-target leak to NOBODY — a mended red is a red again', () => {

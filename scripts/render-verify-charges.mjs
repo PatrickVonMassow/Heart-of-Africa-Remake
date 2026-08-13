@@ -36,6 +36,7 @@
  * @typedef {object} RedCharge
  * @property {number} point    the OPEN work-order point that owns this red
  * @property {RegExp} match    tested against the red's printed name
+ * @property {RegExp} [detailMatch] when present, the printed measurement must match too
  * @property {string} why      one dated sentence of evidence
  * @property {string} [suite]  only this suite's reds (omitted: any suite)
  * @property {'webgpu'|'webgl'} [backend] only this backend's reds (omitted: both)
@@ -47,10 +48,19 @@ export const RED_CHARGES = [
   {
     point: 666,
     suite: 'polish',
+    backend: 'webgl',
     kind: 'check',
     match: /no child walks without getting anywhere/i,
+    detailMatch: /worst child \d+ at \d+\.\d+s, 1\.29 m walked inside 0\.32 m/i,
     why:
-      'Inherited by 666 at the 657 tick (13.08.2026), exactly as 666 was filed to do; a third ' +
+      'DECISION (b), 14.08.2026: accept only the measured WebGL 2 composition, at its named ' +
+      'expected live rate of one run in ten; a different backend or a detail other than exactly ' +
+      '1.29 m walked inside 0.32 m stays unaccounted and red. The player-visible WebGPU standstill ' +
+      'was not this accepted window: the reported-seed replay reproduced child 3 shivering ' +
+      'permanently because every 0.9 m anchor crossing reset the rescue clock. The behavior fix ' +
+      'now completes that clock, carries the child 2.30 m once, and leaves the remaining 88 s ' +
+      'clean at both trace scales. Inherited by 666 at the 657 tick (13.08.2026), exactly as 666 ' +
+      'was filed to do; a third ' +
       'trigger of the same window — the way-round sign boundary inside the release ramp, cure ' +
       'measured and rejected 13.08.2026 (evadeHeading ramp comment) — is charged with it. ' +
       'RESIDUAL after the point-657 second round (measured 13.08.2026 on the deterministic ' +
