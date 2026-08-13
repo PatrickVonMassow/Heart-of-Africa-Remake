@@ -21,12 +21,9 @@ Regel —, und zwar ab der ersten Formulierung, nicht erst beim zweiten Schaden.
 
 ### Wie die Prompts in dieser Anleitung formuliert sind
 
-Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merksätze: „Jedes
-neue Feature bekommt einen Test" wird vergessen, „Etabliere einen Mechanismus, der das
-garantiert" nicht. Wo einer prinzipiell **nicht** möglich ist, steht das dabei.
-
-Eine **Schätzung** wie *(Kosten ≈ 2x)* meint den Mehrverbrauch der betroffenen Arbeit,
-nicht des Projekts.
+Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merksätze; wo einer
+prinzipiell **nicht** möglich ist, steht das dabei. Eine **Schätzung** wie *(Kosten ≈ 2x)*
+meint den Mehrverbrauch der betroffenen Arbeit, nicht des Projekts.
 
 ### Primäres und sekundäres Modell
 
@@ -50,22 +47,13 @@ steuert oder Arbeit vernichten kann, wird immer gegengeprüft; was ein schneller
 sofort zeigt, nie.
 
 **Kontingent ist nicht austauschbar.** Ist ein Modell knapp, gib das Schreiben von Code — den
-größten Verbraucher — dem anderen und behalte für das knappe, was **nur** es kann.
+größten Verbraucher — dem anderen und behalte für das knappe, was **nur** es kann. Wer
+verteilt, muss dabei die Töpfe sehen: Ein Verteiler, der den Füllstand nicht liest, empfiehlt
+ein längst leeres Modell.
 
 > *Prompt:* „Sag mir, bevor ein Kontingent zur Neige geht, welche Arbeit an das Modell mit
-> Restvolumen geht und welche beim knappen bleiben muss, weil kein anderes sie darf."
-
-**Wer verteilt, muss die Töpfe sehen.** Sobald ein Mechanismus die Arbeit auf Modelle
-verteilt, erbt er die Pflicht, deren Verfügbarkeit zu kennen. Sonst empfiehlt er ein Modell,
-dessen Kontingent seit gestern leer ist — die Delegation stirbt am ersten Aufruf, und die
-Ausweichstufe zeigt womöglich genau auf das knappe Modell, das du schonen wolltest. Und
-verlässt du dich darauf, dass die Ausnahme „in diesem Engpass gilt etwas anderes" gemerkt
-wird, hält sie nur so lange, wie jemand sich erinnert: Was ein Werkzeug entscheidet, muss das
-Werkzeug auch wissen.
-
-> *Prompt:* „Der Verteiler, der Arbeit auf Modelle routet, liest den Füllstand der
-> Kontingente und den aktuellen Schalterstand. Eine Spur mit leerem Kontingent darf er nie
-> empfehlen, und den Grund seiner Wahl schreibt er in die Ausgabe."
+> Restvolumen geht und welche beim knappen bleiben muss. Der Verteiler liest den Füllstand:
+> Eine leere Spur empfiehlt er nie."
 
 ---
 
