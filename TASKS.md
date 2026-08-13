@@ -370,6 +370,49 @@ put it is the mistake this line exists to stop.
   card body whose first paragraph still opens with a second `Stand HH:MM`, so the strip cannot
   quietly stop working.
 
+- [ ] 665. EVERY BOARD CARD NAMES ITS PROBLEM BEFORE ITS STATUS — AND A MECHANISM ENFORCES IT
+  (user 12.08.2026, 23:21–23:24, asking about the 641 now-card).
+  
+  MEASURED 12.08.2026 23:24 on the published board: the 641 now-card body reads, in full,
+  "Der Zweig zum ungeklärten Rot am Giza-Rand liegt seit einer gestorbenen Sitzung gebaut,
+  aber ungeprüft im Baum. Ein zweites Modell nimmt ihn auf, urteilt zuerst über den
+  erreichten Stand und schließt das Rot über eine benannte Ursache — nicht über einen
+  späteren grünen Lauf. Berührt keine Datei der Kinder-Kur." — pure fix status. A reader
+  cannot tell WHAT the unexplained red is (the `polish` suite's Giza settlement-edge
+  picture check reds on WebGPU in one of three full runs; nobody knows the cause yet).
+  The user had to ask in chat what the point is about; the board exists so he never has to.
+  
+  FINAL STATE:
+  1. IMMEDIATE REPAIR: the 641 card (and any other card currently in the same state) is
+     rewritten so its body OPENS with one sentence saying what the point is about, in
+     terms the user recognises — the problem, not the branch state — with the status
+     following. For 641 that sentence is roughly: "Der Bildcheck am Giza-Siedlungsrand
+     (gefegter Boden messbar dunkler als das offene Land) wird auf WebGPU sporadisch rot,
+     Ursache unbekannt."
+  2. THE RULE: every card on the board — now-cards, queue cards, decision cards alike —
+     opens with WHAT the point is about before any status. A body consisting only of
+     status prose is not a valid card.
+  3. THE MECHANISM (the user's explicit demand: "vor allem, dass es eine Mechanik dafür
+     braucht, damit das nicht wieder passiert" — enforce, don't remind): the check must be
+     STRUCTURAL, not a prose heuristic. The suggested shape — the author decides the final
+     design, under mechanism review as usual: `board.mjs`'s card-writing commands take the
+     problem statement as its own REQUIRED field, stored distinctly in the card structure;
+     the renderer places it as the body's opening; a card whose problem field is missing,
+     empty, or identical to its status text is REFUSED at write time, and the board guard
+     in the Stop chain blocks a publish containing such a card (same family as the
+     one-topic-per-card guard). Cards already published get a migration pass that fills
+     the field from TASKS.md's point titles/first lines where possible and flags the rest.
+  
+  VERIFIABLE: Vitest over the board core — writing a card without the problem field (or
+  with an empty one, or one equal to the status) is refused; the guard core flags a
+  published card missing it; and the live board shows the 641 card opening with its
+  problem sentence.
+  
+  Criticality: medium — the board is the user's only window into the batch; a status-only
+  card hides what the work is FOR, and this is the second card-content rule that had to be
+  retrofitted (after one-topic-per-card), so the class needs a structural gate, not
+  another reminder.
+
 - [ ] 633. THE RELEASE'S CLOSING RUN — TWO REGRESSIONS WITH THE CLEANUP BETWEEN THEM (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
   zu sein"). 174 carried the whole release in one card estimated at ~1 h, which was true
@@ -1237,6 +1280,20 @@ put it is the mistake this line exists to stop.
   carried 89 % verification — not because a loop ran away.
   A WALL-CLOCK TRIGGER may join the token trigger once point 599 delivers an honest calendar
   decomposition; until then there is no honest wall-clock per point to trigger on.
+  A SILENT RUN IS THE THIRD TRIGGER, AND IT IS THE ONE THAT ACTUALLY BLED (measured
+  13.08.2026, ~09:00). On point 657 the third measurement recording produced NO BYTE of
+  output from 02:32 onwards, and the owning session waited on it in 30-second polls past
+  09:00 — six and a half hours spent on a task that was already dead. Nothing puts a
+  DEADLINE on a background recording, nothing harvests a task that stopped writing, and the
+  hand-over the board card itself promised ("should the agent fail again, the fallback model
+  takes it") had no enforcer behind it. So: a delegated run that has written nothing for
+  longer than a calibratable silence window is REPORTED as stalled at the next hook (with
+  its task id, its last output time and its point), the owner is handed the two legal moves
+  — re-run or hand to the fallback model — and the stall lands where the successor looks,
+  on the work order or the board, exactly as the red-three-times diagnosis does. This is NOT
+  the refused automatic abort: nothing is killed on a timer, the silence is only made
+  VISIBLE, because the cost here was not the dead task but the six hours nobody was told.
+  Point 567 (remains of killed runs) owns the reaping; this point owns the report.
   Criticality: medium — a cap that let a red state pass as green would be worse than the
   cost it saves, so the escalation path is the mechanism and the abort is not.
 
