@@ -627,8 +627,20 @@
        * IDEMPOTENT — it runs after the board render, on the failure path and
        * again on load, and must add exactly one section however often it runs.
        */
+      function ensureFavicon() {
+        if (!document.head || document.head.querySelector('link[rel~="icon"][href="favicon.svg"]')) return
+        const favicon = document.createElement('link')
+        favicon.rel = 'icon'
+        favicon.type = 'image/svg+xml'
+        favicon.href = 'favicon.svg'
+        document.head.append(favicon)
+      }
+
       let chatHost = null
       function injectChat() {
+        // document.write replaces the source <head> along with the body. Keep
+        // the tab icon tied to every route that already restores the chat.
+        ensureFavicon()
         if (!document.body) return
         const standing = document.getElementById('hoa-chat')
         // The section this realm built stays. A COPY — which a swap could carry
