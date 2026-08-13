@@ -49,21 +49,23 @@ Flecken** hat. Die **Obergrenze** zieht die **Sichtbarkeit des Fehlers**: Was de
 steuert oder Arbeit vernichten kann, wird immer gegengeprüft; was ein schneller Test
 sofort zeigt, nie.
 
+**Kontingent ist nicht austauschbar.** Ist ein Modell knapp, gib das Schreiben von Code — den
+größten Verbraucher — dem anderen und behalte für das knappe, was **nur** es kann.
+
+> *Prompt:* „Sag mir, bevor ein Kontingent zur Neige geht, welche Arbeit an das Modell mit
+> Restvolumen geht und welche beim knappen bleiben muss, weil kein anderes sie darf."
+
 ---
 
 ## So setzt du ein Projekt auf (Prompts zum Kopieren)
 
 1. **Zielbild zuerst — und nimm dir dafür Zeit.** Jede Stunde hier spart ein Vielfaches
    an Umbau: Ein Modell baut sehr schnell sehr viel vom Falschen, wenn das Ziel unscharf
-   ist. Das Ausarbeiten ist selbst eine ideale LLM-Aufgabe — lass dich befragen, dir
-   Lücken und Widersprüche zeigen und das Ergebnis ausformulieren; du entscheidest, es
-   schreibt.
-   > „Bevor wir irgendetwas bauen, erarbeiten wir gemeinsam ein `design.md`, das
-   > beschreibt, was am Ende existieren soll. Frag mich so lange aus, bis keine
-   > wesentliche Lücke bleibt, zeig mir Widersprüche und offene Entscheidungen, und
-   > formuliere es dann aus. Danach ist es die alleinige Quelle der Wahrheit: Ändere
-   > es nie eigenmächtig; wenn ich etwas ändere, aktualisiere `design.md` und den
-   > Code gemeinsam."
+   ist. Das Ausarbeiten ist selbst eine ideale LLM-Aufgabe — du entscheidest, es schreibt.
+   > „Bevor wir bauen, erarbeiten wir gemeinsam ein `design.md`, das beschreibt, was am Ende
+   > existieren soll. Frag mich aus, bis keine wesentliche Lücke bleibt, und zeig mir Widersprüche
+   > und offene Entscheidungen. Danach ist es die alleinige Quelle der Wahrheit: Ändere es nie
+   > eigenmächtig; ändere ich etwas, aktualisiere `design.md` und den Code gemeinsam."
 
 2. **Ein dauerhaftes Arbeitsprotokoll.**
    > „Lege ein `TASKS.md` an und **etabliere einen Mechanismus, der seine Regeln
@@ -171,14 +173,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende Prüfung
   verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie sollte. Ein
   Fehlalarm meldet sich selbst, ein ausgefallener nie.
-  → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme
-  weg UND echte Treffer noch da. Die Fälle erfindet das **andere Modell**, gemessen an der
-  Mechanik statt an Testnamen, die **eingeräumten** Grenzen zuerst — eine zugegebene
-  Lücke wird geglaubt, eine verschwiegene gesucht." *(Kosten ≈ 1,3x.)*
+  → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND
+  echte Treffer noch da. Die Fälle erfindet das **andere Modell**, gemessen an der Mechanik statt
+  an Testnamen, die **eingeräumten** Grenzen zuerst — eine zugegebene Lücke wird geglaubt, eine
+  verschwiegene gesucht." *(Kosten ≈ 1,3x.)*
 
-- **Gebaut — und nie in Betrieb genommen.** Die Ausnahme ist entschieden, steht aber im Fließtext
-  statt in der Datei, die das Werkzeug liest. Oder die Verbesserung ist getestet und dokumentiert —
-  nur führt nichts jemanden dorthin. Kein Test schlägt an: Was niemand kennt, verletzt nichts.
+- **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
+  die das Werkzeug liest; oder die Verbesserung ist getestet und dokumentiert, nur führt nichts
+  jemanden dorthin. Kein Test schlägt an: Was niemand kennt, verletzt nichts.
   → *Prompt:* „Eine Ausnahme trägst du **im selben Zug** dort ein, wo der Mechanismus sie liest;
   bei einer Fähigkeit die Stelle, an der jemand danach greift, und **woran** man ihre Benutzung
   erkennt. Und wenn etwas ‚wartet': **worauf genau**?"
@@ -198,8 +200,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   oder hängt an einer Rückfrage — beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
   Aufgabe. Bleib **nie mit einer Rückfrage stehen**: vernünftigste Annahme treffen, sichtbar
-  festhalten, was mich braucht, weitergehen. Und jedes Warten bricht auch beim **Fehler** ab —
-  sonst wartet es auf etwas, das nie kommt."
+  festhalten, was mich braucht, weitergehen. Jedes Warten bricht auch beim **Fehler** ab."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, kurz,
@@ -249,8 +250,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Schätze vor dem Bau **Schwierigkeit × Kritikalität** und zieh bei Kritischem **ein
   anderes Modell** hinzu. Beim **Finden** blind parallel: gleiche Vorgabe, je ein vollständiges
   Ergebnis; beim **Beurteilen** Gegenlesen, aber **erst das Ergebnis, dann die Begründung**.
-  **Vereinigt** wird nach Bedeutung, vom Modell, das an **keiner** Liste mitschrieb, jeder Eingang
-  auffindbar (nur A, nur B, verschmolzen mit X) — Verschmelzen verliert lautlos."
+  **Vereinigt** wird nach Bedeutung, vom Modell, das an **keiner** Liste mitschrieb, jeder
+  Eingang auffindbar — Verschmelzen verliert lautlos."
   *(≈ 2x für den Fundschritt)*
 
 - **Die Lehre gilt als versorgt, sobald ihr Wächter benannt ist** — gebaut ist er damit nicht.
@@ -409,7 +410,6 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 > sie erzwingt. Bei Kritischem hol ein zweites Modell als Gegenprüfer. Frag nach, wenn das
 > Zielbild unklar ist — rate nicht."
 
-Sie setzt auf, woran alles andere hängt: eine Wahrheit, eine Arbeitsordnung, zwei
-Testschichten, den Reflex zum Check. Die Fallstricke oben ersetzt sie nicht.
+Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 07bf8443fdabb27e05837ca6759ce23f5a5471dd37c02c3908ad62ed33ed6be2 -->
+<!-- GUIDE-FINGERPRINT: b3019bd5fd9249f90f6f9731bc64aab07defd4cce76f85cc3d207d9c1d283ee1 -->
