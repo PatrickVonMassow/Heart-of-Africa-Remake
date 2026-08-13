@@ -65,7 +65,8 @@ import {
   DOCTOR_STATE_PATH,
 } from './batch-singleton.mjs'
 import { otherSessionsIn, gateDemandSatisfied } from './batch-doctor-core.mjs'
-import { gatherBoundary } from './batch-boundary.mjs'
+import { gatherBoundary, probeLauncherState } from './batch-boundary.mjs'
+import { gatherWatermark } from './context-watermark.mjs'
 import { launcherRemedy } from './batch-launcher-core.mjs'
 import { gatherOwnerWork } from './batch-owner-work.mjs'
 import { gatherInFlight, gatherHandoverTransfer } from './batch-in-flight.mjs'
@@ -90,8 +91,14 @@ const record = (line) => {
 }
 
 let sid = ''
+let transcriptPath = ''
 try {
-  sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+  const payload = JSON.parse(readFileSync(0, 'utf8'))
+  sid = payload.session_id || ''
+  // The hook's own transcript path is the context watermark's measuring point
+  // (point 675, defeat 3) — the one file that records what this session's
+  // context actually measures.
+  transcriptPath = payload.transcript_path || ''
 } catch {
   /* no/!JSON stdin — sid stays empty → this session can never be conscripted */
 }
@@ -265,13 +272,37 @@ try {
     }
   }
 
+  // THE CONTEXT WATERMARK (point 675, defeat 3) — measured for the owner only,
+  // from the session's own transcript. A demand is raised ONLY off a REAL
+  // reading past the mark AND an armed launcher (never demand what the CLI
+  // would refuse); an UNREADABLE state surfaces loudly below instead of
+  // silently never firing.
+  let watermark = null
+  let watermarkDemand = false
+  if (ownership === 'mine' || ownership === 'acquired') {
+    try {
+      watermark = gatherWatermark({ transcriptPath, sid })
+    } catch (e) {
+      watermark = { state: 'unreadable', tokens: null, watermark: null, alert: true, transcript: String(e?.message ?? e) }
+    }
+    if (watermark.state === 'past' && !(bound.boundary && bound.boundary.valid)) {
+      try {
+        const launcher = bound.launcher === 'armed' ? 'armed' : probeLauncherState()
+        watermarkDemand = launcher === 'armed'
+      } catch {
+        watermarkDemand = false
+      }
+    }
+  }
+
   // MAY THE DECLARED WORK CROSS A BOUNDARY (point 675, defeat 2)? Only asked
-  // when it would change the verdict — a live wait beside a DUE boundary — so an
-  // ordinary turn end pays nothing. Fail direction: unverifiable → NOT
-  // transferable, i.e. the wait is honoured (drain-before-boundary); the other
-  // direction would demand a handover whose commit the CLI then refuses — a loop.
+  // when it would change the verdict — a live wait beside a DUE boundary or a
+  // watermark demand — so an ordinary turn end pays nothing. Fail direction:
+  // unverifiable → NOT transferable, i.e. the wait is honoured
+  // (drain-before-boundary); the other direction would demand a handover whose
+  // commit the CLI then refuses — a loop.
   let inFlightTransferable = true
-  if (inFlight.live === true && bound.due) {
+  if (inFlight.live === true && (bound.due || watermarkDemand)) {
     try {
       inFlightTransferable = gatherHandoverTransfer(sid).blocked !== true
     } catch {
@@ -311,7 +342,17 @@ try {
     inFlightTransferable,
     slotsNeedReason: inFlight.slots?.needsReason === true,
     claim: claimVerdict.verdict,
+    contextPastWatermark: watermarkDemand,
   })
+
+  // FAIL VISIBLY, NEVER SILENTLY NEVER-FIRE (point 675, defeat 3): an owner
+  // whose context cannot be measured must hear it, or the watermark is defeated
+  // by the very silence it exists to end. Appended to whatever this guard says.
+  const watermarkNote =
+    watermark && watermark.state === 'unreadable'
+      ? ' NOTE: the CONTEXT WATERMARK could not be measured this turn (no readable transcript/usage record), so ' +
+        'the context handover CANNOT fire — check `node scripts/context-watermark.mjs --status`.'
+      : ''
 
   if (decision === 'allow-release') {
     // HAND THE BATCH BACK. A real release, not a handover: the user is not the
@@ -389,7 +430,8 @@ try {
         `(merge the agent, read the suite result), then either re-declare what is still running ` +
         `(\`node scripts/batch-in-flight.mjs --waiting-on …\`) or clear it (\`--clear\`).` +
         (bound.due ? ` Note: the boundary for point ${bound.due} is still DUE — take it once the wait is over.` : '') +
-        claimNote,
+        claimNote +
+        watermarkNote,
     )
     process.exit(0)
   }
@@ -454,6 +496,21 @@ try {
         `--waiting-on "<what>" --branch <agent branch> --worktree <its worktree>\`; \`--handover-check\` says ` +
         `which of the two states holds). A mid-merge, or a verification you can await in ONE blocking call ` +
         `(\`node scripts/verify/run-wait.mjs --await\`), is finished first — then hand over.` +
+        claimNote,
+    )
+  }
+
+  if (decision === 'block-context-handover') {
+    block(
+      `HAND OVER — THE CONTEXT PASSED THE WATERMARK: this session's own transcript measures ` +
+        `${watermark?.tokens ?? '?'} tokens of context against the ${watermark?.watermark ?? '?'} watermark, and ` +
+        `context above that mark is the batch's dominant cost (87–94 % of the spend sat there; a session that ` +
+        `answers and files for hours never reaches a point boundary on its own — measured three times on ` +
+        `13.08.2026). This turn's step is done, so hand over NOW, in two phases: ` +
+        `\`node scripts/batch-boundary.mjs --prepare --context\`, do the bookkeeping it names (the watermark ` +
+        `board card SAYS WHY, the publish), then \`node scripts/batch-boundary.mjs --commit --context\` as the ` +
+        `LAST repository action, and stop — and say in your closing message that the watermark is why. ` +
+        `Transferable in-flight work is handed over at the commit and adopted by the successor.` +
         claimNote,
     )
   }
@@ -525,7 +582,8 @@ try {
       `non-transferable work drains first — ending on it throws its work away. If you are blocked on a ` +
       `user decision for EVERY open item, that is also a legitimate pause: create .claude/batch-paused with ` +
       `a reason and add a "Von dir zu klären" dashboard card. Otherwise pick a DIFFERENT open item.` +
-      claimNote,
+      claimNote +
+      watermarkNote,
   )
 } catch (e) {
   // Never hard-block on a guard error — but never allow a stop SILENTLY either:

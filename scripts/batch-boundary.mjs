@@ -50,6 +50,7 @@ import {
 import { launcherRemedy } from './batch-launcher-core.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
 import { gatherHandoverTransfer as gatherTransfer } from './batch-in-flight.mjs'
+import { gatherWatermark } from './context-watermark.mjs'
 import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
@@ -391,8 +392,99 @@ if (isMain) {
     else if (g.boundary.valid && g.launcher === 'armed') console.log('\nA boundary stop would be ALLOWED.')
     else console.log(`\nA boundary stop would be REFUSED (${g.boundary.reason}, launcher ${g.launcher}).`)
   } else {
-    // --prepare <point> | --commit <point> | <point> (legacy one-shot)
+    // --prepare <point>|--context | --commit <point>|--context | <point> (legacy)
     const phaseFlag = arg === '--prepare' || arg === '--commit' ? arg : null
+    const contextMode = phaseFlag !== null && argv[1] === '--context'
+
+    if (contextMode) {
+      // THE CONTEXT BOUNDARY (point 675, defeat 3): no closed point — the
+      // licence is a REAL context reading past the watermark, taken now and
+      // recorded in the marker. Everything else mirrors the point boundary.
+      if (!sid) {
+        fail(
+          'no batch lock owner — only the session that owns .claude/batch-lock.json may end at a ' +
+            'boundary. Nothing recorded.',
+        )
+      }
+      const tIdx = argv.indexOf('--transcript')
+      const wm = gatherWatermark({ transcriptPath: tIdx >= 0 ? argv[tIdx + 1] : '', sid })
+      if (wm.state === 'unreadable') {
+        fail(
+          'NO CONTEXT READING COULD BE TAKEN' +
+            (wm.transcript ? ` (${wm.transcript} carries no usage record)` : ' (no transcript was found)') +
+            ' — a context boundary fires on a MEASUREMENT, never an assumption. Pass the real transcript: ' +
+            `node scripts/batch-boundary.mjs ${phaseFlag} --context --transcript <path> (the Stop hook payload ` +
+            'names it as transcript_path). Nothing recorded.',
+        )
+      }
+      if (wm.state !== 'past') {
+        fail(
+          `the context has NOT passed the watermark (${wm.tokens} < ${wm.watermark} tokens) — the context ` +
+            'boundary ends a session the batch can no longer afford, not one that is merely between steps. ' +
+            'Keep working. Nothing recorded.',
+        )
+      }
+      const launcher = probeLauncherState()
+      if (launcher !== 'armed') {
+        const remedy = launcherRemedy()
+        fail(
+          `the launcher "${remedy.name}" is ${launcher} — nothing would restart the batch, so ending here would ` +
+            `strand it. Keep working, and ${remedy.how}. Nothing recorded.`,
+        )
+      }
+      const transfer = gatherTransfer(sid)
+      if (transfer.blocked) fail(transfer.message)
+      const handover = boundaryHandover({ sid })
+      const card = boundaryCardText({
+        destination: handover.destination,
+        claimantSid: handover.claimantSid,
+        cause: BOUNDARY_CAUSES.CONTEXT,
+      })
+      const cardBlock =
+        'THE BOARD CARD — it says WHY this handover happens (the watermark, not a closed point); take it ' +
+        'verbatim into the unnumbered gap card:\n\n' +
+        `${card}\n\n` +
+        `  ${boundaryCardCommand({ point: null, pointCardStanding: false })}   (the German goes in on stdin)\n` +
+        `  ${PUBLISH_CMD}\n`
+      if (phaseFlag === '--prepare') {
+        console.log(
+          `PREPARED (nothing recorded yet): the context measures ${wm.tokens} tokens against the ` +
+            `${wm.watermark} watermark, the launcher is armed` +
+            (transfer.note ? `, and ${transfer.note}` : '') +
+            '. Do the boundary bookkeeping NOW, while no marker exists that work could delete:\n\n' +
+            `${cardBlock}\n` +
+            `Then check nothing else would block (\`node scripts/guard-preflight.mjs --for answer --session ${sid}\`), ` +
+            'and make `node scripts/batch-boundary.mjs --commit --context` the LAST repository action of this ' +
+            'session. End the session right after.',
+        )
+        process.exit(0)
+      }
+      writeBoundary({
+        v: 2,
+        phase: BOUNDARY_PHASES.COMMITTED,
+        cause: BOUNDARY_CAUSES.CONTEXT,
+        sessionId: sid,
+        point: null,
+        tokens: wm.tokens,
+        at: Date.now(),
+      })
+      const transferred = transfer.commit ? transfer.commit() : null
+      console.log(
+        `boundary COMMITTED at the context watermark (${wm.tokens} >= ${wm.watermark} tokens). This was the ` +
+          'last repository action of this session — END IT NOW and SAY in your closing message that the ' +
+          'context watermark is why. ' +
+          (handover.destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
+            ? `The batch goes to claiming window ${handover.claimantSid}. `
+            : `The launcher (${launcherRemedy().name}) starts the fresh session. `) +
+          'Any further mutation is DENIED loudly (`--clear` withdraws deliberately).' +
+          (transferred
+            ? ` The in-flight declaration was marked TRANSFERRED (${transferred}); the successor adopts it ` +
+              'with `node scripts/batch-in-flight.mjs --adopt`.'
+            : ''),
+      )
+      process.exit(0)
+    }
+
     const pointArg = phaseFlag ? argv[1] : arg
     const point = Number(pointArg)
     if (!Number.isInteger(point) || point <= 0) {
