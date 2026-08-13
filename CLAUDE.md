@@ -298,26 +298,24 @@ coverage map live in `scripts/verify/README.md`.
   A MESSAGE WAKES IT TOO (29.07.2026): `scripts/chat-watcher.mjs` spawns a light
   responder from the chat inbox — only with no live owner and no honoured claim,
   under a bounded claim; the launcher tick supervises it.
-- **Model policy (users 25.07./10.08./12.08.2026, points 309/624). AUTHOR AND REVIEWER
-  ARE SEPARATE ROLES.** AUTHORS: **Opus 5**, then **Fable 5**, then **Opus
-  4.8** — the chain `scripts/batch-autostart.mjs` launches. **FABLE 5 AUTHORS
-  THE HARD CASES** (user 12.08.2026): work judged difficult, complex or
-  error-prone goes to Fable FROM THE START, and Opus work MOVES to Fable once
-  Sol still finds problems after a re-work. Fable is not the default — its
-  volume is the smaller one. REVIEWERS (both
-  modes): **GPT-5.6 Sol** at effort HIGH, else the first of **Fable 5**, **Opus
-  5**, **Opus 4.8** that authored none of it. A reviewer is bought for its
-  DIFFERENT errors, and another VENDOR decorrelates further than our own.
-  Reviews run through `node scripts/review-sol.mjs`, never a hand-typed
-  `codex` line: it names the cause, hands the review on, and records who ran
-  it. Sonnet and Haiku are NOT acceptable: a degraded session
-  is a capability breach; the batch STOPS. Every commit NAMES its author model
+- **Model policy (users 25.07.–13.08.2026, points 309/624/667). AUTHOR AND REVIEWER ARE
+  SEPARATE ROLES, AND AUTHORING HAS TWO LANES.** ANTHROPIC: **Opus 5**, then **Fable
+  5**, then **Opus 4.8** — the chain `scripts/batch-autostart.mjs` launches. **FABLE 5
+  AUTHORS THE HARD CASES** (12.08.2026): difficult, complex or error-prone work goes to
+  Fable FROM THE START, and Opus work MOVES there once Sol still finds problems after a
+  re-work. OPENAI: **GPT-5.6 Sol** AUTHORS the MECHANICAL and MID-DIFFICULTY points
+  (13.08.2026) — never a hard case, never one whose verification IS the work. REVIEWERS:
+  the OTHER vendor, never an author of the range —
+  Sol at effort HIGH on Claude's work; where SOL authored, CLAUDE reviews, runs the
+  suites, judges the picture and lands. Reviews run through `node
+  scripts/review-sol.mjs`, never a hand-typed `codex` line: it names the cause, hands
+  the review on and records who ran it. Sonnet and Haiku are NOT acceptable: a degraded
+  session is a capability breach; the batch STOPS. Every commit NAMES its author model
   in a `Co-Authored-By` trailer the `commit-msg` hook enforces;
-  `scripts/model-guard-core.mjs` holds the AUTHOR allowlist (`ALLOWED`) and
-  `scripts/model-guard.mjs` blocks the turn end on any commit after its
-  baseline authored outside it: HARD on a NAMED forbidden model (pause),
-  resolvably on an UNNAMED one, which transcripts settle. (A degraded session
-  once merged three defective Haiku deliveries in 14 minutes.)
+  `scripts/model-guard-core.mjs` holds the
+  AUTHOR allowlist (`ALLOWED`) and `scripts/model-guard.mjs` blocks the turn end on any
+  commit after its baseline authored outside it: HARD on a NAMED forbidden model
+  (pause), resolvably on an UNNAMED one, which transcripts settle.
 - **The four-eyes principle has TWO MODES, chosen by the STAGE (user
   25.07.2026). This is its normative wording; everywhere else refers here.** A
   DIVERGENT stage — what could go wrong, which cases to test, which designs are

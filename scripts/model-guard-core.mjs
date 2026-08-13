@@ -4,11 +4,20 @@
 // actually authored a commit. This module only decides — no I/O; the gathering
 // and blocking live in the fail-open wrapper scripts/model-guard.mjs.
 //
-// Model policy (user, 25.07.2026): ONLY Opus 5 (default), Opus 4.8 (fallback
-// when Opus 5 is unavailable) and Fable 5 (occasional four-eyes work) may run
-// the batch. Every other model — Sonnet and Haiku included — is a policy
-// breach: the batch must stop rather than run on it. Hence an ALLOWLIST, not
-// a Haiku blocklist: an unknown future model name fails closed.
+// Model policy (users 25.07.2026 / 13.08.2026): ONLY Opus 5 (default), Opus 4.8
+// (fallback when Opus 5 is unavailable), Fable 5 (the hard cases) and GPT-5.6
+// Sol (the OpenAI authoring lane, point 667) may run the batch. Every other
+// model — Sonnet and Haiku included — is a policy breach: the batch must stop
+// rather than run on it. Hence an ALLOWLIST, not a Haiku blocklist: an unknown
+// future model name fails closed.
+//
+// SOL AUTHORS UNDER A ROLE SWAP (point 667). Where Sol authors, CLAUDE reviews,
+// runs the suites, judges the picture and lands — so the change is still seen by
+// two vendors and no model reviews its own work. Admitting Sol as an author is
+// therefore the ONE thing that loosens here; everything else is TIGHTENED in the
+// same breath (see MODEL_TRAILER): a trailer naming a NON-Claude model used to
+// pass this guard unread, because "no Claude token" was taken for "no model
+// evidence". A degraded session stamping `GPT-4o mini` walked straight through.
 
 // AN UNNAMED AUTHOR IS NOT A FORBIDDEN ONE (point 397, observed 28.07.2026 and
 // again on 29.07.2026): commits carrying the bare `Co-Authored-By: Claude
@@ -29,22 +38,51 @@
 // and a trailer claiming more than one model is a finding rather than a pass on
 // its first allowed name: a commit has exactly one authoring model.
 
-/** Model names allowed to author batch commits, matched against the name PARSED
- *  out of a trailer (`modelNamesIn`) — anchored, so an allowed name carrying any
- *  addition is no longer allowed by accident. Everything after the family name
- *  must be version digits: the policy names the model FAMILIES (Opus, Fable),
- *  and a pinned version would redden the whole batch the day the harness serves
- *  a point release or writes the raw model id (`claude-opus-5[1m]`, 14 commits
- *  on 29.07.2026, which normalises to `opus 5`). */
-export const ALLOWED = /^(opus|fable)[\s.\d]*$/i
+/** Model names allowed to author batch commits, ONE PATTERN PER AUTHORING LANE,
+ *  matched against the name PARSED out of a trailer (`modelNamesIn`) — anchored,
+ *  so an allowed name carrying any addition is no longer allowed by accident.
+ *  Everything after the family name must be version digits: the policy names the
+ *  model FAMILIES (Opus, Fable, Sol), and a pinned version would redden the whole
+ *  batch the day the harness serves a point release or writes the raw model id
+ *  (`claude-opus-5[1m]`, 14 commits on 29.07.2026, which normalises to `opus 5`).
+ *
+ *  The OpenAI lane demands the word `sol`: `gpt` alone is NOT an author here, so
+ *  a session degraded to some other GPT is a breach exactly as Haiku is. */
+export const ALLOWED = Object.freeze([
+  /^(opus|fable)[\s.\d]*$/i, //          the Anthropic lane: Opus 5, Opus 4.8, Fable 5
+  /^(gpt[\s.\d]*)?sol[\s.\d]*$/i, //     the OpenAI lane: GPT-5.6 Sol (point 667)
+])
+
+/** May this PARSED model name author a commit here? */
+export function isAllowedModelName(name) {
+  const value = String(name ?? '').trim()
+  return value !== '' && ALLOWED.some((pattern) => pattern.test(value))
+}
 
 /** Any Claude co-author trailer (human co-authors are not model evidence). */
 export const CLAUDE_TRAILER = /\bclaude\b/i
+
+/** …and the OpenAI lane's, which carries no "Claude" token at all. Bare `gpt` is
+ *  matched too, though only `…sol…` is ALLOWED above: the point of naming it here
+ *  is that a GPT trailer becomes model evidence the allowlist then judges, instead
+ *  of a line this guard reads as no evidence at all and waves through. */
+export const OPENAI_TRAILER = /\b(gpt|sol)\b/i
+
+/** A co-author trailer this guard treats as naming a MODEL rather than a human. */
+export const MODEL_TRAILER = new RegExp(`${CLAUDE_TRAILER.source}|${OPENAI_TRAILER.source}`, 'i')
 
 /** Words that stand beside "Claude" without naming a MODEL: the product name and
  *  the context-window suffix. A trailer left with nothing after these names no
  *  model, so it is unidentified rather than forbidden. */
 const NON_MODEL_WORDS = /\b(code|agent)\b/gi
+
+/** One claimed designation, reduced to the bare name an allowlist can match. */
+function bareName(segment) {
+  return String(segment)
+    .replace(NON_MODEL_WORDS, ' ')
+    .replace(/[\s,;/&_-]+/g, ' ')
+    .trim()
+}
 
 /**
  * The model names a single co-author trailer CLAIMS, with the address, the
@@ -54,6 +92,12 @@ const NON_MODEL_WORDS = /\b(code|agent)\b/gi
  * `Claude Sonnet 5 / Claude Opus 5` reads as the two names it is rather than as
  * one string an allowlist search can be fooled by.
  * Empty means the trailer names no model at all.
+ *
+ * A trailer from the OPENAI lane (point 667) carries no "Claude" token to split
+ * on, so the whole cleaned line is the one name it claims — `GPT-5.6 Sol`. The
+ * Claude branch is asked FIRST and unchanged: a line naming both vendors is one
+ * claim per "Claude" token, and `Opus 5 and GPT 5.6 Sol` matches no allowlist
+ * pattern, which is the honest answer for a trailer naming two models.
  */
 export function modelNamesIn(trailer) {
   const cleaned = String(trailer ?? '')
@@ -61,17 +105,14 @@ export function modelNamesIn(trailer) {
     .replace(/\([^)]*\)/g, ' ')
     .replace(/\[[^\]]*\]/g, ' ')
     .replace(/\bco-authored-by:/gi, ' ')
-  if (!CLAUDE_TRAILER.test(cleaned)) return []
-  return cleaned
-    .split(/\bclaude\b/gi)
-    .slice(1)
-    .map((seg) =>
-      seg
-        .replace(NON_MODEL_WORDS, ' ')
-        .replace(/[\s,;/&_-]+/g, ' ')
-        .trim(),
-    )
-    .filter(Boolean)
+  if (CLAUDE_TRAILER.test(cleaned)) {
+    return cleaned.split(/\bclaude\b/gi).slice(1).map(bareName).filter(Boolean)
+  }
+  if (OPENAI_TRAILER.test(cleaned)) {
+    const name = bareName(cleaned)
+    return name ? [name] : []
+  }
+  return []
 }
 
 /** What a trailer says the model is, as one string — the single name in the
@@ -99,9 +140,9 @@ export const CLASSES = Object.freeze(['forbidden', 'unidentified', 'allowed'])
 export function judgeTrailer(trailer) {
   const names = modelNamesIn(trailer)
   if (!names.length) {
-    return { verdict: CLAUDE_TRAILER.test(String(trailer ?? '')) ? 'unidentified' : 'allowed', names }
+    return { verdict: MODEL_TRAILER.test(String(trailer ?? '')) ? 'unidentified' : 'allowed', names }
   }
-  if (names.some((name) => !ALLOWED.test(name))) return { verdict: 'forbidden', names }
+  if (names.some((name) => !isAllowedModelName(name))) return { verdict: 'forbidden', names }
   return { verdict: names.length > 1 ? 'unidentified' : 'allowed', names }
 }
 
@@ -167,7 +208,11 @@ export const ALLOWED_TRAILERS = Object.freeze([
   'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
   'Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>',
   'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
+  'Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>',
 ])
+
+/** The authoring lanes in one phrase, for the refusals that must name them. */
+export const ALLOWED_MODELS_PHRASE = 'Opus 5, Opus 4.8, Fable 5 and GPT-5.6 Sol'
 
 /** The `Co-Authored-By` values in a commit message, git's comment lines dropped
  *  so a hint in the commit template is never read as the author's own trailer. */
@@ -215,7 +260,7 @@ export function evaluateCommitTrailers(message) {
           findings.push({
             rule: 'forbidden-model-trailer',
             trailer,
-            detail: `names a model outside the allowlist (read as "${names.join(' + ')}"; only Opus 5, Opus 4.8 and Fable 5 may author here)`,
+            detail: `names a model outside the allowlist (read as "${names.join(' + ')}"; only ${ALLOWED_MODELS_PHRASE} may author here)`,
           })
         }
       }
@@ -293,6 +338,7 @@ export const TRANSCRIPT_HINT = [
   '',
   '    ~/.claude/projects/<repo-slug>/<session>.jsonl',
   '    ~/.claude/projects/<repo-slug>/<session>/subagents/agent-*.jsonl   (delegated work)',
+  '    ~/.codex/sessions/<yyyy>/…                                        (the GPT-5.6 Sol lane)',
 ]
 
 /** The prefix git's history-rewriting tools park the pre-rewrite commits under. */
@@ -337,8 +383,8 @@ export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified 
   const unnamed = (alsoUnidentified ?? []).filter(Boolean)
   return [
     `SERVING-MODEL TRIPWIRE: commit(s) ${shaList(hits)} carry a co-author trailer NAMING a model ` +
-      'outside the allowlist (only Opus 5, Opus 4.8 and Fable 5 may run the batch — Sonnet and ' +
-      'Haiku are NOT acceptable; user policy 25.07.2026). Do NOT continue batch work: create ' +
+      `outside the allowlist (only ${ALLOWED_MODELS_PHRASE} may run the batch — Sonnet and ` +
+      'Haiku are NOT acceptable; user policy 25.07./13.08.2026). Do NOT continue batch work: create ' +
       '.claude/batch-paused (reason: forbidden serving model) and stop. Only after the user has ' +
       'confirmed an allowed model may .claude/model-guard-baseline.json be advanced past these ' +
       'commits.',
@@ -365,7 +411,7 @@ export function formatUnidentifiedReason(hits, { backupRefs = [] } = {}) {
     '',
     ...TRANSCRIPT_HINT,
     '',
-    '  · an ALLOWED model (Opus 5 / Opus 4.8 / Fable 5) → advance .claude/model-guard-baseline.json',
+    '  · an ALLOWED model (Opus 5 / Opus 4.8 / Fable 5 / GPT-5.6 Sol) → advance .claude/model-guard-baseline.json',
     '    past these commits and carry on; no user interruption is owed.',
     '  · a model outside the allowlist, or no transcript covers the commit → treat it as the ',
     '    forbidden case: create .claude/batch-paused (reason: forbidden serving model) and stop.',

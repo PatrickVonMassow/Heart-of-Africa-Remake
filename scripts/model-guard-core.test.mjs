@@ -10,6 +10,7 @@ import {
   findUnidentifiedCommits,
   formatForbiddenReason,
   formatUnidentifiedReason,
+  isAllowedModelName,
   isPolicyBreach,
   judgeTrailer,
   modelNameIn,
@@ -420,5 +421,82 @@ describe('evaluateCommitTrailers (the commit-msg gate)', () => {
     expect(text).toContain('Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>')
     expect(text).toContain('~/.claude/projects/')
     expect(formatCommitTrailerVerdict({ block: false, findings: [] })).toBe('')
+  })
+})
+
+// POINT 667: the OpenAI AUTHORING lane. Sol may author under the role swap —
+// where it authors, Claude reviews — so its trailer must pass the guard. The
+// same change TIGHTENS everything around it: a non-Claude trailer used to be
+// read as "no model evidence" and waved through whatever model it named.
+describe('the GPT-5.6 Sol authoring lane', () => {
+  const msg = (...trailers) => `Do a thing\n\n${trailers.join('\n')}\n`
+
+  it('accepts a Sol-authored commit as an author', () => {
+    for (const t of [
+      'GPT-5.6 Sol <noreply@openai.com>',
+      'GPT-5.6 Sol (high effort) <noreply@openai.com>',
+      'gpt-5.6-sol <noreply@openai.com>',
+      'Sol <noreply@openai.com>',
+    ]) {
+      expect(judgeTrailer(t).verdict, t).toBe('allowed')
+      expect(classifyTrailer(t), t).toBe('allowed')
+      expect(isPolicyBreach(t), t).toBe(false)
+    }
+    expect(modelNamesIn('GPT-5.6 Sol <noreply@openai.com>')).toEqual(['GPT 5.6 Sol'])
+    expect(modelNameIn('GPT-5.6 Sol <noreply@openai.com>')).toBe('GPT 5.6 Sol')
+  })
+
+  it('advertises the Sol trailer, and every advertised trailer passes the gate', () => {
+    expect(ALLOWED_TRAILERS).toContain('Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
+    for (const t of ALLOWED_TRAILERS) expect(evaluateCommitTrailers(msg(t)).block, t).toBe(false)
+  })
+
+  it('names only SOL, never GPT at large — another GPT is a breach like any other', () => {
+    // It judges the name `modelNamesIn` PARSED, where the separators are already
+    // spaces — the raw hyphenated id is covered through a trailer above.
+    for (const name of ['GPT 5.6 Sol', 'gpt 5.6 sol', 'sol', 'Sol 5.6', 'SOL']) {
+      expect(isAllowedModelName(name), name).toBe(true)
+    }
+    for (const name of ['GPT 5.6', 'GPT 4o mini', 'gpt', 'Solaris 2', 'Sol Turbo', 'Codex', '']) {
+      expect(isAllowedModelName(name), name).toBe(false)
+    }
+  })
+
+  it('TIGHTENS: a non-Claude model trailer is now judged instead of waved through', () => {
+    // Before point 667 each of these carried no "Claude" token, so the guard read
+    // them as a human co-author — no model evidence — and passed them.
+    for (const t of ['GPT-4o mini <x@y>', 'GPT-5.6 <x@y>', 'gpt-4.1 <x@y>']) {
+      expect(classifyTrailer(t), t).toBe('forbidden')
+      expect(isPolicyBreach(t), t).toBe(true)
+      expect(evaluateCommitTrailers(msg(`Co-Authored-By: ${t}`)).findings[0].rule, t).toBe('forbidden-model-trailer')
+    }
+  })
+
+  it('leaves the Anthropic lane exactly as it was', () => {
+    for (const t of HISTORIC_TRAILERS) expect(classifyTrailer(t), t).toBe('allowed')
+    for (const [t, want] of HISTORIC_REJECTS) expect(classifyTrailer(t), t).toBe(want)
+    // The protection that must not weaken: the 24.07.2026 degradation.
+    expect(classifyTrailer('Claude Haiku 4.5 <noreply@anthropic.com>')).toBe('forbidden')
+    expect(classifyTrailer('Claude Sonnet 5 <noreply@anthropic.com>')).toBe('forbidden')
+    // …and the unnamed trailer stays resolvable rather than a breach.
+    expect(classifyTrailer('Claude <noreply@anthropic.com>')).toBe('unidentified')
+  })
+
+  it('is not fooled by a line naming both vendors', () => {
+    // One value naming two models shows which single model authored it: neither.
+    expect(classifyTrailer('Claude Opus 5 and GPT-5.6 Sol <x@y>')).toBe('forbidden')
+    // A human co-author is still not model evidence.
+    expect(classifyTrailer('Patrick von Massow <patrick@example.com>')).toBe('allowed')
+    expect(modelNamesIn('Patrick von Massow <patrick@example.com>')).toEqual([])
+  })
+
+  it('finds a forbidden non-Claude commit in the log window', () => {
+    const log = [
+      line('aaaaaaa', '2026-08-13T09:00:00Z', 'GPT-5.6 Sol <noreply@openai.com>'),
+      line('bbbbbbb', '2026-08-13T09:10:00Z', 'GPT-4o mini <x@y>'),
+    ].join('\n')
+    expect(findForbiddenCommits(log, T0).map((h) => h.sha)).toEqual(['bbbbbbb'])
+    expect(findUnidentifiedCommits(log, T0)).toEqual([])
+    expect(formatForbiddenReason(findForbiddenCommits(log, T0))).toContain('GPT-5.6 Sol')
   })
 })
