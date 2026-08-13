@@ -18123,3 +18123,39 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   19:25 (»Lasse Sol das machen, um Volumen zu sparen«). Mechanical and low-risk, and its
   verification is not the work.
   Criticality: low — it costs nothing if it waits, but the user asked for it directly.
+
+- [x] 674. A TEST'S DUMMY SESSION ID CAN TAKE OVER THE LIVE BATCH LOCK (measured 13.08.2026,
+  18:00 — it PAUSED the batch). `.claude/parallel-alert.json` recorded `ownerSid: "x"` and named
+  the one legitimate session as the parallel one; the escalation then sent five unanswered
+  notifications and paused the batch, with the user unable to do anything about it because
+  nothing was actually wrong.
+  THE CHAIN, confirmed by GPT-5.6 Sol (cross-vendor diagnosis, recorded): `resolveOwnership`
+  (`scripts/batch-singleton.mjs`) resolves ownership `via: 'process'` when the caller's claude
+  ancestor pid equals the lock's pid — and then RESTAMPS the lock's `sessionId` to whatever the
+  caller passed. `scripts/container-ask-guard-core.test.mjs` runs the REAL guard as a subprocess
+  with `{"session_id":"x"}`, and `container-ask-guard.mjs` forwards `payload.session_id` into
+  that resolver. When the batch owner runs `npm run test:unit` in its own tree, the Vitest
+  child's claude ancestor IS the lock's pid, so the live lock is restamped to `x`. Any guard test
+  that runs a real script as a subprocess has the same reach.
+  THIS IS THE SECOND TIME, UNDER A DIFFERENT PLACEHOLDER. The resolver already refuses ids
+  beginning `preflight-`, and its own comment documents the identical incident. That fix blocked
+  ONE placeholder rather than the class, so the class returned as `x`.
+  FINAL STATE — the invariant, not another placeholder list (Sol's refinement, adopted over the
+  UUID-shape rule I first proposed, which a bogus-but-UUID-shaped id would pass and which would
+  fail SILENTLY the day the harness changes its format):
+  1. PROCESS ANCESTRY GRANTS PERMISSION, NEVER IDENTITY. Resolving `via: 'process'` may let the
+     caller act as the existing owner; it must NOT write the caller's asserted id onto the lock.
+     The stored `sessionId` is preserved.
+  2. A GENUINE SESSION TRANSITION KEEPS ITS OWN DOOR: an explicit, named path performs the
+     restamp (the compaction case that `sessionIdBefore` exists for), gated on a lock-generation
+     and pid comparison rather than on ancestry alone, and it validates the new id there.
+  3. A REFUSED TRANSITION IS LOUD: an id the transition path rejects produces a distinct
+     diagnostic and leaves the previous owner intact — never a silently unownable batch.
+  VERIFIABLE, at BOTH levels (Sol's list): in the pure core, that process-based resolution never
+  changes an existing owner id, covering `x`, `test`, `preflight-…`, the empty string and a
+  different well-formed id; at the CLI level, the real guard invoked under matching ancestry
+  leaves the lock byte-for-byte unchanged and raises no parallel alert; plus that the trusted
+  transition path still restamps a legitimate new id and that a rejected one fails observably.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes the batch singleton.
+  Criticality: high — it is the lock that keeps two sessions apart, the failure PAUSES the batch,
+  and it recurs on every unit run in the owner's own tree.
