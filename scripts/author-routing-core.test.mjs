@@ -130,6 +130,11 @@ describe('authorLaneFor — which lane authors a point', () => {
     // `~~~javascript` inside a block is content, not the end of it.
     expect(laneTagIn('~~~\n~~~javascript\nAuthor lane: sol\n~~~\n')).toBe('')
     expect(laneTagIn('```\n     ```\nAuthor lane: opus\n```\n')).toBe('')
+    // …and the same indent rule binds the OPENER (sixth round): four spaces are
+    // an indented code block, and reading one as a fence swallowed every line
+    // after it — suppressing a REAL tag instead of an example.
+    expect(laneTagIn('    ```\nAuthor lane: sol')).toBe('sol')
+    expect(laneTagIn('   ```\nAuthor lane: sol\n   ```')).toBe('')
   })
 
   it('names the subjects its own comments promise (cross-vendor P1)', () => {

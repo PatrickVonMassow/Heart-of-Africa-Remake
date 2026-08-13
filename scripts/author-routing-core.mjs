@@ -120,11 +120,15 @@ export function laneTagIn(body) {
     if (marker) {
       const info = (fenceLine[3] ?? '').trim()
       const indent = (fenceLine[1] ?? '').replace(/[^ ]/g, '').length
+      // THE INDENT RULE BINDS THE OPENER TOO (sixth round): four spaces make an
+      // indented code block, not a fence, so treating one as an opener swallowed
+      // every line after it — suppressing a REAL tag rather than an example.
+      if (indent > 3) continue
       if (!fence) {
         fence = marker
         continue
       }
-      if (marker[0] === fence[0] && marker.length >= fence.length && !info && indent <= 3) fence = ''
+      if (marker[0] === fence[0] && marker.length >= fence.length && !info) fence = ''
       continue
     }
     if (fence) continue
