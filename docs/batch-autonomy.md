@@ -324,19 +324,34 @@ what changed is that ending became a legal way to finish a turn.
 
 How it works:
 
-1. The session merges the point, ticks it on `main`, lets any delegated agent pool
-   DRAIN (a subagent lives inside the session — ending mid-flight throws its
-   unfinished work away, and only its pushed commits survive), and then runs
-   `node scripts/batch-boundary.mjs <point>`. That command REFUSES unless the work
-   order confirms the point closed and the launcher is armed, so the session
-   finds out at the boundary rather than at a blocked turn end. On success it
-   writes `.claude/batch-boundary.json` (session id + point + timestamp).
+1. The session merges the point and ticks it on `main`. The condition is "the
+   point I was LANDING is landed" (point 675) — a delegated author still
+   building does NOT hold the boundary: when its checkpoints are committed AND
+   pushed, its in-flight declaration is transferred at the commit and the
+   successor ADOPTS it (`node scripts/batch-in-flight.mjs --adopt`, expired or
+   contradicted evidence alerting loudly); work WITHOUT a pushed checkpoint
+   blocks the handover with named recovery choices and drains first
+   (`--handover-check` tells the two states apart). The boundary is TWO-PHASE
+   (point 675 closed the marker-deletion defeat): `node scripts/batch-boundary.mjs
+   --prepare <point>` validates the condition and names ALL the bookkeeping (the
+   card, the publish) while writing NO marker — so the bookkeeping can no longer
+   delete one — and `--commit <point>` is the session's LAST repository action:
+   it writes a SEALED `.claude/batch-boundary.json` (phase `committed`), and any
+   later mutation is DENIED loudly (`--clear` is the deliberate way back; the
+   user's own prompt still withdraws). Both refuse unless the work order
+   confirms the point closed and the launcher is armed, so the session finds out
+   at the boundary rather than at a blocked turn end. The CONTEXT WATERMARK
+   closes the third defeat: past 150k measured context tokens
+   (`scripts/context-watermark.mjs`, read from the session's own transcript — an
+   unobtainable reading fails loudly, never silently) the guard demands the same
+   two-phase handover with `--context` in place of a point, and the board card
+   names the watermark as the reason.
 2. At the turn end `batch-progress-guard` re-judges the claim itself — the marker
    is a claim, not proof. It ALLOWS the stop only when the point is closed per
-   `TASKS.md` + `docs/tasks-archive.md`, the marker is fresh and belongs to this
-   session, and the launcher reports an armed state — `Get-ScheduledTask -TaskName
-   HoA-Batch-Autostart` on Windows, the daemon's own record on Linux. It then
-   consumes the marker.
+   `TASKS.md` + `docs/tasks-archive.md` (or the marker records a real watermark
+   reading), the marker is fresh and belongs to this session, and the launcher
+   reports an armed state — `Get-ScheduledTask -TaskName HoA-Batch-Autostart` on
+   Windows, the daemon's own record on Linux.
 3. Anything else blocks exactly as before: a point still open, a stale or foreign
    marker, an unhandled parallel-session alert, an unparseable work order — and,
    the important one, an **unarmed launcher**. A disabled launcher must never be
