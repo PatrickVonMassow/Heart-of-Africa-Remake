@@ -241,7 +241,21 @@ put it is the mistake this line exists to stop.
 
 
 - [ ] 659. THE WHOLE COMMUNICATION CHAIN, PLAYED THROUGH AND JUDGED BY WHAT REACHES THE
-  PLAYER — A SIX-EYES ALL-ROUND REVIEW (user 12.08.2026: "Danach will ich endlich mal
+  PLAYER — A SIX-EYES ALL-ROUND REVIEW.
+  ON HOLD (user 13.08.2026, 22:25: »Stoppe 659 erstmal — der macht erstmal keinen Sinn, wenn wir
+  jetzt die Mechanik umbauen.«). This point must NOT be started while the communication rebuild
+  is unlanded: it would play through and judge a state that will no longer exist. It keeps its
+  number and its full spec below, sits BEHIND the rebuild points in the queue, and is resumed
+  the moment the rebuild has landed — where it matters MORE than before, because it is then the
+  proof that the NEW chain reaches the player. What is being rebuilt (conversation with the user
+  on the evening of 13.08.2026; each part arrives as its own point): the vocabulary shrinks to
+  FIVE words (RIVER, UPSTREAM, DOWNSTREAM, ROCK instead of BIG_ROCK, DIG), with COME, NO, HERE,
+  GO_THERE, FOLLOW and THERE dropped; the trust/gift prelude goes, and the chief speaks from the
+  start; the children teach ROCK/UPSTREAM/DOWNSTREAM through ONE running game between two rocks
+  on the bank (the situation catalogue is dropped outright), the adults only RIVER and DIG; the
+  teaching stone becomes small and moves to the bank upstream; and the chief's answer is
+  replaced by DOWNSTREAM plus an object that leads to the Bandiagara escarpment.
+  (original spec, user 12.08.2026: "Danach will ich endlich mal
   erfolgreich die ganze Kette der Kommunikationsmechanik in diesem Dorf durchspielen können,
   ohne bei jedem Schritt sofort auf blockierende Bugs zu stoßen, obwohl du bereits mehrfach
   getestet und nachgebessert hast. Die QS war bei diesem Feature bisher offensichtlich völlig
@@ -7032,6 +7046,16 @@ to land than a mechanism that needs a review.
   the guard reads the diff it is about to allow. `batch-boundary-core.mjs` carries the rule
   beside `CLOSING_SET_FILES`, with the comment there stating what the narrowing buys and what
   it deliberately still permits.
+  A SECOND HOLE IN THE SAME SEAL, measured 13.08.2026 at 22:2x, minutes after 675 landed: the
+  parallel-session hook demanded a doctor run, the seal refused it and named the way out —
+  `node scripts/batch-boundary.mjs --clear`. THAT VERY CALL was refused too, with the same
+  message, for as long as it carried a pipe (`… | tail -4`); bare, it went through at once. The
+  segment detection reads the pipe as work and so catches the ONE command its own message
+  offers as the escape. A session that follows the message and pipes, as one does, is stuck: it
+  can neither work nor withdraw the seal while a Stop hook blocks the session end — the very
+  clamp 675 was built against, one level up. FINAL STATE for this half: `--clear` is ALWAYS
+  exempt from the seal, however the call is packaged — bare, piped, behind a `cd`, inside an
+  `&&` chain — and the refusal message says so.
   VERIFIABLE: Vitest over the narrowed rule — the marker's own tick and its archive move pass;
   an appended point, an edited spec and a foreign tick are each denied by name; a work-order
   edit BEFORE the seal is untouched; and a diff the guard cannot parse fails OPEN, as every
