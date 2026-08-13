@@ -91,23 +91,6 @@ export const RED_CHARGES = [
       'on the WebGL 2 lane this check stays a real red.',
   },
   {
-    point: 642,
-    suite: 'polish',
-    backend: 'webgl',
-    kind: 'check',
-    match: /settlement walker \(goat\)|fire shadows ON|handover zone itself carries neither/i,
-    why:
-      'THE THREE CASES POINT 642 NAMES BY HAND, made machine-readable 13.08.2026. Its spec lists ' +
-      'them as the sites its load-proofing sweep must classify: the goat\'s planted foot and ' +
-      '"fire shadows ON", both red on WebGL 2 on 12.08.2026 while a WebGPU run and two building ' +
-      'agents shared the machine and both green on the same commit on a quiet one, and the water ' +
-      'rim\'s "handover zone", red once and green on its retry. Point 506 must NOT swallow these: ' +
-      'it is the software lane\'s rate problem and says in its own words that on WebGL 2 the goat ' +
-      'check stays a real red — 642 is where a hardware-lane occurrence is answered, by repairing ' +
-      'the check into a state check or by declaring it timing and reporting it UNMEASURED under ' +
-      'load. The charge dies with 642, which is when each of them has an answer.',
-  },
-  {
     point: 514,
     suite: 'settings',
     backend: 'webgpu',
@@ -129,17 +112,26 @@ export const RED_CHARGES = [
   {
     point: 568,
     suite: 'polish',
+    backend: 'webgl',
     kind: 'check',
     match: /water beyond the plate.s rim is the SAME water/i,
     why:
       'Measured 09.08.2026 twice on WebGL 2 with the world seed pinned to 42: red on one run ' +
       '(samples 13.8/12.1/19.3 against a limit of 12) and fully green on the next at the same ' +
       'commit and the same seed, so the world is not what moves. That rotation IS point 568, ' +
-      'which must establish whether the sample is taken too early or the rim seam is real. ' +
-      'NO LONGER BACKEND-SCOPED (13.08.2026): the same check rotated on WebGPU too, and the ' +
-      'question the point must answer — early sample or real rim seam — is a property of the ' +
-      'water and its sampling, not of the renderer that drew it, so scoping the charge to one ' +
-      'lane only hid half the evidence 568 will need.',
+      'which must establish whether the sample is taken too early or the rim seam is real.',
+  },
+  {
+    point: 568,
+    suite: 'polish',
+    backend: 'webgpu',
+    kind: 'check',
+    match: /water beyond the plate.s rim is the SAME water/i,
+    why:
+      'The SAME rotation, measured on WebGPU 13.08.2026. Listed as its own entry rather than by ' +
+      'dropping the backend field (cross-vendor review, 13.08.2026): the evidence names two ' +
+      'lanes, so the charge names those two and a third backend added tomorrow is uncharged ' +
+      'until someone measures it there.',
   },
   {
     point: 570,

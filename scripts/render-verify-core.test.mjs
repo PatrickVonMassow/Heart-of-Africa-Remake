@@ -1173,7 +1173,7 @@ describe('the shipped charge ledger', () => {
   it('charges the goat-stance red to a DIFFERENT point on each lane', () => {
     const goat = red('settlement walker (goat): the planted foot holds its ground spot')
     expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu' }).point).toBe(506)
-    expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' }).point).toBe(642)
+    expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' })).toBeNull()
   })
 
   it('charges the fixed render-target leak to NOBODY — a mended red is a red again', () => {
