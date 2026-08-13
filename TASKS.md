@@ -2948,17 +2948,23 @@ Build order, chosen so no two parallel agents own the same file:
 
 - [ ] 422. THE BEGINNER GUIDE IS FULL, AND TODAY'S LESSON HAS NOWHERE TO GO
   (29.07.2026, found while doing the guide review the currency guard demands).
-  `docs/analysis_de/vibe-coding-anleitung.md` sits at EXACTLY its budget — 401 lines of
-  401, 3398 words of 3398 (`scripts/guide-brevity-core.mjs`). The gate is right to hold
-  it there: a beginner guide that grows without bound stops being read. But it means the
-  guide can no longer absorb a new lesson at all, and the currency guard will keep asking
-  for one — two mechanisms pulling opposite ways, with no path through.
-  THE LESSON THAT HAS NOWHERE TO GO, and it is the day's biggest: changing WHERE or HOW
-  something is delivered does not carry the old path's guarantees along, and what no test
-  pins falls away SILENTLY — the page still loads, the tests stay green, only a promise no
-  longer holds. Point 419 measured four such losses from one move. Its special case: logic
-  living in a file version control does not track, which no test and no second model can
-  see.
+  `docs/analysis_de/vibe-coding-anleitung.md` sits at EXACTLY its budget — measured
+  13.08.2026, 415 lines of 415 and 3677 words of 3677 (`scripts/guide-brevity-core.mjs`).
+  The gate is right to hold it there: a beginner guide that grows without bound stops being
+  read. But it means the guide can no longer absorb a new lesson at all, and the currency
+  guard will keep asking for one — two mechanisms pulling opposite ways, with no path
+  through. TWO lessons are now waiting, and each is a pitfall in the guide's own form:
+  (A) changing WHERE or HOW something is delivered does not carry the old path's guarantees
+  along, and what no test pins falls away SILENTLY — the page still loads, the tests stay
+  green, only a promise no longer holds. Point 419 measured four such losses from one move.
+  Its special case: logic living in a file version control does not track, which no test and
+  no second model can see.
+  (B) a mechanism defeats itself as soon as the rule is followed exactly (13.08.2026,
+  retrospective §3.116): the handover's own prescribed follow-up counts as work and deletes
+  the marker it just wrote — three times in one day — and a guard asked by hand, as the rule
+  demands, blocks forever on an stdin that only the automatic call supplies. The test question
+  belongs in the guide: what happens when someone follows the instruction to the letter, and
+  what when they additionally invoke it by hand?
   DECIDE AND DO, in this order: (1) read the guide whole and judge which existing entry is
   now the WEAKEST — the budget is a forcing function, so a new lesson earns its place by
   displacing one, not by widening the frame; (2) if genuinely nothing is weaker, raise both

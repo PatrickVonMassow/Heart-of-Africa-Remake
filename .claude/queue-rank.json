@@ -63,10 +63,18 @@
     "675": {
       "at": "2026-08-13T16:51:07.125Z",
       "why": "The user asked for the mechanism three times today; it sits with the other batch-infrastructure fixes at the front"
+    },
+    "676": {
+      "at": "2026-08-13T17:13:15.401Z",
+      "why": "Grosse Infrastruktur, kein Bugfix: vor dem Demo-Checkpoint gilt Bugfixes zuerst, und 675 deckt die drei mechanischen Niederlagen der Uebergabe bereits ohne diese Ebene ab"
+    },
+    "677": {
+      "at": "2026-08-13T17:13:15.449Z",
+      "why": "Haengt nur den Aufrufer, nicht das Projekt, und hat mit '< /dev/null' einen sofort verfuegbaren Umweg — vor dem Release gehen die Release-Punkte vor"
     }
   },
   "settled": {
-    "at": "2026-08-13T16:51:07.126Z",
+    "at": "2026-08-13T17:13:15.450Z",
     "points": [
       174,
       184,
@@ -241,7 +249,9 @@
       672,
       673,
       674,
-      675
+      675,
+      676,
+      677
     ]
   }
 }

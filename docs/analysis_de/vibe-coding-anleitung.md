@@ -412,4 +412,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Sie setzt auf, woran alles andere hängt: eine Wahrheit, eine Arbeitsordnung, zwei
 Testschichten, den Reflex zum Check. Die Fallstricke oben ersetzt sie nicht.
 
-<!-- GUIDE-FINGERPRINT: a464e8345c6e35cea98d189a023efd62b5f6a8ffb57d19852cb94f3a1b18931c -->
+<!-- GUIDE-FINGERPRINT: 07bf8443fdabb27e05837ca6759ce23f5a5471dd37c02c3908ad62ed33ed6be2 -->
