@@ -119,7 +119,7 @@ describe('childEnv — the one enforcement left once the sandbox is off', () => 
 
   it('withholds the credentials the second round named, and the whole GIT_CONFIG family', () => {
     // PGPASSWORD and MYSQL_PWD matched no segment and travelled.
-    for (const key of ['PGPASSWORD', 'MYSQL_PWD', 'GITHUB_TOKEN', 'SSH_AUTH_SOCK']) {
+    for (const key of ['PGPASSWORD', 'PGPASSFILE', 'PGSERVICEFILE', 'NETRC', 'KUBECONFIG', 'MYSQL_PWD', 'GITHUB_TOKEN', 'SSH_AUTH_SOCK']) {
       expect(isWithheldEnv(key), key).toBe(true)
     }
     // GIT_CONFIG_KEY_0 matched and GIT_CONFIG_COUNT did not, which leaves git a
@@ -291,6 +291,10 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
       'unit green', //                       says nothing about build or lint
       'unit passed; build not executed; lint passed',
       'all good', //                         names none of them
+      // …and the absence of a complaint is not a pass (fourth round): this line
+      // carries no blacklisted word at all and reports three failures.
+      'test:unit, build and lint all exited 1',
+      'ran test:unit, build and lint',
       '',
     ]) {
       const parsed = parseAuthoringAnswer(`DONE: a thing\nGATES: ${gates || 'x'}\nOPEN: none`)
@@ -305,6 +309,9 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
       'test:unit, build and lint all passed without errors',
       'vitest green, build green, oxlint clean',
       'unit 10707 passed, build ok, lint zero findings',
+      // A numeric none is a none, and "error-free" is a pass (fourth round).
+      'test:unit, build and lint passed with 0 errors',
+      'test:unit, build and lint were error-free',
     ]) {
       expect(gatesProblem(gates), gates).toBe('')
     }

@@ -10,8 +10,10 @@
 // It is the delegated-agent flow with the author swapped: an isolated worktree,
 // its own `feat/` branch, the point handed over as a BRIEF, atomic commits, and
 // the branch pushed the moment the run ends so nothing lives only here. What it
-// does NOT do is judge its own work — no gate is run by the author, nothing is
-// merged, and the report ends by naming what the reviewing Claude session owes.
+// does NOT do is VERIFY its own work: it runs the three cheap gates (test:unit,
+// build, lint) and must name each in its report, but the browser suites, the
+// picture and the verdict are the reviewing Claude session's, and nothing here
+// merges. The report ends by naming what that session owes.
 //
 // The decisions are pure and tested (author-sol-core.mjs, author-routing-core.mjs);
 // this half does the process work, the git work and the push, and fails LOUD.
@@ -207,6 +209,12 @@ export async function runAuthoringCodex({
   })
   clearTimeout(killer)
   for (const t of escalations) clearTimeout(t)
+  // A TIMED-OUT RUN IS KILLED HARD BEFORE THE TIMERS ARE DROPPED (fourth
+  // cross-vendor round). The child closing after the group SIGTERM cancelled the
+  // pending SIGKILL, so a grandchild that ignored the polite signal — and had
+  // closed its inherited pipes — went on writing to the worktree behind the
+  // report. Whatever is still in the group goes now, not on a timer.
+  if (timedOut) killRun('SIGKILL')
   if (pusher) clearInterval(pusher)
 
   let last = ''
@@ -241,9 +249,10 @@ export const usage = () =>
     '       node scripts/author-sol.mjs --routing (--point <N> | --all)',
     '',
     `${SOL_MODEL_NAME} AUTHORS the point in THIS worktree, on THIS branch, committing at every step;`,
-    'the branch is pushed when the run ends. It runs no gate and merges nothing: the review, the',
-    'suites, the picture and the landing belong to the Claude session that called it, which is',
-    'what keeps two vendors on the point and neither reviewing itself.',
+    'the branch is pushed for it while it works. It runs the three cheap gates (test:unit, build,',
+    'lint) on its own work and merges nothing: the REVIEW, the browser suites, the picture and the',
+    'landing belong to the Claude session that called it, which is what keeps two vendors on the',
+    'point and neither reviewing itself.',
     '',
     'The lane is decided by the point itself (--routing shows why). A point the routing gives to',
     'another lane is refused unless --anyway is given, and the share switch can turn the whole',

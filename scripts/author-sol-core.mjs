@@ -266,12 +266,20 @@ export function buildAuthoringPrompt({ point = '', brief = '', branch = '', find
 /** What a GATES line says when the gates are not green. Deliberately broad: the
  *  cost of a false positive is one line of explanation in a report a human reads
  *  anyway, the cost of a false negative is a red delivery reported as clean. */
+// `(?!-)` keeps a hyphenated compound out of it: "error-free" is a PASS, and the
+// bare-word test read the "error" in it as a confession (fourth round).
 const NOT_GREEN =
-  /\b(not run|not executed|didn'?t run|un-?run|skipped|failing|failed|fails|red|errors?|broken|unverified|pending)\b/i
+  /\b(not run|not executed|didn'?t run|un-?run|skipped|failing|failed|fails|red|errors?(?!-)|broken|unverified|pending)\b/i
 
 /** …with the phrases that contain a negative WORD while saying the opposite cut
- *  out first: "passed without error" is a green line (third cross-vendor round). */
-const NEGATED = /\b(?:without|no|zero)\s+(?:errors?|failures?|warnings?)\b/gi
+ *  out first: "passed without error" is a green line (third cross-vendor round).
+ *  `0` counts as none as much as the word does (fourth round). */
+const NEGATED = /\b(?:without|no|zero|0)\s+(?:errors?|failures?|warnings?|findings?)\b/gi
+
+/** A word that says a gate actually PASSED. Demanded, because the absence of a
+ *  complaint is not a pass: `test:unit, build and lint all exited 1` carries no
+ *  blacklisted word at all and was accepted (fourth cross-vendor round). */
+const GREEN = /\b(green|pass(?:ed|es|ing)?|ok|okay|clean|success(?:ful)?|error-free|no findings|zero findings)\b/i
 
 /** The three gates the house rules demand, each of which must be NAMED. A line
  *  naming one and staying silent about the others reported a clean run for two
@@ -294,7 +302,9 @@ export function gatesProblem(gates) {
   if (!line) return 'it reports no gate result at all'
   const missing = GATE_NAMES.filter(({ re }) => !re.test(line)).map(({ gate }) => gate)
   if (missing.length) return `it does not say what ${missing.join(' and ')} did`
-  return NOT_GREEN.test(line.replace(NEGATED, ' ')) ? 'it reports a gate as anything but green' : ''
+  const claim = line.replace(NEGATED, ' ')
+  if (NOT_GREEN.test(claim)) return 'it reports a gate as anything but green'
+  return GREEN.test(claim) ? '' : 'it never says the gates PASSED — an absent complaint is not a green run'
 }
 
 /** The closing lines of an authoring answer, read off the END of the message. */

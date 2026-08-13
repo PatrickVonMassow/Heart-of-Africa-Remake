@@ -104,16 +104,22 @@ export const VERIFICATION_MARKERS = Object.freeze([
  */
 export function laneTagIn(body) {
   let found = ''
-  let fenced = false
+  let fence = '' // the delimiter that OPENED the current block, or '' outside one
   for (const line of String(body ?? '').split(/\r?\n/)) {
     // A FENCED EXAMPLE IS STILL AN EXAMPLE (third cross-vendor round): the whole
     // purpose is that a document showing the convention cannot route points by
     // showing it, and a code block is where such a document shows it.
-    if (/^[\s>]*(```|~~~)/.test(line)) {
-      fenced = !fenced
+    //
+    // THE DELIMITER IS REMEMBERED (fourth round): toggling on either marker let
+    // a `~~~` inside a backtick block close it — and the tag after it counted.
+    // Markdown's own rule: only the SAME character, at least as long, closes.
+    const marker = /^[\s>]*(`{3,}|~{3,})/.exec(line)?.[1] ?? ''
+    if (marker) {
+      if (!fence) fence = marker
+      else if (marker[0] === fence[0] && marker.length >= fence.length) fence = ''
       continue
     }
-    if (fenced) continue
+    if (fence) continue
     // A list marker or blockquote may precede it; a quote character may not. The
     // line must also END there (second cross-vendor round): without the closing
     // anchor, `Author lane: sol is the example spelling` was still an operative

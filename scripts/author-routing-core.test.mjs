@@ -121,6 +121,11 @@ describe('authorLaneFor — which lane authors a point', () => {
     // …and a FENCED example is an example, which is where a document shows one.
     expect(laneTagIn('The tag looks like this:\n```\nAuthor lane: sol\n```\n')).toBe('')
     expect(laneTagIn('~~~\nAuthor lane: fable\n~~~\nAuthor lane: opus')).toBe('opus')
+    // The fence remembers WHICH delimiter opened it (fourth round): a `~~~` in a
+    // backtick block used to close it and make the next line an operative tag.
+    expect(laneTagIn('```\nsome sample text\n~~~\nAuthor lane: sol\n```\n')).toBe('')
+    // …and a longer opener is not closed by a shorter marker.
+    expect(laneTagIn('````\n```\nAuthor lane: fable\n````\n')).toBe('')
   })
 
   it('names the subjects its own comments promise (cross-vendor P1)', () => {

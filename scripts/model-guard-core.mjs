@@ -87,8 +87,11 @@ export const MODEL_FAMILY_WORD =
  * `Alice <alice@openai.com>` — was read as a model and then refused as one
  * outside the allowlist. Only the no-reply/bot forms our harnesses actually
  * write count.
+ *
+ * The local part is matched WHOLE, not as a prefix (fourth round): `botany@` and
+ * `assistant-professor@` are people, and a prefix test called them robots.
  */
-export const MODEL_VENDOR_ADDRESS = /\b(?:noreply|no-reply|bot|assistant)[^@\s]*@(?:anthropic|openai)\.com\b/i
+export const MODEL_VENDOR_ADDRESS = /(?:^|[\s<"'(])(?:noreply|no-reply|bot|assistant)@(?:anthropic|openai)\.com\b/i
 
 /** A family word with a VERSION ATTACHED TO IT — `Haiku 4.5`, `llama-3`,
  *  `GPT-5.6 Sol`, `o3`. A digit merely somewhere in the line is not a version:
