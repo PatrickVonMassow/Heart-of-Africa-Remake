@@ -6413,6 +6413,28 @@ to land than a mechanism that needs a review.
   provably dead by all three probes is removed; an unreadable probe answers keep, not delete;
   plus the mtime case the existing comment names, where the root's own timestamp is stale
   while a subdirectory is being written.
+  A SECOND, SMALLER FALSE FINDING RIDES ALONG, and it has fired at least eleven times
+  (measured 13.08.2026, 13:00, from the stash list). `.claude/queue-rank.json` is REWRITTEN by
+  `queue-rank.mjs` on every session that lands or files a point — the `settled.at` stamp plus
+  the points that moved — and nobody commits it, so the next session's doctor finds it dirty,
+  cannot attribute it to an author, and quarantines it into a stash. The stash list carries
+  that same quarantine for 04., 05. (twice), 06., 08. (twice), 09., 11. and 12.08. (twice).
+  The cost is not the stash: it is that the ranking baseline starts every session STALE (today
+  it was missing the point filed the evening before) and that a genuine finding has to be read
+  past a standing false one.
+  THE LOCK THAT MAKES IT UNFIXABLE IN PLACE: the file changes at the END of a session, exactly
+  when the board card already reads "gerade keine laufende Arbeit" — and `board-first-guard`
+  then refuses the `git add` that would save it. So the bookkeeping of a landed point cannot be
+  committed at the moment it arises without first re-opening a card and closing it again.
+  FINAL STATE, either: the LANDING writes the ranking into the tick commit (`land-point.mjs`
+  already commits and pushes there, so nothing new has to be arranged), or the file is
+  generated state and moves into `.gitignore` — and then the doctor must stop reading it as a
+  foreign write. Either way the recurring false finding disappears and the baseline is current
+  at the next start.
+  VERIFIABLE: Vitest over the doctor's selector — a dirty `queue-rank.json` alone no longer
+  plans a quarantine — plus a landing whose tick commit carries the ranking (or a repository
+  where the file is untracked), proven by a second session starting with `queue-rank` reporting
+  the baseline current.
   Criticality: high — same failure class as point 629 and the same cost: it destroys work
   that is already done, and it fires while the pool is busiest. Bundle: Session- & Repo-Hygiene.
 
