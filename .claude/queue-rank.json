@@ -63,10 +63,38 @@
     "675": {
       "at": "2026-08-13T16:51:07.125Z",
       "why": "The user asked for the mechanism three times today; it sits with the other batch-infrastructure fixes at the front"
+    },
+    "676": {
+      "at": "2026-08-13T17:13:15.401Z",
+      "why": "Grosse Infrastruktur, kein Bugfix: vor dem Demo-Checkpoint gilt Bugfixes zuerst, und 675 deckt die drei mechanischen Niederlagen der Uebergabe bereits ohne diese Ebene ab"
+    },
+    "677": {
+      "at": "2026-08-13T17:13:15.449Z",
+      "why": "Haengt nur den Aufrufer, nicht das Projekt, und hat mit '< /dev/null' einen sofort verfuegbaren Umweg — vor dem Release gehen die Release-Punkte vor"
+    },
+    "678": {
+      "at": "2026-08-13T18:14:11.985Z",
+      "why": "Vor dem Release gehen die Release-Punkte vor; die akute Haelfte — die Rettung ungesicherter Arbeit — fuehre ich bis dahin von Hand aus, und die leere Spur ist ab jetzt bekannt"
+    },
+    "679": {
+      "at": "2026-08-13T18:27:57.189Z",
+      "why": "Kleine, vom Nutzer direkt gewuenschte Ergaenzung ohne Abhaengigkeit; sie kostet nichts, wenn sie wartet, und die Release-Punkte gehen vor"
+    },
+    "680": {
+      "at": "2026-08-13T18:48:25.602Z",
+      "why": "Es blockiert 666 nicht sofort — die Diagnose kann auch aus dem Seed nachgestellt werden —, aber jeder weitere Bericht dieser Art bleibt ohne es undiagnostizierbar; Release-Punkte gehen trotzdem vor"
+    },
+    "681": {
+      "at": "2026-08-13T18:54:12.170Z",
+      "why": "Gehoert zum Release-Thema Verstaendigung und wird zusammen mit 682 und 659 gespielt; die Reihenfolge dort entscheidet 659"
+    },
+    "682": {
+      "at": "2026-08-13T18:54:12.244Z",
+      "why": "Gehoert zum Release-Thema Verstaendigung; 659 spielt die Kette durch und entscheidet, was zuerst greifen muss"
     }
   },
   "settled": {
-    "at": "2026-08-13T16:51:07.126Z",
+    "at": "2026-08-13T18:54:12.245Z",
     "points": [
       174,
       184,
@@ -241,7 +269,14 @@
       672,
       673,
       674,
-      675
+      675,
+      676,
+      677,
+      678,
+      679,
+      680,
+      681,
+      682
     ]
   }
 }

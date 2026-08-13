@@ -1309,7 +1309,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 13.08.2026, 18:33 · Quellen-Fingerprint: `afa5a0d0e616…`
+Zuletzt aktualisiert: Donnerstag, 13.08.2026, 19:15 · Quellen-Fingerprint: `07bf8443fdab…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1396,10 +1396,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 79 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 53 Prozess-/Meta-TASKS-Punkte (davon 20 offen).
+Erfasste Quellen: 79 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 54 Prozess-/Meta-TASKS-Punkte (davon 21 offen).
 
-<!-- RETRO-FINGERPRINT: afa5a0d0e616b27dda99e8f8af666a4d3a0207c4cc6137b4caf2d71e29102684 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-13T16:33:08.900Z -->
+<!-- RETRO-FINGERPRINT: 07bf8443fdabb27e05837ca6759ce23f5a5471dd37c02c3908ad62ed33ed6be2 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-13T17:15:06.386Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1510,3 +1510,25 @@ Frage ist nie „lässt sich das beheben?", sondern „was kostet die Behebung a
 und die Antwort darauf ist eine Messung, kein Urteil. Ein Befund, dessen Kur teurer ist als er
 selbst, wird mit seinem Mechanismus und seinen Zahlen aktenkundig gemacht und dem Punkt
 zugeschrieben, der ihn erbt; verschwiegen werden darf er nicht, still behoben aber auch nicht.
+
+### 3.116 Die Mechanik schlägt sich selbst, sobald man die Regel befolgt
+
+An einem Tag (13.08.2026) sind zwei Durchsetzungen an genau derselben Stelle gescheitert: nicht
+an Nachlässigkeit, sondern daran, dass die vorgeschriebene Benutzung ihre eigene Voraussetzung
+zerstört.
+
+Die Übergabe an eine frische Sitzung setzt eine Markierung und verlangt danach, die Übergabe auf
+der Tafel zu veröffentlichen. Genau dieses Veröffentlichen zählt als Arbeit — und Arbeit löscht
+die Markierung. Wer die Anweisung vollständig befolgt, hebt seine eigene Übergabe auf; wer sie
+unvollständig befolgt, übergibt ohne Eintrag. Gemessen an einem Tag dreimal, einmal stand der
+Stapel danach vierzig Minuten still, und der Nutzer hat dreimal dasselbe gefragt.
+
+Am selben Tag hing ein Wächter, den eine Sitzung befragte, weil die Regel „frage die Wächter,
+bevor du handelst" es verlangt: Von Hand gestartet wartet er endlos auf eine Eingabe, die nur der
+automatische Aufruf mitliefert. Zwei solcher Prozesse liefen noch, einer seit vierunddreißig
+Minuten. Beide Male war die Regel richtig, die Befolgung richtig — und das Ergebnis Stillstand.
+
+**Lehre:** Eine Mechanik ist nicht fertig, wenn sie das Richtige tut, sondern erst, wenn die
+Handlungsfolge, die sie selbst vorschreibt, sie nicht aufhebt. Die Prüffrage dafür ist billig und
+gehört an jeden neuen Durchsetzer: *Was passiert, wenn jemand die Anweisung ganz genau befolgt —
+und was, wenn er sie zusätzlich von Hand aufruft?* Beide Fälle sind Tests, nicht Gedankenspiele.

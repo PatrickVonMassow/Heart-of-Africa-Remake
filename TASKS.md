@@ -191,8 +191,36 @@ put it is the mistake this line exists to stop.
   go red) and the ten post-cure traces (must go green on both backends); for (b), the charge
   naming the composition and its rate, plus a Vitest case pinning that a red NOT of that shape
   is still uncovered.
-  Criticality: medium — no player sees this window; it is the picture gate's trustworthiness on
-  the release branch that is at stake.
+  A PLAYER HAS NOW SEEN IT, WHICH RETIRES THE "ONLY A MEASUREMENT WINDOW" READING (user bug
+  report 13.08.2026, "Kind hängt wieder fest", F6 dump in `local/KindHaengtWieder/`): production
+  build 7bd0147, WEBGPU, NVIDIA Lovelace, medium, 127 FPS, `bambara-village` at −59.62/−131.19,
+  day 0, seed 236333330. The residual was carried as a WebGL 2 measurement limit (0.39 % against
+  0.25 %); this occurrence is on the OTHER backend, on the SHIPPED build, and visible to the
+  player. So option (b) — accepting the composition with a rate — may only be chosen if it also
+  explains a player-visible standstill on WebGPU; if it cannot, the answer is (a) or a behaviour
+  fix, not a charge. The report alone does NOT permit a diagnosis, because the dump describes the
+  wildlife and nothing of the settlement's inhabitants — that gap is its own point.
+  A SECOND REPORT FIVE MINUTES LATER NAMES THE MECHANISM (same seed, same player position, dump
+  in `local/SelbesKindHaengtImmernochFest/`, user's title "Selbes Kind — hängt seit Minuten fest
+  und zittert herum"). MINUTES, with visible shivering: that is a permanent state on WebGPU in
+  the production build, not a window. READ IN THE CODE (`src/scenes/place/tagGame.ts`,
+  `trackProgress` from line 651): the rescue nudge hangs on an ANCHOR RADIUS. When the child
+  leaves the circle `childRadius * PROGRESS_AWAY` (0.3 × 3 = 0.9 m) around its anchor, the anchor
+  is MOVED and `anchorFor` reset to 0, while `escapeNudge` fires only once `anchorFor` reaches
+  `unstuckSeconds` (1.5 s). A shiver that swings back and forth across 0.9 m therefore resets the
+  anchor every cycle, the counter never reaches 1.5 s, and THE RESCUE CANNOT FIRE BY
+  CONSTRUCTION, for arbitrarily long — exactly what the user describes. Point 656 removed this
+  blindness from the MEASURING gate (distance walked against ground covered, instead of position
+  deltas); the RESCUE still tests only the anchor radius. From the frames: the child stands in
+  open ground in both reports, no obstacle within reach, so the cause lies in the steering
+  (reversal/evasion) rather than in a geometry trap. Reproducible at seed 236333330,
+  `bambara-village`, medium, WebGPU; the headless run at that seed is still owed.
+  SO THE FINAL STATE ABOVE IS NOT THE WHOLE ANSWER: the rescue's own progress test is fixed here
+  too, by the same standard point 656 met — it must see a shiver as a lack of progress — and the
+  fix is proven at the reported seed, not only on the panel.
+  Criticality: high — raised 13.08.2026: it is no longer only the picture gate's trustworthiness,
+  it is the player watching a child shiver in place for minutes in the shipped build, with the
+  rescue unable to fire.
   Bundle: Dorfleben.
 
 - [ ] 672. THE VILLAGE HAS NO AMBIENT DRUM, AND THE DRUMMER HOLDS STILL (user 13.08.2026,
@@ -285,11 +313,33 @@ put it is the mistake this line exists to stop.
   actually shown. A step that works internally but does not reach the player is a DEFECT, and
   the report says which of the two it was.
 
+  THREE CAUSES ARE ALREADY NAMED AND MUST BE FIXED HERE, not merely re-measured (user
+  observation on the deployed build, 13.08.2026, with the debug switch "language: show terms
+  instead of syllables" ON — the adults' actions make no sense even WITH the words visible):
+  1. THE TEACHING ROCK STANDS IN THE MIDDLE OF THE VILLAGE, NOT AT THE RIVER. `layout.ts` places
+     it 6.5–13.6 m from the village centre on the golden-angle sweep, while
+     `docs/communication-poc-spec.md` (rule 3) says "The rock lies upstream". Document and code
+     contradict each other, and for the player it is a purposeless boulder on the village square
+     that everyone walks to — and it is NOT the rock of the chief's drum message.
+  2. THE ERRANDS HAVE NO VISIBLE PURPOSE. `walkToTarget`/`walkToSpeaker`/`followToTarget` end in
+     standing about (`dwellSeconds` 6): nobody carries anything, fetches anything or works. Only
+     the three DIG errands end in visible work. A word cannot be inferred from an errand that
+     produces no result.
+  3. THERE IS NO TEACHING ORDER. `ErrandView` knows villagers and geography, not what the player
+     has already heard. The spec's method ("leaves exactly one unknown") presumes the six
+     children's terms are already learned, and nothing enforces or encourages that — so the
+     player hears two unknowns at once.
+  ALSO OBSERVED, to be judged in the same pass: upstream and downstream are barely
+  distinguishable at the bank ("recognisable with a lot of goodwill"), and the errand sequence
+  reads as a fixed loop (a fair queue over few fillable errands).
   VERIFIABLE: a complete play-through of the chain from entering the village to the victory
   state, with no blocking defect, evidenced by the frames of each step, an audio measurement at
-  the shipped defaults, and the journal it wrote; every defect found is listed with its severity
-  and either fixed here or filed as its own point, and the blocking ones are fixed before this
-  point is ticked. The enumerating lists, their merge and the counted union are recorded.
+  the shipped defaults, and the journal it wrote; the three causes above demonstrably closed —
+  the rock upstream and consistent with the spec document, every errand ending in a visible
+  result, and a teaching order that does not present two unknowns at once; every further defect
+  found is listed with its severity and either fixed here or filed as its own point, and the
+  blocking ones are fixed before this point is ticked. The enumerating lists, their merge and the
+  counted union are recorded.
   Criticality: high — this is the feature the release exists for, and the user is the one who
   keeps hitting the bugs.
   Bundle: Verständigung.
@@ -467,24 +517,38 @@ put it is the mistake this line exists to stop.
   retrofitted (after one-topic-per-card), so the class needs a structural gate, not
   another reminder.
 
-- [ ] 669. THE AUTHORING LANE RUNS CI OVER WITH ITS DURABILITY PUSHES (measured 13.08.2026 on
-  the lane's first live run, point 651). `scripts/author-sol.mjs` pushes the working branch
-  every ~2 minutes so a dying run loses nothing. Every push starts a CI run, and the workflow's
+- [ ] 669. A WORKING AUTHOR'S PUSHES RUN CI OVER, AND THE SUPERVISOR PAYS FOR IT (measured
+  13.08.2026 on BOTH author lanes). `scripts/author-sol.mjs` pushes the working branch every ~2
+  minutes so a dying run loses nothing. Every push starts a CI run, and the workflow's
   `concurrency: ci-${{ github.ref }}` with `cancel-in-progress: true` kills the previous one:
   twelve minutes into the run the branch carried three runs, two `cancelled` and one in
-  progress, and NONE green. Two consequences, both real: `ci-status-guard` can never find a
-  concluded green run on that branch while the author works, so the supervising session's every
-  turn end waits or blocks; and Actions minutes are spent on runs nobody reads.
-  FINAL STATE: the interim pushes are what CLAUDE.md §6 already calls a RESCUE commit — work
-  committed because the run may die, no claim of completeness — so they are written as one:
-  `[skip ci]` in the SUBJECT plus a `Rescue: <what the author was in the middle of>` trailer,
-  which the `commit-msg` hook already demands in that pairing. The run's FINAL commit — the one
-  that claims the work is done — carries neither and goes through CI normally, so the branch
-  ends with exactly one meaningful run. If the author produces no final commit (it died), the
-  branch is left with only skipped runs, which is honest: nobody claims that state is done.
+  progress, and NONE green. The SAME evening the same thing was measured on the CLAUDE lane,
+  where nothing pushes on a timer: a worktree agent committing and pushing at every
+  self-contained step — which CLAUDE.md §6 demands, because an uncommitted block is the one
+  state nothing can rescue — blocked the supervising session's turn end three times in a row,
+  each time for a commit in the middle of an unfinished point. Two consequences, both real:
+  `ci-status-guard` can never find a concluded green run on that branch while the author works,
+  and Actions minutes are spent on runs nobody reads.
+  FINAL STATE, and it has two halves because the two lanes fail for different reasons:
+  (1) THE TIMER LANE. `author-sol.mjs`'s interim pushes are what CLAUDE.md §6 already calls a
+  RESCUE commit — work committed because the run may die, no claim of completeness — so they are
+  written as one: `[skip ci]` in the SUBJECT plus a `Rescue: <what the author was in the middle
+  of>` trailer, which the `commit-msg` hook already demands in that pairing. The run's FINAL
+  commit — the one that claims the work is done — carries neither and goes through CI normally,
+  so the branch ends with exactly one meaningful run. If the author produces no final commit (it
+  died), the branch is left with only skipped runs, which is honest: nobody claims that state is
+  done.
+  (2) THE SUPERVISOR'S GATE. A Claude agent's per-step commits are NOT rescue commits and must
+  keep their CI — but they are not the supervisor's business either. `ci-status-guard` therefore
+  gates the turn end on `main` and on any branch OFFERED FOR LANDING, and reports — without
+  blocking — a branch whose author is still declared in flight. A branch stops being exempt the
+  moment its author's declaration ends, so nothing lands on an unproven run.
   VERIFIABLE: Vitest over the commit-message builder (an interim commit carries both halves, the
-  final commit neither, and a run that dies leaves no commit claiming completeness), plus the
-  next live lane run showing ONE concluded CI run on the branch instead of a cancelled chain.
+  final commit neither, and a run that dies leaves no commit claiming completeness); Vitest over
+  the guard's branch selection (main always gates, a landing candidate gates, a branch with a
+  live author reports only, and it gates again once that author is gone); plus the next live run
+  of EACH lane — the Sol lane showing ONE concluded CI run instead of a cancelled chain, the
+  Claude lane showing a supervising session whose turn ends are not held by its agent.
   Criticality: medium — it does not corrupt work, but it blocks the supervising session's turn
   ends, which is how the batch stalls.
 
@@ -2948,17 +3012,23 @@ Build order, chosen so no two parallel agents own the same file:
 
 - [ ] 422. THE BEGINNER GUIDE IS FULL, AND TODAY'S LESSON HAS NOWHERE TO GO
   (29.07.2026, found while doing the guide review the currency guard demands).
-  `docs/analysis_de/vibe-coding-anleitung.md` sits at EXACTLY its budget — 401 lines of
-  401, 3398 words of 3398 (`scripts/guide-brevity-core.mjs`). The gate is right to hold
-  it there: a beginner guide that grows without bound stops being read. But it means the
-  guide can no longer absorb a new lesson at all, and the currency guard will keep asking
-  for one — two mechanisms pulling opposite ways, with no path through.
-  THE LESSON THAT HAS NOWHERE TO GO, and it is the day's biggest: changing WHERE or HOW
-  something is delivered does not carry the old path's guarantees along, and what no test
-  pins falls away SILENTLY — the page still loads, the tests stay green, only a promise no
-  longer holds. Point 419 measured four such losses from one move. Its special case: logic
-  living in a file version control does not track, which no test and no second model can
-  see.
+  `docs/analysis_de/vibe-coding-anleitung.md` sits at EXACTLY its budget — measured
+  13.08.2026, 415 lines of 415 and 3677 words of 3677 (`scripts/guide-brevity-core.mjs`).
+  The gate is right to hold it there: a beginner guide that grows without bound stops being
+  read. But it means the guide can no longer absorb a new lesson at all, and the currency
+  guard will keep asking for one — two mechanisms pulling opposite ways, with no path
+  through. TWO lessons are now waiting, and each is a pitfall in the guide's own form:
+  (A) changing WHERE or HOW something is delivered does not carry the old path's guarantees
+  along, and what no test pins falls away SILENTLY — the page still loads, the tests stay
+  green, only a promise no longer holds. Point 419 measured four such losses from one move.
+  Its special case: logic living in a file version control does not track, which no test and
+  no second model can see.
+  (B) a mechanism defeats itself as soon as the rule is followed exactly (13.08.2026,
+  retrospective §3.116): the handover's own prescribed follow-up counts as work and deletes
+  the marker it just wrote — three times in one day — and a guard asked by hand, as the rule
+  demands, blocks forever on an stdin that only the automatic call supplies. The test question
+  belongs in the guide: what happens when someone follows the instruction to the letter, and
+  what when they additionally invoke it by hand?
   DECIDE AND DO, in this order: (1) read the guide whole and judge which existing entry is
   now the WEAKEST — the budget is a forcing function, so a new lesson earns its place by
   displacing one, not by widening the frame; (2) if genuinely nothing is weaker, raise both
@@ -6688,3 +6758,324 @@ to land than a mechanism that needs a review.
   Criticality: low — it costs a re-run, but it is the difference between closing a red by its
   cause and closing it by a green, which is exactly what point 640 forbids.
 
+
+- [ ] 676. AN AUTHORING LANE MUST SURVIVE THE SESSION THAT SPAWNED IT (specified 13.08.2026 by
+  the blind-parallel four-eyes stage of CLAUDE.md §6; the counted union, the final proposal and
+  the rejected alternatives are `docs/handover-architecture.md`). TWO RULES OF THIS HOUSE
+  CONTRADICT EACH OTHER TODAY: the pool runs up to three authoring lanes, and the session hands
+  over on context — but every lane a session spawned dies with that session, so a session that
+  keeps the pool busy can hand over only by throwing its own work away. Point 675 closes the
+  three MECHANICAL defeats of the handover on today's mechanics; this point builds the plane
+  underneath, so that a lane stops belonging to a session at all.
+  FIRST STEP, BEFORE ANY CODE: the merge of the two blind lists is RE-RUN by the model that wrote
+  NEITHER of them. The recorded merge was performed by list B's author while a third model
+  existed, which is exactly the anchoring the rule forbids; the deviation is named in the
+  document, and inheriting it silently would make every entry below unaudited. The re-merge is
+  recorded with `scripts/mechanism-review.mjs --merged-by` and may add, drop or re-word entries —
+  what it settles is what this point implements.
+  FINAL STATE, as the union settles it: authoring runs as DAEMON-OWNED detached workers under a
+  model-neutral adapter (`scripts/detached-agent.mjs`) whose reference implementation is the
+  already-detached `scripts/author-sol.mjs`; an Agent-tool child stays session-bound and is
+  declared NON-transferable, blocking a boundary until it finishes or is safely stopped. The
+  coordinator plane is short-lived and split into dispatcher and lander epochs, holding one
+  renewable batch lease whose epoch FENCES every mutation, so two sessions can never adopt the
+  same batch. Coordination state is an append-only checksummed journal beside the repository with
+  an atomically replaced snapshot for fast resume, and every point carries an explicit state
+  (queued, running, checkpointing, ready-for-review, landing, landed, failed, stalled,
+  cancelled). A successor adopts supervision by STABLE JOB IDENTITY — never by process
+  reparenting, never by PID alone — after reconciling every recorded lane against journal,
+  worktrees and local/remote SHAs, and quarantining what it cannot prove. Refill comes only from
+  a bounded, pre-authorized queue behind a global three-lane cap and a completed-review backlog
+  limit, with a journalled REASON whenever three eligible lanes exist and fewer run. Landing stays
+  serial behind a batch-wide landing lock with a crash-recoverable staged journal, and the
+  main-session picture judgments are persisted as evidence a worker may never substitute.
+  Drain-before-boundary REMAINS as the explicit degraded mode whenever any active lane is not
+  transferable.
+  BUILD IT IN THE UNION'S ORDER (schemas and invariants, durable store, daemon plus the Sol
+  adapter, transferable declarations and fencing, bounded dispatch, checkpoint barrier, boundary,
+  successor reconciliation, landing journal, board projection, metrics), each step green on the
+  unit layer before the next, and roll out with the Sol adapter ALONE until the failure drills
+  pass.
+  VERIFIABLE: the unit cases the union names per step; the failure drills — worker crash, stall,
+  push failure, dirty worktree, marker deletion, daemon restart, corrupt snapshot, PID reuse,
+  duplicate coordinator, remote outage, checkpoint timeout — each run through the daemon's drill
+  command; and a measured trial against a recorded baseline day, whose success needs ZERO safety
+  incidents (no lost attempt, no duplicate writer, no overlapping lease, no silently missed
+  boundary), a median handover context materially below baseline, and points landed per day no
+  worse than baseline. Utilization is supporting evidence, never the acceptance test on its own.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2) per step, not once at the end.
+  Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
+  here loses work rather than merely slowing it.
+
+
+- [ ] 677. A GUARD RUN BY HAND HANGS FOREVER ON ITS OWN STDIN (measured 13.08.2026, 19:20). The
+  house rule says to ASK THE GUARDS BEFORE THE ACTION (CLAUDE.md §7.2), and a session that does
+  so directly — `node scripts/tasks-spec-guard.mjs` — never comes back: the wrapper reads the
+  hook payload with `readFileSync(0, 'utf8')`, which BLOCKS while stdin is an open terminal or an
+  inherited pipe, and the `try/catch` around it never runs because nothing ever throws. Two
+  instances were found alive in this container, one of them 34 minutes old, both from a session
+  that only wanted to check itself; the same shape sits in about 25 enforcers (`ci-status-guard`,
+  `dashboard-guard`, `board-first-guard`, `closing-guard`, `queue-order-guard`, the batch guard
+  and the rest). Under a Stop hook the payload always arrives, so the wiring is fine — it is the
+  MANUAL run the rule itself prescribes that hangs, and `< /dev/null` makes the very same command
+  exit 0 immediately.
+  FINAL STATE: one shared helper reads the hook payload and returns EMPTY instead of blocking
+  whenever stdin is not a readable, already-open non-TTY — a TTY, a closed descriptor or nothing
+  attached all yield "no payload", which every caller already handles as a manual run. A bounded
+  read guards the remaining case so an inherited-but-silent pipe cannot hang either. Every
+  enforcer that reads stdin today uses it; none keeps a private copy.
+  VERIFIABLE: a Vitest case per branch of the helper (TTY, closed stdin, valid JSON payload,
+  non-JSON payload, an open pipe that never writes) proving it returns rather than blocks; a
+  repository check that no enforcer calls `readFileSync(0, …)` outside the helper, so the shape
+  cannot return; and a live manual run of two guards from an interactive shell, each returning
+  its verdict.
+  Criticality: medium — nothing is corrupted, but it burns a session's turn and leaves stuck
+  processes behind, and it fires exactly on the session that follows the rule.
+
+- [ ] 678. A LANE IS ROUTED TO WHEN IT HAS NOTHING LEFT, AND WHAT DIES THERE IS RESCUED BY HAND
+  (measured 13.08.2026, 20:0x, on point 675). The routing sends difficult, complex or error-prone
+  work to Fable 5 from the start (`scripts/author-routing-core.mjs`), and it does so without ever
+  asking whether that lane still has volume. Today the Fable author built five commits of the
+  handover mechanism, two cross-vendor review rounds deep, and was then terminated mid-answer by
+  the provider's limit — with ELEVEN files uncommitted in its worktree, among them a recorded
+  review. Nothing in the machinery noticed: the agent reported a failure, its worktree still held
+  the work, and the only reason none of it was lost is that the supervising session opened that
+  worktree and looked. The routing table still sends the next two open points to the same empty
+  lane, so the same death is queued up twice.
+  FINAL STATE, two halves from one incident:
+  (1) A LANE HAS AN AVAILABILITY SWITCH and the routing consults it, the way `scripts/sol-share.mjs`
+  already gates the Sol lane. A lane marked unavailable does not receive work: the routing falls
+  to the next model of the CLAUDE.md §6 chain and NAMES the fall in its verdict, so a session
+  reading `--routing` sees "fable → opus 5, lane unavailable since <when>: <reason>" rather than a
+  lane that will die on contact. Marking it is one command, and the mark carries a reason and a
+  timestamp; nothing guesses a quota from the outside.
+  (2) NO DELEGATED AUTHOR'S DEATH LEAVES UNCOMMITTED WORK. When a delegated author ends — finished,
+  failed or killed — its worktree is INSPECTED before anything else happens to it: an uncommitted
+  or unpushed state is committed as the RESCUE commit CLAUDE.md §6 already defines (`[skip ci]` in
+  the subject, `Rescue: <what was interrupted>` trailer, the AUTHOR's model in the co-author line,
+  never the supervisor's) and pushed, and only then may the worktree be removed. A worktree removal
+  that would discard uncommitted work is REFUSED, naming what it holds.
+  VERIFIABLE: Vitest over the routing (an available lane keeps its work, an unavailable one falls
+  to the next chain member with the reason in the verdict, and an unknown lane name is an error
+  rather than a silent pass-through); Vitest over the rescue path (a dirty worktree produces a
+  rescue commit with both halves and the author's model, a clean one produces nothing, an unpushed
+  commit is pushed, and `worktree-cleanup` refuses a dirty tree); plus one observed delegated run
+  that is killed mid-work and whose branch afterwards carries everything the worktree held.
+  UNTIL IT IS BUILT, the rule is operational and stated by the user (13.08.2026, 19:55): NOTHING is
+  delegated to Fable 5 while its quota is out — not authoring, not four-eyes review — and a hard
+  case whose Fable author died goes to the OpenAI lane with `node scripts/author-sol.mjs --point <N>
+  --anyway`, explicitly overriding the routing rule that keeps hard cases away from Sol. The main
+  session stays on Opus 5. That instruction is what half (1) mechanises, and it expires with the
+  quota reset while the mechanism does not.
+  Criticality: high — it is the only failure mode on record that can destroy finished work outright,
+  and it fired today.
+
+- [ ] 679. THE BOARD'S BROWSER TAB SHOWS THE GENERIC GLOBE (user 13.08.2026, 19:24: »Kannst du dem
+  Tab vom Dashboard ein einfaches Afrika-Symbol geben. Kein großer Aufwand.«). The board is read in
+  a browser full of open tabs and cannot be picked out among them, because the viewer carries no
+  icon of its own. The scope is the icon and its injection, nothing more.
+  FINAL STATE: `public/board/favicon.svg` holds a flat, monochrome, simplified Africa silhouette in
+  the board's own palette (ink on paper, `#3a2e1c` on `#f0e8d2`), a square viewBox, still legible at
+  16 px — one path, no text, no gradient, no external reference, deliberately not a traced coastline.
+  The viewer INJECTS it at runtime rather than carrying it statically: the board content is written
+  into the document with `document.write`, which replaces the whole document INCLUDING the `<head>`,
+  so a `<link rel="icon">` in the source head is gone the moment the board lands. An
+  `ensureFavicon()` beside `injectChat()` in `public/board/index.html` appends
+  `<link rel="icon" type="image/svg+xml" href="favicon.svg">` to `document.head`, is IDEMPOTENT
+  (exactly one such link however often it runs) and runs everywhere `injectChat()` runs — the
+  success path after the swap, the failure path, `load`, and `onBoardSwapped()`. The relative href
+  resolves against the viewer URL, which `document.write` does not change. Nothing here touches the
+  board CONTENT (`.batch-dashboard.html`) or any board guard: the guards parse the fragment and none
+  of them reads the viewer. No new dependency and no build-step change — the icon is a static file
+  under `public/`, deployed by the Pages workflow that already runs.
+  VERIFIABLE: a Vitest/jsdom case beside the existing injection cases in
+  `scripts/chat-viewer.test.mjs` drives the injection twice and asserts exactly one
+  `link[rel~="icon"]` with the expected href, and that a swapped-in document which lost its head
+  gets the link back; plus the PICTURE — the silhouette rasterised and LOOKED AT, not judged from
+  the SVG source. The condition is RECOGNISABLE at 32 px and DISTINCTIVE at 16 px: measured
+  13.08.2026 over four drawn paths, no monochrome continent silhouette is legible at 16 px, so
+  demanding it there costs redraw rounds without ever being reachable. What 16 px must deliver is a
+  dark shape nobody confuses with the browser's generic globe.
+  AUTHOR: the OpenAI lane (`node scripts/author-sol.mjs --point 679`) — user decision 13.08.2026,
+  19:25 (»Lasse Sol das machen, um Volumen zu sparen«). Mechanical and low-risk, and its
+  verification is not the work.
+  Criticality: low — it costs nothing if it waits, but the user asked for it directly.
+
+- [ ] 680. THE BUG REPORT CARRIES THE SETTLEMENT'S LIFE, NOT ONLY THE WILDLIFE (measured
+  13.08.2026 on the user's report "Kind hängt wieder fest", `local/KindHaengtWieder/`). The
+  archive holds a picture, the game state, the balance and UI values — and a WILDLIFE section
+  reading "0 animals, 0 carcasses, 0 flocks", because the report was taken inside a village.
+  About the child the report is ABOUT, and about every other inhabitant, it holds nothing: no
+  position, no state, no tag role, no errand. The one report kind a settlement produces is the
+  one the dump cannot describe, so a stuck-inhabitant report can only ever be answered by trying
+  to reproduce it from the seed.
+  FINAL STATE: a new bounded `placeLife` section in the state JSON, built like
+  `src/systems/wildlifeDump.ts` and named in the archive listing (`.txt`) in BOTH languages,
+  written whenever the report is taken in `place` mode and absent otherwise. It holds, all in
+  world coordinates so it can be replayed against the layout: every INHABITANT within a stated
+  radius — kind (child / adult / porter / errand walker), position, velocity, pose, and for a
+  child its tag role (chaser/target/free), whether it is pinned, the seconds without progress and
+  how often the unstuck nudge fired on it this visit; for an adult the errand it is on (situation
+  id, target place, arrived, remaining dwell). Beside them the TAG GAME state as `__placeTag`
+  reports it (playing, chaser, target, tags, chaserFor), the errand scheduler state as
+  `__placeErrands` reports it (staged counts, last situation, silence), and the settlement's
+  teaching GEOGRAPHY: bank, upstream, downstream, the teaching stone and every dig site. Same
+  bounding discipline as the wildlife section — a stated radius, a cap, and the count of what was
+  left out.
+  IT MUST WORK IN A PRODUCTION BUILD. `__placeTag` and `__placeErrands` are
+  `import.meta.env.DEV`-gated (`src/scenes/place/PlaceLife.tsx`), so today they are absent from
+  exactly the build the player reports from. The dump therefore reads the same state through a
+  channel that SHIPS — a registered snapshot callback, not a debug hook — while the DEV hooks
+  stay as they are for the headless suites, and production gains no debug surface beyond the
+  snapshot the report itself reads. Nothing player-visible changes; the report grows by one
+  section.
+  VERIFIABLE: Vitest over the pure dump builder — a settlement view with more inhabitants than
+  the cap yields the cap plus a correct left-out count, a child with a pinned state and a nudge
+  count round-trips, and the section is absent in travel mode — plus the existing report test
+  extended so the archive listing names the new section in both languages.
+  AUTHOR: the OpenAI lane (Sol) fits — mechanical, bounded, and its verification is not the work.
+  Criticality: medium — nothing is broken by its absence, but every stuck-inhabitant report the
+  user sends is undiagnosable without it, and point 666 is waiting on exactly that.
+  Bundle: Dorfleben.
+
+- [ ] 681. THE TEACHING STONE STANDS ON THE BANK UPSTREAM, AND THE GROUND WORK LEAVES THE VILLAGE MIDDLE (user 13.08.2026, playing the deployed state)
+  User decision 13.08.2026, from playing the deployed state with the debug switch
+  "Speech: show concepts instead of syllables" on: the errands taught him nothing.
+  A boulder on the village square that everybody walks to for no reason, and people
+  digging next to it, read as meaningless — and the settlement's rock is not the
+  rock the chief's message means. docs/communication-poc-spec.md already assumes the
+  stone lies upstream; only the code put it in the village (layout.ts placed it 6.5
+  to 13.6 m from the village centre). This is cause (1) of the carrier finding "Die
+  Erwachsenen-Botengaenge lehren nichts" (target 659); causes (2) and (3) — errands
+  without a visible result, and no teaching order — stay with that finding.
+  The teaching stone stands ON THE RIVER BANK UPSTREAM of the settlement, and the
+  village's ground work no longer sits in the middle of the village.
+
+  Final state:
+
+  1. PLACEMENT. `layout.ts` places the teaching stone on the settlement's UPSTREAM
+     bank stretch — on the open bank beside the water, clear of the wade depth and
+     of every lane and compound, visible from the village and reachable on foot by
+     an errand walker. It keeps its seeded, deterministic placement and its errand
+     parking spot. A settlement with no bank carries no teaching stone (as it
+     already carries no bank errands), and the two BIG_ROCK errands are then simply
+     not castable.
+  2. IT LOOKS LIKE WHAT THE MESSAGE MEANS. The stone is drawn as an upright erratic
+     of the same shape family as the goal boulder of `src/world/communicationRock.ts`
+     at settlement scale, so the object the word is learnt on is the same KIND of
+     thing the chief's message points at.
+  3. THE ROCK/DIRECTION DISCRIMINATOR IS REBUILT — this is why the old placement
+     existed, so moving the stone must replace it, not drop it. With the stone on
+     the upstream stretch, "go upstream" and "go to the rock" would otherwise be the
+     same picture. Therefore:
+     - At least one BIG_ROCK errand carries NO walk along the bank at all: it is
+       spoken AT the stone and points at it ("BIG_ROCK + HERE"), with nobody walking
+       the river.
+     - At least one BIG_ROCK errand is walked STRAIGHT from the village to the
+       stone, not along the bank, so the picture differs from the upstream errands
+       in its path as well as its target.
+     - The UPSTREAM errands target a bank point that is NOT the stone and far enough
+       from it that the two destinations read as different places.
+     - `involvesUpstream`, the catalogue's comments and `MIRRORED_ERRANDS` are
+       brought in line, and the tests pin the new discriminator instead of the old.
+  4. THE GROUND WORK MOVES OUT OF THE MIDDLE. The three dig sites (store pit, post
+     hole, turned patch) are placed where such work belongs — at a compound edge,
+     beside a lane, at the edge of the worked ground — never on the open central
+     ground of the village, and never within a stated clearance of the teaching
+     stone or of its parking spot. The drawn spoil and the digging stick stay as
+     they are.
+  5. DOCUMENTATION. `docs/communication-poc-spec.md` rule 3 is rewritten to the
+     discriminator actually built (it currently states the premise "The rock lies
+     upstream" while the code placed the stone in the village — the two must agree),
+     and the placement comment in `layout.ts` says where the stone stands and why.
+     If design.md §13.4 names the stone's location, it changes in the same commit.
+
+  Test: Vitest over the layout — the stone lies on the upstream side of the bank,
+  clear of lanes, compounds and water; no dig site lies within the central radius or
+  within the stated clearance of the stone; the placement is stable for a seed.
+  Vitest over `adultErrands` — at least one BIG_ROCK errand with no bank walk, at
+  least one walked from the village, and the upstream targets distinct from the
+  stone. Picture check on BOTH backends (a render-set change): the stone is visible
+  from the village and reads as a rock by the water, and the dig sites read as work.
+  CONSTRAINTS:
+  - Difficulty is MEDIUM, not mechanical: placement geometry, the errand catalogue
+    and their tests move together, and the picture decides. Route accordingly; the
+    user's 13.08.2026 instruction allows Sol where Fable is unavailable.
+  - Do not drop the contrast rule while moving the stone — the rule is the reason
+    the old placement existed.
+  - The goal boulder of src/world/communicationRock.ts is untouched: it stays the
+    world-scale erratic ~1.6 to 2.4 degrees upstream on the Niger.
+  - Settlements without a bank keep working, with no stone and no rock errands.
+  QUOTED:
+  Nutzer, 13.08.2026 20:46: »Der Lehrstein soll flussaufwärts wandern. Ein großer Felsbrocken mitten im Dorf macht keinen Sinn - ebensowenig, wie dort zugraben.«
+  Nutzer, 13.08.2026 20:41 (die Beobachtung dahinter): »dann sagt er GO_THERE BIG_ROCK und zeigt in die Dorfmitte, wo der große Felsen liegt (warum auch immer) … sie bleiben am Felsbrocken stehen und machen nichts«
+
+- [ ] 682. THE CHILDREN'S GAME IS A GAME OF TAG AGAIN, AND THE TEACHING RIDES ON IT (user 13.08.2026: »Beim Kinderspiel kann ich auch nichts lernen. Ich erkenne da kein Fangspiel.«)
+  User, 13.08.2026, from playing the deployed state: "Beim Kinderspiel kann ich auch
+  nichts lernen. Ich erkenne da kein Fangspiel." The children read as running about
+  at random and calling out instructions that do not serve the game; the tag game
+  that was there originally has been diluted by the situations added to teach COME,
+  THERE, FOLLOW and the rest, and the sending about looks like an end in itself.
+  Measured against the code: a situation is staged every 6 s (spread 0.35) and its
+  action steers a child for 5 s at pace 1.6, while the chase runs at 3.4 (runner
+  3.8); six of the twelve situations make a child stand still and four more walk it.
+  With four children the teaching layer therefore occupies the group nearly all the
+  time, which is exactly the picture the user describes.
+  The children play a RECOGNISABLE game of tag again, and the teaching rides ON
+  that game instead of replacing it.
+
+  The rule the player must be able to read without a word of explanation: one child
+  is IT and chases, the others flee, whoever is caught becomes IT. Everything the
+  children say serves that picture or waits for a break in it.
+
+  Final state:
+
+  1. THE ROUND OUTRANKS THE SITUATION. While a round is running, only situations
+     whose action is what the child would be doing ANYWAY may be staged: FOLLOW
+     (the caller is fleeing and is followed), THERE (pointing at the chaser while
+     fleeing), HERE (claimed at the moment of a catch), NO (a refusal, which costs
+     no movement). The SENDING situations — COME's gathering, GO_THERE's errands —
+     are staged in the BREAK between rounds, where children arranging themselves is
+     exactly what a game of tag looks like.
+  2. NO STAGED ACTION SLOWS A PLAYING CHILD. `actionPace` no longer overrides the
+     chase: a fleeing or chasing child keeps its chase speed and the situation only
+     chooses the DIRECTION where the chase leaves it free. An action that makes a
+     child STAND (holdTheSpot, noOneMoves, refuserStaysPut) is cast only on a child
+     that is not currently chasing or being chased.
+  3. THE TEACHING HAS A DUTY CYCLE, AND IT IS BOUNDED. At most one situation runs
+     in a group at a time, and over the played clock at most a stated fraction may
+     carry a staged action — a balance value, debug-editable, starting at one third.
+     Measured today: a situation every 6 s (spread 0.35) with a 5 s action over four
+     children means the teaching layer is running almost continuously, half of the
+     twelve situations make a child STAND STILL and four more walk it at pace 1.6
+     against a chase speed of 3.4–3.8. That is why no game is visible.
+  4. THE CATCH IS THE LOUDEST MOMENT. The catch and the handover of the role are
+     staged so the rule reads: the caught child claims the spot (HERE), the new
+     chaser is visibly the one just caught, and the others scatter. Nothing else is
+     staged in the seconds around it.
+  5. EVERY CONCEPT IS STILL TAUGHT. The six stay with the children and every one
+     keeps at least two situations; what changes is WHEN they may be staged, not
+     which they are. The look-alike rules of the catalogue (COME against FOLLOW,
+     GO_THERE against THERE) hold unchanged.
+  6. DOCUMENTATION. `docs/communication-poc-spec.md` and design.md §13.4 state the
+     precedence — the round is the carrier, the teaching rides on it — in the same
+     commit.
+
+  Test: Vitest over a replayed round — no standing action is ever cast on a child
+  in the chase; no staged action reduces a playing child's pace; the duty-cycle
+  bound holds over a long replay; every concept is still staged at least twice.
+  A live section in the browser layer reports, over a minute of play, the fraction
+  of clock with a staged action, the number of catches, and the fraction of clock
+  in which the chaser is actually pursuing — and fails when the game is not
+  recognisable by those numbers.
+  CONSTRAINTS:
+  - This is a DESIGN change to §13.4's children's game, decided by the user; it is
+    not a tuning pass. Difficulty medium-high: catalogue, scheduler, steering and
+    the tests move together, and the picture decides.
+  - Do not drop a concept to buy legibility — the six must still be learnable, and
+    the catalogue's look-alike contrast rules stay.
+  - The stuck/trembling child is a SEPARATE defect (carrier findings on 666); do not
+    fold it in here, but the legibility gate must not be measured on a group whose
+    children are wedged.
+  QUOTED:
+  Nutzer, 13.08.2026 20:51: »Beim Kinderspiel kann ich auch nichts lernen. Ich erkenne da kein Fangspiel. Für mich laufen die Kinder mehr oder weniger zufällig hin und her (wenn sie mal nicht festhängen) und werfen mit Anweisungen um sich, die dem Spiel nicht dienlich sind. Ursprünglich war es mal ein Fangspiel, bei dem einer die anderen fangen muss und der Gefangene dadurch zum Fänger wird. Durch die ganzen neuen Situationen, die zur Erklärung der Kommunikationskonzepte COME, THERE, FOLLOW, usw. hinzugekommen sind, ist das Kinderspiel völlig verwässert. Das Herumschicken wirkt wie zum Selbstzweck eingeführt und macht das Fangspiel nicht mehr erkennbar.«
