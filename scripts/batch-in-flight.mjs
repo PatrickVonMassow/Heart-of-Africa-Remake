@@ -611,6 +611,54 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
 }
 
 /**
+ * MAY THIS SESSION ADOPT THIS TRANSFERRED RECORD (Sol final round, finding 2)?
+ * PURE over its inputs. Null = yes; otherwise { reason, alert }.
+ *
+ * THE TRANSFERRER IS NEVER THE ADOPTER. A session that COMMITTED the boundary
+ * handed its running work to the successor; adopting it back would stamp the
+ * record `adopted`, re-open `--clear`, and leave the session working after its
+ * own handover — the whole defect point 675 exists to close. The refusal
+ * therefore hangs on the TRANSFER STAMP (`transfer.by`), which does not expire:
+ * hanging it on the committed marker alone left the defect open twice over —
+ * BOUNDARY_FRESH_MS later, and whenever the marker is withdrawn or lost. The
+ * marker is still read, but only to say WHICH refusal this is, since a session
+ * still under its own fresh commit needs a different way forward from one whose
+ * boundary is long gone.
+ *
+ * The way forward is never adoption: under a live commit, withdraw the boundary
+ * (`batch-boundary.mjs --clear`); past it, the record is mutable again, so real
+ * resumed work is RE-DECLARED (`--waiting-on …`) or `--clear`ed — an honest
+ * record of this session's own wait, not the fiction that a successor took over.
+ */
+export function selfAdoptionRefusal({ declaration, marker, sid, now = Date.now() } = {}) {
+  if (!declaration?.transfer) return null
+  const by = typeof declaration.transfer.by === 'string' ? declaration.transfer.by : ''
+  const sealed =
+    markerPhase(marker) === 'committed' &&
+    marker.sessionId === sid &&
+    typeof marker.at === 'number' &&
+    now - marker.at < BOUNDARY_FRESH_MS
+  if (sealed) {
+    return {
+      reason: 'own-commit',
+      alert:
+        'this session COMMITTED the boundary that transferred this record — it belongs to the successor. ' +
+        'To take the work back, withdraw the boundary first (`node scripts/batch-boundary.mjs --clear`); ' +
+        'the declaration then becomes mutable again without adoption.',
+    }
+  }
+  if (!sid || by !== sid) return null
+  return {
+    reason: 'own-transfer',
+    alert:
+      'this session TRANSFERRED this record at its boundary commit — adoption is the SUCCESSOR\'s verb, and a ' +
+      'marker that has since expired or been withdrawn does not hand the work back. If this session genuinely ' +
+      'resumed the work, RE-DECLARE it as its own wait (`node scripts/batch-in-flight.mjs --waiting-on "…" ' +
+      '--branch <ref>`), or `--clear` it if it is finished — do not record a handover that never happened.',
+  }
+}
+
+/**
  * THE SUCCESSOR ADOPTS a transferred declaration (M4/M7): evidence is re-probed,
  * what expired is DROPPED AND NAMED, a contradicted or empty record REFUSES with
  * its alerts — never a silent unblock. On success the declaration is rewritten
@@ -621,28 +669,8 @@ export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, n
   const path = statePathsFor(lockPath).inFlightPath
   const declaration = readDeclaration(path)
   if (!declaration || !declaration.transfer) return { adopted: false, reason: 'no-transferred-declaration', alerts: [] }
-  // THE PREDECESSOR MAY NOT ADOPT ITS OWN HANDOVER (Sol final round, finding 2):
-  // while this session's committed marker stands, the record belongs to the
-  // SUCCESSOR — adopting it here would stamp it `adopted` and re-open `--clear`,
-  // the exact erase path the mutation refusal closes. The way back is the same
-  // as everywhere post-commit: withdraw the boundary first.
-  const marker = readBoundaryMarker(lockPath)
-  if (
-    markerPhase(marker) === 'committed' &&
-    marker.sessionId === sid &&
-    typeof marker.at === 'number' &&
-    now - marker.at < BOUNDARY_FRESH_MS
-  ) {
-    return {
-      adopted: false,
-      reason: 'own-commit',
-      alerts: [
-        'this session COMMITTED the boundary that transferred this record — it belongs to the successor. ' +
-          'To take the work back, withdraw the boundary first (`node scripts/batch-boundary.mjs --clear`); ' +
-          'the declaration then becomes mutable again without adoption.',
-      ],
-    }
-  }
+  const self = selfAdoptionRefusal({ declaration, marker: readBoundaryMarker(lockPath), sid, now })
+  if (self) return { adopted: false, reason: self.reason, alerts: [self.alert] }
   const evidence = Array.isArray(declaration.evidence) ? declaration.evidence : []
   const items = evidence.map((e) => checkEvidence(e, { now, ...probes }))
   const checkpointStates = (declaration.transfer.checkpoints ?? []).map((c) => {
@@ -757,6 +785,13 @@ if (isMain) {
     const a = adoptTransferred(sid)
     for (const alert of a.alerts) console.error(`ALERT: ${alert}`)
     if (!a.adopted) {
+      // The self-adoption refusals carry their OWN way forward in the alert
+      // above; repeating the generic "re-declare with --waiting-on" here would
+      // contradict it under a live committed marker, where `sealedCommitRefusal`
+      // denies exactly that.
+      if (a.reason === 'own-commit' || a.reason === 'own-transfer') {
+        fail('ADOPTION REFUSED — this session transferred this record; see the alert above for the way forward.')
+      }
       fail(
         a.reason === 'no-transferred-declaration'
           ? 'no transferred declaration exists — nothing to adopt.'

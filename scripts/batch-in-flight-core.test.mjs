@@ -71,6 +71,7 @@ import {
   readDeclaration,
   resolveRefName,
   sealedCommitRefusal,
+  selfAdoptionRefusal,
   transferredMutationRefusal,
   writeDeclaration,
   clearDeclaration,
@@ -2084,6 +2085,72 @@ describe('gatherHandoverTransfer — session-bound and idempotent', () => {
       // The record itself is untouched — nothing was stamped adopted.
       expect(readDeclaration(path).adopted).toBeUndefined()
     })
+  })
+
+  it('…and not once its marker is STALE or GONE either — the transfer stamp names the transferrer', () => {
+    // THE OPEN FINDING of the rescue commit: tying the refusal to a FRESH
+    // committed marker leaves the defect open twice over — a marker one hour
+    // old, and a marker deleted by anything that rewrites the state file. The
+    // record's own `transfer.by` is what does not expire.
+    for (const marker of [null, { v: 2, phase: 'committed', cause: 'point', sessionId: SID, point: 675, at: 1 }]) {
+      withTempLock(({ lockPath, path }) => {
+        writeDeclaration(declaration({ transfer: { v: 1, by: SID, at: 1, checkpoints: [] } }), path)
+        if (marker) writeFileSync(statePathsFor(lockPath).boundaryPath, JSON.stringify(marker))
+        const a = adoptTransferred(SID, { lockPath })
+        expect(a.adopted).toBe(false)
+        expect(a.reason).toBe('own-transfer')
+        expect(a.alerts[0]).toContain('--waiting-on')
+        expect(readDeclaration(path).adopted).toBeUndefined()
+      })
+    }
+  })
+
+  it('a SUCCESSOR is not caught by the self-adoption rule', () => {
+    withTempLock(({ lockPath, path }) => {
+      writeDeclaration(declaration({ transfer: { v: 1, by: SID, at: 1, checkpoints: [] } }), path)
+      writeFileSync(
+        statePathsFor(lockPath).boundaryPath,
+        JSON.stringify({ v: 2, phase: 'committed', cause: 'point', sessionId: SID, point: 675, at: Date.now() }),
+      )
+      // Its evidence is a dead session's, so the ordinary assessment refuses —
+      // but NOT as a self-adoption: the successor is judged on the work, not
+      // on who transferred it.
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(['own-commit', 'own-transfer']).not.toContain(a.reason)
+    })
+  })
+})
+
+describe('selfAdoptionRefusal — the transferrer is never the adopter (point 675)', () => {
+  const transferred = declaration({ transfer: { v: 1, by: SID, at: 1, checkpoints: [] } })
+  const sealed = { v: 2, phase: 'committed', cause: 'point', sessionId: SID, point: 675, at: NOW - 1000 }
+
+  it('names the COMMIT while the marker stands, and the TRANSFER once it does not', () => {
+    expect(selfAdoptionRefusal({ declaration: transferred, marker: sealed, sid: SID, now: NOW }).reason).toBe(
+      'own-commit',
+    )
+    expect(selfAdoptionRefusal({ declaration: transferred, marker: null, sid: SID, now: NOW }).reason).toBe(
+      'own-transfer',
+    )
+    expect(
+      selfAdoptionRefusal({ declaration: transferred, marker: { ...sealed, at: NOW - 3 * 60 * 60 * 1000 }, sid: SID, now: NOW })
+        .reason,
+    ).toBe('own-transfer')
+  })
+
+  it('lets every other session through, and never fires without a transfer', () => {
+    expect(selfAdoptionRefusal({ declaration: transferred, marker: sealed, sid: 'session-successor', now: NOW })).toBeNull()
+    expect(selfAdoptionRefusal({ declaration: declaration({}), marker: sealed, sid: SID, now: NOW })).toBeNull()
+    expect(selfAdoptionRefusal({ declaration: null, marker: sealed, sid: SID, now: NOW })).toBeNull()
+    // A transfer stamped by nobody (an empty `by`) must not swallow every session.
+    expect(
+      selfAdoptionRefusal({
+        declaration: declaration({ transfer: { v: 1, by: '', at: 1, checkpoints: [] } }),
+        marker: null,
+        sid: SID,
+        now: NOW,
+      }),
+    ).toBeNull()
   })
 })
 

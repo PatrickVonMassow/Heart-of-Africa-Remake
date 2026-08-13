@@ -329,7 +329,14 @@ How it works:
    building does NOT hold the boundary: when its checkpoints are committed AND
    pushed, its in-flight declaration is transferred at the commit and the
    successor ADOPTS it (`node scripts/batch-in-flight.mjs --adopt`, expired or
-   contradicted evidence alerting loudly); work WITHOUT a pushed checkpoint
+   contradicted evidence alerting loudly). ADOPTION IS THE SUCCESSOR'S VERB
+   ALONE: the session named in the record's `transfer.by` is refused for good —
+   not merely while its marker is fresh, since a session that could adopt its own
+   handover an hour later would have handed over and kept working, which is the
+   defeat this whole point closes. Under a live commit the way back is
+   `batch-boundary.mjs --clear`; past it the record is mutable again, so genuinely
+   resumed work is RE-DECLARED (`--waiting-on …`) rather than recorded as a
+   handover that never happened. Work WITHOUT a pushed checkpoint
    blocks the handover with named recovery choices and drains first
    (`--handover-check` tells the two states apart). The boundary is TWO-PHASE
    (point 675 closed the marker-deletion defeat): `node scripts/batch-boundary.mjs
