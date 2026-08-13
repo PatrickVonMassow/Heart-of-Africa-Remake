@@ -1309,7 +1309,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 13.08.2026, 19:15 · Quellen-Fingerprint: `07bf8443fdab…`
+Zuletzt aktualisiert: Donnerstag, 13.08.2026, 23:22 · Quellen-Fingerprint: `b3019bd5fd92…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1371,6 +1371,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Queue order for this release — communication mechanic first, then 633 (closing), then 174 (tag); a new point of that kind is moved to the front in the same turn | 1 | niedrig | lock-release-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 3 | mittel | model-guard.mjs | ✔ Mechanismus |
+| 13.08.2026: Sol (GPT-5.6) authors as much as possible from now on — Fable's pool is empty and Opus is nearly out until the Monday 10:00 reset; Claude only reviews, verifies the picture and lands | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1396,10 +1397,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 79 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 54 Prozess-/Meta-TASKS-Punkte (davon 21 offen).
+Erfasste Quellen: 80 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 54 Prozess-/Meta-TASKS-Punkte (davon 21 offen).
 
-<!-- RETRO-FINGERPRINT: 07bf8443fdabb27e05837ca6759ce23f5a5471dd37c02c3908ad62ed33ed6be2 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-13T17:15:06.386Z -->
+<!-- RETRO-FINGERPRINT: b3019bd5fd9249f90f6f9731bc64aab07defd4cce76f85cc3d207d9c1d283ee1 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-13T21:22:01.130Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
