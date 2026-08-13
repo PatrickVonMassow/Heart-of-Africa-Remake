@@ -368,6 +368,28 @@ put it is the mistake this line exists to stop.
   retrofitted (after one-topic-per-card), so the class needs a structural gate, not
   another reminder.
 
+- [ ] 669. THE AUTHORING LANE RUNS CI OVER WITH ITS DURABILITY PUSHES (measured 13.08.2026 on
+  the lane's first live run, point 651). `scripts/author-sol.mjs` pushes the working branch
+  every ~2 minutes so a dying run loses nothing. Every push starts a CI run, and the workflow's
+  `concurrency: ci-${{ github.ref }}` with `cancel-in-progress: true` kills the previous one:
+  twelve minutes into the run the branch carried three runs, two `cancelled` and one in
+  progress, and NONE green. Two consequences, both real: `ci-status-guard` can never find a
+  concluded green run on that branch while the author works, so the supervising session's every
+  turn end waits or blocks; and Actions minutes are spent on runs nobody reads.
+  FINAL STATE: the interim pushes are what CLAUDE.md §6 already calls a RESCUE commit — work
+  committed because the run may die, no claim of completeness — so they are written as one:
+  `[skip ci]` in the SUBJECT plus a `Rescue: <what the author was in the middle of>` trailer,
+  which the `commit-msg` hook already demands in that pairing. The run's FINAL commit — the one
+  that claims the work is done — carries neither and goes through CI normally, so the branch
+  ends with exactly one meaningful run. If the author produces no final commit (it died), the
+  branch is left with only skipped runs, which is honest: nobody claims that state is done.
+  VERIFIABLE: Vitest over the commit-message builder (an interim commit carries both halves, the
+  final commit neither, and a run that dies leaves no commit claiming completeness), plus the
+  next live lane run showing ONE concluded CI run on the branch instead of a cancelled chain.
+  Criticality: medium — it does not corrupt work, but it blocks the supervising session's turn
+  ends, which is how the batch stalls.
+
+
 - [ ] 633. THE RELEASE'S CLOSING RUN — TWO REGRESSIONS WITH THE CLEANUP BETWEEN THEM (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
   zu sein"). 174 carried the whole release in one card estimated at ~1 h, which was true
