@@ -172,9 +172,19 @@ put it is the mistake this line exists to stop.
   3. THE DRUMMER HOLDS STILL while nothing is drummed: his hands rest
      (`src/scenes/place/drummerPose.ts`) instead of miming strikes that make no sound. An idle
      drummer standing at his drum is the picture.
-  4. THE DRUMMER MOVES WITH THE MESSAGE. While a drum message plays, his strikes follow ITS
-     strike times — the same plan `playDrumMessage` renders — so what the player sees matches
-     what the player hears.
+  4. THE DRUMMER MOVES WITH THE MESSAGE, AND EACH STRIKE FALLS ON THE DRUM OF ITS TONE (user
+     13.08.2026). While a drum message plays, his strikes follow the plan's strike TIMES — the
+     same plan `playDrumMessage` renders — AND every single strike lands on the drum matching
+     that syllable's tone: the large low drum for a low tone, the small high drum for a high
+     one, beaten by the hand standing over that drum, with that drum's head dipping. So the
+     hand the player sees teaches the same tone the player hears.
+     STATE OF THE CODE (measured 13.08.2026): the pitch-matched path already EXISTS from point
+     576 — `src/communication/drumMessage.ts` carries a `DrumId` per strike and the Drummer in
+     `src/scenes/place/PlaceLife.tsx` drives its swings off `strike.drum`. So VERIFY the
+     behaviour rather than rebuilding it, and say so if it holds.
+     Test additionally: a Vitest case walks a whole `drumMessagePlan()` and asserts PER STRIKE
+     that the swinging hand and dipping head are the ones belonging to `strike.drum` and that
+     the other drum stays at rest — not merely that a strike happened at the right time.
   5. design.md §19's ambience list and CLAUDE.md are updated in the SAME commit wherever they
      name the drum bed as a standing ambience layer.
   VERIFIABLE: Vitest for the silent default (no phrase emitted with the switch off, the message
