@@ -26,8 +26,10 @@ import {
   isOutputPagerSegment,
   describeWithdrawalTrigger,
   hookCallTimestamp,
+  berlinMinuteOfDay,
   boardCarriesCard,
   cardProofFragments,
+  cardStampIsCurrent,
   CARD_PROOF_WINDOW,
   markerFresh,
   markerPhase,
@@ -1069,6 +1071,12 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
     ).toBe(true)
   })
 
+  it('reads the board stamp in BERLIN, whatever the machine is set to', () => {
+    // 12:00 UTC on a summer day is 14:00 in Berlin; the board stamps that.
+    expect(berlinMinuteOfDay(Date.UTC(2026, 7, 13, 12, 0))).toBe(14 * 60)
+    expect(berlinMinuteOfDay(Date.UTC(2026, 0, 13, 12, 0))).toBe(13 * 60)
+  })
+
   it('falls back to one card\'s length on a board with no card markup', () => {
     const plain =
       boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT }) +
@@ -1086,6 +1094,30 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
         cardProofFragments({ cause: BOUNDARY_CAUSES.CONTEXT, destination: BOUNDARY_DESTINATIONS.FRESH_SESSION }),
       ).carries,
     ).toBe(true)
+  })
+
+  it('refuses the card the PREVIOUS handover left standing (Sol on 9096fb7)', () => {
+    const stamped = (hhmm) =>
+      `<details class="card"><summary>Übergabe</summary><p><span class="stamp">Stand ${hhmm}</span> ` +
+      `${boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</p></details>`
+    const frags = cardProofFragments({
+      cause: BOUNDARY_CAUSES.CONTEXT,
+      destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
+    })
+    const prepared = 14 * 60 + 30 // 14:30 Berlin
+    // Stamped before this preparation → the last handover's card.
+    const old = boardCarriesCard(stamped('11:05'), frags, { sinceMinute: prepared })
+    expect(old.carries).toBe(false)
+    expect(old.stale).toBe(true)
+    // Stamped at or just after it → this handover's.
+    expect(boardCarriesCard(stamped('14:30'), frags, { sinceMinute: prepared }).carries).toBe(true)
+    expect(boardCarriesCard(stamped('14:47'), frags, { sinceMinute: prepared }).carries).toBe(true)
+    // Across midnight the wall clock wraps; the card is still the newer one.
+    expect(boardCarriesCard(stamped('00:10'), frags, { sinceMinute: 23 * 60 + 55 }).carries).toBe(true)
+    // A card with no stamp at all does not trap the session.
+    expect(cardStampIsCurrent('<p>no stamp here</p>', { sinceMinute: prepared })).toBe(true)
+    // …and with no preparation time to compare against, the stamp decides nothing.
+    expect(boardCarriesCard(stamped('01:00'), frags, { sinceMinute: null }).carries).toBe(true)
   })
 
   it('never traps on a board it cannot read — but says it could not verify', () => {

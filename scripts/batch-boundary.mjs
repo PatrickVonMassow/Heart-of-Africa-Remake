@@ -40,6 +40,7 @@ import {
   BOUNDARY_PHASES,
   LAUNCHER_TASK_NAME,
   assessBoundary,
+  berlinMinuteOfDay,
   boardCarriesCard,
   boundaryCardCommand,
   cardProofFragments,
@@ -362,8 +363,20 @@ export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } =
  * that cannot be READ waves the commit through but SAYS so — a missing file must
  * not end the batch, and an unverified check must never pass in silence.
  */
-export function requireBoardCard({ cause, destination, what, prepare, fail, path = repoPath(BOARD_FILE_DEFAULT) }) {
-  const proof = boardCarriesCard(readText(path), cardProofFragments({ cause, destination }))
+export function requireBoardCard({
+  cause,
+  destination,
+  what,
+  prepare,
+  fail,
+  path = repoPath(BOARD_FILE_DEFAULT),
+  preparedAt = readPrepared()?.at ?? null,
+}) {
+  // The card must be stamped at or after the PREPARATION, or the card the last
+  // handover left standing would prove this one (Sol's review of 9096fb7).
+  const proof = boardCarriesCard(readText(path), cardProofFragments({ cause, destination }), {
+    sinceMinute: typeof preparedAt === 'number' ? berlinMinuteOfDay(preparedAt) : null,
+  })
   if (!proof.verifiable) {
     console.error(
       `WARNING: the board (${path}) could not be read, so ${what} could NOT be verified — the commit proceeds, ` +
@@ -373,9 +386,13 @@ export function requireBoardCard({ cause, destination, what, prepare, fail, path
   }
   if (!proof.carries) {
     fail(
-      `THE BOARD DOES NOT CARRY ${what} — a handover the board does not explain leaves the reader with a ` +
-        `session that vanished for no stated reason. Put up the card \`node scripts/batch-boundary.mjs ${prepare}\` ` +
-        `printed and publish it (\`${PUBLISH_CMD}\`), then commit. Nothing recorded.`,
+      (proof.stale === true
+        ? `THE BOARD CARRIES ${what} FROM AN EARLIER HANDOVER — its stamp predates this preparation, so it says ` +
+          'nothing about the session ending now'
+        : `THE BOARD DOES NOT CARRY ${what} — a handover the board does not explain leaves the reader with a ` +
+          'session that vanished for no stated reason') +
+        `. Put up the card \`node scripts/batch-boundary.mjs ${prepare}\` printed and publish it ` +
+        `(\`${PUBLISH_CMD}\`), then commit. Nothing recorded.`,
     )
   }
 }
