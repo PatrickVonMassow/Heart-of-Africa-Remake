@@ -7079,3 +7079,29 @@ to land than a mechanism that needs a review.
     children are wedged.
   QUOTED:
   Nutzer, 13.08.2026 20:51: »Beim Kinderspiel kann ich auch nichts lernen. Ich erkenne da kein Fangspiel. Für mich laufen die Kinder mehr oder weniger zufällig hin und her (wenn sie mal nicht festhängen) und werfen mit Anweisungen um sich, die dem Spiel nicht dienlich sind. Ursprünglich war es mal ein Fangspiel, bei dem einer die anderen fangen muss und der Gefangene dadurch zum Fänger wird. Durch die ganzen neuen Situationen, die zur Erklärung der Kommunikationskonzepte COME, THERE, FOLLOW, usw. hinzugekommen sind, ist das Kinderspiel völlig verwässert. Das Herumschicken wirkt wie zum Selbstzweck eingeführt und macht das Fangspiel nicht mehr erkennbar.«
+
+- [ ] 683. THE SEAL LETS THE WORK ORDER THROUGH, BECAUSE IT CLASSIFIES BY TARGET (Sol's
+  closing review of point 675, 13.08.2026, the one finding left standing by decision). After
+  `batch-boundary.mjs --commit` the marker is sealed and every further repository mutation is
+  denied — except the closing set, which is a list of TARGETS rather than of operations, and
+  that list carries `tasks.md` and `tasks-archive.md`. They belong there for a reason: a
+  blocked Stop can demand the archive move or a tick of a session that has already committed,
+  and denying it would restore exactly the loop the two-phase boundary was built to close. The
+  cost is that the sealed session may still append a point, rewrite a spec or tick an
+  unrelated point — real work, wearing the clothes of ending — and nothing says a word.
+  FINAL STATE: the work-order files stay in the closing set, but what may be done to them
+  after the seal is narrowed to the ENDING operations: the tick of the point the marker names
+  and that point's move into the archive. A work-order mutation that touches any OTHER point —
+  a new point appended, a spec edited, a foreign tick — is DENIED with the same loud refusal
+  every other post-seal mutation gets, naming the point the marker covers and the point that
+  was touched. The classification therefore stops being purely by target for these two files:
+  the guard reads the diff it is about to allow. `batch-boundary-core.mjs` carries the rule
+  beside `CLOSING_SET_FILES`, with the comment there stating what the narrowing buys and what
+  it deliberately still permits.
+  VERIFIABLE: Vitest over the narrowed rule — the marker's own tick and its archive move pass;
+  an appended point, an edited spec and a foreign tick are each denied by name; a work-order
+  edit BEFORE the seal is untouched; and a diff the guard cannot parse fails OPEN, as every
+  guard here does.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes the boundary seal.
+  Criticality: medium — the seal holds against every other mutation, so this is the last gap
+  in it rather than an open door.
