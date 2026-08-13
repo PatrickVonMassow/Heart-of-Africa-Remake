@@ -202,8 +202,10 @@ put it is the mistake this line exists to stop.
      `src/systems/ambience.ts`, driven by `balance.drumBed` in `src/config/balance.ts`). The
      switch is a debug-menu value like every other calibratable, defaulting to off, so the bed
      can be heard again without a rebuild and a later design keeps its planner.
-  2. THE DRUM MESSAGE IS UNTOUCHED. `playDrumMessage` and the chief's answer keep working
-     exactly as they do; the silence is what makes the message unmistakable.
+  2. THE DRUM MESSAGE PATH STAYS FUNCTIONAL. `playDrumMessage` and the chief's answer keep
+     PLAYING; this point touches neither their content nor their wording, which the
+     communication rebuild (points 686–692) rewrites. The silence around them is what makes
+     the message unmistakable.
   3. THE DRUMMER HOLDS STILL while nothing is drummed: his hands rest
      (`src/scenes/place/drummerPose.ts`) instead of miming strikes that make no sound. An idle
      drummer standing at his drum is the picture.
@@ -240,6 +242,665 @@ put it is the mistake this line exists to stop.
   Bundle: Dorfleben.
 
 
+- [ ] 686. THE TAUGHT LANGUAGE IS FIVE CONCEPTS, AND THE CHIEF'S MESSAGE IS FOUR OF THEM (user
+  13.08.2026, playing the deployed communication slice).
+  The user played the deployed communication slice on 13.08.2026 with the debug
+  switch "Speech: show concepts instead of syllables" on and could learn nothing:
+  "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
+  eingeführt", and about the adults "Selbst wenn ich diese Übersetzungen sehe,
+  erkenne ich keinen Sinn hinter den Handlungen." The evening's conversation
+  diagnosed the cause — the design taught eleven concepts through situations
+  forced onto a game that cannot carry them — and rebuilt the whole slice around
+  five words, two teaching places and one game per settlement kind. This point is
+  one of six that carry that rebuild; they are specified together and read
+  together.
+
+  The six specifications were reviewed cross-vendor before filing (GPT-5.6 Sol at
+  effort high, 13.08.2026, verdict do-not-merge on the first draft): it found two
+  outright contradictions and, more valuable, three wrong readings a player could
+  learn and still finish the puzzle with. What stands here is the corrected state.
+  The taught language is FIVE concepts, and the chief's message is four of them.
+
+  Final state:
+
+  1. `src/communication/lexicon.ts` carries exactly `RIVER`, `UPSTREAM`,
+     `DOWNSTREAM`, `ROCK`, `DIG`. `BIG_ROCK` is RENAMED to `ROCK` — it must read as
+     a class of thing, not as the name of one boulder, because the player learns it
+     on the village's play rocks and applies it to the boulder upstream.
+     `COME`, `GO_THERE`, `FOLLOW`, `THERE`, `HERE` and `NO` are removed.
+  2. `SEQUENCE_LENGTH` BECOMES 4 (user 13.08.2026, replacing the five of
+     11.08.2026, whose reason — eleven words in a four-syllable space — is gone).
+     The inventory rule stands: any two utterances differ in at least TWO
+     syllables, which is exactly the even-number-of-highs constraint the design
+     already uses. Length 4 under that rule offers EIGHT sequences; five are used
+     and three stay reserved. Length 3 would offer only four and is therefore ruled
+     out. `UPSTREAM`/`DOWNSTREAM` stay exact tonal mirrors of each other — reversal
+     preserves the parity, so the pair exists at length 4 — and that pair is the
+     one the player is meant to notice; the other former mirror pairs go with their
+     concepts. The chief's message thereby runs 16 syllables instead of 35, which
+     is the length a player can still hold in his head while he compares it with
+     what he wrote down.
+  3. The drum message (`src/communication/drumMessage.ts`) is
+     `RIVER · UPSTREAM · ROCK · DIG`.
+  4. Every use of a removed concept goes with it, ersatzlos: the twelve situations
+     of `src/scenes/place/childSituations.ts` and the errand catalogue of
+     `src/scenes/place/adultErrands.ts` that speak them, the glossary/journal/i18n
+     strings naming them in BOTH languages, and their tests. What replaces them is
+     built in the two points that follow this one (children's bank game, adults'
+     water and digging), so this point may be landed together with them rather
+     than leaving the village mute in between — the batch decides, but a merge of
+     this point alone must still build, lint and play without errors.
+  5. `docs/communication-poc-spec.md` and design.md §13.4 are rewritten to the five
+     words and the new teaching places in the same commit.
+
+  Test: the Vitest layer pins the five concepts, the two-syllable minimum distance
+  over the whole inventory, the mirror of the direction pair, and the message's
+  exact composition. No test may still reference a removed concept.
+
+  6. THE PERSISTED READINGS BREAK, AND THAT IS ACCEPTED. Renaming `BIG_ROCK` and
+     dropping six concepts invalidates the heard-utterance memory in existing
+     saves. No migration is written and none is owed (user 13.08.2026: the save
+     feature is switched off and nobody plays a serious run in this PoC). The break
+     is stated in the commit and in the spec document; the save/load CODE stays
+     intact.
+  Constraints:
+  - This is the FOUNDATION of the rebuild; the five following points assume it.
+  - Difficulty medium: mechanical in shape, but it touches the lexicon, the
+    message, both language files and every test that names a concept.
+  - SEQUENCE_LENGTH is 4 by the user's decision of 13.08.2026; do not carry the
+    five of 11.08.2026 forward, and do not go below 4 (three syllables cannot hold
+    five words at the required distance).
+  Quotes:
+  Nutzer, 13.08.2026 21:06: »Dafür brauchen wir nur RIVER, UPSTREAM, BIG_ROCK und DIG, würde ich sagen. Die Konzepte GO_THERE, FOLLOW und THERE sind nicht notwendig, oder?«
+  Nutzer, 13.08.2026 21:43: »Wir brauchen also RIVER, UPSTREAM, DOWNSTEAM, ROCK (das ist besser als BIG_ROCK, weil wir den Findling sowieso kleiner machen wollen) und DIG.«
+  Nutzer, 13.08.2026 23:38: »Stimmt, fünf Silben sind dann wohl nicht mehr notwendig.«
+  Refs: src/communication/lexicon.ts, src/communication/drumMessage.ts, src/scenes/place/childSituations.ts, src/scenes/place/adultErrands.ts, docs/communication-poc-spec.md, design.md 13.4
+  Bundle: Dorfleben.
+
+- [ ] 687. THE VILLAGE CHILDREN PLAY ONE GAME AT THE BANK, AND IT TEACHES FOUR WORDS (user
+  13.08.2026, playing the deployed communication slice).
+  The user played the deployed communication slice on 13.08.2026 with the debug
+  switch "Speech: show concepts instead of syllables" on and could learn nothing:
+  "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
+  eingeführt", and about the adults "Selbst wenn ich diese Übersetzungen sehe,
+  erkenne ich keinen Sinn hinter den Handlungen." The evening's conversation
+  diagnosed the cause — the design taught eleven concepts through situations
+  forced onto a game that cannot carry them — and rebuilt the whole slice around
+  five words, two teaching places and one game per settlement kind. This point is
+  one of six that carry that rebuild; they are specified together and read
+  together.
+
+  The six specifications were reviewed cross-vendor before filing (GPT-5.6 Sol at
+  effort high, 13.08.2026, verdict do-not-merge on the first draft): it found two
+  outright contradictions and, more valuable, three wrong readings a player could
+  learn and still finish the puzzle with. What stands here is the corrected state.
+  The village children play ONE game at the river bank, and it teaches four of the
+  five words without a single staged lesson.
+
+  Final state:
+
+  1. THE CYCLE. The children roam their own quarter of the village, out of earshot
+     of the adults. At the end of that phase one of them calls `RIVER`, points at
+     the water, and the whole group runs to the bank — the caller is the first
+     catcher. A CYCLE is: that call, then runs until no runner is left free, then
+     the group walks back and roams again. Phase lengths are balance values,
+     debug-editable; the roaming phase is short (order of a minute) so a visiting
+     player does not miss the call that opens the cycle.
+  2. THE GAME. Two rocks stand on the bank, one upstream, one downstream, in the
+     CURRENT teaching-stone size (scale 2.4) — they are run-to targets and must be
+     recognisable from the far end of the stretch. The runners gather at one rock,
+     the catcher waits at the other. Before each run one of them announces the
+     direction — `UPSTREAM` or `DOWNSTREAM` — and the whole group sets off that way
+     while the catcher comes to meet them. Whoever reaches the far rock calls
+     `ROCK`.
+  3. THE RUN'S STATE MACHINE, stated exactly, because half of it decides what the
+     picture shows:
+     - A run ENDS when every runner has either touched the far rock or been tagged.
+     - A tagged runner drops out where he stands, in an UNMISTAKABLE out-of-play
+       posture (crouched, arms folded — never confusable with a walking child), and
+       holds it until the run ends.
+     - Between runs the dropped-out children WALK to the catchers' side; from the
+       next run on they tag as well. Only catchers tag.
+     - Sides swap every run: the survivors now start where they arrived, so the
+       announced direction alternates by construction.
+     - The cycle ends when no free runner is left.
+  4. THE THREE WRONG READINGS ARE CLOSED — this is the part the cross-vendor review
+     (GPT-5.6 Sol, 13.08.2026) blocked the earlier draft on, and none of it is
+     optional:
+     - `ROCK` must not be learnable as "base", "goal" or "made it". Two guards: the
+       catcher taps his rock and names it at the start of a run, with nobody
+       arriving; and during the ROAMING phase a child climbs one of the ordinary
+       scattered boulders in the village and names it — a rock that is no part of
+       the game at all.
+     - `UPSTREAM`/`DOWNSTREAM` must not be learnable as "to the far rock" or as
+       left/right. Guard: when the group breaks up at the end of a cycle it walks
+       off ALONG the bank and one child announces that walk with the opposite word,
+       from wherever the group happens to stand and with no rock as its target.
+       The words therefore appear once per cycle detached from the two rocks.
+     - Corroboration the world already offers: the river visibly flows, so the two
+       words correlate with the current for a player who watches the water.
+  5. NOTHING IS STAGED. There is no situation catalogue any more. Every utterance
+     falls at a fixed point of the round — the opening call, the direction
+     announcement, the arrival, the catcher's tap, the parting call — and not one
+     of them takes a child out of the game or slows it.
+  6. THE STAGE, in numbers rather than adjectives: the stretch between the rocks is
+     stated in world units, chosen so both rocks are inside the frame from the
+     start line at the default field of view and the stated reference viewport, and
+     the lane is at least three walker diameters wide so a child can pass an adult
+     or the traveller without being pushed into the water or a wall. The numbers
+     stand in the layout comment with the measurement that produced them.
+  7. THE TRAVELLER IS AN OBSTACLE, NEVER A STOP. Children steer round the player
+     and round any villager and keep playing; a game that halts when the player
+     steps in would never be seen. They give the STRANGER a WIDER berth than a
+     villager — one extra radius, calibratable — so they visibly swerve rather than
+     brush past him.
+  8. Every utterance is one atom, read from the same lexicon as everything else.
+
+  Test: Vitest over a replayed cycle — the phases alternate; the caller becomes the
+  first catcher; the direction alternates with the side swap; `ROCK` occurs once
+  without an arrival and once outside the game; a direction word occurs once with
+  no rock as its target; the run and cycle end exactly as §3 says; no utterance
+  reduces a playing child's pace; a tagged child holds the posture and only moves
+  between runs. A browser section judges the picture: both rocks in frame from the
+  start line, and a player standing in the lane is walked around while play goes on.
+  Constraints:
+  - Depends on the five-concept lexicon (the vocabulary point).
+  - The old tag round (chaser, flight, role handover) is NOT deleted — it moves to
+    the port cities in its own point. Keep the reusable parts.
+  - The stuck/trembling child (carrier findings on 666) is a SEPARATE defect; this
+    point must not be measured on a group whose children are wedged.
+  - Difficulty high: this is a new round structure plus layout work, and the
+    picture decides.
+  Quotes:
+  Nutzer, 13.08.2026 22:24: »Am Fluss gibt es am einen Ende und am anderen einen großen Felsen. Die Kinder spielen "Wer hat Angst vorm weißen Hai?" … Schaffen es, rufen sie beim Ankommen ROCK. Bevor sie losrennen, kündigen sie ihre Richtung an: flussaufwärts oder flussabwärts … Wer erwischt wurde, bleibt stehen. Dann beginnt eine neue Runde mit Seitentausch und die vorher vom Fänger erwischten Spieler gehören jetzt zu seinem Team.«
+  Nutzer, 13.08.2026 22:36: »Die Kinder spielen nicht permanent … Irgendwann ruft eines RIVER und zeigt auf den Fluss. Dann laufen alle dort hin und spielen das Spiel. Das Kind, das RIVER gerufen hat, ist dann zu Beginn der Fänger.«
+  Nutzer, 13.08.2026 23:11: »Man sollte meinen, dass die Kinder etwas Angst/Respekt vor mir als fremder Erwachsener haben, anstatt mich fast umzurennen.«
+  Refs: src/scenes/place/tagGame.ts, src/scenes/place/childSituations.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts, src/scenes/place/layout.ts, src/config/balance.ts
+  Bundle: Dorfleben.
+
+- [ ] 688. THE ADULTS TEACH WATER AND DIGGING BY DOING THEIR OWN WORK (user 13.08.2026, playing
+  the deployed communication slice).
+  The user played the deployed communication slice on 13.08.2026 with the debug
+  switch "Speech: show concepts instead of syllables" on and could learn nothing:
+  "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
+  eingeführt", and about the adults "Selbst wenn ich diese Übersetzungen sehe,
+  erkenne ich keinen Sinn hinter den Handlungen." The evening's conversation
+  diagnosed the cause — the design taught eleven concepts through situations
+  forced onto a game that cannot carry them — and rebuilt the whole slice around
+  five words, two teaching places and one game per settlement kind. This point is
+  one of six that carry that rebuild; they are specified together and read
+  together.
+
+  The six specifications were reviewed cross-vendor before filing (GPT-5.6 Sol at
+  effort high, 13.08.2026, verdict do-not-merge on the first draft): it found two
+  outright contradictions and, more valuable, three wrong readings a player could
+  learn and still finish the puzzle with. What stands here is the corrected state.
+  The adults teach `RIVER` and `DIG` by doing their own work, and they never stand
+  at the bank.
+
+  Final state:
+
+  1. WATER. One adult sets off from the village toward the water with an EMPTY jar,
+     says `RIVER` as he goes, and walks out of the settlement down the water path.
+     Another comes back UP that path with a FULL jar carried in the head-load pose,
+     and says `RIVER` on arriving. Both utterances fall in the village, at the head
+     of the path — never at the bank, so no adult voice is ever inside the
+     children's earshot. The two together fix the word on the PLACE: once it is a
+     destination, once an origin, and only the water is common to both. Jar and
+     head-load pose already exist (`TaskWalker`'s jar; the porters' head-carry).
+  2. DIGGING, AND THE WORD SITS ON THE STROKE. At the village's work sites an adult
+     digs visibly and says `DIG` AS HE STRIKES — not before, not while walking
+     there. The second situation is another digger at another site doing the same
+     while a second villager, unbidden, joins in. No adult ever CALLS another over
+     with `DIG`: a word spoken to summon somebody teaches "come" or "help" at least
+     as well as "dig". Two situations, one atom each, both spoken at the moment the
+     ground is worked.
+  3. EVERYTHING ELSE GOES. The old errand catalogue — the sendings, the callings
+     back, the mirrored upstream/downstream walks, every errand that ended in a
+     villager standing still — is deleted. The direction words are the children's
+     now.
+  4. THE WORK SITES LEAVE THE MIDDLE. The three dig sites (store pit, post hole,
+     turned patch) are placed where such work belongs — at a compound edge, beside
+     a lane, at the edge of the worked ground — never on the open central ground.
+  5. THE TEACHING ROCKS ARE LAYOUT. The two rocks of the children's game stand on
+     the bank, one upstream and one downstream of the descent, in the current
+     teaching-stone size; the old single stone in the village centre is gone. The
+     WATER PATH meets the bank OUTSIDE the stretch between them, so the water
+     carrier never crosses the running lane. A settlement with no bank carries
+     neither rocks nor the children's bank game; its adults keep only `DIG`, and
+     its children play the SILENT tag game the ports have (see the port point), so
+     no settlement is ever left without a children's game.
+  6. The three areas — village core (adults), children's roaming quarter, bank
+     stage — each clear the others by at least the hearing radius. Where a layout
+     cannot give all three, the ADULTS are moved, not the children: their words do
+     not depend on where they stand, the children's do.
+
+  Test: Vitest over the layout — the rocks lie on the bank on either side of the
+  descent, the water path meets the bank outside the stretch, no dig site lies on
+  the central ground, the three areas clear each other by the hearing radius, and
+  the placement is stable for a seed. Vitest over the adult situations — two for
+  each word, one atom each, the digging ones ending in the dig pose. Picture check
+  on both backends.
+  Constraints:
+  - Depends on the five-concept lexicon; pairs with the children's bank game (the
+    rocks it places are that game's stage).
+  - No new prop model is required: the jar and the head-load pose exist. A fish was
+    considered and dropped — a net cannot be drawn in this stylised look.
+  - `RIVER` may be read by the player as "water"; that is acceptable and was
+    decided by the user — "Wasser, aufwärts, Fels, graben" leads to the same place.
+  Quotes:
+  Nutzer, 13.08.2026 22:42: »Insgesamt sagen mir die Erwachsenen mit nur einem Wort bisher zu wenig. Vielleicht können sie auch noch irgendwie RIVER benutzen.«
+  Nutzer, 13.08.2026 22:48: »Ein Krug fände ich schon in Ordnung. Wenn der Spieler dann RIVER als WATER interpretiert, wäre das für die Botschaft des Häuptlings nicht schlimm.«
+  Nutzer, 13.08.2026 20:46: »Der Lehrstein soll flussaufwärts wandern. Ein großer Felsbrocken mitten im Dorf macht keinen Sinn - ebensowenig, wie dort zugraben.«
+  Refs: src/scenes/place/adultErrands.ts, src/scenes/place/PlaceLife.tsx (TaskWalker, HEAD_CARRY_POSE), src/scenes/place/layout.ts (teachingStone, digSites), src/scenes/place/riverBank.ts
+  Bundle: Dorfleben.
+
+- [ ] 689. THE CHIEF SPEAKS FROM THE FIRST MINUTE, AND PAYS IN A DIRECTION AND A MOULD (user
+  13.08.2026, playing the deployed communication slice).
+  The user played the deployed communication slice on 13.08.2026 with the debug
+  switch "Speech: show concepts instead of syllables" on and could learn nothing:
+  "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
+  eingeführt", and about the adults "Selbst wenn ich diese Übersetzungen sehe,
+  erkenne ich keinen Sinn hinter den Handlungen." The evening's conversation
+  diagnosed the cause — the design taught eleven concepts through situations
+  forced onto a game that cannot carry them — and rebuilt the whole slice around
+  five words, two teaching places and one game per settlement kind. This point is
+  one of six that carry that rebuild; they are specified together and read
+  together.
+
+  The six specifications were reviewed cross-vendor before filing (GPT-5.6 Sol at
+  effort high, 13.08.2026, verdict do-not-merge on the first draft): it found two
+  outright contradictions and, more valuable, three wrong readings a player could
+  learn and still finish the puzzle with. What stands here is the corrected state.
+  The chief speaks to anyone from the first minute, and what he gives back for the
+  buried thing is a direction and a mould.
+
+  Final state:
+
+  1. NO PRECONDITION. The audience and the drummed message need no gift, no trust,
+     no "Honored Friend" — the player may ask from his first visit. The only thing
+     between him and the message is that he does not know the words. Every gate on
+     the message is removed (it was a placeholder from an early version).
+  2. THE MESSAGE stays as the vocabulary point defines it: `RIVER · UPSTREAM ·
+     ROCK · DIG`, drummed, never translated, reopenable from the journal with the
+     player's own readings.
+  3. THE REWARD. When the traveller hands over what he dug up at the boulder
+     upstream, the chief answers with `RIVER · DOWNSTREAM` — the direction, nothing
+     else. The phrase says WHERE and no more; what to do there is carried by the
+     mould alone. Nothing may be read into the ABSENCE of `DIG`: silence teaches
+     nothing, so no meaning is assigned to it anywhere in the design. The old
+     acknowledgment `BIG_ROCK · DIG · HERE` is gone with the concepts it used.
+  4. THE MOULD. With it he hands over, wordlessly, one item: DE "Tonabdruck eines
+     Felsens", EN "Clay Impression of a Rock". It rides OUTSIDE the pack capacity
+     and cannot be traded, like the buried thing before it. There is no item
+     picture in this game, so the NAME and the JOURNAL carry it: the entry at the
+     handover describes what the traveller sees — a flat back, a hollowed face, a
+     form that wants to go INTO something, not onto it — in the ~1890 voice with
+     the §15 markup, in both languages. That is his own observation, not a
+     translation of the chief's speech, so the no-translation rule stands.
+  5. BANDIAGARA. Downstream lie the cliffs. At the TALUS FOOT — not in the cliff-
+     face niches, which are Tellem burial and granary places (docs/205-world-
+     accuracy-findings.md A18) — the mould fits its socket. Using it there with the
+     use key, within the same kind of radius the digging uses, fires a dummy
+     success message: the PoC puzzle is solved. The message is localized in both
+     languages.
+  6. IT IS A SMALL SYSTEM, NOT A ONE-OFF. An item carries a FORM ID, a place
+     carries the matching SOCKET, and the use key at proximity resolves them. The
+     state rules are part of the system, not left to the first caller:
+     - the traveller may carry several forms; the socket picks the one that MATCHES
+       it and ignores the rest, so nothing has to be "selected" first;
+     - a socket is either open or spent; a spent one answers like a wrong place;
+     - a form is NOT consumed — it stays in the pack, so a second visit is never a
+       dead end;
+     - the spent state is part of the saved game like any other world state;
+     - a use at a wrong or spent place answers with a sentence in the traveller's
+       voice ("the rock here has no such hollow") rather than with silence — that
+       is how the player learns the rule for the next lock.
+     A pyramid or the Sphinx must later be a data line, not a new mechanism.
+
+  Test: Vitest — the message needs no gift/reputation state; the reward phrase is
+  exactly `RIVER · DOWNSTREAM`; the mould is outside capacity and untradeable; the
+  form/socket resolution succeeds only within the radius at the talus foot and
+  answers with the miss sentence elsewhere; the success message exists in both
+  languages. One browser flow proves the handover and the use at the cliff.
+  Constraints:
+  - Depends on the five-concept lexicon.
+  - The goal boulder of src/world/communicationRock.ts is untouched.
+  - Do not let the item name or the journal entry say "cliff" — it must say an
+    impression of A ROCK. The direction comes from the word, the place from the
+    player putting the two together.
+  - The framing is a token of goodwill from one people to the next (the §13.3 chain
+    of knowing people), never a looted sacred object, and nothing is opened in a
+    burial niche.
+  Quotes:
+  Nutzer, 13.08.2026 21:22: »Das mit dem Vertrauen raus - das war nur ein Platzhalter einer frühen Version … Man soll von Anfang an jeder Zeit mit dem Häuptling reden können - nur versteht man ihn nicht, wenn man nicht von den Kindern und den Erwachsenen die Sprache gelernt hat.«
+  Nutzer, 13.08.2026 21:22: »Wie wäre damit, dass er einem etwas und dieses Mal nur flussabwärts (bisher wurde nur flussaufwärts verwendet) sagt? Flussabwärts kommt man zu Bandiagara. Wenn man dort den neuen Gegenstand benutzt, erscheint eine Dummy-Erfolgsmeldung, die besagt, dass man das Rätsel des PoCs gelöst hat.«
+  Nutzer, 13.08.2026 21:37: »Der Gegenstand soll sozusagen ein Negativ zu einem Stück von der Felswand sein. Drückt man ihn dagegen, löst das irgendetwas aus - ein Bisschen Zak McKracken Vibes. Auf ähnliche Art könnte man später vielleicht in einem Pyramide oder in die Sphinx gelangen.«
+  Nutzer, 13.08.2026 22:59: »Der Häuptling sagt zur Belohnung nicht nur DOWNSTREAM, sondern RIVER DOWNSTREAM. Nur dieses Mal kein DIG.«
+  Refs: src/communication/chiefReply.ts, src/state/store.ts (rockArtefact), src/ui/Dialogs.tsx, src/world/data/landmarks.ts (bandiagara), docs/205-world-accuracy-findings.md A18
+  Bundle: Dorfleben.
+
+- [ ] 690. THE CLASSIC GAME OF TAG MOVES TO THE PORT CITIES, AND IS SILENT THERE (user
+  13.08.2026, playing the deployed communication slice).
+  The user played the deployed communication slice on 13.08.2026 with the debug
+  switch "Speech: show concepts instead of syllables" on and could learn nothing:
+  "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
+  eingeführt", and about the adults "Selbst wenn ich diese Übersetzungen sehe,
+  erkenne ich keinen Sinn hinter den Handlungen." The evening's conversation
+  diagnosed the cause — the design taught eleven concepts through situations
+  forced onto a game that cannot carry them — and rebuilt the whole slice around
+  five words, two teaching places and one game per settlement kind. This point is
+  one of six that carry that rebuild; they are specified together and read
+  together.
+
+  The six specifications were reviewed cross-vendor before filing (GPT-5.6 Sol at
+  effort high, 13.08.2026, verdict do-not-merge on the first draft): it found two
+  outright contradictions and, more valuable, three wrong readings a player could
+  learn and still finish the puzzle with. What stands here is the corrected state.
+  The classic game of tag survives — in the PORT CITIES and in any village without
+  a bank, and it is silent wherever it runs.
+
+  Final state:
+
+  1. The round that exists today — one child is IT, the group flees, the child that
+     is caught takes over the role, with its stamina, its break-offs and its
+     body-avoidance — is kept and becomes the PORT settlements' children's game. It
+     is the game the user asked for originally and it works; only the teaching
+     layer bolted onto it was wrong.
+  2. Wherever this game runs the children DO NOT SPEAK. There is no lect to learn
+     in a port, and syllables that mean nothing anywhere would only mislead.
+  3. WHICH SETTLEMENT PLAYS WHAT, with no gap and no overlap:
+     - a village WITH a bank: the bank game, and only that;
+     - a village WITHOUT a bank: this silent tag game, and only that;
+     - a port: this silent tag game, and only that.
+     No settlement ever runs two children's games at once.
+  4. The children of a port (and of a bankless village) get their own play ground,
+     derived like the village one and clearing that settlement's own vignettes by
+     the hearing radius.
+
+  Test: Vitest over the three settlement cases of §3 — each stages exactly one
+  game, the bank game only where a bank exists, and the tag game speaks nothing.
+  The existing children-motion gate keeps running against this game wherever it is
+  staged.
+  Constraints:
+  - Depends on the children's bank game only in so far as the two must not both
+    run in one settlement.
+  - The stuck/trembling child of the user's two bug reports lives in exactly this
+    steering. It MOVES WITH the game to the ports, so it must be cured at its cause
+    (carrier findings on 666) — otherwise the next report says "a child is stuck in
+    the harbour".
+  Quotes:
+  Nutzer, 13.08.2026 22:59: »Es ist schade, dass damit das bisherige Fangspiel, bei dem einer Fänger ist, die Gruppe vor ihm wegrennt und ein gefangenes Kind die Fängerrolle übernimmt, komplett wegfällt. Das würde ich zusätzlich als anderes Spiel beibehalten - allerdings nicht für die Dörfer, weil das sonst zu unübersichtlich wird, wenn zwei verschiedene Spiele parallel laufen. Aber in den Hafenstädten können die Kinder dieses klassische Fangspiel spielen.«
+  Refs: src/scenes/place/tagGame.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts
+  Bundle: Dorfleben.
+
+- [ ] 691. A GUESS IS ENTERED WITH SPACE, AND THE NEARER THING WINS (user 13.08.2026, playing
+  the deployed communication slice).
+  The user played the deployed communication slice on 13.08.2026 with the debug
+  switch "Speech: show concepts instead of syllables" on and could learn nothing:
+  "Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck
+  eingeführt", and about the adults "Selbst wenn ich diese Übersetzungen sehe,
+  erkenne ich keinen Sinn hinter den Handlungen." The evening's conversation
+  diagnosed the cause — the design taught eleven concepts through situations
+  forced onto a game that cannot carry them — and rebuilt the whole slice around
+  five words, two teaching places and one game per settlement kind. This point is
+  one of six that carry that rebuild; they are specified together and read
+  together.
+
+  The six specifications were reviewed cross-vendor before filing (GPT-5.6 Sol at
+  effort high, 13.08.2026, verdict do-not-merge on the first draft): it found two
+  outright contradictions and, more valuable, three wrong readings a player could
+  learn and still finish the puzzle with. What stands here is the corrected state.
+  A guess is entered with SPACE, the use key — the mouse click goes, and the use
+  key has ONE candidate list.
+
+  Final state:
+
+  1. The reading dialog for a heard utterance opens with SPACE on the targeted
+     speaker. The left-click path on the canvas is removed, together with the
+     pointer-lock release it needed only so the dialog could receive keys
+     (src/scenes/place/SpeechLabels.tsx).
+  2. ONE CANDIDATE SET FOR THE USE KEY. Everything SPACE can mean in a settlement —
+     a hut door, a speaker's utterance, a dig site, the chief, a form socket — is
+     collected as candidates with a distance from the player and a range of its
+     own. The nearest candidate IN range wins; a tie holds the standing pick the
+     way the speech target already does (TARGET_HOLD), so the choice cannot flicker
+     between two things a step apart. Distances are measured on the ground plane in
+     place units for every candidate, so they are comparable at all.
+  3. THE PROMPT SHOWS WHAT SPACE WILL ACTUALLY DO. The highlight and the on-screen
+     hint belong to the WINNING candidate — when the door wins, the speaker's note
+     carries no invitation, and the door's hint is shown instead. A prompt that
+     offers something SPACE will not do is a bug, not a detail.
+  4. `src/communication/speechTarget.ts` keeps deciding WHICH speaker is the
+     speaker candidate; it simply no longer decides what SPACE does.
+  5. On-screen hints and both language files say SPACE, never "click".
+
+  Test: Vitest over the candidate arbitration — nearer door wins, nearer speaker
+  wins, a candidate out of its own range never wins, the tie holds its standing
+  pick, and the prompt named by the arbitration is the one the winner owns. A
+  browser check opens a guess with SPACE and proves no mouse handler is left on the
+  canvas.
+  Constraints:
+  - Independent of the rest of the rebuild; it can land on its own.
+  - Small and mechanical — a good fit for the OpenAI lane.
+  Quotes:
+  Nutzer, 13.08.2026 22:59: »Eine Änderung an der Bedienung: Anstatt per Klicken eine Interpretation für etwas Gesagtes festlegen zu können, soll das per SPACE passieren. Das ist ja die Benutzen-Taste. Zusätzlich jetzt Klicken einzuführen war nur unnötig umständlich.«
+  Nutzer, 13.08.2026 23:13: »Vorfahrt hat, was dem Spieler näher ist.«
+  Refs: src/scenes/place/SpeechLabels.tsx, src/communication/speechTarget.ts, src/ui/Dialogs.tsx, src/i18n/de.ts, src/i18n/en.ts
+  Bundle: Dorfleben.
+
+- [ ] 692. EVERY DOCUMENT DESCRIBES THE REBUILT COMMUNICATION MECHANIC, NOT THE OLD ONE (user
+  13.08.2026, playing the deployed communication slice).
+  The rebuild changes what the mechanic IS, and the documents are what the next
+  session, the next agent and the closing run read as the target state. A sweep on
+  13.08.2026 found more than twenty places still specifying the superseded design —
+  the eleven-word lexicon, the twelve-situation catalogue, the mirrored bank
+  errands, the gift-gated message, the seven-concept sentence, the `BIG_ROCK · DIG ·
+  HERE` reply, the mouse click — and design.md §13.4 still calls the whole mechanic
+  "not yet decided". Left standing, every one of them is a trap for whoever builds
+  or judges the slice next.
+  Every document that describes the communication mechanic describes the REBUILT
+  one — no sentence of the superseded design is left standing anywhere.
+
+  This point is the documentation half of the rebuild. It lands WITH (or
+  immediately after) the five build points; a repository whose design documents
+  still specify eleven concepts, a gift-gated message and a click interaction while
+  the code does something else is worse than either state alone.
+
+  Final state, document by document. The list below was produced by a cross-vendor
+  sweep (GPT-5.6 Sol at effort high, 13.08.2026) over the spec document, design.md
+  §13, CLAUDE.md §7.1 and the acceptance detail, with every offending line quoted;
+  each item states what must happen to it. Work it as a checklist — an item is done
+  when the quoted sentence no longer exists in that form.
+  1. **Blocking — the commit does not address the communication rebuild at all.** The diffstat contains only `docs/analysis_de/vibe-coding-anleitung.md`; none of the communication design, acceptance, implementation, localization, journal, or test files changes. Consequently every contradiction below survives unchanged, and none of the six specifications’ required tests is added.
+
+  2. **`docs/communication-poc-spec.md` still declares the superseded brief authoritative.**  
+     Quote: “The user's brief of 03.08.2026 answers the open question…” and “This document is the reference the work-order points 477–488 cite”.  
+     Action: rewrite the document’s status and provenance around the new six-point design; the old work-order reference becomes obsolete.
+
+  3. **Its phrase examples use removed concepts.**  
+     Quote: “a known movement call AND the river utterance”, “dig + here”.  
+     Action: rewrite using surviving phrases, such as `RIVER · DOWNSTREAM`; `HERE` must disappear.
+
+  4. **The five-syllable rationale is still based on eleven words.**  
+     Quotes:
+
+     - “Eleven concepts need eleven sequences.”
+     - “Eleven words in a four-syllable space…”
+     - “Eleven of the fifteen are used and four stay reserved.”
+     - “the chief's message runs thirty-five syllables instead of twenty-eight.”
+     - “it is on the board as a decision the user may reverse.”
+
+     Action: rewrite for five used sequences, ten available/reserved sequences, and a four-atom/twenty-syllable message. Keeping `SEQUENCE_LENGTH` 5 and the two-syllable minimum distance is no longer an open decision.
+
+  5. **The lexicon registry still contains all six concepts that must be removed.**  
+     Quotes: the rows for `COME`, `GO_THERE`, `HERE`, `THERE`, `FOLLOW`, and `NO`.  
+     Action: delete those rows and every dependent reference.
+
+  6. **The rock concept still has the obsolete name.**  
+     Quote: “| BIG_ROCK | `BA-ba-ba-ba-BA` | framed by two highs — a solid block |”.  
+     Action: rename it to `ROCK` everywhere; it is a class, not one named boulder.
+
+  7. **The reserved-sequence registry reflects the eleven-word inventory.**  
+     Quote: “Reserved and unused: `ba-BA-ba-ba-BA`, `BA-BA-ba-BA-BA`, `BA-ba-BA-BA-BA`, `BA-BA-BA-ba-BA`.”  
+     Action: rewrite after removing six words; their sequences become unused too.
+
+  8. **Three obsolete mirror pairs remain part of the design.**  
+     Quote: “All four opposite pairs are exact mirror images: come reversed is go, here reversed is there, follow reversed is no, upstream reversed is downstream.”  
+     Action: delete the first three pairs and re-scope the explanation exclusively to `UPSTREAM`/`DOWNSTREAM`.
+
+  9. **The old child/adult teaching split remains verbatim.**  
+     Quote: “The children, at their game of tag, teach the six general concepts: COME, GO_THERE, FOLLOW, HERE, THERE, NO. The adults… teach… RIVER, UPSTREAM, DOWNSTREAM, BIG_ROCK, DIG.”  
+     Action: rewrite: bank-game children teach `RIVER`, `UPSTREAM`, `DOWNSTREAM`, and `ROCK`; adults teach `RIVER` and `DIG`.
+
+  10. **The three staged contrast lessons are wholly obsolete.**  
+      Quotes:
+
+      - “Three pairs need a deliberately staged contrast…”
+      - “COME against FOLLOW…”
+      - “GO_THERE against THERE…”
+      - “BIG_ROCK against UPSTREAM…”
+
+      Action: delete this catalogue and replace it with the organic guards against the three wrong readings specified for the bank game.
+
+  11. **The hearing/layout section still depends on the deleted situation and errand systems.**  
+      Quote: “It is one decision for the children's situations and the adults' errands alike”.  
+      Action: re-scope to the bank game, adult water/dig work, and silent tag.
+
+  12. **The child layout still describes the old bounded tag chase as the village teaching game.**  
+      Quote: “the children's play ground is DERIVED (`childPlayGround`…) as the largest disc…” and “The chase is bounded by that ground”.  
+      Action: re-scope this derived ground to ports and bankless villages’ silent tag. A bank village instead needs the roaming quarter and measured two-rock bank stage, with all three areas separated from adult speech.
+
+  13. **The chief’s message is still the old seven-concept sentence.**  
+      Quotes:
+
+      - “Go to the river. Follow it upstream. Dig at the big rock.”
+      - “`GO_THERE · RIVER · FOLLOW · UPSTREAM · BIG_ROCK · THERE · DIG`”
+      - “Seven concepts…”
+
+      Action: replace with exactly `RIVER · UPSTREAM · ROCK · DIG`, four atoms.
+
+  14. **The chief’s message is still gift/trust-gated.**  
+      Quote: “only once a culturally correct gift has earned his trust — the §12 condition every hint in the game stands under.”  
+      Action: delete the gift, trust, and honored-friend precondition; the chief must be available from the first visit.
+
+  15. **Adults are still assigned bank-based direction lessons.**  
+      Quote: “the village keeps its own reachable bank, because that is where the adults teach RIVER, UPSTREAM and DOWNSTREAM by pointing at real water.”  
+      Action: rewrite. Adults never stand at the bank and teach no directions; water carriers say `RIVER` at the village end of the path, while children teach both directions.
+
+  16. **Returning the buried item is still described as the puzzle’s endpoint.**  
+      Quote: “He travels back to the village and hands what he dug up to the chief. That solves the puzzle.”  
+      Action: rewrite: the handover yields `RIVER · DOWNSTREAM` and the mould; the puzzle ends only when the mould is used at the matching talus-foot socket below Bandiagara.
+
+  17. **The old acknowledgment remains explicit.**  
+      Quote: “the chief's answer is a PHRASE… `BIG_ROCK · DIG · HERE`”.  
+      Action: delete and replace with exactly `RIVER · DOWNSTREAM`, plus the wordless “Tonabdruck eines Felsens” / “Clay Impression of a Rock” reward and its journal observation.
+
+  18. **The old single teaching-stone transfer remains.**  
+      Quote: “BIG_ROCK is therefore taught on a SMALL boulder visible from the village, and the target upstream is a LARGER one further away”.  
+      Action: rewrite for `ROCK`, the two current-size bank game rocks, the separate ordinary scattered boulder named during roaming, and the upstream target boulder.
+
+  19. **`design.md` §13.4 still calls the mechanic undecided.**  
+      Quotes:
+
+      - “OPEN: the communication mechanic is not yet decided”
+      - “Rough direction (first thoughts, deliberately not yet binding)”
+      - “the zone cut and the mechanic itself remain the user's decision”
+      - “It needs… a decision on the mechanic itself, before any implementation point can be written.”
+      - “Until then…”
+
+      Action: rewrite §13.4 as the decided five-word mechanic. The zone cut may remain open, but the village mechanic may not.
+
+  20. **`design.md` still specifies mouse-click entry.**  
+      Quote: “the NEAREST speaker's note invites a click, and that click opens a modal”.  
+      Action: replace with SPACE/use-key candidate arbitration; remove the canvas click and its pointer-lock-release dependency.
+
+  21. **`design.md` still treats the new mechanic’s eventual landing as hypothetical.**  
+      Quote: “The moment the new mechanic is decided and built, that reverses”.  
+      Action: replace with a present-tense load-bearing description once the rebuild lands.
+
+  22. **CLAUDE.md criterion 6 can still be read as imposing the old gift gate on the communication hint.**  
+      Quote: “a culturally correct gift — not mere observation — is the condition for a hint”.  
+      Action: re-scope explicitly to other cultural-contact hints, if that criterion remains; it must exclude the rebuilt chief audience and drum message.
+
+  23. **CLAUDE.md criterion 7 still delegates its definition to the obsolete §13.4 text.**  
+      Quote: “The tonal village speech of `design.md` §13.4 is implemented”.  
+      Action: rewrite the criterion or its referenced section so acceptance pins the five concepts, new teaching systems, ungated message/reward, and SPACE interaction.
+
+  24. **`docs/acceptance-criteria-detail.md` §6 repeats the ambiguous old gate.**  
+      Quote: “a culturally correct gift is the condition for a hint”.  
+      Action: re-scope it so it cannot govern this communication message.
+
+  25. **Acceptance detail §7 explicitly accepts the eleven-word lexicon.**  
+      Quote: “the Bambara village speaks eleven concepts as five-syllable tone words”.  
+      Action: rewrite to exactly five concepts and record the accepted persisted-reading break.
+
+  26. **Acceptance detail §7 explicitly accepts the deleted teaching catalogues.**  
+      Quote: “The children's tag teaches six concepts and the adults' errands five more, look-alikes apart”.  
+      Action: delete/rewrite for the children’s bank cycle, adults’ two water and two dig situations, and silent tag only in ports or bankless villages.
+
+  27. **Acceptance detail §7 still accepts mouse clicking.**  
+      Quote: “is written by clicking him (`speechLabel`, `speechTarget`, `src/ui/SpeechGuess.tsx`)”.  
+      Action: rewrite for SPACE and the unified use-candidate list; `speechTarget` should choose only the speaker candidate.
+
+  28. **Acceptance detail §7 still accepts the gift-gated seven-word message and old reply.**  
+      Quote: “On earned trust the chief drums a seven-concept message (`drumMessage`); the artefact dug at the erratic it names is answered untranslated (`chiefReply`).”  
+      Action: rewrite for the ungated four-word message, exact two-word reply, mould handover, and Bandiagara socket conclusion.
+
+  29. **Acceptance detail §7 declares the obsolete implementation load-bearing.**  
+      Quote: “What is built is load-bearing.”  
+      Action: rewrite to identify the rebuilt systems; it must not protect the eleven-word catalogue implementation.
+
+  30. **Open point 672 contains one dependency on the old chief response.**  
+      Quote: “`playDrumMessage` and the chief's answer keep working exactly as they do”.  
+      Action: re-scope this to preserve message/reward playback after the response becomes `RIVER · DOWNSTREAM`; it cannot require the old acknowledgment to remain unchanged. The ambient-silence and synchronized-drummer subject itself remains valid.
+
+  31. **Open point 659 records an obsolete intermediate teaching-stone design.**  
+      Quote: “the teaching stone becomes small and moves to the bank upstream”.  
+      Action: rewrite for two current-size bank rocks, one upstream and one downstream, and deletion of the old single central stone.
+
+  32. **Open point 659 understates the new reply and reward.**  
+      Quote: “the chief's answer is replaced by DOWNSTREAM plus an object that leads to the Bandiagara escarpment.”  
+      Action: rewrite to the exact phrase `RIVER · DOWNSTREAM` and name the clay impression/form-and-socket system. The point’s whole-chain review remains valid and should stay on hold until the rebuild lands.
+
+  33. **No attached OPEN work-order point has a subject that becomes wholly obsolete.** Points 672 and 673 still apply to the rebuilt audio, and 659 explicitly resumes against the new chain. Only the stale clauses identified above require rewriting; the other attached open points concern unrelated release/process defects.
+
+  Three notes on that list:
+
+  - Its item 4 says the syllable length stays five. It does NOT: the user decided on
+    13.08.2026 that four syllables suffice once eleven words became five (eight
+    sequences exist at length 4, five are used, three reserved). The documents are
+    rewritten to FOUR, and the chief's message to 16 syllables.
+
+  - Item 1 is an artefact of how the sweep was run (it was handed a commit that had
+    nothing to do with the rebuild) and is NOT a finding — ignore it.
+  - Items 30 to 32 concern OPEN work-order points, not documents; they are filed
+    separately as a finding and are not part of this point.
+
+  Beyond the checklist, two things this point owes on its own:
+
+  - `design.md` §13.4 stops calling the mechanic undecided and states it in the
+    present tense as the decided five-word design (the ZONE cut may remain open —
+    only the village mechanic is decided).
+  - The persisted-reading break is recorded in one line where the acceptance detail
+    claims what the slice guarantees (user 13.08.2026: saves are irrelevant in this
+    PoC, no migration is owed).
+
+  Test: the Vitest layer already pins the lexicon and the message; this point adds
+  the document check it can carry — no design or acceptance document may name a
+  removed concept (`COME`, `GO_THERE`, `FOLLOW`, `HERE`, `THERE`, `NO`,
+  `BIG_ROCK`), and `docs/communication-poc-spec.md` and design.md §13.4 must agree
+  with `ConceptId` and `DRUM_MESSAGE` on which words exist.
+  Constraints:
+  - design.md is never changed unilaterally — but this change IS the user's request
+    of 13.08.2026, so design.md and CLAUDE.md move with the code, per CLAUDE.md §4.
+  - Land with or right after the five build points, never long before them.
+  - Rewrite to the FINAL state only; no "was X, now Y" trail in the documents.
+  Quotes:
+  Nutzer, 13.08.2026 23:32: »Lasse nochmal Sol prüfen, dass nicht noch irgendwo Reste der Spezifikation der bisher geplanten Kommunikationsmechanik stehen.«
+  Refs: docs/communication-poc-spec.md, design.md 13.4, CLAUDE.md 7.1 criteria 6 and 7, docs/acceptance-criteria-detail.md 6 and 7, docs/acceptance-evidence.md 7
+  Bundle: Dorfleben.
+
 - [ ] 659. THE WHOLE COMMUNICATION CHAIN, PLAYED THROUGH AND JUDGED BY WHAT REACHES THE
   PLAYER — A SIX-EYES ALL-ROUND REVIEW.
   ON HOLD (user 13.08.2026, 22:25: »Stoppe 659 erstmal — der macht erstmal keinen Sinn, wenn wir
@@ -253,8 +914,9 @@ put it is the mistake this line exists to stop.
   GO_THERE, FOLLOW and THERE dropped; the trust/gift prelude goes, and the chief speaks from the
   start; the children teach ROCK/UPSTREAM/DOWNSTREAM through ONE running game between two rocks
   on the bank (the situation catalogue is dropped outright), the adults only RIVER and DIG; the
-  teaching stone becomes small and moves to the bank upstream; and the chief's answer is
-  replaced by DOWNSTREAM plus an object that leads to the Bandiagara escarpment.
+  two rocks in TODAY'S size stand on the bank, one upstream and one downstream, while the old
+  stone in the village middle goes; and the chief's answer is exactly RIVER DOWNSTREAM plus the
+  clay impression carried by the mould/impression system.
   (original spec, user 12.08.2026: "Danach will ich endlich mal
   erfolgreich die ganze Kette der Kommunikationsmechanik in diesem Dorf durchspielen können,
   ohne bei jedem Schritt sofort auf blockierende Bugs zu stoßen, obwohl du bereits mehrfach
