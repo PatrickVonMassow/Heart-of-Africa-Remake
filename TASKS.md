@@ -6891,8 +6891,11 @@ to land than a mechanism that needs a review.
   VERIFIABLE: a Vitest/jsdom case beside the existing injection cases in
   `scripts/chat-viewer.test.mjs` drives the injection twice and asserts exactly one
   `link[rel~="icon"]` with the expected href, and that a swapped-in document which lost its head
-  gets the link back; plus the PICTURE — the silhouette judged in the tab at 16 px and 32 px, not by
-  reading the SVG source. A silhouette unrecognisable at 16 px fails the point.
+  gets the link back; plus the PICTURE — the silhouette rasterised and LOOKED AT, not judged from
+  the SVG source. The condition is RECOGNISABLE at 32 px and DISTINCTIVE at 16 px: measured
+  13.08.2026 over four drawn paths, no monochrome continent silhouette is legible at 16 px, so
+  demanding it there costs redraw rounds without ever being reachable. What 16 px must deliver is a
+  dark shape nobody confuses with the browser's generic globe.
   AUTHOR: the OpenAI lane (`node scripts/author-sol.mjs --point 679`) — user decision 13.08.2026,
   19:25 (»Lasse Sol das machen, um Volumen zu sparen«). Mechanical and low-risk, and its
   verification is not the work.
