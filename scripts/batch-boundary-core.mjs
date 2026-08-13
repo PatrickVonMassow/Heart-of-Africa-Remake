@@ -441,21 +441,34 @@ export function berlinMinuteOfDay(ms) {
  */
 export function cardStampIsCurrent(
   region,
-  { sinceMinute = null, untilMinute = null, boardStamps = true, slackMin = CARD_STAMP_SLACK_MIN } = {},
+  { sinceMs = null, nowMs = null, boardStamps = true, slackMin = CARD_STAMP_SLACK_MIN } = {},
 ) {
-  if (typeof sinceMinute !== 'number' || !Number.isFinite(sinceMinute)) return true
+  if (typeof sinceMs !== 'number' || !Number.isFinite(sinceMs)) return true
   const m = String(region ?? '').match(/Stand\s+(\d{1,2}):(\d{2})/)
   if (!m) return boardStamps !== true
   const stamp = (Number(m[1]) % 24) * 60 + Number(m[2])
-  const from = (sinceMinute - slackMin + 1440) % 1440
-  const arc = typeof untilMinute === 'number' && Number.isFinite(untilMinute) ? (untilMinute - sinceMinute + 1440) % 1440 : 0
-  return (stamp - from + 1440) % 1440 <= arc + 2 * slackMin
+  const now = typeof nowMs === 'number' && Number.isFinite(nowMs) ? nowMs : sinceMs
+  const slack = slackMin * 60_000
+  // THE STAMP IS RESOLVED TO A REAL INSTANT, not to an arc on a clock face
+  // (Sol's review of 9dcc783). Modular minute arithmetic reads Berlin's DST
+  // rollback — where 02:00–03:00 happens twice — as a nearly full day, and a
+  // stale card of that night walks through. So the LATEST instant not after the
+  // commit whose Berlin wall clock shows this stamp is found, and that instant
+  // is compared with the preparation. The doubled hour resolves to its second
+  // occurrence, which is the correct one, and the search costs at most a day of
+  // minutes on one command.
+  for (let back = 0; back <= 1500; back += 1) {
+    const t = now + slack - back * 60_000
+    if (berlinMinuteOfDay(t) !== stamp) continue
+    return t >= sinceMs - slack
+  }
+  return false
 }
 
 export function boardCarriesCard(
   boardText,
   fragments = [],
-  { windowChars = CARD_PROOF_WINDOW, sinceMinute = null, untilMinute = null } = {},
+  { windowChars = CARD_PROOF_WINDOW, sinceMs = null, nowMs = null } = {},
 ) {
   if (typeof boardText !== 'string' || !boardText.trim()) return { carries: true, verifiable: false, missing: [] }
   const list = (Array.isArray(fragments) ? fragments : []).filter(Boolean)
@@ -485,7 +498,7 @@ export function boardCarriesCard(
   // …AND IT MUST BE THIS HANDOVER'S CARD, not the one the last handover left
   // standing (Sol's review of 9096fb7).
   const boardStamps = /Stand\s+\d{1,2}:\d{2}/.test(boardText)
-  if (!whole.some((r) => cardStampIsCurrent(r, { sinceMinute, untilMinute, boardStamps }))) {
+  if (!whole.some((r) => cardStampIsCurrent(r, { sinceMs, nowMs, boardStamps }))) {
     return { carries: false, verifiable: true, missing: [], stale: true }
   }
   return { carries: true, verifiable: true, missing: [] }

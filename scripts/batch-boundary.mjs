@@ -40,7 +40,6 @@ import {
   BOUNDARY_PHASES,
   LAUNCHER_TASK_NAME,
   assessBoundary,
-  berlinMinuteOfDay,
   boardCarriesCard,
   boundaryCardCommand,
   cardProofFragments,
@@ -375,8 +374,8 @@ export function requireBoardCard({
   // The card must be stamped at or after the PREPARATION, or the card the last
   // handover left standing would prove this one (Sol's review of 9096fb7).
   const proof = boardCarriesCard(readText(path), cardProofFragments({ cause, destination }), {
-    sinceMinute: typeof preparedAt === 'number' ? berlinMinuteOfDay(preparedAt) : null,
-    untilMinute: berlinMinuteOfDay(Date.now()),
+    sinceMs: typeof preparedAt === 'number' ? preparedAt : null,
+    nowMs: Date.now(),
   })
   if (!proof.verifiable) {
     console.error(

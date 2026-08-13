@@ -1096,55 +1096,76 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
     ).toBe(true)
   })
 
+  const stamped = (hhmm) =>
+    `<details class="card"><summary>Übergabe</summary><p><span class="stamp">Stand ${hhmm}</span> ` +
+    `${boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</p></details>`
+  const frags = cardProofFragments({
+    cause: BOUNDARY_CAUSES.CONTEXT,
+    destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
+  })
+
   it('refuses the card the PREVIOUS handover left standing (Sol on 9096fb7)', () => {
-    const stamped = (hhmm) =>
-      `<details class="card"><summary>Übergabe</summary><p><span class="stamp">Stand ${hhmm}</span> ` +
-      `${boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</p></details>`
-    const frags = cardProofFragments({
-      cause: BOUNDARY_CAUSES.CONTEXT,
-      destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
-    })
-    const prepared = 14 * 60 + 30 // 14:30 Berlin
-    const now = 14 * 60 + 47 // …and the commit seventeen minutes later
-    const at = (hhmm) => boardCarriesCard(stamped(hhmm), frags, { sinceMinute: prepared, untilMinute: now })
+    // 13.08.2026, 14:30 Berlin (CEST = UTC+2) — the preparation; the commit
+    // seventeen minutes later.
+    const prepared = Date.UTC(2026, 7, 13, 12, 30)
+    const now = Date.UTC(2026, 7, 13, 12, 47)
+    const at = (hhmm) => boardCarriesCard(stamped(hhmm), frags, { sinceMs: prepared, nowMs: now })
     // Stamped before this preparation → the last handover's card.
     expect(at('11:05').carries).toBe(false)
     expect(at('11:05').stale).toBe(true)
-    // Stamped between the preparation and now → this handover's.
+    // Stamped between the preparation and the commit → this handover's.
     expect(at('14:30').carries).toBe(true)
     expect(at('14:38').carries).toBe(true)
     expect(at('14:47').carries).toBe(true)
-    // A stamp AFTER the commit is not this handover's either — and yesterday's
-    // card an hour past the interval is refused, which the old fixed window let
+    // A stamp AFTER the commit resolves to the day BEFORE and is refused, as is
+    // yesterday's card at the very same minute — the arc the fixed window let
     // through (Sol on 46c994e).
     expect(at('14:52').carries).toBe(false)
     expect(at('15:40').carries).toBe(false)
-    // Across midnight the wall clock wraps; the card is still the newer one.
+    // Across midnight the card is still the newer one.
     expect(
-      boardCarriesCard(stamped('00:10'), frags, { sinceMinute: 23 * 60 + 55, untilMinute: 15 }).carries,
+      boardCarriesCard(stamped('00:10'), frags, {
+        sinceMs: Date.UTC(2026, 7, 13, 21, 55),
+        nowMs: Date.UTC(2026, 7, 13, 22, 15),
+      }).carries,
     ).toBe(true)
     // …and with no preparation time to compare against, the stamp decides nothing.
-    expect(boardCarriesCard(stamped('01:00'), frags, { sinceMinute: null }).carries).toBe(true)
+    expect(boardCarriesCard(stamped('01:00'), frags, { sinceMs: null }).carries).toBe(true)
+  })
+
+  it('survives the DST ROLLBACK, where 02:00–03:00 happens twice (Sol on 9dcc783)', () => {
+    // 25.10.2026: 03:00 CEST becomes 02:00 CET. Preparation at the FIRST 02:55
+    // (00:55 UTC), commit at the SECOND 02:10 (01:10 UTC) — fifteen real
+    // minutes, which a clock-face arc reads as almost a whole day.
+    const prepared = Date.UTC(2026, 9, 25, 0, 55)
+    const now = Date.UTC(2026, 9, 25, 1, 10)
+    const at = (hhmm) => boardCarriesCard(stamped(hhmm), frags, { sinceMs: prepared, nowMs: now })
+    // The card written in those fifteen minutes counts…
+    expect(at('02:10').carries).toBe(true)
+    expect(at('02:55').carries).toBe(true)
+    // …and the stale card of the same night does not.
+    expect(at('01:00').carries).toBe(false)
+    expect(at('23:30').carries).toBe(false)
   })
 
   it('does not let an UNSTAMPED card prove currency where the board stamps at all', () => {
-    const prepared = 14 * 60 + 30
+    const prepared = Date.UTC(2026, 7, 13, 12, 30)
     // The board stamps its cards, so a matching region without one is not proof.
-    expect(cardStampIsCurrent('<p>no stamp here</p>', { sinceMinute: prepared, boardStamps: true })).toBe(false)
+    expect(cardStampIsCurrent('<p>no stamp here</p>', { sinceMs: prepared, boardStamps: true })).toBe(false)
     // A board that stamps nothing at all is a format without stamps — passing
     // there, because a boundary check may not trap a session on a format change.
-    expect(cardStampIsCurrent('<p>no stamp here</p>', { sinceMinute: prepared, boardStamps: false })).toBe(true)
+    expect(cardStampIsCurrent('<p>no stamp here</p>', { sinceMs: prepared, boardStamps: false })).toBe(true)
     const card =
       `<details class="card"><p>${boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</p></details>`
     const frags = cardProofFragments({
       cause: BOUNDARY_CAUSES.CONTEXT,
       destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
     })
-    expect(boardCarriesCard(card, frags, { sinceMinute: prepared, untilMinute: prepared }).carries).toBe(true)
+    expect(boardCarriesCard(card, frags, { sinceMs: prepared, nowMs: prepared }).carries).toBe(true)
     expect(
       boardCarriesCard(`<details class="card"><p><span class="stamp">Stand 09:00</span> x</p></details>${card}`, frags, {
-        sinceMinute: prepared,
-        untilMinute: prepared,
+        sinceMs: prepared,
+        nowMs: prepared,
       }).carries,
     ).toBe(false)
   })
