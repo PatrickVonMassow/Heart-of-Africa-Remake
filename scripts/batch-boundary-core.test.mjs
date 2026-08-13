@@ -28,6 +28,7 @@ import {
   hookCallTimestamp,
   boardCarriesCard,
   cardProofFragments,
+  CARD_PROOF_WINDOW,
   markerFresh,
   markerPhase,
   preparedReceipt,
@@ -1033,6 +1034,29 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
         cardProofFragments({ cause: BOUNDARY_CAUSES.POINT, destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW }),
       ).carries,
     ).toBe(false)
+  })
+
+  it('will not assemble a card out of TWO cards on the board (Sol on 9f93aeb)', () => {
+    // A watermark card announcing a fresh session, beside a POINT card that
+    // names a claiming window: no card on this board is a watermark handover to
+    // a claiming window, and the proof must not add them together.
+    const board =
+      `<article>${boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</article>` +
+      '<hr>'.padEnd(CARD_PROOF_WINDOW, '-') +
+      `<article>${boundaryCardText({ destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW, claimantSid: 'window-7', cause: BOUNDARY_CAUSES.POINT })}</article>`
+    const proof = boardCarriesCard(
+      board,
+      cardProofFragments({ cause: BOUNDARY_CAUSES.CONTEXT, destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW }),
+    )
+    expect(proof.carries).toBe(false)
+    expect(proof.split).toBe(true)
+    // …while the card that IS on it still proves itself.
+    expect(
+      boardCarriesCard(
+        board,
+        cardProofFragments({ cause: BOUNDARY_CAUSES.CONTEXT, destination: BOUNDARY_DESTINATIONS.FRESH_SESSION }),
+      ).carries,
+    ).toBe(true)
   })
 
   it('never traps on a board it cannot read — but says it could not verify', () => {

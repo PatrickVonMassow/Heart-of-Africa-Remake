@@ -360,6 +360,11 @@ export const BOUNDARY_CARD_HEADS = Object.freeze({
  * that pipeline starts escaping one. They are pinned against the real card text
  * by a test, so a reworded card breaks the test rather than the mechanism.
  */
+/** How far after the head sentence the rest of ONE card can reach. The longest
+ *  card is ~900 characters of text; the slack covers the board's HTML around it
+ *  while staying far below the distance to a neighbouring card. */
+export const CARD_PROOF_WINDOW = 2000
+
 export function cardProofFragments({ cause = BOUNDARY_CAUSES.POINT, destination } = {}) {
   const head =
     cause === BOUNDARY_CAUSES.CONTEXT
@@ -389,10 +394,23 @@ export function cardProofFragments({ cause = BOUNDARY_CAUSES.POINT, destination 
  * from the last one needs an identity on the card itself, which is the board's
  * user-owned structure, not this mechanism's to change.
  */
-export function boardCarriesCard(boardText, fragments = []) {
+export function boardCarriesCard(boardText, fragments = [], { windowChars = CARD_PROOF_WINDOW } = {}) {
   if (typeof boardText !== 'string' || !boardText.trim()) return { carries: true, verifiable: false, missing: [] }
-  const missing = (Array.isArray(fragments) ? fragments : []).filter((f) => f && !boardText.includes(f))
-  return { carries: missing.length === 0, verifiable: true, missing }
+  const list = (Array.isArray(fragments) ? fragments : []).filter(Boolean)
+  const missing = list.filter((f) => !boardText.includes(f))
+  if (missing.length > 0) return { carries: false, verifiable: true, missing }
+  if (list.length < 2) return { carries: true, verifiable: true, missing: [] }
+  // THE FRAGMENTS MUST SIT IN ONE CARD (Sol's review of 9f93aeb): searched
+  // independently, a context/fresh-session card BESIDE a point/claiming-window
+  // card satisfied a context/claiming-window proof no card on that board ever
+  // made. So the head is found first and the rest must follow it inside one
+  // card's length.
+  const [head, ...rest] = list
+  for (let at = boardText.indexOf(head); at >= 0; at = boardText.indexOf(head, at + 1)) {
+    const region = boardText.slice(at, at + windowChars)
+    if (rest.every((f) => region.includes(f))) return { carries: true, verifiable: true, missing: [] }
+  }
+  return { carries: false, verifiable: true, missing: rest, split: true }
 }
 
 /**
