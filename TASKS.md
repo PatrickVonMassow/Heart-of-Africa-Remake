@@ -6781,3 +6781,35 @@ to land than a mechanism that needs a review.
   its verdict.
   Criticality: medium — nothing is corrupted, but it burns a session's turn and leaves stuck
   processes behind, and it fires exactly on the session that follows the rule.
+
+- [ ] 678. A LANE IS ROUTED TO WHEN IT HAS NOTHING LEFT, AND WHAT DIES THERE IS RESCUED BY HAND
+  (measured 13.08.2026, 20:0x, on point 675). The routing sends difficult, complex or error-prone
+  work to Fable 5 from the start (`scripts/author-routing-core.mjs`), and it does so without ever
+  asking whether that lane still has volume. Today the Fable author built five commits of the
+  handover mechanism, two cross-vendor review rounds deep, and was then terminated mid-answer by
+  the provider's limit — with ELEVEN files uncommitted in its worktree, among them a recorded
+  review. Nothing in the machinery noticed: the agent reported a failure, its worktree still held
+  the work, and the only reason none of it was lost is that the supervising session opened that
+  worktree and looked. The routing table still sends the next two open points to the same empty
+  lane, so the same death is queued up twice.
+  FINAL STATE, two halves from one incident:
+  (1) A LANE HAS AN AVAILABILITY SWITCH and the routing consults it, the way `scripts/sol-share.mjs`
+  already gates the Sol lane. A lane marked unavailable does not receive work: the routing falls
+  to the next model of the CLAUDE.md §6 chain and NAMES the fall in its verdict, so a session
+  reading `--routing` sees "fable → opus 5, lane unavailable since <when>: <reason>" rather than a
+  lane that will die on contact. Marking it is one command, and the mark carries a reason and a
+  timestamp; nothing guesses a quota from the outside.
+  (2) NO DELEGATED AUTHOR'S DEATH LEAVES UNCOMMITTED WORK. When a delegated author ends — finished,
+  failed or killed — its worktree is INSPECTED before anything else happens to it: an uncommitted
+  or unpushed state is committed as the RESCUE commit CLAUDE.md §6 already defines (`[skip ci]` in
+  the subject, `Rescue: <what was interrupted>` trailer, the AUTHOR's model in the co-author line,
+  never the supervisor's) and pushed, and only then may the worktree be removed. A worktree removal
+  that would discard uncommitted work is REFUSED, naming what it holds.
+  VERIFIABLE: Vitest over the routing (an available lane keeps its work, an unavailable one falls
+  to the next chain member with the reason in the verdict, and an unknown lane name is an error
+  rather than a silent pass-through); Vitest over the rescue path (a dirty worktree produces a
+  rescue commit with both halves and the author's model, a clean one produces nothing, an unpushed
+  commit is pushed, and `worktree-cleanup` refuses a dirty tree); plus one observed delegated run
+  that is killed mid-work and whose branch afterwards carries everything the worktree held.
+  Criticality: high — it is the only failure mode on record that can destroy finished work outright,
+  and it fired today.
