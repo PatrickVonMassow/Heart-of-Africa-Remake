@@ -135,6 +135,9 @@ describe('authorLaneFor — which lane authors a point', () => {
     // after it — suppressing a REAL tag instead of an example.
     expect(laneTagIn('    ```\nAuthor lane: sol')).toBe('sol')
     expect(laneTagIn('   ```\nAuthor lane: sol\n   ```')).toBe('')
+    // …and a TAB is four columns, not zero (seventh round).
+    expect(laneTagIn('\t```\nAuthor lane: sol')).toBe('sol')
+    expect(laneTagIn(' \t```\nAuthor lane: opus')).toBe('opus')
   })
 
   it('names the subjects its own comments promise (cross-vendor P1)', () => {

@@ -119,7 +119,10 @@ export function laneTagIn(body) {
     const marker = fenceLine?.[2] ?? ''
     if (marker) {
       const info = (fenceLine[3] ?? '').trim()
-      const indent = (fenceLine[1] ?? '').replace(/[^ ]/g, '').length
+      // A TAB IS FOUR COLUMNS, not zero (seventh round): dropping it counted a
+      // tab-indented marker as flush, which is the same misclassification one
+      // whitespace character further along.
+      const indent = [...(fenceLine[1] ?? '')].reduce((n, c) => (c === '\t' ? n + 4 : c === ' ' ? n + 1 : n), 0)
       // THE INDENT RULE BINDS THE OPENER TOO (sixth round): four spaces make an
       // indented code block, not a fence, so treating one as an opener swallowed
       // every line after it — suppressing a REAL tag rather than an example.
