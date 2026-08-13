@@ -14,6 +14,7 @@ import {
   buildAuthoringPrompt,
   childEnv,
   formatAuthoringReport,
+  gatesProblem,
   HOUSE_RULES,
   isWithheldEnv,
   judgeAuthoring,
@@ -27,7 +28,7 @@ import {
 
 const solCommit = (sha, subject = 'Do a thing') => ({ sha, subject, trailers: 'GPT-5.6 Sol <noreply@openai.com>' })
 const okRun = { ok: true, kind: 'ok', cause: '' }
-const answered = parseAuthoringAnswer('DONE: built the thing\nGATES: unit, build and lint green\nOPEN: none\n')
+const answered = parseAuthoringAnswer('DONE: built the thing\nGATES: test:unit, build and lint all green\nOPEN: none\n')
 
 describe('the commit trailer of the lane', () => {
   it('is the allowlist’s own spelling, and passes the commit-msg gate', () => {
@@ -277,17 +278,36 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
     ).toEqual([])
   })
 
-  it('refuses to call a run clean when it says its own gates are not green (2nd round)', () => {
+  it('refuses to call a run clean when its GATES line is not three green gates', () => {
     // `GATES: not run` parsed perfectly and the command exited 0 — a delivery
-    // reported as clean while breaking the prompt's own mandatory rule.
-    for (const gates of ['not run', 'unit green, build FAILED', 'lint red', 'skipped the suites', 'pending']) {
-      const parsed = parseAuthoringAnswer(`DONE: a thing\nGATES: ${gates}\nOPEN: none`)
-      const j = judgeAuthoring({ outcome: okRun, commits: [solCommit('a'.repeat(40))], parsed })
+    // reported as clean while breaking the prompt's own mandatory rule (2nd
+    // round). And a blacklist alone sees a CONFESSION, never an OMISSION: the
+    // three gates must each be NAMED (3rd round).
+    for (const gates of [
+      'not run',
+      'unit green, build FAILED, lint green',
+      'test:unit, build and lint: lint red',
+      'skipped: unit, build, lint',
+      'unit green', //                       says nothing about build or lint
+      'unit passed; build not executed; lint passed',
+      'all good', //                         names none of them
+      '',
+    ]) {
+      const parsed = parseAuthoringAnswer(`DONE: a thing\nGATES: ${gates || 'x'}\nOPEN: none`)
+      const j = judgeAuthoring({ outcome: okRun, commits: [solCommit('a'.repeat(40))], parsed: gates ? parsed : { ok: true, gates: '' } })
       expect(j.clean, gates).toBe(false)
-      expect(j.problems.join(' '), gates).toMatch(/gates as NOT green/)
+      expect(j.problems.join(' '), gates).toMatch(/GATES line/)
     }
-    // A green report stays clean.
+    // A report naming all three as green stays clean — including one that says
+    // so with a negative WORD in a positive sentence.
     expect(judgeAuthoring({ outcome: okRun, commits: [solCommit('b'.repeat(40))], parsed: answered }).clean).toBe(true)
+    for (const gates of [
+      'test:unit, build and lint all passed without errors',
+      'vitest green, build green, oxlint clean',
+      'unit 10707 passed, build ok, lint zero findings',
+    ]) {
+      expect(gatesProblem(gates), gates).toBe('')
+    }
   })
 
   it('keeps the work of a run that died, and still names what went wrong', () => {

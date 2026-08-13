@@ -78,11 +78,23 @@ export const MODEL_FAMILY_WORD =
   /\b(claude|opus|fable|sonnet|haiku|sol|codex|gemini|grok|llama|mistral|qwen|deepseek|o\d(?:-\w+)?)\b|gpt|chatgpt/i
 
 /**
- * The addresses the two vendors' models commit under. A trailer carrying one is
+ * The addresses the two vendors' MODELS commit under. A trailer carrying one is
  * model evidence WHATEVER it calls itself, which is what catches the family this
  * list has never heard of — `OpenAI o3 <noreply@openai.com>`.
+ *
+ * THE LOCAL PART IS PART OF THE TEST (third cross-vendor round). Any address at
+ * the vendor's domain used to qualify, so a HUMAN who works there —
+ * `Alice <alice@openai.com>` — was read as a model and then refused as one
+ * outside the allowlist. Only the no-reply/bot forms our harnesses actually
+ * write count.
  */
-export const MODEL_VENDOR_ADDRESS = /@(?:anthropic|openai)\.com\b/i
+export const MODEL_VENDOR_ADDRESS = /\b(?:noreply|no-reply|bot|assistant)[^@\s]*@(?:anthropic|openai)\.com\b/i
+
+/** A family word with a VERSION ATTACHED TO IT — `Haiku 4.5`, `llama-3`,
+ *  `GPT-5.6 Sol`, `o3`. A digit merely somewhere in the line is not a version:
+ *  it made `Sol Smith 2nd` a model (third cross-vendor round). */
+const FAMILY_WITH_VERSION =
+  /\b(?:claude|opus|fable|sonnet|haiku|sol|codex|gemini|grok|llama|mistral|qwen|deepseek)[\s.\-_]*\d|gpt[\s.\-_]*\d|\bo\d(?:-\w+)?\b/i
 
 /**
  * Does a NON-Claude trailer name a model rather than a person?
@@ -103,10 +115,10 @@ export const MODEL_VENDOR_ADDRESS = /@(?:anthropic|openai)\.com\b/i
  */
 export function namesNonClaudeModel(cleaned, raw = cleaned) {
   const text = String(cleaned ?? '')
-  if (!MODEL_FAMILY_WORD.test(text)) return MODEL_VENDOR_ADDRESS.test(String(raw ?? ''))
   if (MODEL_VENDOR_ADDRESS.test(String(raw ?? ''))) return true
-  // A version beside the family word: `Haiku 4.5`, `GPT-5.6 Sol`, `llama-3`.
-  return /\d/.test(text)
+  if (!MODEL_FAMILY_WORD.test(text)) return false
+  // A version ATTACHED to the family word: `Haiku 4.5`, `GPT-5.6 Sol`, `llama-3`.
+  return FAMILY_WITH_VERSION.test(text)
 }
 
 /** A co-author trailer this guard treats as naming a MODEL rather than a human. */

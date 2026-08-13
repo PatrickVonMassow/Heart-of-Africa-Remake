@@ -114,6 +114,13 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(laneTagIn('> Author lane: sol')).toBe('sol')
     // The LAST tag wins: a spec revises itself at the end.
     expect(laneTagIn('Author lane: sol\n… revised.\nAuthor lane: opus')).toBe('opus')
+    // Nor is a tag with prose after it a tag (third cross-vendor round): the
+    // anchor had no end, so `Author lane: sol is the example spelling` routed.
+    expect(laneTagIn('Author lane: sol is the example spelling')).toBe('')
+    expect(laneTagIn('Author lane: sol.')).toBe('sol')
+    // …and a FENCED example is an example, which is where a document shows one.
+    expect(laneTagIn('The tag looks like this:\n```\nAuthor lane: sol\n```\n')).toBe('')
+    expect(laneTagIn('~~~\nAuthor lane: fable\n~~~\nAuthor lane: opus')).toBe('opus')
   })
 
   it('names the subjects its own comments promise (cross-vendor P1)', () => {

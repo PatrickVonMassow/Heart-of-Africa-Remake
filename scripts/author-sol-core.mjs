@@ -53,6 +53,11 @@ export const AUTHOR_TIMEOUT_MS = 60 * 60_000
  * a commit is durable within two minutes of being made rather than at the end of
  * an hour-long run. It is a fast-forward of a branch only this run is writing,
  * so it cannot collide with the work in progress.
+ *
+ * THIS IS A RESIDUAL, NOT COMPLIANCE (third cross-vendor round). The rule says
+ * immediately; this says within two minutes, and a container that dies inside
+ * that window loses exactly what the rule protects. It is the smallest gap the
+ * trade allows, and it is named rather than counted as a rule kept.
  */
 export const PUSH_INTERVAL_MS = 2 * 60_000
 
@@ -86,7 +91,7 @@ export const KILL_GRACE_MS = 20_000
  * does not.
  */
 export const SENSITIVE_ENV =
-  /(?:^|_)(TOKENS?|SECRETS?|PASSWORDS?|PASSWD|CREDENTIALS?|PAT|KEYS?|AUTH|ASKPASS|COOKIE|SESSION|JWT)(?:_|$)|API_?KEYS?|DATABASE_URL|CONNECTION_STRING|PGPASSWORD|_PWD$/i
+  /(?:^|_)(TOKENS?|SECRETS?|PASSWORDS?|PASSWD|CREDENTIALS?|PAT|KEYS?|AUTH|ASKPASS|COOKIE|SESSION|JWT|NETRC|KUBECONFIG)(?:_|$)|API_?KEYS?|DATABASE_URL|CONNECTION_STRING|PGPASS|PGSERVICEFILE|NETRC|KUBECONFIG|_PWD$/i
 
 /**
  * …and the whole `GIT_CONFIG_*` family goes together, whatever it is called.
@@ -253,7 +258,7 @@ export function buildAuthoringPrompt({ point = '', brief = '', branch = '', find
     '',
     'WHEN YOU ARE DONE, end your final message with exactly these lines and nothing after them:',
     'DONE: <what you built, in one line>',
-    'GATES: <the result of test:unit, build and lint, in one line>',
+    'GATES: <NAME each of test:unit, build and lint with what it did — an unnamed gate reads as one you did not run>',
     'OPEN: <what you left undone or escalated, or the single word none>',
   ].join('\n')
 }
@@ -261,7 +266,36 @@ export function buildAuthoringPrompt({ point = '', brief = '', branch = '', find
 /** What a GATES line says when the gates are not green. Deliberately broad: the
  *  cost of a false positive is one line of explanation in a report a human reads
  *  anyway, the cost of a false negative is a red delivery reported as clean. */
-const NOT_GREEN = /\b(not run|didn'?t run|un-?run|skipped|failing|failed|fails|red|error|broken|unverified|pending)\b/i
+const NOT_GREEN =
+  /\b(not run|not executed|didn'?t run|un-?run|skipped|failing|failed|fails|red|errors?|broken|unverified|pending)\b/i
+
+/** …with the phrases that contain a negative WORD while saying the opposite cut
+ *  out first: "passed without error" is a green line (third cross-vendor round). */
+const NEGATED = /\b(?:without|no|zero)\s+(?:errors?|failures?|warnings?)\b/gi
+
+/** The three gates the house rules demand, each of which must be NAMED. A line
+ *  naming one and staying silent about the others reported a clean run for two
+ *  gates nobody ran (third cross-vendor round) — the blacklist alone could not
+ *  see an omission, only a confession. */
+const GATE_NAMES = Object.freeze([
+  { gate: 'test:unit', re: /\b(test:unit|unit|vitest)\b/i },
+  { gate: 'build', re: /\bbuild\b/i },
+  { gate: 'lint', re: /\b(lint|oxlint)\b/i },
+])
+
+/**
+ * What is wrong with a GATES line, or '' when it reports all three green.
+ *
+ * Both halves are needed: the gates must be NAMED (an omission is invisible to a
+ * word blacklist) and none of them may be reported as anything but green.
+ */
+export function gatesProblem(gates) {
+  const line = String(gates ?? '').trim()
+  if (!line) return 'it reports no gate result at all'
+  const missing = GATE_NAMES.filter(({ re }) => !re.test(line)).map(({ gate }) => gate)
+  if (missing.length) return `it does not say what ${missing.join(' and ')} did`
+  return NOT_GREEN.test(line.replace(NEGATED, ' ')) ? 'it reports a gate as anything but green' : ''
+}
 
 /** The closing lines of an authoring answer, read off the END of the message. */
 export function parseAuthoringAnswer(text) {
@@ -331,8 +365,9 @@ export function judgeAuthoring({ outcome = {}, commits = [], parsed = {}, dirty 
   // exited 0 — reporting as a delivery something the prompt's own rules refuse.
   // The reviewer runs the gates itself regardless; this is about the exit code
   // a script chains on.
-  else if (NOT_GREEN.test(String(parsed.gates ?? ''))) {
-    problems.push(`the run reports its own gates as NOT green ("${String(parsed.gates).trim()}")`)
+  else {
+    const gates = gatesProblem(parsed.gates)
+    if (gates) problems.push(`the run's own GATES line is not a report of three green gates: ${gates} ("${String(parsed.gates).trim()}")`)
   }
   return {
     // DELIVERED means reviewable work exists, which is not the same as a clean

@@ -104,7 +104,16 @@ export const VERIFICATION_MARKERS = Object.freeze([
  */
 export function laneTagIn(body) {
   let found = ''
+  let fenced = false
   for (const line of String(body ?? '').split(/\r?\n/)) {
+    // A FENCED EXAMPLE IS STILL AN EXAMPLE (third cross-vendor round): the whole
+    // purpose is that a document showing the convention cannot route points by
+    // showing it, and a code block is where such a document shows it.
+    if (/^[\s>]*(```|~~~)/.test(line)) {
+      fenced = !fenced
+      continue
+    }
+    if (fenced) continue
     // A list marker or blockquote may precede it; a quote character may not. The
     // line must also END there (second cross-vendor round): without the closing
     // anchor, `Author lane: sol is the example spelling` was still an operative

@@ -555,6 +555,17 @@ describe('the GPT-5.6 Sol authoring lane', () => {
     // A version, or the vendor's own address, still identifies the model.
     expect(classifyTrailer('Sol <noreply@openai.com>')).toBe('allowed')
     expect(classifyTrailer('Haiku 4.5 <s@example.com>')).toBe('forbidden')
+    // THIRD ROUND, both halves of the same over-reach: a person who WORKS at a
+    // vendor is not a model, and a digit merely present in the line is not a
+    // version. `alice@openai.com` and `Sol Smith 2nd` were both read as models.
+    for (const t of ['Alice <alice@openai.com>', 'Sol Smith 2nd <s@example.com>', 'Bob Grok III <b@anthropic.com>']) {
+      expect(classifyTrailer(t), t).toBe('allowed')
+      expect(modelNamesIn(t), t).toEqual([])
+    }
+    // …while the bot addresses our harnesses actually write still identify one.
+    for (const t of ['OpenAI o3 <noreply@openai.com>', 'whatever-9 <bot@anthropic.com>']) {
+      expect(classifyTrailer(t), t).toBe('forbidden')
+    }
   })
 
   it('finds a forbidden non-Claude commit in the log window', () => {

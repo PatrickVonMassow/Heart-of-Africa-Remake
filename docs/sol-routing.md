@@ -125,9 +125,16 @@ the review still found problems, which sends it to Fable whatever the text says.
 `feat/` branch, the point handed over as a BRIEF rather than a reading
 assignment, and a commit per self-contained step. The child is given no
 credential, so the WRAPPER pushes for it — every two minutes while the run
-continues and again when it ends, which keeps §6's durability rule without
-handing a push token to a run that has no sandbox. It runs no gate of its own
-and merges nothing.
+continues and again when it ends. That is a **residual, not compliance**: §6
+says immediately, and a container dying inside those two minutes loses exactly
+what the rule protects; it is the smallest gap available without handing a push
+token to a run that has no sandbox.
+
+The author runs the three cheap gates on its own work (`test:unit`, `build`,
+`lint`) and must name each of them in its closing report — a gate it does not
+name is read as one it did not run. What it does **not** do is verify: the
+browser suites, the picture and the verdict are the reviewer's, which re-runs
+the gates rather than believing the report. It merges nothing.
 
 **The sandbox is off, and it has to be.** This container cannot create
 unprivileged user namespaces, so codex's bubblewrap launcher dies before any

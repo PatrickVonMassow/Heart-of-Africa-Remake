@@ -112,6 +112,10 @@ export function pushBranch(branch, { cwd = process.cwd(), timeoutMs = PUSH_TIMEO
     encoding: 'utf8',
     windowsHide: true,
     timeout: timeoutMs,
+    // SIGKILL, not SIGTERM (third round): a polite signal a hung transport can
+    // ignore is not a bound, and this call blocks the loop the run's own timer
+    // lives on. Bounded at one minute, it delays that timer by at most a minute.
+    killSignal: 'SIGKILL',
   })
   return { ok: res.status === 0 && !res.error, why: (res.stderr || res.error?.message || '').trim() }
 }
@@ -137,12 +141,27 @@ export async function runAuthoringCodex({
 }) {
   const outFile = join(tmpdir(), `author-sol-${process.pid}-${Date.now()}.txt`)
   const args = authoringCodexArgs({ modelId, effort: SOL_REASONING_EFFORT, cwd, outputFile: outFile, prompt })
+  // ITS OWN PROCESS GROUP (third cross-vendor round). Signalling the child alone
+  // left its shells and test runners alive: they went on writing to the worktree
+  // AFTER the commits had been inspected, pushed and reported, so the report
+  // described a branch that was still moving. `detached` makes the run a group
+  // leader, and the kill below takes the group.
   const child = spawn('codex', args, {
     cwd,
     env: childEnv(process.env),
     windowsHide: true,
+    detached: process.platform !== 'win32',
     stdio: ['ignore', 'pipe', 'pipe'],
   })
+  /** Signal the whole run — group where we have one, the child otherwise. */
+  const killRun = (signal) => {
+    try {
+      if (child.pid && process.platform !== 'win32') process.kill(-child.pid, signal)
+      else child.kill(signal)
+    } catch {
+      /* already gone: nothing to signal, and that is the outcome we wanted */
+    }
+  }
   let stdout = ''
   let stderr = ''
   child.stdout.on('data', (d) => {
@@ -157,12 +176,12 @@ export async function runAuthoringCodex({
   const escalations = []
   const killer = setTimeout(() => {
     timedOut = true
-    child.kill('SIGTERM')
-    // A BOUND, NOT A REQUEST (second cross-vendor round): a child that ignores
-    // SIGTERM gets SIGKILL, and if its pipes are still held open by a grandchild
-    // after that, the wrapper stops waiting rather than hanging for ever. What
-    // was committed is on the branch either way, and that is what gets judged.
-    escalations.push(setTimeout(() => child.kill('SIGKILL'), KILL_GRACE_MS))
+    killRun('SIGTERM')
+    // A BOUND, NOT A REQUEST (second cross-vendor round): a run that ignores
+    // SIGTERM gets SIGKILL, and if its pipes are still held open after that, the
+    // wrapper stops waiting rather than hanging for ever. What was committed is
+    // on the branch either way, and that is what gets judged.
+    escalations.push(setTimeout(() => killRun('SIGKILL'), KILL_GRACE_MS))
     escalations.push(setTimeout(() => settle({ spawnError: null, exitCode: 1 }), KILL_GRACE_MS * 2))
   }, timeoutMs)
   // The interim push only runs while the branch has moved, so an idle run costs
