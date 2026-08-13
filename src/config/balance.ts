@@ -1340,8 +1340,8 @@ export const balance: BalanceConfig = {
     // Calibrated against the audio graph, not by feel (point 605). At the
     // master's input a syllable spoken beside the player arrives at
     // SPEECH_PEAK × ambienceVolume × this × the syllable's own synthesis gain
-    // (0.18 × 1.5 × ~2.07), a village drum beat at 0.9 × its layer 0.5 ×
-    // ambientVolume 0.5 — so the voices sit ~2.5× over the drums they must
+    // (0.18 × 1.5 × ~2.07), a village drum beat at 0.9 × its layer 0.42 ×
+    // ambientVolume 0.5 — so the voices sit ~3× over the drums they must
     // carry through, and the loudest realistic moment (two close speakers, the
     // drum bed, a footstep) still stays under full scale. 0.5, the level
     // inherited from the ambient bus in point 577, left them BELOW the drums,

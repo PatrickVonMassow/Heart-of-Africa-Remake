@@ -279,8 +279,9 @@ export function drumBedPhrasePlan(
   previousPattern: number | null,
   firstBarOrdinal: number,
   random: () => number = Math.random,
+  config: Readonly<typeof balance.drumBed> = balance.drumBed,
 ): DrumBedPhrasePlan {
-  const c = balance.drumBed
+  const c = config
   const bars = Math.max(1, Math.round(c.phraseBars))
   const { tempoScale, pitchScale } = drumBedVillageSpread(villageId, c.tempoSpread, c.pitchSpread)
   const step = Math.max(0.02, c.stepSeconds * tempoScale)

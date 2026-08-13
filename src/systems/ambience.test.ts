@@ -39,24 +39,19 @@ describe('village drum bed phrase selection', () => {
   }
 
   it('varies across many bars and never repeats a pattern back to back', () => {
-    const oldBars = balance.drumBed.phraseBars
-    balance.drumBed.phraseBars = 3
-    try {
-      const chosen: number[] = []
-      let previous: number | null = null
-      let ordinal = 0
-      const random = sequence(0, 0.99, 0.34, 0.7, 0.12)
-      for (let phrase = 0; phrase < 8; phrase++) {
-        const plan = drumBedPhrasePlan('bambara-village', 0, previous, ordinal, random)
-        chosen.push(...plan.patternIndices)
-        previous = plan.patternIndices.at(-1) ?? previous
-        ordinal += plan.patternIndices.length
-      }
-      expect(new Set(chosen).size).toBe(DRUM_BED_PATTERNS.length)
-      for (let i = 1; i < chosen.length; i++) expect(chosen[i]).not.toBe(chosen[i - 1])
-    } finally {
-      balance.drumBed.phraseBars = oldBars
+    const config = { ...balance.drumBed, phraseBars: 3 }
+    const chosen: number[] = []
+    let previous: number | null = null
+    let ordinal = 0
+    const random = sequence(0, 0.99, 0.34, 0.7, 0.12)
+    for (let phrase = 0; phrase < 8; phrase++) {
+      const plan = drumBedPhrasePlan('bambara-village', 0, previous, ordinal, random, config)
+      chosen.push(...plan.patternIndices)
+      previous = plan.patternIndices.at(-1) ?? previous
+      ordinal += plan.patternIndices.length
     }
+    expect(new Set(chosen).size).toBe(DRUM_BED_PATTERNS.length)
+    for (let i = 1; i < chosen.length; i++) expect(chosen[i]).not.toBe(chosen[i - 1])
   })
 
   it('guarantees that at least half of every phrase is rests', () => {
@@ -958,9 +953,10 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       expect(balance.ambienceVolume).toBe(0.1)
       expect(balance.ambientVolume).toBe(0.5)
       expect(balance.communication.speechVolume).toBe(1.5)
+      expect(balance.drumBed.villageGain).toBe(0.42)
       const { drums, speech } = measure()
       expect(drums).toBeGreaterThan(0)
-      // MEASURED: 2.04× the drum beat (0.459 against 0.225) at the pinned
+      // MEASURED: 2.43× the drum beat (0.459 against 0.189) at the pinned
       // synthesis gain. Under 1 is the reported bug; a shout is no fix either.
       expect(speech / drums).toBeGreaterThanOrEqual(1.6)
       expect(speech / drums).toBeLessThanOrEqual(4)
