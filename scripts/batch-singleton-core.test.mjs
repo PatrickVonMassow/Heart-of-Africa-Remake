@@ -68,6 +68,7 @@ import {
   LAUNCHER_TICK_MS,
   SPAWN_IDENTITY_TOLERANCE_MS,
 } from './batch-singleton.mjs'
+import { BOUNDARY_FRESH_MS } from './batch-boundary-core.mjs'
 import { assessOwnerWork } from './batch-in-flight-core.mjs'
 import {
   LEASE_MS,
@@ -1211,6 +1212,35 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     const lock = readOwnerLock(lockPath)
     expect(lock.handedOver).toBe(true)
     expect(lock.handedOverAt).toBe(at + 5000)
+  })
+
+  it('a STALE committed marker seals nothing — withdrawal proceeds (Sol finding 2)', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    const at = Date.now() - BOUNDARY_FRESH_MS - 60_000 // written over an hour ago
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 675, now: at })
+    writeFileSync(
+      markerPath,
+      JSON.stringify({ v: 2, phase: 'committed', cause: 'point', sessionId: 's1', point: 675, at }),
+    )
+    // Past its freshness the marker cannot authorise a stop, so keeping the
+    // handover alive beside resumed work would spawn a successor next to it.
+    expect(withdrawHandover('s1', { lockPath, now: Date.now() })).toBe(true)
+    expect(existsSync(markerPath)).toBe(false)
+    expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
+  })
+
+  it('a stale sealed marker does not carry the heartbeat handover either', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    const at = Date.now() - BOUNDARY_FRESH_MS - 60_000
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 675, now: at })
+    writeFileSync(
+      markerPath,
+      JSON.stringify({ v: 2, phase: 'committed', cause: 'point', sessionId: 's1', point: 675, at }),
+    )
+    heartbeat('s1', { lockPath, now: Date.now(), skipBackfill: true, preserveHandover: false })
+    expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
   })
 
   it('a LEGACY (un-phased) marker keeps the old withdrawal semantics exactly', () => {

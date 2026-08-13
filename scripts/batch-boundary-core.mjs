@@ -116,11 +116,21 @@ export function assessBoundary({ marker, sid, now, closure, freshMs = BOUNDARY_F
   }
   // A CONTEXT boundary (point 675, defeat 3) records no point and needs no
   // closure: its licence is the recorded watermark reading, taken at commit time
-  // from a real measurement. Freshness and session binding hold exactly as for a
-  // point boundary.
+  // from a real measurement — and the marker is a CLAIM, re-judged here (Sol
+  // review of 807c2bf, finding 5): the reading must actually clear the recorded
+  // mark, or a marker carrying one token would authorise a stop. Freshness and
+  // session binding hold exactly as for a point boundary.
   if (marker.cause === BOUNDARY_CAUSES.CONTEXT) {
-    if (typeof marker.tokens !== 'number' || !(marker.tokens > 0)) {
+    if (
+      typeof marker.tokens !== 'number' ||
+      !(marker.tokens > 0) ||
+      typeof marker.watermark !== 'number' ||
+      !(marker.watermark > 0)
+    ) {
       return { valid: false, point: null, reason: 'context-marker-unmeasured' }
+    }
+    if (marker.tokens < marker.watermark) {
+      return { valid: false, point: null, reason: 'context-below-watermark' }
     }
     if (typeof marker.at !== 'number' || !(now - marker.at < freshMs)) {
       return { valid: false, point: null, reason: 'marker-stale' }

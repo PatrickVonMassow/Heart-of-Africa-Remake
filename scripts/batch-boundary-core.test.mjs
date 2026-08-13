@@ -677,7 +677,8 @@ describe('the marker survives everything --prepare prescribes (point 675)', () =
 // but ONLY on a recorded real measurement.
 // ---------------------------------------------------------------------------
 describe('assessBoundary — the context-watermark cause', () => {
-  const ctx = (over = {}) => marker({ phase: 'committed', cause: 'context', point: null, tokens: 165_000, ...over })
+  const ctx = (over = {}) =>
+    marker({ phase: 'committed', cause: 'context', point: null, tokens: 165_000, watermark: 150_000, ...over })
 
   it('is valid without any point closure, on a recorded measurement', () => {
     const b = assessBoundary({ marker: ctx(), sid: SID, now: NOW, closure: 'unknown' })
@@ -691,6 +692,20 @@ describe('assessBoundary — the context-watermark cause', () => {
     expect(assessBoundary({ marker: ctx({ tokens: 0 }), sid: SID, now: NOW, closure: 'unknown' }).reason).toBe(
       'context-marker-unmeasured',
     )
+    // …and the recorded MARK is as mandatory as the reading (Sol finding 5).
+    expect(assessBoundary({ marker: ctx({ watermark: undefined }), sid: SID, now: NOW, closure: 'unknown' }).reason).toBe(
+      'context-marker-unmeasured',
+    )
+  })
+
+  it('RE-JUDGES the claim: a reading below the recorded mark authorises nothing (Sol finding 5)', () => {
+    const b = assessBoundary({ marker: ctx({ tokens: 1 }), sid: SID, now: NOW, closure: 'unknown' })
+    expect(b).toEqual({ valid: false, point: null, reason: 'context-below-watermark' })
+    expect(
+      assessBoundary({ marker: ctx({ tokens: 149_999 }), sid: SID, now: NOW, closure: 'unknown' }).valid,
+    ).toBe(false)
+    // At the mark exactly is past it — the same >= the live decision uses.
+    expect(assessBoundary({ marker: ctx({ tokens: 150_000 }), sid: SID, now: NOW, closure: 'unknown' }).valid).toBe(true)
   })
 
   it('keeps the freshness and session binding of every marker', () => {

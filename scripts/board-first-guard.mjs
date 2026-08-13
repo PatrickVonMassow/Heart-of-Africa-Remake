@@ -40,6 +40,7 @@ import {
   renewLease,
   readFence,
   readBoundaryMarker,
+  readOwnerLock,
 } from './batch-singleton.mjs'
 import { fenceDecision } from './batch-lease-core.mjs'
 import {
@@ -244,16 +245,22 @@ try {
   // deletion: the deny names `--clear` as the one-command way back, and the
   // closing set (card publish, focus, the boundary CLI itself) stays open, so
   // nothing the ending still needs is ever blocked. Placed after the worktree
-  // exemption: an ADOPTED delegated agent keeps working through the handover.
+  // exemption (an ADOPTED delegated agent keeps working through the handover)
+  // and bound to the CURRENT batch lock (Sol review of 807c2bf, finding 3): a
+  // session that no longer owns the batch has no boundary to protect, whatever
+  // marker it once wrote.
   try {
-    const sealed = sealedBoundaryDeny({
-      marker: readBoundaryMarker(),
-      sid: payload.session_id || '',
-      now: Date.now(),
-      toolName: payload.tool_name,
-      command: input0.command,
-      filePath: input0.file_path ?? input0.notebook_path,
-    })
+    const ownSid = payload.session_id || ''
+    const sealed = readOwnerLock()?.sessionId !== ownSid
+      ? { deny: false, reason: null }
+      : sealedBoundaryDeny({
+          marker: readBoundaryMarker(),
+          sid: ownSid,
+          now: Date.now(),
+          toolName: payload.tool_name,
+          command: input0.command,
+          filePath: input0.file_path ?? input0.notebook_path,
+        })
     if (sealed.deny) {
       process.stdout.write(
         JSON.stringify({

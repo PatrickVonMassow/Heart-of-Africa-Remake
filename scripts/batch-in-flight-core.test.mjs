@@ -64,10 +64,12 @@ import {
 import { LEASE_MS } from './batch-lease-core.mjs'
 import {
   absPath,
+  gatherHandoverTransfer,
   gatherInFlight,
   maxAgeMs,
   readDeclaration,
   resolveRefName,
+  transferredMutationRefusal,
   writeDeclaration,
   clearDeclaration,
   worktreeBranch,
@@ -1967,5 +1969,99 @@ describe('adoptionAssessment — expired or contradictory evidence ALERTS, never
     })
     expect(a.adopt).toBe(false)
     expect(a.alerts.some((l) => l.includes('gone'))).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE TRANSFER'S LIFECYCLE (Sol review of 807c2bf, findings 4 and 6): the
+// transfer is session-bound and idempotent, and a transferred record under a
+// live committed boundary may not be cleared or overwritten from this side.
+// ---------------------------------------------------------------------------
+describe('gatherHandoverTransfer — session-bound and idempotent', () => {
+  const withTempLock = (fn) => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-transfer-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    try {
+      fn({ lockPath, path: statePathsFor(lockPath).inFlightPath })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  it('an ALREADY-TRANSFERRED declaration is not re-judged — commit only repeats its summary', () => {
+    withTempLock(({ lockPath, path }) => {
+      writeDeclaration(
+        declaration({ transfer: { v: 1, by: SID, at: 1, checkpoints: [{ ref: 'feat/x', sha: 'a'.repeat(40) }] } }),
+        path,
+      )
+      const t = gatherHandoverTransfer(SID, { lockPath })
+      expect(t.blocked).toBe(false)
+      expect(t.note).toContain('already awaits adoption')
+      expect(t.commit()).toContain('feat/x@aaaaaaaa')
+      // Nothing was rewritten: the original transfer stamp survives.
+      expect(readDeclaration(path).transfer.at).toBe(1)
+    })
+  })
+
+  it('a FOREIGN declaration neither blocks this owner nor gets transferred (finding 6)', () => {
+    withTempLock(({ lockPath, path }) => {
+      writeDeclaration(
+        declaration({ sessionId: 'someone-else', evidence: [{ kind: 'branch', ref: 'feat/unpushed' }] }),
+        path,
+      )
+      const t = gatherHandoverTransfer(SID, { lockPath })
+      expect(t.blocked).toBe(false)
+      expect(t.note).toContain('foreign')
+      expect(t.commit).toBeNull()
+      expect(readDeclaration(path).transfer).toBeUndefined()
+    })
+  })
+
+  it('the OWN pid/log-only declaration still blocks with the named recovery choices', () => {
+    withTempLock(({ lockPath, path }) => {
+      writeDeclaration(declaration({ evidence: [{ kind: 'pid', pid: 1234, startedAt: 1 }] }), path)
+      const t = gatherHandoverTransfer(SID, { lockPath })
+      expect(t.blocked).toBe(true)
+      expect(t.message).toContain('only pids/logs')
+      expect(t.message).toContain('CHECKPOINT')
+    })
+  })
+})
+
+describe('transferredMutationRefusal — the adoption record is not this side’s to destroy (finding 4)', () => {
+  const transferred = declaration({ transfer: { v: 1, by: SID, at: 1, checkpoints: [] } })
+  const sealed = { v: 2, phase: 'committed', cause: 'point', sessionId: SID, point: 675, at: NOW - 1000 }
+
+  it('refuses --clear/--waiting-on while a transferred record sits under a live committed marker', () => {
+    const msg = transferredMutationRefusal({ declaration: transferred, marker: sealed, now: NOW })
+    expect(msg).toContain('adoption record')
+    expect(msg).toContain('--adopt')
+    expect(msg).toContain('batch-boundary.mjs --clear')
+  })
+
+  it('allows mutation once the marker is gone, stale, or merely legacy', () => {
+    expect(transferredMutationRefusal({ declaration: transferred, marker: null, now: NOW })).toBeNull()
+    expect(
+      transferredMutationRefusal({
+        declaration: transferred,
+        marker: { ...sealed, at: NOW - 2 * 60 * 60 * 1000 },
+        now: NOW,
+      }),
+    ).toBeNull()
+    expect(
+      transferredMutationRefusal({ declaration: transferred, marker: { ...sealed, phase: undefined }, now: NOW }),
+    ).toBeNull()
+  })
+
+  it('allows mutation for an untransferred or already-adopted declaration', () => {
+    expect(transferredMutationRefusal({ declaration: declaration({}), marker: sealed, now: NOW })).toBeNull()
+    expect(
+      transferredMutationRefusal({
+        declaration: { ...transferred, adopted: { from: SID, at: NOW } },
+        marker: sealed,
+        now: NOW,
+      }),
+    ).toBeNull()
+    expect(transferredMutationRefusal({ declaration: null, marker: sealed, now: NOW })).toBeNull()
   })
 })

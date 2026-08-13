@@ -65,6 +65,25 @@ import {
   normaliseFence,
 } from './batch-lease-core.mjs'
 import { IDLE_WINDOW_MS, ownershipVerdict } from './batch-ownership-core.mjs'
+import { BOUNDARY_FRESH_MS } from './batch-boundary-core.mjs'
+
+/**
+ * Does a SEALED boundary marker protect the handover for THIS session right now
+ * (point 675, defeat 1)? Only a committed marker that is FRESH and the
+ * session's own: a stale or foreign one protects nothing (Sol review of
+ * 807c2bf, finding 2) — past its freshness the marker cannot authorise a stop
+ * anyway, so keeping the handover alive beside resumed work would let the
+ * launcher spawn a successor next to a working session.
+ */
+function sealedMarkerHolds(marker, sessionId, now) {
+  return (
+    marker?.phase === 'committed' &&
+    !!sessionId &&
+    marker.sessionId === sessionId &&
+    typeof marker.at === 'number' &&
+    now - marker.at < BOUNDARY_FRESH_MS
+  )
+}
 
 // --- Constants (exported for tests and callers) -------------------------------
 
@@ -1268,11 +1287,12 @@ export function heartbeat(sessionId, opts = {}) {
     // A SEALED (committed) boundary marker carries the handover through EVERY
     // later hook (point 675, defeat 1): post-commit mutations are denied loudly
     // at PreToolUse, and the reads that do run must not un-take the flag the
-    // launcher spawns on. Only read when a handover actually stands — the hot
-    // path pays nothing.
+    // launcher spawns on. Bound to freshness and to THIS session (Sol review of
+    // 807c2bf, finding 2) — a stale or foreign marker carries nothing. Only
+    // read when a handover actually stands, so the hot path pays nothing.
     let sealed = false
     try {
-      sealed = readJson(statePathsFor(lockPath).boundaryPath)?.phase === 'committed'
+      sealed = sealedMarkerHolds(readJson(statePathsFor(lockPath).boundaryPath), sessionId, now)
     } catch {
       /* an unreadable marker is not sealed */
     }
@@ -1575,7 +1595,7 @@ export function withdrawHandover(sessionId, opts = {}) {
   // (`sealedBoundaryDeny`), and only the deliberate `--clear` (or the user's own
   // prompt, `force`) withdraws. Without this, the seal would deny a mutation and
   // this withdrawal would still eat the marker for the call that was denied.
-  if (marker?.phase === 'committed' && opts.force !== true) {
+  if (sealedMarkerHolds(marker, sessionId, opts.now ?? Date.now()) && opts.force !== true) {
     try {
       appendFileSync(
         opts.logPath ?? statePathsFor(lockPath).boundaryLogPath,

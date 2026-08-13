@@ -30,6 +30,8 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import {
   readOwnerLock,
+  readBoundaryMarker,
+  resolveOwnership,
   probePid,
   ourClaudeProcess,
   statePathsFor,
@@ -38,6 +40,7 @@ import {
   LOCK_PATH,
   IN_FLIGHT_PATH,
 } from './batch-singleton.mjs'
+import { BOUNDARY_FRESH_MS, markerPhase } from './batch-boundary-core.mjs'
 import { DECLARED_WAIT_LEASE_MS } from './batch-lease-core.mjs'
 import {
   adoptionAssessment,
@@ -558,6 +561,39 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
   const path = statePathsFor(lockPath).inFlightPath
   const declaration = readDeclaration(path)
   if (!declaration) return { blocked: false, note: '', commit: null }
+  const summarise = (checkpoints) =>
+    (checkpoints ?? []).map((c) => `${c.ref ?? '?'}@${String(c.sha).slice(0, 8)}`).join(', ') || 'no checkpoints'
+  // IDEMPOTENT (Sol review of 807c2bf, finding 6): a declaration already
+  // transferred and not yet adopted is not re-judged and not re-transferred —
+  // the record awaiting adoption IS the handover's state, and `commit` only
+  // repeats its summary.
+  if (declaration.transfer && !declaration.adopted) {
+    return {
+      blocked: false,
+      note: `a transferred declaration already awaits adoption (${summarise(declaration.transfer.checkpoints)})`,
+      commit: () => summarise(declaration.transfer.checkpoints),
+    }
+  }
+  // SESSION-BOUND (same finding): a declaration this owner cannot be resolved
+  // to is not its to transfer — and it must not BLOCK this owner's handover
+  // either. It is left untouched and named; the successor's --adopt refuses
+  // an untransferred record, so nothing is silently inherited.
+  const lock = readOwnerLock(lockPath)
+  const owner = resolveOwnership({
+    lock: declaration,
+    sessionId: sid,
+    ancestor:
+      lock && typeof lock.pid === 'number' && lock.pid > 0
+        ? { pid: lock.pid, startedAt: lock.pidStartedAt ?? null }
+        : null,
+  })
+  if (!owner.mine) {
+    return {
+      blocked: false,
+      note: `a foreign in-flight declaration (session ${declaration.sessionId ?? '?'}) was left untouched — not this session's to transfer`,
+      commit: null,
+    }
+  }
   const assessment = assessTransfer({ items: transferItems(declaration, { cwd }) })
   if (!assessment.transferable) {
     return { blocked: true, message: transferBlockMessage(assessment), note: '', commit: null }
@@ -618,6 +654,28 @@ export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, n
     kept: assessment.kept.length,
     dropped: assessment.dropped.length,
   }
+}
+
+/**
+ * MAY THIS DECLARATION BE MUTATED AT ALL (Sol review of 807c2bf, finding 4)?
+ * `batch-in-flight` sits in the CLOSING SET, so the sealed-boundary deny never
+ * fires on it — but a TRANSFERRED, un-adopted declaration under a live
+ * committed marker is the SUCCESSOR'S adoption record, and `--clear` or a fresh
+ * `--waiting-on` would strand the very work the handover promised. Injectable
+ * and pure over its inputs, so the Vitest layer pins it. Null = mutation
+ * allowed; otherwise the refusal message.
+ */
+export function transferredMutationRefusal({ declaration, marker, now = Date.now() } = {}) {
+  if (!declaration || !declaration.transfer || declaration.adopted) return null
+  if (markerPhase(marker) !== 'committed') return null
+  if (!(typeof marker.at === 'number' && now - marker.at < BOUNDARY_FRESH_MS)) return null
+  return (
+    'THE DECLARATION IS TRANSFERRED under a committed boundary — it is the successor\'s adoption record now, ' +
+    'so clearing or overwriting it here would strand the work the handover promised. The successor takes it ' +
+    'with `node scripts/batch-in-flight.mjs --adopt`. If this session genuinely resumes work, withdraw the ' +
+    'boundary FIRST (`node scripts/batch-boundary.mjs --clear`) — then the declaration is yours again. ' +
+    'Nothing changed.'
+  )
 }
 
 // --- CLI -----------------------------------------------------------------------
@@ -704,6 +762,8 @@ if (isMain) {
     )
     process.exit(1)
   } else if (argv[0] === '--clear') {
+    const refusal = transferredMutationRefusal({ declaration: readDeclaration(), marker: readBoundaryMarker() })
+    if (refusal) fail(refusal)
     clearDeclaration()
     // …and the lease extension the declaration bought (point 556). The lock must
     // not go on carrying a `declaredWait` whose declaration is gone: the marker is
@@ -731,6 +791,11 @@ if (isMain) {
   } else if (argv[0] === '--waiting-on') {
     const waitingOn = String(argv[1] ?? '').trim()
     if (!waitingOn) fail(`--waiting-on needs a description of the wait.\n${usage}`)
+    const transferRefusal = transferredMutationRefusal({
+      declaration: readDeclaration(),
+      marker: readBoundaryMarker(),
+    })
+    if (transferRefusal) fail(transferRefusal)
     const evidence = []
     let slotsFreeReason = ''
     for (let i = 2; i < argv.length; i += 2) {
