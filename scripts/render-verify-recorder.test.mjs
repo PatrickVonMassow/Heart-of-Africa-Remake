@@ -168,13 +168,14 @@ describe('the captured lines charge the way the guard reads them', () => {
 
   it('charges the same output to the OTHER point on the other lane, where the goat red is real', () => {
     // The lanes never share an owner here: 506 is the software lane's rate
-    // problem and disclaims the hardware lane in its own words, so when one
-    // occurrence appeared there it got a point of its own (671) rather than
-    // being folded into 506 — which would have excused exactly the case 506
-    // says is real. What must never happen is both lanes reading 506.
+    // problem and disclaims the hardware lane in its own words. A hardware-lane
+    // occurrence therefore answers to point 642, whose spec names this very
+    // check among the sites its load-proofing sweep must classify. What must
+    // never happen is both lanes reading 506, which would excuse exactly the
+    // case 506 says is real.
     const lines = 'FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967'
     const reds = chargeReds(failedChecks(lines), { suite: 'polish', backend: 'webgl' })
-    expect(reds.map((r) => r.point)).toEqual([671])
+    expect(reds.map((r) => r.point)).toEqual([642])
   })
 
   it('charges a render-target leak to nothing, at maasai-village or anywhere else', () => {

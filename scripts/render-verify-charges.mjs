@@ -91,17 +91,21 @@ export const RED_CHARGES = [
       'on the WebGL 2 lane this check stays a real red.',
   },
   {
-    point: 671,
+    point: 642,
     suite: 'polish',
     backend: 'webgl',
     kind: 'check',
-    match: /settlement walker \(goat\)|fire shadows ON/i,
+    match: /settlement walker \(goat\)|fire shadows ON|handover zone itself carries neither/i,
     why:
-      'ONE occurrence, 12.08.2026 02:34 on WebGL 2, against eight of the same check on the ' +
-      'software WebGPU lane (those are point 506). Point 506 is backend-scoped in its own words ' +
-      '— "on the WebGL 2 lane this check stays a real red" — so this one is NOT covered there ' +
-      'and is charged to point 671, which must classify it by measurement (throttle probe) as ' +
-      'the rate problem reaching this lane, as a real point-300 slide, or as too thin to call.',
+      'THE THREE CASES POINT 642 NAMES BY HAND, made machine-readable 13.08.2026. Its spec lists ' +
+      'them as the sites its load-proofing sweep must classify: the goat\'s planted foot and ' +
+      '"fire shadows ON", both red on WebGL 2 on 12.08.2026 while a WebGPU run and two building ' +
+      'agents shared the machine and both green on the same commit on a quiet one, and the water ' +
+      'rim\'s "handover zone", red once and green on its retry. Point 506 must NOT swallow these: ' +
+      'it is the software lane\'s rate problem and says in its own words that on WebGL 2 the goat ' +
+      'check stays a real red — 642 is where a hardware-lane occurrence is answered, by repairing ' +
+      'the check into a state check or by declaring it timing and reporting it UNMEASURED under ' +
+      'load. The charge dies with 642, which is when each of them has an answer.',
   },
   {
     point: 514,

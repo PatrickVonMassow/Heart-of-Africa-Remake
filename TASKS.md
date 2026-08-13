@@ -160,41 +160,36 @@ put it is the mistake this line exists to stop.
   the release branch that is at stake.
   Bundle: Dorfleben.
 
-- [ ] 672. THE AMBIENT DRUMS FALL SILENT, AND THE DRUMMER HOLDS STILL WITH THEM (user
-  13.08.2026, testing the deployed state right after point 651 landed: "Und das Ambient-Trommeln
-  nervt immer noch und außerdem irritiert es, weil es mit Kommunikation verwechselt werden kann.
-  Deaktiviere es komplett. Außerdem soll der Trommler dann auch still halten. Aktuell passen
-  seine Bewegungen auch gar nicht zu dem Trommelgeräuschen. Ich hoffe, das tun sie, wenn man mit
-  dem Häuptling kommuniziert.").
-  THIS SUPERSEDES POINT 651, which made the bed varied rather than silent. 651 was the right
-  answer to "monotonous" and the wrong answer to the real complaint: an ambient drum that a
-  player can mistake for the drum MESSAGE damages the mechanic the release exists for. Variation
-  cannot fix that — only silence can. The work 651 delivered is not discarded blindly: its
-  planner and its calibration stay in the tree, switched OFF by default, so the decision is a
-  value and not a deletion, and a later design that wants a bed back has it.
+- [ ] 672. THE VILLAGE HAS NO AMBIENT DRUM, AND THE DRUMMER HOLDS STILL (user 13.08.2026,
+  testing the deployed state: "Und das Ambient-Trommeln nervt immer noch und außerdem irritiert
+  es, weil es mit Kommunikation verwechselt werden kann. Deaktiviere es komplett. Außerdem soll
+  der Trommler dann auch still halten. Aktuell passen seine Bewegungen auch gar nicht zu dem
+  Trommelgeräuschen. Ich hoffe, das tun sie, wenn man mit dem Häuptling kommuniziert.").
+  WHY SILENCE AND NOT VARIATION: an ambient drum a player can mistake for the drum MESSAGE
+  damages the mechanic this release exists for. No amount of variation removes that confusion —
+  only silence does.
   FINAL STATE:
-  1. THE BED IS SILENT by default: no ambient drum phrase is ever emitted, in the village or
-     near it (`emitDrumPhrase`/`startDrumEmitter` and the `drums` layer targets in
+  1. THE BED IS SILENT by default: no ambient drum phrase is emitted, in a village or near one
+     (`emitDrumPhrase`/`startDrumEmitter` and the `drums` layer targets in
      `src/systems/ambience.ts`, driven by `balance.drumBed` in `src/config/balance.ts`). The
-     switch is a debug-menu value like every other calibratable, defaulting to off, so it can be
-     heard again without a rebuild.
+     switch is a debug-menu value like every other calibratable, defaulting to off, so the bed
+     can be heard again without a rebuild and a later design keeps its planner.
   2. THE DRUM MESSAGE IS UNTOUCHED. `playDrumMessage` and the chief's answer keep working
-     exactly as they do; silencing the bed is what makes the message unmistakable.
-  3. THE DRUMMER HOLDS STILL when nothing is being drummed: with the bed off, the drummer NPC's
-     hands rest (`src/scenes/place/drummerPose.ts`), rather than miming strikes that no longer
-     sound. An idle drummer standing at his drum is the picture; a silent player striking it is
-     the bug the user saw.
+     exactly as they do; the silence is what makes the message unmistakable.
+  3. THE DRUMMER HOLDS STILL while nothing is drummed: his hands rest
+     (`src/scenes/place/drummerPose.ts`) instead of miming strikes that make no sound. An idle
+     drummer standing at his drum is the picture.
   4. THE DRUMMER MOVES WITH THE MESSAGE. While a drum message plays, his strikes follow ITS
      strike times — the same plan `playDrumMessage` renders — so what the player sees matches
-     what the player hears. This is the half the user hoped was already true and is not.
+     what the player hears.
   5. design.md §19's ambience list and CLAUDE.md are updated in the SAME commit wherever they
      name the drum bed as a standing ambience layer.
-  VERIFIABLE: Vitest for the silent default (no phrase is emitted with the switch off, the
-  message path still emits), for the drummer's rest pose while nothing plays, and for the strike
-  times matching the message plan; plus the `voice`/ambience browser check that no drum sounds
-  in a village at the default preset. The user's own judgment closes it at the deployed state.
-  Criticality: high — it is the user's second report on the same ambience, and it stands
-  directly in front of the communication mechanic this release exists to let him test.
+  VERIFIABLE: Vitest for the silent default (no phrase emitted with the switch off, the message
+  path still emits), for the drummer's rest pose while nothing plays, and for his strike times
+  matching the message plan; plus the ambience browser check that no drum sounds in a village at
+  the default preset. The user's judgment at the deployed state closes it.
+  Criticality: high — it is the user's second report on the same ambience, and it stands directly
+  in front of the communication mechanic this release exists to let him test.
   Bundle: Dorfleben.
 
 
@@ -6651,25 +6646,3 @@ to land than a mechanism that needs a review.
   Criticality: low — it costs a re-run, but it is the difference between closing a red by its
   cause and closing it by a green, which is exactly what point 640 forbids.
 
-- [ ] 671. THE GOAT'S PLANTED FOOT SLID ONCE ON THE LANE WHERE THAT IS A REAL RED (measured
-  12.08.2026, 02:34, `polish` on WebGL 2, one occurrence in nine recorded goat reds — the other
-  eight are all on the software WebGPU lane and are charged to point 506). Point 506's charge is
-  BACKEND-SCOPED ON PURPOSE and says so in its own words: the stance check is a RATE the software
-  lane cannot deliver, "on the WebGL 2 lane this check stays a real red". So this one occurrence
-  is not covered by it and must not be: on the hardware lane the check answers a product question
-  — does the planted foot hold its ground spot while the body walks over it (point 300)?
-  The same run also reddened on `fire shadows ON: the ground behind a ring stone is measurably
-  darker than beside it`, which may or may not share a cause; both belong to this point.
-  FINAL STATE: the occurrence is CLASSIFIED — either it is the same rate problem reaching the
-  WebGL 2 lane under load, which is settled by MEASUREMENT (`node scripts/throttle-probe.mjs
-  polish --section=<the goat's section> --runs 8` on a quiet machine, reporting the skew rate),
-  or the foot genuinely slides there, which is a point-300 regression and is fixed. Whichever it
-  is, the answer is written where the next reader finds it: a measured rate goes into point 506's
-  charge as an explicitly widened scope with its figures, a real slide is fixed and pinned by a
-  test. A third outcome is allowed and must be stated if it is what the measurement shows: one
-  occurrence in nine is too thin to classify, and then the point says so and states what would
-  settle it.
-  VERIFIABLE: the throttle-probe output with its skew rate, quoted; plus, for the fix case, a
-  failing-then-passing check.
-  Criticality: medium — it is one red on the lane whose verdicts we trust, and an uncharged red
-  on that lane blocks every render landing behind it.

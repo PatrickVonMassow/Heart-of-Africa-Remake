@@ -18047,3 +18047,14 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   asked once this lands.
   Criticality: medium — it is a sound the player cannot escape while in a village, and it sits
   next to the mechanic he is meant to be listening to. Bundle: Ton.
+
+- [x] 671. THE HARDWARE LANE'S GOAT RED — FOLDED INTO POINT 642 (filed and closed 13.08.2026).
+  Filed when a `polish` goat-stance red appeared on WebGL 2, the lane whose verdicts we trust,
+  while the eight others sat on the software WebGPU lane where point 506 owns them as a rate
+  problem it cannot answer. Closed the same day without separate work: point 642's spec already
+  NAMES this case — "the goat's planted foot and 'fire shadows ON', both red on WebGL 2 at 00:34
+  … and the water rim's 'handover zone'" — as the sites its load-proofing sweep must classify,
+  either by repairing the check into a state check or by declaring it timing and reporting it
+  UNMEASURED under load. Nothing is lost by the fold: the red is charged to 642 in
+  `scripts/render-verify-charges.mjs`, backend-scoped to WebGL 2 so point 506 can never swallow
+  a hardware-lane occurrence, and the two charge tests pin that pairing.
