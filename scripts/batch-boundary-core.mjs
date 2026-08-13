@@ -299,7 +299,12 @@ export function markerPhase(marker) {
  * bookkeeping phase RAN, not that nothing followed it; what follows the commit
  * is the sealed marker's business.
  */
-export const PREPARED_RECEIPT_V = 2
+/** RAISED with every change to what `cardsBefore` HOLDS (Sol's review of
+ *  ebf7d00): v2 stored regions cut only at the card ends, so an old receipt's
+ *  prefixed string would no longer equal the region this code now cuts, and the
+ *  unchanged card would read as fresh. A receipt of an older version is refused
+ *  and re-taken rather than compared across representations. */
+export const PREPARED_RECEIPT_V = 3
 
 export function preparedReceipt({
   sid,
@@ -570,7 +575,10 @@ export function boardCarriesCard(
   // leftover card would count as new. Every entry `--prepare` writes carries the
   // head fragment by construction, so one that does not means the receipt cannot
   // be judged against — say so instead of passing.
-  if (Array.isArray(knownRegions) && knownRegions.some((r) => typeof r !== 'string' || !r.includes(list[0]))) {
+  if (
+    Array.isArray(knownRegions) &&
+    knownRegions.some((r) => typeof r !== 'string' || !list.every((f) => r.includes(f)))
+  ) {
     return { carries: false, verifiable: true, missing: [], malformedKnown: true }
   }
   const known = Array.isArray(knownRegions) ? new Set(knownRegions) : null

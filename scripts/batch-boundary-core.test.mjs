@@ -35,6 +35,7 @@ import {
   markerFresh,
   markerPhase,
   preparedReceipt,
+  PREPARED_RECEIPT_V,
   sealedBoundaryDeny,
   unpreparedRefusal,
   BOUNDARY_CAUSES,
@@ -922,6 +923,11 @@ describe('unpreparedRefusal — --commit refuses what --prepare never prepared (
     // nothing to compare against — refused rather than silently downgraded.
     const legacy = { v: 1, sessionId: SID, cause: BOUNDARY_CAUSES.POINT, point: 675, at: NOW - 1000 }
     expect(unpreparedRefusal({ receipt: legacy, sid: SID, point: 675, now: NOW })).toContain('older shape')
+    // …and so is a receipt of the PREVIOUS version, whose recorded regions were
+    // cut differently and would no longer equal the ones read now.
+    expect(
+      unpreparedRefusal({ receipt: { ...fresh(), v: PREPARED_RECEIPT_V - 1 }, sid: SID, point: 675, now: NOW }),
+    ).toContain('older shape')
     expect(
       unpreparedRefusal({ receipt: { ...fresh(), cardsBefore: 'nope' }, sid: SID, point: 675, now: NOW }),
     ).toContain('older shape')
@@ -1167,7 +1173,9 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
     expect(boardCarriesCard(leftover, frags, { sinceMs: prepared, nowMs: now, knownRegions: [] }).carries).toBe(true)
     // …but a reading that records something which is no card at all is BROKEN,
     // not empty: it would match nothing and wave every leftover through.
-    for (const bogus of [['not a card'], [''], [42]]) {
+    // Every fragment must be there, not just the head: a recorded string that
+    // carries only the head matches no real region either.
+    for (const bogus of [['not a card'], [''], [42], [frags[0]]]) {
       const broken = boardCarriesCard(leftover, frags, { sinceMs: prepared, nowMs: now, knownRegions: bogus })
       expect(broken.carries).toBe(false)
       expect(broken.malformedKnown).toBe(true)
