@@ -6556,3 +6556,26 @@ to land than a mechanism that needs a review.
   first-attempt log naming the check that failed.
   Criticality: low — it costs a re-run, but it is the difference between closing a red by its
   cause and closing it by a green, which is exactly what point 640 forbids.
+
+- [ ] 671. THE GOAT'S PLANTED FOOT SLID ONCE ON THE LANE WHERE THAT IS A REAL RED (measured
+  12.08.2026, 02:34, `polish` on WebGL 2, one occurrence in nine recorded goat reds — the other
+  eight are all on the software WebGPU lane and are charged to point 506). Point 506's charge is
+  BACKEND-SCOPED ON PURPOSE and says so in its own words: the stance check is a RATE the software
+  lane cannot deliver, "on the WebGL 2 lane this check stays a real red". So this one occurrence
+  is not covered by it and must not be: on the hardware lane the check answers a product question
+  — does the planted foot hold its ground spot while the body walks over it (point 300)?
+  The same run also reddened on `fire shadows ON: the ground behind a ring stone is measurably
+  darker than beside it`, which may or may not share a cause; both belong to this point.
+  FINAL STATE: the occurrence is CLASSIFIED — either it is the same rate problem reaching the
+  WebGL 2 lane under load, which is settled by MEASUREMENT (`node scripts/throttle-probe.mjs
+  polish --section=<the goat's section> --runs 8` on a quiet machine, reporting the skew rate),
+  or the foot genuinely slides there, which is a point-300 regression and is fixed. Whichever it
+  is, the answer is written where the next reader finds it: a measured rate goes into point 506's
+  charge as an explicitly widened scope with its figures, a real slide is fixed and pinned by a
+  test. A third outcome is allowed and must be stated if it is what the measurement shows: one
+  occurrence in nine is too thin to classify, and then the point says so and states what would
+  settle it.
+  VERIFIABLE: the throttle-probe output with its skew rate, quoted; plus, for the fix case, a
+  failing-then-passing check.
+  Criticality: medium — it is one red on the lane whose verdicts we trust, and an uncharged red
+  on that lane blocks every render landing behind it.

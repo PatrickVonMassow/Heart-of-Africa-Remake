@@ -91,6 +91,19 @@ export const RED_CHARGES = [
       'on the WebGL 2 lane this check stays a real red.',
   },
   {
+    point: 671,
+    suite: 'polish',
+    backend: 'webgl',
+    kind: 'check',
+    match: /settlement walker \(goat\)|fire shadows ON/i,
+    why:
+      'ONE occurrence, 12.08.2026 02:34 on WebGL 2, against eight of the same check on the ' +
+      'software WebGPU lane (those are point 506). Point 506 is backend-scoped in its own words ' +
+      '— "on the WebGL 2 lane this check stays a real red" — so this one is NOT covered there ' +
+      'and is charged to point 671, which must classify it by measurement (throttle probe) as ' +
+      'the rate problem reaching this lane, as a real point-300 slide, or as too thin to call.',
+  },
+  {
     point: 514,
     suite: 'settings',
     backend: 'webgpu',

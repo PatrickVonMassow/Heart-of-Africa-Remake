@@ -1163,10 +1163,17 @@ describe('the shipped charge ledger', () => {
     expect(RED_CHARGES.filter((c) => !open.has(c.point)).map((c) => c.point)).toEqual([])
   })
 
-  it('charges the goat-stance red on the software lane only', () => {
+  // THE TWO LANES ANSWER TO DIFFERENT POINTS, and that separation is the whole
+  // value of the charge (13.08.2026). Point 506 is the software lane's rate
+  // problem and says in its own words that on WebGL 2 the check "stays a real
+  // red" — so it must never swallow a hardware-lane occurrence. When one
+  // appeared, it did not become 506's: it became point 671, which must classify
+  // it by measurement. The pairing below is what stops the two from merging back
+  // together, and 671's entry dies with 671, which is the point of the charge.
+  it('charges the goat-stance red to a DIFFERENT point on each lane', () => {
     const goat = red('settlement walker (goat): the planted foot holds its ground spot')
     expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu' }).point).toBe(506)
-    expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' }).point).toBe(671)
   })
 
   it('charges the fixed render-target leak to NOBODY — a mended red is a red again', () => {
