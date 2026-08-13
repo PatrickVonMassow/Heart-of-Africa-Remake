@@ -227,10 +227,9 @@ put it is the mistake this line exists to stop.
   Final state:
 
   1. `src/communication/lexicon.ts` carries exactly `RIVER`, `UPSTREAM`,
-     `DOWNSTREAM`, `ROCK`, `DIG`. `BIG_ROCK` is RENAMED to `ROCK` — it must read as
+     `DOWNSTREAM`, `ROCK`, `DIG` — no other concept exists in it. `ROCK` must read as
      a class of thing, not as the name of one boulder, because the player learns it
      on the village's play rocks and applies it to the boulder upstream.
-     `COME`, `GO_THERE`, `FOLLOW`, `THERE`, `HERE` and `NO` are removed.
   2. `SEQUENCE_LENGTH` BECOMES 4 (user 13.08.2026, replacing the five of
      11.08.2026, whose reason — eleven words in a four-syllable space — is gone).
      The inventory rule stands: any two utterances differ in at least TWO
