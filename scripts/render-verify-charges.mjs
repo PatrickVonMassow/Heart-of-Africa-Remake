@@ -112,14 +112,17 @@ export const RED_CHARGES = [
   {
     point: 568,
     suite: 'polish',
-    backend: 'webgl',
     kind: 'check',
     match: /water beyond the plate.s rim is the SAME water/i,
     why:
       'Measured 09.08.2026 twice on WebGL 2 with the world seed pinned to 42: red on one run ' +
       '(samples 13.8/12.1/19.3 against a limit of 12) and fully green on the next at the same ' +
       'commit and the same seed, so the world is not what moves. That rotation IS point 568, ' +
-      'which must establish whether the sample is taken too early or the rim seam is real.',
+      'which must establish whether the sample is taken too early or the rim seam is real. ' +
+      'NO LONGER BACKEND-SCOPED (13.08.2026): the same check rotated on WebGPU too, and the ' +
+      'question the point must answer — early sample or real rim seam — is a property of the ' +
+      'water and its sampling, not of the renderer that drew it, so scoping the charge to one ' +
+      'lane only hid half the evidence 568 will need.',
   },
   {
     point: 570,
