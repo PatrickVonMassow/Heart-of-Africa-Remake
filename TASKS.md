@@ -327,6 +327,49 @@ put it is the mistake this line exists to stop.
   Criticality: medium — it stalls every landing behind a dice roll on a runner's network.
   Bundle: unbundled (infrastructure).
 
+- [ ] 664. THE ESTIMATE ON THE BOARD EXPIRES UNSEEN, AND EVERY CARD SAYS "STAND" TWICE (user
+  13.08.2026: "Wieso ist die Endzeitschätzung der Karten wieder so veraltet? Ich denke, dagegen
+  gibt es einen Mechanismus. Außerdem steht inzwischen immer 2x Stand drin - z. B. Stand 04:48
+  Stand 04:49"). Two defects in the board, both MEASURED on the published page at 07:42 on
+  13.08.2026.
+  
+  FIRST, THE STALE ESTIMATE. The mechanism the user remembers exists — `etaStatus` in
+  `scripts/dashboard-guard-core.mjs` with `ETA_MARGIN_MIN` 15, read by the `eta` rule
+  (`dashboard-guard-core.mjs`) and by `scripts/batch-in-flight-core.mjs` — but it speaks ONLY at
+  the owning session's TURN END, so it says nothing while that session sits inside one long turn,
+  and nothing at all once the session stalls or dies. Measured: the two now-cards read
+  `22:59 · ~06:30` and `23:00 · ~05:30` while the clock read 07:42 — 72 and 132 minutes past,
+  with no turn end in between. Point 411 already shifted the comparison forward by a margin for
+  exactly this reason; the margin cannot help when nothing ticks. THE FIX MUST NOT DEPEND ON A
+  SESSION: the promised end travels to the reader as DATA on the card (a `data-eta` attribute
+  beside the rendered meta, written by `renderQueueCard`/`setCardStatus` from the same parse
+  `etaMinutes` performs), and the board's own viewer script — which already runs in the reader's
+  browser and whose clock always ticks (`scripts/board-refresher-core.mjs`) — renders an expired
+  promise AS expired ("seit 1 h überfällig", German like the rest of the board), so the phone
+  never shows a promise the page itself knows is gone. The session-side rule STAYS as it is; it
+  is the second line, not the first. Additionally the launcher tick (`scripts/batch-autostart.mjs`,
+  which already compares the published page against the repository) reports a card past its
+  margin, so an owner that is alive is told before the reader notices.
+  
+  SECOND, THE DOUBLED STAMP. `renderCardBody` (`scripts/board-core.mjs`) prepends
+  `<span class="stamp">Stand HH:MM</span>` to the first paragraph, while sessions additionally
+  type "Stand HH:MM:" at the start of the text they hand in — the live board shows
+  `<p><span class="stamp">Stand 04:48</span> Stand 04:49: Nach einer halben Stunde …</p>`, and the
+  two times differ, so the reader cannot tell which one is the card's. `renderCardBody` therefore
+  STRIPS a leading `Stand HH:MM` (with an optional trailing colon, dash or period) from the text
+  it is given, and when that stripped time is LATER than the stamp it was called with, that time
+  becomes the stamp — the writer's own reading is the more recent one and must not be silently
+  discarded. One stamp per card, always, whichever way the text was written.
+  
+  TESTS: Vitest cases in `scripts/board-core.test.mjs` for the strip (leading stamp with and
+  without colon, a later and an earlier one, prose that merely CONTAINS "Stand" mid-sentence,
+  which must survive untouched) and in `scripts/board-refresher-core.test.mjs` for the
+  viewer-side overdue rendering (before the end, inside the margin, hours past, and across
+  midnight — `etaMinutes` already lifts a wrapped end onto the card's day and the viewer must use
+  that same function, not a second parser). A rule in `scripts/dashboard-guard-core.mjs` refuses a
+  card body whose first paragraph still opens with a second `Stand HH:MM`, so the strip cannot
+  quietly stop working.
+
 - [ ] 633. THE RELEASE'S CLOSING RUN — TWO REGRESSIONS WITH THE CLEANUP BETWEEN THEM (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
   zu sein"). 174 carried the whole release in one card estimated at ~1 h, which was true
@@ -6449,47 +6492,3 @@ to land than a mechanism that needs a review.
   catches "the text is STALE", not "the text is WRONG" — a section rewritten carelessly still
   passes. It would have caught this case, because `src/communication/` is young and the section
   is old.
-
-
-- [ ] 664. THE ESTIMATE ON THE BOARD EXPIRES UNSEEN, AND EVERY CARD SAYS "STAND" TWICE (user
-  13.08.2026: "Wieso ist die Endzeitschätzung der Karten wieder so veraltet? Ich denke, dagegen
-  gibt es einen Mechanismus. Außerdem steht inzwischen immer 2x Stand drin - z. B. Stand 04:48
-  Stand 04:49"). Two defects in the board, both MEASURED on the published page at 07:42 on
-  13.08.2026.
-  
-  FIRST, THE STALE ESTIMATE. The mechanism the user remembers exists — `etaStatus` in
-  `scripts/dashboard-guard-core.mjs` with `ETA_MARGIN_MIN` 15, read by the `eta` rule
-  (`dashboard-guard-core.mjs`) and by `scripts/batch-in-flight-core.mjs` — but it speaks ONLY at
-  the owning session's TURN END, so it says nothing while that session sits inside one long turn,
-  and nothing at all once the session stalls or dies. Measured: the two now-cards read
-  `22:59 · ~06:30` and `23:00 · ~05:30` while the clock read 07:42 — 72 and 132 minutes past,
-  with no turn end in between. Point 411 already shifted the comparison forward by a margin for
-  exactly this reason; the margin cannot help when nothing ticks. THE FIX MUST NOT DEPEND ON A
-  SESSION: the promised end travels to the reader as DATA on the card (a `data-eta` attribute
-  beside the rendered meta, written by `renderQueueCard`/`setCardStatus` from the same parse
-  `etaMinutes` performs), and the board's own viewer script — which already runs in the reader's
-  browser and whose clock always ticks (`scripts/board-refresher-core.mjs`) — renders an expired
-  promise AS expired ("seit 1 h überfällig", German like the rest of the board), so the phone
-  never shows a promise the page itself knows is gone. The session-side rule STAYS as it is; it
-  is the second line, not the first. Additionally the launcher tick (`scripts/batch-autostart.mjs`,
-  which already compares the published page against the repository) reports a card past its
-  margin, so an owner that is alive is told before the reader notices.
-  
-  SECOND, THE DOUBLED STAMP. `renderCardBody` (`scripts/board-core.mjs`) prepends
-  `<span class="stamp">Stand HH:MM</span>` to the first paragraph, while sessions additionally
-  type "Stand HH:MM:" at the start of the text they hand in — the live board shows
-  `<p><span class="stamp">Stand 04:48</span> Stand 04:49: Nach einer halben Stunde …</p>`, and the
-  two times differ, so the reader cannot tell which one is the card's. `renderCardBody` therefore
-  STRIPS a leading `Stand HH:MM` (with an optional trailing colon, dash or period) from the text
-  it is given, and when that stripped time is LATER than the stamp it was called with, that time
-  becomes the stamp — the writer's own reading is the more recent one and must not be silently
-  discarded. One stamp per card, always, whichever way the text was written.
-  
-  TESTS: Vitest cases in `scripts/board-core.test.mjs` for the strip (leading stamp with and
-  without colon, a later and an earlier one, prose that merely CONTAINS "Stand" mid-sentence,
-  which must survive untouched) and in `scripts/board-refresher-core.test.mjs` for the
-  viewer-side overdue rendering (before the end, inside the margin, hours past, and across
-  midnight — `etaMinutes` already lifts a wrapped end onto the card's day and the viewer must use
-  that same function, not a second parser). A rule in `scripts/dashboard-guard-core.mjs` refuses a
-  card body whose first paragraph still opens with a second `Stand HH:MM`, so the strip cannot
-  quietly stop working.
