@@ -355,7 +355,6 @@ if (section('settlement-sizes')) {
     },
     { d: DRUMMER },
   )
-  await page.waitForTimeout(400)
   await shot('672-drummer-at-rest', {
     local: { x: DRUMMER.x, y: 1.1, z: DRUMMER.z },
     label: 'the drummer waiting still at his drums',
