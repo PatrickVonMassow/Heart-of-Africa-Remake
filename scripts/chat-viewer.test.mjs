@@ -28,6 +28,7 @@ const OUT_MSG = { ...VECTOR.message, direction: 'outbox' }
 
 const VIEWER = resolve(process.cwd(), 'public', 'board', 'index.html')
 const viewerHtml = readFileSync(VIEWER, 'utf8')
+const faviconSvg = readFileSync(resolve(process.cwd(), 'public', 'board', 'favicon.svg'), 'utf8')
 
 /** The page's crypto block, extracted between its markers and made callable. */
 function browserCrypto() {
@@ -71,6 +72,18 @@ async function settle(dom, cond, tries = 200) {
 }
 
 const okResponse = (body) => ({ ok: true, status: 200, statusText: 'OK', text: async () => body })
+
+describe('the board favicon artwork', () => {
+  it('is a square, self-contained, single-path silhouette', () => {
+    const doc = new JSDOM(faviconSvg, { contentType: 'image/svg+xml' }).window.document
+    const svg = doc.documentElement
+
+    expect(svg.getAttribute('viewBox')).toBe('0 0 64 64')
+    expect(svg.querySelectorAll('path')).toHaveLength(1)
+    expect(svg.querySelector('path').getAttribute('fill')).toBe('#3a2e1c')
+    expect(svg.querySelectorAll('text, linearGradient, radialGradient, image, use')).toHaveLength(0)
+  })
+})
 
 describe('the page speaks the same protocol as chat-core', () => {
   const api = browserCrypto()
