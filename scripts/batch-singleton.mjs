@@ -1420,12 +1420,18 @@ export function ownsLock(sessionId, opts = {}) {
  * path plus the lock-generation/process checks below, not from a string shape.
  */
 export function validTransitionSessionId(sessionId) {
+  const containsControlCharacter =
+    typeof sessionId === 'string' &&
+    [...sessionId].some((character) => {
+      const code = character.charCodeAt(0)
+      return code <= 31 || code === 127
+    })
   return (
     typeof sessionId === 'string' &&
     sessionId.length > 0 &&
     sessionId.length <= 512 &&
     sessionId === sessionId.trim() &&
-    !/[\u0000-\u001f\u007f]/.test(sessionId) &&
+    !containsControlCharacter &&
     !isProbeSessionId(sessionId)
   )
 }
