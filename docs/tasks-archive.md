@@ -18092,3 +18092,34 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes the boundary and the batch guard.
   Criticality: high — it is the cost driver the whole boundary rule exists for, and it has now
   failed three times in one day under the user's direct observation.
+
+- [x] 679. THE BOARD'S BROWSER TAB SHOWS THE GENERIC GLOBE (user 13.08.2026, 19:24: »Kannst du dem
+  Tab vom Dashboard ein einfaches Afrika-Symbol geben. Kein großer Aufwand.«). The board is read in
+  a browser full of open tabs and cannot be picked out among them, because the viewer carries no
+  icon of its own. The scope is the icon and its injection, nothing more.
+  FINAL STATE: `public/board/favicon.svg` holds a flat, monochrome, simplified Africa silhouette in
+  the board's own palette (ink on paper, `#3a2e1c` on `#f0e8d2`), a square viewBox, still legible at
+  16 px — one path, no text, no gradient, no external reference, deliberately not a traced coastline.
+  The viewer INJECTS it at runtime rather than carrying it statically: the board content is written
+  into the document with `document.write`, which replaces the whole document INCLUDING the `<head>`,
+  so a `<link rel="icon">` in the source head is gone the moment the board lands. An
+  `ensureFavicon()` beside `injectChat()` in `public/board/index.html` appends
+  `<link rel="icon" type="image/svg+xml" href="favicon.svg">` to `document.head`, is IDEMPOTENT
+  (exactly one such link however often it runs) and runs everywhere `injectChat()` runs — the
+  success path after the swap, the failure path, `load`, and `onBoardSwapped()`. The relative href
+  resolves against the viewer URL, which `document.write` does not change. Nothing here touches the
+  board CONTENT (`.batch-dashboard.html`) or any board guard: the guards parse the fragment and none
+  of them reads the viewer. No new dependency and no build-step change — the icon is a static file
+  under `public/`, deployed by the Pages workflow that already runs.
+  VERIFIABLE: a Vitest/jsdom case beside the existing injection cases in
+  `scripts/chat-viewer.test.mjs` drives the injection twice and asserts exactly one
+  `link[rel~="icon"]` with the expected href, and that a swapped-in document which lost its head
+  gets the link back; plus the PICTURE — the silhouette rasterised and LOOKED AT, not judged from
+  the SVG source. The condition is RECOGNISABLE at 32 px and DISTINCTIVE at 16 px: measured
+  13.08.2026 over four drawn paths, no monochrome continent silhouette is legible at 16 px, so
+  demanding it there costs redraw rounds without ever being reachable. What 16 px must deliver is a
+  dark shape nobody confuses with the browser's generic globe.
+  AUTHOR: the OpenAI lane (`node scripts/author-sol.mjs --point 679`) — user decision 13.08.2026,
+  19:25 (»Lasse Sol das machen, um Volumen zu sparen«). Mechanical and low-risk, and its
+  verification is not the work.
+  Criticality: low — it costs nothing if it waits, but the user asked for it directly.
