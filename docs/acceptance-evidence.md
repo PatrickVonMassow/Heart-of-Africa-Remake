@@ -1540,13 +1540,15 @@ Verifiable, by suite:
   else (asserted over the completeness table AND on the rendered menu),
   and the speech row's label reads as a volume in the wording family of
   its neighbours in both languages while still naming the village
-  speech. The DEFAULT (`balance.communication.speechVolume` 1.5, pinned
-  in `src/config/balance.test.ts`) is calibrated on the audio graph:
-  `src/systems/ambience.test.ts` measures, off the live nodes at the
-  default balance, a syllable spoken beside the player against a
-  village drum beat — 2.04× at the master's input — and that the
-  loudest realistic moment (two close speakers, the drum bed, a
-  footstep) reaches 0.62 of full scale, so nothing clips. The one
+  speech. After the ambient drum bed shipped silent, the DEFAULT
+  (`balance.communication.speechVolume` 2, pinned above the failed 1.5
+  value in `src/config/balance.test.ts`) is calibrated on the deployed
+  audio graph: `src/systems/ambience.test.ts` measures, off the live
+  nodes at the default balance, a syllable peak of 0.612 against a
+  conservative 0.2275 remaining village ambience floor — 2.69×, or
+  8.59 dB, clear. The dormant debug drum mix remains measured too, and
+  its loudest realistic moment (two close speakers, the drum bed, a
+  footstep) reaches 0.76 of full scale, so nothing clips. The one
   factor the node graph does not carry, a syllable's ~2× synthesis
   gain, is measured on the rendered chain in
   `src/systems/ambience.speech.test.ts`.
@@ -1878,4 +1880,3 @@ etc., pt. 20 / point 276): the level drives the post chain — SSAO on only
 at high, TRAA + bloom off only on low — combined with the internal flags
 without ever clobbering them; `settings.mjs` gates the F9 cycle and the
 effective flips.
-
