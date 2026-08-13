@@ -200,8 +200,27 @@ put it is the mistake this line exists to stop.
   explains a player-visible standstill on WebGPU; if it cannot, the answer is (a) or a behaviour
   fix, not a charge. The report alone does NOT permit a diagnosis, because the dump describes the
   wildlife and nothing of the settlement's inhabitants — that gap is its own point.
+  A SECOND REPORT FIVE MINUTES LATER NAMES THE MECHANISM (same seed, same player position, dump
+  in `local/SelbesKindHaengtImmernochFest/`, user's title "Selbes Kind — hängt seit Minuten fest
+  und zittert herum"). MINUTES, with visible shivering: that is a permanent state on WebGPU in
+  the production build, not a window. READ IN THE CODE (`src/scenes/place/tagGame.ts`,
+  `trackProgress` from line 651): the rescue nudge hangs on an ANCHOR RADIUS. When the child
+  leaves the circle `childRadius * PROGRESS_AWAY` (0.3 × 3 = 0.9 m) around its anchor, the anchor
+  is MOVED and `anchorFor` reset to 0, while `escapeNudge` fires only once `anchorFor` reaches
+  `unstuckSeconds` (1.5 s). A shiver that swings back and forth across 0.9 m therefore resets the
+  anchor every cycle, the counter never reaches 1.5 s, and THE RESCUE CANNOT FIRE BY
+  CONSTRUCTION, for arbitrarily long — exactly what the user describes. Point 656 removed this
+  blindness from the MEASURING gate (distance walked against ground covered, instead of position
+  deltas); the RESCUE still tests only the anchor radius. From the frames: the child stands in
+  open ground in both reports, no obstacle within reach, so the cause lies in the steering
+  (reversal/evasion) rather than in a geometry trap. Reproducible at seed 236333330,
+  `bambara-village`, medium, WebGPU; the headless run at that seed is still owed.
+  SO THE FINAL STATE ABOVE IS NOT THE WHOLE ANSWER: the rescue's own progress test is fixed here
+  too, by the same standard point 656 met — it must see a shiver as a lack of progress — and the
+  fix is proven at the reported seed, not only on the panel.
   Criticality: high — raised 13.08.2026: it is no longer only the picture gate's trustworthiness,
-  it is the player watching a child stand still in the shipped build.
+  it is the player watching a child shiver in place for minutes in the shipped build, with the
+  rescue unable to fire.
   Bundle: Dorfleben.
 
 - [ ] 672. THE VILLAGE HAS NO AMBIENT DRUM, AND THE DRUMMER HOLDS STILL (user 13.08.2026,
@@ -6915,3 +6934,145 @@ to land than a mechanism that needs a review.
   Criticality: medium — nothing is broken by its absence, but every stuck-inhabitant report the
   user sends is undiagnosable without it, and point 666 is waiting on exactly that.
   Bundle: Dorfleben.
+
+- [ ] 681. THE TEACHING STONE STANDS ON THE BANK UPSTREAM, AND THE GROUND WORK LEAVES THE VILLAGE MIDDLE (user 13.08.2026, playing the deployed state)
+  User decision 13.08.2026, from playing the deployed state with the debug switch
+  "Speech: show concepts instead of syllables" on: the errands taught him nothing.
+  A boulder on the village square that everybody walks to for no reason, and people
+  digging next to it, read as meaningless — and the settlement's rock is not the
+  rock the chief's message means. docs/communication-poc-spec.md already assumes the
+  stone lies upstream; only the code put it in the village (layout.ts placed it 6.5
+  to 13.6 m from the village centre). This is cause (1) of the carrier finding "Die
+  Erwachsenen-Botengaenge lehren nichts" (target 659); causes (2) and (3) — errands
+  without a visible result, and no teaching order — stay with that finding.
+  The teaching stone stands ON THE RIVER BANK UPSTREAM of the settlement, and the
+  village's ground work no longer sits in the middle of the village.
+
+  Final state:
+
+  1. PLACEMENT. `layout.ts` places the teaching stone on the settlement's UPSTREAM
+     bank stretch — on the open bank beside the water, clear of the wade depth and
+     of every lane and compound, visible from the village and reachable on foot by
+     an errand walker. It keeps its seeded, deterministic placement and its errand
+     parking spot. A settlement with no bank carries no teaching stone (as it
+     already carries no bank errands), and the two BIG_ROCK errands are then simply
+     not castable.
+  2. IT LOOKS LIKE WHAT THE MESSAGE MEANS. The stone is drawn as an upright erratic
+     of the same shape family as the goal boulder of `src/world/communicationRock.ts`
+     at settlement scale, so the object the word is learnt on is the same KIND of
+     thing the chief's message points at.
+  3. THE ROCK/DIRECTION DISCRIMINATOR IS REBUILT — this is why the old placement
+     existed, so moving the stone must replace it, not drop it. With the stone on
+     the upstream stretch, "go upstream" and "go to the rock" would otherwise be the
+     same picture. Therefore:
+     - At least one BIG_ROCK errand carries NO walk along the bank at all: it is
+       spoken AT the stone and points at it ("BIG_ROCK + HERE"), with nobody walking
+       the river.
+     - At least one BIG_ROCK errand is walked STRAIGHT from the village to the
+       stone, not along the bank, so the picture differs from the upstream errands
+       in its path as well as its target.
+     - The UPSTREAM errands target a bank point that is NOT the stone and far enough
+       from it that the two destinations read as different places.
+     - `involvesUpstream`, the catalogue's comments and `MIRRORED_ERRANDS` are
+       brought in line, and the tests pin the new discriminator instead of the old.
+  4. THE GROUND WORK MOVES OUT OF THE MIDDLE. The three dig sites (store pit, post
+     hole, turned patch) are placed where such work belongs — at a compound edge,
+     beside a lane, at the edge of the worked ground — never on the open central
+     ground of the village, and never within a stated clearance of the teaching
+     stone or of its parking spot. The drawn spoil and the digging stick stay as
+     they are.
+  5. DOCUMENTATION. `docs/communication-poc-spec.md` rule 3 is rewritten to the
+     discriminator actually built (it currently states the premise "The rock lies
+     upstream" while the code placed the stone in the village — the two must agree),
+     and the placement comment in `layout.ts` says where the stone stands and why.
+     If design.md §13.4 names the stone's location, it changes in the same commit.
+
+  Test: Vitest over the layout — the stone lies on the upstream side of the bank,
+  clear of lanes, compounds and water; no dig site lies within the central radius or
+  within the stated clearance of the stone; the placement is stable for a seed.
+  Vitest over `adultErrands` — at least one BIG_ROCK errand with no bank walk, at
+  least one walked from the village, and the upstream targets distinct from the
+  stone. Picture check on BOTH backends (a render-set change): the stone is visible
+  from the village and reads as a rock by the water, and the dig sites read as work.
+  CONSTRAINTS:
+  - Difficulty is MEDIUM, not mechanical: placement geometry, the errand catalogue
+    and their tests move together, and the picture decides. Route accordingly; the
+    user's 13.08.2026 instruction allows Sol where Fable is unavailable.
+  - Do not drop the contrast rule while moving the stone — the rule is the reason
+    the old placement existed.
+  - The goal boulder of src/world/communicationRock.ts is untouched: it stays the
+    world-scale erratic ~1.6 to 2.4 degrees upstream on the Niger.
+  - Settlements without a bank keep working, with no stone and no rock errands.
+  QUOTED:
+  Nutzer, 13.08.2026 20:46: »Der Lehrstein soll flussaufwärts wandern. Ein großer Felsbrocken mitten im Dorf macht keinen Sinn - ebensowenig, wie dort zugraben.«
+  Nutzer, 13.08.2026 20:41 (die Beobachtung dahinter): »dann sagt er GO_THERE BIG_ROCK und zeigt in die Dorfmitte, wo der große Felsen liegt (warum auch immer) … sie bleiben am Felsbrocken stehen und machen nichts«
+
+- [ ] 682. THE CHILDREN'S GAME IS A GAME OF TAG AGAIN, AND THE TEACHING RIDES ON IT (user 13.08.2026: »Beim Kinderspiel kann ich auch nichts lernen. Ich erkenne da kein Fangspiel.«)
+  User, 13.08.2026, from playing the deployed state: "Beim Kinderspiel kann ich auch
+  nichts lernen. Ich erkenne da kein Fangspiel." The children read as running about
+  at random and calling out instructions that do not serve the game; the tag game
+  that was there originally has been diluted by the situations added to teach COME,
+  THERE, FOLLOW and the rest, and the sending about looks like an end in itself.
+  Measured against the code: a situation is staged every 6 s (spread 0.35) and its
+  action steers a child for 5 s at pace 1.6, while the chase runs at 3.4 (runner
+  3.8); six of the twelve situations make a child stand still and four more walk it.
+  With four children the teaching layer therefore occupies the group nearly all the
+  time, which is exactly the picture the user describes.
+  The children play a RECOGNISABLE game of tag again, and the teaching rides ON
+  that game instead of replacing it.
+
+  The rule the player must be able to read without a word of explanation: one child
+  is IT and chases, the others flee, whoever is caught becomes IT. Everything the
+  children say serves that picture or waits for a break in it.
+
+  Final state:
+
+  1. THE ROUND OUTRANKS THE SITUATION. While a round is running, only situations
+     whose action is what the child would be doing ANYWAY may be staged: FOLLOW
+     (the caller is fleeing and is followed), THERE (pointing at the chaser while
+     fleeing), HERE (claimed at the moment of a catch), NO (a refusal, which costs
+     no movement). The SENDING situations — COME's gathering, GO_THERE's errands —
+     are staged in the BREAK between rounds, where children arranging themselves is
+     exactly what a game of tag looks like.
+  2. NO STAGED ACTION SLOWS A PLAYING CHILD. `actionPace` no longer overrides the
+     chase: a fleeing or chasing child keeps its chase speed and the situation only
+     chooses the DIRECTION where the chase leaves it free. An action that makes a
+     child STAND (holdTheSpot, noOneMoves, refuserStaysPut) is cast only on a child
+     that is not currently chasing or being chased.
+  3. THE TEACHING HAS A DUTY CYCLE, AND IT IS BOUNDED. At most one situation runs
+     in a group at a time, and over the played clock at most a stated fraction may
+     carry a staged action — a balance value, debug-editable, starting at one third.
+     Measured today: a situation every 6 s (spread 0.35) with a 5 s action over four
+     children means the teaching layer is running almost continuously, half of the
+     twelve situations make a child STAND STILL and four more walk it at pace 1.6
+     against a chase speed of 3.4–3.8. That is why no game is visible.
+  4. THE CATCH IS THE LOUDEST MOMENT. The catch and the handover of the role are
+     staged so the rule reads: the caught child claims the spot (HERE), the new
+     chaser is visibly the one just caught, and the others scatter. Nothing else is
+     staged in the seconds around it.
+  5. EVERY CONCEPT IS STILL TAUGHT. The six stay with the children and every one
+     keeps at least two situations; what changes is WHEN they may be staged, not
+     which they are. The look-alike rules of the catalogue (COME against FOLLOW,
+     GO_THERE against THERE) hold unchanged.
+  6. DOCUMENTATION. `docs/communication-poc-spec.md` and design.md §13.4 state the
+     precedence — the round is the carrier, the teaching rides on it — in the same
+     commit.
+
+  Test: Vitest over a replayed round — no standing action is ever cast on a child
+  in the chase; no staged action reduces a playing child's pace; the duty-cycle
+  bound holds over a long replay; every concept is still staged at least twice.
+  A live section in the browser layer reports, over a minute of play, the fraction
+  of clock with a staged action, the number of catches, and the fraction of clock
+  in which the chaser is actually pursuing — and fails when the game is not
+  recognisable by those numbers.
+  CONSTRAINTS:
+  - This is a DESIGN change to §13.4's children's game, decided by the user; it is
+    not a tuning pass. Difficulty medium-high: catalogue, scheduler, steering and
+    the tests move together, and the picture decides.
+  - Do not drop a concept to buy legibility — the six must still be learnable, and
+    the catalogue's look-alike contrast rules stay.
+  - The stuck/trembling child is a SEPARATE defect (carrier findings on 666); do not
+    fold it in here, but the legibility gate must not be measured on a group whose
+    children are wedged.
+  QUOTED:
+  Nutzer, 13.08.2026 20:51: »Beim Kinderspiel kann ich auch nichts lernen. Ich erkenne da kein Fangspiel. Für mich laufen die Kinder mehr oder weniger zufällig hin und her (wenn sie mal nicht festhängen) und werfen mit Anweisungen um sich, die dem Spiel nicht dienlich sind. Ursprünglich war es mal ein Fangspiel, bei dem einer die anderen fangen muss und der Gefangene dadurch zum Fänger wird. Durch die ganzen neuen Situationen, die zur Erklärung der Kommunikationskonzepte COME, THERE, FOLLOW, usw. hinzugekommen sind, ist das Kinderspiel völlig verwässert. Das Herumschicken wirkt wie zum Selbstzweck eingeführt und macht das Fangspiel nicht mehr erkennbar.«

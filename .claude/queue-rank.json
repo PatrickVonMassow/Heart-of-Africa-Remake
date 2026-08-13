@@ -83,10 +83,18 @@
     "680": {
       "at": "2026-08-13T18:48:25.602Z",
       "why": "Es blockiert 666 nicht sofort — die Diagnose kann auch aus dem Seed nachgestellt werden —, aber jeder weitere Bericht dieser Art bleibt ohne es undiagnostizierbar; Release-Punkte gehen trotzdem vor"
+    },
+    "681": {
+      "at": "2026-08-13T18:54:12.170Z",
+      "why": "Gehoert zum Release-Thema Verstaendigung und wird zusammen mit 682 und 659 gespielt; die Reihenfolge dort entscheidet 659"
+    },
+    "682": {
+      "at": "2026-08-13T18:54:12.244Z",
+      "why": "Gehoert zum Release-Thema Verstaendigung; 659 spielt die Kette durch und entscheidet, was zuerst greifen muss"
     }
   },
   "settled": {
-    "at": "2026-08-13T18:48:25.603Z",
+    "at": "2026-08-13T18:54:12.245Z",
     "points": [
       174,
       184,
@@ -266,7 +274,9 @@
       677,
       678,
       679,
-      680
+      680,
+      681,
+      682
     ]
   }
 }
