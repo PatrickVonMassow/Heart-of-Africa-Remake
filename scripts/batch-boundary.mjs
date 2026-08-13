@@ -342,6 +342,19 @@ export function boundaryHandover({ sid = readOwnerLock()?.sessionId ?? '' } = {}
   return { ...where, card: boundaryCardText(where) }
 }
 
+/**
+ * THE COMMIT'S WRITE ORDER, extracted so a test can prove it (Sol re-review of
+ * cd6faaa, finding 4): the transfer is recorded FIRST and the marker LAST — a
+ * throwing transfer leaves NO marker, because the marker is what authorises the
+ * stop and nothing may follow it. `write` is injectable for exactly that proof.
+ */
+export function commitSealedBoundary({ transfer, marker, write = writeBoundary } = {}) {
+  let transferred = null
+  if (transfer && typeof transfer.commit === 'function') transferred = transfer.commit()
+  write(marker)
+  return transferred
+}
+
 // --- CLI ----------------------------------------------------------------------
 
 const isMain =
@@ -459,33 +472,33 @@ if (isMain) {
         )
         process.exit(0)
       }
-      // The transfer is written FIRST and the marker LAST (Sol review of
-      // 807c2bf, finding 1): the marker is what authorises the stop, so nothing
-      // may follow it — a failed transfer refuses before anything is recorded.
+      // Transfer FIRST, marker LAST (Sol review of 807c2bf, finding 1) —
+      // `commitSealedBoundary` pins the order, and a failed transfer refuses
+      // before anything is recorded.
       let transferred = null
-      if (transfer.commit) {
-        try {
-          transferred = transfer.commit()
-        } catch (e) {
-          fail(
-            `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
-              'Retry, or check `node scripts/batch-in-flight.mjs --status`.',
-          )
-        }
+      try {
+        transferred = commitSealedBoundary({
+          transfer,
+          marker: {
+            v: 2,
+            phase: BOUNDARY_PHASES.COMMITTED,
+            cause: BOUNDARY_CAUSES.CONTEXT,
+            sessionId: sid,
+            point: null,
+            tokens: wm.tokens,
+            // The mark the reading was judged against — assessBoundary
+            // re-judges the claim (tokens >= watermark), so a marker cannot
+            // smuggle a sub-threshold reading past the guard.
+            watermark: wm.watermark,
+            at: Date.now(),
+          },
+        })
+      } catch (e) {
+        fail(
+          `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
+            'Retry, or check `node scripts/batch-in-flight.mjs --status`.',
+        )
       }
-      writeBoundary({
-        v: 2,
-        phase: BOUNDARY_PHASES.COMMITTED,
-        cause: BOUNDARY_CAUSES.CONTEXT,
-        sessionId: sid,
-        point: null,
-        tokens: wm.tokens,
-        // The mark the reading was judged against — assessBoundary re-judges
-        // the claim (tokens >= watermark), so a marker cannot smuggle a
-        // sub-threshold reading past the guard.
-        watermark: wm.watermark,
-        at: Date.now(),
-      })
       console.log(
         `boundary COMMITTED at the context watermark (${wm.tokens} >= ${wm.watermark} tokens). This was the ` +
           'last repository action of this session — END IT NOW and SAY in your closing message that the ' +
@@ -580,20 +593,20 @@ if (isMain) {
       )
     }
 
-    // Transfer FIRST, marker LAST (Sol review of 807c2bf, finding 1): the
-    // marker authorises the stop, so it must be the final write of the commit.
+    // Transfer FIRST, marker LAST (Sol review of 807c2bf, finding 1) —
+    // `commitSealedBoundary` pins the order.
     let transferred = null
-    if (transfer.commit) {
-      try {
-        transferred = transfer.commit()
-      } catch (e) {
-        fail(
-          `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
-            'Retry, or check `node scripts/batch-in-flight.mjs --status`.',
-        )
-      }
+    try {
+      transferred = commitSealedBoundary({
+        transfer,
+        marker: { v: 2, phase: BOUNDARY_PHASES.COMMITTED, cause: BOUNDARY_CAUSES.POINT, sessionId: sid, point, at: Date.now() },
+      })
+    } catch (e) {
+      fail(
+        `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
+          'Retry, or check `node scripts/batch-in-flight.mjs --status`.',
+      )
     }
-    writeBoundary({ v: 2, phase: BOUNDARY_PHASES.COMMITTED, cause: BOUNDARY_CAUSES.POINT, sessionId: sid, point, at: Date.now() })
     const transferLine = transferred
       ? ` The in-flight declaration was marked TRANSFERRED (${transferred}); the successor adopts it with ` +
         '`node scripts/batch-in-flight.mjs --adopt`, so the running author keeps building through the handover.'

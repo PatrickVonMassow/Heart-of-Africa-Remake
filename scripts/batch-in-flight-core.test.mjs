@@ -69,6 +69,7 @@ import {
   maxAgeMs,
   readDeclaration,
   resolveRefName,
+  sealedCommitRefusal,
   transferredMutationRefusal,
   writeDeclaration,
   clearDeclaration,
@@ -1923,6 +1924,44 @@ describe('markTransferred — the adoption record stays probeable (M4/M7)', () =
     const t = markTransferred({ declaration, bySid: 's1', now: 99, checkpoints: [{ ref: 'b', sha: 'x' }] })
     expect(t.evidence).toEqual(declaration.evidence)
     expect(t.transfer).toEqual({ v: 1, by: 's1', at: 99, checkpoints: [{ ref: 'b', sha: 'x' }] })
+  })
+
+  it('a RE-TRANSFER supersedes the old adoption, so the record stays protected (Sol re-review, finding 1)', () => {
+    const adoptedOnce = {
+      v: 1,
+      sessionId: 's2',
+      at: 5,
+      waitingOn: 'agent',
+      evidence: [{ kind: 'branch', ref: 'b' }],
+      transfer: { v: 1, by: 's1', at: 2, checkpoints: [] },
+      adopted: { from: 's1', at: 3 },
+    }
+    const again = markTransferred({ declaration: adoptedOnce, bySid: 's2', now: 9, checkpoints: [] })
+    expect(again.adopted).toBeUndefined()
+    expect(again.transfer.by).toBe('s2')
+    // …and the mutation refusal therefore covers the whole second handover too.
+    const marker = { v: 2, phase: 'committed', cause: 'point', sessionId: 's2', point: 1, at: 10 }
+    expect(transferredMutationRefusal({ declaration: again, marker, now: 11 })).not.toBeNull()
+  })
+})
+
+describe('sealedCommitRefusal — no NEW wait behind a committed boundary (Sol re-review, finding 2)', () => {
+  const sealed = { v: 2, phase: 'committed', cause: 'point', sessionId: SID, point: 675, at: NOW - 1000 }
+
+  it('refuses a fresh --waiting-on for the committing session, naming the way back', () => {
+    const msg = sealedCommitRefusal({ marker: sealed, sid: SID, now: NOW })
+    expect(msg).toContain('COMMITTED')
+    expect(msg).toContain('batch-boundary.mjs --clear')
+  })
+
+  it('refuses nothing for a stale, foreign, legacy or absent marker', () => {
+    expect(sealedCommitRefusal({ marker: null, sid: SID, now: NOW })).toBeNull()
+    expect(sealedCommitRefusal({ marker: { ...sealed, phase: undefined }, sid: SID, now: NOW })).toBeNull()
+    expect(sealedCommitRefusal({ marker: sealed, sid: 'someone-else', now: NOW })).toBeNull()
+    expect(sealedCommitRefusal({ marker: sealed, sid: '', now: NOW })).toBeNull()
+    expect(
+      sealedCommitRefusal({ marker: { ...sealed, at: NOW - 2 * 60 * 60 * 1000 }, sid: SID, now: NOW }),
+    ).toBeNull()
   })
 })
 

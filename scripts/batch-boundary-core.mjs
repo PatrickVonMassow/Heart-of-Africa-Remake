@@ -121,6 +121,13 @@ export function assessBoundary({ marker, sid, now, closure, freshMs = BOUNDARY_F
   // mark, or a marker carrying one token would authorise a stop. Freshness and
   // session binding hold exactly as for a point boundary.
   if (marker.cause === BOUNDARY_CAUSES.CONTEXT) {
+    // Only `--commit --context` writes a context marker, and it always seals it
+    // — there is no legacy context format, so an unphased context claim is a
+    // hand-written one and authorises nothing (Sol re-review of cd6faaa,
+    // finding 3).
+    if (marker.phase !== BOUNDARY_PHASES.COMMITTED) {
+      return { valid: false, point: null, reason: 'context-marker-uncommitted' }
+    }
     if (
       typeof marker.tokens !== 'number' ||
       !(marker.tokens > 0) ||

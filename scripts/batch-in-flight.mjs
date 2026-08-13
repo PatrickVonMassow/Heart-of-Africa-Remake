@@ -657,6 +657,27 @@ export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, n
 }
 
 /**
+ * MAY A NEW WAIT BE DECLARED AT ALL (Sol re-review of cd6faaa, finding 2)?
+ * `batch-in-flight` sits in the closing set, so nothing denies its calls after
+ * a commit — but `--waiting-on` after `--commit` would declare NEW work behind
+ * a sealed marker: work the commit never transferred, running beside a
+ * successor the launcher is about to spawn. Refused while a fresh COMMITTED
+ * marker names this session; `batch-boundary.mjs --clear` is the way back.
+ * Injectable and pure over its inputs. Null = allowed.
+ */
+export function sealedCommitRefusal({ marker, sid, now = Date.now() } = {}) {
+  if (markerPhase(marker) !== 'committed') return null
+  if (!sid || marker.sessionId !== sid) return null
+  if (!(typeof marker.at === 'number' && now - marker.at < BOUNDARY_FRESH_MS)) return null
+  return (
+    'THE BOUNDARY IS COMMITTED — `batch-boundary.mjs --commit` was this session\'s last repository action, so ' +
+    'a NEW wait cannot be declared behind it: that work would never have been transferred and would run beside ' +
+    'the successor. Either leave the work to the successor, or withdraw the boundary FIRST ' +
+    '(`node scripts/batch-boundary.mjs --clear`) and declare the wait then. Nothing recorded.'
+  )
+}
+
+/**
  * MAY THIS DECLARATION BE MUTATED AT ALL (Sol review of 807c2bf, finding 4)?
  * `batch-in-flight` sits in the CLOSING SET, so the sealed-boundary deny never
  * fires on it — but a TRANSFERRED, un-adopted declaration under a live
@@ -791,11 +812,11 @@ if (isMain) {
   } else if (argv[0] === '--waiting-on') {
     const waitingOn = String(argv[1] ?? '').trim()
     if (!waitingOn) fail(`--waiting-on needs a description of the wait.\n${usage}`)
-    const transferRefusal = transferredMutationRefusal({
-      declaration: readDeclaration(),
-      marker: readBoundaryMarker(),
-    })
+    const marker = readBoundaryMarker()
+    const transferRefusal = transferredMutationRefusal({ declaration: readDeclaration(), marker })
     if (transferRefusal) fail(transferRefusal)
+    const commitRefusal = sealedCommitRefusal({ marker, sid })
+    if (commitRefusal) fail(commitRefusal)
     const evidence = []
     let slotsFreeReason = ''
     for (let i = 2; i < argv.length; i += 2) {

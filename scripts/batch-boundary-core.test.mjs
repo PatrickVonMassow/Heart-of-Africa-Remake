@@ -37,6 +37,7 @@ import {
   topicViolations,
 } from './dashboard-card-topic-guard-core.mjs'
 import { progressGuardDecision } from './batch-singleton.mjs'
+import { commitSealedBoundary } from './batch-boundary.mjs'
 
 const NOW = 1_785_000_000_000
 const SID = 'session-abc'
@@ -698,6 +699,17 @@ describe('assessBoundary — the context-watermark cause', () => {
     )
   })
 
+  it('an UNPHASED context marker authorises nothing — only --commit writes one (Sol re-review, finding 3)', () => {
+    expect(assessBoundary({ marker: ctx({ phase: undefined }), sid: SID, now: NOW, closure: 'unknown' })).toEqual({
+      valid: false,
+      point: null,
+      reason: 'context-marker-uncommitted',
+    })
+    expect(assessBoundary({ marker: ctx({ phase: 'prepared' }), sid: SID, now: NOW, closure: 'unknown' }).valid).toBe(
+      false,
+    )
+  })
+
   it('RE-JUDGES the claim: a reading below the recorded mark authorises nothing (Sol finding 5)', () => {
     const b = assessBoundary({ marker: ctx({ tokens: 1 }), sid: SID, now: NOW, closure: 'unknown' })
     expect(b).toEqual({ valid: false, point: null, reason: 'context-below-watermark' })
@@ -722,6 +734,43 @@ describe('assessBoundary — the context-watermark cause', () => {
     const boundary = assessBoundary({ marker: ctx(), sid: SID, now: NOW, closure: 'unknown' })
     expect(boundaryVerdict({ boundary, launcher: 'armed' })).toBe('allow-boundary')
     expect(boundaryVerdict({ boundary, launcher: 'disabled' })).toBe('block-launcher')
+  })
+})
+
+describe('commitSealedBoundary — the marker is the LAST write (Sol findings 1/4)', () => {
+  it('records the transfer first, then writes the marker', () => {
+    const order = []
+    const out = commitSealedBoundary({
+      transfer: { commit: () => (order.push('transfer'), 'feat/x@abcd') },
+      marker: { v: 2 },
+      write: () => order.push('marker'),
+    })
+    expect(order).toEqual(['transfer', 'marker'])
+    expect(out).toBe('feat/x@abcd')
+  })
+
+  it('a THROWING transfer leaves NO marker behind', () => {
+    let wrote = false
+    expect(() =>
+      commitSealedBoundary({
+        transfer: {
+          commit: () => {
+            throw new Error('declaration unwritable')
+          },
+        },
+        marker: { v: 2 },
+        write: () => {
+          wrote = true
+        },
+      }),
+    ).toThrow('declaration unwritable')
+    expect(wrote).toBe(false)
+  })
+
+  it('no transfer at all still writes the marker', () => {
+    let marker = null
+    expect(commitSealedBoundary({ transfer: null, marker: { v: 2, point: 675 }, write: (m) => (marker = m) })).toBeNull()
+    expect(marker).toEqual({ v: 2, point: 675 })
   })
 })
 

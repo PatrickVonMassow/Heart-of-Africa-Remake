@@ -625,10 +625,16 @@ export function transferBlockMessage({ blockers = [] } = {}) {
  * MARK A DECLARATION TRANSFERRED at boundary commit. PURE. The original
  * evidence stays probeable (M7); the transfer block records who handed it over,
  * when, and the checkpoints the successor can verify against.
+ *
+ * A previous ADOPTION is DROPPED (Sol re-review of cd6faaa, finding 1): a new
+ * transfer supersedes it, and a record still stamped `adopted` would lose the
+ * mutation protection the moment it crossed a SECOND boundary — the very
+ * record a chain of handovers depends on most.
  */
 export function markTransferred({ declaration, bySid, now, checkpoints = [] } = {}) {
+  const { adopted: _superseded, ...rest } = declaration ?? {}
   return {
-    ...declaration,
+    ...rest,
     transfer: { v: 1, by: String(bySid ?? ''), at: Number(now), checkpoints },
   }
 }
