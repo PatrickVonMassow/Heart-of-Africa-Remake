@@ -17920,3 +17920,70 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   three runs each, on a quiet machine AND under throttle.
   Criticality: medium — no player sees it, but an unexplained red on the release branch makes
   the picture gate untrustworthy exactly where the release needs it.
+
+- [x] 657. THE CHILDREN STILL WALK ON THE SPOT IN THE LIVE SETTLEMENT (measured 12.08.2026
+  with the gate point 656 delivers, at seed 2972259115, on a machine with nothing else on it,
+  on BOTH backends). The figures are the ones the REPAIRED measure reads — time-weighted, the
+  trace broken at a rescue instead of guessed across, and judged PER CHILD rather than in the
+  group's average, after three rounds of cross-vendor review threw out the earlier ones. Worst
+  child's own share against the 0.25 % gate: WebGL 2 0.00 / 1.29 / 0.09 / 0.34 / 0.00 %,
+  WebGPU 0.00 / 0.24 / 0.00 / 1.53 / 0.00 % — RED in 3 of 10 traces, on both backends. The
+  worst windows have a child WALK 2.92 m and end 0.00 m from where it started, and 3.08 m
+  ending 0.23 m away. The rescue teleport is not what produces this: the game's own counter
+  reads 0.00 m carried per minute for the WORST child of every one of the ten runs, and no red
+  window holds a rescue or a sample gap longer than the second it measures. This is the symptom
+  of the user's own report behind point 648 ("die Kinder hängen kurz fest, zittern"); that
+  point's behaviour fix made it rarer and did not end it.
+
+  FINAL STATE: a child that is commanded to walk gets somewhere. In the live settlement at that
+  seed, the share of one-second windows in which a child walks more than 1 m without leaving a
+  0.35 m circle stays under the 0.25 % gate across repeated traces on BOTH backends — with the
+  gate untouched, and with the carry and rescue rates staying under their own gates, so the
+  symptom is gone rather than tidied away.
+  THE CAUSE IS NAMED BEFORE IT IS FIXED. The measurement leaves three candidates open and the
+  trace can tell them apart: the separation pass pushing a child back into the pocket it just
+  walked out of; two children resolving each other in opposite directions on alternating frames;
+  and a walk target that sits inside another body, so the child never arrives and keeps pressing
+  into it. Which one it is goes into the commit message and the code comment.
+  THE CAUSE, NAMED AND EVIDENCED (12.08.2026, from the point-656 measurements plus a read of the
+  code): THE CHASE CANNOT SEE ANOTHER INHABITANT'S BODY. `TagWorld.blocked`, which every step of
+  `moveChild` probes and which the whole deflection is built on, is assembled in
+  `src/scenes/place/PlaceLife.tsx` from the play-ground rim and `standingClear(colliders, …)` —
+  huts, fences, the fire ring. It does not know that a child, an adult, a porter or an errand
+  walker is standing where the child wants to go. So the way reads OPEN, the child walks into the
+  body, and the separation pass pushes it straight back out; `walked` grows, ground covered does
+  not, and that is precisely the measure's definition of walking without getting anywhere. Three
+  measurements agree: the replay reads 3.5 % on the burst measure when adults cross the children's
+  ground against 0.03 % when they keep to their own work; the live red windows sit at the same
+  moment of the visit (10.7-12.0 s) run after run, which is when the errand walkers pass; and
+  making the separation gentler (below) made the symptom MORE visible, not less, because a child
+  pressed into a body is now released slowly instead of being flung out.
+  THE FIX for that cause is BUILT on `feat/657-separation-speed-cap` (Fable 5, 12.08.2026): a
+  dynamic `occupied` layer over the static `blocked` — the chase and the adults' walkers steer
+  round bodies, the tag pair is excluded so catching stays possible, and playmate-vs-playmate
+  contact deliberately stays with the separation pass (four playmate-wall shapes were measured
+  and every one degraded healthy villages, 0.46-1.33 % against the 0.25 % gate). Proven: the
+  crowded-adults replay reads 0.00 % with the fix against 1.88 % without.
+  WHAT REMAINS, measured on that branch (~1 red in 4 idle-machine runs): a SECOND mechanism —
+  a recovering child paces in the DEAD-END WEDGE where the hut at (13.5, -6.4) r 2.35 straddles
+  the bambara play-ground rim; every probed red window sits at (10.4-10.7, -5.6..-5.8), the
+  nearest adult 2.6 m away, nothing carried. The cure is one of: play grounds that never
+  dead-end against a rim-straddling collider (lifeSpots), or a cornered-evade behaviour — both
+  re-roll every village and need their own measurement round. The charge stays restored with
+  exactly this evidence until the wedge is closed.
+  A SECOND, SMALLER DEFECT rides along, named by GPT-5.6 Sol's re-review of point 648's behaviour
+  (12.08.2026, verdict merge-with-fixes on that one finding): `separateGroup` in
+  `src/scenes/place/inhabitantBodies.ts` calls `pushBody(..., dt, …)` in EVERY sweep, so the
+  per-frame `maxSpeed` is applied once PER PASS — with the shipped values (8 m/s, 4 passes) a
+  body can be corrected at an effective 32 m/s, against a cap the code documents as per frame.
+  A deep stack therefore snaps apart instead of easing apart, which is exactly what a child
+  walking hard into a pocket would look like from outside. The fix is ONE shared per-body
+  movement budget spent across all sweeps; it is part of this point, and its Vitest case pins
+  that no body moves further in a frame than the cap allows, whatever the pass count.
+  VERIFIABLE: the live `children-motion` section runs five times per backend with no red, and a
+  Vitest replay reproduces the named cause from a recorded trace and shows it gone after the fix
+  — the replay fails against the code as it stands today. While this point is open, the live
+  red is charged to it in `scripts/render-verify-charges.mjs`, and the charge dies with the tick.
+  Criticality: high — it is the user's own bug report and the most visible surface of the
+  settlement.
+  Bundle: Dorfleben.

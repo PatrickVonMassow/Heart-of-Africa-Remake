@@ -318,60 +318,60 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   liegt, und prüfe sie bei jedem Start gegen eine **Beobachtung**."
 
 - **Der Alarm, der nie spricht.** Fällt die Quelle aus, meldet ein Alarm auf ein *Ereignis*
-  nichts; und ein Ersatzkanal, den du für scharf hältst, hat oft nie gefeuert.
-  → *Prompt:* „Überwache den **Zustand** statt des Ereignisses. Bevor du eine Meldung dämpfst,
-  **löse den verbleibenden Kanal einmal echt aus**. Und was den Betrieb anhalten darf,
-  wiederholt erst und eskaliert nur auf **aufeinanderfolgende** Fehlschläge."
+  nichts — und ein Ersatzkanal, den du für scharf hältst, hat oft nie gefeuert.
+  → *Prompt:* „Überwache den **Zustand** statt des Ereignisses, und **löse jeden Ersatzkanal
+  einmal echt aus**. Was anhalten darf, eskaliert nur auf **aufeinanderfolgende** Fehlschläge."
 
-- **Eine Priorität, die nur in Prosa steht, wirkt nicht.** Sie landet getreu in der Aufgabenliste
-  — aber die Reihenfolge, aus der gearbeitet wird, steht woanders, und die Nachfolge-Sitzung
-  kennt deinen Chat nicht.
+- **Eine Priorität, die nur in Prosa steht, wirkt nicht.** Die Reihenfolge, aus der gearbeitet
+  wird, steht woanders — und die Nachfolge-Sitzung kennt deinen Chat nicht.
   → *Prompt:* „Trag Priorisiertes dort ein, wo die Arbeit gezogen wird, und lass eine Prüfung
   fehlschlagen, wenn beides auseinanderläuft. Priorisiere das **Ziel**: Was das Feature
   schneller fertig macht, kommt mit nach vorn."
 
-- **Blockiert heißt nicht: du bist dran.** Bei fehlender Berechtigung bekommst du
-  gern einen Befehl gereicht — oft einen, der gar nicht funktionieren kann.
-  → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir. **Miss** erst, ob der Weg trägt.
-  Fehlt wirklich eine Fähigkeit, bitte **einmal um die Fähigkeit** — nie um ihre Ausführung."
+- **Blockiert heißt nicht: du bist dran.** Bei fehlender Berechtigung bekommst du gern einen
+  Befehl gereicht — oft einen, der gar nicht funktionieren kann.
+  → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir; **miss** erst, ob der Weg trägt. Fehlt
+  wirklich eine Fähigkeit, bitte **einmal um die Fähigkeit** — nie um ihre Ausführung."
 
 - **Nicht jedes Rot ist deins.** Eine Prüfung, die nur „rot" und „grün" kennt, schiebt fremde
   Ausfälle deinem Code zu.
-  → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — **lief überhaupt ein eigener
-  Schritt?** Liegt sie außerhalb, nenn den **echten Griff** dort."
+  → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — lief überhaupt ein eigener
+  Schritt? Liegt sie außerhalb, nenn den **echten Griff** dort."
 
-- **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er sitzt
-  — Netz, Rechte, Umgebung —, verliert mit dem Fehlschlag die nächste Reparatur mit.
+- **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er sitzt,
+  verliert mit dem Fehlschlag die nächste Reparatur mit.
   → *Prompt:* „Bevor du deine eigene Umgebung änderst: Gibt es eine **kleinere Handlung**, die nur
   **ergänzt**? Und lass jeden Neuaufbau nach **offen** scheitern — ein zugesperrter Stand ist
   nicht mehr reparierbar."
 
-- **Verschlucken sieht aus wie Erfolg — und ein nie gestartetes Werkzeug wie ein strenges.**
-  → *Prompt:* „Ein Ersatzwert im `catch` darf nur verschluckt werden, wenn er zu **weniger** Aktion
-  führt. ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
+- **Verschlucken sieht aus wie Erfolg — ein nie gestartetes Werkzeug wie ein strenges.**
+  → *Prompt:* „Ein Ersatzwert im `catch` gilt nur, wenn er zu **weniger** Aktion führt.
+  ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
 
-- **Einigkeit ist keine Evidenz.** Mehrere Modelle können sich einig sein und gemeinsam
-  danebenliegen; die Einigkeit fühlt sich dann an wie ein Beweis.
-  → *Prompt:* „Bevor du Versuche vorschlägst: Welcher **eine Test** macht die Ursache **sichtbar**?"
-
-- **Der Erfolg beweist den Weg nicht.** Es lief durch — nur hattest du den Dialog weggeklickt.
-  → *Prompt:* „Sag **vor** der Messung, welches Ergebnis welche Erklärung **ausschließen** würde."
+- **Einigkeit und Erfolg sind keine Evidenz.** Modelle können gemeinsam danebenliegen, und
+  „es lief durch" beweist den Weg nicht — du hattest den Dialog weggeklickt.
+  → *Prompt:* „Welcher **eine Test** macht die Ursache **sichtbar**? Sag **vor** der Messung,
+  welches Ergebnis welche Erklärung ausschließt."
 
 - **Zwei Aufträge für einen Fehler.** Derselbe Mangel wird arglos ein zweites Mal aufgeschrieben.
   → *Prompt:* „Vor jedem neuen Punkt: Such die offenen nach demselben Problem ab — gibt es einen,
-  **erweitere ihn**. Verwirfst du einen Zweig, rette, was er über seinen Auftrag hinaus mitbrachte."
+  **erweitere ihn**. Verwirfst du einen Zweig, rette, was über seinen Auftrag hinaus darin steckt."
 
-- **Gebaut heißt nicht auffindbar.** Ein Feature ist korrekt und wird trotzdem als fehlend
-  gemeldet, weil seine Bedienung falsch einsortiert ist: Dein Test fragt „wirkt es?", der Nutzer
-  „komme ich dorthin?".
-  → *Prompt:* „Meldet er etwas erneut, das repariert ist, nimm an, er **erreicht** es nicht. Prüf
-  die **Nachbarschaft** — und wo das als Test schreibbar ist, schreib es als Test."
+- **Gebaut heißt nicht auffindbar.** Dein Test fragt „wirkt es?", der Nutzer „komme ich dorthin?".
+  → *Prompt:* „Meldet er etwas erneut, das repariert ist, nimm an, er **erreicht** es nicht — prüf
+  die **Nachbarschaft**, und wo das als Test schreibbar ist, schreib es als Test."
 
 - **Der erste Fehlschlag macht sich selbst dauerhaft.** Eine wiederkehrende Aufgabe liest ihre
-  eigene Spur, die es beim ersten Lauf nicht gibt — sie bricht ab, schreibt die Spur nie und
-  bricht ab jetzt immer ab. Von außen: „übersprungen".
+  eigene Spur, die es beim ersten Lauf nicht gibt — und bricht von da an immer ab. Von außen:
+  „übersprungen".
   → *Prompt:* „Prüf jede wiederkehrende Aufgabe gegen den **leeren Zustand**; so beginnt sie nach
   jedem Neustart. ‚Übersprungen' ist **kein Betriebszustand** — was sie nicht tut, meldet sie laut."
+
+- **Die Kur ist teurer als der Fehler.** Eine Regel, die ein seltenes Fehlverhalten sicher
+  unterbindet, verbiegt das Verhalten überall sonst mit.
+  → *Prompt:* „Ein bestätigter Befund verpflichtet zur **Untersuchung**, nicht zur Änderung: Miss
+  die Kur gegen gesunde Fälle. Ist sie teurer als der Fehler, **buche** ihn mit Zahlen und
+  verworfener Kur — verschweigen gilt nicht, still beheben auch nicht."
 
 ---
 
@@ -412,4 +412,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Sie setzt auf, woran alles andere hängt: eine Wahrheit, eine Arbeitsordnung, zwei
 Testschichten, den Reflex zum Check. Die Fallstricke oben ersetzt sie nicht.
 
-<!-- GUIDE-FINGERPRINT: 0a04f8ecb8bd3891b7cfcec82f7e747416dc7206fea27079f57ab22b8a7f4110 -->
+<!-- GUIDE-FINGERPRINT: a464e8345c6e35cea98d189a023efd62b5f6a8ffb57d19852cb94f3a1b18931c -->
