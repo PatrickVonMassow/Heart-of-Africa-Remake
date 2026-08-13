@@ -144,6 +144,29 @@ describe('the chat survives the document the board writes over it', () => {
     dom.window.close()
   })
 
+  it('restores exactly one favicon after the board replaces the source head', async () => {
+    const dom = await loadViewer({ fetchImpl: async () => okResponse(board) })
+    const doc = dom.window.document
+    // The fetched board really replaced the viewer head; its title is live and
+    // the viewer-only color-scheme metadata is gone.
+    expect(doc.title).toBe('b')
+    expect(doc.querySelector('meta[name="color-scheme"]')).toBeNull()
+
+    // A later replacement can lose the runtime link too. The same swap route
+    // that restores the chat must put it back, and repeated injection stays
+    // idempotent.
+    doc.head.replaceChildren(doc.createElement('title'))
+    dom.window.dispatchEvent(new dom.window.Event('hoa-board-swapped'))
+    dom.window.injectChat()
+    dom.window.injectChat()
+
+    const icons = doc.querySelectorAll('link[rel~="icon"]')
+    expect(icons).toHaveLength(1)
+    expect(icons[0].getAttribute('type')).toBe('image/svg+xml')
+    expect(icons[0].getAttribute('href')).toBe('favicon.svg')
+    dom.window.close()
+  })
+
   it('adds no <details>, so the board fragment’s own open-card memory is untouched', async () => {
     const dom = await loadViewer({ fetchImpl: async () => okResponse(board) })
     const doc = dom.window.document
