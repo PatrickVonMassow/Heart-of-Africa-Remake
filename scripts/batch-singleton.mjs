@@ -593,8 +593,10 @@ export function progressGuardDecision({
   launcher = 'unknown', // 'armed' | 'disabled' | 'unknown'
   boundaryDue = null, // point number closed in THIS session without a marker | null
   inFlight = false, // declared work PROVEN still running (assessInFlight().live)
+  inFlightTransferable = true, // false ONLY when declared work lacks a pushed checkpoint (point 675)
   slotsNeedReason = false, // free pool slots + an independent queued point + no reason (point 427)
   claim = 'none', // 'none' | 'wait' | 'release' from batch-claim-core's releaseDecision
+  contextPastWatermark = false, // a REAL context reading past the watermark, launcher armed (point 675)
 }) {
   if (paused) return 'allow'
   if (formatSuspect) return 'block-format'
@@ -642,8 +644,25 @@ export function progressGuardDecision({
   // only once the idle slots are accounted for: either the pool is at its cap, the
   // queue's remaining points all touch the running branch, the batch is paused, a
   // closing freeze is recorded, or the declaration carries a written reason.
-  if (inFlight === true) return slotsNeedReason === true ? 'block-slots-free' : 'allow-in-flight'
+  // THE CONDITION IS "THE POINT I WAS LANDING IS LANDED" (point 675, defeat 2),
+  // not "the pool has drained". A declared wait therefore shields the session
+  // from the boundary demand ONLY while the work could not survive it — no
+  // committed-and-pushed checkpoint, so a successor could neither verify nor
+  // rescue it (drain-before-boundary stays the safe degraded mode). Transferable
+  // work is ADOPTED by the successor instead of waited out, so the boundary (and
+  // the context watermark) is demanded right through it.
+  if (inFlight === true && inFlightTransferable !== true) {
+    return slotsNeedReason === true ? 'block-slots-free' : 'allow-in-flight'
+  }
   if (Number.isInteger(boundaryDue) && boundaryDue > 0) return 'block-take-boundary'
+  // THE CONTEXT WATERMARK (point 675, defeat 3): a session that answers
+  // questions and files points for hours never closes a point, so nothing above
+  // ever fires — but its context is the batch's dominant cost all the same.
+  // The caller sets this ONLY from a real measurement AND an armed launcher
+  // (never demand what the CLI would refuse), so a block here always names a
+  // handover the session can actually take.
+  if (contextPastWatermark === true) return 'block-context-handover'
+  if (inFlight === true) return slotsNeedReason === true ? 'block-slots-free' : 'allow-in-flight'
   return 'block-continue'
 }
 
@@ -1246,7 +1265,18 @@ export function heartbeat(sessionId, opts = {}) {
       now,
       settleMs: opts.settleMs,
     })
-    if (opts.preserveHandover === true && next.handedOver === true) {
+    // A SEALED (committed) boundary marker carries the handover through EVERY
+    // later hook (point 675, defeat 1): post-commit mutations are denied loudly
+    // at PreToolUse, and the reads that do run must not un-take the flag the
+    // launcher spawns on. Only read when a handover actually stands — the hot
+    // path pays nothing.
+    let sealed = false
+    try {
+      sealed = readJson(statePathsFor(lockPath).boundaryPath)?.phase === 'committed'
+    } catch {
+      /* an unreadable marker is not sealed */
+    }
+    if ((opts.preserveHandover === true || sealed) && next.handedOver === true) {
       next.handedOverAt = now
     } else if (causal) {
       delete next.handedOver
@@ -1515,6 +1545,13 @@ export function withdrawalIsCausal({
  * heartbeat lands (four-eyes review, finding 1). Calling this from a PreToolUse
  * hook closes that window BEFORE the long call starts.
  */
+/** The boundary marker beside a lock, or null — for callers (the PreToolUse
+ *  gate) that must judge a sealed boundary without importing the boundary CLI's
+ *  whole dependency set. */
+export function readBoundaryMarker(lockPath = LOCK_PATH) {
+  return readJson(statePathsFor(lockPath).boundaryPath)
+}
+
 export function withdrawHandover(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
   const lock = readOwnerLock(lockPath)
@@ -1532,6 +1569,26 @@ export function withdrawHandover(sessionId, opts = {}) {
   // is protected by the same test as the flag — deleting it is what forces the
   // re-take, and that re-take loop is what point 388 was opened on.
   const marker = readJson(boundaryPath)
+  // A COMMITTED marker is SEALED (point 675, defeat 1): `--commit` was the
+  // session's last repository action, so a later call never silently un-takes
+  // the boundary — the PreToolUse gate DENIES the call loudly instead
+  // (`sealedBoundaryDeny`), and only the deliberate `--clear` (or the user's own
+  // prompt, `force`) withdraws. Without this, the seal would deny a mutation and
+  // this withdrawal would still eat the marker for the call that was denied.
+  if (marker?.phase === 'committed' && opts.force !== true) {
+    try {
+      appendFileSync(
+        opts.logPath ?? statePathsFor(lockPath).boundaryLogPath,
+        `[${new Date(opts.now ?? Date.now()).toISOString()}] SEALED MARKER KEPT for ` +
+          `${marker.cause === 'context' ? 'the context watermark' : `point ${marker.point ?? '?'}`} by ${sessionId} — ` +
+          `a post-commit call (${opts.trigger ?? 'unrecorded'}) does not withdraw a committed boundary; ` +
+          `only \`batch-boundary.mjs --clear\` or the user's own prompt does.\n`,
+      )
+    } catch {
+      /* best effort */
+    }
+    return false
+  }
   const writtenAt = Math.max(
     typeof lock.handedOverAt === 'number' ? lock.handedOverAt : 0,
     typeof marker?.at === 'number' ? marker.at : 0,

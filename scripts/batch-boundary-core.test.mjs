@@ -26,6 +26,8 @@ import {
   isOutputPagerSegment,
   describeWithdrawalTrigger,
   hookCallTimestamp,
+  markerPhase,
+  sealedBoundaryDeny,
   WITHDRAWAL_TRIGGER_MAX,
 } from './batch-boundary-core.mjs'
 import { NO_CURRENT_WORK_TITLE } from './board-core.mjs'
@@ -569,5 +571,196 @@ describe('the boundary card names where the batch actually goes', () => {
     expect(boundaryCardText({ point: 1, ...boundaryDestination({ claimHonoured: true, claimantSid: 's' }) })).toContain(
       'Fenster s hat ihn beansprucht',
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE TWO-PHASE BOUNDARY (point 675, defeat 1): a committed marker is SEALED —
+// a later mutation is an explicit, loud DENY, never a silent marker deletion,
+// and everything `--prepare` prescribes stays inside the closing set so the
+// bookkeeping can never delete a marker either.
+// ---------------------------------------------------------------------------
+describe('markerPhase — only a committed marker is sealed', () => {
+  it('distinguishes none / legacy / committed', () => {
+    expect(markerPhase(null)).toBe('none')
+    expect(markerPhase(undefined)).toBe('none')
+    expect(markerPhase(marker())).toBe('legacy')
+    expect(markerPhase(marker({ phase: 'committed' }))).toBe('committed')
+    expect(markerPhase(marker({ phase: 'prepared' }))).toBe('legacy') // unknown phases are not sealed
+  })
+})
+
+describe('sealedBoundaryDeny — a mutation after --commit errors loudly (point 675)', () => {
+  const sealed = marker({ phase: 'committed' })
+  const call = { toolName: 'Bash', command: 'git commit -m x' }
+
+  it('DENIES a non-closing mutation after commit, naming --clear as the way back', () => {
+    const d = sealedBoundaryDeny({ marker: sealed, sid: SID, now: NOW, ...call })
+    expect(d.deny).toBe(true)
+    expect(d.reason).toContain('COMMITTED')
+    expect(d.reason).toContain('--clear')
+  })
+
+  it('a file edit outside the closing set is denied too', () => {
+    expect(
+      sealedBoundaryDeny({ marker: sealed, sid: SID, now: NOW, toolName: 'Write', filePath: 'src/App.tsx' }).deny,
+    ).toBe(true)
+  })
+
+  it('NEVER denies the closing set — the card publish, the board, --clear itself', () => {
+    for (const command of [
+      'node scripts/board.mjs none --text-stdin',
+      'node scripts/board-publish.mjs',
+      'node scripts/batch-boundary.mjs --clear',
+      'node scripts/batch-boundary.mjs --status',
+      'node scripts/batch-in-flight.mjs --status',
+      'node scripts/guard-preflight.mjs --for answer --session s',
+    ]) {
+      expect(sealedBoundaryDeny({ marker: sealed, sid: SID, now: NOW, toolName: 'Bash', command }).deny).toBe(false)
+    }
+  })
+
+  it('a legacy (un-phased) marker denies nothing — old semantics untouched', () => {
+    expect(sealedBoundaryDeny({ marker: marker(), sid: SID, now: NOW, ...call }).deny).toBe(false)
+  })
+
+  it('a stale or foreign committed marker denies nothing — the seal is not a trap', () => {
+    expect(
+      sealedBoundaryDeny({
+        marker: marker({ phase: 'committed', at: NOW - BOUNDARY_FRESH_MS - 1 }),
+        sid: SID,
+        now: NOW,
+        ...call,
+      }).deny,
+    ).toBe(false)
+    expect(sealedBoundaryDeny({ marker: sealed, sid: 'other-session', now: NOW, ...call }).deny).toBe(false)
+    expect(sealedBoundaryDeny({ marker: sealed, sid: '', now: NOW, ...call }).deny).toBe(false)
+    expect(sealedBoundaryDeny({ marker: null, sid: SID, now: NOW, ...call }).deny).toBe(false)
+  })
+
+  it('names the context watermark when that is what was committed', () => {
+    const d = sealedBoundaryDeny({
+      marker: marker({ phase: 'committed', cause: 'context', point: null, tokens: 160_000 }),
+      sid: SID,
+      now: NOW,
+      ...call,
+    })
+    expect(d.deny).toBe(true)
+    expect(d.reason).toContain('context watermark')
+  })
+})
+
+describe('the marker survives everything --prepare prescribes (point 675)', () => {
+  it('every bookkeeping command the prepare phase names is in the closing set', () => {
+    // These are the commands `batch-boundary.mjs --prepare` prints. If one of
+    // them ever left the closing set, running it would withdraw a taken
+    // boundary again — the exact measured defeat of 13.08.2026 (board-publish
+    // was the missing one).
+    for (const command of [
+      'node scripts/board.mjs done 675 --none --text-stdin',
+      'node scripts/board.mjs none --text-stdin',
+      'node scripts/board-publish.mjs',
+      'node scripts/guard-preflight.mjs --for answer --session s',
+      'node scripts/batch-boundary.mjs --prepare 675',
+      'node scripts/batch-boundary.mjs --commit 675',
+      'node scripts/batch-in-flight.mjs --handover-check',
+      'node scripts/batch-in-flight.mjs --adopt',
+      'node scripts/context-watermark.mjs --status',
+    ]) {
+      expect(handoverSurvivesCall({ toolName: 'Bash', command }).survives, command).toBe(true)
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE CONTEXT BOUNDARY (point 675, defeat 3): valid without a closed point,
+// but ONLY on a recorded real measurement.
+// ---------------------------------------------------------------------------
+describe('assessBoundary — the context-watermark cause', () => {
+  const ctx = (over = {}) => marker({ phase: 'committed', cause: 'context', point: null, tokens: 165_000, ...over })
+
+  it('is valid without any point closure, on a recorded measurement', () => {
+    const b = assessBoundary({ marker: ctx(), sid: SID, now: NOW, closure: 'unknown' })
+    expect(b).toEqual({ valid: true, point: null, reason: 'context-boundary' })
+  })
+
+  it('REFUSES a context marker with no recorded token reading — assumption is not measurement', () => {
+    expect(assessBoundary({ marker: ctx({ tokens: undefined }), sid: SID, now: NOW, closure: 'unknown' }).valid).toBe(
+      false,
+    )
+    expect(assessBoundary({ marker: ctx({ tokens: 0 }), sid: SID, now: NOW, closure: 'unknown' }).reason).toBe(
+      'context-marker-unmeasured',
+    )
+  })
+
+  it('keeps the freshness and session binding of every marker', () => {
+    expect(
+      assessBoundary({ marker: ctx({ at: NOW - BOUNDARY_FRESH_MS - 1 }), sid: SID, now: NOW, closure: 'unknown' })
+        .reason,
+    ).toBe('marker-stale')
+    expect(assessBoundary({ marker: ctx(), sid: 'other', now: NOW, closure: 'unknown' }).reason).toBe(
+      'marker-foreign-session',
+    )
+  })
+
+  it('feeds boundaryVerdict exactly like a point boundary', () => {
+    const boundary = assessBoundary({ marker: ctx(), sid: SID, now: NOW, closure: 'unknown' })
+    expect(boundaryVerdict({ boundary, launcher: 'armed' })).toBe('allow-boundary')
+    expect(boundaryVerdict({ boundary, launcher: 'disabled' })).toBe('block-launcher')
+  })
+})
+
+describe('boundaryCardText — the watermark variant says WHY (point 675)', () => {
+  it('a context boundary names the watermark, not a closed point', () => {
+    const text = boundaryCardText({ ...boundaryDestination({}), cause: 'context' })
+    expect(text).toContain('Wasserstandsmarke')
+    expect(text).not.toContain('Der Punkt ist abgeschlossen')
+  })
+
+  it('the point variant is untouched, and the claiming-window variant carries the head too', () => {
+    expect(boundaryCardText({ ...boundaryDestination({}) })).toContain('Der Punkt ist abgeschlossen')
+    expect(
+      boundaryCardText({ ...boundaryDestination({ claimHonoured: true, claimantSid: 's' }), cause: 'context' }),
+    ).toContain('Wasserstandsmarke')
+  })
+})
+
+describe('progressGuardDecision — the context watermark demands a handover (point 675)', () => {
+  const base = { sid: SID, paused: false, openCount: 3, formatSuspect: false, ownership: 'mine', unhandledAlert: false }
+
+  it('past the watermark, an owner with no other verdict is told to hand over', () => {
+    expect(progressGuardDecision({ ...base, contextPastWatermark: true })).toBe('block-context-handover')
+  })
+
+  it('a TRANSFERABLE wait does not shield the session from the watermark — the successor adopts', () => {
+    expect(progressGuardDecision({ ...base, contextPastWatermark: true, inFlight: true })).toBe(
+      'block-context-handover',
+    )
+  })
+
+  it('NON-transferable work drains first — the safe degraded mode', () => {
+    expect(
+      progressGuardDecision({ ...base, contextPastWatermark: true, inFlight: true, inFlightTransferable: false }),
+    ).toBe('allow-in-flight')
+  })
+
+  it('a due POINT boundary outranks the watermark, and a valid boundary still hands over', () => {
+    expect(progressGuardDecision({ ...base, contextPastWatermark: true, boundaryDue: 675 })).toBe(
+      'block-take-boundary',
+    )
+    expect(
+      progressGuardDecision({
+        ...base,
+        contextPastWatermark: true,
+        boundary: { valid: true, point: null, reason: 'context-boundary' },
+        launcher: 'armed',
+      }),
+    ).toBe('allow-boundary')
+  })
+
+  it('never fires for a non-owner, a paused batch or an empty queue', () => {
+    expect(progressGuardDecision({ ...base, ownership: 'held', contextPastWatermark: true })).toBe('stand-down')
+    expect(progressGuardDecision({ ...base, paused: true, contextPastWatermark: true })).toBe('allow')
+    expect(progressGuardDecision({ ...base, openCount: 0, contextPastWatermark: true })).toBe('allow')
   })
 })

@@ -114,6 +114,22 @@ export function assessBoundary({ marker, sid, now, closure, freshMs = BOUNDARY_F
   if (!marker || typeof marker !== 'object') {
     return { valid: false, point: null, reason: 'no-marker' }
   }
+  // A CONTEXT boundary (point 675, defeat 3) records no point and needs no
+  // closure: its licence is the recorded watermark reading, taken at commit time
+  // from a real measurement. Freshness and session binding hold exactly as for a
+  // point boundary.
+  if (marker.cause === BOUNDARY_CAUSES.CONTEXT) {
+    if (typeof marker.tokens !== 'number' || !(marker.tokens > 0)) {
+      return { valid: false, point: null, reason: 'context-marker-unmeasured' }
+    }
+    if (typeof marker.at !== 'number' || !(now - marker.at < freshMs)) {
+      return { valid: false, point: null, reason: 'marker-stale' }
+    }
+    if (!sid || marker.sessionId !== sid) {
+      return { valid: false, point: null, reason: 'marker-foreign-session' }
+    }
+    return { valid: true, point: null, reason: 'context-boundary' }
+  }
   const point = Number(marker.point)
   if (!Number.isInteger(point) || point <= 0) {
     return { valid: false, point: null, reason: 'marker-malformed' }
@@ -197,6 +213,68 @@ export function boundaryDueFrom({ tick, ownerSince, now, dueMs = BOUNDARY_DUE_MS
 // KEPT one lets a successor spawn beside a working session, which is the
 // incident class this whole apparatus exists to prevent.
 
+// --- The TWO-PHASE boundary (point 675, defeat 1) ------------------------------
+//
+// The marker used to be written FIRST and the bookkeeping done after — and the
+// bookkeeping (the card publish, every guard remedy a blocked turn forces)
+// counted as work and cleared the marker. Measured twice on 13.08.2026; once it
+// left the batch idle for forty minutes. The boundary is now two-phase:
+//   --prepare  does/validates ALL bookkeeping and writes NO marker — there is
+//              nothing to delete while the session finishes ending;
+//   --commit   is the session's LAST repository action: it seals the marker
+//              (phase 'committed'), and any mutation attempted afterwards is an
+//              EXPLICIT, LOUD error (a PreToolUse deny naming `--clear` as the
+//              way back) rather than a silent marker deletion.
+
+/** Marker phases. A legacy marker (no phase field) keeps the old withdrawal
+ *  semantics; only a COMMITTED marker is sealed. */
+export const BOUNDARY_PHASES = Object.freeze({ COMMITTED: 'committed' })
+
+/** What kind of boundary the marker records: a closed point, or the context
+ *  watermark (point 675, defeat 3 — a session can outgrow its context without
+ *  ever closing a point). */
+export const BOUNDARY_CAUSES = Object.freeze({ POINT: 'point', CONTEXT: 'context' })
+
+export function markerPhase(marker) {
+  if (!marker || typeof marker !== 'object') return 'none'
+  return marker.phase === BOUNDARY_PHASES.COMMITTED ? 'committed' : 'legacy'
+}
+
+/**
+ * MUST THIS CALL BE DENIED BECAUSE THE BOUNDARY IS COMMITTED? PURE.
+ *
+ * Only a fresh, committed marker belonging to the asking session denies, and only
+ * a call that is NOT part of ending (the closing set stays open, so the card
+ * publish and `--clear` itself are never blocked). Everything else — a stale
+ * marker, a foreign one, a legacy one — denies nothing: the deny is a seal on a
+ * deliberate `--commit`, never a trap, and its reason names the one-command way
+ * back. Returns { deny, reason }.
+ */
+export function sealedBoundaryDeny({
+  marker,
+  sid,
+  now,
+  toolName,
+  command,
+  filePath,
+  freshMs = BOUNDARY_FRESH_MS,
+} = {}) {
+  if (markerPhase(marker) !== 'committed') return { deny: false, reason: null }
+  if (!sid || marker.sessionId !== sid) return { deny: false, reason: null }
+  if (typeof marker.at !== 'number' || !(now - marker.at < freshMs)) return { deny: false, reason: null }
+  if (handoverSurvivesCall({ toolName, command, filePath }).survives) return { deny: false, reason: null }
+  const what = marker.cause === BOUNDARY_CAUSES.CONTEXT ? 'the context watermark' : `point ${marker.point ?? '?'}`
+  return {
+    deny: true,
+    reason:
+      `THE BOUNDARY IS COMMITTED (${what}) — \`batch-boundary.mjs --commit\` was this session's last ` +
+      `repository action, so this call is refused instead of silently deleting the marker (that silent ` +
+      `deletion defeated every handover on 13.08.2026). END THE SESSION NOW. If you genuinely must work ` +
+      `again, withdraw the boundary FIRST: \`node scripts/batch-boundary.mjs --clear\` — then this call is ` +
+      `allowed and the boundary must be re-taken afterwards.`,
+  }
+}
+
 /** Files whose modification is part of ENDING the batch, by basename. */
 export const CLOSING_SET_FILES = new Set([
   'batch-dashboard.html',
@@ -212,17 +290,24 @@ export const CLOSING_SET_FILES = new Set([
   'tasks-archive.md',
 ])
 
-/** Scripts that exist to SATISFY a Stop guard or to run the handover itself. */
+/** Scripts that exist to SATISFY a Stop guard or to run the handover itself.
+ *  `board-publish` and `batch-in-flight` joined for point 675: publishing the
+ *  handover card IS ending (its absence from this list was one of the measured
+ *  marker deletions of 13.08.2026), and transferring/adopting the in-flight
+ *  declaration is boundary bookkeeping, not batch work. */
 export const CLOSING_SET_SCRIPTS = [
   'dashboard-publish',
   'dashboard-sync',
   'focus',
   'board',
+  'board-publish',
   'mechanism-review',
   'retro-refresh',
   'batch-boundary',
   'batch-handover-observe',
+  'batch-in-flight',
   'batch-singleton',
+  'context-watermark',
   'guard-preflight',
 ]
 
@@ -431,8 +516,15 @@ export function boundaryCardCommand({ point, pointCardStanding = false } = {}) {
     : `${NONE_CARD_CMD} --text-stdin`
 }
 
-export function boundaryCardText({ destination, claimantSid = null } = {}) {
-  const head = 'Der Punkt ist abgeschlossen.'
+export function boundaryCardText({ destination, claimantSid = null, cause = BOUNDARY_CAUSES.POINT } = {}) {
+  // The WATERMARK head (point 675, defeat 3): the reader must see that the
+  // handover happens BECAUSE the context passed the mark, not because a point
+  // closed — a card that says "der Punkt ist abgeschlossen" over a watermark
+  // handover claims a closure that never happened.
+  const head =
+    cause === BOUNDARY_CAUSES.CONTEXT
+      ? 'Der Kontext dieser Sitzung hat die Wasserstandsmarke erreicht; ich übergebe deshalb jetzt, statt weiter in diesem teuren Kontext zu arbeiten.'
+      : 'Der Punkt ist abgeschlossen.'
   if (destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW && claimantSid) {
     // The reservation is stated with its LIMIT, not as a promise. It survives the
     // release now (point 461 — the freed lock stays that window's while its

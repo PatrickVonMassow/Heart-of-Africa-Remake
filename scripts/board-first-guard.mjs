@@ -33,9 +33,21 @@ import {
   mergeState,
   sha256File,
 } from './dashboard-state.mjs'
-import { heldByOtherLiveOwner, withdrawHandover, touchHandover, renewLease, readFence } from './batch-singleton.mjs'
+import {
+  heldByOtherLiveOwner,
+  withdrawHandover,
+  touchHandover,
+  renewLease,
+  readFence,
+  readBoundaryMarker,
+} from './batch-singleton.mjs'
 import { fenceDecision } from './batch-lease-core.mjs'
-import { handoverSurvivesCall, describeWithdrawalTrigger, hookCallTimestamp } from './batch-boundary-core.mjs'
+import {
+  handoverSurvivesCall,
+  describeWithdrawalTrigger,
+  hookCallTimestamp,
+  sealedBoundaryDeny,
+} from './batch-boundary-core.mjs'
 import { publishCapability } from './board-currency-core.mjs'
 import { evaluate, isWorktreeCheckout } from './board-first-core.mjs'
 
@@ -226,6 +238,37 @@ try {
   // part an agent could not act on. Measured: 1058 characters of deny plus a
   // discarded tool call per agent, for a publish it is forbidden to make.
   if (isWorktreeCheckout(REPO_ROOT)) process.exit(0)
+
+  // THE SEALED BOUNDARY (point 675, defeat 1). After `batch-boundary.mjs
+  // --commit`, a mutation is an EXPLICIT, LOUD error, never a silent marker
+  // deletion: the deny names `--clear` as the one-command way back, and the
+  // closing set (card publish, focus, the boundary CLI itself) stays open, so
+  // nothing the ending still needs is ever blocked. Placed after the worktree
+  // exemption: an ADOPTED delegated agent keeps working through the handover.
+  try {
+    const sealed = sealedBoundaryDeny({
+      marker: readBoundaryMarker(),
+      sid: payload.session_id || '',
+      now: Date.now(),
+      toolName: payload.tool_name,
+      command: input0.command,
+      filePath: input0.file_path ?? input0.notebook_path,
+    })
+    if (sealed.deny) {
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'deny',
+            permissionDecisionReason: sealed.reason,
+          },
+        }),
+      )
+      process.exit(0)
+    }
+  } catch {
+    /* fail-OPEN: an unreadable marker must never cost anybody a tool call */
+  }
 
   const input = input0
   const { state, focus, repoHash, boardPaths, boardHtml } = gather()

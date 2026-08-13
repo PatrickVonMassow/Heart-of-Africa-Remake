@@ -1160,6 +1160,69 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(readOwnerLock(lockPath).handedOver).toBe(true)
   })
 
+  // --- THE SEALED MARKER (point 675, defeat 1) --------------------------------
+  // After `batch-boundary.mjs --commit` the marker is phase 'committed': no
+  // later call silently withdraws it — the PreToolUse gate denies mutations
+  // loudly instead — and only `--clear` or the user's own prompt (`force`) ends it.
+  it('a COMMITTED marker is never silently withdrawn — and the refusal is logged', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    const at = Date.now()
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 675, now: at })
+    writeFileSync(
+      markerPath,
+      JSON.stringify({ v: 2, phase: 'committed', cause: 'point', sessionId: 's1', point: 675, at }),
+    )
+    expect(
+      withdrawHandover('s1', { lockPath, now: at + HANDOVER_SETTLE_MS + 1, trigger: 'Bash: git commit' }),
+    ).toBe(false)
+    expect(existsSync(markerPath)).toBe(true)
+    expect(readOwnerLock(lockPath).handedOver).toBe(true)
+    expect(readFileSync(join(dir, 'boundary.log'), 'utf8')).toMatch(/SEALED MARKER KEPT for point 675 by s1/)
+  })
+
+  it('`force` (the user\'s own prompt, --clear) still withdraws a committed marker', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    const at = Date.now()
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 675, now: at })
+    writeFileSync(
+      markerPath,
+      JSON.stringify({ v: 2, phase: 'committed', cause: 'point', sessionId: 's1', point: 675, at }),
+    )
+    expect(
+      withdrawHandover('s1', { lockPath, now: at + HANDOVER_SETTLE_MS + 1, force: true, trigger: 'UserPromptSubmit' }),
+    ).toBe(true)
+    expect(existsSync(markerPath)).toBe(false)
+    expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
+  })
+
+  it('the HEARTBEAT carries a sealed handover forward even for ordinary work', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    const at = Date.now()
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 675, now: at })
+    writeFileSync(
+      markerPath,
+      JSON.stringify({ v: 2, phase: 'committed', cause: 'point', sessionId: 's1', point: 675, at }),
+    )
+    // preserveHandover FALSE — the call was not closing work — yet the seal holds.
+    heartbeat('s1', { lockPath, now: at + 5000, skipBackfill: true, preserveHandover: false })
+    const lock = readOwnerLock(lockPath)
+    expect(lock.handedOver).toBe(true)
+    expect(lock.handedOverAt).toBe(at + 5000)
+  })
+
+  it('a LEGACY (un-phased) marker keeps the old withdrawal semantics exactly', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    const at = Date.now()
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 675, now: at })
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 675, at }))
+    expect(withdrawHandover('s1', { lockPath, now: at + HANDOVER_SETTLE_MS + 1 })).toBe(true)
+    expect(existsSync(markerPath)).toBe(false)
+  })
+
   it('FINDING 3: the withdrawal is logged BESIDE the redirected lock, never in the repo', () => {
     const at = Date.now()
     acquire('s1', opts())

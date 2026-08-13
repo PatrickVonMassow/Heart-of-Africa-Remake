@@ -3,13 +3,26 @@
 // only reads the work order, probes the OS launcher, and stores/clears the
 // marker. CLI:
 //
-//   node scripts/batch-boundary.mjs <point>   record: point N is closed, end here
+//   node scripts/batch-boundary.mjs --prepare <point>  validate + name ALL the
+//                                             boundary bookkeeping; NO marker
+//   node scripts/batch-boundary.mjs --commit <point>   the session's LAST
+//                                             repository action: seal the marker
+//   node scripts/batch-boundary.mjs <point>   one-shot (legacy): seal + print the
+//                                             bookkeeping that must still follow
 //   node scripts/batch-boundary.mjs --status  what the Stop hook would decide
 //   node scripts/batch-boundary.mjs --clear   withdraw a recorded boundary
 //
 // Recording is DELIBERATE and verified up front: the command refuses unless the
 // point is really closed in the work order and the launcher is really armed, so
 // the session learns at the boundary rather than at a blocked turn end.
+//
+// TWO-PHASE since point 675: the marker used to be written first and the
+// bookkeeping done after, and that bookkeeping (the card publish, guard
+// remedies) counted as work and deleted the marker — twice on 13.08.2026.
+// `--prepare` therefore writes NOTHING (there is nothing to lose while the
+// session ends), and `--commit` seals a marker no later call silently deletes:
+// post-commit mutations are DENIED loudly (`sealedBoundaryDeny`), with
+// `--clear` as the deliberate way back.
 import { readFileSync, rmSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { repoPath } from './repo-paths.mjs'
@@ -19,8 +32,10 @@ import { readOwnerLock } from './batch-singleton.mjs'
 import { gatherClaim } from './batch-claim.mjs'
 import { reservationDecision } from './batch-claim-core.mjs'
 import {
+  BOUNDARY_CAUSES,
   BOUNDARY_DESTINATIONS,
   BOUNDARY_DUE_MS,
+  BOUNDARY_PHASES,
   LAUNCHER_TASK_NAME,
   assessBoundary,
   boundaryCardCommand,
@@ -28,10 +43,13 @@ import {
   boundaryDestination,
   boundaryDueFrom,
   classifyLauncherState,
+  markerPhase,
   pointClosure,
   tickedPointsInDiff,
 } from './batch-boundary-core.mjs'
 import { launcherRemedy } from './batch-launcher-core.mjs'
+import { PUBLISH_CMD } from './board-remedy.mjs'
+import { gatherHandoverTransfer as gatherTransfer } from './batch-in-flight.mjs'
 import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
@@ -329,7 +347,8 @@ const isMain =
   process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href
 
 if (isMain) {
-  const arg = process.argv[2]
+  const argv = process.argv.slice(2)
+  const arg = argv[0]
   const sid = readOwnerLock()?.sessionId ?? ''
   const fail = (msg) => {
     console.error(msg)
@@ -355,6 +374,7 @@ if (isMain) {
         {
           ownerSessionId: sid || null,
           ...g,
+          phase: markerPhase(g.marker),
           handover,
           launcherName: remedy.name,
           launcherProbe,
@@ -371,14 +391,25 @@ if (isMain) {
     else if (g.boundary.valid && g.launcher === 'armed') console.log('\nA boundary stop would be ALLOWED.')
     else console.log(`\nA boundary stop would be REFUSED (${g.boundary.reason}, launcher ${g.launcher}).`)
   } else {
-    const point = Number(arg)
-    if (!Number.isInteger(point) || point <= 0) fail(`not a point number: "${arg}"`)
+    // --prepare <point> | --commit <point> | <point> (legacy one-shot)
+    const phaseFlag = arg === '--prepare' || arg === '--commit' ? arg : null
+    const pointArg = phaseFlag ? argv[1] : arg
+    const point = Number(pointArg)
+    if (!Number.isInteger(point) || point <= 0) {
+      fail(
+        `not a point number: "${pointArg ?? ''}"` +
+          (phaseFlag ? ` (usage: node scripts/batch-boundary.mjs ${phaseFlag} <point>)` : ''),
+      )
+    }
     if (!sid) {
       fail(
         'no batch lock owner — only the session that owns .claude/batch-lock.json may end at a ' +
           'boundary. Nothing recorded.',
       )
     }
+    // THE CONDITION (point 675, defeat 2): the point this session was LANDING is
+    // LANDED. Delegated authors still building do not hold the boundary — the
+    // successor adopts them through the transferred in-flight declaration.
     const closure = closureOf(point)
     if (closure !== 'closed') {
       fail(
@@ -394,29 +425,82 @@ if (isMain) {
           `strand it. Keep working, and ${remedy.how}. Nothing recorded.`,
       )
     }
-    writeBoundary({ v: 1, sessionId: sid, point, at: Date.now() })
+    // IN-FLIGHT WORK MUST BE TRANSFERABLE (point 675, defeat 2 / merged proposal
+    // M28–M34): a worker without a committed-and-pushed checkpoint would die
+    // with this session, so it BLOCKS the handover with named recovery choices.
+    // A transferable declaration is handed to the successor at commit.
+    const transfer = gatherTransfer(sid)
+    if (transfer.blocked) fail(transfer.message)
     const handover = boundaryHandover({ sid })
     const toWindow = handover.destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
+    const cardBlock =
+      'THE BOARD CARD (point 434 (7)) — it must name where the batch actually goes, so take this text ' +
+      'verbatim rather than writing it again. It names NO point number on purpose: it goes into the ' +
+      'unnumbered gap card, where the topic guard reads every point reference as a foreign one.\n\n' +
+      `${handover.card}\n\n` +
+      // The command is CHOSEN from the board's real state (point 470), never
+      // assumed: an instruction that does not work is what sent sessions to
+      // hand-edit the board file, and a hand-edit appends.
+      `  ${boundaryCardCommand({ point, pointCardStanding: pointCardStanding(point) })}   (the German ` +
+      'goes in on stdin — a Windows shell mangles the umlauts on the argument path)\n' +
+      `  ${PUBLISH_CMD}\n`
+    const destinationLine = toWindow
+      ? `the batch does NOT go to a fresh session: window ${handover.claimantSid} holds an honoured claim, ` +
+        'so batch-autostart reserves the batch for it and SKIPS the spawn. '
+      : `the launcher (${launcherRemedy().name}) starts a fresh one within its interval and ` +
+        'batch-resume-hook re-orients it. '
+
+    if (phaseFlag === '--prepare') {
+      console.log(
+        `PREPARED (nothing recorded yet): point ${point} is landed, the launcher is armed` +
+          (transfer.note ? `, and ${transfer.note}` : '') +
+          '. Do the boundary bookkeeping NOW, while no marker exists that work could delete:\n\n' +
+          `${cardBlock}\n` +
+          `Then check nothing else would block (\`node scripts/guard-preflight.mjs --for answer --session ${sid}\`), ` +
+          `and make \`node scripts/batch-boundary.mjs --commit ${point}\` the LAST repository action of this ` +
+          'session: it seals the marker, and any mutation after it is an explicit error. End the session right after.',
+      )
+      process.exit(0)
+    }
+
+    if (phaseFlag === '--commit' && pointCardStanding(point)) {
+      fail(
+        `the board still carries the current-work card for point ${point}, so the boundary bookkeeping has ` +
+          `not been done. Run \`node scripts/batch-boundary.mjs --prepare ${point}\` and follow it — the card, ` +
+          'the publish — then commit. Nothing recorded.',
+      )
+    }
+
+    const sealed = { v: 2, phase: BOUNDARY_PHASES.COMMITTED, cause: BOUNDARY_CAUSES.POINT, sessionId: sid, point, at: Date.now() }
+    writeBoundary(sealed)
+    const transferred = transfer.commit ? transfer.commit() : null
+    const transferLine = transferred
+      ? ` The in-flight declaration was marked TRANSFERRED (${transferred}); the successor adopts it with ` +
+        '`node scripts/batch-in-flight.mjs --adopt`, so the running author keeps building through the handover.'
+      : ''
+
+    if (phaseFlag === '--commit') {
+      console.log(
+        `boundary COMMITTED: point ${point} is landed and the launcher is armed. This was the last repository ` +
+          `action of this session — END IT NOW. ${destinationLine}Any further mutation is DENIED loudly ` +
+          '(withdraw deliberately with `node scripts/batch-boundary.mjs --clear` if you truly must work again).' +
+          transferLine,
+      )
+      process.exit(0)
+    }
+
+    // Legacy one-shot: seal first, bookkeeping after — kept working for existing
+    // callers, but the marker now SURVIVES the bookkeeping (the closing set stays
+    // open; everything else is denied loudly instead of silently deleting it).
     console.log(
-      `boundary recorded: point ${point} is closed and the launcher is armed. End this session now — ` +
-        (toWindow
-          ? `the batch does NOT go to a fresh session: window ${handover.claimantSid} holds an honoured claim, ` +
-            'so batch-autostart reserves the batch for it and SKIPS the spawn. '
-          : `the launcher (${launcherRemedy().name}) starts a fresh one within its interval and ` +
-            'batch-resume-hook re-orients it. ') +
-        'Do NOT start the next point in this context, and do NOT end while a delegated agent is still in ' +
-        'flight (its work would be thrown away — let the pool drain first).\n\n' +
-        'THE BOARD CARD (point 434 (7)) — it must name where the batch actually goes, so take this text ' +
-        'verbatim rather than writing it again. It names NO point number on purpose: it goes into the ' +
-        'unnumbered gap card, where the topic guard reads every point reference as a foreign one.\n\n' +
-        `${handover.card}\n\n` +
-        // The command is CHOSEN from the board's real state (point 470), never
-        // assumed: an instruction that does not work is what sent sessions to
-        // hand-edit the board file, and a hand-edit appends.
-        `  ${boundaryCardCommand({ point, pointCardStanding: pointCardStanding(point) })}   (the German ` +
-        'goes in on stdin — a Windows shell mangles the umlauts on the argument path)\n\n' +
+      `boundary recorded (SEALED): point ${point} is closed and the launcher is armed. End this session now — ` +
+        destinationLine +
+        'Do NOT start the next point in this context; a delegated author still building is ADOPTED by the ' +
+        `successor, not waited out.${transferLine}\n\n${cardBlock}\n` +
         'The card is a CLAIM TO STOP: once it stands, the board gate denies the next state-changing ' +
-        'call. Publishing it, the focus stamp and this boundary command are never blocked.',
+        'call. Publishing it, the focus stamp and this boundary command are never blocked — any OTHER ' +
+        'mutation is denied loudly (`--clear` withdraws deliberately). Next time, prefer ' +
+        `\`--prepare ${point}\` → bookkeeping → \`--commit ${point}\`: the commit is then the last action of all.`,
     )
   }
 }

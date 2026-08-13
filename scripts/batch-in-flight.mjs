@@ -40,16 +40,21 @@ import {
 } from './batch-singleton.mjs'
 import { DECLARED_WAIT_LEASE_MS } from './batch-lease-core.mjs'
 import {
+  adoptionAssessment,
   agentOutputVerdict,
   assessInFlight,
+  assessTransfer,
+  checkEvidence,
   combineWorktreeStamps,
   describeInFlight,
+  markTransferred,
   porcelainPaths,
   respawnDecision,
   selfReferentialEvidence,
   slotReasonDecision,
   slotsRemedy,
   statusVerdict,
+  transferBlockMessage,
   closingFreezeActive,
   declaredAgentCount,
   openPointSpecs,
@@ -475,6 +480,146 @@ export function checkAgentOutput({ worktree = null, branch = null, log = null, n
   return { output, ...respawnDecision({ output }) }
 }
 
+// --- The transferable adoption record (point 675, defeat 2) ---------------------
+
+/** Local and remote-tracking tip of a branch: { ref, localSha, remoteSha }, or
+ *  null for an unusable name. `origin/<branch>` is the honest reading of
+ *  "committed AND PUSHED" without a network round trip: a worktree push updates
+ *  it in the shared git dir, and a branch never pushed simply has none. */
+export function checkpointOf(ref, { cwd = REPO_ROOT } = {}) {
+  const name = String(ref ?? '')
+    .trim()
+    .replace(/^refs\/heads\//, '')
+  if (!name || name.startsWith('-') || /[\s~^:?*[\]\\]/.test(name)) return null
+  const sha = (rev) => {
+    try {
+      return (
+        execFileSync('git', ['rev-parse', `${rev}^{commit}`], {
+          windowsHide: true,
+          cwd,
+          encoding: 'utf8',
+          timeout: 8000,
+          stdio: ['ignore', 'pipe', 'ignore'],
+        }).trim() || null
+      )
+    } catch {
+      return null
+    }
+  }
+  return { ref: name, localSha: sha(`refs/heads/${name}`) ?? sha(name), remoteSha: sha(`refs/remotes/origin/${name}`) }
+}
+
+/** Is `ancestorSha` contained in `sha`? Used at adoption: a branch that moved
+ *  FORWARD from its recorded checkpoint is still the handed-over work. */
+export function isAncestor(ancestorSha, sha, { cwd = REPO_ROOT } = {}) {
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', String(ancestorSha), String(sha)], {
+      windowsHide: true,
+      cwd,
+      timeout: 8000,
+      stdio: ['ignore', 'ignore', 'ignore'],
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** The declaration's evidence, annotated with checkpoints for `assessTransfer`. */
+export function transferItems(declaration, { cwd = REPO_ROOT } = {}) {
+  const out = []
+  for (const e of Array.isArray(declaration?.evidence) ? declaration.evidence : []) {
+    if (e?.kind === 'branch') {
+      out.push({ kind: 'branch', describe: `branch ${e.ref}`, checkpoint: checkpointOf(e.ref, { cwd }) })
+    } else if (e?.kind === 'worktree') {
+      const ref = worktreeBranch(e.path, { cwd })
+      out.push({
+        kind: 'worktree',
+        describe: `worktree ${e.path}`,
+        checkpoint: ref ? checkpointOf(ref, { cwd }) : null,
+      })
+    } else {
+      out.push({ kind: String(e?.kind ?? ''), describe: `${e?.kind ?? '?'} ${e?.pid ?? e?.path ?? ''}`.trim(), checkpoint: null })
+    }
+  }
+  return out
+}
+
+/**
+ * MAY THE BOUNDARY HAND THIS SESSION'S IN-FLIGHT WORK TO A SUCCESSOR (point 675,
+ * defeat 2)? Judged at `--prepare` AND at `--commit`. Returns
+ * { blocked, message?, note, commit? } — `commit()` marks the declaration
+ * TRANSFERRED and returns the checkpoint summary; it exists only when nothing
+ * blocks. Fail direction: an unreadable declaration blocks nothing (it is the
+ * guard's ordinary business), but a READABLE one with unverifiable checkpoints
+ * blocks — a successor cannot adopt what cannot be verified.
+ */
+export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, now = Date.now() } = {}) {
+  const path = statePathsFor(lockPath).inFlightPath
+  const declaration = readDeclaration(path)
+  if (!declaration) return { blocked: false, note: '', commit: null }
+  const assessment = assessTransfer({ items: transferItems(declaration, { cwd }) })
+  if (!assessment.transferable) {
+    return { blocked: true, message: transferBlockMessage(assessment), note: '', commit: null }
+  }
+  const summary =
+    assessment.checkpoints.map((c) => `${c.ref ?? '?'}@${String(c.sha).slice(0, 8)}`).join(', ') || 'no checkpoints'
+  return {
+    blocked: false,
+    note: `the declared in-flight work is transferable (pushed checkpoints: ${summary})`,
+    commit: () => {
+      writeDeclaration(markTransferred({ declaration, bySid: sid, now, checkpoints: assessment.checkpoints }), path)
+      return summary
+    },
+  }
+}
+
+/**
+ * THE SUCCESSOR ADOPTS a transferred declaration (M4/M7): evidence is re-probed,
+ * what expired is DROPPED AND NAMED, a contradicted or empty record REFUSES with
+ * its alerts — never a silent unblock. On success the declaration is rewritten
+ * under the adopting session's own identity, so every existing probe
+ * (`gatherInFlight`, the launcher) keeps working on it unchanged.
+ */
+export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, now = Date.now() } = {}) {
+  const path = statePathsFor(lockPath).inFlightPath
+  const declaration = readDeclaration(path)
+  if (!declaration || !declaration.transfer) return { adopted: false, reason: 'no-transferred-declaration', alerts: [] }
+  const evidence = Array.isArray(declaration.evidence) ? declaration.evidence : []
+  const items = evidence.map((e) => checkEvidence(e, { now, ...probes }))
+  const checkpointStates = (declaration.transfer.checkpoints ?? []).map((c) => {
+    const cp = c?.ref ? checkpointOf(c.ref, { cwd }) : null
+    return {
+      ref: c?.ref ?? null,
+      recordedSha: c?.sha,
+      localSha: cp?.localSha ?? null,
+      ancestor: cp?.localSha && c?.sha ? isAncestor(c.sha, cp.localSha, { cwd }) : false,
+    }
+  })
+  const assessment = adoptionAssessment({ items, checkpointStates })
+  if (!assessment.adopt) return { adopted: false, reason: 'refused', alerts: assessment.alerts }
+  const lock = readOwnerLock(lockPath)
+  writeDeclaration(
+    {
+      ...declaration,
+      sessionId: sid,
+      pid: typeof lock?.pid === 'number' ? lock.pid : null,
+      pidStartedAt: typeof lock?.pidStartedAt === 'number' ? lock.pidStartedAt : null,
+      at: now,
+      evidence: evidence.filter((_, i) => items[i]?.ok === true),
+      adopted: { from: declaration.transfer.by || declaration.sessionId || null, at: now },
+    },
+    path,
+  )
+  return {
+    adopted: true,
+    reason: 'adopted',
+    alerts: assessment.alerts,
+    kept: assessment.kept.length,
+    dropped: assessment.dropped.length,
+  }
+}
+
 // --- CLI -----------------------------------------------------------------------
 
 const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href
@@ -489,9 +634,44 @@ if (isMain) {
   const usage =
     'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--pid N] [--branch REF] ' +
     '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] | --status | --clear | ' +
-    '--agent-check [--worktree PATH] [--branch REF] [--log PATH]'
+    '--agent-check [--worktree PATH] [--branch REF] [--log PATH] | --handover-check | --adopt'
 
-  if (argv[0] === '--agent-check') {
+  if (argv[0] === '--handover-check') {
+    // May the boundary hand the declared work to a successor (point 675)?
+    // Read-only twin of what `batch-boundary.mjs --prepare/--commit` enforces.
+    const t = gatherHandoverTransfer(sid)
+    if (t.blocked) {
+      console.error(t.message)
+      process.exit(1)
+    }
+    console.log(
+      t.note
+        ? `TRANSFERABLE — ${t.note}. A boundary commit will mark it transferred; the successor adopts it ` +
+            'with `node scripts/batch-in-flight.mjs --adopt`.'
+        : 'nothing is declared in flight — the handover is unconstrained.',
+    )
+    process.exit(0)
+  } else if (argv[0] === '--adopt') {
+    if (!sid) fail('no batch lock owner — only the session that owns the batch lock may adopt. Nothing adopted.')
+    const a = adoptTransferred(sid)
+    for (const alert of a.alerts) console.error(`ALERT: ${alert}`)
+    if (!a.adopted) {
+      fail(
+        a.reason === 'no-transferred-declaration'
+          ? 'no transferred declaration exists — nothing to adopt.'
+          : 'ADOPTION REFUSED — the transferred declaration no longer describes live, verifiable work (see the ' +
+              'alerts above). Do NOT treat this as a green light: LOOK at each named worktree/branch yourself, ' +
+              'then either re-declare what is really running (`--waiting-on …`) or, if the work is finished or ' +
+              'gone, act on it and `--clear`.',
+      )
+    }
+    console.log(
+      `ADOPTED the transferred declaration (${a.kept} evidence item(s) kept, ${a.dropped} dropped and named ` +
+        'above). This session now waits on that work under the ordinary rules: act the moment it lands, ' +
+        're-declare or --clear as it changes.',
+    )
+    process.exit(0)
+  } else if (argv[0] === '--agent-check') {
     const opt = (name) => {
       const i = argv.indexOf(name)
       return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null
