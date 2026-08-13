@@ -931,6 +931,22 @@ describe('unpreparedRefusal — --commit refuses what --prepare never prepared (
     ).toContain('--prepare --context --transcript')
   })
 
+  it('records WHETHER the board was read, not merely what it held (Sol on 456be8f)', () => {
+    const read = preparedReceipt({
+      sid: SID,
+      point: 675,
+      now: NOW,
+      board: { readable: true, cards: ['<details class="card">…</details>'] },
+    })
+    expect(read.boardRead).toBe(true)
+    expect(read.cardsBefore).toHaveLength(1)
+    // An unreadable board leaves an empty list — and says that it is not the
+    // same thing as a board with no cards on it.
+    const unread = preparedReceipt({ sid: SID, point: 675, now: NOW, board: { readable: false, cards: [] } })
+    expect(unread.boardRead).toBe(false)
+    expect(unread.cardsBefore).toEqual([])
+  })
+
   it('refuses a receipt of an OLDER SHAPE, and one whose destination has since changed (Sol on 7ecebed)', () => {
     // A v1 receipt carries no board reading, so the stale-card check would have
     // nothing to compare against — refused rather than silently downgraded.

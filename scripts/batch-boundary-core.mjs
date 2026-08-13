@@ -314,7 +314,7 @@ export function markerPhase(marker) {
  *  prefixed string would no longer equal the region this code now cuts, and the
  *  unchanged card would read as fresh. A receipt of an older version is refused
  *  and re-taken rather than compared across representations. */
-export const PREPARED_RECEIPT_V = 3
+export const PREPARED_RECEIPT_V = 4
 
 export function preparedReceipt({
   sid,
@@ -322,8 +322,9 @@ export function preparedReceipt({
   point = null,
   now,
   destination = null,
-  cardsBefore = [],
+  board = { readable: false, cards: [] },
 }) {
+  const { readable = false, cards = [] } = board ?? {}
   return {
     v: PREPARED_RECEIPT_V,
     sessionId: String(sid ?? ''),
@@ -339,7 +340,12 @@ export function preparedReceipt({
     // leftovers of earlier handovers. `--commit` demands a card that is not one
     // of them, which is the only thing that tells this handover's card from a
     // predecessor's (Sol's review of bcf820c).
-    cardsBefore: Array.isArray(cardsBefore) ? cardsBefore : [],
+    cardsBefore: Array.isArray(cards) ? cards : [],
+    // …and WHETHER that reading happened at all: an unreadable board is not an
+    // empty one (Sol's review of 456be8f). Collapsed into an empty list, a
+    // failed reading would make every standing card look newly added once the
+    // board came back, and a leftover card would prove the handover.
+    boardRead: readable === true,
   }
 }
 

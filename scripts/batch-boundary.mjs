@@ -357,10 +357,19 @@ export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } =
  * Any read failure answers false — the pointless `--none` is the one that can
  * fail; `board.mjs none` works in both states, so it is the safe default.
  */
-/** The handover cards of this cause and destination ALREADY on the board — what
- *  `--prepare` records so `--commit` can demand a card that is not one of them. */
+/**
+ * The handover cards of this cause and destination ALREADY on the board — what
+ * `--prepare` records so `--commit` can demand a card that is not one of them.
+ *
+ * Returns `{ readable, cards }`: an unreadable board is NOT an empty board (Sol's
+ * review of 456be8f). Collapsed into `[]`, a failed reading at preparation time
+ * would make every standing card look newly added once the board became
+ * readable again, and a leftover card would prove the handover.
+ */
 export function standingCards({ cause, destination, path = repoPath(BOARD_FILE_DEFAULT) } = {}) {
-  return cardRegions(readText(path), cardProofFragments({ cause, destination }))
+  const text = readText(path)
+  const readable = typeof text === 'string' && text.trim().length > 0
+  return { readable, cards: readable ? cardRegions(text, cardProofFragments({ cause, destination })) : [] }
 }
 
 /**
@@ -392,6 +401,16 @@ export function requireBoardCard({
         'but check by hand that the card is up and published.',
     )
     return
+  }
+  // THE PREPARATION'S READING MUST HAVE HAPPENED (Sol's review of 456be8f): a
+  // board unreadable THEN and readable NOW leaves every standing card looking
+  // newly added, so the leftover would prove the handover. One command fixes it.
+  if (receipt && receipt.boardRead !== true) {
+    fail(
+      `THE PREPARATION COULD NOT READ THE BOARD, and it can be read now — so nothing distinguishes ${what} from ` +
+        `a card an earlier handover left standing. Run \`node scripts/batch-boundary.mjs ${prepare}\` again for a ` +
+        'reading that counts, put the card up, then commit. Nothing recorded.',
+    )
   }
   if (proof.malformedKnown === true) {
     fail(
@@ -597,7 +616,7 @@ if (isMain) {
             cause: BOUNDARY_CAUSES.CONTEXT,
             now: Date.now(),
             destination: handover.destination,
-            cardsBefore: standingCards({ cause: BOUNDARY_CAUSES.CONTEXT, destination: handover.destination }),
+            board: standingCards({ cause: BOUNDARY_CAUSES.CONTEXT, destination: handover.destination }),
           }),
         )
         console.log(
@@ -755,7 +774,7 @@ if (isMain) {
           point,
           now: Date.now(),
           destination: handover.destination,
-          cardsBefore: standingCards({ cause: BOUNDARY_CAUSES.POINT, destination: handover.destination }),
+          board: standingCards({ cause: BOUNDARY_CAUSES.POINT, destination: handover.destination }),
         }),
       )
       console.log(
