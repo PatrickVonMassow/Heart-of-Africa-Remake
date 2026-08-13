@@ -17987,3 +17987,38 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — it is the user's own bug report and the most visible surface of the
   settlement.
   Bundle: Dorfleben.
+
+- [x] 667. SOL AUTHORS TOO, SO THE LOAD MOVES WHERE THE VOLUME IS (user 13.08.2026, 09:38:
+  "Kannst du noch mehr Last zu OpenAI hin schieben? Da habe ich noch viel mehr Volumen übrig
+  als bei Anthropic."). MEASURED STATE OF THE LEVER THAT EXISTS: the routing switch already
+  stands at its maximum — `prefer-sol` sends every READING kind (diagnose, audit, enumerate,
+  explain) through `scripts/ask-sol.mjs`. What still sits with Anthropic is the AUTHORING of
+  delegated points, which is the largest single item (~58 % of the weighted spend comes from
+  delegated-agent transcripts), plus the suites, the picture judgment and the landing.
+  FINAL STATE: Sol may AUTHOR suitable points, under a role swap that keeps four eyes intact.
+  1. THE ROLE SWAP IS THE POINT. Today Claude authors and Sol reviews. Where Sol authors,
+     CLAUDE reviews, runs the suites, judges the picture and lands — so every point still has
+     two vendors on it and neither model reviews its own work. `mechanism-review.mjs` and
+     `review-sol.mjs` learn the reversed direction; the blind-parallel and convergent modes of
+     CLAUDE.md §6 are unchanged in substance, only in who holds which end.
+  2. THE CUT IS NAMED, NOT GUESSED. Which points Sol authors is decided at the build from the
+     measured record, not by taste: mechanical and mid-difficulty work first (the class Fable
+     is explicitly NOT for), never the hard cases that CLAUDE.md §6 routes to Fable, and never
+     a point whose verification is the whole of the work.
+  3. THE MACHINERY. A codex-driven worktree authoring loop, the same shape the delegated agent
+     already has: its own branch, atomic commits pushed at every step, gates green before it
+     reports. The commit trailer NAMES Sol, `scripts/model-guard-core.mjs`'s `ALLOWED` gains it
+     as an AUTHOR (it is currently reviewer-only, so an authored commit would stop the batch),
+     and CLAUDE.md §6's model policy is rewritten to state the two authoring lanes and who
+     reviews which — the policy paragraph is the binding text, so it changes in the same commit.
+  4. THE SAVING IS MEASURED, not assumed: `node scripts/measure-context-cost.mjs` over a full
+     day after the lever lands, reported against the rate it started from, in both scopes —
+     the way point 553 requires. If the authoring lane does not move the Anthropic share, that
+     is reported as such.
+  VERIFIABLE: Vitest over the guard core (a Sol-authored commit passes as an author, an
+  unnamed trailer still fails, a forbidden model still pauses the batch) and over the routing
+  decision (a point in the named class routes to Sol, a hard case still routes to Fable); live,
+  one real point authored by Sol end to end, reviewed and landed by Claude.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): this changes the model guard and the model policy.
+  Criticality: medium — it moves spend to the quota that has room, and it touches the guard that
+  protects the batch from a degraded session, so the guard half is the risky half.
