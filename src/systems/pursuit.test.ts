@@ -377,6 +377,35 @@ describe('headings', () => {
     expect(Math.hypot(27 + Math.sin(h) * 0.5, Math.cos(h) * 0.5)).toBeLessThan(27.5)
   })
 
+  // THE UN-WRAP'S OWN SIGN BOUNDARY (Sol re-review, 13.08.2026). Inside the
+  // ramp band the un-wrapped delta crosses zero near 131° and the runner's
+  // heading can overshoot onto delta's own side, where the sign test drops
+  // the whole remaining un-wrap in one frame. That jump is a KNOWN residual:
+  // three cure families were measured on the tag sims and rejected for
+  // degrading healthy villages (see `evadeHeading`'s ramp comment), and its
+  // live signature is charged to point 666. What must NOT drift is the
+  // committed side of the test — a runner genuinely on the long way keeps
+  // the full un-wrap; this is the 648 rim-runner protection.
+  describe('at the un-wrap sign boundary (delta ≈ 131°)', () => {
+    // Runner far out at +x, chaser placed so the flee bearing stands 131°
+    // from the inward pull: away ≈ 2.427, delta ≈ +2.285 — inside the band.
+    const runner = { x: 20, z: 0 }
+    const chaser = { x: 18.034, z: 2.266 }
+    const away = headingToward(chaser.x, chaser.z, runner.x, runner.z)
+
+    it('a whole commitment onto the long way keeps the full un-wrap', () => {
+      const inward = headingToward(runner.x, runner.z, 0, 0, away)
+      const delta = Math.atan2(Math.sin(inward - away), Math.cos(inward - away))
+      const opposed = Math.PI - Math.PI / 6
+      const release = opposed - Math.PI / 6
+      const w = Math.min(1, (Math.abs(delta) - release) / (opposed - release))
+      const t = ((20 - 28 * 0.55) / (28 - 28 * 0.55)) * 0.85
+      const expected = away + (delta - Math.sign(delta) * Math.PI * 2 * w) * t
+      const h = evadeHeading(runner.x, runner.z, chaser.x, chaser.z, 28, 0, 0, undefined, undefined, away - 2)
+      expect(Math.abs(Math.atan2(Math.sin(h - expected), Math.cos(h - expected)))).toBeLessThan(1e-9)
+    })
+  })
+
   // THE TWO PULLS OPPOSING ONE ANOTHER (work-order 648). With the chaser between
   // a cornered runner and the middle, fleeing and returning point opposite ways
   // and there are two equally good ways round. Taken always the short way, the

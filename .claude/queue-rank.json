@@ -35,10 +35,14 @@
     "663": {
       "at": "2026-08-12T20:20:48.210Z",
       "why": "Infrastruktur-Aergernis mit Retry als Sofort-Handgriff; hinter den Release-Punkten bei den Infrastruktur-Nachbarn"
+    },
+    "668": {
+      "at": "2026-08-13T12:07:50.425Z",
+      "why": "Small landing-chain hardening; the red is loud and the remedy obvious, so it waits behind the release-critical fixes"
     }
   },
   "settled": {
-    "at": "2026-08-13T11:00:40.873Z",
+    "at": "2026-08-13T12:07:50.425Z",
     "points": [
       174,
       184,
@@ -200,7 +204,6 @@
       651,
       652,
       653,
-      657,
       658,
       659,
       660,
@@ -209,7 +212,8 @@
       664,
       665,
       666,
-      667
+      667,
+      668
     ]
   }
 }

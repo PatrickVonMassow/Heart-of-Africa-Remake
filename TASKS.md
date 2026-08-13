@@ -89,6 +89,17 @@ put it is the mistake this line exists to stop.
   deliberately left to the separation pass — and green runs on BOTH backends carry the identical
   1.29 m window UNDER the gate (0.09–0.11 %). What makes it red is that one such legitimate
   event lands inside a one-second window the measure reads as pacing.
+  A THIRD TRIGGER OF THE SAME WINDOW is confirmed (Sol re-review of the landed 657 range,
+  13.08.2026, verified on the math and charged here): `evadeHeading`'s way-round sign test has
+  its own boundary — inside the release ramp the un-wrapped delta crosses zero near 131°, the
+  output settles onto the flee bearing, and the frame the runner's heading overshoots to the
+  short-way side the whole remaining un-wrap drops at once, a one-frame jump of |delta|·t
+  (~0.71 rad at the traced t). A CURE WAS BUILT AND REJECTED BY MEASUREMENT: fading the un-wrap
+  with |toCurrent| closes the cliff, and every shape tried (fixed 30°/10°/45° bands, a t-scaled
+  band, a band scoped to the ramp) measured +25 % hover rescues over ten adult-in-ground minutes
+  (44→55, seeds 1–10) with tags 78→75 — the same bar that rejected the second round's two
+  downstream cures; the figures stand in `evadeHeading`'s ramp comment. The trigger therefore
+  joins this charge: whichever way (a)/(b) closes this point must account for it too.
   WHY THIS POINT EXISTS: the charge in `scripts/render-verify-charges.mjs` DIES WITH 657's TICK.
   From that moment a `polish` red of this composition — roughly 1 in 10 live runs on WebGL 2 —
   is uncovered, and an uncovered red on the release branch is precisely what point 640 forbids.

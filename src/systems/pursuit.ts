@@ -338,6 +338,20 @@ export function evadeHeading(
       // 0.8 s committed ±60° breakaway (pacing loops against the demand it
       // suppressed: bambara 0.30 %, maasai bursts 0.73 % at the fixed
       // cadence, against 0.00-0.03 % before).
+      // A THIRD CURE FAMILY WAS MEASURED AND REJECTED TOO (Sol re-review +
+      // measurements 13.08.2026). The sign test below has its own boundary:
+      // inside the ramp band the un-wrapped delta crosses zero near 131°,
+      // the output settles onto `away`, the runner's heading follows — and
+      // the frame it overshoots to delta's own side this branch is skipped
+      // whole, a one-frame jump of |delta|·t (~0.71 rad at t≈0.31). Fading
+      // the un-wrap with |toCurrent| closes that cliff, and every shape of
+      // it degraded healthy villages: a fixed 30° band (and 10°/45°), a
+      // t-scaled band and a band scoped to the ramp (vanishing at w=1) all
+      // measured +25 % hover rescues (44→55 over ten adult-in-ground
+      // minutes, seeds 1-10) with tags 78→75. The jump's live signature is
+      // exactly the rare pacing composition CHARGED to point 666 in
+      // scripts/render-verify-charges.mjs; it is closed by reading the
+      // trace, not by a cure that bends the game everywhere else.
       const w = Math.min(1, (Math.abs(delta) - RELEASE) / (OPPOSED - RELEASE))
       delta -= Math.sign(delta) * Math.PI * 2 * w
     }
