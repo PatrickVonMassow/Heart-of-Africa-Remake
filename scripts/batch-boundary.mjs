@@ -43,6 +43,7 @@ import {
   boardCarriesCard,
   boundaryCardCommand,
   cardProofFragments,
+  cardRegions,
   boundaryCardText,
   boundaryDestination,
   boundaryDueFrom,
@@ -356,6 +357,12 @@ export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } =
  * Any read failure answers false — the pointless `--none` is the one that can
  * fail; `board.mjs none` works in both states, so it is the safe default.
  */
+/** The handover cards of this cause and destination ALREADY on the board — what
+ *  `--prepare` records so `--commit` can demand a card that is not one of them. */
+export function standingCards({ cause, destination, path = repoPath(BOARD_FILE_DEFAULT) } = {}) {
+  return cardRegions(readText(path), cardProofFragments({ cause, destination }))
+}
+
 /**
  * THE COMMIT ASKS THE BOARD, not the printout it hoped was followed (Sol's
  * reviews of ffa0a78/389bbc7). Refuses with the command that fixes it; a board
@@ -369,13 +376,15 @@ export function requireBoardCard({
   prepare,
   fail,
   path = repoPath(BOARD_FILE_DEFAULT),
-  preparedAt = readPrepared()?.at ?? null,
+  receipt = readPrepared(),
 }) {
-  // The card must be stamped at or after the PREPARATION, or the card the last
-  // handover left standing would prove this one (Sol's review of 9096fb7).
+  // The card must be one the preparation did NOT already see, and stamped at or
+  // after it — or the card an earlier handover left standing would prove this
+  // one (Sol's reviews of 9096fb7/bcf820c).
   const proof = boardCarriesCard(readText(path), cardProofFragments({ cause, destination }), {
-    sinceMs: typeof preparedAt === 'number' ? preparedAt : null,
+    sinceMs: typeof receipt?.at === 'number' ? receipt.at : null,
     nowMs: Date.now(),
+    knownRegions: Array.isArray(receipt?.cardsBefore) ? receipt.cardsBefore : null,
   })
   if (!proof.verifiable) {
     console.error(
@@ -387,8 +396,8 @@ export function requireBoardCard({
   if (!proof.carries) {
     fail(
       (proof.stale === true
-        ? `THE BOARD CARRIES ${what} FROM AN EARLIER HANDOVER — its stamp predates this preparation, so it says ` +
-          'nothing about the session ending now'
+        ? `THE BOARD CARRIES ${what} FROM AN EARLIER HANDOVER — the preparation already found that card there, ` +
+          'so it says nothing about the session ending now'
         : `THE BOARD DOES NOT CARRY ${what} — a handover the board does not explain leaves the reader with a ` +
           'session that vanished for no stated reason') +
         `. Put up the card \`node scripts/batch-boundary.mjs ${prepare}\` printed and publish it ` +
@@ -573,7 +582,14 @@ if (isMain) {
       if (phaseFlag === '--prepare') {
         // The RECEIPT, not a marker: it proves phase one ran, and `--commit`
         // refuses without it (Sol's review of 4e93933).
-        writePrepared(preparedReceipt({ sid, cause: BOUNDARY_CAUSES.CONTEXT, now: Date.now() }))
+        writePrepared(
+          preparedReceipt({
+            sid,
+            cause: BOUNDARY_CAUSES.CONTEXT,
+            now: Date.now(),
+            cardsBefore: standingCards({ cause: BOUNDARY_CAUSES.CONTEXT, destination: handover.destination }),
+          }),
+        )
         console.log(
           `PREPARED (nothing recorded yet): the context measures ${wm.tokens} tokens against the ` +
             `${wm.watermark} watermark, the launcher is armed` +
@@ -716,7 +732,15 @@ if (isMain) {
       // with none of the promised board bookkeeping, which is defeat 1 with a
       // shorter fuse. The bare form keeps WORKING — it starts the two-phase
       // flow and says exactly what to do.
-      writePrepared(preparedReceipt({ sid, cause: BOUNDARY_CAUSES.POINT, point, now: Date.now() }))
+      writePrepared(
+        preparedReceipt({
+          sid,
+          cause: BOUNDARY_CAUSES.POINT,
+          point,
+          now: Date.now(),
+          cardsBefore: standingCards({ cause: BOUNDARY_CAUSES.POINT, destination: handover.destination }),
+        }),
+      )
       console.log(
         (phaseFlag === null
           ? `NOTE: the one-shot form is retired (point 675) — this call ran --prepare ${point} instead, and ` +

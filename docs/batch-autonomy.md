@@ -348,7 +348,12 @@ How it works:
    delete one, only a RECEIPT (`.claude/batch-boundary-prepared.json`) that
    `--commit` requires for its own session, cause and point, since a phase that
    can be skipped is not a phase; a withdrawal (`--clear`) drops it, so a
-   re-taken boundary starts at phase one again — and `--commit <point>` is the
+   re-taken boundary starts at phase one again. The receipt also records the
+   handover cards ALREADY on the board, and the commit reads the board for a
+   card of this cause and destination that is NOT one of them — the board's
+   undated `Stand HH:MM` cannot tell a leftover card from a fresh one, and a
+   handover the board does not explain is the half of the mechanism the reader
+   sees — and `--commit <point>` is the
    session's LAST repository action:
    it writes a SEALED `.claude/batch-boundary.json` (phase `committed`), and any
    later mutation is DENIED loudly (`--clear` is the deliberate way back; the

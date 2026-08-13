@@ -29,6 +29,7 @@ import {
   berlinMinuteOfDay,
   boardCarriesCard,
   cardProofFragments,
+  cardRegions,
   cardStampIsCurrent,
   CARD_PROOF_WINDOW,
   markerFresh,
@@ -1102,6 +1103,27 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
   const frags = cardProofFragments({
     cause: BOUNDARY_CAUSES.CONTEXT,
     destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
+  })
+
+  it('refuses the card the preparation ALREADY SAW, whatever its stamp reads (Sol on bcf820c)', () => {
+    // The undated `HH:MM` can alias — the rollback night has two 02:10s, and
+    // yesterday's card can fall inside today's interval. What cannot alias is
+    // that the preparation already found this exact card on the board.
+    const leftover = stamped('02:10')
+    const prepared = Date.UTC(2026, 9, 25, 0, 55)
+    const now = Date.UTC(2026, 9, 25, 1, 10)
+    const known = cardRegions(leftover, frags)
+    expect(known.length).toBe(1)
+    const stale = boardCarriesCard(leftover, frags, { sinceMs: prepared, nowMs: now, knownRegions: known })
+    expect(stale.carries).toBe(false)
+    expect(stale.stale).toBe(true)
+    // The card put up AFTER the preparation is a different region — even one
+    // minute later, since the stamp is part of it.
+    expect(
+      boardCarriesCard(stamped('02:11'), frags, { sinceMs: prepared, nowMs: now, knownRegions: known }).carries,
+    ).toBe(true)
+    // A board that carried no such card at preparation time proves it outright.
+    expect(boardCarriesCard(leftover, frags, { sinceMs: prepared, nowMs: now, knownRegions: [] }).carries).toBe(true)
   })
 
   it('refuses the card the PREVIOUS handover left standing (Sol on 9096fb7)', () => {

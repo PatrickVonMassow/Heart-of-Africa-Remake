@@ -299,8 +299,19 @@ export function markerPhase(marker) {
  * bookkeeping phase RAN, not that nothing followed it; what follows the commit
  * is the sealed marker's business.
  */
-export function preparedReceipt({ sid, cause = BOUNDARY_CAUSES.POINT, point = null, now }) {
-  return { v: 1, sessionId: String(sid ?? ''), cause, point: point ?? null, at: Number(now) }
+export function preparedReceipt({ sid, cause = BOUNDARY_CAUSES.POINT, point = null, now, cardsBefore = [] }) {
+  return {
+    v: 2,
+    sessionId: String(sid ?? ''),
+    cause,
+    point: point ?? null,
+    at: Number(now),
+    // The handover cards ALREADY on the board when the preparation looked — the
+    // leftovers of earlier handovers. `--commit` demands a card that is not one
+    // of them, which is the only thing that tells this handover's card from a
+    // predecessor's (Sol's review of bcf820c).
+    cardsBefore: Array.isArray(cardsBefore) ? cardsBefore : [],
+  }
 }
 
 /** May `--commit` run at all? PURE. Null = prepared; otherwise the refusal. */
@@ -465,40 +476,58 @@ export function cardStampIsCurrent(
   return false
 }
 
+/**
+ * THE CARD REGIONS OF THE BOARD that carry ALL these fragments. PURE.
+ *
+ * The board is cut at its real card boundaries — every card is a `<details>`
+ * block, so each `</details>` ends one (Sol's reviews of 9f93aeb/1589da5:
+ * searched independently, a context/fresh-session card BESIDE a
+ * point/claiming-window card satisfied a proof no card on that board ever made,
+ * and a DISTANCE cannot tell adjacent cards apart). A board without that markup
+ * falls back to one card's length, which is still better than the whole file.
+ */
+export function cardRegions(boardText, fragments = [], { windowChars = CARD_PROOF_WINDOW } = {}) {
+  const text = typeof boardText === 'string' ? boardText : ''
+  const list = (Array.isArray(fragments) ? fragments : []).filter(Boolean)
+  if (list.length === 0) return []
+  const [head, ...rest] = list
+  let regions
+  if (text.includes(CARD_END)) {
+    regions = text.split(CARD_END)
+  } else {
+    regions = []
+    for (let at = text.indexOf(head); at >= 0; at = text.indexOf(head, at + 1)) {
+      regions.push(text.slice(at, at + windowChars))
+    }
+  }
+  return regions.filter((r) => r.includes(head) && rest.every((f) => r.includes(f)))
+}
+
 export function boardCarriesCard(
   boardText,
   fragments = [],
-  { windowChars = CARD_PROOF_WINDOW, sinceMs = null, nowMs = null } = {},
+  { windowChars = CARD_PROOF_WINDOW, sinceMs = null, nowMs = null, knownRegions = null } = {},
 ) {
   if (typeof boardText !== 'string' || !boardText.trim()) return { carries: true, verifiable: false, missing: [] }
   const list = (Array.isArray(fragments) ? fragments : []).filter(Boolean)
   const missing = list.filter((f) => !boardText.includes(f))
   if (missing.length > 0) return { carries: false, verifiable: true, missing }
   if (list.length < 2) return { carries: true, verifiable: true, missing: [] }
-  // THE FRAGMENTS MUST SIT IN ONE CARD (Sol's reviews of 9f93aeb/1589da5):
-  // searched independently, a context/fresh-session card BESIDE a
-  // point/claiming-window card satisfied a context/claiming-window proof no card
-  // on that board ever made. A DISTANCE cannot decide that — adjacent cards are
-  // as close as their markup — so the board is cut at its real card boundaries:
-  // every card is a `<details>` block, so each `</details>` ends one. A board
-  // without that markup at all falls back to one card's length, which is still
-  // better than the whole file.
-  const [head, ...rest] = list
-  let regions
-  if (boardText.includes(CARD_END)) {
-    regions = boardText.split(CARD_END)
-  } else {
-    regions = []
-    for (let at = boardText.indexOf(head); at >= 0; at = boardText.indexOf(head, at + 1)) {
-      regions.push(boardText.slice(at, at + windowChars))
-    }
-  }
-  const whole = regions.filter((r) => r.includes(head) && rest.every((f) => r.includes(f)))
+  const rest = list.slice(1)
+  const whole = cardRegions(boardText, list, { windowChars })
   if (whole.length === 0) return { carries: false, verifiable: true, missing: rest, split: true }
   // …AND IT MUST BE THIS HANDOVER'S CARD, not the one the last handover left
-  // standing (Sol's review of 9096fb7).
+  // standing (Sol's reviews of 9096fb7/bcf820c). Two things are asked, and the
+  // FIRST is the one that decides, because no reading of an undated `HH:MM` ever
+  // can: the card must not be BYTE-IDENTICAL to a card that was already on the
+  // board when `--prepare` looked. A leftover card is exactly that; a card put
+  // up after the preparation is not. The stamp is asked afterwards, as the
+  // cheaper second signal, and only where the board stamps at all.
+  const known = Array.isArray(knownRegions) ? new Set(knownRegions) : null
+  const fresh = known ? whole.filter((r) => !known.has(r)) : whole
+  if (fresh.length === 0) return { carries: false, verifiable: true, missing: [], stale: true }
   const boardStamps = /Stand\s+\d{1,2}:\d{2}/.test(boardText)
-  if (!whole.some((r) => cardStampIsCurrent(r, { sinceMs, nowMs, boardStamps }))) {
+  if (!fresh.some((r) => cardStampIsCurrent(r, { sinceMs, nowMs, boardStamps }))) {
     return { carries: false, verifiable: true, missing: [], stale: true }
   }
   return { carries: true, verifiable: true, missing: [] }
