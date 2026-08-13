@@ -6811,5 +6811,39 @@ to land than a mechanism that needs a review.
   rescue commit with both halves and the author's model, a clean one produces nothing, an unpushed
   commit is pushed, and `worktree-cleanup` refuses a dirty tree); plus one observed delegated run
   that is killed mid-work and whose branch afterwards carries everything the worktree held.
+  UNTIL IT IS BUILT, the rule is operational and stated by the user (13.08.2026, 19:55): NOTHING is
+  delegated to Fable 5 while its quota is out — not authoring, not four-eyes review — and a hard
+  case whose Fable author died goes to the OpenAI lane with `node scripts/author-sol.mjs --point <N>
+  --anyway`, explicitly overriding the routing rule that keeps hard cases away from Sol. The main
+  session stays on Opus 5. That instruction is what half (1) mechanises, and it expires with the
+  quota reset while the mechanism does not.
   Criticality: high — it is the only failure mode on record that can destroy finished work outright,
   and it fired today.
+
+- [ ] 679. THE BOARD'S BROWSER TAB SHOWS THE GENERIC GLOBE (user 13.08.2026, 19:24: »Kannst du dem
+  Tab vom Dashboard ein einfaches Afrika-Symbol geben. Kein großer Aufwand.«). The board is read in
+  a browser full of open tabs and cannot be picked out among them, because the viewer carries no
+  icon of its own. The scope is the icon and its injection, nothing more.
+  FINAL STATE: `public/board/favicon.svg` holds a flat, monochrome, simplified Africa silhouette in
+  the board's own palette (ink on paper, `#3a2e1c` on `#f0e8d2`), a square viewBox, still legible at
+  16 px — one path, no text, no gradient, no external reference, deliberately not a traced coastline.
+  The viewer INJECTS it at runtime rather than carrying it statically: the board content is written
+  into the document with `document.write`, which replaces the whole document INCLUDING the `<head>`,
+  so a `<link rel="icon">` in the source head is gone the moment the board lands. An
+  `ensureFavicon()` beside `injectChat()` in `public/board/index.html` appends
+  `<link rel="icon" type="image/svg+xml" href="favicon.svg">` to `document.head`, is IDEMPOTENT
+  (exactly one such link however often it runs) and runs everywhere `injectChat()` runs — the
+  success path after the swap, the failure path, `load`, and `onBoardSwapped()`. The relative href
+  resolves against the viewer URL, which `document.write` does not change. Nothing here touches the
+  board CONTENT (`.batch-dashboard.html`) or any board guard: the guards parse the fragment and none
+  of them reads the viewer. No new dependency and no build-step change — the icon is a static file
+  under `public/`, deployed by the Pages workflow that already runs.
+  VERIFIABLE: a Vitest/jsdom case beside the existing injection cases in
+  `scripts/chat-viewer.test.mjs` drives the injection twice and asserts exactly one
+  `link[rel~="icon"]` with the expected href, and that a swapped-in document which lost its head
+  gets the link back; plus the PICTURE — the silhouette judged in the tab at 16 px and 32 px, not by
+  reading the SVG source. A silhouette unrecognisable at 16 px fails the point.
+  AUTHOR: the OpenAI lane (`node scripts/author-sol.mjs --point 679`) — user decision 13.08.2026,
+  19:25 (»Lasse Sol das machen, um Volumen zu sparen«). Mechanical and low-risk, and its
+  verification is not the work.
+  Criticality: low — it costs nothing if it waits, but the user asked for it directly.
