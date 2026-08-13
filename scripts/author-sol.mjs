@@ -15,7 +15,7 @@
 //
 // The decisions are pure and tested (author-sol-core.mjs, author-routing-core.mjs);
 // this half does the process work, the git work and the push, and fails LOUD.
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -36,6 +36,7 @@ import {
   formatAuthoringReport,
   judgeAuthoring,
   parseAuthoringAnswer,
+  PUSH_INTERVAL_MS,
   readinessProblems,
   SOL_MODEL_ID,
   SOL_MODEL_NAME,
@@ -89,19 +90,73 @@ export function commitsSince(base, { cwd = process.cwd() } = {}) {
     })
 }
 
-/** Run codex as an AUTHOR: sandbox bypassed (it cannot work here), credentials
- *  stripped from the environment, the worktree as the working root. */
-export function runAuthoringCodex({ prompt, cwd, timeoutMs = AUTHOR_TIMEOUT_MS, modelId = SOL_MODEL_ID }) {
+/** Push the branch, quietly. Returns true only on a real success. */
+export function pushBranch(branch, { cwd = process.cwd() } = {}) {
+  const res = spawnSync('git', ['push', '-u', 'origin', branch], { cwd, encoding: 'utf8', windowsHide: true })
+  return { ok: res.status === 0 && !res.error, why: (res.stderr || res.error?.message || '').trim() }
+}
+
+/**
+ * Run codex as an AUTHOR: sandbox bypassed (it cannot work here), credentials
+ * stripped from the environment, the worktree as the working root.
+ *
+ * ASYNCHRONOUS, so the branch can be PUSHED WHILE IT WORKS (cross-vendor review
+ * of point 667, P2). The house rule is a push after every commit; the child
+ * cannot be given the credential to do it, so the wrapper does it on an interval
+ * instead and a commit is durable within two minutes rather than at the end of
+ * an hour-long run.
+ */
+export async function runAuthoringCodex({
+  prompt,
+  cwd,
+  branch = '',
+  timeoutMs = AUTHOR_TIMEOUT_MS,
+  modelId = SOL_MODEL_ID,
+  pushEveryMs = PUSH_INTERVAL_MS,
+  onPush = () => {},
+}) {
   const outFile = join(tmpdir(), `author-sol-${process.pid}-${Date.now()}.txt`)
   const args = authoringCodexArgs({ modelId, effort: SOL_REASONING_EFFORT, cwd, outputFile: outFile, prompt })
-  const res = spawnSync('codex', args, {
+  const child = spawn('codex', args, {
     cwd,
-    encoding: 'utf8',
     env: childEnv(process.env),
-    timeout: timeoutMs,
     windowsHide: true,
-    maxBuffer: 64 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
   })
+  let stdout = ''
+  let stderr = ''
+  child.stdout.on('data', (d) => {
+    stdout += d
+  })
+  child.stderr.on('data', (d) => {
+    stderr += d
+  })
+
+  let timedOut = false
+  const killer = setTimeout(() => {
+    timedOut = true
+    child.kill('SIGTERM')
+  }, timeoutMs)
+  // The interim push only runs while the branch has moved, so an idle run costs
+  // no network calls at all.
+  let lastPushed = git(['rev-parse', 'HEAD'], { cwd })
+  const pusher = branch && pushEveryMs > 0
+    ? setInterval(() => {
+        const head = git(['rev-parse', 'HEAD'], { cwd })
+        if (!head || head === lastPushed) return
+        const { ok, why } = pushBranch(branch, { cwd })
+        if (ok) lastPushed = head
+        onPush({ ok, head, why })
+      }, pushEveryMs)
+    : null
+
+  const { spawnError, exitCode } = await new Promise((resolve) => {
+    child.on('error', (error) => resolve({ spawnError: error, exitCode: 1 }))
+    child.on('close', (code) => resolve({ spawnError: null, exitCode: code ?? 1 }))
+  })
+  clearTimeout(killer)
+  if (pusher) clearInterval(pusher)
+
   let last = ''
   try {
     last = readFileSync(outFile, 'utf8')
@@ -114,18 +169,19 @@ export function runAuthoringCodex({ prompt, cwd, timeoutMs = AUTHOR_TIMEOUT_MS, 
     /* a leftover temp file is not worth an exit code */
   }
   return {
-    spawnError: res.error ?? null,
-    exitCode: res.status ?? 1,
-    stdout: res.stdout ?? '',
-    stderr: res.stderr ?? '',
-    timedOut: res.signal === 'SIGTERM' || String(res.error?.code ?? '') === 'ETIMEDOUT',
-    finalMessage: last || res.stdout || '',
+    spawnError,
+    exitCode,
+    stdout,
+    stderr,
+    timedOut,
+    finalMessage: last || stdout || '',
   }
 }
 
 export const usage = () =>
   [
-    'usage: node scripts/author-sol.mjs --point <N> [--findings <file>] [--timeout <ms>] [--anyway] [--dry-run]',
+    'usage: node scripts/author-sol.mjs --point <N> [--findings <file>] [--reworked] [--timeout <ms>]',
+    '           [--anyway] [--dry-run]',
     '       node scripts/author-sol.mjs --routing (--point <N> | --all)',
     '',
     `${SOL_MODEL_NAME} AUTHORS the point in THIS worktree, on THIS branch, committing at every step;`,
@@ -165,7 +221,7 @@ if (isMainModule(import.meta.url)) {
         console.error(usage())
         process.exit(2)
       }
-      const decided = laneFor(number)
+      const decided = laneFor(number, { reworked: argv.includes('--reworked') })
       if (!decided.body) console.error(`author-sol: point ${number} is not in the OPEN work order — routing what is known.`)
       console.log(`author-sol: point ${number} → ${decided.lane} (${LANE_MODEL[decided.lane]})`)
       for (const why of decided.why) console.log(`  because ${why}`)
@@ -201,7 +257,10 @@ if (isMainModule(import.meta.url)) {
     }
 
     // THE LANE IS THE POINT'S OWN ANSWER, not the dispatcher's mood (point 667).
-    const decided = laneFor(point)
+    // `--reworked` is how the caller says Sol has already been round this point
+    // and the review still found problems: CLAUDE.md §6 moves such work to Fable,
+    // and the routing could not know it from the text (cross-vendor review, P1).
+    const decided = laneFor(point, { reworked: argv.includes('--reworked') })
     if (decided.lane !== 'sol' && !argv.includes('--anyway')) {
       console.error(
         `author-sol: point ${point} routes to the ${decided.lane} lane (${LANE_MODEL[decided.lane]}), not to ${SOL_MODEL_NAME}:\n` +
@@ -270,21 +329,40 @@ if (isMainModule(import.meta.url)) {
     )
     if (withheld.length) console.error(`  withheld from its environment: ${withheld.join(', ')}`)
 
-    const run = runAuthoringCodex({ prompt, cwd: worktree, timeoutMs: Number(flag('--timeout')) || AUTHOR_TIMEOUT_MS })
+    const run = await runAuthoringCodex({
+      prompt,
+      cwd: worktree,
+      branch,
+      timeoutMs: Number(flag('--timeout')) || AUTHOR_TIMEOUT_MS,
+      onPush: ({ ok, head, why }) =>
+        console.error(ok ? `author-sol: pushed ${String(head).slice(0, 7)} while the run continues` : `author-sol: interim push failed — ${why}`),
+    })
     const outcome = classifyOutcome(run)
     const parsed = parseAuthoringAnswer(run.finalMessage)
-    const commits = commitsSince(base, { cwd })
+    // WHERE THE RUN ENDED, not where it began: nothing stops a sandbox-less run
+    // from checking out another branch, and the commits below would then belong
+    // to something else entirely (cross-vendor review, P1).
+    const branchAfter = git(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd }) ?? ''
+    const commits = branchAfter === branch ? commitsSince(base, { cwd }) : []
 
     // PUSHED BEFORE ANYTHING IS JUDGED: whatever the run did, what is committed
     // must not live only in a worktree that a landing may delete underneath it.
+    // (The interval above has usually pushed it already; this is the last one.)
     let pushed = null
     if (commits.length) {
-      const res = spawnSync('git', ['push', '-u', 'origin', branch], { cwd, encoding: 'utf8', windowsHide: true })
-      pushed = res.status === 0 && !res.error
-      if (!pushed) console.error(`author-sol: PUSH FAILED — ${(res.stderr || res.error?.message || '').trim()}`)
+      const res = pushBranch(branch, { cwd })
+      pushed = res.ok
+      if (!pushed) console.error(`author-sol: PUSH FAILED — ${res.why}`)
     }
 
-    const judged = judgeAuthoring({ outcome, commits, parsed, dirty: git(['status', '--porcelain'], { cwd }) ?? '' })
+    const judged = judgeAuthoring({
+      outcome,
+      commits,
+      parsed,
+      branch,
+      branchAfter,
+      dirty: git(['status', '--porcelain'], { cwd }) ?? '',
+    })
     const said = String(run.finalMessage ?? '').trim()
     if (said) console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end ---\n`)
     console.log(formatAuthoringReport({ point, branch, judged, parsed, pushed }))

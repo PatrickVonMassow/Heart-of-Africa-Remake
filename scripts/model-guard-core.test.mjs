@@ -464,12 +464,44 @@ describe('the GPT-5.6 Sol authoring lane', () => {
 
   it('TIGHTENS: a non-Claude model trailer is now judged instead of waved through', () => {
     // Before point 667 each of these carried no "Claude" token, so the guard read
-    // them as a human co-author — no model evidence — and passed them.
-    for (const t of ['GPT-4o mini <x@y>', 'GPT-5.6 <x@y>', 'gpt-4.1 <x@y>']) {
+    // them as a human co-author — no model evidence — and passed them. The list
+    // was widened by the cross-vendor review of this branch (P0): naming only
+    // gpt/sol left `Haiku 4.5 <x@y>` walking past the tripwire built for it.
+    for (const t of [
+      'GPT-4o mini <x@y>',
+      'GPT-5.6 <x@y>',
+      'gpt-4.1 <x@y>',
+      'Haiku 4.5 <x@y>',
+      'Sonnet 5 <x@y>',
+      'Gemini 2.5 Pro <x@y>',
+      'Grok 4 <x@y>',
+      'llama-3 <x@y>',
+    ]) {
       expect(classifyTrailer(t), t).toBe('forbidden')
       expect(isPolicyBreach(t), t).toBe(true)
       expect(evaluateCommitTrailers(msg(`Co-Authored-By: ${t}`)).findings[0].rule, t).toBe('forbidden-model-trailer')
     }
+    // …while the allowed families stay allowed without the vendor word too.
+    for (const t of ['Opus 5 <x@y>', 'Fable 5 <x@y>']) expect(classifyTrailer(t), t).toBe('allowed')
+  })
+
+  it('reads a model named BEFORE the first "Claude" token (cross-vendor P0)', () => {
+    // The split discarded everything ahead of the first token, so a forbidden
+    // name written FIRST was invisible — the smuggling shape point 527 closed
+    // only on the far side, because every test wrote the bad model second.
+    for (const t of [
+      'Sonnet 5 / Claude Opus 5 <x@y>',
+      'GPT-4o mini / Claude Opus 5 <x@y>',
+      'Haiku 4.5 and Claude Fable 5 <x@y>',
+    ]) {
+      expect(classifyTrailer(t), t).toBe('forbidden')
+      expect(isPolicyBreach(t), t).toBe(true)
+    }
+    // Two ALLOWED names in one value still show no single author.
+    expect(classifyTrailer('Opus 4.8 / Claude Opus 5 <x@y>')).toBe('unidentified')
+    // …and an ordinary trailer has nothing in front of the token at all.
+    expect(modelNamesIn('Claude Opus 5 <noreply@anthropic.com>')).toEqual(['Opus 5'])
+    expect(modelNamesIn('Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>')).toEqual(['Opus 5'])
   })
 
   it('leaves the Anthropic lane exactly as it was', () => {

@@ -80,26 +80,48 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(lane('A screenshot point.', { reworked: true })).toBe('fable')
     expect(lane('Something mechanical.', { reworked: true })).toBe('fable')
     expect(authorLaneFor({ body: 'x', reworked: true }).why[0]).toMatch(/after a re-work/)
+    // ABOVE THE TAG TOO (cross-vendor review of point 667, P1): the order used to
+    // return the tag first, so `Author lane: sol` plus a failed re-work stayed
+    // with Sol while the comment claimed rework outranked everything.
+    expect(lane('Something mechanical.\nAuthor lane: sol', { reworked: true })).toBe('fable')
+    expect(lane('A picture point.\nAuthor lane: opus', { reworked: true })).toBe('fable')
+    // The caller's explicit override is the ONE thing above it: a human saying
+    // "this one, in that lane" is not a signal to be outvoted.
+    expect(lane('x', { reworked: true, override: 'sol' })).toBe('sol')
   })
 
   it('lets a point name its own lane, and a caller override even that', () => {
-    expect(lane('A complex rebuild. Author lane: sol')).toBe('sol')
-    expect(lane('Something mechanical. Author lane: fable')).toBe('fable')
-    expect(lane('Something mechanical. Author lane: opus')).toBe('opus')
-    expect(lane('A complex rebuild. Author lane: sol', { override: 'opus' })).toBe('opus')
+    expect(lane('A complex rebuild.\nAuthor lane: sol')).toBe('sol')
+    expect(lane('Something mechanical.\nAuthor lane: fable')).toBe('fable')
+    expect(lane('Something mechanical.\nAuthor lane: opus')).toBe('opus')
+    expect(lane('A complex rebuild.\nAuthor lane: sol', { override: 'opus' })).toBe('opus')
     // An override that is not a lane is no override at all.
     expect(lane('Something mechanical.', { override: 'haiku' })).toBe('sol')
     expect(authorLaneFor({ body: 'x', override: 'FABLE' }).lane).toBe('fable')
   })
 
-  it('never routes a point by a QUOTED description of the tag convention', () => {
-    // Point 667 itself quotes it; reading that would route the point that DEFINES
-    // the convention by its own definition (the trap `criticalityOf` already hit).
+  it('reads a tag only as a LINE of its own, never inside a sentence', () => {
+    // Checking the character before the tag was not enough (cross-vendor review,
+    // P1): a quoted sentence mid-line stayed operative, so any document that
+    // DESCRIBES the convention would route the points quoting it.
     expect(laneTagIn('the tag is written `Author lane: sol` in the spec')).toBe('')
-    expect(laneTagIn('"Author lane: fable"')).toBe('')
+    expect(laneTagIn('"use Author lane: sol for this example"')).toBe('')
+    expect(laneTagIn('A complex rebuild. Author lane: sol')).toBe('')
+    expect(laneTagIn('`Author lane: fable`')).toBe('')
+    // …and the real thing, however it is bulleted or quoted as markdown.
     expect(laneTagIn('Author lane: fable')).toBe('fable')
-    // The LAST unquoted tag wins: a spec revises itself at the end.
+    expect(laneTagIn('  - Author lane: opus')).toBe('opus')
+    expect(laneTagIn('> Author lane: sol')).toBe('sol')
+    // The LAST tag wins: a spec revises itself at the end.
     expect(laneTagIn('Author lane: sol\n… revised.\nAuthor lane: opus')).toBe('opus')
+  })
+
+  it('names the subjects its own comments promise (cross-vendor P1)', () => {
+    // The list claimed locks and state migration and held only the noun.
+    expect(lane('The batch lock is taken twice.')).toBe('fable')
+    expect(lane('Migrating every recorded review row.')).toBe('fable')
+    // …and "visually inspect" is how half the render points are written.
+    expect(lane('Visually inspect the horizon banding.')).toBe('opus')
   })
 
   it('reports every signal it saw, not only the deciding one', () => {

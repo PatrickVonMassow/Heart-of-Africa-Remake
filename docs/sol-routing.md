@@ -116,13 +116,18 @@ the point's own text: the hard cases (difficult, complex, error-prone, or tagged
 HIGH criticality) stay with Fable, a point whose VERIFICATION is the work stays
 with the main session that judges pictures anyway, and what is left —
 mechanical and mid-difficulty — is Sol's. Measured over the whole open queue on
-13.08.2026: **170 points → 64 Sol / 30 Fable / 76 main session.** A point may
-override the function with `Author lane: sol|fable|opus` in its own spec.
+13.08.2026: **170 points → 57 Sol / 40 Fable / 73 main session.** A point may
+override the function with `Author lane: sol|fable|opus` **on a line of its
+own** in its spec; `--reworked` says Sol has already been round this point and
+the review still found problems, which sends it to Fable whatever the text says.
 
 **The lane runs like any delegated agent**: an isolated worktree, its own
 `feat/` branch, the point handed over as a BRIEF rather than a reading
-assignment, a commit per self-contained step, and the branch pushed the moment
-the run ends. It runs no gate of its own and merges nothing.
+assignment, and a commit per self-contained step. The child is given no
+credential, so the WRAPPER pushes for it — every two minutes while the run
+continues and again when it ends, which keeps §6's durability rule without
+handing a push token to a run that has no sandbox. It runs no gate of its own
+and merges nothing.
 
 **The sandbox is off, and it has to be.** This container cannot create
 unprivileged user namespaces, so codex's bubblewrap launcher dies before any
@@ -131,12 +136,21 @@ bwrap error and nothing else. A reviewer works around that by having its
 material fed to it; an author that cannot run `git commit` cannot author. So the
 run uses `--dangerously-bypass-approvals-and-sandbox`, whose own documentation
 names the condition we are in ("intended solely for running in environments that
-are externally sandboxed"). What is still enforced: the child's environment is
-stripped of everything that reads like a credential (`childEnv`), so no token
-for a push or another account travels with it, and the run is refused outright
-on `main`, in the main checkout, or on a dirty tree. **Residual, named rather
-than implied:** inside this container the run has the filesystem access this
-session has, `.secrets/` included. The container is the trust boundary.
+are externally sandboxed").
+
+What is still done is **hygiene, not containment**, and the difference is worth
+stating plainly: the child's environment is stripped of everything that reads
+like a credential (`childEnv`), and the run is refused outright unless it is on
+a `feat/` branch in a worktree that is not the main checkout, with a clean tree.
+**The residual, named rather than implied:** inside this container the run has
+the filesystem access this session has — it can read `.secrets/`, use a
+credential helper and push, and no regex over environment names prevents any of
+that. What the stripping buys is that nothing leaks by *accident*: a token in
+the environment is spent by any command that happens to look there, a token in a
+file is spent only by a run that goes for it deliberately. The container is the
+trust boundary; if that is not enough for a piece of work, that work is not this
+lane's. Afterwards the wrapper checks that the run ended on the branch it
+started on, because commits made elsewhere cannot be attributed to the point.
 
 **Nothing is taken on trust afterwards.** What counts is what is in git — the
 commits that appeared, their trailers, the tree left behind — never the run's

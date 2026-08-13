@@ -4,6 +4,8 @@
 // they refuse to record an answer nobody gave, and this one must refuse to
 // report work nobody did. So the cases are built around what GIT says, never
 // around what the run claimed about itself.
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { evaluateCommitTrailers, ALLOWED_TRAILERS } from './model-guard-core.mjs'
 import {
@@ -15,6 +17,7 @@ import {
   HOUSE_RULES,
   judgeAuthoring,
   parseAuthoringAnswer,
+  PUSH_INTERVAL_MS,
   readinessProblems,
   SOL_MODEL_ID,
   SOL_TRAILER,
@@ -50,6 +53,15 @@ describe('authoringCodexArgs', () => {
   it('gives an authoring run room to build and test', () => {
     expect(AUTHOR_TIMEOUT_MS).toBeGreaterThanOrEqual(30 * 60_000)
   })
+
+  it('pushes often enough that an hour-long run is not an hour of local-only work', () => {
+    // The house rule is a push after every commit; the child cannot be given a
+    // credential, so the wrapper pushes on this interval (cross-vendor P2).
+    expect(PUSH_INTERVAL_MS).toBeGreaterThan(0)
+    expect(PUSH_INTERVAL_MS).toBeLessThanOrEqual(5 * 60_000)
+    expect(HOUSE_RULES.join(' ')).toMatch(/pushed FOR you/)
+    expect(HOUSE_RULES.join(' ')).toMatch(/Do NOT change branch/)
+  })
 })
 
 describe('childEnv — the one enforcement left once the sandbox is off', () => {
@@ -63,26 +75,53 @@ describe('childEnv — the one enforcement left once the sandbox is off', () => 
       ANTHROPIC_API_KEY: 'sk-a',
       NPM_TOKEN: 'npm_z',
       MY_SECRET: 's',
+      GIT_ASKPASS: '/x',
+      SSH_AUTH_SOCK: '/s',
+      AWS_ACCESS_KEY_ID: 'a',
+      DATABASE_URL: 'postgres://x',
+      CI_JOB_JWT: 'j',
+      GIT_AUTHOR_NAME: 'Fixture',
       DB_PASSWORD: 'p',
       SOME_PRIVATE_KEY: 'k',
       REPO_PAT: 'p',
       AUTH_HEADER: 'a',
     }
     const kept = childEnv(env)
-    expect(kept).toEqual({ PATH: '/usr/bin', HOME: '/home/node', CODEX_HOME: '/home/node/.codex' })
+    // What survives is what the run NEEDS, plus a git identity, which is not a
+    // credential: `GIT_AUTHOR_NAME` must not be swept up by the word "AUTH".
+    expect(kept).toEqual({
+      PATH: '/usr/bin',
+      HOME: '/home/node',
+      CODEX_HOME: '/home/node/.codex',
+      GIT_AUTHOR_NAME: 'Fixture',
+    })
     expect(withheldEnvNames(env)).toEqual([
       'ANTHROPIC_API_KEY',
       'AUTH_HEADER',
+      'AWS_ACCESS_KEY_ID',
+      'CI_JOB_JWT',
+      'DATABASE_URL',
       'DB_PASSWORD',
       'GH_TOKEN',
       'GITHUB_TOKEN',
+      'GIT_ASKPASS',
       'MY_SECRET',
       'NPM_TOKEN',
       'REPO_PAT',
       'SOME_PRIVATE_KEY',
+      'SSH_AUTH_SOCK',
     ])
     expect(childEnv()).toEqual({})
     expect(withheldEnvNames()).toEqual([])
+  })
+
+  it('is hygiene, not containment — and the file says so', () => {
+    // The cross-vendor review's P0: with the sandbox off, the run can still read
+    // a token FILE and push. The regex must not be described as preventing that,
+    // and the wrapper is what pushes, so the claim to check is the narrow one.
+    const source = readFileSync(resolve('scripts', 'author-sol-core.mjs'), 'utf8')
+    expect(source).toMatch(/HYGIENE, NOT CONTAINMENT/)
+    expect(source).toMatch(/can read `\.secrets\/`/)
   })
 })
 
@@ -95,9 +134,16 @@ describe('readinessProblems — where this run may not write', () => {
     expect(readinessProblems({ ...good, worktree: '/w/tree/' })).toEqual([])
   })
 
-  it('refuses main, the main checkout, an unknown branch and a dirty tree', () => {
-    expect(readinessProblems({ ...good, branch: 'main' }).join(' ')).toMatch(/own feat\/ branch/)
-    expect(readinessProblems({ ...good, branch: 'HEAD' }).join(' ')).toMatch(/own feat\/ branch/)
+  it('refuses every branch that is not a feature branch (cross-vendor P1)', () => {
+    // Naming `main` and `HEAD` let `master`, `release` and `gh-pages` through
+    // while the refusal claimed to demand a feat/ branch.
+    for (const branch of ['main', 'HEAD', 'master', 'release', 'gh-pages', 'poc', 'feature/x']) {
+      expect(readinessProblems({ ...good, branch }).join(' '), branch).toMatch(/feat\/<point>-<slug>/)
+    }
+    expect(readinessProblems({ ...good, branch: 'feat/667-sol-authoring-lane' })).toEqual([])
+  })
+
+  it('refuses the main checkout, an unknown branch and a dirty tree', () => {
     expect(readinessProblems({ ...good, branch: '' }).join(' ')).toMatch(/unknown ref/)
     expect(readinessProblems({ ...good, worktree: '/w/main' }).join(' ')).toMatch(/MAIN checkout/)
     expect(readinessProblems({ ...good, worktree: '' }).join(' ')).toMatch(/no worktree path/)
@@ -182,6 +228,38 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
       parsed: answered,
     })
     expect(other.problems.join(' ')).toMatch(/does not name GPT-5\.6 Sol/)
+  })
+
+  it('does not read a "sol" in an e-mail address as Sol’s authorship (cross-vendor P1)', () => {
+    // `Claude Opus 5 <build@sol.example>` is an allowlisted commit by ANOTHER
+    // model. Tested against the raw trailer, it counted as this lane's work.
+    const j = judgeAuthoring({
+      outcome: okRun,
+      commits: [{ sha: 'a'.repeat(40), subject: 'x', trailers: 'Claude Opus 5 <build@sol.example>' }],
+      parsed: answered,
+    })
+    expect(j.problems.join(' ')).toMatch(/does not name GPT-5\.6 Sol/)
+    // …while every real spelling of Sol's own trailer is accepted.
+    for (const trailers of ['GPT-5.6 Sol <noreply@openai.com>', 'Sol <noreply@openai.com>', 'gpt-5.6-sol <x@y>']) {
+      const ok = judgeAuthoring({ outcome: okRun, commits: [{ sha: 'b'.repeat(40), subject: 'x', trailers }], parsed: answered })
+      expect(ok.problems, trailers).toEqual([])
+    }
+  })
+
+  it('refuses to attribute commits made on another branch (cross-vendor P1)', () => {
+    const j = judgeAuthoring({
+      outcome: okRun,
+      commits: [solCommit('c'.repeat(40))],
+      parsed: answered,
+      branch: 'feat/667-x',
+      branchAfter: 'main',
+    })
+    expect(j.clean).toBe(false)
+    expect(j.problems.join(' ')).toMatch(/ended on `main`, not on `feat\/667-x`/)
+    // Ending where it started is silent.
+    expect(
+      judgeAuthoring({ outcome: okRun, commits: [solCommit('d'.repeat(40))], parsed: answered, branch: 'b', branchAfter: 'b' }).problems,
+    ).toEqual([])
   })
 
   it('keeps the work of a run that died, and still names what went wrong', () => {

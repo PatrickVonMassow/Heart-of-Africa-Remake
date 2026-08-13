@@ -30,7 +30,8 @@
 // Side-effect free: the spawn, the git work and the push belong to
 // scripts/author-sol.mjs. Pinned by author-sol-core.test.mjs.
 
-import { ALLOWED_TRAILERS, classifyTrailer } from './model-guard-core.mjs'
+import { ALLOWED_TRAILERS, classifyTrailer, modelNamesIn } from './model-guard-core.mjs'
+import { sameModel } from './mechanism-review-core.mjs'
 import { SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 
 export { SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
@@ -43,20 +44,37 @@ export const SOL_TRAILER = ALLOWED_TRAILERS.find((t) => /sol/i.test(t)) ?? ''
 export const AUTHOR_TIMEOUT_MS = 60 * 60_000
 
 /**
+ * How often the WRAPPER pushes while the run is still going (cross-vendor review
+ * of point 667, P2).
+ *
+ * CLAUDE.md §6 demands a push after every commit, and the child cannot give one:
+ * pushing needs a credential, and handing a credential to a sandbox-less run is
+ * a worse trade than the delay. So the wrapper pushes on this interval instead —
+ * a commit is durable within two minutes of being made rather than at the end of
+ * an hour-long run. It is a fast-forward of a branch only this run is writing,
+ * so it cannot collide with the work in progress.
+ */
+export const PUSH_INTERVAL_MS = 2 * 60_000
+
+/**
  * The environment the authoring child gets: this one MINUS anything that reads
  * like a credential.
  *
- * The one enforcement left once the sandbox is off, and it is worth having: a
- * token in the environment is what turns filesystem access into an action
- * outside the container — a push, an API call, a spend on another account. The
- * repository's own automation reads its GitHub token from a FILE when it needs
- * one, so nothing in this lane is broken by the removal, and the wrapper pushes
- * the branch itself afterwards rather than handing over the means to.
+ * HYGIENE, NOT CONTAINMENT — and the difference matters enough to write down
+ * (cross-vendor review of point 667, P0). With the sandbox off, the run has this
+ * session's filesystem access: it can read `.secrets/`, use a credential helper
+ * and push. Removing the variables does not prevent that, and a claim that it
+ * did would be false. What it does buy is that nothing leaks by ACCIDENT — a
+ * token in the environment is spent by any command that happens to look there,
+ * a token in a file is spent only by a run that goes for it deliberately.
  *
  * Fails towards dropping: an unknown variable that merely LOOKS like a secret
- * costs nothing to remove, while one wrongly kept is the whole risk.
+ * costs nothing to remove, while one wrongly kept is the whole risk. The
+ * segments are matched WHOLE, so `GIT_AUTHOR_NAME` survives while `SSH_AUTH_SOCK`
+ * does not.
  */
-export const SENSITIVE_ENV = /(TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|PRIVATE_KEY|API_KEY|_PAT$|AUTH_)/i
+export const SENSITIVE_ENV =
+  /(?:^|_)(TOKENS?|SECRETS?|PASSWORDS?|PASSWD|CREDENTIALS?|PAT|KEYS?|AUTH|ASKPASS|COOKIE|SESSION|JWT)(?:_|$)|API_?KEYS?|DATABASE_URL|CONNECTION_STRING/i
 
 export function childEnv(env = {}) {
   const out = {}
@@ -113,8 +131,13 @@ export function authoringCodexArgs({
 export function readinessProblems({ branch = '', worktree = '', mainCheckout = '', dirty = '' } = {}) {
   const problems = []
   const b = String(branch ?? '').trim()
+  // THE RULE IS `feat/`, SO THAT IS WHAT IS CHECKED (cross-vendor review, P1).
+  // Listing `main` and `HEAD` by name let `master`, `release` and `gh-pages`
+  // through while the refusal claimed to demand a feature branch.
   if (!b) problems.push('the branch could not be read — refusing to author into an unknown ref')
-  else if (b === 'main' || b === 'HEAD') problems.push(`the branch is \`${b}\` — every point is authored on its own feat/ branch`)
+  else if (!/^feat\//.test(b)) {
+    problems.push(`the branch is \`${b}\` — every point is authored on its own \`feat/<point>-<slug>\` branch`)
+  }
   const tree = String(worktree ?? '').replace(/[/\\]+$/, '')
   const main = String(mainCheckout ?? '').replace(/[/\\]+$/, '')
   if (!tree) problems.push('no worktree path was given')
@@ -137,7 +160,11 @@ export const HOUSE_RULES = Object.freeze([
   '  nothing can rescue: if this run is killed, only what is committed survives.',
   'Commit messages describe the CHANGE ITSELF, never the point number, and are written in English.',
   'Do NOT push, do NOT merge, do NOT create or move a tag, and do NOT touch TASKS.md,',
-  '  the dashboard, .claude/settings.json or the git hooks. The branch is pushed for you.',
+  '  the dashboard, .claude/settings.json or the git hooks. The branch is pushed FOR you,',
+  '  every two minutes and again when you finish — which is exactly why committing each',
+  '  step as you go is what makes it durable.',
+  'Do NOT change branch, and do not leave the worktree you were started in. What you commit',
+  '  elsewhere cannot be attributed to this point, and the run is reported as having failed.',
   'Add or extend a test for everything you build, in the layer that can assert it:',
   '  Vitest (jsdom, `npm run test:unit`) for logic, state and pure functions; the browser',
   '  suites are NOT yours to run.',
@@ -223,11 +250,31 @@ export function parseAuthoringAnswer(text) {
  * exact failure this lane must not paper over, and a stalled run that DID commit
  * is worth keeping rather than throwing away.
  */
-export function judgeAuthoring({ outcome = {}, commits = [], parsed = {}, dirty = '' } = {}) {
+/**
+ * Does this trailer name SOL as the author — the PARSED model name, never the
+ * raw line?
+ *
+ * The raw line carries the address, and `Claude Opus 5 <build@sol.example>` is
+ * an allowlisted commit by another model whose e-mail happens to contain the
+ * word (cross-vendor review of point 667, P1). Read off the raw text it counted
+ * as this lane's own work.
+ */
+export function namesSolAsAuthor(trailers) {
+  return modelNamesIn(trailers).some((name) => sameModel(name, SOL_MODEL_NAME))
+}
+
+export function judgeAuthoring({ outcome = {}, commits = [], parsed = {}, dirty = '', branchAfter = '', branch = '' } = {}) {
   const list = Array.isArray(commits) ? commits : []
   const problems = []
   if (!list.length) {
     problems.push('NOTHING WAS COMMITTED — the branch is where it started, so there is nothing to review')
+  }
+  // THE RUN MUST END WHERE IT STARTED (cross-vendor review, P1). Nothing stops a
+  // sandbox-less run from checking out another branch, and `base..HEAD` would
+  // then report ITS commits as this point's work while the push names the branch
+  // the readiness check approved.
+  if (branch && branchAfter && branch !== branchAfter) {
+    problems.push(`the run ended on \`${branchAfter}\`, not on \`${branch}\` — what it committed cannot be attributed to this point`)
   }
   for (const commit of list) {
     const verdict = classifyTrailer(commit?.trailers ?? '')
@@ -235,7 +282,7 @@ export function judgeAuthoring({ outcome = {}, commits = [], parsed = {}, dirty 
       problems.push(`${short(commit.sha)} names a model outside the author allowlist (${String(commit.trailers).trim()})`)
     } else if (verdict === 'unidentified') {
       problems.push(`${short(commit.sha)} carries a trailer naming no single model — it cannot show who wrote it`)
-    } else if (!/sol/i.test(String(commit?.trailers ?? ''))) {
+    } else if (!namesSolAsAuthor(commit?.trailers)) {
       problems.push(`${short(commit.sha)} does not name ${SOL_MODEL_NAME} as its author — this lane's commits must`)
     }
   }

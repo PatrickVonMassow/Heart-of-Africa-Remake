@@ -51,7 +51,11 @@ export const HARD_MARKERS = Object.freeze([
   /\brace (?:condition|window)\b/i,
   /\bconcurren\w+\b/i,
   /\bdeadlock\b/i,
-  /\bmigration\b/i,
+  // The inflections, not one spelling: the comment above promised locks and
+  // state migration and the list held only the noun "migration" (cross-vendor
+  // review of point 667, P1).
+  /\bmigrat\w+\b/i,
+  /\block(?:s|ed|ing)?\b/i,
 ])
 
 /**
@@ -61,6 +65,11 @@ export const HARD_MARKERS = Object.freeze([
  * or a browser run, and CLAUDE.md §6 keeps both with the main session whoever
  * authored the code. Handing such a point to another lane splits it in two and
  * saves nothing — the expensive half stays here either way.
+ *
+ * THEY ERR TOWARDS MATCHING, deliberately (cross-vendor review of point 667,
+ * P1): a mechanical rename that merely mentions WebGPU is routed here and costs
+ * the Sol lane one point, while a real picture point routed to Sol costs a
+ * rebuild. The point's own `Author lane:` tag is the cheap way back.
  */
 export const VERIFICATION_MARKERS = Object.freeze([
   /\bscreenshots?\b/i,
@@ -72,6 +81,9 @@ export const VERIFICATION_MARKERS = Object.freeze([
   /\bplaywright\b/i,
   /\bbrowser suites?\b/i,
   /\baesthetic\w*\b/i,
+  // "visually inspect the banding" is how half the render points are written,
+  // and the list had no word for it (same review).
+  /\bvisual\w*\b/i,
 ])
 
 /**
@@ -81,18 +93,23 @@ export const VERIFICATION_MARKERS = Object.freeze([
  * knows better than the markers says so once, in the work order where it is
  * reviewable, instead of the dispatcher remembering an exception.
  *
- * A QUOTED occurrence is skipped, exactly as `criticalityOf` skips one: a point
- * that DESCRIBES this convention must not be routed by its own description.
+ * A TAG IS A LINE OF ITS OWN, not a phrase inside a sentence (cross-vendor
+ * review of point 667, P1). Skipping only a quote character immediately in front
+ * of it left `"use Author lane: sol for this example"` operative — and a
+ * document that DESCRIBES this convention would route the points that quote it.
+ * Requiring the line to begin with the tag is both simpler and stricter than
+ * chasing quotation, and it is how the tag is meant to be written anyway.
+ *
+ * The LAST such line wins: a spec revises itself at the end.
  */
 export function laneTagIn(body) {
-  const text = String(body ?? '')
-  let found = null
-  for (const m of text.matchAll(/author lane:\s*(sol|fable|opus)\b/gi)) {
-    const before = m.index > 0 ? text[m.index - 1] : ''
-    if (before === '"' || before === "'" || before === '`') continue
-    found = m
+  let found = ''
+  for (const line of String(body ?? '').split(/\r?\n/)) {
+    // A list marker or blockquote may precede it; a quote character may not.
+    const m = /^[\s>*-]*author lane:\s*(sol|fable|opus)\b/i.exec(line)
+    if (m) found = m[1].toLowerCase()
   }
-  return found ? found[1].toLowerCase() : ''
+  return found
 }
 
 /**
@@ -139,11 +156,14 @@ export function authorLaneFor({ body = '', criticality = null, reworked = false,
   if (LANES.includes(String(override).toLowerCase())) {
     return decide(String(override).toLowerCase(), `the caller asked for the ${override} lane explicitly`)
   }
-  if (tag) return decide(tag, `the point itself carries \`Author lane: ${tag}\``)
   // A RE-WORK THAT SOL STILL FINDS PROBLEMS IN OUTRANKS EVERY OTHER SIGNAL
-  // (CLAUDE.md §6). Whatever the text looks like, the evidence says the lane it
-  // was on could not finish it.
+  // (CLAUDE.md §6). Whatever the text looks like — and whatever lane it was
+  // TAGGED for — the evidence says the lane it was on could not finish it. It
+  // stood BELOW the tag until the cross-vendor review of point 667 (P1) read the
+  // order against the sentence claiming it, and `Author lane: sol` plus a failed
+  // re-work therefore stayed with Sol.
   if (reworked) return decide('fable', 'Sol still found problems after a re-work — §6 moves such work to Fable')
+  if (tag) return decide(tag, `the point itself carries \`Author lane: ${tag}\``)
   if (criticality === 'high') return decide('fable', 'the point is tagged HIGH criticality — a hard case by definition')
   if (hard.length) return decide('fable', `the spec names it a hard case (${hard.join(', ')})`)
   if (verification.length) {

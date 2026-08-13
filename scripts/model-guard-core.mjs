@@ -62,14 +62,22 @@ export function isAllowedModelName(name) {
 /** Any Claude co-author trailer (human co-authors are not model evidence). */
 export const CLAUDE_TRAILER = /\bclaude\b/i
 
-/** …and the OpenAI lane's, which carries no "Claude" token at all. Bare `gpt` is
- *  matched too, though only `…sol…` is ALLOWED above: the point of naming it here
- *  is that a GPT trailer becomes model evidence the allowlist then judges, instead
- *  of a line this guard reads as no evidence at all and waves through. */
-export const OPENAI_TRAILER = /\b(gpt|sol)\b/i
+/**
+ * The family word of any model this project would recognise — the LLM vendors'
+ * names, not only the two lanes that may author.
+ *
+ * IT DELIBERATELY NAMES MODELS THAT MAY NOT AUTHOR (cross-vendor review of point
+ * 667, P0). Recognising is not allowing: a trailer reading `Haiku 4.5 <x@y>` or
+ * `Gemini 2.5 Pro <x@y>` carries no "Claude" token, so before this it produced
+ * no model evidence and was waved through as a human co-author — inside the very
+ * guard whose purpose is to catch a session that silently degraded. Every name
+ * here becomes evidence the ALLOWLIST then judges, and only Opus, Fable and Sol
+ * survive that.
+ */
+export const MODEL_FAMILY_WORD = /\b(claude|opus|fable|sonnet|haiku|gpt|sol|codex|gemini|grok|llama|mistral|qwen|deepseek)\b/i
 
 /** A co-author trailer this guard treats as naming a MODEL rather than a human. */
-export const MODEL_TRAILER = new RegExp(`${CLAUDE_TRAILER.source}|${OPENAI_TRAILER.source}`, 'i')
+export const MODEL_TRAILER = MODEL_FAMILY_WORD
 
 /** Words that stand beside "Claude" without naming a MODEL: the product name and
  *  the context-window suffix. A trailer left with nothing after these names no
@@ -93,11 +101,16 @@ function bareName(segment) {
  * one string an allowlist search can be fooled by.
  * Empty means the trailer names no model at all.
  *
- * A trailer from the OPENAI lane (point 667) carries no "Claude" token to split
- * on, so the whole cleaned line is the one name it claims — `GPT-5.6 Sol`. The
- * Claude branch is asked FIRST and unchanged: a line naming both vendors is one
- * claim per "Claude" token, and `Opus 5 and GPT 5.6 Sol` matches no allowlist
- * pattern, which is the honest answer for a trailer naming two models.
+ * A trailer that names a model WITHOUT the word "Claude" — the OpenAI lane's
+ * `GPT-5.6 Sol`, or a degraded session's bare `Haiku 4.5` — has no token to
+ * split on, so the whole cleaned line is the one name it claims.
+ *
+ * WHAT STANDS BEFORE THE FIRST "Claude" IS A CLAIM TOO (cross-vendor review of
+ * point 667, P0). The split used to DISCARD it, so `GPT-4o mini / Claude Opus 5`
+ * — and, for the whole life of this guard, `Sonnet 5 / Claude Opus 5` — read as
+ * the single allowed name `Opus 5` and passed. That is precisely the smuggling
+ * shape point 527 closed for names AFTER the first token, left open in front of
+ * it because every test wrote the forbidden model second.
  */
 export function modelNamesIn(trailer) {
   const cleaned = String(trailer ?? '')
@@ -106,9 +119,15 @@ export function modelNamesIn(trailer) {
     .replace(/\[[^\]]*\]/g, ' ')
     .replace(/\bco-authored-by:/gi, ' ')
   if (CLAUDE_TRAILER.test(cleaned)) {
-    return cleaned.split(/\bclaude\b/gi).slice(1).map(bareName).filter(Boolean)
+    const parts = cleaned.split(/\bclaude\b/gi)
+    const names = parts.slice(1).map(bareName).filter(Boolean)
+    const head = bareName(parts[0])
+    // Only a head that NAMES something counts: the ordinary trailer's head is
+    // empty, and a stray word is not a second model.
+    if (head && MODEL_FAMILY_WORD.test(head)) names.unshift(head)
+    return names
   }
-  if (OPENAI_TRAILER.test(cleaned)) {
+  if (MODEL_FAMILY_WORD.test(cleaned)) {
     const name = bareName(cleaned)
     return name ? [name] : []
   }
