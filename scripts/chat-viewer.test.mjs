@@ -77,8 +77,14 @@ describe('the board favicon artwork', () => {
   it('is a square, self-contained, single-path silhouette', () => {
     const doc = new JSDOM(faviconSvg, { contentType: 'image/svg+xml' }).window.document
     const svg = doc.documentElement
+    const paper = svg.firstElementChild
 
     expect(svg.getAttribute('viewBox')).toBe('0 0 64 64')
+    expect(svg.hasAttribute('style')).toBe(false)
+    expect(paper.tagName).toBe('rect')
+    expect(paper.getAttribute('width')).toBe('64')
+    expect(paper.getAttribute('height')).toBe('64')
+    expect(paper.getAttribute('fill')).toBe('#f0e8d2')
     expect(svg.querySelectorAll('path')).toHaveLength(1)
     expect(svg.querySelector('path').getAttribute('fill')).toBe('#3a2e1c')
     expect(svg.querySelectorAll('text, linearGradient, radialGradient, image, use')).toHaveLength(0)
