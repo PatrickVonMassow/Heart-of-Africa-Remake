@@ -7085,3 +7085,21 @@ to land than a mechanism that needs a review.
   review runs through.
   Criticality: high — it decides what our four-eyes principle actually covers, and it has been
   overstating that coverage on every large branch.
+
+- [ ] 685. THE BOARD'S TAB ICON STANDS ON A TRANSPARENT GROUND, NOT ON A BEIGE PLATE (user
+  13.08.2026, 23:00, on the deployed icon: »Das Afrika-Symbol für den Browser-Tab finde ich gut.
+  Eine kleine Änderung: Der Hintergrund sollte nicht beige sondern transparent sein.«). The
+  silhouette is right, but its beige plate reads as a card wedged between the other tabs, whose
+  favicons all stand free.
+  FINAL STATE:
+  - `public/board/favicon.svg` drops the `<rect width="64" height="64" fill="#f0e8d2"/>` behind
+    the silhouette. Nothing else about the drawing changes — same viewBox, same path, same size.
+  - Because the plate went, the silhouette now sits on whatever the browser paints behind the
+    tab. It therefore carries its own theme rule: the path is filled `#3a2e1c` by default and
+    `#e9dfc2` under `@media (prefers-color-scheme: dark)`, written as an internal `<style>` in
+    the SVG. A browser that ignores it keeps the dark silhouette, which is today's picture — so
+    the fallback is never worse than what ships now.
+  VERIFIABLE: the existing favicon test in the Vitest layer additionally asserts that the file
+  contains no opaque full-size background rect and that both fills are present; plus the
+  PICTURE — the icon rasterised and looked at against a light and a dark tab strip.
+  Criticality: low — it is a one-element correction to the icon point 679 delivered.
