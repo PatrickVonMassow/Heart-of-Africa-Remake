@@ -22,6 +22,7 @@ import {
   READ_GAP_FRAMES,
   READ_GAP_MS,
   SETTLE_DROP_BRIGHTEST,
+  SHOT_DRIFT_BAR,
   STREAK_LINGER_MS,
   luminance,
   luminanceSamples,
@@ -30,6 +31,7 @@ import {
   median,
   readsNeededToSurvive,
   settleReading,
+  shotDrift,
   shotReading,
 } from './cropLuma.mjs'
 
@@ -343,7 +345,7 @@ describe('the reads are spaced so a streak cannot reach the median', () => {
     expect(READ_COUNT).toBe(5)
     expect(READ_GAP_MS).toBe(600)
     expect(READ_GAP_FRAMES).toBe(12)
-    expect(STREAK_LINGER_MS).toBe(135)
+    expect(STREAK_LINGER_MS).toBe(270)
     expect(maxContaminatedReads()).toBe(1)
     expect(readsNeededToSurvive()).toBe(3)
   })
@@ -358,10 +360,11 @@ describe('the reads are spaced so a streak cannot reach the median', () => {
     expect(maxContaminatedReads(700, 600)).not.toBeLessThan(readsNeededToSurvive(3))
   })
 
-  it('holds with a wide margin at the measured lifetime, not just barely', () => {
-    // The gap outlasts the streak four times over, so the bound does not sit on
-    // the measurement's own resolution.
-    expect(READ_GAP_MS / STREAK_LINGER_MS).toBeGreaterThan(4)
+  it('holds with margin at the measured bound, not just barely', () => {
+    // The gap outlasts the streak twice over. The bound itself is 2x the
+    // sampler's interval — what the measurement actually proves — so this margin
+    // is on top of an already conservative number.
+    expect(READ_GAP_MS / STREAK_LINGER_MS).toBeGreaterThan(2)
   })
 })
 
@@ -427,5 +430,73 @@ describe('the captured frames', () => {
     // The generated crop must be the same ground, or the placeable cases above
     // are arguing about a different picture.
     expect(Math.abs(mean(samples(groundAt(1))) - mean(clean))).toBeLessThan(0.5)
+  })
+})
+
+
+// THE SEQUENCE THE MEDIAN WOULD ERASE, and the guard that refuses it. A defect
+// arriving AFTER the settle and lasting only the last reads is dropped by
+// shotReading exactly as the rain is — and the settle loop cannot be the
+// backstop for a BRIGHTENING one, because its trim is one-sided by design.
+describe('shotDrift — the scene must not move while the shot is taken', () => {
+  const clean = () => samples(groundAt(1))
+  const streaked = () => samples(withStreak(groundAt(1)))
+  // A defect over the near rows, in both signs: the leak the band can spring,
+  // and the brightening the settle reading is blind to.
+  const darker = () => samples(withLeak(groundAt(1), 8))
+  const brighter = () => samples((x, y) => (y >= HEIGHT - 8 ? groundAt(1)(x, y) * 1.18 : groundAt(1)(x, y)))
+
+  it('is zero on a scene that stood still', () => {
+    const c = clean()
+    expect(shotDrift([c, c, c, c, c])).toBeCloseTo(0, 12)
+  })
+
+  it('is unmoved by the rain, which is what lets it be a bar at all', () => {
+    const c = clean()
+    const s = streaked()
+    for (const reads of [
+      [s, c, c, c, c],
+      [c, c, s, c, c],
+      [c, c, c, c, s],
+      [s, c, c, c, s],
+    ]) {
+      expect(shotDrift(reads)).toBeLessThan(SHOT_DRIFT_BAR)
+    }
+  })
+
+  it('CATCHES a defect arriving in the last two reads, in either sign', () => {
+    const c = clean()
+    for (const late of [brighter(), darker()]) {
+      const reads = [c, c, c, late, late]
+      // The reading alone cannot see it — that is precisely the hole.
+      expect(shotReading(reads)).toBeCloseTo(shotReading([c, c, c, c, c]), 10)
+      // The drift does, and the shot is refused rather than measured.
+      expect(shotDrift(reads)).toBeGreaterThan(SHOT_DRIFT_BAR)
+    }
+  })
+
+  it('catches it arriving mid-shot as well as at the end', () => {
+    const c = clean()
+    const late = brighter()
+    expect(shotDrift([c, c, late, late, late])).toBeGreaterThan(SHOT_DRIFT_BAR)
+  })
+
+  it('does not fire on a defect that was there for the whole shot', () => {
+    // Present throughout is not drift — it is the measurement, and it must
+    // reach the criterion rather than be thrown away as an unstable shot.
+    const leaked = darker()
+    expect(shotDrift([leaked, leaked, leaked, leaked, leaked])).toBeCloseTo(0, 12)
+  })
+
+  it('sits well clear of what a settled scene actually does', () => {
+    // Measured over 54 shots of a full run: median 0.007 %, maximum 0.111 %.
+    expect(SHOT_DRIFT_BAR).toBeGreaterThan(0.00111 * 5)
+    expect(SHOT_DRIFT_BAR).toBeLessThan(OUTSIDE_BAR)
+  })
+
+  it('reads back null rather than a number when it cannot be computed', () => {
+    expect(shotDrift([])).toBeNull()
+    expect(shotDrift(null)).toBeNull()
+    expect(shotDrift([new Float64Array(3), new Float64Array(3)])).toBeNull()
   })
 })

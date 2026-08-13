@@ -70,23 +70,30 @@ export const READ_GAP_FRAMES = 12
 /** How long one §19.13 streak stays in the crop — MEASURED, not assumed, at
  *  giza in the rains (local/streak-probe.mjs, local/streak-lifetime.mjs).
  *  Sampling the crop once per animation frame for 120 s, twice: of 52 crossings
- *  not ONE spanned two consecutive samples 134 ms apart, so the dwell is under
- *  one frame here and this is an upper bound the sampler could still resolve.
- *  The rate is ~30 crossings per 150 s.
+ *  not ONE spanned two consecutive samples 134 ms apart.
  *
- *  The earlier figure of ~700 ms was inherited and is wrong by a factor of five;
- *  the bound below was safe anyway, and is now safe by a much wider margin. */
-export const STREAK_LINGER_MS = 135
+ *  WHAT THAT PROVES is 2x the sample interval, not one. An event lasting 2*dt or
+ *  more MUST cover two consecutive samples whatever its phase; one lasting a
+ *  little under that can always fall between them. So the sound upper bound is
+ *  268 ms, and this is it rounded up. The sampler cannot say anything tighter,
+ *  and the number a bound is built on has to be the one that was proved.
+ *
+ *  The earlier figure of ~700 ms was inherited from a session whose frames are
+ *  gone and is an overestimate; the inequality below held under it and holds
+ *  with more room now. */
+export const STREAK_LINGER_MS = 270
 
-/** The gap gives up after this many frames, so a scene that stops drawing
- *  cannot hang the suite in it. Generous against the 12 it normally waits: it is
- *  a net, not a schedule. */
-export const READ_GAP_FRAME_CAP = 600
+/** The WALL-CLOCK net under the gap, so a scene that stops drawing frames
+ *  cannot hang the suite in it — a frame counter cannot bound that case at all,
+ *  because the counter is what stops advancing. Generous against the ~1.75 s the
+ *  gap normally takes here: it is a net, not a schedule, and a gap that hits it
+ *  FAILS the shot rather than accepting reads that sit too close together. */
+export const READ_GAP_NET_MS = 60000
 
 /** How many consecutive reads one streak can reach, at that spacing. At the
- *  measured lifetime it is ONE: the gap outlasts the streak four times over,
- *  and on this host a 12-frame gap is ~1.75 s (the scene draws ~6.8 fps
- *  headless at giza), so the frame condition alone already clears it. */
+ *  measured bound it is ONE: the gap outlasts the streak twice over, and on this
+ *  host a 12-frame gap is ~1.75 s (the scene draws ~6.8 fps headless at giza),
+ *  so the frame condition alone clears it six times over. */
 export function maxContaminatedReads(lingerMs = STREAK_LINGER_MS, gapMs = READ_GAP_MS) {
   if (!(gapMs > 0)) return Infinity
   return Math.floor(lingerMs / gapMs) + 1
@@ -195,3 +202,39 @@ export function shotReading(reads) {
   }
   return sum / pixels
 }
+
+/**
+ * DID THE PICTURE CHANGE WHILE THE SHOT WAS TAKEN?
+ *
+ * `shotReading` drops anything that reaches a minority of the reads, which is
+ * what makes the rain harmless — and it would drop a real defect ARRIVING
+ * mid-shot just as silently. The settle loop is the first defence and it is
+ * one-sided (`settleReading`), so a BRIGHTENING that begins after the settle and
+ * covers part of the crop could slip in unseen.
+ *
+ * This is the second defence, and it is sign-agnostic: read the first three and
+ * the last three separately. Each sub-window is still rain-robust — a streak
+ * reaches one of three and the median drops it — so a crossing does not move
+ * either half, while anything that ARRIVES and STAYS moves the second and not
+ * the first. Returned as a fraction of the reading, so it compares against the
+ * same bar the criterion uses.
+ */
+export function shotDrift(reads) {
+  if (!Array.isArray(reads) || reads.length < 3) return null
+  const half = Math.ceil(reads.length / 2)
+  const first = shotReading(reads.slice(0, half))
+  const last = shotReading(reads.slice(reads.length - half))
+  const whole = shotReading(reads)
+  if (first === null || last === null || !(whole > 0)) return null
+  return Math.abs(first - last) / whole
+}
+
+/**
+ * How much drift is still the scene standing still. MEASURED over 54 shots of a
+ * full settlement-edge run (three places, both seasons, on/off/on): median
+ * 0.007 %, maximum 0.111 %. The bar sits nine times above that maximum and two
+ * and a half times under the 0.025 the criterion separates on — high enough that
+ * a settled scene never reaches it, low enough that anything arriving mid-shot
+ * large enough to matter is caught before the median can erase it.
+ */
+export const SHOT_DRIFT_BAR = 0.01

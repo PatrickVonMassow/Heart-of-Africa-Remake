@@ -14,7 +14,7 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
-import { READ_COUNT, READ_GAP_FRAMES, READ_GAP_FRAME_CAP, READ_GAP_MS, luminanceSamples, settleReading, shotReading } from './cropLuma.mjs'
+import { READ_COUNT, READ_GAP_FRAMES, READ_GAP_NET_MS, READ_GAP_MS, SHOT_DRIFT_BAR, luminanceSamples, settleReading, shotDrift, shotReading } from './cropLuma.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -2693,20 +2693,34 @@ if (section('settlement-edge')) {
    *  clock, which is the clock the rain falls on, not a sleep in the harness. */
   const readGap = (ms = READ_GAP_MS, frames = READ_GAP_FRAMES) =>
     page.evaluate(
-      ([wait, n, cap]) =>
+      ([wait, n, netMs]) =>
         new Promise((res) => {
+          // The net is WALL CLOCK and lives OUTSIDE the frame loop. Counting
+          // frames cannot bound a scene that has stopped drawing them: the
+          // counter simply never advances. And a gap that gives up must not
+          // pretend it waited — it reports STARVED, and the shot fails rather
+          // than measuring reads that sit closer together than the rain needs
+          // them to.
           const t0 = performance.now()
           let i = 0
+          let done = false
+          const finish = (ok) => {
+            if (done) return
+            done = true
+            res(ok)
+          }
+          const net = setTimeout(() => finish(false), netMs)
           const step = () => {
-            // BOUNDED, so a scene that stops drawing cannot hang the suite here:
-            // the gap gives up after `cap` frames and the reads are then merely
-            // closer together than intended, which the reading survives.
-            if ((++i >= n && performance.now() - t0 >= wait) || i >= cap) return res()
+            if (done) return
+            if (++i >= n && performance.now() - t0 >= wait) {
+              clearTimeout(net)
+              return finish(true)
+            }
             requestAnimationFrame(step)
           }
           requestAnimationFrame(step)
         }),
-      [ms, frames, READ_GAP_FRAME_CAP],
+      [ms, frames, READ_GAP_NET_MS],
     )
 
   const enterFor = async (id) => {
@@ -2769,10 +2783,24 @@ if (section('settlement-edge')) {
       if ((await settledLuma(ndc, 0.2)) === null) return null
       const reads = []
       for (let i = 0; i < READ_COUNT; i++) {
-        if (i > 0) await readGap()
+        // A starved gap is a FAILED shot, not a faster one: reads that are not
+        // far enough apart are not independent pictures, and the rain rejection
+        // is exactly what that independence buys.
+        if (i > 0 && !(await readGap())) return null
         const cur = await groundSamples(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
         if (cur === null) return null
         reads.push(cur)
+      }
+      // A scene that changed WHILE the shot was taken is not a shot. The
+      // per-pixel median would erase a defect arriving in a minority of the
+      // reads exactly as it erases the rain, and the settle loop ahead of it is
+      // one-sided — so the two halves of the shot are compared, each still
+      // rain-robust, and a disagreement fails the shot instead of averaging it
+      // away.
+      const drift = shotDrift(reads)
+      if (drift === null || drift > SHOT_DRIFT_BAR) {
+        console.log(`# shot REJECTED — the crop moved ${(drift * 100).toFixed(3)} % between its first and last reads (bar ${(SHOT_DRIFT_BAR * 100).toFixed(1)} %)`)
+        return null
       }
       return shotReading(reads)
     }
