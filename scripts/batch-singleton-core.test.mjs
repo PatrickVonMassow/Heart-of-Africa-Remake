@@ -1976,7 +1976,7 @@ describe('a preflight identity is not a session', () => {
     }
   })
 
-  it('only the reserved namespace counts — a real session id is a UUID', () => {
+  it('only the repository-reserved namespace counts, without assuming the harness id format', () => {
     for (const sid of ['preflight-test', 'preflight-', 'PREFLIGHT-anything', '  preflight-x  ']) {
       expect(isProbeSessionId(sid), sid).toBe(true)
     }

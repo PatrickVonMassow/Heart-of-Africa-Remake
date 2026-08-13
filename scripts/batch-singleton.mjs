@@ -340,7 +340,7 @@ export function resolveOwnership({ lock, sessionId, ancestor, tolerance = PID_ST
   // through: five registered gathers ask `heldByOtherLiveOwner('preflight-test')`,
   // and when the BATCH OWNER runs the unit suite in its own tree, the Vitest
   // process's claude ancestor IS the lock's pid — so ownership resolved `via:
-  // 'process'` and the restamp below rewrote the LIVE lock's sessionId to
+  // 'process'` and the former implicit restamp rewrote the LIVE lock's sessionId to
   // `preflight-test`. The launcher then read `owner=preflight-test` beside the
   // real session and reported a parallel batch. Refused here, in the pure
   // resolver, so every door that asks — ownsLock, heldByOtherLiveOwner, acquire —
@@ -530,10 +530,12 @@ export function ownerStateKey(lock, suffix = '') {
  * guard and its `acquire` is on its own Stop path. The restamp above is the path
  * that exists, and it needs no free lock, which fits the frequency far better.)
  *
- * A real session id is a UUID and can never carry this prefix, so the namespace is
- * reserved rather than shared. Three consequences: `resolveOwnership` never answers
- * "mine" for a probe (so nothing restamps a lock to one), `acquire` refuses it the
- * lock outright, and the classifier below is blind to one on either side.
+ * The repository reserves this prefix for its own probes. That is a namespace
+ * contract, not an assumption about the harness's session-id syntax. Three
+ * consequences remain useful beyond the general no-restamp invariant:
+ * `resolveOwnership` never grants a probe permission to act for the owner,
+ * `acquire` refuses it the lock outright, and the classifier below is blind to
+ * one on either side.
  */
 export const PROBE_SESSION_PREFIX = 'preflight-'
 
