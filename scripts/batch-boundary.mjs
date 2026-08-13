@@ -396,8 +396,10 @@ export function requireBoardCard({
   if (!proof.carries) {
     fail(
       (proof.stale === true
-        ? `THE BOARD CARRIES ${what} FROM AN EARLIER HANDOVER — the preparation already found that card there, ` +
-          'so it says nothing about the session ending now'
+        ? `THE BOARD CARRIES ${what} FROM AN EARLIER HANDOVER — the preparation already found that exact card ` +
+          'there, so it says nothing about the session ending now. (If you DID just re-put it: the board stamps ' +
+          'whole minutes, so a replacement written inside the same minute is byte-identical to what was there. ' +
+          'Put it up again once the minute has turned.)'
         : `THE BOARD DOES NOT CARRY ${what} — a handover the board does not explain leaves the reader with a ` +
           'session that vanished for no stated reason') +
         `. Put up the card \`node scripts/batch-boundary.mjs ${prepare}\` printed and publish it ` +
@@ -587,6 +589,7 @@ if (isMain) {
             sid,
             cause: BOUNDARY_CAUSES.CONTEXT,
             now: Date.now(),
+            destination: handover.destination,
             cardsBefore: standingCards({ cause: BOUNDARY_CAUSES.CONTEXT, destination: handover.destination }),
           }),
         )
@@ -606,6 +609,7 @@ if (isMain) {
         receipt: readPrepared(),
         sid,
         cause: BOUNDARY_CAUSES.CONTEXT,
+        destination: handover.destination,
         now: Date.now(),
       })
       if (unprepared) fail(unprepared)
@@ -738,6 +742,7 @@ if (isMain) {
           cause: BOUNDARY_CAUSES.POINT,
           point,
           now: Date.now(),
+          destination: handover.destination,
           cardsBefore: standingCards({ cause: BOUNDARY_CAUSES.POINT, destination: handover.destination }),
         }),
       )
@@ -762,6 +767,7 @@ if (isMain) {
       sid,
       cause: BOUNDARY_CAUSES.POINT,
       point,
+      destination: handover.destination,
       now: Date.now(),
     })
     if (unprepared) fail(unprepared)

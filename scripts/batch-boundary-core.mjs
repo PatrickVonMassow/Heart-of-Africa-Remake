@@ -299,13 +299,27 @@ export function markerPhase(marker) {
  * bookkeeping phase RAN, not that nothing followed it; what follows the commit
  * is the sealed marker's business.
  */
-export function preparedReceipt({ sid, cause = BOUNDARY_CAUSES.POINT, point = null, now, cardsBefore = [] }) {
+export const PREPARED_RECEIPT_V = 2
+
+export function preparedReceipt({
+  sid,
+  cause = BOUNDARY_CAUSES.POINT,
+  point = null,
+  now,
+  destination = null,
+  cardsBefore = [],
+}) {
   return {
-    v: 2,
+    v: PREPARED_RECEIPT_V,
     sessionId: String(sid ?? ''),
     cause,
     point: point ?? null,
     at: Number(now),
+    // WHERE the batch was going when the card was written (Sol's review of
+    // 7ecebed): a claim appearing or expiring between the phases changes the
+    // card's text, so the commit must re-prepare rather than judge the new
+    // destination against the old board reading.
+    destination,
     // The handover cards ALREADY on the board when the preparation looked — the
     // leftovers of earlier handovers. `--commit` demands a card that is not one
     // of them, which is the only thing that tells this handover's card from a
@@ -320,6 +334,7 @@ export function unpreparedRefusal({
   sid,
   cause = BOUNDARY_CAUSES.POINT,
   point = null,
+  destination = null,
   now,
   freshMs = BOUNDARY_FRESH_MS,
 } = {}) {
@@ -332,7 +347,16 @@ export function unpreparedRefusal({
     `card, the publish and the checks happen. Run \`${how}\`, do the bookkeeping it names, then commit. ` +
     'Nothing recorded.'
   if (!receipt || typeof receipt !== 'object') return refuse('no --prepare receipt exists')
+  // A receipt of an OLDER SHAPE proves less than the commit now asks — without
+  // its board reading the stale-card check has nothing to compare against, so it
+  // is refused rather than silently downgraded (Sol's review of 7ecebed).
+  if (receipt.v !== PREPARED_RECEIPT_V || !Array.isArray(receipt.cardsBefore)) {
+    return refuse('the receipt is of an older shape and carries no board reading')
+  }
   if (!sid || receipt.sessionId !== sid) return refuse(`the receipt belongs to session ${receipt.sessionId || '?'}`)
+  if (destination !== null && receipt.destination !== destination) {
+    return refuse(`the batch now goes elsewhere than at the preparation (${receipt.destination ?? '?'} → ${destination})`)
+  }
   if (receipt.cause !== cause) {
     return refuse(
       `the receipt prepared ${receipt.cause === BOUNDARY_CAUSES.CONTEXT ? 'a CONTEXT boundary' : 'a POINT boundary'}`,

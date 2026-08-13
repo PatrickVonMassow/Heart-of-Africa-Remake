@@ -917,6 +917,42 @@ describe('unpreparedRefusal — --commit refuses what --prepare never prepared (
     ).toContain('--prepare --context --transcript')
   })
 
+  it('refuses a receipt of an OLDER SHAPE, and one whose destination has since changed (Sol on 7ecebed)', () => {
+    // A v1 receipt carries no board reading, so the stale-card check would have
+    // nothing to compare against — refused rather than silently downgraded.
+    const legacy = { v: 1, sessionId: SID, cause: BOUNDARY_CAUSES.POINT, point: 675, at: NOW - 1000 }
+    expect(unpreparedRefusal({ receipt: legacy, sid: SID, point: 675, now: NOW })).toContain('older shape')
+    expect(
+      unpreparedRefusal({ receipt: { ...fresh(), cardsBefore: 'nope' }, sid: SID, point: 675, now: NOW }),
+    ).toContain('older shape')
+    // A claim appearing between the phases changes the card's text, so the old
+    // board reading no longer covers it.
+    const prepared = preparedReceipt({
+      sid: SID,
+      point: 675,
+      now: NOW - 1000,
+      destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
+    })
+    expect(
+      unpreparedRefusal({
+        receipt: prepared,
+        sid: SID,
+        point: 675,
+        destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW,
+        now: NOW,
+      }),
+    ).toContain('goes elsewhere')
+    expect(
+      unpreparedRefusal({
+        receipt: prepared,
+        sid: SID,
+        point: 675,
+        destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
+        now: NOW,
+      }),
+    ).toBeNull()
+  })
+
   it('refuses a FOREIGN, a STALE, a WRONG-CAUSE and a WRONG-POINT receipt', () => {
     expect(unpreparedRefusal({ receipt: fresh({ sessionId: 'other' }), sid: SID, point: 675, now: NOW })).toContain(
       'belongs to session other',
