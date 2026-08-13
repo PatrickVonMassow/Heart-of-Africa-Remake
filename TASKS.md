@@ -6562,3 +6562,22 @@ to land than a mechanism that needs a review.
   charge on the landing point blocks the tick; a charge on any other point does not).
   Criticality: low — the defect is loud and self-explaining at the push; this removes the manual
   after-the-fact repair, nothing else.
+
+- [ ] 670. A FILTERED GATE CHAIN DESTROYS THE EVIDENCE ITS OWN SUSPECT RECORD DEMANDS (measured
+  13.08.2026 while verifying point 651). The gates were run as one chain whose suite call ended
+  in `| grep -E "PASS|FAIL" | tail -2`. The suite went RED on its first attempt and green on the
+  retry, so the harness recorded the run SUSPECT — correctly, per point 640, which then demands
+  the red be closed by a NAMED CAUSE. The cause was unknowable: the filter had thrown away the
+  first attempt's output, and `throttle-probe` cannot even be aimed, because it requires the
+  `--section` of the check that reddened. A rule the house already holds ("a bundled shell chain
+  must never hide its failing step", CLAUDE.md §6) had no mechanism, so it was broken by the
+  session that wrote it down.
+  FINAL STATE: a verification run's OWN output is never the thing that gets filtered. The suite
+  runner writes its full output to a file under `local/` whatever the caller does with stdout —
+  the caller may filter its console freely once the record on disk is complete — and the SUSPECT
+  record names that file, so the next session reading "closed by a cause" has the cause to read.
+  A Vitest case pins that the runner writes the log and that the suspect record carries its path.
+  VERIFIABLE: the unit-layer case above, plus a live run whose retried suite leaves a readable
+  first-attempt log naming the check that failed.
+  Criticality: low — it costs a re-run, but it is the difference between closing a red by its
+  cause and closing it by a green, which is exactly what point 640 forbids.

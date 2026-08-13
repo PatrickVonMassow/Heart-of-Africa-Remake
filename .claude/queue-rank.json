@@ -43,10 +43,14 @@
     "669": {
       "at": "2026-08-13T13:50:49.371Z",
       "why": "Blocks the supervising session's turn ends on every Sol run, so it belongs right behind the lane that causes it"
+    },
+    "670": {
+      "at": "2026-08-13T15:12:02.801Z",
+      "why": "Small evidence-plumbing fix; it belongs with the other verification-chain hardening rather than ahead of the release fixes"
     }
   },
   "settled": {
-    "at": "2026-08-13T13:50:49.371Z",
+    "at": "2026-08-13T15:12:02.801Z",
     "points": [
       174,
       184,
@@ -217,7 +221,8 @@
       665,
       666,
       668,
-      669
+      669,
+      670
     ]
   }
 }
