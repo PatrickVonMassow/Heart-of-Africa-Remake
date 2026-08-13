@@ -1165,6 +1165,13 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
     ).toBe(true)
     // A board that carried no such card at preparation time proves it outright.
     expect(boardCarriesCard(leftover, frags, { sinceMs: prepared, nowMs: now, knownRegions: [] }).carries).toBe(true)
+    // …but a reading that records something which is no card at all is BROKEN,
+    // not empty: it would match nothing and wave every leftover through.
+    for (const bogus of [['not a card'], [''], [42]]) {
+      const broken = boardCarriesCard(leftover, frags, { sinceMs: prepared, nowMs: now, knownRegions: bogus })
+      expect(broken.carries).toBe(false)
+      expect(broken.malformedKnown).toBe(true)
+    }
   })
 
   it('cuts the region back to the CARD, so an edit around it does not make a stale card look new (Sol on 04cea00)', () => {

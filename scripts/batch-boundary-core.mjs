@@ -565,6 +565,14 @@ export function boardCarriesCard(
   // board when `--prepare` looked. A leftover card is exactly that; a card put
   // up after the preparation is not. The stamp is asked afterwards, as the
   // cheaper second signal, and only where the board stamps at all.
+  // A RECORDED REGION THAT IS NOT A CARD is a broken reading, not an empty one
+  // (Sol's review of 9ff9311): `['not a card']` would match nothing, and every
+  // leftover card would count as new. Every entry `--prepare` writes carries the
+  // head fragment by construction, so one that does not means the receipt cannot
+  // be judged against — say so instead of passing.
+  if (Array.isArray(knownRegions) && knownRegions.some((r) => typeof r !== 'string' || !r.includes(list[0]))) {
+    return { carries: false, verifiable: true, missing: [], malformedKnown: true }
+  }
   const known = Array.isArray(knownRegions) ? new Set(knownRegions) : null
   const fresh = known ? whole.filter((r) => !known.has(r)) : whole
   if (fresh.length === 0) return { carries: false, verifiable: true, missing: [], stale: true }

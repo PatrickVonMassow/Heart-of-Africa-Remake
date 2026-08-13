@@ -393,6 +393,13 @@ export function requireBoardCard({
     )
     return
   }
+  if (proof.malformedKnown === true) {
+    fail(
+      `THE PREPARE RECEIPT'S BOARD READING IS BROKEN — it records something that is not a handover card, so ` +
+        `${what} cannot be told from an earlier one. Run \`node scripts/batch-boundary.mjs ${prepare}\` again ` +
+        'to take a fresh reading, then commit. Nothing recorded.',
+    )
+  }
   if (!proof.carries) {
     fail(
       (proof.stale === true
