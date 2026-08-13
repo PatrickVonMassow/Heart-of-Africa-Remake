@@ -144,6 +144,41 @@ put it is the mistake this line exists to stop.
   settlement.
   Bundle: Dorfleben.
 
+- [ ] 666. THE CHILDREN'S LAST RESIDUAL RED NEEDS AN OWNER ONCE 657 IS TICKED (measured
+  13.08.2026, 10:0x, on the merged state 389440ea, quiet machine, by the Fable 5 agent that
+  finished point 657). THE STATE 657 LEAVES BEHIND: the cure works and is large — the live
+  `children-motion` panel reads WebGPU 5/5 green (worst child 0.09 %) and WebGL 2 4/5 green,
+  against 3 of 10 red on BOTH backends before it. What remains is ONE WebGL 2 trace at 0.39 %
+  against the 0.25 % gate: child 3, an 8.9 s window, 1.29 m walked inside a 0.32 m circle, no
+  rescue in the window, 0.00 m carried in the whole run.
+  IT IS NOT AN UNEXPLAINED RED. It is exactly the composition point 657's charge already names —
+  a catch that reverses the new chaser along its own approach line, and a playmate contact
+  deliberately left to the separation pass — and green runs on BOTH backends carry the identical
+  1.29 m window UNDER the gate (0.09–0.11 %). What makes it red is that one such legitimate
+  event lands inside a one-second window the measure reads as pacing.
+  WHY THIS POINT EXISTS: the charge in `scripts/render-verify-charges.mjs` DIES WITH 657's TICK.
+  From that moment a `polish` red of this composition — roughly 1 in 10 live runs on WebGL 2 —
+  is uncovered, and an uncovered red on the release branch is precisely what point 640 forbids.
+  So the charge is INHERITED here rather than dropped.
+  FINAL STATE, one of two, decided by measurement and not by preference:
+  (a) THE MEASURE IS SHARPENED so a single legitimate event can no longer read as pacing — the
+      one-second window is the suspect, and the fix is at the measure, with the GATE untouched
+      (0.25 %) and the pre-cure traces re-read to prove the sharpened measure still goes RED on
+      the defect it was built for. That proof is mandatory: a measure that no longer sees the
+      original bug is worse than the red it silences.
+  (b) THE COMPOSITION IS ACCEPTED EXPLICITLY, written into the charge with its evidence and a
+      named expected rate, so a red of exactly this shape closes by a NAMED cause instead of by
+      a retry — and anything else stays red.
+  Either way the charge stays live until this point closes, and the decision is recorded here
+  with its figures, not in a commit message.
+  VERIFIABLE: for (a), the sharpened measure re-read over BOTH the recorded pre-cure traces (must
+  go red) and the ten post-cure traces (must go green on both backends); for (b), the charge
+  naming the composition and its rate, plus a Vitest case pinning that a red NOT of that shape
+  is still uncovered.
+  Criticality: medium — no player sees this window; it is the picture gate's trustworthiness on
+  the release branch that is at stake.
+  Bundle: Dorfleben.
+
 - [ ] 659. THE WHOLE COMMUNICATION CHAIN, PLAYED THROUGH AND JUDGED BY WHAT REACHES THE
   PLAYER — A SIX-EYES ALL-ROUND REVIEW (user 12.08.2026: "Danach will ich endlich mal
   erfolgreich die ganze Kette der Kommunikationsmechanik in diesem Dorf durchspielen können,
@@ -412,6 +447,41 @@ put it is the mistake this line exists to stop.
   card hides what the work is FOR, and this is the second card-content rule that had to be
   retrofitted (after one-topic-per-card), so the class needs a structural gate, not
   another reminder.
+
+- [ ] 667. SOL AUTHORS TOO, SO THE LOAD MOVES WHERE THE VOLUME IS (user 13.08.2026, 09:38:
+  "Kannst du noch mehr Last zu OpenAI hin schieben? Da habe ich noch viel mehr Volumen übrig
+  als bei Anthropic."). MEASURED STATE OF THE LEVER THAT EXISTS: the routing switch already
+  stands at its maximum — `prefer-sol` sends every READING kind (diagnose, audit, enumerate,
+  explain) through `scripts/ask-sol.mjs`. What still sits with Anthropic is the AUTHORING of
+  delegated points, which is the largest single item (~58 % of the weighted spend comes from
+  delegated-agent transcripts), plus the suites, the picture judgment and the landing.
+  FINAL STATE: Sol may AUTHOR suitable points, under a role swap that keeps four eyes intact.
+  1. THE ROLE SWAP IS THE POINT. Today Claude authors and Sol reviews. Where Sol authors,
+     CLAUDE reviews, runs the suites, judges the picture and lands — so every point still has
+     two vendors on it and neither model reviews its own work. `mechanism-review.mjs` and
+     `review-sol.mjs` learn the reversed direction; the blind-parallel and convergent modes of
+     CLAUDE.md §6 are unchanged in substance, only in who holds which end.
+  2. THE CUT IS NAMED, NOT GUESSED. Which points Sol authors is decided at the build from the
+     measured record, not by taste: mechanical and mid-difficulty work first (the class Fable
+     is explicitly NOT for), never the hard cases that CLAUDE.md §6 routes to Fable, and never
+     a point whose verification is the whole of the work.
+  3. THE MACHINERY. A codex-driven worktree authoring loop, the same shape the delegated agent
+     already has: its own branch, atomic commits pushed at every step, gates green before it
+     reports. The commit trailer NAMES Sol, `scripts/model-guard-core.mjs`'s `ALLOWED` gains it
+     as an AUTHOR (it is currently reviewer-only, so an authored commit would stop the batch),
+     and CLAUDE.md §6's model policy is rewritten to state the two authoring lanes and who
+     reviews which — the policy paragraph is the binding text, so it changes in the same commit.
+  4. THE SAVING IS MEASURED, not assumed: `node scripts/measure-context-cost.mjs` over a full
+     day after the lever lands, reported against the rate it started from, in both scopes —
+     the way point 553 requires. If the authoring lane does not move the Anthropic share, that
+     is reported as such.
+  VERIFIABLE: Vitest over the guard core (a Sol-authored commit passes as an author, an
+  unnamed trailer still fails, a forbidden model still pauses the batch) and over the routing
+  decision (a point in the named class routes to Sol, a hard case still routes to Fable); live,
+  one real point authored by Sol end to end, reviewed and landed by Claude.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): this changes the model guard and the model policy.
+  Criticality: medium — it moves spend to the quota that has room, and it touches the guard that
+  protects the batch from a degraded session, so the guard half is the risky half.
 
 - [ ] 633. THE RELEASE'S CLOSING RUN — TWO REGRESSIONS WITH THE CLEANUP BETWEEN THEM (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
