@@ -943,8 +943,9 @@ async function main(argv) {
     '\nDONE BY THIS COMMAND: the merge, the gate, the tick, the archive move, the tick\n' +
       'COMMIT and the push of main, the board publish and the branch/worktree cleanup.\n' +
       'NOT DONE: the picture verification on both backends (it belongs BEFORE the merge,\n' +
-      'on the branch), and the point boundary — run\n' +
-      `  node scripts/batch-boundary.mjs ${number}\n` +
+      'on the branch), and the point boundary — two-phase (point 675):\n' +
+      `  node scripts/batch-boundary.mjs --prepare ${number}   (then its bookkeeping)\n` +
+      `  node scripts/batch-boundary.mjs --commit ${number}    (the LAST repository action)\n` +
       'and end the session.',
   )
   return landingExit(full)

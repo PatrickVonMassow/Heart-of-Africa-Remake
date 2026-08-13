@@ -7,8 +7,10 @@
 //                                             boundary bookkeeping; NO marker
 //   node scripts/batch-boundary.mjs --commit <point>   the session's LAST
 //                                             repository action: seal the marker
-//   node scripts/batch-boundary.mjs <point>   one-shot (legacy): seal + print the
-//                                             bookkeeping that must still follow
+//   node scripts/batch-boundary.mjs <point>   alias for --prepare <point> — the
+//                                             sealing one-shot is retired (a stop
+//                                             after its write left a marker with
+//                                             no bookkeeping; Sol final round)
 //   node scripts/batch-boundary.mjs --status  what the Stop hook would decide
 //   node scripts/batch-boundary.mjs --clear   withdraw a recorded boundary
 //
@@ -50,7 +52,7 @@ import {
 import { launcherRemedy } from './batch-launcher-core.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
 import { gatherHandoverTransfer as gatherTransfer } from './batch-in-flight.mjs'
-import { gatherWatermark } from './context-watermark.mjs'
+import { gatherWatermark, watermarkTokens } from './context-watermark.mjs'
 import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
@@ -263,7 +265,9 @@ export function closureOf(point, { cwd = repoPath('.') } = {}) {
 export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } = {}) {
   const marker = readBoundary(path)
   const closure = marker ? closureOf(marker.point) : 'unknown'
-  const boundary = assessBoundary({ marker, sid, now, closure })
+  // The CURRENT configured watermark rides along (Sol final round, finding 1):
+  // a context claim must clear it as well as its own recorded mark.
+  const boundary = assessBoundary({ marker, sid, now, closure, watermarkNow: watermarkTokens() })
   // Probe the OS only when a boundary is actually claimed — this runs at every
   // turn end of the owning session, and a PowerShell round-trip per turn for a
   // question nobody asked would be pure waste.
@@ -591,9 +595,19 @@ if (isMain) {
       : `the launcher (${launcherRemedy().name}) starts a fresh one within its interval and ` +
         'batch-resume-hook re-orients it. '
 
-    if (phaseFlag === '--prepare') {
+    if (phaseFlag !== '--commit') {
+      // Both `--prepare <point>` AND the bare `<point>` land here. The one-shot
+      // that sealed first and did the bookkeeping after is RETIRED (Sol final
+      // round, finding 3): a stop right after its write left a committed marker
+      // with none of the promised board bookkeeping, which is defeat 1 with a
+      // shorter fuse. The bare form keeps WORKING — it starts the two-phase
+      // flow and says exactly what to do.
       console.log(
-        `PREPARED (nothing recorded yet): point ${point} is landed, the launcher is armed` +
+        (phaseFlag === null
+          ? `NOTE: the one-shot form is retired (point 675) — this call ran --prepare ${point} instead, and ` +
+            'NOTHING is recorded until the commit.\n\n'
+          : '') +
+          `PREPARED (nothing recorded yet): point ${point} is landed, the launcher is armed` +
           (transfer.note ? `, and ${transfer.note}` : '') +
           '. Do the boundary bookkeeping NOW, while no marker exists that work could delete:\n\n' +
           `${cardBlock}\n` +
@@ -604,7 +618,7 @@ if (isMain) {
       process.exit(0)
     }
 
-    if (phaseFlag === '--commit' && pointCardStanding(point)) {
+    if (pointCardStanding(point)) {
       fail(
         `the board still carries the current-work card for point ${point}, so the boundary bookkeeping has ` +
           `not been done. Run \`node scripts/batch-boundary.mjs --prepare ${point}\` and follow it — the card, ` +
@@ -635,28 +649,11 @@ if (isMain) {
         '`node scripts/batch-in-flight.mjs --adopt`, so the running author keeps building through the handover.'
       : ''
 
-    if (phaseFlag === '--commit') {
-      console.log(
-        `boundary COMMITTED: point ${point} is landed and the launcher is armed. This was the last repository ` +
-          `action of this session — END IT NOW. ${destinationLine}Any further mutation is DENIED loudly ` +
-          '(withdraw deliberately with `node scripts/batch-boundary.mjs --clear` if you truly must work again).' +
-          transferLine,
-      )
-      process.exit(0)
-    }
-
-    // Legacy one-shot: seal first, bookkeeping after — kept working for existing
-    // callers, but the marker now SURVIVES the bookkeeping (the closing set stays
-    // open; everything else is denied loudly instead of silently deleting it).
     console.log(
-      `boundary recorded (SEALED): point ${point} is closed and the launcher is armed. End this session now — ` +
-        destinationLine +
-        'Do NOT start the next point in this context; a delegated author still building is ADOPTED by the ' +
-        `successor, not waited out.${transferLine}\n\n${cardBlock}\n` +
-        'The card is a CLAIM TO STOP: once it stands, the board gate denies the next state-changing ' +
-        'call. Publishing it, the focus stamp and this boundary command are never blocked — any OTHER ' +
-        'mutation is denied loudly (`--clear` withdraws deliberately). Next time, prefer ' +
-        `\`--prepare ${point}\` → bookkeeping → \`--commit ${point}\`: the commit is then the last action of all.`,
+      `boundary COMMITTED: point ${point} is landed and the launcher is armed. This was the last repository ` +
+        `action of this session — END IT NOW. ${destinationLine}Any further mutation is DENIED loudly ` +
+        '(withdraw deliberately with `node scripts/batch-boundary.mjs --clear` if you truly must work again).' +
+        transferLine,
     )
   }
 }

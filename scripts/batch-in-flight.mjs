@@ -621,6 +621,28 @@ export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, n
   const path = statePathsFor(lockPath).inFlightPath
   const declaration = readDeclaration(path)
   if (!declaration || !declaration.transfer) return { adopted: false, reason: 'no-transferred-declaration', alerts: [] }
+  // THE PREDECESSOR MAY NOT ADOPT ITS OWN HANDOVER (Sol final round, finding 2):
+  // while this session's committed marker stands, the record belongs to the
+  // SUCCESSOR — adopting it here would stamp it `adopted` and re-open `--clear`,
+  // the exact erase path the mutation refusal closes. The way back is the same
+  // as everywhere post-commit: withdraw the boundary first.
+  const marker = readBoundaryMarker(lockPath)
+  if (
+    markerPhase(marker) === 'committed' &&
+    marker.sessionId === sid &&
+    typeof marker.at === 'number' &&
+    now - marker.at < BOUNDARY_FRESH_MS
+  ) {
+    return {
+      adopted: false,
+      reason: 'own-commit',
+      alerts: [
+        'this session COMMITTED the boundary that transferred this record — it belongs to the successor. ' +
+          'To take the work back, withdraw the boundary first (`node scripts/batch-boundary.mjs --clear`); ' +
+          'the declaration then becomes mutable again without adoption.',
+      ],
+    }
+  }
   const evidence = Array.isArray(declaration.evidence) ? declaration.evidence : []
   const items = evidence.map((e) => checkEvidence(e, { now, ...probes }))
   const checkpointStates = (declaration.transfer.checkpoints ?? []).map((c) => {

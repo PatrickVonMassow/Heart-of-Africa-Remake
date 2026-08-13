@@ -64,6 +64,7 @@ import {
 import { LEASE_MS } from './batch-lease-core.mjs'
 import {
   absPath,
+  adoptTransferred,
   gatherHandoverTransfer,
   gatherInFlight,
   maxAgeMs,
@@ -2063,6 +2064,25 @@ describe('gatherHandoverTransfer — session-bound and idempotent', () => {
       expect(t.blocked).toBe(true)
       expect(t.message).toContain('only pids/logs')
       expect(t.message).toContain('CHECKPOINT')
+    })
+  })
+
+  it('the PREDECESSOR may not adopt its own handover while its committed marker stands (Sol final round)', () => {
+    withTempLock(({ lockPath, path }) => {
+      writeDeclaration(
+        declaration({ transfer: { v: 1, by: SID, at: 1, checkpoints: [] } }),
+        path,
+      )
+      writeFileSync(
+        statePathsFor(lockPath).boundaryPath,
+        JSON.stringify({ v: 2, phase: 'committed', cause: 'point', sessionId: SID, point: 675, at: Date.now() }),
+      )
+      const a = adoptTransferred(SID, { lockPath })
+      expect(a.adopted).toBe(false)
+      expect(a.reason).toBe('own-commit')
+      expect(a.alerts[0]).toContain('batch-boundary.mjs --clear')
+      // The record itself is untouched — nothing was stamped adopted.
+      expect(readDeclaration(path).adopted).toBeUndefined()
     })
   })
 })

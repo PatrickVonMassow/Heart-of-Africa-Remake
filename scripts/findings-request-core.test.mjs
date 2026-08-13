@@ -311,11 +311,12 @@ describe('depositing and retiring a request are durable records', () => {
 describe('the gate is the point boundary, not every turn end', () => {
   const boundary = (command) => turnTakesBoundary([{ name: 'Bash', command }])
 
-  it('recognises the turn that TAKES the boundary', () => {
-    expect(boundary('node scripts/batch-boundary.mjs 462')).toBe(true)
+  it('recognises the turn that TAKES the boundary — the COMMIT phase (point 675)', () => {
+    expect(boundary('node scripts/batch-boundary.mjs --commit 462')).toBe(true)
+    expect(boundary('node scripts/batch-boundary.mjs --commit --context')).toBe(true)
     // A PowerShell caller quotes it (four-eyes finding 3, Fable 5).
-    expect(boundary('node scripts/batch-boundary.mjs "462"')).toBe(true)
-    expect(boundary('node C:/repo/scripts/batch-boundary.mjs 462')).toBe(true)
+    expect(boundary('node scripts/batch-boundary.mjs "--commit" 462')).toBe(true)
+    expect(boundary('node C:/repo/scripts/batch-boundary.mjs --commit 462')).toBe(true)
   })
 
   it('does not read the read-only forms as taking it', () => {
@@ -323,6 +324,9 @@ describe('the gate is the point boundary, not every turn end', () => {
     expect(boundary('node scripts/batch-boundary.mjs --clear')).toBe(false)
     expect(boundary('node scripts/batch-boundary.mjs')).toBe(false)
     expect(boundary('node scripts/guard-preflight.mjs --for boundary --session x')).toBe(false)
+    // The prepare phase and the bare point (now a prepare alias) record nothing.
+    expect(boundary('node scripts/batch-boundary.mjs --prepare 462')).toBe(false)
+    expect(boundary('node scripts/batch-boundary.mjs 462')).toBe(false)
   })
 
   it('never blocks an owner mid-branch — it cannot write the work order at all', () => {

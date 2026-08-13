@@ -730,6 +730,26 @@ describe('assessBoundary — the context-watermark cause', () => {
     )
   })
 
+  it('the claim may not bring its own yardstick — the CURRENT mark is judged too (Sol final round)', () => {
+    // {tokens: 1, watermark: 1} is internally consistent and must still fail.
+    expect(
+      assessBoundary({ marker: ctx({ tokens: 1, watermark: 1 }), sid: SID, now: NOW, closure: 'unknown', watermarkNow: 150_000 })
+        .reason,
+    ).toBe('context-below-watermark')
+    expect(
+      assessBoundary({ marker: ctx(), sid: SID, now: NOW, closure: 'unknown', watermarkNow: 150_000 }).valid,
+    ).toBe(true)
+    // A mark recalibrated DOWN since the commit still honours the recorded, higher one.
+    expect(
+      assessBoundary({ marker: ctx({ tokens: 120_000 }), sid: SID, now: NOW, closure: 'unknown', watermarkNow: 100_000 })
+        .valid,
+    ).toBe(false)
+    // …and a broken watermarkNow input falls back to the recorded mark alone.
+    expect(
+      assessBoundary({ marker: ctx(), sid: SID, now: NOW, closure: 'unknown', watermarkNow: NaN }).valid,
+    ).toBe(true)
+  })
+
   it('feeds boundaryVerdict exactly like a point boundary', () => {
     const boundary = assessBoundary({ marker: ctx(), sid: SID, now: NOW, closure: 'unknown' })
     expect(boundaryVerdict({ boundary, launcher: 'armed' })).toBe('allow-boundary')

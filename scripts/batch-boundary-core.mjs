@@ -110,7 +110,7 @@ export function pointClosure(n, tasksOpenText, archiveText) {
  *   freshMs   — override for tests
  * Returns { valid, point, reason }.
  */
-export function assessBoundary({ marker, sid, now, closure, freshMs = BOUNDARY_FRESH_MS }) {
+export function assessBoundary({ marker, sid, now, closure, freshMs = BOUNDARY_FRESH_MS, watermarkNow = null }) {
   if (!marker || typeof marker !== 'object') {
     return { valid: false, point: null, reason: 'no-marker' }
   }
@@ -136,7 +136,15 @@ export function assessBoundary({ marker, sid, now, closure, freshMs = BOUNDARY_F
     ) {
       return { valid: false, point: null, reason: 'context-marker-unmeasured' }
     }
-    if (marker.tokens < marker.watermark) {
+    // The claim may not bring its own yardstick (Sol final round, finding 1):
+    // `{tokens: 1, watermark: 1}` would pass a check that trusts the recorded
+    // mark alone. Where the caller supplies the CURRENTLY configured mark, the
+    // reading must clear the HIGHER of the two.
+    const mark = Math.max(
+      marker.watermark,
+      typeof watermarkNow === 'number' && watermarkNow > 0 ? watermarkNow : 0,
+    )
+    if (marker.tokens < mark) {
       return { valid: false, point: null, reason: 'context-below-watermark' }
     }
     if (typeof marker.at !== 'number' || !(now - marker.at < freshMs)) {
