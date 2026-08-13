@@ -399,10 +399,11 @@ export function cardProofFragments({ cause = BOUNDARY_CAUSES.POINT, destination 
  * from the last one needs an identity on the card itself, which is the board's
  * user-owned structure, not this mechanism's to change.
  */
-/** How long after the preparation a card may still be stamped and count as THIS
- *  handover's. Wide enough for a boundary that takes its time, far short of the
- *  day it would take to collide with the previous handover's stamp. */
-export const CARD_STAMP_WINDOW_MIN = 120
+/** The rounding slack on a `HH:MM` stamp compared with a millisecond clock: one
+ *  minute at each end, and nothing more. The acceptable arc is otherwise the
+ *  REAL interval between the preparation and now — bounded by the receipt's own
+ *  freshness rather than by an invented window (Sol's review of 46c994e). */
+export const CARD_STAMP_SLACK_MIN = 1
 
 /** Berlin wall-clock minute of the day — the board stamps `Stand HH:MM` in that
  *  zone, so a comparison must be made in it. PURE for a given instant. */
@@ -420,28 +421,41 @@ export function berlinMinuteOfDay(ms) {
 }
 
 /**
- * IS THIS CARD THIS HANDOVER'S, or the last one's (Sol's review of 9096fb7)?
- * PURE. The fragments identify a card of the right cause and destination — and
- * the card the PREVIOUS handover left standing has both. What tells them apart
- * is the board's own `Stand HH:MM`, which must fall at or after the preparation.
+ * IS THIS CARD THIS HANDOVER'S, or the last one's (Sol's reviews of
+ * 9096fb7/46c994e)? PURE. The fragments identify a card of the right cause and
+ * destination — and the card the PREVIOUS handover left standing has both. What
+ * tells them apart is the board's own `Stand HH:MM`, which must fall inside the
+ * REAL interval between the preparation and now, plus a minute of rounding at
+ * each end. That interval is bounded by the receipt's freshness, so the arc a
+ * stale card could land in is the elapsed hour at most — not a window this
+ * function invents.
  *
- * A region with NO stamp passes: a card format without one must not trap a
- * session at its boundary. Named residual: a stamp from a previous day at the
- * very same minute passes too — the board stamps no date, and giving it one is
- * the board's structure, not this mechanism's.
+ * An UNSTAMPED region does not prove currency where the board stamps at all: it
+ * is refused, exactly because every generated state card carries a stamp. On a
+ * board that stamps nothing it passes, so a card format without stamps cannot
+ * trap a session at its boundary.
+ *
+ * RESIDUAL, named: the stamp carries no DATE, so a card from an earlier day
+ * whose wall clock falls in that same elapsed arc passes. Dating the stamp is
+ * the board's user-owned structure, not this mechanism's to change.
  */
-export function cardStampIsCurrent(region, { sinceMinute = null, windowMin = CARD_STAMP_WINDOW_MIN } = {}) {
+export function cardStampIsCurrent(
+  region,
+  { sinceMinute = null, untilMinute = null, boardStamps = true, slackMin = CARD_STAMP_SLACK_MIN } = {},
+) {
   if (typeof sinceMinute !== 'number' || !Number.isFinite(sinceMinute)) return true
   const m = String(region ?? '').match(/Stand\s+(\d{1,2}):(\d{2})/)
-  if (!m) return true
+  if (!m) return boardStamps !== true
   const stamp = (Number(m[1]) % 24) * 60 + Number(m[2])
-  return (stamp - sinceMinute + 1440) % 1440 <= windowMin
+  const from = (sinceMinute - slackMin + 1440) % 1440
+  const arc = typeof untilMinute === 'number' && Number.isFinite(untilMinute) ? (untilMinute - sinceMinute + 1440) % 1440 : 0
+  return (stamp - from + 1440) % 1440 <= arc + 2 * slackMin
 }
 
 export function boardCarriesCard(
   boardText,
   fragments = [],
-  { windowChars = CARD_PROOF_WINDOW, sinceMinute = null } = {},
+  { windowChars = CARD_PROOF_WINDOW, sinceMinute = null, untilMinute = null } = {},
 ) {
   if (typeof boardText !== 'string' || !boardText.trim()) return { carries: true, verifiable: false, missing: [] }
   const list = (Array.isArray(fragments) ? fragments : []).filter(Boolean)
@@ -470,7 +484,8 @@ export function boardCarriesCard(
   if (whole.length === 0) return { carries: false, verifiable: true, missing: rest, split: true }
   // …AND IT MUST BE THIS HANDOVER'S CARD, not the one the last handover left
   // standing (Sol's review of 9096fb7).
-  if (!whole.some((r) => cardStampIsCurrent(r, { sinceMinute }))) {
+  const boardStamps = /Stand\s+\d{1,2}:\d{2}/.test(boardText)
+  if (!whole.some((r) => cardStampIsCurrent(r, { sinceMinute, untilMinute, boardStamps }))) {
     return { carries: false, verifiable: true, missing: [], stale: true }
   }
   return { carries: true, verifiable: true, missing: [] }

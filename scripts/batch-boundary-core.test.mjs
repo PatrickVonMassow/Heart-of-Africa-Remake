@@ -1105,19 +1105,48 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
       destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
     })
     const prepared = 14 * 60 + 30 // 14:30 Berlin
+    const now = 14 * 60 + 47 // …and the commit seventeen minutes later
+    const at = (hhmm) => boardCarriesCard(stamped(hhmm), frags, { sinceMinute: prepared, untilMinute: now })
     // Stamped before this preparation → the last handover's card.
-    const old = boardCarriesCard(stamped('11:05'), frags, { sinceMinute: prepared })
-    expect(old.carries).toBe(false)
-    expect(old.stale).toBe(true)
-    // Stamped at or just after it → this handover's.
-    expect(boardCarriesCard(stamped('14:30'), frags, { sinceMinute: prepared }).carries).toBe(true)
-    expect(boardCarriesCard(stamped('14:47'), frags, { sinceMinute: prepared }).carries).toBe(true)
+    expect(at('11:05').carries).toBe(false)
+    expect(at('11:05').stale).toBe(true)
+    // Stamped between the preparation and now → this handover's.
+    expect(at('14:30').carries).toBe(true)
+    expect(at('14:38').carries).toBe(true)
+    expect(at('14:47').carries).toBe(true)
+    // A stamp AFTER the commit is not this handover's either — and yesterday's
+    // card an hour past the interval is refused, which the old fixed window let
+    // through (Sol on 46c994e).
+    expect(at('14:52').carries).toBe(false)
+    expect(at('15:40').carries).toBe(false)
     // Across midnight the wall clock wraps; the card is still the newer one.
-    expect(boardCarriesCard(stamped('00:10'), frags, { sinceMinute: 23 * 60 + 55 }).carries).toBe(true)
-    // A card with no stamp at all does not trap the session.
-    expect(cardStampIsCurrent('<p>no stamp here</p>', { sinceMinute: prepared })).toBe(true)
+    expect(
+      boardCarriesCard(stamped('00:10'), frags, { sinceMinute: 23 * 60 + 55, untilMinute: 15 }).carries,
+    ).toBe(true)
     // …and with no preparation time to compare against, the stamp decides nothing.
     expect(boardCarriesCard(stamped('01:00'), frags, { sinceMinute: null }).carries).toBe(true)
+  })
+
+  it('does not let an UNSTAMPED card prove currency where the board stamps at all', () => {
+    const prepared = 14 * 60 + 30
+    // The board stamps its cards, so a matching region without one is not proof.
+    expect(cardStampIsCurrent('<p>no stamp here</p>', { sinceMinute: prepared, boardStamps: true })).toBe(false)
+    // A board that stamps nothing at all is a format without stamps — passing
+    // there, because a boundary check may not trap a session on a format change.
+    expect(cardStampIsCurrent('<p>no stamp here</p>', { sinceMinute: prepared, boardStamps: false })).toBe(true)
+    const card =
+      `<details class="card"><p>${boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</p></details>`
+    const frags = cardProofFragments({
+      cause: BOUNDARY_CAUSES.CONTEXT,
+      destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
+    })
+    expect(boardCarriesCard(card, frags, { sinceMinute: prepared, untilMinute: prepared }).carries).toBe(true)
+    expect(
+      boardCarriesCard(`<details class="card"><p><span class="stamp">Stand 09:00</span> x</p></details>${card}`, frags, {
+        sinceMinute: prepared,
+        untilMinute: prepared,
+      }).carries,
+    ).toBe(false)
   })
 
   it('never traps on a board it cannot read — but says it could not verify', () => {

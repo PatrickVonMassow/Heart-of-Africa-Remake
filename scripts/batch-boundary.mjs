@@ -376,6 +376,7 @@ export function requireBoardCard({
   // handover left standing would prove this one (Sol's review of 9096fb7).
   const proof = boardCarriesCard(readText(path), cardProofFragments({ cause, destination }), {
     sinceMinute: typeof preparedAt === 'number' ? berlinMinuteOfDay(preparedAt) : null,
+    untilMinute: berlinMinuteOfDay(Date.now()),
   })
   if (!proof.verifiable) {
     console.error(
