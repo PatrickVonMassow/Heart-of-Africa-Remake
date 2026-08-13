@@ -64,6 +64,7 @@ import {
 import { buildLayout, builtFabric, type PlaceLayout } from './layout'
 import { childPlayGround, villageAdultStations } from './lifeSpots'
 import { absorbSeparation, createTagGame, stepTagGame, type TagWorld } from './tagGame'
+import { buildWedgeCarve } from './wedgeCarve'
 
 // The two numbers `PlaceLife` holds for the children it draws.
 const KID_SCALE = 0.55
@@ -274,11 +275,19 @@ function village(
     const d = Math.hypot(x - pen.x, z - pen.z)
     return d > options.pen.r && d < options.pen.r + 1.5
   }
+  // The sub-passage slots between pinching boundaries are not part of the
+  // ground, exactly as `PlaceLife` wires it (point 657).
+  const carve = buildWedgeCarve(colliders, NPC_RADIUS, {
+    x: ground.x,
+    z: ground.z,
+    radius: ground.radius,
+  })
   const blocked = (x: number, z: number) =>
     penned(x, z) ||
     Math.hypot(x, z) > rim ||
     Math.hypot(x - ground.x, z - ground.z) > ground.radius ||
-    !standingClear(colliders, x, z, NPC_RADIUS)
+    !standingClear(colliders, x, z, NPC_RADIUS) ||
+    carve(x, z)
   const world: TagWorld = {
     radius: ground.radius,
     centerX: ground.x,
@@ -523,6 +532,76 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     })
   }
 
+  it('holds on the cadence that walked the children into the dead-end wedge (point 657)', () => {
+    // THE WEDGE, REPLAYED (point 657). The reported ground carries a 0.76 m
+    // channel between two hut clearance circles at (10.5, -5.7) and a corridor
+    // a rim-straddling hut pinches shut at (15.9, -7.7); at this recorded
+    // cadence — a healthy headless run's 38-71 fps jitter — the code as point
+    // 656 left it walks the evaders INTO them: measured on that code, the
+    // worst child reads 0.76 % against the 0.25 % gate (burst 0.60 %), its red
+    // windows sitting in the two slots, run after run. With the ground carved
+    // (`buildWedgeCarve`) and the tag-back window's press and U-turn gone, the
+    // same recorded cadence must read inside the shipped gates — this case
+    // FAILS on the pre-carve code, and that is its whole point.
+    const rand = mulberry32(18)
+    const v = village('bambara-village', 2972259115)
+    const paths: Track[][] = v.game.children.map(() => [])
+    for (let t = 0; t < 150; ) {
+      const dt = 0.014 + rand() * 0.012
+      t += dt
+      frame(v, dt)
+      sample(v, paths)
+    }
+    expectLively(paths)
+    const r = shuffleWindows(paths)
+    const burst = shuffleWindows(paths, CHILD_MOTION.short)
+    expect(judgedEnough(r)).toBe(true)
+    expect(judgedEnough(burst)).toBe(true)
+    expect(r.leastJudged).toBeGreaterThan(CHILD_MOTION.judgedGate)
+    expect(r.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
+    expect(burst.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
+    const rescues = rescueRate(paths)
+    expect(rescues.carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
+    expect(rescues.perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
+    expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
+  })
+
+  it('holds on the cadence that flipped two evaders about-face at the band edge (point 657, second round)', () => {
+    // THE BAND-EDGE FLIP, REPLAYED. The point-648 evade commitment released on
+    // a cliff: the frame the short-way delta slipped under its 30° opposition
+    // band, the un-wrap vanished whole and the evade heading jumped by 2π·t.
+    // At THIS cadence seed the group logger caught it plainly — two co-walking
+    // evaders at (8.25, -5.45) and (10.42, -5.30) flipping 197° together in
+    // open ground, each walking 1.29 m of floor-pace legs inside 0.3 m — and
+    // the trace read the worst child at exactly the 0.25 % gate, run after run
+    // (the replay is deterministic; the live section showed the same
+    // mechanism at 0.44 % on a quiet WebGL 2 run). With the release RAMP in
+    // `evadeHeading` the same recorded cadence must read inside the shipped
+    // gates: this case FAILS on the cliff-release code, and that is its
+    // whole point.
+    const rand = mulberry32(14)
+    const v = village('bambara-village', 2972259115)
+    const paths: Track[][] = v.game.children.map(() => [])
+    for (let t = 0; t < 150; ) {
+      const dt = 0.014 + rand() * 0.012
+      t += dt
+      frame(v, dt)
+      sample(v, paths)
+    }
+    expectLively(paths)
+    const r = shuffleWindows(paths)
+    const burst = shuffleWindows(paths, CHILD_MOTION.short)
+    expect(judgedEnough(r)).toBe(true)
+    expect(judgedEnough(burst)).toBe(true)
+    expect(r.leastJudged).toBeGreaterThan(CHILD_MOTION.judgedGate)
+    expect(r.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
+    expect(burst.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
+    const rescues = rescueRate(paths)
+    expect(rescues.carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
+    expect(rescues.perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
+    expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
+  })
+
   it('holds at a low and uneven frame rate too', () => {
     // The headless machine draws at anything from 60 down to ten-odd frames a
     // second, and every rule behind this is a per-frame decision — so the
@@ -670,20 +749,26 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
 })
 
 /**
- * The pen, measured. A yard of 0.8 m leaves the child room to keep WALKING —
+ * The pen, measured. A yard of 0.65 m leaves the child room to keep WALKING —
  * the deflection needs a couple of body radii of clear ground ahead before it
  * will take a step at all — and no room to get anywhere, and the settlement
- * carries it 3 m clear whenever its stall watch runs out. Measured over 40 s at
- * these numbers: 22.5 rescues per child-minute, every one of them carrying the
- * child, and 1.94 % of the judged game time walked without getting anywhere —
- * nearly eight times the gate. Two fifths of that trace is not judged at all,
- * because a window that spans a carry is refused rather than guessed at; the
- * carries are what the rescue gate answers for. THE MEASURE THIS ONE REPLACED
- * sees 0.35 % of the same trace and would have passed it at its own 1 % gate,
- * because every one of its two-second windows holds a 3 m carry: it counted the
- * teleport as the child walking, and as ground the child covered.
+ * carries it 3 m clear whenever its stall watch runs out. The yard was 0.8 m
+ * until the point-657 behaviour work: in THAT yard the evader circles the pen
+ * wall, and a child circling a 1.6 m circle covers "ground" the 0.35 m window
+ * cannot call pacing — the construction, not the gate, had stopped producing
+ * the symptom, so the pen tightened to where walking cannot orbit. Measured
+ * over 40 s at 0.65 m (re-measured after the point-657 second round's evade
+ * ramp): 18.0 rescues per child-minute, carrying it 54.9 m in that minute,
+ * 110 m walked per played minute (full legs, the healthy band), and 15.1 %
+ * of the judged game time walked without getting anywhere — sixty times the
+ * gate. A third of the trace is not judged at all, because a window that
+ * spans a carry is refused rather than guessed at; the carries are what the
+ * rescue gate answers for. THE MEASURE THIS ONE REPLACED sees 2.5 % of the
+ * same trace — a sixth of the truth — because every one of its two-second
+ * windows holds a 3 m carry: it counted the teleport as the child walking,
+ * and as ground the child covered.
  */
-const PEN_RADIUS = 0.8
+const PEN_RADIUS = 0.65
 const PEN_CARRY = 3
 
 describe('and the gate SEES a child that is wedged (point 656)', () => {
@@ -749,7 +834,7 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     expect(holdsAGame(traceLiveness(paths))).toBe(true)
     const asItWas = oldMeasure(penned, 2, 2, 0.5)
     expect(asItWas.windows).toBeGreaterThan(1000) // it really did look
-    expect(asItWas.share).toBeLessThan(0.01) // and it would have passed its gate
+    expect(asItWas.share).toBeLessThan(0.05) // and it saw a sixth of the truth
     expect(r.share).toBeGreaterThan(asItWas.share * 5)
   })
 
@@ -761,18 +846,18 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     // settlement changes, only how often it was looked at.
     //
     // WHAT IS PINNED HERE IS THE VERDICT, NOT THE NUMBER, and the difference is
-    // deliberate. This child is CARRIED every two and a half seconds, and a
-    // window that spans a carry is refused rather than guessed at — so only
-    // three fifths of the trace can be judged at all (measured judgedShare
-    // 0.58-0.60 at every cadence), and what survives is a scatter of short
-    // continuous stretches whose share swings with which of them a cadence
-    // happens to sample: 1.94 / 1.69 / 2.29 / 3.24 / 2.49 %. The one thing that
-    // does NOT swing is the answer the gate reads — every cadence is RED by a
-    // factor of at least six — and the rescue rate below, which counts the very
-    // carries that made the trace unjudgeable, is red by a factor of three at
-    // all of them. A rescue-free minute of ordinary play holds its share to
-    // 9.5 % (the crowded case in the first block); this is the worst case the
-    // metric has, and it is stated rather than smoothed over.
+    // deliberate. This child is CARRIED every three and a half seconds, and a
+    // window that spans a carry is refused rather than guessed at — so about
+    // two thirds of the trace can be judged (measured judgedShare 0.663-0.677
+    // across the cadences, re-measured after the point-657 second round's
+    // evade ramp), and what survives is a scatter of short continuous
+    // stretches whose share swings a little with the cadence: 15.15 / 15.17 /
+    // 15.58 / 15.40 / 18.84 %. The one thing that does NOT swing is the
+    // answer the gate reads — every cadence is RED by a factor of at least
+    // sixty — and the rescue rate below, which counts the very carries that
+    // made the trace unjudgeable, is red by a factor of three at all of them.
+    // This is the worst case the metric has, and it is stated rather than
+    // smoothed over.
     const penned = [wedged()[0]]
     const read = CADENCES.map(([, step]) => shuffleWindows(resample(penned, step, 31337)))
     for (const r of read) {
@@ -781,7 +866,7 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     }
     for (const [, step] of CADENCES) {
       expect(rescueRate(resample(penned, step, 31337)).perChildMinute).toBeGreaterThan(
-        CHILD_MOTION.rescueGate * 3,
+        CHILD_MOTION.rescueGate * 2,
       )
     }
   })

@@ -50,21 +50,30 @@ export const RED_CHARGES = [
     kind: 'check',
     match: /no child walks without getting anywhere/i,
     why:
-      'REMAINING MECHANISM after the point-657 steering fix (12.08.2026). The FIRST mechanism — ' +
-      'the chase probing a blocked() that knew no bodies, so children pressed on crossing adults ' +
-      '— is fixed and pinned: the crowded replay fell from 1.14 % (worst child 1.88 %, bursts ' +
-      '3.5 %) to 0.00 % at the shipped gates. What still reds, measured at the fixed steering ' +
-      'over 24 idle traces at seed 2972259115 — WebGL 2 four of ten (0.51-2.14 %, bursts to ' +
-      '3.56 %), WebGPU three of fourteen (0.38-1.15 %) — is a child pacing in the DEAD-END ' +
-      'WEDGE the bambara play ground carries where the hut at (13.5, -6.4) r 2.35 straddles the ' +
-      'ground rim: every probed red window sits at (10.4-10.7, -5.6 to -5.8), a recovering ' +
-      'evader at pace 1.29 walking 1.3-2.9 m for 0.00 m gained, nearest adult 2.6 m away ' +
-      '(__placeBodies). Its rescue carries it 0.00 m because the wedge floor is statically free ' +
-      'ground. Four steering remedies were measured and rejected for degrading healthy villages ' +
-      'against the 0.25 % gate (playmates as mutual walls 0.48 %, a one-sided yield 0.70 %, a ' +
-      'centre-ward stall kick 1.33 %, touch-gated walls 0.46-0.63 %); the cure is a ground that ' +
-      'does not dead-end against a rim-straddling hut, or an evade that gives a cornered child ' +
-      'a way past — that decision stays with point 657.',
+      'RESIDUAL after the point-657 second round (measured 13.08.2026 on the deterministic ' +
+      'replay panel). The first-round carve, orbit and peel took the live worst-child shares ' +
+      'from red-in-3-of-10 (to 1.53 %) to one red in ten (WebGL 2 0.44 %, WebGPU worst 0.23 %); ' +
+      'the second round traced that red to the evade commitment RELEASING ON A CLIFF ' +
+      '(evadeHeading: the un-wrap vanished whole below the 150-degree band, a 2*pi*t heading ' +
+      'jump — two co-walking evaders flipped 197 degrees together in open ground) and cured it ' +
+      'with the release ramp, pinned by the deterministic dt-seed-14 replay (red at exactly ' +
+      '0.25 % before, inside every gate after). What remains, measured over 40 live-cadence ' +
+      'replay seeds (1/24 bambara red at 0.31 %, maasai and swahili 0/8): SINGLE LEGITIMATE ' +
+      'EVENTS the one-second window reads as pacing when one lands on a child — a catch that ' +
+      'reverses the new chaser exactly along its own approach line (the quarry\'s position ' +
+      'dictates the out-leg; traced at t=90.3-91.0, dt-seed 1, the rim at (10.5,-16.9)) and a ' +
+      'playmate-contact walk (nearKid 0.25 m, deliberately left to the separation — four ' +
+      'playmate-wall shapes degraded healthy villages, and two more downstream cures were ' +
+      'measured and rejected this round, recorded in evadeHeading). At a ~30 s live trace one ' +
+      'such event is over the 0.25 % gate on its own, so a rare live red of this composition ' +
+      'remains possible; it is closed by reading the trace (a catch or a contact at the worst ' +
+      'window, no rescue, 0.00 m carried), not by retrying. The post-ramp LIVE panel ' +
+      '(13.08.2026, merged state 389440ea, quiet machine, 5 runs per backend) confirms it: ' +
+      'WebGPU 5/5 green (worst child 0.09 %), WebGL 2 4/5 green and ONE red of exactly this ' +
+      'composition — child 3 at 0.39 %, worst window 8.9 s, 1.29 m walked inside 0.32 m, no ' +
+      'rescue at the window, 0.00 m carried in the whole run. The 1.29 m walk is the single ' +
+      'event\'s own signature: green runs on both backends carry the SAME 1.29 m window under ' +
+      'gate (0.09-0.11 %); red is only where one lands on a child whose judged share is small.',
   },
   {
     point: 506,

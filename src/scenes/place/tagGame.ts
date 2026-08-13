@@ -544,6 +544,28 @@ function wayOpen(
  *  only one that is going nowhere ever reaches it. */
 const PROGRESS_AWAY = 3
 
+/** How far off the straight flee the freshly-tagged child breaks away while
+ *  its immunity runs — 60°: enough that the inbound and outbound legs of the
+ *  tag U-turn no longer cancel inside a one-second window, small enough that
+ *  it still reads as running from the new chaser. */
+const PEEL_ANGLE = Math.PI / 3
+
+/** Whether the NEXT COUPLE OF STEPS along `heading` are walkable — a short
+ *  probe for a heading about to be taken: the per-step deflection handles a
+ *  bend further on, so only the immediate ground has to answer. */
+function nearWalkable(
+  c: TagChild,
+  heading: number,
+  world: TagWorld,
+  blockedAt: (x: number, z: number) => boolean,
+): boolean {
+  for (const m of [1.5, 3]) {
+    const d = world.childRadius * m
+    if (blockedAt(c.x + Math.sin(heading) * d, c.z + Math.cos(heading) * d)) return false
+  }
+  return true
+}
+
 /**
  * THE ESCAPE, AND THE FINDING IT LEAVES BEHIND (point 656). Both stall watches
  * end here — the one for a child that cannot move at all and the one for a child
@@ -903,6 +925,12 @@ function advanceTagGame(
     const c = s.children[i]
     const walkedBefore = c.walked
     const isChaser = i === s.chaser
+    // The tag pair steers freely at one another; everyone else's body is ground
+    // to walk round (point 657). For the chaser the partner is its quarry, for
+    // the quarry its chaser — treating those as walls would hold the catch at
+    // arm's length for ever.
+    const partner = isChaser ? s.target : i === s.target ? s.chaser : -1
+    const occAt = occ && ((x: number, z: number) => occ(i, partner, x, z))
     let wants: boolean
     let desired: number
     if (isChaser) {
@@ -918,6 +946,23 @@ function advanceTagGame(
           cfg.commitDistance,
         )
       desired = target ? headingToward(c.x, c.z, target.x, target.z, c.heading) : c.heading
+      // A CHASER THAT MAY NOT CATCH DOES NOT PRESS (point 657). While the
+      // tag-back window runs, the catch is forbidden — but the chaser still
+      // aimed at its quarry, so one that was already AT it walked into the
+      // body at the floor pace for the whole window: 1.4 s × 1.29 m/s of legs
+      // pumping against the separation with no ground covered, a guaranteed
+      // red window (measured at both reported seeds, every frozen pair in the
+      // traces was this). Where it is that close it ORBITS the quarry instead
+      // — real ground covered, visibly circling for the tag it is owed — and
+      // presses again the moment the window ends.
+      if (target && s.immuneFor > 0 && gap < cfg.catchDistance + world.childRadius * 2) {
+        const to = headingToward(c.x, c.z, target.x, target.z, c.heading)
+        const side = Math.sin(c.heading - to) >= 0 ? 1 : -1
+        // A quarter-turn off the line to the quarry orbits it; inside the
+        // catch ring the turn opens a little further, so the circle drifts
+        // outward instead of grinding along the body.
+        desired = to + side * (Math.PI / 2 + (gap < cfg.catchDistance ? 0.35 : 0))
+      }
     } else {
       const gapToChaser = dist(c, chaser)
       wants = runnerPresses(gapToChaser, cfg.pressureDistance)
@@ -949,6 +994,26 @@ function advanceTagGame(
         : Math.hypot(c.x - cx, c.z - cz) > cfg.pressureDistance
           ? headingToward(c.x, c.z, cx, cz, c.heading)
           : c.heading
+      // THE FRESHLY-TAGGED CHILD PEELS OFF SIDEWAYS (point 657). Its flee is
+      // the chase line reversed BY CONSTRUCTION — it walked toward the quarry,
+      // now it walks away from the same child — and at the floor pace a spent
+      // ex-chaser walks that knife-edge U-turn as a metre of legs for a
+      // handbreadth of ground, which is indistinguishable from pacing
+      // (measured: 1.29 m walked inside 0.29 m across one catch). While its
+      // immunity runs — the window in which it cannot be tagged back anyway —
+      // it breaks away at an angle instead, on whichever side keeps more of
+      // its momentum and is walkable.
+      if (c.evading && i === s.immune && s.immuneFor > 0) {
+        const keep = angleTo(c.heading, desired + PEEL_ANGLE)
+        const first = Math.abs(keep) <= Math.abs(angleTo(c.heading, desired - PEEL_ANGLE)) ? 1 : -1
+        for (const side of [first, -first]) {
+          const peeled = desired + side * PEEL_ANGLE
+          if (nearWalkable(c, peeled, world, world.blocked)) {
+            desired = peeled
+            break
+          }
+        }
+      }
     }
     // What was SAID overrides where the chase would go — for a runner only, and
     // only for the moment the action lasts (point 481). THE FLOOR IS THE CHASE'S
@@ -969,16 +1034,10 @@ function advanceTagGame(
       : Math.max(floor, effortPace(c.effort, c.reserve, cfg, isChaser ? 'chaser' : 'runner'))
     c.held = !!claim && c.pace <= 0
     ageEdge(c, dt)
-    // The tag pair steers freely at one another; everyone else's body is ground
-    // to walk round (point 657). For the chaser the partner is its quarry, for
-    // the quarry its chaser — treating those as walls would hold the catch at
-    // arm's length for ever.
-    const partner = isChaser ? s.target : i === s.target ? s.chaser : -1
     // A commanded stillness moves nothing — and leaves `pinned` and `walked`
     // alone, so a standing child is never mistaken for one stuck on geometry and
     // its legs stay still.
-    if (c.pace > 0)
-      moveChild(c, desired, c.pace * dt, dt, cfg, world, occ && ((x, z) => occ(i, partner, x, z)))
+    if (c.pace > 0) moveChild(c, desired, c.pace * dt, dt, cfg, world, occAt)
     trackProgress(c, dt, cfg, world)
     // Whatever its legs did this frame, they did it while the round was on.
     c.walkedWhilePlaying += c.walked - walkedBefore

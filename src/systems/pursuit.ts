@@ -315,18 +315,42 @@ export function evadeHeading(
   const t = clamp((d - start) / (radius - start), 0, 1) * clamp(strength, 0, 1)
   const inward = headingToward(x, z, cx, cz, away)
   let delta = Math.atan2(Math.sin(inward - away), Math.cos(inward - away))
-  if (Number.isFinite(current) && Math.abs(delta) > OPPOSED) {
+  if (Number.isFinite(current) && Math.abs(delta) > RELEASE) {
     // Near opposition the two ways round are as good as each other, so the
     // runner's own is taken: the long way, if that is the side it is running to.
     const toCurrent = Math.atan2(Math.sin(current - away), Math.cos(current - away))
     if (toCurrent !== 0 && Math.sign(toCurrent) !== Math.sign(delta)) {
-      delta -= Math.sign(delta) * Math.PI * 2
+      // AND THE COMMITMENT RELEASES ON A RAMP, NOT A CLIFF (point 657, second
+      // round). Applied whole above `OPPOSED` and dropped whole below it, the
+      // un-wrap made the heading JUMP by 2π·t the frame the short-way delta
+      // slipped under the band: measured at the reported seed, two co-walking
+      // evaders flipped 197° in open ground at (8.4, -5.5), each walking the
+      // jump as 1.29 m of floor-pace legs inside 0.3 m — out and back on one
+      // line, the exact signature the 0.25 % pacing gate reads, and rare
+      // enough to red roughly one live trace in five. Fading the un-wrap over
+      // the 30° below the band turns that snap into a walked curve: the
+      // heading rotates only as fast as the geometry moves the delta through
+      // the ramp, and every value between the two ways round is passed
+      // through instead of jumped over. Two downstream cures were measured
+      // first and rejected for degrading healthy villages (the wedgeCarve.ts
+      // record): a rate-limited bank (a third hover rescue in the
+      // adult-in-ground minute — its sweep hugs the progress anchor) and a
+      // 0.8 s committed ±60° breakaway (pacing loops against the demand it
+      // suppressed: bambara 0.30 %, maasai bursts 0.73 % at the fixed
+      // cadence, against 0.00-0.03 % before).
+      const w = Math.min(1, (Math.abs(delta) - RELEASE) / (OPPOSED - RELEASE))
+      delta -= Math.sign(delta) * Math.PI * 2 * w
     }
   }
   return away + delta * t
 }
 
 /** How near opposition the flee and the pull must come before the runner's own
- *  way round decides it — 30°, wide enough to cover the whole band in which the
- *  short way is about to flip to the other side. */
+ *  way round decides it WHOLLY — 30°, wide enough to cover the whole band in
+ *  which the short way is about to flip to the other side. */
 const OPPOSED = Math.PI - Math.PI / 6
+
+/** Where the way-round commitment has faded to nothing — 30° below `OPPOSED`.
+ *  Between the two the un-wrap is blended linearly; see the ramp comment in
+ *  `evadeHeading`. */
+const RELEASE = OPPOSED - Math.PI / 6
