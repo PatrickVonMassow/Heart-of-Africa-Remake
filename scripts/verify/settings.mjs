@@ -661,6 +661,31 @@ if (section('ambience-sources')) {
     surf153.atCoast > 0 && surf153.inland === 0, JSON.stringify(surf153))
   check('the surf gust also fades to silence inland (no leak past the target)',
     surf153.wobbleCoast > 0 && surf153.wobbleInland === 0, JSON.stringify(surf153))
+  // --- The village drum BED is silent at the shipped default (point 672) -------
+  // A meaningless bed can be mistaken for the chief's drum MESSAGE, so it ships
+  // off — in the village and near one. The debug audition switch must still
+  // bring it back, which is what proves the planner survived the silencing.
+  const drumBed = await page.evaluate(() => {
+    const a = window.__ambience
+    const b = window.__balance
+    const shipsEnabled = b.drumBed.enabled
+    a.setScene({ region: 'west', mode: 'place', placeKind: 'village', nearVillage: false })
+    const inVillage = a.layerTarget('drums')
+    a.setScene({ region: 'west', mode: 'travel', placeKind: null, nearVillage: true })
+    const nearVillage = a.layerTarget('drums')
+    b.drumBed.enabled = true
+    a.setScene({ region: 'west', mode: 'place', placeKind: 'village', nearVillage: false })
+    const auditioned = a.layerTarget('drums')
+    b.drumBed.enabled = shipsEnabled
+    // Leave the scene as the birdsong check above left it.
+    a.setScene({ region: 'central', mode: 'travel', placeKind: null, nearVillage: false })
+    return { shipsEnabled, inVillage, nearVillage, auditioned }
+  })
+  check('the ambient drum bed ships OFF and stays silent in and near a village (point 672)',
+    drumBed.shipsEnabled === false && drumBed.inVillage === 0 && drumBed.nearVillage === 0,
+    JSON.stringify(drumBed))
+  check('the debug audition switch brings the bed back, so its planner is intact',
+    drumBed.auditioned > 0, JSON.stringify(drumBed))
   // --- Village speech really plays (design.md §13.4) ---------------------------
   // The plan (pace, pause, attenuation) is pinned in the Vitest layer; the browser
   // owes only the fact that a spoken utterance SCHEDULES audio — and that one
