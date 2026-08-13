@@ -3,13 +3,28 @@
 // only reads the work order, probes the OS launcher, and stores/clears the
 // marker. CLI:
 //
-//   node scripts/batch-boundary.mjs <point>   record: point N is closed, end here
+//   node scripts/batch-boundary.mjs --prepare <point>  validate + name ALL the
+//                                             boundary bookkeeping; NO marker
+//   node scripts/batch-boundary.mjs --commit <point>   the session's LAST
+//                                             repository action: seal the marker
+//   node scripts/batch-boundary.mjs <point>   alias for --prepare <point> — the
+//                                             sealing one-shot is retired (a stop
+//                                             after its write left a marker with
+//                                             no bookkeeping; Sol final round)
 //   node scripts/batch-boundary.mjs --status  what the Stop hook would decide
 //   node scripts/batch-boundary.mjs --clear   withdraw a recorded boundary
 //
 // Recording is DELIBERATE and verified up front: the command refuses unless the
 // point is really closed in the work order and the launcher is really armed, so
 // the session learns at the boundary rather than at a blocked turn end.
+//
+// TWO-PHASE since point 675: the marker used to be written first and the
+// bookkeeping done after, and that bookkeeping (the card publish, guard
+// remedies) counted as work and deleted the marker — twice on 13.08.2026.
+// `--prepare` therefore writes NOTHING (there is nothing to lose while the
+// session ends), and `--commit` seals a marker no later call silently deletes:
+// post-commit mutations are DENIED loudly (`sealedBoundaryDeny`), with
+// `--clear` as the deliberate way back.
 import { readFileSync, rmSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { repoPath } from './repo-paths.mjs'
@@ -19,19 +34,30 @@ import { readOwnerLock } from './batch-singleton.mjs'
 import { gatherClaim } from './batch-claim.mjs'
 import { reservationDecision } from './batch-claim-core.mjs'
 import {
+  BOUNDARY_CAUSES,
   BOUNDARY_DESTINATIONS,
   BOUNDARY_DUE_MS,
+  BOUNDARY_PHASES,
   LAUNCHER_TASK_NAME,
   assessBoundary,
+  boardCarriesCard,
   boundaryCardCommand,
+  cardProofFragments,
+  cardRegions,
   boundaryCardText,
   boundaryDestination,
   boundaryDueFrom,
   classifyLauncherState,
+  markerPhase,
   pointClosure,
+  preparedReceipt,
   tickedPointsInDiff,
+  unpreparedRefusal,
 } from './batch-boundary-core.mjs'
 import { launcherRemedy } from './batch-launcher-core.mjs'
+import { PUBLISH_CMD } from './board-remedy.mjs'
+import { gatherHandoverTransfer as gatherTransfer } from './batch-in-flight.mjs'
+import { gatherWatermark, watermarkTokens } from './context-watermark.mjs'
 import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
@@ -62,13 +88,47 @@ export function writeBoundary(marker, path = BOUNDARY_PATH) {
   writeJsonAtomic(path, marker)
 }
 
-export function clearBoundary(path = BOUNDARY_PATH) {
+/** Where `--prepare` leaves its receipt for `--commit` (Sol's review of 4e93933).
+ *  Beside the marker, but NOT a marker: nothing withdraws it and no guard reads
+ *  it, so it cannot become a second thing work can delete. */
+export const PREPARED_PATH = repoPath('.claude/batch-boundary-prepared.json')
+
+export function readPrepared(path = PREPARED_PATH) {
   try {
-    rmSync(path, { force: true })
-    return true
+    const r = JSON.parse(readFileSync(path, 'utf8'))
+    return r && typeof r === 'object' ? r : null
   } catch {
-    return false
+    return null
   }
+}
+
+export function writePrepared(receipt, path = PREPARED_PATH) {
+  writeJsonAtomic(path, receipt)
+}
+
+/**
+ * WITHDRAW THE BOUNDARY — marker AND prepare receipt (Sol's review of ffa0a78:
+ * a withdrawal that leaves the receipt behind leaves the next `--commit`
+ * runnable without a fresh preparation, and a caller that is not the CLI got no
+ * receipt removal at all). Returns { marker, prepared }, each true when nothing
+ * of that kind is left; a caller that swallows a false re-opens the bypass, so
+ * the CLI says so LOUDLY.
+ */
+export function clearBoundary(path = BOUNDARY_PATH, { preparedPath = PREPARED_PATH, remove = rmSync } = {}) {
+  const gone = (p) => {
+    try {
+      remove(p, { force: true })
+      return true
+    } catch {
+      return false
+    }
+  }
+  // THE RECEIPT GOES FIRST (Sol's review of 389bbc7): with the marker deleted
+  // first, a failing receipt removal would leave exactly the bypass this closes
+  // — no seal, and a fresh receipt the next `--commit` accepts. This order
+  // leaves the seal STANDING on a partial failure, which is the safe half.
+  const prepared = gone(preparedPath)
+  return { prepared, marker: prepared ? gone(path) : false }
 }
 
 /**
@@ -244,7 +304,9 @@ export function closureOf(point, { cwd = repoPath('.') } = {}) {
 export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } = {}) {
   const marker = readBoundary(path)
   const closure = marker ? closureOf(marker.point) : 'unknown'
-  const boundary = assessBoundary({ marker, sid, now, closure })
+  // The CURRENT configured watermark rides along (Sol final round, finding 1):
+  // a context claim must clear it as well as its own recorded mark.
+  const boundary = assessBoundary({ marker, sid, now, closure, watermarkNow: watermarkTokens() })
   // Probe the OS only when a boundary is actually claimed — this runs at every
   // turn end of the owning session, and a PowerShell round-trip per turn for a
   // question nobody asked would be pure waste.
@@ -295,6 +357,83 @@ export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } =
  * Any read failure answers false — the pointless `--none` is the one that can
  * fail; `board.mjs none` works in both states, so it is the safe default.
  */
+/**
+ * The handover cards of this cause and destination ALREADY on the board — what
+ * `--prepare` records so `--commit` can demand a card that is not one of them.
+ *
+ * Returns `{ readable, cards }`: an unreadable board is NOT an empty board (Sol's
+ * review of 456be8f). Collapsed into `[]`, a failed reading at preparation time
+ * would make every standing card look newly added once the board became
+ * readable again, and a leftover card would prove the handover.
+ */
+export function standingCards({ cause, destination, path = repoPath(BOARD_FILE_DEFAULT) } = {}) {
+  const text = readText(path)
+  const readable = typeof text === 'string' && text.trim().length > 0
+  return { readable, cards: readable ? cardRegions(text, cardProofFragments({ cause, destination })) : [] }
+}
+
+/**
+ * THE COMMIT ASKS THE BOARD, not the printout it hoped was followed (Sol's
+ * reviews of ffa0a78/389bbc7). Refuses with the command that fixes it; a board
+ * that cannot be READ waves the commit through but SAYS so — a missing file must
+ * not end the batch, and an unverified check must never pass in silence.
+ */
+export function requireBoardCard({
+  cause,
+  destination,
+  what,
+  prepare,
+  fail,
+  path = repoPath(BOARD_FILE_DEFAULT),
+  receipt = readPrepared(),
+}) {
+  // The card must be one the preparation did NOT already see, and stamped at or
+  // after it — or the card an earlier handover left standing would prove this
+  // one (Sol's reviews of 9096fb7/bcf820c).
+  const proof = boardCarriesCard(readText(path), cardProofFragments({ cause, destination }), {
+    sinceMs: typeof receipt?.at === 'number' ? receipt.at : null,
+    nowMs: Date.now(),
+    knownRegions: Array.isArray(receipt?.cardsBefore) ? receipt.cardsBefore : null,
+  })
+  if (!proof.verifiable) {
+    console.error(
+      `WARNING: the board (${path}) could not be read, so ${what} could NOT be verified — the commit proceeds, ` +
+        'but check by hand that the card is up and published.',
+    )
+    return
+  }
+  // THE PREPARATION'S READING MUST HAVE HAPPENED (Sol's review of 456be8f): a
+  // board unreadable THEN and readable NOW leaves every standing card looking
+  // newly added, so the leftover would prove the handover. One command fixes it.
+  if (receipt && receipt.boardRead !== true) {
+    fail(
+      `THE PREPARATION COULD NOT READ THE BOARD, and it can be read now — so nothing distinguishes ${what} from ` +
+        `a card an earlier handover left standing. Run \`node scripts/batch-boundary.mjs ${prepare}\` again for a ` +
+        'reading that counts, put the card up, then commit. Nothing recorded.',
+    )
+  }
+  if (proof.malformedKnown === true) {
+    fail(
+      `THE PREPARE RECEIPT'S BOARD READING IS BROKEN — it records something that is not a handover card, so ` +
+        `${what} cannot be told from an earlier one. Run \`node scripts/batch-boundary.mjs ${prepare}\` again ` +
+        'to take a fresh reading, then commit. Nothing recorded.',
+    )
+  }
+  if (!proof.carries) {
+    fail(
+      (proof.stale === true
+        ? `THE BOARD CARRIES ${what} FROM AN EARLIER HANDOVER — the preparation already found that exact card ` +
+          'there, so it says nothing about the session ending now. (If you DID just re-put it: the board stamps ' +
+          'whole minutes, so a replacement written inside the same minute is byte-identical to what was there. ' +
+          'Put it up again once the minute has turned.)'
+        : `THE BOARD DOES NOT CARRY ${what} — a handover the board does not explain leaves the reader with a ` +
+          'session that vanished for no stated reason') +
+        `. Put up the card \`node scripts/batch-boundary.mjs ${prepare}\` printed and publish it ` +
+        `(\`${PUBLISH_CMD}\`), then commit. Nothing recorded.`,
+    )
+  }
+}
+
 export function pointCardStanding(point, { path = repoPath(BOARD_FILE_DEFAULT) } = {}) {
   try {
     return nowCard(readFileSync(path, 'utf8'), point) != null
@@ -323,13 +462,42 @@ export function boundaryHandover({ sid = readOwnerLock()?.sessionId ?? '' } = {}
   return { ...where, card: boundaryCardText(where) }
 }
 
+/**
+ * THE COMMIT'S WRITE ORDER, extracted so a test can prove it (Sol re-review of
+ * cd6faaa, finding 4): the transfer is recorded FIRST and the marker LAST — a
+ * throwing transfer leaves NO marker, because the marker is what authorises the
+ * stop and nothing may follow it. `write` is injectable for exactly that proof.
+ */
+export function commitSealedBoundary({ transfer, marker, write = writeBoundary } = {}) {
+  let transferred = null
+  if (transfer && typeof transfer.commit === 'function') {
+    try {
+      transferred = transfer.commit()
+    } catch (cause) {
+      // STAGE-TAGGED (Sol round 3): a failure here means NOTHING was recorded…
+      throw Object.assign(new Error(String(cause?.message ?? cause)), { stage: 'transfer', cause })
+    }
+  }
+  try {
+    write(marker)
+  } catch (cause) {
+    // …while a failure HERE means the transfer already stands and only the
+    // marker is missing — reporting it as "nothing recorded" would send the
+    // session to re-do a transfer that is done and to distrust a state that is
+    // half-taken. The caller says which half, honestly.
+    throw Object.assign(new Error(String(cause?.message ?? cause)), { stage: 'marker', cause, transferred })
+  }
+  return transferred
+}
+
 // --- CLI ----------------------------------------------------------------------
 
 const isMain =
   process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href
 
 if (isMain) {
-  const arg = process.argv[2]
+  const argv = process.argv.slice(2)
+  const arg = argv[0]
   const sid = readOwnerLock()?.sessionId ?? ''
   const fail = (msg) => {
     console.error(msg)
@@ -337,7 +505,20 @@ if (isMain) {
   }
 
   if (arg === '--clear') {
-    clearBoundary()
+    // The prepare receipt goes with the marker: a withdrawn boundary is re-TAKEN
+    // from the first phase, bookkeeping included, not committed on the strength
+    // of an attempt the session deliberately abandoned.
+    const cleared = clearBoundary()
+    if (!cleared.prepared || !cleared.marker) {
+      // NOT swallowed (Sol's review of ffa0a78): a surviving receipt would let
+      // the next `--commit` run on a preparation this session just abandoned.
+      fail(
+        `the boundary was NOT withdrawn — ${!cleared.prepared ? `the prepare receipt (${PREPARED_PATH})` : `the marker (${BOUNDARY_PATH})`} ` +
+          'could not be deleted' +
+          (cleared.prepared ? '' : ', so the marker was left in place rather than half-withdrawing the boundary') +
+          '. Remove the file by hand and run `--clear` again; until then the boundary still stands.',
+      )
+    }
     console.log('boundary marker cleared — the ordinary "do not stop the batch" rule applies again.')
   } else if (arg === '--status' || !arg) {
     const g = gatherBoundary(sid)
@@ -355,6 +536,7 @@ if (isMain) {
         {
           ownerSessionId: sid || null,
           ...g,
+          phase: markerPhase(g.marker),
           handover,
           launcherName: remedy.name,
           launcherProbe,
@@ -371,14 +553,173 @@ if (isMain) {
     else if (g.boundary.valid && g.launcher === 'armed') console.log('\nA boundary stop would be ALLOWED.')
     else console.log(`\nA boundary stop would be REFUSED (${g.boundary.reason}, launcher ${g.launcher}).`)
   } else {
-    const point = Number(arg)
-    if (!Number.isInteger(point) || point <= 0) fail(`not a point number: "${arg}"`)
+    // --prepare <point>|--context | --commit <point>|--context | <point> (legacy)
+    const phaseFlag = arg === '--prepare' || arg === '--commit' ? arg : null
+    const contextMode = phaseFlag !== null && argv[1] === '--context'
+
+    if (contextMode) {
+      // THE CONTEXT BOUNDARY (point 675, defeat 3): no closed point — the
+      // licence is a REAL context reading past the watermark, taken now and
+      // recorded in the marker. Everything else mirrors the point boundary.
+      if (!sid) {
+        fail(
+          'no batch lock owner — only the session that owns .claude/batch-lock.json may end at a ' +
+            'boundary. Nothing recorded.',
+        )
+      }
+      const tIdx = argv.indexOf('--transcript')
+      const wm = gatherWatermark({ transcriptPath: tIdx >= 0 ? argv[tIdx + 1] : '', sid })
+      if (wm.state === 'unreadable') {
+        fail(
+          'NO CONTEXT READING COULD BE TAKEN' +
+            (wm.transcript ? ` (${wm.transcript} carries no usage record)` : ' (no transcript was found)') +
+            ' — a context boundary fires on a MEASUREMENT, never an assumption. Pass the real transcript: ' +
+            `node scripts/batch-boundary.mjs ${phaseFlag} --context --transcript <path> (the Stop hook payload ` +
+            'names it as transcript_path). Nothing recorded.',
+        )
+      }
+      if (wm.state !== 'past') {
+        fail(
+          `the context has NOT passed the watermark (${wm.tokens} < ${wm.watermark} tokens) — the context ` +
+            'boundary ends a session the batch can no longer afford, not one that is merely between steps. ' +
+            'Keep working. Nothing recorded.',
+        )
+      }
+      const launcher = probeLauncherState()
+      if (launcher !== 'armed') {
+        const remedy = launcherRemedy()
+        fail(
+          `the launcher "${remedy.name}" is ${launcher} — nothing would restart the batch, so ending here would ` +
+            `strand it. Keep working, and ${remedy.how}. Nothing recorded.`,
+        )
+      }
+      const transfer = gatherTransfer(sid)
+      if (transfer.blocked) fail(transfer.message)
+      const handover = boundaryHandover({ sid })
+      const card = boundaryCardText({
+        destination: handover.destination,
+        claimantSid: handover.claimantSid,
+        cause: BOUNDARY_CAUSES.CONTEXT,
+      })
+      const cardBlock =
+        'THE BOARD CARD — it says WHY this handover happens (the watermark, not a closed point); take it ' +
+        'verbatim into the unnumbered gap card:\n\n' +
+        `${card}\n\n` +
+        `  ${boundaryCardCommand({ point: null, pointCardStanding: false })}   (the German goes in on stdin)\n` +
+        `  ${PUBLISH_CMD}\n`
+      if (phaseFlag === '--prepare') {
+        // The RECEIPT, not a marker: it proves phase one ran, and `--commit`
+        // refuses without it (Sol's review of 4e93933).
+        writePrepared(
+          preparedReceipt({
+            sid,
+            cause: BOUNDARY_CAUSES.CONTEXT,
+            now: Date.now(),
+            destination: handover.destination,
+            board: standingCards({ cause: BOUNDARY_CAUSES.CONTEXT, destination: handover.destination }),
+          }),
+        )
+        console.log(
+          `PREPARED (nothing recorded yet): the context measures ${wm.tokens} tokens against the ` +
+            `${wm.watermark} watermark, the launcher is armed` +
+            (transfer.note ? `, and ${transfer.note}` : '') +
+            '. Do the boundary bookkeeping NOW, while no marker exists that work could delete:\n\n' +
+            `${cardBlock}\n` +
+            `Then check nothing else would block (\`node scripts/guard-preflight.mjs --for answer --session ${sid}\`), ` +
+            'and make `node scripts/batch-boundary.mjs --commit --context` the LAST repository action of this ' +
+            'session. End the session right after.',
+        )
+        process.exit(0)
+      }
+      // READ ONCE, JUDGE THAT ONE (Sol's review of 04cea00): a second read could
+      // hand the card proof a different receipt — or none — and a missing one
+      // silently restores the bypass the first read just refused.
+      const receipt = readPrepared()
+      const unprepared = unpreparedRefusal({
+        receipt,
+        sid,
+        cause: BOUNDARY_CAUSES.CONTEXT,
+        destination: handover.destination,
+        now: Date.now(),
+      })
+      if (unprepared) fail(unprepared)
+      // …and the receipt proves only that the phase RAN (Sol's review of
+      // ffa0a78). The card is the visible half of defeat 3 — the reader must see
+      // that the handover happened because the context passed the mark — so the
+      // commit reads the board for it rather than trusting the printout was
+      // followed.
+      requireBoardCard({
+        cause: BOUNDARY_CAUSES.CONTEXT,
+        destination: handover.destination,
+        what: 'THE WATERMARK CARD',
+        prepare: '--prepare --context --transcript <path>',
+        fail,
+        receipt,
+      })
+      // Transfer FIRST, marker LAST (Sol review of 807c2bf, finding 1) —
+      // `commitSealedBoundary` pins the order, and a failed transfer refuses
+      // before anything is recorded.
+      let transferred = null
+      try {
+        transferred = commitSealedBoundary({
+          transfer,
+          marker: {
+            v: 2,
+            phase: BOUNDARY_PHASES.COMMITTED,
+            cause: BOUNDARY_CAUSES.CONTEXT,
+            sessionId: sid,
+            point: null,
+            tokens: wm.tokens,
+            // The mark the reading was judged against — assessBoundary
+            // re-judges the claim (tokens >= watermark), so a marker cannot
+            // smuggle a sub-threshold reading past the guard.
+            watermark: wm.watermark,
+            at: Date.now(),
+          },
+        })
+      } catch (e) {
+        fail(
+          e?.stage === 'marker'
+            ? `the transfer stage succeeded${e.transferred ? ` (${e.transferred})` : ''} but the boundary MARKER ` +
+                `could not be written (${e?.message ?? e}) — the boundary is NOT taken. Retry this exact commit: ` +
+                'it is idempotent (an already-transferred declaration is not re-judged), and only the marker is missing.'
+            : `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
+                'Retry, or check `node scripts/batch-in-flight.mjs --status`.',
+        )
+      }
+      console.log(
+        `boundary COMMITTED at the context watermark (${wm.tokens} >= ${wm.watermark} tokens). This was the ` +
+          'last repository action of this session — END IT NOW and SAY in your closing message that the ' +
+          'context watermark is why. ' +
+          (handover.destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
+            ? `The batch goes to claiming window ${handover.claimantSid}. `
+            : `The launcher (${launcherRemedy().name}) starts the fresh session. `) +
+          'Any further mutation is DENIED loudly (`--clear` withdraws deliberately).' +
+          (transferred
+            ? ` The in-flight declaration was marked TRANSFERRED (${transferred}); the successor adopts it ` +
+              'with `node scripts/batch-in-flight.mjs --adopt`.'
+            : ''),
+      )
+      process.exit(0)
+    }
+
+    const pointArg = phaseFlag ? argv[1] : arg
+    const point = Number(pointArg)
+    if (!Number.isInteger(point) || point <= 0) {
+      fail(
+        `not a point number: "${pointArg ?? ''}"` +
+          (phaseFlag ? ` (usage: node scripts/batch-boundary.mjs ${phaseFlag} <point>)` : ''),
+      )
+    }
     if (!sid) {
       fail(
         'no batch lock owner — only the session that owns .claude/batch-lock.json may end at a ' +
           'boundary. Nothing recorded.',
       )
     }
+    // THE CONDITION (point 675, defeat 2): the point this session was LANDING is
+    // LANDED. Delegated authors still building do not hold the boundary — the
+    // successor adopts them through the transferred in-flight declaration.
     const closure = closureOf(point)
     if (closure !== 'closed') {
       fail(
@@ -394,29 +735,124 @@ if (isMain) {
           `strand it. Keep working, and ${remedy.how}. Nothing recorded.`,
       )
     }
-    writeBoundary({ v: 1, sessionId: sid, point, at: Date.now() })
+    // IN-FLIGHT WORK MUST BE TRANSFERABLE (point 675, defeat 2 / merged proposal
+    // M28–M34): a worker without a committed-and-pushed checkpoint would die
+    // with this session, so it BLOCKS the handover with named recovery choices.
+    // A transferable declaration is handed to the successor at commit.
+    const transfer = gatherTransfer(sid)
+    if (transfer.blocked) fail(transfer.message)
     const handover = boundaryHandover({ sid })
     const toWindow = handover.destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
+    const cardBlock =
+      'THE BOARD CARD (point 434 (7)) — it must name where the batch actually goes, so take this text ' +
+      'verbatim rather than writing it again. It names NO point number on purpose: it goes into the ' +
+      'unnumbered gap card, where the topic guard reads every point reference as a foreign one.\n\n' +
+      `${handover.card}\n\n` +
+      // The command is CHOSEN from the board's real state (point 470), never
+      // assumed: an instruction that does not work is what sent sessions to
+      // hand-edit the board file, and a hand-edit appends.
+      `  ${boundaryCardCommand({ point, pointCardStanding: pointCardStanding(point) })}   (the German ` +
+      'goes in on stdin — a Windows shell mangles the umlauts on the argument path)\n' +
+      `  ${PUBLISH_CMD}\n`
+    const destinationLine = toWindow
+      ? `the batch does NOT go to a fresh session: window ${handover.claimantSid} holds an honoured claim, ` +
+        'so batch-autostart reserves the batch for it and SKIPS the spawn. '
+      : `the launcher (${launcherRemedy().name}) starts a fresh one within its interval and ` +
+        'batch-resume-hook re-orients it. '
+
+    if (phaseFlag !== '--commit') {
+      // Both `--prepare <point>` AND the bare `<point>` land here. The one-shot
+      // that sealed first and did the bookkeeping after is RETIRED (Sol final
+      // round, finding 3): a stop right after its write left a committed marker
+      // with none of the promised board bookkeeping, which is defeat 1 with a
+      // shorter fuse. The bare form keeps WORKING — it starts the two-phase
+      // flow and says exactly what to do.
+      writePrepared(
+        preparedReceipt({
+          sid,
+          cause: BOUNDARY_CAUSES.POINT,
+          point,
+          now: Date.now(),
+          destination: handover.destination,
+          board: standingCards({ cause: BOUNDARY_CAUSES.POINT, destination: handover.destination }),
+        }),
+      )
+      console.log(
+        (phaseFlag === null
+          ? `NOTE: the one-shot form is retired (point 675) — this call ran --prepare ${point} instead, and ` +
+            'NOTHING is recorded until the commit.\n\n'
+          : '') +
+          `PREPARED (nothing recorded yet): point ${point} is landed, the launcher is armed` +
+          (transfer.note ? `, and ${transfer.note}` : '') +
+          '. Do the boundary bookkeeping NOW, while no marker exists that work could delete:\n\n' +
+          `${cardBlock}\n` +
+          `Then check nothing else would block (\`node scripts/guard-preflight.mjs --for answer --session ${sid}\`), ` +
+          `and make \`node scripts/batch-boundary.mjs --commit ${point}\` the LAST repository action of this ` +
+          'session: it seals the marker, and any mutation after it is an explicit error. End the session right after.',
+      )
+      process.exit(0)
+    }
+
+    // Read once, judge that one (Sol's review of 04cea00).
+    const receipt = readPrepared()
+    const unprepared = unpreparedRefusal({
+      receipt,
+      sid,
+      cause: BOUNDARY_CAUSES.POINT,
+      point,
+      destination: handover.destination,
+      now: Date.now(),
+    })
+    if (unprepared) fail(unprepared)
+
+    // The OLD card being gone is no evidence that the NEW one is up (Sol's
+    // review of 389bbc7) — both are asked, in the order that names the likelier
+    // omission first.
+    requireBoardCard({
+      cause: BOUNDARY_CAUSES.POINT,
+      destination: handover.destination,
+      what: 'THE HANDOVER CARD',
+      prepare: `--prepare ${point}`,
+      fail,
+      receipt,
+    })
+
+    if (pointCardStanding(point)) {
+      fail(
+        `the board still carries the current-work card for point ${point}, so the boundary bookkeeping has ` +
+          `not been done. Run \`node scripts/batch-boundary.mjs --prepare ${point}\` and follow it — the card, ` +
+          'the publish — then commit. Nothing recorded.',
+      )
+    }
+
+    // Transfer FIRST, marker LAST (Sol review of 807c2bf, finding 1) —
+    // `commitSealedBoundary` pins the order.
+    let transferred = null
+    try {
+      transferred = commitSealedBoundary({
+        transfer,
+        marker: { v: 2, phase: BOUNDARY_PHASES.COMMITTED, cause: BOUNDARY_CAUSES.POINT, sessionId: sid, point, at: Date.now() },
+      })
+    } catch (e) {
+      fail(
+        e?.stage === 'marker'
+          ? `the transfer stage succeeded${e.transferred ? ` (${e.transferred})` : ''} but the boundary MARKER ` +
+              `could not be written (${e?.message ?? e}) — the boundary is NOT taken. Retry this exact commit: ` +
+              'it is idempotent (an already-transferred declaration is not re-judged), and only the marker is missing.'
+          : `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
+              'Retry, or check `node scripts/batch-in-flight.mjs --status`.',
+      )
+    }
+    const transferLine = transferred
+      ? ` The in-flight declaration was marked TRANSFERRED (${transferred}); the successor adopts it with ` +
+        '`node scripts/batch-in-flight.mjs --adopt`, so the running author keeps building through the handover.'
+      : ''
+
     console.log(
-      `boundary recorded: point ${point} is closed and the launcher is armed. End this session now — ` +
-        (toWindow
-          ? `the batch does NOT go to a fresh session: window ${handover.claimantSid} holds an honoured claim, ` +
-            'so batch-autostart reserves the batch for it and SKIPS the spawn. '
-          : `the launcher (${launcherRemedy().name}) starts a fresh one within its interval and ` +
-            'batch-resume-hook re-orients it. ') +
-        'Do NOT start the next point in this context, and do NOT end while a delegated agent is still in ' +
-        'flight (its work would be thrown away — let the pool drain first).\n\n' +
-        'THE BOARD CARD (point 434 (7)) — it must name where the batch actually goes, so take this text ' +
-        'verbatim rather than writing it again. It names NO point number on purpose: it goes into the ' +
-        'unnumbered gap card, where the topic guard reads every point reference as a foreign one.\n\n' +
-        `${handover.card}\n\n` +
-        // The command is CHOSEN from the board's real state (point 470), never
-        // assumed: an instruction that does not work is what sent sessions to
-        // hand-edit the board file, and a hand-edit appends.
-        `  ${boundaryCardCommand({ point, pointCardStanding: pointCardStanding(point) })}   (the German ` +
-        'goes in on stdin — a Windows shell mangles the umlauts on the argument path)\n\n' +
-        'The card is a CLAIM TO STOP: once it stands, the board gate denies the next state-changing ' +
-        'call. Publishing it, the focus stamp and this boundary command are never blocked.',
+      `boundary COMMITTED: point ${point} is landed and the launcher is armed. This was the last repository ` +
+        `action of this session — END IT NOW. ${destinationLine}Any further mutation is DENIED loudly ` +
+        '(withdraw deliberately with `node scripts/batch-boundary.mjs --clear` if you truly must work again).' +
+        transferLine,
     )
   }
 }

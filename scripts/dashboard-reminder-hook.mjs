@@ -39,7 +39,9 @@ try {
 // Withdrawing the handover here keeps the launcher from spawning a successor
 // beside it. Owner-guarded, so it is a no-op once the successor holds the lock.
 try {
-  withdrawHandover(sid, { trigger: "the user's own prompt (UserPromptSubmit)" })
+  // `force`: the user's own prompt is a genuine interrupt and withdraws even a
+  // COMMITTED (sealed) boundary — the session answers, then re-takes it (point 675).
+  withdrawHandover(sid, { trigger: "the user's own prompt (UserPromptSubmit)", force: true })
 } catch {
   /* best effort */
 }
