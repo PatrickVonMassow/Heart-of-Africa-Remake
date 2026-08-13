@@ -21,6 +21,9 @@ import {
   trampleCrunchGain,
   trampleCrunchPlan,
   DRUM_BEAT_PEAK,
+  DRUM_BED_PATTERNS,
+  drumBedPhrasePlan,
+  drumBedVillageSpread,
   PROXIMITY_AUDIBLE,
 } from './ambience'
 import { thunderDelaySeconds } from './season'
@@ -28,6 +31,66 @@ import { balance } from '../config/balance'
 import { phraseOf, utteranceOf, SEQUENCE_LENGTH } from '../communication/lexicon'
 import { phrasePlan, utterancePlan } from '../communication/speaking'
 import { resetDevAsserts } from './devAssert'
+
+describe('village drum bed phrase selection', () => {
+  const sequence = (...values: number[]) => {
+    let i = 0
+    return () => values[i++ % values.length]
+  }
+
+  it('varies across many bars and never repeats a pattern back to back', () => {
+    const config = { ...balance.drumBed, phraseBars: 3 }
+    const chosen: number[] = []
+    let previous: number | null = null
+    let ordinal = 0
+    const random = sequence(0, 0.99, 0.34, 0.7, 0.12)
+    for (let phrase = 0; phrase < 8; phrase++) {
+      const plan = drumBedPhrasePlan('bambara-village', 0, previous, ordinal, random, config)
+      chosen.push(...plan.patternIndices)
+      previous = plan.patternIndices.at(-1) ?? previous
+      ordinal += plan.patternIndices.length
+    }
+    expect(new Set(chosen).size).toBe(DRUM_BED_PATTERNS.length)
+    for (let i = 1; i < chosen.length; i++) expect(chosen[i]).not.toBe(chosen[i - 1])
+  })
+
+  it('guarantees that at least half of every phrase is rests', () => {
+    for (let pick = 0; pick < DRUM_BED_PATTERNS.length; pick++) {
+      const plan = drumBedPhrasePlan('bambara-village', 0, null, 0, () => (pick + 0.01) / DRUM_BED_PATTERNS.length)
+      expect(plan.restShare).toBeGreaterThanOrEqual(0.5)
+    }
+  })
+
+  it('moves a secondary accent while preserving the same rhythm', () => {
+    const first = drumBedPhrasePlan('bambara-village', 0, null, 0, () => 0)
+    const second = drumBedPhrasePlan('bambara-village', 0, null, 1, () => 0)
+    expect(first.patternIndices[0]).toBe(second.patternIndices[0])
+    expect(first.hits.map((h) => h.startOffset)).toEqual(second.hits.map((h) => h.startOffset))
+    expect(first.hits.map((h) => h.peak)).not.toEqual(second.hits.map((h) => h.peak))
+  })
+
+  it('gives each village a stable bounded tempo and pitch spread', () => {
+    const ids = ['bambara-village', 'hausa-village', 'maasai-village', 'zulu-village']
+    const spreads = ids.map((id) => drumBedVillageSpread(id, 0.07, 0.08))
+    expect(spreads.map((s) => s.tempoScale)).toEqual(ids.map((id) => drumBedVillageSpread(id, 0.07, 0.08).tempoScale))
+    expect(new Set(spreads.map((s) => s.tempoScale)).size).toBe(ids.length)
+    expect(new Set(spreads.map((s) => s.pitchScale)).size).toBe(ids.length)
+    for (const spread of spreads) {
+      expect(spread.tempoScale).toBeGreaterThanOrEqual(0.93)
+      expect(spread.tempoScale).toBeLessThanOrEqual(1.07)
+      expect(spread.pitchScale).toBeGreaterThanOrEqual(0.92)
+      expect(spread.pitchScale).toBeLessThanOrEqual(1.08)
+    }
+  })
+
+  it('lengthens phrase silence as a visit continues without changing its bar count', () => {
+    const random = () => 0.5
+    const opening = drumBedPhrasePlan('bambara-village', 0, null, 0, random)
+    const thinned = drumBedPhrasePlan('bambara-village', balance.drumBed.thinAfterSeconds, null, 0, random)
+    expect(thinned.patternIndices).toHaveLength(opening.patternIndices.length)
+    expect(thinned.nextDelaySeconds).toBeGreaterThan(opening.nextDelaySeconds)
+  })
+})
 
 describe('coastSurfGain (point 153 — the coastal surf fade)', () => {
   const near = 0.4
@@ -890,9 +953,10 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       expect(balance.ambienceVolume).toBe(0.1)
       expect(balance.ambientVolume).toBe(0.5)
       expect(balance.communication.speechVolume).toBe(1.5)
+      expect(balance.drumBed.villageGain).toBe(0.42)
       const { drums, speech } = measure()
       expect(drums).toBeGreaterThan(0)
-      // MEASURED: 2.04× the drum beat (0.459 against 0.225) at the pinned
+      // MEASURED: 2.43× the drum beat (0.459 against 0.189) at the pinned
       // synthesis gain. Under 1 is the reported bug; a shout is no fix either.
       expect(speech / drums).toBeGreaterThanOrEqual(1.6)
       expect(speech / drums).toBeLessThanOrEqual(4)

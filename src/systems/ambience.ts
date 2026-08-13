@@ -17,6 +17,9 @@ export interface AmbienceScene {
   placeKind: PlaceKind | null
   /** Travel mode: a village is close by (drums carry over, design.md §19). */
   nearVillage: boolean
+  /** The village heard here, in-place or nearby. It gives the otherwise
+   *  meaningless drum bed a stable local tempo and pitch. */
+  villageId?: string | null
 }
 
 interface Layer {
@@ -60,6 +63,9 @@ let speechBus: GainNode | null = null
 const layers: Record<string, Layer> = {}
 let scene: AmbienceScene = { region: 'north', mode: 'place', placeKind: 'port', nearVillage: false }
 let started = false
+let drumPreviousPattern: number | null = null
+let drumBarOrdinal = 0
+let drumVisitStartedAt = 0
 
 function layer(name: string): Layer {
   if (!ctx || !master) throw new Error('audio not started')
@@ -206,18 +212,161 @@ function emitMonkey(dest: GainNode) {
  *  it (point 605). */
 export const DRUM_BEAT_PEAK = 0.9
 
-/** One drum bar: low hits with a lighter off-beat (design.md §19 drums). */
-function emitDrums(dest: GainNode) {
-  if (!ctx) return
+/** Composed rhythms, not calibration: zeroes are rests and the other values
+ *  are relative accents. Tuning their pace, voice, dynamics and spacing lives
+ *  in `balance.drumBed`; these figures only say which rhythm is played. Every
+ *  figure is at least half rest, keeping air inside even a two-bar phrase. */
+export const DRUM_BED_PATTERNS: ReadonlyArray<ReadonlyArray<number>> = [
+  [1, 0, 0.52, 0, 0.78, 0, 0.38, 0],
+  [1, 0, 0, 0.42, 0.72, 0, 0.55, 0],
+  [0.76, 0, 0.44, 0, 1, 0, 0, 0.34],
+  [1, 0, 0.36, 0.58, 0, 0, 0.68, 0],
+]
+
+export interface DrumBedHit {
+  startOffset: number
+  peak: number
+  pitchStartHz: number
+  pitchEndHz: number
+}
+
+export interface DrumBedPhrasePlan {
+  patternIndices: number[]
+  hits: DrumBedHit[]
+  restShare: number
+  tempoScale: number
+  pitchScale: number
+  /** From this phrase's first hit to the next phrase's first hit. */
+  nextDelaySeconds: number
+}
+
+/** Stable 0..1 hash: the village character must not change every bar or visit. */
+function villageUnit(villageId: string, salt: string): number {
+  let h = 2166136261
+  for (const c of `${villageId}:${salt}`) {
+    h ^= c.charCodeAt(0)
+    h = Math.imul(h, 16777619)
+  }
+  return (h >>> 0) / 0xffffffff
+}
+
+/** The slight, stable tempo/pitch signature that separates villages without
+ *  turning the meaningless bed into one of the semantic message figures. */
+export function drumBedVillageSpread(villageId: string, tempoSpread: number, pitchSpread: number) {
+  const signed = (salt: string) => villageUnit(villageId, salt) * 2 - 1
+  return {
+    tempoScale: 1 + signed('tempo') * Math.max(0, tempoSpread),
+    pitchScale: 1 + signed('pitch') * Math.max(0, pitchSpread),
+  }
+}
+
+/** Pick an index uniformly from all patterns except the previous one. */
+function differentPattern(previous: number | null, random: () => number): number {
+  const count = DRUM_BED_PATTERNS.length
+  if (previous === null || previous < 0 || previous >= count) {
+    return Math.min(count - 1, Math.floor(Math.max(0, random()) * count))
+  }
+  const candidate = Math.min(count - 2, Math.floor(Math.max(0, random()) * (count - 1)))
+  return candidate >= previous ? candidate + 1 : candidate
+}
+
+/** Pure village-bed planner. It chooses several different bars, moves a
+ *  secondary accent through their audible hits, leaves their written rests
+ *  intact, then inserts a phrase pause that lengthens over a long visit. */
+export function drumBedPhrasePlan(
+  villageId: string,
+  staySeconds: number,
+  previousPattern: number | null,
+  firstBarOrdinal: number,
+  random: () => number = Math.random,
+  config: Readonly<typeof balance.drumBed> = balance.drumBed,
+): DrumBedPhrasePlan {
+  const c = config
+  const bars = Math.max(1, Math.round(c.phraseBars))
+  const { tempoScale, pitchScale } = drumBedVillageSpread(villageId, c.tempoSpread, c.pitchSpread)
+  const step = Math.max(0.02, c.stepSeconds * tempoScale)
+  const hits: DrumBedHit[] = []
+  const patternIndices: number[] = []
+  let previous = previousPattern
+  let restCount = 0
+  let stepCount = 0
+
+  for (let bar = 0; bar < bars; bar++) {
+    const patternIndex = differentPattern(previous, random)
+    const pattern = DRUM_BED_PATTERNS[patternIndex]
+    patternIndices.push(patternIndex)
+    previous = patternIndex
+    const audible = pattern.flatMap((value, index) => value > 0 ? [index] : [])
+    const movingAccent = audible[(firstBarOrdinal + bar) % audible.length]
+    for (let i = 0; i < pattern.length; i++) {
+      const value = pattern[i]
+      stepCount++
+      if (value <= 0) {
+        restCount++
+        continue
+      }
+      const shifted = i === movingAccent ? value + (1 - value) * Math.max(0, Math.min(1, c.accentShift)) : value
+      hits.push({
+        startOffset: (bar * pattern.length + i) * step,
+        peak: DRUM_BEAT_PEAK * shifted,
+        pitchStartHz: Math.max(20, c.pitchStartHz * pitchScale),
+        pitchEndHz: Math.max(20, c.pitchEndHz * pitchScale),
+      })
+    }
+  }
+
+  const phraseSeconds = bars * DRUM_BED_PATTERNS[0].length * step
+  const gapLo = Math.max(0, Math.min(c.phraseGapMinSeconds, c.phraseGapMaxSeconds))
+  const gapHi = Math.max(gapLo, c.phraseGapMinSeconds, c.phraseGapMaxSeconds)
+  const baseGap = gapLo + Math.max(0, Math.min(1, random())) * (gapHi - gapLo)
+  const thinning = Math.min(1, Math.max(0, staySeconds) / Math.max(1, c.thinAfterSeconds))
+  const gapFactor = 1 + thinning * (Math.max(1, c.thinMaxGapFactor) - 1)
+  return {
+    patternIndices,
+    hits,
+    restShare: restCount / stepCount,
+    tempoScale,
+    pitchScale,
+    nextDelaySeconds: phraseSeconds + baseGap * gapFactor,
+  }
+}
+
+/** Render one planned phrase with the bed's deliberately plain low sine voice.
+ *  Message drums use two distinct heads, a longer ring and a stick click below;
+ *  keeping all three out of this bed preserves that semantic boundary. */
+function emitDrumPhrase(dest: GainNode): number {
+  if (!ctx) return 1
+  const villageId = scene.villageId ?? scene.region
+  const staySeconds = Math.max(0, ctx.currentTime - drumVisitStartedAt)
+  const plan = drumBedPhrasePlan(villageId, staySeconds, drumPreviousPattern, drumBarOrdinal)
   const t0 = ctx.currentTime
-  const step = 0.24
-  const pattern = [1, 0, 0.6, 0, 1, 0, 0.6, 0.4]
-  pattern.forEach((v, i) => {
-    if (v === 0) return
-    const t = t0 + i * step
-    envOsc(dest, 'sine', 130, 55, t, 0.22, DRUM_BEAT_PEAK * v)
-    if (v < 1) envOsc(dest, 'triangle', 320, 180, t, 0.08, 0.25)
-  })
+  for (const hit of plan.hits) {
+    envOsc(
+      dest,
+      'sine',
+      hit.pitchStartHz,
+      hit.pitchEndHz,
+      t0 + hit.startOffset,
+      Math.max(0.04, balance.drumBed.hitSeconds),
+      hit.peak,
+    )
+  }
+  drumPreviousPattern = plan.patternIndices.at(-1) ?? drumPreviousPattern
+  drumBarOrdinal += plan.patternIndices.length
+  return plan.nextDelaySeconds
+}
+
+/** Unlike the generic one-shot emitters, a drum phrase chooses its own next
+ *  delay: that is where its explicit rests and long-visit thinning live. */
+function startDrumEmitter() {
+  const tick = () => {
+    let delay = 1
+    if (ctx && layers.drums && layers.drums.gain.gain.value > 0.005) {
+      delay = emitDrumPhrase(layers.drums.gain)
+    }
+    setTimeout(tick, Math.max(0.1, delay) * 1000)
+  }
+  setTimeout(tick, Math.random() * Math.max(0.1, balance.drumBed.phraseGapMaxSeconds) * 1000)
 }
 
 // Pentatonic roots per region for the sparse music phrases.
@@ -357,7 +506,7 @@ function buildGraph() {
   emitter('insects', 0.4, 1.6, emitInsects)
   emitter('birds', 1.8, 6, emitBird)
   emitter('birds', 7, 18, emitMonkey)
-  emitter('drums', 2.2, 2.2, emitDrums) // continuous bars while audible
+  startDrumEmitter()
   emitter('music', 9, 22, emitMusic)
   emitter('aniElephant', 3, 9, emitTrumpet)
   emitter('aniLion', 4, 11, emitRoar)
@@ -392,7 +541,7 @@ function applyScene() {
   setTarget('insects', !port && (region === 'west' || region === 'south' || region === 'east') ? (inPlace ? 0.12 : 0.2) : 0)
   // Birdsong carries its own per-source volume (point 153).
   setTarget('birds', (!port && region === 'central' ? (inPlace ? 0.25 : 0.4) : 0) * balance.birdsongVolume)
-  setTarget('drums', village ? 0.5 : nearVillage ? 0.18 : 0)
+  setTarget('drums', village ? balance.drumBed.villageGain : nearVillage ? balance.drumBed.nearbyGain : 0)
   setTarget('music', inPlace ? 0.16 : 0.1)
   applyAnimalTargets()
 }
@@ -972,12 +1121,20 @@ export function refreshAmbienceVolume() {
 
 /** Update the ambience to the current game situation. */
 export function setAmbienceScene(next: AmbienceScene) {
+  const nextVillageId = next.villageId ?? null
+  const villageChanged = nextVillageId !== (scene.villageId ?? null)
   const changed =
     next.region !== scene.region ||
     next.mode !== scene.mode ||
     next.placeKind !== scene.placeKind ||
-    next.nearVillage !== scene.nearVillage
+    next.nearVillage !== scene.nearVillage ||
+    villageChanged
   scene = next
+  if (villageChanged) {
+    drumPreviousPattern = null
+    drumBarOrdinal = 0
+    drumVisitStartedAt = ctx?.currentTime ?? 0
+  }
   if (changed && ctx) applyScene()
 }
 

@@ -235,6 +235,33 @@ const SEPARATION_FIELDS: ReadonlyArray<{
   { key: 'passes', label: 'separationPasses', step: 1, min: 1, max: 8 },
 ]
 
+/** Every numeric choice in the non-semantic village drum bed. The patterns
+ *  themselves are musical figures; all timing, dynamics, voice and variation
+ *  around those figures are live calibration values. */
+const DRUM_BED_FIELDS: ReadonlyArray<{
+  key: keyof typeof balance.drumBed
+  label: DebugLabelKey
+  step: number
+  min: number
+  max?: number
+  integer?: boolean
+}> = [
+  { key: 'stepSeconds', label: 'drumBedStep', step: 0.01, min: 0.02 },
+  { key: 'phraseBars', label: 'drumBedPhraseBars', step: 1, min: 1, max: 8, integer: true },
+  { key: 'phraseGapMinSeconds', label: 'drumBedGapMin', step: 0.1, min: 0 },
+  { key: 'phraseGapMaxSeconds', label: 'drumBedGapMax', step: 0.1, min: 0 },
+  { key: 'tempoSpread', label: 'drumBedTempoSpread', step: 0.01, min: 0, max: 0.5 },
+  { key: 'pitchSpread', label: 'drumBedPitchSpread', step: 0.01, min: 0, max: 0.5 },
+  { key: 'pitchStartHz', label: 'drumBedPitchStart', step: 5, min: 20 },
+  { key: 'pitchEndHz', label: 'drumBedPitchEnd', step: 5, min: 20 },
+  { key: 'hitSeconds', label: 'drumBedHitSeconds', step: 0.01, min: 0.04 },
+  { key: 'accentShift', label: 'drumBedAccentShift', step: 0.05, min: 0, max: 1 },
+  { key: 'thinAfterSeconds', label: 'drumBedThinAfter', step: 5, min: 1 },
+  { key: 'thinMaxGapFactor', label: 'drumBedThinFactor', step: 0.1, min: 1 },
+  { key: 'villageGain', label: 'drumBedVillageGain', step: 0.05, min: 0 },
+  { key: 'nearbyGain', label: 'drumBedNearbyGain', step: 0.05, min: 0 },
+]
+
 function NumberField({
   label,
   value,
@@ -753,6 +780,12 @@ export function DebugMenu() {
         refreshAmbienceVolume()
         bump()
       }, 0.1),
+      ...tableRows(DRUM_BED_FIELDS, (f) => balance.drumBed[f.key], (f, v) => {
+        balance.drumBed[f.key] = f.integer ? Math.round(v) : v
+        // Gain edits affect the standing layer immediately; the other values
+        // are picked up by the next phrase without restarting the audio graph.
+        refreshAmbienceVolume()
+      }),
       num(t.debug.surfNearRadius, balance.surf.nearRadius,
         (v) => { balance.surf.nearRadius = Math.max(0, v); bump() }, 0.1),
       num(t.debug.surfCutoff, balance.surf.cutoff,

@@ -83,6 +83,33 @@ export interface BalanceConfig {
    *  slider over the single ambience volume, so the birds can be turned down on
    *  their own. 1 = the design gain, 0 = silent. */
   birdsongVolume: number
+  /** The meaningless village drum BED (not the message drums): its phrasing,
+   *  low membrane voice, village-to-village character and long-visit thinning.
+   *  Every number is exposed in the debug menu for calibration by ear. */
+  drumBed: {
+    /** Seconds between the eight subdivisions of a bar. */
+    stepSeconds: number
+    /** Number of varied bars in one phrase before the audible pause. */
+    phraseBars: number
+    /** Random bounds of the silence after each phrase. */
+    phraseGapMinSeconds: number
+    phraseGapMaxSeconds: number
+    /** Per-village tempo and pitch spread around the values above/below. */
+    tempoSpread: number
+    pitchSpread: number
+    /** Pitch fall and body length of the low, soft bed membrane. */
+    pitchStartHz: number
+    pitchEndHz: number
+    hitSeconds: number
+    /** How much one secondary accent moves around the phrase (0..1). */
+    accentShift: number
+    /** When thinning reaches its maximum, and how much it stretches pauses. */
+    thinAfterSeconds: number
+    thinMaxGapFactor: number
+    /** Layer gains while inside a village and while passing nearby. */
+    villageGain: number
+    nearbyGain: number
+  }
   /** Coastal surf fade (point 153, design.md §19.1): the ocean-surf bed is only
    *  audible near the coast — full within `nearRadius`, silent at/beyond
    *  `cutoff`, smooth between, keyed on the distance to the nearest coast in
@@ -809,6 +836,28 @@ export const balance: BalanceConfig = {
   footstepVolume: 2, // footsteps twice as loud as the rest (user request)
   ambientVolume: 0.5, // every other ambient sound half as loud (user request)
   birdsongVolume: 1, // per-source birdsong slider (point 153); 1 = design gain
+  drumBed: {
+    // Two bars establish a phrase, followed by enough silence that the bed
+    // cannot read as an endlessly repeated loop. All are calibratable (§2).
+    stepSeconds: 0.25,
+    phraseBars: 2,
+    phraseGapMinSeconds: 1.4,
+    phraseGapMaxSeconds: 3,
+    // A village keeps its own small, deterministic character for the visit;
+    // neither spread is wide enough to turn the bed into message drumming.
+    tempoSpread: 0.07,
+    pitchSpread: 0.08,
+    pitchStartHz: 112,
+    pitchEndHz: 48,
+    hitSeconds: 0.18,
+    accentShift: 0.35,
+    // After roughly a minute the pauses are 2.6x their opening length. The
+    // bed remains present as place character, but demands progressively less.
+    thinAfterSeconds: 60,
+    thinMaxGapFactor: 2.6,
+    villageGain: 0.42,
+    nearbyGain: 0.14,
+  },
   surf: { nearRadius: 0.4, cutoff: 3 }, // surf full within 0.4° of the coast, silent beyond 3° (point 153, calibratable)
   daysPerUnit: 0.2,
   foodPerDay: 0, // demo start preset (point 104): no hunger by default; debug-editable
@@ -1291,8 +1340,8 @@ export const balance: BalanceConfig = {
     // Calibrated against the audio graph, not by feel (point 605). At the
     // master's input a syllable spoken beside the player arrives at
     // SPEECH_PEAK × ambienceVolume × this × the syllable's own synthesis gain
-    // (0.18 × 1.5 × ~2.07), a village drum beat at 0.9 × its layer 0.5 ×
-    // ambientVolume 0.5 — so the voices sit ~2.5× over the drums they must
+    // (0.18 × 1.5 × ~2.07), a village drum beat at 0.9 × its layer 0.42 ×
+    // ambientVolume 0.5 — so the voices sit ~3× over the drums they must
     // carry through, and the loudest realistic moment (two close speakers, the
     // drum bed, a footstep) still stays under full scale. 0.5, the level
     // inherited from the ambient bus in point 577, left them BELOW the drums,

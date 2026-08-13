@@ -49,6 +49,7 @@ const DEFAULTS = {
   labelOverlayMax: balance.labelOverlay.maxLabels,
   birdsongVolume: balance.birdsongVolume,
   speechVolume: balance.communication.speechVolume,
+  drumBed: { ...balance.drumBed },
   surfNearRadius: balance.surf.nearRadius,
   surfCutoff: balance.surf.cutoff,
   canoeSpeedup: balance.canoeSpeedup,
@@ -137,6 +138,7 @@ afterEach(() => {
   balance.labelOverlay.maxLabels = DEFAULTS.labelOverlayMax
   balance.birdsongVolume = DEFAULTS.birdsongVolume
   balance.communication.speechVolume = DEFAULTS.speechVolume
+  Object.assign(balance.drumBed, DEFAULTS.drumBed)
   balance.surf.nearRadius = DEFAULTS.surfNearRadius
   balance.surf.cutoff = DEFAULTS.surfCutoff
   balance.canoeSpeedup = DEFAULTS.canoeSpeedup
@@ -290,6 +292,22 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     // The speech's own level (point 577) — the slider the player lacked when he
     // silenced the syllables trying to lift them over the drums.
     { label: en.debug.speechVolume, read: () => balance.communication.speechVolume, value: 0.8 },
+    // Every timing, variation, timbre, thinning and level value of the
+    // meaningless drum bed is calibratable without a reload.
+    { label: en.debug.drumBedStep, read: () => balance.drumBed.stepSeconds, value: 0.3 },
+    { label: en.debug.drumBedPhraseBars, read: () => balance.drumBed.phraseBars, value: 3 },
+    { label: en.debug.drumBedGapMin, read: () => balance.drumBed.phraseGapMinSeconds, value: 2 },
+    { label: en.debug.drumBedGapMax, read: () => balance.drumBed.phraseGapMaxSeconds, value: 4 },
+    { label: en.debug.drumBedTempoSpread, read: () => balance.drumBed.tempoSpread, value: 0.1 },
+    { label: en.debug.drumBedPitchSpread, read: () => balance.drumBed.pitchSpread, value: 0.12 },
+    { label: en.debug.drumBedPitchStart, read: () => balance.drumBed.pitchStartHz, value: 120 },
+    { label: en.debug.drumBedPitchEnd, read: () => balance.drumBed.pitchEndHz, value: 45 },
+    { label: en.debug.drumBedHitSeconds, read: () => balance.drumBed.hitSeconds, value: 0.2 },
+    { label: en.debug.drumBedAccentShift, read: () => balance.drumBed.accentShift, value: 0.5 },
+    { label: en.debug.drumBedThinAfter, read: () => balance.drumBed.thinAfterSeconds, value: 90 },
+    { label: en.debug.drumBedThinFactor, read: () => balance.drumBed.thinMaxGapFactor, value: 3 },
+    { label: en.debug.drumBedVillageGain, read: () => balance.drumBed.villageGain, value: 0.35 },
+    { label: en.debug.drumBedNearbyGain, read: () => balance.drumBed.nearbyGain, value: 0.1 },
     { label: en.debug.canoeSpeedup, read: () => balance.canoeSpeedup, value: 5 },
     // Nested balance field (balance.health.canteenCapacity).
     { label: en.debug.canteenCapacity, read: () => balance.health.canteenCapacity, value: 600 },
@@ -863,6 +881,11 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.detailLevel', 'debug.flatGround', 'debug.startupFreezeBudget', 'debug.labelOverlayMax',
     'debug.ambienceVolume',
     'debug.footstepVolume', 'debug.ambientVolume', 'debug.birdsongVolume', 'debug.speechVolume',
+    'debug.drumBedStep', 'debug.drumBedPhraseBars', 'debug.drumBedGapMin', 'debug.drumBedGapMax',
+    'debug.drumBedTempoSpread', 'debug.drumBedPitchSpread', 'debug.drumBedPitchStart',
+    'debug.drumBedPitchEnd', 'debug.drumBedHitSeconds', 'debug.drumBedAccentShift',
+    'debug.drumBedThinAfter', 'debug.drumBedThinFactor', 'debug.drumBedVillageGain',
+    'debug.drumBedNearbyGain',
     'debug.surfNearRadius', 'debug.surfCutoff',
   ],
   jump: ['debug.jumpTo'],
@@ -938,12 +961,12 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 167 controls in total, and none twice', () => {
+  it('carries all 181 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(167)
+    expect(labels.length).toBe(181)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
@@ -990,7 +1013,7 @@ describe('DebugMenu completeness: every control is present, in its group (point 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(167)
+    expect(rows.length).toBe(181)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -1044,7 +1067,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(167)
+    expect(renderedRowLabels().length).toBe(181)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -1092,7 +1115,7 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     typeFilter('croc')
     expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(167)
+    expect(renderedRowLabels().length).toBe(181)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 
