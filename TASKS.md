@@ -936,6 +936,13 @@ put it is the mistake this line exists to stop.
   clauses present in the survivor; `tasks-archive-guard`, `queue-order-guard` and
   `bundle-first-guard --status` are clean; and the open count drops by the number of
   merges and ticks made. No point is deleted without its content landing somewhere.
+  A FOLD ALSO NEEDS A WAY ONTO THE BOARD (measured 13.08.2026): a point filed and folded
+  within the hour can be ticked and archived, but NO board command can give it the Erledigt
+  card the dashboard audit then demands — `done` needs a now-card, `promote` needs a queue
+  card, and the queue is derived from the OPEN work order the point has just left. The only
+  way out was `--waive-audit`, which bypasses the audit rather than satisfying it. This point
+  is where seven duplicates get folded, so it carries the fold's own board path: one command
+  that ticks, archives and writes the Erledigt card naming the point the content went to.
   Criticality: medium — it removes verification rounds that would otherwise be paid
   several times for one defect, and it stops five blocks from reading as unstarted work.
 
