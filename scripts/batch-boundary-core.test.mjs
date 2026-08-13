@@ -1036,24 +1036,53 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
     ).toBe(false)
   })
 
-  it('will not assemble a card out of TWO cards on the board (Sol on 9f93aeb)', () => {
-    // A watermark card announcing a fresh session, beside a POINT card that
-    // names a claiming window: no card on this board is a watermark handover to
-    // a claiming window, and the proof must not add them together.
+  it('will not assemble a card out of TWO ADJACENT cards on the board (Sol on 9f93aeb/1589da5)', () => {
+    // A watermark card announcing a fresh session, IMMEDIATELY followed by a
+    // point card that names a claiming window — the real markup, with no gap
+    // manufactured between them. No card on this board is a watermark handover
+    // to a claiming window, and the proof must not add the two together.
+    const card = (cause, destination) =>
+      `<details class="card"><summary>Übergabe</summary><p>${boundaryCardText({ destination, claimantSid: 'window-7', cause })}</p></details>`
     const board =
-      `<article>${boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</article>` +
-      '<hr>'.padEnd(CARD_PROOF_WINDOW, '-') +
-      `<article>${boundaryCardText({ destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW, claimantSid: 'window-7', cause: BOUNDARY_CAUSES.POINT })}</article>`
+      `<details class="sect"><summary><h2>Aktuell</h2></summary>` +
+      card(BOUNDARY_CAUSES.CONTEXT, BOUNDARY_DESTINATIONS.FRESH_SESSION) +
+      card(BOUNDARY_CAUSES.POINT, BOUNDARY_DESTINATIONS.CLAIMING_WINDOW) +
+      '</details>'
     const proof = boardCarriesCard(
       board,
       cardProofFragments({ cause: BOUNDARY_CAUSES.CONTEXT, destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW }),
     )
     expect(proof.carries).toBe(false)
     expect(proof.split).toBe(true)
-    // …while the card that IS on it still proves itself.
+    // …while each card that IS on it proves itself.
     expect(
       boardCarriesCard(
         board,
+        cardProofFragments({ cause: BOUNDARY_CAUSES.CONTEXT, destination: BOUNDARY_DESTINATIONS.FRESH_SESSION }),
+      ).carries,
+    ).toBe(true)
+    expect(
+      boardCarriesCard(
+        board,
+        cardProofFragments({ cause: BOUNDARY_CAUSES.POINT, destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW }),
+      ).carries,
+    ).toBe(true)
+  })
+
+  it('falls back to one card\'s length on a board with no card markup', () => {
+    const plain =
+      boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT }) +
+      '\n'.padEnd(CARD_PROOF_WINDOW, '.') +
+      boundaryCardText({ destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW, claimantSid: 'w', cause: BOUNDARY_CAUSES.POINT })
+    expect(
+      boardCarriesCard(
+        plain,
+        cardProofFragments({ cause: BOUNDARY_CAUSES.CONTEXT, destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW }),
+      ).carries,
+    ).toBe(false)
+    expect(
+      boardCarriesCard(
+        plain,
         cardProofFragments({ cause: BOUNDARY_CAUSES.CONTEXT, destination: BOUNDARY_DESTINATIONS.FRESH_SESSION }),
       ).carries,
     ).toBe(true)

@@ -360,9 +360,14 @@ export const BOUNDARY_CARD_HEADS = Object.freeze({
  * that pipeline starts escaping one. They are pinned against the real card text
  * by a test, so a reworded card breaks the test rather than the mechanism.
  */
-/** How far after the head sentence the rest of ONE card can reach. The longest
- *  card is ~900 characters of text; the slack covers the board's HTML around it
- *  while staying far below the distance to a neighbouring card. */
+/** Where one board card ENDS: every card is a `<details>` block, so this is the
+ *  real boundary the proof is cut at, not a guessed distance. */
+export const CARD_END = '</details>'
+
+/** The fallback for a board carrying no card markup at all — one card's length
+ *  (the longest card is ~900 characters, the slack covers its surroundings).
+ *  A distance can only ever be a fallback: adjacent cards are as close as their
+ *  markup puts them (Sol's review of 1589da5). */
 export const CARD_PROOF_WINDOW = 2000
 
 export function cardProofFragments({ cause = BOUNDARY_CAUSES.POINT, destination } = {}) {
@@ -400,17 +405,28 @@ export function boardCarriesCard(boardText, fragments = [], { windowChars = CARD
   const missing = list.filter((f) => !boardText.includes(f))
   if (missing.length > 0) return { carries: false, verifiable: true, missing }
   if (list.length < 2) return { carries: true, verifiable: true, missing: [] }
-  // THE FRAGMENTS MUST SIT IN ONE CARD (Sol's review of 9f93aeb): searched
-  // independently, a context/fresh-session card BESIDE a point/claiming-window
-  // card satisfied a context/claiming-window proof no card on that board ever
-  // made. So the head is found first and the rest must follow it inside one
-  // card's length.
+  // THE FRAGMENTS MUST SIT IN ONE CARD (Sol's reviews of 9f93aeb/1589da5):
+  // searched independently, a context/fresh-session card BESIDE a
+  // point/claiming-window card satisfied a context/claiming-window proof no card
+  // on that board ever made. A DISTANCE cannot decide that — adjacent cards are
+  // as close as their markup — so the board is cut at its real card boundaries:
+  // every card is a `<details>` block, so each `</details>` ends one. A board
+  // without that markup at all falls back to one card's length, which is still
+  // better than the whole file.
   const [head, ...rest] = list
-  for (let at = boardText.indexOf(head); at >= 0; at = boardText.indexOf(head, at + 1)) {
-    const region = boardText.slice(at, at + windowChars)
-    if (rest.every((f) => region.includes(f))) return { carries: true, verifiable: true, missing: [] }
+  const inOneRegion = (regions) => regions.some((r) => r.includes(head) && rest.every((f) => r.includes(f)))
+  if (boardText.includes(CARD_END)) {
+    return inOneRegion(boardText.split(CARD_END))
+      ? { carries: true, verifiable: true, missing: [] }
+      : { carries: false, verifiable: true, missing: rest, split: true }
   }
-  return { carries: false, verifiable: true, missing: rest, split: true }
+  const windows = []
+  for (let at = boardText.indexOf(head); at >= 0; at = boardText.indexOf(head, at + 1)) {
+    windows.push(boardText.slice(at, at + windowChars))
+  }
+  return inOneRegion(windows)
+    ? { carries: true, verifiable: true, missing: [] }
+    : { carries: false, verifiable: true, missing: rest, split: true }
 }
 
 /**
