@@ -48,7 +48,10 @@ import {
   topicViolations,
 } from './dashboard-card-topic-guard-core.mjs'
 import { progressGuardDecision } from './batch-singleton.mjs'
-import { clearBoundary, commitSealedBoundary } from './batch-boundary.mjs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { clearBoundary, commitSealedBoundary, standingCards } from './batch-boundary.mjs'
 
 const NOW = 1_785_000_000_000
 const SID = 'session-abc'
@@ -929,6 +932,30 @@ describe('unpreparedRefusal — --commit refuses what --prepare never prepared (
     expect(
       unpreparedRefusal({ receipt: null, sid: SID, cause: BOUNDARY_CAUSES.CONTEXT, now: NOW }),
     ).toContain('--prepare --context --transcript')
+  })
+
+  it('reads the board through standingCards, and tells a failed reading from an empty one', () => {
+    // Through the real function, not an injected shape: reverting it to a bare
+    // array must fail here (Sol on 68d6b5e).
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-board-'))
+    try {
+      const path = join(dir, 'board.html')
+      const cause = BOUNDARY_CAUSES.CONTEXT
+      const destination = BOUNDARY_DESTINATIONS.FRESH_SESSION
+      // A board that is not there at all — not the same as one without cards.
+      expect(standingCards({ cause, destination, path })).toEqual({ readable: false, cards: [] })
+      writeFileSync(path, '<details class="sect"><summary>Leer</summary></details>')
+      expect(standingCards({ cause, destination, path })).toEqual({ readable: true, cards: [] })
+      writeFileSync(
+        path,
+        `<details class="card"><p>${boundaryCardText({ destination, cause })}</p></details>`,
+      )
+      const seen = standingCards({ cause, destination, path })
+      expect(seen.readable).toBe(true)
+      expect(seen.cards).toHaveLength(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('records WHETHER the board was read, not merely what it held (Sol on 456be8f)', () => {
