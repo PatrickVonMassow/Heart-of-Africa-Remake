@@ -123,6 +123,63 @@ put it is the mistake this line exists to stop.
   the release branch that is at stake.
   Bundle: Dorfleben.
 
+- [ ] 672. THE AMBIENT DRUMS FALL SILENT, AND THE DRUMMER HOLDS STILL WITH THEM (user
+  13.08.2026, testing the deployed state right after point 651 landed: "Und das Ambient-Trommeln
+  nervt immer noch und außerdem irritiert es, weil es mit Kommunikation verwechselt werden kann.
+  Deaktiviere es komplett. Außerdem soll der Trommler dann auch still halten. Aktuell passen
+  seine Bewegungen auch gar nicht zu dem Trommelgeräuschen. Ich hoffe, das tun sie, wenn man mit
+  dem Häuptling kommuniziert.").
+  THIS SUPERSEDES POINT 651, which made the bed varied rather than silent. 651 was the right
+  answer to "monotonous" and the wrong answer to the real complaint: an ambient drum that a
+  player can mistake for the drum MESSAGE damages the mechanic the release exists for. Variation
+  cannot fix that — only silence can. The work 651 delivered is not discarded blindly: its
+  planner and its calibration stay in the tree, switched OFF by default, so the decision is a
+  value and not a deletion, and a later design that wants a bed back has it.
+  FINAL STATE:
+  1. THE BED IS SILENT by default: no ambient drum phrase is ever emitted, in the village or
+     near it (`emitDrumPhrase`/`startDrumEmitter` and the `drums` layer targets in
+     `src/systems/ambience.ts`, driven by `balance.drumBed` in `src/config/balance.ts`). The
+     switch is a debug-menu value like every other calibratable, defaulting to off, so it can be
+     heard again without a rebuild.
+  2. THE DRUM MESSAGE IS UNTOUCHED. `playDrumMessage` and the chief's answer keep working
+     exactly as they do; silencing the bed is what makes the message unmistakable.
+  3. THE DRUMMER HOLDS STILL when nothing is being drummed: with the bed off, the drummer NPC's
+     hands rest (`src/scenes/place/drummerPose.ts`), rather than miming strikes that no longer
+     sound. An idle drummer standing at his drum is the picture; a silent player striking it is
+     the bug the user saw.
+  4. THE DRUMMER MOVES WITH THE MESSAGE. While a drum message plays, his strikes follow ITS
+     strike times — the same plan `playDrumMessage` renders — so what the player sees matches
+     what the player hears. This is the half the user hoped was already true and is not.
+  5. design.md §19's ambience list and CLAUDE.md are updated in the SAME commit wherever they
+     name the drum bed as a standing ambience layer.
+  VERIFIABLE: Vitest for the silent default (no phrase is emitted with the switch off, the
+  message path still emits), for the drummer's rest pose while nothing plays, and for the strike
+  times matching the message plan; plus the `voice`/ambience browser check that no drum sounds
+  in a village at the default preset. The user's own judgment closes it at the deployed state.
+  Criticality: high — it is the user's second report on the same ambience, and it stands
+  directly in front of the communication mechanic this release exists to let him test.
+  Bundle: Dorfleben.
+
+
+- [ ] 673. THE VILLAGE SPEECH IS STILL TOO QUIET AT THE DEPLOYED STATE (user 13.08.2026,
+  answering the board's own question "Ist die Sprache am ausgelieferten Stand laut genug?":
+  "Nein, ist zu leise."). The earlier raise brought `balance.villageLife.speechVolume` to 1.5 and
+  was judged against the tone path rather than against the deployed mix; the user has now judged
+  the deployed mix and it does not carry.
+  FINAL STATE: the syllables carry over the remaining ambience at the default preset — and the
+  bed that used to mask them is going silent in point 672, so this point is calibrated AFTER
+  that one and against the mix it leaves. The starting value is raised until the measured
+  syllable peak stands clear of the remaining ambience floor by a stated margin, the margin is
+  written down where the next reader finds it, and the slider stays where the other volumes are.
+  VERIFIABLE: the measured peak-to-floor margin at the default preset, quoted; a Vitest case
+  pinning the default above the value that failed; and the user's judgment at the deployed
+  state, which is what closes it.
+  ORDER: after 672, whose silence changes the mix this is measured against.
+  Criticality: medium — it is a second report on the same defect, and inaudible speech is the
+  communication mechanic being untestable.
+  Bundle: Dorfleben.
+
+
 - [ ] 659. THE WHOLE COMMUNICATION CHAIN, PLAYED THROUGH AND JUDGED BY WHAT REACHES THE
   PLAYER — A SIX-EYES ALL-ROUND REVIEW (user 12.08.2026: "Danach will ich endlich mal
   erfolgreich die ganze Kette der Kommunikationsmechanik in diesem Dorf durchspielen können,

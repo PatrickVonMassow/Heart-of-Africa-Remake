@@ -51,10 +51,18 @@
     "671": {
       "at": "2026-08-13T16:04:20.150Z",
       "why": "One thin occurrence needing a measurement, not a fix; it waits behind the release-critical work but ahead of the backlog"
+    },
+    "672": {
+      "at": "2026-08-13T16:20:17.166Z",
+      "why": "User's second report on the same ambience and it stands directly in front of the communication test he is waiting for"
+    },
+    "673": {
+      "at": "2026-08-13T16:20:28.320Z",
+      "why": "Calibrated against the mix that 672 leaves, so it follows it immediately"
     }
   },
   "settled": {
-    "at": "2026-08-13T16:04:20.151Z",
+    "at": "2026-08-13T16:20:28.320Z",
     "points": [
       174,
       184,
@@ -226,7 +234,9 @@
       668,
       669,
       670,
-      671
+      671,
+      672,
+      673
     ]
   }
 }
