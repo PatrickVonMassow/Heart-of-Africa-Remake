@@ -163,15 +163,21 @@ export function authoringCodexArgs({
  * "what did Sol write" unanswerable afterwards, which is the question every
  * check below it depends on.
  */
-export function readinessProblems({ branch = '', worktree = '', mainCheckout = '', dirty = '' } = {}) {
+export function readinessProblems({ branch = '', worktree = '', mainCheckout = '', dirty = '', point = '' } = {}) {
   const problems = []
   const b = String(branch ?? '').trim()
-  // THE RULE IS `feat/`, SO THAT IS WHAT IS CHECKED (cross-vendor review, P1).
-  // Listing `main` and `HEAD` by name let `master`, `release` and `gh-pages`
-  // through while the refusal claimed to demand a feature branch.
+  // THE RULE IS `feat/<point>-<slug>`, SO THAT IS WHAT IS CHECKED. Listing `main`
+  // and `HEAD` by name let `master`, `release` and `gh-pages` through (third
+  // round); a bare `feat/` prefix then let a run for one point commit onto
+  // ANOTHER point's branch (fifth round), which is how work lands under a number
+  // that never asked for it.
+  const n = String(point ?? '').trim()
+  const wanted = n ? new RegExp(`^feat/${n}-.+`) : /^feat\/.+-.+/
   if (!b) problems.push('the branch could not be read — refusing to author into an unknown ref')
-  else if (!/^feat\//.test(b)) {
-    problems.push(`the branch is \`${b}\` — every point is authored on its own \`feat/<point>-<slug>\` branch`)
+  else if (!wanted.test(b)) {
+    problems.push(
+      `the branch is \`${b}\` — point ${n || '<N>'} is authored on its own \`feat/${n || '<point>'}-<slug>\` branch`,
+    )
   }
   const tree = String(worktree ?? '').replace(/[/\\]+$/, '')
   const main = String(mainCheckout ?? '').replace(/[/\\]+$/, '')
@@ -269,7 +275,7 @@ export function buildAuthoringPrompt({ point = '', brief = '', branch = '', find
 // `(?!-)` keeps a hyphenated compound out of it: "error-free" is a PASS, and the
 // bare-word test read the "error" in it as a confession (fourth round).
 const NOT_GREEN =
-  /\b(not run|not executed|didn'?t run|un-?run|skipped|failing|failed|fails|red|errors?(?!-)|broken|unverified|pending)\b/i
+  /\b(not run|not executed|didn'?t run|un-?run|skipped|failing|failed|fails|red|errors?(?!-)|broken|unverified|pending|non-?zero)\b|\bexit(?:ed|s)?\s*(?:code\s*)?[1-9]/i
 
 /** …with the phrases that contain a negative WORD while saying the opposite cut
  *  out first: "passed without error" is a green line (third cross-vendor round).
@@ -294,17 +300,31 @@ const GATE_NAMES = Object.freeze([
 /**
  * What is wrong with a GATES line, or '' when it reports all three green.
  *
- * Both halves are needed: the gates must be NAMED (an omission is invisible to a
- * word blacklist) and none of them may be reported as anything but green.
+ * Three things are needed, and each was learned from a line that got past the
+ * one before it: the gates must be NAMED (an omission is invisible to a word
+ * blacklist), none may be reported as anything but green, and the line must
+ * actually SAY they passed — the absence of a complaint is not a pass.
+ *
+ * IT IS JUDGED CLAUSE BY CLAUSE (fifth cross-vendor round). A single green word
+ * anywhere used to carry the whole line, so `test:unit passed; build exited 1;
+ * lint exited 1` reported two red gates and exited clean. Every clause that
+ * names a gate must carry its own verdict; a clause naming none is prose.
  */
 export function gatesProblem(gates) {
   const line = String(gates ?? '').trim()
   if (!line) return 'it reports no gate result at all'
   const missing = GATE_NAMES.filter(({ re }) => !re.test(line)).map(({ gate }) => gate)
   if (missing.length) return `it does not say what ${missing.join(' and ')} did`
-  const claim = line.replace(NEGATED, ' ')
-  if (NOT_GREEN.test(claim)) return 'it reports a gate as anything but green'
-  return GREEN.test(claim) ? '' : 'it never says the gates PASSED — an absent complaint is not a green run'
+  const whole = line.replace(NEGATED, ' ')
+  if (NOT_GREEN.test(whole)) return 'it reports a gate as anything but green'
+  // Only `;` and a newline separate CLAUSES: a comma is how one clause lists
+  // several gates ("test:unit, build and lint all green").
+  for (const part of whole.split(/[;\n]|(?:\s+·\s+)/)) {
+    const clause = part.trim()
+    if (!clause || !GATE_NAMES.some(({ re }) => re.test(clause))) continue
+    if (!GREEN.test(clause)) return `"${clause}" names a gate without saying it passed`
+  }
+  return GREEN.test(whole) ? '' : 'it never says the gates PASSED — an absent complaint is not a green run'
 }
 
 /** The closing lines of an authoring answer, read off the END of the message. */

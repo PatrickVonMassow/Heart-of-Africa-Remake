@@ -308,6 +308,10 @@ if (isMainModule(import.meta.url)) {
     const problems = readinessProblems({
       branch,
       worktree,
+      // THE POINT travels with it (fifth cross-vendor round): without it any
+      // `feat/` branch passed, so a run for one point could commit and push onto
+      // another point's branch.
+      point,
       mainCheckout: mainCheckoutFrom(common, REPO_ROOT),
       dirty: git(['status', '--porcelain'], { cwd }) ?? '',
     })

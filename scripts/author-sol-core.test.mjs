@@ -142,7 +142,7 @@ describe('childEnv — the one enforcement left once the sandbox is off', () => 
 })
 
 describe('readinessProblems — where this run may not write', () => {
-  const good = { branch: 'feat/651-drum-bed', worktree: '/w/tree', mainCheckout: '/w/main', dirty: '' }
+  const good = { branch: 'feat/651-drum-bed', worktree: '/w/tree', mainCheckout: '/w/main', dirty: '', point: '651' }
 
   it('lets an isolated worktree on a feature branch through', () => {
     expect(readinessProblems(good)).toEqual([])
@@ -150,13 +150,22 @@ describe('readinessProblems — where this run may not write', () => {
     expect(readinessProblems({ ...good, worktree: '/w/tree/' })).toEqual([])
   })
 
-  it('refuses every branch that is not a feature branch (cross-vendor P1)', () => {
+  it('refuses every branch that is not THIS point’s feature branch', () => {
     // Naming `main` and `HEAD` let `master`, `release` and `gh-pages` through
-    // while the refusal claimed to demand a feat/ branch.
+    // while the refusal claimed to demand a feat/ branch (third round)…
     for (const branch of ['main', 'HEAD', 'master', 'release', 'gh-pages', 'poc', 'feature/x']) {
-      expect(readinessProblems({ ...good, branch }).join(' '), branch).toMatch(/feat\/<point>-<slug>/)
+      expect(readinessProblems({ ...good, branch }).join(' '), branch).toMatch(/feat\/651-<slug>/)
     }
-    expect(readinessProblems({ ...good, branch: 'feat/667-sol-authoring-lane' })).toEqual([])
+    // …and a bare `feat/` prefix then let a run for one point commit onto
+    // ANOTHER point's branch (fifth round), which lands work under a number that
+    // never asked for it.
+    for (const branch of ['feat/667-sol-authoring-lane', 'feat/', 'feat/nonsense']) {
+      expect(readinessProblems({ ...good, branch }).join(' '), branch).toMatch(/own `feat\/651-<slug>` branch/)
+    }
+    expect(readinessProblems({ ...good, branch: 'feat/667-sol-authoring-lane', point: '667' })).toEqual([])
+    // With no point given it can only demand the shape, which it still does.
+    expect(readinessProblems({ ...good, point: '', branch: 'feat/651-drum-bed' })).toEqual([])
+    expect(readinessProblems({ ...good, point: '', branch: 'main' }).join(' ')).toMatch(/feat\/<point>-<slug>/)
   })
 
   it('refuses the main checkout, an unknown branch and a dirty tree', () => {
@@ -295,6 +304,10 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
       // carries no blacklisted word at all and reports three failures.
       'test:unit, build and lint all exited 1',
       'ran test:unit, build and lint',
+      // One green word used to carry the whole line, so two red gates rode in
+      // behind one that passed (fifth round).
+      'test:unit passed; build exited 1; lint exited 1',
+      'test:unit green; build and lint pending',
       '',
     ]) {
       const parsed = parseAuthoringAnswer(`DONE: a thing\nGATES: ${gates || 'x'}\nOPEN: none`)
@@ -312,6 +325,8 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
       // A numeric none is a none, and "error-free" is a pass (fourth round).
       'test:unit, build and lint passed with 0 errors',
       'test:unit, build and lint were error-free',
+      // …and a clause-per-gate report is the normal way to write it.
+      'test:unit green; build green; lint clean',
     ]) {
       expect(gatesProblem(gates), gates).toBe('')
     }

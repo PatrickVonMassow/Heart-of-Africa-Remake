@@ -112,11 +112,19 @@ export function laneTagIn(body) {
     //
     // THE DELIMITER IS REMEMBERED (fourth round): toggling on either marker let
     // a `~~~` inside a backtick block close it — and the tag after it counted.
-    // Markdown's own rule: only the SAME character, at least as long, closes.
-    const marker = /^[\s>]*(`{3,}|~{3,})/.exec(line)?.[1] ?? ''
+    // Markdown's rule, followed properly (fifth round): only the SAME character
+    // closes, at least as long, with NO info string and at most three spaces of
+    // indent — so `~~~javascript` inside a backtick block is content.
+    const fenceLine = /^([\s>]*)(`{3,}|~{3,})(.*)$/.exec(line)
+    const marker = fenceLine?.[2] ?? ''
     if (marker) {
-      if (!fence) fence = marker
-      else if (marker[0] === fence[0] && marker.length >= fence.length) fence = ''
+      const info = (fenceLine[3] ?? '').trim()
+      const indent = (fenceLine[1] ?? '').replace(/[^ ]/g, '').length
+      if (!fence) {
+        fence = marker
+        continue
+      }
+      if (marker[0] === fence[0] && marker.length >= fence.length && !info && indent <= 3) fence = ''
       continue
     }
     if (fence) continue

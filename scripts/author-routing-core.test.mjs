@@ -126,6 +126,10 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(laneTagIn('```\nsome sample text\n~~~\nAuthor lane: sol\n```\n')).toBe('')
     // …and a longer opener is not closed by a shorter marker.
     expect(laneTagIn('````\n```\nAuthor lane: fable\n````\n')).toBe('')
+    // A closer carries no info string and is barely indented (fifth round):
+    // `~~~javascript` inside a block is content, not the end of it.
+    expect(laneTagIn('~~~\n~~~javascript\nAuthor lane: sol\n~~~\n')).toBe('')
+    expect(laneTagIn('```\n     ```\nAuthor lane: opus\n```\n')).toBe('')
   })
 
   it('names the subjects its own comments promise (cross-vendor P1)', () => {
