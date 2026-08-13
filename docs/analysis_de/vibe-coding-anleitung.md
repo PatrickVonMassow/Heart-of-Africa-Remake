@@ -55,6 +55,18 @@ größten Verbraucher — dem anderen und behalte für das knappe, was **nur** e
 > *Prompt:* „Sag mir, bevor ein Kontingent zur Neige geht, welche Arbeit an das Modell mit
 > Restvolumen geht und welche beim knappen bleiben muss, weil kein anderes sie darf."
 
+**Wer verteilt, muss die Töpfe sehen.** Sobald ein Mechanismus die Arbeit auf Modelle
+verteilt, erbt er die Pflicht, deren Verfügbarkeit zu kennen. Sonst empfiehlt er ein Modell,
+dessen Kontingent seit gestern leer ist — die Delegation stirbt am ersten Aufruf, und die
+Ausweichstufe zeigt womöglich genau auf das knappe Modell, das du schonen wolltest. Und
+verlässt du dich darauf, dass die Ausnahme „in diesem Engpass gilt etwas anderes" gemerkt
+wird, hält sie nur so lange, wie jemand sich erinnert: Was ein Werkzeug entscheidet, muss das
+Werkzeug auch wissen.
+
+> *Prompt:* „Der Verteiler, der Arbeit auf Modelle routet, liest den Füllstand der
+> Kontingente und den aktuellen Schalterstand. Eine Spur mit leerem Kontingent darf er nie
+> empfehlen, und den Grund seiner Wahl schreibt er in die Ausgabe."
+
 ---
 
 ## So setzt du ein Projekt auf (Prompts zum Kopieren)
@@ -412,4 +424,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 7824785880868a5df97bcb08e107237789f1bd480b32d08ef32ef35b5d713006 -->
+<!-- GUIDE-FINGERPRINT: c94bfe87c89f26815984b4912fd969656bd77e74db3a9b3aadb814541bb1c5cc -->

@@ -87,10 +87,14 @@
     "685": {
       "at": "2026-08-13T21:09:57.053Z",
       "why": "Kleine Nachbesserung am gerade gelieferten Symbol; sie kostet nichts, wenn sie hinter den Release-Bugfixes wartet"
+    },
+    "693": {
+      "at": "2026-08-13T23:44:58.490Z",
+      "why": "Der Umweg ist bekannt und kostenlos (author-sol --anyway, in der Merk-Datei festgehalten), deshalb steht der Punkt hinter den Spielfehlern und dem Verständigungsumbau, die der Nutzer für diese Auslieferung zuerst sehen will"
     }
   },
   "settled": {
-    "at": "2026-08-13T23:31:23.384Z",
+    "at": "2026-08-13T23:44:58.491Z",
     "points": [
       174,
       184,
@@ -278,7 +282,8 @@
       689,
       690,
       691,
-      692
+      692,
+      693
     ]
   }
 }
