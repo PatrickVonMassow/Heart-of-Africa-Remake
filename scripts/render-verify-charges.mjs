@@ -91,6 +91,25 @@ export const RED_CHARGES = [
       'on the WebGL 2 lane this check stays a real red.',
   },
   {
+    point: 514,
+    suite: 'settings',
+    backend: 'webgpu',
+    why:
+      'THE LANE, NOT THE PRODUCT — point 514 §5/§6 already owns this family in prose; this is ' +
+      'the machine-readable half, added 13.08.2026 when it stood between a DOM-only change and ' +
+      'its merge. On the WebGPU compatibility lane every check that switches TRAA OFF falls back ' +
+      'to an MSAA path that cannot exist there: `RGBA16Float does not support multisampling` ' +
+      'arrives as an uncaptured GPUValidationError and the scene then renders black (mean 2.2-2.5), ' +
+      'which also reddens the ground-detail and F9 graphics-level checks and every "no new console ' +
+      'errors" assertion in the same run. WebGL 2 passes the same suite on the same tree minutes ' +
+      'apart, and `baseline-classify` labelled 16 of 17 of these pre-existing (09.08.2026). ' +
+      'Backend-scoped and suite-scoped on purpose: on WebGL 2 each of these stays a real red, and ' +
+      'the charge dies with point 514, which must decide whether the lane records these as ' +
+      'UNAVAILABLE rather than red.',
+    match:
+      /(TRAA (off again|toggle stress)|F9 low|Graphics levels|the leak block produced no OTHER|first-person ground shows micro-detail)/i,
+  },
+  {
     point: 568,
     suite: 'polish',
     backend: 'webgl',
