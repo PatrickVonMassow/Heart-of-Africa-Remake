@@ -29,6 +29,7 @@ import {
   noteTopLevelSession,
   findClaudeAncestor,
   probePid,
+  transitionOwnerSession,
 } from './batch-singleton.mjs'
 import { gatherOwnerWork } from './batch-owner-work.mjs'
 import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
@@ -146,9 +147,13 @@ function clearAuthorized() {
 // A missing id falls back to a fresh random id, which errs toward NOT resuming
 // (an unknown session can never own the lock → it stands down).
 let sessionId = randomUUID()
+let assertedSessionId = ''
+let sessionSource = ''
 try {
   const parsed = JSON.parse(readFileSync(0, 'utf8'))
-  if (typeof parsed.session_id === 'string' && parsed.session_id) sessionId = parsed.session_id
+  if (typeof parsed.session_id === 'string') assertedSessionId = parsed.session_id
+  if (assertedSessionId) sessionId = assertedSessionId
+  if (typeof parsed.source === 'string') sessionSource = parsed.source
 } catch {
   // no/!JSON stdin — keep the random fallback
 }
@@ -241,6 +246,21 @@ try {
           'or delete .claude/batch-paused) before resuming.',
       )
     } else {
+      // A compaction is the one trusted transition event: ordinary guards can
+      // prove process ownership, but may NEVER use an asserted payload id to
+      // rename the lock. The transition itself rechecks the observed generation
+      // and process under the takeover mutex. A refusal is loud and leaves the
+      // prior owner intact; acquire below then merely acts with process permission.
+      if (sessionSource === 'compact') {
+        const observed = readOwnerLock()
+        const transition = transitionOwnerSession(assertedSessionId, { lock: observed })
+        if (!transition.transitioned && transition.reason !== 'already-current') {
+          console.error(
+            `[batch-resume] OWNER SESSION TRANSITION REFUSED (${transition.reason}); ` +
+              `the lock still names ${observed?.sessionId || 'no owner'}.`,
+          )
+        }
+      }
       // A RESERVATION (point 395): the user claimed the batch back into the window
       // they are sitting at. A freshly started session — most of all one the OS
       // launcher spawned — must NOT take the lock the owner is about to release

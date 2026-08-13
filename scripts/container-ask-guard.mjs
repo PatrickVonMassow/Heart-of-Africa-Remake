@@ -38,9 +38,9 @@ const PAUSE = repoPath('.claude', 'batch-paused')
  * preflight runs, and a preflight has no transcript path to hand it. The `why`
  * says so rather than reading as a clean bill.
  */
-export function gatherContainerAskInputs({ sessionId = '', transcriptPath = '' } = {}) {
+export function gatherContainerAskInputs({ sessionId = '', transcriptPath = '', lockPath } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
-  if (heldByOtherLiveOwner(sessionId)) {
+  if (heldByOtherLiveOwner(sessionId, lockPath ? { lockPath } : {})) {
     return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
   }
   if (!transcriptPath) {
@@ -81,9 +81,14 @@ if (isMainModule(import.meta.url)) {
       /* no/garbled stdin (manual run) — there is then no transcript to judge */
     }
 
+    // The subprocess regression must exercise THIS wrapper without reaching the
+    // live repository lock. The seam exists only under Vitest; production hook
+    // invocations cannot redirect the authority through their environment.
+    const testLockPath = process.env.VITEST === 'true' ? process.env.HOA_TEST_BATCH_LOCK_PATH : ''
     const gathered = gatherContainerAskInputs({
       sessionId: (payload && payload.session_id) || '',
       transcriptPath: (payload && payload.transcript_path) || '',
+      ...(testLockPath ? { lockPath: testLockPath } : {}),
     })
     if (!gathered.applicable) process.exit(0)
 

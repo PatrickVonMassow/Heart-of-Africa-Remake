@@ -8,9 +8,10 @@
 // specification, and they outnumber the blocks on purpose.
 import { describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import {
   blocksOf,
   clausesOf,
@@ -449,6 +450,69 @@ describe('the wrapper (spawned the way the hook spawns it)', () => {
     const r = run([], JSON.stringify({ session_id: 'x', hook_event_name: 'Stop' }))
     expect(r.status).toBe(0)
     expect(r.stdout.trim()).toBe('')
+  })
+
+  it('a real guard under matching ancestry cannot restamp its asserted test id or raise an alert', () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'container-ask-lock-'))
+    const lockPath = resolve(dir, 'batch-lock.json')
+    const singletonUrl = pathToFileURL(resolve(process.cwd(), 'scripts', 'batch-singleton.mjs')).href
+    const helper = `
+      import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+      import { dirname, resolve } from 'node:path'
+      import { spawnSync } from 'node:child_process'
+      const singleton = await import(${JSON.stringify(singletonUrl)})
+      process.title = 'claude'
+      const now = Date.now()
+      const startedAt = singleton.processStartTime(process.pid)
+      const lockPath = ${JSON.stringify(lockPath)}
+      writeFileSync(lockPath, JSON.stringify({
+        v: 2,
+        sessionId: 'live-owner',
+        kind: 'session',
+        startedAt: now,
+        claimedAt: now,
+        acquiredAt: now,
+        leaseUntil: now + 60_000,
+        fence: 17,
+        pid: process.pid,
+        pidStartedAt: startedAt,
+      }))
+      const before = readFileSync(lockPath, 'utf8')
+      const child = spawnSync(process.execPath, [${JSON.stringify(guard)}], {
+        encoding: 'utf8',
+        input: JSON.stringify({ session_id: 'x', hook_event_name: 'Stop' }),
+        env: { ...process.env, VITEST: 'true', HOA_TEST_BATCH_LOCK_PATH: lockPath },
+      })
+      const after = readFileSync(lockPath, 'utf8')
+      const cachePath = resolve(dirname(lockPath), 'session-process.json')
+      const cache = existsSync(cachePath) ? JSON.parse(readFileSync(cachePath, 'utf8')) : {}
+      console.log(JSON.stringify({
+        status: child.status,
+        stdout: child.stdout,
+        stderr: child.stderr,
+        unchanged: after === before,
+        alert: existsSync(resolve(dirname(lockPath), 'parallel-alert.json')),
+        matchedAncestorPid: cache.x?.pid === process.pid,
+      }))
+    `
+    try {
+      const parent = spawnSync(process.execPath, ['--input-type=module', '-e', helper], {
+        encoding: 'utf8',
+        windowsHide: true,
+      })
+      expect(parent.status, parent.stderr).toBe(0)
+      const result = JSON.parse(parent.stdout.trim())
+      expect(result).toEqual({
+        status: 0,
+        stdout: '',
+        stderr: '',
+        unchanged: true,
+        alert: false,
+        matchedAncestorPid: true,
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('allows the stop on garbled stdin', () => {
