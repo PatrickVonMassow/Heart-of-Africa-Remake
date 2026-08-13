@@ -52,7 +52,10 @@ import { clearBoundary, commitSealedBoundary } from './batch-boundary.mjs'
 
 const NOW = 1_785_000_000_000
 const SID = 'session-abc'
-const marker = (over = {}) => ({ v: 1, sessionId: SID, point: 373, at: NOW - 1000, ...over })
+// A marker as `--commit` writes it — SEALED. The unphased shape the retired
+// one-shot form wrote is no longer a boundary claim (Sol's review of abdde93),
+// and the case below pins that.
+const marker = (over = {}) => ({ v: 2, phase: 'committed', sessionId: SID, point: 373, at: NOW - 1000, ...over })
 
 // ---------------------------------------------------------------------------
 describe('classifyLauncherState — armed means "will fire again on its own"', () => {
@@ -145,6 +148,16 @@ describe('assessBoundary', () => {
     expect(assessBoundary({ marker: old, sid: SID, now: NOW, closure: 'closed' }).reason).toBe(
       'marker-stale',
     )
+  })
+
+  it('refuses an UNPHASED point marker — the one-shot form that wrote it is retired (Sol on abdde93)', () => {
+    // Such a marker would authorise a stop that skipped --prepare, its receipt,
+    // the card proof, the transfer and the seal.
+    const legacy = { v: 1, sessionId: SID, point: 373, at: NOW - 1000 }
+    const b = assessBoundary({ marker: legacy, sid: SID, now: NOW, closure: 'closed' })
+    expect(b.valid).toBe(false)
+    expect(b.reason).toBe('marker-uncommitted')
+    expect(boundaryVerdict({ boundary: b, launcher: 'armed' })).toBe(null)
   })
 
   it('refuses a malformed marker', () => {
@@ -596,8 +609,8 @@ describe('markerPhase — only a committed marker is sealed', () => {
   it('distinguishes none / legacy / committed', () => {
     expect(markerPhase(null)).toBe('none')
     expect(markerPhase(undefined)).toBe('none')
-    expect(markerPhase(marker())).toBe('legacy')
-    expect(markerPhase(marker({ phase: 'committed' }))).toBe('committed')
+    expect(markerPhase(marker({ phase: undefined }))).toBe('legacy')
+    expect(markerPhase(marker())).toBe('committed')
     expect(markerPhase(marker({ phase: 'prepared' }))).toBe('legacy') // unknown phases are not sealed
   })
 })
@@ -632,8 +645,8 @@ describe('sealedBoundaryDeny — a mutation after --commit errors loudly (point 
     }
   })
 
-  it('a legacy (un-phased) marker denies nothing — old semantics untouched', () => {
-    expect(sealedBoundaryDeny({ marker: marker(), sid: SID, now: NOW, ...call }).deny).toBe(false)
+  it('a legacy (un-phased) marker denies nothing — it authorises nothing either', () => {
+    expect(sealedBoundaryDeny({ marker: marker({ phase: undefined }), sid: SID, now: NOW, ...call }).deny).toBe(false)
   })
 
   it('a stale or foreign committed marker denies nothing — the seal is not a trap', () => {

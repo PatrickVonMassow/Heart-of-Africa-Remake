@@ -177,6 +177,16 @@ export function assessBoundary({ marker, sid, now, closure, freshMs = BOUNDARY_F
   if (!markerFresh(marker, now, freshMs)) {
     return { valid: false, point, reason: 'marker-stale' }
   }
+  // A POINT MARKER MUST BE COMMITTED TOO (Sol's review of abdde93). The legacy
+  // shape was tolerated while the one-shot form still wrote it; that form is
+  // retired, so an unphased marker is now either a leftover of the old code or a
+  // hand-written claim — and either way it would authorise a stop that skipped
+  // `--prepare`, its receipt, the card proof, the transfer and the seal. It is
+  // refused like an old receipt: the boundary is re-taken, which costs the two
+  // commands it should have been taken with.
+  if (markerPhase(marker) !== 'committed') {
+    return { valid: false, point, reason: 'marker-uncommitted' }
+  }
   // Bound to the session that recorded it: a marker left by a previous session
   // must never authorise this one's stop.
   if (!sid || marker.sessionId !== sid) {
