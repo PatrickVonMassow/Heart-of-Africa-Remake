@@ -280,6 +280,20 @@ export function turnToward(from: number, to: number, maxDelta: number): number {
  * otherwise. A play area that sits in a corner of a settlement (point 481.4) is
  * still a disc; only its middle is somewhere else, and the pull must bend toward
  * THAT one or it drags every runner out of its own ground.
+ *
+ * THE TWO PULLS CAN OPPOSE ONE ANOTHER, and that was a bug the player saw
+ * (work-order 648). With the chaser standing between a cornered runner and the
+ * middle, fleeing points straight out and the pull points straight in — and
+ * between two OPPOSITE bearings there are two equally good ways round. Taken
+ * always the SHORT way, the choice flips to the other side the moment the
+ * geometry passes through opposition, which is an about-face: measured at the
+ * reported seed, a runner ran 1.2 m along the rim, turned right round, ran the
+ * same 1.2 m back and turned again — 3.25 m walked for 0 cm gained. So where
+ * the two pulls are within 30° of opposing, the way round is decided by the way
+ * the runner is ALREADY running (`current`) rather than by the geometry, and it
+ * therefore holds across frames: the runner breaks along the rim and stays on
+ * that break. Further from opposition there is only one sensible way round and
+ * the short one is always taken.
  */
 export function evadeHeading(
   x: number,
@@ -291,6 +305,7 @@ export function evadeHeading(
   cz = 0,
   inner = 0.55,
   strength = 0.85,
+  current = NaN,
 ): number {
   const away = headingToward(chaserX, chaserZ, x, z, Math.atan2(x - cx, z - cz))
   if (!(radius > 0)) return away
@@ -298,5 +313,20 @@ export function evadeHeading(
   const start = radius * clamp(inner, 0, 0.99)
   if (d <= start) return away
   const t = clamp((d - start) / (radius - start), 0, 1) * clamp(strength, 0, 1)
-  return blendHeading(away, headingToward(x, z, cx, cz, away), t)
+  const inward = headingToward(x, z, cx, cz, away)
+  let delta = Math.atan2(Math.sin(inward - away), Math.cos(inward - away))
+  if (Number.isFinite(current) && Math.abs(delta) > OPPOSED) {
+    // Near opposition the two ways round are as good as each other, so the
+    // runner's own is taken: the long way, if that is the side it is running to.
+    const toCurrent = Math.atan2(Math.sin(current - away), Math.cos(current - away))
+    if (toCurrent !== 0 && Math.sign(toCurrent) !== Math.sign(delta)) {
+      delta -= Math.sign(delta) * Math.PI * 2
+    }
+  }
+  return away + delta * t
 }
+
+/** How near opposition the flee and the pull must come before the runner's own
+ *  way round decides it — 30°, wide enough to cover the whole band in which the
+ *  short way is about to flip to the other side. */
+const OPPOSED = Math.PI - Math.PI / 6

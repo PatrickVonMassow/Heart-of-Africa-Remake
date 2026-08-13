@@ -863,6 +863,55 @@ describe('the spec document a point’s slice belongs to', () => {
   })
 })
 
+describe('the durability demand every brief carries (point 629)', () => {
+  const brief = assembleBrief({ point: { number: 1, done: false, body: 'x' } })
+
+  it('demands a commit at every self-contained step, not one at the end', () => {
+    expect(brief).toMatch(/COMMIT AND PUSH AT EVERY SELF-CONTAINED STEP/)
+  })
+
+  it('states WHY: an uncommitted block is the one state nothing can rescue', () => {
+    expect(brief).toMatch(/UNCOMMITTED BLOCK IS THE ONE STATE NOTHING CAN RESCUE/)
+    // The evidence, not just the rule — a rule without its incident reads as ceremony.
+    expect(brief).toContain('isolation worktree appears to have been removed')
+    expect(brief).toMatch(/failed push is REPORTED, never skipped/)
+  })
+})
+
+// THE BRIEF TELLS EVERY AGENT WHERE THE READ-ONLY WORK GOES (point 654 A3). It is one
+// line at every setting: an agent that is never told the lever exists cannot pull it, and
+// a line that appeared only sometimes would train its readers to skip it.
+describe('the sol-routing line', () => {
+  const briefAt = (solShare) => assembleBrief({ point: { number: 1, done: false, body: 'x' }, solShare })
+
+  it('names the switch at the default, without asking for anything', () => {
+    expect(briefAt('default')).toMatch(/SOL ROUTING is at `default`/)
+    expect(briefAt('default')).toMatch(/sol-share\.mjs --status/)
+    expect(briefAt('default')).not.toMatch(/ask-sol\.mjs --kind/)
+  })
+
+  it('tells the agent WHAT to hand over while the switch prefers Sol', () => {
+    const brief = briefAt('prefer-sol')
+    expect(brief).toMatch(/hand diagnose\/audit\/enumerate\/explain/)
+    expect(brief).toMatch(/ask-sol\.mjs --kind/)
+    expect(brief).toMatch(/You keep authoring, the gates, the suites and the pictures/)
+  })
+
+  it('tells it to stay off Sol entirely at claude-only', () => {
+    expect(briefAt('claude-only')).toMatch(/do NOT call `scripts\/ask-sol\.mjs`/)
+  })
+
+  it('defaults to the default when the caller passes nothing at all', () => {
+    expect(assembleBrief({ point: { number: 1, done: false, body: 'x' } })).toMatch(/SOL ROUTING is at `default`/)
+  })
+
+  it('stands among the house facts, above the call discipline', () => {
+    const brief = briefAt('prefer-sol')
+    expect(brief.indexOf('SOL ROUTING')).toBeGreaterThan(brief.indexOf('HOUSE FACTS NO POINT STATES'))
+    expect(brief.indexOf('SOL ROUTING')).toBeLessThan(brief.indexOf('HOW TO SPEND A TURN'))
+  })
+})
+
 describe('assembleBrief', () => {
   it('omits the empty parts instead of printing empty headings', () => {
     const brief = assembleBrief({ point: { number: 1, done: false, body: 'x' } })

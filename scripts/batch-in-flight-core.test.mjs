@@ -44,6 +44,8 @@ import {
   statusVerdict,
   closingFreezeActive,
   declarationShields,
+  pastEtaCards,
+  waitEtaRefusal,
   POOL_CAP,
 } from './batch-in-flight-core.mjs'
 import {
@@ -1755,5 +1757,66 @@ describe('declarationShields — the expiry the branch sweep now applies too', (
     expect(declarationShields({ declaration: {}, now: NOW })).toMatchObject({ shields: true, reason: 'no-timestamp' })
     expect(declarationShields({ declaration: { at: 'soon' }, now: NOW }).shields).toBe(true)
     expect(declarationShields().shields).toBe(true)
+  })
+})
+
+// Point 661: a declared wait is the session's licence to produce no turn end for
+// up to an hour, so the now-card's "~HH:MM" promise must be checked HERE — the
+// `now-eta-past` audit only fires at turn ends, and on 12.08.2026 the published
+// promise aged 50 minutes deep while every mechanism held green.
+describe('a wait is refused while the board promises an end time that has passed (point 661)', () => {
+  const board = (meta, { withNowCard = true } = {}) =>
+    `<main><h1>B</h1>` +
+    `<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n` +
+    (withNowCard
+      ? `<details class="now"><summary><span class="t">388 — T</span><span class="right">` +
+        `<span class="meta">${meta}</span></span></summary><div class="body"><p>Stand 14:12 — läuft</p></div></details>\n`
+      : '') +
+    `</details>` +
+    `<details class="sect"><summary><h2>Warteschlange</h2></summary>\n</details>` +
+    `<footer>Stand: 12.08.2026 · 1 offene Punkte</footer></main>`
+
+  it('names the card whose ETA is past — point, meta and how far past', () => {
+    const past = pastEtaCards({ html: board('10:44 · ~11:15'), nowMinutes: 13 * 60 })
+    expect(past).toHaveLength(1)
+    expect(past[0]).toMatchObject({ points: [388], meta: '10:44 · ~11:15', minutesPast: 105 })
+    const refusal = waitEtaRefusal({ html: board('10:44 · ~11:15'), nowMinutes: 13 * 60 })
+    expect(refusal).toContain('388')
+    expect(refusal).toContain('10:44 · ~11:15')
+    expect(refusal).toContain('~HH:MM')
+    expect(refusal).toContain('board-publish')
+    expect(refusal).toContain('re-declare')
+  })
+
+  it('a future ETA passes', () => {
+    expect(pastEtaCards({ html: board('10:44 · ~15:15'), nowMinutes: 13 * 60 })).toEqual([])
+    expect(waitEtaRefusal({ html: board('10:44 · ~15:15'), nowMinutes: 13 * 60 })).toBeNull()
+  })
+
+  it('keeps the audit grace: only past the grace minutes does the promise count as broken', () => {
+    expect(waitEtaRefusal({ html: board('10:44 · ~13:00'), nowMinutes: 13 * 60 + 4 })).toBeNull()
+    expect(waitEtaRefusal({ html: board('10:44 · ~13:00'), nowMinutes: 13 * 60 + 6 })).not.toBeNull()
+  })
+
+  it('no now-card, or a card without an estimate, passes', () => {
+    expect(waitEtaRefusal({ html: board('', { withNowCard: false }), nowMinutes: 13 * 60 })).toBeNull()
+    expect(waitEtaRefusal({ html: board('10:44'), nowMinutes: 13 * 60 })).toBeNull()
+  })
+
+  it('FAIL-OPEN: an unreadable board or an unavailable clock refuses nothing', () => {
+    expect(waitEtaRefusal({ html: null, nowMinutes: 13 * 60 })).toBeNull()
+    expect(waitEtaRefusal({ html: undefined, nowMinutes: 13 * 60 })).toBeNull()
+    expect(waitEtaRefusal({ html: '<main>not a board</main>', nowMinutes: 13 * 60 })).toBeNull()
+    expect(waitEtaRefusal({ html: board('10:44 · ~11:15'), nowMinutes: null })).toBeNull()
+    expect(waitEtaRefusal({})).toBeNull()
+  })
+
+  it('an estimate across midnight is not falsely past — and a genuinely broken one still is', () => {
+    // 23:40 · ~00:30 at 23:50: the end wraps to the next day, 40 min left.
+    expect(waitEtaRefusal({ html: board('23:40 · ~00:30'), nowMinutes: 23 * 60 + 50 })).toBeNull()
+    // Same card at 00:50, past midnight: 20 min past — refused, on one clock.
+    const past = pastEtaCards({ html: board('23:40 · ~00:30'), nowMinutes: 50 })
+    expect(past).toHaveLength(1)
+    expect(past[0].minutesPast).toBe(20)
   })
 })

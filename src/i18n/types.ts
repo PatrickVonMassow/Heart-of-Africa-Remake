@@ -555,6 +555,7 @@ export interface Strings {
     tagTrendLeave: string
     tagVariation: string
     tagUnstuck: string
+    tagEdge: string
     tagSilence: string
     tagLean: string
     tagTurnRate: string
@@ -580,6 +581,7 @@ export interface Strings {
     separationStiffness: string
     separationSpeed: string
     separationWedge: string
+    separationPasses: string
     foodPerDay: string
     canteenDrain: string
     canteenDesertDrain: string

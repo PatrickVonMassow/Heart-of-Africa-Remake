@@ -45,6 +45,28 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 657,
+    suite: 'polish',
+    kind: 'check',
+    match: /no child walks without getting anywhere/i,
+    why:
+      'REMAINING MECHANISM after the point-657 steering fix (12.08.2026). The FIRST mechanism — ' +
+      'the chase probing a blocked() that knew no bodies, so children pressed on crossing adults ' +
+      '— is fixed and pinned: the crowded replay fell from 1.14 % (worst child 1.88 %, bursts ' +
+      '3.5 %) to 0.00 % at the shipped gates. What still reds, measured at the fixed steering ' +
+      'over 24 idle traces at seed 2972259115 — WebGL 2 four of ten (0.51-2.14 %, bursts to ' +
+      '3.56 %), WebGPU three of fourteen (0.38-1.15 %) — is a child pacing in the DEAD-END ' +
+      'WEDGE the bambara play ground carries where the hut at (13.5, -6.4) r 2.35 straddles the ' +
+      'ground rim: every probed red window sits at (10.4-10.7, -5.6 to -5.8), a recovering ' +
+      'evader at pace 1.29 walking 1.3-2.9 m for 0.00 m gained, nearest adult 2.6 m away ' +
+      '(__placeBodies). Its rescue carries it 0.00 m because the wedge floor is statically free ' +
+      'ground. Four steering remedies were measured and rejected for degrading healthy villages ' +
+      'against the 0.25 % gate (playmates as mutual walls 0.48 %, a one-sided yield 0.70 %, a ' +
+      'centre-ward stall kick 1.33 %, touch-gated walls 0.46-0.63 %); the cure is a ground that ' +
+      'does not dead-end against a rim-straddling hut, or an evade that gives a cornered child ' +
+      'a way past — that decision stays with point 657.',
+  },
+  {
     point: 506,
     suite: 'polish',
     backend: 'webgpu',

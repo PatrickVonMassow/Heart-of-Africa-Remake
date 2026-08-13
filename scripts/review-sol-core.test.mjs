@@ -68,6 +68,48 @@ describe('classifyOutcome — how a codex run ended', () => {
     expect(out).toMatchObject({ ok: false, kind: OUTCOME.ALLOWANCE_EXHAUSTED })
   })
 
+  it('calls a dead connection unreachable, even when its text also mentions a limit', () => {
+    // 11.08.2026: the real message from a container whose firewall entry for
+    // chatgpt.com had gone stale. Reported as an exhausted allowance it sent the
+    // user to his billing page while 96 % of his weekly limit stood unused — and
+    // it hid a cause that was ours to fix.
+    const real =
+      'ERROR: Reconnecting... 5/5 | ERROR: stream disconnected before completion: ' +
+      'error sending request for url (https://chatgpt.com/backend-api/codex/responses)'
+    expect(classifyOutcome({ exitCode: 1, stderr: real })).toMatchObject({
+      ok: false,
+      kind: OUTCOME.UNREACHABLE,
+    })
+    // A bare mention of a limit does not outrank a dead socket…
+    expect(
+      classifyOutcome({ exitCode: 1, stderr: 'rate limit hint\nerror sending request for url (…)' }),
+    ).toMatchObject({ kind: OUTCOME.UNREACHABLE })
+    // …but a server that actually REFUSED does, however the stream ended afterwards.
+    // Codex retries, so a real 429 and a reconnect storm share one transcript, and
+    // calling that unreachable would send us hunting a firewall that is fine
+    // (GPT-5.6 Sol, reviewing the first version of this fix).
+    expect(
+      classifyOutcome({
+        exitCode: 1,
+        stderr: 'attempt 1: 429 Too Many Requests\nReconnecting... 3/5\nstream disconnected before completion',
+      }),
+    ).toMatchObject({ kind: OUTCOME.ALLOWANCE_EXHAUSTED })
+    // But a NAKED status code is not the server refusing. Codex reconnects through
+    // 403s and prints `last status: 429` as the last thing it saw, on accounts with
+    // allowance to spare — that run died in transport, and calling it a spent account
+    // is the original mistake one round further along (GPT-5.6 Sol, second review).
+    expect(
+      classifyOutcome({
+        exitCode: 1,
+        stderr: 'websocket 403\nReconnecting... 5/5\nstream disconnected; last status: 429',
+      }),
+    ).toMatchObject({ kind: OUTCOME.UNREACHABLE })
+    // And a genuine quota verdict on its own is still read as one.
+    expect(classifyOutcome({ exitCode: 1, stderr: 'You have hit your usage limit. (429)' })).toMatchObject({
+      kind: OUTCOME.ALLOWANCE_EXHAUSTED,
+    })
+  })
+
   it('names a refused model id — the id is honoured, not substituted', () => {
     const msg = 'The requested model is not supported when using Codex with a ChatGPT account.'
     expect(classifyOutcome({ exitCode: 1, stderr: msg })).toMatchObject({ kind: OUTCOME.MODEL_REFUSED })

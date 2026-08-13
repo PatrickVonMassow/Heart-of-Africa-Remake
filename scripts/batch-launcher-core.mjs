@@ -97,8 +97,11 @@ export function ownershipSignal({ lock, assessment } = {}) {
  * a second owner, because it never produces an owner at all. The 15-minute tick
  * REMAINS as the backstop for everything no signal covers.
  *
- * `previous` is null on the first observation of a sleep: the daemon has just
- * ticked, so there is nothing to react to yet.
+ * `previous` is null ONLY where the daemon has no earlier observation at all —
+ * that is, where the lock could not be read. The baseline for a sleep is taken
+ * BEFORE the tick (point 644), never from the sleep's first poll: a change that
+ * lands while the tick runs, or before that first poll is armed, is an EVENT like
+ * any other, and treating it as a baseline is how a wake was lost entirely.
  */
 export function releaseSpawnDecision({
   signal,

@@ -17526,3 +17526,373 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   accepted; an unexplained red is refused with the three ways out named. Plus the throttle
   command reproducing the point-600 measurement (8/8 before the fix on the old state).
   Criticality: HIGH — it is the difference between a verification and a ritual.
+
+- [x] 644. MAIN WENT RED ON A DAEMON TEST THAT NOBODY CAN REPRODUCE, AND THE CAUSE IS NOT
+  NAMED (measured 11.08.2026 on `main` at 4a953ed0, CI run 31504918389). `npm run test:unit`
+  is green locally and RED on the CI runner: `scripts/batch-launcher-daemon.test.mjs > ticks
+  again within seconds of an IDLE lapse too, not only a handover` hit its 30 s timeout while
+  the other 10171 tests passed. This point exists because point 640 forbids closing it any
+  other way — it is filed, not explained.
+  WHAT IS ESTABLISHED. (1) The failure mode is a TIMEOUT, not a missed budget: the test
+  asserts the second tick arrives within 5 s, and a slow tick would fail THAT assertion. It
+  timed out instead, so the daemon loop never woke again at all. That distinction rules out
+  "the runner was merely slow". (2) Load does not reproduce it here: 5 ordinary runs and 6
+  runs pinned to a single core are all green, 11 of 11. By point 640 that closes nothing —
+  it only means the cheap instrument does not reach the cause. (3) The test injects
+  `readLock`, `isPaused` and `tick` but NOT `assess`, so the wake decision runs the real
+  `assessOwner` against the real `/proc` probe of the vitest worker and the real boot clock,
+  and its phase-2 lock carries a live pid with no `pidStartedAt`. That is the one
+  uncontrolled ENVIRONMENT input in an otherwise fully injected test, and the wake fires
+  only if that verdict says ownership ended. The comment above the test says the real
+  `assessOwner` is used ON PURPOSE, so this is not to be "fixed" by injecting it — that
+  would delete the coverage the test exists for. (4) Point 504 records that the two clocks
+  this identity is computed from drift apart in our container, which is a candidate for why
+  the verdict differs between hosts, NOT a demonstration that it did.
+  FINAL STATE: the cause is named with evidence and fixed at that cause — reproduced on a
+  host that shows it (a CI run with the verdict logged is the cheapest handle, since the
+  runner is the only place it has appeared), then absent by the same mechanism. If the
+  verdict genuinely depends on host clocks, the fix belongs where that is computed and
+  point 504 owns it; if it is the daemon's wake, the fix is there. Either way the test keeps
+  judging by the real `assessOwner`.
+  VERIFIABLE: the failure reproduced deliberately by a named mechanism, then absent after
+  the fix by the same mechanism; `npm run test:unit` green on the CI runner three
+  consecutive times without a retry.
+  Criticality: HIGH — it turns `main` red, which mails the user, and a red nobody can
+  explain is what points 455 and 640 exist to stop being argued away.
+
+- [x] 629. THE LANDING DELETES THE WORKTREE OF AN AGENT THAT IS STILL WORKING (measured
+  11.08.2026, and it destroyed finished work). Landing point 608 ran `land-point.mjs`
+  through its `cleanup` step ("delete branch, remote branch and worktree"), and the
+  worktree of the agent on point 590 (`.claude/worktrees/agent-a46632fd8f7f4bbce`)
+  disappeared underneath it. From then on every one of that agent's shell calls was
+  refused with "the isolation worktree appears to have been removed". LOST: the finished,
+  tested, UNCOMMITTED answer to six review findings — `queue-rank-core.mjs`,
+  `queue-rank.mjs`, `queue-order-guard-core.mjs` with 89 green cases and the reviewer's
+  recorded verdict. Only the pushed state 6105a528 survived.
+  TWO FAULTS, FIXED SEPARATELY. (a) The landing's cleanup must touch the branch and the
+  worktree OF THE LANDED POINT and nothing else. Where it cannot prove a worktree belongs
+  to the point it is landing, it leaves it alone and says so; where a worktree is
+  demonstrably ALIVE (an agent process, a recently written branch — the liveness evidence
+  `batch-in-flight.mjs` already collects), it is never removed, even when it does belong
+  to the point. (b) An agent whose ground is pulled away must not be standing on
+  unpublished work: the commit-and-push-per-step rule exists and was not followed here,
+  because the whole answer ran as one block up to the green verdict. The delegation prompt
+  therefore demands a commit at each self-contained step, and the agent is told that an
+  uncommitted block is the one state nothing can rescue.
+  VERIFIABLE: a Vitest case over the pure cleanup selector — given a landed point, a set of
+  worktrees and their liveness evidence, it returns exactly the landed point's dead
+  worktree and never a foreign or a live one; plus a case that a worktree whose ownership
+  cannot be established is reported, not removed.
+  Criticality: high — this is the one failure class that destroys work already done, and it
+  fires precisely when the batch is at its most productive (a landing beside a running
+  pool). Bundle: Session- & Repo-Hygiene.
+
+- [x] 649. THE CLEANUP'S NEW LOCK PROTOCOL STILL HAS FOUR WAYS TO GO WRONG (GPT-5.6 Sol,
+  fifth review of point 629, on the delta 213702f..ae40a08; recorded 11.08.2026 and filed
+  rather than held back, because 629 landed and these are defects in the mechanism it
+  added). Point 629 replaced a cleanup that deleted live worktrees; it now takes git's own
+  worktree lock, proves the tree's identity, and recovers only a lock of its own whose
+  holder is provably dead. That is a large improvement on what stood before, and none of
+  the four below reaches the old failure — but each is a hole in the NEW protocol.
+  1. THE PARSER CLAIMS REASONS THE FORMATTER NEVER WRITES. `parseCleanupLock` TRIMS before
+     matching its anchored signature, so a foreign reason padded with whitespace —
+     `" worktree-cleanup verifying and deleting (pid 999999 start 1) "` — reads as OURS and
+     becomes recoverable once that pid is absent. The collision tests carry no padding.
+  2. LOSING THE LOCK CAN STILL END IN AN UNLOCKED DELETION. `takeCleanupLock` returns as
+     soon as the FIRST acquisition succeeds, and `matchesExpectation` rejects only a
+     NON-EMPTY foreign lock. A concurrent stale-lock recovery that clears our lock and
+     pauses before retaking it leaves NO lock at all: verification sees an empty reason,
+     passes, and the deletion proceeds without exclusion. The race tests always install the
+     competing lock immediately, so the empty interval is never exercised.
+  3. `tryUnlock` STILL COMPARES AND UNLOCKS AS TWO ACTS. It re-reads the reason, then runs
+     an unconditional `git worktree unlock`. A recovery that clears ours and a winner that
+     installs its own between those two calls means we release the WINNER's lock — the same
+     defect the re-read was added to close, moved one step later.
+  4. A LOCK NOTHING CAN EVER CLEAR. `cleanupLockReason` writes `start 0` when the
+     process-start probe cannot answer, and `staleLockVerdict` permanently refuses to
+     recover any zero-start lock. A crash while holding such a lock wedges that worktree for
+     good; the recovery tests all use non-zero synthetic starts.
+  TWO MORE, OF THE ORIGINAL CLASS, found by the whole-branch review (GPT-5.6 Sol,
+  5ceaa3ab..ae40a081). These are BRANCH loss rather than worktree loss, but the cost is the
+  same — a live tree left standing on a branch that no longer exists:
+  5. A DETACHED NON-AGENT WORKTREE IS TREATED AS FOREIGN AND THEREFORE PROTECTS NOTHING. In
+     `judgeCleanupTarget`, `if (!has)` classifies a detached non-agent tree as `foreign`;
+     `selectCleanupTargets` then leaves it out of `reported`, and its EMPTY branch fails the
+     fallback branch comparison. So a live manual worktree that happens to be rebasing the
+     landed branch permits BOTH branch deletions — the exact shape of the incident, one level
+     up.
+  6. THE BRANCH BLOCKER IS READ FROM A STALE SNAPSHOT. `branchBlocked` in `land-point.mjs`
+     uses the `cleanup` snapshot taken minutes earlier and never re-lists the worktrees before
+     deleting; `deleteLandedBranch` then runs the local and the remote deletion as two
+     commands. A detached tree appearing AFTER selection can lose both branches, and a live
+     tree that recreates the local branch after `branch -d` can still lose its remote. The
+     tests cover command failure and ordering, not either concurrent transition.
+  FINAL STATE: 1, 3, 4, 5 and 6 are fixed at their cause — the parser matches what the formatter
+  writes with no normalisation that widens it, the release is made a single act or, where
+  git offers no such primitive, is narrowed and its residual written down, and a lock this
+  command wrote that carries no usable identity is recoverable by SOME stated rule rather
+  than never. For 2 the honest answer may be that git gives no way to hold exclusion across
+  the gap; then verification must treat an EMPTY lock where we hold one as a refusal, not
+  as a pass, which closes the deletion path even if the exclusion cannot be kept.
+  VERIFIABLE: a Vitest case per hole, each failing before its fix — a padded foreign
+  reason is refused as foreign; a verification that finds no lock while `weLocked` refuses;
+  a release that finds a foreign lock in place leaves it standing; and a zero-start lock of
+  ours is recoverable by the stated rule. For 5 and 6: a detached non-agent worktree holding
+  the landed branch BLOCKS both branch deletions, and a tree that appears between the
+  selection and the deletion blocks them too — the branch state is re-read at the moment of
+  deletion, not taken from the plan. The existing suite stays green.
+  Criticality: high — same subject as 629 and the same cost if it goes wrong, and it is
+  live on `main` today. Bundle: Session- & Repo-Hygiene.
+
+- [x] 648. THE CHILDREN SNAG, JITTER AND CLIP THROUGH EACH OTHER (user F6 reports
+  11.08.2026, 19:08–19:11, all three from ONE state — `local/bugreports/`
+  `KindHaengtKurzFest.zip`, `KindZittertAufStelleHerum.zip`,
+  `KinderKlemmenKurzIneinander.zip`; seed 2972259115, `place` mode in the bambara-village,
+  west region, production build e1bd2fa, WebGPU, quality medium, viewport 1899×984 @dpr
+  1.25). Three symptoms of ONE system, filed as one point because they share the child
+  steering code and must not be split across branches:
+  1. "Kind hängt kurz fest" — a child stops moving for a moment and then frees itself.
+  2. "Kind zittert auf der Stelle herum" — a child jitters in place instead of walking,
+     which is the signature of a target it reaches and overshoots every frame, or of two
+     forces cancelling.
+  3. "Kinder klemmen kurz ineinander" — two children occupy the same space for a moment
+     before separating, so the separation either acts too late or is overridden.
+  THE USER IS BLOCKED ON THIS: he reported it while trying to exercise the communication
+  mechanic (§13/§19.10 — the teaching children), and jittering, snagging children make that
+  untestable. That is why it stands at the head of the work order.
+  WHERE IT LIVES: `src/scenes/place/childSituations.ts` and `lifeSpots.ts` (what a child is
+  doing and where it stands), `tagGame.ts` (the chase that moves them), `collision.ts` (the
+  swept move and the separation between inhabitants), with `inhabitantBodies.ts` for the
+  radius each one occupies. The state dump carries no per-child runtime state, so the
+  reproduction is in-game at that seed.
+  FINAL STATE: all three are traced to a NAMED cause and fixed there — not damped by
+  raising a smoothing constant until the symptom stops showing, which would leave the
+  cause and cost the next reader the same hunt. A child that reaches its target settles
+  instead of oscillating; two children never occupy one another's radius, however briefly;
+  and no child is ever held motionless by geometry it should walk around. Where two of the
+  three share one cause, that is stated rather than split into three fixes.
+  VERIFIABLE: Vitest over the pure steering — a child at its target does not oscillate
+  across frames (its position converges rather than alternating), two children pushed into
+  one another separate within one step and never overlap, and a child pathing past a
+  building corner keeps moving. Plus the browser layer at the reported seed: the children
+  are watched over a run of frames and no child's position alternates, freezes or overlaps
+  another's radius. Judge it by WATCHING them, not only by the assertions — the complaint is
+  what the player sees.
+  Criticality: high — it is what the user is blocked on, and it is the visible surface of
+  the settlement the whole communication PoC is played in. Bundle: Dorfleben.
+
+- [x] 654. THE WORK THAT NEEDS NO WRITE ACCESS GOES TO SOL, WITH A CHEAP SWITCH OVER IT (user 11.08.2026).
+  INSERT AT THE TOP OF THE QUEUE. The user pays two vendors whose allowances run out at
+  different times and wants to be able to move load to OpenAI BEFORE the Anthropic volume is
+  nearly spent, in his own words: "Mir reicht ein günstig zu bauender Schalter, mit dem ich die
+  Last mehr zu OpenAI hin verlegen kann, wenn das Anthropic-Volumen knapp wird. Ich muss ja
+  nicht warten, bis vom Anthropic-Volumen nur noch 1 % übrig ist, sondern kann schon früher
+  umschalten."
+  
+  MEASURED FIRST (`node scripts/measure-task-cost.mjs`, 45,078 turns from 371 transcripts,
+  03.08.–11.08.2026, weighted share): verification 43.3 %, bookkeeping 26.9 %, implementation
+  15.6 %, gates 10.4 %, brief 2.1 %, merge 1.6 %. Subagents burn 69.1 % of the whole and 55.5 % of
+  THEIR spend is verification; the top-level session puts 63.5 % of its own into bookkeeping. The
+  volume sits in the delegated work.
+  
+  THE FOUNDATION EXISTS: `scripts/review-sol.mjs` (519 lines over a 577-line pure core, ~1050
+  lines of tests) runs `codex exec` non-interactively in a READ-ONLY sandbox with the artefact on
+  stdin, because this container cannot create user namespaces. It is proven daily — the last 12
+  recorded mechanism reviews in `.claude/mechanism-reviews.jsonl` all carry `"model":"GPT-5.6
+  Sol"`, with no silent fallback.
+  
+  === PART A — BUILD NOW ===
+  
+  A1. `scripts/ask-sol.mjs`: the read-only path generalised beyond reviews. It takes a TASK KIND,
+      a brief and the material (files, diff, logs — on stdin, exactly as `review-sol.mjs` ships
+      it), runs the same proven `codex exec` path at effort HIGH, and returns the result in the
+      shape its caller records. KINDS, all pure text work: DIAGNOSE (name the cause of a red from
+      log plus diff), AUDIT (the enumerating plausibility and bug-finding sweeps), ENUMERATE
+      (risk, test-case and option lists — BOTH halves of a blind-parallel divergent stage per
+      CLAUDE.md §6), EXPLAIN (what a subsystem does, where something is handled). Login handling,
+      the unavailability path and the model-id freshness probe are REUSED from
+      `review-sol-core.mjs`, not rebuilt. When Sol is unavailable it says so in ONE line, names
+      the cause and hands back to the Claude chain — never silently, never recorded as Sol's work.
+  
+  A2. THE CHEAP SWITCH, which is cheap precisely because Sol AUTHORS NOTHING here: no commit
+      carries Sol's trailer, so the author allowlist, the `commit-msg` hook and `model-guard` are
+      untouched, and none of the auditability machinery a role swap would need is required.
+      `node scripts/sol-share.mjs --status | --more | --less` over `.claude/sol-share.json` with
+      three settings:
+        · `default` — today's behaviour: reviews to Sol, everything else to Claude.
+        · `prefer-sol` — every kind A1 supports goes to Sol; Claude keeps authoring, driving the
+          suites, judging pictures and landing.
+        · `claude-only` — the escape hatch when the ChatGPT side is the scarce one.
+      `--status` prints in ONE line what goes where right now; the dashboard shows a non-default
+      setting while it is on, so nobody wonders why a diagnosis came back in another voice. The
+      delegation prompt and the guards READ this file rather than keeping their own copy.
+  
+  A3. The delegated-agent prompt and `docs/` name the switch, so an agent asks Sol for its
+      diagnosis or enumeration when the setting says so, instead of doing it in its own context.
+  
+  === PART B — DEFERRED, NOT DROPPED (do not start without the user's word) ===
+  
+  B1. Authoring as a PATCH round-trip (`author-sol.mjs`): Sol gets the brief plus the current file
+      contents and returns a UNIFIED DIFF; a script applies it in the worktree, runs the fast gate,
+      commits with Sol's trailer on green, feeds the gate output back for a bounded 2 rounds on
+      red, and hands the point to a Claude author afterwards with Sol's work attached.
+  B2. Only B1 makes Sol an AUTHOR, and only then does the role swap at guard level become
+      necessary: `model-roles.mjs --swap`, every consumer reading one core, the swap never
+      retroactive (a commit is judged against the roles in force at ITS commit time), a refusal of
+      any setting that puts the same vendor on both sides of a four-eyes stage, and the history
+      kept with timestamps.
+  WHY DEFERRED: B is where the effort and the uncertainty sit (the quality of Sol's diffs is
+  unproven here, and B2 widens the guard that exists to stop a degraded session), while A already
+  delivers the lever the user asked for.
+  
+  MEASUREMENT OWED, FIRST STEP OF THIS POINT (small): the verification phase is 43.3 % but the
+  tool does not split it into TEXT work (reading logs, diagnosing) and work needing the harness or
+  eyes (driving suites, judging screenshots). Measure that split from the verification turns' tool
+  calls; it decides how much further A is worth pushing and whether B is worth starting at all.
+  
+  WHAT IS EXPLICITLY NOT ROUTED: driving the browser suites and JUDGING THE PICTURE, the landing
+  (`land-point.mjs`), and the main session's bookkeeping — that share answers to reduction (point
+  boundary, brief), not to a change of vendor.
+  
+  VERIFIABLE: Vitest over the pure cores — the kind→prompt mapping, the unavailability path and
+  its one-line report, the three switch settings and what each routes, `--status`'s wording, the
+  consumers asked through the core rather than a constant, and the dashboard note while a
+  non-default setting is on. Plus ONE recorded end-to-end run: a real DIAGNOSE through
+  `ask-sol.mjs` on an actual red, named in the point's commit.
+  
+  CRITICALITY: MEDIUM for part A (it routes work; it does not touch the model guard, and a failure
+  degrades to Claude). HIGH for part B when it is started.
+
+- [x] 655. EVERY BOARD CARD NAMES ITS POINT NUMBER AND ITS SUBJECT (user 11.08.2026, with a
+  screenshot of the card "Abschlussarbeiten zum gerade beendeten Punkt": "Oft sehen Karten von
+  dir so aus. Da steht noch nicht einmal die Nummer des Punktes, geschweige denn, worum es in
+  dem Punkt geht. Beides muss immer zwangsweise drin stehen. Das dauerhaft per Mechanismus
+  zusichern."). The board is read on a phone, at a glance, by someone who does not carry the
+  work order in his head: a card whose title is a STAGE ("closing duties for the point just
+  finished", "currently no running work") tells him neither WHICH point nor WHAT it was about,
+  so the one screen he has says nothing. Queue cards already carry both — the numbered chip and
+  a German title — and the gap is in the cards the session writes at a transition: the now-card
+  written by `board.mjs now|status`, the closing card, and the handover card.
+  IT IS THE HEADER THAT MUST CARRY IT, not the body (user, same evening, after the number alone
+  had been added to the text: "Die Punktnummer ist hinzugekommen, aber es fehlt weiterhin der
+  Titel des Punktes im Header und die Beschreibung des Punktes im Body."). So: the SUMMARY line
+  carries the number AND the point's German title, and the BODY says what the point is about
+  before it says what stage it is in. Writing the number into the body while the header stays a
+  stage word does not satisfy this — that was tried and rejected. The obstacle to fix is in
+  `board-core.mjs`: `CLOSING_WORK_TITLE` is a CONSTANT and the regex that finds the card is
+  built from it, so a per-point title needs the matcher to key on a stable marker (a class or a
+  data attribute) instead of the literal text — change both together or the card becomes
+  unfindable and the state can never be replaced.
+  FINAL STATE:
+  1. Every card in "Woran ich gerade arbeite" carries its POINT NUMBER in the same numbered chip
+     the queue cards use, and a TITLE naming the subject, not the stage. "Abschlussarbeiten"
+     becomes "651 — Das Trommelbett ist eine 1,9-Sekunden-Schleife: Abschlussarbeiten": the
+     number, the subject, then the stage.
+  2. The one deliberate exception stays exactly one and is NAMED as such: the handover card that
+     says nothing is running belongs to NO point (that is the whole content of point 434(7), and
+     the topic guard reads a point reference inside it as a foreign one). It keeps its unnumbered
+     form and gains nothing else — but it must then say what the batch does NEXT, i.e. name the
+     point the successor picks up, in prose rather than as a chip.
+  3. The PUBLISH GATE refuses a board that breaks either: a now-card without a numbered chip, or
+     one whose title carries only a stage word ("Abschlussarbeiten", "Nacharbeit", "Vorbereitung",
+     "Aufräumen" and their English forms) with no subject behind it. The refusal names the card.
+     `board.mjs closing` therefore takes the point it closes and composes the title itself, so the
+     caller cannot get it wrong.
+  VERIFIABLE: Vitest over the pure gate — a now-card without a chip is refused; a title that is
+  only a stage word is refused; "651 — <subject>: Abschlussarbeiten" passes; the unnumbered
+  handover card passes but is refused when it names no follow-on work; and `board.mjs closing 651`
+  renders exactly the composed title. Plus one rendering check that the chip appears in the
+  phone-width layout of a now-card, where it never has before.
+  Criticality: medium — it cannot break the game, but the board is the user's only window into
+  an unattended batch, and a card he cannot decode is the same as no card. Bundle: Chat & Tafel.
+
+- [x] 645. CRITERION 7 DESCRIBES THE PLACEHOLDER, NOT THE COMMUNICATION MECHANICS THAT WERE
+  BUILT (found 11.08.2026 in conversation with the user while the batch was paused).
+  `docs/acceptance-criteria-detail.md` §7 and the short form in CLAUDE.md §7.1 point 7 still
+  describe the OLD placeholder — the village elder handing out a glossary and direction
+  words — together with the OPEN note against `design.md` §13.4 saying the real mechanic is
+  undecided and nothing should be built on it. What is built and shipped on `main` is the
+  mechanic the user specified: `src/communication/` with `lexicon`, `speaking`, `heard`,
+  `speechLabel`, `speechTarget`, `spokenGesture`, `drumMessage` and `chiefReply`, plus the
+  teaching adults and children of the Bambara village (points 580–583, 588 and their
+  successors).
+  WHY IT MATTERS: the detail section is the PROOF text read at the closing run and at the
+  v0.3 tag. As it stands it would sign off a built mechanic as a placeholder, and its
+  sentence "do not build on it, but do not protect it either" invites sacrificing that
+  mechanic when something else changes.
+  FINAL STATE: criterion 7 and its detail section describe the mechanic that exists, naming
+  its files; the evidence chain in `docs/acceptance-evidence.md` §7 points at the tests that
+  actually prove it; and what is GENUINELY still open from `design.md` §13.4 — the invented
+  language per region — stands as a clearly bounded remainder rather than as a blanket
+  "undecided".
+  VERIFIABLE: no runtime invariant — this is proof-document hygiene. The proof is that every
+  file and test §7 names exists and covers what the section claims; check each claim against
+  the code that owns it. CLAUDE.md §7.1, the detail section and the evidence section change
+  in the SAME commit, per the rule each of them states.
+  Criticality: medium — no player sees it, but it is the document the closing run and the
+  release tag read as proof, and it currently misreports delivered work as unbuilt.
+  Bundle: Dokumentation.
+
+- [x] 656. THE CHILDREN'S SHUFFLE GATE CANNOT SEE THE SYMPTOM IT WAS BUILT FOR (found
+  11.08.2026 by the cross-vendor review of point 648 — GPT-5.6 Sol at effort high, verdict
+  do-not-merge, recorded against `d1ed0d27`; the behaviour fixes of 648 are on `main` and are
+  not in question, its PROOF is). Point 648 replaced a frame-rate-dependent reversal count with
+  the user's own complaint — a child that walks over 2 m in a 2-second window without leaving a
+  0.5 m circle. Measured against the code that runs beside it, that gate is largely blind:
+  1. `trackProgress` in `src/scenes/place/tagGame.ts` teleports a child that has not left
+     `childRadius * 3` for `unstuckSeconds` (1.5 s) to free ground. The window is 2 s. So the
+     exact failure the gate looks for is ENDED half a second before its window can close, and
+     the user's report was "hängt KURZ fest" — the short episode is the bug.
+  2. Both the browser check (`scripts/verify/polish.mjs`, section `children-motion`) and
+     `src/scenes/place/tagShuffle.test.ts` sum FRAME-TO-FRAME POSITION DELTAS as the path
+     walked. The teleport is a position delta, so the correction that hides the symptom is
+     counted as the child walking out of the circle — twice blind, in the same window.
+  3. The browser check waits for `window.__placeTag().playing` but discards the result and
+     never asserts it. A group that never plays produces no stalls and no shuffle windows and
+     satisfies the gate vacuously.
+  4. `tagShuffle.test.ts` claims only the CHILDREN in a fresh `InhabitantSet`, so the
+     multi-pass separation is never exercised against the adults, porters and errand walkers
+     whose bodies share the production registry — the very crowding that made more than one
+     pass necessary.
+
+  FINAL STATE:
+
+  1. The shuffle metric measures the game's OWN walked distance (`walked`, which deliberately
+     excludes the nudge) against ground covered, in both the browser check and the pure test —
+     never a summed position delta.
+  2. A NUDGE IS A FINDING, NOT AN ESCAPE. The teleport is counted and reported: a child freed by
+     it was, by definition, going nowhere. The gate fails on a nudge rate above a stated
+     threshold, and the window is shorter than `unstuckSeconds` so an episode the player sees
+     is inside it, with the chosen window and threshold justified by a measurement in the
+     comment.
+  3. The browser check ASSERTS that the group is playing, and a trace with no play at all fails
+     rather than passes.
+  4. The pure integration test builds the body set the settlement really has — children,
+     adults, porters, errand walkers — and the separation is judged against all of them.
+  5. `pinned` is cleared wherever the round is broken off or a child is commanded to stand
+     (`breakOffRound`, the held branch, after a progress nudge), so a stale count from before a
+     hold cannot fire a teleport on the first blocked frame after it.
+
+  VERIFIABLE: Vitest over a replayed settlement in which a child is deliberately wedged — the
+  gate must go RED with the nudge left on, and the same trace must show the shuffle it was
+  hiding; a trace with a permanently idle group fails; a trace with adults crowding the children
+  is judged like the children. Plus the live section at seed 2972259115 on both backends, whose
+  report NAMES the nudge count it observed.
+  Criticality: high — it is the proof that the user's own bug report stays fixed.
+  Bundle: Dorfleben.
+
+- [x] 661. A CARD'S END TIME MUST NOT AGE SILENTLY BETWEEN TURNS (user 12.08.2026: "Die
+  Endzeit der aktuellen Karte ist 50 min in der Vergangenheit. Ich denke wir haben einen
+  Mechanismus, dass eine Schätzung maximal um ein paar Minuten veralten kann."). THE GAP,
+  measured that evening: the `now-eta-past` audit fires only inside `--synced`/`attest` — i.e.
+  at a TURN END. A session waiting on a delegated agent produces no turn end for an hour, so
+  the promise on the published board expired 50 minutes deep while every mechanism held green.
+  FINAL STATE: the ETA is checked and refreshed wherever the session's waiting heartbeat
+  already runs — the in-flight re-declaration (`batch-in-flight.mjs`) refuses to record a wait
+  whose now-card ETA lies in the past, naming the card, so every ~45-minute re-declaration
+  bounds the staleness; and the launcher tick alerts on a published board whose now-card ETA is
+  older than one tick, catching the ownerless case too. VERIFIABLE: Vitest over the pure
+  decision (a wait with a past ETA is refused, a future one passes), and the launcher-tick
+  check pinned like its board-behind sibling.
+  Criticality: medium — the board is the user's only window into the batch.
+  Bundle: Chat & Tafel.

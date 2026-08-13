@@ -56,6 +56,13 @@ const SCRIPT_FILES = [
   'blind-merge-core.mjs',
   'repo-paths.mjs',
   'is-main.mjs',
+  // The share switch the command asks BEFORE it spends an allowance (point 654), and
+  // the atomic write it persists a setting with. The fixture leaves the setting unset,
+  // so every case below runs at `default` — reviews to Sol, as before.
+  'sol-share.mjs',
+  'sol-share-core.mjs',
+  'ask-sol-core.mjs',
+  'atomic-write.mjs',
 ]
 
 let dir = ''
@@ -351,6 +358,25 @@ describe('a review that does not run', () => {
     })
     expect(r.status).toBe(3)
     expect(r.stdout).toContain('FALLBACK')
+  })
+
+  // THE SHARE SWITCH (point 654) at `claude-only` means the operator moved the load off
+  // OpenAI, so nothing may be sent — and the review must land exactly where an
+  // unreachable Sol lands: with a Claude reviewer and NO verdict. A "switched off" that
+  // quietly recorded a green review would be the worst of both.
+  it('asks NOTHING at all while the share switch is at claude-only, and still hands the review on', () => {
+    provenId()
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', headSha, '--brief', 'judge it'], { SOL_SHARE_FILE: shareFile })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('FALLBACK')
+    expect(r.stdout).toMatch(/claude-only/)
+    expect(r.stdout).toContain('The review is NOT done')
+    // The allowance is what the switch protects: no codex call may have happened.
+    expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
+    rmSync(shareFile, { force: true })
   })
 
   it('hands a Fable-authored range to Opus 5, never back to Fable', () => {
