@@ -326,7 +326,12 @@ export function assessOwner(lock, { now, bootTime, probe, work, leaseMs = LEASE_
  * Being wrong toward "not mine" costs a stand-down; being wrong the other way
  * costs the incident this module was written for.
  *
- * Returns { mine, via, restamp }.
+ * Process ancestry is permission to act for the recorded owner, never permission
+ * to replace that owner's identity. A session-id change has its own explicit,
+ * generation-checked door (`transitionOwnerSession`) below.
+ *
+ * Returns { mine, via, restamp }. `restamp` is always false; it remains in the
+ * result shape so callers cannot mistake a process match for a transition.
  */
 export function resolveOwnership({ lock, sessionId, ancestor, tolerance = PID_START_TOLERANCE_MS }) {
   const no = (via) => ({ mine: false, via, restamp: false })
@@ -353,7 +358,7 @@ export function resolveOwnership({ lock, sessionId, ancestor, tolerance = PID_ST
     return no('start-time-unknown')
   }
   if (Math.abs(ancestor.startedAt - lock.pidStartedAt) > tolerance) return no('pid-reused')
-  return { mine: true, via: 'process', restamp: true }
+  return { mine: true, via: 'process', restamp: false }
 }
 
 /**
@@ -985,11 +990,12 @@ export function acquire(sessionId, opts = {}) {
 
   const lock = readOwnerLock(lockPath)
   if (lock && typeof lock.fence === 'number') priorFence = lock.fence
-  // Ours by id, or ours by PROCESS under a session id a compaction renamed. The
-  // restamp inside ownsLock puts the current id back on the lock, so this is the
-  // one place that pays for the ancestor walk.
-  if (lock && ownsLock(sessionId, { ...opts, lockPath, lock, now }).mine) {
-    heartbeat(sessionId, { lockPath, now })
+  // Ours by id, or permission by PROCESS to act for the recorded owner. Process
+  // ancestry never changes identity; a genuine compaction has already used
+  // transitionOwnerSession from the SessionStart hook.
+  const ownership = lock ? ownsLock(sessionId, { ...opts, lockPath, lock, now }) : null
+  if (ownership?.mine) {
+    heartbeat(ownership.via === 'process' ? lock.sessionId : sessionId, { lockPath, now })
     return 'mine'
   }
   if (lock) {
@@ -1374,12 +1380,12 @@ export function ourClaudeProcess(sessionId, opts = {}) {
 
 /**
  * Ownership, by session id first and by PROCESS second. Returns
- * `{ mine, via, lock }`. On a process match the lock is RE-STAMPED with the
- * current session id, so every later check is the cheap string compare again and
- * the state file stops lying about who holds it.
+ * `{ mine, via, lock }`. A process match is deliberately READ-ONLY: ancestry
+ * grants the caller permission to act for the existing owner, but never lets an
+ * asserted session id become that owner's identity.
  *
  * `processIdentity: false` keeps the old id-only behaviour for a caller that
- * wants it; `restamp: false` asks the same question without writing.
+ * wants it.
  */
 export function ownsLock(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
@@ -1403,21 +1409,98 @@ export function ownsLock(sessionId, opts = {}) {
   // name itself the owner. Ancestry is established or it is not.
   const ancestor = opts.ancestor !== undefined ? opts.ancestor : ourClaudeProcess(sessionId, opts)
   const verdict = resolveOwnership({ lock, sessionId, ancestor })
-  if (verdict.mine && verdict.restamp && opts.restamp !== false) {
+  return { mine: verdict.mine, via: verdict.via, lock }
+}
+
+/**
+ * Is this a session id safe to put on the owner lock? PURE.
+ *
+ * This intentionally does NOT prescribe UUID syntax. The hook harness owns the
+ * id format and may change it; authenticity comes from the explicit compaction
+ * path plus the lock-generation/process checks below, not from a string shape.
+ */
+export function validTransitionSessionId(sessionId) {
+  return (
+    typeof sessionId === 'string' &&
+    sessionId.length > 0 &&
+    sessionId.length <= 512 &&
+    sessionId === sessionId.trim() &&
+    !/[\u0000-\u001f\u007f]/.test(sessionId) &&
+    !isProbeSessionId(sessionId)
+  )
+}
+
+/** A stable acquisition generation, never a heartbeat timestamp. PURE. */
+function ownerLockGeneration(lock) {
+  if (!lock || typeof lock !== 'object') return null
+  if (typeof lock.fence === 'number' && Number.isFinite(lock.fence)) return `fence:${lock.fence}`
+  if (typeof lock.acquiredAt === 'number' && Number.isFinite(lock.acquiredAt)) return `acquired:${lock.acquiredAt}`
+  if (typeof lock.startedAt === 'number' && Number.isFinite(lock.startedAt)) return `started:${lock.startedAt}`
+  return null
+}
+
+/**
+ * THE ONLY DOOR THAT CHANGES A LIVE OWNER'S SESSION ID.
+ *
+ * SessionStart calls this for an explicit compaction event. Its `lock` argument
+ * is the generation that event observed. Under the same mutex used for lock
+ * takeover, this re-reads the authority and requires that generation, owner id,
+ * pid and pid start time to be unchanged, then verifies that the caller really
+ * runs under that exact process. A stale observation can therefore never stamp
+ * over a successor, even if a recycled pid happens to match later.
+ *
+ * Rejections are data, never silence: `{ transitioned: false, reason }`. The
+ * SessionStart wrapper prints the reason so a refused genuine transition cannot
+ * turn into an inexplicably ownerless batch.
+ */
+export function transitionOwnerSession(sessionId, opts = {}) {
+  const rejected = (reason) => ({ transitioned: false, reason })
+  if (!validTransitionSessionId(sessionId)) return rejected('invalid-session-id')
+
+  const lockPath = opts.lockPath ?? LOCK_PATH
+  const observed = opts.lock !== undefined ? opts.lock : readOwnerLock(lockPath)
+  if (!observed || typeof observed.sessionId !== 'string') return rejected('no-lock')
+  if (observed.sessionId === sessionId) return { transitioned: false, reason: 'already-current' }
+  if (observed.kind === 'pending-spawn') return rejected('pending-spawn')
+
+  const generation = ownerLockGeneration(observed)
+  if (generation === null) return rejected('lock-without-generation')
+  const ancestor = opts.ancestor !== undefined ? opts.ancestor : (opts.findAncestorFn ?? findClaudeAncestor)()
+  const permission = resolveOwnership({ lock: observed, sessionId, ancestor })
+  if (!permission.mine || permission.via !== 'process') return rejected(`not-owner:${permission.via}`)
+
+  const mutexPath = `${lockPath}.reaping`
+  if (!enterReapMutex(mutexPath)) return rejected('transition-busy')
+  try {
+    const current = readOwnerLock(lockPath)
+    if (
+      !current ||
+      current.sessionId !== observed.sessionId ||
+      current.kind !== observed.kind ||
+      current.pid !== observed.pid ||
+      current.pidStartedAt !== observed.pidStartedAt ||
+      ownerLockGeneration(current) !== generation
+    ) {
+      return rejected('lock-generation-changed')
+    }
+    const currentPermission = resolveOwnership({ lock: current, sessionId, ancestor })
+    if (!currentPermission.mine || currentPermission.via !== 'process') {
+      return rejected(`not-owner:${currentPermission.via}`)
+    }
     try {
-      // Only the id moves. claimedAt is NOT bumped (that would count as work and
-      // silently withdraw a handover) and no other field is touched.
       writeJsonAtomic(lockPath, {
-        ...lock,
+        ...current,
         sessionId,
-        sessionIdBefore: lock.sessionId,
+        sessionIdBefore: current.sessionId,
         sessionIdRestampedAt: opts.now ?? Date.now(),
       })
-    } catch {
-      /* the verdict stands; the next call simply pays for the walk again */
+    } catch (error) {
+      return rejected(`write-failed:${error && error.message ? error.message : 'unknown error'}`)
     }
+    return { transitioned: true, reason: 'transitioned', sessionIdBefore: current.sessionId }
+  } finally {
+    exitReapMutex(mutexPath)
   }
-  return { mine: verdict.mine, via: verdict.via, lock }
 }
 
 export function isOwner(sessionId, lockPath = LOCK_PATH) {
