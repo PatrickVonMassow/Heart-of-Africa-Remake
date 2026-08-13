@@ -110,6 +110,21 @@ export function pointClosure(n, tasksOpenText, archiveText) {
  *   freshMs   — override for tests
  * Returns { valid, point, reason }.
  */
+/**
+ * IS THIS MARKER FRESH? PURE, and the one place that decides it (Sol's review of
+ * ffa0a78). A FUTURE stamp is not fresh: `now - at < freshMs` alone accepted a
+ * marker dated forward, which would authorise a stop and hold the seal far
+ * beyond the window — a clock that jumped, or a hand-written marker. An age
+ * below zero is therefore treated exactly like an expired one: the boundary is
+ * re-taken, which costs one command.
+ */
+export function markerFresh(marker, now, freshMs = BOUNDARY_FRESH_MS) {
+  const at = marker?.at
+  if (typeof at !== 'number' || !Number.isFinite(at)) return false
+  const age = now - at
+  return age >= 0 && age < freshMs
+}
+
 export function assessBoundary({ marker, sid, now, closure, freshMs = BOUNDARY_FRESH_MS, watermarkNow = null }) {
   if (!marker || typeof marker !== 'object') {
     return { valid: false, point: null, reason: 'no-marker' }
@@ -147,7 +162,7 @@ export function assessBoundary({ marker, sid, now, closure, freshMs = BOUNDARY_F
     if (marker.tokens < mark) {
       return { valid: false, point: null, reason: 'context-below-watermark' }
     }
-    if (typeof marker.at !== 'number' || !(now - marker.at < freshMs)) {
+    if (!markerFresh(marker, now, freshMs)) {
       return { valid: false, point: null, reason: 'marker-stale' }
     }
     if (!sid || marker.sessionId !== sid) {
@@ -159,7 +174,7 @@ export function assessBoundary({ marker, sid, now, closure, freshMs = BOUNDARY_F
   if (!Number.isInteger(point) || point <= 0) {
     return { valid: false, point: null, reason: 'marker-malformed' }
   }
-  if (typeof marker.at !== 'number' || !(now - marker.at < freshMs)) {
+  if (!markerFresh(marker, now, freshMs)) {
     return { valid: false, point, reason: 'marker-stale' }
   }
   // Bound to the session that recorded it: a marker left by a previous session
@@ -315,10 +330,46 @@ export function unpreparedRefusal({
   if (cause === BOUNDARY_CAUSES.POINT && Number(receipt.point) !== Number(point)) {
     return refuse(`the receipt prepared point ${receipt.point ?? '?'}, not point ${point ?? '?'}`)
   }
-  if (!(typeof receipt.at === 'number' && Number.isFinite(receipt.at) && now - receipt.at < freshMs)) {
+  // A FUTURE age is not freshness (Sol's review of ffa0a78): `now - at < freshMs`
+  // alone accepts a hand-written receipt dated forward, which would stay valid
+  // until that date plus the window. An age below zero is a broken or forged
+  // stamp, and both are refused the same way.
+  const age = typeof receipt.at === 'number' && Number.isFinite(receipt.at) ? now - receipt.at : NaN
+  if (!(age >= 0 && age < freshMs)) {
     return refuse('the receipt is stale — the bookkeeping it named is no longer this turn\'s')
   }
   return null
+}
+
+/** The card sentence each boundary cause opens with — the reader's proof that
+ *  the handover was announced, and what `boardCarriesCard` looks for. */
+export const BOUNDARY_CARD_HEADS = Object.freeze({
+  [BOUNDARY_CAUSES.CONTEXT]:
+    'Der Kontext dieser Sitzung hat die Wasserstandsmarke erreicht; ich übergebe deshalb jetzt, statt weiter in diesem teuren Kontext zu arbeiten.',
+  [BOUNDARY_CAUSES.POINT]: 'Der Punkt ist abgeschlossen.',
+})
+
+/**
+ * DOES THE BOARD CARRY THE BOUNDARY CARD for this cause? PURE over the board's
+ * text (Sol's review of ffa0a78: the receipt proves `--prepare` ran, not that
+ * the bookkeeping it printed was done).
+ *
+ * Used for the CONTEXT cause only, where the head is a whole distinctive
+ * sentence and the card IS the mechanism's visible half — defeat 3 requires the
+ * reader to see WHY the batch handed over without a closed point. The POINT
+ * cause keeps its own check (the old current-work card must be gone): its head
+ * is one short sentence that other cards may legitimately contain, and a false
+ * positive there would only wave the commit through while a false negative would
+ * block a correct boundary.
+ *
+ * An unreadable board returns TRUE — a board this cannot read must not be able
+ * to trap the session at its boundary.
+ */
+export function boardCarriesCard(boardText, cause = BOUNDARY_CAUSES.CONTEXT) {
+  if (typeof boardText !== 'string' || !boardText.trim()) return true
+  const head = BOUNDARY_CARD_HEADS[cause]
+  if (!head) return true
+  return boardText.includes(head)
 }
 
 /**
@@ -350,7 +401,7 @@ export function sealedBoundaryDeny({
 } = {}) {
   if (markerPhase(marker) !== 'committed') return { deny: false, reason: null }
   if (!sid || marker.sessionId !== sid) return { deny: false, reason: null }
-  if (typeof marker.at !== 'number' || !(now - marker.at < freshMs)) return { deny: false, reason: null }
+  if (!markerFresh(marker, now, freshMs)) return { deny: false, reason: null }
   if (handoverSurvivesCall({ toolName, command, filePath }).survives) return { deny: false, reason: null }
   const what = marker.cause === BOUNDARY_CAUSES.CONTEXT ? 'the context watermark' : `point ${marker.point ?? '?'}`
   return {
@@ -620,10 +671,7 @@ export function boundaryCardText({ destination, claimantSid = null, cause = BOUN
   // handover happens BECAUSE the context passed the mark, not because a point
   // closed — a card that says "der Punkt ist abgeschlossen" over a watermark
   // handover claims a closure that never happened.
-  const head =
-    cause === BOUNDARY_CAUSES.CONTEXT
-      ? 'Der Kontext dieser Sitzung hat die Wasserstandsmarke erreicht; ich übergebe deshalb jetzt, statt weiter in diesem teuren Kontext zu arbeiten.'
-      : 'Der Punkt ist abgeschlossen.'
+  const head = BOUNDARY_CARD_HEADS[cause] ?? BOUNDARY_CARD_HEADS[BOUNDARY_CAUSES.POINT]
   if (destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW && claimantSid) {
     // The reservation is stated with its LIMIT, not as a promise. It survives the
     // release now (point 461 — the freed lock stays that window's while its

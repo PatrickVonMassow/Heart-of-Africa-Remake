@@ -65,7 +65,7 @@ import {
   normaliseFence,
 } from './batch-lease-core.mjs'
 import { IDLE_WINDOW_MS, ownershipVerdict } from './batch-ownership-core.mjs'
-import { BOUNDARY_FRESH_MS } from './batch-boundary-core.mjs'
+import { markerFresh } from './batch-boundary-core.mjs'
 
 /**
  * Does a SEALED boundary marker protect the handover for THIS session right now
@@ -76,13 +76,10 @@ import { BOUNDARY_FRESH_MS } from './batch-boundary-core.mjs'
  * launcher spawn a successor next to a working session.
  */
 function sealedMarkerHolds(marker, sessionId, now) {
-  return (
-    marker?.phase === 'committed' &&
-    !!sessionId &&
-    marker.sessionId === sessionId &&
-    typeof marker.at === 'number' &&
-    now - marker.at < BOUNDARY_FRESH_MS
-  )
+  // The freshness test is the boundary core's, so a future-dated marker cannot
+  // hold the seal here while `assessBoundary` calls the same marker stale (Sol's
+  // review of ffa0a78).
+  return marker?.phase === 'committed' && !!sessionId && marker.sessionId === sessionId && markerFresh(marker, now)
 }
 
 // --- Constants (exported for tests and callers) -------------------------------

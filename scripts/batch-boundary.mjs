@@ -40,6 +40,7 @@ import {
   BOUNDARY_PHASES,
   LAUNCHER_TASK_NAME,
   assessBoundary,
+  boardCarriesCard,
   boundaryCardCommand,
   boundaryCardText,
   boundaryDestination,
@@ -103,13 +104,24 @@ export function writePrepared(receipt, path = PREPARED_PATH) {
   writeJsonAtomic(path, receipt)
 }
 
-export function clearBoundary(path = BOUNDARY_PATH) {
-  try {
-    rmSync(path, { force: true })
-    return true
-  } catch {
-    return false
+/**
+ * WITHDRAW THE BOUNDARY — marker AND prepare receipt (Sol's review of ffa0a78:
+ * a withdrawal that leaves the receipt behind leaves the next `--commit`
+ * runnable without a fresh preparation, and a caller that is not the CLI got no
+ * receipt removal at all). Returns { marker, prepared }, each true when nothing
+ * of that kind is left; a caller that swallows a false re-opens the bypass, so
+ * the CLI says so LOUDLY.
+ */
+export function clearBoundary(path = BOUNDARY_PATH, { preparedPath = PREPARED_PATH } = {}) {
+  const gone = (p) => {
+    try {
+      rmSync(p, { force: true })
+      return true
+    } catch {
+      return false
+    }
   }
+  return { marker: gone(path), prepared: gone(preparedPath) }
 }
 
 /**
@@ -409,14 +421,18 @@ if (isMain) {
   }
 
   if (arg === '--clear') {
-    clearBoundary()
-    // The prepare receipt goes with it: a withdrawn boundary is re-TAKEN from
-    // the first phase, bookkeeping included, not committed on the strength of
-    // an attempt the session deliberately abandoned.
-    try {
-      rmSync(PREPARED_PATH, { force: true })
-    } catch {
-      /* best effort — a receipt we cannot delete is caught by its own freshness */
+    // The prepare receipt goes with the marker: a withdrawn boundary is re-TAKEN
+    // from the first phase, bookkeeping included, not committed on the strength
+    // of an attempt the session deliberately abandoned.
+    const cleared = clearBoundary()
+    if (!cleared.marker || !cleared.prepared) {
+      // NOT swallowed (Sol's review of ffa0a78): a surviving receipt would let
+      // the next `--commit` run on a preparation this session just abandoned.
+      fail(
+        `the boundary was only PARTLY withdrawn — ${!cleared.marker ? `the marker (${BOUNDARY_PATH})` : `the prepare receipt (${PREPARED_PATH})`} ` +
+          'could not be deleted. Remove it by hand and run `--clear` again; until then treat neither the ' +
+          'boundary as withdrawn nor a commit as prepared.',
+      )
     }
     console.log('boundary marker cleared — the ordinary "do not stop the batch" rule applies again.')
   } else if (arg === '--status' || !arg) {
@@ -529,6 +545,19 @@ if (isMain) {
         now: Date.now(),
       })
       if (unprepared) fail(unprepared)
+      // …and the receipt proves only that the phase RAN (Sol's review of
+      // ffa0a78). The card is the visible half of defeat 3 — the reader must see
+      // that the handover happened because the context passed the mark — so the
+      // commit reads the board for it rather than trusting the printout was
+      // followed. An unreadable board waves it through: it may not trap a
+      // session at its boundary.
+      if (!boardCarriesCard(readText(repoPath(BOARD_FILE_DEFAULT)), BOUNDARY_CAUSES.CONTEXT)) {
+        fail(
+          'THE BOARD DOES NOT CARRY THE WATERMARK CARD — a context handover the board does not explain leaves ' +
+            'the reader with a session that vanished for no stated reason. Put up the card `--prepare --context` ' +
+            `printed and publish it (\`${PUBLISH_CMD}\`), then commit. Nothing recorded.`,
+        )
+      }
       // Transfer FIRST, marker LAST (Sol review of 807c2bf, finding 1) —
       // `commitSealedBoundary` pins the order, and a failed transfer refuses
       // before anything is recorded.

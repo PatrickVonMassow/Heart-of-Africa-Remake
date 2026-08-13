@@ -26,6 +26,8 @@ import {
   isOutputPagerSegment,
   describeWithdrawalTrigger,
   hookCallTimestamp,
+  boardCarriesCard,
+  markerFresh,
   markerPhase,
   preparedReceipt,
   sealedBoundaryDeny,
@@ -928,5 +930,52 @@ describe('unpreparedRefusal — --commit refuses what --prepare never prepared (
   it('is not satisfied by a receipt with no time at all', () => {
     expect(unpreparedRefusal({ receipt: fresh({ at: 'now-ish' }), sid: SID, point: 675, now: NOW })).toContain('stale')
     expect(unpreparedRefusal({ receipt: fresh({ at: NaN }), sid: SID, point: 675, now: NOW })).toContain('stale')
+  })
+
+  it('refuses a FUTURE-dated receipt — a forward stamp is not freshness', () => {
+    expect(
+      unpreparedRefusal({
+        receipt: preparedReceipt({ sid: SID, point: 675, now: NOW + 60_000 }),
+        sid: SID,
+        point: 675,
+        now: NOW,
+      }),
+    ).toContain('stale')
+  })
+})
+
+describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced handover (Sol on ffa0a78)', () => {
+  it('calls a FUTURE-dated marker unfresh at every predicate that reads one', () => {
+    const future = marker({ at: NOW + 60_000 })
+    expect(markerFresh(future, NOW)).toBe(false)
+    // …so it authorises no stop…
+    expect(assessBoundary({ marker: future, sid: SID, now: NOW, closure: 'closed' }).reason).toBe('marker-stale')
+    // …and holds no seal either, which is the direction that cannot trap a session.
+    expect(
+      sealedBoundaryDeny({
+        marker: { ...future, phase: 'committed' },
+        sid: SID,
+        now: NOW,
+        toolName: 'Bash',
+        command: 'git commit -m x',
+      }).deny,
+    ).toBe(false)
+    expect(markerFresh(marker(), NOW)).toBe(true)
+    expect(markerFresh({ at: 'soon' }, NOW)).toBe(false)
+    expect(markerFresh(null, NOW)).toBe(false)
+  })
+
+  it('reads the watermark card off the board, and never traps on a board it cannot read', () => {
+    const card = boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })
+    expect(boardCarriesCard(`<div><p>${card}</p></div>`, BOUNDARY_CAUSES.CONTEXT)).toBe(true)
+    // A point card is NOT a watermark card: it claims a closure that never happened.
+    expect(
+      boardCarriesCard(
+        boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.POINT }),
+        BOUNDARY_CAUSES.CONTEXT,
+      ),
+    ).toBe(false)
+    expect(boardCarriesCard('', BOUNDARY_CAUSES.CONTEXT)).toBe(true)
+    expect(boardCarriesCard(null, BOUNDARY_CAUSES.CONTEXT)).toBe(true)
   })
 })
