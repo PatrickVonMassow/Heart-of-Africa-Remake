@@ -9,6 +9,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import {
   coastSurfGain,
   emitFootstep,
+  emitDrumPhrase,
+  playDrumMessage,
   playSpeech,
   playThunder,
   proximityGain,
@@ -31,12 +33,18 @@ import { balance } from '../config/balance'
 import { phraseOf, utteranceOf, SEQUENCE_LENGTH } from '../communication/lexicon'
 import { phrasePlan, utterancePlan } from '../communication/speaking'
 import { resetDevAsserts } from './devAssert'
+import { drumMessagePlan } from '../communication/drumMessage'
 
 describe('village drum bed phrase selection', () => {
   const sequence = (...values: number[]) => {
     let i = 0
     return () => values[i++ % values.length]
   }
+
+  it('ships disabled while retaining its planner for debug audition', () => {
+    expect(balance.drumBed.enabled).toBe(false)
+    expect(drumBedPhrasePlan('bambara-village', 0, null, 0).hits.length).toBeGreaterThan(0)
+  })
 
   it('varies across many bars and never repeats a pattern back to back', () => {
     const config = { ...balance.drumBed, phraseBars: 3 }
@@ -416,6 +424,30 @@ describe('playThunder (point 166 — scheduled on the audio clock, survives to f
     const gain = filter.connected[0] as FakeGain
     return gain.gain
   }
+
+  it('emits no ambient drum phrase in the shipped off state', () => {
+    const ctx = FakeCtx.last
+    expect(ctx).not.toBeNull()
+    if (!ctx) return
+    const before = ctx.oscillators.length
+    expect(balance.drumBed.enabled).toBe(false)
+    emitDrumPhrase(new FakeGain() as unknown as GainNode)
+    expect(ctx.oscillators.slice(before)).toHaveLength(0)
+  })
+
+  it("still emits every strike of the chief's message while the ambient bed is off", () => {
+    const ctx = FakeCtx.last
+    if (!ctx) return
+    ctx.currentTime = 5
+    const plan = drumMessagePlan()
+    const before = ctx.oscillators.length
+    playDrumMessage(plan)
+    const voices = ctx.oscillators.slice(before)
+    expect(balance.drumBed.enabled).toBe(false)
+    expect(voices).toHaveLength(plan.strikes.length * 2)
+    expect(voices[0].startedAt).toBeCloseTo(5 + plan.strikes[0].at, 10)
+    expect(voices[voices.length - 2].startedAt).toBeCloseTo(5 + plan.strikes.at(-1)!.at, 10)
+  })
 
   it('schedules both clap voices at now + the pure delay, with a stop only after the tail', () => {
     const ctx = FakeCtx.last
@@ -883,12 +915,21 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
 
   // Point 605: point 577 gave the speech its own bus at the level it had had on
   // the ambient one, and at that level the syllables sat BELOW the village drum
-  // bed — the user still reported them too quiet. The default is calibrated
+  // bed — the user still reported them too quiet. Its dormant audition mix is
+  // calibrated
   // against the graph, so this case measures the whole chain the ear gets:
   // syllable peak × speech bus against drum beat × drum layer × ambient bus,
-  // all read off the LIVE nodes at the default balance. A later change to
+  // all read off the LIVE nodes at the default gains. A later change to
   // either side then fails here instead of quietly re-burying the voices.
-  describe('the speech carries over the drums at the DEFAULT mix (point 605)', () => {
+  describe('the speech carries over the debug-enabled drum mix (point 605)', () => {
+    beforeEach(() => {
+      balance.drumBed.enabled = true
+      refreshAmbienceVolume()
+    })
+    afterEach(() => {
+      balance.drumBed.enabled = false
+      refreshAmbienceVolume()
+    })
     /** What a syllable's own synthesis puts out per unit of scheduled envelope
      *  peak — the vowel's formant filters sit before the envelope, so the wave
      *  is louder than the peak. MEASURED on the shipped chain and pinned in
@@ -928,7 +969,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       expect(moved, 'exactly one layer separates the two scenes: the drums').toHaveLength(1)
       return moved[0].gain.value
     }
-    /** One syllable spoken right beside the player, at the DEFAULT volume — no
+    /** One syllable spoken right beside the player, at the default volume — no
      *  option override, so the plan reads the shipped balance. */
     const syllableBesideThePlayer = (): { peak: number; bus: FakeGain } => {
       const before = ctx.oscillators.length
@@ -949,7 +990,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
 
     it('measures the syllables well ABOVE the drum bed, not under it', () => {
       ctx.currentTime = 240
-      // The mix this measures is the DEFAULT one — the state the player starts in.
+      // The gains are the calibrated defaults; only the debug audition switch differs.
       expect(balance.ambienceVolume).toBe(0.1)
       expect(balance.ambientVolume).toBe(0.5)
       expect(balance.communication.speechVolume).toBe(1.5)

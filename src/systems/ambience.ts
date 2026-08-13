@@ -333,8 +333,11 @@ export function drumBedPhrasePlan(
 
 /** Render one planned phrase with the bed's deliberately plain low sine voice.
  *  Message drums use two distinct heads, a longer ring and a stick click below;
- *  keeping all three out of this bed preserves that semantic boundary. */
-function emitDrumPhrase(dest: GainNode): number {
+ *  keeping all three out of this bed preserves that semantic boundary. The
+ *  live switch is checked here as well as by the emitter, so a phrase already
+ *  queued when the switch is turned off cannot leak through. */
+export function emitDrumPhrase(dest: GainNode): number {
+  if (!balance.drumBed.enabled) return 1
   if (!ctx) return 1
   const villageId = scene.villageId ?? scene.region
   const staySeconds = Math.max(0, ctx.currentTime - drumVisitStartedAt)
@@ -361,7 +364,7 @@ function emitDrumPhrase(dest: GainNode): number {
 function startDrumEmitter() {
   const tick = () => {
     let delay = 1
-    if (ctx && layers.drums && layers.drums.gain.gain.value > 0.005) {
+    if (balance.drumBed.enabled && ctx && layers.drums && layers.drums.gain.gain.value > 0.005) {
       delay = emitDrumPhrase(layers.drums.gain)
     }
     setTimeout(tick, Math.max(0.1, delay) * 1000)
@@ -541,7 +544,12 @@ function applyScene() {
   setTarget('insects', !port && (region === 'west' || region === 'south' || region === 'east') ? (inPlace ? 0.12 : 0.2) : 0)
   // Birdsong carries its own per-source volume (point 153).
   setTarget('birds', (!port && region === 'central' ? (inPlace ? 0.25 : 0.4) : 0) * balance.birdsongVolume)
-  setTarget('drums', village ? balance.drumBed.villageGain : nearVillage ? balance.drumBed.nearbyGain : 0)
+  setTarget(
+    'drums',
+    balance.drumBed.enabled
+      ? village ? balance.drumBed.villageGain : nearVillage ? balance.drumBed.nearbyGain : 0
+      : 0,
+  )
   setTarget('music', inPlace ? 0.16 : 0.1)
   applyAnimalTargets()
 }

@@ -83,10 +83,12 @@ export interface BalanceConfig {
    *  slider over the single ambience volume, so the birds can be turned down on
    *  their own. 1 = the design gain, 0 = silent. */
   birdsongVolume: number
-  /** The meaningless village drum BED (not the message drums): its phrasing,
-   *  low membrane voice, village-to-village character and long-visit thinning.
-   *  Every number is exposed in the debug menu for calibration by ear. */
+  /** The optional meaningless village drum BED (not the message drums). It is
+   *  silent by default so it cannot be mistaken for communication; the switch
+   *  and every calibration value remain exposed in the debug menu. */
   drumBed: {
+    /** Debug audition switch. False is the shipped, silent state. */
+    enabled: boolean
     /** Seconds between the eight subdivisions of a bar. */
     stepSeconds: number
     /** Number of varied bars in one phrase before the audible pause. */
@@ -837,6 +839,8 @@ export const balance: BalanceConfig = {
   ambientVolume: 0.5, // every other ambient sound half as loud (user request)
   birdsongVolume: 1, // per-source birdsong slider (point 153); 1 = design gain
   drumBed: {
+    // Message drums bypass this switch. The meaningless ambient bed ships off.
+    enabled: false,
     // Two bars establish a phrase, followed by enough silence that the bed
     // cannot read as an endlessly repeated loop. All are calibratable (§2).
     stepSeconds: 0.25,

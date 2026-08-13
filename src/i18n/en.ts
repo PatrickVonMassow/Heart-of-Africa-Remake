@@ -523,6 +523,7 @@ export const en: Strings = {
     ambientVolume: 'Other ambient volume',
     birdsongVolume: 'Birdsong volume',
     speechVolume: 'Village speech volume',
+    drumBedEnabled: 'Ambient drum bed (debug audition)',
     drumBedStep: 'Drum bed: step length (s)',
     drumBedPhraseBars: 'Drum bed: bars per phrase',
     drumBedGapMin: 'Drum bed: phrase pause min. (s)',

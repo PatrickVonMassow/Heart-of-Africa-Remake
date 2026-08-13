@@ -3,7 +3,8 @@
 // porters and traders in the wealthier ports. Inhabitants interact with each
 // other and with the props: pairs stand in conversation, a fire tender stokes
 // the fire, food is fetched from the huts and cooked over it, grain is
-// pounded in a mortar, a drummer plays, and water is carried from the well.
+// pounded in a mortar, a drummer waits for the chief's message, and water is
+// carried from the well.
 // Pure animation, no mechanics.
 
 import { createContext, useContext, useEffect, useMemo, useRef, type RefObject } from 'react'
@@ -73,12 +74,6 @@ import {
 } from './adultErrands'
 import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
 import { phrasePlan, utterancePlan } from '../../communication/speaking'
-import {
-  drumMessagePlan,
-  drumStrikeAt,
-  drumStrikeProgress,
-  type DrumMessagePlan,
-} from '../../communication/drumMessage'
 import { speechLabelSeconds } from '../../communication/speechLabel'
 import { playSpeech } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
@@ -97,9 +92,8 @@ import {
   type InhabitantSet,
 } from './inhabitantBodies'
 import {
-  drumHandPose,
   drumHeadY,
-  drumStroke,
+  drummerPoseAt,
   DRUMMER_LEAN,
   HIGH_DRUM,
   LOW_DRUM,
@@ -1271,11 +1265,6 @@ function Drum({ drum, headRef }: { drum: DrumGeometry; headRef: RefObject<THREE.
   )
 }
 
-/** The stroke each drum is beaten with, solved once from its own dimensions
- *  (`drummerPose.ts`): which hand, aimed where, between which elevations. */
-const LOW_STROKE = drumStroke(LOW_DRUM)
-const HIGH_STROKE = drumStroke(HIGH_DRUM)
-
 /**
  * Drummer at his pair of drums — the audible village drums made visible, and
  * the voice the chief's message goes out on (design.md §13.4, point 486).
@@ -1284,10 +1273,8 @@ const HIGH_STROKE = drumStroke(HIGH_DRUM)
  * speaks `BA` and stands to his LEFT — and neither side is stated twice: each
  * drum's stroke reads its hand off the drum's OWN placement (`drummerPose.ts`),
  * so the hand that falls is always the one standing over the drum that sounds,
- * and that drum's head dips under it. While no message is going out the two
- * hands keep the village's own idle beat half a beat apart, the large drum on
- * the strong beat and the small one on the lighter off-beat, as the ambient drum
- * bar sounds them.
+ * and that drum's head dips under it. While no message is going out his arms
+ * use the figure's genuine rest pose and both drum heads stay still.
  *
  * Both the falling hand and the sounding beat come from the ONE plan
  * (src/communication/drumMessage.ts) the ambience engine plays, so the picture
@@ -1299,42 +1286,18 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   const pose = useRef<FigurePose | null>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: DRUMMER_LEAN, turn: 0 })
   const lowHead = useRef<THREE.Mesh>(null)
   const highHead = useRef<THREE.Mesh>(null)
-  // The plan of the message currently going out, kept with the start it was
-  // built for, so a re-sent message rebuilds it against the live balance values.
-  const sending = useRef<{ startedAt: number; plan: DrumMessagePlan } | null>(null)
-  useFrame(({ clock }) => {
+  useFrame(() => {
     const p = pose.current
     if (!p) return
     const beating = useUi.getState().drumPerformance
-    // Each hand's swing on its OWN drum: 0 is on the head, 1 the top of the lift.
-    let lowSwing = 1
-    let highSwing = 1
-    if (beating) {
-      if (sending.current?.startedAt !== beating.startedAt) {
-        sending.current = { startedAt: beating.startedAt, plan: drumMessagePlan() }
-      }
-      // The wall clock, the one the performance and the scheduled audio run on.
-      const elapsed = (speechClock() * 1000 - beating.startedAt) / 1000
-      const strike = drumStrikeAt(sending.current.plan, elapsed)
-      // The hand falls at the beat and rises again through the strike's ring;
-      // between two beats both hands wait raised over their own drum.
-      const swing = strike ? drumStrikeProgress(strike, elapsed) : 1
-      if (strike?.drum === 'low') lowSwing = swing
-      else if (strike?.drum === 'high') highSwing = swing
-    } else {
-      sending.current = null
-      // The idle village beat (design.md §19): the two hands half a beat apart,
-      // each on its OWN drum and each dipping the head it strikes — the large
-      // drum on the strong beat, the small one on the lighter off-beat, as the
-      // ambient drum bar sounds them.
-      const t = clock.elapsedTime * 4.2
-      lowSwing = Math.abs(Math.sin(t))
-      highSwing = Math.abs(Math.cos(t))
-    }
-    Object.assign(p[LOW_STROKE.side], drumHandPose(LOW_STROKE, lowSwing))
-    Object.assign(p[HIGH_STROKE.side], drumHandPose(HIGH_STROKE, highSwing))
-    if (lowHead.current) lowHead.current.position.y = drumHeadY(LOW_DRUM, lowSwing)
-    if (highHead.current) highHead.current.position.y = drumHeadY(HIGH_DRUM, highSwing)
+    const elapsed = beating ? (speechClock() * 1000 - beating.startedAt) / 1000 : 0
+    const frame = drummerPoseAt(beating?.plan ?? null, elapsed)
+    Object.assign(p.left, frame.pose.left)
+    Object.assign(p.right, frame.pose.right)
+    p.lean = frame.pose.lean
+    p.turn = frame.pose.turn
+    if (lowHead.current) lowHead.current.position.y = drumHeadY(LOW_DRUM, frame.lowSwing)
+    if (highHead.current) highHead.current.position.y = drumHeadY(HIGH_DRUM, frame.highSwing)
   })
   return (
     <group position={[x, 0, z]} rotation={[0, Math.atan2(-x + 3.5, -z + 2.5), 0]}>
