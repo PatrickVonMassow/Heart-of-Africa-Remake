@@ -6737,3 +6737,27 @@ to land than a mechanism that needs a review.
   Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
   here loses work rather than merely slowing it.
 
+
+- [ ] 677. A GUARD RUN BY HAND HANGS FOREVER ON ITS OWN STDIN (measured 13.08.2026, 19:20). The
+  house rule says to ASK THE GUARDS BEFORE THE ACTION (CLAUDE.md §7.2), and a session that does
+  so directly — `node scripts/tasks-spec-guard.mjs` — never comes back: the wrapper reads the
+  hook payload with `readFileSync(0, 'utf8')`, which BLOCKS while stdin is an open terminal or an
+  inherited pipe, and the `try/catch` around it never runs because nothing ever throws. Two
+  instances were found alive in this container, one of them 34 minutes old, both from a session
+  that only wanted to check itself; the same shape sits in about 25 enforcers (`ci-status-guard`,
+  `dashboard-guard`, `board-first-guard`, `closing-guard`, `queue-order-guard`, the batch guard
+  and the rest). Under a Stop hook the payload always arrives, so the wiring is fine — it is the
+  MANUAL run the rule itself prescribes that hangs, and `< /dev/null` makes the very same command
+  exit 0 immediately.
+  FINAL STATE: one shared helper reads the hook payload and returns EMPTY instead of blocking
+  whenever stdin is not a readable, already-open non-TTY — a TTY, a closed descriptor or nothing
+  attached all yield "no payload", which every caller already handles as a manual run. A bounded
+  read guards the remaining case so an inherited-but-silent pipe cannot hang either. Every
+  enforcer that reads stdin today uses it; none keeps a private copy.
+  VERIFIABLE: a Vitest case per branch of the helper (TTY, closed stdin, valid JSON payload,
+  non-JSON payload, an open pipe that never writes) proving it returns rather than blocks; a
+  repository check that no enforcer calls `readFileSync(0, …)` outside the helper, so the shape
+  cannot return; and a live manual run of two guards from an interactive shell, each returning
+  its verdict.
+  Criticality: medium — nothing is corrupted, but it burns a session's turn and leaves stuck
+  processes behind, and it fires exactly on the session that follows the rule.
