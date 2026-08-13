@@ -633,12 +633,13 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
 export function selfAdoptionRefusal({ declaration, marker, sid, now = Date.now() } = {}) {
   if (!declaration?.transfer) return null
   const by = typeof declaration.transfer.by === 'string' ? declaration.transfer.by : ''
+  const mine = Boolean(sid) && by === sid
   const sealed =
     markerPhase(marker) === 'committed' &&
     marker.sessionId === sid &&
     typeof marker.at === 'number' &&
     now - marker.at < BOUNDARY_FRESH_MS
-  if (sealed) {
+  if (mine && sealed) {
     return {
       reason: 'own-commit',
       alert:
@@ -647,15 +648,31 @@ export function selfAdoptionRefusal({ declaration, marker, sid, now = Date.now()
         'the declaration then becomes mutable again without adoption.',
     }
   }
-  if (!sid || by !== sid) return null
-  return {
-    reason: 'own-transfer',
-    alert:
-      'this session TRANSFERRED this record at its boundary commit — adoption is the SUCCESSOR\'s verb, and a ' +
-      'marker that has since expired or been withdrawn does not hand the work back. If this session genuinely ' +
-      'resumed the work, RE-DECLARE it as its own wait (`node scripts/batch-in-flight.mjs --waiting-on "…" ' +
-      '--branch <ref>`), or `--clear` it if it is finished — do not record a handover that never happened.',
+  if (mine) {
+    return {
+      reason: 'own-transfer',
+      alert:
+        'this session TRANSFERRED this record at its boundary commit — adoption is the SUCCESSOR\'s verb, and a ' +
+        'marker that has since expired or been withdrawn does not hand the work back. If this session genuinely ' +
+        'resumed the work, RE-DECLARE it as its own wait (`node scripts/batch-in-flight.mjs --waiting-on "…" ' +
+        '--branch <ref>`), or `--clear` it if it is finished — do not record a handover that never happened.',
+    }
   }
+  // A SEALED BOUNDARY ADOPTS NOTHING, whoever transferred the record (Sol's
+  // review of fa11223d): adoption writes the declaration under this session's
+  // identity, which is declaring a wait — exactly what `sealedCommitRefusal`
+  // denies behind a committed marker. The wording must not claim this session
+  // transferred it, though, because here it did not.
+  if (sealed) {
+    return {
+      reason: 'sealed-commit',
+      alert:
+        `this session's boundary is COMMITTED, so it may adopt nothing behind that seal — the record (transferred by ` +
+        `${by || 'an unnamed session'}) is the SUCCESSOR's to take. If this session is genuinely working on, withdraw ` +
+        'the boundary first (`node scripts/batch-boundary.mjs --clear`) and adopt then.',
+    }
+  }
+  return null
 }
 
 /**
@@ -789,8 +806,8 @@ if (isMain) {
       // above; repeating the generic "re-declare with --waiting-on" here would
       // contradict it under a live committed marker, where `sealedCommitRefusal`
       // denies exactly that.
-      if (a.reason === 'own-commit' || a.reason === 'own-transfer') {
-        fail('ADOPTION REFUSED — this session transferred this record; see the alert above for the way forward.')
+      if (a.reason === 'own-commit' || a.reason === 'own-transfer' || a.reason === 'sealed-commit') {
+        fail('ADOPTION REFUSED — this record is not this session\'s to adopt; see the alert above for the way forward.')
       }
       fail(
         a.reason === 'no-transferred-declaration'

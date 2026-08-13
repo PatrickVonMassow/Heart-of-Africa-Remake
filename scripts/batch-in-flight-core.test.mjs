@@ -2151,6 +2151,32 @@ describe('selfAdoptionRefusal — the transferrer is never the adopter (point 67
         now: NOW,
       }),
     ).toBeNull()
+    // …and neither may a stranger's transfer, once no committed marker stands.
+    expect(
+      selfAdoptionRefusal({
+        declaration: declaration({ transfer: { v: 1, by: 'session-predecessor', at: 1, checkpoints: [] } }),
+        marker: null,
+        sid: SID,
+        now: NOW,
+      }),
+    ).toBeNull()
+  })
+
+  it('under this session\'s OWN fresh commit it refuses whoever transferred — without claiming it did (Sol on fa11223d)', () => {
+    // Adoption writes the declaration under this session's identity, which IS
+    // declaring a wait — the very thing `sealedCommitRefusal` denies behind a
+    // committed marker. So the seal refuses; only the WORDING may not lie.
+    for (const by of ['session-predecessor', '']) {
+      const r = selfAdoptionRefusal({
+        declaration: declaration({ transfer: { v: 1, by, at: 1, checkpoints: [] } }),
+        marker: sealed,
+        sid: SID,
+        now: NOW,
+      })
+      expect(r.reason).toBe('sealed-commit')
+      expect(r.alert).not.toContain('this session COMMITTED the boundary that transferred')
+      expect(r.alert).toContain('--clear')
+    }
   })
 })
 

@@ -336,7 +336,10 @@ How it works:
    defeat this whole point closes. Under a live commit the way back is
    `batch-boundary.mjs --clear`; past it the record is mutable again, so genuinely
    resumed work is RE-DECLARED (`--waiting-on …`) rather than recorded as a
-   handover that never happened. Work WITHOUT a pushed checkpoint
+   handover that never happened. A session under its OWN committed marker adopts
+   nothing behind that seal whoever transferred the record — adoption writes the
+   declaration under the adopter's identity, which is declaring a wait, the very
+   thing the seal denies. Work WITHOUT a pushed checkpoint
    blocks the handover with named recovery choices and drains first
    (`--handover-check` tells the two states apart). The boundary is TWO-PHASE
    (point 675 closed the marker-deletion defeat): `node scripts/batch-boundary.mjs
