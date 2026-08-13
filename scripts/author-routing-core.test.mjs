@@ -138,6 +138,10 @@ describe('authorLaneFor — which lane authors a point', () => {
     // …and a TAB is four columns, not zero (seventh round).
     expect(laneTagIn('\t```\nAuthor lane: sol')).toBe('sol')
     expect(laneTagIn(' \t```\nAuthor lane: opus')).toBe('opus')
+    // A blockquote's markers are not indentation (eighth round): an ordinary
+    // quoted example looked over-indented, and its tag became operative.
+    expect(laneTagIn('   > ```\n   > Author lane: sol\n   > ```')).toBe('')
+    expect(laneTagIn('> ```\n> Author lane: fable\n> ```')).toBe('')
   })
 
   it('names the subjects its own comments promise (cross-vendor P1)', () => {
