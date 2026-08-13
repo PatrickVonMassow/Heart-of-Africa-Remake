@@ -17896,3 +17896,27 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   check pinned like its board-behind sibling.
   Criticality: medium — the board is the user's only window into the batch.
   Bundle: Chat & Tafel.
+
+- [x] 641. THE GIZA EDGE CHECK REDS ON WEBGPU AND NOBODY KNOWS WHY (measured 11.08.2026 on
+  branch `feat/600-ctrl-label-states`, head fde5a652). `polish` on WebGPU: `giza (wet): the
+  swept ground inside is measurably darkened, the open land outside is untouched — inside
+  ×0.905 · boundary ×0.951 · outside ×0.963`. It appeared in ONE of three full runs; the same
+  section run three times in isolation on the same backend and head passed 3/3. That is
+  exactly the state point 640 forbids closing on repetition, so it is filed instead.
+  FINAL STATE: the cause is NAMED with evidence — a genuine intermittent in the sweep's
+  darkening, a measurement that samples before the ground has settled, or a threshold that
+  sits too close to the values it separates (0.951 against 0.963 is a 1.2 % margin, which is
+  the first thing to check) — and fixed at that cause. The throttle probe of point 640 is the
+  instrument: if the red reproduces under throttle, it is timing; if it never does, the margin
+  and the sampling are the suspects.
+  WORK ALREADY STANDS ON A BRANCH (11.08.2026). `feat/641-giza-edge-red` is PUSHED at 8eaa9a6f
+  — three commits: a ground crop read by its MEDIAN so a rain streak cannot fake the edge band, that
+  crop helper classified as the pure decision layer it is, and a soak budget a loaded machine can
+  meet. The agent was STOPPED mid-run to free a pool slot for the user-blocking point 648, not
+  because the work was wrong. Whoever takes this point RESUMES from that branch and re-runs the
+  throttle probe on both backends, which is exactly where it was interrupted.
+  VERIFIABLE: the failure reproduced deterministically by a named mechanism, then absent after
+  the fix by the same mechanism; `polish --section=settlement-edge` green on both backends,
+  three runs each, on a quiet machine AND under throttle.
+  Criticality: medium — no player sees it, but an unexplained red on the release branch makes
+  the picture gate untrustworthy exactly where the release needs it.
