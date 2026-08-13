@@ -26,6 +26,9 @@ import {
   PROBE_MAX_AGE_MS,
   probeFreshness,
   savedAuthPathFrom,
+  claudeReviewerFor,
+  CLAUDE_REVIEW_CHAIN,
+  solAuthored,
   SECOND_FALLBACK_MODEL_NAME,
   SOL_MODEL_ID,
   SOL_MODEL_NAME,
@@ -564,5 +567,84 @@ describe('the codex command line is the rule, not a preference of the caller', (
     expect(divergent).toMatch(/B<n> \| <file> \| <the defect in/)
     expect(divergent).toMatch(/cannot be counted/)
     expect(buildReviewPrompt({ sha: 'abc', brief: 'x' })).not.toMatch(/ONE ENTRY PER LINE/)
+  })
+})
+
+// POINT 667: the REVERSED direction. Sol authors too now, and the failure this
+// mechanism exists to prevent has a mirror image: a review recorded as Sol's
+// over a range Sol WROTE. That reads green at both gates and is nobody's second
+// pair of eyes.
+describe('the reversed direction — where SOL authored', () => {
+  const SOL_COMMIT = 'GPT-5.6 Sol <noreply@openai.com>'
+
+  it('recognises Sol as an author in every spelling of its name', () => {
+    for (const author of [SOL_COMMIT, 'GPT-5.6 Sol', 'Sol', 'gpt-5.6-sol', ['Claude Opus 5', SOL_COMMIT]]) {
+      expect(solAuthored(author), String(author)).toBe(true)
+    }
+    for (const author of ['', 'Claude Opus 5 <x@y>', ['Claude Opus 5', 'Claude Fable 5'], 'Patrick <p@x>']) {
+      expect(solAuthored(author), String(author)).toBe(false)
+    }
+  })
+
+  it('hands a Sol-authored range to Opus 5 — the model that also lands it', () => {
+    expect(CLAUDE_REVIEW_CHAIN[0]).toBe('Opus 5')
+    expect(claudeReviewerFor(SOL_COMMIT)).toBe('Opus 5')
+    // …and skips a Claude model that authored part of the range.
+    expect(claudeReviewerFor([SOL_COMMIT, 'Claude Opus 5 <x@y>'])).toBe('Fable 5')
+    expect(claudeReviewerFor([SOL_COMMIT, 'Claude Opus 5 <x@y>', 'Claude Fable 5 <x@y>'])).toBe('Opus 4.8')
+    // Every candidate authored part of it: no reviewer, said plainly.
+    expect(claudeReviewerFor([SOL_COMMIT, 'Claude Opus 5', 'Claude Fable 5', 'Claude Opus 4.8'])).toBe('')
+  })
+
+  it('refuses to record a SUCCESSFUL Sol run over a range Sol authored', () => {
+    // The dangerous case: the run worked and came back with a clean verdict.
+    // Recording it would be a self-review that reads green at both gates.
+    const d = decideReview({ ...okRun(), authorModel: [SOL_COMMIT] })
+    expect(d.kind).toBe(OUTCOME.SELF_REVIEW)
+    expect(d.ready).toBe(false)
+    expect(d.verdict).toBe('')
+    expect(d.ranBy).toBe('')
+    expect(d.model).toBe('Opus 5')
+    expect(d.cause).toMatch(/AUTHORED/)
+  })
+
+  it('leaves the ordinary direction exactly as it was', () => {
+    const d = decideReview({ ...okRun(), authorModel: ['Claude Opus 5 <x@y>'] })
+    expect(d).toMatchObject({ model: SOL_MODEL_NAME, ranBy: SOL_MODEL_NAME, verdict: 'merge', ready: true })
+    // Sol unavailable over Claude-authored work still falls back to Fable.
+    expect(fallbackReviewerFor('Claude Opus 5 <x@y>')).toBe(FALLBACK_MODEL_NAME)
+    expect(fallbackReviewerFor('Claude Fable 5 <x@y>')).toBe(SECOND_FALLBACK_MODEL_NAME)
+  })
+
+  it('reports a role swap as a role swap, not as a failure, and invents no verdict', () => {
+    const d = decideReview({ ...okRun(), authorModel: [SOL_COMMIT] })
+    const text = formatReviewReport({ decision: d, sha: 'abcdef1234567', mode: 'review', point: '667' })
+    expect(text).toMatch(/ROLE SWAP/)
+    expect(text).not.toMatch(/FALLBACK/)
+    expect(text).toMatch(/AUTHORED part of abcdef1/)
+    expect(text).toMatch(/runs the suites, judges the picture and lands/)
+    // The printed record command carries the PLACEHOLDER, so a hand that pastes
+    // it without having the review done gets a refusal from the recorder.
+    expect(text).toContain('--model "Opus 5"')
+    expect(text).toContain(`--verdict <${VERDICTS.join('|')}>`)
+    expect(validateRecord({
+      sha: 'abcdef1234567',
+      model: 'Opus 5',
+      verdict: '<merge|merge-with-fixes|do-not-merge>',
+      evidence: '<what the review actually checked>',
+      authoredBy: SOL_COMMIT,
+      mode: 'review',
+    }).ok).toBe(false)
+  })
+
+  it('says so when the whole chain authored the range', () => {
+    const d = decideReview({
+      ...okRun(),
+      authorModel: [SOL_COMMIT, 'Claude Opus 5', 'Claude Fable 5', 'Claude Opus 4.8'],
+    })
+    const text = formatReviewReport({ decision: d, sha: 'abcdef1234567' })
+    expect(d.model).toBe('')
+    expect(text).toMatch(/cannot be recorded/)
+    expect(text).not.toMatch(/--record/)
   })
 })

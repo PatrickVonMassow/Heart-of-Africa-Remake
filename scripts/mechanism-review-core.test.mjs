@@ -149,6 +149,35 @@ describe('model identity', () => {
     expect(modelFromTrailers('Patrick von Massow <p@example.com>')).toBe('')
     expect(modelFromTrailers('')).toBe('')
   })
+
+  // POINT 667: Sol authors as well as reviews, so "who wrote this" must read its
+  // trailer too — every self-review refusal downstream is built on that answer.
+  it('reads a Sol-authored commit as authored, and by ONE model', () => {
+    expect(modelFromTrailers('GPT-5.6 Sol <noreply@openai.com>')).toBe('GPT-5.6 Sol <noreply@openai.com>')
+    expect(modelsFromTrailers('Patrick von Massow <p@example.com>;GPT-5.6 Sol <n@o.com>')).toEqual([
+      'GPT-5.6 Sol <n@o.com>',
+    ])
+    // Both halves of Sol's name are the same model, whichever is written.
+    expect(sameModel('GPT-5.6 Sol <noreply@openai.com>', 'Sol')).toBe(true)
+    expect(sameModel('GPT-5.6 Sol', 'GPT-5.6 Sol')).toBe(true)
+    expect(sameModel('GPT-5.6 Sol', 'Claude Opus 5')).toBe(false)
+    expect(parseModel('GPT-5.6 Sol')).toMatchObject({ family: 'sol', version: '5.6' })
+  })
+
+  it('refuses Sol reviewing what Sol authored, and lets Claude review it', () => {
+    const record = {
+      sha: 'b'.repeat(40),
+      verdict: 'merge',
+      evidence: 'read the routing core and its cases; the hard-case branch is covered',
+      authoredBy: 'GPT-5.6 Sol <noreply@openai.com>',
+      mode: 'review',
+    }
+    const self = validateRecord({ ...record, model: 'GPT-5.6 Sol' })
+    expect(self.ok).toBe(false)
+    expect(self.errors.join(' ')).toMatch(/SELF-REVIEW is refused/)
+    expect(validateRecord({ ...record, model: 'Sol' }).ok).toBe(false)
+    expect(validateRecord({ ...record, model: 'Opus 5' }).ok).toBe(true)
+  })
 })
 
 describe('validateRecord', () => {

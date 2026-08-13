@@ -290,9 +290,12 @@ export const usage = () =>
   `       --union <U.json> --list-a <A> --list-b <B>   (preferred; --accounting then\n` +
   `       needs no value). Or run node scripts/blind-merge.mjs first and pass the line\n` +
   `       it prints as --accounting "<summary>".\n` +
-  `\nWHO REVIEWS (CLAUDE.md §6): GPT-5.6 Sol at reasoning effort high; when Sol is\n` +
-  `       unavailable, the first of Fable 5 / Opus 5 / Opus 4.8 that authored no part of\n` +
-  `       the range. Run it — never a hand-typed codex line — with:\n` +
+  `\nWHO REVIEWS (CLAUDE.md §6): the OTHER vendor, never an author of the range.\n` +
+  `       Claude authored it → GPT-5.6 Sol at reasoning effort high, and when Sol is\n` +
+  `       unavailable the first of Fable 5 / Opus 5 / Opus 4.8 that wrote no part of it.\n` +
+  `       SOL authored it → the first of Opus 5 / Fable 5 / Opus 4.8 that wrote no part\n` +
+  `       of it, which also runs the suites, judges the picture and lands the point.\n` +
+  `       Run it — never a hand-typed codex line — with:\n` +
   `       node scripts/review-sol.mjs --sha <sha> --brief "<what to judge>"\n` +
   `\nThe GATES are separate commands and answer --status themselves:\n` +
   `       node scripts/mechanism-review-guard.mjs --status\n` +
