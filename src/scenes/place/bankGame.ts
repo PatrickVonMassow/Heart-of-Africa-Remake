@@ -602,7 +602,7 @@ function endRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
 
 /** Back to roaming: everybody is a runner again, and a climber is picked for the
  *  boulder that is no part of the game. */
-function openRoam(s: BankState, stage: BankStage, cfg: BankConfig, rand: () => number): void {
+function openRoam(s: BankState, cfg: BankConfig, rand: () => number): void {
   s.phase = 'roam'
   s.phaseFor = cfg.roamSeconds * (1 + (rand() * 2 - 1) * cfg.roamSpread)
   s.direction = null
@@ -668,7 +668,7 @@ export function stepBankGame(
       openedRun = true
     }
   }
-  if (s.phase === 'part' && s.phaseFor <= 0) openRoam(s, stage, cfg, rand)
+  if (s.phase === 'part' && s.phaseFor <= 0) openRoam(s, cfg, rand)
   switch (s.phase) {
     case 'roam':
       stepRoam(s, dt, cfg, stage, world, rand)
