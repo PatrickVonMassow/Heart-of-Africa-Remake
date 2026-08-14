@@ -91,20 +91,19 @@ there (§9).
 ## 7. Language and communication.
 
 BUILT (`design.md` §13.4, `docs/communication-poc-spec.md`), in `src/communication/`: the
-Bambara village speaks eleven concepts as five-syllable tone words (`lexicon`); voice and
+Bambara village speaks FIVE concepts as four-syllable tone words (`lexicon`); voice and
 gesture carry equally far (`speaking`, `spokenGesture`); what is audible is recorded with
-day and village (`heard`). The children's tag teaches six concepts and the adults' errands
-five more, look-alikes apart (`src/scenes/place/childSituations`, `adultErrands`). The
-player's OWN reading — never judged — stands over the nearest speaker and is written by
-clicking him (`speechLabel`, `speechTarget`, `src/ui/SpeechGuess.tsx`), one note with the
-journal. On earned trust the chief drums a seven-concept message (`drumMessage`); the
-artefact dug at the erratic it names is answered untranslated (`chiefReply`). The
-§13.1–13.3 layer stands unchanged beside it (`src/world/lore.ts`): the elder's lesson, the
-glossary and the retroactively deciphered hints that carry criterion 10.
+day and village (`heard`). The children's ONE game at the bank teaches four of them at
+fixed moments of its round, the forbidden readings closed by the catcher's tap, a boulder
+named off the game and the parting call (`scenes/place/bankGame`, `bankStage`). The
+player's OWN reading — never judged — stands over the nearest speaker, written by clicking
+him (`speechLabel`, `speechTarget`, `src/ui/SpeechGuess.tsx`), one note with the journal.
+On earned trust the chief drums the four-concept message (`drumMessage`) and answers the
+artefact untranslated (`chiefReply`). Beside it stands §13.1–13.3 (`src/world/lore.ts`).
 
-REMAINDER (§13.4): ONE lect is built, `tonalWestCentre`; the other regions' invented
-languages and the zone cut of `docs/communication-1890.md` stay the user's decision, so
-§13.2's word lists remain placeholders. What is built is load-bearing.
+REMAINDER (§13.4): the ADULTS' half — `RIVER` and `DIG` at their own work, never at the
+bank — is owed by point 688. ONE lect is built; other regions' languages and the
+`communication-1890.md` zone cut stay the user's decision, so §13.2 stays placeholder.
 
 ## 8. Chronicle/journal.
 
