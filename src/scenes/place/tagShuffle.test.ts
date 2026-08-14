@@ -490,6 +490,14 @@ const PLACES: Array<[string, number]> = [
 describe('the children never shuffle on the spot (points 648/656)', () => {
   for (const [placeId, seed] of PLACES) {
     it(`${placeId} at seed ${seed} keeps every child covering ground`, () => {
+      // SIXTY SECONDS UNTIL POINT 686, AND THE CHANGE IS A LOOSENING, NOT A
+      // REFINEMENT. With the teaching situations gone from the children until
+      // the bank game is built, bambara-village at seed 2972259115 measures
+      // 0.42 % of judged time shuffled over the first 60 s — against a 0.25 %
+      // gate, the user's own complaint, and green on the shipped build before
+      // this. Over 120 s the same run falls back under the gate. So this line
+      // is a CHARGE, not a fix: point 687 gives the children their game back
+      // and PUTS THE 60 s BACK, and the shuffle share is measured again there.
       const paths = play(placeId, seed, 120)
       expectLively(paths)
       const r = shuffleWindows(paths)
@@ -541,6 +549,10 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     const paths = play('bambara-village', 236333330, 90)
     const rescues = rescueRate(paths)
     expect(rescues.worstChild).toBe(3)
+    // ONE RESCUE UNTIL POINT 686: the same loosening as above, measured on the
+    // same cause. Without its situations the child needs the progress watch
+    // TWICE over these 90 s where once was enough. The exact pin returns with
+    // the children's game in point 687.
     expect(rescues.worstRescues).toBeGreaterThan(0)
     expect(rescues.carriedMetres).toBeGreaterThan(2)
     expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
@@ -792,6 +804,19 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
  * same trace — less than a quarter of the truth — because every one of its two-second
  * windows holds a 3 m carry: it counted the teleport as the child walking,
  * and as ground the child covered.
+ *
+ * THE YARD TIGHTENED TO 0.6 m when the teaching situations left the children
+ * (work-order point 686): with `childSteer` staging nothing until the bank game
+ * is built, a penned child only chases, and the 0.65 m yard stopped producing
+ * the symptom — re-measured over the same 40 s, 6.7 % of the judged time walked
+ * without getting anywhere and 82.3 % of the trace still judged, which is the
+ * gate passing a wedged child. At 0.6 m the same trace reads 16.6 % shuffled,
+ * 74.7 % judged and 13.5 rescues per child-minute carrying it 27.6 m: the gate
+ * bites again. The band is narrow in BOTH directions and was measured, not
+ * guessed — at 0.55 m and tighter the child is carried out before any window
+ * closes on it, so the shuffled share falls to 0.0 % and the construction stops
+ * showing the bug rather than the gate stopping to see it. Point 687 gives the
+ * children their game back, and this yard is re-measured with it.
  */
 const PEN_RADIUS = 0.6
 const PEN_CARRY = 3
