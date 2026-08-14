@@ -1199,6 +1199,24 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(measured, { suite: 'polish', backend: 'webgpu' })).toBeNull()
   })
 
+  it('charges the same composition on the OTHER backend to the same owner, by its own signature', () => {
+    // The WebGL-2-only scoping was disproved the night it was written: the same
+    // composition appeared on WebGPU at a different measurement (point 694).
+    // Each entry still answers for ITS signature alone — which is precisely why
+    // 694 must replace them both with a rule about the SHAPE.
+    const child = (detail) => ({ ...red('no child walks without getting anywhere'), detail })
+    const onWebgpu = child('worst child 1 at 0.29 % — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m')
+    expect(chargeFor(onWebgpu, { suite: 'polish', backend: 'webgpu' }).point).toBe(694)
+    // Not on the other backend, and no blanket over the check itself.
+    expect(chargeFor(onWebgpu, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(
+      chargeFor(child('worst child 2 at 18.4 % — worst child 2 at 3.0s, 9.10 m walked inside 0.12 m'), {
+        suite: 'polish',
+        backend: 'webgpu',
+      }),
+    ).toBeNull()
+  })
+
   it('charges the fixed render-target leak to NOBODY — a mended red is a red again', () => {
     // Point 546 released the bird's-eye cascade shadow maps and its entry left
     // the ledger with the tick. Should the leak ever come back, it must count
