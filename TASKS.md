@@ -7811,3 +7811,37 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the release branch's picture gate: while it stands, every turn either
   blocks or waves reds through with a deferral, which is how a real regression slips past.
   Bundle: Werkzeug.
+
+- [ ] 696. A HANDED-OVER SESSION KEPT WRITING, AND THE SUCCESSOR WAS TOLD IT WAS DEAD (measured
+  14.08.2026, 07:00-07:05, while resuming point 687). The SessionStart hook told the incoming
+  session "the previous owner was provably dead" and handed it the batch lock at 06:56. The
+  predecessor (pid 2380442, 1 h 25 min old) was alive and went on working: it committed into the
+  SAME worktree at 06:59:30 and 07:04:22, after the lock had changed hands. It had already taken
+  its point boundary and transferred its in-flight declaration — so it handed over AND kept
+  going, and neither its own Stop guards nor the PreToolUse fence stopped its commit or its push.
+  The cost was measurable within minutes: a delegated Sol run started by the new owner saw
+  foreign commits appear in its own worktree mid-run, read the point as already implemented and
+  authored nothing. Two writers in one worktree is the exact failure the hard singleton exists to
+  prevent. Resolved by hand with `kill -TERM`; `batch-doctor --gate` then reported consistent.
+  FINAL STATE: two holes are closed, and each is closed where it is, not by a reminder.
+  (a) THE LIVENESS VERDICT. Whatever `provably dead` is computed from judged a process that was
+  running and committing as dead. The probe is corrected so that a live pid that is still
+  producing commits is NEVER judged dead, and the failure direction is stated: a wrong "alive"
+  costs a delayed spawn, a wrong "dead" costs two writers — so the probe errs toward alive.
+  (`verify-owner-really-dead` in the memory records the OPPOSITE drift on the same probe, a live
+  owner declared pid-reused after ~30 min; both directions come out of one mechanism and are
+  fixed together.)
+  (b) THE FENCE. A session that does not hold the lock must not be able to commit or push in a
+  repository worktree. The fence already refuses it merge, push of main, the tick, the board
+  publish and `dashboard-state.json`; a branch commit and a branch push are added to what it
+  refuses, so a session that has handed over cannot write even if it is still running.
+  Additionally the handover ENDS the session it hands from: after `--commit`, a predecessor that
+  is still alive is stopped rather than trusted to stop itself.
+  VERIFIABLE: Vitest cases over the pure liveness core proving a running, recently-committing pid
+  is judged alive and that the tie-break falls toward alive; a case over the fence proving a
+  commit and a push are refused for a session without the lock; and a case proving the boundary
+  commit leaves no live predecessor behind.
+  Criticality: high — this is the singleton itself. While it holds wrong, every resumed session
+  can silently share a worktree with its predecessor, and the damage (a lost delegated run) is
+  invisible in git.
+  Bundle: Session- & Repo-Hygiene.
