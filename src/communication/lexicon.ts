@@ -1,5 +1,5 @@
 // The tonal lexicon of the village communication slice (design.md §13.4,
-// docs/communication-poc-spec.md): the eleven concepts, the tone sequence each
+// docs/communication-poc-spec.md): the five concepts, the tone sequence each
 // one is spoken in, and the tone helpers every consumer — villager speech,
 // drums, journal, overhead labels — reads instead of restating them.
 //
@@ -18,37 +18,22 @@ export type Tone = 'low' | 'high'
 export type ToneSequence = readonly Tone[]
 
 /**
- * The eleven concepts of the slice. Adding a twelfth here fails to compile
+ * The five concepts of the slice. Adding another here fails to compile
  * until every lect gives it a sequence (the Record below is exhaustive).
  */
 export type ConceptId =
-  // The children's six, taught at their game of tag.
-  | 'COME'
-  | 'GO_THERE'
-  | 'FOLLOW'
-  | 'HERE'
-  | 'THERE'
-  | 'NO'
-  // The five the chief's message needs on top, taught by the adults.
   | 'RIVER'
   | 'UPSTREAM'
   | 'DOWNSTREAM'
-  | 'BIG_ROCK'
+  | 'ROCK'
   | 'DIG'
 
 /**
- * Every sequence is this long: five syllables, an even number of them high.
- *
- * FIVE and not four, and the user CONFIRMED it on 11.08.2026 after trying the
- * length ("Fünf Silben sind in Ordnung"), so the four-syllable variant is off the
- * table. The reason it was worth asking: eleven concepts fit into four syllables,
- * but then some pairs necessarily differ in a SINGLE syllable — mishear one tone
- * and you hear another valid word and are confidently wrong. At five the
- * inventory can be chosen so any two sequences differ in at least TWO, and a
- * misheard tone yields no word at all, which is noticeable. The price is the
- * chief's message running 35 syllables instead of 28.
+ * Every sequence is four syllables long with an even number of highs. Those
+ * eight parity sequences are mutually at least two syllables apart: five are
+ * words and three remain reserved.
  */
-export const SEQUENCE_LENGTH = 5
+export const SEQUENCE_LENGTH = 4
 
 /** Syllables are written out separated by this, in speech and in the save. */
 export const SYLLABLE_SEPARATOR = '-'
@@ -100,34 +85,26 @@ export function toneOfSyllable(syllable: string): Tone {
 
 /**
  * The tonal West/Centre belt of the slice — the only lect the PoC ships.
- * Five syllables with an EVEN number of highs: any two such sequences differ in
+ * Four syllables with an EVEN number of highs: any two such sequences differ in
  * at least two syllables, so one misheard beat can never turn one concept into
- * another, only into a non-word the player notices. Four syllables cannot do
- * that for eleven concepts (a length-four code with every pair two apart holds
- * at most eight). Fifteen sequences qualify; eleven are used.
+ * another, only into a non-word the player notices. Eight sequences qualify;
+ * five are used.
  */
 const TONAL_WEST_CENTRE: Lect = {
   id: 'tonalWestCentre',
   low: 'ba',
   high: 'BA',
   sequences: {
-    COME: seq('BA-BA-ba-ba-ba'), // falling, toward the speaker
-    GO_THERE: seq('ba-ba-ba-BA-BA'), // rising, away — the mirror of COME
-    HERE: seq('BA-ba-BA-ba-ba'), // the near thing
-    THERE: seq('ba-ba-BA-ba-BA'), // its mirror, the far thing
-    FOLLOW: seq('ba-BA-BA-ba-ba'),
-    NO: seq('ba-ba-BA-BA-ba'), // its mirror
-    UPSTREAM: seq('ba-BA-BA-BA-BA'), // rising against the current
-    DOWNSTREAM: seq('BA-BA-BA-BA-ba'), // its mirror, falling with it
-    RIVER: seq('ba-BA-ba-BA-ba'), // alternating, like the water
-    BIG_ROCK: seq('BA-ba-ba-ba-BA'), // framed by two highs — a solid block
-    DIG: seq('BA-ba-ba-BA-ba'),
+    RIVER: seq('ba-ba-ba-ba'),
+    UPSTREAM: seq('ba-ba-BA-BA'), // rising against the current
+    DOWNSTREAM: seq('BA-BA-ba-ba'), // its mirror, falling with it
+    ROCK: seq('BA-ba-ba-BA'), // framed by two highs: a class of solid things
+    DIG: seq('ba-BA-BA-ba'),
   },
   reserved: [
-    seq('ba-BA-ba-ba-BA'),
-    seq('BA-BA-ba-BA-BA'),
-    seq('BA-ba-BA-BA-BA'),
-    seq('BA-BA-BA-ba-BA'),
+    seq('ba-BA-ba-BA'),
+    seq('BA-ba-BA-ba'),
+    seq('BA-BA-BA-BA'),
   ],
 }
 
@@ -143,20 +120,16 @@ export function lectOf(id: LectId = DEFAULT_LECT): Lect {
   return LECTS[id]
 }
 
-/** Every concept, in the registry's order (children's six, then adults' five). */
+/** Every concept, in the registry's order. */
 export const CONCEPT_IDS: readonly ConceptId[] = Object.keys(
   TONAL_WEST_CENTRE.sequences,
 ) as ConceptId[]
 
 /**
- * The four opposite pairs, whose sequences are exact reverses of each other.
- * A reward for listening closely, never a requirement: every concept stays
- * learnable from its situations alone.
+ * The direction pair is an exact tonal mirror, the relationship the player is
+ * meant to notice.
  */
 export const MIRROR_PAIRS: readonly (readonly [ConceptId, ConceptId])[] = [
-  ['COME', 'GO_THERE'],
-  ['HERE', 'THERE'],
-  ['FOLLOW', 'NO'],
   ['UPSTREAM', 'DOWNSTREAM'],
 ]
 
@@ -205,14 +178,13 @@ export function toneDistance(a: ToneSequence, b: ToneSequence): number {
 }
 
 /**
- * A sequence usable as a concept: the fixed length, at least one syllable of
- * each tone, and an even number of highs (which is what buys the distance of
- * two between any two of them).
+ * A sequence usable as a concept: the fixed length and an even number of highs,
+ * which buys the distance of two between any two inventory entries.
  */
 export function isWellFormed(sequence: ToneSequence): boolean {
   if (sequence.length !== SEQUENCE_LENGTH) return false
   const highs = highCount(sequence)
-  return highs > 0 && highs < sequence.length && highs % 2 === 0
+  return highs % 2 === 0
 }
 
 export function reversed(sequence: ToneSequence): ToneSequence {

@@ -14,14 +14,14 @@ import { en } from '../i18n/en'
 import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
 
-const COME = utteranceOf('COME')
+const RIVER_UTTERANCE = utteranceOf('RIVER')
 const DIG = utteranceOf('DIG')
 
 let memory = emptyMemory()
 
 beforeEach(() => {
   useLocale.getState().setLang('en')
-  memory = observeUtterance(observeUtterance(emptyMemory(), COME, 1), DIG, 1)
+  memory = observeUtterance(observeUtterance(emptyMemory(), RIVER_UTTERANCE, 1), DIG, 1)
 })
 afterEach(() => {
   useLocale.getState().setLang('en')
@@ -29,9 +29,9 @@ afterEach(() => {
 
 /** The three speakers of a village corner, and how far each stands away. */
 const SPEAKERS = [
-  { speakerId: 'villager-1', atoms: [COME], distance: 6 },
+  { speakerId: 'villager-1', atoms: [RIVER_UTTERANCE], distance: 6 },
   { speakerId: 'kid-2', atoms: [DIG], distance: 2.5 },
-  { speakerId: 'villager-3', atoms: [COME], distance: 9 },
+  { speakerId: 'villager-3', atoms: [RIVER_UTTERANCE], distance: 9 },
 ]
 
 /** Renders every speaker's note, highlighting the one a click would take. */
@@ -60,14 +60,14 @@ const cardOf = (id: string) => document.querySelector(`.speech-label[data-speake
 
 describe('the note over a speaker’s head (design.md §13.4)', () => {
   it('shows the syllables beside the reading, ??? where none is written', () => {
-    render(<SpeechLabelCard speakerId="kid-1" atoms={[COME]} memory={memory} />)
-    expect(document.querySelector('.speech-label .syllables')?.textContent).toBe(COME)
+    render(<SpeechLabelCard speakerId="kid-1" atoms={[RIVER_UTTERANCE]} memory={memory} />)
+    expect(document.querySelector('.speech-label .syllables')?.textContent).toBe(RIVER_UTTERANCE)
     expect(document.querySelector('.speech-label .reading')?.textContent).toBe(NO_READING)
   })
 
   it('shows the reading the player wrote in the journal', () => {
     render(
-      <SpeechLabelCard speakerId="kid-1" atoms={[COME]} memory={setHypothesis(memory, COME, 'come here')} />,
+      <SpeechLabelCard speakerId="kid-1" atoms={[RIVER_UTTERANCE]} memory={setHypothesis(memory, RIVER_UTTERANCE, 'come here')} />,
     )
     expect(document.querySelector('.speech-label .reading')?.textContent).toBe('come here')
   })
@@ -93,7 +93,7 @@ describe('which note a click would take (point 588)', () => {
   it('invites in both languages, and in neither of them shouts', () => {
     for (const [lang, dict] of [['en', en], ['de', de]] as const) {
       useLocale.getState().setLang(lang)
-      const view = render(<SpeechLabelCard speakerId="kid-1" atoms={[COME]} memory={memory} targeted />)
+      const view = render(<SpeechLabelCard speakerId="kid-1" atoms={[RIVER_UTTERANCE]} memory={memory} targeted />)
       const invite = document.querySelector('.speech-invite')?.textContent ?? ''
       expect(invite).toBe(dict.speechGuess.invite)
       expect(invite.length).toBeGreaterThan(0)
@@ -103,7 +103,7 @@ describe('which note a click would take (point 588)', () => {
   })
 
   it('offers no guess on the debug concept view — that is the answer, not a question', () => {
-    render(<SpeechLabelCard speakerId="kid-1" atoms={[COME]} memory={memory} targeted conceptLabels />)
+    render(<SpeechLabelCard speakerId="kid-1" atoms={[RIVER_UTTERANCE]} memory={memory} targeted conceptLabels />)
     expect(document.querySelector('.speech-invite')).toBeNull()
   })
 })

@@ -1,6 +1,6 @@
 // The chief's drum message on paper (work-order point 486): the display shows
-// the seven concepts with the player's own reading over each, every reading is
-// editable HERE and in the journal as ONE note, and the message can always be
+// the four concepts with the player's own reading over each, every reading is
+// editable in the journal as ONE note, and the message can always be
 // reopened once the drums have spoken.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, fireEvent, act } from '@testing-library/react'
@@ -46,14 +46,14 @@ const syllables = () =>
   )
 
 describe('the message display (design.md §13.4)', () => {
-  it('shows the seven drummed concepts in the order they were beaten', () => {
+  it('shows the four drummed concepts in the order they were beaten', () => {
     render(<DrumMessageDialog />)
     expect(syllables()).toEqual([...chiefMessagePhrase()])
   })
 
   it('shows ??? over a concept the player has not read yet', () => {
     render(<DrumMessageDialog />)
-    expect(readings()).toEqual(new Array(7).fill(NO_READING))
+    expect(readings()).toEqual(new Array(4).fill(NO_READING))
   })
 
   it('is localized in both languages', () => {
@@ -69,7 +69,7 @@ describe('a reading edited at the drums is the journal note (point 486)', () => 
   it('writes the note straight into the communication memory', () => {
     g().receiveDrumMessage()
     render(<DrumMessageDialog />)
-    fireEvent.click(document.querySelectorAll('.drum-concept .reading')[6])
+    fireEvent.click(document.querySelectorAll('.drum-concept .reading')[3])
     const field = document.querySelector('.drum-concept .hypothesis') as HTMLInputElement
     expect(field.getAttribute('aria-label')).toBe(en.drumMessage.readingFor(DIG))
     fireEvent.change(field, { target: { value: 'dig here' } })
@@ -80,7 +80,7 @@ describe('a reading edited at the drums is the journal note (point 486)', () => 
     g().receiveDrumMessage()
     // Written at the drums …
     const drums = render(<DrumMessageDialog />)
-    fireEvent.click(document.querySelectorAll('.drum-concept .reading')[1])
+    fireEvent.click(document.querySelectorAll('.drum-concept .reading')[0])
     fireEvent.change(document.querySelector('.drum-concept .hypothesis') as HTMLInputElement, {
       target: { value: 'water / river' },
     })
@@ -96,13 +96,13 @@ describe('a reading edited at the drums is the journal note (point 486)', () => 
     fireEvent.change(field, { target: { value: 'the water' } })
     journal.unmount()
     render(<DrumMessageDialog />)
-    expect(readings()[1]).toBe('the water')
+    expect(readings()[0]).toBe('the water')
   })
 
   it('keeps the space the player is typing (the store trims)', () => {
     g().receiveDrumMessage()
     render(<DrumMessageDialog />)
-    fireEvent.click(document.querySelectorAll('.drum-concept .reading')[6])
+    fireEvent.click(document.querySelectorAll('.drum-concept .reading')[3])
     const field = document.querySelector('.drum-concept .hypothesis') as HTMLInputElement
     fireEvent.change(field, { target: { value: 'dig ' } })
     expect(field.value).toBe('dig ')
@@ -112,12 +112,12 @@ describe('a reading edited at the drums is the journal note (point 486)', () => 
   it('closes the field again on Enter, leaving the reading in place', () => {
     g().receiveDrumMessage()
     render(<DrumMessageDialog />)
-    fireEvent.click(document.querySelectorAll('.drum-concept .reading')[6])
+    fireEvent.click(document.querySelectorAll('.drum-concept .reading')[3])
     const field = document.querySelector('.drum-concept .hypothesis') as HTMLInputElement
     fireEvent.change(field, { target: { value: 'dig' } })
     fireEvent.keyDown(field, { key: 'Enter' })
     expect(document.querySelector('.drum-concept .hypothesis')).toBeNull()
-    expect(readings()[6]).toBe('dig')
+    expect(readings()[3]).toBe('dig')
   })
 })
 

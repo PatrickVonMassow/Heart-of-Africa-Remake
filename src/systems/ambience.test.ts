@@ -699,7 +699,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
 
   it('schedules one voice per syllable, at the plan offsets on the audio clock', () => {
     ctx.currentTime = 40
-    const plan = utterancePlan(utteranceOf('COME'), 0, { syllableSeconds: 0.3, volume: 1 })
+    const plan = utterancePlan(utteranceOf('DIG'), 0, { syllableSeconds: 0.3, volume: 1 })
     const voices = spoken(() => playSpeech(plan))
     expect(voices).toHaveLength(plan.syllables.length)
     voices.forEach((v, i) => {
@@ -710,7 +710,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
 
   it('gives the high syllable a higher carrier than the low one — the two samples', () => {
     ctx.currentTime = 60
-    const plan = utterancePlan(utteranceOf('COME'), 0, { syllableSeconds: 0.3, volume: 1 })
+    const plan = utterancePlan(utteranceOf('DIG'), 0, { syllableSeconds: 0.3, volume: 1 })
     const voices = spoken(() => playSpeech(plan))
     const pitch = (i: number) => voices[i].frequency.events[0].value ?? 0
     const high = plan.syllables.findIndex((s) => s.tone === 'high')
@@ -720,7 +720,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
 
   it('keeps the phrase pause on the clock between the atoms', () => {
     ctx.currentTime = 80
-    const plan = phrasePlan(phraseOf(['DIG', 'HERE']), 0, {
+    const plan = phrasePlan(phraseOf(['DIG', 'ROCK']), 0, {
       syllableSeconds: 0.3,
       pauseSeconds: 0.9,
       volume: 1,

@@ -15,7 +15,7 @@ import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
 import { freshGame, g } from '../test/store'
 
-const COME = utteranceOf('COME')
+const RIVER_UTTERANCE = utteranceOf('RIVER')
 const DIG = utteranceOf('DIG')
 
 /** Open the dialog for what one speaker just said. */
@@ -40,7 +40,7 @@ beforeEach(() => {
   freshGame()
   useLocale.getState().setLang('en')
   useUi.getState().setDialog(null)
-  g().hearUtterance(COME)
+  g().hearUtterance(RIVER_UTTERANCE)
   g().hearUtterance(DIG)
 })
 afterEach(() => {
@@ -50,29 +50,29 @@ afterEach(() => {
 
 describe('the guess dialog (design.md §13.4)', () => {
   it('opens for exactly the utterance that was spoken, showing its syllables', () => {
-    openFor(COME)
+    openFor(RIVER_UTTERANCE)
     render(<Dialogs />)
     expect(document.querySelector('.dialog.speech-guess')).not.toBeNull()
-    expect(spoken()).toEqual([COME])
+    expect(spoken()).toEqual([RIVER_UTTERANCE])
   })
 
   it('carries a reading already written, and saving writes the store field', () => {
-    g().setUtteranceHypothesis(COME, 'come')
-    openFor(COME)
+    g().setUtteranceHypothesis(RIVER_UTTERANCE, 'come')
+    openFor(RIVER_UTTERANCE)
     render(<Dialogs />)
     expect(field().value).toBe('come')
     fireEvent.change(field(), { target: { value: 'come here' } })
     fireEvent.click(document.querySelectorAll('.dialog.speech-guess .actions .hud-button')[0])
-    expect(hypothesisFor(g().communication, COME)).toBe('come here')
+    expect(hypothesisFor(g().communication, RIVER_UTTERANCE)).toBe('come here')
     expect(useUi.getState().dialog).toBeNull()
   })
 
   it('shows the saved reading in the journal — one note, two views', () => {
-    openFor(COME)
+    openFor(RIVER_UTTERANCE)
     const dialog = render(<Dialogs />)
     fireEvent.change(field(), { target: { value: 'come here' } })
     fireEvent.keyDown(window, { key: 'Enter' })
-    expect(hypothesisFor(g().communication, COME)).toBe('come here')
+    expect(hypothesisFor(g().communication, RIVER_UTTERANCE)).toBe('come here')
     dialog.unmount()
     g().setJournalOpen(true)
     render(<JournalPanel />)
@@ -84,64 +84,64 @@ describe('the guess dialog (design.md §13.4)', () => {
     const written = Array.from(
       document.querySelectorAll('.observation .hypothesis'),
     ).find(
-      (e) => e.getAttribute('aria-label') === en.journalPanel.hypothesisFor(COME),
+      (e) => e.getAttribute('aria-label') === en.journalPanel.hypothesisFor(RIVER_UTTERANCE),
     ) as HTMLInputElement
     expect(written.value).toBe('come here')
   })
 
   it('saves on Enter and leaves the note untouched on Escape', () => {
-    g().setUtteranceHypothesis(COME, 'come')
-    openFor(COME)
+    g().setUtteranceHypothesis(RIVER_UTTERANCE, 'come')
+    openFor(RIVER_UTTERANCE)
     const first = render(<Dialogs />)
     fireEvent.change(field(), { target: { value: 'arrive' } })
     fireEvent.keyDown(window, { key: 'Enter' })
-    expect(hypothesisFor(g().communication, COME)).toBe('arrive')
+    expect(hypothesisFor(g().communication, RIVER_UTTERANCE)).toBe('arrive')
     expect(useUi.getState().dialog).toBeNull()
     first.unmount()
 
-    openFor(COME)
+    openFor(RIVER_UTTERANCE)
     render(<Dialogs />)
     fireEvent.change(field(), { target: { value: 'nonsense' } })
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(hypothesisFor(g().communication, COME)).toBe('arrive')
+    expect(hypothesisFor(g().communication, RIVER_UTTERANCE)).toBe('arrive')
     expect(useUi.getState().dialog).toBeNull()
   })
 
   it('leaves the note untouched when the guess is cancelled by button', () => {
-    g().setUtteranceHypothesis(COME, 'come')
-    openFor(COME)
+    g().setUtteranceHypothesis(RIVER_UTTERANCE, 'come')
+    openFor(RIVER_UTTERANCE)
     render(<Dialogs />)
     fireEvent.change(field(), { target: { value: 'nonsense' } })
     fireEvent.click(document.querySelectorAll('.dialog.speech-guess .actions .hud-button')[1])
-    expect(hypothesisFor(g().communication, COME)).toBe('come')
+    expect(hypothesisFor(g().communication, RIVER_UTTERANCE)).toBe('come')
     expect(useUi.getState().dialog).toBeNull()
   })
 
   it('keeps a space the player types inside his note', () => {
     // The store trims a reading, so a directly bound field would swallow every
     // space the moment it is typed.
-    openFor(COME)
+    openFor(RIVER_UTTERANCE)
     render(<Dialogs />)
     fireEvent.change(field(), { target: { value: 'come ' } })
     expect(field().value).toBe('come ')
     fireEvent.change(field(), { target: { value: 'come here' } })
     fireEvent.keyDown(window, { key: 'Enter' })
-    expect(hypothesisFor(g().communication, COME)).toBe('come here')
+    expect(hypothesisFor(g().communication, RIVER_UTTERANCE)).toBe('come here')
   })
 
   it('gives a spoken phrase one field per word, each writing its own note', () => {
-    openFor(DIG, COME)
+    openFor(DIG, RIVER_UTTERANCE)
     render(<Dialogs />)
-    expect(spoken()).toEqual([DIG, COME])
+    expect(spoken()).toEqual([DIG, RIVER_UTTERANCE])
     fireEvent.change(field(0), { target: { value: 'dig' } })
     fireEvent.change(field(1), { target: { value: 'come here' } })
     fireEvent.keyDown(window, { key: 'Enter' })
     expect(hypothesisFor(g().communication, DIG)).toBe('dig')
-    expect(hypothesisFor(g().communication, COME)).toBe('come here')
+    expect(hypothesisFor(g().communication, RIVER_UTTERANCE)).toBe('come here')
   })
 
   it('speaks both languages, and never interprets the note itself', () => {
-    openFor(COME)
+    openFor(RIVER_UTTERANCE)
     const view = render(<Dialogs />)
     expect(dialogText()).toContain(en.speechGuess.title)
     expect(dialogText()).toContain(en.speechGuess.hint)
@@ -154,6 +154,6 @@ describe('the guess dialog (design.md §13.4)', () => {
     // player's note, unchecked (CLAUDE.md §2 — no translation aid).
     fireEvent.change(field(), { target: { value: 'utter nonsense' } })
     fireEvent.keyDown(window, { key: 'Enter' })
-    expect(hypothesisFor(g().communication, COME)).toBe('utter nonsense')
+    expect(hypothesisFor(g().communication, RIVER_UTTERANCE)).toBe('utter nonsense')
   })
 })

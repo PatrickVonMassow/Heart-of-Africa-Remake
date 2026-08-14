@@ -1,4 +1,4 @@
-// The chief's drum message (work-order point 486): the seven concepts, the
+// The chief's drum message (work-order point 486): the four concepts, the
 // strikes that beat them, and the elements the display shows. The load-bearing
 // claim is that the drums say EXACTLY what the village speaks — sequence for
 // sequence, with one constant pause between the concepts and nothing else.
@@ -25,26 +25,18 @@ afterEach(() => {
 })
 
 describe('the message itself', () => {
-  it('is the seven concepts of the spec, in order', () => {
+  it('is the four concepts of the spec, in order', () => {
     expect(CHIEF_MESSAGE_CONCEPTS).toEqual([
-      'GO_THERE',
       'RIVER',
-      'FOLLOW',
       'UPSTREAM',
-      'BIG_ROCK',
-      'THERE',
+      'ROCK',
       'DIG',
     ])
   })
 
-  it('uses only concepts that are observable in the village beforehand', () => {
-    // The children teach the six general concepts, the adults the five the
-    // message needs on top (docs/communication-poc-spec.md).
-    const taught = new Set([
-      'COME', 'GO_THERE', 'FOLLOW', 'HERE', 'THERE', 'NO',
-      'RIVER', 'UPSTREAM', 'DOWNSTREAM', 'BIG_ROCK', 'DIG',
-    ])
-    for (const concept of CHIEF_MESSAGE_CONCEPTS) expect(taught.has(concept)).toBe(true)
+  it('uses only concepts in the five-word inventory', () => {
+    const inventory = new Set(['RIVER', 'UPSTREAM', 'DOWNSTREAM', 'ROCK', 'DIG'])
+    for (const concept of CHIEF_MESSAGE_CONCEPTS) expect(inventory.has(concept)).toBe(true)
   })
 
   it('takes its atoms from the lexicon, never a literal of its own', () => {
@@ -96,7 +88,7 @@ describe('the drum plan says what the village speaks', () => {
     expect(plan.strikes[first].at - plan.strikes[first - 1].at).toBeCloseTo(2.5, 6)
   })
 
-  it('runs the whole message: five beats per concept plus the six pauses', () => {
+  it('runs the whole message: four beats per concept plus the three pauses', () => {
     const { syllableSeconds, phrasePauseSeconds } = balance.communication
     const n = CHIEF_MESSAGE_CONCEPTS.length
     const plan = drumMessagePlan()

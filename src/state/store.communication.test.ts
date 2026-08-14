@@ -16,9 +16,9 @@ beforeEach(() => {
   freshGame()
 })
 
-const COME = utteranceOf('COME')
+const RIVER_UTTERANCE = utteranceOf('RIVER')
 const DIG = utteranceOf('DIG')
-const HERE = utteranceOf('HERE')
+const ROCK_UTTERANCE = utteranceOf('ROCK')
 
 describe('hearing utterances (design.md §13.4)', () => {
   it('a fresh game has heard nothing', () => {
@@ -27,46 +27,46 @@ describe('hearing utterances (design.md §13.4)', () => {
 
   it('records a heard utterance with the current in-game day', () => {
     g().debugSet({ day: 12.4 })
-    g().hearUtterance(COME)
-    expect(hasHeard(g().communication, COME)).toBe(true)
-    expect(g().communication.heard[COME].firstHeardDay).toBe(12)
+    g().hearUtterance(RIVER_UTTERANCE)
+    expect(hasHeard(g().communication, RIVER_UTTERANCE)).toBe(true)
+    expect(g().communication.heard[RIVER_UTTERANCE].firstHeardDay).toBe(12)
   })
 
   it('an utterance never heard stays absent', () => {
-    g().hearUtterance(COME)
+    g().hearUtterance(RIVER_UTTERANCE)
     expect(hasHeard(g().communication, DIG)).toBe(false)
-    expect(heardUtterances(g().communication).map((h) => h.utterance)).toEqual([COME])
+    expect(heardUtterances(g().communication).map((h) => h.utterance)).toEqual([RIVER_UTTERANCE])
   })
 
   it('hearing the same utterance again keeps one entry and its first day', () => {
     g().debugSet({ day: 3 })
-    g().hearUtterance(COME)
+    g().hearUtterance(RIVER_UTTERANCE)
     const first = g().communication
     g().debugSet({ day: 9 })
-    g().hearUtterance(COME)
+    g().hearUtterance(RIVER_UTTERANCE)
     expect(heardUtterances(g().communication)).toHaveLength(1)
-    expect(g().communication.heard[COME].firstHeardDay).toBe(3)
+    expect(g().communication.heard[RIVER_UTTERANCE].firstHeardDay).toBe(3)
     // Nothing changed, so the memory is the very same object (no re-render).
     expect(g().communication).toBe(first)
   })
 
   it('records the settlement the player stands in, and none out on the map', () => {
     useGame.setState({ mode: 'place', placeId: 'bambara-village' })
-    g().hearUtterance(COME)
-    expect(g().communication.heard[COME].firstHeardPlace).toBe('bambara-village')
+    g().hearUtterance(RIVER_UTTERANCE)
+    expect(g().communication.heard[RIVER_UTTERANCE].firstHeardPlace).toBe('bambara-village')
 
     // Heard while travelling, the utterance keeps no place — the journal then
     // names no village rather than an invented one (point 579).
     useGame.setState({ mode: 'travel', placeId: null })
-    g().hearPhrase([DIG, HERE])
+    g().hearPhrase([DIG, ROCK_UTTERANCE])
     expect(g().communication.heard[DIG].firstHeardPlace).toBeUndefined()
-    expect(g().communication.heard[HERE].firstHeardPlace).toBeUndefined()
+    expect(g().communication.heard[ROCK_UTTERANCE].firstHeardPlace).toBeUndefined()
   })
 
   it('a phrase records each of its atoms once', () => {
-    g().hearPhrase([DIG, HERE, DIG])
+    g().hearPhrase([DIG, ROCK_UTTERANCE, DIG])
     expect(heardUtterances(g().communication).map((h) => h.utterance).sort()).toEqual(
-      [DIG, HERE].sort(),
+      [DIG, ROCK_UTTERANCE].sort(),
     )
   })
 })
@@ -95,8 +95,8 @@ describe('the player\'s own readings (design.md §13.4)', () => {
 describe('observations travel with the save (design.md §18)', () => {
   it('heard utterances and notes survive a save/load round trip', () => {
     g().debugSet({ day: 5 })
-    g().hearPhrase([DIG, HERE])
-    g().setUtteranceHypothesis(HERE, 'here / this place')
+    g().hearPhrase([DIG, ROCK_UTTERANCE])
+    g().setUtteranceHypothesis(ROCK_UTTERANCE, 'here / this place')
     g().saveCheckpoint()
 
     g().newGame()
@@ -104,9 +104,9 @@ describe('observations travel with the save (design.md §18)', () => {
 
     expect(g().loadCheckpoint()).toBe(true)
     expect(heardUtterances(g().communication).map((h) => h.utterance).sort()).toEqual(
-      [DIG, HERE].sort(),
+      [DIG, ROCK_UTTERANCE].sort(),
     )
-    expect(hypothesisFor(g().communication, HERE)).toBe('here / this place')
+    expect(hypothesisFor(g().communication, ROCK_UTTERANCE)).toBe('here / this place')
     expect(g().communication.heard[DIG].firstHeardDay).toBe(5)
   })
 
@@ -129,29 +129,29 @@ describe('observations travel with the save (design.md §18)', () => {
 // the journal is the note that stands over the speaker.
 describe('the overhead label reads the journal note (design.md §13.4)', () => {
   it('shows ??? until the player writes a reading, then his own words', () => {
-    g().hearUtterance(COME)
-    expect(labelReadings(g().communication, [COME])[0].reading).toBe(NO_READING)
+    g().hearUtterance(RIVER_UTTERANCE)
+    expect(labelReadings(g().communication, [RIVER_UTTERANCE])[0].reading).toBe(NO_READING)
 
-    g().setUtteranceHypothesis(COME, 'come here')
-    expect(labelReadings(g().communication, [COME])[0].reading).toBe('come here')
+    g().setUtteranceHypothesis(RIVER_UTTERANCE, 'come here')
+    expect(labelReadings(g().communication, [RIVER_UTTERANCE])[0].reading).toBe('come here')
 
     // Clearing the field in the journal takes the label straight back.
-    g().setUtteranceHypothesis(COME, '')
-    expect(labelReadings(g().communication, [COME])[0].reading).toBe(NO_READING)
+    g().setUtteranceHypothesis(RIVER_UTTERANCE, '')
+    expect(labelReadings(g().communication, [RIVER_UTTERANCE])[0].reading).toBe(NO_READING)
   })
 
   it('shows one reading per atom of a heard phrase, in the spoken order', () => {
-    g().hearPhrase([DIG, HERE])
+    g().hearPhrase([DIG, ROCK_UTTERANCE])
     g().setUtteranceHypothesis(DIG, 'dig')
-    expect(labelReadings(g().communication, [DIG, HERE])).toEqual([
+    expect(labelReadings(g().communication, [DIG, ROCK_UTTERANCE])).toEqual([
       { utterance: DIG, reading: 'dig' },
-      { utterance: HERE, reading: NO_READING },
+      { utterance: ROCK_UTTERANCE, reading: NO_READING },
     ])
   })
 
   it('shows no label for speech that was never observed', () => {
-    g().hearUtterance(COME)
-    expect(isSpeechLabelVisible(g().communication, [COME])).toBe(true)
+    g().hearUtterance(RIVER_UTTERANCE)
+    expect(isSpeechLabelVisible(g().communication, [RIVER_UTTERANCE])).toBe(true)
     expect(isSpeechLabelVisible(g().communication, [DIG])).toBe(false)
   })
 })

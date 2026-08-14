@@ -2,14 +2,13 @@
 // (docs/communication-poc-spec.md, work-order point 487).
 //
 // The hand-over is what solves the puzzle, and the chief acknowledges it IN HIS
-// OWN TONGUE: three concepts, spoken like any other phrase in the village, with
+// OWN TONGUE: two concepts, spoken like any other phrase in the village, with
 // no translation anywhere. A player who learned the words reads them; a player
 // who did not sees three runs of syllables and his own `???`. That asymmetry is
 // the payoff of the whole slice, so nothing here may localize.
 //
-// The concepts are deliberately ones the player has necessarily met: BIG_ROCK
-// and DIG stand in the chief's own drum message, HERE is one of the children's
-// six. Nothing new is introduced at the moment of the solution.
+// Both concepts stand in the chief's own drum message. Nothing new is
+// introduced at the moment of the solution.
 //
 // Pure data and pure logic — the sequences are never re-authored here, they come
 // from the lexicon like every other utterance.
@@ -17,10 +16,9 @@
 import { phraseOf, type ConceptId, type LectId, type Phrase } from './lexicon'
 
 /**
- * "The big rock — dug — here": the chief names what the traveller did and that
- * its fruit now lies before him.
+ * "Rock — dig": the chief names the errand back to the traveller.
  */
-export const CHIEF_ACKNOWLEDGE_CONCEPTS: readonly ConceptId[] = ['BIG_ROCK', 'DIG', 'HERE']
+export const CHIEF_ACKNOWLEDGE_CONCEPTS: readonly ConceptId[] = ['ROCK', 'DIG']
 
 /** The acknowledgment's atoms in the given lect — the spoken phrase, unchanged. */
 export function chiefAcknowledgePhrase(lect?: LectId): Phrase {

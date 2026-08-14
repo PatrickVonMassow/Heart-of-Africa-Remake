@@ -105,9 +105,9 @@ describe('entry kinds, ordering and sketches (design.md §15/§16)', () => {
 // free-text reading. The store side is pinned in store.communication.test.ts.
 // ---------------------------------------------------------------------------
 
-const COME = utteranceOf('COME')
+const RIVER_UTTERANCE = utteranceOf('RIVER')
 const DIG = utteranceOf('DIG')
-const HERE = utteranceOf('HERE')
+const ROCK_UTTERANCE = utteranceOf('ROCK')
 
 /** Text of the observation section, '' when it is not rendered at all. */
 const observationText = () => document.querySelector('.journal .observations')?.textContent ?? ''
@@ -134,28 +134,28 @@ describe('journal observation section (design.md §13.4)', () => {
   })
 
   it('lists a heard utterance once, and never an unheard one', () => {
-    g().hearUtterance(COME)
-    g().hearUtterance(COME) // heard again — still one line
+    g().hearUtterance(RIVER_UTTERANCE)
+    g().hearUtterance(RIVER_UTTERANCE) // heard again — still one line
     render(<JournalPanel />)
     openObservationsTab()
-    expect(listedUtterances()).toEqual([COME])
+    expect(listedUtterances()).toEqual([RIVER_UTTERANCE])
     expect(observationText()).not.toContain(DIG)
   })
 
   it('sorts the utterances by the lexicon rule, mixed lengths included', () => {
     // 'ba' before 'BA' syllable by syllable; a shorter prefix comes first.
-    const short = 'ba-BA'
-    for (const u of [DIG, HERE, short, COME]) g().hearUtterance(u)
+    const short = 'ba'
+    for (const u of [DIG, ROCK_UTTERANCE, short, RIVER_UTTERANCE]) g().hearUtterance(u)
     render(<JournalPanel />)
     openObservationsTab()
-    const expected = [DIG, HERE, short, COME].sort(compareUtterances)
+    const expected = [DIG, ROCK_UTTERANCE, short, RIVER_UTTERANCE].sort(compareUtterances)
     expect(listedUtterances()).toEqual(expected)
     // The rule itself: the low-tone opening sorts ahead of the high-tone ones.
     expect(expected[0]).toBe(short)
   })
 
   it('keeps the section separate from the written entries', () => {
-    g().hearUtterance(COME)
+    g().hearUtterance(RIVER_UTTERANCE)
     render(<JournalPanel />)
     openObservationsTab()
     expect(document.querySelector('.entries .observations')).not.toBeInTheDocument()
@@ -185,8 +185,8 @@ describe('journal observation section (design.md §13.4)', () => {
   })
 
   it('shows a note restored from a save', () => {
-    g().hearUtterance(HERE)
-    g().setUtteranceHypothesis(HERE, 'this place')
+    g().hearUtterance(ROCK_UTTERANCE)
+    g().setUtteranceHypothesis(ROCK_UTTERANCE, 'this place')
     g().saveCheckpoint()
     g().newGame()
     expect(g().loadCheckpoint()).toBe(true)
@@ -197,7 +197,7 @@ describe('journal observation section (design.md §13.4)', () => {
   })
 
   it('labels the section in both languages', () => {
-    g().hearUtterance(COME)
+    g().hearUtterance(RIVER_UTTERANCE)
     const { unmount } = render(<JournalPanel />)
     openObservationsTab()
     expect(observationText()).toContain(en.journalPanel.observationsHint)
@@ -237,7 +237,7 @@ describe('journal tabs (point 579)', () => {
   })
 
   it('opens on the diary and switches on a click', () => {
-    g().hearUtterance(COME)
+    g().hearUtterance(RIVER_UTTERANCE)
     render(<JournalPanel />)
     expect(activeTab()).toBe(en.journalPanel.entries)
     openObservationsTab()
@@ -255,7 +255,7 @@ describe('journal tabs (point 579)', () => {
   })
 
   it('keeps only one panel in the DOM at a time', () => {
-    g().hearUtterance(COME)
+    g().hearUtterance(RIVER_UTTERANCE)
     render(<JournalPanel />)
     expect(document.querySelector('.journal .entries')).toBeInTheDocument()
     expect(document.querySelector('.journal .observations')).not.toBeInTheDocument()
@@ -286,7 +286,7 @@ describe('journal tabs (point 579)', () => {
   })
 
   it('writes no label in upper case, in the text or through the stylesheet', () => {
-    g().hearUtterance(COME)
+    g().hearUtterance(RIVER_UTTERANCE)
     render(<JournalPanel />)
     const labels = [...tabLabels(), firstHeardText()]
     openObservationsTab()
@@ -310,7 +310,7 @@ describe('journal tabs (point 579)', () => {
 describe('first heard names its village (point 579)', () => {
   it('names the village an utterance was first heard in', () => {
     standIn('bambara-village')
-    g().hearUtterance(COME)
+    g().hearUtterance(RIVER_UTTERANCE)
     const { unmount } = render(<JournalPanel />)
     openObservationsTab()
     expect(firstHeardText()).toContain(en.places['bambara-village'])
@@ -325,7 +325,7 @@ describe('first heard names its village (point 579)', () => {
     // An utterance heard out on the map — as every one recorded before the
     // village was tracked reads too.
     useGame.setState({ mode: 'travel', placeId: null })
-    g().hearUtterance(COME)
+    g().hearUtterance(RIVER_UTTERANCE)
     render(<JournalPanel />)
     openObservationsTab()
     const line = firstHeardText()

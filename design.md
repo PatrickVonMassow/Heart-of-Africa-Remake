@@ -409,22 +409,31 @@ A village elder teaches the region's direction words; a second talk with the eld
 ### 13.3 Cascade and Time Limit
 Per region exactly one knowing people (seeded anew each run) reveals the region's component of the site: the North's chief the latitude, the East's the longitude, the other regions narrowing statements. Every other chief offers only unspecific knowledge (Oz Oz …) that points toward the region's knowing people. Several hints are triangulated into the exact position of the tomb.
 
-### 13.4 OPEN: the communication mechanic is not yet decided
+### 13.4 The five-word communication slice
 
-**§13.1–13.3 above describe what is BUILT, not the target state.** Understanding the inhabitants is meant to become a central mechanic of the game rather than a vocabulary list handed over by an elder, and the mechanic that carries it is still an open design question. Nothing in §13.1–13.3 should be treated as settled, and nothing should be built on top of it until this is decided. What IS already built toward it is the ACT OF GUESSING: a speaker's words stand as a note over his head carrying the player's own reading, the NEAREST speaker's note invites a click, and that click opens a modal — the one deliberate exception to §16.1 — where the reading is written where the guess is formed. Journal and note are one field. The game never judges it: guessing wrong is the mechanic.
+The tonal West/Centre village teaches exactly five concepts: RIVER, UPSTREAM,
+DOWNSTREAM, ROCK and DIG. The player infers them from two places rather than
+receiving a glossary: the children's bank game, including the village's play
+rocks, and the adults' water and digging work. ROCK is a class of thing learned
+on those rocks and transferred to the separate boulder upstream; it is not a
+proper name or shorthand for one "big rock."
 
-Rough direction (first thoughts, deliberately not yet binding):
+Each word is an atomic four-syllable sequence of low and high `ba`. Valid
+sequences have an even number of highs, making every pair differ in at least two
+positions. Four syllables provide eight such sequences: five are used and three
+reserved. UPSTREAM and DOWNSTREAM are exact tonal reversals and form the one
+direction pair the player is meant to notice.
 
-- **Learning, not being told.** Today the elder simply teaches the region's direction words and the hint decodes. The intent is that the player must *work out* what the inhabitants mean — by observing them, by interacting, by seeing a word used in a situation whose meaning is obvious, and by testing a guess and being wrong. The reference point is **Chants of Sennaar**: meaning is inferred from context and confirmed by use, and the player's own understanding is the progression, not an inventory flag.
-- **One invented language per region**, each **invented but resting on real local and historical practice** — the same standard the world's geography and peoples are held to (§3.1, §16). The research comes first and the language follows from it: where a region really communicated in a particular form, the invented language takes that form. Example (the user's, and it is a real West African practice): if the research shows that **talking drums** carried messages across West Africa, then the West's language is a drum-signal language the player must learn to hear.
-- **Consequence for §13.2's glossary:** the current word lists are placeholders from the original game, not researched material. They are likely to be replaced wholesale rather than extended.
-- **Consequence for §13.3:** the knowing-people cascade may survive as the *structure* of who holds which part of the answer, but its delivery — an elder's lesson, a raw hint decoded retroactively — belongs to the old mechanic and is under review with it.
+The chief's message is `RIVER · UPSTREAM · ROCK · DIG`: sixteen drum
+strikes, with the same constant pause between atoms that speech uses. The large
+drum carries the low tone and the small drum the high one. The journal and the
+overhead note show only the player's own reading; the game never supplies or
+judges a translation. Full implementation detail lives in
+`docs/communication-poc-spec.md`.
 
-**This section is the flag CLAUDE.md §2 requires: the concept is missing, so it is recorded as an open item rather than invented.** It needs (a) research into how each region really communicated around 1890, in the manner of `docs/climate-1890.md` and `docs/peoples-1890.md`, and (b) a decision on the mechanic itself, before any implementation point can be written.
-
-**(a) is DONE: `docs/communication-1890.md`**, which carries the evidence and sources. Its load-bearing findings: drum speech is a real language operated in stock formulas, and the stock phrase IS the signal, which is what makes it learnable by observation; whistling and drumming are one abstraction in different media across the tonal Niger-Congo zone; the Sambla balafon models it better than the famous Congo drum; nsibidi supplies the visual counterpart, on whose mechanics the game must build an INVENTED system rather than transcribe the real one, per its own custodians; North and East Africa genuinely lack sound surrogates — an honest mechanical contrast, not a gap to fill; and in 1890 the mechanism was un-decoded by outsiders, so a player inferring it stands where a European of that year stood. It closes with a concrete ZONE PROPOSAL; **the zone cut and the mechanic itself remain the user's decision (b).**
-
-**Until then, §13.1–13.3 is NOT a constraint on other work.** It is placeholder machinery awaiting replacement, so disturbing it is not a reason to compromise a change elsewhere — do not bend an accurate implementation to protect the elder's lesson, the glossary or the knowing-people cascade. Being free to disturb it is no licence to leave the suite red (CLAUDE.md §7.2). **The moment the new mechanic is decided and built, that reverses: it then becomes load-bearing and must be protected like any other system.**
+The reduced inventory deliberately breaks persisted heard-utterance readings.
+No migration is owed while saving is disabled for the PoC; save/load code stays
+in place.
 
 ---
 
