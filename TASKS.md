@@ -7657,9 +7657,22 @@ to land than a mechanism that needs a review.
   at 0.29 % of the judged time — worst child 1 at 22.2 s, 1.42 m walked inside 0.31 m, 3 of 4664
   one-second windows, and 0.00 % in the 0.5 s bursts. That is the SAME composition, on the OTHER
   backend, at a DIFFERENT measurement, so the inherited entry — scoped to WebGL 2 and to the
-  exact string "1.29 m walked inside 0.32 m" — covers neither. It is not a regression of the
-  point-666 fix: point 666's own evidence measured this composition at 1 red in 24 live-cadence
-  replay seeds at 0.31 %, before that fix existed, and today's 0.29 % sits in that band. TWO
+  exact string "1.29 m walked inside 0.32 m" — covers neither. What the evidence does and does
+  NOT say about the point-666 fix (sharpened by the cross-vendor review, 14.08.2026): point 666
+  measured this same composition at 0.31 % on a live-cadence replay seed BEFORE that fix existed,
+  so the composition PREDATES it and today's 0.29 % is of the same magnitude — but one prior
+  severity value is not a band, no post-fix incidence RATE was measured, and this point may
+  therefore not assume the fix left the rate untouched. Measuring that rate is part of the work.
+  AND THE VEHICLE IT INHERITS CANNOT FIRE AT ALL (measured 14.08.2026, 04:35, over the recorded
+  run state): a `detailMatch` is tested against a red's `detail`, and the recorder has never
+  written one — 0 of 99 recorded reds carry the field, because the suites print `name — detail`
+  as ONE line and only the name is stored. So both entries are inert against a real run: they
+  match in the unit tests, which manufacture the field, and never in production. The direction is
+  SAFE (a charge that cannot match leaves the red loudly uncharged, it never blesses one), which
+  is why nothing broke, but it means the acceptance point 666 recorded has never covered
+  anything. THE FIRST STEP OF THIS POINT IS THEREFORE TO MAKE A MEASUREMENT CHARGEABLE AT ALL —
+  either the recorder carries the measurement with the red, or the rule is expressed where it can
+  be read — before any acceptance is written on top of it. TWO
   CONSEQUENCES BIND THE ANSWER BELOW: the acceptance is BACKEND-INDEPENDENT (the artefact is
   about the one-second window meeting a live dt cadence, not about a renderer), and an
   acceptance keyed to an exact measured number CANNOT work for a stochastic artefact — every

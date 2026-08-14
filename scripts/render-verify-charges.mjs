@@ -101,9 +101,16 @@ export const RED_CHARGES = [
     why:
       'THE SAME COMPOSITION ON THE OTHER BACKEND (measured 14.08.2026, 03:58, polish re-run on ' +
       'main c71d6780, WebGPU): 0.29 % of the judged time, worst child 1 at 22.2 s, 1.42 m walked ' +
-      'inside 0.31 m, 3 of 4664 one-second windows, 0.00 % in the 0.5 s bursts. It is NOT a ' +
-      'regression of the point-666 rescue fix: point 666 measured this composition at 1 red in 24 ' +
-      'live-cadence replay seeds at 0.31 % BEFORE that fix existed, and 0.29 % sits in that band. ' +
+      'inside 0.31 m, 3 of 4664 one-second windows, 0.00 % in the 0.5 s bursts. The composition ' +
+      'PREDATES the point-666 rescue fix — 666 measured it at 0.31 % on a live-cadence replay ' +
+      'seed before that fix existed, the same magnitude as today\'s 0.29 % — but that says ' +
+      'nothing about its RATE after the fix, which is unmeasured and is point 694\'s to measure. ' +
+      'BOTH THIS ENTRY AND THE ONE ABOVE ARE INERT AGAINST A REAL RUN (measured 14.08.2026): a ' +
+      'detailMatch reads a red\'s detail, and the recorder has never written one (0 of 99 ' +
+      'recorded reds). They match in the unit tests, which manufacture the field, and nowhere ' +
+      'else. The direction is safe — an unmatchable charge leaves the red loudly uncharged — but ' +
+      'the acceptance they were written for has never covered anything, and point 694 fixes the ' +
+      'reading before it writes any acceptance on top of it. ' +
       'It disproves the backend scoping of the entry above — the artefact is the one-second ' +
       'window meeting a live dt cadence, not a renderer — and it shows why a signature keyed to a ' +
       'measured number cannot cover a stochastic artefact: this run minted a new one. Both ' +

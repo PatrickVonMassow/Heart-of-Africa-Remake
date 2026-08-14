@@ -1199,6 +1199,19 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(measured, { suite: 'polish', backend: 'webgpu' })).toBeNull()
   })
 
+  it('does NOT charge a detailMatch entry against a real recorded red — the recorder writes no detail', () => {
+    // MEASURED 14.08.2026 over the recorded run state: 0 of 99 recorded reds
+    // carry a `detail`, because a suite prints `name — detail` as one line and
+    // only the name is stored. Every detailMatch entry is therefore inert in
+    // production. The direction is SAFE — it leaves the red loudly uncharged,
+    // it never blesses one — and point 694 owns the repair. This case exists so
+    // the two cases below, which manufacture the field, cannot read as proof
+    // that the ledger covers anything live.
+    const asRecorded = { name: 'no child walks without getting anywhere', kind: 'check' }
+    expect(chargeFor(asRecorded, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+    expect(chargeFor(asRecorded, { suite: 'polish', backend: 'webgl' })).toBeNull()
+  })
+
   it('charges the same composition on the OTHER backend to the same owner, by its own signature', () => {
     // The WebGL-2-only scoping was disproved the night it was written: the same
     // composition appeared on WebGPU at a different measurement (point 694).
