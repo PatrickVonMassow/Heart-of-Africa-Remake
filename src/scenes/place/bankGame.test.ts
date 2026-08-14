@@ -328,6 +328,45 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(said.some((u) => u.moment === 'call')).toBe(true)
   })
 
+  it('tries another child when only the nearest boulder route is blocked', () => {
+    const cfg: BankConfig = {
+      ...CFG,
+      roamSeconds: 0.1,
+      roamSpread: 0,
+      roamGoalSeconds: 0.2,
+      utteranceGapSeconds: 0,
+    }
+    // Child 0 starts nearest to the boulder but west of an unbroken wall. Child
+    // 1 is a little farther away on the boulder's east side, where its own
+    // approach is open. The first failure must therefore yield the job, not the
+    // entire phase guard.
+    const world: BankWorld = {
+      ...openWorld(),
+      blocked: (x) => x > -0.25 && x < 0.25,
+      nudge: (x, z) => ({ x, z, found: false }),
+    }
+    const rand = mulberry32(30)
+    const s = createBankGame(
+      [
+        { x: -1, z: -22 },
+        { x: 5.2, z: -22 },
+        { x: -4, z: -22 },
+      ],
+      rand,
+      cfg,
+    )
+    let boulder: BankUtterance | null = null
+    for (let t = 0; t < 10 && !boulder; t += 1 / 60) {
+      const u = stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+      if (u?.moment === 'boulder') boulder = u
+    }
+
+    expect(s.failedClimbers).toEqual([0])
+    expect(boulder?.speaker).toBe(1)
+    expect(s.namedBoulder).toBe(true)
+    expect(s.abandonedBoulder).toBe(false)
+  })
+
   it('emits the catcher`s tap on the exact frame the run opens', () => {
     const cfg: BankConfig = { ...CFG, roamSeconds: 0.1, roamSpread: 0, utteranceGapSeconds: 5 }
     const rand = mulberry32(31)

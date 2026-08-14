@@ -235,9 +235,11 @@ export interface BankState {
   caller: number
   /** Who climbs the boulder this roaming phase, or −1. */
   climber: number
+  /** Children whose boulder approach made no progress this roaming phase. */
+  failedClimbers: number[]
   /** Whether the boulder has already been named this roaming phase. */
   namedBoulder: boolean
-  /** Whether the chosen climber proved unable to reach the boulder this phase. */
+  /** Whether every child proved unable to reach the boulder this phase. */
   abandonedBoulder: boolean
   /** Runs opened in this cycle. The normal exit is still the last runner being
    *  caught; this bounds a cycle in which every runner gets through untouched. */
@@ -355,6 +357,7 @@ export function createBankGame(
     direction: null,
     caller: -1,
     climber: -1,
+    failedClimbers: [],
     namedBoulder: false,
     abandonedBoulder: false,
     runsThisCycle: 0,
@@ -613,6 +616,7 @@ function openRoam(s: BankState, cfg: BankConfig, rand: () => number): void {
   s.caller = -1
   s.namedBoulder = false
   s.abandonedBoulder = false
+  s.failedClimbers.length = 0
   for (const c of s.children) {
     c.role = 'runner'
     c.arrived = false
@@ -803,10 +807,10 @@ function stepRoam(
   // the FIRST phase of a visit has one too: a player who walks in and watches
   // the group would otherwise wait a whole cycle for the one utterance that
   // shows ROCK outside the game.
-  if (s.climber < 0 && !s.namedBoulder) {
+  if (s.climber < 0 && !s.namedBoulder && !s.abandonedBoulder) {
     s.climber = nearestOf(
       s,
-      s.children.map((_, i) => i),
+      s.children.flatMap((_, i) => (s.failedClimbers.includes(i) ? [] : [i])),
       stage.boulder,
     )
     if (s.climber >= 0) {
@@ -849,11 +853,12 @@ function stepRoam(
         roamGoal(c, rand)
       } else if (c.goalFor > cfg.roamGoalSeconds) {
         // The player sees the child stop pressing an obstructed route and
-        // return to the group's wander. The missing off-game ROCK is not
-        // replayed elsewhere, but the failed approach cannot suppress every
-        // bank cycle that follows it.
-        s.abandonedBoulder = true
+        // return to the group's wander while the next nearest child tries. The
+        // guard is abandoned only when no child in the group can make the
+        // approach, so one obstructed route cannot suppress the off-game ROCK.
+        s.failedClimbers.push(i)
         s.climber = -1
+        s.abandonedBoulder = s.failedClimbers.length === s.children.length
         roamGoal(c, rand)
       } else {
         drive(s, i, boulder, false, dt, cfg, world)
