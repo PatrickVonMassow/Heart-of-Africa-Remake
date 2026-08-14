@@ -174,10 +174,12 @@ THE VILLAGE SPEECH (§13.4, docs/communication-poc-spec.md, work-order points
 nothing in the mechanic needs a browser, and the one thing that does (the note
 landing over the figure the scene drew) is the polish suite below:
 
-- `src/communication/lexicon.test.ts` — the eleven concepts and the spec's table
+- `src/communication/lexicon.test.ts` — the five concepts (`RIVER`, `UPSTREAM`,
+  `DOWNSTREAM`, `ROCK`, `DIG`) and the spec's table
   syllable for syllable; every pair at least two syllables apart, so a misheard
-  beat can only produce a non-word, never a second concept; the four mirrored
-  opposite pairs; and the journal sort order as a total order.
+  beat can only produce a non-word, never a second concept; the one mirrored
+  opposite pair (`UPSTREAM`/`DOWNSTREAM`); and the journal sort order as a total
+  order.
 - `src/communication/speaking.test.ts` — the syllable timing at the calibratable
   pace, the constant pause BETWEEN a phrase's atoms and nowhere else, the
   distance curve, and that "audible" and "recorded as heard" are one condition.
@@ -237,8 +239,8 @@ note against that figure's own head (`146-speech-hypothesis-label`), and section
 THE CHIEF'S MESSAGE ON THE DRUMS (§13.4, docs/communication-poc-spec.md,
 point 486). Asked for at the audience — in his village alone, and only once a
 culturally correct gift has earned his trust (the §12 condition every hint
-stands under) — the chief has his drummer beat out GO_THERE · RIVER · FOLLOW ·
-UPSTREAM · BIG_ROCK · THERE · DIG on two drums: the large low one for `ba`, the
+stands under) — the chief has his drummer beat out RIVER · UPSTREAM · ROCK ·
+DIG on two drums: the large low one for `ba`, the
 small high one for `BA`, the hand falling and the head dipping on the drum that
 sounds. The sequences are never re-authored: the message is a list of CONCEPT
 ids whose atoms come from the lexicon and whose timing is the same phrase plan a
@@ -269,7 +271,7 @@ and the spot that yields are the same value, and a dig anywhere else yields the
 ordinary nothing. The find rides OUTSIDE the inventory capacity: it is a puzzle
 token, not trade goods, so a full pack can never strand the errand. Carried back
 into the chief's own village it is laid in his hands, and that hand-over is what
-solves the puzzle — he answers with BIG_ROCK · DIG · HERE, three concepts the
+solves the puzzle — he answers with ROCK · DIG, two concepts the
 village has already taught, recorded like any other speech of his people and
 shown with the player's OWN notes over them. Nothing is translated for him,
 here least of all.
