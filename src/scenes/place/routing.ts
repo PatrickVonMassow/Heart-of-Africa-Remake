@@ -111,6 +111,29 @@ export function buildPlaceNavGrid(
   return grid
 }
 
+/**
+ * Narrows a built grid to ground an EXTRA rule also allows.
+ *
+ * The grid knows the settlement's boundary and its colliders, which is all an
+ * adult's errand needs. A mover with rules of its own — the children's round is
+ * kept off the sloping shore and out of the sub-passage wedges `buildWedgeCarve`
+ * closes — would otherwise be routed over ground its own step then refuses: the
+ * mandinka village planned the walk down to the bank through a carved wedge, the
+ * child circled the waypoint it could not reach for two hundred seconds and 400 m
+ * of legs, and the group never played. One planner, one definition of free
+ * (points 129/378) — so the caller hands its own rule in rather than keeping a
+ * second grid.
+ */
+export function navRestrict(grid: PlaceNavGrid, free: (x: number, z: number) => boolean): void {
+  for (let i = 0; i < grid.n; i++) {
+    const x = worldOf(grid, i)
+    for (let j = 0; j < grid.n; j++) {
+      const k = i * grid.n + j
+      if (grid.free[k] === 1 && !free(x, worldOf(grid, j))) grid.free[k] = 0
+    }
+  }
+}
+
 /** Whether a mover may stand at a world point, as the grid sees it. */
 export function navPointFree(grid: PlaceNavGrid, x: number, z: number): boolean {
   return grid.free[cellOf(grid, x) * grid.n + cellOf(grid, z)] === 1

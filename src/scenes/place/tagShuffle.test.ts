@@ -63,7 +63,7 @@ import {
 } from './inhabitantBodies'
 import { buildLayout, builtFabric, type PlaceLayout } from './layout'
 import { childPlayGround, villageAdultStations } from './lifeSpots'
-import { absorbSeparation, createTagGame, stepTagGame, type TagChild, type TagWorld } from './tagGame'
+import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
 import {
   bankChildCanSeparate,
   createBankGame,
@@ -72,8 +72,14 @@ import {
   type BankConfig,
   type BankStage,
   type BankState,
+  type BankEnd,
   type BankWorld,
+  rockAt,
+  stationAt,
 } from './bankGame'
+import { insidePlace } from './boundary'
+import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict } from './routing'
+import { standsOnGroundPlate } from './riverBank'
 import { buildWedgeCarve } from './wedgeCarve'
 
 /** The children's round as `PlaceLife` composes it (work-order 687): the bank
@@ -303,13 +309,27 @@ function village(
   // The sub-passage slots between pinching boundaries are not part of the
   // ground, exactly as `PlaceLife` wires it (point 657).
   const carve = buildWedgeCarve(colliders, NPC_RADIUS, region)
+  // AND THE SHAPE THE ROUND WALKS, exactly as `PlaceLife` wires it: the bank
+  // round walks the settlement's OWN boundary — the lobe out to the water
+  // included, because the two play rocks stand on it — and is kept off the
+  // sloping shore. The tag round keeps its circle. Replaying the bank round
+  // inside the plain circle put its whole stage out of reach.
+  const bounds = { radius: layout.radius, bank: layout.bank }
+  const onGround = hasBank
+    ? (x: number, z: number) =>
+        insidePlace(bounds, x, z, NPC_RADIUS * 2) && standsOnGroundPlate(layout.bank, x, z, NPC_RADIUS)
+    : (x: number, z: number) =>
+        Math.hypot(x, z) <= rim && Math.hypot(x - region.x, z - region.z) <= region.radius
   const blocked = (x: number, z: number) =>
-    penned(x, z) ||
-    Math.hypot(x, z) > rim ||
-    Math.hypot(x - region.x, z - region.z) > region.radius ||
-    !standingClear(colliders, x, z, NPC_RADIUS) ||
-    carve(x, z)
-  const world: TagWorld = {
+    penned(x, z) || !onGround(x, z) || !standingClear(colliders, x, z, NPC_RADIUS) || carve(x, z)
+  // And the way ROUND the village for the walk down to the bank, exactly as
+  // `PlaceLife` builds it: only a settlement that plays the bank round has one.
+  const nav = hasBank ? buildPlaceNavGrid(bounds, colliders, NPC_RADIUS) : null
+    // AND ONLY WHERE THE CHILDREN THEMSELVES MAY STAND: the grid knows the
+    // boundary and the colliders, not the shore rule nor the carved wedges, and a
+    // route over either strands the child at a waypoint it can never reach.
+    if (nav) navRestrict(nav, (px, pz) => !blocked(px, pz))
+  const world: BankWorld = {
     radius: region.radius,
     centerX: region.x,
     centerZ: region.z,
@@ -332,6 +352,8 @@ function village(
       const r = roomy.found ? roomy : nudgeWhere(x, z, (ax, az) => !blocked(ax, az))
       return { x: r.pos[0], z: r.pos[1], found: r.found }
     },
+    lineBlocked: nav ? (ax, az, bx, bz) => !navClearBetween(nav, ax, az, bx, bz) : undefined,
+    route: nav ? (from, to) => findPlaceRoute(nav, from, to) : undefined,
   }
   const rand = mulberry32((localSeed + 5171) >>> 0)
   const spots = Array.from({ length: count }, (_, i) => {
@@ -1221,6 +1243,127 @@ describe('and the replay refuses a trace with no game in it (point 656)', () => 
     expect(shuffleWindows(idle).share).toBeLessThan(CHILD_MOTION.shareGate)
     expect(() => expectLively(idle)).toThrow()
   })
+})
+
+/**
+ * THE ROUND IS PLAYED WHERE THE STAGE IS (work-order 687).
+ *
+ * The bank round's two rocks stand on the settlement's BANK LOBE — measured on
+ * all three river villages, 32.5 m from the middle, while the plain walkable
+ * radius is 28 and the children's own rim 27.4. Wired to the plain circle, the
+ * children could not reach their own stage at ALL: the gather ran out on its
+ * backstop with the group pressed against the rim four metres short of the
+ * stones, the run opened on a bunched group, the catcher swept it in seconds and
+ * the cycle ended without one child on the bank. Every gate above went green on
+ * it — a group shuffling nowhere is exactly what they are built to catch, and
+ * this group was walking hard, just never to the bank — and the browser check
+ * photographed an empty stretch.
+ *
+ * So the stage is asserted as GROUND FIRST (nothing else can be true if the
+ * children may not stand there) and then as a PLAYED ROUND: the group arrives at
+ * both rocks and the runners cross the middle of the stretch, which is where a
+ * traveller standing in the lane would be.
+ */
+describe('the children`s bank round can reach its own stage (work-order 687)', () => {
+  const RIVER_VILLAGES: Array<[string, number]> = [
+    ['bambara-village', 2972259115],
+    ['nubian-village', 42],
+    ['mandinka-village', 99],
+  ]
+
+  for (const [placeId, seed] of RIVER_VILLAGES) {
+    it(`${placeId} lets the children stand on every part of the stage`, () => {
+      const v = village(placeId, seed)
+      expect(v.stage).not.toBeNull()
+      const stage = v.stage!
+      const ends: BankEnd[] = ['upstream', 'downstream']
+      for (const end of ends) {
+        // EVERY WAITING STATION. `stationAt` is what the walk down aims at and
+        // what `inPlace` judges, so a blocked station is a gather that can only
+        // ever end on its backstop.
+        for (let slot = 0; slot < v.children.length; slot++) {
+          const at = stationAt(stage, end, slot, BANK_CFG)
+          expect({ end, slot, blocked: v.world.blocked(at.x, at.z) }).toEqual({ end, slot, blocked: false })
+        }
+        // AND AN ARRIVAL IS PHYSICALLY POSSIBLE: the rock is a collider, so what
+        // has to exist is standing room inside the reach the run judges the
+        // touch by.
+        const rock = rockAt(stage, end)
+        let touchable = 0
+        for (let k = 0; k < 36; k++) {
+          const a = (k / 36) * Math.PI * 2
+          const r = BANK_CFG.reachDistance * 0.9
+          if (!v.world.blocked(rock.x + Math.cos(a) * r, rock.z + Math.sin(a) * r)) touchable++
+        }
+        expect({ end, touchable: touchable > 0 }).toEqual({ end, touchable: true })
+      }
+      // AND THE WHOLE RUNNING LANE BETWEEN THEM, station to station: the ground
+      // the runners cross and the ground a traveller plants himself in.
+      const from = stationAt(stage, 'upstream', 1, BANK_CFG)
+      const to = stationAt(stage, 'downstream', 1, BANK_CFG)
+      const walled: number[] = []
+      for (let k = 0; k <= 40; k++) {
+        const t = k / 40
+        const x = from.x + (to.x - from.x) * t
+        const z = from.z + (to.z - from.z) * t
+        if (v.world.blocked(x, z)) walled.push(Number(t.toFixed(2)))
+      }
+      expect(walled).toEqual([])
+    })
+  }
+
+  for (const [placeId, seed] of RIVER_VILLAGES) {
+    it(`${placeId} walks the group down to the bank and runs the stretch`, () => {
+      const v = village(placeId, seed)
+      const stage = v.stage!
+      const up = rockAt(stage, 'upstream')
+      const down = rockAt(stage, 'downstream')
+      const mid = { x: (up.x + down.x) / 2, z: (up.z + down.z) / 2 }
+      const span = Math.hypot(down.x - up.x, down.z - up.z) || 1
+      const ax = (down.x - up.x) / span
+      const az = (down.z - up.z) / span
+      // Long enough for the roaming phase (~55 s, and it waits for the off-game
+      // boulder to be named) and the whole cycle that follows it.
+      const nearest = { up: Infinity, down: Infinity }
+      const side = v.children.map(() => ({ before: 0, crossed: false }))
+      const dt = 1 / 60
+      for (let t = 0; t < 200; t += dt) {
+        frame(v, dt)
+        for (let i = 0; i < v.children.length; i++) {
+          const c = v.children[i]
+          nearest.up = Math.min(nearest.up, Math.hypot(c.x - up.x, c.z - up.z))
+          nearest.down = Math.min(nearest.down, Math.hypot(c.x - down.x, c.z - down.z))
+          // The lane's own axis with the middle of the stretch as its origin, and
+          // a metre of hysteresis so a child loitering beside the middle is never
+          // read as having crossed it.
+          const along = (c.x - mid.x) * ax + (c.z - mid.z) * az
+          if (Math.abs(along) <= 1) continue
+          const now = along > 0 ? 1 : -1
+          if (side[i].before !== 0 && now !== side[i].before) side[i].crossed = true
+          side[i].before = now
+        }
+      }
+      // A CYCLE WAS PLAYED — not merely a phase clock ticking over a group that
+      // never arrived, which is exactly what the plain circle produced.
+      expect(v.bank!.runs).toBeGreaterThan(0)
+      expect(v.bank!.cycles).toBeGreaterThan(0)
+      // BOTH ENDS OF THE STAGE WERE STOOD AT: a child at its station is
+      // `standOff` from its rock, so this is the group at each end rather than
+      // near one of them. Measured up/down: 1.50/1.61 (bambara), 1.50/1.50
+      // (nubian), 1.50/2.70 (mandinka).
+      const stood = BANK_CFG.standOff + BANK_CFG.reachDistance
+      expect(nearest.up).toBeLessThanOrEqual(stood)
+      expect(nearest.down).toBeLessThanOrEqual(stood)
+      // ...and one of them was TOUCHED, inside the reach the arrival is judged
+      // by — so a run can end in a `ROCK` at the far stone and not only in tags.
+      expect(Math.min(nearest.up, nearest.down)).toBeLessThanOrEqual(BANK_CFG.reachDistance)
+      // AND THE STRETCH WAS RUN: somebody went from one side of its middle to the
+      // other. That middle is where the browser section plants the traveller, so
+      // this is the pure half of "the children walk PAST him". All four crossed
+      // in all three villages.
+      expect(side.filter((s) => s.crossed).length).toBeGreaterThan(0)
+    })
+  }
 })
 
 /** The measure as point 648 left it, kept for exactly one purpose: to show on a

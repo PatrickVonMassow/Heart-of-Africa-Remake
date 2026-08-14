@@ -13,6 +13,7 @@ import {
   findPlaceRoute,
   navClearBetween,
   navPointFree,
+  navRestrict,
 } from './routing'
 import { buildLayout } from './layout'
 import { resolveMove, standingClear, WALKER_RADIUS, type Collider } from './collision'
@@ -64,6 +65,30 @@ describe('the free-ground grid', () => {
   it('reports no route where there is none', () => {
     const boxed = buildPlaceNavGrid({ radius: 20 }, [{ x: 8, z: 0, r: 3 }], R)
     expect(findPlaceRoute(boxed, { x: 0, z: 0 }, { x: 8, z: 0 })).toBeNull()
+  })
+
+  // A MOVER WITH RULES OF ITS OWN (work-order 687). The children's round is kept
+  // off the sloping shore and out of the carved sub-passage wedges, neither of
+  // which the grid knows — and a route over ground the mover's own step then
+  // refuses strands it at a waypoint it can never reach. `navRestrict` is how a
+  // caller narrows one grid rather than keeping a second definition of free.
+  it('narrows a built grid to the caller`s own ground, and routes round the rest', () => {
+    const own = buildPlaceNavGrid({ radius: 20 }, [], R)
+    expect(navPointFree(own, 0, 0)).toBe(true)
+    expect(findPlaceRoute(own, { x: 0, z: -6 }, { x: 0, z: 6 })).toEqual([{ x: 0, z: 6 }])
+    // A bar across the middle this mover may not stand on, invisible to both the
+    // boundary and the colliders, with open ground round each of its ends.
+    navRestrict(own, (x, z) => Math.abs(z) > 1 || Math.abs(x) > 8)
+    expect(navPointFree(own, 0, 0)).toBe(false)
+    expect(navPointFree(own, 0, 6)).toBe(true)
+    expect(navClearBetween(own, 0, -6, 0, 6)).toBe(false)
+    const round = findPlaceRoute(own, { x: 0, z: -6 }, { x: 0, z: 6 })
+    expect(round).not.toBeNull()
+    for (const w of round!) expect(navPointFree(own, w.x, w.z)).toBe(true)
+    // It only ever takes ground away — a cell the rule already refused stays
+    // refused, and none is handed back.
+    navRestrict(own, () => true)
+    expect(navPointFree(own, 0, 0)).toBe(false)
   })
 })
 

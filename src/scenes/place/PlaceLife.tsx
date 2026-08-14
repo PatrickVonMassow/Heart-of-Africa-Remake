@@ -50,8 +50,8 @@ import type { RegionPlaceStyle } from './regionStyles'
 import { nudgeToFree, nudgeWhere, PLAYER_RADIUS, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import { utteranceOf } from '../../communication/lexicon'
 import { insidePlace } from './boundary'
-import type { PlaceRiverBank } from './riverBank'
-import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, type NavPoint } from './routing'
+import { standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
+import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict, type NavPoint } from './routing'
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
 import {
   bankChildCanSeparate,
@@ -579,6 +579,7 @@ function Kids({
   colliders,
   radius,
   stage,
+  bank,
 }: {
   x: number
   z: number
@@ -594,6 +595,9 @@ function Kids({
    *  bank game; without one — a village with no river — it keeps the tag round
    *  the port cities inherit in their own point. */
   stage: BankStage | null
+  /** The settlement's river bank, where it has one: what makes its walkable
+   *  region a lobe rather than a circle, and where the shore begins. */
+  bank: PlaceRiverBank | null
 }) {
   const refs = useRef<Array<THREE.Group | null>>([])
   // The world leg length these children walk on, and the cadence it dictates.
@@ -629,17 +633,49 @@ function Kids({
     // down to the water and back. The tag round keeps its bounded ground.
     const region = stage ? { x: 0, z: 0, radius: rim } : { x, z, radius: playRadius }
     const carve = buildWedgeCarve(colliders, NPC_RADIUS, region)
+    // AND THE SETTLEMENT IS NOT A CIRCLE WHERE IT STANDS ON A RIVER. A village
+    // with a bank grows a lobe out to the water (`boundary.ts`), and the two
+    // play rocks stand ON that lobe: measured on all three river villages they
+    // sit 32.5 m from the middle while the plain walkable radius is 28 and the
+    // children's own rim 27.4. Held to the circle, the group could not reach its
+    // own stage at all — the gather timed out at the rim, the run opened with
+    // everybody bunched four metres short of the stones, the catcher swept the
+    // lot in seconds and the cycle ended without a single child on the bank.
+    // That is the round the traveller frame photographed empty. So the bank
+    // round walks the SAME shape the player does — inset by its own footprint —
+    // and is kept off the shore, which is ground that slopes into the water.
+    const bounds = { radius, bank }
+    const onGround = stage
+      ? (px: number, pz: number) =>
+          insidePlace(bounds, px, pz, NPC_RADIUS * 2) && standsOnGroundPlate(bank, px, pz, NPC_RADIUS)
+      : (px: number, pz: number) =>
+          Math.hypot(px, pz) <= rim && Math.hypot(px - region.x, pz - region.z) <= region.radius
     const blocked = (px: number, pz: number) =>
-      Math.hypot(px, pz) > rim ||
-      Math.hypot(px - region.x, pz - region.z) > region.radius ||
-      !standingClear(colliders, px, pz, NPC_RADIUS) ||
-      carve(px, pz)
+      !onGround(px, pz) || !standingClear(colliders, px, pz, NPC_RADIUS) || carve(px, pz)
+    // THE WAY ROUND THE VILLAGE, for the one long walk the round has (work-order
+    // 687): the RIVER call sends the group from its own quarter down to the
+    // bank, and where the quarter lies across the built ground from the water
+    // that is forty metres past huts, fences and compounds — the mandinka
+    // village, where a locally steering group pressed into the first wall and
+    // never reached the stage at all. The same grid the adults' errands cross
+    // the village by, built from the same boundary and the same colliders the
+    // step above obeys, so a route can never lead where the step is refused.
+    // Only a settlement that plays the bank round pays for it.
+    const nav = stage ? buildPlaceNavGrid(bounds, colliders, NPC_RADIUS) : null
+    // AND ONLY WHERE THE CHILDREN THEMSELVES MAY STAND: the grid knows the
+    // boundary and the colliders, not the shore rule nor the carved wedges, and a
+    // route over either strands the child at a waypoint it can never reach.
+    if (nav) navRestrict(nav, (px, pz) => !blocked(px, pz))
     return {
       radius: region.radius,
       centerX: region.x,
       centerZ: region.z,
       childRadius: NPC_RADIUS,
       blocked,
+      lineBlocked: nav
+        ? (ax: number, az: number, bx: number, bz: number) => !navClearBetween(nav, ax, az, bx, bz)
+        : undefined,
+      route: nav ? (from: NavPoint, to: NavPoint) => findPlaceRoute(nav, from, to) : undefined,
       // WHICH BODIES ARE A CHILD'S WALLS: everybody OUTSIDE the game — adults,
       // porters, errand walkers, the standing and slow-crossing figures the
       // measured red windows coincided with — and NEVER a playmate. Both
@@ -674,7 +710,7 @@ function Kids({
         return { x: r.pos[0], z: r.pos[1], found: r.found }
       },
     }
-  }, [colliders, radius, x, z, playRadius, bodySet, kidIndex, stage])
+  }, [colliders, radius, x, z, playRadius, bodySet, kidIndex, stage, bank])
 
   // The group, spawned on validated ground (point 155): a play spot covered by a
   // hut is nudged to the nearest free one before the first frame — INSIDE the
@@ -2666,6 +2702,7 @@ export function PlaceLife({
             colliders={colliders}
             radius={radius}
             stage={bankStage}
+            bank={bank}
           />
           {/* The adults at their errands (point 483): the five landscape and
               action concepts, taught by what the villagers visibly go and do. */}

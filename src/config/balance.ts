@@ -1275,8 +1275,14 @@ export const balance: BalanceConfig = {
       roamSpread: 0.25,
       // The stretch is ~20 m and a child crosses it at a run in some six
       // seconds; the walk down from the quarter is longer, hence the wider
-      // backstop on the gather.
-      gatherSeconds: 30,
+      // backstop on the gather. MEASURED on the three river villages, replayed
+      // in `tagShuffle.test.ts`: the whole group is at its stations after 19.9 s
+      // (nubian), 22.9 s (bambara) and 34.5 s (mandinka, whose quarter lies
+      // across the built ground from its water). At 30 s the mandinka run opened
+      // on a group still walking — the clock ending a phase that is meant to end
+      // on its condition — so the backstop carries a third again over the
+      // slowest walk measured.
+      gatherSeconds: 45,
       runSeconds: 20,
       regroupSeconds: 14,
       partSeconds: 8,

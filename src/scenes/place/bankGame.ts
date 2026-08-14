@@ -140,6 +140,21 @@ export interface BankChild extends TagChild {
    *  swept a bunched group and tagged all of it, and no run ever ended in an
    *  arrival. */
   quarry: number
+  /**
+   * THE WAY ROUND THE VILLAGE, for the one walk of the round that is long: the
+   * call takes the group from its own quarter down to the bank, and in a
+   * settlement whose quarter lies across the built ground from its water that is
+   * forty metres past huts, fences and compounds. Steering locally, the group
+   * pressed into the first wall and stood there for the whole gather — measured
+   * in the mandinka village, where not one child ever reached the stage. Held
+   * across frames and planned only when the straight line is actually shut, so
+   * the ordinary walk over open ground costs nothing.
+   */
+  path: Array<{ x: number; z: number }> | null
+  /** The goal `path` was planned for; a moved goal discards it. */
+  pathTo: { x: number; z: number } | null
+  /** Seconds before this child may ask for another plan. */
+  replan: number
 }
 
 /**
@@ -218,6 +233,16 @@ export type BankConfig = TagConfig & BankRoundConfig
  */
 export interface BankWorld extends TagWorld {
   stranger?: { x: number; z: number; radius: number } | null
+  /** Whether the straight line between two points crosses ground a child may
+   *  not walk. Left out, every line counts as open and the round steers
+   *  locally, exactly as it did before the walk down to the bank existed. */
+  lineBlocked?: (ax: number, az: number, bx: number, bz: number) => boolean
+  /** A way round whatever stands between two points, or null where none is
+   *  known. Only the walk to the stations asks for one. */
+  route?: (
+    from: { x: number; z: number },
+    to: { x: number; z: number },
+  ) => Array<{ x: number; z: number }> | null
 }
 
 /** The round. */
@@ -347,6 +372,9 @@ export function createBankGame(
       settled: false,
       lane: 0,
       quarry: -1,
+      path: null,
+      pathTo: null,
+      replan: 0,
     }
   })
   return {
@@ -525,6 +553,8 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
   const to = otherEnd(s.from)
   s.phase = 'run'
   s.phaseFor = cfg.runSeconds
+  // The stations are behind them: no run, roam or parting walk follows a route.
+  for (const c of s.children) clearPath(c)
   s.runsThisCycle++
   s.runs++
   for (const c of s.children) {
@@ -612,6 +642,7 @@ function endRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
 function openRoam(s: BankState, cfg: BankConfig, rand: () => number): void {
   s.phase = 'roam'
   s.phaseFor = cfg.roamSeconds * (1 + (rand() * 2 - 1) * cfg.roamSpread)
+  for (const c of s.children) clearPath(c)
   s.direction = null
   s.caller = -1
   s.namedBoulder = false
@@ -916,6 +947,49 @@ function inPlace(
   return true
 }
 
+/** How near a waypoint counts as reached, and how often a child may replan. */
+const WAYPOINT_RADIUS = 1.2
+const REPLAN_SECONDS = 1
+
+/** Drops the route a child is no longer walking. */
+function clearPath(c: BankChild): void {
+  c.path = null
+  c.pathTo = null
+}
+
+/**
+ * WHERE THE NEXT STEP OF A LONG WALK GOES: at the goal while the line to it is
+ * open, and otherwise at the next waypoint of a way round what stands between.
+ * The same rule the adults' errands walk the village by — planning is asked for
+ * only when the line is actually shut, and at most once a second per child, so
+ * an open crossing costs nothing at all.
+ */
+function wayTo(
+  c: BankChild,
+  goal: { x: number; z: number },
+  dt: number,
+  world: BankWorld,
+): { x: number; z: number } {
+  const shut = world.lineBlocked
+  if (!shut || !world.route) return goal
+  c.replan -= dt
+  if (c.pathTo && (c.pathTo.x !== goal.x || c.pathTo.z !== goal.z)) clearPath(c)
+  const blocked = shut(c.x, c.z, goal.x, goal.z)
+  if (!blocked) {
+    // Back on the open line: the detour it has already got past is dropped.
+    clearPath(c)
+    return goal
+  }
+  if (!c.path && c.replan <= 0) {
+    c.path = world.route(c, goal)
+    c.pathTo = { x: goal.x, z: goal.z }
+    c.replan = REPLAN_SECONDS
+  }
+  if (!c.path || c.path.length === 0) return goal
+  while (c.path.length > 1 && dist(c, c.path[0]) <= WAYPOINT_RADIUS) c.path.shift()
+  return c.path[0]
+}
+
 /** The walk to the stations — down to the bank at the head of a cycle, and
  *  across between two runs, which is the ONLY time a tagged child moves. */
 function stepStations(
@@ -940,7 +1014,12 @@ function stepStations(
     // The walk DOWN to the bank is a run — the whole group sets off at the call
     // — while the shuffle between two runs is a walk.
     const running = s.phase === 'gather' && !c.settled && away > cfg.reachDistance
-    drive(s, i, c.settled ? null : to, running, dt, cfg, world)
+    if (c.settled) {
+      clearPath(c)
+      drive(s, i, null, false, dt, cfg, world)
+    } else {
+      drive(s, i, wayTo(c, to, dt, world), running, dt, cfg, world)
+    }
   }
 }
 
