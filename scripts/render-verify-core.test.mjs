@@ -1221,10 +1221,16 @@ describe('the shipped charge ledger', () => {
     const [stored] = chargeReds([parsed], { suite: 'polish', backend: 'webgpu' })
     expect(stored.point).toBe(694)
 
-    // What survives into the record carries no detail — so re-reading the ledger
-    // against the stored red charges nothing, whatever the ledger now says.
+    // What survives into the record carries no detail.
     expect(stored.detail).toBeUndefined()
-    expect(chargeFor(stored, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+
+    // AND THE CASE THAT ACTUALLY BIT: a red recorded BEFORE the entry existed —
+    // uncharged, and without the detail the new entry would need. Adding the
+    // entry afterwards cannot reach it, however the ledger now reads.
+    const [beforeTheRule] = chargeReds([parsed], { suite: 'polish', backend: 'webgpu', ledger: [] })
+    expect(beforeTheRule.point).toBeNull()
+    expect(beforeTheRule.detail).toBeUndefined()
+    expect(chargeFor(beforeTheRule, { suite: 'polish', backend: 'webgpu' })).toBeNull()
   })
 
   it('charges the same composition on the OTHER backend to the same owner, by its own signature', () => {
