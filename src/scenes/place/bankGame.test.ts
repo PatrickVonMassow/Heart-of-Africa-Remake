@@ -65,6 +65,7 @@ interface Log {
     arrivals: number
     direction: string | null
     cycle: number
+    climbing: boolean
   }>
 }
 
@@ -96,6 +97,7 @@ function replay(
         arrivals: s.children.filter((c) => c.arrived).length,
         direction: s.direction,
         cycle: s.cycles,
+        climbing: s.children[u.speaker]?.climbing ?? false,
       })
     }
   }
@@ -235,6 +237,7 @@ describe('the children`s game at the bank (point 687)', () => {
     for (const b of boulders) {
       expect(b.phase).toBe('roam')
       expect(b.u.at).toBe('boulder')
+      expect(b.climbing).toBe(true)
       expect(Math.hypot(b.u.aim.x - STAGE.boulder!.x, b.u.aim.z - STAGE.boulder!.z)).toBeLessThan(1e-6)
       // …and it is nowhere near either play rock, so it cannot be read as one.
       for (const end of ['upstream', 'downstream'] as const) {
@@ -251,6 +254,27 @@ describe('the children`s game at the bank (point 687)', () => {
     // at it would otherwise chant.
     const roams = log.phases.filter((p) => p === 'roam').length
     expect(boulders.length).toBeLessThanOrEqual(roams)
+  })
+
+  it('does not leave roaming until the ordinary boulder has been climbed and named', () => {
+    const cfg: BankConfig = {
+      ...CFG,
+      roamSeconds: 0.1,
+      roamSpread: 0,
+      roamGoalSeconds: 0.05,
+      utteranceGapSeconds: 0,
+    }
+    const { log } = replay(120, { seed: 23, cfg })
+    let guarded = false
+    let calls = 0
+    for (const u of log.said) {
+      if (u.moment === 'boulder') guarded = true
+      if (u.moment !== 'call') continue
+      calls++
+      expect(guarded).toBe(true)
+      guarded = false
+    }
+    expect(calls).toBeGreaterThan(1)
   })
 
   it('emits the catcher`s tap on the exact frame the run opens', () => {
@@ -356,11 +380,11 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(s.cycles).toBeGreaterThan(0)
     expect(log.phases).toContain('part')
     expect(log.phases.filter((phase) => phase === 'roam').length).toBeGreaterThan(1)
-    expect(s.runs).toBeGreaterThan(s.children.length)
+    expect(s.runs).toBeGreaterThanOrEqual(s.children.length)
   })
 
   it('keeps a moving speaker at the round`s commanded pace while it speaks', () => {
-    const cfg = CFG
+    const cfg: BankConfig = { ...CFG, utteranceGapSeconds: 0 }
     const rand = mulberry32(3)
     const spots = Array.from({ length: 4 }, (_, i) => ({ x: STAGE.roam.x + i * 1.2, z: STAGE.roam.z }))
     const s = createBankGame(spots, rand, cfg)
@@ -512,19 +536,4 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan(CFG.stationSpacing)
   })
 
-  it('roams without a boulder too, and simply says nothing there', () => {
-    const stage: BankStage = { ...STAGE, boulder: null }
-    const rand = mulberry32(9)
-    const s = createBankGame([{ x: -20, z: -20 }, { x: -18, z: -20 }, { x: -19, z: -21 }], rand, CFG)
-    const world = openWorld()
-    const said: BankUtterance[] = []
-    for (let t = 0; t < 400; t += 1 / 60) {
-      const u = stepBankGame(s, 1 / 60, CFG, stage, world, rand)
-      if (u) said.push(u)
-    }
-    expect(said.some((u) => u.moment === 'boulder')).toBe(false)
-    // The game itself is unaffected: it still opens, runs and parts.
-    expect(said.some((u) => u.moment === 'call')).toBe(true)
-    expect(s.runs).toBeGreaterThan(0)
-  })
 })

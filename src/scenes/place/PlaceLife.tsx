@@ -814,7 +814,8 @@ function Kids({
       if (!g) return
       const phase = gaitPhase(c.walked, cadence)
       gaits.current[i].current = phase
-      g.position.set(c.x, gaitBodyLift(phase, legLength), c.z)
+      const climbing = (c as BankChild).climbing === true
+      g.position.set(c.x, gaitBodyLift(phase, legLength) + (climbing ? 0.32 : 0), c.z)
       // A TAGGED CHILD IS UNMISTAKABLY OUT OF PLAY (work-order 687 item 3):
       // squatted down, trunk folded over and both arms crossed in front of it.
       // Written here rather than as a prop, because the state changes inside the
@@ -2595,8 +2596,9 @@ export function PlaceLife({
   const bankStage = useMemo<BankStage | null>(() => {
     if (!bank || !playRocks) return null
     // The nearest loose boulder to the children's own quarter — the one they
-    // would plausibly be standing at anyway. Without one the roaming utterance
-    // simply does not fall.
+    // would plausibly be standing at anyway. It is the guard that keeps ROCK
+    // from meaning only a game target, so without one this settlement keeps the
+    // old tag round just as a riverless village does.
     let boulder: { x: number; z: number } | null = null
     let best = Infinity
     for (const [rx, rz] of rocks) {
@@ -2606,6 +2608,7 @@ export function PlaceLife({
         boulder = { x: rx, z: rz }
       }
     }
+    if (!boulder) return null
     return {
       upstream: playRocks.upstream,
       downstream: playRocks.downstream,

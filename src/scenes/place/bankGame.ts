@@ -115,10 +115,11 @@ export interface BankChild extends TagChild {
   /** Where the CLIMBER is walking — the boulder it names. Unused by the rest. */
   goalX: number
   goalZ: number
-  /** How long it has been walking at that goal. A goal it cannot reach — behind
-   *  a hut, in a pocket — is given up rather than leaned on, which is the
-   *  difference between a child crossing its quarter and one pushing at a wall. */
+  /** How long it has been walking at that goal. */
   goalFor: number
+  /** Standing up against the ordinary boulder for the visible climb that
+   *  carries the off-game ROCK utterance. */
+  climbing: boolean
   /** A RUNNER's own lane across the stretch, in metres to one side of the line
    *  between the rocks. The group crosses in parallel lanes rather than in one
    *  column, which is what lets a catcher take one child and the others get
@@ -153,9 +154,8 @@ export interface BankStage {
   /** Where the water lies — the point the RIVER call points at. */
   water: { x: number; z: number }
   /** An ordinary scattered boulder in the village, climbed and named during the
-   *  roaming phase. Null where the settlement scattered none, and the roaming
-   *  utterance then simply does not fall. */
-  boulder: { x: number; z: number } | null
+   *  roaming phase. A settlement without one must not construct this stage. */
+  boulder: { x: number; z: number }
   /** The children's own quarter, out of earshot of the adults (point 481.4). */
   roam: { x: number; z: number; radius: number }
 }
@@ -267,6 +267,9 @@ export interface BankState {
 const dist = (a: { x: number; z: number }, b: { x: number; z: number }) =>
   Math.hypot(a.x - b.x, a.z - b.z)
 
+/** Long enough to read as stepping onto the stone, short enough not to turn an
+ *  active roaming child into an idle interval in the motion trace. */
+const BOULDER_CLIMB_SECONDS = 0.35
 
 /** Deterministic per-child spread around 1 (never applied to a pace). */
 function spread(rand: () => number, variation: number): number {
@@ -328,6 +331,7 @@ export function createBankGame(
       goalX: p.x,
       goalZ: p.z,
       goalFor: 0,
+      climbing: false,
       settled: false,
       lane: 0,
       quarry: -1,
@@ -464,6 +468,7 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig): void {
     c.role = i === caller ? 'catcher' : 'runner'
     c.arrived = false
     c.crouched = false
+    c.climbing = false
     c.settled = false
   })
   s.phase = 'gather'
@@ -511,6 +516,7 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
   for (const c of s.children) {
     c.arrived = false
     c.crouched = c.role === 'out'
+    c.climbing = false
     c.settled = false
   }
   // Each runner takes its own lane across the stretch, and every catcher starts
@@ -599,15 +605,11 @@ function openRoam(s: BankState, stage: BankStage, cfg: BankConfig, rand: () => n
     c.role = 'runner'
     c.arrived = false
     c.crouched = false
+    c.climbing = false
     c.settled = false
   }
-  s.climber = stage.boulder
-    ? nearestOf(
-        s,
-        s.children.map((_, i) => i),
-        stage.boulder,
-      )
-    : -1
+  // The approach is resolved against the live world on the first roaming step.
+  s.climber = -1
   for (const c of s.children) roamGoal(c, rand)
 }
 
@@ -643,7 +645,10 @@ export function stepBankGame(
   // run was recorded against children still standing at their stations, and
   // "no utterance slows a playing child" read as a slowed child.
   s.phaseFor -= dt
-  if (s.phase === 'roam' && s.phaseFor <= 0) openCycle(s, stage, cfg)
+  // The off-game ROCK guard is part of every roaming phase, not an optional
+  // attempt. The river call waits until the boulder has actually been climbed
+  // and named; a settlement with no boulder never constructs a bank stage.
+  if (s.phase === 'roam' && s.phaseFor <= 0 && s.namedBoulder) openCycle(s, stage, cfg)
   let openedRun = false
   if (
     (s.phase === 'gather' || s.phase === 'regroup') &&
@@ -779,24 +784,30 @@ function stepRoam(
   // the FIRST phase of a visit has one too: a player who walks in and watches
   // the group would otherwise wait a whole cycle for the one utterance that
   // shows ROCK outside the game.
-  if (s.climber < 0 && !s.namedBoulder && stage.boulder) {
+  if (s.climber < 0 && !s.namedBoulder) {
     s.climber = nearestOf(
       s,
       s.children.map((_, i) => i),
       stage.boulder,
     )
+    if (s.climber >= 0) s.children[s.climber].goalFor = 0
   }
   for (let i = 0; i < s.children.length; i++) {
     const c = s.children[i]
     c.goalFor += dt
-    const climbing = i === s.climber && !s.namedBoulder && stage.boulder
+    if (i === s.climber && c.climbing) {
+      if (c.goalFor > BOULDER_CLIMB_SECONDS) c.climbing = false
+    }
+    const climbing = i === s.climber && !s.namedBoulder
     if (climbing) {
-      const boulder = stage.boulder!
+      const boulder = stage.boulder
       if (dist(c, boulder) <= cfg.reachDistance) {
         // THE BOULDER THAT IS NO PART OF THE GAME (spec item 4). Named where it
         // stands, in the village, far from the two rocks the run is about — so
         // ROCK cannot be read as "the thing you run to".
         s.namedBoulder = true
+        c.climbing = true
+        c.goalFor = 0
         say(s, {
           concept: 'ROCK',
           moment: 'boulder',
@@ -805,13 +816,6 @@ function stepRoam(
           aim: { x: boulder.x, y: 0.8, z: boulder.z },
           at: 'boulder',
         })
-        roamGoal(c, rand)
-      } else if (c.goalFor > cfg.roamGoalSeconds) {
-        // It cannot get there — it gives the stone up rather than leaning on
-        // whatever is between, and this roaming phase simply has no boulder
-        // call. Marked as done rather than by clearing the climber, or the pick
-        // above would hand the same walk straight back to somebody.
-        s.namedBoulder = true
         roamGoal(c, rand)
       } else {
         drive(s, i, boulder, false, dt, cfg, world)

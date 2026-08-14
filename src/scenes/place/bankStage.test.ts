@@ -36,6 +36,16 @@ describe('the children`s play stage on the bank (point 687)', () => {
     }
   })
 
+  it('gives every bank settlement an ordinary off-game boulder', () => {
+    for (const id of RIVER_VILLAGES) {
+      for (const seed of [42, 99, 2972259115, 236333330]) {
+        const layout = buildLayout(id, seed)
+        expect(layout.bank).not.toBeNull()
+        expect(layout.rocks.length).toBeGreaterThan(0)
+      }
+    }
+  })
+
   it('sets them at the ends of the settlement`s own stretch, mirrored', () => {
     for (const id of RIVER_VILLAGES) {
       const layout = buildLayout(id, 42)

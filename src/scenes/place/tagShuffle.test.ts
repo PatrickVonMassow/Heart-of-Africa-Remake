@@ -293,7 +293,8 @@ function village(
   // bank round inside the tag round's circle pressed the group against a
   // boundary the scene does not have, and clumped four children into half a
   // metre of ground.
-  const hasBank = !!(layout.bank && layout.playRocks)
+  const boulder = nearestRock(layout, ground)
+  const hasBank = !!(layout.bank && layout.playRocks && boulder)
   const region = hasBank
     ? { x: 0, z: 0, radius: rim }
     : { x: ground.x, z: ground.z, radius: ground.radius }
@@ -346,7 +347,7 @@ function village(
           upstream: layout.playRocks.upstream,
           downstream: layout.playRocks.downstream,
           water: { x: layout.bank.nx * layout.bank.distance, z: layout.bank.nz * layout.bank.distance },
-          boulder: nearestRock(layout, ground),
+          boulder: boulder!,
           roam: { x: ground.x, z: ground.z, radius: ground.radius },
         }
       : null
