@@ -3894,12 +3894,17 @@ if (section('children-bank-game')) {
     // ON the lane's own line put the near stone across the whole frame with the
     // far one peeping over its shoulder, 35 px of it. Both projected, both were
     // drawn, and the picture still did not show the stretch — the "looks wrong
-    // but passes" case. A spectator does not stand in the running lane anyway. So
-    // the stance is back of the line by two fifths of the stretch and a few paces
-    // INLAND of the lane, aimed level at the middle of the stretch: from there the
-    // two stones stand apart with the running ground between them, which is what
-    // the picture is evidence OF. The offsets are the stage's own units, so they
-    // travel with a settlement whose stretch is not this one's.
+    // but passes" case. A spectator does not stand in the running lane anyway.
+    //
+    // So the stance is back of the line AND a couple of paces INLAND of the lane,
+    // aimed level at the middle of the stretch. The two offsets are the stretch's
+    // own fractions, and they are the MEASURED optimum rather than a guess: swept
+    // over the three river villages (nubian, bambara, mandinka) and both ends of
+    // each stretch, 0.25 and 0.13 of the stretch is the stance with the largest
+    // JOINT margin against the three walls this picture sits between — the
+    // settlement boundary (5.0 m of room; the bank's walkable lobe is a ±34 deg
+    // wedge and the second run of this section walked a stance straight out of
+    // it), the frame edge (7.6 deg) and the two stones overlapping (5.9 deg).
     const stood = await page.evaluate(() => {
       const L = window.__placeLayout
       const p = window.__placePlayer
@@ -3918,8 +3923,8 @@ if (section('children-bank-game')) {
       const inland = ax * -near.z - az * -near.x > 0 ? 1 : -1
       const vx = -az * inland
       const vz = ax * inland
-      const back = len * 0.4
-      const aside = len * 0.15
+      const back = len * 0.25
+      const aside = len * 0.13
       p.x = near.x - ax * back + vx * aside
       p.z = near.z - az * back + vz * aside
       p.pitch = 0
@@ -3953,9 +3958,23 @@ if (section('children-bank-game')) {
             `stretch ${stood.stretch.toFixed(1)} m`
         : 'no stage to stand at',
     )
+    // Let the camera follow the teleport — and the settlement's own boundary
+    // judge it — before anything is projected from it.
+    if (stood) await nextFrames(2)
+    // A stance the boundary rejects unmounts the whole settlement scene, and
+    // every projection below then reads an undefined camera. It fails HERE, by
+    // name, rather than crashing the suite in a stack trace about a matrix.
+    const held = stood
+      ? await page.evaluate(() => window.__game.getState().placeId === 'bambara-village' && !!window.__placeCamera)
+      : false
     if (stood) {
-      // Let the camera follow the teleport before anything is projected from it.
-      await nextFrames(2)
+      check(
+        'and standing there leaves him inside the settlement, the scene still mounted',
+        held,
+        held ? `at ${stood.x.toFixed(1)}, ${stood.z.toFixed(1)}` : 'the boundary put him back on the map',
+      )
+    }
+    if (stood && held) {
       const seen = await page.evaluate((rocks) => {
         const cam = window.__placeCamera
         const apply = (e, v) => [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
