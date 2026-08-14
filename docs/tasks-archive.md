@@ -18203,3 +18203,21 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — it is the user's second report on the same ambience, and it stands directly
   in front of the communication mechanic this release exists to let him test.
   Bundle: Dorfleben.
+
+- [x] 673. THE VILLAGE SPEECH IS STILL TOO QUIET AT THE DEPLOYED STATE (user 13.08.2026,
+  answering the board's own question "Ist die Sprache am ausgelieferten Stand laut genug?":
+  "Nein, ist zu leise."). The earlier raise brought `balance.villageLife.speechVolume` to 1.5 and
+  was judged against the tone path rather than against the deployed mix; the user has now judged
+  the deployed mix and it does not carry.
+  FINAL STATE: the syllables carry over the remaining ambience at the default preset — and the
+  bed that used to mask them is going silent in point 672, so this point is calibrated AFTER
+  that one and against the mix it leaves. The starting value is raised until the measured
+  syllable peak stands clear of the remaining ambience floor by a stated margin, the margin is
+  written down where the next reader finds it, and the slider stays where the other volumes are.
+  VERIFIABLE: the measured peak-to-floor margin at the default preset, quoted; a Vitest case
+  pinning the default above the value that failed; and the user's judgment at the deployed
+  state, which is what closes it.
+  ORDER: after 672, whose silence changes the mix this is measured against.
+  Criticality: medium — it is a second report on the same defect, and inaudible speech is the
+  communication mechanic being untestable.
+  Bundle: Dorfleben.
