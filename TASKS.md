@@ -121,9 +121,14 @@ put it is the mistake this line exists to stop.
      `src/scenes/place/adultErrands.ts` that speak them, the glossary/journal/i18n
      strings naming them in BOTH languages, and their tests. What replaces them is
      built in the two points that follow this one (children's bank game, adults'
-     water and digging), so this point may be landed together with them rather
-     than leaving the village mute in between — the batch decides, but a merge of
-     this point alone must still build, lint and play without errors.
+     water and digging), and THE BATCH HAS DECIDED, ON A MEASUREMENT, THAT THIS
+     POINT LANDS WITH THE CHILDREN'S GAME AND NOT BEFORE (14.08.2026): emptying
+     the child situations takes the children's steering with it, and the shipped
+     bambara village then shuffles 0.42 % of its judged time against the 0.25 %
+     gate — the user's own "Kind zittert auf der Stelle herum", which `main` is
+     green on today. The branch stays open until the game is back rather than
+     deploying that regression; the code on it builds, lints and plays without
+     errors, which is what a merge of it alone was required to prove.
   5. `docs/communication-poc-spec.md` and design.md §13.4 are rewritten to the five
      words and the new teaching places in the same commit.
 
@@ -229,6 +234,19 @@ put it is the mistake this line exists to stop.
      villager — one extra radius, calibratable — so they visibly swerve rather than
      brush past him.
   8. Every utterance is one atom, read from the same lexicon as everything else.
+  9. THE THREE CHILD-MOTION PINS THE VOCABULARY POINT LOOSENED ARE RESTORED AND
+     RE-MEASURED (measured 14.08.2026 on `feat/686-five-word-lexicon`). Emptying
+     the child situations took the children's steering with it, and
+     `src/scenes/place/tagShuffle.test.ts` measured the cost: bambara-village at
+     seed 2972259115 shuffles 0.42 % of its judged time over 60 s against the
+     0.25 % gate, the progress watch fires twice over 90 s where once was enough,
+     and the constructed pen stops producing the symptom at 0.65 m (6.7 % shuffled,
+     82.3 % of the trace still judged — the gate passing a wedged child). The
+     interim run is 120 s, the exact rescue pin is `toBeGreaterThan(0)` and the
+     pen is 0.6 m; each site names the number it held. This point puts the 60 s,
+     the exact `toBe(1)` and the 0.65 m yard back, and states the re-measurement
+     in the same commit. A pin that cannot be restored is a finding, not a value
+     to re-tune.
 
   Test: Vitest over a replayed cycle — the phases alternate; the caller becomes the
   first catcher; the direction alternates with the side swap; `ROCK` occurs once
