@@ -760,6 +760,29 @@ function drain(s: BankState, cfg: BankRoundConfig): BankUtterance | null {
   return spoken
 }
 
+/**
+ * THE BERTH THE ROUND OWES THE TRAVELLER (spec item 7), in ONE place: a child's
+ * own footprint plus the stranger's, plus the extra radius the children keep
+ * from him because they are shy of him.
+ *
+ * Everything that can move a child reads THIS — the round's own steering below
+ * AND the body separation the scene runs after it (points 129/378). The
+ * separation knows only the inhabitants' bodies, and the traveller is not one of
+ * them, so with a rule of its own it pushed a child 5 cm inside the berth the
+ * steering had just kept: a brush past him where the spec asks for a visible
+ * swerve.
+ */
+export function insideStrangerBerth(
+  world: BankWorld,
+  cfg: BankRoundConfig,
+  x: number,
+  z: number,
+): boolean {
+  const s = world.stranger
+  if (!s) return false
+  return Math.hypot(x - s.x, z - s.z) < s.radius + world.childRadius + Math.max(0, cfg.strangerBerth)
+}
+
 /** The obstacle set THIS child steers round: every other body, plus — with an
  *  extra berth of its own — the traveller (spec item 7). The stranger is not a
  *  stop: a child walks round him and keeps playing. */
@@ -769,12 +792,9 @@ function obstacles(
   world: BankWorld,
 ): ((x: number, z: number) => boolean) | undefined {
   const occ = world.occupied
-  const stranger = world.stranger
-  if (!occ && !stranger) return undefined
-  const berth = stranger ? stranger.radius + world.childRadius + Math.max(0, cfg.strangerBerth) : 0
+  if (!occ && !world.stranger) return undefined
   return (x: number, z: number) =>
-    (!!occ && occ(i, -1, x, z)) ||
-    (!!stranger && Math.hypot(x - stranger.x, z - stranger.z) < berth)
+    (!!occ && occ(i, -1, x, z)) || insideStrangerBerth(world, cfg, x, z)
 }
 
 /** Commands one child a pace and walks it there. `wants` is whether it is

@@ -43,6 +43,7 @@ import {
 import { balance } from '../../config/balance'
 import { mulberry32 } from '../../world/noise'
 import {
+  PLAYER_RADIUS,
   nudgeToFree,
   nudgeWhere,
   resolveMove,
@@ -67,6 +68,7 @@ import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './t
 import {
   bankChildCanSeparate,
   createBankGame,
+  insideStrangerBerth,
   stepBankGame,
   type BankChild,
   type BankConfig,
@@ -485,7 +487,15 @@ function frame(v: ReturnType<typeof village>, dt: number): void {
   const separable = v.bank
     ? v.bodies.filter((_, i) => bankChildCanSeparate(v.children[i] as BankChild))
     : v.bodies
-  separateGroup(v.set, separable, dt, balance.villageLife.separation, v.world)
+  // The separation resolves in the round's ground PLUS the traveller's berth,
+  // exactly as `PlaceLife` wires it: the traveller is not an inhabitant body, so
+  // without this the separation pushes a child inside the berth the steering
+  // kept.
+  separateGroup(v.set, separable, dt, balance.villageLife.separation, {
+    blocked: (x: number, z: number) =>
+      v.world.blocked(x, z) || insideStrangerBerth(v.world, BANK_CFG, x, z),
+    nudge: v.world.nudge,
+  })
   for (let i = 0; i < v.children.length; i++) {
     // The resolved position AND the separation's own wedge rescues (point 656
     // follow-up), exactly as `PlaceLife` reads them back.
@@ -1324,6 +1334,32 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       expect(walled).toEqual([])
     })
   }
+
+  it('walks round a traveller planted in the running lane, never through him', () => {
+    const [placeId, seed] = RIVER_VILLAGES[0]
+    const v = village(placeId, seed)
+    const stage = v.stage!
+    const up = rockAt(stage, 'upstream')
+    const down = rockAt(stage, 'downstream')
+    // He plants himself in the MIDDLE of the running ground — the worst place he
+    // could pick, and the one the browser section stands him in.
+    const him = { x: (up.x + down.x) / 2, z: (up.z + down.z) / 2, radius: PLAYER_RADIUS }
+    v.world.stranger = him
+    const bodies = PLAYER_RADIUS + NPC_RADIUS
+    const owed = bodies + BANK_CFG.strangerBerth
+    let minGap = Infinity
+    const dt = 1 / 60
+    for (let t = 0; t < 200; t += dt) {
+      frame(v, dt)
+      for (const c of v.children) minGap = Math.min(minGap, Math.hypot(c.x - him.x, c.z - him.z))
+    }
+    // A run happened with him standing in it, rather than the round halting.
+    expect(v.bank!.runs).toBeGreaterThan(0)
+    // ...and nobody brushed past him: the bodies never met, and the extra radius
+    // the children owe the stranger was kept as well.
+    expect(minGap).toBeGreaterThanOrEqual(bodies)
+    expect(minGap).toBeGreaterThanOrEqual(owed)
+  })
 
   for (const [placeId, seed] of RIVER_VILLAGES) {
     it(`${placeId} at seed ${seed} walks the group down to the bank and runs the stretch`, () => {

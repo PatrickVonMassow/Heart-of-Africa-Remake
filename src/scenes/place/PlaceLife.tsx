@@ -56,6 +56,7 @@ import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './t
 import {
   bankChildCanSeparate,
   createBankGame,
+  insideStrangerBerth,
   stepBankGame,
   type BankChild,
   type BankStage,
@@ -773,6 +774,13 @@ function Kids({
     }),
     [children, x, z, playRadius],
   )
+  // The world the BODY SEPARATION resolves in: the round's own ground, plus the
+  // traveller's berth, written in place each frame (the stranger moves, the
+  // object must not be rebuilt per frame).
+  const separationWorld = useMemo(
+    () => ({ blocked: world.blocked, nudge: world.nudge }),
+    [world],
+  )
   const gestures = useRef<Array<RefObject<GestureState>>>([])
   if (gestures.current.length !== count) {
     gestures.current = Array.from(
@@ -839,6 +847,13 @@ function Kids({
     // three apart at all — together that was the user's "Kinder klemmen kurz
     // ineinander". `separateGroup` sweeps until nobody moves.
     const sep = balance.villageLife.separation
+    // ...AND THE SEPARATION KEEPS THE TRAVELLER'S BERTH TOO (work-order 687 item
+    // 7). It resolves the inhabitants' bodies against one another, and the
+    // traveller is not one of them — so without this it pushed a child inside
+    // the berth the round's own steering had just kept clear.
+    separationWorld.blocked = (px: number, pz: number) =>
+      world.blocked(px, pz) ||
+      insideStrangerBerth(world, balance.villageLife.bankGame, px, pz)
     for (let i = 0; i < children.length; i++) {
       const b = bodies[i]
       if (!b) continue
@@ -848,7 +863,7 @@ function Kids({
     const separable = round.bank
       ? bodies.filter((_, i) => bankChildCanSeparate(children[i] as BankChild))
       : bodies
-    separateGroup(bodySet, separable, dt, sep, world)
+    separateGroup(bodySet, separable, dt, sep, separationWorld)
     for (let i = 0; i < children.length; i++) {
       const b = bodies[i]
       if (!b) continue
