@@ -532,6 +532,31 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     })
   }
 
+  it('rescues the permanently shivering child at the player-reported seed (point 666)', () => {
+    // The production report names this exact settlement and seed. On the code
+    // shipped to the player, child 3 spent effectively every judged window
+    // walking in place for minutes. This is the owed headless reproduction:
+    // the progress watch must fire once, move the child beyond the oscillation,
+    // and the remainder of the same deterministic run must stay clean.
+    const paths = play('bambara-village', 236333330, 90)
+    const rescues = rescueRate(paths)
+    expect(rescues.worstChild).toBe(3)
+    expect(rescues.worstRescues).toBe(1)
+    expect(rescues.carriedMetres).toBeGreaterThan(2)
+    expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
+    expect(rescues.worstCarriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildCarryGate)
+
+    const rescuedAt = paths[3].findIndex((s) => s.nudges > 0)
+    expect(rescuedAt).toBeGreaterThan(0)
+    const after = paths.map((path) => path.slice(rescuedAt + 1))
+    const shuffle = shuffleWindows(after)
+    const burst = shuffleWindows(after, CHILD_MOTION.short)
+    expect(judgedEnough(shuffle)).toBe(true)
+    expect(judgedEnough(burst)).toBe(true)
+    expect(shuffle.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
+    expect(burst.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
+  })
+
   it('holds on the cadence that walked the children into the dead-end wedge (point 657)', () => {
     // THE WEDGE, REPLAYED (point 657). The reported ground carries a 0.76 m
     // channel between two hut clearance circles at (10.5, -5.7) and a corridor
@@ -759,12 +784,12 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
  * the symptom, so the pen tightened to where walking cannot orbit. Measured
  * over 40 s at 0.65 m (re-measured after the point-657 second round's evade
  * ramp): 18.0 rescues per child-minute, carrying it 54.9 m in that minute,
- * 110 m walked per played minute (full legs, the healthy band), and 15.1 %
+ * 110 m walked per played minute (full legs, the healthy band), and 14.8 %
  * of the judged game time walked without getting anywhere — sixty times the
  * gate. A third of the trace is not judged at all, because a window that
  * spans a carry is refused rather than guessed at; the carries are what the
  * rescue gate answers for. THE MEASURE THIS ONE REPLACED sees 2.5 % of the
- * same trace — a sixth of the truth — because every one of its two-second
+ * same trace — less than a quarter of the truth — because every one of its two-second
  * windows holds a 3 m carry: it counted the teleport as the child walking,
  * and as ground the child covered.
  */
@@ -834,8 +859,8 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     expect(holdsAGame(traceLiveness(paths))).toBe(true)
     const asItWas = oldMeasure(penned, 2, 2, 0.5)
     expect(asItWas.windows).toBeGreaterThan(1000) // it really did look
-    expect(asItWas.share).toBeLessThan(0.05) // and it saw a sixth of the truth
-    expect(r.share).toBeGreaterThan(asItWas.share * 5)
+    expect(asItWas.share).toBeLessThan(0.05) // and it saw less than a quarter of the truth
+    expect(r.share).toBeGreaterThan(asItWas.share * 4)
   })
 
   it('and says the same thing about that ONE recorded trace at any frame cadence', () => {

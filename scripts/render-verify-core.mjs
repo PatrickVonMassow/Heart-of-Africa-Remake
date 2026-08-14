@@ -190,6 +190,7 @@ export function chargeablePoints(text) {
 export function chargeFor(red, options) {
   const { suite = '', backend = '', ledger = RED_CHARGES } = options ?? {}
   const name = text(red?.name)
+  const detail = text(red?.detail)
   if (!name) return null
   for (const charge of Array.isArray(ledger) ? ledger : []) {
     try {
@@ -198,6 +199,10 @@ export function chargeFor(red, options) {
       if (charge.backend && charge.backend !== backend) continue
       if (charge.kind && red?.kind && charge.kind !== red.kind) continue
       if (!charge.match?.test?.(name)) continue
+      // Some checks have more than one red cause behind the same stable label.
+      // Such a charge must name the measured signature in the detail instead
+      // of swallowing every future failure of that check.
+      if (charge.detailMatch && !charge.detailMatch?.test?.(detail)) continue
       return charge
     } catch {
       /* a broken ledger entry charges nothing — the red stays unaccounted */
