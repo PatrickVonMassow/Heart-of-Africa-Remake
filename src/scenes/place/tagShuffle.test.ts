@@ -1379,6 +1379,14 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       ['bambara-village', 7],
       ['mandinka-village', 99],
       ['bambara-village', 236333330],
+      // THE CASE THAT PROVES THE FOLD BELOW, and the only one of the five that
+      // does. Swept out of 120 village/seed layouts against the UNBOUNDED code:
+      // here every roam that ENDS inside the window stays within the cap (45.9 s
+      // against 55.0 s) while the roam the window CLOSES in has already run
+      // 55.4 s, and a run had opened long before (38.6 s). It is therefore the
+      // one layout where the exit-only measurement reads green on a round that
+      // is over its bound — which is what made the test unable to fail.
+      ['mandinka-village', 58],
     ]
     const shippedRoam = BANK_CFG.roamSeconds
     try {
@@ -1407,6 +1415,13 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
           if (b.phase === 'run' && firstRun === Infinity) firstRun = b.playedClock
           last = b.phase
         }
+        // THE PHASE THE WINDOW CLOSES IN IS COUNTED TOO (cross-vendor finding,
+        // 14.08.2026). Folding a roam in only where it ENDS is blind to the one
+        // failure this test exists for: a round still roaming when the window
+        // closes never left the phase, so its length was never measured — and an
+        // earlier successful run had already made `firstRun` green. The test
+        // then passed on exactly the state it is meant to catch.
+        if (last === 'roam') worstRoam = Math.max(worstRoam, roamFor)
         // A tenth of a second of slack for the frame the bound falls in.
         expect({ placeId, seed, longestRoam: worstRoam <= cap + 0.1 }).toEqual({
           placeId,
