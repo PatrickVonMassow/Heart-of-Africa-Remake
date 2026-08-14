@@ -558,7 +558,9 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
     expect(rescues.worstCarriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildCarryGate)
 
-    const rescuedAt = paths[3].findIndex((s) => s.nudges > 0)
+    // `nudges` is optional on a track sample — the metric reads a missing one
+    // as zero, and so does this.
+    const rescuedAt = paths[3].findIndex((s) => (s.nudges ?? 0) > 0)
     expect(rescuedAt).toBeGreaterThan(0)
     const after = paths.map((path) => path.slice(rescuedAt + 1))
     const shuffle = shuffleWindows(after)
