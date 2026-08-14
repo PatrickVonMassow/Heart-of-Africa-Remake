@@ -287,6 +287,13 @@ export function wordToward(end: BankEnd): BankConcept {
   return end === 'upstream' ? 'UPSTREAM' : 'DOWNSTREAM'
 }
 
+/** Whether the settlement's body-separation pass may move this child. A tagged
+ *  child is a fixed posture for the rest of its run: other bodies yield to it,
+ *  but the pass must not rewrite the place where it was caught. */
+export function bankChildCanSeparate(c: BankChild): boolean {
+  return !c.crouched
+}
+
 /** A group at its spawn points, roaming. Every point must already be free — the
  *  caller validates it against the real collider set, exactly as the tag game's
  *  spawns are. */

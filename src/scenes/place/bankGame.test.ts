@@ -17,6 +17,7 @@ import { balance } from '../../config/balance'
 import { floorPace } from '../../systems/pursuit'
 import { mulberry32 } from '../../world/noise'
 import {
+  bankChildCanSeparate,
   createBankGame,
   otherEnd,
   rockAt,
@@ -29,6 +30,13 @@ import {
   type BankUtterance,
   type BankWorld,
 } from './bankGame'
+import { absorbSeparation } from './tagGame'
+import {
+  addBodies,
+  createBodies,
+  createInhabitantSet,
+  separateGroup,
+} from './inhabitantBodies'
 
 const CFG: BankConfig = { ...balance.villageLife.tag, ...balance.villageLife.bankGame }
 
@@ -418,18 +426,39 @@ describe('the children`s game at the bank (point 687)', () => {
     const spots = Array.from({ length: 5 }, (_, i) => ({ x: STAGE.roam.x + i * 1.1, z: STAGE.roam.z }))
     const s = createBankGame(spots, rand, CFG)
     const world = openWorld()
+    const set = createInhabitantSet()
+    const bodies = createBodies(s.children.length, { scale: 0.55 })
+    addBodies(set, bodies)
     const at = s.children.map((c) => ({ x: c.x, z: c.z }))
+    const wasOut = s.children.map(() => false)
     // A child is judged on the frames it was ALREADY crouched at the start of:
     // the frame it is caught in it was still running, and it was running that
     // is caught.
     let was = s.children.map(() => false)
     for (let t = 0; t < 600; t += 1 / 60) {
       const before = was
+      const walkedBefore = s.children.map((c) => c.walked)
       stepBankGame(s, 1 / 60, CFG, STAGE, world, rand)
+      // The scene's integration order: write every body, separate the group,
+      // then absorb the resolved positions. Crouched children remain in the set
+      // as obstacles, but are not candidates for movement themselves.
+      bodies.forEach((body, i) => {
+        body.x = s.children[i].x
+        body.z = s.children[i].z
+      })
+      separateGroup(
+        set,
+        bodies.filter((_, i) => bankChildCanSeparate(s.children[i])),
+        1 / 60,
+        balance.villageLife.separation,
+        world,
+      )
+      bodies.forEach((body, i) => absorbSeparation(s.children[i], body))
       was = s.children.map((c) => c.crouched)
       s.children.forEach((c, i) => {
         const moved = Math.hypot(c.x - at[i].x, c.z - at[i].z)
         if (c.crouched) {
+          wasOut[i] = true
           // It stands where it was tagged: no pace, and it is HELD, which is the
           // reading rather than a stall.
           expect(c.pace).toBe(0)
@@ -441,7 +470,7 @@ describe('the children`s game at the bank (point 687)', () => {
           }
         }
         // …and once the run is over, the same child walks to the catchers' side.
-        if (!c.crouched && c.role === 'catcher' && s.phase === 'regroup' && moved > 1e-9) {
+        if (wasOut[i] && !c.crouched && s.phase !== 'run' && c.walked > walkedBefore[i]) {
           walkedAfterOut++
         }
         at[i] = { x: c.x, z: c.z }

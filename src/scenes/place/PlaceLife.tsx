@@ -54,6 +54,7 @@ import type { PlaceRiverBank } from './riverBank'
 import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, type NavPoint } from './routing'
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild } from './tagGame'
 import {
+  bankChildCanSeparate,
   createBankGame,
   stepBankGame,
   type BankChild,
@@ -795,7 +796,10 @@ function Kids({
       b.x = children[i].x
       b.z = children[i].z
     }
-    separateGroup(bodySet, bodies, dt, sep, world)
+    const separable = round.bank
+      ? bodies.filter((_, i) => bankChildCanSeparate(children[i] as BankChild))
+      : bodies
+    separateGroup(bodySet, separable, dt, sep, world)
     for (let i = 0; i < children.length; i++) {
       const b = bodies[i]
       if (!b) continue

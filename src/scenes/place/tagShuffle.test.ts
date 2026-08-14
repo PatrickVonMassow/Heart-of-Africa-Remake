@@ -65,8 +65,10 @@ import { buildLayout, builtFabric, type PlaceLayout } from './layout'
 import { childPlayGround, villageAdultStations } from './lifeSpots'
 import { absorbSeparation, createTagGame, stepTagGame, type TagChild, type TagWorld } from './tagGame'
 import {
+  bankChildCanSeparate,
   createBankGame,
   stepBankGame,
+  type BankChild,
   type BankConfig,
   type BankStage,
   type BankState,
@@ -453,7 +455,10 @@ function frame(v: ReturnType<typeof village>, dt: number): void {
     v.bodies[i].x = v.children[i].x
     v.bodies[i].z = v.children[i].z
   }
-  separateGroup(v.set, v.bodies, dt, balance.villageLife.separation, v.world)
+  const separable = v.bank
+    ? v.bodies.filter((_, i) => bankChildCanSeparate(v.children[i] as BankChild))
+    : v.bodies
+  separateGroup(v.set, separable, dt, balance.villageLife.separation, v.world)
   for (let i = 0; i < v.children.length; i++) {
     // The resolved position AND the separation's own wedge rescues (point 656
     // follow-up), exactly as `PlaceLife` reads them back.
