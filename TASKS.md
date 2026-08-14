@@ -131,6 +131,36 @@ put it is the mistake this line exists to stop.
      errors, which is what a merge of it alone was required to prove.
   5. `docs/communication-poc-spec.md` and design.md §13.4 are rewritten to the five
      words and the new teaching places in the same commit.
+  7. THE LEFTOVERS THE CROSS-VENDOR REVIEW FOUND ARE CLOSED (Opus 5 on
+     `main..44f37c6a`, 14.08.2026, verdict merge-with-fixes; the lexicon core itself
+     it verified correct and genuinely pinned — recomputed distances, the mirror and
+     the sixteen-strike message all hold). None of these is optional:
+     - THE PLAYER-VISIBLE ONES FIRST, in BOTH languages: the drum journal entry
+       still says "Seven words, each of five beats" / "Sieben Wörter zu je fünf
+       Schlägen" (`en.ts:1057`/`de.ts:1069`), the drum panel hint still says "Seven
+       words, one after another" (`en.ts:279`/`de.ts:281`), and two further entries
+       (`en.ts:1059`/`de.ts:1071`, `en.ts:1061`/`de.ts:1073`) describe an errand and
+       children's speech that no longer exist. Item 4 named the i18n strings and no
+       i18n file was touched.
+     - `scripts/verify/settings.mjs` and `scripts/verify/polish.mjs` still hard-code
+       FIVE-syllable literals. The heard store is string-keyed, so those suites still
+       pass — which is the defect: the browser gate proves the audio path for a shape
+       the game can no longer produce and covers the shipped four-syllable utterance
+       nowhere.
+     - The point-589 speech-silence alarms are DEAD: `watchProducer`'s only remaining
+       caller is the tag round, `adultErrands.ts` carries an unstepped watch, and yet
+       `balance.ts` documents both alarms and the debug menu still ships both sliders
+       in both languages. Either the alarms are re-armed for the rounds that do speak,
+       or the controls and their documentation go with them — no dead slider.
+     - `docs/acceptance-evidence.md` still describes the eleven-word state while §7's
+       criterion detail was corrected; the two contradict each other and must move
+       together.
+     - `RIVER` is four identical low strikes. Six of the eight even-parity sequences
+       carry BOTH tones and only five words are needed, so the "at least one syllable
+       of each tone" rule is restored and `RIVER` takes a mixed-tone sequence: the
+       least hearable word in the inventory is not the one the whole message opens on.
+     - The persisted-readings break of item 6 is STATED IN A COMMIT, not only in the
+       spec document.
 
   Test: the Vitest layer pins the five concepts, the two-syllable minimum distance
   over the whole inventory, the mirror of the direction pair, and the message's
@@ -247,6 +277,41 @@ put it is the mistake this line exists to stop.
      the exact `toBe(1)` and the 0.65 m yard back, and states the re-measurement
      in the same commit. A pin that cannot be restored is a finding, not a value
      to re-tune.
+ 10. THE CROSS-VENDOR REVIEW'S FINDINGS ARE ANSWERED (GPT-5.6 Sol at effort high on
+     `44f37c6a..9598673d`, 14.08.2026, verdict DO-NOT-MERGE). Each is fixed or
+     refuted with evidence, and the ones that are fixed are pinned by a test that
+     would fail without the fix:
+     - THE CYCLE CAN NEVER END. `endRun` promotes only children already `out`, and
+       the sole cycle exit is "no free runner left", so a sequence of runs in which
+       nobody is tagged repeats run/regroup forever. The roaming phase then never
+       returns — and with it neither the boulder that teaches `ROCK` off the game nor
+       the opening `RIVER` call. The round needs a guaranteed elimination or an
+       explicit cycle backstop, and a test that drives a no-tag run to termination.
+     - THE CATCHER'S TAP CAN FALL AFTER SOMEBODY ARRIVES. The tap and the direction
+       announcement are QUEUED and drained one per `utteranceGapSeconds`, so the tap
+       is emitted at least one gap into the run — which is exactly the "made it"
+       reading item 4 forbids. Every utterance that item 5 fixes to a moment of the
+       round is emitted AT that moment or not at all.
+     - THE OFF-GAME `ROCK` GUARD IS SILENTLY ABANDONED when the roaming goal runs
+       long (`namedBoulder` is set true without anyone speaking), `BankStage.boulder`
+       is nullable, and no code makes the child climb. The guard either fires every
+       roaming phase or the settlement has no bank round; a cycle without the boulder
+       utterance is a failing test, not an accepted case.
+     - THE BODY SEPARATION MOVES CROUCHED CHILDREN. `separateGroup` and
+       `absorbSeparation` run unconditionally after the round's own step, so a tagged
+       child can be pushed while it is meant to hold its posture, and can be pushed
+       inside the traveller's berth because the round's obstacle check has already
+       finished. The pure test asserts immobility on a path the game does not take —
+       the integration path is what must be pinned.
+     - THREE ASSERTIONS PIN NOTHING and are replaced by ones that bite:
+       `expect(free).toBeGreaterThanOrEqual(0)` is tautological, `expect(pace)
+       .toBeGreaterThanOrEqual(Math.min(paceBefore, pace))` is always true, and
+       `expect(nearest).toBeGreaterThan(berth * 0.9)` permits ten percent penetration
+       of the very radius it guards and never compares against the ordinary villager's.
+     - The re-pen construction of item 9 was NOT judged (it fell outside the reviewed
+       range), so the re-review covers it: the guard was loosened from demanding a
+       clear r+1.6 m yard to only refusing to leave a sibling in the wall band, and
+       that must be shown to be a correction rather than a weakening.
 
   Test: Vitest over a replayed cycle — the phases alternate; the caller becomes the
   first catcher; the direction alternates with the side swap; `ROCK` occurs once
