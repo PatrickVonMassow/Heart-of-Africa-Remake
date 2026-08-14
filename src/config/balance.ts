@@ -739,7 +739,7 @@ export interface BalanceConfig {
       dodgeReach: number
       /** How fast a roaming child's heading drifts (rad/s). */
       roamTurn: number
-      /** How long the climber walks at the boulder before giving the stone up. */
+      /** How long the climber may make no progress toward the boulder before giving up. */
       roamGoalSeconds: number
       /** The pace of every walk that is not a run (m/s). */
       walkPace: number
