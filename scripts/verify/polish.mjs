@@ -4080,13 +4080,87 @@ if (section('children-bank-game')) {
       p.yaw = Math.atan2(far.x - p.x, far.z - p.z) + Math.PI
       return { x: p.x, z: p.z, ax: dx / len, az: dz / len, far, r: L.playRocks.r, berth: window.__balance.villageLife.bankGame.strangerBerth }
     })
-    const running = planted
-      ? await page
-          .waitForFunction(() => window.__placeTag().phase === 'run', null, { timeout: 240000, polling: 'raf' })
+    // WAITING FOR A RUN IS WAITING ON THE GAME'S CLOCK, NOT ON THE WALL'S. This
+    // was a 240 s wall-clock deadline on an event of the round's own clock, and
+    // it broke the rule the lane window below states for itself: a headless
+    // frame buys wildly different amounts of game per machine. Starve the
+    // process and those 240 s buy far less played time, the round has not
+    // reached its run phase inside them, and the check reports a product defect
+    // that is not there — measured by `throttle-probe.mjs` on a quarter of a
+    // core at a 6/8 skew rate, every one of the six reds this check and no
+    // other.
+    //
+    // The budget is therefore PLAYED SECONDS. 150 of them, against a worst
+    // measured wait of 79.7 s: replayed in the fast layer at this section's own
+    // shortened roam (`src/scenes/place/tagShuffle.test.ts`), the longest gap
+    // between two runs in the bambara village at the verification's seed is
+    // 79.7 s of played time and the first run from a cold start falls at 71.3 s.
+    //
+    // The wall clock keeps one job only — telling a DEAD PAGE from a round that
+    // played its budget without opening a run. Those are different findings and
+    // they get different messages: a page that has stopped stepping buys no
+    // played time at all, so it is caught by the played clock STANDING STILL,
+    // never by a deadline the game's own progress has to beat.
+    const RUN_WAIT_PLAYED_S = 150
+    const RUN_WAIT_STALL_MS = 90000
+    const RUN_WAIT_WALL_MS = 1800000
+    let runPhase = null
+    let runPlayed = 0
+    let runDead = false
+    let runWallMs = 0
+    if (planted) {
+      const readRound = () =>
+        page.evaluate(() => {
+          const t = window.__placeTag()
+          return { phase: t.phase, playedClock: t.playedClock }
+        })
+      const first = await readRound()
+      let seen = first.playedClock
+      const wallStart = Date.now()
+      for (;;) {
+        const now = await readRound()
+        runPhase = now.phase
+        runPlayed = now.playedClock - first.playedClock
+        if (runPhase === 'run') break
+        runWallMs = Date.now() - wallStart
+        if (runPlayed >= RUN_WAIT_PLAYED_S) break
+        if (Date.now() - wallStart > RUN_WAIT_WALL_MS) {
+          runDead = true
+          break
+        }
+        // ON TO THE NEXT SAMPLE BY WAITING FOR THE GAME'S CLOCK TO MOVE — a
+        // CONDITION, never a pause (this suite's own fixed-wait gate, and the
+        // same reason the budget above is played seconds). Its deadline is the
+        // dead-page detector and nothing else: a scene that is still stepping
+        // satisfies it in a frame however slow the machine, and only one that
+        // has stopped buying game time at all can run it out.
+        seen = now.playedClock
+        const stepped = await page
+          .waitForFunction((was) => window.__placeTag().playedClock > was, seen, {
+            timeout: RUN_WAIT_STALL_MS,
+            polling: 'raf',
+          })
           .then(() => true)
           .catch(() => false)
-      : false
-    check('a run starts while the traveller stands in the lane', running)
+        if (!stepped) {
+          runDead = true
+          break
+        }
+      }
+    }
+    const running = runPhase === 'run'
+    check(
+      'a run starts while the traveller stands in the lane',
+      running,
+      running
+        ? `after ${runPlayed.toFixed(1)}s of played time (budget ${RUN_WAIT_PLAYED_S}s)`
+        : runDead
+          ? `THE PAGE STOPPED STEPPING — only ${runPlayed.toFixed(1)}s of played time in ` +
+            `${(runWallMs / 1000).toFixed(0)}s of wall clock. This is a dead or frozen scene, NOT a round ` +
+            `that failed to open a run: nothing about the GAME is judged by this red.`
+          : `the round played ${runPlayed.toFixed(1)}s of its own clock without opening a run ` +
+            `(budget ${RUN_WAIT_PLAYED_S}s, phase ${runPhase})`,
+    )
     if (planted && running) {
       // The window is an interval of the GAME's own clock, never a frame count:
       // a headless frame buys wildly different amounts of game per machine, and
