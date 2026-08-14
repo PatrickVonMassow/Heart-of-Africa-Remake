@@ -923,13 +923,47 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
  */
 const PEN_RADIUS = 0.65
 const PEN_CARRY = 3
+type PenClearance = 'wall-band' | 'clear-yard'
+
+/** Whether a pen can be placed without putting a sibling on its wall. The old
+ *  construction required every sibling outside a much larger clear yard; the
+ *  corrected construction admits one already inside the pen while still
+ *  keeping every sibling clear of the blocked annulus. */
+function penHasClearWall(
+  children: ReadonlyArray<{ x: number; z: number }>,
+  penned: number,
+  r: number,
+  clearance: PenClearance,
+): boolean {
+  const c = children[penned]
+  return children.every((o, i) => {
+    if (i === penned) return true
+    const d = Math.hypot(o.x - c.x, o.z - c.z)
+    return clearance === 'clear-yard'
+      ? d > r + 1.6
+      : d <= r || d >= r + 1.5 + NPC_RADIUS
+  })
+}
+
+interface PenEvidence {
+  placements: number
+  /** Placements the wall-band rule admits because a sibling is already inside
+   *  the yard, but the former r + 1.6 m rule wrongly refuses. */
+  refusedByClearYard: number
+}
 
 describe('and the gate SEES a child that is wedged (point 656)', () => {
   /** The reported settlement with one child penned: a wall thrown up round it
    *  with room to keep walking and none to get anywhere, and a settlement that
    *  carries it clear of the wall when its stall watch runs out. The pen follows
    *  the child, so the trace holds episode after episode rather than one. */
-  function wedged(seconds = 40, r = PEN_RADIUS, carry = PEN_CARRY) {
+  function wedged(
+    seconds = 40,
+    r = PEN_RADIUS,
+    carry = PEN_CARRY,
+    clearance: PenClearance = 'wall-band',
+    evidence?: PenEvidence,
+  ) {
     const v = village('bambara-village', 2972259115, undefined, { pen: { r, carry } })
     const paths: Track[][] = v.children.map(() => [])
     for (let t = 0; t < seconds; t += 1 / 60) {
@@ -946,12 +980,12 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
       // every re-pen — 6 rescues a child-minute where the tag round produced 18,
       // which is the construction losing its grip on the symptom rather than the
       // gate losing sight of it.
-      const clear = v.children.every((o, i) => {
-        if (i === 0) return true
-        const d = Math.hypot(o.x - c.x, o.z - c.z)
-        return d <= r || d >= r + 1.5 + NPC_RADIUS
-      })
+      const clear = penHasClearWall(v.children, 0, r, clearance)
       if (clear && v.clock() > 3 && (!v.pen.on || Math.hypot(c.x - v.pen.x, c.z - v.pen.z) > r)) {
+        if (evidence) {
+          evidence.placements++
+          if (!penHasClearWall(v.children, 0, r, 'clear-yard')) evidence.refusedByClearYard++
+        }
         v.pen.x = c.x
         v.pen.z = c.z
         v.pen.on = true
@@ -960,6 +994,36 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     }
     return paths
   }
+
+  it('re-pens with a sibling safely inside the yard instead of starving the construction', () => {
+    const pair = (d: number) => [{ x: 0, z: 0 }, { x: d, z: 0 }]
+    // A sibling standing on either side of the annulus is valid; one on the wall
+    // or less than its body radius beyond the outer edge is not. This is the
+    // safety the correction retains while dropping unrelated empty ground.
+    expect(penHasClearWall(pair(PEN_RADIUS / 2), 0, PEN_RADIUS, 'wall-band')).toBe(true)
+    expect(penHasClearWall(pair(PEN_RADIUS / 2), 0, PEN_RADIUS, 'clear-yard')).toBe(false)
+    expect(penHasClearWall(pair(PEN_RADIUS + 0.1), 0, PEN_RADIUS, 'wall-band')).toBe(false)
+    expect(
+      penHasClearWall(pair(PEN_RADIUS + 1.5 + NPC_RADIUS - 0.01), 0, PEN_RADIUS, 'wall-band'),
+    ).toBe(false)
+    expect(
+      penHasClearWall(pair(PEN_RADIUS + 1.5 + NPC_RADIUS + 0.01), 0, PEN_RADIUS, 'wall-band'),
+    ).toBe(true)
+
+    const evidence: PenEvidence = { placements: 0, refusedByClearYard: 0 }
+    const corrected = [wedged(40, PEN_RADIUS, PEN_CARRY, 'wall-band', evidence)[0]]
+    const stricter = [wedged(40, PEN_RADIUS, PEN_CARRY, 'clear-yard')[0]]
+    const correctedRescues = rescueRate(corrected).perChildMinute
+    const stricterRescues = rescueRate(stricter).perChildMinute
+
+    // This is the case the former rule got wrong: the wall is clear, but a
+    // sibling already inside its inner yard makes r + 1.6 m of empty ground
+    // impossible. Refusing those valid placements starves the repeated symptom.
+    expect(evidence.placements).toBeGreaterThan(10)
+    expect(evidence.refusedByClearYard).toBeGreaterThan(0)
+    expect(correctedRescues).toBeGreaterThan(stricterRescues * 2)
+    expect(correctedRescues).toBeGreaterThan(CHILD_MOTION.rescueGate * 2)
+  })
 
   it('goes RED on it — and the measure it replaced would have passed', () => {
     const paths = wedged()
