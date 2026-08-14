@@ -236,6 +236,9 @@ export interface BankState {
   climber: number
   /** Whether the boulder has already been named this roaming phase. */
   namedBoulder: boolean
+  /** Runs opened in this cycle. The normal exit is still the last runner being
+   *  caught; this bounds a cycle in which every runner gets through untouched. */
+  runsThisCycle: number
   runs: number
   cycles: number
   /** Children tagged so far — the round's own "something happened" counter, read
@@ -338,6 +341,7 @@ export function createBankGame(
     caller: -1,
     climber: -1,
     namedBoulder: false,
+    runsThisCycle: 0,
     runs: 0,
     cycles: 0,
     tags: 0,
@@ -462,6 +466,7 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig): void {
   s.phase = 'gather'
   s.phaseFor = cfg.gatherSeconds
   s.direction = null
+  s.runsThisCycle = 0
   if (caller >= 0) {
     say(s, {
       concept: 'RIVER',
@@ -481,6 +486,7 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
   s.direction = wordToward(to)
   s.phase = 'run'
   s.phaseFor = cfg.runSeconds
+  s.runsThisCycle++
   s.runs++
   for (const c of s.children) {
     c.arrived = false
@@ -536,8 +542,11 @@ function endRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
   }
   s.from = otherEnd(s.from)
   s.direction = null
-  // The cycle ends when no free runner is left — nobody to chase, nobody to run.
-  if (runners(s).length === 0) {
+  // The cycle normally ends when no runner is left. A run per child is the
+  // explicit backstop for the equally valid sequence in which every runner
+  // reaches the rock untouched: without it the same sides swap forever and the
+  // game never returns to the roaming ROCK guard or the next RIVER call.
+  if (runners(s).length === 0 || s.runsThisCycle >= s.children.length) {
     s.phase = 'part'
     s.phaseFor = cfg.partSeconds
     s.cycles++

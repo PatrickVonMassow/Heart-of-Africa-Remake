@@ -287,6 +287,26 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(checked).toBeGreaterThan(0)
   })
 
+  it('ends a cycle after one run per child even when nobody is ever tagged', () => {
+    const cfg: BankConfig = {
+      ...CFG,
+      roamSeconds: 0.1,
+      roamSpread: 0,
+      gatherSeconds: 0.1,
+      runSeconds: 0.1,
+      regroupSeconds: 0.1,
+      partSeconds: 0.1,
+      catchDistance: -1,
+    }
+    const { s, log } = replay(5, { seed: 17, cfg })
+
+    expect(s.tags).toBe(0)
+    expect(s.cycles).toBeGreaterThan(0)
+    expect(log.phases).toContain('part')
+    expect(log.phases.filter((phase) => phase === 'roam').length).toBeGreaterThan(1)
+    expect(s.runs).toBeGreaterThan(s.children.length)
+  })
+
   it('never lets an utterance slow a playing child', () => {
     const cfg = CFG
     const rand = mulberry32(3)
