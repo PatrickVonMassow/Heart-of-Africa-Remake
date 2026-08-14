@@ -1240,6 +1240,36 @@ function TeachingStone({ stone }: { stone: PlaceLayout['teachingStone'] }) {
 }
 
 /**
+ * The two PLAY ROCKS of the children's bank game (work-order 687): the run-to
+ * targets at the upstream and downstream ends of their stretch. They are drawn
+ * from the same rock dressing as the teaching stone and at the same scale — the
+ * word called at them is the same word, and ROCK has to transfer between
+ * instances rather than name one boulder. Positions and radius are the layout's,
+ * so the drawn stone and its collider are one object (points 129/378).
+ */
+function PlayRocks({ rocks }: { rocks: PlaceLayout['playRocks'] }) {
+  const geo = useMemo(() => buildRock(), [])
+  if (!rocks) return null
+  return (
+    <>
+      {[rocks.upstream, rocks.downstream].map((p, i) => (
+        <mesh
+          key={i}
+          geometry={geo}
+          position={[p.x, 0, p.z]}
+          rotation={[0, p.x * 1.7 + p.z, 0]}
+          scale={rocks.scale}
+          castShadow
+          receiveShadow
+        >
+          <meshStandardMaterial vertexColors roughness={0.95} />
+        </mesh>
+      ))}
+    </>
+  )
+}
+
+/**
  * The village's ground work (work-order point 483): the patches the adults teach
  * the word for digging at — a store pit being sunk, a post hole beside the lane,
  * a patch of earth turned over. Small dressing drawn at the layout's own
@@ -2909,6 +2939,12 @@ export function PlaceScene() {
           rock dressing as the scatter, at its own bigger scale, exactly at the
           layout position its collider comes from. */}
       <TeachingStone stone={layout.teachingStone} />
+
+      {/* The two rocks the children's bank game runs between (work-order 687):
+          the same dressing at the same size as the teaching stone, because the
+          word they call at them is the same word — a class of thing, not the
+          name of one boulder. */}
+      <PlayRocks rocks={layout.playRocks} />
 
       {/* The ground work the adults teach DIG at (work-order point 483). */}
       <DigSites sites={layout.digSites} />

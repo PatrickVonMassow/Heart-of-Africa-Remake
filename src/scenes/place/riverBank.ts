@@ -104,6 +104,88 @@ export const BANK_STRETCH_ANGLE_FRAC = 0.8
  *  still not sprout on the slope. */
 export const BANK_DRESSING_CLEARANCE = 0.9
 
+// --- The children's play stage on the bank (work-order 687) ---------------
+//
+// THE STAGE IN NUMBERS, AND THE MEASUREMENT THAT PRODUCED THEM (spec item 6).
+// The children's game runs BETWEEN TWO ROCKS on the bank, one upstream and one
+// downstream, and the picture has to hold two things at once: a runner at the
+// start line must SEE the rock he is running to, and the lane between them must
+// be wide enough that a child can pass an adult — or the traveller — without
+// being shoved into the water or into a wall.
+//
+// The stretch is the settlement's own: the two rocks stand on the bearings of
+// `upstream`/`downstream`, drawn `BANK_PLAY_ROCK_INSET` inland of those points
+// so the adults' bank stops stay free ground (a villager is SENT to them, point
+// 155). Measured on the three river villages that carry a bank — nubian,
+// bambara and mandinka — the rocks then stand 19.7 m apart (the bank points
+// themselves 21.2 m; `riverBank.test.ts` pins the pair).
+//
+// BOTH ROCKS IN ONE FRAME. At the reference viewport of the verification
+// (1440x900) and the default field of view (50 deg vertical, App.tsx), a
+// spectator at the start line sees the near rock beside him and the far one
+// 19.7 m down the bank: the far rock is 2.4 m across and 1.3 m tall, which is
+// 3.8 deg of the 50 deg frame — some 68 px of the 900, plainly a rock rather
+// than a speck. The horizontal frame is 2*atan(tan(25 deg)*1.6) = 73.4 deg, so
+// the whole stretch fits with either rock a good 20 deg inside the edge for a
+// spectator standing back from the line. `riverBank.test.ts` computes both
+// angles rather than restating them.
+//
+// THE LANE IS THREE WALKER DIAMETERS. `BANK_PLAY_LANE_HALF` is kept clear of
+// every scattered boulder, tuft and tree, which leaves 3.0 m of running ground
+// — five walker diameters (0.6 m each), and the spec's floor is three. The
+// margin is deliberate: the lane's own edges are the bank's shore on one side
+// and whatever the plan built on the other, and a child that meets an adult
+// halfway needs room for BOTH of them plus the swerve.
+
+/** How far inland of the bank's own stretch points the two play rocks stand.
+ *  It must exceed the rock's radius plus a walker's, so the adults' bank stops
+ *  stay ground a villager can be sent to. */
+export const BANK_PLAY_ROCK_INSET = 2.6
+
+/** Half-width of the running lane between the two play rocks that the loose
+ *  dressing is kept out of. */
+export const BANK_PLAY_LANE_HALF = 1.5
+
+/** The two play rocks of a bank: the ends of the children's stretch, upstream
+ *  and downstream, mirrored exactly as the bank's own stretch points are. */
+export function bankPlayRocks(
+  bank: Pick<PlaceRiverBank, 'upstream' | 'downstream'>,
+): { upstream: BankPoint; downstream: BankPoint } {
+  const pull = (p: BankPoint): BankPoint => {
+    const r = Math.hypot(p.x, p.z)
+    if (r <= 1e-6) return { ...p }
+    const f = Math.max(0, (r - BANK_PLAY_ROCK_INSET) / r)
+    return { x: p.x * f, z: p.z * f }
+  }
+  return { upstream: pull(bank.upstream), downstream: pull(bank.downstream) }
+}
+
+/**
+ * Whether a body of radius `r` would stand in the children's running lane —
+ * the corridor between the two rocks, plus the rocks' own ends. Everything the
+ * layout scatters loose asks this, so the lane the picture shows is the lane
+ * the state machine runs in (points 129/378: one description, not two).
+ */
+export function inBankPlayLane(
+  rocks: { upstream: BankPoint; downstream: BankPoint } | null,
+  x: number,
+  z: number,
+  r = 0,
+): boolean {
+  if (!rocks) return false
+  const ax = rocks.upstream.x
+  const az = rocks.upstream.z
+  const bx = rocks.downstream.x
+  const bz = rocks.downstream.z
+  const dx = bx - ax
+  const dz = bz - az
+  const len2 = dx * dx + dz * dz
+  const t = len2 > 1e-9 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / len2)) : 0
+  const px = ax + dx * t
+  const pz = az + dz * t
+  return Math.hypot(x - px, z - pz) < BANK_PLAY_LANE_HALF + r
+}
+
 /**
  * Does a body of radius `r` stand on the settlement's FLAT ground plate, clear
  * of the shore?

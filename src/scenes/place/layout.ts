@@ -13,7 +13,15 @@ import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOf
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
 import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
-import { buildRiverBank, settleBankPoints, standsOnGroundPlate, type PlaceRiverBank } from './riverBank'
+import {
+  bankPlayRocks,
+  buildRiverBank,
+  inBankPlayLane,
+  settleBankPoints,
+  standsOnGroundPlate,
+  type BankPoint,
+  type PlaceRiverBank,
+} from './riverBank'
 import type { BuildingType } from '../../state/ui'
 
 export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
@@ -98,6 +106,15 @@ export interface PlaceLayout {
    * the walkable region something other than a circle — see `./boundary`.
    */
   bank: PlaceRiverBank | null
+  /**
+   * The two PLAY ROCKS of the children's bank game (work-order 687): one at the
+   * upstream end of their stretch, one at the downstream end, in the teaching
+   * stone's own size so a runner at one end can see the one he is running to.
+   * They are LAYOUT data for the same reason the teaching stone is — the run
+   * ends where the scene draws the rock, and no second position may exist. Null
+   * in every settlement without a bank.
+   */
+  playRocks: { upstream: BankPoint; downstream: BankPoint; r: number; scale: number } | null
   /** Livestock pen (kraal layouts). */
   pen: { x: number; z: number; r: number } | null
   /** Points walkers visit on their errands. */
@@ -361,6 +378,13 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // The river the settlement stands on (work-order 482), derived from the world
   // model — not seeded, because the geography is the same in every run.
   const bank = buildRiverBank(place, radius)
+  // The children's two play rocks (work-order 687), derived from that bank and
+  // fixed BEFORE anything loose is scattered, so the dressing grows around the
+  // stage instead of into it. See `riverBank.ts` for the numbers and the
+  // measurement behind them.
+  const playRocks: PlaceLayout['playRocks'] = bank
+    ? { ...bankPlayRocks(bank), r: TEACHING_STONE_RADIUS, scale: TEACHING_STONE_SCALE }
+    : null
 
   const interactives: Interactive[] = []
   if (place.kind === 'village') {
@@ -1043,7 +1067,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   const clearOfDressing = (x: number, z: number, bodyR: number) =>
     flora.every((t) => Math.hypot(x - t.x, z - t.z) > 0.45 + bodyR + dressingGap) &&
     rocks.every(([rx, rz, rs]) => Math.hypot(x - rx, z - rz) > 0.35 + rs * 0.5 + bodyR + dressingGap) &&
-    (!teachingStone || Math.hypot(x - teachingStone.x, z - teachingStone.z) > teachingStone.r + bodyR + dressingGap)
+    (!teachingStone || Math.hypot(x - teachingStone.x, z - teachingStone.z) > teachingStone.r + bodyR + dressingGap) &&
+    // AND OUT OF THE CHILDREN'S LANE (work-order 687). A boulder dropped between
+    // the two play rocks narrows the running ground the game needs, and the pair
+    // themselves are solid: the lane test covers both, because the corridor runs
+    // from one rock centre to the other.
+    !inBankPlayLane(playRocks, x, z, bodyR)
   for (let i = 0; i < 48 && flora.length < 9; i++) {
     const angle = rand() * Math.PI * 2
     const r = 8 + rand() * 18
@@ -1159,6 +1188,10 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   for (const t of flora) colliders.push({ x: t.x, z: t.z, r: 0.45 })
   for (const [x, z, s] of rocks) colliders.push({ x, z, r: 0.35 + s * 0.5 })
   if (teachingStone) colliders.push({ x: teachingStone.x, z: teachingStone.z, r: teachingStone.r })
+  if (playRocks) {
+    colliders.push({ x: playRocks.upstream.x, z: playRocks.upstream.z, r: playRocks.r })
+    colliders.push({ x: playRocks.downstream.x, z: playRocks.downstream.z, r: playRocks.r })
+  }
   if (place.kind === 'village') {
     // The fire pit alone (work-order 604). The cook used to carry a collider of
     // her own 1.56 m from the fire's centre, which overlapped the fire's 1.3 m by
@@ -1211,5 +1244,5 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     site.z = z
   }
 
-  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, teachingStone, digSites, bank, pen, errands, colliders }
+  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, teachingStone, digSites, bank, playRocks, pen, errands, colliders }
 }
