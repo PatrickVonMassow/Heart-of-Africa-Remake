@@ -1030,8 +1030,12 @@ function clearPath(c: BankChild): void {
  * The same rule the adults' errands walk the village by — planning is asked for
  * only when the line is actually shut, and at most once a second per child, so
  * an open crossing costs nothing at all.
+ *
+ * Exported for the unit layer: its stall branch decides whether a child walks
+ * round an obstruction or into it, and that is not reachable through a whole
+ * simulated round on any layout the villages actually generate.
  */
-function wayTo(
+export function wayTo(
   c: BankChild,
   goal: { x: number; z: number },
   dt: number,
@@ -1075,6 +1079,23 @@ function wayTo(
     if (c.wayFor > WAYPOINT_STALL_SECONDS) {
       if (c.path.length > 1) {
         c.path.shift()
+        // THE LEG THE DROP OPENS UP IS CHECKED, NOT ASSUMED OPEN (cross-vendor
+        // finding, 14.08.2026). Dropping the corner is right where it fell in a
+        // wedge — but the corner may equally have been the way ROUND a collider
+        // or round the traveller in a bottleneck, and the leg it leaves behind
+        // then runs straight through what it was avoiding. Steering at it walks
+        // the child into the obstruction, and nothing re-plans while a path
+        // exists, so it stays there until the corners run out.
+        //
+        // A shut leg therefore drops the whole route instead. The child walks at
+        // its goal meanwhile, deflecting off what it meets like any other walk,
+        // and the throttle above plans a fresh way from where it has got to —
+        // which cannot re-instate this corner from the same spot, because the
+        // child has moved by then.
+        if (shut(c.x, c.z, c.path[0].x, c.path[0].z)) {
+          clearPath(c)
+          return { ...goal, advanced: true }
+        }
         c.wayBest = dist(c, c.path[0])
         dropped = true
       } else {

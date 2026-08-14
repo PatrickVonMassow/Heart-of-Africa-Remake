@@ -78,6 +78,7 @@ import {
   type BankWorld,
   rockAt,
   stationAt,
+  wayTo,
 } from './bankGame'
 import { insidePlace } from './boundary'
 import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, navRestrict } from './routing'
@@ -1493,6 +1494,83 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       expect(side.filter((s) => s.crossed).length).toBeGreaterThan(0)
     })
   }
+})
+
+/**
+ * WHAT HAPPENS TO THE CORNER A CHILD CANNOT REACH (cross-vendor finding,
+ * 14.08.2026). The walk drops such a corner rather than pressing against it —
+ * right, because a corner inside a carved wedge is unreachable however long the
+ * child walks at it. But the corner may equally have been the way ROUND a
+ * collider, and dropping it then leaves a leg that runs straight through what it
+ * was avoiding, with nothing re-planning while a path exists.
+ *
+ * On synthetic geometry, where both cases are visible: the drop stands where the
+ * leg it opens is clear, and gives the route up where it is not.
+ */
+describe('the walk drops a corner it cannot reach, but not into a wall', () => {
+  const GOAL = { x: 0, z: 10 }
+  /** A child of the round, taken from the round itself so it carries every
+   *  field the walk reads, and stood where the case needs it. */
+  const childAt = (x: number, z: number): BankChild => {
+    const s = createBankGame([{ x, z }], () => 0.5, BANK_CFG)
+    return s.children[0]
+  }
+  /** A world whose straight line to the goal is always shut — the child is on a
+   *  planned route throughout — with `route` and the leg rule handed in. */
+  const worldWith = (
+    route: Array<{ x: number; z: number }>,
+    legShut: (ax: number, az: number, bx: number, bz: number) => boolean,
+  ): BankWorld =>
+    ({
+      radius: 40,
+      centerX: 0,
+      centerZ: 0,
+      childRadius: NPC_RADIUS,
+      blocked: () => false,
+      nudge: (x: number, z: number) => ({ x, z, found: true }),
+      lineBlocked: (ax: number, az: number, bx: number, bz: number) =>
+        bx === GOAL.x && bz === GOAL.z ? true : legShut(ax, az, bx, bz),
+      route: () => route.map((p) => ({ ...p })),
+    }) as unknown as BankWorld
+
+  /** Walk the child's stall watch out several times over without ever letting it
+   *  get closer — the corner it can never reach. The child is held still, which
+   *  is the worst case: the planner is asked from the same spot every time and
+   *  can only answer with the same route. Returns every place the walk aimed. */
+  const stallAt = (c: BankChild, world: BankWorld) => {
+    const dt = 1 / 60
+    const aims: Array<{ x: number; z: number }> = []
+    for (let t = 0; t < 20; t += dt) {
+      const aim = wayTo(c, GOAL, dt, world)
+      aims.push({ x: aim.x, z: aim.z })
+    }
+    return aims
+  }
+
+  it('drops the corner and walks on where the leg behind it is clear', () => {
+    const c = childAt(0, 0)
+    // A route whose first corner the child never reaches, and a second corner it
+    // has a clear line to.
+    const world = worldWith([{ x: 6, z: 2 }, { x: 0, z: 6 }, GOAL], () => false)
+    const aims = stallAt(c, world)
+    // The unreachable corner is given up on and the walk carries on along the
+    // route, rather than standing at that corner for the whole window.
+    expect(aims).toContainEqual({ x: 0, z: 6 })
+  })
+
+  it('never steers at the corner behind a shut leg', () => {
+    const c = childAt(0, 0)
+    // The same route, but the corner that was dropped was the way round a
+    // collider: the leg from the child to the next corner is shut.
+    const world = worldWith([{ x: 6, z: 2 }, { x: 0, z: 6 }, GOAL], (_ax, _az, bx, bz) => bx === 0 && bz === 6)
+    const aims = stallAt(c, world)
+    // NOT ONCE in twenty seconds is the child sent at the corner behind the
+    // wall — which is what it was steered at before, for as long as the route
+    // held. It is sent at its goal instead, and walks there deflecting off what
+    // it meets like any other walk.
+    expect(aims).not.toContainEqual({ x: 0, z: 6 })
+    expect(aims).toContainEqual(GOAL)
+  })
 })
 
 /** The measure as point 648 left it, kept for exactly one purpose: to show on a
