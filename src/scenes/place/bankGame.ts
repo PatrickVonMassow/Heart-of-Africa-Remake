@@ -258,7 +258,8 @@ export interface BankState {
    */
   playedClock: number
   playing: boolean
-  /** Utterances owed, spoken one per gap so two never overlap. */
+  /** Utterances born in the current step. A moment that falls inside the
+   *  hearing gap is omitted, never carried into a later moment. */
   pending: BankUtterance[]
   sinceSaid: number
 }
@@ -407,8 +408,10 @@ function bankwardAim(
   return { x: from.x + (dx / len) * reach, y: 0.6, z: from.z + (dz / len) * reach }
 }
 
-/** Queue one utterance. Nothing here touches a pace or a heading: an utterance
- *  is something the player HEARS, never something that steers a child. */
+/** Offer one utterance in this step. Nothing here touches a pace or a heading:
+ *  an utterance is something the player HEARS, never something that steers a
+ *  child. Two simultaneous offers remain simultaneous; `drain` chooses one and
+ *  discards the rest rather than moving either to the wrong moment. */
 function say(s: BankState, u: BankUtterance): void {
   s.pending.push(u)
 }
@@ -479,11 +482,28 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig): void {
   }
 }
 
-/** Opens one run: the direction is announced, and the catcher taps his own rock
- *  and names it with nobody arriving. */
+/** Announces the direction while both sides are still at their stations. The
+ *  run itself waits one hearing gap, so its tap is a distinct audible moment. */
+function announceRun(s: BankState, stage: BankStage): void {
+  const direction = wordToward(otherEnd(s.from))
+  const line = runners(s)
+  const announcer = line.length > 0 ? nearestOf(s, line, rockAt(stage, s.from)) : -1
+  if (announcer < 0) return
+  s.direction = direction
+  say(s, {
+    concept: direction,
+    moment: 'announce',
+    speaker: announcer,
+    gesture: 'point',
+    aim: bankwardAim(stage, direction, s.children[announcer]),
+    at: 'bank',
+  })
+}
+
+/** Opens one run: the catcher taps his own rock and names it with nobody
+ *  arriving. Its direction was announced one hearing gap before this. */
 function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
   const to = otherEnd(s.from)
-  s.direction = wordToward(to)
   s.phase = 'run'
   s.phaseFor = cfg.runSeconds
   s.runsThisCycle++
@@ -500,17 +520,6 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
     s.children[idx].lane = (k - (line.length - 1) / 2) * cfg.laneSpacing
   })
   for (const idx of catchers(s)) s.children[idx].quarry = -1
-  const announcer = line.length > 0 ? nearestOf(s, line, rockAt(stage, s.from)) : -1
-  if (announcer >= 0) {
-    say(s, {
-      concept: s.direction,
-      moment: 'announce',
-      speaker: announcer,
-      gesture: 'point',
-      aim: bankwardAim(stage, s.direction, s.children[announcer]),
-      at: 'bank',
-    })
-  }
   // THE TAP (spec item 4). The catcher names the rock he is STANDING at, at the
   // start of the run, with nobody arriving anywhere — so ROCK cannot be read as
   // "made it".
@@ -618,6 +627,10 @@ export function stepBankGame(
 ): BankUtterance | null {
   assertRoundSound(s, cfg)
   if (!(dt > 0)) return null
+  // Nothing spoken in an earlier step survives into this one. A delayed word
+  // belongs to a different visible action and therefore teaches the wrong
+  // reading; a collision is omitted instead.
+  s.pending.length = 0
   s.clock += dt
   s.sinceSaid += dt
   if (s.playing) s.playedClock += dt
@@ -631,11 +644,17 @@ export function stepBankGame(
   // "no utterance slows a playing child" read as a slowed child.
   s.phaseFor -= dt
   if (s.phase === 'roam' && s.phaseFor <= 0) openCycle(s, stage, cfg)
+  let openedRun = false
   if (
     (s.phase === 'gather' || s.phase === 'regroup') &&
     (s.phaseFor <= 0 || inPlace(s, stage, cfg, s.from, otherEnd(s.from)))
   ) {
-    openRun(s, stage, cfg)
+    if (s.direction === null && s.sinceSaid >= cfg.utteranceGapSeconds) {
+      announceRun(s, stage)
+    } else if (s.direction !== null && s.sinceSaid >= cfg.utteranceGapSeconds) {
+      openRun(s, stage, cfg)
+      openedRun = true
+    }
   }
   if (s.phase === 'part' && s.phaseFor <= 0) openRoam(s, stage, cfg, rand)
   switch (s.phase) {
@@ -647,7 +666,9 @@ export function stepBankGame(
       stepStations(s, dt, cfg, stage, world, s.from, otherEnd(s.from))
       break
     case 'run':
-      stepRun(s, dt, cfg, stage, world)
+      // The opening frame belongs to the tap: nobody has started toward the far
+      // rock yet, so the returned ROCK cannot be read as an arrival.
+      if (!openedRun) stepRun(s, dt, cfg, stage, world)
       break
     case 'part':
       stepPart(s, dt, cfg, stage, world)
@@ -657,12 +678,18 @@ export function stepBankGame(
   return drain(s, cfg)
 }
 
-/** Speaks at most one owed utterance, with a constant gap between two. */
+/** Speaks at most one utterance born this step, with a constant hearing gap.
+ *  Everything else from the step is omitted rather than replayed late. */
 function drain(s: BankState, cfg: BankRoundConfig): BankUtterance | null {
   if (s.pending.length === 0) return null
-  if (s.sinceSaid < cfg.utteranceGapSeconds) return null
+  if (s.sinceSaid < cfg.utteranceGapSeconds) {
+    s.pending.length = 0
+    return null
+  }
   s.sinceSaid = 0
-  return s.pending.shift() ?? null
+  const spoken = s.pending[0] ?? null
+  s.pending.length = 0
+  return spoken
 }
 
 /** The obstacle set THIS child steers round: every other body, plus — with an

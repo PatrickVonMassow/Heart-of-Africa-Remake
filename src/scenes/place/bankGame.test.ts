@@ -14,6 +14,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { balance } from '../../config/balance'
+import { floorPace } from '../../systems/pursuit'
 import { mulberry32 } from '../../world/noise'
 import {
   createBankGame,
@@ -58,7 +59,13 @@ interface Log {
   said: BankUtterance[]
   phases: string[]
   /** The state as it stood when each utterance fell. */
-  when: Array<{ u: BankUtterance; phase: string; arrivals: number; direction: string | null }>
+  when: Array<{
+    u: BankUtterance
+    phase: string
+    arrivals: number
+    direction: string | null
+    cycle: number
+  }>
 }
 
 /** Runs the group for `seconds` and records what it said and did. */
@@ -88,6 +95,7 @@ function replay(
         phase: s.phase,
         arrivals: s.children.filter((c) => c.arrived).length,
         direction: s.direction,
+        cycle: s.cycles,
       })
     }
   }
@@ -105,7 +113,10 @@ function replay(
 const SEEDS = [7, 13, 21, 42, 99]
 
 /** The same replay over every seed, with the logs concatenated. */
-function replayAll(seconds: number, options: { world?: BankWorld; count?: number } = {}) {
+function replayAll(
+  seconds: number,
+  options: { world?: BankWorld; count?: number; cfg?: BankConfig } = {},
+) {
   const runs = SEEDS.map((seed) => replay(seconds, { ...options, seed }))
   return {
     runs,
@@ -171,16 +182,33 @@ describe('the children`s game at the bank (point 687)', () => {
   })
 
   it('alternates the announced direction with the side swap', () => {
-    const { log } = replayAll(600)
+    const cfg: BankConfig = {
+      ...CFG,
+      roamSeconds: 0.1,
+      roamSpread: 0,
+      gatherSeconds: 0.1,
+      runSeconds: 0.1,
+      regroupSeconds: 0.1,
+      partSeconds: 0.1,
+      utteranceGapSeconds: 0,
+      catchDistance: -1,
+    }
+    const { runs, log } = replayAll(30, { cfg })
     const announced = log.said.filter((u) => u.moment === 'announce').map((u) => u.concept)
     expect(announced.length).toBeGreaterThan(2)
     // Inside ONE cycle the sides swap every run, so the word alternates by
-    // construction. Cycles are separated by a parting call, so the run of
-    // announcements is split at each of them before it is checked.
-    const cycles: string[][] = [[]]
-    for (const u of log.said) {
-      if (u.moment === 'parting' || u.moment === 'call') cycles.push([])
-      else if (u.moment === 'announce') cycles[cycles.length - 1].push(u.concept)
+    // construction. Group by the round's cycle count rather than by another
+    // utterance: a simultaneous word may be omitted, never used as bookkeeping.
+    const cycles: string[][] = []
+    for (const run of runs) {
+      const byCycle = new Map<number, string[]>()
+      for (const w of run.log.when) {
+        if (w.u.moment !== 'announce') continue
+        const cycle = byCycle.get(w.cycle) ?? []
+        cycle.push(w.u.concept)
+        byCycle.set(w.cycle, cycle)
+      }
+      cycles.push(...byCycle.values())
     }
     const multi = cycles.filter((c) => c.length > 1)
     expect(multi.length).toBeGreaterThan(0)
@@ -216,11 +244,35 @@ describe('the children`s game at the bank (point 687)', () => {
     }
     // And ROCK is called on ARRIVAL too, which is the reading the two guards
     // above exist to keep from being the only one.
-    expect(rock.some((w) => w.u.moment === 'arrival')).toBe(true)
+    const arrivals = replayAll(600, { cfg: { ...CFG, utteranceGapSeconds: 0 } }).log.when
+      .filter((w) => w.u.moment === 'arrival')
+    expect(arrivals.length).toBeGreaterThan(0)
     // The boulder is named at most once per roaming phase — a child that stood
     // at it would otherwise chant.
     const roams = log.phases.filter((p) => p === 'roam').length
     expect(boulders.length).toBeLessThanOrEqual(roams)
+  })
+
+  it('emits the catcher`s tap on the exact frame the run opens', () => {
+    const cfg: BankConfig = { ...CFG, roamSeconds: 0.1, roamSpread: 0, utteranceGapSeconds: 5 }
+    const rand = mulberry32(31)
+    const spots = Array.from({ length: 4 }, (_, i) => ({
+      x: STAGE.roam.x + i * 1.2,
+      z: STAGE.roam.z,
+    }))
+    const s = createBankGame(spots, rand, cfg)
+    const world = openWorld()
+    let tap: BankUtterance | null = null
+
+    for (let t = 0; t < 60 && !tap; t += 1 / 60) {
+      const u = stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+      if (u?.moment === 'tap') tap = u
+    }
+
+    expect(tap?.concept).toBe('ROCK')
+    expect(s.phase).toBe('run')
+    expect(s.phaseFor).toBe(cfg.runSeconds)
+    expect(s.children.every((c) => !c.arrived)).toBe(true)
   })
 
   it('says a direction word once per cycle with no rock as its target', () => {
@@ -298,7 +350,7 @@ describe('the children`s game at the bank (point 687)', () => {
       partSeconds: 0.1,
       catchDistance: -1,
     }
-    const { s, log } = replay(5, { seed: 17, cfg })
+    const { s, log } = replay(30, { seed: 17, cfg })
 
     expect(s.tags).toBe(0)
     expect(s.cycles).toBeGreaterThan(0)
@@ -307,7 +359,7 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(s.runs).toBeGreaterThan(s.children.length)
   })
 
-  it('never lets an utterance slow a playing child', () => {
+  it('keeps a moving speaker at the round`s commanded pace while it speaks', () => {
     const cfg = CFG
     const rand = mulberry32(3)
     const spots = Array.from({ length: 4 }, (_, i) => ({ x: STAGE.roam.x + i * 1.2, z: STAGE.roam.z }))
@@ -315,17 +367,19 @@ describe('the children`s game at the bank (point 687)', () => {
     const world = openWorld()
     let checkedSpeakers = 0
     for (let t = 0; t < 600; t += 1 / 60) {
-      const paceBefore = s.children.map((c) => c.pace)
       const u = stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
       if (!u) continue
       const speaker = s.children[u.speaker]
-      // A child that was RUNNING when it spoke is still running: the utterance
-      // is something the player hears, never a claim on the speaker.
-      if (s.phase === 'run' && speaker.role === 'runner' && !speaker.arrived) {
+      // The two words spoken on a moving child's own action leave that movement
+      // intact: ROCK on arrival is still a run, ROCK on the boulder still a walk.
+      if (u.moment === 'arrival') {
         checkedSpeakers++
-        expect(speaker.pace).toBeGreaterThan(0)
+        expect(speaker.pace).toBeGreaterThanOrEqual(floorPace(cfg))
         expect(speaker.held).toBe(false)
-        expect(speaker.pace).toBeGreaterThanOrEqual(Math.min(paceBefore[u.speaker], speaker.pace))
+      } else if (u.moment === 'boulder') {
+        checkedSpeakers++
+        expect(speaker.pace).toBe(cfg.walkPace)
+        expect(speaker.held).toBe(false)
       }
     }
     expect(checkedSpeakers).toBeGreaterThan(0)
