@@ -146,6 +146,20 @@ put it is the mistake this line exists to stop.
   SO THE FINAL STATE ABOVE IS NOT THE WHOLE ANSWER: the rescue's own progress test is fixed here
   too, by the same standard point 656 met — it must see a shiver as a lack of progress — and the
   fix is proven at the reported seed, not only on the panel.
+  DECISION TAKEN 14.08.2026, WITH ITS FIGURES (the record this point asks for). THE BEHAVIOUR FIX
+  ANSWERS THE PLAYER-VISIBLE STANDSTILL: the progress window now runs to its end instead of being
+  re-taken at every 0.9 m anchor crossing, and a window that walked a real distance while reaching
+  less than a fifth of it is rescued past the whole observed oscillation. At the reported seed
+  236333330 in `bambara-village`, the headless replay this point owed measures child 3 at 59
+  rescues in 90 s on the shipped code and 1 rescue carrying 2.30 m on the fixed code, with the
+  remaining 88 s clean at both trace scales; the pre-fix figure was re-measured independently in
+  the counter-check, so the regression test is proven to bite. THE REMAINING WEBGL 2 COMPOSITION
+  IS ACCEPTED — option (b), narrowed to that backend and to the measured signature, everything
+  else of that check staying red — and it is accepted UNDER A DIFFERENT OWNER: a charge dies with
+  its point's tick by construction, so the acceptance is inherited by point 694, which must make
+  it durable by sharpening the measure or by a vehicle that does not expire. Option (b)'s
+  precondition is met the only way it could be: the WebGPU standstill was NOT this composition
+  but the rescue defect above, and it was answered with a behaviour fix rather than a charge.
   Criticality: high — raised 13.08.2026: it is no longer only the picture gate's trustworthiness,
   it is the player watching a child shiver in place for minutes in the shipped build, with the
   rescue unable to fire.
@@ -7710,3 +7724,39 @@ to land than a mechanism that needs a review.
   decision the four-eyes principle rests on.
   Criticality: medium — it wastes a delegation per hard case and points the batch at the wrong
   pool exactly while the pool is the binding constraint.
+
+- [ ] 694. THE CHILDREN'S ACCEPTED WEBGL 2 COMPOSITION NEEDS A HOME THAT SURVIVES A TICK
+  (found 14.08.2026 by the cross-vendor review of point 666 — Claude Opus 5 on the Sol-authored
+  branch — and verified against the mechanism itself, not argued). Point 666 answered the
+  player-visible standstill with a behaviour fix and settled its REMAINING WebGL 2 red by its
+  option (b): a charge in `scripts/render-verify-charges.mjs` naming the composition
+  (`no child walks without getting anywhere`, worst child 3, 1.29 m walked inside 0.32 m, an
+  expected live rate of one run in ten), narrowed to that backend and that measured detail.
+  THAT ACCEPTANCE CANNOT SURVIVE ITS OWN POINT'S TICK, and the ledger says so in its own header:
+  "The moment the owning point is ticked, its entries stop clearing anything" — pinned by
+  `render-verify-core.test.mjs` ("charges only points the work order still holds OPEN"). MEASURED
+  on the branch before the landing: point 666 chargeable while open, NOT chargeable once ticked,
+  so `npm run test:unit` would have gone red on main the moment 666 was ticked and the accepted
+  red would have been uncovered from that same moment — the state point 666 was filed to prevent
+  (point 640). The charge was therefore re-pointed HERE at 666's landing, and this point owns the
+  composition until it has a durable answer.
+  FINAL STATE, one of two, decided by measurement and not by preference:
+  (a) THE MEASURE IS SHARPENED so a single legitimate event can no longer read as pacing — the
+      one-second window is the suspect, the GATE stays untouched at 0.25 %, and the recorded
+      PRE-CURE traces are re-read to prove the sharpened measure still goes RED on the defect it
+      was built for. That proof is mandatory: a measure that no longer sees the original bug is
+      worse than the red it silences. The charge entry leaves the ledger with the sharpening.
+  (b) THE ACCEPTANCE IS MADE PERMANENT AND EXPLICIT — a vehicle for a known, justified,
+      permanently accepted red, the way `scripts/audit-check.mjs`'s ALLOW map carries an
+      advisory with no upstream fix: SEPARATE from the charge ledger, which is temporary by
+      construction and expires with its point, and carrying the evidence, the measured rate and
+      a dated justification. It stays as NARROW as the evidence allows — this backend, this
+      check, this measured signature — so every other red of the same check stays unaccounted.
+      The charge entry moves into that vehicle and leaves the ledger.
+  VERIFIABLE: for (a), the sharpened measure re-read over BOTH the recorded pre-cure traces (must
+  go red) and the post-cure traces on both backends (must go green); for (b), the permanent entry
+  plus Vitest cases pinning that a red NOT of that signature is still uncovered AND that the entry
+  does not expire with any point's tick — the failure this point exists to answer.
+  Criticality: medium — no player sees it; what is at stake is that the release branch's last
+  children red closes by a NAMED cause instead of by a retry (point 640).
+  Bundle: Dorfleben.
