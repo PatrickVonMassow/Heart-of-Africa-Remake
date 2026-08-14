@@ -1309,7 +1309,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 13.08.2026, 23:55 · Quellen-Fingerprint: `782478588086…`
+Zuletzt aktualisiert: Freitag, 14.08.2026, 01:49 · Quellen-Fingerprint: `c94bfe87c89f…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1400,8 +1400,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 81 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 54 Prozess-/Meta-TASKS-Punkte (davon 20 offen).
 
-<!-- RETRO-FINGERPRINT: 7824785880868a5df97bcb08e107237789f1bd480b32d08ef32ef35b5d713006 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-13T21:55:30.514Z -->
+<!-- RETRO-FINGERPRINT: c94bfe87c89f26815984b4912fd969656bd77e74db3a9b3aadb814541bb1c5cc -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-13T23:49:02.834Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1534,3 +1534,25 @@ Minuten. Beide Male war die Regel richtig, die Befolgung richtig — und das Erg
 Handlungsfolge, die sie selbst vorschreibt, sie nicht aufhebt. Die Prüffrage dafür ist billig und
 gehört an jeden neuen Durchsetzer: *Was passiert, wenn jemand die Anweisung ganz genau befolgt —
 und was, wenn er sie zusätzlich von Hand aufruft?* Beide Fälle sind Tests, nicht Gedankenspiele.
+
+### 3.117 Das Werkzeug empfiehlt eine Ressource, die es nicht sehen kann
+
+Am 14.08.2026 hat die Routing-Tabelle, die entscheidet welches Modell einen Punkt schreibt, den
+ersten Punkt des Tages an Fable 5 geschickt — „hohe Kritikalität, also ein harter Fall". Der
+delegierte Agent starb am allerersten Aufruf: Das Wochenkontingent dieses Modells war seit dem
+Vortag aufgebraucht. Die Ersatzkette zeigte danach auf Opus 5, also auf genau die Ausgabe, die
+der Nutzer am Abend zuvor untersagt hatte, weil das knappe Anthropic-Kontingent für Prüfung,
+Bild und Landung reichen muss. Die Statusausgabe derselben Spur nennt harte Fälle obendrein
+„niemals an Sol" — was wie ein Verbot dessen liest, was die stehende Anweisung verlangt.
+
+Kein Skript log. Jedes einzelne war für sich korrekt: Die Routing-Tabelle kennt Schwierigkeit,
+die Statusausgabe kennt Rollen, die Ersatzkette kennt Rangfolge. Keines kennt den Füllstand der
+Töpfe, aus denen es schöpfen lässt. Die einzige Stelle, an der die richtige Antwort stand, war
+eine Merk-Datei, die kein Werkzeug liest — sie hat den Tag gerettet, und sie hätte auch fehlen
+können.
+
+**Lehre:** Ein Werkzeug, das eine Ressource empfiehlt, erbt die Pflicht, deren Verfügbarkeit zu
+kennen — sonst ist seine Empfehlung eine Behauptung über einen Zustand, den es nie geprüft hat.
+Und wo die Korrektur zu einer Mechanik nur in einer Merk-Datei lebt, ist sie nicht durchgesetzt,
+sondern erinnert: Sie hält genau so lange, wie jemand sich erinnert. Beides gehört an dieselbe
+Prüffrage bei jedem neuen Empfehler: *Woher weiß er, dass es das Empfohlene noch gibt?*
