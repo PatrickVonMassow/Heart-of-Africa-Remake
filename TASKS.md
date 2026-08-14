@@ -7652,6 +7652,20 @@ to land than a mechanism that needs a review.
   red would have been uncovered from that same moment — the state point 666 was filed to prevent
   (point 640). The charge was therefore re-pointed HERE at 666's landing, and this point owns the
   composition until it has a durable answer.
+  AND THE SCOPE IT INHERITED IS ALREADY TOO NARROW, MEASURED THE SAME NIGHT (14.08.2026, 03:58,
+  the `polish` re-run on main, c71d6780, WebGPU): `no child walks without getting anywhere` red
+  at 0.29 % of the judged time — worst child 1 at 22.2 s, 1.42 m walked inside 0.31 m, 3 of 4664
+  one-second windows, and 0.00 % in the 0.5 s bursts. That is the SAME composition, on the OTHER
+  backend, at a DIFFERENT measurement, so the inherited entry — scoped to WebGL 2 and to the
+  exact string "1.29 m walked inside 0.32 m" — covers neither. It is not a regression of the
+  point-666 fix: point 666's own evidence measured this composition at 1 red in 24 live-cadence
+  replay seeds at 0.31 %, before that fix existed, and today's 0.29 % sits in that band. TWO
+  CONSEQUENCES BIND THE ANSWER BELOW: the acceptance is BACKEND-INDEPENDENT (the artefact is
+  about the one-second window meeting a live dt cadence, not about a renderer), and an
+  acceptance keyed to an exact measured number CANNOT work for a stochastic artefact — every
+  run mints a new signature, so the entry would never match twice. What may be accepted is a
+  SHAPE (a marginal exceedance of the gate by a single event), never a check-wide blanket: the
+  defect this check was built for reads 1.5 %, 22 % and 99 %, orders of magnitude away.
   FINAL STATE, one of two, decided by measurement and not by preference:
   (a) THE MEASURE IS SHARPENED so a single legitimate event can no longer read as pacing — the
       one-second window is the suspect, the GATE stays untouched at 0.25 %, and the recorded
