@@ -4023,6 +4023,19 @@ if (section('children-bank-game')) {
         seen.near.solid && seen.far.solid,
         `${describeRock('near', seen.near)}; ${describeRock('far', seen.far)}`,
       )
+      // The picture has to show the STRETCH, not one stone with a bump behind it.
+      const apart =
+        !!seen.near.span &&
+        !!seen.far.span &&
+        (seen.near.span[0] > seen.far.span[1] || seen.far.span[0] > seen.near.span[1])
+      check(
+        'and they stand apart in it, the running ground between them',
+        apart,
+        seen.near.span && seen.far.span
+          ? `near spans ndc ${seen.near.span[0].toFixed(2)}..${seen.near.span[1].toFixed(2)}, far ` +
+              `${seen.far.span[0].toFixed(2)}..${seen.far.span[1].toFixed(2)}`
+          : 'a stone projected behind the camera',
+      )
       await frame('687-bank-play-rocks', {
         local: { x: stood.far.x, y: stood.r * 0.5, z: stood.far.z },
         label: `both play rocks from the start line (stretch ${stood.stretch.toFixed(1)} m)`,
@@ -4088,12 +4101,19 @@ if (section('children-bank-game')) {
       const phases = new Set(lane.map((s) => s.phase))
       const played = tail && head ? tail.playedClock - head.playedClock : 0
       const walked = Array.from({ length: kids }, (_, k) => tail.c[k].walked - head.c[k].walked)
+      // A GAME, not a group standing about with the phases ticking over it: the
+      // cycle must advance AND the legs must carry the group at the walking floor
+      // the child-motion metric already sets (m per child-minute). A tagged child
+      // legitimately holds its crouch, so the floor is asked of the GROUP.
+      const groupWalked = walked.reduce((a, b) => a + b, 0)
+      const perChildMinute = played > 0 && kids > 0 ? groupWalked / kids / (played / 60) : 0
       check(
         'the round goes on with him planted in it, rather than halting at him',
-        played >= LANE_WINDOW_S * 0.9 && phases.size >= 2 && walked.reduce((a, b) => a + b, 0) > kids,
+        played >= LANE_WINDOW_S * 0.9 && phases.size >= 2 && perChildMinute > CHILD_MOTION.walkFloor,
         `${played.toFixed(1)}s of ${LANE_WINDOW_S}s played over ${lane.length} samples, phases ` +
           `[${[...phases].join(', ')}], ${kids} children walked ` +
-          `[${walked.map((m) => m.toFixed(1)).join(', ')}] m, ${tail.tags - head.tags} tagged`,
+          `[${walked.map((m) => m.toFixed(1)).join(', ')}] m = ${perChildMinute.toFixed(1)} m per ` +
+          `child-minute (floor ${CHILD_MOTION.walkFloor}), ${tail.tags - head.tags} tagged`,
       )
       // WALKED AROUND, not merely near: a child counts as having passed him when
       // it goes from one side of him to the other along the lane's own axis, with
