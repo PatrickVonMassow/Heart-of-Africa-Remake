@@ -4098,6 +4098,15 @@ if (section('children-bank-game')) {
       // whole window.
       const LANE_SHOT_GAP = 10
       const LANE_SHOT_AHEAD = 1.5
+      // ...and it must be CLOSING on him by at least this much between two
+      // samples. Being on the positive side of the lane axis says nothing about
+      // which way a child is going: the run reverses at every side swap, a
+      // runner that got past him is walking away down the same axis, and a
+      // tagged one holds its crouch where it fell. Without this the frame could
+      // be written of any of the three under the label "coming at the
+      // traveller".
+      const LANE_SHOT_CLOSING = 0.05
+      let prevGap = null
       let shotRun = false
       const first = await page.evaluate(() => window.__placeTag().clock)
       const lane = []
@@ -4136,6 +4145,8 @@ if (section('children-bank-game')) {
             const along = (s.c[k].x - s.px) * planted.ax + (s.c[k].z - s.pz) * planted.az
             if (along < LANE_SHOT_AHEAD) continue
             const d = Math.hypot(s.c[k].x - s.px, s.c[k].z - s.pz)
+            // AND COMING AT HIM: the gap it stands at has to be shrinking.
+            if (!(prevGap && prevGap[k] != null && d < prevGap[k] - LANE_SHOT_CLOSING)) continue
             if (d < gap) {
               gap = d
               near = k
@@ -4150,6 +4161,7 @@ if (section('children-bank-game')) {
             })
           }
         }
+        prevGap = s.c.map((k) => Math.hypot(k.x - s.px, k.z - s.pz))
         await nextFrames(2)
       }
       const head = lane[0]
@@ -4322,18 +4334,27 @@ if (section('adult-errands')) {
       JSON.stringify({ bank: geography.bank, upstream: geography.upstream, downstream: geography.downstream }),
     )
 
-    // THE TRIPWIRE. Sampled over a window of the live scene rather than read
-    // once, because "nothing is staged" is a claim about a stretch of play: the
-    // scheduler's own interval is 0.8 s above, so this window covers it many
-    // times over. Every one of these would be non-zero the moment 688 stages a
-    // situation, and the red it then raises is the instruction to put this
-    // section's walk-and-arrive checks back.
-    let staged = {}
+    // THE TRIPWIRE, AND IT IS AGGREGATED ACROSS THE WINDOW, NOT READ OFF THE LAST
+    // SAMPLE. This one check replaced six, and its whole justification is that it
+    // goes red the moment 688 stages anything — so it may not depend on the shape
+    // of a counter it does not own. Keeping only the final snapshot would prove
+    // "nothing was staged" only if `staged` were guaranteed cumulative and the
+    // settlement were guaranteed not to remount; taking the LARGEST value each
+    // key ever showed proves it either way, and a situation that appeared and
+    // vanished between two samples still leaves its mark.
+    //
+    // What is proven: over this window no situation counter ever rose above zero,
+    // no villager was ever seen carrying an errand, and none was ever at the
+    // digging pose. The scheduler's own interval is 0.8 s above, so the window
+    // covers it many times over.
+    const staged = {}
     let errands = 0
     let dug = 0
     for (let i = 0; i < 120; i++) {
       const now = await page.evaluate(() => window.__placeErrands())
-      staged = now.staged
+      for (const [id, n] of Object.entries(now.staged ?? {})) {
+        staged[id] = Math.max(staged[id] ?? 0, n ?? 0)
+      }
       for (const v of now.villagers) {
         if (v.digging) dug++
         if (v.errand) errands++
@@ -4344,7 +4365,8 @@ if (section('adult-errands')) {
     check(
       'the adults stage nothing while the catalogue awaits its rebuild (work-order 688)',
       stagedTotal === 0 && errands === 0 && dug === 0,
-      `${stagedTotal} staged over 120 samples, ${errands} villager-samples carrying an errand, ` +
+      `${stagedTotal} staged at the window's peak over 120 samples, ${errands} villager-samples ` +
+        `carrying an errand, ` +
         `${dug} at the digging pose` +
         (stagedTotal > 0
           ? ` — ${Object.entries(staged)
