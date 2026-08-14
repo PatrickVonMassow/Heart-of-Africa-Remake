@@ -14,6 +14,12 @@
 // goat bolting from someone, a dog in a port); this module adds only the ROUND:
 // who is IT, who may be caught, and what happens when one of them is.
 //
+// THE MOTION IS SHARED WITH THE BANK ROUND (work-order 687). `moveChild`,
+// `trackProgress` and `ageEdge` are exported because the children's bank game
+// steers the same bodies with the same deflection, the same one-side commitment
+// and the same two stall watches — the round on top differs, the walking does
+// not, and a second copy of it would drift from the metric that judges both.
+//
 // THE STEERING IS THE WILDLIFE'S, NOT THE WALKER'S. The village walkers resolve
 // an obstacle by sliding along it and stopping, which is exactly what reads as
 // bumping into things. `deflectedStep` probes around the heading and CONTINUES
@@ -496,7 +502,7 @@ function breakOffRound(s: TagState, cfg: TagConfig): void {
  * it on a child that stands — a call obeyed, a spot held, a round break — and
  * that child would then set off again round an obstacle it is no longer at.
  */
-function ageEdge(c: TagChild, dt: number): void {
+export function ageEdge(c: TagChild, dt: number): void {
   if (c.edgeFor > 0) {
     c.edgeFor = Math.max(0, c.edgeFor - dt)
     if (c.edgeFor === 0) c.edgeSide = 0
@@ -690,7 +696,7 @@ function resetProgress(c: TagChild): void {
  * walk now renews the anchor only at the end of the window; a wide, fast
  * out-and-back spends the same ground for that whole window and is rescued.
  */
-function trackProgress(c: TagChild, dt: number, cfg: TagConfig, world: TagWorld): void {
+export function trackProgress(c: TagChild, dt: number, cfg: TagConfig, world: TagWorld): void {
   if (!(c.pace > 0) || c.held) {
     resetProgress(c)
     // A child that is not walking is not stuck on anything — it is standing
@@ -739,7 +745,7 @@ function trackProgress(c: TagChild, dt: number, cfg: TagConfig, world: TagWorld)
  * The commitment ends by itself the moment the way it wants is open, and
  * `edgeSeconds` is only the backstop on a side that was the long way round.
  */
-function moveChild(
+export function moveChild(
   c: TagChild,
   desired: number,
   distance: number,

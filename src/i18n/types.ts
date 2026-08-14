@@ -575,6 +575,21 @@ export interface Strings {
     tagLean: string
     tagTurnRate: string
     tagPlayRadius: string
+    bankRoam: string
+    bankRoamSpread: string
+    bankGather: string
+    bankRun: string
+    bankRegroup: string
+    bankPart: string
+    bankReach: string
+    bankStandOff: string
+    bankSpacing: string
+    bankLaneSpacing: string
+    bankDodgeDistance: string
+    bankDodgeReach: string
+    bankWalkPace: string
+    bankStrangerBerth: string
+    bankUtteranceGap: string
     childSpeechInterval: string
     childSpeechSpread: string
     childSpeechAction: string

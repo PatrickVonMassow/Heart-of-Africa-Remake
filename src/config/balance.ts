@@ -709,6 +709,41 @@ export interface BalanceConfig {
        *  (point 481/478), not a scatter across the whole settlement. */
       playRadius: number
     }
+    /** The children's game at the river bank (work-order 687): the phases of one
+     *  cycle, the stage's own distances and the berth they give the traveller.
+     *  The paces, the stamina and the steering are the tag game's above. */
+    bankGame: {
+      /** How long the group roams its own quarter between two cycles. */
+      roamSeconds: number
+      /** Per-cycle spread of that length, 0..1 (0 = a metronome). */
+      roamSpread: number
+      /** Backstop on the walk down to the bank. */
+      gatherSeconds: number
+      /** Backstop on one run. */
+      runSeconds: number
+      /** Backstop on the walk between two runs. */
+      regroupSeconds: number
+      /** How long the group walks off along the bank before roaming again. */
+      partSeconds: number
+      /** How near a rock's centre counts as touching it. */
+      reachDistance: number
+      /** How far off a rock's centre a child's waiting station stands. */
+      standOff: number
+      /** Side-by-side spacing of the stations at one rock. */
+      stationSpacing: number
+      /** Sideways spacing of the runners' lanes across the stretch. */
+      laneSpacing: number
+      /** How near a catcher must be before a runner bends its line round him. */
+      dodgeDistance: number
+      /** How far sideways that bend carries the runner's aim at the closest. */
+      dodgeReach: number
+      /** The pace of every walk that is not a run (m/s). */
+      walkPace: number
+      /** The EXTRA berth the children give the traveller over a villager. */
+      strangerBerth: number
+      /** Constant gap between two utterances of the round. */
+      utteranceGapSeconds: number
+    }
     /** What the children SAY at their game (work-order point 481). */
     childSpeech: {
       /** Seconds between two staged situations. */
@@ -1223,6 +1258,47 @@ export const balance: BalanceConfig = {
       // A ground 20 m across: room for a chase to breathe, small enough that the
       // group stays one group a player can stand among and hear (point 481).
       playRadius: 10,
+    },
+    // The children's game at the bank (work-order 687). Calibratable starting
+    // values (educated guess, CLAUDE.md §2), all debug-editable, chosen so a
+    // visiting player sees a WHOLE cycle rather than a fragment of one: the
+    // roaming phase is of the order of a minute so the RIVER call that opens the
+    // cycle is never missed, and every phase that ends on a CONDITION carries a
+    // backstop generous enough that it is the condition — not the clock — that
+    // normally ends it.
+    bankGame: {
+      roamSeconds: 55,
+      roamSpread: 0.25,
+      // The stretch is ~20 m and a child crosses it at a run in some six
+      // seconds; the walk down from the quarter is longer, hence the wider
+      // backstop on the gather.
+      gatherSeconds: 30,
+      runSeconds: 20,
+      regroupSeconds: 14,
+      partSeconds: 8,
+      // Past the rock's own collider (1.2 m) plus a child's footprint (0.3 m):
+      // touching the stone, not standing in it.
+      reachDistance: 2.2,
+      standOff: 2.6,
+      stationSpacing: 1,
+      // The swerve that makes a run a game rather than a sweep: a runner starts
+      // bending its line six metres out from a catcher and, at the closest,
+      // aims six metres to the side of the rock. Both are wide enough that the
+      // dodge is visible from the far end of the stretch and narrow enough that
+      // the runner is still plainly making for the rock.
+      laneSpacing: 1.2,
+      dodgeDistance: 7,
+      dodgeReach: 3,
+      // A child's walk, well under the chase's trot — the walks between runs
+      // must read as walking, not as more running.
+      walkPace: 1.4,
+      // ONE EXTRA RADIUS over what a villager's body already claims (spec item
+      // 7): the children are shy of the stranger, so they visibly swerve round
+      // the traveller rather than brushing past him.
+      strangerBerth: 0.3,
+      // One atom is four syllables at 0.35 s each; this leaves a clear breath
+      // between two moments that fall together.
+      utteranceGapSeconds: 2,
     },
     // What the children SAY (work-order point 481). Calibratable starting
     // values: an utterance every few seconds is often enough to be heard several
