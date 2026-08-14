@@ -95,10 +95,14 @@
     "695": {
       "at": "2026-08-14T02:25:45.277Z",
       "why": "Es blockiert das Bild-Tor jeder Sitzung, gehört aber hinter die laufenden Spieler-Fixes; als Werkzeug-Punkt kommt es mit dem nächsten Werkzeug-Block."
+    },
+    "696": {
+      "at": "2026-08-14T05:13:27.358Z",
+      "why": "Sits with the other infrastructure fixes filed the same night (693-695), behind the communication-slice points the release is cut for"
     }
   },
   "settled": {
-    "at": "2026-08-14T02:25:45.278Z",
+    "at": "2026-08-14T05:13:27.359Z",
     "points": [
       174,
       184,
@@ -287,7 +291,8 @@
       692,
       693,
       694,
-      695
+      695,
+      696
     ]
   }
 }
