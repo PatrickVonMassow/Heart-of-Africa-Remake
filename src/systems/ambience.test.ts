@@ -913,6 +913,10 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
     })
   })
 
+  /** Conservative measured output of the rendered vowel filters per unit of
+   * scheduled speech envelope; pinned in ambience.speech.test.ts. */
+  const SYLLABLE_SYNTHESIS_GAIN = 1.7
+
   // Point 605: point 577 gave the speech its own bus at the level it had had on
   // the ambient one, and at that level the syllables sat BELOW the village drum
   // bed — the user still reported them too quiet. Its dormant audition mix is
@@ -930,13 +934,6 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       balance.drumBed.enabled = false
       refreshAmbienceVolume()
     })
-    /** What a syllable's own synthesis puts out per unit of scheduled envelope
-     *  peak — the vowel's formant filters sit before the envelope, so the wave
-     *  is louder than the peak. MEASURED on the shipped chain and pinned in
-     *  src/systems/ambience.speech.test.ts; kept conservative here, so the
-     *  relation is understated rather than flattered. */
-    const SYLLABLE_SYNTHESIS_GAIN = 1.7
-
     /** The bus a spoken syllable lands on, and the master behind it. */
     const busOf = (voice: FakeOscillator): FakeGain => {
       const bus = envelopeOf(voice).connected[0] as FakeGain | undefined
@@ -993,11 +990,11 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       // The gains are the calibrated defaults; only the debug audition switch differs.
       expect(balance.ambienceVolume).toBe(0.1)
       expect(balance.ambientVolume).toBe(0.5)
-      expect(balance.communication.speechVolume).toBe(1.5)
+      expect(balance.communication.speechVolume).toBe(2)
       expect(balance.drumBed.villageGain).toBe(0.42)
       const { drums, speech } = measure()
       expect(drums).toBeGreaterThan(0)
-      // MEASURED: 2.43× the drum beat (0.459 against 0.189) at the pinned
+      // MEASURED: 3.24× the drum beat (0.612 against 0.189) at the pinned
       // synthesis gain. Under 1 is the reported bug; a shout is no fix either.
       expect(speech / drums).toBeGreaterThanOrEqual(1.6)
       expect(speech / drums).toBeLessThanOrEqual(4)
@@ -1015,8 +1012,58 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       const footstep =
         Math.max(...stepGain.gain.events.map((e) => e.value ?? 0)) * stepBus.gain.value
       // Two villagers speaking right beside the player, over the drum bed, with
-      // the player walking: MEASURED 0.62 of full scale after the master.
+      // the player walking: MEASURED 0.76 of full scale after the master.
       expect((2 * speech + drums + footstep) * master).toBeLessThan(1)
     })
+  })
+
+  // Point 673 follows the shipped drum silence, so the calibration that closes
+  // it measures the DEPLOYED village mix rather than turning the dormant bed
+  // back on. The floor is deliberately conservative: all remaining active
+  // layer gains are summed as though their peaks coincided, along with gain
+  // modulation feeding those layers, before the common master gain. Real bird
+  // and music envelopes can only make the instantaneous floor lower.
+  it('puts a nearby syllable at least 8 dB above the remaining deployed village ambience', () => {
+    ctx.currentTime = 280
+    expect(balance.drumBed.enabled).toBe(false)
+    setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
+    refreshAmbienceVolume()
+
+    // Find the ambient bus through a real ambient emitter, then select layer
+    // nodes by their setTarget ramps rather than assuming graph build order.
+    const beforeProbe = ctx.gains.length
+    const beforeSources = ctx.sources.length
+    playThunder(thunderDelaySeconds(3), 0.8)
+    const clap = ctx.sources.slice(beforeSources)[0]
+    const clapEnvelope = (clap.connected[0] as FakeFilter).connected[0] as FakeGain
+    const ambientBus = clapEnvelope.connected[0] as FakeGain
+    const activeLayers = ctx.gains
+      .slice(0, beforeProbe)
+      .filter((g) => g.connected[0] === ambientBus)
+      .filter((g) => g.gain.value > 0 && g.gain.events.some((e) => e.type === 'cancel'))
+    const activeParams = new Set(activeLayers.map((g) => g.gain))
+    const modulation = ctx.gains
+      .slice(0, beforeProbe)
+      .filter((g) => activeParams.has(g.connected[0] as FakeParam))
+      .reduce((sum, g) => sum + Math.max(0, g.gain.value), 0)
+    const ambienceFloor = (
+      activeLayers.reduce((sum, layer) => sum + layer.gain.value, 0) + modulation
+    ) * ambientBus.gain.value
+
+    const beforeSpeech = ctx.oscillators.length
+    playSpeech(utterancePlan(utteranceOf('DIG'), 0))
+    const voice = ctx.oscillators.slice(beforeSpeech)[0]
+    const envelope = envelopeOf(voice)
+    const speechBus = envelope.connected[0] as FakeGain
+    const peak = Math.max(...envelope.gain.events.map((e) => e.value ?? 0))
+    const speechPeak = peak * speechBus.gain.value * SYLLABLE_SYNTHESIS_GAIN
+    const marginDb = 20 * Math.log10(speechPeak / ambienceFloor)
+
+    // MEASURED at the default preset: 0.612 over 0.2275, a 2.69× / 8.59 dB
+    // peak-to-floor margin. The explicit floor makes the promised margin the
+    // failure boundary, not an incidental consequence of the chosen number.
+    expect(ambienceFloor).toBeCloseTo(0.2275, 10)
+    expect(speechPeak).toBeCloseTo(0.612, 10)
+    expect(marginDb).toBeGreaterThanOrEqual(8)
   })
 })

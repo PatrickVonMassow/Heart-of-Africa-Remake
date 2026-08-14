@@ -151,25 +151,6 @@ put it is the mistake this line exists to stop.
   rescue unable to fire.
   Bundle: Dorfleben.
 
-- [ ] 673. THE VILLAGE SPEECH IS STILL TOO QUIET AT THE DEPLOYED STATE (user 13.08.2026,
-  answering the board's own question "Ist die Sprache am ausgelieferten Stand laut genug?":
-  "Nein, ist zu leise."). The earlier raise brought `balance.villageLife.speechVolume` to 1.5 and
-  was judged against the tone path rather than against the deployed mix; the user has now judged
-  the deployed mix and it does not carry.
-  FINAL STATE: the syllables carry over the remaining ambience at the default preset — and the
-  bed that used to mask them is going silent in point 672, so this point is calibrated AFTER
-  that one and against the mix it leaves. The starting value is raised until the measured
-  syllable peak stands clear of the remaining ambience floor by a stated margin, the margin is
-  written down where the next reader finds it, and the slider stays where the other volumes are.
-  VERIFIABLE: the measured peak-to-floor margin at the default preset, quoted; a Vitest case
-  pinning the default above the value that failed; and the user's judgment at the deployed
-  state, which is what closes it.
-  ORDER: after 672, whose silence changes the mix this is measured against.
-  Criticality: medium — it is a second report on the same defect, and inaudible speech is the
-  communication mechanic being untestable.
-  Bundle: Dorfleben.
-
-
 - [ ] 686. THE TAUGHT LANGUAGE IS FIVE CONCEPTS, AND THE CHIEF'S MESSAGE IS FOUR OF THEM (user
   13.08.2026, playing the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
@@ -7692,3 +7673,40 @@ to land than a mechanism that needs a review.
   contains no opaque full-size background rect and that both fills are present; plus the
   PICTURE — the icon rasterised and looked at against a light and a dark tab strip.
   Criticality: low — it is a one-element correction to the icon point 679 delivered.
+
+- [ ] 693. THE AUTHOR ROUTING RECOMMENDS A LANE WHOSE POOL IS EMPTY (measured 14.08.2026,
+  01:33–01:40, at the start of an autonomous batch session). `scripts/author-routing-core.mjs`
+  routed point 666 to Fable 5 — "tagged HIGH criticality, a hard case by definition" — the
+  delegated Fable agent died on its FIRST API call with "You've reached your Fable 5 limit", and
+  the fallback chain then pointed at Opus 5, which is the one spend the user's standing order of
+  13.08.2026 23:20 forbids while the pool is short (Anthropic 91 % used, Fable 100 % used, reset
+  Monday 10:00): Anthropic volume is reserved for review, the picture and the landing, and every
+  point Sol can author goes to Sol, because a failed Sol attempt costs no Anthropic tokens.
+  TWO MECHANISMS CONTRADICT EACH OTHER. `sol-share.mjs --status` prints "NEVER routed, at any
+  setting: the HARD cases", which reads as a prohibition on exactly what the standing order
+  requires; the resolution — override the cut with `--anyway` — lives ONLY in a memory file no
+  script reads, so the tools mislead any session that trusts them. Cost as measured: one wasted
+  delegation per hard case, plus the standing risk of spending scarce Anthropic tokens on
+  authoring rather than on the landing only Claude can do.
+  FINAL STATE:
+  - The routing cut reads the share setting AND a recorded pool state. At `prefer-sol` a HARD
+    case routes to **Sol**, with the shortage named as the reason in the printed line, instead of
+    requiring `--anyway`; at `default` the cut stays exactly as it is today.
+  - A lane whose provider is recorded EXHAUSTED is never the printed recommendation. The pool
+    state is a small operator file beside `sol-share.json`, written by hand or by an author run
+    that hit a limit error, and carrying a reset timestamp after which the exhaustion lapses on
+    its own. A missing or unusable file means "nothing known", which routes exactly as today —
+    the shortage may never be inferred from silence.
+  - `sol-share.mjs --status` states the rule it actually applies. The "NEVER routed" list keeps
+    the two entries that are genuinely absolute (reviewing what Sol itself authored; the landing
+    and the picture) and moves the hard cases to a line that names the current setting.
+  - An author run that dies on a provider limit RECORDS that provider as exhausted before it
+    exits, so the next session does not repeat the delegation.
+  VERIFIABLE: Vitest cases over the pure core for each cut — hard case at `default` → Fable, hard
+  case at `prefer-sol` → Sol with the shortage reason, exhausted lane never recommended, missing
+  and corrupt pool file → today's routing, lapsed reset timestamp → today's routing; plus one
+  real `--routing` run whose printed reason names the setting it applied.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes which vendor authors, which is the
+  decision the four-eyes principle rests on.
+  Criticality: medium — it wastes a delegation per hard case and points the batch at the wrong
+  pool exactly while the pool is the binding constraint.
