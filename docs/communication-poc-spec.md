@@ -76,6 +76,36 @@ range decision governs sound, observation, overhead note, and gesture: unheard
 speech teaches nothing and is not silently mimed. Pace, pause, radius, and
 falloff remain calibratable under `balance.communication.*`.
 
+## The children's game at the bank
+
+The children play ONE game, at the river bank, and it teaches four of the five
+words without a staged lesson (work-order 687). They roam their own quarter out
+of earshot of the adults; at the end of that phase one of them calls `RIVER`,
+points at the water and the group runs to the bank, and that caller is the first
+catcher. Two rocks stand at the ends of a stretch of bank, one upstream and one
+downstream, in the teaching stone's own size. The runners gather at one, the
+catcher waits at the other, the direction is announced before each run, whoever
+reaches the far rock calls `ROCK`, and whoever is caught drops out where he
+stands until the run ends. Sides swap every run, so the announced word alternates
+by construction, and the cycle ends when no free runner is left.
+
+Three readings are closed deliberately. `ROCK` cannot be learned as "made it",
+because the catcher taps his own rock and names it at the start of a run with
+nobody arriving, and because a child climbs an ordinary scattered boulder in the
+village — no part of the game — and names that while the group roams.
+`UPSTREAM`/`DOWNSTREAM` cannot be learned as "to the far rock" or as left/right,
+because the group's parting walk along the bank is announced with the opposite
+word from wherever it stands, with no rock as its target. And the river visibly
+flows, so the pair correlates with the current for a player who watches the
+water.
+
+Every utterance falls at a fixed point of the round — the opening call, the
+direction announcement, the catcher's tap, the arrival, the parting call — and
+none of them takes a child out of the game or slows it. Each is one atom from the
+same lexicon, heard through the same range rule as any other village speech. The
+phase lengths, the stage's distances and the extra berth the children give the
+traveller are calibratable under `balance.villageLife.bankGame`.
+
 ## The message
 
 `RIVER · UPSTREAM · ROCK · DIG`

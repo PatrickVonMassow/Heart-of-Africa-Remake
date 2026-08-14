@@ -195,14 +195,24 @@ landing over the figure the scene drew) is the polish suite below:
   spoken order, rides on the SPEAKER'S OWN height (point 582), never accumulates;
   and the click goes to the NEAREST speaker, a tie held rather than flickering,
   with no invitation while a dialog stands open (point 588).
-- `src/scenes/place/childSituations.test.ts` — the children's six concepts, each
-  in more than one situation, the staged contrasts (a COME from a child standing
-  still, a THERE nobody moves after), one situation at a time, and the scheduler
-  putting every one of them in front of the player within a visit.
-- `src/scenes/place/adultErrands.test.ts` — the five concepts the children do NOT
-  teach, each in at least two distinct situations and mixed with a known one;
-  RIVER unable to collapse into "fetch water"; UPSTREAM/DOWNSTREAM staged as a
-  mirrored pair; and a BIG_ROCK errand with no upstream walk (point 482).
+- `src/scenes/place/bankGame.test.ts` (work-order 687) — the children's ONE game
+  at the river bank, which teaches four of the five words: the cycle's phases in
+  order, the caller of RIVER as the first catcher, the announced direction
+  alternating with the side swap, ROCK called once with nobody arriving (the
+  catcher's tap) and once outside the game altogether (a child naming an ordinary
+  village boulder while the group roams), a direction word called once with no
+  rock as its target (the parting walk along the bank), the run and cycle ending
+  exactly as the spec states, no utterance reducing a playing child's pace, and a
+  tagged child holding its crouch until the run ends.
+- `src/scenes/place/bankStage.test.ts` (work-order 687) — the stage the game is
+  played on, measured rather than asserted: the two play rocks at the ends of the
+  settlement's own bank stretch, the stretch in world units, the far rock's share
+  of the frame at the default field of view and the reference viewport, and the
+  lane at least three walker diameters wide against the shipped collider set.
+- `src/scenes/place/mutedTeaching.test.ts` (work-order 686) — the removed
+  eleven-concept catalogues stage nothing: neither the children's old situations
+  nor the adults' old errands speak or steer. The adults' own teaching of RIVER
+  and DIG is owed by work-order point 688 and is not claimed here.
 - `src/scenes/place/speechChannel.test.ts` — the scene speaks over a named
   figure, holds the click target, and never accumulates standing text.
 - `src/systems/ambience.test.ts` (`playSpeech`) — the syllables reach the audio
