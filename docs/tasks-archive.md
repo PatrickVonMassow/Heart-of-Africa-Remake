@@ -18221,3 +18221,91 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — it is a second report on the same defect, and inaudible speech is the
   communication mechanic being untestable.
   Bundle: Dorfleben.
+
+- [x] 666. THE CHILDREN'S LAST RESIDUAL RED NEEDS AN OWNER ONCE 657 IS TICKED (measured
+  13.08.2026, 10:0x, on the merged state 389440ea, quiet machine, by the Fable 5 agent that
+  finished point 657). THE STATE 657 LEAVES BEHIND: the cure works and is large — the live
+  `children-motion` panel reads WebGPU 5/5 green (worst child 0.09 %) and WebGL 2 4/5 green,
+  against 3 of 10 red on BOTH backends before it. What remains is ONE WebGL 2 trace at 0.39 %
+  against the 0.25 % gate: child 3, an 8.9 s window, 1.29 m walked inside a 0.32 m circle, no
+  rescue in the window, 0.00 m carried in the whole run.
+  IT IS NOT AN UNEXPLAINED RED. It is exactly the composition point 657's charge already names —
+  a catch that reverses the new chaser along its own approach line, and a playmate contact
+  deliberately left to the separation pass — and green runs on BOTH backends carry the identical
+  1.29 m window UNDER the gate (0.09–0.11 %). What makes it red is that one such legitimate
+  event lands inside a one-second window the measure reads as pacing.
+  A THIRD TRIGGER OF THE SAME WINDOW is confirmed (Sol re-review of the landed 657 range,
+  13.08.2026, verified on the math and charged here): `evadeHeading`'s way-round sign test has
+  its own boundary — inside the release ramp the un-wrapped delta crosses zero near 131°, the
+  output settles onto the flee bearing, and the frame the runner's heading overshoots to the
+  short-way side the whole remaining un-wrap drops at once, a one-frame jump of |delta|·t
+  (~0.71 rad at the traced t). A CURE WAS BUILT AND REJECTED BY MEASUREMENT: fading the un-wrap
+  with |toCurrent| closes the cliff, and every shape tried (fixed 30°/10°/45° bands, a t-scaled
+  band, a band scoped to the ramp) measured +25 % hover rescues over ten adult-in-ground minutes
+  (44→55, seeds 1–10) with tags 78→75 — the same bar that rejected the second round's two
+  downstream cures; the figures stand in `evadeHeading`'s ramp comment. The trigger therefore
+  joins this charge: whichever way (a)/(b) closes this point must account for it too.
+  WHY THIS POINT EXISTS: the charge in `scripts/render-verify-charges.mjs` DIES WITH 657's TICK.
+  From that moment a `polish` red of this composition — roughly 1 in 10 live runs on WebGL 2 —
+  is uncovered, and an uncovered red on the release branch is precisely what point 640 forbids.
+  So the charge is INHERITED here rather than dropped.
+  FINAL STATE, one of two, decided by measurement and not by preference:
+  (a) THE MEASURE IS SHARPENED so a single legitimate event can no longer read as pacing — the
+      one-second window is the suspect, and the fix is at the measure, with the GATE untouched
+      (0.25 %) and the pre-cure traces re-read to prove the sharpened measure still goes RED on
+      the defect it was built for. That proof is mandatory: a measure that no longer sees the
+      original bug is worse than the red it silences.
+  (b) THE COMPOSITION IS ACCEPTED EXPLICITLY, written into the charge with its evidence and a
+      named expected rate, so a red of exactly this shape closes by a NAMED cause instead of by
+      a retry — and anything else stays red.
+  Either way the charge stays live until this point closes, and the decision is recorded here
+  with its figures, not in a commit message.
+  VERIFIABLE: for (a), the sharpened measure re-read over BOTH the recorded pre-cure traces (must
+  go red) and the ten post-cure traces (must go green on both backends); for (b), the charge
+  naming the composition and its rate, plus a Vitest case pinning that a red NOT of that shape
+  is still uncovered.
+  A PLAYER HAS NOW SEEN IT, WHICH RETIRES THE "ONLY A MEASUREMENT WINDOW" READING (user bug
+  report 13.08.2026, "Kind hängt wieder fest", F6 dump in `local/KindHaengtWieder/`): production
+  build 7bd0147, WEBGPU, NVIDIA Lovelace, medium, 127 FPS, `bambara-village` at −59.62/−131.19,
+  day 0, seed 236333330. The residual was carried as a WebGL 2 measurement limit (0.39 % against
+  0.25 %); this occurrence is on the OTHER backend, on the SHIPPED build, and visible to the
+  player. So option (b) — accepting the composition with a rate — may only be chosen if it also
+  explains a player-visible standstill on WebGPU; if it cannot, the answer is (a) or a behaviour
+  fix, not a charge. The report alone does NOT permit a diagnosis, because the dump describes the
+  wildlife and nothing of the settlement's inhabitants — that gap is its own point.
+  A SECOND REPORT FIVE MINUTES LATER NAMES THE MECHANISM (same seed, same player position, dump
+  in `local/SelbesKindHaengtImmernochFest/`, user's title "Selbes Kind — hängt seit Minuten fest
+  und zittert herum"). MINUTES, with visible shivering: that is a permanent state on WebGPU in
+  the production build, not a window. READ IN THE CODE (`src/scenes/place/tagGame.ts`,
+  `trackProgress` from line 651): the rescue nudge hangs on an ANCHOR RADIUS. When the child
+  leaves the circle `childRadius * PROGRESS_AWAY` (0.3 × 3 = 0.9 m) around its anchor, the anchor
+  is MOVED and `anchorFor` reset to 0, while `escapeNudge` fires only once `anchorFor` reaches
+  `unstuckSeconds` (1.5 s). A shiver that swings back and forth across 0.9 m therefore resets the
+  anchor every cycle, the counter never reaches 1.5 s, and THE RESCUE CANNOT FIRE BY
+  CONSTRUCTION, for arbitrarily long — exactly what the user describes. Point 656 removed this
+  blindness from the MEASURING gate (distance walked against ground covered, instead of position
+  deltas); the RESCUE still tests only the anchor radius. From the frames: the child stands in
+  open ground in both reports, no obstacle within reach, so the cause lies in the steering
+  (reversal/evasion) rather than in a geometry trap. Reproducible at seed 236333330,
+  `bambara-village`, medium, WebGPU; the headless run at that seed is still owed.
+  SO THE FINAL STATE ABOVE IS NOT THE WHOLE ANSWER: the rescue's own progress test is fixed here
+  too, by the same standard point 656 met — it must see a shiver as a lack of progress — and the
+  fix is proven at the reported seed, not only on the panel.
+  DECISION TAKEN 14.08.2026, WITH ITS FIGURES (the record this point asks for). THE BEHAVIOUR FIX
+  ANSWERS THE PLAYER-VISIBLE STANDSTILL: the progress window now runs to its end instead of being
+  re-taken at every 0.9 m anchor crossing, and a window that walked a real distance while reaching
+  less than a fifth of it is rescued past the whole observed oscillation. At the reported seed
+  236333330 in `bambara-village`, the headless replay this point owed measures child 3 at 59
+  rescues in 90 s on the shipped code and 1 rescue carrying 2.30 m on the fixed code, with the
+  remaining 88 s clean at both trace scales; the pre-fix figure was re-measured independently in
+  the counter-check, so the regression test is proven to bite. THE REMAINING WEBGL 2 COMPOSITION
+  IS ACCEPTED — option (b), narrowed to that backend and to the measured signature, everything
+  else of that check staying red — and it is accepted UNDER A DIFFERENT OWNER: a charge dies with
+  its point's tick by construction, so the acceptance is inherited by point 694, which must make
+  it durable by sharpening the measure or by a vehicle that does not expire. Option (b)'s
+  precondition is met the only way it could be: the WebGPU standstill was NOT this composition
+  but the rescue defect above, and it was answered with a behaviour fix rather than a charge.
+  Criticality: high — raised 13.08.2026: it is no longer only the picture gate's trustworthiness,
+  it is the player watching a child shiver in place for minutes in the shipped build, with the
+  rescue unable to fire.
+  Bundle: Dorfleben.
