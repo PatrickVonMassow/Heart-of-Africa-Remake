@@ -5,6 +5,11 @@ design. The playable slice has one five-word tonal language, two teaching
 places, and a four-word message. The child tag situations and the adult errand
 catalogue from the former design are not part of this version.
 
+This document is the reference the work-order points 686–692 cite; it states
+what those decisions left to the build, so the points that carry the rebuild
+cannot each invent their own answer. It replaces the version the finished points
+477–488 were built against, which described the eleven-word design.
+
 ## What the player does
 
 In one village of the tonal West/Centre belt the player watches and listens.

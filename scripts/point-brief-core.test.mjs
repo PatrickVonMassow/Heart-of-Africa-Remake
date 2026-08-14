@@ -1300,9 +1300,9 @@ describe('faithfulness over the WHOLE work order', () => {
       result.sliceDocs.some((d) => d.path === 'docs/communication-poc-spec.md'),
     )
     expect(claimed.map((b) => b.point.number).sort((a, b) => a - b)).toEqual([
-      477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488,
+      686, 687, 688, 689, 690, 691, 692,
     ])
-    expect(briefOf(487)).toContain('docs/communication-poc-spec.md — declares itself for work-order points 477–488')
+    expect(briefOf(687)).toContain('docs/communication-poc-spec.md — declares itself for work-order points 686–692')
   })
 
   it('claims no point no document declares — the block stays the exception', () => {

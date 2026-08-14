@@ -40,7 +40,7 @@ export const SYLLABLE_SEPARATOR = '-'
 
 /**
  * An utterance as it is spoken and stored: the syllables of one atom joined by
- * SYLLABLE_SEPARATOR, e.g. `BA-BA-ba-ba-ba`. It is ATOMIC — nothing parses it
+ * SYLLABLE_SEPARATOR, e.g. `BA-BA-ba-ba`. It is ATOMIC — nothing parses it
  * into meaning-bearing parts, and loudness, tempo, rhythm and syllable length
  * mean nothing anywhere. The text doubles as the key of the heard store, which
  * is why the lects must not share a syllable pair (asserted in the tests).
@@ -137,7 +137,7 @@ export function sequenceOf(concept: ConceptId, lect: LectId = DEFAULT_LECT): Ton
   return lectOf(lect).sequences[concept]
 }
 
-/** Writes a sequence out in a lect's syllables, e.g. `BA-BA-ba-ba-ba`. */
+/** Writes a sequence out in a lect's syllables, e.g. `BA-BA-ba-ba`. */
 export function speak(sequence: ToneSequence, lect: LectId = DEFAULT_LECT): UtteranceId {
   const { low, high } = lectOf(lect)
   return sequence.map((tone) => (tone === 'high' ? high : low)).join(SYLLABLE_SEPARATOR)

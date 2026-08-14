@@ -1115,8 +1115,8 @@ function talkerAim(
  * mute pantomime the user reported from the picture ("they gesture, but I see
  * no texts over their heads"), and at ANY distance, since nothing it did could
  * ever be heard. Those four gestures are the very ones the teaching situations
- * use for COME, GO_THERE, THERE and NO, so an ambient pair performing them
- * showed the player concepts with no word attached to them. Gesturing now
+ * use, so an ambient pair performing them showed the player concepts with no
+ * word attached to them. Gesturing now
  * belongs to the figures that SPEAK: the children's situations and the adults'
  * errands, which drive the same `gesture` refs through the hearing gate
  * (`src/communication/spokenGesture.ts`).
@@ -1813,9 +1813,10 @@ const ERRAND_ARRIVE_RADIUS = 1.1
 const WAYPOINT_RADIUS = 1.2
 
 /**
- * The adults at their errands (work-order point 483), and the five concepts they
- * teach at them: RIVER, UPSTREAM, DOWNSTREAM, BIG_ROCK and DIG. The catalogue
- * and the scheduler are the pure `adultErrands` module; here it is given the
+ * The adults at their errands, and the concepts they teach at them: RIVER,
+ * UPSTREAM, DOWNSTREAM, ROCK and DIG. The catalogue is EMPTY until the water
+ * and digging teaching is rebuilt, so nothing is staged here for now. It and
+ * the scheduler are the pure `adultErrands` module; here it is given the
  * live village, and what comes back is spoken (through the §13.4 hearing curve),
  * shown over the speaker's head, gestured with the point-479 arms and CARRIED
  * OUT — the villager walks to the bank, up or down the stretch, over to the

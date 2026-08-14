@@ -411,29 +411,13 @@ Per region exactly one knowing people (seeded anew each run) reveals the region'
 
 ### 13.4 The five-word communication slice
 
-The tonal West/Centre village teaches exactly five concepts: RIVER, UPSTREAM,
-DOWNSTREAM, ROCK and DIG. The player infers them from two places rather than
-receiving a glossary: the children's bank game, including the village's play
-rocks, and the adults' water and digging work. ROCK is a class of thing learned
-on those rocks and transferred to the separate boulder upstream; it is not a
-proper name or shorthand for one "big rock."
+The tonal West/Centre village teaches exactly five concepts: RIVER, UPSTREAM, DOWNSTREAM, ROCK and DIG. The player infers them from two places rather than receiving a glossary: the children's bank game, including the village's play rocks, and the adults' water and digging work. ROCK is a class of thing learned on those rocks and transferred to the separate boulder upstream; it is not a proper name or shorthand for one "big rock."
 
-Each word is an atomic four-syllable sequence of low and high `ba`. Valid
-sequences have an even number of highs, making every pair differ in at least two
-positions. Four syllables provide eight such sequences: five are used and three
-reserved. UPSTREAM and DOWNSTREAM are exact tonal reversals and form the one
-direction pair the player is meant to notice.
+Each word is an atomic four-syllable sequence of low and high `ba`. Valid sequences have an even number of highs, making every pair differ in at least two positions. Four syllables provide eight such sequences: five are used and three reserved. UPSTREAM and DOWNSTREAM are exact tonal reversals and form the one direction pair the player is meant to notice.
 
-The chief's message is `RIVER · UPSTREAM · ROCK · DIG`: sixteen drum
-strikes, with the same constant pause between atoms that speech uses. The large
-drum carries the low tone and the small drum the high one. The journal and the
-overhead note show only the player's own reading; the game never supplies or
-judges a translation. Full implementation detail lives in
-`docs/communication-poc-spec.md`.
+The chief's message is `RIVER · UPSTREAM · ROCK · DIG`: sixteen drum strikes, with the same constant pause between atoms that speech uses. The large drum carries the low tone and the small drum the high one. The journal and the overhead note show only the player's own reading; the game never supplies or judges a translation. Full implementation detail lives in `docs/communication-poc-spec.md`.
 
-The reduced inventory deliberately breaks persisted heard-utterance readings.
-No migration is owed while saving is disabled for the PoC; save/load code stays
-in place.
+The reduced inventory deliberately breaks persisted heard-utterance readings. No migration is owed while saving is disabled for the PoC; save/load code stays in place.
 
 ---
 

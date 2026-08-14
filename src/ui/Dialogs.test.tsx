@@ -318,7 +318,7 @@ describe('handing the artefact to the chief (point 487)', () => {
       (r) => r.textContent,
     )
     expect(readings).toContain('to dig')
-    expect(readings).toContain(NO_READING) // BIG_ROCK / HERE carry no note
+    expect(readings).toContain(NO_READING) // ROCK carries no note
     // Nothing here is clickable: the answer is heard, not edited.
     expect(document.querySelectorAll('.chief-acknowledge button')).toHaveLength(0)
   })
