@@ -4092,6 +4092,13 @@ if (section('children-bank-game')) {
       // a headless frame buys wildly different amounts of game per machine, and
       // this one has to span a run, the regroup walk and the next run.
       const LANE_WINDOW_S = 45
+      // How near a child has to come before the picture below is worth taking:
+      // close enough that the frame shows him and the runner together, wide
+      // enough that the shot is not waiting on the single closest pass of the
+      // whole window.
+      const LANE_SHOT_GAP = 10
+      const LANE_SHOT_AHEAD = 1.5
+      let shotRun = false
       const first = await page.evaluate(() => window.__placeTag().clock)
       const lane = []
       let laneClock = first
@@ -4112,6 +4119,37 @@ if (section('children-bank-game')) {
         })
         laneClock = s.clock
         lane.push(s)
+        // THE PICTURE IS TAKEN WHERE THE CLAIM IS TRUE (point 375). Shot after
+        // this window instead, it caught whatever the group happened to be doing
+        // by then — the run long over, the children back in their quarter — and
+        // wrote an empty stretch of bank under the label "the children's run".
+        // The frame's SUBJECT is therefore the nearest CHILD, not the rock: the
+        // shutter refuses to write it unless that child is in the picture.
+        if (!shotRun && s.phase === 'run') {
+          let near = -1
+          let gap = Infinity
+          for (let k = 0; k < s.c.length; k++) {
+            // IN FRONT OF HIM, not merely near: he faces down the stretch toward
+            // the far rock, so a child behind him projects behind the camera and
+            // the shutter rightly refuses the frame. The lane's own axis says
+            // which side he is looking at.
+            const along = (s.c[k].x - s.px) * planted.ax + (s.c[k].z - s.pz) * planted.az
+            if (along < LANE_SHOT_AHEAD) continue
+            const d = Math.hypot(s.c[k].x - s.px, s.c[k].z - s.pz)
+            if (d < gap) {
+              gap = d
+              near = k
+            }
+          }
+          if (near >= 0 && gap <= LANE_SHOT_GAP) {
+            shotRun = true
+            await frame('687-bank-game-traveller', {
+              local: { x: s.c[near].x, y: planted.r * 0.5, z: s.c[near].z },
+              label: `a child of the run coming at the traveller planted in their lane, ${gap.toFixed(1)} m off him`,
+              settle: false,
+            })
+          }
+        }
         await nextFrames(2)
       }
       const head = lane[0]
@@ -4195,11 +4233,18 @@ if (section('children-bank-game')) {
         `closest approach ${minGap.toFixed(2)} m against the berth ${(bodies + planted.berth).toFixed(2)} m ` +
           `(strangerBerth ${planted.berth})`,
       )
-      await frame('687-bank-game-traveller', {
-        local: { x: planted.far.x, y: planted.r * 0.5, z: planted.far.z },
-        label: 'the children`s run seen from the traveller planted in their lane',
-        settle: false,
-      })
+      // A window in which no runner ever came within `LANE_SHOT_GAP` of him is a
+      // FAILURE of the check above, not a picture to paper over — but the frame
+      // is still written, aimed at the stage, so the reader can see WHAT the
+      // group was doing instead.
+      check('and the run was photographed with a child in it', shotRun, shotRun ? '' : 'no runner came near enough to shoot')
+      if (!shotRun) {
+        await frame('687-bank-game-traveller', {
+          local: { x: planted.far.x, y: planted.r * 0.5, z: planted.far.z },
+          label: 'the stretch the traveller stood in — no runner came near enough to photograph',
+          settle: false,
+        })
+      }
     }
   }
   // The world goes back as it was found: the shipped roaming phase, and the game
