@@ -1296,11 +1296,9 @@ export const balance: BalanceConfig = {
       // A quarter turn a second at the most: a wander that reads as wandering
       // rather than as a figure being blown about.
       roamTurn: 1.4,
-      // The climber may start its phase at the far end of the settlement — the
-      // group has just walked back from the bank — so this has to cover a walk
-      // right across it: 30 s at the walking pace is some forty metres, well
-      // past the widest village. A stone still unreached after that is one the
-      // child cannot reach.
+      // A reachable stone keeps resetting this watch as the climber gets
+      // closer. Thirty seconds without gaining any ground toward it means a
+      // hut, pocket or other collider has made the approach impossible.
       roamGoalSeconds: 30,
       // A child's walk, well under the chase's trot — the walks between runs
       // must read as walking, not as more running.

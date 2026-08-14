@@ -285,6 +285,49 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(calls).toBeGreaterThan(1)
   })
 
+  it('opens a cycle after the boulder approach proves unreachable', () => {
+    const cfg: BankConfig = {
+      ...CFG,
+      roamSeconds: 0.1,
+      roamSpread: 0,
+      roamGoalSeconds: 0.2,
+      utteranceGapSeconds: 0,
+    }
+    // An unbroken wall leaves the children free on its west side and the
+    // boulder sealed more than one reach beyond it on the east. This is the
+    // world's real obstacle predicate, so `drive` exhausts its deflection
+    // choices instead of a test double merely refusing the destination.
+    const world: BankWorld = {
+      ...openWorld(),
+      blocked: (x) => x > -1,
+      nudge: (x, z) => ({ x, z, found: false }),
+    }
+    const rand = mulberry32(29)
+    const s = createBankGame(
+      [
+        { x: -4, z: -23 },
+        { x: -5, z: -22 },
+        { x: -4, z: -21 },
+      ],
+      rand,
+      cfg,
+    )
+    const said: BankUtterance[] = []
+    let openedAt = 0
+    for (let t = 0; t < 10 && s.phase === 'roam'; t += 1 / 60) {
+      const u = stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
+      if (u) said.push(u)
+      openedAt = s.clock
+    }
+
+    expect(s.phase).toBe('gather')
+    expect(openedAt).toBeGreaterThan(cfg.roamSeconds)
+    expect(s.namedBoulder).toBe(false)
+    expect(s.abandonedBoulder).toBe(true)
+    expect(said.some((u) => u.moment === 'boulder')).toBe(false)
+    expect(said.some((u) => u.moment === 'call')).toBe(true)
+  })
+
   it('emits the catcher`s tap on the exact frame the run opens', () => {
     const cfg: BankConfig = { ...CFG, roamSeconds: 0.1, roamSpread: 0, utteranceGapSeconds: 5 }
     const rand = mulberry32(31)

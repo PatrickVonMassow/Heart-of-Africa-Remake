@@ -112,10 +112,10 @@ export interface BankChild extends TagChild {
    * which is how the wildlife has always wandered.
    */
   roamHeading: number
-  /** Where the CLIMBER is walking — the boulder it names. Unused by the rest. */
+  /** The closest point the climber has reached on its boulder approach. */
   goalX: number
   goalZ: number
-  /** How long it has been walking at that goal. */
+  /** How long the boulder approach has gone without getting any closer. */
   goalFor: number
   /** Standing up against the ordinary boulder for the visible climb that
    *  carries the off-game ROCK utterance. */
@@ -196,7 +196,8 @@ export interface BankRoundConfig {
   dodgeReach: number
   /** How fast a roaming child's heading drifts (rad/s) — the wander itself. */
   roamTurn: number
-  /** How long the climber walks at the boulder before it gives the stone up. */
+  /** How long a climber may make no progress toward the boulder before giving
+   *  the obstructed approach up. A reachable stone keeps resetting this watch. */
   roamGoalSeconds: number
   /** The pace of every walk that is not a run (m/s). */
   walkPace: number
@@ -236,6 +237,8 @@ export interface BankState {
   climber: number
   /** Whether the boulder has already been named this roaming phase. */
   namedBoulder: boolean
+  /** Whether the chosen climber proved unable to reach the boulder this phase. */
+  abandonedBoulder: boolean
   /** Runs opened in this cycle. The normal exit is still the last runner being
    *  caught; this bounds a cycle in which every runner gets through untouched. */
   runsThisCycle: number
@@ -353,6 +356,7 @@ export function createBankGame(
     caller: -1,
     climber: -1,
     namedBoulder: false,
+    abandonedBoulder: false,
     runsThisCycle: 0,
     runs: 0,
     cycles: 0,
@@ -608,6 +612,7 @@ function openRoam(s: BankState, cfg: BankConfig, rand: () => number): void {
   s.direction = null
   s.caller = -1
   s.namedBoulder = false
+  s.abandonedBoulder = false
   for (const c of s.children) {
     c.role = 'runner'
     c.arrived = false
@@ -654,8 +659,15 @@ export function stepBankGame(
   s.phaseFor -= dt
   // The off-game ROCK guard is part of every roaming phase, not an optional
   // attempt. The river call waits until the boulder has actually been climbed
-  // and named; a settlement with no boulder never constructs a bank stage.
-  if (s.phase === 'roam' && s.phaseFor <= 0 && s.namedBoulder) openCycle(s, stage, cfg)
+  // and named, unless the approach itself has gone a full calibrated interval
+  // without progress. A settlement with no boulder never constructs a stage.
+  if (
+    s.phase === 'roam' &&
+    s.phaseFor <= 0 &&
+    (s.namedBoulder || s.abandonedBoulder)
+  ) {
+    openCycle(s, stage, cfg)
+  }
   let openedRun = false
   if (
     (s.phase === 'gather' || s.phase === 'regroup') &&
@@ -797,7 +809,12 @@ function stepRoam(
       s.children.map((_, i) => i),
       stage.boulder,
     )
-    if (s.climber >= 0) s.children[s.climber].goalFor = 0
+    if (s.climber >= 0) {
+      const c = s.children[s.climber]
+      c.goalX = c.x
+      c.goalZ = c.z
+      c.goalFor = 0
+    }
   }
   for (let i = 0; i < s.children.length; i++) {
     const c = s.children[i]
@@ -808,6 +825,12 @@ function stepRoam(
     const climbing = i === s.climber && !s.namedBoulder
     if (climbing) {
       const boulder = stage.boulder
+      const nearest = Math.hypot(c.goalX - boulder.x, c.goalZ - boulder.z)
+      if (dist(c, boulder) < nearest - 1e-4) {
+        c.goalX = c.x
+        c.goalZ = c.z
+        c.goalFor = 0
+      }
       if (dist(c, boulder) <= cfg.reachDistance) {
         // THE BOULDER THAT IS NO PART OF THE GAME (spec item 4). Named where it
         // stands, in the village, far from the two rocks the run is about — so
@@ -823,6 +846,14 @@ function stepRoam(
           aim: { x: boulder.x, y: 0.8, z: boulder.z },
           at: 'boulder',
         })
+        roamGoal(c, rand)
+      } else if (c.goalFor > cfg.roamGoalSeconds) {
+        // The player sees the child stop pressing an obstructed route and
+        // return to the group's wander. The missing off-game ROCK is not
+        // replayed elsewhere, but the failed approach cannot suppress every
+        // bank cycle that follows it.
+        s.abandonedBoulder = true
+        s.climber = -1
         roamGoal(c, rand)
       } else {
         drive(s, i, boulder, false, dt, cfg, world)
