@@ -209,6 +209,9 @@ export interface BankState {
   namedBoulder: boolean
   runs: number
   cycles: number
+  /** Children tagged so far — the round's own "something happened" counter, read
+   *  by the live check exactly as the tag game's catches are. */
+  tags: number
   /** SIM seconds this group has run, playing and idling alike. */
   clock: number
   /** …and the part of it the group was at its game, counted by the settlement
@@ -296,6 +299,7 @@ export function createBankGame(
     namedBoulder: false,
     runs: 0,
     cycles: 0,
+    tags: 0,
     clock: 0,
     playedClock: 0,
     playing: false,
@@ -877,6 +881,7 @@ function stepRun(
       runner.pace = 0
       runner.held = true
       catcher.quarry = -1
+      s.tags++
     }
   }
 

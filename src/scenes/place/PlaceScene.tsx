@@ -2960,6 +2960,8 @@ export function PlaceScene() {
           style={style}
           buildings={layout.interactives.filter((it) => it.type !== 'villager').map((it) => it.pos)}
           fabric={fabric}
+          playRocks={layout.playRocks}
+          rocks={layout.rocks}
           firePos={[-3.5, 2.5]}
           homes={layout.dwellings
             .filter((d) => d.kind === 'hut' || d.kind === 'box')
