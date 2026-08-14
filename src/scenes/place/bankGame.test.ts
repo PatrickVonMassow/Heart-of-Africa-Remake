@@ -347,28 +347,25 @@ describe('the children`s game at the bank (point 687)', () => {
     expect(toPart.length).toBeGreaterThan(0)
     for (const from of toPart) expect(from).toBe('run')
 
-    // Stepped by hand: the frame a run ends on has no free runner left — every
-    // one of them arrived or was tagged.
+    // Stepped by hand: one runner touches the far rock while the backstop still
+    // has almost all its time left. The empty-free-runner guard must close the
+    // run on that frame; deleting that half of `stepRun`'s exit condition leaves
+    // this state in `run` and fails the phase assertion below.
     const rand = mulberry32(11)
-    const spots = Array.from({ length: 4 }, (_, i) => ({ x: STAGE.roam.x + i * 1.2, z: STAGE.roam.z }))
-    const game = createBankGame(spots, rand, CFG)
+    const game = createBankGame([STAGE.upstream, STAGE.downstream], rand, CFG)
     const world = openWorld()
-    let checked = 0
-    let free = 0
-    for (let t = 0; t < 600; t += 1 / 60) {
-      const wasRun = game.phase === 'run'
-      const before = game.children.map((c) => ({ role: c.role, arrived: c.arrived }))
-      stepBankGame(game, 1 / 60, CFG, STAGE, world, rand)
-      if (!wasRun || game.phase === 'run') {
-        if (wasRun) free = before.filter((c) => c.role === 'runner' && !c.arrived).length
-        continue
-      }
-      // The run ended on this frame. Before it did, its survivors were exactly
-      // the children that had arrived, and the ones caught were tagged out.
-      checked++
-      expect(free).toBeGreaterThanOrEqual(0)
-    }
-    expect(checked).toBeGreaterThan(0)
+    game.phase = 'run'
+    game.phaseFor = CFG.runSeconds
+    game.from = 'upstream'
+    game.direction = 'DOWNSTREAM'
+    game.runsThisCycle = 1
+    game.children[0].role = 'catcher'
+    game.children[1].role = 'runner'
+
+    stepBankGame(game, 1 / 60, CFG, STAGE, world, rand)
+
+    expect(game.phase).toBe('regroup')
+    expect(game.phaseFor).toBe(CFG.regroupSeconds)
   })
 
   it('ends a cycle after one run per child even when nobody is ever tagged', () => {
@@ -393,28 +390,35 @@ describe('the children`s game at the bank (point 687)', () => {
 
   it('keeps a moving speaker at the round`s commanded pace while it speaks', () => {
     const cfg: BankConfig = { ...CFG, utteranceGapSeconds: 0 }
-    const rand = mulberry32(3)
-    const spots = Array.from({ length: 4 }, (_, i) => ({ x: STAGE.roam.x + i * 1.2, z: STAGE.roam.z }))
-    const s = createBankGame(spots, rand, cfg)
     const world = openWorld()
-    let checkedSpeakers = 0
-    for (let t = 0; t < 600; t += 1 / 60) {
-      const u = stepBankGame(s, 1 / 60, cfg, STAGE, world, rand)
-      if (!u) continue
-      const speaker = s.children[u.speaker]
-      // The two words spoken on a moving child's own action leave that movement
-      // intact: ROCK on arrival is still a run, ROCK on the boulder still a walk.
-      if (u.moment === 'arrival') {
-        checkedSpeakers++
-        expect(speaker.pace).toBeGreaterThanOrEqual(floorPace(cfg))
-        expect(speaker.held).toBe(false)
-      } else if (u.moment === 'boulder') {
-        checkedSpeakers++
-        expect(speaker.pace).toBe(cfg.walkPace)
-        expect(speaker.held).toBe(false)
-      }
-    }
-    expect(checkedSpeakers).toBeGreaterThan(0)
+
+    // Put one runner at the far rock so this exact step is both its arrival and
+    // its utterance, independent of a replay seed.
+    const runRand = mulberry32(3)
+    const run = createBankGame([STAGE.upstream, STAGE.downstream], runRand, cfg)
+    run.phase = 'run'
+    run.phaseFor = cfg.runSeconds
+    run.from = 'upstream'
+    run.direction = 'DOWNSTREAM'
+    run.children[0].role = 'catcher'
+    run.children[1].role = 'runner'
+    const arrival = stepBankGame(run, 1 / 60, cfg, STAGE, world, runRand)
+    expect(arrival?.moment).toBe('arrival')
+    expect(arrival?.speaker).toBe(1)
+    // Mutating `say` to hold its speaker or zero its pace fails these exact
+    // action-frame checks; they do not compare the value with itself.
+    expect(run.children[1].pace).toBeGreaterThanOrEqual(floorPace(cfg))
+    expect(run.children[1].held).toBe(false)
+
+    // Likewise, start the chosen climber on the ordinary boulder: ROCK and the
+    // commanded walking pace must coexist on this frame.
+    const roamRand = mulberry32(5)
+    const roam = createBankGame([STAGE.boulder], roamRand, cfg)
+    const boulder = stepBankGame(roam, 1 / 60, cfg, STAGE, world, roamRand)
+    expect(boulder?.moment).toBe('boulder')
+    expect(boulder?.speaker).toBe(0)
+    expect(roam.children[0].pace).toBe(cfg.walkPace)
+    expect(roam.children[0].held).toBe(false)
   })
 
   it('holds a tagged child in its posture, and moves it only between runs', () => {
@@ -508,13 +512,14 @@ describe('the children`s game at the bank (point 687)', () => {
       stepBankGame(s, 1 / 60, CFG, STAGE, world, rand)
       for (const c of s.children) nearest = Math.min(nearest, Math.hypot(c.x - stranger.x, c.z - stranger.z))
     }
-    // The berth is the stranger's own body plus a child's footprint plus the
-    // calibratable extra — a villager gets the first two only.
-    const berth = stranger.radius + world.childRadius + CFG.strangerBerth
-    expect(nearest).toBeGreaterThan(berth * 0.9)
+    // A villager gets the two body radii; the stranger gets the calibratable
+    // extra on top. Removing `strangerBerth` from the obstacle predicate makes
+    // this measured extra clearance collapse to zero and fails here.
+    const villagerBerth = stranger.radius + world.childRadius
+    expect(nearest - villagerBerth).toBeGreaterThanOrEqual(CFG.strangerBerth - 1e-6)
     // …and they really did come past him: a group that never left its quarter
     // would clear him trivially.
-    expect(nearest).toBeLessThan(berth * 4)
+    expect(nearest).toBeLessThan((villagerBerth + CFG.strangerBerth) * 4)
   })
 
   it('speaks one utterance at a time, with the constant gap between two', () => {
