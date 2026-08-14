@@ -4212,19 +4212,25 @@ if (section('children-bank-game')) {
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 
-// --- The adults' errands (work-order point 483) -------------------------------
-// What needs a real browser here is the WALK: the catalogue, the fair queue and
-// every teaching rule are pinned in src/scenes/place/adultErrands.test.ts, but
-// only the live scene can show that a villager told to go somewhere actually
-// crosses the village to it against the collision set and stands there.
+// --- The adults at the water and the ground work ------------------------------
+// THE ERRAND CATALOGUE IS EMPTY ON PURPOSE, AND THIS SECTION SAYS SO. The
+// five-concept rebuild deleted the eleven-concept teaching this section used to
+// watch — the sendings, the callings back, the mirrored upstream/downstream
+// walks — and the adults' replacement teaching (an adult carrying a jar to the
+// water and back saying RIVER, a digger saying DIG on the stroke) is WORK-ORDER
+// 688, not this one. Until it lands the adults stroll the village and stage
+// nothing at all.
+//
+// So what this section still proves is the STAGE that teaching will stand on —
+// the dig sites, the bank, its two stretches, the drawn river and the direction
+// its current runs, all of which 688's situations are placed against — plus one
+// TRIPWIRE: nothing is staged. The moment 688 stages its first situation that
+// check goes red, and it is replaced there by the walk-and-arrive checks this
+// section used to carry (they are in the history of this file, at the commit
+// before the empty catalogue).
 //
 // The village is the PoC's own (the Bambara village), because that is the one
 // with the teaching stone; the ground work is in every village.
-//
-// The RIVER errands are checked here too (work-order 482 landed the bank): the
-// village now carries a walkable bank and two stretches along it, so a villager
-// told to go to the water has somewhere to go — and this is where that walk, and
-// the current it is walked beside, can be seen.
 if (section('adult-errands')) {
   await page.evaluate(() => {
     const g = window.__game.getState()
@@ -4271,83 +4277,36 @@ if (section('adult-errands')) {
       JSON.stringify({ bank: geography.bank, upstream: geography.upstream, downstream: geography.downstream }),
     )
 
-    // Sample the group over a window of frames: every errand handed out, and how
-    // far its villager still is from where it was sent.
-    // The seven errands that are ABOUT the water (work-order 482): the three
-    // that name the river and the two mirrored direction pairs.
-    const RIVER_ERRANDS = [
-      'sendToTheBank',
-      'callBackFromTheBank',
-      'gatherAtTheBank',
-      'sendUpTheBank',
-      'sendDownTheBank',
-      'haulUpTheBank',
-      'haulDownTheBank',
-    ]
-    const isRiverErrand = (key) => RIVER_ERRANDS.some((id) => key.includes(`:${id}:`))
-    const seen = new Map()
-    let arrivals = 0
-    let progressed = 0
-    let riverArrivals = 0
-    let riverProgress = 0
-    let dug = 0
+    // THE TRIPWIRE. Sampled over a window of the live scene rather than read
+    // once, because "nothing is staged" is a claim about a stretch of play: the
+    // scheduler's own interval is 0.8 s above, so this window covers it many
+    // times over. Every one of these would be non-zero the moment 688 stages a
+    // situation, and the red it then raises is the instruction to put this
+    // section's walk-and-arrive checks back.
     let staged = {}
-    for (let i = 0; i < 1400; i++) {
+    let errands = 0
+    let dug = 0
+    for (let i = 0; i < 120; i++) {
       const now = await page.evaluate(() => window.__placeErrands())
       staged = now.staged
-      for (const [index, v] of now.villagers.entries()) {
+      for (const v of now.villagers) {
         if (v.digging) dug++
-        if (!v.errand) continue
-        const key = `${index}:${v.errand.situation}:${v.errand.x.toFixed(2)}:${v.errand.z.toFixed(2)}`
-        const gap = Math.hypot(v.x - v.errand.x, v.z - v.errand.z)
-        const first = seen.get(key)
-        if (!first) seen.set(key, { gap, best: gap, arrived: v.errand.arrived })
-        else {
-          first.best = Math.min(first.best, gap)
-          first.arrived = first.arrived || v.errand.arrived
-        }
+        if (v.errand) errands++
       }
-      // Everything this window is here to show has happened: stop sampling
-      // rather than spend minutes proving it again. A scene that never gets
-      // there runs the whole cap and fails on the checks below.
-      arrivals = [...seen.values()].filter((e) => e.arrived).length
-      progressed = [...seen.values()].filter((e) => e.gap - e.best > 0.8).length
-      riverArrivals = [...seen.entries()].filter(([k, e]) => isRiverErrand(k) && e.arrived).length
-      riverProgress = [...seen.entries()].filter(([k, e]) => isRiverErrand(k) && e.gap - e.best > 0.8).length
-      if (arrivals >= 2 && progressed >= 2 && dug > 0 && riverArrivals >= 1 && riverProgress >= 1) break
       await nextFrames(2)
     }
     const stagedTotal = Object.values(staged).reduce((a, b) => a + b, 0)
     check(
-      'the adults stage errands while the player watches',
-      stagedTotal >= 3,
-      `${stagedTotal} staged: ${Object.entries(staged).filter(([, n]) => n > 0).map(([k, n]) => `${k}×${n}`).join(', ')}`,
-    )
-    check(
-      'a villager told to go somewhere WALKS there: it closes the distance to its target',
-      progressed >= 1,
-      `${progressed} of ${seen.size} errands visibly closed the gap`,
-    )
-    check(
-      'and it gets there: the walk ends at the place it was sent to',
-      arrivals >= 1,
-      `${arrivals} of ${seen.size} errands reached their target`,
-    )
-    check(
-      'the ground work is worked: a villager is seen digging',
-      dug > 0,
-      `${dug} samples with a villager at the digging pose; ground-work errands staged ` +
-        `${['digWhereIStand', 'sendToThePostHole', 'joinTheDigging'].map((id) => `${id}×${staged[id] ?? 0}`).join(', ')}`,
-    )
-    check(
-      'the adults stage the errands that are about the water (work-order 482)',
-      RIVER_ERRANDS.reduce((n, id) => n + (staged[id] ?? 0), 0) >= 1,
-      RIVER_ERRANDS.map((id) => `${id}×${staged[id] ?? 0}`).join(', '),
-    )
-    check(
-      'a villager sent to the BANK crosses the village to it and arrives',
-      riverProgress >= 1 && riverArrivals >= 1,
-      `${riverProgress} closed the gap, ${riverArrivals} arrived`,
+      'the adults stage nothing while the catalogue awaits its rebuild (work-order 688)',
+      stagedTotal === 0 && errands === 0 && dug === 0,
+      `${stagedTotal} staged over 120 samples, ${errands} villager-samples carrying an errand, ` +
+        `${dug} at the digging pose` +
+        (stagedTotal > 0
+          ? ` — ${Object.entries(staged)
+              .filter(([, n]) => n > 0)
+              .map(([k, n]) => `${k}×${n}`)
+              .join(', ')}. The adults teach again: restore the walk-and-arrive checks here`
+          : ''),
     )
 
     // The picture: a villager standing at the ground work it was sent to.
