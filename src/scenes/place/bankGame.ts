@@ -155,6 +155,13 @@ export interface BankChild extends TagChild {
   pathTo: { x: number; z: number } | null
   /** Seconds before this child may ask for another plan. */
   replan: number
+  /** How long it has failed to get any nearer to the corner it is walking to,
+   *  and the closest it has come. A corner it cannot touch — one the planner
+   *  ran through a wedge the chase is kept out of, one a body is standing on —
+   *  is DROPPED rather than pressed against: the mandinka catcher circled a
+   *  waypoint it could not reach for two hundred seconds and 400 m of legs. */
+  wayFor: number
+  wayBest: number
 }
 
 /**
@@ -375,6 +382,8 @@ export function createBankGame(
       path: null,
       pathTo: null,
       replan: 0,
+      wayFor: 0,
+      wayBest: Infinity,
     }
   })
   return {
@@ -873,6 +882,7 @@ function stepRoam(
         s.namedBoulder = true
         c.climbing = true
         c.goalFor = 0
+        clearPath(c)
         say(s, {
           concept: 'ROCK',
           moment: 'boulder',
@@ -890,8 +900,14 @@ function stepRoam(
         s.failedClimbers.push(i)
         s.climber = -1
         s.abandonedBoulder = s.failedClimbers.length === s.children.length
+        clearPath(c)
         roamGoal(c, rand)
       } else {
+        // Steered straight at it, deliberately: the boulder is an ORDINARY
+        // village stone a few paces off the group's own quarter, not a place the
+        // round has to get to. Where one stands behind a hut the watch above
+        // gives up on it and the next child tries, which is what the guard's own
+        // abandon is for — and the bound below keeps that from holding a cycle.
         drive(s, i, boulder, false, dt, cfg, world)
         continue
       }
@@ -947,14 +963,18 @@ function inPlace(
   return true
 }
 
-/** How near a waypoint counts as reached, and how often a child may replan. */
+/** How near a waypoint counts as reached, how often a child may replan, and how
+ *  long it may fail to gain any ground on a corner before dropping it. */
 const WAYPOINT_RADIUS = 1.2
 const REPLAN_SECONDS = 1
+const WAYPOINT_STALL_SECONDS = 4
 
 /** Drops the route a child is no longer walking. */
 function clearPath(c: BankChild): void {
   c.path = null
   c.pathTo = null
+  c.wayFor = 0
+  c.wayBest = Infinity
 }
 
 /**
@@ -969,25 +989,57 @@ function wayTo(
   goal: { x: number; z: number },
   dt: number,
   world: BankWorld,
-): { x: number; z: number } {
+): { x: number; z: number; advanced: boolean } {
   const shut = world.lineBlocked
-  if (!shut || !world.route) return goal
+  if (!shut || !world.route) return { ...goal, advanced: false }
   c.replan -= dt
   if (c.pathTo && (c.pathTo.x !== goal.x || c.pathTo.z !== goal.z)) clearPath(c)
   const blocked = shut(c.x, c.z, goal.x, goal.z)
   if (!blocked) {
     // Back on the open line: the detour it has already got past is dropped.
+    const had = !!c.path
     clearPath(c)
-    return goal
+    return { ...goal, advanced: had }
   }
   if (!c.path && c.replan <= 0) {
     c.path = world.route(c, goal)
     c.pathTo = { x: goal.x, z: goal.z }
     c.replan = REPLAN_SECONDS
   }
-  if (!c.path || c.path.length === 0) return goal
-  while (c.path.length > 1 && dist(c, c.path[0]) <= WAYPOINT_RADIUS) c.path.shift()
-  return c.path[0]
+  if (!c.path || c.path.length === 0) return { ...goal, advanced: false }
+  let dropped = false
+  while (c.path.length > 1 && dist(c, c.path[0]) <= WAYPOINT_RADIUS) {
+    c.path.shift()
+    dropped = true
+  }
+  // THE CORNER IT CANNOT TOUCH IS DROPPED, NOT PRESSED AGAINST. The planner
+  // reads the settlement's boundary, its shore and its colliders; the round is
+  // ALSO kept out of the sub-passage wedges `buildWedgeCarve` closes, and a
+  // corner that fell in one can never be reached however long the child walks at
+  // it. Carving the planner's own ground instead would be worse: measured over
+  // five layouts of the bambara village, it disconnects the bank from the
+  // village on three of them and there is then no route at all.
+  const gap = dist(c, c.path[0])
+  if (dropped || gap < c.wayBest - 0.05) {
+    c.wayBest = gap
+    c.wayFor = 0
+  } else {
+    c.wayFor += dt
+    if (c.wayFor > WAYPOINT_STALL_SECONDS) {
+      if (c.path.length > 1) {
+        c.path.shift()
+        c.wayBest = dist(c, c.path[0])
+        dropped = true
+      } else {
+        // The last corner is the goal itself: walk at it directly rather than
+        // hold a route with nothing left in it.
+        clearPath(c)
+        return { ...goal, advanced: false }
+      }
+      c.wayFor = 0
+    }
+  }
+  return { ...c.path[0], advanced: dropped }
 }
 
 /** The walk to the stations — down to the bank at the head of a cycle, and

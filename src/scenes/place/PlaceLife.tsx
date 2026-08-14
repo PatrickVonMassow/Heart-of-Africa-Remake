@@ -632,7 +632,17 @@ function Kids({
     // where the group ROAMS, not a wall it is kept behind — the cycle takes it
     // down to the water and back. The tag round keeps its bounded ground.
     const region = stage ? { x: 0, z: 0, radius: rim } : { x, z, radius: playRadius }
-    const carve = buildWedgeCarve(colliders, NPC_RADIUS, region)
+    // ...AND ONLY THE TAG ROUND IS KEPT OUT OF THEM. The carve answers the
+    // CHASE's failure (point 657): a fixed target behind a pinch herded the
+    // group into a dead-end slot and it walked on the spot there. The bank round
+    // has no such steering — it roams on a drifting heading, runs an open lane
+    // and otherwise walks a PLANNED way across the village — and for that walk
+    // the carve is a wall in the wrong place: measured at the verification's own
+    // seed, the only route from the children's quarter to the bank runs through
+    // one carved wedge, so the group stood in a pocket for the whole gather and
+    // never came down to the water. The child-motion gate judges this round in
+    // the bambara village and stays green without it.
+    const carve = stage ? () => false : buildWedgeCarve(colliders, NPC_RADIUS, region)
     // AND THE SETTLEMENT IS NOT A CIRCLE WHERE IT STANDS ON A RIVER. A village
     // with a bank grows a lobe out to the water (`boundary.ts`), and the two
     // play rocks stand ON that lobe: measured on all three river villages they
@@ -662,10 +672,13 @@ function Kids({
     // step above obeys, so a route can never lead where the step is refused.
     // Only a settlement that plays the bank round pays for it.
     const nav = stage ? buildPlaceNavGrid(bounds, colliders, NPC_RADIUS) : null
-    // AND ONLY WHERE THE CHILDREN THEMSELVES MAY STAND: the grid knows the
-    // boundary and the colliders, not the shore rule nor the carved wedges, and a
-    // route over either strands the child at a waypoint it can never reach.
-    if (nav) navRestrict(nav, (px, pz) => !blocked(px, pz))
+    // AND OFF THE SHORE, which the grid does not know: it reads the boundary and
+    // the colliders, and the lobe it therefore calls walkable runs on down the
+    // sloping bank into the water. The wedge carve is deliberately NOT added
+    // here — measured over five layouts of the bambara village it disconnects
+    // the bank from the village on three of them, and a corner that does fall in
+    // a wedge is dropped by the walk itself (`wayTo`).
+    if (nav) navRestrict(nav, (px, pz) => standsOnGroundPlate(bank, px, pz, NPC_RADIUS))
     return {
       radius: region.radius,
       centerX: region.x,

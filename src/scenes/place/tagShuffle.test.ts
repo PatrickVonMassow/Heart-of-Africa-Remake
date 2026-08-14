@@ -308,7 +308,9 @@ function village(
     : { x: ground.x, z: ground.z, radius: ground.radius }
   // The sub-passage slots between pinching boundaries are not part of the
   // ground, exactly as `PlaceLife` wires it (point 657).
-  const carve = buildWedgeCarve(colliders, NPC_RADIUS, region)
+  // Only the TAG round is kept out of the sub-passage wedges, exactly as
+  // `PlaceLife` wires it — see the reasoning there.
+  const carve = hasBank ? () => false : buildWedgeCarve(colliders, NPC_RADIUS, region)
   // AND THE SHAPE THE ROUND WALKS, exactly as `PlaceLife` wires it: the bank
   // round walks the settlement's OWN boundary — the lobe out to the water
   // included, because the two play rocks stand on it — and is kept off the
@@ -325,10 +327,13 @@ function village(
   // And the way ROUND the village for the walk down to the bank, exactly as
   // `PlaceLife` builds it: only a settlement that plays the bank round has one.
   const nav = hasBank ? buildPlaceNavGrid(bounds, colliders, NPC_RADIUS) : null
-    // AND ONLY WHERE THE CHILDREN THEMSELVES MAY STAND: the grid knows the
-    // boundary and the colliders, not the shore rule nor the carved wedges, and a
-    // route over either strands the child at a waypoint it can never reach.
-    if (nav) navRestrict(nav, (px, pz) => !blocked(px, pz))
+    // AND OFF THE SHORE, which the grid does not know: it reads the boundary and
+    // the colliders, and the lobe it therefore calls walkable runs on down the
+    // sloping bank into the water. The wedge carve is deliberately NOT added
+    // here — measured over five layouts of the bambara village it disconnects
+    // the bank from the village on three of them, and a corner that does fall in
+    // a wedge is dropped by the walk itself (`wayTo`).
+    if (nav) navRestrict(nav, (px, pz) => standsOnGroundPlate(layout.bank, px, pz, NPC_RADIUS))
   const world: BankWorld = {
     radius: region.radius,
     centerX: region.x,
@@ -647,33 +652,35 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     })
   }
 
-  it('rescues the permanently shivering child at the player-reported seed (point 666)', () => {
+  it('leaves the player-reported settlement with no child to rescue at all (point 666)', () => {
     // The production report names this exact settlement and seed. On the code
     // shipped to the player, child 3 spent effectively every judged window
-    // walking in place for minutes. This is the owed headless reproduction:
-    // the progress watch must fire once, move the child beyond the oscillation,
-    // and the remainder of the same deterministic run must stay clean.
+    // walking in place for minutes, and the progress watch had to carry it out.
+    //
+    // IT NO LONGER HAS ANYTHING TO CARRY. This village stands on a river, so it
+    // plays the bank round (work-order 687), whose children roam on a drifting
+    // heading and otherwise walk a PLANNED way across the settlement — neither
+    // of which presses a fixed target through a pinch, which is what wedged the
+    // reported child. Re-measured over the same deterministic 90 s: not one
+    // rescue in the whole group, nothing carried a centimetre, and the trace
+    // clean end to end.
+    //
+    // The RESCUE MECHANISM keeps its own coverage: the pen cases below build a
+    // wedged child deliberately and prove the watch fires, names it and shows
+    // the carry in the trace. What is asserted here is the settlement's OWN
+    // state, which is the thing the player reported.
     const paths = play('bambara-village', 236333330, 90)
     const rescues = rescueRate(paths)
-    expect(rescues.worstChild).toBe(3)
-    // ONE RESCUE, RESTORED (work-order 687 item 9). Point 686 had loosened this
-    // to "at least one" because the children without their situations needed the
-    // progress watch twice over these 90 s. Re-measured with the bank game:
-    // child 3 is still the worst child of that settlement, the progress watch
-    // still fires exactly ONCE over the 90 s, and it still carries it a real
-    // distance (2.07 m). The pin is the original one, not a re-tuned one.
-    expect(rescues.worstRescues).toBe(1)
-    expect(rescues.carriedMetres).toBeGreaterThan(2)
-    expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
-    expect(rescues.worstCarriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildCarryGate)
-
-    // `nudges` is optional on a track sample — the metric reads a missing one
-    // as zero, and so does this.
-    const rescuedAt = paths[3].findIndex((s) => (s.nudges ?? 0) > 0)
-    expect(rescuedAt).toBeGreaterThan(0)
-    const after = paths.map((path) => path.slice(rescuedAt + 1))
-    const shuffle = shuffleWindows(after)
-    const burst = shuffleWindows(after, CHILD_MOTION.short)
+    expect(rescues.carriedPublished).toBe(true)
+    expect(rescues.nudgesPublished).toBe(true)
+    expect(rescues.worstRescues).toBe(0)
+    expect(rescues.carriedMetres).toBe(0)
+    expect(paths.every((path) => path.every((s) => (s.nudges ?? 0) === 0))).toBe(true)
+    // ...and the run it walks instead is a real game, judged over its whole
+    // length rather than from a rescue onward.
+    expectLively(paths)
+    const shuffle = shuffleWindows(paths)
+    const burst = shuffleWindows(paths, CHILD_MOTION.short)
     expect(judgedEnough(shuffle)).toBe(true)
     expect(judgedEnough(burst)).toBe(true)
     expect(shuffle.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
@@ -1265,14 +1272,20 @@ describe('and the replay refuses a trace with no game in it (point 656)', () => 
  * traveller standing in the lane would be.
  */
 describe('the children`s bank round can reach its own stage (work-order 687)', () => {
+  // SEED 42 FIRST, because it is the world the BROWSER section judges this round
+  // in (`scripts/verify/verify-seed.mjs` pins the verify lane to it). The pure
+  // layer had covered the bambara village at the child-motion report's seed
+  // only, and the layout the picture check actually walks — a different one —
+  // was the one whose route across the village could not be planned.
   const RIVER_VILLAGES: Array<[string, number]> = [
+    ['bambara-village', 42],
     ['bambara-village', 2972259115],
     ['nubian-village', 42],
     ['mandinka-village', 99],
   ]
 
   for (const [placeId, seed] of RIVER_VILLAGES) {
-    it(`${placeId} lets the children stand on every part of the stage`, () => {
+    it(`${placeId} at seed ${seed} lets the children stand on every part of the stage`, () => {
       const v = village(placeId, seed)
       expect(v.stage).not.toBeNull()
       const stage = v.stage!
@@ -1313,7 +1326,7 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
   }
 
   for (const [placeId, seed] of RIVER_VILLAGES) {
-    it(`${placeId} walks the group down to the bank and runs the stretch`, () => {
+    it(`${placeId} at seed ${seed} walks the group down to the bank and runs the stretch`, () => {
       const v = village(placeId, seed)
       const stage = v.stage!
       const up = rockAt(stage, 'upstream')
