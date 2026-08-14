@@ -18,6 +18,7 @@ import {
 import { buildLayout } from './layout'
 import { resolveMove, standingClear, WALKER_RADIUS, type Collider } from './collision'
 import { insidePlace } from './boundary'
+import { standsOnGroundPlate } from './riverBank'
 import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
 import { balance } from '../../config/balance'
 
@@ -89,6 +90,66 @@ describe('the free-ground grid', () => {
     // refused, and none is handed back.
     navRestrict(own, () => true)
     expect(navPointFree(own, 0, 0)).toBe(false)
+  })
+
+  /**
+   * THE INVARIANT THE PLANNER EXISTS FOR: a route may never lead where the step
+   * is refused. `PlaceLife` narrows the children's grid with the SAME `onGround`
+   * their movement uses, and this asserts the consequence over every cell of
+   * every river village's grid rather than over one sampled route.
+   *
+   * It also settles a review finding (GPT-5.6 Sol, effort high) that narrowing
+   * with the shore half alone could hand back a boundary-edge waypoint the step
+   * refuses. It cannot: `buildPlaceNavGrid` tests the boundary at `margin +
+   * slack`, which is strictly stronger than the `margin` the step uses, so the
+   * boundary half of `onGround` is already implied. Measured over the six
+   * layouts below, the two restrictions yield BIT-IDENTICAL grids. The
+   * predicates are single-sourced anyway, and this is what keeps them so.
+   */
+  it('narrows the children`s grid to ground their own step accepts, over every cell', () => {
+    const SEEDS: Array<[string, number]> = [
+      ['bambara-village', 42],
+      ['bambara-village', 2972259115],
+      ['bambara-village', 7],
+      ['bambara-village', 1337],
+      ['nubian-village', 42],
+      ['mandinka-village', 99],
+    ]
+    let checked = 0
+    for (const [placeId, seed] of SEEDS) {
+      const layout = buildLayout(placeId, seed)
+      if (!layout.bank || !layout.playRocks) continue
+      const bounds = { radius: layout.radius, bank: layout.bank }
+      // The bank round's own ground rule and step, as `PlaceLife` writes them.
+      const onGround = (x: number, z: number) =>
+        insidePlace(bounds, x, z, R * 2) && standsOnGroundPlate(layout.bank, x, z, R)
+      const blocked = (x: number, z: number) =>
+        !onGround(x, z) || !standingClear(layout.colliders, x, z, R)
+
+      const grid = buildPlaceNavGrid(bounds, layout.colliders, R)
+      navRestrict(grid, onGround)
+      // ...and the shore half on its own, which is what the finding proposed.
+      const shoreOnly = buildPlaceNavGrid(bounds, layout.colliders, R)
+      navRestrict(shoreOnly, (x, z) => standsOnGroundPlate(layout.bank, x, z, R))
+
+      let free = 0
+      for (let i = 0; i < grid.n; i++) {
+        const x = grid.min + i * grid.cell
+        for (let j = 0; j < grid.n; j++) {
+          const z = grid.min + j * grid.cell
+          const k = i * grid.n + j
+          // The boundary half is implied, so the two agree cell for cell.
+          expect(shoreOnly.free[k]).toBe(grid.free[k])
+          if (!grid.free[k]) continue
+          free++
+          // ...and nothing the planner offers is ground the step refuses.
+          expect(blocked(x, z)).toBe(false)
+        }
+      }
+      expect(free).toBeGreaterThan(1000)
+      checked++
+    }
+    expect(checked).toBe(SEEDS.length)
   })
 })
 

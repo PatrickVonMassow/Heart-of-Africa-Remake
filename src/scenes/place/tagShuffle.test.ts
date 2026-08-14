@@ -329,13 +329,8 @@ function village(
   // And the way ROUND the village for the walk down to the bank, exactly as
   // `PlaceLife` builds it: only a settlement that plays the bank round has one.
   const nav = hasBank ? buildPlaceNavGrid(bounds, colliders, NPC_RADIUS) : null
-    // AND OFF THE SHORE, which the grid does not know: it reads the boundary and
-    // the colliders, and the lobe it therefore calls walkable runs on down the
-    // sloping bank into the water. The wedge carve is deliberately NOT added
-    // here — measured over five layouts of the bambara village it disconnects
-    // the bank from the village on three of them, and a corner that does fall in
-    // a wedge is dropped by the walk itself (`wayTo`).
-    if (nav) navRestrict(nav, (px, pz) => standsOnGroundPlate(layout.bank, px, pz, NPC_RADIUS))
+  // Narrowed by the STEP's own predicate, exactly as `PlaceLife` narrows it.
+  if (nav) navRestrict(nav, onGround)
   const world: BankWorld = {
     radius: region.radius,
     centerX: region.x,

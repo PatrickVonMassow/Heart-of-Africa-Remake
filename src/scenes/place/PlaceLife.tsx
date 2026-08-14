@@ -673,13 +673,21 @@ function Kids({
     // step above obeys, so a route can never lead where the step is refused.
     // Only a settlement that plays the bank round pays for it.
     const nav = stage ? buildPlaceNavGrid(bounds, colliders, NPC_RADIUS) : null
-    // AND OFF THE SHORE, which the grid does not know: it reads the boundary and
-    // the colliders, and the lobe it therefore calls walkable runs on down the
-    // sloping bank into the water. The wedge carve is deliberately NOT added
-    // here — measured over five layouts of the bambara village it disconnects
-    // the bank from the village on three of them, and a corner that does fall in
-    // a wedge is dropped by the walk itself (`wayTo`).
-    if (nav) navRestrict(nav, (px, pz) => standsOnGroundPlate(bank, px, pz, NPC_RADIUS))
+    // AND NARROWED BY THE STEP'S OWN PREDICATE — the SAME `onGround`, not a
+    // second expression that happens to agree today (points 129/378). What it
+    // actually adds is the shore: the grid reads the boundary and the colliders,
+    // so the bank lobe it calls walkable runs on down the sloping shore into the
+    // water. The boundary half is already implied — `buildPlaceNavGrid` tests it
+    // at `margin + slack`, strictly stronger than the `margin` here — and
+    // passing it costs nothing while making the invariant one predicate deep
+    // instead of two that must be kept in step. `routing.test.ts` asserts it:
+    // every cell the planner calls free is ground the step accepts.
+    //
+    // The wedge carve is deliberately NOT part of this — measured over five
+    // layouts of the bambara village it disconnects the bank from the village on
+    // three of them, and a corner that does fall in a wedge is dropped by the
+    // walk itself (`wayTo`).
+    if (nav) navRestrict(nav, onGround)
     return {
       radius: region.radius,
       centerX: region.x,
