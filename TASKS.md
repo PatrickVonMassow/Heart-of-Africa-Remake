@@ -7663,16 +7663,20 @@ to land than a mechanism that needs a review.
   so the composition PREDATES it and today's 0.29 % is of the same magnitude — but one prior
   severity value is not a band, no post-fix incidence RATE was measured, and this point may
   therefore not assume the fix left the rate untouched. Measuring that rate is part of the work.
-  AND THE VEHICLE IT INHERITS CANNOT FIRE AT ALL (measured 14.08.2026, 04:35, over the recorded
-  run state): a `detailMatch` is tested against a red's `detail`, and the recorder has never
-  written one — 0 of 99 recorded reds carry the field, because the suites print `name — detail`
-  as ONE line and only the name is stored. So both entries are inert against a real run: they
-  match in the unit tests, which manufacture the field, and never in production. The direction is
-  SAFE (a charge that cannot match leaves the red loudly uncharged, it never blesses one), which
-  is why nothing broke, but it means the acceptance point 666 recorded has never covered
-  anything. THE FIRST STEP OF THIS POINT IS THEREFORE TO MAKE A MEASUREMENT CHARGEABLE AT ALL —
-  either the recorder carries the measurement with the red, or the rule is expressed where it can
-  be read — before any acceptance is written on top of it. TWO
+  AND THE VEHICLE IT INHERITS ONLY WORKS FORWARD (measured 14.08.2026, 04:36, through the real
+  parser and the real recorder path, pinned by a Vitest case): a suite prints `FAIL <name> —
+  <detail>`, `failedChecks` parses the detail out, and `chargeReds` reads it and STAMPS the owner
+  — so a `detailMatch` entry does fire while a run is being recorded. What the record then keeps
+  is name/key/kind/point; the detail is DROPPED, and 0 of 99 recorded reds carry one. So the
+  ledger's own promise — "it is CHARGED to the OPEN point that owns it; the charge counts at
+  once, no re-run needed", and "THE CHARGE IS READ AS IT STANDS NOW, not as it stood when the run
+  was recorded" — holds for a plain `match` and NOT for a `detailMatch`: a red that is already
+  recorded can never be charged afterwards. That is why the WebGPU red above stayed unexplained
+  after its entry was written, and why closing it needed a deferral plus a re-run rather than the
+  charge the mechanism advertises. Fail-safe in direction (an unmatched red stays loudly
+  uncharged, never blessed), and it is the FIRST thing this point repairs: a measurement must be
+  chargeable AFTER the fact — the record carries what the rule reads — before any acceptance is
+  written on top of it. TWO
   CONSEQUENCES BIND THE ANSWER BELOW: the acceptance is BACKEND-INDEPENDENT (the artefact is
   about the one-second window meeting a live dt cadence, not about a renderer), and an
   acceptance keyed to an exact measured number CANNOT work for a stochastic artefact — every

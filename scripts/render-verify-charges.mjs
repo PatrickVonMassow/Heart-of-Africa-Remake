@@ -105,12 +105,13 @@ export const RED_CHARGES = [
       'PREDATES the point-666 rescue fix — 666 measured it at 0.31 % on a live-cadence replay ' +
       'seed before that fix existed, the same magnitude as today\'s 0.29 % — but that says ' +
       'nothing about its RATE after the fix, which is unmeasured and is point 694\'s to measure. ' +
-      'BOTH THIS ENTRY AND THE ONE ABOVE ARE INERT AGAINST A REAL RUN (measured 14.08.2026): a ' +
-      'detailMatch reads a red\'s detail, and the recorder has never written one (0 of 99 ' +
-      'recorded reds). They match in the unit tests, which manufacture the field, and nowhere ' +
-      'else. The direction is safe — an unmatchable charge leaves the red loudly uncharged — but ' +
-      'the acceptance they were written for has never covered anything, and point 694 fixes the ' +
-      'reading before it writes any acceptance on top of it. ' +
+      'A detailMatch ENTRY ONLY WORKS FORWARD (measured 14.08.2026, pinned by a Vitest case): ' +
+      'the parser hands chargeReds the printed detail, so the owner is stamped while the run is ' +
+      'RECORDED, but the record keeps name/key/kind/point and drops the detail (0 of 99 recorded ' +
+      'reds carry one). A red already recorded can therefore never be charged afterwards — this ' +
+      'one was not, which is why closing it took a deferral and a re-run rather than the charge ' +
+      'the ledger advertises. Point 694 repairs that reading before it writes any lasting ' +
+      'acceptance on top of it. ' +
       'It disproves the backend scoping of the entry above — the artefact is the one-second ' +
       'window meeting a live dt cadence, not a renderer — and it shows why a signature keyed to a ' +
       'measured number cannot cover a stochastic artefact: this run minted a new one. Both ' +

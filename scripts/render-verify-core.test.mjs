@@ -23,6 +23,7 @@ import {
   pointStatusesFrom,
   chargeablePoints,
   chargeFor,
+  chargeReds,
   runVerdict,
   formatSuspectEnv,
   parseSuspectEnv,
@@ -1199,17 +1200,31 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(measured, { suite: 'polish', backend: 'webgpu' })).toBeNull()
   })
 
-  it('does NOT charge a detailMatch entry against a real recorded red — the recorder writes no detail', () => {
-    // MEASURED 14.08.2026 over the recorded run state: 0 of 99 recorded reds
-    // carry a `detail`, because a suite prints `name — detail` as one line and
-    // only the name is stored. Every detailMatch entry is therefore inert in
-    // production. The direction is SAFE — it leaves the red loudly uncharged,
-    // it never blesses one — and point 694 owns the repair. This case exists so
-    // the two cases below, which manufacture the field, cannot read as proof
-    // that the ledger covers anything live.
-    const asRecorded = { name: 'no child walks without getting anywhere', kind: 'check' }
-    expect(chargeFor(asRecorded, { suite: 'polish', backend: 'webgpu' })).toBeNull()
-    expect(chargeFor(asRecorded, { suite: 'polish', backend: 'webgl' })).toBeNull()
+  it('a detailMatch charge fires at RECORD time and can never be applied afterwards', () => {
+    // MEASURED 14.08.2026, through the real parser and the real recorder path.
+    // A suite prints `FAIL  <name> — <detail>`; failedChecks parses the detail
+    // out, so chargeReds CAN read it and stamps the point. What it then STORES
+    // is name/key/kind/point — the detail is dropped, and 0 of 99 recorded reds
+    // carry one. So the ledger's promise that a charge "counts at once, no
+    // re-run needed" holds for `match` and NOT for `detailMatch`: a red that was
+    // already recorded can never be charged retroactively, which is why a
+    // WebGPU children red of 14.08.2026 stayed unexplained after its entry was
+    // written. Point 694 owns the repair. Fail-safe either way — an unmatched
+    // red stays loudly uncharged, it is never blessed.
+    const line =
+      'FAIL  no child walks without getting anywhere — worst child 1 at 0.29 % of its own judged ' +
+      'time — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m  [--section=children-motion]'
+    const [parsed] = failedChecks(line)
+    expect(parsed.detail).toContain('1.42 m walked inside 0.31 m')
+
+    // At record time the charge sees the detail and stamps the owner.
+    const [stored] = chargeReds([parsed], { suite: 'polish', backend: 'webgpu' })
+    expect(stored.point).toBe(694)
+
+    // What survives into the record carries no detail — so re-reading the ledger
+    // against the stored red charges nothing, whatever the ledger now says.
+    expect(stored.detail).toBeUndefined()
+    expect(chargeFor(stored, { suite: 'polish', backend: 'webgpu' })).toBeNull()
   })
 
   it('charges the same composition on the OTHER backend to the same owner, by its own signature', () => {
