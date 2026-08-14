@@ -593,6 +593,7 @@ export const de: Strings = {
     bankDodgeReach: 'Uferspiel: Weite des Ausweichbogens (m)',
     bankRoamTurn: 'Uferspiel: Drift der Streifzugsrichtung (rad/s)',
     bankRoamGoal: 'Uferspiel: Ziel beim Streifzug aufgeben nach (s)',
+    bankRoamGuard: 'Uferspiel: Fels-Nachweis hält den Zyklus höchstens (s)',
     bankWalkPace: 'Uferspiel: Gehtempo (m/s)',
     bankStrangerBerth: 'Uferspiel: Zusatzabstand zum Fremden (m)',
     bankUtteranceGap: 'Uferspiel: Pause zwischen Rufen (s)',

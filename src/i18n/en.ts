@@ -591,6 +591,7 @@ export const en: Strings = {
     bankDodgeReach: 'Bank game: width of the dodge (m)',
     bankRoamTurn: 'Bank game: drift of the roaming heading (rad/s)',
     bankRoamGoal: 'Bank game: give a roaming goal up after (s)',
+    bankRoamGuard: 'Bank game: rock proof holds the cycle at most (s)',
     bankWalkPace: 'Bank game: walking pace (m/s)',
     bankStrangerBerth: 'Bank game: extra berth for the stranger (m)',
     bankUtteranceGap: 'Bank game: gap between two calls (s)',

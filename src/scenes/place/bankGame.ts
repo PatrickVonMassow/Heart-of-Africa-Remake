@@ -221,6 +221,11 @@ export interface BankRoundConfig {
   /** How long a climber may make no progress toward the boulder before giving
    *  the obstructed approach up. A reachable stone keeps resetting this watch. */
   roamGoalSeconds: number
+  /** The most OVERTIME the guard may hold a cycle for, past the roaming phase's
+   *  own length. The watch above resets on any gain, so a child creeping at a
+   *  stone it can never reach neither arrives nor fails; without this the phase
+   *  has no bound at all. */
+  roamGuardSeconds: number
   /** The pace of every walk that is not a run (m/s). */
   walkPace: number
   /** The EXTRA berth the children give the traveller over a villager — they are
@@ -271,7 +276,10 @@ export interface BankState {
   failedClimbers: number[]
   /** Whether the boulder has already been named this roaming phase. */
   namedBoulder: boolean
-  /** Whether every child proved unable to reach the boulder this phase. */
+  /** Whether the off-game ROCK guard is FINISHED WITHOUT A NAMING this phase —
+   *  because every child proved unable to reach the boulder, or because the
+   *  guard spent its overtime (`roamGuardSeconds`). Either way the cycle is free
+   *  to open. */
   abandonedBoulder: boolean
   /** Runs opened in this cycle. The normal exit is still the last runner being
    *  caught; this bounds a cycle in which every runner gets through untouched. */
@@ -705,6 +713,25 @@ export function stepBankGame(
   // attempt. The river call waits until the boulder has actually been climbed
   // and named, unless the approach itself has gone a full calibrated interval
   // without progress. A settlement with no boulder never constructs a stage.
+  // THE ROAMING PHASE CANNOT RUN FOREVER (work-order 687). Its only exit was the
+  // off-game ROCK guard resolving, and the guard's own watch resets on ANY gain
+  // toward the boulder — so a child creeping at a stone it can never quite reach
+  // neither arrives nor gives up, and the phase had no bound at all. Measured
+  // under load, the round played 150 s of its own clock in `roam` without
+  // opening a single run: the player stands at the bank and the game he came for
+  // never happens. The guard therefore gets the phase plus `roamGuardSeconds` of
+  // overtime, and then it is DONE — expressed in the round's own clock, like
+  // every other length here, and left in exactly the state a genuine abandon
+  // leaves so `openCycle` needs to know nothing about which of the two it was.
+  //
+  // WHAT IT COSTS: that one cycle carries no off-game ROCK. The guard keeps
+  // 92 % of its namings at this bound (see `balance.villageLife.bankGame`), and
+  // a settlement whose boulder is chronically unreachable loses the guard while
+  // keeping the game. That is the trade deliberately: the ROCK outside the game
+  // is a corroboration, the game is the deliverable.
+  if (s.phase === 'roam' && s.phaseFor <= -cfg.roamGuardSeconds && !s.namedBoulder) {
+    s.abandonedBoulder = true
+  }
   if (
     s.phase === 'roam' &&
     s.phaseFor <= 0 &&

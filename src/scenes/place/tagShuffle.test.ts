@@ -1356,6 +1356,76 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
     expect(minGap).toBeGreaterThanOrEqual(owed)
   })
 
+
+
+  /**
+   * THE ROAMING PHASE CANNOT RUN FOREVER (work-order 687). Its only exit was the
+   * off-game ROCK guard resolving, and that guard's watch resets on ANY gain
+   * toward the boulder — so a child creeping at a stone it can never quite reach
+   * neither arrived nor gave up, and the phase had no bound. Measured in the
+   * browser under load: the round played 150 s of its own clock in `roam` and
+   * never opened a run, which is a player standing at the bank watching the
+   * children wander and never play.
+   *
+   * The three layouts below are the ones that showed it, and they are here by
+   * measurement: at this section's shortened roam the guard spent 136 s of
+   * overtime in bambara@7, 206 s in mandinka@99, and in bambara@236333330 it
+   * NEVER named the boulder at all (275 s to abandon). The ordinary case is
+   * beside them so the bound is not only proved where it bites.
+   */
+  it('bounds the roaming phase, so a run always comes (work-order 687)', () => {
+    const CASES: Array<[string, number]> = [
+      ['bambara-village', 42],
+      ['bambara-village', 7],
+      ['mandinka-village', 99],
+      ['bambara-village', 236333330],
+    ]
+    const shippedRoam = BANK_CFG.roamSeconds
+    try {
+      // The browser section shortens the roam exactly this way (debug menu §21),
+      // and it is the stress case: less time inside the phase means the guard
+      // spends more of it in overtime.
+      BANK_CFG.roamSeconds = 8
+      const cap = BANK_CFG.roamSeconds * (1 + BANK_CFG.roamSpread) + BANK_CFG.roamGuardSeconds
+      // The budget the browser check gives a run to start, in played seconds.
+      const RUN_BUDGET_S = 150
+      for (const [placeId, seed] of CASES) {
+        const v = village(placeId, seed)
+        const dt = 1 / 60
+        let worstRoam = 0
+        let roamFor = 0
+        let firstRun = Infinity
+        let last = ''
+        for (let t = 0; t < 400; t += dt) {
+          frame(v, dt)
+          const b = v.bank!
+          if (b.phase === 'roam') roamFor += dt
+          else {
+            if (last === 'roam') worstRoam = Math.max(worstRoam, roamFor)
+            roamFor = 0
+          }
+          if (b.phase === 'run' && firstRun === Infinity) firstRun = b.playedClock
+          last = b.phase
+        }
+        // A tenth of a second of slack for the frame the bound falls in.
+        expect({ placeId, seed, longestRoam: worstRoam <= cap + 0.1 }).toEqual({
+          placeId,
+          seed,
+          longestRoam: true,
+        })
+        // ...and the round got to its game, inside the budget the picture check
+        // allows it.
+        expect({ placeId, seed, ranWithin: firstRun <= RUN_BUDGET_S }).toEqual({
+          placeId,
+          seed,
+          ranWithin: true,
+        })
+      }
+    } finally {
+      BANK_CFG.roamSeconds = shippedRoam
+    }
+  })
+
   for (const [placeId, seed] of RIVER_VILLAGES) {
     it(`${placeId} at seed ${seed} walks the group down to the bank and runs the stretch`, () => {
       const v = village(placeId, seed)

@@ -741,6 +741,10 @@ export interface BalanceConfig {
       roamTurn: number
       /** How long the climber may make no progress toward the boulder before giving up. */
       roamGoalSeconds: number
+      /** The most OVERTIME the off-game ROCK guard may hold a cycle for, past
+       *  the roaming phase's own length. Beyond it the RIVER call goes out with
+       *  that one cycle's boulder unnamed. */
+      roamGuardSeconds: number
       /** The pace of every walk that is not a run (m/s). */
       walkPace: number
       /** The EXTRA berth the children give the traveller over a villager. */
@@ -1306,6 +1310,22 @@ export const balance: BalanceConfig = {
       // closer. Thirty seconds without gaining any ground toward it means a
       // hut, pocket or other collider has made the approach impossible.
       roamGoalSeconds: 30,
+      // AND THE PHASE ITSELF IS BOUNDED, because the watch above is not enough:
+      // it resets on ANY gain, so a child creeping toward a stone it can never
+      // quite reach neither arrives nor fails, and the roaming phase then has no
+      // end at all. Measured under load, the round sat in `roam` for 150 s of
+      // its own clock without ever opening a run — a player at the bank watching
+      // the children wander and never play.
+      //
+      // 45 s is the KNEE of the measured curve, not a round number: replayed
+      // over nine village/seed layouts at the verification's own shortened roam
+      // (122 roaming phases, 113 namings), a 45 s bound keeps 92 % of the
+      // namings — and 60 s or 90 s keep 92-93 %, because every remaining one
+      // needs 89-206 s. So the overtime past 45 s buys almost no teaching and
+      // costs the deliverable: the game itself. What a cut-off cycle loses is
+      // the off-game ROCK once; the RIVER call, the runs and the arrivals all
+      // still happen.
+      roamGuardSeconds: 45,
       // A child's walk, well under the chase's trot — the walks between runs
       // must read as walking, not as more running.
       walkPace: 1.4,
