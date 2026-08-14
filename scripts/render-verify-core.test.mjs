@@ -1185,7 +1185,10 @@ describe('the shipped charge ledger', () => {
     const measured = child(
       'worst child 3 at 0.39 % of its own judged time — worst child 3 at 8.9s, 1.29 m walked inside 0.32 m',
     )
-    expect(chargeFor(measured, { suite: 'polish', backend: 'webgl' }).point).toBe(666)
+    // The owner is 694, not the point that delivered the acceptance: an entry
+    // charged to 666 would have expired at 666's own tick, taking the
+    // acceptance with it on the very landing that made it.
+    expect(chargeFor(measured, { suite: 'polish', backend: 'webgl' }).point).toBe(694)
 
     // The player-reported permanent shiver has the same check label, but not
     // the accepted single-event signature. Missing details are equally unsafe,

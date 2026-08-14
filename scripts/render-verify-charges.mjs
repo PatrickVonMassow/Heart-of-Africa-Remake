@@ -46,13 +46,16 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
-    point: 666,
+    point: 694,
     suite: 'polish',
     backend: 'webgl',
     kind: 'check',
     match: /no child walks without getting anywhere/i,
     detailMatch: /worst child \d+ at \d+\.\d+s, 1\.29 m walked inside 0\.32 m/i,
     why:
+      'OWNED BY 694 SINCE 666 LANDED (14.08.2026): a charge expires with its point by ' +
+      'construction, so an acceptance meant to outlive point 666 cannot be charged to it — ' +
+      '694 holds it until the measure is sharpened or the acceptance is made permanent. ' +
       'DECISION (b), 14.08.2026: accept only the measured WebGL 2 composition, at its named ' +
       'expected live rate of one run in ten; a different backend or a detail other than exactly ' +
       '1.29 m walked inside 0.32 m stays unaccounted and red. The player-visible WebGPU standstill ' +
