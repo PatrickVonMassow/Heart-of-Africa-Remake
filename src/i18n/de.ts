@@ -591,6 +591,8 @@ export const de: Strings = {
     bankLaneSpacing: 'Uferspiel: Abstand der Laufbahnen (m)',
     bankDodgeDistance: 'Uferspiel: Ausweichen ab Abstand (m)',
     bankDodgeReach: 'Uferspiel: Weite des Ausweichbogens (m)',
+    bankRoamTurn: 'Uferspiel: Drift der Streifzugsrichtung (rad/s)',
+    bankRoamGoal: 'Uferspiel: Ziel beim Streifzug aufgeben nach (s)',
     bankWalkPace: 'Uferspiel: Gehtempo (m/s)',
     bankStrangerBerth: 'Uferspiel: Zusatzabstand zum Fremden (m)',
     bankUtteranceGap: 'Uferspiel: Pause zwischen Rufen (s)',

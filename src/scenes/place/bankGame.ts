@@ -101,14 +101,39 @@ export interface BankChild extends TagChild {
   arrived: boolean
   /** Tagged: crouched where it stood, arms folded, until the run ends. */
   crouched: boolean
-  /** Where it is walking while it roams; meaningless in the other phases. */
+  /**
+   * THE HEADING IT IS ROAMING ON — not a point it is walking to. A fixed goal is
+   * a wall to lean against: where one lies behind a hut the child walks at it,
+   * the deflection turns it aside, it re-aims and walks at it again, and the
+   * child-motion gate calls that what it is (measured at the recorded cadence of
+   * point 657's second case: 1.4 m of legs inside a 0.24 m circle, 21 bad
+   * windows in one episode). A drifting heading cannot be unreachable, and after
+   * a deflection the child simply carries on from the way it ended up going,
+   * which is how the wildlife has always wandered.
+   */
+  roamHeading: number
+  /** Where the CLIMBER is walking — the boulder it names. Unused by the rest. */
   goalX: number
   goalZ: number
+  /** How long it has been walking at that goal. A goal it cannot reach — behind
+   *  a hut, in a pocket — is given up rather than leaned on, which is the
+   *  difference between a child crossing its quarter and one pushing at a wall. */
+  goalFor: number
   /** A RUNNER's own lane across the stretch, in metres to one side of the line
    *  between the rocks. The group crosses in parallel lanes rather than in one
    *  column, which is what lets a catcher take one child and the others get
    *  past — and what the player sees as a spread-out charge. */
   lane: number
+  /**
+   * Standing at its station rather than walking to it — and it KEEPS standing
+   * until it is pushed a full reach away, not merely past the line it stopped
+   * on. Without that hysteresis a child jostled by the group at its station
+   * stepped back in, was pushed out, stepped back in: walking without getting
+   * anywhere, which is the exact symptom the child-motion gate exists for
+   * (measured at the recorded cadence of point 657's second case, 0.26 % of the
+   * judged windows against a 0.25 % gate; with it, 0.03 %).
+   */
+  settled: boolean
   /** A CATCHER's chosen quarry, or −1. Held for the run rather than re-picked
    *  every frame: a catcher that always went for whoever was nearest simply
    *  swept a bunched group and tagged all of it, and no run ever ended in an
@@ -169,6 +194,10 @@ export interface BankRoundConfig {
   /** How far sideways that bend carries the runner's aim at the closest — the
    *  swerve that turns a straight sprint into a game. */
   dodgeReach: number
+  /** How fast a roaming child's heading drifts (rad/s) — the wander itself. */
+  roamTurn: number
+  /** How long the climber walks at the boulder before it gives the stone up. */
+  roamGoalSeconds: number
   /** The pace of every walk that is not a run (m/s). */
   walkPace: number
   /** The EXTRA berth the children give the traveller over a villager — they are
@@ -214,8 +243,16 @@ export interface BankState {
   tags: number
   /** SIM seconds this group has run, playing and idling alike. */
   clock: number
-  /** …and the part of it the group was at its game, counted by the settlement
-   *  itself so no watcher has to decide from a sampled flag (point 656). */
+  /**
+   * …and the part of it the group was at its game, counted by the settlement
+   * itself so no watcher has to decide from a sampled flag (point 656).
+   *
+   * FOR THIS ROUND THAT IS ALL OF IT. The tag round has an idle BREAK in which
+   * the group stands and recovers, and its played clock exists to keep that dead
+   * time out of the walking floor. The bank cycle has no such break: the roaming
+   * phase is part of the cycle and the children walk right through it, so every
+   * second of this group's clock is a second of its game.
+   */
   playedClock: number
   playing: boolean
   /** Utterances owed, spoken one per gap so two never overlap. */
@@ -225,6 +262,7 @@ export interface BankState {
 
 const dist = (a: { x: number; z: number }, b: { x: number; z: number }) =>
   Math.hypot(a.x - b.x, a.z - b.z)
+
 
 /** Deterministic per-child spread around 1 (never applied to a pace). */
 function spread(rand: () => number, variation: number): number {
@@ -282,8 +320,11 @@ export function createBankGame(
       role: 'runner' as BankRole,
       arrived: false,
       crouched: false,
+      roamHeading: heading,
       goalX: p.x,
       goalZ: p.z,
+      goalFor: 0,
+      settled: false,
       lane: 0,
       quarry: -1,
     }
@@ -302,7 +343,8 @@ export function createBankGame(
     tags: 0,
     clock: 0,
     playedClock: 0,
-    playing: false,
+    // The cycle is continuous — see `playedClock` above.
+    playing: true,
     pending: [],
     sinceSaid: Infinity,
   }
@@ -415,11 +457,11 @@ function openCycle(s: BankState, stage: BankStage, cfg: BankConfig): void {
     c.role = i === caller ? 'catcher' : 'runner'
     c.arrived = false
     c.crouched = false
+    c.settled = false
   })
   s.phase = 'gather'
   s.phaseFor = cfg.gatherSeconds
   s.direction = null
-  s.playing = true
   if (caller >= 0) {
     say(s, {
       concept: 'RIVER',
@@ -443,6 +485,7 @@ function openRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
   for (const c of s.children) {
     c.arrived = false
     c.crouched = c.role === 'out'
+    c.settled = false
   }
   // Each runner takes its own lane across the stretch, and every catcher starts
   // the run without a quarry — it picks one on the first frame.
@@ -489,6 +532,7 @@ function endRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
       c.crouched = false
     }
     c.arrived = false
+    c.settled = false
   }
   s.from = otherEnd(s.from)
   s.direction = null
@@ -530,7 +574,6 @@ function endRun(s: BankState, stage: BankStage, cfg: BankConfig): void {
 function openRoam(s: BankState, stage: BankStage, cfg: BankConfig, rand: () => number): void {
   s.phase = 'roam'
   s.phaseFor = cfg.roamSeconds * (1 + (rand() * 2 - 1) * cfg.roamSpread)
-  s.playing = false
   s.direction = null
   s.caller = -1
   s.namedBoulder = false
@@ -538,6 +581,7 @@ function openRoam(s: BankState, stage: BankStage, cfg: BankConfig, rand: () => n
     c.role = 'runner'
     c.arrived = false
     c.crouched = false
+    c.settled = false
   }
   s.climber = stage.boulder
     ? nearestOf(
@@ -546,19 +590,7 @@ function openRoam(s: BankState, stage: BankStage, cfg: BankConfig, rand: () => n
         stage.boulder,
       )
     : -1
-  for (const c of s.children) roamGoal(c, stage, rand)
-  if (s.climber >= 0 && stage.boulder) {
-    s.children[s.climber].goalX = stage.boulder.x
-    s.children[s.climber].goalZ = stage.boulder.z
-  }
-}
-
-/** A fresh wander target inside the children's own quarter. */
-function roamGoal(c: BankChild, stage: BankStage, rand: () => number): void {
-  const a = rand() * Math.PI * 2
-  const d = Math.sqrt(rand()) * stage.roam.radius
-  c.goalX = stage.roam.x + Math.cos(a) * d
-  c.goalZ = stage.roam.z + Math.sin(a) * d
+  for (const c of s.children) roamGoal(c, rand)
 }
 
 /**
@@ -683,8 +715,22 @@ function drive(
   c.lean += (want - c.lean) * Math.min(1, dt * 4)
 }
 
-/** The roaming phase: the group wanders its own quarter, one of them climbs an
- *  ordinary boulder and names it, and at the end of it one calls RIVER. */
+/** A fresh drift for a roaming child: a heading it has not just come from. */
+function roamGoal(c: BankChild, rand: () => number): void {
+  c.goalFor = 0
+  c.roamHeading = rand() * Math.PI * 2
+}
+
+/**
+ * The roaming phase: the group wanders its own quarter on drifting headings, one
+ * of them walks to an ordinary boulder and names it, and at the end of it one
+ * calls RIVER.
+ *
+ * The heading DRIFTS and is bent back when the child reaches the edge of the
+ * quarter; after every step it is re-read from the way the child actually
+ * travelled, so a hut walked round is simply a turn taken rather than a target
+ * to fight back toward.
+ */
 function stepRoam(
   s: BankState,
   dt: number,
@@ -693,12 +739,24 @@ function stepRoam(
   world: BankWorld,
   rand: () => number,
 ): void {
+  // The climber is picked HERE rather than only when a roaming phase opens, so
+  // the FIRST phase of a visit has one too: a player who walks in and watches
+  // the group would otherwise wait a whole cycle for the one utterance that
+  // shows ROCK outside the game.
+  if (s.climber < 0 && !s.namedBoulder && stage.boulder) {
+    s.climber = nearestOf(
+      s,
+      s.children.map((_, i) => i),
+      stage.boulder,
+    )
+  }
   for (let i = 0; i < s.children.length; i++) {
     const c = s.children[i]
-    const goal = { x: c.goalX, z: c.goalZ }
+    c.goalFor += dt
     const climbing = i === s.climber && !s.namedBoulder && stage.boulder
-    if (dist(c, goal) <= cfg.reachDistance) {
-      if (climbing) {
+    if (climbing) {
+      const boulder = stage.boulder!
+      if (dist(c, boulder) <= cfg.reachDistance) {
         // THE BOULDER THAT IS NO PART OF THE GAME (spec item 4). Named where it
         // stands, in the village, far from the two rocks the run is about — so
         // ROCK cannot be read as "the thing you run to".
@@ -708,13 +766,51 @@ function stepRoam(
           moment: 'boulder',
           speaker: i,
           gesture: 'indicate',
-          aim: { x: stage.boulder!.x, y: 0.8, z: stage.boulder!.z },
+          aim: { x: boulder.x, y: 0.8, z: boulder.z },
           at: 'boulder',
         })
+        roamGoal(c, rand)
+      } else if (c.goalFor > cfg.roamGoalSeconds) {
+        // It cannot get there — it gives the stone up rather than leaning on
+        // whatever is between, and this roaming phase simply has no boulder
+        // call. Marked as done rather than by clearing the climber, or the pick
+        // above would hand the same walk straight back to somebody.
+        s.namedBoulder = true
+        roamGoal(c, rand)
+      } else {
+        drive(s, i, boulder, false, dt, cfg, world)
+        continue
       }
-      roamGoal(c, stage, rand)
     }
-    drive(s, i, { x: c.goalX, z: c.goalZ }, false, dt, cfg, world)
+    // The drift, REFLECTED at the edge of the quarter rather than turned toward
+    // its middle. Aiming a child that had reached the rim at the centre point
+    // gathered the whole group there: four children milling half a metre apart
+    // in the middle of their own quarter (measured in the replayed bambara
+    // village, minimum gap 0.42-0.57 m for a whole roaming phase). A reflection
+    // keeps the sideways half of the motion and only turns the outward half
+    // back, so they walk ALONG their quarter and stay a group of individuals.
+    c.roamHeading += (rand() * 2 - 1) * cfg.roamTurn * dt
+    const out = Math.hypot(c.x - stage.roam.x, c.z - stage.roam.z)
+    if (out > stage.roam.radius * 0.8) {
+      const nx = (c.x - stage.roam.x) / out
+      const nz = (c.z - stage.roam.z) / out
+      const dx = Math.sin(c.roamHeading)
+      const dz = Math.cos(c.roamHeading)
+      const radial = dx * nx + dz * nz
+      if (radial > 0) c.roamHeading = Math.atan2(dx - 2 * radial * nx, dz - 2 * radial * nz)
+    }
+    const look = cfg.reachDistance
+    drive(
+      s,
+      i,
+      { x: c.x + Math.sin(c.roamHeading) * look, z: c.z + Math.cos(c.roamHeading) * look },
+      false,
+      dt,
+      cfg,
+      world,
+    )
+    // Carried on from the way it really went, deflections included.
+    c.roamHeading = c.heading
   }
 }
 
@@ -755,10 +851,13 @@ function stepStations(
     const end = c.role === 'catcher' ? wait : line
     const slot = c.role === 'catcher' ? atWait++ : atLine++
     const to = stationAt(stage, end, slot, cfg)
+    const away = dist(c, to)
+    if (away <= cfg.reachDistance * 0.6) c.settled = true
+    else if (away > cfg.reachDistance) c.settled = false
     // The walk DOWN to the bank is a run — the whole group sets off at the call
     // — while the shuffle between two runs is a walk.
-    const running = s.phase === 'gather' && dist(c, to) > cfg.reachDistance
-    drive(s, i, dist(c, to) <= cfg.reachDistance * 0.6 ? null : to, running, dt, cfg, world)
+    const running = s.phase === 'gather' && !c.settled && away > cfg.reachDistance
+    drive(s, i, c.settled ? null : to, running, dt, cfg, world)
   }
 }
 
@@ -844,8 +943,13 @@ function stepRun(
       continue
     }
     if (c.arrived) {
-      // Safe at the far rock: it steps aside into the line for the next run.
-      drive(s, i, stationAt(stage, to, safeSlot++, cfg), false, dt, cfg, world)
+      // Safe at the far rock: it steps aside into the line for the next run, and
+      // stays there once it is in it (the same hysteresis as the stations).
+      const spot = stationAt(stage, to, safeSlot++, cfg)
+      const away = dist(c, spot)
+      if (away <= cfg.reachDistance * 0.6) c.settled = true
+      else if (away > cfg.reachDistance) c.settled = false
+      drive(s, i, c.settled ? null : spot, false, dt, cfg, world)
       continue
     }
     drive(s, i, dodgedAim(s, c, farRock, cfg), true, dt, cfg, world)

@@ -63,8 +63,20 @@ import {
 } from './inhabitantBodies'
 import { buildLayout, builtFabric, type PlaceLayout } from './layout'
 import { childPlayGround, villageAdultStations } from './lifeSpots'
-import { absorbSeparation, createTagGame, stepTagGame, type TagWorld } from './tagGame'
+import { absorbSeparation, createTagGame, stepTagGame, type TagChild, type TagWorld } from './tagGame'
+import {
+  createBankGame,
+  stepBankGame,
+  type BankConfig,
+  type BankStage,
+  type BankState,
+  type BankWorld,
+} from './bankGame'
 import { buildWedgeCarve } from './wedgeCarve'
+
+/** The children's round as `PlaceLife` composes it (work-order 687): the bank
+ *  game where the settlement stands on a river, the tag round everywhere else. */
+const BANK_CFG: BankConfig = { ...balance.villageLife.tag, ...balance.villageLife.bankGame }
 
 // The two numbers `PlaceLife` holds for the children it draws.
 const KID_SCALE = 0.55
@@ -275,23 +287,29 @@ function village(
     const d = Math.hypot(x - pen.x, z - pen.z)
     return d > options.pen.r && d < options.pen.r + 1.5
   }
+  // THE ROUND'S OWN REGION, exactly as `PlaceLife` wires it: the bank game walks
+  // the whole settlement — its quarter is where the group ROAMS, not a wall it
+  // is kept behind — while the tag round keeps its bounded ground. Replaying the
+  // bank round inside the tag round's circle pressed the group against a
+  // boundary the scene does not have, and clumped four children into half a
+  // metre of ground.
+  const hasBank = !!(layout.bank && layout.playRocks)
+  const region = hasBank
+    ? { x: 0, z: 0, radius: rim }
+    : { x: ground.x, z: ground.z, radius: ground.radius }
   // The sub-passage slots between pinching boundaries are not part of the
   // ground, exactly as `PlaceLife` wires it (point 657).
-  const carve = buildWedgeCarve(colliders, NPC_RADIUS, {
-    x: ground.x,
-    z: ground.z,
-    radius: ground.radius,
-  })
+  const carve = buildWedgeCarve(colliders, NPC_RADIUS, region)
   const blocked = (x: number, z: number) =>
     penned(x, z) ||
     Math.hypot(x, z) > rim ||
-    Math.hypot(x - ground.x, z - ground.z) > ground.radius ||
+    Math.hypot(x - region.x, z - region.z) > region.radius ||
     !standingClear(colliders, x, z, NPC_RADIUS) ||
     carve(x, z)
   const world: TagWorld = {
-    radius: ground.radius,
-    centerX: ground.x,
-    centerZ: ground.z,
+    radius: region.radius,
+    centerX: region.x,
+    centerZ: region.z,
     childRadius: NPC_RADIUS,
     blocked,
     nudge: (x, z) => {
@@ -318,9 +336,26 @@ function village(
     const spot = world.nudge(ground.x + Math.cos(a) * 2.4, ground.z + Math.sin(a) * 2.4)
     return { x: spot.x, z: spot.z }
   })
-  const game = createTagGame(spots, rand, balance.villageLife.tag)
+  // THE ROUND THE SETTLEMENT ACTUALLY PLAYS (work-order 687), built exactly as
+  // `PlaceLife` builds it: the bank game where there is a bank, the tag round
+  // where there is none. Replaying the tag round in a village that plays the
+  // bank one would measure a game nobody watches.
+  const stage: BankStage | null =
+    hasBank && layout.bank && layout.playRocks
+      ? {
+          upstream: layout.playRocks.upstream,
+          downstream: layout.playRocks.downstream,
+          water: { x: layout.bank.nx * layout.bank.distance, z: layout.bank.nz * layout.bank.distance },
+          boulder: nearestRock(layout, ground),
+          roam: { x: ground.x, z: ground.z, radius: ground.radius },
+        }
+      : null
+  const bank: BankState | null = stage ? createBankGame(spots, rand, BANK_CFG) : null
+  const game = bank ? null : createTagGame(spots, rand, balance.villageLife.tag)
+  const children: TagChild[] = bank ? bank.children : game!.children
   const speech = createChildSpeech(count, balance.villageLife.childSpeech)
   const speechRand = mulberry32((localSeed + 7717) >>> 0)
+  const bankRand = mulberry32((localSeed + 9931) >>> 0)
   const set = createInhabitantSet()
   const bodies = claimBodies(set, count, { scale: KID_SCALE })
   bodies.forEach((b, i) => {
@@ -352,14 +387,50 @@ function village(
     chaser: -1,
     target: -1,
     immune: -1,
-    children: game.children,
+    children,
     ground: { x: ground.x, z: ground.z, radius: ground.radius },
     // What THERE points at, exactly as `PlaceLife` sets it: the settlement's own
     // middle, well outside the play ground. It was missing here, so the one
     // situation that reads it could never have been replayed.
     farMark: { x: 0, z: 0 },
   }
-  return { game, speech, speechRand, world, set, bodies, view, others, layout, ground, pen }
+  return {
+    game,
+    bank,
+    children,
+    bankRand,
+    stage,
+    speech,
+    speechRand,
+    world: world as BankWorld,
+    set,
+    bodies,
+    view,
+    others,
+    layout,
+    ground,
+    pen,
+    /** The game's own clocks, whichever round is running — the metric reads
+     *  these and must not have to know which. */
+    clock: () => (bank ? bank.clock : game!.clock),
+    playedClock: () => (bank ? bank.playedClock : game!.playedClock),
+    playing: () => (bank ? bank.playing : game!.playing),
+  }
+}
+
+/** The loose boulder nearest the children's quarter — what a child climbs and
+ *  names while the group roams, exactly as `PlaceLife` picks it. */
+function nearestRock(layout: PlaceLayout, ground: { x: number; z: number }): { x: number; z: number } | null {
+  let best: { x: number; z: number } | null = null
+  let bestD = Infinity
+  for (const [rx, rz] of layout.rocks) {
+    const d = Math.hypot(rx - ground.x, rz - ground.z)
+    if (d < bestD) {
+      bestD = d
+      best = { x: rx, z: rz }
+    }
+  }
+  return best
 }
 
 /** One frame of the settlement, in `PlaceLife`'s own order: what was said steers
@@ -368,23 +439,27 @@ function village(
  *  same registry after them, as the vignettes mounted below the children do. */
 function frame(v: ReturnType<typeof village>, dt: number): void {
   const cfg = balance.villageLife.childSpeech
-  v.view.playing = v.game.playing
-  v.view.chaser = v.game.chaser
-  v.view.target = v.game.target
-  v.view.immune = v.game.immuneFor > 0 ? v.game.immune : -1
-  stepTagGame(v.game, dt, balance.villageLife.tag, v.world, (i) => childSteer(v.speech, v.view, i, cfg))
-  for (let i = 0; i < v.game.children.length; i++) {
-    v.bodies[i].x = v.game.children[i].x
-    v.bodies[i].z = v.game.children[i].z
+  if (v.bank) {
+    stepBankGame(v.bank, dt, BANK_CFG, v.stage!, v.world, v.bankRand)
+  } else {
+    v.view.playing = v.game!.playing
+    v.view.chaser = v.game!.chaser
+    v.view.target = v.game!.target
+    v.view.immune = v.game!.immuneFor > 0 ? v.game!.immune : -1
+    stepTagGame(v.game!, dt, balance.villageLife.tag, v.world, (i) => childSteer(v.speech, v.view, i, cfg))
+  }
+  for (let i = 0; i < v.children.length; i++) {
+    v.bodies[i].x = v.children[i].x
+    v.bodies[i].z = v.children[i].z
   }
   separateGroup(v.set, v.bodies, dt, balance.villageLife.separation, v.world)
-  for (let i = 0; i < v.game.children.length; i++) {
+  for (let i = 0; i < v.children.length; i++) {
     // The resolved position AND the separation's own wedge rescues (point 656
     // follow-up), exactly as `PlaceLife` reads them back.
-    absorbSeparation(v.game.children[i], v.bodies[i])
+    absorbSeparation(v.children[i], v.bodies[i])
   }
-  v.others.step(dt, v.game.clock)
-  stepChildSpeech(v.speech, v.view, dt, cfg, v.speechRand)
+  v.others.step(dt, v.clock())
+  if (!v.bank) stepChildSpeech(v.speech, v.view, dt, cfg, v.speechRand)
 }
 
 interface Track extends ChildMotionSample {
@@ -397,21 +472,24 @@ interface Track extends ChildMotionSample {
 
 /** One sample of every child, in the shape the shared metric judges. */
 function sample(v: ReturnType<typeof village>, paths: Track[][]): void {
-  v.game.children.forEach((c, i) => {
+  const clock = v.clock()
+  const playedClock = v.playedClock()
+  const playing = v.playing()
+  v.children.forEach((c, i) => {
     paths[i].push({
-      clock: v.game.clock,
+      clock,
       x: c.x,
       z: c.z,
       walked: c.walked,
       walkedWhilePlaying: c.walkedWhilePlaying,
-      playedClock: v.game.playedClock,
+      playedClock,
       nudges: c.nudges,
       carried: c.carried,
       pace: c.pace,
       held: c.held,
       // Whether the GROUP was playing (point 656) — the trace has to be able to
       // show that there was a game in it at all.
-      playing: v.game.playing,
+      playing,
     })
   })
 }
@@ -441,7 +519,7 @@ const CADENCES: Array<[string, (rand: () => number) => number]> = [
 /** Every child's path through `seconds` of the game, sampled every frame. */
 function play(placeId: string, seed: number, seconds: number, dt = 1 / 60): Track[][] {
   const v = village(placeId, seed)
-  const paths: Track[][] = v.game.children.map(() => [])
+  const paths: Track[][] = v.children.map(() => [])
   for (let t = 0; t < seconds; t += dt) {
     frame(v, dt)
     sample(v, paths)
@@ -457,7 +535,8 @@ function play(placeId: string, seed: number, seconds: number, dt = 1 / 60): Trac
  * group is playing before it judges anything; the pure proof of the user's own
  * bug had no such assertion at all, and would have gone green on a trace with no
  * game in it. The bars are measured on the four settlements replayed below —
- * four children, the whole minute played, 107-115 m walked per child-minute —
+ * four children, the whole minute played, 92-111 m walked per child-minute with
+ * the bank round —
  * and set far below them: they separate a game from NOTHING, not a good game
  * from a poor one — and the walking bar is asked of the QUIETEST child, because
  * a group of four with one statue in it walks three quarters as far as a group
@@ -473,8 +552,8 @@ function expectLively(paths: Track[][]): void {
   // group played a majority of the game CLOCK, and every child walked WHILE it
   // was played — one motionless child among three busy ones is invisible in a
   // sum, and walking counted over the whole trace would take a group's warm-up
-  // for a game. Measured here: the quietest child of each village walks 102-113 m
-  // per minute of play.
+  // for a game. Re-measured with the bank round (work-order 687): the quietest
+  // child of each village walks 92-111 m per minute of play.
   expect(live.quietestWalkedPerPlayedMinute).toBeGreaterThan(CHILD_MOTION.walkFloor)
   expect(holdsAGame(live)).toBe(true)
 }
@@ -490,15 +569,14 @@ const PLACES: Array<[string, number]> = [
 describe('the children never shuffle on the spot (points 648/656)', () => {
   for (const [placeId, seed] of PLACES) {
     it(`${placeId} at seed ${seed} keeps every child covering ground`, () => {
-      // SIXTY SECONDS UNTIL POINT 686, AND THE CHANGE IS A LOOSENING, NOT A
-      // REFINEMENT. With the teaching situations gone from the children until
-      // the bank game is built, bambara-village at seed 2972259115 measures
-      // 0.42 % of judged time shuffled over the first 60 s — against a 0.25 %
-      // gate, the user's own complaint, and green on the shipped build before
-      // this. Over 120 s the same run falls back under the gate. So this line
-      // is a CHARGE, not a fix: point 687 gives the children their game back
-      // and PUTS THE 60 s BACK, and the shuffle share is measured again there.
-      const paths = play(placeId, seed, 120)
+      // SIXTY SECONDS, RESTORED (work-order 687 item 9). Point 686 had widened
+      // this window to 120 s because emptying the child situations left the
+      // children with nothing but the bare chase: bambara-village at seed
+      // 2972259115 then measured 0.42 % of its judged time shuffled over the
+      // first minute, against a 0.25 % gate. With the bank game back the same
+      // minute re-measures at 0.02 % (worst child 0.05 %), so the window is the
+      // one the user's own complaint is judged over again.
+      const paths = play(placeId, seed, 60)
       expectLively(paths)
       const r = shuffleWindows(paths)
       expect(r.seconds).toBeGreaterThan(200) // a real stretch of the game, in child-seconds
@@ -506,21 +584,21 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       // than the window is judged by nobody and reported as unjudged, so a share
       // is only worth what `judgedShare` says it covers — and both are read off
       // the WORST child, because one snagging child among three healthy ones is
-      // divided by four in every group average. Measured here: the least
-      // judgeable child 0.88-0.90 (the missing part being the tail no window can
-      // reach into and the second before each of that child's few rescues), the
-      // worst child's share 0.00-0.03 %.
+      // divided by four in every group average. Re-measured over the restored
+      // minute with the bank round (work-order 687): the least judgeable child
+      // 0.983 in all three villages — the missing part is the tail no window can
+      // reach into — and the worst child's share 0.000 / 0.000 / 0.028 %.
       expect(r.leastJudged).toBeGreaterThan(CHILD_MOTION.judgedGate)
       expect(r.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
       // AND THE SHORT BURST the one-second window cannot see (point 656): a
       // child that paces on the spot for six tenths of a second between spells
       // of walking never collects the metre a one-second window asks for.
-      // Measured here, worst child: 0.000 / 0.028 / 0.028 %.
+      // Re-measured with the bank round, worst child: 0.000 / 0.000 / 0.000 %.
       const burst = shuffleWindows(paths, CHILD_MOTION.short)
       expect(burst.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
       // AND THE BURST MEASURE MUST HAVE JUDGED SOMETHING: its share is 0 both
-      // when nothing was bad and when nothing was looked at. Measured here:
-      // 230-234 judged child-seconds, least judgeable child 0.941-0.949.
+      // when nothing was bad and when nothing was looked at. Re-measured with
+      // the bank round: 238 judged child-seconds, least judgeable child 0.992.
       expect(judgedEnough(burst)).toBe(true)
       expect(judgedEnough(r)).toBe(true)
       // AND NOBODY IS BEING CARRIED (point 656): the rescue teleport is what
@@ -533,8 +611,9 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
       expect(rescues.nudgesPublished).toBe(true)
       expect(rescues.carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
       expect(rescues.perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
-      // The worst child on its own clock: 5-6 rescues in its minute here, and
-      // 0.00-2.40 m carried.
+      // The worst child on its own clock: with the bank round not one rescue
+      // falls in this minute in any of the three villages, and nothing is
+      // carried at all.
       expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
       expect(rescues.worstCarriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildCarryGate)
     })
@@ -549,11 +628,13 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     const paths = play('bambara-village', 236333330, 90)
     const rescues = rescueRate(paths)
     expect(rescues.worstChild).toBe(3)
-    // ONE RESCUE UNTIL POINT 686: the same loosening as above, measured on the
-    // same cause. Without its situations the child needs the progress watch
-    // TWICE over these 90 s where once was enough. The exact pin returns with
-    // the children's game in point 687.
-    expect(rescues.worstRescues).toBeGreaterThan(0)
+    // ONE RESCUE, RESTORED (work-order 687 item 9). Point 686 had loosened this
+    // to "at least one" because the children without their situations needed the
+    // progress watch twice over these 90 s. Re-measured with the bank game:
+    // child 3 is still the worst child of that settlement, the progress watch
+    // still fires exactly ONCE over the 90 s, and it still carries it a real
+    // distance (2.07 m). The pin is the original one, not a re-tuned one.
+    expect(rescues.worstRescues).toBe(1)
     expect(rescues.carriedMetres).toBeGreaterThan(2)
     expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
     expect(rescues.worstCarriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildCarryGate)
@@ -582,9 +663,18 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // (`buildWedgeCarve`) and the tag-back window's press and U-turn gone, the
     // same recorded cadence must read inside the shipped gates — this case
     // FAILS on the pre-carve code, and that is its whole point.
+    // AND ON BOTH ROUNDS. bambara-village plays the BANK game since work-order
+    // 687, so the mechanism this cadence was recorded against — the tag round's
+    // evade — no longer runs there; maasai-village has no river and still plays
+    // it, so the recorded cadence is replayed on both. The reported settlement
+    // keeps its case, and the fix keeps its gate.
+    for (const [placeId, placeSeed] of [
+      ['bambara-village', 2972259115],
+      ['maasai-village', 42],
+    ] as Array<[string, number]>) {
     const rand = mulberry32(18)
-    const v = village('bambara-village', 2972259115)
-    const paths: Track[][] = v.game.children.map(() => [])
+    const v = village(placeId, placeSeed)
+    const paths: Track[][] = v.children.map(() => [])
     for (let t = 0; t < 150; ) {
       const dt = 0.014 + rand() * 0.012
       t += dt
@@ -603,6 +693,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     expect(rescues.carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
     expect(rescues.perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
     expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
+    }
   })
 
   it('holds on the cadence that flipped two evaders about-face at the band edge (point 657, second round)', () => {
@@ -618,9 +709,18 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // `evadeHeading` the same recorded cadence must read inside the shipped
     // gates: this case FAILS on the cliff-release code, and that is its
     // whole point.
+    // AND ON BOTH ROUNDS. bambara-village plays the BANK game since work-order
+    // 687, so the mechanism this cadence was recorded against — the tag round's
+    // evade — no longer runs there; maasai-village has no river and still plays
+    // it, so the recorded cadence is replayed on both. The reported settlement
+    // keeps its case, and the fix keeps its gate.
+    for (const [placeId, placeSeed] of [
+      ['bambara-village', 2972259115],
+      ['maasai-village', 42],
+    ] as Array<[string, number]>) {
     const rand = mulberry32(14)
-    const v = village('bambara-village', 2972259115)
-    const paths: Track[][] = v.game.children.map(() => [])
+    const v = village(placeId, placeSeed)
+    const paths: Track[][] = v.children.map(() => [])
     for (let t = 0; t < 150; ) {
       const dt = 0.014 + rand() * 0.012
       t += dt
@@ -639,6 +739,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     expect(rescues.carriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.carryGate)
     expect(rescues.perChildMinute).toBeLessThan(CHILD_MOTION.rescueGate)
     expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
+    }
   })
 
   it('holds at a low and uneven frame rate too', () => {
@@ -647,7 +748,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // measurement is repeated where each frame carries five times the movement.
     const rand = mulberry32(4242)
     const v = village('bambara-village', 2972259115)
-    const paths: Track[][] = v.game.children.map(() => [])
+    const paths: Track[][] = v.children.map(() => [])
     for (let t = 0; t < 150; ) {
       const dt = 0.07 + rand() * 0.03
       t += dt
@@ -667,7 +768,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // (point 656.4), not the children's alone. An adult is drawn at full scale,
     // so a child owes it a wider berth than it owes another child.
     const v = village('bambara-village', 2972259115)
-    const n = v.game.children.length
+    const n = v.children.length
     const sep = balance.villageLife.separation
     const kidPair = sep.bodyRadius * KID_SCALE * 2 - sep.slop
     const adultPair = sep.bodyRadius * KID_SCALE + sep.bodyRadius - sep.slop
@@ -676,10 +777,10 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     const stall = new Array<number>(n).fill(0)
     let overlaps = 0
     let nearestAdult = Infinity
-    const last = v.game.children.map((c) => c.walked)
+    const last = v.children.map((c) => c.walked)
     for (let t = 0; t < 60; t += 1 / 60) {
       frame(v, 1 / 60)
-      v.game.children.forEach((c, i) => {
+      v.children.forEach((c, i) => {
         if (c.pace > 1e-6 && !c.held && c.walked - last[i] < 1e-4) {
           stall[i] += 1 / 60
           longestStall = Math.max(longestStall, stall[i])
@@ -687,9 +788,9 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
         last[i] = c.walked
       })
       for (let i = 0; i < n; i++) {
-        const a = v.game.children[i]
+        const a = v.children[i]
         for (let j = i + 1; j < n; j++) {
-          const b = v.game.children[j]
+          const b = v.children[j]
           if (Math.hypot(a.x - b.x, a.z - b.z) < kidPair - 1e-6) overlaps++
         }
         for (const b of adults) {
@@ -718,7 +819,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // bodies at full scale, crossing and standing among the children, which is
     // the crowding that made the multi-pass sweep necessary.
     const v = village('bambara-village', 2972259115, undefined, { adultsAmongTheChildren: true })
-    const paths: Track[][] = v.game.children.map(() => [])
+    const paths: Track[][] = v.children.map(() => [])
     const sep = balance.villageLife.separation
     const adultPair = sep.bodyRadius * KID_SCALE + sep.bodyRadius - sep.slop
     const adults = [...v.others.standing, ...v.others.porters, ...v.others.walkers]
@@ -728,7 +829,7 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     for (let t = 0; t < 60; t += 1 / 60) {
       frame(v, 1 / 60)
       sample(v, paths)
-      for (const c of v.game.children) {
+      for (const c of v.children) {
         for (const b of adults) {
           const d = Math.hypot(c.x - b.x, c.z - b.z)
           if (d < adultPair - 1e-6) {
@@ -757,11 +858,11 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
     // here before the fix, 1.14 % of one-second windows (the group), the worst
     // child 3.5 % of its half-second bursts, against 0.00-0.03 % where the
     // adults keep to their own work; a held bar of 2 % stood here in place of a
-    // gate. Now the chase steers round the other inhabitants' bodies
+    // gate. Now the round steers round the other inhabitants' bodies
     // (`TagWorld.occupied`) and the walkers steer round the children
     // (`stepRoundBodies`), and this crowded minute must read INSIDE the same
-    // gates as a quiet one — measured after the fix: not one bad window at
-    // either scale. The bars are the shipped gates, so the old code fails here.
+    // gates as a quiet one — re-measured with the bank round: 322 pair-frames of
+    // contact, not one overlap and not one bad window at either scale. The bars are the shipped gates, so the old code fails here.
     const crowded = shuffleWindows(paths)
     const crowdedBurst = shuffleWindows(paths, CHILD_MOTION.short)
     expect(judgedEnough(crowded)).toBe(true)
@@ -788,39 +889,33 @@ describe('the children never shuffle on the spot (points 648/656)', () => {
 })
 
 /**
- * The pen, measured. A yard of 0.65 m leaves the child room to keep WALKING —
- * the deflection needs a couple of body radii of clear ground ahead before it
- * will take a step at all — and no room to get anywhere, and the settlement
- * carries it 3 m clear whenever its stall watch runs out. The yard was 0.8 m
- * until the point-657 behaviour work: in THAT yard the evader circles the pen
- * wall, and a child circling a 1.6 m circle covers "ground" the 0.35 m window
- * cannot call pacing — the construction, not the gate, had stopped producing
- * the symptom, so the pen tightened to where walking cannot orbit. Measured
- * over 40 s at 0.65 m (re-measured after the point-657 second round's evade
- * ramp): 18.0 rescues per child-minute, carrying it 54.9 m in that minute,
- * 110 m walked per played minute (full legs, the healthy band), and 14.8 %
- * of the judged game time walked without getting anywhere — sixty times the
- * gate. A third of the trace is not judged at all, because a window that
- * spans a carry is refused rather than guessed at; the carries are what the
- * rescue gate answers for. THE MEASURE THIS ONE REPLACED sees 2.5 % of the
- * same trace — less than a quarter of the truth — because every one of its two-second
- * windows holds a 3 m carry: it counted the teleport as the child walking,
- * and as ground the child covered.
+ * THE PEN, RE-MEASURED WITH THE CHILDREN'S GAME BACK (work-order 687 item 9).
  *
- * THE YARD TIGHTENED TO 0.6 m when the teaching situations left the children
- * (work-order point 686): with `childSteer` staging nothing until the bank game
- * is built, a penned child only chases, and the 0.65 m yard stopped producing
- * the symptom — re-measured over the same 40 s, 6.7 % of the judged time walked
- * without getting anywhere and 82.3 % of the trace still judged, which is the
- * gate passing a wedged child. At 0.6 m the same trace reads 16.6 % shuffled,
- * 74.7 % judged and 13.5 rescues per child-minute carrying it 27.6 m: the gate
- * bites again. The band is narrow in BOTH directions and was measured, not
- * guessed — at 0.55 m and tighter the child is carried out before any window
- * closes on it, so the shuffled share falls to 0.0 % and the construction stops
- * showing the bug rather than the gate stopping to see it. Point 687 gives the
- * children their game back, and this yard is re-measured with it.
+ * A yard of 0.65 m leaves the child room to keep WALKING — the deflection needs
+ * a couple of body radii of clear ground ahead before it will take a step at all
+ * — and no room to get anywhere, and the settlement carries it 3 m clear
+ * whenever its stall watch runs out. Point 686 had tightened it to 0.6 m because
+ * a child with nothing but the bare chase stopped producing the symptom at
+ * 0.65 m; item 9 puts the 0.65 m yard back, and this is the measurement that
+ * comes with it. Over 40 s at 0.65 m with the bank round: 25.5 rescues per
+ * child-minute carrying it 76.5 m in that minute, 84.0 m walked per played
+ * minute (full legs — the healthy band, once the walking of the roaming phase is
+ * counted), and 25.0 % of the judged game time walked without getting anywhere,
+ * a hundred times the gate. Not half the trace is judged at all, because a
+ * window that spans a carry is refused rather than guessed at; the carries are
+ * what the rescue gate answers for.
+ *
+ * THE MEASURE THIS ONE REPLACED sees 2.4 % of the same trace — a tenth of the
+ * truth — because every one of its two-second windows holds a 3 m carry: it
+ * counted the teleport as the child walking, and as ground the child covered.
+ *
+ * THE BAND IS NARROW IN BOTH DIRECTIONS, and it was measured rather than
+ * guessed: at 0.6 m and at 0.7 m the same 40 s read 1.4 % and 1.5 % shuffled
+ * with a judged share above 0.92 — the wall no longer catches the walk — and at
+ * 0.55 m and tighter the child is carried out before a window can close on it.
+ * 0.65 m is where the construction bites.
  */
-const PEN_RADIUS = 0.6
+const PEN_RADIUS = 0.65
 const PEN_CARRY = 3
 
 describe('and the gate SEES a child that is wedged (point 656)', () => {
@@ -830,18 +925,27 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
    *  the child, so the trace holds episode after episode rather than one. */
   function wedged(seconds = 40, r = PEN_RADIUS, carry = PEN_CARRY) {
     const v = village('bambara-village', 2972259115, undefined, { pen: { r, carry } })
-    const paths: Track[][] = v.game.children.map(() => [])
+    const paths: Track[][] = v.children.map(() => [])
     for (let t = 0; t < seconds; t += 1 / 60) {
       frame(v, 1 / 60)
-      const c = v.game.children[0]
+      const c = v.children[0]
       // Penned once the game is running, and re-penned wherever it is carried.
       // Never over ANOTHER child, though: the wall is ground nobody may stand
       // on, and building it round a passer-by would leave that child inside a
       // collider — a broken settlement rather than a wedged child.
-      const clear = v.game.children.every(
-        (o, i) => i === 0 || Math.hypot(o.x - c.x, o.z - c.z) > r + 1.6,
-      )
-      if (clear && v.game.clock > 3 && (!v.pen.on || Math.hypot(c.x - v.pen.x, c.z - v.pen.z) > r)) {
+      // Never OVER another child, though: the wall is ground nobody may stand
+      // on, so no sibling may be left inside the band it occupies. Asking for a
+      // clear yard of r + 1.6 m all round was stricter than that and, with the
+      // bank round's children walking their quarter together, it refused nearly
+      // every re-pen — 6 rescues a child-minute where the tag round produced 18,
+      // which is the construction losing its grip on the symptom rather than the
+      // gate losing sight of it.
+      const clear = v.children.every((o, i) => {
+        if (i === 0) return true
+        const d = Math.hypot(o.x - c.x, o.z - c.z)
+        return d <= r || d >= r + 1.5 + NPC_RADIUS
+      })
+      if (clear && v.clock() > 3 && (!v.pen.on || Math.hypot(c.x - v.pen.x, c.z - v.pen.z) > r)) {
         v.pen.x = c.x
         v.pen.z = c.z
         v.pen.on = true
@@ -877,8 +981,8 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     // opened for, and it is measured here rather than argued.
     // AND THE WALKING FLOOR CANNOT SEE THIS AT ALL, which is why the share
     // exists. The penned child's legs move exactly as much as a healthy child's
-    // — measured 109.6 m per played minute, inside the shipped villages' own
-    // 102-113 band — so no floor could separate the two without failing
+    // — re-measured 84.0 m per played minute, inside the shipped villages' own
+    // 92-111 band once the walk of the roaming phase is counted — so no floor could separate the two without failing
     // ordinary play. The floor answers "did it move?"; the share answers "did
     // it get anywhere?", and only the second one is the reported bug.
     const legs = traceLiveness(penned)
@@ -886,7 +990,7 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     expect(holdsAGame(traceLiveness(paths))).toBe(true)
     const asItWas = oldMeasure(penned, 2, 2, 0.5)
     expect(asItWas.windows).toBeGreaterThan(1000) // it really did look
-    expect(asItWas.share).toBeLessThan(0.05) // and it saw less than a quarter of the truth
+    expect(asItWas.share).toBeLessThan(0.05) // and it saw a tenth of the truth
     expect(r.share).toBeGreaterThan(asItWas.share * 4)
   })
 
@@ -898,13 +1002,12 @@ describe('and the gate SEES a child that is wedged (point 656)', () => {
     // settlement changes, only how often it was looked at.
     //
     // WHAT IS PINNED HERE IS THE VERDICT, NOT THE NUMBER, and the difference is
-    // deliberate. This child is CARRIED every three and a half seconds, and a
-    // window that spans a carry is refused rather than guessed at — so about
-    // two thirds of the trace can be judged (measured judgedShare 0.663-0.677
-    // across the cadences, re-measured after the point-657 second round's
-    // evade ramp), and what survives is a scatter of short continuous
-    // stretches whose share swings a little with the cadence: 15.15 / 15.17 /
-    // 15.58 / 15.40 / 18.84 %. The one thing that does NOT swing is the
+    // deliberate. This child is CARRIED every other second, and a window that
+    // spans a carry is refused rather than guessed at — so a little over half
+    // the trace can be judged (re-measured with the bank round, judgedShare
+    // 0.525-0.553 across the cadences), and what survives is a scatter of short
+    // continuous stretches whose share swings a little with the cadence: 25.00 /
+    // 24.77 / 25.62 / 25.76 / 27.16 %. The one thing that does NOT swing is the
     // answer the gate reads — every cadence is RED by a factor of at least
     // sixty — and the rescue rate below, which counts the very carries that
     // made the trace unjudgeable, is red by a factor of three at all of them.

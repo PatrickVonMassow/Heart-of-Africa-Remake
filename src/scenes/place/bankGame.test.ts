@@ -94,6 +94,29 @@ function replay(
   return { s, log }
 }
 
+/**
+ * SEVERAL SEEDS, NOT ONE. Which child calls, who is caught and how many runs a
+ * cycle holds all fall out of the group's own random stream, so a property of
+ * THE ROUND — "ROCK is called once with nobody arriving", "a cycle with two runs
+ * alternates its direction" — is asked of a handful of groups rather than of the
+ * one that happened to be seeded first. A case that needed a particular seed to
+ * see its property would be pinning that seed, not the game.
+ */
+const SEEDS = [7, 13, 21, 42, 99]
+
+/** The same replay over every seed, with the logs concatenated. */
+function replayAll(seconds: number, options: { world?: BankWorld; count?: number } = {}) {
+  const runs = SEEDS.map((seed) => replay(seconds, { ...options, seed }))
+  return {
+    runs,
+    log: {
+      said: runs.flatMap((r) => r.log.said),
+      phases: runs.flatMap((r) => r.log.phases),
+      when: runs.flatMap((r) => r.log.when),
+    } as Log,
+  }
+}
+
 describe('the children`s game at the bank (point 687)', () => {
   it('runs the cycle in order: roam, gather, runs with their swaps, parting, roam again', () => {
     const { s, log } = replay(400)
@@ -148,7 +171,7 @@ describe('the children`s game at the bank (point 687)', () => {
   })
 
   it('alternates the announced direction with the side swap', () => {
-    const { log } = replay(600)
+    const { log } = replayAll(600)
     const announced = log.said.filter((u) => u.moment === 'announce').map((u) => u.concept)
     expect(announced.length).toBeGreaterThan(2)
     // Inside ONE cycle the sides swap every run, so the word alternates by
@@ -156,7 +179,7 @@ describe('the children`s game at the bank (point 687)', () => {
     // announcements is split at each of them before it is checked.
     const cycles: string[][] = [[]]
     for (const u of log.said) {
-      if (u.moment === 'parting') cycles.push([])
+      if (u.moment === 'parting' || u.moment === 'call') cycles.push([])
       else if (u.moment === 'announce') cycles[cycles.length - 1].push(u.concept)
     }
     const multi = cycles.filter((c) => c.length > 1)
@@ -167,7 +190,7 @@ describe('the children`s game at the bank (point 687)', () => {
   })
 
   it('calls ROCK once with nobody arriving, and once outside the game altogether', () => {
-    const { log } = replay(600)
+    const { log } = replayAll(600)
     const rock = log.when.filter((w) => w.u.concept === 'ROCK')
     expect(rock.length).toBeGreaterThan(2)
     // THE TAP: at the start of a run, at the catcher's own rock, with not one
@@ -201,7 +224,7 @@ describe('the children`s game at the bank (point 687)', () => {
   })
 
   it('says a direction word once per cycle with no rock as its target', () => {
-    const { log } = replay(600)
+    const { log } = replayAll(600)
     const partings = log.said.filter((u) => u.moment === 'parting')
     expect(partings.length).toBeGreaterThan(0)
     const stretch = Math.hypot(
@@ -219,16 +242,18 @@ describe('the children`s game at the bank (point 687)', () => {
       }
     }
     // …and it is the OPPOSITE of the run that just ended.
-    const order = log.said.filter((u) => u.moment === 'announce' || u.moment === 'parting')
-    for (let i = 1; i < order.length; i++) {
-      if (order[i].moment !== 'parting') continue
-      expect(order[i].concept).not.toBe(order[i - 1].concept)
+    for (const run of replayAll(600).runs) {
+      const order = run.log.said.filter((u) => u.moment === 'announce' || u.moment === 'parting')
+      for (let i = 1; i < order.length; i++) {
+        if (order[i].moment !== 'parting') continue
+        expect(order[i].concept).not.toBe(order[i - 1].concept)
+      }
     }
   })
 
   it('ends a run when every runner has arrived or been tagged, and the cycle when none is free', () => {
-    const { s, log } = replay(600)
-    expect(s.runs).toBeGreaterThan(2)
+    const { runs: all, log } = replayAll(600)
+    expect(all.reduce((n, r) => n + r.s.runs, 0)).toBeGreaterThan(2)
     // A parting only ever follows a run in which nobody survived free — the
     // state machine reaches `part` from `run` and from nowhere else.
     const toPart: string[] = []
@@ -287,13 +312,14 @@ describe('the children`s game at the bank (point 687)', () => {
   })
 
   it('holds a tagged child in its posture, and moves it only between runs', () => {
-    const rand = mulberry32(5)
-    const spots = Array.from({ length: 5 }, (_, i) => ({ x: STAGE.roam.x + i * 1.1, z: STAGE.roam.z }))
-    const s = createBankGame(spots, rand, CFG)
-    const world = openWorld()
     let crouchedFrames = 0
     let movedWhileCrouched = 0
     let walkedAfterOut = 0
+    for (const seed of SEEDS) {
+    const rand = mulberry32(seed)
+    const spots = Array.from({ length: 5 }, (_, i) => ({ x: STAGE.roam.x + i * 1.1, z: STAGE.roam.z }))
+    const s = createBankGame(spots, rand, CFG)
+    const world = openWorld()
     const at = s.children.map((c) => ({ x: c.x, z: c.z }))
     // A child is judged on the frames it was ALREADY crouched at the start of:
     // the frame it is caught in it was still running, and it was running that
@@ -323,6 +349,7 @@ describe('the children`s game at the bank (point 687)', () => {
         at[i] = { x: c.x, z: c.z }
       })
     }
+    }
     expect(crouchedFrames).toBeGreaterThan(60)
     expect(movedWhileCrouched).toBe(0)
     expect(walkedAfterOut).toBeGreaterThan(0)
@@ -334,13 +361,13 @@ describe('the children`s game at the bank (point 687)', () => {
     // villager's body plus the extra berth.
     const stranger = { x: 0, z: 0, radius: 0.35 }
     const world = openWorld(stranger)
-    const { s, log } = replay(600, { world, seed: 13 })
-    expect(s.runs).toBeGreaterThan(2)
+    const { runs: blocked, log } = replayAll(600, { world })
+    expect(blocked.reduce((n, r) => n + r.s.runs, 0)).toBeGreaterThan(2)
     expect(log.said.some((u) => u.moment === 'arrival')).toBe(true)
-    // …and the same replay without him produces a game too, so the case is
+    // …and the same replays without him produce a game too, so the case is
     // measuring the swerve rather than a settlement that never plays.
-    const { s: freeRun } = replay(600, { seed: 13 })
-    expect(freeRun.runs).toBeGreaterThan(2)
+    const { runs: open } = replayAll(600)
+    expect(open.reduce((n, r) => n + r.s.runs, 0)).toBeGreaterThan(2)
   })
 
   it('keeps its distance from the stranger frame by frame', () => {

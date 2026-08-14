@@ -195,6 +195,8 @@ const BANK_GAME_FIELDS: ReadonlyArray<{
   { key: 'laneSpacing', label: 'bankLaneSpacing', step: 0.1, min: 0 },
   { key: 'dodgeDistance', label: 'bankDodgeDistance', step: 0.5, min: 0 },
   { key: 'dodgeReach', label: 'bankDodgeReach', step: 0.5, min: 0 },
+  { key: 'roamTurn', label: 'bankRoamTurn', step: 0.1, min: 0 },
+  { key: 'roamGoalSeconds', label: 'bankRoamGoal', step: 1, min: 1 },
   { key: 'walkPace', label: 'bankWalkPace', step: 0.1, min: 0.1 },
   { key: 'strangerBerth', label: 'bankStrangerBerth', step: 0.1, min: 0 },
   { key: 'utteranceGapSeconds', label: 'bankUtteranceGap', step: 0.5, min: 0 },

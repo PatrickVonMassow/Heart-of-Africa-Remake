@@ -587,6 +587,8 @@ export interface Strings {
     bankLaneSpacing: string
     bankDodgeDistance: string
     bankDodgeReach: string
+    bankRoamTurn: string
+    bankRoamGoal: string
     bankWalkPace: string
     bankStrangerBerth: string
     bankUtteranceGap: string

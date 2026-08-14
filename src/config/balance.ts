@@ -737,6 +737,10 @@ export interface BalanceConfig {
       dodgeDistance: number
       /** How far sideways that bend carries the runner's aim at the closest. */
       dodgeReach: number
+      /** How fast a roaming child's heading drifts (rad/s). */
+      roamTurn: number
+      /** How long the climber walks at the boulder before giving the stone up. */
+      roamGoalSeconds: number
       /** The pace of every walk that is not a run (m/s). */
       walkPace: number
       /** The EXTRA berth the children give the traveller over a villager. */
@@ -1289,6 +1293,15 @@ export const balance: BalanceConfig = {
       laneSpacing: 1.2,
       dodgeDistance: 7,
       dodgeReach: 3,
+      // A quarter turn a second at the most: a wander that reads as wandering
+      // rather than as a figure being blown about.
+      roamTurn: 1.4,
+      // The climber may start its phase at the far end of the settlement — the
+      // group has just walked back from the bank — so this has to cover a walk
+      // right across it: 30 s at the walking pace is some forty metres, well
+      // past the widest village. A stone still unreached after that is one the
+      // child cannot reach.
+      roamGoalSeconds: 30,
       // A child's walk, well under the chase's trot — the walks between runs
       // must read as walking, not as more running.
       walkPace: 1.4,
