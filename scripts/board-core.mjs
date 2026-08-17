@@ -504,9 +504,6 @@ export function toNow(html, point, status, { stamp = berlinStamp() } = {}) {
  */
 export function toQueue(html, point, { text, estimate } = {}) {
   const card = nowCard(html, point)
-  // DELIBERATE CONTRACT: after the move (drift path included) there is no
-  // now-card left, so a SECOND identical call throws here — pinned by a case.
-  if (!card) throw new Error(`board: no current-work card for point ${point}`)
   const renderEntry = (title, meta, body) =>
     `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
     `<span class="right"><span class="meta">${meta}</span></span>` +
@@ -525,18 +522,32 @@ export function toQueue(html, point, { text, estimate } = {}) {
   } catch {
     /* no queue section — the insertion below reports it */
   }
-  if (standing) {
-    const out = html.replace(card, '')
-    // A caller's UPDATE is honoured on the standing card, never swallowed
-    // (Sol review of d0aebb6, finding 5): text replaces its body, estimate its
-    // meta, and what was not given keeps the standing card's own value. The
-    // bare handover call (`queue <n>`) leaves it untouched.
-    if (!text?.trim() && estimate == null) return out
+  // A caller's UPDATE is honoured on the standing card, never swallowed
+  // (Sol review of d0aebb6, finding 5): text replaces its body, estimate its
+  // meta, and what was not given keeps the standing card's own value. The
+  // bare handover call (`queue <n>`) leaves it untouched.
+  const updateStanding = (doc) => {
+    if (!text?.trim() && estimate == null) return doc
     const body = text?.trim() || statusOf(standing)
     if (!body) throw new Error('board: refusing to queue a card with an empty body')
     const meta = estimate ?? (metaOf(standing).trim() || QUEUE_STUB_META)
-    return out.replace(standing, renderEntry(stripPointPrefix(titleOf(standing), point), meta, body))
+    return doc.replace(standing, renderEntry(stripPointPrefix(titleOf(standing), point), meta, body))
   }
+  if (!card) {
+    // A REPEATED move is a SUCCESS, not a typo (point 700; Sol review of
+    // 534c2ba, finding 5). Of the spec's two options — legitimise the
+    // handover state or demand a numbered now-card even then — this takes
+    // the first: with the point already standing in the queue and no
+    // now-card left, the desired end state HOLDS, and the spec says the last
+    // bookkeeping of a session must not be blocked by the session ending —
+    // which a throw here did, at the most expensive moment there is. The
+    // no-op still honours a caller's text/estimate, exactly as the drift
+    // path does. The throw is kept ONLY for a point nowhere on the board at
+    // all — the typo it was always protecting against.
+    if (standing) return updateStanding(html)
+    throw new Error(`board: point ${point} is nowhere on the board — no current-work card and no queue card`)
+  }
+  if (standing) return updateStanding(html.replace(card, ''))
   const body = text?.trim() || statusOf(card)
   if (!body) throw new Error('board: refusing to queue a card with an empty body')
   const hours = spanHours(metaOf(card))

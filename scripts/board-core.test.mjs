@@ -267,8 +267,8 @@ describe('toQueue — the move that had to be done by hand', () => {
     expect(out).toContain('<span class="meta">~4 h</span>')
   })
 
-  it('throws when the point is not in current work', () => {
-    expect(() => toQueue(board(), 999)).toThrow(/no current-work card/)
+  it('throws only when the point is NOWHERE on the board — the typo case', () => {
+    expect(() => toQueue(board(), 999)).toThrow(/nowhere on the board/)
   })
 
   // A point promoted straight from a STUB queue card has a start time and no
@@ -541,9 +541,16 @@ describe('point 700 — the handover state cannot block the handover', () => {
     const textOnly = queueCard(toQueue(drifted, 700, { text: 'Nur neuer Text.' }), 700)
     expect(textOnly).toContain('Nur neuer Text.')
     expect(textOnly).toContain('~5 h')
-    // …and the SECOND identical call throws: the move already happened, there
-    // is no now-card left — the deliberate contract, not an oversight.
-    expect(() => toQueue(toQueue(drifted, 700), 700)).toThrow(/no current-work card/)
+    // …and the SECOND identical call is a NO-OP SUCCESS (Sol review of
+    // 534c2ba, finding 5): the desired end state already holds, and the last
+    // bookkeeping of a session must never be blocked by the session ending.
+    const once = toQueue(drifted, 700)
+    expect(toQueue(once, 700)).toBe(once)
+    // A repeat WITH an update still lands on the standing card.
+    const repeatUpdated = queueCard(toQueue(once, 700, { text: 'Doch noch ein Nachtrag.' }), 700)
+    expect(repeatUpdated).toContain('Doch noch ein Nachtrag.')
+    // Only a point NOWHERE on the board — no now-card, no queue card — throws.
+    expect(() => toQueue(once, 999)).toThrow(/nowhere on the board/)
   })
 
   it('toQueue is IDEMPOTENT against board drift — a standing queue card is kept, never doubled', () => {
