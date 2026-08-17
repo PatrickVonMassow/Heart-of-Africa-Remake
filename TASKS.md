@@ -7886,3 +7886,36 @@ to land than a mechanism that needs a review.
   can silently share a worktree with its predecessor, and the damage (a lost delegated run) is
   invisible in git.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 698. THE CHILDREN CROSS THE TRAVELLER'S LINE TOO RARELY FOR THE PICTURE THE BANK ROUND
+  PROMISES (measured 17.08.2026 on `feat/687-roam-bound-fixes`; the user decided the same day to
+  land the round as it stands and calibrate the density here). The round's acceptance is that the
+  children play PAST the traveller, and the check that claimed it counted a crossing over the
+  WHOLE simulation — roaming, gathering, running, regrouping alike — so drift while roaming
+  satisfied it. Counted only while the round is actually RUNNING, three of four measured cases
+  show NO child crossing at all inside the old 200 s window; over 600 s the four cases reach
+  2/3/1/4 of four children, with the FIRST crossing at 251 s, 81 s, 447 s and 228 s of game time
+  (bambara@42, bambara@2972259115, nubian@42, mandinka@99). A player standing at the stretch's
+  middle therefore waits minutes for the thing the round exists to show. The mechanic is sound —
+  this is density, not correctness, which is why it is deferred rather than blocking.
+  FINAL STATE:
+  - A traveller standing at the middle of the stretch sees a child pass him within a SHORT,
+    stated wait — set the target as a balance value and name it here when it is chosen (a first
+    guess: a crossing within ~30 s in the median case, every case under a minute).
+  - It is reached through the round's OWN calibratable numbers (run length, the pause between
+    runs, how the catcher picks its target, where the group re-forms) — all of them balance
+    values the debug menu already edits. No new mechanism, and the round's rules do not change.
+  - The measurement is the phase-coupled one: crossings counted ONLY while the round runs. The
+    figures above are the baseline this point improves on, and the new figures replace them in
+    the test's comment when it lands.
+  ALSO OPEN, FOUND IN THE SAME MEASUREMENT: at three of the four seeds every run ended as a full
+  three-tag sweep — zero arrivals, zero regroup phases — so the arrival `ROCK` call and the
+  multi-run cycle effectively never play there. Judge whether the dodge is doing its job before
+  calibrating the density, because a round that always ends in a sweep is also a round whose
+  length is decided by something other than the numbers above.
+  VERIFIABLE: the phase-coupled Vitest measurement over the same four cases, asserting the chosen
+  target rather than "greater than zero"; plus the browser section's traveller check, which must
+  see a child pass inside its window rather than at the end of a long one.
+  Criticality: medium — nothing is broken, but the round's whole purpose is a picture the player
+  currently has to wait minutes for.
+  Bundle: Dorfleben.
