@@ -264,6 +264,11 @@ put it is the mistake this line exists to stop.
   a receipt path → `--prepare --context` proceeds; without one → today's refusal); plus the real
   proof — the next session that crosses the mark hands over inside its current step, and its
   recorded boundary context is within the margin.
+  ALSO IN SCOPE: `runIsLive` in `scripts/verify/run-record.mjs` — the consumer behind the wait
+  marker and `activeRecordPath` — judges liveness from `status:'running'` plus bare pid existence,
+  so a recycled pid keeps a stale record looking live on that path. It is the same defect class the
+  cross-vendor rounds closed in `commandNamesRun`, in the other consumer. FINAL STATE: it reads the
+  SAME run identity, rather than bypassing it.
   MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it is a new fence and it changes the boundary.
   Criticality: high — it is the batch's dominant cost, the user has now raised it twice, and the
   existing mechanism demonstrably does not bind.
@@ -343,6 +348,13 @@ put it is the mistake this line exists to stop.
   harmful. FINAL STATE: `guide-brevity-guard` takes the same stand-down as its siblings; its budget
   verdict is unchanged and stays the OWNER's to satisfy. A case pins the stand-down, and a second
   pins that the owner still gets the verdict.
+  ALSO IN SCOPE, measured 17.08.2026 (runs 32054043421, 32055125370, 32055597148): each deploy step
+  got HTTP 503 from the Pages API with nothing stuck, and `ci-status-guard` blocked every turn end
+  naming a remedy that reports `no in-progress Pages deployment found` — an instruction that
+  provably cannot apply. Its outage waiver misses the case because the build job DID run, so only
+  the deploy job is red. FINAL STATE: a red whose cause is provably outside the repository and for
+  which the guard holds no executable remedy passes with a named deadline and an alert, instead of
+  repeating an impossible instruction.
   VERIFIABLE: Vitest over the preflight core — each of the four reported with its new status, the
   read-only progress variant leaving the lock file untouched (asserted on its mtime), and a fixture
   where the CI verdict is red surfacing as a block rather than as `not judged`.
