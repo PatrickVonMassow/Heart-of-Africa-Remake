@@ -66,6 +66,7 @@ import {
   absPath,
   adoptTransferred,
   gatherHandoverTransfer,
+  runRecordFor,
   gatherInFlight,
   maxAgeMs,
   readDeclaration,
@@ -1917,6 +1918,108 @@ describe('assessTransfer — committed-and-pushed checkpoints decide transferabi
     })
     expect(msg).toContain('feat/700-x')
     for (const word of ['CHECKPOINT', 'DRAIN', 'RE-DECLARE', 'ABANDON']) expect(msg).toContain(word)
+  })
+
+  // --- A RUNNING VERIFICATION IS TRANSFERABLE (point 700) --------------------
+  // The 17.08.2026 defeat: a background suite run (pid + log, no branch) made
+  // `--prepare --context` demand a DRAIN, pinning the session past the very
+  // mark at which leaving is worth the most. A log whose RUN RECORD can be read
+  // is a named, awaitable run, so it is adoptable output.
+  const run = {
+    recordPath: '/repo/local/verify-logs/x.log.run.json',
+    suites: ['world', 'polish'],
+    backends: ['webgl'],
+    head: 'abc1234',
+    pid: 4242,
+    log: 'local/verify-logs/x.log',
+    status: 'running',
+  }
+
+  it('a declared run WITH a record transfers — the handover proceeds instead of demanding a drain', () => {
+    const t = assessTransfer({ items: [{ kind: 'log', describe: 'log x.log', checkpoint: null, run }] })
+    expect(t.transferable).toBe(true)
+    expect(t.runs).toEqual([run])
+  })
+
+  it('a declared run WITHOUT a record keeps today\'s refusal — a bare log proves nothing', () => {
+    const t = assessTransfer({ items: [{ kind: 'log', describe: 'log x.log', checkpoint: null, run: null }] })
+    expect(t.transferable).toBe(false)
+    expect(t.blockers[0].why).toContain('only pids/logs')
+  })
+
+  it('a run rides beside a pushed branch, and both are recorded for the successor', () => {
+    const t = assessTransfer({
+      items: [
+        { kind: 'branch', describe: 'branch feat/700-x', checkpoint: pushed },
+        { kind: 'log', describe: 'log x.log', checkpoint: null, run },
+      ],
+    })
+    expect(t.transferable).toBe(true)
+    expect(t.checkpoints).toHaveLength(1)
+    expect(t.runs).toEqual([run])
+  })
+
+  it('a run does not excuse an UNPUSHED branch — the branch still blocks by name', () => {
+    const t = assessTransfer({
+      items: [
+        { kind: 'branch', describe: 'branch feat/700-x', checkpoint: { ...pushed, remoteSha: null } },
+        { kind: 'log', describe: 'log x.log', checkpoint: null, run },
+      ],
+    })
+    expect(t.transferable).toBe(false)
+  })
+
+  it('markTransferred carries the runs to the successor, and omits the field when none were declared', () => {
+    const declaration = { v: 1, sessionId: 's1', at: 1, waitingOn: 'a run', evidence: [{ kind: 'log', path: 'x.log' }] }
+    const withRun = markTransferred({ declaration, bySid: 's1', now: 9, checkpoints: [], runs: [run] })
+    expect(withRun.transfer.runs).toEqual([run])
+    const withoutRun = markTransferred({ declaration, bySid: 's1', now: 9, checkpoints: [] })
+    expect(withoutRun.transfer.runs).toBeUndefined()
+  })
+})
+
+describe('runRecordFor — the run record beside a declared log, reduced for the transfer', () => {
+  const record = {
+    suites: ['world'],
+    backends: ['webgpu'],
+    head: 'abc1234',
+    pid: 77,
+    log: 'local/verify-logs/x.log',
+    status: 'running',
+    polls: 3,
+    receipt: null,
+  }
+
+  it('pairs <log>.run.json and keeps only what the successor needs', () => {
+    const seen = []
+    const r = runRecordFor('/repo/local/verify-logs/x.log', {
+      read: (p) => {
+        seen.push(p)
+        return record
+      },
+    })
+    expect(seen[0].replace(/\\/g, '/')).toBe('/repo/local/verify-logs/x.log.run.json')
+    expect(r).toEqual({
+      recordPath: seen[0],
+      suites: ['world'],
+      backends: ['webgpu'],
+      head: 'abc1234',
+      pid: 77,
+      log: 'local/verify-logs/x.log',
+      status: 'running',
+    })
+  })
+
+  it('answers null for a missing or unreadable record, and for an empty path', () => {
+    expect(
+      runRecordFor('/repo/x.log', {
+        read: () => {
+          throw new Error('ENOENT')
+        },
+      }),
+    ).toBe(null)
+    expect(runRecordFor('/repo/x.log', { read: () => 'not an object' })).toBe(null)
+    expect(runRecordFor('', { read: () => record })).toBe(null)
   })
 })
 

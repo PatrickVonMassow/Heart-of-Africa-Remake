@@ -528,6 +528,41 @@ export function isAncestor(ancestorSha, sha, { cwd = REPO_ROOT } = {}) {
   }
 }
 
+/**
+ * THE RUN RECORD BESIDE A DECLARED LOG (point 700), reduced to what a successor
+ * needs to adopt the run: what it is (suites, backends), what it covers (HEAD),
+ * what proves it (pid, log) and where its receipt lands (`recordPath` — the
+ * same file, stamped `finished` with the receipt by run-logged.mjs). Null when
+ * no record can be read: a bare log proves nothing and stays non-transferable.
+ * `read` is injectable so the reduction is pinned without a disk.
+ *
+ * The `<log>.run.json` pairing repeats run-record.mjs's `recordPathFor` rather
+ * than importing it: scripts/verify/ is deliberately absent from the temp
+ * copies the spawned guard tests run in, and batch-progress-guard imports this
+ * module — a static import would take every one of those guards down.
+ */
+export function runRecordFor(logPath, { read } = {}) {
+  try {
+    const declared = absPath(logPath)
+    if (!declared) return null
+    const path = `${declared}.run.json`
+    const readOne = read ?? ((p) => JSON.parse(readFileSync(p, 'utf8')))
+    const r = readOne(path)
+    if (!r || typeof r !== 'object') return null
+    return {
+      recordPath: path,
+      suites: Array.isArray(r.suites) ? r.suites : [],
+      backends: Array.isArray(r.backends) ? r.backends : [],
+      head: typeof r.head === 'string' ? r.head : null,
+      pid: typeof r.pid === 'number' ? r.pid : null,
+      log: typeof r.log === 'string' ? r.log : null,
+      status: typeof r.status === 'string' ? r.status : null,
+    }
+  } catch {
+    return null
+  }
+}
+
 /** The declaration's evidence, annotated with checkpoints for `assessTransfer`. */
 export function transferItems(declaration, { cwd = REPO_ROOT } = {}) {
   const out = []
@@ -541,6 +576,9 @@ export function transferItems(declaration, { cwd = REPO_ROOT } = {}) {
         describe: `worktree ${e.path}`,
         checkpoint: ref ? checkpointOf(ref, { cwd }) : null,
       })
+    } else if (e?.kind === 'log') {
+      // A declared run is adoptable through its run record (point 700).
+      out.push({ kind: 'log', describe: `log ${e.path}`, checkpoint: null, run: runRecordFor(e.path) })
     } else {
       out.push({ kind: String(e?.kind ?? ''), describe: `${e?.kind ?? '?'} ${e?.pid ?? e?.path ?? ''}`.trim(), checkpoint: null })
     }
@@ -561,8 +599,17 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
   const path = statePathsFor(lockPath).inFlightPath
   const declaration = readDeclaration(path)
   if (!declaration) return { blocked: false, note: '', commit: null }
-  const summarise = (checkpoints) =>
-    (checkpoints ?? []).map((c) => `${c.ref ?? '?'}@${String(c.sha).slice(0, 8)}`).join(', ') || 'no checkpoints'
+  const summarise = (checkpoints, runs) =>
+    [
+      ...(checkpoints ?? []).map((c) => `${c.ref ?? '?'}@${String(c.sha).slice(0, 8)}`),
+      // A handed-over RUN is named by what it is and where its receipt lands
+      // (point 700), so the successor's first command is a read, not a restart.
+      ...(runs ?? []).map(
+        (r) =>
+          `run ${(r.suites ?? []).join('+') || '?'}${(r.backends ?? []).length ? `@${r.backends.join('/')}` : ''} ` +
+          `(receipt ${r.recordPath})`,
+      ),
+    ].join(', ') || 'no checkpoints'
   // IDEMPOTENT (Sol review of 807c2bf, finding 6): a declaration already
   // transferred and not yet adopted is not re-judged and not re-transferred —
   // the record awaiting adoption IS the handover's state, and `commit` only
@@ -570,8 +617,8 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
   if (declaration.transfer && !declaration.adopted) {
     return {
       blocked: false,
-      note: `a transferred declaration already awaits adoption (${summarise(declaration.transfer.checkpoints)})`,
-      commit: () => summarise(declaration.transfer.checkpoints),
+      note: `a transferred declaration already awaits adoption (${summarise(declaration.transfer.checkpoints, declaration.transfer.runs)})`,
+      commit: () => summarise(declaration.transfer.checkpoints, declaration.transfer.runs),
     }
   }
   // SESSION-BOUND (same finding): a declaration this owner cannot be resolved
@@ -598,13 +645,15 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
   if (!assessment.transferable) {
     return { blocked: true, message: transferBlockMessage(assessment), note: '', commit: null }
   }
-  const summary =
-    assessment.checkpoints.map((c) => `${c.ref ?? '?'}@${String(c.sha).slice(0, 8)}`).join(', ') || 'no checkpoints'
+  const summary = summarise(assessment.checkpoints, assessment.runs)
   return {
     blocked: false,
-    note: `the declared in-flight work is transferable (pushed checkpoints: ${summary})`,
+    note: `the declared in-flight work is transferable (${summary})`,
     commit: () => {
-      writeDeclaration(markTransferred({ declaration, bySid: sid, now, checkpoints: assessment.checkpoints }), path)
+      writeDeclaration(
+        markTransferred({ declaration, bySid: sid, now, checkpoints: assessment.checkpoints, runs: assessment.runs }),
+        path,
+      )
       return summary
     },
   }

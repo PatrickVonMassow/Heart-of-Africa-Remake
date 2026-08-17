@@ -562,18 +562,33 @@ export function assessInFlight({
  * the remote-tracking ref could not be read) and null for pid/log kinds.
  *
  * The rule: every branch/worktree item needs a PUSHED checkpoint (local tip ==
- * remote-tracking tip), and at least ONE such item must exist — a declaration of
- * only pids and logs names nothing a successor could adopt: the process dies
- * with this session and the log proves nothing about what survives.
+ * remote-tracking tip), and at least ONE ADOPTABLE item must exist — a
+ * declaration of only bare pids and logs names nothing a successor could adopt:
+ * the process dies with this session and the log proves nothing about what
+ * survives.
  *
- * Returns { transferable, blockers: [{ describe, why }], checkpoints }.
+ * A RUNNING VERIFICATION IS ADOPTABLE (point 700): a log item annotated with
+ * its RUN RECORD (`run` — the `<log>.run.json` scripts/verify/run-logged.mjs
+ * writes: suites, backends, the HEAD it covers, pid, and the receipt once it
+ * closes) is a named, awaitable run, not a process that merely dies. It counts
+ * as adoptable output and is recorded for the successor, which awaits the
+ * receipt and reads the verdict — so a 25-minute suite never again PINS a
+ * session past the watermark by demanding a drain. A log WITHOUT a record
+ * still proves nothing and still counts as none.
+ *
+ * Returns { transferable, blockers: [{ describe, why }], checkpoints, runs }.
  */
 export function assessTransfer({ items = [] } = {}) {
   const list = Array.isArray(items) ? items : []
   const blockers = []
   const checkpoints = []
+  const runs = []
   let output = 0
   for (const item of list) {
+    if (item?.kind === 'log' && item.run && typeof item.run.recordPath === 'string' && item.run.recordPath) {
+      runs.push(item.run)
+      continue
+    }
     if (!OUTPUT_KINDS.has(item?.kind)) continue
     output += 1
     const cp = item.checkpoint
@@ -590,13 +605,15 @@ export function assessTransfer({ items = [] } = {}) {
       checkpoints.push({ ref: cp.ref ?? null, sha: cp.localSha })
     }
   }
-  if (output === 0 && list.length > 0) {
+  if (output === 0 && runs.length === 0 && list.length > 0) {
     blockers.push({
       describe: 'the whole declaration',
-      why: 'it names only pids/logs — nothing with a committed-and-pushed checkpoint a successor could adopt',
+      why:
+        'it names only pids/logs — nothing with a committed-and-pushed checkpoint, and no run record beside ' +
+        'a log, that a successor could adopt',
     })
   }
-  return { transferable: blockers.length === 0, blockers, checkpoints }
+  return { transferable: blockers.length === 0, blockers, checkpoints, runs }
 }
 
 /**
@@ -631,11 +648,20 @@ export function transferBlockMessage({ blockers = [] } = {}) {
  * mutation protection the moment it crossed a SECOND boundary — the very
  * record a chain of handovers depends on most.
  */
-export function markTransferred({ declaration, bySid, now, checkpoints = [] } = {}) {
+export function markTransferred({ declaration, bySid, now, checkpoints = [], runs = [] } = {}) {
   const { adopted: _superseded, ...rest } = declaration ?? {}
   return {
     ...rest,
-    transfer: { v: 1, by: String(bySid ?? ''), at: Number(now), checkpoints },
+    transfer: {
+      v: 1,
+      by: String(bySid ?? ''),
+      at: Number(now),
+      checkpoints,
+      // The RUNNING VERIFICATIONS handed over (point 700): the successor awaits
+      // each record's receipt rather than restarting the run. Only present when
+      // one was declared, so branch-only transfers keep their shape.
+      ...(Array.isArray(runs) && runs.length > 0 ? { runs } : {}),
+    },
   }
 }
 
