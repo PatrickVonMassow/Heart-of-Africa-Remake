@@ -10,11 +10,15 @@ import {
   parsePointBlocks,
   findTrailMarker,
   specTrailOffenders,
+  pointTitle,
+  sentenceCaseTitle,
+  isShoutingTitle,
+  titleCaseOffenders,
   evaluate,
 } from './tasks-spec-guard-core.mjs'
 
 const CLEAN_POINT =
-  '- [ ] 300. DEBUG EVENT-TRIGGER DROPDOWN. Add a dropdown selector to the debug\n' +
+  '- [ ] 300. Debug event-trigger dropdown. Add a dropdown selector to the debug\n' +
   '  menu, modelled on the jump-to menu: grouped by category, alphabetically\n' +
   '  sorted, firing each drama via its existing entry point. Localized labels in\n' +
   '  both languages. VERIFIABLE: DebugMenu.test.tsx renders the grouped entries.\n'
@@ -102,6 +106,43 @@ describe('specTrailOffenders', () => {
   it('handles a mixed file: only the trailing open point is reported', () => {
     const md = '- [x] 100. Superseded by point 30 (living shield).\n' + CLEAN_POINT + TRAIL_POINT
     expect(specTrailOffenders(md)).toEqual([{ point: 301, phrase: 'instead of the earlier' }])
+  })
+})
+
+describe('title casing', () => {
+  const point = (number, title, body = 'Final-state body.') => `- [ ] ${number}. ${title}\n  ${body}\n`
+
+  it('refuses an uppercase title and supplies a copy-ready sentence-case form', () => {
+    const md = point(702, 'A TITLE THAT SHOUTS')
+    expect(titleCaseOffenders(md)).toEqual([
+      { point: 702, title: 'A TITLE THAT SHOUTS', expected: 'A title that shouts' },
+    ])
+    expect(evaluate({ tasksMd: md }).reason).toContain('702: "A title that shouts"')
+  })
+
+  it('passes a sentence-case title and allows an uppercase emphasis word inside it', () => {
+    expect(isShoutingTitle('A title may still say NEVER here')).toBe(false)
+    expect(titleCaseOffenders(point(703, 'A title may still say NEVER here'))).toEqual([])
+  })
+
+  it('passes an acronym-only title and a title with fewer than eight letters', () => {
+    expect(isShoutingTitle('HTTP API')).toBe(false)
+    expect(isShoutingTitle('LOUD ONE')).toBe(false)
+  })
+
+  it('ignores a pre-baseline offender until that point is edited', () => {
+    const old = point(700, 'HISTORIC SHOUTING TITLE')
+    expect(titleCaseOffenders(old, old)).toEqual([])
+    const edited = point(700, 'HISTORIC SHOUTING TITLE', 'Edited final-state body.')
+    expect(titleCaseOffenders(edited, old)).toEqual([
+      { point: 700, title: 'HISTORIC SHOUTING TITLE', expected: 'Historic shouting title' },
+    ])
+  })
+
+  it('uses only the first-line title before an attribution parenthesis', () => {
+    const block = parsePointBlocks(point(704, 'TITLE BEFORE ATTRIBUTION (user 17.08.2026): body.'))[0]
+    expect(pointTitle(block)).toBe('TITLE BEFORE ATTRIBUTION')
+    expect(sentenceCaseTitle('"LOUD" TITLE')).toBe('"Loud" title')
   })
 })
 
