@@ -8080,3 +8080,34 @@ to land than a mechanism that needs a review.
   offender ignored; plus `node scripts/tasks-spec-guard.mjs` green on the normalised file.
   Criticality: low — it is a readability rule with a mechanical check; it touches no game code.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 703. A board command writes, then reports failure, and the retry doubles the card (user
+  17.08.2026: »Aber warum hast du diese Karte zweimal eingestellt? Auch das darf nicht passieren
+  können«). Reproduced the same day: the same question stood twice under "Von dir zu klären".
+  The cause has two halves, both read in the code. First, `addVdzk` in
+  `scripts/board-core.mjs` prepends its card unconditionally — it has no idea whether a card
+  with that title already stands, while its sibling `removeVdzk` refuses an ambiguous fragment
+  rather than delete the wrong question. The remove side was hardened; the add side never was.
+  Second, `edit()` in `scripts/board.mjs` writes the file and then publishes, and when the
+  publish leg refuses — here because the freshly filed point had no queue card yet — the command
+  prints only the remedy for the refusal. The write it had already committed is never mentioned,
+  so the call reads as "nothing happened" and inviting the retry that produced the duplicate.
+  FINAL STATE:
+  - `addVdzk` refuses a card whose title already stands in the section, naming the standing one,
+    the way `removeVdzk` refuses an ambiguous fragment. Re-asking a question that is already on
+    the board is never the intent; a genuinely new question gets a distinguishable title.
+  - `edit()` reports what it did before it reports what failed: when the file was written and
+    the publish leg then refused, the output says so in its first line, so no reader can mistake
+    a half-applied call for a no-op. This holds for every command routed through `edit()`, not
+    only the one that produced this bug.
+  - The publish precondition is checked BEFORE the write where it can be — a point without a
+    queue card is knowable up front — so the common case fails cleanly with nothing applied.
+  - The board file is left with no duplicate under any section: the publish audit fails on two
+    cards sharing a title, which also catches a duplicate that arrives by hand-editing.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes a gate's write path.
+  VERIFIABLE: Vitest over the pure core — a second `addVdzk` with a standing title refused, a
+  distinct title accepted, the audit red on a hand-built duplicate and green after; plus a
+  driven run of the failing sequence that produced this bug, ending with one card, not two.
+  Criticality: medium — the board is what the user reads, and a command that lies about having
+  written is the failure mode that makes every other board rule unreliable.
+  Bundle: Chat & Tafel.
