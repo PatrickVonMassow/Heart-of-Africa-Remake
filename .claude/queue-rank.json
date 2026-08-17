@@ -103,10 +103,18 @@
     "699": {
       "at": "2026-08-17T09:44:54.861Z",
       "why": "Kosmetisch und eng verwandt mit 628: Sie wartet hinter den gemeldeten Fehlern und den fast fertigen Punkten, wie es die Warteschlangenregel fuer Fundstuecke vorsieht."
+    },
+    "702": {
+      "at": "2026-08-17T13:31:26.112Z",
+      "why": "Kleiner Hygiene-Fix, den der Nutzer heute angestoßen hat; laeuft bereits bei Sol und landet noch heute, die Reihung dahinter ist folgenlos"
+    },
+    "703": {
+      "at": "2026-08-17T13:31:30.746Z",
+      "why": "Kleiner Tafel-Fix, den der Nutzer heute angestoßen hat; laeuft bereits bei Sol und landet noch heute, die Reihung dahinter ist folgenlos"
     }
   },
   "settled": {
-    "at": "2026-08-17T12:45:02.691Z",
+    "at": "2026-08-17T13:31:30.747Z",
     "points": [
       174,
       184,
@@ -300,7 +308,9 @@
       698,
       699,
       700,
-      701
+      701,
+      702,
+      703
     ]
   }
 }
