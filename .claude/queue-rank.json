@@ -127,14 +127,10 @@
     "708": {
       "at": "2026-08-17T14:29:14.792Z",
       "why": "Groesserer Umbau der Ablaeufe; er lohnt erst nach 707, das dieselbe Vorabpruefung braucht"
-    },
-    "709": {
-      "at": "2026-08-17T14:39:28.373Z",
-      "why": "Blockiert das Pushen, sobald eine Sitzung die Einheitspruefung direkt startet; kommt aber hinter den schon laufenden Punkten, weil der Umweg ueber land-point sie gruen faehrt"
     }
   },
   "settled": {
-    "at": "2026-08-17T14:39:28.374Z",
+    "at": "2026-08-17T15:58:21.897Z",
     "points": [
       174,
       184,
@@ -335,7 +331,7 @@
       706,
       707,
       708,
-      709
+      710
     ]
   }
 }
