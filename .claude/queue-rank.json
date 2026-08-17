@@ -104,10 +104,6 @@
       "at": "2026-08-17T09:44:54.861Z",
       "why": "Kosmetisch und eng verwandt mit 628: Sie wartet hinter den gemeldeten Fehlern und den fast fertigen Punkten, wie es die Warteschlangenregel fuer Fundstuecke vorsieht."
     },
-    "702": {
-      "at": "2026-08-17T13:31:26.112Z",
-      "why": "Kleiner Hygiene-Fix, den der Nutzer heute angestoßen hat; laeuft bereits bei Sol und landet noch heute, die Reihung dahinter ist folgenlos"
-    },
     "703": {
       "at": "2026-08-17T13:31:30.746Z",
       "why": "Kleiner Tafel-Fix, den der Nutzer heute angestoßen hat; laeuft bereits bei Sol und landet noch heute, die Reihung dahinter ist folgenlos"
@@ -115,10 +111,26 @@
     "704": {
       "at": "2026-08-17T13:43:56.910Z",
       "why": "Tafel-Fix aus dem heutigen 429; klein und eigenstaendig, die Reihung hinter den laufenden Punkten ist folgenlos"
+    },
+    "705": {
+      "at": "2026-08-17T14:29:14.631Z",
+      "why": "Ursache der Tafel-Drosselung, aber die Lesesite (704) faengt den Nutzer schon ab; die Reihung hinter den laufenden Punkten ist folgenlos"
+    },
+    "706": {
+      "at": "2026-08-17T14:29:14.683Z",
+      "why": "Kleiner Argument-Fehler in einem Hilfsbefehl; nichts haengt daran, letzte Stelle ist richtig"
+    },
+    "707": {
+      "at": "2026-08-17T14:29:14.742Z",
+      "why": "Zug-Ersparnis, kein Produktfehler; sie zahlt sich ueber viele Sitzungen aus und hat keine Frist"
+    },
+    "708": {
+      "at": "2026-08-17T14:29:14.792Z",
+      "why": "Groesserer Umbau der Ablaeufe; er lohnt erst nach 707, das dieselbe Vorabpruefung braucht"
     }
   },
   "settled": {
-    "at": "2026-08-17T13:43:56.911Z",
+    "at": "2026-08-17T14:29:14.793Z",
     "points": [
       174,
       184,
@@ -313,9 +325,12 @@
       699,
       700,
       701,
-      702,
       703,
-      704
+      704,
+      705,
+      706,
+      707,
+      708
     ]
   }
 }
