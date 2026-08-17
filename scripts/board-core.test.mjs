@@ -474,6 +474,79 @@ describe('removeVdzk — an answered question disappears', () => {
   })
 })
 
+// ═══ Point 700 — THE HANDOVER STATE IS LEGITIMATE, and the audit knows it ═══
+// Measured 17.08.2026, twice, on the live board: while the unnumbered handover
+// card stood where a numbered now-card had been, the unit layer went red
+// (`dup-in-section`) — and because the pre-push gate runs this layer, the
+// refusal landed on the session's LAST bookkeeping, the most expensive moment
+// there is; one commit was dropped rather than fought for. THE DECISION PINNED
+// HERE: the unnumbered gap card is the SANCTIONED state of a board whose
+// session is ending (points 439/470/655 built it deliberately) — the audit
+// passes it, the live-board sweep SKIPS it (no now-point to move), and the
+// sanctioned moves into that state cannot mint a duplicate. A numbered card is
+// NOT owed during a handover.
+describe('point 700 — the handover state cannot block the handover', () => {
+  const running = () =>
+    `<details class="now">\n  <summary><span class="num">700</span><span class="t">Die Kontextmarke</span>` +
+    `<span class="right"><span class="meta">18:04 · ~23:04</span></span></summary>\n` +
+    `  <div class="body">\n    <p><span class="stamp">Stand 16:20</span> läuft</p>\n  </div>\n</details>\n`
+  const audit = (doc) => auditDashboard(doc, { open: [], done: [] }).map((v) => v.code)
+
+  it('a POINT handover (done --none) leaves a board the audit passes, the gap card standing', () => {
+    const before = fullBoard({ now: running(), queue: queueEntry(701, 'Nächster Punkt', '~2 h') })
+    const after = closeCard(before, 700, {
+      text: 'Fertig; übergeben.',
+      end: '19:00',
+      none: 'Der Punkt ist abgeschlossen; der Nachfolger nimmt Punkt 701.',
+    })
+    // `archive-link-missing` is the fixture's, not the move's: the synthetic
+    // Erledigt section has no archive link for its first-ever card to sit under.
+    const added = audit(after).filter((c) => !audit(before).includes(c) && c !== 'archive-link-missing')
+    expect(added).toEqual([])
+    expect(claimsNoCurrentWork(after)).toBe(true)
+  })
+
+  it('a CONTEXT handover (queue back, then the gap card) duplicates nothing', () => {
+    const before = fullBoard({ now: running(), queue: queueEntry(701, 'Nächster Punkt', '~2 h') })
+    const returned = toQueue(before, 700)
+    const after = toNoCurrentWork(returned, 'Wasserstandsmarke erreicht; der Nachfolger nimmt Punkt 700 wieder auf.', {
+      stamp: '19:01',
+    })
+    expect(audit(after)).not.toContain('dup-in-section')
+    expect([...parseQueuePoints(after)]).toEqual([700, 701])
+  })
+
+  it('the gap card contributes NO now-point, so the live sweep skips instead of moving a card that is not there', () => {
+    const after = toNoCurrentWork(fullBoard({ queue: queueEntry(701, 'Nächster Punkt', '~2 h') }),
+      'Übergabe; der Nachfolger nimmt Punkt 701.', { stamp: '19:01' })
+    expect([...parseNowCardPoints(after)]).toEqual([])
+  })
+
+  it('toQueue is IDEMPOTENT against board drift — a standing queue card is kept, never doubled', () => {
+    // The measured red: the queue already lists the point while its now-card
+    // stands; a second card is the dup-in-section that blocked the handover.
+    const drifted = fullBoard({
+      now: running(),
+      queue: queueEntry(700, 'Die Kontextmarke', '~5 h') + queueEntry(701, 'Nächster Punkt', '~2 h'),
+    })
+    const after = toQueue(drifted, 700)
+    expect(audit(after)).not.toContain('dup-in-section')
+    expect([...parseNowCardPoints(after)]).toEqual([])
+    expect([...parseQueuePoints(after)]).toEqual([700, 701])
+    // …and an Erledigt card of the same bare shape does NOT masquerade as the
+    // standing queue entry: with no queue card, the move still inserts one.
+    const redelivered = fullBoard({
+      now: running(),
+      queue: queueEntry(701, 'Nächster Punkt', '~2 h'),
+      done:
+        `<details>\n  <summary><span class="num">700</span><span class="t">Die Kontextmarke</span>` +
+        `<span class="right"><span class="meta">10:00 · 11:00</span></span></summary>\n` +
+        `  <div class="body">\n    <p>Frühere Lieferung.</p>\n  </div>\n</details>\n`,
+    })
+    expect([...parseQueuePoints(toQueue(redelivered, 700))]).toEqual([700, 701])
+  })
+})
+
 // The fixtures above pin the shape; this pins that the shape is the LIVE one.
 // A card generator that drifts from the board the guard reads would pass every
 // synthetic test and block the next turn instead.

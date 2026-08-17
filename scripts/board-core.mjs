@@ -505,6 +505,21 @@ export function toNow(html, point, status, { stamp = berlinStamp() } = {}) {
 export function toQueue(html, point, { text, estimate } = {}) {
   const card = nowCard(html, point)
   if (!card) throw new Error(`board: no current-work card for point ${point}`)
+  // IDEMPOTENT AGAINST BOARD DRIFT (point 700, measured 17.08.2026): a board
+  // that already lists the point in the Warteschlange — however it came to —
+  // must not receive a SECOND card for it, because the resulting
+  // `dup-in-section` turns the unit layer red and the pre-push gate then
+  // refuses exactly the handover bookkeeping this move exists for. The
+  // standing queue entry keeps the place; only the now-card goes. Scoped to
+  // the queue SECTION, because an Erledigt card shares the bare markup shape.
+  let standing = null
+  try {
+    const { from, end } = sectionBounds(html, 'queue')
+    standing = queueCard(html.slice(from, end), point)
+  } catch {
+    /* no queue section — the insertion below reports it */
+  }
+  if (standing) return html.replace(card, '')
   const body = text?.trim() || statusOf(card)
   if (!body) throw new Error('board: refusing to queue a card with an empty body')
   const hours = spanHours(metaOf(card))
