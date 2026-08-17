@@ -462,6 +462,16 @@ put it is the mistake this line exists to stop.
     is spent, so a caller can split the review instead of discovering the gap in the verdict.
   - Fail-open: a tool that cannot tell whether it fit says so and refuses the record, rather than
     assuming it did.
+  - SPLITTING BY COMMIT DOES NOT HELP, which is why the passes above are cuts through the FILE SET
+    and not through the history (measured 18.08.2026 over the 35 commits the guard currently holds
+    open, `ae8539d2~1..657fc453`). `gatherMaterial` ships the CURRENT CONTENT of every touched
+    path beside the patch, so a commit's material is dominated by the largest file it happens to
+    touch: 34 of those 41 commits exceed 150k characters on their own, and 31 of them do so ONLY
+    because of four bookkeeping files that carry no reviewable mechanism at all —
+    `docs/tasks-archive.md` (1.39M), `TASKS.md` (662k), `.claude/mechanism-reviews.jsonl` (256k)
+    and `docs/analysis_de/retrospektive-zusammenarbeit.md` (231k). The worst single commit reaches
+    2.05M. A caller who reacts to a truncation by reviewing commit by commit therefore gets the
+    same truncation one commit at a time, and pays a round per commit for it.
   VERIFIABLE: Vitest over the pure assembly — material under the budget yields a record command,
   material over it yields the refusal naming the dropped files, and a two-pass composition yields a
   record naming both passes; plus a case pinning that a truncation notice inside the material alone
