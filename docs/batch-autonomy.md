@@ -388,6 +388,12 @@ How it works:
    and a worktree-isolated agent (whose calls carry the parent's session id
    while its own context is small), and it fails OPEN on an unreadable
    measurement — a fence may end a session early at worst, never trap one.
+   EVERY boundary marker, point or context, additionally RECORDS the context
+   reading it was taken at (`tokens`/`watermark` on the marker; null when
+   honestly unmeasurable), and a commit further past the mark than the stated
+   margin (`CONTEXT_MARGIN_TOKENS`, context-watermark-core.mjs) prints the
+   distance and demands it in the closing report — so how far past the mark a
+   session really left stays a number somebody reads, not a claim.
 2. At the turn end `batch-progress-guard` re-judges the claim itself — the marker
    is a claim, not proof. It ALLOWS the stop only when the point is closed per
    `TASKS.md` + `docs/tasks-archive.md` (or the marker records a real watermark
