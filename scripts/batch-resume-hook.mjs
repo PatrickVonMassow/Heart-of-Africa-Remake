@@ -15,6 +15,11 @@
 //     e9407cae incident's second hole).
 // It also records this TOP-LEVEL session id for the parallel-session detector
 // (subagents never fire SessionStart, so they can never be flagged).
+//
+// The rule-echo stamp sits DOWN at the policy wording rather than up here, and
+// nothing but the stamp shares its block: a comment beside it would be quotable,
+// and quoting commentary is how a stamp gets cleared without reading the rule
+// (review rounds 7 and 8).
 import { readFileSync, rmSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -229,8 +234,7 @@ try {
     // forbidden commit.
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
-      // rule:model-policy@8b2f41d7 — the stamp sits AT the policy wording, not in
-      // the file header, so clearing it needs a quote from THIS text (review 7).
+      // rule:model-policy@8b2f41d7
       'MODEL POLICY (25.07.-17.08.2026, CLAUDE.md par.6): AUTHORING HAS THREE LANES. ' +
       'GPT-5.6 Sol authors the MECHANICAL and MID-DIFFICULTY points via ' +
       'scripts/author-sol.mjs; OPUS 5 keeps the HARD cases — difficult, complex or ' +

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { memoryDirs } from './rule-echo-guard.mjs'
 import {
@@ -446,5 +448,29 @@ describe('stampPlan', () => {
   it('refuses an empty file list and never throws on nothing', () => {
     expect(stampPlan({ id: 'demo', hash: 'ffffffff', texts: [], quote: passage }).ok).toBe(false)
     expect(stampPlan().ok).toBe(false)
+  })
+})
+
+describe('the real placement of a stamp (review round 8)', () => {
+  // The synthetic cases above prove the RULE; this one proves the PLACEMENT in
+  // the file that had the defect twice — first a stamp in the file header, then
+  // a stamp with explanatory prose in its own block, each quotable without ever
+  // reading the policy.
+  const hookText = readFileSync(resolve(process.cwd(), 'scripts/batch-resume-hook.mjs'), 'utf8')
+
+  it('accepts a quote from the policy text it marks', () => {
+    expect(quoteIsInFile(hookText, 'OPUS 5 keeps the HARD cases', { id: 'model-policy' }).ok).toBe(true)
+  })
+
+  it('refuses a quote of the commentary ABOUT the stamp', () => {
+    expect(
+      quoteIsInFile(hookText, 'The rule-echo stamp sits DOWN at the policy wording', { id: 'model-policy' }).ok,
+    ).toBe(false)
+  })
+
+  it('refuses a quote from the file header, where the stamp used to sit', () => {
+    expect(
+      quoteIsInFile(hookText, 'auto-resume the TASKS.md batch', { id: 'model-policy' }).ok,
+    ).toBe(false)
   })
 })
