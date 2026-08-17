@@ -561,15 +561,6 @@ export function processCommandOf(pid) {
   }
 }
 
-/** Slash-normalise, lower-case and collapse whitespace — the one lens both
- *  sides of an identity compare are read through. */
-const normCmdText = (s) =>
-  String(s ?? '')
-    .replace(/\\/g, '/')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase()
-
 /**
  * Does this command line say it IS the process a run record describes? PURE,
  * so the identity rule is pinned without a process table.
@@ -582,24 +573,44 @@ const normCmdText = (s) =>
  *   1. Cheap first gate: the INVOKED script must be run-logged.mjs — the
  *      first non-flag word after the interpreter, or the program word itself
  *      when the script runs directly. A process merely HANDED the name as a
- *      later argument is not the wrapper.
- *   2. The RECORDED LOG PATH must stand in the probed argv as its own word
- *      (`logPaths`). Every wrapper's argv names its log: a `--log-file`
- *      launch carries it by hand, and the default launch RE-EXECS itself
- *      with the resolved path appended (run-logged.mjs). A verbatim
- *      command-line equality stood here once and was an accepted break (Sol
- *      round 4): a bare default argv is not an identity — a recycled pid
- *      re-running the identical invocation compared EQUAL, and an unrelated
- *      run read as alive.
+ *      later argument is not the wrapper. Program names are CASE-FOLDED here
+ *      (a Windows spelling is still the program).
+ *   2. The RECORDED LOG PATH must stand as the VALUE of `--log-file` —
+ *      detached (`--log-file <path>`) or attached (`--log-file=<path>`).
+ *      Every RUNNING wrapper's argv carries it there: a `--log-file` launch
+ *      by hand, the default launch by RE-EXEC (run-logged.mjs). Anywhere
+ *      else in argv the path is an OPERAND, not the run — `run-logged.mjs
+ *      --show <log>` is a READER of the recorded log, and gate 1 alone only
+ *      proves "some run-logged.mjs process" (Sol round 5; a plain
+ *      any-word scan stood here and read the reader as alive). A verbatim
+ *      command-line equality stood here even earlier and was an accepted
+ *      break (Sol round 4): a bare default argv is not an identity.
+ *      The path compare is CASE-SENSITIVE: on POSIX `x.log` and `X.log` are
+ *      two files, and folding them conflated two runs (Sol round 5). Only
+ *      separators are normalised (`\` → `/`), matching the record's own
+ *      display form.
+ * ARGV BOUNDARIES: the probed command line is read space-joined from /proc,
+ * so a log path CONTAINING whitespace has no recoverable spelling here. Such
+ * a candidate DENIES outright rather than being matched piecewise (Sol round
+ * 5) — the repo's own log paths carry no spaces, and the false-DENY side is
+ * the rule this whole function follows: one refused transfer and a re-run,
+ * never a mis-read identity.
  * A caller that can supply NO identity gets false, never a lenient true: the
  * false-DENY side costs one refused transfer and a re-run, while a stranger
  * process adopted as the run costs a receipt that never arrives.
  */
 export function commandNamesRun(command, { logPaths = [] } = {}) {
-  const words = normCmdText(command).split(' ').filter(Boolean)
+  const words = String(command ?? '')
+    .replace(/\\/g, '/')
+    .split(/\s+/)
+    .filter(Boolean)
   if (words.length === 0) return false
-  const isScript = (w) => w === 'run-logged.mjs' || w.endsWith('/run-logged.mjs')
-  const prog = words[0].slice(words[0].lastIndexOf('/') + 1).replace(/\.(exe|cmd|bat)$/, '')
+  const isScript = (w) => {
+    const l = w.toLowerCase()
+    return l === 'run-logged.mjs' || l.endsWith('/run-logged.mjs')
+  }
+  const w0 = words[0].toLowerCase()
+  const prog = w0.slice(w0.lastIndexOf('/') + 1).replace(/\.(exe|cmd|bat)$/, '')
   if (['node', 'nodejs', 'bun', 'deno', 'tsx'].includes(prog)) {
     // The invoked script is the first non-flag word. A detached interpreter
     // flag value (`node -r esm run-logged.mjs`) would misread here — that
@@ -609,8 +620,15 @@ export function commandNamesRun(command, { logPaths = [] } = {}) {
   } else if (!isScript(words[0])) {
     return false
   }
-  const candidates = (Array.isArray(logPaths) ? logPaths : [logPaths]).map(normCmdText).filter(Boolean)
-  return candidates.length > 0 && words.some((w) => candidates.includes(w))
+  const candidates = (Array.isArray(logPaths) ? logPaths : [logPaths])
+    .map((p) => String(p ?? '').replace(/\\/g, '/').trim())
+    .filter(Boolean)
+  if (candidates.length === 0 || candidates.some((c) => /\s/.test(c))) return false
+  for (let i = 0; i < words.length; i++) {
+    if (words[i] === '--log-file' && words[i + 1] !== undefined && candidates.includes(words[i + 1])) return true
+    if (words[i].startsWith('--log-file=') && candidates.includes(words[i].slice('--log-file='.length))) return true
+  }
+  return false
 }
 
 /**
@@ -634,9 +652,11 @@ export function commandNamesRun(command, { logPaths = [] } = {}) {
  * would read a RECYCLED pid — any stranger process that inherited the number
  * after the wrapper died — as a live run, and the successor would await a
  * receipt that never arrives. Identity is judged on the process's COMMAND
- * LINE against the RECORD's own LOG PATH (`commandNamesRun`, Sol round 3):
- * every wrapper argv names its log — a `--log-file` launch by hand, the
- * default launch by RE-EXEC (run-logged.mjs). NOT a verbatim command-line
+ * LINE against the RECORD's own LOG PATH standing as the `--log-file` VALUE
+ * (`commandNamesRun`, Sol rounds 3/5): every RUNNING wrapper's argv carries
+ * it there — a `--log-file` launch by hand, the default launch by RE-EXEC
+ * (run-logged.mjs) — while a `--show` READER of the same log does not, and
+ * must not read as the run. NOT a verbatim command-line
  * equality: that stood here and broke (Sol round 4) — a recycled pid
  * re-running the identical bare default invocation compared equal, and an
  * unrelated run read as alive. A probe that cannot show the recorded path —

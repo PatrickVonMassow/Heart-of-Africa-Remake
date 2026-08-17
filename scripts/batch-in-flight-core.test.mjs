@@ -2144,6 +2144,45 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
     expect(commandNamesRun(null, logs)).toBe(false)
   })
 
+  it('commandNamesRun demands the path as the --log-file VALUE — a --show reader is not the run (Sol round 5)', () => {
+    const logs = { logPaths: ['local/verify-logs/x.log'] }
+    // The READER of the recorded log: gate 1 passes (it IS run-logged.mjs),
+    // but the path stands behind --show — a process reading the record's log,
+    // not the run that writes it. The any-word scan read this as ALIVE.
+    expect(commandNamesRun('node scripts/verify/run-logged.mjs --show local/verify-logs/x.log --tail 40', logs)).toBe(
+      false,
+    )
+    // The path as a bare operand is not the run either.
+    expect(commandNamesRun('node scripts/verify/run-logged.mjs local/verify-logs/x.log', logs)).toBe(false)
+    // The attached spelling is the same value.
+    expect(commandNamesRun('node scripts/verify/run-logged.mjs --log-file=local/verify-logs/x.log world', logs)).toBe(
+      true,
+    )
+    // A trailing --log-file with no value names nothing.
+    expect(commandNamesRun('node scripts/verify/run-logged.mjs --log-file', logs)).toBe(false)
+  })
+
+  it('commandNamesRun compares the path case-sensitively; only the program name folds (Sol round 5)', () => {
+    const logs = { logPaths: ['local/verify-logs/x.log'] }
+    // POSIX: X.log and x.log are two files — the folded compare conflated two
+    // runs into one identity.
+    expect(commandNamesRun('node scripts/verify/run-logged.mjs --log-file local/verify-logs/X.log world', logs)).toBe(
+      false,
+    )
+    // The program-name gate still folds: a Windows spelling is the wrapper.
+    expect(commandNamesRun('NODE C:/repo/scripts/verify/Run-Logged.mjs --log-file local/verify-logs/x.log', logs)).toBe(
+      true,
+    )
+    // A candidate log path CONTAINING whitespace has no recoverable argv
+    // spelling (the /proc reading is space-joined) — it DENIES outright,
+    // never a piecewise match.
+    expect(
+      commandNamesRun('node scripts/verify/run-logged.mjs --log-file "local/verify logs/x.log"', {
+        logPaths: ['local/verify logs/x.log'],
+      }),
+    ).toBe(false)
+  })
+
   it('commandNamesRun judges the INVOKED script — run-logged.mjs as data is not the wrapper', () => {
     // The program word is node, the invoked script unrelated.mjs; the wrapper
     // name and even the log path ride along as arguments (Sol round 3,
