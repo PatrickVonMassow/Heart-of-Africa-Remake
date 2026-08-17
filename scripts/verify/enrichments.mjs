@@ -8628,6 +8628,7 @@ if (section('ctrl-actor-labels')) {
         let fusedFrames = 0
         let worstDepth = 0
         let worstPair = null
+        let labelsMin = Infinity
         let labelsMax = 0
         const read = () => {
           const boxes = [...document.querySelectorAll('.actor-label')]
@@ -8636,6 +8637,7 @@ if (section('ctrl-actor-labels')) {
               return { text: (el.textContent ?? '').trim(), left: r.left, right: r.right, top: r.top, bottom: r.bottom }
             })
             .filter((b) => b.right > b.left && b.bottom > b.top)
+          labelsMin = Math.min(labelsMin, boxes.length)
           labelsMax = Math.max(labelsMax, boxes.length)
           let fusedHere = false
           for (let i = 0; i < boxes.length; i++) {
@@ -8655,7 +8657,7 @@ if (section('ctrl-actor-labels')) {
             }
           }
           if (fusedHere) fusedFrames++
-          if (++sampled >= SAMPLES) return res({ samples: sampled, fusedFrames, worstDepth, worstPair, labelsMax })
+          if (++sampled >= SAMPLES) return res({ samples: sampled, fusedFrames, worstDepth, worstPair, labelsMin, labelsMax })
           requestAnimationFrame(read)
         }
         requestAnimationFrame(read)

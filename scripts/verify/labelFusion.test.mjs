@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import { FUSE_HARD, FUSE_MAX_SHARE, FUSE_TOLERANCE, judgeLabelFusion } from './labelFusion.mjs'
 
-const clean = { samples: 90, fusedFrames: 0, worstDepth: 0, worstPair: null, labelsMax: 19 }
+const clean = { samples: 90, fusedFrames: 0, worstDepth: 0, worstPair: null, labelsMin: 19, labelsMax: 19 }
 
 describe('judgeLabelFusion (point 628)', () => {
   it('passes a clean crowd', () => {
@@ -17,8 +17,8 @@ describe('judgeLabelFusion (point 628)', () => {
     expect(r.detail).toContain('80/90')
   })
 
-  it('fails ONE deep fusion even in a single frame', () => {
-    const r = judgeLabelFusion({ ...clean, fusedFrames: 1, worstDepth: FUSE_HARD + 1 })
+  it('fails ONE fusion AS DEEP AS the unreadable bar, even in a single frame', () => {
+    const r = judgeLabelFusion({ ...clean, fusedFrames: 1, worstDepth: FUSE_HARD })
     expect(r.ok).toBe(false)
     expect(r.detail).toContain('unreadable')
   })
@@ -39,11 +39,23 @@ describe('judgeLabelFusion (point 628)', () => {
   it('fails an empty or crowdless sample — a green over nothing certifies nothing', () => {
     expect(judgeLabelFusion(null).ok).toBe(false)
     expect(judgeLabelFusion({ ...clean, samples: 0 }).ok).toBe(false)
-    expect(judgeLabelFusion({ ...clean, labelsMax: 1 }).ok).toBe(false)
+    expect(judgeLabelFusion({ ...clean, labelsMin: 1, labelsMax: 1 }).ok).toBe(false)
+  })
+
+  it('demands the crowd HOLD through the whole sample, not peak in one frame (Sol review, 17.08.)', () => {
+    // Two clean labels in the first frame, every label unmounted for the other
+    // 89: a scene that HIDES labels instead of placing them must not pass.
+    expect(judgeLabelFusion({ ...clean, labelsMin: 0, labelsMax: 19 }).ok).toBe(false)
+  })
+
+  it('fails a sampler that never reported the floor — peak alone is not a reading', () => {
+    const { labelsMin: _dropped, ...peakOnly } = clean
+    expect(judgeLabelFusion(peakOnly).ok).toBe(false)
   })
 
   it('lets a caller with a legitimate lone subject lower the floor to 1, never to 0', () => {
-    expect(judgeLabelFusion({ ...clean, labelsMax: 1 }, { minLabels: 1 }).ok).toBe(true)
-    expect(judgeLabelFusion({ ...clean, labelsMax: 0 }, { minLabels: 1 }).ok).toBe(false)
+    expect(judgeLabelFusion({ ...clean, labelsMin: 1, labelsMax: 1 }, { minLabels: 1 }).ok).toBe(true)
+    // minLabels: 0 is CLAMPED to 1 — an empty picture never passes any caller.
+    expect(judgeLabelFusion({ ...clean, labelsMin: 0, labelsMax: 0 }, { minLabels: 0 }).ok).toBe(false)
   })
 })
