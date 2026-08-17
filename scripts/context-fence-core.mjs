@@ -218,36 +218,59 @@ const VERIFY_TREE = /(?:^|\/)scripts\/verify(?:\/|$)/i
  * read `notes.md` as a target directory and ALLOWED the write; and the sed/perl
  * letter scans denied ordinary READS whose attached value carried the trigger
  * letter (`sed -ffilters.sed TASKS.md`, `perl -MFile::Spec report.pl TASKS.md`).
- * Each letter checked against the INSTALLED tool, not guessed:
- *   - `cp/mv/ln --help`: only -S SUFFIX and -t DIRECTORY take values;
- *   - `install --help`: -g GROUP, -m MODE, -o OWNER, -S, -t;
- *   - `sed --help`: -e script, -f script-file, -l N, and -i[SUFFIX] (optional,
- *     attached only — it never consumes the next word);
- *   - `perl -h`: -e/-E commandline, -m/-M module, -Idirectory, -F/pattern/,
- *     -i[extension], -x[directory], -C[list] and -D[letters] attach values.
- *     NOT -l and NOT -s: -l[octnum] attaches only DIGITS (the non-letter stop
- *     covers those) and -s takes nothing, so `-lne`/`-se` stay the evals they
- *     really are — listing either here would read their `e` as a value and
- *     MISS the write;
- *   - `python3 -h`: -c cmd, -m mod, -W arg, -X opt (all attach);
- *   - `node --help`: -C conditions, -e eval, -p print, -r require.
- * The copy-family/ln letters all take REQUIRED values (detachable, consumed in
- * `splitArgv`); the sed/perl/python/node entries serve the LETTER SCANS, where
- * only attachment matters — their detached values stay in the operand list,
- * the noise it always carried.
+ *
+ * Each letter carries its value's MODE (round 14): 'required' — the value may
+ * stand DETACHED, and `splitArgv` consumes the next word when the cluster ends
+ * on the letter; 'optional' — the value only ever rides ATTACHED, so nothing
+ * after the token may be swallowed. The mode is what lets the ONE table serve
+ * consumption everywhere, the eval path included: round 12 skipped detached
+ * consumption for the interpreters because sed's `-i` attaches optionally, and
+ * that blanket reasoning hid a real defect — `node -r esm -e …` /
+ * `python3 -W ignore -c …` read the detached value as the first operand, which
+ * ended the leading-flag region and MISSED the eval behind it. The axis is
+ * per LETTER, not per tool. A letter ambiguous even at the tool's own help
+ * would stay 'optional': not consuming keeps the operand visible, the safe
+ * direction for detached values (the cluster-scan rule "unsure → value-taking"
+ * is about ATTACHED letters and does not transfer).
+ *
+ * Each letter checked against the INSTALLED tool (help text plus a probe of
+ * the detached form), not guessed:
+ *   - `cp/mv/ln --help` (coreutils 9.1): only -S SUFFIX and -t DIRECTORY take
+ *     values, both detachable — required;
+ *   - `install --help`: -g GROUP, -m MODE, -o OWNER, -S, -t — all required
+ *     (`install -m 644 …` probed);
+ *   - `sed --help`: -e script, -f script-file, -l N all take detached values
+ *     (each probed) — required; -i[SUFFIX] attaches only (`sed -i 's/…/…/'
+ *     file` treats the script as the script, probed) — optional;
+ *   - `perl -h` + probes: -e/-E commandline take detached values — required;
+ *     -Idirectory too (`perl -I lib -e …` probed) — required. -m/-M are
+ *     ATTACH-ONLY: `perl -M Carp` dies "Missing argument to -M" without
+ *     consuming the next word — optional. -F/pattern/, -i[extension],
+ *     -x[directory], -C[list], -D[letters] attach or stand bare (probed:
+ *     `perl -F , …` reads `,` as the program file; `-C -e`/`-x -e` keep the
+ *     -e an option) — optional. NOT -l and NOT -s: -l[octnum] attaches only
+ *     DIGITS (the non-letter stop covers those) and -s takes nothing, so
+ *     `-lne`/`-se` stay the evals they really are — listing either would read
+ *     their `e` as a value and MISS the write;
+ *   - `python3 -h` + probes: -c cmd, -m mod, -W arg, -X opt — all required
+ *     (`-W ignore`, `-X utf8` probed detached);
+ *   - `node --help` + probes: -C conditions, -e eval, -p print, -r require —
+ *     all required (`-r fs`, `-C default` probed detached).
  */
+const req = 'required'
+const opt = 'optional'
 const VALUE_TAKING_SHORTS = new Map([
-  ['cp', new Set(['S', 't'])],
-  ['mv', new Set(['S', 't'])],
-  ['install', new Set(['g', 'm', 'o', 'S', 't'])],
-  ['ln', new Set(['S', 't'])],
-  ['sed', new Set(['e', 'f', 'l', 'i'])],
-  ['perl', new Set(['e', 'E', 'm', 'M', 'I', 'F', 'i', 'x', 'C', 'D'])],
-  ['python', new Set(['c', 'm', 'W', 'X'])],
-  ['python3', new Set(['c', 'm', 'W', 'X'])],
-  ['node', new Set(['C', 'e', 'p', 'r'])],
+  ['cp', new Map([['S', req], ['t', req]])],
+  ['mv', new Map([['S', req], ['t', req]])],
+  ['install', new Map([['g', req], ['m', req], ['o', req], ['S', req], ['t', req]])],
+  ['ln', new Map([['S', req], ['t', req]])],
+  ['sed', new Map([['e', req], ['f', req], ['l', req], ['i', opt]])],
+  ['perl', new Map([['e', req], ['E', req], ['I', req], ['m', opt], ['M', opt], ['F', opt], ['i', opt], ['x', opt], ['C', opt], ['D', opt]])],
+  ['python', new Map([['c', req], ['m', req], ['W', req], ['X', req]])],
+  ['python3', new Map([['c', req], ['m', req], ['W', req], ['X', req]])],
+  ['node', new Map([['C', req], ['e', req], ['p', req], ['r', req]])],
 ])
-const NO_VALUE_SHORTS = new Set()
+const NO_VALUE_SHORTS = new Map()
 const valueShortsOf = (head) => VALUE_TAKING_SHORTS.get(head) ?? NO_VALUE_SHORTS
 
 /**
@@ -328,13 +351,15 @@ function pathTokensOf(text) {
  *     spelled. `cp -- -notes.md docs/new.md` copies a dash-named file, and
  *     `node -- -e x` runs a FILE named `-e` — no eval;
  *   - with `valueTaking` (the tool's `VALUE_TAKING_SHORTS` entry), a short
- *     cluster is read through `splitShortCluster`: a value-taking letter
+ *     cluster is read through `splitShortCluster`: a REQUIRED-value letter
  *     ENDING its cluster takes the NEXT word as its value (`cp -S .bak`,
- *     `ln -st /tmp`), which is consumed, not an operand — and with
- *     `targetOption`, the value of `t` (attached `-tdocs` or detached) and
- *     of `--target-directory[=<dir>]` is the destination. A letter whose
- *     value rides ATTACHED consumes nothing (`-St`: the `t` is `-S`'s value,
- *     so no `-t` fires — Sol round 12).
+ *     `ln -st /tmp`, `node -r esm`, `python3 -W ignore`), which is consumed,
+ *     not an operand — an OPTIONAL-value letter (sed/perl `-i`, perl `-M`)
+ *     attaches or stands bare and never swallows the next word (round 14) —
+ *     and with `targetOption`, the value of `t` (attached `-tdocs` or
+ *     detached) and of `--target-directory[=<dir>]` is the destination. A
+ *     letter whose value rides ATTACHED consumes nothing (`-St`: the `t` is
+ *     `-S`'s value, so no `-t` fires — Sol round 12).
  * Judged on the whole token however it was quoted — a quoted `-t` is still
  * the flag. Returns:
  *   operands     — the non-option words, the post-`--` region included;
@@ -377,9 +402,11 @@ function splitArgv(args, { targetOption = false, valueTaking = NO_VALUE_SHORTS }
       if (targetOption && cluster.valueLetter === 't') targetDir = cluster.attached
       continue
     }
-    // A required-value option ending its cluster takes the next word — it is
-    // the option's value, never an operand (all copy-family/ln table letters
-    // take required values; only they reach here with a table).
+    // Only a REQUIRED-value option ending its cluster takes the next word —
+    // then it is the option's value, never an operand. An optional-value
+    // letter (sed/perl -i, perl -M/-F/-C/-D/-x) attaches or stands bare, so
+    // consuming here would eat a real operand (round 14).
+    if (valueTaking.get(cluster.valueLetter) !== req) continue
     if (targetOption && cluster.valueLetter === 't') targetDir = args[i + 1] ? args[i + 1].text : null
     i++
   }
@@ -490,32 +517,34 @@ function authoringDirDestination(dest, resolvePath) {
  * false denial teaches the session to fight its own tooling — which costs
  * far more. Short-option VALUES are no longer such an ambiguity: the
  * classified families' value-taking letters are recorded in
- * `VALUE_TAKING_SHORTS` (checked against the installed tools), which is what
- * makes `-St`, `-ffilters.sed` and `-MFile::Spec` KNOWABLE rather than
- * guessed at (Sol rounds 11/12 — both directions of the `t`-only model were
- * real defects, an allowed write and two refused reads, not a residual).
+ * `VALUE_TAKING_SHORTS` with each value's required/optional mode (checked
+ * against the installed tools), which is what makes `-St`, `-ffilters.sed`,
+ * `-MFile::Spec` and the detached `node -r esm` KNOWABLE rather than guessed
+ * at (Sol rounds 11/12 and round 14 — both directions of the `t`-only model
+ * and the skipped detached consumption were real defects, not residuals).
  *
  * THE RESIDUAL after that, each item pinned by test and named with the SIDE
- * it falls on:
+ * it falls on. The round-14 test for membership: an item may stand here only
+ * if the information needed to close it is NOT already in hand — the
+ * required/optional metadata closed two items the round-12 text had
+ * rationalised as intended (the detached-short-value miss, and the
+ * `sed -i -f` refused read, both decided by the table now):
  *   - MISSED WRITE: a directory destination carrying no evidence is judged
- *     the file it was spelled as, so `cp notes.md docs` passes;
- *   - MISSED WRITE: a DETACHED option value standing before an eval flag
- *     ends the leading-flag region and hides the eval (`node --require esm
- *     -e …` passes; likewise a detached short value, `perl -I lib -e …`,
- *     since detached values are consumed only for the copy family/ln, whose
- *     table letters ALL take required values — sed's and perl's `-i` attach
- *     optionally, and a blanket consumption would eat their operands);
+ *     the file it was spelled as, so `cp notes.md docs` passes — closing it
+ *     needs the filesystem fact, which is exactly what the injected
+ *     `isDirectory` supplies where the guard can;
+ *   - MISSED WRITE: a LONG option's detached value standing before an eval
+ *     flag ends the leading-flag region and hides the eval (`node --require
+ *     esm -e …` passes) — the short-option table cannot decide a long
+ *     option, and long-option tables per interpreter are the open-ended
+ *     surface this contract refuses to chase;
  *   - REFUSED READ: the deliberate eval over-reach above — an eval that only
- *     READS a fenced document is denied, the ordinary reads staying open;
- *   - REFUSED READ: a detached sed option value that itself NAMES a fenced
- *     document still rides the operand list, so `sed -i -f TASKS.md
- *     src/x.ts` — the work order as the sed SCRIPT, a read of it — is
- *     denied by the same non-consumption.
+ *     READS a fenced document is denied; deciding an eval's intent means
+ *     reading its program, not its argv, so no table closes it. The ordinary
+ *     reads stay open.
  * Each miss is one unfenced edit in a spelling a cooperating session has no
  * reason to write; each refusal costs one message that names the boundary
- * command. Closing any of them means modelling required-vs-optional values
- * per tool and long-option tables per interpreter — the open-ended surface
- * this contract refuses to chase.
+ * command.
  */
 function shellAuthoringTarget(head, args, resolvePath, isDirectory) {
   const texts = args.map((a) => a.text)
@@ -533,7 +562,10 @@ function shellAuthoringTarget(head, args, resolvePath, isDirectory) {
   // the start-anchored whole-token patterns: `sed 's/-i/x/' TASKS.md` is a
   // substitution whose token starts with `s`, and it stays the read it is.
   if (head === 'sed') {
-    const { flags, operands } = splitArgv(args)
+    // sed's own table consumes -e/-f/-l detached values (round 14): a script
+    // file that NAMES a fenced document (`sed -i -f TASKS.md src/x.ts`) is
+    // that option's value — a READ of it — not a file operand to deny.
+    const { flags, operands } = splitArgv(args, { valueTaking: valueShortsOf('sed') })
     return flags.some(inPlaceFlag) ? firstNamed(operands) : null
   }
   if (head === 'tee') return firstNamed(splitArgv(args).operands)
@@ -587,12 +619,19 @@ function shellAuthoringTarget(head, args, resolvePath, isDirectory) {
     // over-reach covers read-only EVALS, not ordinary calls. The whole-token
     // rule as sed's above holds here too (finding 3): a quoted `--eval` IS
     // the flag, while the start-anchored patterns keep a flag-shaped string
-    // inside a longer script body from counting. BOUNDED MISS, the reading
-    // side winning as stated above: a detached option VALUE before the flag
-    // (`node --require esm -e …`) reads as the first non-flag word without
-    // every interpreter's option table, so that spelling passes — one
-    // unfenced edit, against idling ordinary script calls.
-    if (splitArgv(args).leadingFlags.some(isEvalFlag)) return firstNamed(texts.flatMap(pathTokensOf))
+    // inside a longer script body from counting. The interpreter's OWN table
+    // consumes a required-value short's detached value (round 14): `node -r
+    // esm -e …` / `python3 -W ignore -c …` / `perl -I lib -e …` keep their
+    // eval flag in the leading region — round 12 left these open, and that
+    // was a real defect, not a residual. BOUNDED MISS, the reading side
+    // winning as stated above: a LONG option's detached value before the
+    // flag (`node --require esm -e …`) still reads as the first non-flag
+    // word — long-option tables per interpreter stay unmodelled — so that
+    // spelling passes: one unfenced edit, against idling ordinary script
+    // calls.
+    if (splitArgv(args, { valueTaking: valueShortsOf(head) }).leadingFlags.some(isEvalFlag)) {
+      return firstNamed(texts.flatMap(pathTokensOf))
+    }
   }
   return null
 }

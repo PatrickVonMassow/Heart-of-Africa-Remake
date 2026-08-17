@@ -217,6 +217,35 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
       toolName: 'Bash',
       command: 'cp notes.md TASKS.md -S .bak',
     }],
+    // The other copy-family detached spellings, pinned under the same
+    // metadata: the leading detached value is consumed and the last operand
+    // stays the destination.
+    ['mv -S with a leading detached value', { toolName: 'Bash', command: 'mv -S .bak draft.md TASKS.md' }],
+    ['install -m with a detached mode', { toolName: 'Bash', command: 'install -m 644 notes.md TASKS.md' }],
+    // A REQUIRED-value short's DETACHED value is consumed by the interpreter's
+    // own table (round 14): before the metadata, the detached value became the
+    // first operand, ended the leading-flag region and HID the eval — all
+    // three commands here were ALLOWED at 2f068745 (verified against that
+    // revision) while they write the work order.
+    ['node -r with a detached value before the eval flag', {
+      toolName: 'Bash',
+      command: `node -r esm -e "fs.appendFileSync('TASKS.md','x')"`,
+    }],
+    ['python3 -W with a detached value before the eval flag', {
+      toolName: 'Bash',
+      command: `python3 -W ignore -c "open('TASKS.md','a').write('x')"`,
+    }],
+    ['perl -I with a detached value before the eval flag', {
+      toolName: 'Bash',
+      command: `perl -I lib -e 'open(F, ">>", "TASKS.md")'`,
+    }],
+    // An OPTIONAL-value letter must NOT consume detached (probed: `perl -x -e`
+    // keeps -e an option — -x[directory] attaches or stands bare): marking
+    // `x` required would swallow the -e token as its value and MISS the eval.
+    ['perl -x standing bare before the eval flag — the optional letter swallows nothing', {
+      toolName: 'Bash',
+      command: `perl -x -e 'open(F, ">>", "TASKS.md")'`,
+    }],
     // node accepts the attached long spellings too (`node --help`: --eval=...,
     // --print=...); the exact-token match let this write pass.
     ['node --eval= with the script attached', {
@@ -274,17 +303,6 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
     expect(v.block).toBe(true)
   })
 
-  // A detached sed option value that itself NAMES a fenced document rides the
-  // operand list — detached values are consumed only for the copy family/ln,
-  // whose table letters all take REQUIRED values (sed's -i attaches
-  // optionally; blanket consumption would eat its operands). This read of the
-  // work order as a sed SCRIPT costs one refusal; pinned as the deny-side
-  // residual the classifier's contract names.
-  it('denies sed -i -f TASKS.md on repo code — the script-file operand is not consumed (INTENDED false deny)', () => {
-    const v = decide({ toolName: 'Bash', command: 'sed -i -f TASKS.md src/x.ts' })
-    expect(v.block).toBe(true)
-  })
-
   // The READING side is the one that must never be fenced: these are how a
   // session answers a question about the repository past the mark.
   const reads = [
@@ -325,6 +343,14 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
       toolName: 'Bash',
       command: 'sed -ffilters.sed TASKS.md',
     }],
+    // sed's -f takes a REQUIRED value, so its DETACHED spelling is consumed
+    // too (round 14): the work order here is the sed SCRIPT — a read of it —
+    // and the in-place write lands on repo code. Round 12 pinned this DENIED
+    // as a residual; the metadata decides it, so the pin flipped.
+    ['sed -i -f with the work order as the DETACHED script file — a read, the write is on repo code', {
+      toolName: 'Bash',
+      command: 'sed -i -f TASKS.md src/x.ts',
+    }],
     ['perl -M with the module ATTACHED — an ordinary script run over the work order', {
       toolName: 'Bash',
       command: 'perl -MFile::Spec report.pl TASKS.md',
@@ -358,24 +384,21 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
   // note): the classifier catches the ORDINARY shell forms that write the
   // fenced documents and is NOT argv-complete; ambiguity resolves toward the
   // READ, because a missed authoring call costs one unfenced edit while a
-  // false denial costs the session its way of working. These pins hold that
-  // direction — each names a real miss that must STAY a miss rather than
-  // grow another parser.
+  // false denial costs the session its way of working. An item may be pinned
+  // here only while the information to close it is NOT in hand (round 14:
+  // the detached-SHORT-value pin that stood here locked in a miss the table
+  // decides — it moved to the denies above, with `python3 -W`/`node -r`).
   const residual = [
     ['a directory named with NO evidence is judged a file — the copy-in is missed, the copy-out stays open', {
       toolName: 'Bash',
       command: 'cp notes.md docs',
     }],
-    ['a detached option value before the eval flag hides the eval — ordinary script calls must not idle', {
+    // Only the LONG spelling remains on this side: the short-option table
+    // cannot decide a long option's detached value, and long-option tables
+    // per interpreter are the surface the contract refuses to chase.
+    ['a LONG option\'s detached value before the eval flag hides the eval — ordinary script calls must not idle', {
       toolName: 'Bash',
       command: `node --require esm -e "fs.appendFileSync('TASKS.md','x')"`,
-    }],
-    // The short spelling of the same miss: -I's detached value is not consumed
-    // (consumption is copy-family/ln only), so `lib` ends the leading-flag
-    // region and the -e behind it goes unseen.
-    ['a detached SHORT option value before the eval flag — the same class, same side', {
-      toolName: 'Bash',
-      command: `perl -I lib -e 'open(F, ">>", "TASKS.md")'`,
     }],
   ]
   for (const [name, call] of residual) {
