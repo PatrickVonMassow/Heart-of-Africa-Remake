@@ -1322,41 +1322,6 @@ put it is the mistake this line exists to stop.
   and a remnant that keeps vultures on station is itself renderable; plus a browser frame from
   that seed showing predator and prey together, on both backends.
 
-- [ ] 628. THE HOLD-CTRL LAYER LABELS A CAMP TWICE AND NAMES THE PLAYER'S OWN BOAT
-  (found 11.08.2026 while re-testing the roster for point 600, and deliberately not fixed
-  there: both halves are a judgment about what the layer PROMISES, not a defect in the
-  state coverage that point closed).
-  FINAL STATE:
-  1. A PITCHED CAMP CARRIES EXACTLY ONE LABEL. `CampMarkers` in
-     `src/scenes/travel/TravelScene.tsx` draws a permanent `map-label` reading
-     `labels.camp` AND registers the same object with the hold-Ctrl layer, whose text is
-     that same word — so holding Ctrl stacks two identical boxes over one camp. The camp
-     STAYS in point 342's roster, which names "a pitched camp, a set-down canoe"
-     explicitly, so the cure is the one the elder already uses: an object that carries a
-     permanent label of its own is not offered a second time by the Ctrl layer, whoever
-     draws it. Stating that as a rule about permanent labels, not a per-object exception,
-     is the point — a second exception list would rot the way the first one nearly did.
-  2. THE TRAVELLER'S OWN CANOE IS NOT NAMED. The marked canoe groups at the same call site
-     are the boat the player rides or drags. The layer's promise is "what am I looking
-     at", and the player's own vehicle is not that. A canoe SET DOWN in the world keeps
-     its label, per the same roster line.
-  3. TWO LABELS NEVER OVERLAP INTO ONE UNREADABLE BOX (seen 11.08.2026 in
-     `verification/148-ctrl-actor-labels-village.png`, the point-600 evidence frame). Where
-     two villagers stand close, their boxes overlap and the picture reads "Villager llager"
-     and "Villa Villager" — each label is correct, the PICTURE is not, and no test looks at
-     it because every check asks the DOM whether the text is present. The layer therefore
-     declutters: boxes that would overlap are offset, or the further one is dropped while
-     the nearer keeps its name. Which of the two is a judgment to make at the picture, on a
-     crowd, not in the abstract.
-  VERIFIABLE: the pure source/roster test gains both cases — a pitched camp yields exactly
-  one offered label, a ridden or dragged canoe yields none while a set-down one yields its
-  own; the declutter is judged AT THE FRAME on a crowded village, since a DOM assertion is
-  exactly the proxy that let this through; plus the browser check that asks the scene what
-  it DREW asserts that no two labels of identical text stand at one position.
-  Criticality: low — nothing breaks, but a doubled box is exactly the noise the elder
-  exception exists to prevent, and naming the player's own boat makes the layer read as
-  though it labels everything indiscriminately.
-
 - [ ] 658. THE EGRESS ALLOWANCE MUST SURVIVE A CONTAINER RESTART AND THE HOURS AFTER IT (user
   12.08.2026: "Das ist auch schon zum zweiten Mal passiert. Sorge dafür, dass das den
   Container-Neustart überlebt. Deine bisherige Maßnahme scheint also nicht wirksam gewesen zu
