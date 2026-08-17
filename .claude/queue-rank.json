@@ -99,10 +99,14 @@
     "696": {
       "at": "2026-08-14T05:13:27.358Z",
       "why": "Sits with the other infrastructure fixes filed the same night (693-695), behind the communication-slice points the release is cut for"
+    },
+    "698": {
+      "at": "2026-08-17T09:12:55.330Z",
+      "why": "Kalibrierung, kein Defekt: Sie gehoert hinter die uebrigen Sprachpunkte, weil 688-691 die Mechanik noch aendern und die Dichte erst danach sinnvoll eingestellt wird."
     }
   },
   "settled": {
-    "at": "2026-08-14T09:53:59.546Z",
+    "at": "2026-08-17T09:12:55.331Z",
     "points": [
       174,
       184,
@@ -293,7 +297,8 @@
       694,
       695,
       696,
-      697
+      697,
+      698
     ]
   }
 }
