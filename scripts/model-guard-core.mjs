@@ -1,12 +1,14 @@
-// Pure decision core of the serving-model tripwire (point 309): on 24.07.2026
+// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@3ffcd6dc
+// On 24.07.2026
 // the session silently degraded to Haiku 4.5 and merged defective work; the
 // Co-Authored-By trailer in `git log` is the one mechanical record of WHO
 // actually authored a commit. This module only decides — no I/O; the gathering
 // and blocking live in the fail-open wrapper scripts/model-guard.mjs.
 //
-// Model policy (users 25.07.2026 / 13.08.2026): ONLY Opus 5 (default), Opus 4.8
-// (fallback when Opus 5 is unavailable), Fable 5 (the hard cases) and GPT-5.6
-// Sol (the OpenAI authoring lane, point 667) may run the batch. Every other
+// Model policy (users 25.07.2026 / 17.08.2026): ONLY Opus 5 (default, and the
+// hard cases), Opus 4.8 (fallback when Opus 5 is unavailable), Fable 5 (the
+// escalation: Opus work Sol still rejects after a re-work) and GPT-5.6 Sol (the
+// OpenAI authoring lane, point 667) may run the batch. Every other
 // model — Sonnet and Haiku included — is a policy breach: the batch must stop
 // rather than run on it. Hence an ALLOWLIST, not a Haiku blocklist: an unknown
 // future model name fails closed.

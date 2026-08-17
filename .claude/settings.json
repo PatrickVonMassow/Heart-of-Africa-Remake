@@ -83,6 +83,10 @@
           },
           {
             "type": "command",
+            "command": "node scripts/rule-echo-guard.mjs"
+          },
+          {
+            "type": "command",
             "command": "node scripts/dashboard-conciseness-guard.mjs"
           },
           {
