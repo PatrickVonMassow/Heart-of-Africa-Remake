@@ -165,6 +165,12 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
     ['cp -t into the docs directory', { toolName: 'Bash', command: 'cp -t docs notes.md' }],
     ['cp --target-directory= into the docs directory', { toolName: 'Bash', command: 'cp --target-directory=docs notes.md' }],
     ['mv -t into the docs directory', { toolName: 'Bash', command: 'mv -t docs draft.md' }],
+    // The option terminator and the attached short-option value are ordinary
+    // argv facts, shared by ONE helper (Sol round 9, finding 2): behind `--`
+    // a dash-leading word is an operand, and `-tdocs` carries its value
+    // attached.
+    ['cp of a dash-named source behind the option terminator', { toolName: 'Bash', command: 'cp -- -notes.md docs/new.md' }],
+    ['cp -t with its value ATTACHED', { toolName: 'Bash', command: 'cp -tdocs notes.md' }],
     // Any directory UNDER the docs tree is an authoring destination, not only
     // its root (Sol round 7, finding 2).
     ['cp into a directory UNDER docs', { toolName: 'Bash', command: 'cp notes.md docs/reviews/' }],
@@ -240,6 +246,9 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
     // that script's own argument — an ordinary call, not an eval at all.
     ["-e as the invoked script's own argument", { toolName: 'Bash', command: 'node tools/report.mjs -e TASKS.md' }],
     ["a perl script's own -e-shaped argument", { toolName: 'Bash', command: 'perl tools/check.pl -export TASKS.md' }],
+    // `--` ends the interpreter's options too (Sol round 9, finding 2): the
+    // -e behind it is a FILENAME, and denying it fenced an ordinary call.
+    ['-e behind the option terminator — a filename, not an eval', { toolName: 'Bash', command: 'node -- -e TASKS.md' }],
     ['tee -a into the CARRIER — the sanctioned place for a finding', {
       toolName: 'Bash',
       command: 'printf "- [ ] x" | tee -a /home/node/.claude/projects/-workspace-hoa-/memory/findings-carrier.md',
@@ -450,8 +459,10 @@ describe("the fence's claim is BOUNDED — a constructed escape is outside it (r
     expect(decide({ toolName: 'Bash', command: 'ln -s scripts/verify late-link' }).block).toBe(true)
     expect(decide({ toolName: 'Bash', command: 'ln -s ./scripts/./verify late-link' }).block).toBe(true)
     // The -t destination form of the same construction — the operands are all
-    // link targets there.
+    // link targets there — and the CLUSTERED spelling of the same flags
+    // (Sol round 9, finding 2: `-st` slipped past the detached-only parse).
     expect(decide({ toolName: 'Bash', command: 'ln -s -t /tmp scripts/verify' }).block).toBe(true)
+    expect(decide({ toolName: 'Bash', command: 'ln -st /tmp scripts/verify' }).block).toBe(true)
   })
 
   it('the catch is ONE construction wide (Sol round 7, finding 5): a symlink whose TARGET is the verify tree', () => {

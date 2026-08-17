@@ -231,30 +231,59 @@ function pathTokensOf(text) {
 }
 
 /**
- * cp/mv/install/ln argv, split into its bare OPERANDS and the
- * `-t <dir>`/`--target-directory=<dir>` destination where one is given (Sol
- * round 7, finding 2: both forms leave one positional, so a `pos.length < 2`
- * rule read them as having no destination at all). Judged on the whole token
- * however it was quoted — a quoted `-t` is still the flag.
+ * The ONE argv reader every shell rule shares (Sol round 9, finding 2: the
+ * option terminator and attached short options are ordinary argv facts, and
+ * three separate parsers had them wrong three ways — in BOTH directions).
+ * The facts, implemented once:
+ *   - `--` ENDS THE OPTIONS: every later token is an OPERAND however it is
+ *     spelled. `cp -- -notes.md docs/new.md` copies a dash-named file, and
+ *     `node -- -e x` runs a FILE named `-e` — no eval;
+ *   - with `targetOption`, the `-t <dir>`/`--target-directory[=<dir>]`
+ *     destination is read with its value DETACHED, ATTACHED (`-tdocs`) or
+ *     closing a short cluster (`ln -st /tmp`). Only `t` is modelled as
+ *     value-taking — the one letter these rules read; the utilities' other
+ *     value-taking shorts stay unmodelled (see the claim note on
+ *     `shellAuthoringTarget`).
+ * Judged on the whole token however it was quoted — a quoted `-t` is still
+ * the flag. Returns:
+ *   operands     — the non-option words, the post-`--` region included;
+ *   flags        — option tokens before `--`, at ANY position (GNU tools
+ *                  accept trailing options);
+ *   leadingFlags — option tokens before BOTH `--` and the first operand,
+ *                  where an interpreter's OWN options live;
+ *   targetDir    — the target-directory value, or null.
  */
-function destinationSplit(args) {
-  let targetDir = null
+function splitArgv(args, { targetOption = false } = {}) {
   const operands = []
+  const flags = []
+  const leadingFlags = []
+  let targetDir = null
+  let optionsEnded = false
   for (let i = 0; i < args.length; i++) {
     const t = args[i].text
-    if (t === '-t' || t === '--target-directory') {
-      targetDir = args[i + 1] ? args[i + 1].text : null
-      i++
+    if (!optionsEnded && t === '--') {
+      optionsEnded = true
       continue
     }
-    if (t.startsWith('--target-directory=')) {
-      targetDir = t.slice('--target-directory='.length)
+    if (optionsEnded || !t.startsWith('-') || t === '-') {
+      operands.push(t)
       continue
     }
-    if (t.startsWith('-')) continue
-    operands.push(t)
+    flags.push(t)
+    if (operands.length === 0) leadingFlags.push(t)
+    if (targetOption) {
+      if (t === '-t' || t === '--target-directory' || /^-[A-Za-z]*t$/.test(t)) {
+        targetDir = args[i + 1] ? args[i + 1].text : null
+        i++
+      } else if (t.startsWith('--target-directory=')) {
+        targetDir = t.slice('--target-directory='.length)
+      } else {
+        const attached = /^-([A-Za-z]*?)t(.+)$/.exec(t)
+        if (attached) targetDir = attached[2]
+      }
+    }
   }
-  return { targetDir, operands }
+  return { operands, flags, leadingFlags, targetDir }
 }
 
 /**
@@ -333,7 +362,6 @@ function authoringDirDestination(dest, resolvePath) {
  */
 function shellAuthoringTarget(head, args, resolvePath) {
   const texts = args.map((a) => a.text)
-  const pos = texts.filter((t) => !t.startsWith('-'))
   const firstNamed = (candidates) => {
     for (const c of candidates) {
       const target = authoringTarget(c)
@@ -347,10 +375,13 @@ function shellAuthoringTarget(head, args, resolvePath) {
   // owes — a flag STRING inside a longer script body — is already given by
   // the start-anchored whole-token patterns: `sed 's/-i/x/' TASKS.md` is a
   // substitution whose token starts with `s`, and it stays the read it is.
-  if (head === 'sed' && args.some((a) => inPlaceFlag(a.text))) return firstNamed(pos)
-  if (head === 'tee') return firstNamed(pos)
+  if (head === 'sed') {
+    const { flags, operands } = splitArgv(args)
+    return flags.some(inPlaceFlag) ? firstNamed(operands) : null
+  }
+  if (head === 'tee') return firstNamed(splitArgv(args).operands)
   if (head === 'cp' || head === 'mv' || head === 'install') {
-    const { targetDir, operands } = destinationSplit(args)
+    const { targetDir, operands } = splitArgv(args, { targetOption: true })
     const sources = targetDir === null ? operands.slice(0, -1) : operands
     const dest = targetDir === null ? (operands.length >= 2 ? operands[operands.length - 1] : null) : targetDir
     if (dest === null) return null
@@ -373,10 +404,11 @@ function shellAuthoringTarget(head, args, resolvePath) {
   const isEvalFlag = EVAL_FLAGS.get(head)
   if (isEvalFlag) {
     // An eval flag is an INTERPRETER option, and an interpreter option stands
-    // BEFORE the first non-flag word — the same line
-    // `segmentInvokesPathWhere` already draws (Sol round 7, finding 4).
-    // Behind that word a `-e` belongs to the invoked script (`node
-    // tools/report.mjs -e TASKS.md` runs no eval at all), and the approved
+    // BEFORE the first non-flag word AND before `--` — the same line
+    // `segmentInvokesPathWhere` already draws (Sol round 7, finding 4; round
+    // 9, finding 2). Behind either boundary the token belongs to the invoked
+    // script (`node tools/report.mjs -e TASKS.md` runs no eval at all, and
+    // `node -- -e TASKS.md` runs a FILE named -e), and the approved
     // over-reach covers read-only EVALS, not ordinary calls. The whole-token
     // rule as sed's above holds here too (finding 3): a quoted `--eval` IS
     // the flag, while the start-anchored patterns keep a flag-shaped string
@@ -385,9 +417,7 @@ function shellAuthoringTarget(head, args, resolvePath) {
     // (`node --require esm -e …`) reads as the first non-flag word without
     // every interpreter's option table, so that spelling passes — one
     // unfenced edit, against idling ordinary script calls.
-    const firstBare = args.findIndex((a) => !a.text.startsWith('-'))
-    const options = firstBare === -1 ? args : args.slice(0, firstBare)
-    if (options.some((a) => isEvalFlag(a.text))) return firstNamed(texts.flatMap(pathTokensOf))
+    if (splitArgv(args).leadingFlags.some(isEvalFlag)) return firstNamed(texts.flatMap(pathTokensOf))
   }
   return null
 }
@@ -421,10 +451,11 @@ function segmentStart(seg, resolvePath) {
   // intended limit, and an `ln -s` pointing elsewhere is ordinary file work.
   // This closes the literal construction; the CLASS of constructed escapes
   // stays outside the fence's claim — see resolveThroughAncestors.
-  if (head === 'ln' && args.some((a) => /^-[A-Za-z]*s/.test(a.text) || a.text === '--symbolic')) {
-    const { targetDir, operands } = destinationSplit(args)
+  if (head === 'ln') {
+    const { targetDir, operands, flags } = splitArgv(args, { targetOption: true })
+    const symbolic = flags.some((t) => /^-[A-Za-z]*s/.test(t) || t === '--symbolic')
     const linkTargets = targetDir !== null || operands.length < 2 ? operands : operands.slice(0, -1)
-    if (linkTargets.some((t) => VERIFY_TREE.test(posixNormalizePath(t)))) {
+    if (symbolic && linkTargets.some((t) => VERIFY_TREE.test(posixNormalizePath(t)))) {
       return { what: `constructing a link into the verify tree (\`${seg.raw}\`)`, authoring: false }
     }
   }
