@@ -1440,7 +1440,10 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
     } finally {
       BANK_CFG.roamSeconds = shippedRoam
     }
-  })
+    // Five cases of 400 replayed seconds each: 17 s alone on this machine, and
+    // over the default 20 s budget under the full suite's worker contention —
+    // a measurement this long carries its own budget, not a flake.
+  }, 60_000)
 
   for (const [placeId, seed] of RIVER_VILLAGES) {
     it(`${placeId} at seed ${seed} walks the group down to the bank and runs the stretch`, () => {
