@@ -8143,3 +8143,78 @@ to land than a mechanism that needs a review.
   Criticality: medium — it spends a shared quota the user's only window depends on, and the
   failure is invisible to the session that causes it.
   Bundle: Chat & Tafel.
+
+- [ ] 706. A queue command swallows the text behind a flag and still reports success
+  (measured 17.08.2026 against the code and the stored state, while filing points). `parseSetArgs`
+  in `scripts/board-queue-core.mjs` treats `--title`/`--estimate` as a MODE switch and pushes every
+  following argument into THAT bucket (`buckets[field].push(a)`). So `set 702 --estimate "~2 h"
+  "<prose>"` files the prose under `estimate`, where `setQueueEntry` discards it while normalising —
+  what remains stored is `~2 h`, and the card text was never there. The command reported `estimate
+  for point 702 stored` and said nothing about the swallowed argument. The cost is not only the lost
+  text: it forces three calls per card (title, body, estimate) instead of the ONE the usage line
+  offers, and with the edit-publish coupling each of those was another publish.
+  FINAL STATE:
+  - An argument the parser does not use as what the caller plainly meant is REFUSED LOUDLY instead
+    of dropped: text after `--estimate` that does not read as a duration aborts and names the right
+    order. The same holds for `--title` followed by more than a title.
+  - The success line names EVERY field it set, so a missing one is visible in the output.
+  VERIFIABLE: Vitest over `parseSetArgs` with exactly this call — the mixed form refused with the
+  correct order named, the well-formed three-field call accepted, and the success line listing each
+  field it wrote.
+  Criticality: low — one command's argument handling, but it silently discards the user-visible
+  text of a board card.
+  Bundle: Chat & Tafel.
+
+- [ ] 707. The preflight cannot judge four wired guards, and those four then block one at a time
+  (measured 17.08.2026). `guard-preflight.mjs --for answer` says so itself: `ci-status-guard,
+  timestamp-guard, decision-card-guard, batch-progress-guard are wired and were NOT JUDGED here`.
+  Exactly those four blocked the turn afterwards, one after another, and a blocked turn produces
+  nothing — the loop around `batch-progress-guard` alone cost seven answers after the marker carried
+  the predecessor's session id while the hook measured the current one. The preflight is blind where
+  it would be worth the most: the whole point of the tool is to name every objection in ONE pass.
+  FINAL STATE:
+  - `ci-status-guard` is judged in the pass. It is read-only decidable — it costs a network round
+    trip, which the report makes rather than skips.
+  - `timestamp-guard` and `decision-card-guard` judge a reply that does not exist yet, so the report
+    names the CONDITION they will be judged against — which time form is expected, which "Von dir zu
+    klären" cards stand — instead of only `not judged`.
+  - `batch-progress-guard` gets a read-only variant that answers "would a boundary stop be
+    permitted" without acquiring or handing over the batch lock, and the report uses that.
+  - Where a guard is genuinely not decidable in advance, the report names WHICH ACTION settles it,
+    so that action can fall into the same turn.
+  VERIFIABLE: Vitest over the preflight core — each of the four reported with its new status, the
+  read-only progress variant leaving the lock file untouched (asserted on its mtime), and a fixture
+  where the CI verdict is red surfacing as a block rather than as `not judged`.
+  Criticality: medium — it is the tool that exists to save turns, and it costs them where it is blind.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 708. Only the landing is one command; the beginning and the turn's end are hand-driven chains
+  (analysed 17.08.2026 against the code). The project knows the pattern: `land-point.mjs` drives 15
+  steps — merge, gate, tick, archive, push, board, cleanup — as ONE command, and CLAUDE.md calls it
+  out as "The landing is ONE command". What was bundled is the RARE, dangerous end. What runs MANY
+  times per point stayed unbundled, and four gaps were measured:
+  (1) THE SESSION BOUNDARY prints a card it could set itself — `batch-boundary.mjs` composes the text
+  via `boundaryCardText`, imports `PUBLISH_CMD` and has `execFileSync`, but neither puts the card up
+  nor publishes; that cost three refused `--commit` runs in one day (card missing, card naming no
+  point, card byte-identical inside the same minute) plus a correction for card brevity.
+  (2) FILING A POINT is about ten calls with no helper at all: append to TASKS.md, `tasks-spec-guard`,
+  `tasks-archive-guard`, `doc-budget-guard`, commit, push, `board-queue set` for title, body and
+  estimate, render the queue, publish the board, `queue-rank --ranked`. No script in the tree appends
+  a point, and `queue-order-guard` blocks the turn end when the ranking step is missing — so the chain
+  is MANDATORY and still unbundled. It ran three times in one day.
+  (3) HANDING A POINT OUT is three calls with no helper: `git worktree add -b feat/<n>-<slug>`,
+  `worktree-bootstrap.mjs`, `author-sol.mjs --point` — and `author-sol` explicitly demands an existing
+  worktree and branch. There are 15 bundled steps for the END and none for the BEGINNING.
+  (4) THE TURN'S END has no command at all: `focus set`, `board-publish`, `dashboard-guard --synced`,
+  `board.mjs attest`, `guard-preflight`. `attest` bundles three of them, but neither the publish nor
+  the focus, and `batch-progress-guard` alone names seven different commands across its remedies.
+  FINAL STATE: one command per sequence, built like `land-point.mjs` — fixed order, one verdict per
+  step, STOPS at the first red, leaves no half state and bypasses no guard. Built in this order, by
+  how often each runs: (2) file a point, (4) end the turn, (1) take the boundary, (3) hand a point out.
+  Each carries a `--dry` that prints the plan without touching anything, as the landing does.
+  VERIFIABLE: Vitest over each sequence's pure plan — the step list, the stop-at-first-red behaviour
+  and the `--dry` output; plus one driven run per command against a fixture repository, ending in the
+  state the hand-driven chain produced.
+  Criticality: medium — it is the per-point overhead of every session, and each hand-driven chain is
+  a place a step gets forgotten.
+  Bundle: Session- & Repo-Hygiene.
