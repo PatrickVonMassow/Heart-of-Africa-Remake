@@ -182,6 +182,19 @@ describe('formatVerdict', () => {
     expect(text).toContain('node scripts/rule-echo.mjs --stamp')
   })
 
+  it('gives BOTH remedies when a stale echo and a stray stamp coexist (round 7)', () => {
+    const text = formatVerdict(
+      [{ id: 'demo', kind: 'stale', hash: 'aaaaaaaa', stale: [{ file: 'a.mjs', had: 'bbbbbbbb' }], unstamped: [] }],
+      [{ file: 'z.md', id: 'demo', why: 'not in this rule\u2019s echo list' }],
+    )
+    expect(text).toContain('node scripts/rule-echo.mjs --stamp')
+    // --stamp refuses an unregistered file, so without this the turn was blocked
+    // with no command able to clear it.
+    expect(text).toContain('RULE_REGISTRY')
+    expect(text).toContain('remove the stamp')
+    expect(text).toContain('z.md')
+  })
+
   it('says plainly when the watch itself is broken', () => {
     const text = formatVerdict([{ id: 'demo', kind: 'source-gone', detail: 'the anchor "x" matches no line', stale: [], unstamped: [] }])
     expect(text).toContain('THE WATCH IS BROKEN')

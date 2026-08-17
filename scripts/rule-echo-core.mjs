@@ -393,6 +393,14 @@ export function formatVerdict(results = [], strays = []) {
   }
   for (const s of loose) lines.push(`  stray stamp ${s.file} → rule:${s.id} (${s.why})`)
   lines.push('')
+  if (loose.length) {
+    // A STRAY NEEDS THE OTHER REMEDY (review round 7): --stamp refuses a file the
+    // registry does not list, so a mixed verdict that offered only --stamp left
+    // the session blocked with no command that could clear it.
+    lines.push('A STRAY stamp is cleared the other way: add that file to RULE_REGISTRY in')
+    lines.push('scripts/rule-echo-core.mjs, or remove the stamp from it.')
+    lines.push('')
+  }
   lines.push('READ each file above and make its wording match the rule — then stamp it:')
   lines.push('  node scripts/rule-echo.mjs --stamp <file> --quote "<a phrase from that file>"')
   lines.push('The quote must occur in the file, so the stamp cannot be set from the list alone.')

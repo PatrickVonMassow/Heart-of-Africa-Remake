@@ -1,9 +1,6 @@
 // SessionStart hook: auto-resume the TASKS.md batch (user mandate 2026-07-14 —
 // the batch must complete autonomously; no session may sit idle waiting for a
-// "continue"). It states the model policy to every session it resumes —
-// rule:model-policy@8b2f41d7
-//
-// Prints the resume instruction only while TASKS.md still has
+// "continue"). Prints the resume instruction only while TASKS.md still has
 // unticked points AND this session actually WINS the batch ownership:
 //   - a user PAUSE marker (.claude/batch-paused) suppresses auto-resume entirely
 //     until an explicit go;
@@ -232,6 +229,8 @@ try {
     // forbidden commit.
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
+      // rule:model-policy@8b2f41d7 — the stamp sits AT the policy wording, not in
+      // the file header, so clearing it needs a quote from THIS text (review 7).
       'MODEL POLICY (25.07.-17.08.2026, CLAUDE.md par.6): AUTHORING HAS THREE LANES. ' +
       'GPT-5.6 Sol authors the MECHANICAL and MID-DIFFICULTY points via ' +
       'scripts/author-sol.mjs; OPUS 5 keeps the HARD cases — difficult, complex or ' +
