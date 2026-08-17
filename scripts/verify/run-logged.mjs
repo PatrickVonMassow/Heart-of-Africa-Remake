@@ -43,6 +43,7 @@
 //                   `commandNamesRun` in scripts/batch-in-flight.mjs)
 import { spawn } from 'node:child_process'
 import { createWriteStream, mkdirSync, readFileSync } from 'node:fs'
+import { constants as osConstants } from 'node:os'
 import { dirname, isAbsolute, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DEFAULTS, buildDigest, createSelector, failureSurface, showWindow } from './run-digest-core.mjs'
@@ -51,6 +52,12 @@ import { framesWrittenSince, gitPosition, readRecord, recordPathFor, selfCommand
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
+
+/** The termination signals both layers FORWARD to their child rather than
+ *  dying around it — SIGHUP/SIGQUIT beside the classic two (Sol round 5), so
+ *  a hangup reaches the runner instead of killing a middle layer and
+ *  orphaning it. */
+const FORWARDED_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGQUIT']
 
 /** Split our own flags out of the argv; everything else goes to run-all. */
 function parseOwnArgs(argv) {
@@ -237,7 +244,7 @@ function runVerify() {
   child.stdout.on('data', consume)
   child.stderr.on('data', consume)
 
-  for (const sig of ['SIGINT', 'SIGTERM']) {
+  for (const sig of FORWARDED_SIGNALS) {
     process.on(sig, () => {
       try {
         child.kill(sig)
@@ -301,6 +308,14 @@ function runVerify() {
 // once and re-execs itself with it appended; the record writer's argv then
 // always names its log. Costs one idle shim process for the run's duration —
 // Node has no in-place exec — which is nothing beside a browser regression.
+// The shim WAITS for the child however long it runs — a child that ignores a
+// forwarded signal included. Sol round 5 read that as "can remain alive
+// indefinitely"; it is INTENDED: waiting for the child IS the shim's job, its
+// exit status is the run's verdict, and the handlers below only forward —
+// they never end the shim while the child lives. What round 5 did find real
+// is the exit SHAPE: `code === null ? 1` flattened a signal-killed child into
+// an ordinary exit-1 failure, so an interrupted run recorded as a red one.
+// The termination is now REPRODUCED instead — see the close handler.
 function reexecWithLogPath() {
   const logPath = logPathFor(forward, own)
   // The DISPLAY form (ROOT-relative where possible): it is what the record's
@@ -310,7 +325,7 @@ function reexecWithLogPath() {
     stdio: 'inherit',
     env: process.env,
   })
-  for (const sig of ['SIGINT', 'SIGTERM']) {
+  for (const sig of FORWARDED_SIGNALS) {
     process.on(sig, () => {
       try {
         child.kill(sig)
@@ -319,7 +334,24 @@ function reexecWithLogPath() {
       }
     })
   }
-  child.on('close', (code) => {
+  child.on('close', (code, signal) => {
+    if (signal) {
+      // A signal-killed child is reproduced, not flattened to exit 1 (Sol
+      // round 5). Our own forwarders come off first, so the re-raise reaches
+      // the default disposition instead of a handler whose child is already
+      // gone.
+      for (const sig of FORWARDED_SIGNALS) process.removeAllListeners(sig)
+      try {
+        process.kill(process.pid, signal)
+      } catch {
+        /* a signal this platform cannot re-raise — fall through */
+      }
+      // Reached when the signal could not be re-raised (or until it lands):
+      // 128+n is the shell's own spelling of a death by that signal.
+      const num = osConstants.signals[signal]
+      process.exitCode = typeof num === 'number' ? 128 + num : 1
+      return
+    }
     process.exitCode = code === null ? 1 : code
   })
   child.on('error', (err) => {
