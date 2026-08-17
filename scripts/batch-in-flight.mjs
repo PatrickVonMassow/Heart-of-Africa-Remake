@@ -532,8 +532,9 @@ export function isAncestor(ancestorSha, sha, { cwd = REPO_ROOT } = {}) {
  *  reads /proc (NUL-separated argv); Windows asks CIM. Null means UNKNOWN,
  *  never "not it" — the caller decides what unknown identity is worth.
  *  MIRRORED by `selfCommandLine` in scripts/verify/run-record.mjs (the record
- *  writer's own reading): the two must present a process identically or a
- *  recorded identity can never compare equal — change them together. A static
+ *  writer's own reading, kept as evidence beside the pid): the two must
+ *  present a process identically or the recorded evidence stops matching
+ *  what a live probe would see — change them together. A static
  *  import either way is off the table: scripts/verify/ is deliberately absent
  *  from the temp copies the spawned guard tests run in (see runRecordFor). */
 export function processCommandOf(pid) {
@@ -582,15 +583,19 @@ const normCmdText = (s) =>
  *      first non-flag word after the interpreter, or the program word itself
  *      when the script runs directly. A process merely HANDED the name as a
  *      later argument is not the wrapper.
- *   2. The line must carry what the record knows of its writer: the writer's
- *      own recorded command line (read through the same lens as the probe, so
- *      the same process compares EQUAL — `cmdline`), or the recorded log path
- *      standing as an argv word (`--log-file` launches — `logPaths`).
+ *   2. The RECORDED LOG PATH must stand in the probed argv as its own word
+ *      (`logPaths`). Every wrapper's argv names its log: a `--log-file`
+ *      launch carries it by hand, and the default launch RE-EXECS itself
+ *      with the resolved path appended (run-logged.mjs). A verbatim
+ *      command-line equality stood here once and was an accepted break (Sol
+ *      round 4): a bare default argv is not an identity — a recycled pid
+ *      re-running the identical invocation compared EQUAL, and an unrelated
+ *      run read as alive.
  * A caller that can supply NO identity gets false, never a lenient true: the
  * false-DENY side costs one refused transfer and a re-run, while a stranger
  * process adopted as the run costs a receipt that never arrives.
  */
-export function commandNamesRun(command, { cmdline = null, logPaths = [] } = {}) {
+export function commandNamesRun(command, { logPaths = [] } = {}) {
   const words = normCmdText(command).split(' ').filter(Boolean)
   if (words.length === 0) return false
   const isScript = (w) => w === 'run-logged.mjs' || w.endsWith('/run-logged.mjs')
@@ -604,7 +609,6 @@ export function commandNamesRun(command, { cmdline = null, logPaths = [] } = {})
   } else if (!isScript(words[0])) {
     return false
   }
-  if (cmdline && normCmdText(cmdline) === normCmdText(command)) return true
   const candidates = (Array.isArray(logPaths) ? logPaths : [logPaths]).map(normCmdText).filter(Boolean)
   return candidates.length > 0 && words.some((w) => candidates.includes(w))
 }
@@ -630,12 +634,14 @@ export function commandNamesRun(command, { cmdline = null, logPaths = [] } = {})
  * would read a RECYCLED pid — any stranger process that inherited the number
  * after the wrapper died — as a live run, and the successor would await a
  * receipt that never arrives. Identity is judged on the process's COMMAND
- * LINE against the RECORD'S OWN identity (`commandNamesRun`, Sol round 3):
- * the writer's recorded `cmdline` (captured through the same lens the probe
- * reads), or the recorded log path standing in the argv. A record carrying
- * neither — one written before `cmdline` existed, on a default launch whose
- * argv names no log — reads NOT alive: the false-deny side, one re-run,
- * never a stranger adopted as the run.
+ * LINE against the RECORD's own LOG PATH (`commandNamesRun`, Sol round 3):
+ * every wrapper argv names its log — a `--log-file` launch by hand, the
+ * default launch by RE-EXEC (run-logged.mjs). NOT a verbatim command-line
+ * equality: that stood here and broke (Sol round 4) — a recycled pid
+ * re-running the identical bare default invocation compared equal, and an
+ * unrelated run read as alive. A probe that cannot show the recorded path —
+ * a record from before the re-exec existed among them — reads NOT alive:
+ * the false-deny side, one re-run, never a stranger adopted as the run.
  * DELIBERATELY NOT a start-time compare: the measured 04.08.2026 incident
  * (findings carrier) showed the derived start time DRIFTS against a recorded
  * one in this WSL2 container, growing with process age (~3 s at 30 min), and
@@ -664,7 +670,6 @@ export function runRecordFor(logPath, { read, probe = probePid, commandOf = proc
             cmd == null
               ? null
               : commandNamesRun(cmd, {
-                  cmdline: typeof r.cmdline === 'string' ? r.cmdline : null,
                   logPaths: [typeof r.log === 'string' ? r.log : '', declared],
                 })
         }

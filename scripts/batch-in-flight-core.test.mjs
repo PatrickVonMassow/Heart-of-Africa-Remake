@@ -2042,7 +2042,11 @@ describe('assessTransfer — committed-and-pushed checkpoints decide transferabi
 })
 
 describe('runRecordFor — the run record beside a declared log, reduced for the transfer', () => {
+  // The bare default invocation, as a RECYCLED pid would re-run it. The live
+  // wrapper's argv always carries its log path (`--log-file`, by hand or via
+  // the default launch's re-exec — Sol round 4).
   const wrapperCmd = 'node /repo/scripts/verify/run-logged.mjs world'
+  const liveWrapperCmd = 'node /repo/scripts/verify/run-logged.mjs --log-file local/verify-logs/x.log world'
 
   const record = {
     suites: ['world'],
@@ -2064,7 +2068,7 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
         return record
       },
       probe: (pid) => ({ exists: pid === 77, startedAt: null }),
-      commandOf: () => wrapperCmd,
+      commandOf: () => liveWrapperCmd,
     })
     expect(seen[0].replace(/\\/g, '/')).toBe('/repo/local/verify-logs/x.log.run.json')
     expect(r).toEqual({
@@ -2082,7 +2086,7 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
 
   it('a dead pid, a throwing probe and an absent pid read false / null / null — never assumed alive', () => {
     const withProbe = (probe, rec = record) =>
-      runRecordFor('/repo/x.log', { read: () => rec, probe, commandOf: () => wrapperCmd })
+      runRecordFor('/repo/x.log', { read: () => rec, probe, commandOf: () => liveWrapperCmd })
     expect(withProbe(() => ({ exists: false })).alive).toBe(false)
     expect(
       withProbe(() => {
@@ -2101,43 +2105,54 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
     expect(withCommand(() => 'grep -rn run-logged.mjs docs/').alive).toBe(false)
     // An unreadable command line is UNKNOWN — refused by the bar, never assumed.
     expect(withCommand(() => null).alive).toBe(null)
-    // The genuine wrapper, by the record's own recorded command line.
-    expect(withCommand(() => wrapperCmd).alive).toBe(true)
+    // The genuine wrapper: its argv names the record's log — EVERY wrapper's
+    // does, because the default launch re-execs itself with `--log-file`.
+    expect(
+      withCommand(() => 'node /repo/scripts/verify/run-logged.mjs --log-file local/verify-logs/x.log world').alive,
+    ).toBe(true)
+    // …the DECLARED absolute spelling of the same log counts too.
+    expect(withCommand(() => 'node /repo/scripts/verify/run-logged.mjs --log-file /repo/x.log world').alive).toBe(true)
+    // A recycled pid re-running the IDENTICAL bare invocation is not this run
+    // (Sol round 4): without the log path in argv there is no identity,
+    // however verbatim-equal the command line reads against the recorded one.
+    expect(withCommand(() => wrapperCmd).alive).toBe(false)
     // The SAME wrapper on ANOTHER run — a recycled pid running run-logged.mjs
     // for a different suite — is not THIS record's process (Sol round 3).
     expect(withCommand(() => 'node /repo/scripts/verify/run-logged.mjs polish').alive).toBe(false)
-    // A record with NO self-identity (pre-cmdline shape, default launch whose
-    // argv names no log) refuses even the genuine-looking wrapper: false deny
-    // over a stranger adopted as the run.
-    expect(withCommand(() => wrapperCmd, { ...record, cmdline: undefined }).alive).toBe(false)
-    // …unless the argv itself carries the recorded log path (--log-file launch).
+    // A wrapper on a DIFFERENT log is another run, not this record's.
     expect(
-      withCommand(
-        () => 'node /repo/scripts/verify/run-logged.mjs --log-file local/verify-logs/x.log world',
-        { ...record, cmdline: undefined },
-      ).alive,
-    ).toBe(true)
+      withCommand(() => 'node /repo/scripts/verify/run-logged.mjs --log-file local/verify-logs/other.log world')
+        .alive,
+    ).toBe(false)
   })
 
-  it('commandNamesRun demands the record identity, not just the wrapper name', () => {
-    const cmd = 'node scripts\\verify\\run-logged.mjs --suite world'
-    // The record's own command line, in either path style, is the identity.
-    expect(commandNamesRun(cmd, { cmdline: 'node scripts/verify/run-logged.mjs --suite world' })).toBe(true)
-    // The wrapper name ALONE identifies no run: no identity supplied → false.
-    expect(commandNamesRun(cmd)).toBe(false)
-    expect(commandNamesRun('node run-logged.mjs', { cmdline: null, logPaths: [] })).toBe(false)
-    // A different run of the same wrapper does not satisfy this record.
-    expect(commandNamesRun('node run-logged.mjs polish', { cmdline: 'node run-logged.mjs world' })).toBe(false)
-    expect(commandNamesRun('node scripts/verify/run-all.mjs world', { cmdline: 'node scripts/verify/run-all.mjs world' })).toBe(false)
-    expect(commandNamesRun('', { cmdline: '' })).toBe(false)
-    expect(commandNamesRun(null, { cmdline: null })).toBe(false)
+  it('commandNamesRun demands the record log path in the argv, not just the wrapper name', () => {
+    const logs = { logPaths: ['local/verify-logs/x.log'] }
+    // The recorded log path standing in the wrapper's argv, in either path
+    // style, is the identity.
+    expect(
+      commandNamesRun('node scripts\\verify\\run-logged.mjs --log-file local\\verify-logs\\x.log world', logs),
+    ).toBe(true)
+    // The wrapper name ALONE identifies no run — an IDENTICAL bare argv
+    // included (Sol round 4: a recycled pid re-running the same default
+    // invocation verbatim must not read as this record's run).
+    expect(commandNamesRun('node scripts/verify/run-logged.mjs world', logs)).toBe(false)
+    expect(commandNamesRun('node run-logged.mjs', { logPaths: [] })).toBe(false)
+    // A different program carrying the log path is not the wrapper.
+    expect(commandNamesRun('node scripts/verify/run-all.mjs --log-file local/verify-logs/x.log', logs)).toBe(false)
+    expect(commandNamesRun('', logs)).toBe(false)
+    expect(commandNamesRun(null, logs)).toBe(false)
   })
 
   it('commandNamesRun judges the INVOKED script — run-logged.mjs as data is not the wrapper', () => {
     // The program word is node, the invoked script unrelated.mjs; the wrapper
-    // name rides along as an argument (Sol round 3, finding 2).
-    const asData = 'node unrelated.mjs run-logged.mjs'
-    expect(commandNamesRun(asData, { cmdline: asData })).toBe(false)
+    // name and even the log path ride along as arguments (Sol round 3,
+    // finding 2).
+    expect(
+      commandNamesRun('node unrelated.mjs run-logged.mjs local/verify-logs/x.log', {
+        logPaths: ['local/verify-logs/x.log'],
+      }),
+    ).toBe(false)
     // The recorded log path merely MENTIONED by a non-wrapper is not the run.
     expect(
       commandNamesRun('grep -rn local/verify-logs/x.log docs/', { logPaths: ['local/verify-logs/x.log'] }),
@@ -2149,7 +2164,11 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
       }),
     ).toBe(true)
     // The script executed directly still counts as the wrapper.
-    expect(commandNamesRun('scripts/verify/run-logged.mjs world', { cmdline: 'scripts/verify/run-logged.mjs world' })).toBe(true)
+    expect(
+      commandNamesRun('scripts/verify/run-logged.mjs --log-file local/verify-logs/x.log world', {
+        logPaths: ['local/verify-logs/x.log'],
+      }),
+    ).toBe(true)
   })
 
   it('selfCommandLine and processCommandOf read one process through one lens', () => {

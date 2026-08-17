@@ -40,17 +40,19 @@ export function recordPathFor(logPath) {
   return `${full}.run.json`
 }
 
-/** This process's OWN command line — the run record stores it beside the pid
- *  (point 700, Sol round 3) so a later probe can ask "is pid N still the
- *  process that WROTE this record?" instead of "does something by the
- *  wrapper's name exist?". Read through the SAME LENS the probe uses
- *  (`processCommandOf` in scripts/batch-in-flight.mjs: /proc cmdline joined
- *  with single spaces; CIM CommandLine on Windows), so the same process
- *  compares EQUAL — the two implementations must present identically, change
- *  them together (a static import either way is ruled out there). Null when
- *  unreadable: the record then carries no self-identity and a transfer probe
- *  refuses the run as not-alive — the false-deny side, chosen over adopting a
- *  stranger process as the run. */
+/** This process's OWN command line, recorded beside the pid as EVIDENCE of
+ *  the writer's argv (point 700). The liveness probe's identity is the LOG
+ *  PATH inside that argv — every wrapper launch carries one, the default
+ *  launch by re-exec (run-logged.mjs); `commandNamesRun` in
+ *  scripts/batch-in-flight.mjs matches the RECORDED path against the PROBED
+ *  argv. A verbatim equality against this field stood there once and was an
+ *  accepted break (Sol round 4): a recycled pid re-running the identical
+ *  bare invocation compared equal. Read through the SAME LENS the probe
+ *  uses (`processCommandOf`: /proc cmdline joined with single spaces; CIM
+ *  CommandLine on Windows) so the recorded evidence stays comparable with a
+ *  live probe — change the two together (a static import either way is
+ *  ruled out there). Null when unreadable; the identity does not depend on
+ *  it. */
 export function selfCommandLine() {
   if (process.platform !== 'win32') {
     try {

@@ -38,6 +38,9 @@
 //   --keep N        the structured-line budget of the end digest (default 120)
 //   --tail N        raw tail lines on a failure (default 40)
 //   --log-file P    write the log here instead of local/verify-logs/<stamp>.log
+//                   (a launch WITHOUT it re-execs itself with the resolved path
+//                   appended — the record writer's argv must name its log; see
+//                   `commandNamesRun` in scripts/batch-in-flight.mjs)
 import { spawn } from 'node:child_process'
 import { createWriteStream, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative } from 'node:path'
@@ -189,9 +192,11 @@ function runVerify() {
     polls: 0,
     status: 'running',
     pid: process.pid,
-    // The writer's own identity, same lens as the transfer probe: without it a
-    // recycled pid running the same wrapper on ANOTHER run would satisfy this
-    // record (the default launch's argv names no log path to tell them apart).
+    // The writer's own argv, recorded as EVIDENCE. The identity the transfer
+    // probe matches is the LOG PATH inside it — guaranteed present because a
+    // launch without --log-file re-execs itself with the path appended (a bare
+    // argv is no identity: a recycled pid re-running the identical default
+    // invocation must not read as this run — Sol round 4).
     cmdline: selfCommandLine(),
     finishedAt: null,
     exitCode: null,
@@ -287,6 +292,43 @@ function runVerify() {
   })
 }
 
+// ── The default launch RE-EXECS itself with the log path in argv ────────────
+// (point 700, Sol round 4). The run record's liveness probe identifies the
+// wrapper by the RECORDED LOG PATH standing in the probed process's own argv
+// (`commandNamesRun` in scripts/batch-in-flight.mjs) — a bare argv is not an
+// identity: a recycled pid re-running the identical default command line would
+// read as THIS run. So a launch that names no `--log-file` computes the path
+// once and re-execs itself with it appended; the record writer's argv then
+// always names its log. Costs one idle shim process for the run's duration —
+// Node has no in-place exec — which is nothing beside a browser regression.
+function reexecWithLogPath() {
+  const logPath = logPathFor(forward, own)
+  // The DISPLAY form (ROOT-relative where possible): it is what the record's
+  // `log` field will carry, so argv word and recorded path compare equal.
+  const child = spawn(process.execPath, [...process.argv.slice(1), '--log-file', forDisplay(logPath)], {
+    windowsHide: true,
+    stdio: 'inherit',
+    env: process.env,
+  })
+  for (const sig of ['SIGINT', 'SIGTERM']) {
+    process.on(sig, () => {
+      try {
+        child.kill(sig)
+      } catch {
+        /* already gone */
+      }
+    })
+  }
+  child.on('close', (code) => {
+    process.exitCode = code === null ? 1 : code
+  })
+  child.on('error', (err) => {
+    console.log(`FAIL  run-logged   could not re-exec with the log path: ${err.message}`)
+    process.exitCode = 1
+  })
+}
+
 const { own, forward } = parseOwnArgs(process.argv.slice(2))
 if (own.show) process.exitCode = showLog(own.show)
-else runVerify()
+else if (own.logFile) runVerify()
+else reexecWithLogPath()
