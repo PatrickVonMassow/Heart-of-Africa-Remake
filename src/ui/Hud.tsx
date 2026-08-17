@@ -23,6 +23,7 @@ import { TouchControls } from './TouchControls'
 import { dispatchSyntheticKey, onKeyPress, onTouchEngage } from '../systems/input'
 import { benchmarkFromUrl, startBenchmarkSafely } from '../systems/startBenchmark'
 import { getStrings, useStrings } from '../i18n'
+import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL } from '../systems/unstuck'
 
 function InventoryBar() {
   const t = useStrings()
@@ -138,12 +139,26 @@ function InventoryBar() {
 function Toast() {
   const toast = useGame((s) => s.toast)
   const setToast = useGame((s) => s.setToast)
+  const touchActive = useUi((s) => s.touchActive)
+  const strings = useStrings()
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => setToast(null), 3500)
     return () => clearTimeout(t)
   }, [toast, setToast])
   if (!toast) return null
+  // The stuck hint is the only route to the escape for a player with no keyboard
+  // (work-order 610), so on touch it is an ACTION, not a notice: a tap dispatches
+  // the very key it names, exactly as the interaction prompt does — one input
+  // path. It is recognised by its own text, the way the scenes that raise it
+  // clear it again. Every other toast stays a plain label.
+  if (touchActive && toast === strings.toasts.stuckHint(UNSTUCK_KEY_LABEL)) {
+    return (
+      <button className="toast toast-tappable" onClick={() => dispatchSyntheticKey(UNSTUCK_KEY_CODE)}>
+        {toast}
+      </button>
+    )
+  }
   return <div className="toast">{toast}</div>
 }
 
@@ -481,18 +496,22 @@ export function Hud() {
       // Silent at the window's edge: nothing moved, so say nothing.
       if (g.day !== before) useGame.getState().setToast(st.formatDateShort(g.day, START_YEAR))
     }
+    // The calendar row keeps its chords with the BROWSER (work-order 601: the
+    // keyboard zoom and the tab jumps), so these handlers must ignore a
+    // modified press — otherwise Ctrl+3 switches the tab AND jumps to March.
+    const calendarKey = { ignoreModified: true }
     const offYears = [
-      onKeyPress('BracketRight', () => jumpYear(1)),
-      onKeyPress('NumpadAdd', () => jumpYear(1)),
-      onKeyPress('Slash', () => jumpYear(-1)),
-      onKeyPress('NumpadSubtract', () => jumpYear(-1)),
+      onKeyPress('BracketRight', () => jumpYear(1), calendarKey),
+      onKeyPress('NumpadAdd', () => jumpYear(1), calendarKey),
+      onKeyPress('Slash', () => jumpYear(-1), calendarKey),
+      onKeyPress('NumpadSubtract', () => jumpYear(-1), calendarKey),
     ]
     const offMonths = MONTH_KEYS.map((code, i) =>
       onKeyPress(code, () => {
         useGame.getState().debugJumpToMonth(i + 1)
         const s = getStrings()
         useGame.getState().setToast(`${s.months[i]} ${s.formatDateShort(useGame.getState().day, START_YEAR).slice(6)}`)
-      }),
+      }, calendarKey),
     )
     const offEsc = onKeyPress('Escape', () => {
       // A running benchmark comes first: Esc aborts it and the runner restores

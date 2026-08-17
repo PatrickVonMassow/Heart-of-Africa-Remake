@@ -85,10 +85,11 @@ import {
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { SpeechLabels } from './SpeechLabels'
+import { releasePointerLock, requestPlacePointerLock } from './pointerLock'
 import { ActorLabels } from '../ActorLabels'
 import { markActor } from '../actorLabelSource'
 import { resolveMove, standingClear, PLAYER_RADIUS } from './collision'
-import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, findFreeSpot, newStallState, updateStall } from '../../systems/unstuck'
+import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL, escapeOutcome, findFreeSpot, newStallState, stuckHintDue, updateStall } from '../../systems/unstuck'
 import { buildBoundaryLut, isOutsidePlace } from './boundary'
 import {
   RIVER_HALF_LENGTH,
@@ -101,6 +102,7 @@ import {
 } from '../../render/placeRiver'
 import { RIVER_DRIFT_SPEED } from '../../render/waterAppearance'
 import { bankGroundHeight, type PlaceRiverBank } from './riverBank'
+import { scatterGrassTufts } from './groundScatter'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { devAssert } from '../../systems/devAssert'
 import { buildLayout, builtFabric, DIG_SITE_RADIUS, fencePanels, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
@@ -1136,6 +1138,7 @@ function GroundScatter({
   grassFactor = 1,
   rocks,
   radius,
+  bank,
 }: {
   placeId: string
   seed: number
@@ -1143,20 +1146,14 @@ function GroundScatter({
   grassFactor?: number
   rocks: Array<[number, number, number]>
   radius: number
+  bank: PlaceRiverBank | null
 }) {
-  const tufts = useMemo(() => {
-    let hash = 0
-    for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
-    const rand = mulberry32(((seed ^ hash) + 977) >>> 0)
-    const tufts: Array<[number, number, number]> = []
-    const tuftCount = Math.round((isPort ? 30 : 70) * grassFactor)
-    for (let i = 0; i < tuftCount; i++) {
-      const a = rand() * Math.PI * 2
-      const r = 4 + rand() * (radius + 8)
-      tufts.push([Math.cos(a) * r, Math.sin(a) * r, 0.55 + rand() * 0.55])
-    }
-    return tufts
-  }, [placeId, seed, isPort, grassFactor, radius])
+  // The scatter itself is pure (groundScatter.ts), so the rule it keeps — no
+  // tuft on the shore, work-order 585 — is pinned in the unit layer.
+  const tufts = useMemo(
+    () => scatterGrassTufts({ placeId, seed, isPort, grassFactor, radius, bank }),
+    [placeId, seed, isPort, grassFactor, radius, bank],
+  )
 
   const tuftGeo = useMemo(() => buildGrassTuft(), [])
   const rockGeo = useMemo(() => buildRock(), [])
@@ -2402,31 +2399,34 @@ export function PlaceScene() {
   useEffect(() => {
     const el = gl.domElement
     ;(document.activeElement as HTMLElement | null)?.blur?.()
-    const grab = () => {
-      // Never grab the pointer while a full-screen overlay is up (the initial
-      // checkpoint-load choice, defeat or victory): the cursor is needed to
-      // click it. The DOM is committed before this effect runs, so the overlay
-      // is already present on the start-of-game grab.
-      if (document.querySelector('.overlay')) return
-      // Never engage pointer lock under browser automation (navigator.webdriver
-      // is set by Playwright/CDP): the verify captures enter this first-person
-      // scene headless, and system-Chrome --headless=new (the WebGPU lane) grabs
-      // the REAL OS cursor on requestPointerLock, dragging the user's Windows
-      // mouse into a corner. Real players never set webdriver, so mouse-look is
-      // unaffected; the headless suites drive yaw via synthetic events anyway.
-      if (navigator.webdriver) return
-      if (!useUi.getState().dialog && document.pointerLockElement !== el) {
-        try {
-          const r = el.requestPointerLock() as unknown as Promise<void> | undefined
-          if (r && typeof r.catch === 'function') r.catch(() => {})
-        } catch {
-          /* pointer lock unavailable — the game stays playable via keyboard */
-        }
-      }
-    }
+    // The rules of who owns the cursor — the overlay and dialog exceptions, and
+    // the deliberate skip under browser automation — live in ./pointerLock.
+    const grab = () => requestPlacePointerLock(el)
     grab() // engage immediately on entry (activation from the walk-in keypress)
     const onClick = () => grab()
+    // The lock comes back when the guess dialog closes (point 588): the button
+    // click carries the user activation the request needs, so the player is not
+    // left having to click the ground again to walk on.
+    const offDialog = useUi.subscribe((s, prev) => {
+      if (prev.dialog?.kind === 'speechGuess' && s.dialog === null) grab()
+    })
+    // The FIRST movement after the lock returns is dropped: the browser reports
+    // the jump from wherever the cursor sat as a movement, and the view would
+    // swing round the moment the dialog closes.
+    let settling = false
+    const onLockChange = () => {
+      if (document.pointerLockElement === el) settling = true
+    }
+    document.addEventListener('pointerlockchange', onLockChange)
     const onMove = (e: MouseEvent) => {
+      // A modal dialog freezes looking as it freezes walking (design.md §16.1):
+      // without the lock there is no look anyway, but under automation the raw
+      // movement below would still turn the head.
+      if (useUi.getState().dialog) return
+      if (settling) {
+        settling = false
+        return
+      }
       // Under automation we deliberately skip the real pointer lock (above), so
       // apply mouse-look from the raw movement instead — the verify suites still
       // drive and assert first-person yaw, without the OS cursor being grabbed.
@@ -2448,6 +2448,8 @@ export function PlaceScene() {
     return () => {
       el.removeEventListener('click', onClick)
       window.removeEventListener('mousemove', onMove)
+      document.removeEventListener('pointerlockchange', onLockChange)
+      offDialog()
       if (document.pointerLockElement === el) document.exitPointerLock()
     }
   }, [gl])
@@ -2472,14 +2474,14 @@ export function PlaceScene() {
         game.setToast(strings.toasts.chiefHostile)
       } else {
         setDialog({ kind: 'audience' })
-        if (document.pointerLockElement) document.exitPointerLock()
+        releasePointerLock()
       }
     } else if (near.type === 'bazaar' || near.type === 'agency') {
       setDialog({ kind: near.type })
-      if (document.pointerLockElement) document.exitPointerLock()
+      releasePointerLock()
     } else {
       setDialog({ kind: 'trade', building: near.type })
-      if (document.pointerLockElement) document.exitPointerLock()
+      releasePointerLock()
     }
   }
 
@@ -2502,7 +2504,7 @@ export function PlaceScene() {
       const l = layoutRef.current
       if (!l) return
       const p = player.current
-      const { pos } = findFreeSpot(p.x, p.z, {
+      const { pos, found } = findFreeSpot(p.x, p.z, {
         step: balance.unstuck.searchStep,
         maxRadius: balance.unstuck.searchRadius,
         // Free ground here is the full rule: no collider touches his footprint,
@@ -2514,16 +2516,28 @@ export function PlaceScene() {
         // Free by construction: the place's own entry point (design.md §2.3).
         fallback: [0, l.spawnZ],
       })
-      p.x = pos[0]
-      p.z = pos[1]
-      placePlayerPosition.x = p.x
-      placePlayerPosition.z = p.z
-      // Stop dead where he lands: carrying the velocity that pressed him into the
-      // wedge would walk him straight back in.
-      walk.current.velF = 0
-      walk.current.velS = 0
-      stall.current = newStallState(p.x, p.z)
-      useGame.getState().setToast(getStrings().toasts.unstuckFreed)
+      // Say what happened, never more (work-order 610): a search that carried
+      // him nowhere may not report a rescue. Here the fallback is the entry
+      // point, so a failed search still MOVES him — that is a rescue; standing
+      // free already is not.
+      const outcome = escapeOutcome(p.x, p.z, { pos, found })
+      const t = getStrings().toasts
+      if (outcome === 'freed') {
+        p.x = pos[0]
+        p.z = pos[1]
+        placePlayerPosition.x = p.x
+        placePlayerPosition.z = p.z
+        // Stop dead where he lands: carrying the velocity that pressed him into the
+        // wedge would walk him straight back in.
+        walk.current.velF = 0
+        walk.current.velS = 0
+        stall.current = newStallState(p.x, p.z)
+      }
+      useGame
+        .getState()
+        .setToast(
+          outcome === 'freed' ? t.unstuckFreed : outcome === 'alreadyFree' ? t.unstuckAlreadyFree : t.unstuckNoRoom,
+        )
     })
     return off
   }, [])
@@ -2688,9 +2702,10 @@ export function PlaceScene() {
     // on purpose would teleport him for nothing.
     {
       const before = stall.current.stuck
-      stall.current = updateStall(stall.current, p.x, p.z, tf !== 0 || ts !== 0, dt, balance.unstuck)
+      const moving = tf !== 0 || ts !== 0
+      stall.current = updateStall(stall.current, p.x, p.z, moving, dt, balance.unstuck)
       const strings = getStrings()
-      if (stall.current.stuck && !before) {
+      if (stuckHintDue(stall.current.stuck, before, moving, useGame.getState().toast !== null)) {
         useGame.getState().setToast(strings.toasts.stuckHint(UNSTUCK_KEY_LABEL))
       } else if (!stall.current.stuck && before) {
         // He moved again: the hint goes with the wedge it described.
@@ -2887,7 +2902,7 @@ export function PlaceScene() {
 
       <PlaceFlora slots={layout.flora} style={sandy ? REGION_PLACE_STYLES.north : style} material={floraMaterial} geos={floraGeos} />
 
-      <GroundScatter placeId={place.id} seed={seed} isPort={sandy} grassFactor={style.grass} rocks={layout.rocks} radius={layout.radius} />
+      <GroundScatter placeId={place.id} seed={seed} isPort={sandy} grassFactor={style.grass} rocks={layout.rocks} radius={layout.radius} bank={layout.bank} />
 
       {/* The communication PoC's teaching stone (work-order 482): the boulder in
           the open the adults teach the word for a rock at. Drawn from the same

@@ -14,11 +14,13 @@ import {
   drumHandPose,
   drumHeadTop,
   drumHeadY,
+  drummerPoseAt,
   drumStroke,
   type DrumGeometry,
 } from './drummerPose'
 import { FIGURE_LIMBS } from '../../render/figures'
-import { armDirection } from '../../render/gesture'
+import { armDirection, REST_POSE } from '../../render/gesture'
+import { drumMessagePlan } from '../../communication/drumMessage'
 
 const DRUMS: ReadonlyArray<[string, DrumGeometry]> = [
   ['the large low drum', LOW_DRUM],
@@ -132,5 +134,53 @@ describe('the drummer beats ON his drums', () => {
         stated.forEach((v, i) => expect(v).toBeCloseTo(drawn[i], 9))
       }
     }
+  })
+})
+
+describe('the drummer moves only for the message plan', () => {
+  it('holds the genuine rest pose and leaves both skins still without a message', () => {
+    for (const elapsed of [0, 1, 60, 3600]) {
+      const frame = drummerPoseAt(null, elapsed)
+      expect(frame.pose.left).toEqual(REST_POSE.left)
+      expect(frame.pose.right).toEqual(REST_POSE.right)
+      expect(frame.lowSwing).toBe(1)
+      expect(frame.highSwing).toBe(1)
+      expect(drumHeadY(LOW_DRUM, frame.lowSwing)).toBe(LOW_DRUM.headY)
+      expect(drumHeadY(HIGH_DRUM, frame.highSwing)).toBe(HIGH_DRUM.headY)
+    }
+  })
+
+  it("drops the matching hand at every strike time in the chief's exact plan", () => {
+    const plan = drumMessagePlan()
+    for (const strike of plan.strikes) {
+      const frame = drummerPoseAt(plan, strike.at)
+      const activeSwing = strike.drum === 'low' ? frame.lowSwing : frame.highSwing
+      const waitingSwing = strike.drum === 'low' ? frame.highSwing : frame.lowSwing
+      const drum = strike.drum === 'low' ? LOW_DRUM : HIGH_DRUM
+      const stroke = drumStroke(drum)
+      expect(activeSwing, `strike at ${strike.at}s on ${strike.drum}`).toBe(0)
+      expect(waitingSwing, `other hand at ${strike.at}s`).toBe(1)
+      expect(frame.pose[stroke.side]).toEqual(drumHandPose(stroke, 0))
+    }
+  })
+
+  it('follows each sounding strike through its own duration and waits in the gaps', () => {
+    const plan = drumMessagePlan()
+    for (const strike of plan.strikes) {
+      const elapsed = strike.at + strike.duration * 0.4
+      const frame = drummerPoseAt(plan, elapsed)
+      expect(strike.drum === 'low' ? frame.lowSwing : frame.highSwing).toBeCloseTo(0.4, 10)
+      expect(strike.drum === 'low' ? frame.highSwing : frame.lowSwing).toBe(1)
+    }
+
+    const gapAfter = plan.strikes.findIndex(
+      (strike, i) => i < plan.strikes.length - 1 && plan.strikes[i + 1].at > strike.at + strike.duration,
+    )
+    expect(gapAfter).toBeGreaterThanOrEqual(0)
+    const before = plan.strikes[gapAfter]
+    const after = plan.strikes[gapAfter + 1]
+    const gapTime = (before.at + before.duration + after.at) / 2
+    expect(drummerPoseAt(plan, gapTime).lowSwing).toBe(1)
+    expect(drummerPoseAt(plan, gapTime).highSwing).toBe(1)
   })
 })

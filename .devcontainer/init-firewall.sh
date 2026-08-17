@@ -73,6 +73,9 @@ for domain in \
     "vscode.blob.core.windows.net" \
     "update.code.visualstudio.com" \
     "ntfy.sh" \
+    "auth.openai.com" \
+    "api.openai.com" \
+    "chatgpt.com" \
     "cdn.playwright.dev" \
     "playwright.download.prss.microsoft.com" \
     "storage.googleapis.com" \

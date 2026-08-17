@@ -14,6 +14,15 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
+import { READ_COUNT, READ_GAP_FRAMES, CONFIRM_READS, READ_GAP_NET_MS, READ_GAP_MS, SHOT_DRIFT_BAR, luminanceSamples, settleReading, shotDrift, shotReading } from './cropLuma.mjs'
+import {
+  CHILD_MOTION,
+  holdsAGame,
+  judgedEnough,
+  rescueRate,
+  shuffleWindows,
+  traceLiveness,
+} from './childMotionMetric.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -877,6 +886,198 @@ if (section('speech-hypothesis')) {
     p.yaw = saved.yaw
     if (saved.pitch !== undefined) p.pitch = saved.pitch
   }, pose)
+}
+// --- Guessing a meaning where it is spoken (design.md §13.4, point 588) -------
+// The picking rule, the dialog and the note it writes are pinned in the Vitest
+// layer. What ONLY a browser can answer is the input path: a real left click on
+// the settlement view opens the dialog at all, the pointer lock is given up for
+// it and asked back on close, and real keystrokes land in the field. The lock
+// itself cannot be exercised here — it is deliberately never engaged under
+// browser automation (system-Chrome headless grabs the real OS cursor), so what
+// is read is the game's own DECISION counter, while the click, the focus and
+// the typing are the genuine article.
+if (section('speech-guess')) {
+  await goToPlace('maasai-village')
+  const GUESS_UTTERANCE = 'BA-BA-ba-ba-ba'
+  const guessPose = await page.evaluate(() => {
+    const p = window.__placePlayer
+    return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null
+  })
+  // Stage ONE speaker a few steps in front of the player: the click takes the
+  // NEAREST speaker, so standing near him is what the highlight is for — and at
+  // a distance a player really walks up to, since the note's size follows it.
+  const staged = await page.evaluate((u) => {
+    const scene = window.__placeScene
+    const p = window.__placePlayer
+    if (!scene || !p) return false
+    let figure = null
+    scene.traverse((o) => {
+      if (!figure && o.name === 'inhabitant') figure = o
+    })
+    if (!figure) return false
+    figure.updateWorldMatrix(true, false)
+    const e = figure.matrixWorld.elements
+    p.x = e[12] + 4
+    p.z = e[14]
+    p.pitch = 0
+    // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+    p.yaw = Math.atan2(e[12] - p.x, e[14] - p.z) + Math.PI
+    // A label shows only over speech the player has ALREADY observed, and a
+    // long lifetime keeps this off the expiry clock, which is pure-tested.
+    window.__game.getState().hearUtterance(u)
+    window.__game.getState().setUtteranceHypothesis(u, '')
+    figure.name = 'guess-probe-figure'
+    const ok = window.__speech?.speak('guess-speaker', [u], 'guess-probe-figure', 120) === true
+    figure.name = 'inhabitant'
+    return ok
+  }, GUESS_UTTERANCE)
+  check('a figure can be staged to speak beside the player (point 588)', staged, `staged ${staged}`)
+  await nextFrames(4)
+  // What the player sees: which note is highlighted, and what stands under it.
+  const highlight = await page.evaluate(() => {
+    const all = Array.from(document.querySelectorAll('.speech-label'))
+    const targeted = all.filter((el) => el.classList.contains('targeted'))
+    const one = targeted[0]
+    return {
+      labels: all.length,
+      targeted: targeted.length,
+      speaker: one?.getAttribute('data-speaker') ?? null,
+      invite: one?.querySelector('.speech-invite')?.textContent ?? '',
+      strayInvites: all.filter(
+        (el) => !el.classList.contains('targeted') && el.querySelector('.speech-invite'),
+      ).length,
+      syllables: Array.from(one?.querySelectorAll('.syllables') ?? []).map((s) => s.textContent),
+    }
+  })
+  check(
+    'exactly one note is highlighted, and it is the speaker beside the player (point 588)',
+    highlight.targeted === 1 && highlight.speaker === 'guess-speaker',
+    JSON.stringify(highlight),
+  )
+  check(
+    'the invitation stands under the highlighted note alone, and does not shout (point 588)',
+    highlight.invite.length > 0 &&
+      highlight.invite !== highlight.invite.toUpperCase() &&
+      highlight.strayInvites === 0,
+    `invite ${JSON.stringify(highlight.invite)}, invitations on unhighlighted notes ${highlight.strayInvites}`,
+  )
+  await frame('148-speech-guess-invitation', {
+    element: '.speech-label.targeted',
+    label: 'the highlighted note of the nearest speaker, inviting the guess',
+  })
+  // A point of the settlement view the click can actually land on: the notes are
+  // drawn in an overlay of their own, and a click that hit one would prove
+  // nothing about the canvas the player clicks.
+  const spot = await page.evaluate(() => {
+    const w = window.innerWidth
+    const h = window.innerHeight
+    for (const [fx, fy] of [[0.2, 0.55], [0.8, 0.55], [0.2, 0.35], [0.5, 0.62]]) {
+      const x = Math.round(w * fx)
+      const y = Math.round(h * fy)
+      if (document.elementFromPoint(x, y)?.tagName === 'CANVAS') return { x, y }
+    }
+    return null
+  })
+  check('the settlement view offers a spot to click on (point 588)', !!spot, JSON.stringify(spot))
+  if (spot) {
+    const lockBefore = await page.evaluate(() => ({ ...window.__placeLock }))
+    await page.mouse.click(spot.x, spot.y)
+    await nextFrames(2)
+    const opened = await page.evaluate(() => {
+      const dialog = document.querySelector('.dialog.speech-guess')
+      return {
+        open: !!dialog,
+        spoken: Array.from(dialog?.querySelectorAll('.utterance') ?? []).map((u) =>
+          Array.from(u.querySelectorAll('span'))
+            .map((s) => s.textContent)
+            .join('-'),
+        ),
+        focused: document.activeElement?.className ?? '',
+        lock: { ...window.__placeLock },
+      }
+    })
+    check(
+      'a left click on the settlement opens the guess for the highlighted speaker (point 588)',
+      opened.open && opened.spoken.join(' ') === highlight.syllables.join(' '),
+      `${JSON.stringify(opened.spoken)} against the note's ${JSON.stringify(highlight.syllables)}`,
+    )
+    check(
+      'the pointer is given back when the dialog opens (point 588)',
+      opened.lock.releases > lockBefore.releases,
+      `releases ${lockBefore.releases} → ${opened.lock.releases}`,
+    )
+    check(
+      'the field takes the keyboard the moment the dialog stands (point 588)',
+      String(opened.focused).includes('hypothesis'),
+      `focus on ${JSON.stringify(opened.focused)}`,
+    )
+    // The genuine article: real keystrokes, not a synthetic change event.
+    await page.keyboard.type('come here')
+    const typed = await page.evaluate(
+      () => document.querySelector('.dialog.speech-guess .hypothesis')?.value ?? null,
+    )
+    check(
+      'what the player types reaches the field (point 588)',
+      typed === 'come here',
+      `field reads ${JSON.stringify(typed)}`,
+    )
+    await frame('149-speech-guess-dialog', {
+      element: '.dialog.speech-guess',
+      label: 'the guess at what the villager just said',
+    })
+    await page.keyboard.press('Enter')
+    await nextFrames(2)
+    const saved = await page.evaluate(
+      (u) => ({
+        open: !!document.querySelector('.dialog.speech-guess'),
+        reading: window.__game.getState().communication.heard[u]?.hypothesis ?? null,
+        lock: { ...window.__placeLock },
+      }),
+      GUESS_UTTERANCE,
+    )
+    check(
+      'Enter writes the reading into the same note the journal keeps (point 588)',
+      !saved.open && saved.reading === 'come here',
+      JSON.stringify(saved),
+    )
+    check(
+      'the pointer is asked back when the dialog closes (point 588)',
+      saved.lock.grabs > lockBefore.grabs,
+      `grabs ${lockBefore.grabs} → ${saved.lock.grabs}`,
+    )
+    // And Escape leaves the note exactly as it was.
+    await page.mouse.click(spot.x, spot.y)
+    await nextFrames(2)
+    const reopened = await page.evaluate(() => !!document.querySelector('.dialog.speech-guess'))
+    if (reopened) await page.keyboard.type(' and never mind')
+    await page.keyboard.press('Escape')
+    await nextFrames(2)
+    const cancelled = await page.evaluate(
+      (u) => ({
+        open: !!document.querySelector('.dialog.speech-guess'),
+        reading: window.__game.getState().communication.heard[u]?.hypothesis ?? null,
+      }),
+      GUESS_UTTERANCE,
+    )
+    check(
+      'Escape closes the guess and leaves the note unchanged (point 588)',
+      reopened && !cancelled.open && cancelled.reading === 'come here',
+      `reopened ${reopened}, ${JSON.stringify(cancelled)}`,
+    )
+  }
+  await page.evaluate(
+    ({ u, saved }) => {
+      window.__game.getState().setUtteranceHypothesis(u, '')
+      window.__speech?.clear()
+      const p = window.__placePlayer
+      if (!p || !saved) return
+      p.x = saved.x
+      p.z = saved.z
+      p.yaw = saved.yaw
+      if (saved.pitch !== undefined) p.pitch = saved.pitch
+    },
+    { u: GUESS_UTTERANCE, saved: guessPose },
+  )
 }
 // Point 300, slope footing: a silhouette on a dune must lie ON the incline —
 // its body pitched over its own wheelbase, and each foot then seated on the
@@ -2000,9 +2201,9 @@ if (section('villager-gestures')) {
     // A SHORT gesture, so the end arrives within a bounded number of FRAMES even
     // where each frame is a second long.
     await page.evaluate(() => window.__placeForceGesture(0, 'point', 0.6))
-    // Read the resting state IN the same poll that observes the end: the ambient
-    // scheduler may start the next gesture a second and a half later, and a
-    // separate read afterwards would race it.
+    // Read the resting state IN the same poll that observes the end: nothing
+    // else poses this pair since point 580, but the read stays inside the poll
+    // so the check cannot race whatever drives the arms next.
     const restHandle = await page
       .waitForFunction(
         () => {
@@ -2026,8 +2227,14 @@ if (section('villager-gestures')) {
       JSON.stringify(atRest),
     )
 
-    // --- sampled over the ambient conversation ------------------------------
+    // --- sampled over the standing conversation -----------------------------
     // A single instant proves nothing about a scheduler: sample across frames.
+    // Since point 580 the sample must find the pair QUIET — the two used to
+    // cycle the four gestures as ambient dressing, with no utterance behind any
+    // of them and at any distance, which is the mute pantomime the user
+    // reported. Every gesture in a settlement now belongs to a figure whose
+    // words the player can hear (the children's and adults' teaching paths,
+    // covered purely in src/communication/spokenGesture.test.ts).
     const samples = []
     for (let i = 0; i < 30; i++) {
       samples.push(await page.evaluate(() => window.__placeGestures()))
@@ -2041,11 +2248,15 @@ if (section('villager-gestures')) {
     const both = samples.filter((s) => s[0].kind !== null && s[1].kind !== null)
     check('the pair takes turns — the two never gesture over each other', both.length === 0, `${both.length} overlaps`)
     const seen = new Set(samples.flatMap((s) => s.map((g) => g.kind)).filter(Boolean))
-    check('the conversation actually gestures while it runs', seen.size >= 1, [...seen].join(', ') || 'none')
+    check(
+      'the standing pair mimes nothing on its own — no gesture without a word',
+      seen.size === 0,
+      [...seen].join(', ') || 'quiet',
+    )
     const restBroken = samples.filter((s) =>
       s.some((g) => g.kind === null && (g.pose.lean !== 0 || g.pose.turn !== 0 || g.pose.left.yaw !== 0)),
     )
-    check('a figure between gestures is exactly at rest', restBroken.length === 0, `${restBroken.length} samples`)
+    check('a figure that is not speaking stands exactly at rest', restBroken.length === 0, `${restBroken.length} samples`)
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
@@ -2408,18 +2619,27 @@ if (section('settlement-edge')) {
       return null
     })
 
-  /** Mean luminance of a crop centred on a ground point. */
-  const groundLuma = async (buf, ndc, w, h) => {
+  /** Every pixel's luminance in a crop centred on a ground point. The reads are
+   *  kept per PIXEL (point 641): the shot's reading rejects the §19.13 rain
+   *  streaks across the reads and then measures the band across the pixels, and
+   *  neither is possible once a read has been collapsed to one number.
+   *  cropLuma.mjs carries the reasoning and cropLuma.test.mjs pins it. */
+  const groundSamples = async (buf, ndc, w, h) => {
     const view = page.viewportSize()
     const left = Math.round(((ndc.x + 1) / 2) * view.width - w / 2)
     const top = Math.round(((1 - ndc.y) / 2) * view.height - h / 2)
     if (left < 0 || top < 0 || left + w > view.width || top + h > view.height) return null
     const { data, info } = await sharp(buf).extract({ left, top, width: w, height: h }).raw().toBuffer({ resolveWithObject: true })
-    let sum = 0
-    for (let i = 0; i < info.width * info.height; i++) {
-      sum += 0.35 * data[i * info.channels] + 0.5 * data[i * info.channels + 1] + 0.15 * data[i * info.channels + 2]
-    }
-    return sum / (info.width * info.height)
+    return luminanceSamples(data, info)
+  }
+
+  /** The crop's SETTLE reading (cropLuma.mjs): the crop's mean with its
+   *  brightest fifth dropped, so a rain streak cannot end the wait early and a
+   *  band leak arriving over part of the crop still holds it open. It compares
+   *  the picture with itself; it never measures the band. */
+  const groundLuma = async (buf, ndc, w, h) => {
+    const samples = await groundSamples(buf, ndc, w, h)
+    return samples === null ? null : settleReading(samples)
   }
 
   /** Aim the camera at a ground point ahead by bisecting the pitch on the
@@ -2469,6 +2689,49 @@ if (section('settlement-edge')) {
       frames,
     )
 
+  /** The gap between two reads of one shot (point 641): far enough apart to be
+   *  DIFFERENT PICTURES of the same scene. Both conditions are needed. Frames,
+   *  because on a throttled machine time passes while the picture does not; and
+   *  the page's own elapsed time, because a fast machine could draw twelve
+   *  frames in a fraction of a second. MEASURED here (cropLuma.mjs): a §19.13
+   *  streak stays in the crop under 270 ms — the bound the sampling actually
+   *  proves — and the scene draws ~6.8 fps headless at giza, so twelve frames are
+   *  ~1.75 s and the frame condition alone outlasts the streak about six times
+   *  over. The 600 ms is the floor that keeps that true on a machine that draws
+   *  faster. This polls the PAGE's clock, which is the clock the rain falls on,
+   *  not a sleep in the harness. */
+  const readGap = (ms = READ_GAP_MS, frames = READ_GAP_FRAMES) =>
+    page.evaluate(
+      ([wait, n, netMs]) =>
+        new Promise((res) => {
+          // The net is WALL CLOCK and lives OUTSIDE the frame loop. Counting
+          // frames cannot bound a scene that has stopped drawing them: the
+          // counter simply never advances. And a gap that gives up must not
+          // pretend it waited — it reports STARVED, and the shot fails rather
+          // than measuring reads that sit closer together than the rain needs
+          // them to.
+          const t0 = performance.now()
+          let i = 0
+          let done = false
+          const finish = (ok) => {
+            if (done) return
+            done = true
+            res(ok)
+          }
+          const net = setTimeout(() => finish(false), netMs)
+          const step = () => {
+            if (done) return
+            if (++i >= n && performance.now() - t0 >= wait) {
+              clearTimeout(net)
+              return finish(true)
+            }
+            requestAnimationFrame(step)
+          }
+          requestAnimationFrame(step)
+        }),
+      [ms, frames, READ_GAP_NET_MS],
+    )
+
   const enterFor = async (id) => {
     await page.evaluate((want) => {
       const g = window.__game.getState()
@@ -2508,23 +2771,48 @@ if (section('settlement-edge')) {
    *  the live proof that the calibratable strength lands without a reload. */
   const bandRatio = async (ndc) => {
     // Point 549: three frames were not the band arriving, they were three frames.
-    // Each shot now waits for the crop to STOP MOVING on the new strength and
-    // then averages three reads of it — the rains draw over the ground and TRAA
-    // jitters it, so a single frame samples that noise instead of measuring the
-    // band. The measured spread of `capetown (wet)` across five runs was 6.5
-    // luminance points on an unchanged scene, straddling its own 0.04 bar.
+    // Each shot waits for the crop to STOP MOVING on the new strength and then
+    // takes three reads of it — the rains draw over the ground and TRAA jitters
+    // it, so a single frame samples that noise instead of measuring the band.
+    // The measured spread of `capetown (wet)` across five runs was 6.5 luminance
+    // points on an unchanged scene, straddling its own 0.04 bar.
+    //
+    // Point 641: a shot is FIVE reads of the crop, kept per pixel, combined by
+    // the per-pixel median across the reads and then by the crop's mean
+    // (cropLuma.mjs). The rain is a transient in TIME and the band is not, so
+    // the streak is rejected across the reads while every pixel still counts
+    // towards the measurement — a spatial median would reject the streak too,
+    // and with it a genuine band leak over part of the crop, which at 0.3 m of
+    // clearance is the first real defect this check has to catch (measured: a
+    // leak over 8 of the 46 rows reads ×0.968 on the mean and ×1.000 on the
+    // spatial median). Five reads, so a streak surviving into two of them still
+    // cannot reach the middle value.
     const shot = async (strength) => {
       await page.evaluate((s) => { window.__balance.placeEdgeBand.strength = s }, strength)
-      const first = await settledLuma(ndc, 0.2)
-      if (first === null) return null
-      const reads = [first]
-      for (let i = 0; i < 2; i++) {
-        await settleFrames(2)
-        const cur = await groundLuma(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
+      if ((await settledLuma(ndc, 0.2)) === null) return null
+      const reads = []
+      for (let i = 0; i < READ_COUNT + CONFIRM_READS; i++) {
+        // A starved gap is a FAILED shot, not a faster one: reads that are not
+        // far enough apart are not independent pictures, and the rain rejection
+        // is exactly what that independence buys.
+        if (i > 0 && !(await readGap())) return null
+        const cur = await groundSamples(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
         if (cur === null) return null
         reads.push(cur)
       }
-      return reads.reduce((a, b) => a + b, 0) / reads.length
+      // A scene that changed WHILE the shot was taken is not a shot. The
+      // per-pixel median would erase a defect arriving in a minority of the
+      // reads exactly as it erases the rain, and the settle loop ahead of it is
+      // one-sided — so the two halves of the shot are compared, each still
+      // rain-robust, and a disagreement fails the shot instead of averaging it
+      // away.
+      const drift = shotDrift(reads)
+      if (drift === null || drift > SHOT_DRIFT_BAR) {
+        console.log(`# shot REJECTED — the crop moved ${(drift * 100).toFixed(3)} % between its first and last reads (bar ${(SHOT_DRIFT_BAR * 100).toFixed(1)} %)`)
+        return null
+      }
+      // The confirmation read is the guard's, not the measurement's.
+      return shotReading(reads.slice(0, READ_COUNT))
     }
     // ON, OFF, ON — and the two ONs averaged. In the rains the ground SOAKS
     // while the shots are taken (the §19.13 wet accumulation keeps darkening
@@ -2555,7 +2843,16 @@ if (section('settlement-edge')) {
         const s = window.__placeSeason()
         return { wetness: s.wetness, groundWet: s.groundWet, sun: s.sun, hemi: s.hemi }
       },
-      { settleMs: 400, samples: 3, timeout: 60000 },
+      // A LOAD-PROOF budget, not a tight one (point 641). The soak advances per
+      // FRAME, so a machine that draws a quarter of the frames needs about four
+      // times the wall clock for the same drying — and the 60 s this used to
+      // allow is only 1.7× the 34.9 s the dry settle takes on a quiet machine.
+      // Measured under `throttle-probe … --rate 4`: 1 of 3 runs failed here at
+      // 60 051 ms with groundWet at 0.133 and still falling — a budget expiring
+      // on a converging reading, not a scene that had stopped. The ceiling stays
+      // as a net for a settle that genuinely never comes; it costs a green run
+      // nothing.
+      { settleMs: 400, samples: 3, timeout: 240000 },
     )
     check(
       `${id} (${seasonName}): the ground's wet state settles before the band is measured`,
@@ -2621,9 +2918,29 @@ if (section('settlement-edge')) {
   // Both were reading a wet state still on its way in. With the soak and the
   // light on it polled until they stop, four consecutive WebGL 2 runs reported
   // capetown inside ×0.946, ×0.944, ×0.944, ×0.946 (spread 0.002) and giza
-  // inside ×0.905, ×0.906, ×0.906. The outside half is steady but not yet
-  // perfectly still: giza read ×1.000, ×1.000, ×0.980 — inside the ±0.025 bar,
-  // and the one reading worth watching if this check ever rotates again.
+  // inside ×0.905, ×0.906, ×0.906.
+  //
+  // WHAT STILL ROTATED, AND WHY (point 641). The outside half kept moving —
+  // ×1.000, ×1.000, ×0.980, and on 11.08.2026 `giza (wet)` went red at ×0.963,
+  // in one of three full runs while the same section passed 3/3 in isolation.
+  // The wet state was not the cause and neither was load: the crop was sampled
+  // 284 times over 90 s at giza with the band strength fixed and the light
+  // constant, and its MEAN jumped from 102.5 to 114.0 — +11.4 % — about every
+  // 13 s. The saved frames name it: a §19.13 rain streak, bright and ~14 px
+  // wide, falling straight through the 150×46 crop. In one of the three shots a
+  // ratio takes, that is the whole red — with the measured ×1.1137
+  // contamination, a streak in an ON shot gives ×1.057 (the reading on record,
+  // to three decimals), one in the OFF shot ×0.898, and a 4–5 px sliver the
+  // ×0.963. A shot is now five reads of the crop, combined per PIXEL by their
+  // median across the reads and then by the crop's mean (cropLuma.mjs): the
+  // streak is transient and is dropped, while a band effect over any part of
+  // the crop is still measured at full strength.
+  // The geometry was measured and ruled out in the same pass: at giza the
+  // outside crop's near row sits at radius+2.7 m and the band reaches at most
+  // radius+2.4 m, the per-row ON/OFF profile reads 1.000 across every row of the
+  // crop, and the aim is reproducible to 16 digits between runs — clear, though
+  // by only 0.3 m, which is the number to look at first if the offsets or the
+  // band's width are ever recalibrated.
   const kinds = [
     { id: 'maasai-village', shoot: { name: '488-village-edge-band', label: 'the swept village ground giving way at the edge' } },
     { id: 'capetown', shoot: { name: '488-port-edge-band', label: 'the port ground giving way at the edge' } },
@@ -3122,6 +3439,398 @@ if (section('children-tag')) {
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
+// --- How the children MOVE (work-order 648) ----------------------------------
+// The user reported three things from one state in the Bambara village: a child
+// hangs briefly, a child jitters on the spot, two children clip through each
+// other. All three are the same system, and the pure layer pins each cause
+// (src/scenes/place/tagGame.test.ts, inhabitantBodies.test.ts). What needs a
+// real browser is the state itself: this settlement, at HIS seed, with its own
+// huts, fences, fire and lanes in the collision set — the pockets that stalled a
+// child are drawn by THAT layout, and no synthetic world can stand in for it.
+//
+// The trace is taken INSIDE the page, one entry per rendered frame. The defects
+// are per-frame — an alternation, a single stalled step, a moment of overlap —
+// and a sampling loop that crosses the process boundary between readings would
+// step straight over them.
+if (section('children-motion')) {
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  // HIS seed: the settlement layout is derived from place + seed, so this is the
+  // village he was standing in and not merely one of the same people. Put back
+  // afterwards — every section after this one would otherwise be reading a world
+  // it did not ask for.
+  const bootSeed = await page.evaluate(() => window.__game.getState().seed)
+  await page.evaluate(() => window.__game.setState({ seed: 2972259115 }))
+  await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+  const live = await page
+    .waitForFunction(
+      () => window.__game.getState().placeId === 'bambara-village' && !!window.__placeTag,
+      null,
+      { timeout: 40000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  check('the reported village publishes its live game of tag', live)
+  if (live) {
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    // AND IT MUST REALLY BE PLAYING (point 656). The wait's result used to be
+    // thrown away: a group that never played produced no stalls, no shuffle
+    // windows and no rescues, and satisfied every check below VACUOUSLY.
+    const playing = await page
+      .waitForFunction(() => window.__placeTag().playing, null, { timeout: 40000 })
+      .then(() => true)
+      .catch(() => false)
+    check('the group is really playing before the trace is taken', playing)
+    const FRAMES = 1200
+    const trace = await page.evaluate(
+      (frames) =>
+        new Promise((resolve) => {
+          const log = []
+          const tick = () => {
+            const t = window.__placeTag()
+            log.push({
+              clock: t.clock,
+              playing: t.playing,
+              // Of that clock, the seconds actually played — likewise the
+              // game's own count.
+              playedClock: t.playedClock,
+              c: t.children.map((k) => ({
+                x: k.x,
+                z: k.z,
+                pace: k.pace,
+                held: k.held,
+                walked: k.walked,
+                // The metres walked while the round was ON, the game's own
+                // counter (point 656): a watcher outside cannot say which side
+                // of a round's first frame a step belongs to.
+                walkedWhilePlaying: k.walkedWhilePlaying,
+                heading: k.heading,
+                // How often the settlement has had to pick this child up
+                // (point 656): the rescue is what ENDS a snag, so without it
+                // the correction reads as the child getting somewhere.
+                nudges: k.nudges,
+                // And how far it carried it, the game's own counter — no watcher
+                // outside can tell a carry from a walk in one frame vector.
+                carried: k.carried,
+              })),
+            })
+            if (log.length < frames) requestAnimationFrame(tick)
+            else resolve({ bodyRadius: t.bodyRadius, log })
+          }
+          requestAnimationFrame(tick)
+        }),
+      FRAMES,
+    )
+    const log = trace.log
+    const n = log[0]?.c.length ?? 0
+    check(
+      'the trace covers a real stretch of the game, frame by frame',
+      log.length >= FRAMES && n >= 2 && log[log.length - 1].clock - log[0].clock > 5,
+      `${log.length} frames, ${n} children, ${(log[log.length - 1].clock - log[0].clock).toFixed(1)}s`,
+    )
+    // AND THE TRACE ITSELF HOLDS A GAME (point 656). Between rounds the group
+    // idles for a calibratable break, which is legitimate — but a trace that is
+    // ALL break has nothing in it to judge: no chase, no pockets walked into, no
+    // shuffle windows.
+    //
+    // TWO REPAIRS HERE, both from the fourth cross-vendor review. The bar was a
+    // majority of the FRAMES, which is not a majority of the minute — frames are
+    // not evenly spaced, and this trace's own run from 20 ms to over a second.
+    // And nothing required a child to WALK: four stationary children reporting
+    // themselves as playing passed this check, the shuffle share (nothing walked
+    // is nothing shuffled), the judged share, and both rescue rates. The
+    // condition is now the shared `holdsAGame`, which asks the game CLOCK and
+    // the QUIETEST child's legs.
+    const tracks = Array.from({ length: n }, (_, k) =>
+      log.map((f) => ({ ...f.c[k], clock: f.clock, playing: f.playing, playedClock: f.playedClock })),
+    )
+    const live = traceLiveness(tracks)
+    check(
+      'and the trace holds a game rather than a break',
+      holdsAGame(live),
+      `${live.playedSeconds.toFixed(1)}s of ${live.seconds.toFixed(1)}s played ` +
+        `(${(live.playedShare * 100).toFixed(0)} %), quietest child ${live.quietestChild} walked ` +
+        `${live.quietestWalkedPerPlayedMinute.toFixed(1)} m per played minute ` +
+        `(floor ${CHILD_MOTION.walkFloor}), ` +
+        `group ${live.walkedPerChildMinute.toFixed(1)} m/child-min`,
+    )
+
+    // 3. THEY NEVER OCCUPY ONE ANOTHER. Judged against the body the game itself
+    // publishes, not an assumed radius (§7.2) — and against the distance the
+    // separation actually settles a resting pair at, which is the contact
+    // distance less the deliberate slop band. Judging it against the bare
+    // contact distance would call every settled pair an overlap.
+    const contact = trace.bodyRadius * 2 - (await page.evaluate(() => window.__balance.villageLife.separation.slop))
+    let worstOverlap = 0
+    let overlapFrames = 0
+    for (const f of log) {
+      let bad = false
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          const d = Math.hypot(f.c[i].x - f.c[j].x, f.c[i].z - f.c[j].z)
+          if (contact - d > worstOverlap) worstOverlap = contact - d
+          if (contact - d > 1e-6) bad = true
+        }
+      }
+      if (bad) overlapFrames++
+    }
+    check(
+      'no two children are ever inside one another, in any frame',
+      overlapFrames === 0,
+      `${overlapFrames} of ${log.length} frames, worst ${Math.max(0, worstOverlap).toFixed(4)} m inside a ${contact.toFixed(3)} m contact`,
+    )
+
+    // 1. NOTHING SNAGS. A child COMMANDED to move that covers no ground is the
+    // reported hang; a child standing at a pace of zero, or standing because it
+    // was told to, is not — that is the game idling or a call being obeyed.
+    let longestStall = 0
+    for (let k = 0; k < n; k++) {
+      let run = 0
+      for (let i = 1; i < log.length; i++) {
+        const before = log[i - 1].c[k]
+        const now = log[i].c[k]
+        const moving = now.pace > 1e-6 && !now.held
+        if (moving && now.walked - before.walked < 1e-4) {
+          run += log[i].clock - log[i - 1].clock
+          longestStall = Math.max(longestStall, run)
+        } else run = 0
+      }
+    }
+    check(
+      'no child that is walking is held motionless by the settlement',
+      longestStall < 0.25,
+      `longest stall while commanded to move ${longestStall.toFixed(2)}s`,
+    )
+
+    // 2. NOTHING SHUFFLES ON THE SPOT — the user's own words, measured as he
+    // would judge them: over a window of one second, does a child WALK a real
+    // distance without GETTING anywhere?
+    //
+    // THE MEASURE IS NOT THIS FILE'S (point 656). It is
+    // scripts/verify/childMotionMetric.mjs, which the replay test
+    // (src/scenes/place/tagShuffle.test.ts) judges by too — because when each
+    // side carried its own copy, both copies had the same two blind spots: they
+    // summed frame-to-frame POSITIONS as the path walked, so the rescue teleport
+    // that ENDS a snag counted as the child walking out of its own pocket, and
+    // their window was longer than the 1.5 s rescue that tidied the symptom
+    // away. The walked distance now comes from the game itself, the ground
+    // covered leaves out the carry, and the rescues are counted.
+    //
+    // AND THE SHARE IS WEIGHTED IN GAME TIME, which matters most HERE: the
+    // headless frame times in this very trace run from 20 ms to over a second,
+    // and one window per FRAME would have let the fast stretches of a run
+    // outvote the slow ones — the same fault, in a new place. Each window now
+    // counts for the game time it stands for, so the number below is the share
+    // of the traced minute the children spent shuffling.
+    //
+    // It used to count REVERSALS — a step that undoes the one before — and that
+    // check could never hold either. A chase is FULL of legitimate reversals: a
+    // runner doubling back at the rim, a chaser cutting in as its quarry dodges.
+    // And their rate rides on the FRAME RATE — 1.4 % of steps at 60 fps against
+    // 3.2 % at 14, because a slower frame turns a longer step — so on this
+    // machine, where a headless frame takes anything from 20 ms to over a
+    // second, one run passed a 3 % gate and the next failed it on the same code.
+    // Ground covered against ground walked has neither fault.
+    //
+    // The gate is the replay's own, and this run is the proof that the LIVE
+    // settlement — real frame times, the speech, the bodies, the player standing
+    // in it — behaves as the replay says.
+    const shuffle = shuffleWindows(tracks)
+    // AND THE SHORT BURST BESIDE IT (point 656): the user's report was "die
+    // Kinder hängen KURZ fest", and a child that paces on the spot for six
+    // tenths of a second between spells of walking never collects the metre of
+    // walking a one-second window asks for. The same windows over half a second,
+    // with the ground bar a ratio of the distance walked. Both verdicts are ONE
+    // check, because they are one question asked at two scales.
+    const burst = shuffleWindows(tracks, CHILD_MOTION.short)
+    check(
+      'no child walks without getting anywhere',
+      // The bar is CHILD-SECONDS of game, not a count of frames: this trace is
+      // 1200 rendered frames and buys anything from 20 s of game to a minute
+      // and a half of it. 20 child-seconds is the same floor the trace check
+      // above sets (5 s of game, four children), read in the unit the share is
+      // weighted in.
+      // AND THE VERDICT MUST REST ON THE TRACE, CHILD BY CHILD. A live frame gap
+      // longer than the window is judged by nobody — interpolating across a
+      // silence longer than the question would invent the answer — so a share is
+      // worth exactly what `judgedShare` says it covers. Both are read off the
+      // WORST child rather than the group: one child snagging into a rescue
+      // every three seconds while its three siblings play leaves every group
+      // average clean, which is the whole of it divided by four.
+      // BOTH measures must have judged something, and both must be clean. A
+      // share of 0 is what either reports when nothing was bad AND when nothing
+      // was looked at: at a live frame gap of 0.6 s the one-second windows still
+      // stand while every half-second one is refused, so the burst half would
+      // pass on nothing at all.
+      judgedEnough(shuffle) &&
+        judgedEnough(burst) &&
+        shuffle.worstShare < CHILD_MOTION.shareGate &&
+        burst.worstShare < CHILD_MOTION.shareGate,
+      `worst child ${shuffle.worstShareChild} at ${(shuffle.worstShare * 100).toFixed(2)} % of its own ` +
+        `judged time; group ${(shuffle.share * 100).toFixed(2)} % (${shuffle.bad} of ${shuffle.windows} ` +
+        `${CHILD_MOTION.span}s windows, ${shuffle.seconds.toFixed(1)} judged child-seconds). ` +
+        `Least judgeable child ${shuffle.leastJudgedChild} at ${(shuffle.leastJudged * 100).toFixed(1)} %, ` +
+        `group ${(shuffle.judgedShare * 100).toFixed(1)} % of ${shuffle.covered.toFixed(1)} traced. ` +
+        `In ${CHILD_MOTION.short.span}s bursts: worst child ${burst.worstShareChild} at ` +
+        `${(burst.worstShare * 100).toFixed(2)} %, group ${(burst.share * 100).toFixed(2)} % of ` +
+        `${burst.seconds.toFixed(1)} judged child-seconds, least judgeable child ` +
+        `${burst.leastJudgedChild} at ${(burst.leastJudged * 100).toFixed(1)} %. ` +
+        `Bad = over ${CHILD_MOTION.minPath} m walked inside ${CHILD_MOTION.circle} m ` +
+        `(burst: over ${CHILD_MOTION.short.minPath} m walked for a ${CHILD_MOTION.short.ratio}th of it covered)` +
+        (shuffle.worst.child >= 0
+          ? ` — worst child ${shuffle.worst.child} at ${shuffle.worst.clock.toFixed(1)}s, ${shuffle.worst.path.toFixed(2)} m walked inside ${shuffle.worst.out.toFixed(2)} m`
+          : ''),
+    )
+
+    // 2b. AND NOBODY IS BEING CARRIED (point 656). The stall watch teleports a
+    // child that has got nowhere for 1.5 s onto free ground, and that teleport
+    // is the reported episode ENDING — so it is a finding in its own right and
+    // is reported by name here, whatever the windows above say. A CARRY is a
+    // rescue that really set the child down somewhere else; the rest handed it
+    // back the ground it was already standing on.
+    const rescues = rescueRate(tracks)
+    check(
+      'and no child has to be carried out of the settlement’s own geometry',
+      rescues.carriedPublished &&
+        rescues.nudgesPublished &&
+        rescues.carriedMetresPerChildMinute < CHILD_MOTION.carryGate &&
+        rescues.perChildMinute < CHILD_MOTION.rescueGate &&
+        // AND THE WORST CHILD ON ITS OWN CLOCK: a rate averaged over the group
+        // divides one persistently rescued child by its healthy siblings.
+        rescues.worstPerChildMinute < CHILD_MOTION.worstChildRescueGate &&
+        rescues.worstCarriedMetresPerChildMinute < CHILD_MOTION.worstChildCarryGate,
+      // EACH FIGURE WITH THE CHILD IT BELONGS TO, AND CALLED WHAT IT IS. Three
+      // different questions with three possibly different answers: the highest
+      // RATE (what the gate reads), the most rescues in ABSOLUTE count, and the
+      // furthest CARRIED. The rate used to be printed as "most-often-picked-up",
+      // which is the count's name, and the count was not printed at all.
+      `highest rescue rate: child ${rescues.worstRescueChild} at ` +
+        `${rescues.worstPerChildMinute.toFixed(2)}/min. Most rescues in all: child ` +
+        `${rescues.worstChild} with ${rescues.worstRescues}. Furthest carried: child ` +
+        `${rescues.worstCarriedChild} at ${rescues.worstCarriedMetresPerChildMinute.toFixed(2)} m/min. ` +
+        `Group ` +
+        `${rescues.rescues} rescues (${rescues.carriedMetres.toFixed(2)} m carried in all` +
+        `${rescues.carriedPublished && rescues.nudgesPublished ? '' : ', A COUNTER NOT PUBLISHED BY THE GAME'}) in ` +
+        `${rescues.childMinutes.toFixed(2)} child-minutes = ${rescues.perChildMinute.toFixed(2)}/child-min, ` +
+        `carried ${rescues.carriedMetresPerChildMinute.toFixed(2)} m/child-min`,
+    )
+
+    // AND A LOOK AT THEM. The complaint is what the player SEES, so the run
+    // leaves a frame of the children themselves — the traveller stepped back to
+    // the group and turned to face it, the shutter projecting their centroid so
+    // a frame named after them cannot photograph an empty lane (point 375).
+    // THE STANDPOINT IS SEARCHED, AND SO IS THE MOMENT. Where the children
+    // stand decides what any standpoint can see of them: their ground is 13 m
+    // across with the huts standing in it, so while the chase has them strung
+    // out through the lanes, the best vantage in the settlement still sees one
+    // of them past a wall — a photograph of an empty village with a figure in
+    // it. The search below is therefore run EVERY frame and the shutter waits,
+    // bounded, for a moment worth photographing; if the game never offers one it
+    // shoots the best it found rather than skipping the picture.
+    await page.evaluate(() => {
+      window.__pickChildVantage = () => {
+        const kids = window.__placeTag().children
+        if (kids.length === 0) return null
+        const cx = kids.reduce((s, k) => s + k.x, 0) / kids.length
+        const cz = kids.reduce((s, k) => s + k.z, 0) / kids.length
+        // A vantage the huts do not stand in. Merely stepping back from where
+        // the traveller happened to be put the camera inside a dwelling, and the
+        // shutter cannot see that: the centroid still PROJECTED into the frame,
+        // behind a wall. So the standpoint is chosen against the layout — clear
+        // of every dwelling, and with a clear line to the children.
+        const huts = window.__placeLayout.dwellings
+        const blocks = (ax, az, bx, bz, pad) =>
+          huts.some((h) => {
+            const dx = bx - ax
+            const dz = bz - az
+            const len2 = dx * dx + dz * dz || 1
+            const t = Math.max(0, Math.min(1, ((h.x - ax) * dx + (h.z - az) * dz) / len2))
+            return Math.hypot(ax + t * dx - h.x, az + t * dz - h.z) < h.r + pad
+          })
+        const room = (sx, sz) =>
+          huts.length > 0 ? Math.min(...huts.map((h) => Math.hypot(sx - h.x, sz - h.z) - h.r)) : Infinity
+        let best = null
+        let bestScore = -Infinity
+        for (let i = 0; i < 24; i++) {
+          const a = (i / 24) * Math.PI * 2
+          for (const dist of [6, 8, 10]) {
+            const sx = cx + Math.sin(a) * dist
+            const sz = cz + Math.cos(a) * dist
+            if (Math.hypot(sx, sz) > window.__placeLayout.radius - 2) continue
+            if (blocks(sx, sz, sx, sz, 2)) continue // standing inside a hut
+            // How many children it can actually SEE: a thatch roof is opaque,
+            // and a subject that merely projects into the frame can sit behind
+            // one. The roof overhangs the wall, so the sightline is tested
+            // against a hut generously wider than its footprint.
+            const seen = kids.filter((k) => !blocks(sx, sz, k.x, k.z, 1.2))
+            if (seen.length === 0) continue
+            // Then ELBOW ROOM, then nearness. Seeing them was not enough on its
+            // own: the first standpoint that did stood in the alley between two
+            // dwellings, and at eye height a wall a metre away fills half the
+            // picture whatever the sightline says. Room counts up to four metres
+            // and no further — beyond that the wall is out of the picture, and
+            // what is left to decide is that the children are figures rather
+            // than specks.
+            const clear = Math.min(room(sx, sz), 4)
+            const score = seen.length * 1000 + clear * 50 - dist
+            if (score > bestScore) {
+              bestScore = score
+              best = { sx, sz, seen: seen.length, of: kids.length, clear, dist }
+              const vx = seen.reduce((s, k) => s + k.x, 0) / seen.length
+              const vz = seen.reduce((s, k) => s + k.z, 0) / seen.length
+              best.vx = vx
+              best.vz = vz
+            }
+          }
+        }
+        return best
+      }
+    })
+    // Worth photographing: most of the group in the clear, and the camera in the
+    // open rather than up against a wall.
+    await stepUntil(() => {
+      const b = window.__pickChildVantage()
+      return !!b && b.seen >= Math.min(3, b.of) && b.clear >= 2.5
+    }, null, 300)
+    const aimed = await page.evaluate(() => {
+      const p = window.__placePlayer
+      const best = window.__pickChildVantage()
+      if (!p || !best) return null
+      const pose = { x: p.x, z: p.z, yaw: p.yaw }
+      p.x = best.sx
+      p.z = best.sz
+      // Look at what is actually visible, and hand the shutter the same point.
+      p.yaw = Math.atan2(-(best.vx - p.x), -(best.vz - p.z))
+      return { pose, cx: best.vx, cz: best.vz, seen: best.seen, of: best.of }
+    })
+    if (aimed) {
+      await nextFrames(2)
+      await frame('648-village-children', {
+        local: { x: aimed.cx, y: 0.8, z: aimed.cz },
+        label: `the children at their game of tag (${aimed.seen} of ${aimed.of} in the clear)`,
+      })
+      await page.evaluate((pose) => {
+        const p = window.__placePlayer
+        if (!p) return
+        p.x = pose.x
+        p.z = pose.z
+        p.yaw = pose.yaw
+      }, aimed.pose)
+    }
+    // The world goes back as it was found, the injected search included — every
+    // section after this one would otherwise read a page this one left behind.
+    await page.evaluate(() => {
+      delete window.__pickChildVantage
+    })
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  await page.evaluate((seed) => window.__game.setState({ seed }), bootSeed)
 }
 
 // --- The adults' errands (work-order point 483) -------------------------------
@@ -3980,15 +4689,41 @@ if (section('ctrl-actor-labels')) {
     .waitForFunction(() => (window.__actorLabels?.() ?? []).length > 0, null, { timeout: 20000 })
     .then(() => true)
     .catch(() => false)
-  const held = await page.evaluate(() => (window.__actorLabels ? window.__actorLabels() : null))
-  const rendered = await page.evaluate(() =>
-    [...document.querySelectorAll('.actor-label')].map((el) => el.textContent ?? ''),
+  // BOTH readings must describe the SAME moment — the bird's-eye half of this
+  // check already reads them that way (enrichments.mjs) and this half was the
+  // one still reading them apart, one round trip at a time. The probe reports
+  // the list the layer last rendered FROM, while every new label reaches the
+  // DOM through drei's own portal root, which commits on its own schedule.
+  // Measured 11.08.2026 under a 20× CPU throttle, on this branch and on `main`
+  // alike: the settlement's ~20 labels then arrive roughly ONE PER FRAME, so a
+  // state read one round trip before the DOM read reported 24 labels against 2
+  // drawn — which is exactly how this check went red on the loaded WebGL 2 lane
+  // while every label was correct. So: poll on the app's own frames until the
+  // two agree and snapshot them in the SAME tick. If they never converge the
+  // snapshot still comes back and the check below fails on it, which is the
+  // defect this assertion is really for.
+  const snapshot = await page.evaluate(
+    () =>
+      new Promise((res) => {
+        let frames = 0
+        const step = () => {
+          const labels = window.__actorLabels ? window.__actorLabels() : null
+          if (labels === null) return res(null)
+          const rendered = [...document.querySelectorAll('.actor-label')].map((el) => el.textContent ?? '')
+          if (rendered.length === labels.length || ++frames > 240) return res({ labels, rendered, frames })
+          requestAnimationFrame(step)
+        }
+        requestAnimationFrame(step)
+      }),
   )
+  const held = snapshot === null ? null : snapshot.labels
+  const rendered = snapshot === null ? [] : snapshot.rendered
   check(
     "holding Ctrl names the settlement's people and animals (point 342)",
     !!held && held.length > 0 && rendered.length === held.length,
     held
-      ? `${held.length} labels [${held.map((l) => l.kind).join(', ')}]: ${rendered.slice(0, 4).join(' | ')}`
+      ? `${held.length} labels, ${rendered.length} drawn after ${snapshot.frames} frame(s) ` +
+        `[${held.map((l) => l.kind).join(', ')}]: ${rendered.slice(0, 4).join(' | ')}`
       : `no layer (appeared: ${appeared})`,
   )
   // A settlement's actors are its INHABITANTS and their animals — nothing else
@@ -4010,6 +4745,88 @@ if (section('ctrl-actor-labels')) {
   const SCENERY_WORDS = ['hut', 'wall', 'mauer', 'fence', 'zaun', 'roof', 'dach', 'tree', 'baum', 'rock', 'fels', 'grass', 'gras']
   const scenery = rendered.filter((t) => SCENERY_WORDS.some((w) => t.toLowerCase().includes(w)))
   check('no building, fence or plant is named (point 342)', scenery.length === 0, scenery.join(' | '))
+
+  // NOTHING THE SETTLEMENT DRAWS IS INVISIBLE TO THE LAYER (point 600). The
+  // bird's-eye defect was a figure drawn from a list no source walked, and the
+  // same failure here would be an inhabitant drawn without a mark. Every figure
+  // names ITSELF in the graph (`name="inhabitant"`, set by PlaceLife's Figure
+  // for the speech label), so that name is an INDEPENDENT handle on the people
+  // this scene really draws: each of them must carry an actor mark AND stand in
+  // the layer's raw candidate set, whatever it is doing.
+  const figures = await page.evaluate(() => {
+    const cands = window.__actorCandidates ? window.__actorCandidates() : null
+    if (!cands || !window.__placeScene) return null
+    const drawn = []
+    window.__placeScene.traverse((o) => {
+      if (o.name !== 'inhabitant') return
+      for (let n = o; n; n = n.parent) if (n.visible === false) return
+      const m = o.matrixWorld.elements
+      drawn.push({ x: m[12], z: m[14], kind: o.userData?.actor?.kind ?? null })
+    })
+    const unmarked = drawn.filter((f) => f.kind === null)
+    const unoffered = drawn.filter(
+      (f) => f.kind !== null && !cands.some((c) => c.kind === f.kind && Math.hypot(c.x - f.x, c.z - f.z) < 1.5),
+    )
+    return {
+      total: drawn.length,
+      unmarked: unmarked.length,
+      unoffered: unoffered.length,
+      kinds: [...new Set(drawn.map((f) => f.kind))],
+    }
+  })
+  check(
+    'every inhabitant figure the scene draws reaches the label layer (point 600)',
+    !!figures && figures.total > 0 && figures.unmarked === 0 && figures.unoffered === 0,
+    figures
+      ? `${figures.total} figures [${figures.kinds.join(', ')}], ${figures.unmarked} unmarked, ` +
+        `${figures.unoffered} not offered`
+      : 'no candidate hook',
+  )
+
+  // And it rides them while they WALK: the settlement's states are motion, and
+  // a label that stayed at the birthplace would be the same defect one layer
+  // down. Polled on the app's own frames (point 177), never a wall-clock wait.
+  const walking = await page.evaluate(
+    () =>
+      new Promise((res) => {
+        const figuresNow = () => {
+          const list = []
+          window.__placeScene.traverse((o) => {
+            if (o.name !== 'inhabitant') return
+            const m = o.matrixWorld.elements
+            list.push({ node: o, x: m[12], z: m[14], kind: o.userData?.actor?.kind ?? null })
+          })
+          return list
+        }
+        const start = new Map(figuresNow().map((f) => [f.node, { x: f.x, z: f.z }]))
+        let frames = 0
+        const step = () => {
+          const moved = figuresNow().filter((f) => {
+            const s = start.get(f.node)
+            return s !== undefined && Math.hypot(f.x - s.x, f.z - s.z) > 0.25
+          })
+          if (moved.length > 0) {
+            const cands = window.__actorCandidates()
+            const named = moved.filter((f) =>
+              cands.some((c) => c.kind === f.kind && Math.hypot(c.x - f.x, c.z - f.z) < 1.5),
+            )
+            res({ moved: moved.length, named: named.length, kinds: [...new Set(moved.map((f) => f.kind))], frames })
+            return
+          }
+          if (++frames > 900) {
+            res({ moved: 0, named: 0, kinds: [], frames })
+            return
+          }
+          requestAnimationFrame(step)
+        }
+        requestAnimationFrame(step)
+      }),
+  )
+  check(
+    'a walking inhabitant is named where it now stands (point 600)',
+    walking.moved > 0 && walking.named === walking.moved,
+    `${walking.named}/${walking.moved} moved figures named after ${walking.frames} frame(s) [${walking.kinds.join(', ')}]`,
+  )
 
   await frame('148-ctrl-actor-labels-village', {
     place: 'maasai-village',

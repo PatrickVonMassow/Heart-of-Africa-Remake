@@ -4,7 +4,7 @@
 // everywhere doors stay reachable, windows keep a clear line outward and no
 // building stands on a lane.
 
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import {
   COMPOUND_RING_MIN,
   buildLayout,
@@ -20,7 +20,15 @@ import { ANIMAL_RADIUS, animalAnchors } from './animalSpots'
 import { closestOnPolyline } from './lanePlan'
 import { PLACES, placeById } from '../../world/geo'
 import { ROCK_VILLAGE_ID, ROCK_HEIGHT_UNITS, communicationRockSite } from '../../world/communicationRock'
+import { setupGeodata } from '../../test/geodata'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS } from './regionStyles'
+
+// The landmark boulder is placed against the REAL terrain (it refuses every wet
+// spot — work-order 585), so this file needs the elevation dataset the browser
+// has; without it the whole map reads as ocean and no bank exists to place it on.
+beforeAll(async () => {
+  await setupGeodata()
+})
 
 const SEEDS = [7, 42, 1337]
 /** The world of the F6 reports behind work-order 583/584. */

@@ -16,6 +16,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildSpawnArgs,
+  firewallTopUpDecision,
   buildSpawnOptions,
   recordSpawn,
   reapableSpawns,
@@ -57,6 +58,8 @@ import {
   repoTrustKeys,
   claudeConfigPath,
   CLAUDE_CLI_ENV,
+  ETA_OVERDUE_ALERT_MIN,
+  staleEtaLogLine,
 } from './batch-autostart-core.mjs'
 import { isOwnSpawn } from './batch-singleton.mjs'
 
@@ -117,11 +120,14 @@ describe('buildSpawnArgs — print mode, the model chain, and no prompt that can
 })
 
 describe('the resume prompt', () => {
-  it('tells the session that a WAIT MUST BE VISIBLE — poll, never sit silent (point 402 (b))', () => {
-    // A silent wait is what made a working session indistinguishable from a
-    // corpse: every poll is a tool call and every tool call refreshes the
-    // heartbeat, which is what the launcher reads liveness from.
-    expect(RESUME_PROMPT).toMatch(/POLLE/)
+  it('tells the session to AWAIT a run, never to poll it (point 402 (b), narrowed by point 592)', () => {
+    // A silent wait once made a working session indistinguishable from a corpse,
+    // and polling was the answer to that. It was the wrong answer: measured, the
+    // poll loop cost 10.9 % of the weighted spend. Visibility now comes from the
+    // hook-set in-flight marker, so the wait itself may be ONE blocking call.
+    expect(RESUME_PROMPT).toMatch(/WARTE\s+BLOCKIEREND/)
+    expect(RESUME_PROMPT).toMatch(/run-wait\.mjs --await/)
+    expect(RESUME_PROMPT).toMatch(/Poll-Schleife ist verboten/)
     expect(RESUME_PROMPT).toMatch(/batch-in-flight\.mjs --waiting-on/)
   })
 
@@ -1016,5 +1022,97 @@ describe('the call-discipline paragraph (point 593)', () => {
     }
     const ids = callDisciplineTopics().map((t) => t.id)
     expect(new Set(ids).size).toBe(ids.length)
+  })
+})
+
+// THE TOP-UP THAT NEVER RAN — 12.08.2026. The egress allowance is an ipset of
+// resolved IPs; it ages out under a running container, and the tick re-resolves
+// it. It had not done so once since the container came up, because the pid file
+// that bounds it to one child at a time does not exist on a fresh container and
+// reading it threw. The first failure made itself permanent: the record is only
+// written after a spawn that then never happened.
+describe('the firewall top-up decision', () => {
+  const ours = () => 'node /workspace/hoa/scripts/firewall-allow.mjs '
+
+  it('starts when there is no record at all — the fresh container case', () => {
+    const d = firewallTopUpDecision({ pidText: null, cmdlineOf: () => null })
+    expect(d.start).toBe(true)
+    expect(d.reason).toMatch(/no top-up on record/)
+  })
+
+  it('starts when the record is empty or unreadable rather than a number', () => {
+    for (const pidText of ['', '   ', 'not-a-pid', '0']) {
+      expect(firewallTopUpDecision({ pidText, cmdlineOf: () => null }).start).toBe(true)
+    }
+  })
+
+  it('does not start a second while our own top-up is still running', () => {
+    const d = firewallTopUpDecision({ pidText: '4711', cmdlineOf: () => ours() })
+    expect(d.start).toBe(false)
+    expect(d.reason).toMatch(/still running \(pid 4711\)/)
+  })
+
+  it('starts anyway when the recorded pid belongs to something else — pid reuse', () => {
+    // A live pid is not proof of our child: without this, one reused number
+    // would suppress the top-up for as long as that unrelated process lives.
+    const d = firewallTopUpDecision({ pidText: '4711', cmdlineOf: () => '/usr/bin/vim ' })
+    expect(d.start).toBe(true)
+    expect(d.reason).toMatch(/not a top-up any more/)
+  })
+
+  it('starts when the pid cannot be identified at all — the non-Linux case', () => {
+    // A redundant top-up is the safe direction: it is idempotent and short.
+    expect(firewallTopUpDecision({ pidText: '4711', cmdlineOf: () => null }).start).toBe(true)
+  })
+
+  it('trims the record the way a written pid file reads back', () => {
+    expect(firewallTopUpDecision({ pidText: '4711\n', cmdlineOf: () => ours() }).start).toBe(false)
+  })
+})
+
+// Point 661, the ownerless half: the launcher tick calls out a PUBLISHED board
+// whose now-card "~HH:MM" lies more than one tick in the past — the in-flight
+// refusal only bounds the staleness while a session exists to re-declare.
+describe('the launcher calls out a published now-card ETA older than a tick (point 661)', () => {
+  it('logs the card once its promise is more than one tick past, naming point and meta', () => {
+    const line = staleEtaLogLine({ overdue: [{ points: [388], meta: '10:44 · ~11:15', minutesPast: 50 }] })
+    expect(line).toContain('388')
+    expect(line).toContain('10:44 · ~11:15')
+    expect(line).toContain('50 min past')
+    expect(line).toMatch(/^board: /)
+  })
+
+  it('stays quiet inside the tick: the audit or the wait refusal may not have spoken yet', () => {
+    expect(staleEtaLogLine({ overdue: [{ points: [388], meta: 'm', minutesPast: 10 }] })).toBeNull()
+    expect(staleEtaLogLine({ overdue: [{ points: [388], meta: 'm', minutesPast: ETA_OVERDUE_ALERT_MIN }] })).toBeNull()
+    expect(staleEtaLogLine({ overdue: [{ points: [388], meta: 'm', minutesPast: ETA_OVERDUE_ALERT_MIN + 1 }] })).not.toBeNull()
+  })
+
+  it('names only the cards past the tick when several are overdue', () => {
+    const line = staleEtaLogLine({
+      overdue: [
+        { points: [388], meta: 'a', minutesPast: 40 },
+        { points: [401], meta: 'b', minutesPast: 8 },
+      ],
+    })
+    expect(line).toContain('388')
+    expect(line).not.toContain('401')
+  })
+
+  it('a pointless card is still named, by its placeholder', () => {
+    expect(staleEtaLogLine({ overdue: [{ points: [], meta: 'idle', minutesPast: 30 }] })).toContain('?')
+  })
+
+  it('FAIL-OPEN on anything malformed — the child output is data, not trusted structure', () => {
+    expect(staleEtaLogLine({ overdue: undefined })).toBeNull()
+    expect(staleEtaLogLine({ overdue: null })).toBeNull()
+    expect(staleEtaLogLine({ overdue: [] })).toBeNull()
+    expect(staleEtaLogLine({ overdue: 'garbage' })).toBeNull()
+    expect(staleEtaLogLine({ overdue: [{ points: [1], meta: 'm', minutesPast: 'NaN' }] })).toBeNull()
+    // A numeric STRING is malformed too — no coercion into an alert (Sol review).
+    expect(staleEtaLogLine({ overdue: [{ points: [1], meta: 'm', minutesPast: '50' }] })).toBeNull()
+    expect(staleEtaLogLine({ overdue: [{ points: [1], meta: 'm', minutesPast: Infinity }] })).toBeNull()
+    expect(staleEtaLogLine({ overdue: [{ points: [1], meta: 'm' }] })).toBeNull()
+    expect(staleEtaLogLine()).toBeNull()
   })
 })

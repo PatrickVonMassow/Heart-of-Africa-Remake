@@ -5,10 +5,12 @@
 // and a fake AudioContext pins that a flash SCHEDULES the clap at the pure
 // thunderDelaySeconds lag on the audio clock and SURVIVES to fire — no later
 // frame or ambience state change can cancel it.
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   coastSurfGain,
   emitFootstep,
+  emitDrumPhrase,
+  playDrumMessage,
   playSpeech,
   playThunder,
   proximityGain,
@@ -21,12 +23,82 @@ import {
   trampleCrunchGain,
   trampleCrunchPlan,
   DRUM_BEAT_PEAK,
+  DRUM_BED_PATTERNS,
+  drumBedPhrasePlan,
+  drumBedVillageSpread,
   PROXIMITY_AUDIBLE,
 } from './ambience'
 import { thunderDelaySeconds } from './season'
 import { balance } from '../config/balance'
 import { phraseOf, utteranceOf, SEQUENCE_LENGTH } from '../communication/lexicon'
 import { phrasePlan, utterancePlan } from '../communication/speaking'
+import { resetDevAsserts } from './devAssert'
+import { drumMessagePlan } from '../communication/drumMessage'
+
+describe('village drum bed phrase selection', () => {
+  const sequence = (...values: number[]) => {
+    let i = 0
+    return () => values[i++ % values.length]
+  }
+
+  it('ships disabled while retaining its planner for debug audition', () => {
+    expect(balance.drumBed.enabled).toBe(false)
+    expect(drumBedPhrasePlan('bambara-village', 0, null, 0).hits.length).toBeGreaterThan(0)
+  })
+
+  it('varies across many bars and never repeats a pattern back to back', () => {
+    const config = { ...balance.drumBed, phraseBars: 3 }
+    const chosen: number[] = []
+    let previous: number | null = null
+    let ordinal = 0
+    const random = sequence(0, 0.99, 0.34, 0.7, 0.12)
+    for (let phrase = 0; phrase < 8; phrase++) {
+      const plan = drumBedPhrasePlan('bambara-village', 0, previous, ordinal, random, config)
+      chosen.push(...plan.patternIndices)
+      previous = plan.patternIndices.at(-1) ?? previous
+      ordinal += plan.patternIndices.length
+    }
+    expect(new Set(chosen).size).toBe(DRUM_BED_PATTERNS.length)
+    for (let i = 1; i < chosen.length; i++) expect(chosen[i]).not.toBe(chosen[i - 1])
+  })
+
+  it('guarantees that at least half of every phrase is rests', () => {
+    for (let pick = 0; pick < DRUM_BED_PATTERNS.length; pick++) {
+      const plan = drumBedPhrasePlan('bambara-village', 0, null, 0, () => (pick + 0.01) / DRUM_BED_PATTERNS.length)
+      expect(plan.restShare).toBeGreaterThanOrEqual(0.5)
+    }
+  })
+
+  it('moves a secondary accent while preserving the same rhythm', () => {
+    const first = drumBedPhrasePlan('bambara-village', 0, null, 0, () => 0)
+    const second = drumBedPhrasePlan('bambara-village', 0, null, 1, () => 0)
+    expect(first.patternIndices[0]).toBe(second.patternIndices[0])
+    expect(first.hits.map((h) => h.startOffset)).toEqual(second.hits.map((h) => h.startOffset))
+    expect(first.hits.map((h) => h.peak)).not.toEqual(second.hits.map((h) => h.peak))
+  })
+
+  it('gives each village a stable bounded tempo and pitch spread', () => {
+    const ids = ['bambara-village', 'hausa-village', 'maasai-village', 'zulu-village']
+    const spreads = ids.map((id) => drumBedVillageSpread(id, 0.07, 0.08))
+    expect(spreads.map((s) => s.tempoScale)).toEqual(ids.map((id) => drumBedVillageSpread(id, 0.07, 0.08).tempoScale))
+    expect(new Set(spreads.map((s) => s.tempoScale)).size).toBe(ids.length)
+    expect(new Set(spreads.map((s) => s.pitchScale)).size).toBe(ids.length)
+    for (const spread of spreads) {
+      expect(spread.tempoScale).toBeGreaterThanOrEqual(0.93)
+      expect(spread.tempoScale).toBeLessThanOrEqual(1.07)
+      expect(spread.pitchScale).toBeGreaterThanOrEqual(0.92)
+      expect(spread.pitchScale).toBeLessThanOrEqual(1.08)
+    }
+  })
+
+  it('lengthens phrase silence as a visit continues without changing its bar count', () => {
+    const random = () => 0.5
+    const opening = drumBedPhrasePlan('bambara-village', 0, null, 0, random)
+    const thinned = drumBedPhrasePlan('bambara-village', balance.drumBed.thinAfterSeconds, null, 0, random)
+    expect(thinned.patternIndices).toHaveLength(opening.patternIndices.length)
+    expect(thinned.nextDelaySeconds).toBeGreaterThan(opening.nextDelaySeconds)
+  })
+})
 
 describe('coastSurfGain (point 153 — the coastal surf fade)', () => {
   const near = 0.4
@@ -352,6 +424,30 @@ describe('playThunder (point 166 — scheduled on the audio clock, survives to f
     const gain = filter.connected[0] as FakeGain
     return gain.gain
   }
+
+  it('emits no ambient drum phrase in the shipped off state', () => {
+    const ctx = FakeCtx.last
+    expect(ctx).not.toBeNull()
+    if (!ctx) return
+    const before = ctx.oscillators.length
+    expect(balance.drumBed.enabled).toBe(false)
+    emitDrumPhrase(new FakeGain() as unknown as GainNode)
+    expect(ctx.oscillators.slice(before)).toHaveLength(0)
+  })
+
+  it("still emits every strike of the chief's message while the ambient bed is off", () => {
+    const ctx = FakeCtx.last
+    if (!ctx) return
+    ctx.currentTime = 5
+    const plan = drumMessagePlan()
+    const before = ctx.oscillators.length
+    playDrumMessage(plan)
+    const voices = ctx.oscillators.slice(before)
+    expect(balance.drumBed.enabled).toBe(false)
+    expect(voices).toHaveLength(plan.strikes.length * 2)
+    expect(voices[0].startedAt).toBeCloseTo(5 + plan.strikes[0].at, 10)
+    expect(voices[voices.length - 2].startedAt).toBeCloseTo(5 + plan.strikes.at(-1)!.at, 10)
+  })
 
   it('schedules both clap voices at now + the pure delay, with a stop only after the tail', () => {
     const ctx = FakeCtx.last
@@ -746,23 +842,98 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       refreshAmbienceVolume()
       expect(speechBusOf(speak()[0]).gain.value).toBe(0)
     })
+
+    // THE RESULT-LEVEL ASSERTION (point 589, rule 1): the level that LEAVES the
+    // graph is what the ear gets, and point 577 proved a plan can be perfect
+    // while the chain behind it multiplies the tone away. So the running game
+    // judges the end of the chain, and every session — headless or manual —
+    // reports it.
+    describe('the armed end-of-chain level', () => {
+      let spy: ReturnType<typeof vi.spyOn>
+      beforeEach(() => {
+        resetDevAsserts()
+        spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      })
+      afterEach(() => spy.mockRestore())
+
+      const codes = () => spy.mock.calls.map((c) => String(c[0]))
+
+      it('says nothing at the shipped mix, nor with the bed turned to zero', () => {
+        ctx.currentTime = 240
+        balance.ambientVolume = 0
+        refreshAmbienceVolume()
+        speak()
+        expect(codes()).toEqual([])
+      })
+
+      it('stays silent when the PLAYER turned the speech off — that is not a defect', () => {
+        ctx.currentTime = 260
+        balance.communication.speechVolume = 0
+        refreshAmbienceVolume()
+        speak()
+        expect(codes()).toEqual([])
+      })
+
+      it('FIRES when the chain behind an intact plan is zero (the point-577 shape)', () => {
+        ctx.currentTime = 280
+        // The bus is left at zero while the player's own setting says otherwise
+        // — exactly the state in which every plan-level measurement was green.
+        balance.communication.speechVolume = 0
+        refreshAmbienceVolume()
+        balance.communication.speechVolume = defaultSpeech
+        speak()
+        expect(codes().join(' ')).toContain('speech-inaudible')
+      })
+
+      it('FIRES on a zero MASTER too — every factor of the chain is in the product', () => {
+        ctx.currentTime = 300
+        // The node the speech bus feeds IS the master; zeroing it silences the
+        // voices just as surely, and a check that read only the sub-bus would
+        // pass. Restored immediately, so nothing after this sees a mute engine.
+        const master = speechBusOf(speak()[0]).connected[0] as FakeGain
+        const held = master.gain.value
+        master.gain.value = 0
+        speak()
+        master.gain.value = held
+        expect(codes().join(' ')).toContain('speech-inaudible')
+      })
+
+      it('FIRES on a plan that carries syllables at no level at all', () => {
+        ctx.currentTime = 320
+        // Not reachable through `phrasePlan` — it returns no syllables for an
+        // inaudible level — but `playSpeech` takes any plan, and syllables at
+        // peak 0 are silence whatever the scheduling floor makes of them.
+        playSpeech({
+          syllables: [{ tone: 'low', startOffset: 0, duration: 0.1, peak: 0 }],
+          duration: 0.1,
+          gain: 1,
+        })
+        expect(codes().join(' ')).toContain('speech-inaudible')
+      })
+    })
   })
+
+  /** Conservative measured output of the rendered vowel filters per unit of
+   * scheduled speech envelope; pinned in ambience.speech.test.ts. */
+  const SYLLABLE_SYNTHESIS_GAIN = 1.7
 
   // Point 605: point 577 gave the speech its own bus at the level it had had on
   // the ambient one, and at that level the syllables sat BELOW the village drum
-  // bed — the user still reported them too quiet. The default is calibrated
+  // bed — the user still reported them too quiet. Its dormant audition mix is
+  // calibrated
   // against the graph, so this case measures the whole chain the ear gets:
   // syllable peak × speech bus against drum beat × drum layer × ambient bus,
-  // all read off the LIVE nodes at the default balance. A later change to
+  // all read off the LIVE nodes at the default gains. A later change to
   // either side then fails here instead of quietly re-burying the voices.
-  describe('the speech carries over the drums at the DEFAULT mix (point 605)', () => {
-    /** What a syllable's own synthesis puts out per unit of scheduled envelope
-     *  peak — the vowel's formant filters sit before the envelope, so the wave
-     *  is louder than the peak. MEASURED on the shipped chain and pinned in
-     *  src/systems/ambience.speech.test.ts; kept conservative here, so the
-     *  relation is understated rather than flattered. */
-    const SYLLABLE_SYNTHESIS_GAIN = 1.7
-
+  describe('the speech carries over the debug-enabled drum mix (point 605)', () => {
+    beforeEach(() => {
+      balance.drumBed.enabled = true
+      refreshAmbienceVolume()
+    })
+    afterEach(() => {
+      balance.drumBed.enabled = false
+      refreshAmbienceVolume()
+    })
     /** The bus a spoken syllable lands on, and the master behind it. */
     const busOf = (voice: FakeOscillator): FakeGain => {
       const bus = envelopeOf(voice).connected[0] as FakeGain | undefined
@@ -795,7 +966,7 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       expect(moved, 'exactly one layer separates the two scenes: the drums').toHaveLength(1)
       return moved[0].gain.value
     }
-    /** One syllable spoken right beside the player, at the DEFAULT volume — no
+    /** One syllable spoken right beside the player, at the default volume — no
      *  option override, so the plan reads the shipped balance. */
     const syllableBesideThePlayer = (): { peak: number; bus: FakeGain } => {
       const before = ctx.oscillators.length
@@ -816,13 +987,14 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
 
     it('measures the syllables well ABOVE the drum bed, not under it', () => {
       ctx.currentTime = 240
-      // The mix this measures is the DEFAULT one — the state the player starts in.
+      // The gains are the calibrated defaults; only the debug audition switch differs.
       expect(balance.ambienceVolume).toBe(0.1)
       expect(balance.ambientVolume).toBe(0.5)
-      expect(balance.communication.speechVolume).toBe(1.5)
+      expect(balance.communication.speechVolume).toBe(2)
+      expect(balance.drumBed.villageGain).toBe(0.42)
       const { drums, speech } = measure()
       expect(drums).toBeGreaterThan(0)
-      // MEASURED: 2.04× the drum beat (0.459 against 0.225) at the pinned
+      // MEASURED: 3.24× the drum beat (0.612 against 0.189) at the pinned
       // synthesis gain. Under 1 is the reported bug; a shout is no fix either.
       expect(speech / drums).toBeGreaterThanOrEqual(1.6)
       expect(speech / drums).toBeLessThanOrEqual(4)
@@ -840,8 +1012,58 @@ describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)'
       const footstep =
         Math.max(...stepGain.gain.events.map((e) => e.value ?? 0)) * stepBus.gain.value
       // Two villagers speaking right beside the player, over the drum bed, with
-      // the player walking: MEASURED 0.62 of full scale after the master.
+      // the player walking: MEASURED 0.76 of full scale after the master.
       expect((2 * speech + drums + footstep) * master).toBeLessThan(1)
     })
+  })
+
+  // Point 673 follows the shipped drum silence, so the calibration that closes
+  // it measures the DEPLOYED village mix rather than turning the dormant bed
+  // back on. The floor is deliberately conservative: all remaining active
+  // layer gains are summed as though their peaks coincided, along with gain
+  // modulation feeding those layers, before the common master gain. Real bird
+  // and music envelopes can only make the instantaneous floor lower.
+  it('puts a nearby syllable at least 8 dB above the remaining deployed village ambience', () => {
+    ctx.currentTime = 280
+    expect(balance.drumBed.enabled).toBe(false)
+    setAmbienceScene({ region: 'central', mode: 'place', placeKind: 'village', nearVillage: false })
+    refreshAmbienceVolume()
+
+    // Find the ambient bus through a real ambient emitter, then select layer
+    // nodes by their setTarget ramps rather than assuming graph build order.
+    const beforeProbe = ctx.gains.length
+    const beforeSources = ctx.sources.length
+    playThunder(thunderDelaySeconds(3), 0.8)
+    const clap = ctx.sources.slice(beforeSources)[0]
+    const clapEnvelope = (clap.connected[0] as FakeFilter).connected[0] as FakeGain
+    const ambientBus = clapEnvelope.connected[0] as FakeGain
+    const activeLayers = ctx.gains
+      .slice(0, beforeProbe)
+      .filter((g) => g.connected[0] === ambientBus)
+      .filter((g) => g.gain.value > 0 && g.gain.events.some((e) => e.type === 'cancel'))
+    const activeParams = new Set(activeLayers.map((g) => g.gain))
+    const modulation = ctx.gains
+      .slice(0, beforeProbe)
+      .filter((g) => activeParams.has(g.connected[0] as FakeParam))
+      .reduce((sum, g) => sum + Math.max(0, g.gain.value), 0)
+    const ambienceFloor = (
+      activeLayers.reduce((sum, layer) => sum + layer.gain.value, 0) + modulation
+    ) * ambientBus.gain.value
+
+    const beforeSpeech = ctx.oscillators.length
+    playSpeech(utterancePlan(utteranceOf('DIG'), 0))
+    const voice = ctx.oscillators.slice(beforeSpeech)[0]
+    const envelope = envelopeOf(voice)
+    const speechBus = envelope.connected[0] as FakeGain
+    const peak = Math.max(...envelope.gain.events.map((e) => e.value ?? 0))
+    const speechPeak = peak * speechBus.gain.value * SYLLABLE_SYNTHESIS_GAIN
+    const marginDb = 20 * Math.log10(speechPeak / ambienceFloor)
+
+    // MEASURED at the default preset: 0.612 over 0.2275, a 2.69× / 8.59 dB
+    // peak-to-floor margin. The explicit floor makes the promised margin the
+    // failure boundary, not an incidental consequence of the chosen number.
+    expect(ambienceFloor).toBeCloseTo(0.2275, 10)
+    expect(speechPeak).toBeCloseTo(0.612, 10)
+    expect(marginDb).toBeGreaterThanOrEqual(8)
   })
 })

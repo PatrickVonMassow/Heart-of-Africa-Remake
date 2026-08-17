@@ -37,6 +37,7 @@ import {
   formatMechanismReviewVerdict,
   mechanismPathsIn,
   modelFromTrailers,
+  modelsFromTrailers,
 } from './mechanism-review-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
@@ -175,6 +176,9 @@ function mechanismCommits(base, head, files) {
       at: Number(ct) * 1000 || 0,
       subject: (subject ?? '').trim(),
       authorModel: modelFromTrailers(trailers),
+      // EVERY co-author, not only the first: a commit naming two models has two
+      // list authors, and neither may merge the union (point 634).
+      authorModels: modelsFromTrailers(trailers),
       files: mech,
     })
   }

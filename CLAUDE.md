@@ -277,68 +277,76 @@ coverage map live in `scripts/verify/README.md`.
   resolves nowhere, and where one section number exists in two documents it
   prints BOTH — no resolver can decide that, so the reader is told. Every brief
   carries the revision it was cut from; regenerate rather than reuse an old one.
-- **Context boundary at a point boundary (users 27./28.07.2026).** 87–94 % of
-  the spend sat above 150k context, one session carrying point after
-  point. A batch session ENDS at its boundary, and the boundary is
-  TAKEN: after merge and tick run `node scripts/batch-boundary.mjs
-  <point>` and stop. `batch-progress-guard` BLOCKS a stop that closed a point
-  without that marker, allows one only against the work order and an armed
-  launcher (`scripts/batch-launcher.mjs --start` on Linux, the
-  `HoA-Batch-Autostart` task on Windows), then marks the lock HANDED OVER so it spawns
-  the successor — five hours were lost to a session that stopped holding it.
+- **Context boundary at a point boundary (users 27./28.07.2026; rebuilt by point
+  675).** 87–94 % of the spend sat above 150k context, one session carrying
+  point after point. A batch session ENDS at its boundary, TAKEN in TWO PHASES:
+  after merge and tick, `batch-boundary.mjs --prepare <point>`, the bookkeeping
+  it names, then `--commit <point>` LAST, and stop — a committed marker is
+  SEALED: later mutations are denied loudly (`--clear` withdraws), never a
+  silent deletion. The condition is "the point I was LANDING is landed": work
+  with pushed checkpoints is transferred at the commit and ADOPTED by the
+  successor (`batch-in-flight.mjs --adopt`); unpushed work drains first. Past
+  the CONTEXT WATERMARK (150k measured tokens, `context-watermark.mjs`) the
+  same handover fires with `--context`, and the board card says so. The guard
+  enforces all three against an armed launcher (`batch-launcher.mjs --start` on
+  Linux, the `HoA-Batch-Autostart` task on Windows), then marks the lock HANDED
+  OVER so it spawns the successor.
   Attended, ask for `/clear`. OWNERSHIP IS A LEASE (30.07.2026): `leaseUntil` on
   the lock, renewed BEFORE each call; an owner that stops renewing stops owning
-  the batch — arithmetic, nothing killed. A PreToolUse fence then refuses it
-  merge/push, the tick, the board publish and `dashboard-state.json`.
+  the batch. A PreToolUse fence then refuses it merge/push, the tick, the board
+  publish and `dashboard-state.json`.
   THE WAY BACK (28.07.2026): a returning window runs `node
   scripts/batch-claim.mjs --session <id>`; the owner sees it at its next hook,
   finishes — never mid-merge, never with an agent or a verification running —
-  releases, and the same command takes it. A claim expires, a dead claimant's is
-  ignored, one session ever wins.
+  releases, and the same command takes it. A claim expires, a dead claimant's
+  is ignored, one session wins.
   A MESSAGE WAKES IT TOO (29.07.2026): `scripts/chat-watcher.mjs` spawns a light
   responder from the chat inbox — only with no live owner and no honoured claim,
   under a bounded claim; the launcher tick supervises it.
-- **Model policy (user decision 25.07.2026, points 309 + the role revision).**
-  ONLY three models may author work here: **Opus 5** is the WORKER at any
-  difficulty; **Fable 5** serves the four-eyes principle (the two-mode rule
-  below) or the first fallback; **Opus 4.8** is the last
-  fallback. The chain is Opus 5 → Fable 5 → Opus 4.8, and
-  `scripts/batch-autostart.mjs` launches accordingly. DIFFICULTY IS NOT A REASON
-  to hand work to Fable — Opus 5 is equally capable, and a second model's value
-  is its different blind spots, which only a REVIEW realises. Sonnet and Haiku
-  are NOT acceptable: a session degraded to one is a capability breach and the
-  batch STOPS. Every commit NAMES its author model in the `Co-Authored-By`
-  trailer, and the `commit-msg` hook refuses one that does not.
-  `scripts/model-guard-core.mjs` holds the allowlist (`ALLOWED`) and the Stop
-  hook `scripts/model-guard.mjs` blocks the turn end on any commit after its
-  baseline authored outside it: HARD on a NAMED forbidden model (pause),
-  resolvably on an UNNAMED one, which the transcripts settle. (History: on
-  24.07.2026 a degraded session merged three defective Haiku deliveries in 14
-  minutes — only the trailers could have caught it.)
+- **Model policy (users 25.07.–13.08.2026, points 309/624/667). AUTHOR AND REVIEWER ARE
+  SEPARATE ROLES, AND AUTHORING HAS TWO LANES.** ANTHROPIC: **Opus 5**, then **Fable
+  5**, then **Opus 4.8** — the chain `scripts/batch-autostart.mjs` launches. **FABLE 5
+  AUTHORS THE HARD CASES** (12.08.2026): difficult, complex or error-prone work goes to
+  Fable FROM THE START, and Opus work MOVES there once Sol still finds problems after a
+  re-work. OPENAI: **GPT-5.6 Sol** AUTHORS the MECHANICAL and MID-DIFFICULTY points
+  through `node scripts/author-sol.mjs` (13.08.2026), the cut made by
+  `scripts/author-routing-core.mjs` — never a hard case, never one whose verification IS
+  the work. REVIEWERS:
+  the OTHER vendor, never an author of the range —
+  Sol at effort HIGH on Claude's work; where SOL authored, CLAUDE reviews, runs the
+  suites, judges the picture and lands. Reviews run through `node
+  scripts/review-sol.mjs`, never a hand-typed `codex` line: it names the cause, hands
+  the review on and records who ran it. Sonnet and Haiku are NOT acceptable: a degraded
+  session is a capability breach; the batch STOPS. Every commit NAMES its author model
+  in a `Co-Authored-By` trailer the `commit-msg` hook enforces;
+  `scripts/model-guard-core.mjs` holds the
+  AUTHOR allowlist (`ALLOWED`) and `scripts/model-guard.mjs` blocks the turn end on any
+  commit after its baseline authored outside it: HARD on a NAMED forbidden model
+  (pause), resolvably on an UNNAMED one, which transcripts settle.
 - **The four-eyes principle has TWO MODES, chosen by the STAGE (user
   25.07.2026). This is its normative wording; everywhere else refers here.** A
-  DIVERGENT stage — what could go wrong, which scenarios to test, which designs
-  are possible, where a system might break — runs BLIND PARALLEL: both models
-  work from the same inputs to their own complete result, neither seeing the
-  other's until both are done; the two are then merged into a union
-  deduplicated BY MEANING, keeping both wherever it is unclear that one subsumes
-  the other, MARKING what only one produced and dropping none for being
-  unusual. The reason is anchoring: a reviewer handed a finished
-  list CHECKS THAT LIST and produces far less than it would have from a blank
-  page, so review is the wrong instrument wherever the risk is the item nobody
-  thought of. A CONVERGENT stage — is this diff correct, does this implementation
-  match its spec, is this measurement sound — judges ONE artefact, which cannot
-  be produced twice independently; it keeps the ORDINARY REVIEW, refined only in
-  that the reviewer reads the ARTEFACT before the author's rationale, so the
-  justification cannot anchor it either. Two sets are worth what their errors
-  are UNCORRELATED, so CROSS-MODEL is the default pairing (the allowlist above);
-  two blind runs of ONE model are independent in what they saw but not in how
-  they think — the WEAKER fallback when no second model is available, recorded
-  as such and DECORRELATED BY FRAMING (a hostile tester, a maintainer inheriting
-  the code, a player trying to break it), since a re-run varies least where the
-  model is confidently blind. The generative stage runs twice, so it costs
-  roughly 2× there and applies where four-eyes already applies by the
-  criticality triage, not everywhere.
+  DIVERGENT stage — what could go wrong, which cases to test, which designs are
+  possible — runs BLIND PARALLEL: both models work from the same inputs to their
+  own complete result, neither seeing the other's until both are done; the two
+  are then merged BY MEANING, keeping both wherever it is unclear that one
+  subsumes the other and dropping none for being unusual. The reason is
+  anchoring: a reviewer handed a finished list CHECKS THAT LIST and names far
+  less than from a blank page, wrong where the risk is the item nobody thought
+  of. THE MERGE, where a finding vanishes silently, GOES TO THE MODEL THAT WROTE
+  NEITHER LIST and is COUNTED (user 11.08.2026): every entry carries an id and
+  the union accounts for each — `only A`, `only B`, `merged with <id>` — via
+  `scripts/blind-merge.mjs`; `mechanism-review.mjs --merged-by` names the merger
+  and refuses either author unless only two models existed. A CONVERGENT stage —
+  is this diff correct, does it match its spec, is this measurement sound —
+  judges ONE artefact, which cannot be produced twice; it keeps the ORDINARY
+  REVIEW, refined only in that the reviewer reads the ARTEFACT before the
+  author's rationale, so that cannot anchor it either. Two sets are worth what
+  their errors are UNCORRELATED, so CROSS-VENDOR
+  is the default pairing (the reviewers above); two blind runs of ONE model are
+  the WEAKER fallback, recorded as such and DECORRELATED BY FRAMING (a hostile
+  tester), since a re-run varies least where the model is confidently blind. The
+  generative stage runs twice, so ~2× there, and applies where four-eyes already
+  applies by the criticality triage, not everywhere.
 - **Language.** All player-visible text (UI, chronicle, messages) is served
   from the language files (`design.md` §17): English is the default game
   language, German is available, and the structure must make further
@@ -434,10 +442,11 @@ detail section change in the SAME commit.
    Detail: docs/acceptance-criteria-detail.md §6.
    Evidence: docs/acceptance-evidence.md §6.
 
-7. **Language/direction system.** The full system of `design.md` §13 is
-   implemented: the regional direction systems and glossary taught by the
-   village elder, hints of landmark, direction word and coordinate, deciphered
-   retroactively in either order.
+7. **Language and communication.** The tonal village speech of `design.md`
+   §13.4 is implemented — heard, guessed at, never translated — beside the
+   §13.1–13.3 direction words, glossary and retroactively deciphered hints,
+   which still stand. The village has no standing drum bed; only the chief's
+   message makes the drummer strike, from the message's own plan.
    Detail: docs/acceptance-criteria-detail.md §7.
    Evidence: docs/acceptance-evidence.md §7.
 
@@ -619,55 +628,48 @@ detail section change in the SAME commit.
 
 After completion and after every major system:
 
-- Run `npm run build` and confirm it passes without errors.
-- Run `npm run lint` always, and `node scripts/audit-check.mjs` whenever the
-  lockfile moved (nothing else moves the tree it reads); both clean, per §7.1
-  point 18.
-- Run `npm run test:unit` (the fast Vitest layer) and confirm it is green;
-  add or extend a test there for the changed logic/store/HUD when applicable.
-- Start the dev server and verify via headless screenshot (e.g. Playwright)
-  that the affected view renders without console errors. `npm test` chains all
-  of the above (build → lint → vitest → the browser suites → preview).
-- Store screenshots of each core view (bird's-eye view, port city,
-  village/chief's hut, opened journal) and check them against the criteria
-  of §7.1.
+- Run `npm run build` (no errors) and `npm run lint` always, plus
+  `node scripts/audit-check.mjs` whenever the lockfile moved (nothing else moves
+  that tree); all clean, per §7.1 point 18.
+- Run `npm run test:unit` (the fast Vitest layer) green, adding or extending a
+  test there for the changed logic/store/HUD.
+- Verify the affected view headlessly (Playwright): it renders without console
+  errors, and the core-view screenshots (bird's-eye, port city, village/chief's
+  hut, opened journal) hold against §7.1. `npm test` chains all of it (§5).
 - **Test at in-game-achievable conditions (point 172).** A verification must
   exercise a feature at a state the player can actually reach — for the
   bird's-eye zoom that is the NON-DEBUG range 0.125–0.5 (default 0.5), never a
   debug-only wide zoom unless the check tests that feature itself. Judge "is it
   in view" by PROJECTING the point to the rendered frame
   (`__camera.onScreen`/`ndc`), never by an assumed radius (100×zoom, fog.far, a
-  hard-coded distance) — clearView pushes the fog to the horizon at a wide zoom,
-  so no radius stands in for the picture, and a green assertion against one can
-  hide a real bug the player sees (points 164/171).
+  fixed distance): clearView pushes the fog to the horizon at a wide zoom, so a
+  green assertion against a radius can hide a bug the player sees (164/171).
 - **A frame must show what its name claims (point 375).** The same projection
-  decides at the SHUTTER: every frame a verify script writes declares its
-  subject — a place/landmark (`world`), something inside a settlement (`local`/
-  `place`), a HUD element, or explicitly a `general` view WITH its reason — and
-  the shutter (`scripts/verify/frameSubject.mjs`) refuses to write a frame whose
-  subject is not in the picture, naming what was found instead. Two `world` runs
-  on identical code had photographed different places, both exiting 0. A pure
-  gate in the unit layer fails on any screenshot written outside the shutter.
+  decides at the SHUTTER: every frame declares its subject — a place/landmark
+  (`world`), something inside a settlement (`local`/`place`), a HUD element, or
+  explicitly a `general` view WITH its reason — and
+  `scripts/verify/frameSubject.mjs` refuses to write a frame whose subject is not
+  in the picture, naming what was found instead. Two `world` runs on identical
+  code had photographed different places, both exiting 0. A unit-layer gate fails
+  on any screenshot written outside the shutter.
 - **Backend coverage is UNIVERSAL where it is possible (point 204).** WebGPU is
-  the player's real backend and WebGL 2 the shipped fallback, so both are
-  verified:
+  the player's backend and WebGL 2 the shipped fallback, so both are verified:
   - Every browser suite launches through `launchVerifyBrowser()` and asserts the
-    backend it actually got (`assertBackend`, right after the `window.__renderer`
-    wait). A `VERIFY_GL=webgpu` run that silently fell back to WebGL 2 — or a
-    `webgl` run that came up on WebGPU — FAILS LOUD.
-    The only exceptions are `docs` (pure Node, no browser) and
-    `preview` (production build, where `__renderer` is dev-only).
+    backend it got (`assertBackend`, right after the `window.__renderer` wait): a
+    `VERIFY_GL=webgpu` run that fell back to WebGL 2, or a `webgl` run that came
+    up on WebGPU, FAILS LOUD. Only `docs` (pure Node) and `preview` (production
+    build, where `__renderer` is dev-only) are exempt.
   - The everyday lane is WEBGPU, the player's backend (user 09.08.2026): unpinned,
     the SMALL tier and a bare suite filter run there — every one-backend defect on
     record showed on WebGPU, never on WebGL 2 alone. WebGL 2 is the REGRESSION lane
-    a LARGE run covers (no `VERIFY_GL` pinned): the whole LARGE on WebGL 2 with
+    a LARGE covers (no `VERIFY_GL` pinned): the whole LARGE on WebGL 2 with
     preflight and preview, then the render suites on WebGPU. `touch`/`voice` are
     ROUTED to WebGL 2 wherever picked (headless WebGPU cannot drive them), never
-    dropped from it. RESIDUAL: a WebGL-2-only regression now surfaces only at the
-    next LARGE.
-  - The suite→tier→backend map is the pure module `scripts/verify/tiers.mjs`,
-    pinned by `scripts/verify/tiers.test.mjs` in the Vitest layer; change it
-    there and in `scripts/verify/README.md` together.
+    dropped from a tier.
+    RESIDUAL: a WebGL-2-only regression surfaces only at the next LARGE.
+  - The suite→tier→backend map is the pure `scripts/verify/tiers.mjs`, pinned by
+    `tiers.test.mjs` in the Vitest layer; change it and
+    `scripts/verify/README.md` together.
 - **The Stop chain gates the turn end, not only the test run.** Beyond the
   suites, Stop hooks (authoritative list: `.claude/settings.json`) BLOCK a turn
   end while the working state contradicts a standing rule — "enforce, don't
@@ -676,9 +678,9 @@ After completion and after every major system:
   behind (30.07.2026). The families: the BOARD (published,
   concise, one topic per card, consistent with the real state, every decision
   asked of the user standing as a card); the BATCH (no idle wait or idle stop,
-  the §6 model allowlist — a named breach pauses, an unnamed author is looked
-  up — a red CI, a branch already contained in `main`, the retrospective's
-  currency, the chat timestamp); the WORK ORDER (queue order, final-state-only specs,
+  the §6 context watermark and model allowlist — a named breach pauses, an
+  unnamed author is looked up — a red CI, a branch already in `main`, the
+  retrospective's currency, the chat timestamp); the WORK ORDER (queue order, final-state-only specs,
   the open/archived split, the measured doc ceilings in
   `scripts/doc-budget-core.mjs`); the FINDING (a turn that investigated and left
   nothing durable, and a carrier the owner has not drained); and the
@@ -689,7 +691,7 @@ After completion and after every major system:
   `scripts/mechanism-review.mjs --record`). One is worth naming exactly:
   `ci-status-guard` watches EVERY ref the repository PUSHED, not just the
   session's HEAD (that blindness left 26 red runs on `main` unseen for three
-  weeks), and demands a run CONCLUDED green for that sha; an unfinished one
+  weeks), and demands a CONCLUDED green run for that sha; an unfinished one
   WAITS. Versioned git hooks (`scripts/git-hooks/`, wired by `npm
   install`) refuse a stray file, a trailer naming no model, a rescue commit that
   would mail the user, and a push CI would reject. Separately, PreToolUse hooks run `closing-guard` (§9),
@@ -702,25 +704,32 @@ After completion and after every major system:
   turn. It binds EVERY session (point 400): `scripts/board-publish.mjs` publishes
   from a SCRIPT, so the headless successor can too; the check reads that PAGE, and
   `batch-autostart.mjs` alerts when it is behind. It runs BACK too
-  (`scripts/chat-core.mjs`): the launcher polls the chat each tick and hands what
-  VERIFIES on as untrusted input, not authorization.
-  Every one is fail-OPEN (an internal error allows the stop, so a guard bug
-  cannot trap the session) with a pure, Vitest-covered core.
+  (`scripts/chat-core.mjs`): the launcher polls the chat each tick, handing on
+  what VERIFIES as untrusted input, not authorization.
+  Every one is fail-OPEN (a guard bug cannot trap the session) with a pure,
+  Vitest-covered core.
 - **Ask the guards BEFORE the action, and answer LAST (points 365/403).** Before
   an action a guard governs, `node scripts/guard-preflight.mjs --for <action>
   --session <id>` reports read-only whether one would block — advisory; the guard
-  stays authoritative, a blocked turn produces nothing, one loop cost ~30 turns.
-  The turn's END is such an action (`--for answer`): routine duties (focus
-  confirm, board publish/attest, the boundary) FIRST, the closing reply LAST,
-  once the chain would pass. Blocked anyway, the next message names in one
-  sentence what was fixed; re-answering is how the user got the same text twice.
+  stays authoritative, and a blocked turn produces nothing (one loop cost ~30
+  turns). The turn's END is such an action (`--for answer`): routine duties (focus
+  confirm, board publish/attest, the boundary) FIRST, the closing reply LAST, once
+  the chain would pass. Blocked anyway, the next message names what was fixed in
+  one sentence.
 - **Screenshot diffing is NOT available as a shortcut (point 361).** Every
   pixel-metric shortcut was replayed against the bugs the picture caught and
   REJECTED: two runs of one suite on identical code move 11–98 % of a frame,
-  the smallest real defect 0.75 %. No golden-image
-  gate until `node scripts/picture-stability.mjs <suite>` reports STABLE;
-  verdicts in `docs/picture-check-levers.md`.
-- Fix deviations, do not paper over them. An unfulfilled criterion is
+  the smallest real defect 0.75 %. No golden-image gate until
+  `node scripts/picture-stability.mjs <suite>` reports STABLE (verdicts:
+  `docs/picture-check-levers.md`).
+- **A red closes by a CAUSE, never by a later green (point 640).** Three closings
+  only: the cause is named and fixed; it is CHARGED to the open point that owns it
+  (`scripts/render-verify-charges.mjs`); or it becomes an open point. "It passed
+  on the retry" is none — the retry stays, but that run is recorded SUSPECT and
+  covers nothing; `--defer` WAIVES one on the record, it does not close it. Is it
+  load? MEASURE: `node scripts/throttle-probe.mjs <suite> --section=<name> --runs
+  8` reruns it pinned to one core and reports the skew rate.
+- Fix deviations, never paper over them; an unfulfilled criterion is
   reported as such.
 
 ---
@@ -745,26 +754,25 @@ At the end:
 - List the collected open items (`// OPEN: …`).
 - Name the simplifications made and the placeholder values set.
 - No silent extensions beyond §7.1.
-- **Closing completeness is ENFORCED, not remembered (user decision 24.07.2026, point
-  306).** A closing is more than the LARGE regression — the dead-code / stale-doc /
-  stale-comment cleanup and the `.md` audit distinguish it (v0.2 skipped these, being
-  memory-tracked). The checklist is machine-readable in
-  `scripts/closing-guard-core.mjs` (`CLOSING_STEPS`), and a PreToolUse guard on the shell
-  AND the editing tools (`scripts/closing-guard.mjs`) DENIES a version tag (created,
-  pushed, or `poc` moved) AND the tick of a point that itself delivers a closing, until
-  EVERY step is recorded done for that commit.
-  Drive it as you close: that script's `--status`, then
-  `--step <id> --evidence "<proof>"` per step. A feature needing a closing step adds it
-  to `CLOSING_STEPS` (the gate tightens automatically).
-- **Graphics detail-level doc current (user 24.07.2026).** Explicitly confirm
+- **Closing completeness is ENFORCED, not remembered (users 24.07./11.08.2026, points
+  306/631).** A closing is a SEQUENCE, not a set: LARGE regression, then the legacy
+  cleanup of ALL code and documents as a BLIND-PARALLEL four-eyes stage (§6), then
+  a SECOND LARGE regression after the last cleanup commit — and only then the user's go
+  for the tag. v0.2 skipped the cleanup; a skipped second regression tags untested
+  changes. The checklist is machine-readable in `scripts/closing-guard-core.mjs`
+  (`CLOSING_STEPS`) and its ORDER is checked: the `regression-after-cleanup` evidence
+  must NAME the tagged commit or a time after the cleanup. A PreToolUse guard
+  (`scripts/closing-guard.mjs`) DENIES a version tag (created, pushed, `poc` moved) AND
+  the tick of a point that itself delivers one, until EVERY step is recorded for
+  that commit. Drive it: `--status`, then `--step <id> --evidence "<proof>"`; a step a
+  feature needs is added to `CLOSING_STEPS`, which tightens the gate.
+- **Graphics detail-level doc current (user 24.07.2026).** Confirm
   `docs/graphics-detail-levels.md` still matches `QUALITY_PRESETS`
-  (`src/config/quality.ts`). The `src/config/qualityDoc.test.ts` sync test
-  enforces it on every `npm run test:unit` run, so a green regression already
-  proves it; the closing names it anyway, as a deliberate check.
+  (`src/config/quality.ts`); `src/config/qualityDoc.test.ts` proves it on every
+  `npm run test:unit`, and the closing names it anyway, deliberately.
 
-**Closing freeze (user decision 22.07.2026).** During a closing run the code
-is FROZEN: no parallel agent work may land or merge while the closing runs,
-else the closing does not test the FINAL state. Before starting a closing
-cycle, stop spawning agents and let all in-flight branches merge (or park
-them); run the closing on the frozen `main`; resume the agent pool only
-AFTER the closing completes.
+**Closing freeze (user decision 22.07.2026).** The code is FROZEN while a
+closing runs: no agent work may land or merge, else the closing does not test
+the FINAL state. Stop spawning agents, let in-flight branches merge or park
+them; run the closing on the frozen `main`; resume the pool only AFTER it
+completes.

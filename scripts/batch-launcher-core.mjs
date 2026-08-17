@@ -42,6 +42,96 @@ export const LAUNCHER_STALE_TICKS = 2
  *  imported, because this module stays pure and that one is the IO half. */
 export const LAUNCHER_PID_TOLERANCE_MS = 2000
 
+/** How often the daemon looks at the lock WHILE IT SLEEPS between ticks (point
+ *  612). Five seconds: the spec asks for a successor "within seconds", and the
+ *  read is one small JSON file. */
+export const WAKE_POLL_MS = 5000
+
+/** The floor between two EARLY ticks. Without it a tick that cannot spawn — a
+ *  backoff, a preflight failure, a quota block — would return to a lock that is
+ *  still free and wake again immediately, turning the 15-minute cadence into a
+ *  five-second one. One minute keeps the fast path fast and the spin impossible. */
+export const WAKE_MIN_GAP_MS = 60 * 1000
+
+/**
+ * DOES ANYBODY STILL OWN THE BATCH, as one comparable string? PURE.
+ *
+ * IT HANGS OFF THE OWNERSHIP VERDICT, NOT OFF THE HANDOVER MARK (612's refinement,
+ * from the second model's blind enumeration). An idle lapse and an expired lease
+ * end ownership just as definitively as a handover does; a signal attached to the
+ * mark alone would leave exactly those two waiting for the next quarter-hour tick —
+ * the latency this whole mechanism exists to remove. So the caller passes the
+ * verdict `assessOwner` already computes (one code path decides "ownership just
+ * ended"), and every reason it can give reads as the same kind of event here.
+ *
+ * The daemon reacts to a CHANGE, not to a state: a lock that has been free for
+ * hours is not an event, and waking on it every poll would run the whole tick four
+ * times a minute. Comparing this string between polls turns "nobody owns it" into
+ * "nobody owns it ANY MORE".
+ *
+ * The reason is part of the string, and `claimedAt` is part of the held one, so a
+ * handover, a withdrawal and a SECOND handover read as three different states
+ * rather than one that never changed.
+ */
+export function ownershipSignal({ lock, assessment } = {}) {
+  if (lock === null || lock === undefined) return 'free'
+  if (typeof lock !== 'object') return 'unknown'
+  if (!assessment || typeof assessment !== 'object') return 'unknown'
+  if (assessment.alive === false) return `ended:${assessment.reason ?? '?'}`
+  return `held:${lock.sessionId ?? ''}:${lock.claimedAt ?? 0}`
+}
+
+/**
+ * SHOULD THE DAEMON CUT ITS SLEEP SHORT AND TICK NOW? PURE, TOTAL.
+ *
+ * WHY IT EXISTS (measured 10.08.2026). The outgoing session handed over correctly
+ * at 13:20, the lock was released, and the launcher — which ticks every 15 minutes
+ * — would not have looked before 13:31. At 13:28 an unattended window took the free
+ * lock, so the 13:31 tick correctly found a live owner and spawned nobody. Every
+ * part behaved as built and the batch stood still for half an hour. Marking the
+ * lock handed over is an EVENT; discovering it on the next tick is too late.
+ *
+ * IT SPAWNS NOTHING. All it does is shorten a sleep. The tick it brings forward is
+ * the same `batch-autostart.mjs` child as ever, so the hard singleton, the claim
+ * reservation and the atomic acquire are untouched — this decision cannot produce
+ * a second owner, because it never produces an owner at all. The 15-minute tick
+ * REMAINS as the backstop for everything no signal covers.
+ *
+ * `previous` is null ONLY where the daemon has no earlier observation at all —
+ * that is, where the lock could not be read. The baseline for a sleep is taken
+ * BEFORE the tick (point 644), never from the sleep's first poll: a change that
+ * lands while the tick runs, or before that first poll is armed, is an EVENT like
+ * any other, and treating it as a baseline is how a wake was lost entirely.
+ */
+export function releaseSpawnDecision({
+  signal,
+  previous = null,
+  now = Date.now(),
+  paused = false,
+  lastWakeAt = 0,
+  minGapMs = WAKE_MIN_GAP_MS,
+} = {}) {
+  // Stands down for a paused batch, like every mechanism here: waking a tick that
+  // will bail at the pause record buys nothing and hides the park in the log.
+  if (paused === true) return { wake: false, reason: 'the batch is paused' }
+  if (typeof signal !== 'string' || !signal) return { wake: false, reason: 'the lock could not be read' }
+  if (previous === null || previous === undefined) return { wake: false, reason: 'first observation — nothing to compare' }
+  if (signal === previous) return { wake: false, reason: 'ownership has not changed' }
+  const free = signal === 'free'
+  const ended = signal.startsWith('ended:')
+  if (!free && !ended) return { wake: false, reason: `ownership changed to "${signal}" — nobody's ownership ended` }
+  const since = Number(now) - (Number(lastWakeAt) || 0)
+  if (Number.isFinite(since) && Number(lastWakeAt) > 0 && since < minGapMs) {
+    return { wake: false, reason: `an early tick ran ${Math.round(since / 1000)} s ago — the floor is ${Math.round(minGapMs / 1000)} s` }
+  }
+  return {
+    wake: true,
+    reason: free
+      ? 'the lock was RELEASED — ticking now instead of at the next quarter hour'
+      : `ownership ENDED (${signal.slice('ended:'.length)}) — ticking now`,
+  }
+}
+
 /**
  * WHICH LAUNCHER THIS HOST HAS, and how it is armed. PURE.
  *

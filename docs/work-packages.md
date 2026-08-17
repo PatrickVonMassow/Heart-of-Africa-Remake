@@ -79,7 +79,7 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 
 | Name | Id | What it is | Points |
 |---|---|---|---|
-| **Dorfleben** | A | Village life | 350, 351, 356, 357, 359, 360, 394, 578 |
+| **Dorfleben** | A | Village life | 648, 350, 351, 356, 357, 359, 360, 394, 578 (648 first — the user is blocked on it) |
 | **Wetter & Wasser** | B | Weather, ground and water surface | 314, 320, 321, 323, 348, 353, 354, 358, 384, 385 |
 | **Siedlungsgeometrie** | C | Settlement geometry | 299, 349, 352, 380, 415, 428, 581, 583, 604 |
 | **Sonne & Himmel** | D | Sun and sky | 343, 344, 345, 346 |
@@ -87,10 +87,10 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 | **Tierverhalten** | F | Animal behaviour | 265, 269, 312, 362, 363, 364, 414, 565, 575 |
 | **Kadaver & Geier** | G | Carrion, vultures, staging | 319, 322, 326, 327, 328, 336, 453 |
 | **Chat & Tafel** | H | Chat and board | 440, 451, 465, 467, 473, 539 — the rest landed 30.07.2026 (308, 410, 411, 416, 421, 423, 424, 430, 435, 436, 441, 439, 452, 472, 470) |
-| **Session- & Repo-Hygiene** | I | Session, pool and repo hygiene | 401, 434, 461, 462, 463, 471, 553, 554, 556 (553 is 373's measured successor lever; 556 is the lease half of the same singleton family) — the rest landed 30.07.2026 (329, 396, 399, 409, 426, 427, 429, 431, 433, 458) and 08.08.2026 (373) |
-| **Modell & Wächter** | J | Model and guard chain | 309, 355, 397, 425, 437, 438, 457, 468, 534, 535, 536, 537, 538, 540, 560, 561, 613 (534–538 are the audit findings of point 297 — worked BEFORE the rest of the bundle, because they decide what the four-eyes gate and the review schedule see at all) |
-| **Testinfrastruktur** | K | Test and verification infrastructure | 295, 330, 387, 418, 455, 456, 460, 464, 466, 532, 549, 557, 563, 564, 566, 567, 568, 569, 570, 571, 572, 573, 574 (564/566/567 all came out of the point-342 verification: what a red is believed to mean, what a repair costs, and what a killed session leaves running) |
-| **Dokumentation** | L | Docs and knowledge transfer | 303, 333, 422, 555 — the rest landed 30.07.2026 (459) |
+| **Session- & Repo-Hygiene** | I | Session, pool and repo hygiene | 401, 434, 461, 462, 463, 471, 553, 554, 556, 629, 646, 649 (646 is the doctor-side twin of 629 — the same deletion reached by a different route; 649 holds the holes the fifth review found in 629's own lock protocol; 553 is 373's measured successor lever; 556 is the lease half of the same singleton family) — the rest landed 30.07.2026 (329, 396, 399, 409, 426, 427, 429, 431, 433, 458) and 08.08.2026 (373) |
+| **Modell & Wächter** | J | Model and guard chain | 309, 355, 397, 425, 437, 438, 457, 468, 534, 535, 536, 537, 538, 540, 560, 561, 613, 630, 631, 632, 634, 638, 639, 640 (534–538 are the audit findings of point 297 — worked BEFORE the rest of the bundle, because they decide what the four-eyes gate and the review schedule see at all) |
+| **Testinfrastruktur** | K | Test and verification infrastructure | 295, 330, 387, 418, 455, 456, 460, 464, 466, 532, 549, 557, 563, 564, 566, 567, 568, 569, 570, 571, 572, 573, 574, 641, 642, 647 (564/566/567 all came out of the point-342 verification: what a red is believed to mean, what a repair costs, and what a killed session leaves running) |
+| **Dokumentation** | L | Docs and knowledge transfer | 303, 333, 422, 555, 645 — the rest landed 30.07.2026 (459) |
 | **Steuerung & Performance** | M | Controls and performance | 310, 342, 347 |
 | **Urlaubsfestigkeit** | N | Unattended operation for a fortnight — recovery from a failure at ANY moment, quota waiting, the boot path, the readiness check and the chaos drill that proves it | 442, 443, 444, 445, 446, 447, 448, 449, 450, 533, 562, 612 |
 | **Kommunikation** | O | The communication PoC: the tonal language, who speaks it, where it is spoken, what the player may write down | 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488 (480 IS point 351 and 488 IS point 352, pulled forward — they close together); and the PLAY-SESSION findings of 09.08.2026: 587, 577, 586, 580, 582, 588, 576, 585, 584, 579, and of 10.08.2026: 605 |
@@ -109,6 +109,11 @@ change) and 449 last, because the drill is what makes the others more than a cla
 - **184, 200, 203, 205, 207** — the big audits. They sweep the whole codebase and would
   swallow any bundle they were put in.
 - **174, 224** — releases, gated on a full closing run rather than on a branch.
+- **635, 636, 637** — the release machinery the user asked for on 11.08.2026: the queue cut
+  into release blocks, a block that closes and tags itself, and a board that can be
+  rearranged by hand. Built under the assurance regime of 639.
+- **633** — the release's own closing run: two regressions with the blind-parallel cleanup
+  between them. Not a bundle member; it IS the gate 174 waits on.
 - **285**.
 - **393** — sequenced behind 264, so it moves with that point rather than with a
   bundle.
@@ -213,14 +218,21 @@ Festhängen leads, then Ton: a session that cannot be continued makes every othe
 judgment moot, and after it, while the syllables are a squawk and the speech sits behind
 a control nobody finds, nothing about the language can be judged at all.
 
-Then **Urlaubsfestigkeit** (30.07.2026): the user must be able to leave for two
-weeks and rely on the batch being worked without them, so the layer that keeps it
-running outranks everything it would keep running. Then **Chat & Tafel →
-Session- & Repo-Hygiene → Modell & Wächter → Testinfrastruktur**, then the visible
-defects **Siedlungsgeometrie → Monumente → Dorfleben → Wetter & Wasser →
-Kadaver & Geier**, then **v0.3 with the full closing** (dead code, stale docs and the
-`.md` audit included), then **Tierverhalten → Sonne & Himmel →
-Steuerung & Performance → Dokumentation**, and the big audits last.
+**THE RANKING AS IT STANDS (user 10.08.2026).** The goal is the communication PoC in
+a usable state and then **v0.3**, and the order serves that goal:
+
+1. **Throughput and token cost first** — anything that measurably lowers what a point
+   costs or raises the rate at which the queue is worked, including the measured batch
+   STALLS out of Urlaubsfestigkeit (a batch that stands still has throughput zero).
+   The remaining absence-hardening is insurance rather than a lever and follows later.
+2. **The communication mechanic**, until the PoC is usable — that is what the release
+   is for.
+3. **The critical bugs**: anything that ends the player's session, loses the
+   expedition, or voids a verification.
+4. **v0.3 with the full closing** (dead code, stale docs and the `.md` audit included).
+   It is gated on 2 and 3 ONLY. Features do not gate it.
+5. **Everything else** — the visible-defect bundles, **Tierverhalten → Sonne & Himmel →
+   Steuerung & Performance → Dokumentation** — and the big audits last.
 
 Infrastructure leads because every later bundle is verified through it: the board
 must tell the truth, the session handover must hold, the guard chain must actually

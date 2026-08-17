@@ -184,6 +184,23 @@ export interface Strings {
     reopenDrumMessage: string
   }
 
+  /** Guessing a meaning where it is spoken (design.md §13.4, point 588): the
+   *  invitation under the highlighted speaker's note, and the dialog it opens. */
+  speechGuess: {
+    /** Invitation under the note of the speaker a click would take. Never in
+     *  upper case — it is spoken to the player, not shouted at him. */
+    invite: string
+    title: string
+    /** Line above the fields: the reading is his own and nothing checks it. */
+    hint: string
+    /** Accessible label of one utterance's field, naming its syllables. */
+    readingFor(utterance: string): string
+    /** Placeholder in an empty field. */
+    notePlaceholder: string
+    save: string
+    cancel: string
+  }
+
   /** The chief's drum message and its reopenable display (design.md §13.4,
    *  docs/communication-poc-spec.md, point 486). */
   drumMessage: {
@@ -360,9 +377,13 @@ export interface Strings {
     /** A gift unlocked the settlement orientation (design.md §17). */
     orientationGained: string
     /** The escape from a wedge (design.md §17.5): the hint that names the key,
-     *  and the confirmation that he stands free again. */
+     *  and the three honest outcomes of a press — he was carried clear, he was
+     *  standing free already, or nothing within reach was free (work-order 610).
+     *  Only the first may claim a rescue. */
     stuckHint(key: string): string
     unstuckFreed: string
+    unstuckAlreadyFree: string
+    unstuckNoRoom: string
   }
 
   dialogs: {
@@ -478,7 +499,7 @@ export interface Strings {
     walkerUnstuck: string
     placeCollisionFactor: string
     startupFreezeBudget: string
-    /** Cap on the hold-Ctrl labels (design.md §17.8). */
+    /** Cap on the name labels of the hold layer (design.md §17.8). */
     labelOverlayMax: string
     mouseSensitivity: string
     lookPitchLimit: string
@@ -488,11 +509,31 @@ export interface Strings {
     unstuckSearchRadius: string
     unstuckSearchStep: string
     invertLook: string
+    /** The rebindable hold key of design.md §17.8 (work-order 601) and its options. */
+    labelModifier: string
+    labelModifierCtrl: string
+    labelModifierShift: string
+    labelModifierAlt: string
     ambienceVolume: string
     footstepVolume: string
     ambientVolume: string
     birdsongVolume: string
     speechVolume: string
+    drumBedEnabled: string
+    drumBedStep: string
+    drumBedPhraseBars: string
+    drumBedGapMin: string
+    drumBedGapMax: string
+    drumBedTempoSpread: string
+    drumBedPitchSpread: string
+    drumBedPitchStart: string
+    drumBedPitchEnd: string
+    drumBedHitSeconds: string
+    drumBedAccentShift: string
+    drumBedThinAfter: string
+    drumBedThinFactor: string
+    drumBedVillageGain: string
+    drumBedNearbyGain: string
     surfNearRadius: string
     surfCutoff: string
     /** Village speech: pace, phrase pause and how far an utterance carries (§13.4). */
@@ -529,6 +570,8 @@ export interface Strings {
     tagTrendLeave: string
     tagVariation: string
     tagUnstuck: string
+    tagEdge: string
+    tagSilence: string
     tagLean: string
     tagTurnRate: string
     tagPlayRadius: string
@@ -538,6 +581,7 @@ export interface Strings {
     childSpeechPace: string
     childSpeechRefusal: string
     childSpeechReply: string
+    childSpeechSilence: string
     adultErrandInterval: string
     adultErrandSpread: string
     adultErrandDwell: string
@@ -552,6 +596,7 @@ export interface Strings {
     separationStiffness: string
     separationSpeed: string
     separationWedge: string
+    separationPasses: string
     foodPerDay: string
     canteenDrain: string
     canteenDesertDrain: string

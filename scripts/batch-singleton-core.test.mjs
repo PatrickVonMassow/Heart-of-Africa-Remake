@@ -50,6 +50,8 @@ import {
   fenceNoticePath,
   sweepableTmpFiles,
   resolveOwnership,
+  transitionOwnerSession,
+  validTransitionSessionId,
   ourClaudeProcess,
   statePathsFor,
   LOCK_PATH,
@@ -68,6 +70,7 @@ import {
   LAUNCHER_TICK_MS,
   SPAWN_IDENTITY_TOLERANCE_MS,
 } from './batch-singleton.mjs'
+import { BOUNDARY_FRESH_MS } from './batch-boundary-core.mjs'
 import { assessOwnerWork } from './batch-in-flight-core.mjs'
 import {
   LEASE_MS,
@@ -399,19 +402,23 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     expect(spawnDecision(a)).toBe('spawn')
   })
 
-  it('a handed-over lock with a LIVE process waits out the grace, then frees', () => {
-    const at = NOW - HANDOVER_GRACE_MS + 60_000 // handed over, grace not yet elapsed
-    const inGrace = assessOwner(handed({ claimedAt: at - 1, handedOverAt: at }), {
+  it('a handed-over lock with a LIVE process frees AT ONCE — no grace (point 612)', () => {
+    // MEASURED 10.08.2026: the handover was marked at 13:57 and the ticks at
+    // 14:01, 14:16 and 14:31 all skipped. The grace was one half of why; the
+    // other is the case below. A release is an EVENT, and the successor may start
+    // within seconds of it, so no age of the mark buys the outgoing process time.
+    const justNow = assessOwner(handed({ claimedAt: NOW - 2000, handedOverAt: NOW - 1000 }), {
       now: NOW,
       bootTime: BOOT,
       probe: aliveProbe,
     })
-    expect(inGrace.alive).toBe(true)
-    expect(inGrace.reason).toBe('handover-grace')
-    expect(spawnDecision(inGrace)).toBe('skip-alive')
+    expect(justNow.alive).toBe(false)
+    expect(justNow.reason).toBe('handed-over')
+    expect(spawnDecision(justNow)).toBe('spawn')
 
-    const past = NOW - HANDOVER_GRACE_MS - 1000
-    const elapsed = assessOwner(handed({ claimedAt: past - 1, handedOverAt: past }), {
+    // …and it is still the same verdict a whole grace window later.
+    const old = NOW - HANDOVER_GRACE_MS - 1000
+    const elapsed = assessOwner(handed({ claimedAt: old - 1, handedOverAt: old }), {
       now: NOW,
       bootTime: BOOT,
       probe: aliveProbe,
@@ -420,19 +427,35 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     expect(elapsed.reason).toBe('handed-over')
   })
 
-  it('THE SAFETY INVARIANT: a session that kept working WITHDRAWS its own handover', () => {
-    // A later Stop hook in the chain blocked the turn end, the session carried on
-    // and its PostToolUse heartbeat stamped claimedAt past the handover. The lock
-    // must read ALIVE again — no successor may be spawned beside a working session.
+  it('THE INCIDENT: a LATER heartbeat no longer un-marks a handover (point 612)', () => {
+    // 10.08.2026, and the reason pid liveness cannot answer this question here:
+    // pid 939 is the attended window's `claude` process, started the day before.
+    // It survives `/clear` and hosts EVERY session of that window, so successive
+    // sessions write the SAME pid and `pidStartedAt` records the CONTAINER's start,
+    // not the session's — the pid-alive branch can never observe a dead one.
+    //
+    // The old rule demanded `claimedAt <= handedOverAt`, and any later write of the
+    // lock breaks that WITHOUT deleting the flag: a late PostToolUse hook whose
+    // withdrawal `withdrawalIsCausal` judges non-causal leaves exactly this state.
+    // The handover then silently stopped counting while the flag still sat in the
+    // file, and three ticks read `pid-alive` off a lock that said "handed over".
     const at = NOW - 30 * 60_000
     const a = assessOwner(handed({ handedOverAt: at, claimedAt: at + 1000 }), {
       now: NOW,
       bootTime: BOOT,
       probe: aliveProbe,
     })
-    expect(a.alive).toBe(true)
-    expect(a.reason).toBe('pid-alive')
-    expect(spawnDecision(a)).toBe('skip-alive')
+    expect(a.alive).toBe(false)
+    expect(a.reason).toBe('handed-over')
+    expect(spawnDecision(a)).toBe('spawn')
+
+    // THE SAFETY INVARIANT IS UNCHANGED, only its mechanism: a session that really
+    // did keep working WITHDRAWS its handover by DELETING it, which `heartbeat`
+    // does wherever the work is causal (see the withdrawal cases below). A lock
+    // with no mark on it is an ordinary live owner again.
+    const withdrawn = assessOwner(lock({ claimedAt: NOW - 60_000 }), { now: NOW, bootTime: BOOT, probe: aliveProbe })
+    expect(withdrawn.alive).toBe(true)
+    expect(spawnDecision(withdrawn)).toBe('skip-alive')
   })
 
   it('a half-written or forged handover flag alone frees nothing', () => {
@@ -512,9 +535,21 @@ describe('resolveOwnership — identity on the process, never on liveness alone'
   const lock = (over = {}) => ({ sessionId: 'old-id', claimedAt: NOW, pid: 4242, pidStartedAt: NOW - 3600_000, ...over })
   const ours = { pid: 4242, startedAt: NOW - 3600_000 }
 
-  it('the SAME pid and start time under a NEW session id is ours, and asks to be restamped', () => {
+  it('the SAME pid and start time grants permission but NEVER asks to replace the owner id', () => {
     const r = resolveOwnership({ lock: lock(), sessionId: 'new-id', ancestor: ours })
-    expect(r).toEqual({ mine: true, via: 'process', restamp: true })
+    expect(r).toEqual({ mine: true, via: 'process', restamp: false })
+  })
+
+  it.each([
+    ['x', true],
+    ['test', true],
+    ['preflight-anything', false],
+    ['', false],
+    ['830a6878-915f-4838-92fc-4af7859c4758', true],
+  ])('never authorises a restamp for asserted id %j', (sessionId, mine) => {
+    const r = resolveOwnership({ lock: lock(), sessionId, ancestor: ours })
+    expect(r.mine).toBe(mine)
+    expect(r.restamp).toBe(false)
   })
 
   it('a DIFFERENT pid is NOT ours — that is a second window, and it must stay visible', () => {
@@ -1140,6 +1175,98 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(readOwnerLock(lockPath).handedOver).toBe(true)
   })
 
+  // --- THE SEALED MARKER (point 675, defeat 1) --------------------------------
+  // After `batch-boundary.mjs --commit` the marker is phase 'committed': no
+  // later call silently withdraws it — the PreToolUse gate denies mutations
+  // loudly instead — and only `--clear` or the user's own prompt (`force`) ends it.
+  it('a COMMITTED marker is never silently withdrawn — and the refusal is logged', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    const at = Date.now()
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 675, now: at })
+    writeFileSync(
+      markerPath,
+      JSON.stringify({ v: 2, phase: 'committed', cause: 'point', sessionId: 's1', point: 675, at }),
+    )
+    expect(
+      withdrawHandover('s1', { lockPath, now: at + HANDOVER_SETTLE_MS + 1, trigger: 'Bash: git commit' }),
+    ).toBe(false)
+    expect(existsSync(markerPath)).toBe(true)
+    expect(readOwnerLock(lockPath).handedOver).toBe(true)
+    expect(readFileSync(join(dir, 'boundary.log'), 'utf8')).toMatch(/SEALED MARKER KEPT for point 675 by s1/)
+  })
+
+  it('`force` (the user\'s own prompt, --clear) still withdraws a committed marker', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    const at = Date.now()
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 675, now: at })
+    writeFileSync(
+      markerPath,
+      JSON.stringify({ v: 2, phase: 'committed', cause: 'point', sessionId: 's1', point: 675, at }),
+    )
+    expect(
+      withdrawHandover('s1', { lockPath, now: at + HANDOVER_SETTLE_MS + 1, force: true, trigger: 'UserPromptSubmit' }),
+    ).toBe(true)
+    expect(existsSync(markerPath)).toBe(false)
+    expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
+  })
+
+  it('the HEARTBEAT carries a sealed handover forward even for ordinary work', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    const at = Date.now()
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 675, now: at })
+    writeFileSync(
+      markerPath,
+      JSON.stringify({ v: 2, phase: 'committed', cause: 'point', sessionId: 's1', point: 675, at }),
+    )
+    // preserveHandover FALSE — the call was not closing work — yet the seal holds.
+    heartbeat('s1', { lockPath, now: at + 5000, skipBackfill: true, preserveHandover: false })
+    const lock = readOwnerLock(lockPath)
+    expect(lock.handedOver).toBe(true)
+    expect(lock.handedOverAt).toBe(at + 5000)
+  })
+
+  it('a STALE committed marker seals nothing — withdrawal proceeds (Sol finding 2)', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    const at = Date.now() - BOUNDARY_FRESH_MS - 60_000 // written over an hour ago
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 675, now: at })
+    writeFileSync(
+      markerPath,
+      JSON.stringify({ v: 2, phase: 'committed', cause: 'point', sessionId: 's1', point: 675, at }),
+    )
+    // Past its freshness the marker cannot authorise a stop, so keeping the
+    // handover alive beside resumed work would spawn a successor next to it.
+    expect(withdrawHandover('s1', { lockPath, now: Date.now() })).toBe(true)
+    expect(existsSync(markerPath)).toBe(false)
+    expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
+  })
+
+  it('a stale sealed marker does not carry the heartbeat handover either', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    const at = Date.now() - BOUNDARY_FRESH_MS - 60_000
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 675, now: at })
+    writeFileSync(
+      markerPath,
+      JSON.stringify({ v: 2, phase: 'committed', cause: 'point', sessionId: 's1', point: 675, at }),
+    )
+    heartbeat('s1', { lockPath, now: Date.now(), skipBackfill: true, preserveHandover: false })
+    expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
+  })
+
+  it('a LEGACY (un-phased) marker keeps the old withdrawal semantics exactly', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    const at = Date.now()
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 675, now: at })
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 675, at }))
+    expect(withdrawHandover('s1', { lockPath, now: at + HANDOVER_SETTLE_MS + 1 })).toBe(true)
+    expect(existsSync(markerPath)).toBe(false)
+  })
+
   it('FINDING 3: the withdrawal is logged BESIDE the redirected lock, never in the repo', () => {
     const at = Date.now()
     acquire('s1', opts())
@@ -1326,24 +1453,78 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(acquire('s1', opts({ probePidFn: () => aliveProbe }))).toBe('held') // → stand-down
   })
 
-  it('a compacted session keeps its lock and RESTAMPS it, so the next check is cheap', () => {
+  it('process ownership leaves the lock byte-for-byte unchanged, even for a test placeholder', () => {
     acquire('before-compaction', opts())
     const before = readOwnerLock(lockPath)
+    const bytes = readFileSync(lockPath, 'utf8')
     const sameProcess = () => ({ pid: before.pid, startedAt: before.pidStartedAt })
-    // Every ownership-gated guard would stand down on the new id alone.
-    expect(heldByOther('after-compaction', { processIdentity: false })).toBe(true)
-    // With the process as identity it is ours, and the lock says so afterwards.
     expect(
-      heldByOther('after-compaction', {
+      heldByOther('x', {
         findAncestorFn: sameProcess,
         ancestorCachePath: join(dir, 'session-process.json'),
       }),
     ).toBe(false)
+    expect(readFileSync(lockPath, 'utf8')).toBe(bytes)
+    expect(readOwnerLock(lockPath).sessionId).toBe('before-compaction')
+  })
+
+  it('the explicit transition door restamps a legitimate compaction id', () => {
+    acquire('before-compaction', opts())
+    const before = readOwnerLock(lockPath)
+    const transition = transitionOwnerSession('after-compaction', {
+      lockPath,
+      lock: before,
+      ancestor: { pid: before.pid, startedAt: before.pidStartedAt },
+      now: NOW + 1,
+    })
+    expect(transition).toEqual({
+      transitioned: true,
+      reason: 'transitioned',
+      sessionIdBefore: 'before-compaction',
+    })
     const lock = readOwnerLock(lockPath)
     expect(lock.sessionId).toBe('after-compaction')
     expect(lock.sessionIdBefore).toBe('before-compaction')
-    expect(lock.claimedAt).toBe(before.claimedAt) // the restamp is not work
+    expect(lock.sessionIdRestampedAt).toBe(NOW + 1)
+    expect(lock.claimedAt).toBe(before.claimedAt)
     expect(acquire('after-compaction', opts())).toBe('mine') // …and the id path suffices now
+  })
+
+  it('a rejected transition is observable and preserves the previous owner', () => {
+    acquire('before-compaction', opts())
+    const before = readOwnerLock(lockPath)
+    const bytes = readFileSync(lockPath, 'utf8')
+    expect(
+      transitionOwnerSession('preflight-test', {
+        lockPath,
+        lock: before,
+        ancestor: { pid: before.pid, startedAt: before.pidStartedAt },
+      }),
+    ).toEqual({ transitioned: false, reason: 'invalid-session-id' })
+    expect(readFileSync(lockPath, 'utf8')).toBe(bytes)
+  })
+
+  it('a stale lock generation cannot restamp a successor even under the same process', () => {
+    acquire('before-compaction', opts())
+    const observed = readOwnerLock(lockPath)
+    writeFileSync(lockPath, JSON.stringify({ ...observed, sessionId: 'successor', fence: observed.fence + 1 }))
+    expect(
+      transitionOwnerSession('after-compaction', {
+        lockPath,
+        lock: observed,
+        ancestor: { pid: observed.pid, startedAt: observed.pidStartedAt },
+      }),
+    ).toEqual({ transitioned: false, reason: 'lock-generation-changed' })
+    expect(readOwnerLock(lockPath).sessionId).toBe('successor')
+  })
+
+  it('validates transition ids without coupling them to the harness UUID format', () => {
+    for (const sid of ['after-compaction', '830a6878-915f-4838-92fc-4af7859c4758']) {
+      expect(validTransitionSessionId(sid)).toBe(true)
+    }
+    for (const sid of ['', ' preflight-safe', 'preflight-test', 'line\nbreak', null, 42]) {
+      expect(validTransitionSessionId(sid)).toBe(false)
+    }
   })
 
   it('a SECOND WINDOW is still a second window — its own claude process gives it away', () => {
@@ -1795,7 +1976,7 @@ describe('a preflight identity is not a session', () => {
     }
   })
 
-  it('only the reserved namespace counts — a real session id is a UUID', () => {
+  it('only the repository-reserved namespace counts, without assuming the harness id format', () => {
     for (const sid of ['preflight-test', 'preflight-', 'PREFLIGHT-anything', '  preflight-x  ']) {
       expect(isProbeSessionId(sid), sid).toBe(true)
     }

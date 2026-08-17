@@ -25,7 +25,7 @@ import { EVENT_KINDS, type EventKind } from '../systems/events'
 import { debugEventGroups, fireDebugEvent, sortByLabel } from '../systems/debugEvents'
 import { jumpTargetPlaceId } from '../systems/jumpTargets'
 import { TREASURE_IDS, type TreasureId } from '../systems/economy'
-import { useUi } from '../state/ui'
+import { LABEL_MODIFIERS, useUi, type LabelModifier } from '../state/ui'
 import type { DetailLevel } from '../config/quality'
 import { startBenchmarkSafely } from '../systems/startBenchmark'
 import { PLACES, type Material } from '../world/geo'
@@ -50,7 +50,14 @@ type DebugLabelKey = {
 /** One control row: the localized label the filter matches on, and its node. */
 type DebugRow = { label: string; node: ReactNode }
 
-const EQUIPMENT_IDS: EquipmentId[] = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'canoe']
+/** The label key each hold-key option carries (design.md §17.8, work-order 601). */
+const LABEL_MODIFIER_LABELS: Record<LabelModifier, 'labelModifierCtrl' | 'labelModifierShift' | 'labelModifierAlt'> = {
+  ctrl: 'labelModifierCtrl',
+  shift: 'labelModifierShift',
+  alt: 'labelModifierAlt',
+}
+
+const EQUIPMENT_IDS: EquipmentId[] =['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'canoe']
 const MATERIALS: Material[] = ['gold', 'silver', 'emerald', 'copper', 'ivory']
 
 /** Labeled dropdown that fires an action on pick and snaps back to the placeholder. */
@@ -155,6 +162,8 @@ const TAG_FIELDS: ReadonlyArray<{
   { key: 'trendLeave', label: 'tagTrendLeave', step: 0.02, min: 0 },
   { key: 'variation', label: 'tagVariation', step: 0.05, min: 0, max: 0.9 },
   { key: 'unstuckSeconds', label: 'tagUnstuck', step: 0.5, min: 0.1 },
+  { key: 'edgeSeconds', label: 'tagEdge', step: 0.1, min: 0 },
+  { key: 'silenceSeconds', label: 'tagSilence', step: 5, min: 1 },
   { key: 'leanAtSprint', label: 'tagLean', step: 0.02, min: 0 },
   { key: 'turnRate', label: 'tagTurnRate', step: 0.2, min: 0.1 },
   { key: 'playRadius', label: 'tagPlayRadius', step: 1, min: 2 },
@@ -179,6 +188,7 @@ const CHILD_SPEECH_FIELDS: ReadonlyArray<{
   { key: 'actionPace', label: 'childSpeechPace', step: 0.1, min: 0.1 },
   { key: 'refusalChance', label: 'childSpeechRefusal', step: 0.05, min: 0, max: 1 },
   { key: 'replySeconds', label: 'childSpeechReply', step: 0.5, min: 0 },
+  { key: 'silenceSeconds', label: 'childSpeechSilence', step: 5, min: 1 },
 ]
 
 /**
@@ -222,6 +232,35 @@ const SEPARATION_FIELDS: ReadonlyArray<{
   { key: 'stiffness', label: 'separationStiffness', step: 0.05, min: 0.05, max: 1 },
   { key: 'maxSpeed', label: 'separationSpeed', step: 0.1, min: 0.1 },
   { key: 'wedgeSeconds', label: 'separationWedge', step: 0.5, min: 0.1 },
+  { key: 'passes', label: 'separationPasses', step: 1, min: 1, max: 8 },
+]
+
+/** Every numeric choice in the non-semantic village drum bed. The patterns
+ *  themselves are musical figures; all timing, dynamics, voice and variation
+ *  around those figures are live calibration values. */
+type DrumBedNumberKey = Exclude<keyof typeof balance.drumBed, 'enabled'>
+const DRUM_BED_FIELDS: ReadonlyArray<{
+  key: DrumBedNumberKey
+  label: DebugLabelKey
+  step: number
+  min: number
+  max?: number
+  integer?: boolean
+}> = [
+  { key: 'stepSeconds', label: 'drumBedStep', step: 0.01, min: 0.02 },
+  { key: 'phraseBars', label: 'drumBedPhraseBars', step: 1, min: 1, max: 8, integer: true },
+  { key: 'phraseGapMinSeconds', label: 'drumBedGapMin', step: 0.1, min: 0 },
+  { key: 'phraseGapMaxSeconds', label: 'drumBedGapMax', step: 0.1, min: 0 },
+  { key: 'tempoSpread', label: 'drumBedTempoSpread', step: 0.01, min: 0, max: 0.5 },
+  { key: 'pitchSpread', label: 'drumBedPitchSpread', step: 0.01, min: 0, max: 0.5 },
+  { key: 'pitchStartHz', label: 'drumBedPitchStart', step: 5, min: 20 },
+  { key: 'pitchEndHz', label: 'drumBedPitchEnd', step: 5, min: 20 },
+  { key: 'hitSeconds', label: 'drumBedHitSeconds', step: 0.01, min: 0.04 },
+  { key: 'accentShift', label: 'drumBedAccentShift', step: 0.05, min: 0, max: 1 },
+  { key: 'thinAfterSeconds', label: 'drumBedThinAfter', step: 5, min: 1 },
+  { key: 'thinMaxGapFactor', label: 'drumBedThinFactor', step: 0.1, min: 1 },
+  { key: 'villageGain', label: 'drumBedVillageGain', step: 0.05, min: 0 },
+  { key: 'nearbyGain', label: 'drumBedNearbyGain', step: 0.05, min: 0 },
 ]
 
 function NumberField({
@@ -285,6 +324,7 @@ export function DebugMenu() {
   const groundDebugFlat = useUi((s) => s.groundDebugFlat)
   const seasonCollapseEnabled = useUi((s) => s.seasonCollapseEnabled)
   const invertLook = useUi((s) => s.invertLook)
+  const labelModifier = useUi((s) => s.labelModifier)
   const wheelZoomEnabled = useUi((s) => s.wheelZoomEnabled)
   const webglFallback = useUi((s) => s.webglFallback)
   const journalDnd = useUi((s) => s.journalDnd)
@@ -402,6 +442,23 @@ export function DebugMenu() {
       num(t.debug.unstuckSearchStep, balance.unstuck.searchStep,
         (v) => { balance.unstuck.searchStep = Math.max(0.1, v); bump() }, 0.1),
       check(t.debug.invertLook, invertLook, (v) => useUi.getState().setInvertLook(v)),
+      // The hold key for the §17.8 name labels (work-order 601). Ctrl is the
+      // shipped default, but its chords are the browser's outside fullscreen —
+      // Ctrl+W closes the tab while walking forward — so the player can move
+      // the layer onto a modifier no browser claims.
+      custom(t.debug.labelModifier, (
+        <label>
+          <span>{t.debug.labelModifier}</span>
+          <select
+            value={labelModifier}
+            onChange={(e) => useUi.getState().setLabelModifier(e.target.value as LabelModifier)}
+          >
+            {LABEL_MODIFIERS.map((m) => (
+              <option key={m} value={m}>{t.debug[LABEL_MODIFIER_LABELS[m]]}</option>
+            ))}
+          </select>
+        </label>
+      )),
       // The §21.4 zoom unlock is a control, not a graphics setting.
       check(t.debug.wheelZoom, wheelZoomEnabled, (v) => useUi.getState().setWheelZoomEnabled(v)),
     ],
@@ -724,6 +781,17 @@ export function DebugMenu() {
         refreshAmbienceVolume()
         bump()
       }, 0.1),
+      check(t.debug.drumBedEnabled, balance.drumBed.enabled, (v) => {
+        balance.drumBed.enabled = v
+        refreshAmbienceVolume()
+        bump()
+      }),
+      ...tableRows(DRUM_BED_FIELDS, (f) => balance.drumBed[f.key], (f, v) => {
+        balance.drumBed[f.key] = f.integer ? Math.round(v) : v
+        // Gain edits affect the standing layer immediately; the other values
+        // are picked up by the next phrase without restarting the audio graph.
+        refreshAmbienceVolume()
+      }),
       num(t.debug.surfNearRadius, balance.surf.nearRadius,
         (v) => { balance.surf.nearRadius = Math.max(0, v); bump() }, 0.1),
       num(t.debug.surfCutoff, balance.surf.cutoff,

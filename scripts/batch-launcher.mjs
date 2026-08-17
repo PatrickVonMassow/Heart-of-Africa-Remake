@@ -39,9 +39,14 @@ import {
   LAUNCHER_DAEMON_NAME,
   LAUNCHER_RECORD_VERSION,
   LAUNCHER_TASK_NAME,
+  WAKE_MIN_GAP_MS,
+  WAKE_POLL_MS,
   classifyDaemonRecord,
   launcherRemedy,
+  ownershipSignal,
+  releaseSpawnDecision,
 } from './batch-launcher-core.mjs'
+import { LOCK_PATH, assessOwner, bootTimeMs, readOwnerLock } from './batch-singleton.mjs'
 
 export const LAUNCHER_RECORD_PATH = repoPath('.claude/batch-launcher.json')
 export const LAUNCHER_LOG_PATH = repoPath('.claude/batch-launcher.log')
@@ -189,6 +194,35 @@ export async function runDaemon({
   recordPath = LAUNCHER_RECORD_PATH,
   logPath = LAUNCHER_LOG_PATH,
   tickMs = LAUNCHER_TICK_MS,
+  // THE END OF OWNERSHIP WAKES IT (point 612). The daemon watches the batch lock
+  // while it sleeps and brings its next tick forward the moment NOBODY owns the
+  // batch any more — released, handed over, idle or lease-expired alike — instead
+  // of discovering it up to a quarter of an hour later. The verdict is
+  // `assessOwner`'s, the same one the tick itself uses, so there is one code path
+  // deciding "ownership just ended". All of it is injected so the loop can be
+  // exercised without a batch.
+  //
+  // The probe is two `/proc` reads on Linux, which is the only host this daemon
+  // runs on (`--daemon` refuses win32, where the same call is a PowerShell round
+  // trip) — cheap enough for a five-second poll.
+  //
+  // IT PASSES NO `work`, and the cost of that is bounded to ONE tick. Building it
+  // means `assessOwnerWork`, which runs pid probes and git queries — far too heavy
+  // for a five-second poll. Without it an expired lease reads as ended here even
+  // where the owner's declared work is still producing (point 556's protection),
+  // so the sleep is cut short once; the TICK then builds the real `work` and skips
+  // correctly. It cannot repeat: the wake fires on a CHANGE of signal, and the
+  // signal is stable across that skip. The lock-recorded `declaredWait` IS honoured
+  // (`ownershipVerdict` reads it off the lock), so the sanctioned long wait costs
+  // nothing at all; only a declaration living solely in `batch-in-flight.json` can
+  // buy that single spurious tick — and declaring is itself a tool call, which
+  // moves `claimedAt` and takes the owner out of the idle branch anyway.
+  readLock = () => readOwnerLock(LOCK_PATH),
+  assess = (lock) =>
+    assessOwner(lock, { now: Date.now(), bootTime: bootTimeMs(), probe: probePid(lock?.pid ?? 0) }),
+  isPaused = () => pauseState().state !== 'none',
+  pollMs = WAKE_POLL_MS,
+  wakeGapMs = WAKE_MIN_GAP_MS,
 } = {}) {
   const existing = launcherState({ recordPath, tickMs })
   if ((existing.state === 'ready' || existing.state === 'running') && Number(existing.record?.pid) !== process.pid) {
@@ -206,6 +240,24 @@ export async function runDaemon({
   const base = { v: LAUNCHER_RECORD_VERSION, name: LAUNCHER_DAEMON_NAME, pid: process.pid, pidStartedAt, startedAt, tickMs }
   let lastTickAt = startedAt
   let leaving = null
+  // The lock state as the last observation saw it, and when an early tick last
+  // ran. Both live across the whole loop: the watcher reacts to a CHANGE (a lock
+  // that has been free for hours is not an event), and the floor keeps a tick
+  // that could not spawn from waking itself again five seconds later.
+  let lastSignal = null
+  let lastWakeAt = 0
+  /** Ownership as ONE comparable string, or null when the lock could not be read
+   *  at all — a watcher that cannot read must never take the launcher down, so
+   *  the failure is logged and the 15-minute tick carries on as the backstop. */
+  const observeOwnership = () => {
+    try {
+      const seen = readLock()
+      return ownershipSignal({ lock: seen, assessment: seen ? assess(seen) : null })
+    } catch (e) {
+      appendLog(logPath, `lock watch failed: ${(e && e.message) || e}`)
+      return null
+    }
+  }
   /** Writes the record, unless somebody else's claim or a stop order says not to.
    *  Returns false when this daemon has just lost the singleton and must leave. */
   const publish = (patch = {}) => {
@@ -250,6 +302,23 @@ export async function runDaemon({
     // Checked again right here, before the tick rather than after it: a daemon
     // that lost the record must not spend an interval running the batch first.
     if (!publish({ tickInFlight: true, tickStartedAt: Date.now() })) return leave()
+    // THE BASELINE FOR THE COMING SLEEP IS THE STATE THE TICK ACTED ON (point
+    // 644, measured 11.08.2026). It used to be whatever the sleep's FIRST POLL
+    // happened to see, and the first poll is armed only after the tick and its
+    // record writes are done — so every ownership change that landed in that
+    // window became the baseline instead of an event, and the daemon then slept
+    // the whole interval out with nobody owning the batch. That is the exact
+    // latency point 612 removed, reintroduced through the back door, and it is
+    // what turned `main` red (CI run 31504918389): the same gap left the daemon
+    // test's second tick waiting for a quarter of an hour, which vitest reports
+    // as a TIMEOUT rather than a missed budget. Measured on the runner, the poll
+    // follows the tick by 1 ms at the median and 14 ms at the worst of 400
+    // samples, with the event loop's own lag never past 23 ms — so the window is
+    // narrow, it is not empty, and nothing bounds it: one starved scheduling
+    // moment is all it takes, and the wake is then lost for good rather than
+    // late. Reading here closes it: anything that ends ownership from the tick's
+    // start onward is a CHANGE.
+    lastSignal = observeOwnership() ?? lastSignal
     try {
       const code = await tick({ logPath })
       appendLog(logPath, `tick finished (exit ${code === null ? 'killed' : code})`)
@@ -259,13 +328,52 @@ export async function runDaemon({
     lastTickAt = Date.now()
     if (!publish({ tickInFlight: false })) return leave()
     if (stopping) break
-    // Interruptible: a stop signal must not have to wait out a whole interval.
+    // Interruptible, and WATCHFUL: a stop signal must not have to wait out a whole
+    // interval, and neither must a release. The poll only ever shortens this
+    // sleep — the tick it brings forward is the same child as always, so the hard
+    // singleton below it is untouched and no second owner can come of it.
     await new Promise((resolve) => {
-      const timer = setTimeout(resolve, tickMs)
-      wake = () => {
-        clearTimeout(timer)
+      const deadline = Date.now() + tickMs
+      let timer = null
+      let done = false
+      const finish = () => {
+        if (done) return
+        done = true
+        if (timer) clearTimeout(timer)
+        timer = null
         resolve()
       }
+      const poll = () => {
+        timer = null
+        if (stopping || Date.now() >= deadline) return finish()
+        let decision = { wake: false, reason: '' }
+        const signal = observeOwnership()
+        try {
+          if (signal !== null) {
+            decision = releaseSpawnDecision({
+              signal,
+              previous: lastSignal,
+              now: Date.now(),
+              paused: isPaused(),
+              lastWakeAt,
+              minGapMs: wakeGapMs,
+            })
+            lastSignal = signal
+          }
+        } catch (e) {
+          // A watcher that cannot decide must never take the launcher down
+          // either: the 15-minute tick is the backstop and it is still running.
+          appendLog(logPath, `lock watch failed: ${(e && e.message) || e}`)
+        }
+        if (decision.wake) {
+          lastWakeAt = Date.now()
+          appendLog(logPath, `early tick — ${decision.reason}`)
+          return finish()
+        }
+        timer = setTimeout(poll, Math.max(1, Math.min(pollMs, deadline - Date.now())))
+      }
+      wake = finish
+      timer = setTimeout(poll, Math.max(1, Math.min(pollMs, tickMs)))
     })
     wake = null
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { findFreeSpot, newStallState, updateStall } from './unstuck'
+import { escapeOutcome, findFreeSpot, newStallState, stuckHintDue, updateStall } from './unstuck'
 import { standingClear, PLAYER_RADIUS, type Collider } from '../scenes/place/collision'
 
 const cfg = { stallDistance: 0.5, stallSeconds: 3 }
@@ -133,5 +133,65 @@ describe('free-spot search (work-order 604)', () => {
     })
     expect(r.found).toBe(false)
     expect(r.pos).toEqual([0, 18])
+  })
+})
+
+describe('the hint stays reachable (work-order 610)', () => {
+  it('is raised on the stuck edge, as it always was', () => {
+    expect(stuckHintDue(true, false, true, false)).toBe(true)
+  })
+
+  it('comes back after it timed out while he is still pushing', () => {
+    // `stuck` only clears by real movement, so without this a player who missed
+    // the one showing could never call it back — and on touch that hint IS the
+    // only button to the escape.
+    expect(stuckHintDue(true, true, true, false)).toBe(true)
+  })
+
+  it('never displaces another message', () => {
+    expect(stuckHintDue(true, true, true, true)).toBe(false)
+  })
+
+  it('stays quiet while he has let go of the controls', () => {
+    expect(stuckHintDue(true, true, false, false)).toBe(false)
+  })
+
+  it('says nothing at all about a man who is not stuck', () => {
+    expect(stuckHintDue(false, true, true, false)).toBe(false)
+    expect(stuckHintDue(false, false, false, false)).toBe(false)
+  })
+})
+
+describe('the escape reports only what happened (work-order 610)', () => {
+  it('a search that carried him somewhere else freed him', () => {
+    expect(escapeOutcome(0, 0, { pos: [1.5, 0], found: true })).toBe('freed')
+  })
+
+  it('a failed search whose fallback still moves him (the settlement entry point) freed him', () => {
+    expect(escapeOutcome(0, 0, { pos: [0, 18], found: false })).toBe('freed')
+  })
+
+  it('a failed search that puts him back where he stood freed NOBODY', () => {
+    // The bird's-eye fallback IS his own position, so this is the case the game
+    // used to announce as a rescue.
+    expect(escapeOutcome(-4.25, 9.5, { pos: [-4.25, 9.5], found: false })).toBe('noRoom')
+  })
+
+  it('a press on open ground reports no rescue either', () => {
+    expect(escapeOutcome(2, 3, { pos: [2, 3], found: true })).toBe('alreadyFree')
+  })
+
+  it('a hair of floating-point drift is not a rescue', () => {
+    expect(escapeOutcome(2, 3, { pos: [2 + 1e-12, 3], found: false })).toBe('noRoom')
+  })
+
+  it('the whole travel case end to end: nothing free within reach, nothing claimed', () => {
+    const r = findFreeSpot(7, -3, {
+      step: 0.34,
+      maxRadius: 6.72,
+      accept: () => false, // every ring blocked, as in a closed stand of trees
+      fallback: [7, -3], // the bird's-eye fallback: where he already stands
+    })
+    expect(escapeOutcome(7, -3, r)).toBe('noRoom')
   })
 })

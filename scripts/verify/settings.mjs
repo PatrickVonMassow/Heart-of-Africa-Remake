@@ -661,6 +661,31 @@ if (section('ambience-sources')) {
     surf153.atCoast > 0 && surf153.inland === 0, JSON.stringify(surf153))
   check('the surf gust also fades to silence inland (no leak past the target)',
     surf153.wobbleCoast > 0 && surf153.wobbleInland === 0, JSON.stringify(surf153))
+  // --- The village drum BED is silent at the shipped default (point 672) -------
+  // A meaningless bed can be mistaken for the chief's drum MESSAGE, so it ships
+  // off — in the village and near one. The debug audition switch must still
+  // bring it back, which is what proves the planner survived the silencing.
+  const drumBed = await page.evaluate(() => {
+    const a = window.__ambience
+    const b = window.__balance
+    const shipsEnabled = b.drumBed.enabled
+    a.setScene({ region: 'west', mode: 'place', placeKind: 'village', nearVillage: false })
+    const inVillage = a.layerTarget('drums')
+    a.setScene({ region: 'west', mode: 'travel', placeKind: null, nearVillage: true })
+    const nearVillage = a.layerTarget('drums')
+    b.drumBed.enabled = true
+    a.setScene({ region: 'west', mode: 'place', placeKind: 'village', nearVillage: false })
+    const auditioned = a.layerTarget('drums')
+    b.drumBed.enabled = shipsEnabled
+    // Leave the scene as the birdsong check above left it.
+    a.setScene({ region: 'central', mode: 'travel', placeKind: null, nearVillage: false })
+    return { shipsEnabled, inVillage, nearVillage, auditioned }
+  })
+  check('the ambient drum bed ships OFF and stays silent in and near a village (point 672)',
+    drumBed.shipsEnabled === false && drumBed.inVillage === 0 && drumBed.nearVillage === 0,
+    JSON.stringify(drumBed))
+  check('the debug audition switch brings the bed back, so its planner is intact',
+    drumBed.auditioned > 0, JSON.stringify(drumBed))
   // --- Village speech really plays (design.md §13.4) ---------------------------
   // The plan (pace, pause, attenuation) is pinned in the Vitest layer; the browser
   // owes only the fact that a spoken utterance SCHEDULES audio — and that one
@@ -993,6 +1018,91 @@ if (section('debug-wheel-zoom')) {
     `${canvasWheel.before} → ${canvasWheel.after}`,
   )
   await page.evaluate((z) => window.__ui.getState().setTravelZoom(z), zoomBefore)
+}
+
+// --- Keyboard capture (work-order 601, design.md §17.8) ----------------------
+// Holding the label modifier while walking IS Ctrl+W, and no keydown handler
+// reaches that chord — only the Keyboard Lock API does, and only in fullscreen.
+// WHAT NEEDS A BROWSER here is the wiring alone: that the shipped bundle
+// installs the document listeners and asks for the lock exactly at the
+// fullscreen + pointer transition. The decision itself is pinned without a
+// browser in src/systems/keyboardGuard.test.ts. The API is STUBBED rather than
+// driven for real: headless grants neither fullscreen nor pointer lock
+// dependably, and a check that quietly skips proves nothing.
+if (section('keyboard-lock')) {
+  await ensureTravel()
+  await page.evaluate(() => {
+    window.__lockCalls = []
+    Object.defineProperty(navigator, 'keyboard', {
+      configurable: true,
+      value: {
+        lock: (codes) => {
+          window.__lockCalls.push({ kind: 'lock', codes: [...(codes ?? [])] })
+          return Promise.resolve()
+        },
+        unlock: () => window.__lockCalls.push({ kind: 'unlock' }),
+      },
+    })
+  })
+  // Drive the two document conditions the guard reads, then fire the event it
+  // listens for — the same path the real transitions take.
+  const drive = (state) =>
+    page.evaluate((s) => {
+      const el = document.body
+      const fake = (name, value) => Object.defineProperty(document, name, { configurable: true, get: () => value })
+      fake('fullscreenElement', s.fullscreen ? el : null)
+      fake('pointerLockElement', s.pointerLocked ? el : null)
+      fake('hidden', s.hidden === true)
+      // The guard also reads a FILLED viewport as fullscreen (F11 sets no
+      // fullscreenElement), so the not-fullscreen case must really not fill it.
+      Object.defineProperty(window.screen, 'height', {
+        configurable: true,
+        get: () => window.innerHeight + (s.fullscreen ? 0 : 400),
+      })
+      if (s.event === 'resize') window.dispatchEvent(new Event('resize'))
+      else document.dispatchEvent(new Event(s.event))
+      return window.__lockCalls
+    }, state)
+
+  const pointerOnly = await drive({ fullscreen: false, pointerLocked: true, event: 'pointerlockchange' })
+  check('the pointer alone does not lock the keyboard (the API needs fullscreen)', pointerOnly.length === 0,
+    `${pointerOnly.length} calls`)
+
+  const locked = await drive({ fullscreen: true, pointerLocked: true, event: 'fullscreenchange' })
+  const lockCall = locked.find((c) => c.kind === 'lock')
+  check('fullscreen + pointer lock requests the keyboard lock for the game keys',
+    lockCall != null && lockCall.codes.includes('KeyW') && lockCall.codes.includes('KeyT'),
+    lockCall ? `${lockCall.codes.length} codes` : 'no lock requested')
+  check('Escape stays the browser\'s, so leaving fullscreen is one press',
+    lockCall != null && !lockCall.codes.includes('Escape'))
+
+  const released = await drive({ fullscreen: true, pointerLocked: false, event: 'pointerlockchange' })
+  check('losing the pointer lock releases the keyboard', released.at(-1)?.kind === 'unlock',
+    released.map((c) => c.kind).join(','))
+
+  await drive({ fullscreen: true, pointerLocked: true, event: 'pointerlockchange' })
+  const hidden = await drive({ fullscreen: true, pointerLocked: true, hidden: true, event: 'visibilitychange' })
+  check('a hidden tab gives the keyboard back', hidden.at(-1)?.kind === 'unlock',
+    hidden.map((c) => c.kind).join(','))
+
+  // F11 AFTER the pointer lock: it fires neither fullscreenchange nor
+  // pointerlockchange and sets no fullscreenElement — the viewport just grows.
+  // Only the resize listener sees it, in the state the settings call safe.
+  await drive({ fullscreen: false, pointerLocked: true, event: 'pointerlockchange' })
+  const beforeF11 = await drive({ fullscreen: false, pointerLocked: true, event: 'resize' })
+  const f11 = await drive({ fullscreen: true, pointerLocked: true, event: 'resize' })
+  check('F11 while already pointer-locked still reaches the lock (resize is its only event)',
+    f11.length === beforeF11.length + 1 && f11.at(-1)?.kind === 'lock',
+    f11.map((c) => c.kind).join(','))
+
+  // Hand the page back its own document and keyboard: nothing downstream may
+  // measure a stubbed state.
+  await page.evaluate(() => {
+    for (const name of ['fullscreenElement', 'pointerLockElement', 'hidden']) delete document[name]
+    delete window.screen.height
+    delete navigator.keyboard
+    delete window.__lockCalls
+  })
 }
 
 // --- DEV render-resource leak invariant (point 295) --------------------------

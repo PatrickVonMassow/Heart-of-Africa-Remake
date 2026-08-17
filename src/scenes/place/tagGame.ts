@@ -24,7 +24,12 @@
 // side of a fence panel, overlapping nothing.
 
 import { deflectedStep } from '../travel/wildlifeBehavior'
-import { devAssert } from '../../systems/devAssert'
+import {
+  createProducerWatch,
+  devAssert,
+  watchProducer,
+  type ProducerWatch,
+} from '../../systems/devAssert'
 import {
   advanceReserve,
   chaserPresses,
@@ -83,6 +88,35 @@ export interface TagConfig extends StaminaProfile {
   variation: number
   /** Seconds of no real movement before a child is nudged to free ground. */
   unstuckSeconds: number
+  /**
+   * How long a child keeps going ROUND an obstacle the same way before it is
+   * free to pick a side again (point 648).
+   *
+   * A per-step deflection has no memory, and that is what the user saw. Where
+   * the way it wants is shut, the child turns aside; one step later the same way
+   * reads clear again, because it has stepped back out of what shut it — so it
+   * turns back in, and paces to and fro on the spot for as long as the chase
+   * points that way. Measured in the reported village: 12.7 % of all
+   * one-second windows covered under a quarter of the ground the child walked in
+   * them, the worst 2.71 m walked for 1 cm gained. Holding the escape BEARING
+   * for a moment only set the period of that pacing, ~0.9 s per cycle.
+   *
+   * What ends it is committing to a SIDE: while the way ahead is shut the child
+   * searches for its way out in ONE rotational sense, so it follows the
+   * obstacle's edge round instead of taking whichever flank is momentarily
+   * nearer — and it lets the side go the moment it is travelling where it wanted
+   * again. This window is only the BACKSTOP on a side that turned out to be the
+   * long way round: long enough to round a hut at a trot, short enough that the
+   * child then re-picks rather than circling a whole compound.
+   */
+  edgeSeconds: number
+  /**
+   * The dev-mode long-run alarm's window (point 589): a group that CAN play and
+   * has produced neither a catch nor a fresh round for this long is broken, not
+   * quiet. It must sit clear of the longest LEGITIMATE gap between two round
+   * events — a tenure that runs to the backstop plus the idle break after it.
+   */
+  silenceSeconds: number
   /** Forward lean (rad) at the full sprint; the posture eases toward it in
    *  proportion to the pace, and back to upright while recovering. */
   leanAtSprint: number
@@ -126,10 +160,62 @@ export interface TagChild {
   /** Distance actually WALKED — the gait phase rides it, so a teleport nudge is
    *  deliberately excluded and the legs never flail through a correction. */
   walked: number
+  /**
+   * AND HOW MUCH OF IT WAS WALKED WHILE THE ROUND WAS ON (point 656). The
+   * settlement knows when it is playing, so it counts the metres itself rather
+   * than leaving a watcher to guess from a `playing` flag sampled beside a
+   * position: a frame's movement is recorded at the sample AFTER it happened,
+   * so an outside reconstruction credits the wrong side of a round's first or
+   * last frame. Cumulative, and free of the teleport for the same reason
+   * `walked` is.
+   */
+  walkedWhilePlaying: number
   /** Seconds without real movement. */
   pinned: number
+  /**
+   * HOW OFTEN THIS CHILD HAD TO BE FREED (point 656). Every teleport to free
+   * ground — the one a child that cannot move at all is given, and the one a
+   * child that walks without getting anywhere is given — is counted here and
+   * never reset, because a nudge is a FINDING, not an escape: a child the
+   * settlement had to pick up was, by definition, going nowhere for the whole
+   * `unstuckSeconds` before it. The count is what lets a check see the episode
+   * at all; the correction itself is a position jump, which is exactly what
+   * made the symptom invisible to a check that watched positions.
+   */
+  nudges: number
+  /**
+   * AND HOW FAR IT WAS CARRIED DOING SO (point 656), in metres, cumulative. The
+   * teleport's own distance, taken where the teleport happens, because nothing
+   * outside can work it out: a check watching positions sees one vector per
+   * frame with the child's walking and the settlement's correction added
+   * together, and `walked` is a SCALAR that cannot say which way the legs went.
+   * A rescue that only handed the child back the ground it was standing on adds
+   * nothing here; one that really moved it adds exactly what it moved it.
+   */
+  carried: number
+  /** Which way round the obstacle in front of it this child is going: +1 for
+   *  the turns that add to its heading, −1 for the ones that subtract, 0 while
+   *  nothing is in the way. See `TagConfig.edgeSeconds`. */
+  edgeSide: number
+  /** Seconds left on that commitment. */
+  edgeFor: number
+  /** The start, walked distance and furthest reach of the current progress
+   *  window — a child that walks without covering ground is as stuck as one
+   *  that cannot move at all (point 648). See `trackProgress`. */
+  anchorX: number
+  anchorZ: number
+  anchorWalked: number
+  anchorOut: number
+  anchorFor: number
   /** Eased posture, 0 = upright, `leanAtSprint` = flat out. */
   lean: number
+  /**
+   * Standing because an outside claim ASKED it to (point 481's refusal, the
+   * held spot, an errand carried out), not because the chase stalled. It is the
+   * one case in which a playing child may be below the floor pace: what was said
+   * is being obeyed, and the stillness is the whole reading of it.
+   */
+  held: boolean
 }
 
 /** The round. */
@@ -151,6 +237,12 @@ export interface TagState {
   /** Seconds left of the idle break. */
   idleFor: number
   playing: boolean
+  /**
+   * SIM seconds of this group's clock that were actually PLAYED (point 656).
+   * The settlement counts them itself, so a check need not decide from a
+   * sampled flag which side of a round's first frame an interval belongs to.
+   */
+  playedClock: number
   /** Catches so far — a probe for the tests and the live check. */
   tags: number
   /**
@@ -162,11 +254,14 @@ export interface TagState {
    * without a bug behind it.
    */
   clock: number
+  /** The long-run alarm's watch over the play itself (point 589): how long the
+   *  group has produced no catch and no fresh round. */
+  play: ProducerWatch
 }
 
-/** The settlement as the chase sees it. `blocked` answers for the FULL set —
- *  colliders, the fire ring and the walkable rim alike — so one predicate keeps
- *  the children inside the settlement, out of the fire and clear of every body. */
+/** The settlement as the chase sees it. `blocked` answers for the STATIC set —
+ *  colliders, the fire ring and the walkable rim — and `occupied` for the
+ *  inhabitants standing about, so a child walks ROUND a body like round a hut. */
 export interface TagWorld {
   /** Radius of the play ground the children keep to. */
   radius: number
@@ -180,6 +275,28 @@ export interface TagWorld {
   childRadius: number
   blocked: (x: number, z: number) => boolean
   nudge: (x: number, z: number) => { x: number; z: number; found: boolean }
+  /**
+   * ANOTHER INHABITANT'S BODY IS GROUND TO WALK ROUND, NOT SOMETHING TO
+   * DISCOVER BY COLLISION (point 657). Without this, `blocked` knew only the
+   * geometry: a chase whose heading crossed an adult standing in the ground
+   * read the way as open, walked into the body, and the separation pass pushed
+   * it straight back out — `walked` grew, ground covered did not, which is the
+   * measured walking-on-the-spot of the user's report.
+   *
+   * Answers whether a body OTHER than child `self`'s stands at (x, z), judged
+   * with the child's own footprint. `partner` is the child the round pairs
+   * `self` with this step — the chaser's quarry, the quarry's chaser, −1 for
+   * everyone else — and the predicate must NOT count that one: a chaser that
+   * treated its target as a wall would deflect round it at arm's length and
+   * never close the catch. The pair needs no steering anyway — each aims at or
+   * away from the other — and the separation still keeps their bodies apart.
+   *
+   * DELIBERATELY NOT part of `blocked`: the catch's `lineClear` must stay a
+   * wall test (a tag past a third child is a tag, through a wall it is not),
+   * and the `tag-inside` invariant judges where a child may STAND, which a
+   * moving body it is being pushed clear of must not fail.
+   */
+  occupied?: (self: number, partner: number, x: number, z: number) => boolean
 }
 
 /**
@@ -229,8 +346,19 @@ export function createTagGame(
       recoverScale: spread(rand, cfg.variation),
       pace: 0,
       walked: 0,
+      walkedWhilePlaying: 0,
       pinned: 0,
+      nudges: 0,
+      carried: 0,
+      edgeSide: 0,
+      edgeFor: 0,
+      anchorX: p.x,
+      anchorZ: p.z,
+      anchorWalked: 0,
+      anchorOut: 0,
+      anchorFor: 0,
       lean: 0,
+      held: false,
     }
   })
   return {
@@ -244,8 +372,10 @@ export function createTagGame(
     chaserFor: 0,
     idleFor: 0,
     playing: false,
+    playedClock: 0,
     tags: 0,
     clock: 0,
+    play: createProducerWatch(),
   }
 }
 
@@ -331,7 +461,10 @@ function startRound(s: TagState, cfg: TagConfig): void {
   // They are about to run: opening the round on a commanded pace of zero would
   // leave one frame in which a PLAYING child stands still — the very thing the
   // floor exists to forbid, and what any observer of the state would read.
-  for (const c of s.children) c.pace = floorPace(cfg)
+  for (const c of s.children) {
+    c.pace = floorPace(cfg)
+    c.held = false
+  }
 }
 
 /** Break the round off into ordinary idling for a while before starting again. */
@@ -349,12 +482,263 @@ function breakOffRound(s: TagState, cfg: TagConfig): void {
     c.pace = 0
     c.effort = 'recover'
     c.sprinting = false
+    c.held = false
+    // The round is over and nobody is walking into anything: whatever this child
+    // had run up against belongs to the round that just ended (point 656). Kept,
+    // it would teleport a child on the first blocked frame of the NEXT one.
+    c.pinned = 0
   }
 }
 
-/** Move one child `dist` along `desired`, substepped so nothing is stepped over,
- *  deflected around whatever is in the way, and nudged free if it is genuinely
- *  pinned. The heading it ends on is the one it TRAVELLED. */
+/**
+ * The commitment to one way round ages on the CLOCK, not on the walking, and
+ * every child is aged every frame. Ageing it only where it is USED would freeze
+ * it on a child that stands — a call obeyed, a spot held, a round break — and
+ * that child would then set off again round an obstacle it is no longer at.
+ */
+function ageEdge(c: TagChild, dt: number): void {
+  if (c.edgeFor > 0) {
+    c.edgeFor = Math.max(0, c.edgeFor - dt)
+    if (c.edgeFor === 0) c.edgeSide = 0
+  }
+}
+
+/** The signed angle from `from` to `to`, in (−π, π]. */
+function angleTo(from: number, to: number): number {
+  return Math.atan2(Math.sin(to - from), Math.cos(to - from))
+}
+
+/** How far off the wanted heading a child may end up and still count as going
+ *  where it wanted: one probe step of the deflection (15°) and a little over. */
+const ON_COURSE = Math.PI / 10
+
+/**
+ * How far ahead the wanted heading must be OPEN before a child that is going
+ * round something turns back onto it, as a multiple of its own footprint. It is
+ * deliberately several times the deflection's own probe: what re-entered the
+ * pocket was the momentary clearance one step outside its mouth, and a way out
+ * that is only one step deep is not a way out.
+ */
+const OPEN_AHEAD = 8
+/** How many points along it are sampled — enough that a fence panel or a hut
+ *  corner between the child and open ground cannot fall between two of them. */
+const OPEN_SAMPLES = 4
+
+/** Whether the child could really set off on `heading` from where it stands:
+ *  clear over the whole opening distance, not merely at the next step.
+ *  `blockedAt` is the predicate THIS child steers by — the static world plus
+ *  the other inhabitants' bodies (point 657), the same one its steps probe. */
+function wayOpen(
+  c: TagChild,
+  heading: number,
+  world: TagWorld,
+  blockedAt: (x: number, z: number) => boolean,
+): boolean {
+  const reach = world.childRadius * OPEN_AHEAD
+  for (let i = 1; i <= OPEN_SAMPLES; i++) {
+    const d = (reach * i) / OPEN_SAMPLES
+    if (blockedAt(c.x + Math.sin(heading) * d, c.z + Math.cos(heading) * d)) return false
+  }
+  return true
+}
+
+/** How far a child must get from where it last got somewhere before it counts
+ *  as having covered ground, as a multiple of its own footprint. At the floor
+ *  pace a playing child walks more than three times this in the window below, so
+ *  only one that is going nowhere ever reaches it. */
+const PROGRESS_AWAY = 3
+
+/** How much farther the legs may travel than the ground they cover before the
+ *  progress watch calls it shuffling. This is the rescue-side form of the
+ *  short trace measure's path/ground ratio: ordinary turns cover well over a
+ *  fifth of their path, while a fast shiver repeatedly spends the same ground. */
+const PROGRESS_RATIO = 5
+
+/** How far off the straight flee the freshly-tagged child breaks away while
+ *  its immunity runs — 60°: enough that the inbound and outbound legs of the
+ *  tag U-turn no longer cancel inside a one-second window, small enough that
+ *  it still reads as running from the new chaser. */
+const PEEL_ANGLE = Math.PI / 3
+
+/** Whether the NEXT COUPLE OF STEPS along `heading` are walkable — a short
+ *  probe for a heading about to be taken: the per-step deflection handles a
+ *  bend further on, so only the immediate ground has to answer. */
+function nearWalkable(
+  c: TagChild,
+  heading: number,
+  world: TagWorld,
+  blockedAt: (x: number, z: number) => boolean,
+): boolean {
+  for (const m of [1.5, 3]) {
+    const d = world.childRadius * m
+    if (blockedAt(c.x + Math.sin(heading) * d, c.z + Math.cos(heading) * d)) return false
+  }
+  return true
+}
+
+/**
+ * THE ESCAPE, AND THE FINDING IT LEAVES BEHIND (point 656). Both stall watches
+ * end here — the one for a child that cannot move at all and the one for a child
+ * that walks without getting anywhere — so the settlement picks it up in exactly
+ * one place and every such rescue is counted in exactly one place.
+ *
+ * The count is the point. The teleport ENDS the reported episode ("hängt kurz
+ * fest") half a second before a two-second window could close on it, and it ends
+ * it with a position jump, which any check that watches positions reads as the
+ * child walking out of its own pocket. Counting it turns the correction from an
+ * alibi into the evidence. `walked` is deliberately left alone: the gait rides
+ * it, and the legs must not flail through a correction the eye never sees.
+ *
+ * The anchor is re-taken here too, so the frame that freed a child cannot charge
+ * it a second rescue from the other watch a few lines later.
+ */
+function escapeNudge(c: TagChild, world: TagWorld, fromProgress = false): void {
+  // A child that is physically pinned asks for free ground around where it is.
+  // A child shuffling on otherwise-open ground is already standing somewhere
+  // valid, so asking about that same point returns it unchanged and cannot
+  // break the steering loop. Put the progress rescue beyond the whole observed
+  // oscillation before resolving that requested point against the ground. One
+  // old anchor-radius (0.9 m) left the reported seed in the same loop (26
+  // rescues in 90 s); two radii ended it with one rescue, carrying 2.30 m.
+  let free = world.nudge(c.x, c.z)
+  if (fromProgress && (!free.found || Math.hypot(free.x - c.x, free.z - c.z) < 1e-6)) {
+    const away = world.childRadius * PROGRESS_AWAY * 2
+    free = world.nudge(c.x + Math.sin(c.heading) * away, c.z + Math.cos(c.heading) * away)
+  }
+  if (free.found) {
+    // How far the settlement moved it, recorded where it is known (point 656).
+    c.carried += Math.hypot(free.x - c.x, free.z - c.z)
+    c.x = free.x
+    c.z = free.z
+  }
+  // Counted whether or not free ground was found: the child stood its whole
+  // window without getting anywhere either way, and a settlement that cannot
+  // even offer it a way out is the worse finding of the two.
+  c.nudges++
+  c.pinned = 0
+  c.anchorX = c.x
+  c.anchorZ = c.z
+  c.anchorWalked = c.walked
+  c.anchorOut = 0
+  c.anchorFor = 0
+}
+
+/**
+ * Read one child's position back from its resolved BODY, and with it whatever
+ * the separation's own escape did (point 656 follow-up). `separateGroup` has a
+ * third rescue path neither of the chase's watches sees: a body pressed between
+ * a collider and another body past its wedge window is teleported to free
+ * ground by the separation itself. Uncounted, that jump stood in the trace as
+ * the child walking out of its pocket — the exact blind spot point 656 closed
+ * for `escapeNudge`, open again one layer down. The body counts what the
+ * separation did where it does it; this folds the count and the carried metres
+ * into the child's own `nudges`/`carried`, which is where every consumer
+ * already reads rescues, and re-takes the anchor exactly as `escapeNudge` does,
+ * so the frame that freed the child cannot charge it a second rescue from the
+ * progress watch. BOTH settlements use it — the live scene and the replay —
+ * because a write-back done by hand in one of them is how the two fell apart
+ * before.
+ */
+export function absorbSeparation(
+  c: TagChild,
+  body: { x: number; z: number; nudges: number; carried: number },
+): void {
+  c.x = body.x
+  c.z = body.z
+  if (body.nudges > 0 || body.carried > 0) {
+    c.nudges += body.nudges
+    c.carried += body.carried
+    body.nudges = 0
+    body.carried = 0
+    c.pinned = 0
+    c.anchorX = c.x
+    c.anchorZ = c.z
+    c.anchorWalked = c.walked
+    c.anchorOut = 0
+    c.anchorFor = 0
+  }
+}
+
+/** Begin a fresh, complete progress window at the child's current ground. */
+function resetProgress(c: TagChild): void {
+  c.anchorX = c.x
+  c.anchorZ = c.z
+  c.anchorWalked = c.walked
+  c.anchorOut = 0
+  c.anchorFor = 0
+}
+
+/**
+ * A CHILD THAT WALKS WITHOUT GETTING ANYWHERE IS STUCK (point 648), and it took
+ * the reported bug to see it: the stall watch only ever counted the frames in
+ * which a child could not move AT ALL, so a child wedged in a hand's breadth of
+ * free ground — between a hut and the edge of its play ground — walked its two
+ * centimetres one way and its two centimetres back, at the full commanded pace,
+ * for as long as anything sent it there. Measured in one such slot: 5.3 m walked
+ * inside 15 cm. Every frame of it satisfied the old watch.
+ *
+ * So progress is watched instead of motion. Half the window without covering
+ * ground gives up whatever way round the child had committed to — the cheap
+ * answer, and usually enough. The whole window asks the settlement for free
+ * ground when the child's legs travelled a real distance but reached less than
+ * a fifth of it, the same standard as the trace measure.
+ *
+ * THE WINDOW MUST FINISH BEFORE ITS ANCHOR MOVES (point 666). Resetting it the
+ * instant the child crossed `childRadius * PROGRESS_AWAY` made the rescue blind
+ * to a shiver wider than that radius: every swing re-took the anchor and set
+ * `anchorFor` back to zero, so the rescue could be postponed forever. A healthy
+ * walk now renews the anchor only at the end of the window; a wide, fast
+ * out-and-back spends the same ground for that whole window and is rescued.
+ */
+function trackProgress(c: TagChild, dt: number, cfg: TagConfig, world: TagWorld): void {
+  if (!(c.pace > 0) || c.held) {
+    resetProgress(c)
+    // A child that is not walking is not stuck on anything — it is standing
+    // because the round is over or because it was TOLD to (point 656). Leaving
+    // the count of the frames before it standing would fire a teleport on the
+    // first blocked frame after the hold, on a child that had just been asked
+    // to stand still.
+    c.pinned = 0
+    return
+  }
+  c.anchorOut = Math.max(c.anchorOut, Math.hypot(c.x - c.anchorX, c.z - c.anchorZ))
+  c.anchorFor += dt
+  if (
+    c.anchorFor >= cfg.unstuckSeconds * 0.5 &&
+    c.anchorOut <= world.childRadius * PROGRESS_AWAY &&
+    c.edgeFor > 0
+  ) {
+    c.edgeSide = 0
+    c.edgeFor = 0
+  }
+  if (c.anchorFor < cfg.unstuckSeconds) return
+
+  const walked = Math.max(0, c.walked - c.anchorWalked)
+  const walkedEnough = walked > world.childRadius * PROGRESS_AWAY
+  if (walkedEnough && c.anchorOut * PROGRESS_RATIO < walked) escapeNudge(c, world, true)
+  else resetProgress(c)
+}
+
+/**
+ * Move one child `dist` along `desired`, substepped so nothing is stepped over,
+ * deflected around whatever is in the way, and nudged free if it is genuinely
+ * pinned. The heading it ends on is the one it TRAVELLED — and that heading is
+ * handed back to the deflection as the COURSE it is on, so a step round a hut
+ * can never undo the step before it (point 648).
+ *
+ * WHERE IT HAS TO GO ROUND SOMETHING, IT GOES ROUND (point 648). Two rules
+ * together make that, and neither works without the other:
+ *  - it keeps to ONE SIDE — the deflection searches its way out in the sense
+ *    this child committed to, so it follows the obstacle's edge instead of
+ *    taking whichever flank is momentarily nearer;
+ *  - and while it is going round, it holds its COURSE rather than re-aiming at
+ *    what it wants every frame, until the way it wants is open for a real
+ *    distance ahead. Re-aiming is what the pacing was: one step outside the
+ *    pocket the wanted heading reads clear again, so the child turned straight
+ *    back into it.
+ * The commitment ends by itself the moment the way it wants is open, and
+ * `edgeSeconds` is only the backstop on a side that was the long way round.
+ */
 function moveChild(
   c: TagChild,
   desired: number,
@@ -362,41 +746,70 @@ function moveChild(
   dt: number,
   cfg: TagConfig,
   world: TagWorld,
+  /** The other inhabitants' bodies as THIS child must steer round them (point
+   *  657): self and the tag partner already excluded. Layered over the static
+   *  `blocked` for every probe of the step, so a body is walked round exactly
+   *  the way a hut is — and left out of `escapeNudge`, whose target the static
+   *  world answers for (a rescue beside a moving body is resolved by the
+   *  separation the frame after). */
+  occupied?: (x: number, z: number) => boolean,
 ): void {
+  const blockedAt = occupied
+    ? (x: number, z: number) => world.blocked(x, z) || occupied(x, z)
+    : world.blocked
   const maxStep = Math.max(0.05, world.childRadius * 0.9)
   const steps = Math.max(1, Math.ceil(distance / maxStep))
   const len = distance / steps
   const look = Math.max(len, world.childRadius * 2)
-  let heading = desired
+  // Going round something and the way it wants has opened: it is past whatever
+  // it was going round, and takes its own heading again.
+  if (c.edgeFor > 0 && wayOpen(c, desired, world, blockedAt)) {
+    c.edgeSide = 0
+    c.edgeFor = 0
+  }
+  // What it steers on this frame: where it wants to go, or — while it is going
+  // round something — the course it is already on along that obstacle's edge.
+  let heading = c.edgeFor > 0 ? c.heading : desired
+  let course = c.heading
   let moved = false
   for (let k = 0; k < steps; k++) {
-    const r = deflectedStep(c.x, c.z, heading, len, world.blocked, look)
+    // THE PROBE TURNS THE FULL CIRCLE, not the wildlife's ±90°. A coast is
+    // something an animal walks along; a settlement is something a child walks
+    // ROUND, and between the huts, the fences and the bounded play ground it
+    // meets pockets whose only way out is backwards. With the ±90° arc such a
+    // pocket left the child STANDING until the unstuck timer teleported it —
+    // the user's "hängt kurz fest": measured at his seed, every single stalled
+    // frame had free ground 105–150° off the heading it wanted, just outside
+    // what the probe could see.
+    const r = deflectedStep(c.x, c.z, heading, len, blockedAt, look, 12, course, c.edgeSide)
     if (!r.moved) break
     c.walked += Math.hypot(r.x - c.x, r.z - c.z)
     c.x = r.x
     c.z = r.z
     heading = r.heading
+    course = r.heading
     moved = true
   }
   if (moved) {
     c.heading = heading
     c.pinned = 0
+    // Something stood in the way of where it wanted to go and it had to turn
+    // aside for it: from here it goes round that obstacle the way this step
+    // turned, and keeps to that side until the way it wants is open again.
+    const off = angleTo(desired, heading)
+    if (c.edgeFor <= 0 && Math.abs(off) > ON_COURSE) {
+      c.edgeSide = off > 0 ? 1 : -1
+      c.edgeFor = Math.max(0, cfg.edgeSeconds)
+    }
     return
   }
-  // Blocked on every probe: turn a quarter and try again next frame — and if it
-  // is still standing there past its window, nudge it to free ground. The nudge
-  // is a teleport, so its distance is deliberately NOT added to `walked`: the
-  // legs must not flail through a correction the eye never sees.
-  c.heading = desired + Math.PI / 2
+  // Blocked on every probe: turn a quarter — to the side it is already going
+  // round, so the two rules never pull against each other — and try again next
+  // frame; and if it is still standing there past its window, it is picked up
+  // and set down on free ground — counted, see `escapeNudge`.
+  c.heading = desired + (c.edgeSide < 0 ? -Math.PI / 2 : Math.PI / 2)
   c.pinned += dt
-  if (c.pinned > cfg.unstuckSeconds) {
-    const free = world.nudge(c.x, c.z)
-    if (free.found) {
-      c.x = free.x
-      c.z = free.z
-    }
-    c.pinned = 0
-  }
+  if (c.pinned > cfg.unstuckSeconds) escapeNudge(c, world)
 }
 
 /**
@@ -420,7 +833,41 @@ export function stepTagGame(
   world: TagWorld,
   steer?: TagSteer,
 ): void {
+  // THE LONG-RUN ALARM (point 589), judged on what the PLAYER would have seen:
+  // a catch, or a fresh round starting. Not on the timers meant to produce them
+  // — a chase that runs on forever with a dead catch test keeps every timer
+  // moving and still shows a group that never plays. A group of one has nobody
+  // to chase and is quiet by right. DEV-gated at the CALL SITE, so a production
+  // build allocates nothing per frame.
+  const dev = import.meta.env.DEV
+  const tags = dev ? s.tags : 0
+  const wasPlaying = dev ? s.playing : false
+  advanceTagGame(s, dt, cfg, world, steer)
+  if (dev) {
+    watchProducer(s.play, {
+      code: 'tag-silent',
+      dt,
+      produced: s.tags !== tags || (s.playing && !wasPlaying),
+      expected: s.children.length >= 2,
+      maxSilenceSeconds: cfg.silenceSeconds,
+      detail: () =>
+        `${s.children.length} children, ${s.playing ? `chaser ${s.chaser} for ${s.chaserFor.toFixed(0)}s` : `idling for ${s.idleFor.toFixed(0)}s more`}`,
+    })
+  }
+}
+
+function advanceTagGame(
+  s: TagState,
+  dt: number,
+  cfg: TagConfig,
+  world: TagWorld,
+  steer?: TagSteer,
+): void {
   const n = s.children.length
+  // The other inhabitants' bodies, as ground each child steers round (point
+  // 657). Bound per child below, so every probe of a step already excludes the
+  // child itself and its tag partner.
+  const occ = world.occupied
   // Judged on the state as RECEIVED, before anything below repairs it — a step
   // that quietly mends a broken state and then asserts would report nothing.
   assertRoundSound(s, dt, cfg)
@@ -450,11 +897,16 @@ export function stepTagGame(
       // instead of shuffling at the chase's floor pace.
       const claim = steer?.(i, s) ?? null
       c.pace = claim ? Math.max(0, claim.pace) : 0
+      c.held = !!claim && c.pace <= 0
       c.effort = 'recover'
+      ageEdge(c, dt)
       if (claim && c.pace > 0) {
-        moveChild(c, claim.heading, c.pace * dt, dt, cfg, world)
+        // No round runs, so no child has a tag partner: every other body is
+        // ground this errand walks round (point 657).
+        moveChild(c, claim.heading, c.pace * dt, dt, cfg, world, occ && ((x, z) => occ(i, -1, x, z)))
         c.facing = turnToward(c.facing, c.heading, cfg.turnRate * dt)
       }
+      trackProgress(c, dt, cfg, world)
       c.reserve = advanceReserve(c.reserve, c.pace, dt, cfg, c.drainScale, c.recoverScale)
       c.lean += (0 - c.lean) * Math.min(1, dt * 4)
     }
@@ -468,6 +920,11 @@ export function stepTagGame(
   }
 
   s.chaserFor += dt
+  // The game's own count of the seconds it was PLAYED (point 656), for the same
+  // reason as the metres below: a watcher reconstructing it from a sampled flag
+  // has to decide which side of a round's first frame the interval belongs to,
+  // and the settlement need not guess.
+  s.playedClock += dt
   if (s.immuneFor > 0) {
     s.immuneFor = Math.max(0, s.immuneFor - dt)
     if (s.immuneFor === 0) s.immune = -1
@@ -510,7 +967,14 @@ export function stepTagGame(
   const floor = floorPace(cfg)
   for (let i = 0; i < n; i++) {
     const c = s.children[i]
+    const walkedBefore = c.walked
     const isChaser = i === s.chaser
+    // The tag pair steers freely at one another; everyone else's body is ground
+    // to walk round (point 657). For the chaser the partner is its quarry, for
+    // the quarry its chaser — treating those as walls would hold the catch at
+    // arm's length for ever.
+    const partner = isChaser ? s.target : i === s.target ? s.chaser : -1
+    const occAt = occ && ((x: number, z: number) => occ(i, partner, x, z))
     let wants: boolean
     let desired: number
     if (isChaser) {
@@ -526,6 +990,23 @@ export function stepTagGame(
           cfg.commitDistance,
         )
       desired = target ? headingToward(c.x, c.z, target.x, target.z, c.heading) : c.heading
+      // A CHASER THAT MAY NOT CATCH DOES NOT PRESS (point 657). While the
+      // tag-back window runs, the catch is forbidden — but the chaser still
+      // aimed at its quarry, so one that was already AT it walked into the
+      // body at the floor pace for the whole window: 1.4 s × 1.29 m/s of legs
+      // pumping against the separation with no ground covered, a guaranteed
+      // red window (measured at both reported seeds, every frozen pair in the
+      // traces was this). Where it is that close it ORBITS the quarry instead
+      // — real ground covered, visibly circling for the tag it is owed — and
+      // presses again the moment the window ends.
+      if (target && s.immuneFor > 0 && gap < cfg.catchDistance + world.childRadius * 2) {
+        const to = headingToward(c.x, c.z, target.x, target.z, c.heading)
+        const side = Math.sin(c.heading - to) >= 0 ? 1 : -1
+        // A quarter-turn off the line to the quarry orbits it; inside the
+        // catch ring the turn opens a little further, so the circle drifts
+        // outward instead of grinding along the body.
+        desired = to + side * (Math.PI / 2 + (gap < cfg.catchDistance ? 0.35 : 0))
+      }
     } else {
       const gapToChaser = dist(c, chaser)
       wants = runnerPresses(gapToChaser, cfg.pressureDistance)
@@ -547,24 +1028,63 @@ export function stepTagGame(
             world.radius,
             world.centerX ?? 0,
             world.centerZ ?? 0,
+            undefined,
+            undefined,
+            // Which way it is already running, so a runner cornered with the
+            // chaser between it and the middle breaks ALONG the rim and STAYS
+            // on that way round instead of turning about-face (point 648).
+            c.heading,
           )
         : Math.hypot(c.x - cx, c.z - cz) > cfg.pressureDistance
           ? headingToward(c.x, c.z, cx, cz, c.heading)
           : c.heading
+      // THE FRESHLY-TAGGED CHILD PEELS OFF SIDEWAYS (point 657). Its flee is
+      // the chase line reversed BY CONSTRUCTION — it walked toward the quarry,
+      // now it walks away from the same child — and at the floor pace a spent
+      // ex-chaser walks that knife-edge U-turn as a metre of legs for a
+      // handbreadth of ground, which is indistinguishable from pacing
+      // (measured: 1.29 m walked inside 0.29 m across one catch). While its
+      // immunity runs — the window in which it cannot be tagged back anyway —
+      // it breaks away at an angle instead, on whichever side keeps more of
+      // its momentum and is walkable.
+      if (c.evading && i === s.immune && s.immuneFor > 0) {
+        const keep = angleTo(c.heading, desired + PEEL_ANGLE)
+        const first = Math.abs(keep) <= Math.abs(angleTo(c.heading, desired - PEEL_ANGLE)) ? 1 : -1
+        for (const side of [first, -first]) {
+          const peeled = desired + side * PEEL_ANGLE
+          if (nearWalkable(c, peeled, world, world.blocked)) {
+            desired = peeled
+            break
+          }
+        }
+      }
     }
     // What was SAID overrides where the chase would go — for a runner only, and
-    // only for the moment the action lasts (point 481). The pace still cannot
-    // fall below the floor while a round runs: a child standing stock still
-    // mid-game reads as a bug, which is what the floor exists to forbid.
+    // only for the moment the action lasts (point 481). THE FLOOR IS THE CHASE'S
+    // OWN, not a claim's: it forbids a child the chase is steering from standing
+    // still mid-game, but a child that was TOLD to stand — the refusal, the held
+    // spot, an errand target reached — is obeying, and the stillness is the
+    // reading. Forcing the floor on it walked a standing child forward at 1.16
+    // m/s into whatever was in front of it, where the blocked-step fallback then
+    // turned it a quarter every frame: the child spun on the spot instead of
+    // standing (measured at the user's seed, 3930 of 3931 commanded-still frames).
     const claim = isChaser ? null : (steer?.(i, s) ?? null)
     if (claim) desired = claim.heading
     c.sprinting = wants
     c.press = pressState(c.press, c.reserve, cfg)
     c.effort = chooseEffort(c.press, wants)
     c.pace = claim
-      ? Math.max(floor, claim.pace)
+      ? Math.max(0, claim.pace)
       : Math.max(floor, effortPace(c.effort, c.reserve, cfg, isChaser ? 'chaser' : 'runner'))
-    moveChild(c, desired, c.pace * dt, dt, cfg, world)
+    c.held = !!claim && c.pace <= 0
+    ageEdge(c, dt)
+    // A commanded stillness moves nothing — and leaves `pinned` and `walked`
+    // alone, so a standing child is never mistaken for one stuck on geometry and
+    // its legs stay still.
+    if (c.pace > 0) moveChild(c, desired, c.pace * dt, dt, cfg, world, occAt)
+    trackProgress(c, dt, cfg, world)
+    // Whatever its legs did this frame, they did it while the round was on.
+    c.walkedWhilePlaying += c.walked - walkedBefore
     // The BODY turns at a rate toward where it is going. The travel heading may
     // jump — a deflection round a hut corner is a real change of direction — but
     // a body that snapped to it spun about-face inside a single frame.
@@ -584,9 +1104,19 @@ export function stepTagGame(
   // catch ring untagged. Measured over 8×600 s with five children that never
   // once happened — evasion keeps the others out — but a much larger catch ring
   // or a much larger margin would reopen it.
+  //
+  // AND NO CATCH AT ALL WHILE THE TAG-BACK WINDOW RUNS (point 648). Protecting
+  // only the child that just tagged left the ROLE free to run round a knot: in a
+  // cluster of three, A tags B, B tags C and C tags A again, each catch clearing
+  // the last one's protection — measured at the reported seed, the role changed
+  // every two or three FRAMES, and since a new chaser turns away from the child
+  // it just tagged, all three stood trembling within 7 cm of one another for
+  // seconds at a time. That is the user's "Kind zittert auf der Stelle herum" at
+  // its worst. The window is the same one the freshly-tagged child already had,
+  // so the round keeps its calibration: it is simply the whole group's now, and
+  // the role can change at most once in it.
   if (target && s.target !== s.chaser) {
-    const caught =
-      !(s.target === s.immune && s.immuneFor > 0) && catchReached(chaser, target, cfg, world)
+    const caught = s.immuneFor <= 0 && catchReached(chaser, target, cfg, world)
     if (caught) {
       const old = s.chaser
       s.chaser = s.target
@@ -650,7 +1180,8 @@ function assertRoundSound(s: TagState, dt: number, cfg: TagConfig): void {
 }
 
 /** Where the step LEFT them: no child inside a collider, outside the walkable
- *  rim or standing below the floor while a chase runs. */
+ *  rim or standing below the floor while a chase runs — the one exception being
+ *  a child that was TOLD to stand (`held`), which is obeying rather than stuck. */
 function assertPlaced(s: TagState, cfg: TagConfig, world: TagWorld): void {
   const floor = floorPace(cfg)
   for (let i = 0; i < s.children.length; i++) {
@@ -661,7 +1192,7 @@ function assertPlaced(s: TagState, cfg: TagConfig, world: TagWorld): void {
       () => `child ${i} stands at ${c.x.toFixed(2)},${c.z.toFixed(2)} (r ${Math.hypot(c.x, c.z).toFixed(2)} of ${world.radius})`,
     )
     devAssert(
-      !s.playing || c.pace >= floor - 1e-6,
+      !s.playing || c.held || c.pace >= floor - 1e-6,
       'tag-floor',
       () => `child ${i} commanded ${c.pace.toFixed(2)} below the floor ${floor.toFixed(2)}`,
     )

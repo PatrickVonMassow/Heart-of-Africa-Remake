@@ -30,6 +30,8 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import {
   readOwnerLock,
+  readBoundaryMarker,
+  resolveOwnership,
   probePid,
   ourClaudeProcess,
   statePathsFor,
@@ -38,26 +40,35 @@ import {
   LOCK_PATH,
   IN_FLIGHT_PATH,
 } from './batch-singleton.mjs'
+import { BOUNDARY_FRESH_MS, markerPhase } from './batch-boundary-core.mjs'
 import { DECLARED_WAIT_LEASE_MS } from './batch-lease-core.mjs'
 import {
+  adoptionAssessment,
   agentOutputVerdict,
   assessInFlight,
+  assessTransfer,
+  checkEvidence,
   combineWorktreeStamps,
   describeInFlight,
+  markTransferred,
   porcelainPaths,
   respawnDecision,
   selfReferentialEvidence,
   slotReasonDecision,
   slotsRemedy,
   statusVerdict,
+  transferBlockMessage,
   closingFreezeActive,
   declaredAgentCount,
   openPointSpecs,
+  waitEtaRefusal,
   IN_FLIGHT_MAX_AGE_MS,
   POOL_CAP,
   RESPAWN_GRACE_MS,
 } from './batch-in-flight-core.mjs'
 import { readTasksOpen, TASKS_PATH } from './tasks-source.mjs'
+import { boardFilePath } from './dashboard-state.mjs'
+import { berlinMinutes } from './dashboard-guard.mjs'
 
 export { IN_FLIGHT_PATH }
 
@@ -472,6 +483,289 @@ export function checkAgentOutput({ worktree = null, branch = null, log = null, n
   return { output, ...respawnDecision({ output }) }
 }
 
+// --- The transferable adoption record (point 675, defeat 2) ---------------------
+
+/** Local and remote-tracking tip of a branch: { ref, localSha, remoteSha }, or
+ *  null for an unusable name. `origin/<branch>` is the honest reading of
+ *  "committed AND PUSHED" without a network round trip: a worktree push updates
+ *  it in the shared git dir, and a branch never pushed simply has none. */
+export function checkpointOf(ref, { cwd = REPO_ROOT } = {}) {
+  const name = String(ref ?? '')
+    .trim()
+    .replace(/^refs\/heads\//, '')
+  if (!name || name.startsWith('-') || /[\s~^:?*[\]\\]/.test(name)) return null
+  const sha = (rev) => {
+    try {
+      return (
+        execFileSync('git', ['rev-parse', `${rev}^{commit}`], {
+          windowsHide: true,
+          cwd,
+          encoding: 'utf8',
+          timeout: 8000,
+          stdio: ['ignore', 'pipe', 'ignore'],
+        }).trim() || null
+      )
+    } catch {
+      return null
+    }
+  }
+  return { ref: name, localSha: sha(`refs/heads/${name}`) ?? sha(name), remoteSha: sha(`refs/remotes/origin/${name}`) }
+}
+
+/** Is `ancestorSha` contained in `sha`? Used at adoption: a branch that moved
+ *  FORWARD from its recorded checkpoint is still the handed-over work. */
+export function isAncestor(ancestorSha, sha, { cwd = REPO_ROOT } = {}) {
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', String(ancestorSha), String(sha)], {
+      windowsHide: true,
+      cwd,
+      timeout: 8000,
+      stdio: ['ignore', 'ignore', 'ignore'],
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** The declaration's evidence, annotated with checkpoints for `assessTransfer`. */
+export function transferItems(declaration, { cwd = REPO_ROOT } = {}) {
+  const out = []
+  for (const e of Array.isArray(declaration?.evidence) ? declaration.evidence : []) {
+    if (e?.kind === 'branch') {
+      out.push({ kind: 'branch', describe: `branch ${e.ref}`, checkpoint: checkpointOf(e.ref, { cwd }) })
+    } else if (e?.kind === 'worktree') {
+      const ref = worktreeBranch(e.path, { cwd })
+      out.push({
+        kind: 'worktree',
+        describe: `worktree ${e.path}`,
+        checkpoint: ref ? checkpointOf(ref, { cwd }) : null,
+      })
+    } else {
+      out.push({ kind: String(e?.kind ?? ''), describe: `${e?.kind ?? '?'} ${e?.pid ?? e?.path ?? ''}`.trim(), checkpoint: null })
+    }
+  }
+  return out
+}
+
+/**
+ * MAY THE BOUNDARY HAND THIS SESSION'S IN-FLIGHT WORK TO A SUCCESSOR (point 675,
+ * defeat 2)? Judged at `--prepare` AND at `--commit`. Returns
+ * { blocked, message?, note, commit? } — `commit()` marks the declaration
+ * TRANSFERRED and returns the checkpoint summary; it exists only when nothing
+ * blocks. Fail direction: an unreadable declaration blocks nothing (it is the
+ * guard's ordinary business), but a READABLE one with unverifiable checkpoints
+ * blocks — a successor cannot adopt what cannot be verified.
+ */
+export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, now = Date.now() } = {}) {
+  const path = statePathsFor(lockPath).inFlightPath
+  const declaration = readDeclaration(path)
+  if (!declaration) return { blocked: false, note: '', commit: null }
+  const summarise = (checkpoints) =>
+    (checkpoints ?? []).map((c) => `${c.ref ?? '?'}@${String(c.sha).slice(0, 8)}`).join(', ') || 'no checkpoints'
+  // IDEMPOTENT (Sol review of 807c2bf, finding 6): a declaration already
+  // transferred and not yet adopted is not re-judged and not re-transferred —
+  // the record awaiting adoption IS the handover's state, and `commit` only
+  // repeats its summary.
+  if (declaration.transfer && !declaration.adopted) {
+    return {
+      blocked: false,
+      note: `a transferred declaration already awaits adoption (${summarise(declaration.transfer.checkpoints)})`,
+      commit: () => summarise(declaration.transfer.checkpoints),
+    }
+  }
+  // SESSION-BOUND (same finding): a declaration this owner cannot be resolved
+  // to is not its to transfer — and it must not BLOCK this owner's handover
+  // either. It is left untouched and named; the successor's --adopt refuses
+  // an untransferred record, so nothing is silently inherited.
+  const lock = readOwnerLock(lockPath)
+  const owner = resolveOwnership({
+    lock: declaration,
+    sessionId: sid,
+    ancestor:
+      lock && typeof lock.pid === 'number' && lock.pid > 0
+        ? { pid: lock.pid, startedAt: lock.pidStartedAt ?? null }
+        : null,
+  })
+  if (!owner.mine) {
+    return {
+      blocked: false,
+      note: `a foreign in-flight declaration (session ${declaration.sessionId ?? '?'}) was left untouched — not this session's to transfer`,
+      commit: null,
+    }
+  }
+  const assessment = assessTransfer({ items: transferItems(declaration, { cwd }) })
+  if (!assessment.transferable) {
+    return { blocked: true, message: transferBlockMessage(assessment), note: '', commit: null }
+  }
+  const summary =
+    assessment.checkpoints.map((c) => `${c.ref ?? '?'}@${String(c.sha).slice(0, 8)}`).join(', ') || 'no checkpoints'
+  return {
+    blocked: false,
+    note: `the declared in-flight work is transferable (pushed checkpoints: ${summary})`,
+    commit: () => {
+      writeDeclaration(markTransferred({ declaration, bySid: sid, now, checkpoints: assessment.checkpoints }), path)
+      return summary
+    },
+  }
+}
+
+/**
+ * MAY THIS SESSION ADOPT THIS TRANSFERRED RECORD (Sol final round, finding 2)?
+ * PURE over its inputs. Null = yes; otherwise { reason, alert }.
+ *
+ * THE TRANSFERRER IS NEVER THE ADOPTER. A session that COMMITTED the boundary
+ * handed its running work to the successor; adopting it back would stamp the
+ * record `adopted`, re-open `--clear`, and leave the session working after its
+ * own handover — the whole defect point 675 exists to close. The refusal
+ * therefore hangs on the TRANSFER STAMP (`transfer.by`), which does not expire:
+ * hanging it on the committed marker alone left the defect open twice over —
+ * BOUNDARY_FRESH_MS later, and whenever the marker is withdrawn or lost. The
+ * marker is still read, but only to say WHICH refusal this is, since a session
+ * still under its own fresh commit needs a different way forward from one whose
+ * boundary is long gone.
+ *
+ * The way forward is never adoption: under a live commit, withdraw the boundary
+ * (`batch-boundary.mjs --clear`); past it, the record is mutable again, so real
+ * resumed work is RE-DECLARED (`--waiting-on …`) or `--clear`ed — an honest
+ * record of this session's own wait, not the fiction that a successor took over.
+ */
+export function selfAdoptionRefusal({ declaration, marker, sid, now = Date.now() } = {}) {
+  if (!declaration?.transfer) return null
+  const by = typeof declaration.transfer.by === 'string' ? declaration.transfer.by : ''
+  const mine = Boolean(sid) && by === sid
+  const sealed =
+    markerPhase(marker) === 'committed' &&
+    marker.sessionId === sid &&
+    typeof marker.at === 'number' &&
+    now - marker.at < BOUNDARY_FRESH_MS
+  if (mine && sealed) {
+    return {
+      reason: 'own-commit',
+      alert:
+        'this session COMMITTED the boundary that transferred this record — it belongs to the successor. ' +
+        'To take the work back, withdraw the boundary first (`node scripts/batch-boundary.mjs --clear`); ' +
+        'the declaration then becomes mutable again without adoption.',
+    }
+  }
+  if (mine) {
+    return {
+      reason: 'own-transfer',
+      alert:
+        'this session TRANSFERRED this record at its boundary commit — adoption is the SUCCESSOR\'s verb, and a ' +
+        'marker that has since expired or been withdrawn does not hand the work back. If this session genuinely ' +
+        'resumed the work, RE-DECLARE it as its own wait (`node scripts/batch-in-flight.mjs --waiting-on "…" ' +
+        '--branch <ref>`), or `--clear` it if it is finished — do not record a handover that never happened.',
+    }
+  }
+  // A SEALED BOUNDARY ADOPTS NOTHING, whoever transferred the record (Sol's
+  // review of fa11223d): adoption writes the declaration under this session's
+  // identity, which is declaring a wait — exactly what `sealedCommitRefusal`
+  // denies behind a committed marker. The wording must not claim this session
+  // transferred it, though, because here it did not.
+  if (sealed) {
+    return {
+      reason: 'sealed-commit',
+      alert:
+        `this session's boundary is COMMITTED, so it may adopt nothing behind that seal — the record (transferred by ` +
+        `${by || 'an unnamed session'}) is the SUCCESSOR's to take. If this session is genuinely working on, withdraw ` +
+        'the boundary first (`node scripts/batch-boundary.mjs --clear`) and adopt then.',
+    }
+  }
+  return null
+}
+
+/**
+ * THE SUCCESSOR ADOPTS a transferred declaration (M4/M7): evidence is re-probed,
+ * what expired is DROPPED AND NAMED, a contradicted or empty record REFUSES with
+ * its alerts — never a silent unblock. On success the declaration is rewritten
+ * under the adopting session's own identity, so every existing probe
+ * (`gatherInFlight`, the launcher) keeps working on it unchanged.
+ */
+export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, now = Date.now() } = {}) {
+  const path = statePathsFor(lockPath).inFlightPath
+  const declaration = readDeclaration(path)
+  if (!declaration || !declaration.transfer) return { adopted: false, reason: 'no-transferred-declaration', alerts: [] }
+  const self = selfAdoptionRefusal({ declaration, marker: readBoundaryMarker(lockPath), sid, now })
+  if (self) return { adopted: false, reason: self.reason, alerts: [self.alert] }
+  const evidence = Array.isArray(declaration.evidence) ? declaration.evidence : []
+  const items = evidence.map((e) => checkEvidence(e, { now, ...probes }))
+  const checkpointStates = (declaration.transfer.checkpoints ?? []).map((c) => {
+    const cp = c?.ref ? checkpointOf(c.ref, { cwd }) : null
+    return {
+      ref: c?.ref ?? null,
+      recordedSha: c?.sha,
+      localSha: cp?.localSha ?? null,
+      ancestor: cp?.localSha && c?.sha ? isAncestor(c.sha, cp.localSha, { cwd }) : false,
+    }
+  })
+  const assessment = adoptionAssessment({ items, checkpointStates })
+  if (!assessment.adopt) return { adopted: false, reason: 'refused', alerts: assessment.alerts }
+  const lock = readOwnerLock(lockPath)
+  writeDeclaration(
+    {
+      ...declaration,
+      sessionId: sid,
+      pid: typeof lock?.pid === 'number' ? lock.pid : null,
+      pidStartedAt: typeof lock?.pidStartedAt === 'number' ? lock.pidStartedAt : null,
+      at: now,
+      evidence: evidence.filter((_, i) => items[i]?.ok === true),
+      adopted: { from: declaration.transfer.by || declaration.sessionId || null, at: now },
+    },
+    path,
+  )
+  return {
+    adopted: true,
+    reason: 'adopted',
+    alerts: assessment.alerts,
+    kept: assessment.kept.length,
+    dropped: assessment.dropped.length,
+  }
+}
+
+/**
+ * MAY A NEW WAIT BE DECLARED AT ALL (Sol re-review of cd6faaa, finding 2)?
+ * `batch-in-flight` sits in the closing set, so nothing denies its calls after
+ * a commit — but `--waiting-on` after `--commit` would declare NEW work behind
+ * a sealed marker: work the commit never transferred, running beside a
+ * successor the launcher is about to spawn. Refused while a fresh COMMITTED
+ * marker names this session; `batch-boundary.mjs --clear` is the way back.
+ * Injectable and pure over its inputs. Null = allowed.
+ */
+export function sealedCommitRefusal({ marker, sid, now = Date.now() } = {}) {
+  if (markerPhase(marker) !== 'committed') return null
+  if (!sid || marker.sessionId !== sid) return null
+  if (!(typeof marker.at === 'number' && now - marker.at < BOUNDARY_FRESH_MS)) return null
+  return (
+    'THE BOUNDARY IS COMMITTED — `batch-boundary.mjs --commit` was this session\'s last repository action, so ' +
+    'a NEW wait cannot be declared behind it: that work would never have been transferred and would run beside ' +
+    'the successor. Either leave the work to the successor, or withdraw the boundary FIRST ' +
+    '(`node scripts/batch-boundary.mjs --clear`) and declare the wait then. Nothing recorded.'
+  )
+}
+
+/**
+ * MAY THIS DECLARATION BE MUTATED AT ALL (Sol review of 807c2bf, finding 4)?
+ * `batch-in-flight` sits in the CLOSING SET, so the sealed-boundary deny never
+ * fires on it — but a TRANSFERRED, un-adopted declaration under a live
+ * committed marker is the SUCCESSOR'S adoption record, and `--clear` or a fresh
+ * `--waiting-on` would strand the very work the handover promised. Injectable
+ * and pure over its inputs, so the Vitest layer pins it. Null = mutation
+ * allowed; otherwise the refusal message.
+ */
+export function transferredMutationRefusal({ declaration, marker, now = Date.now() } = {}) {
+  if (!declaration || !declaration.transfer || declaration.adopted) return null
+  if (markerPhase(marker) !== 'committed') return null
+  if (!(typeof marker.at === 'number' && now - marker.at < BOUNDARY_FRESH_MS)) return null
+  return (
+    'THE DECLARATION IS TRANSFERRED under a committed boundary — it is the successor\'s adoption record now, ' +
+    'so clearing or overwriting it here would strand the work the handover promised. The successor takes it ' +
+    'with `node scripts/batch-in-flight.mjs --adopt`. If this session genuinely resumes work, withdraw the ' +
+    'boundary FIRST (`node scripts/batch-boundary.mjs --clear`) — then the declaration is yours again. ' +
+    'Nothing changed.'
+  )
+}
+
 // --- CLI -----------------------------------------------------------------------
 
 const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href
@@ -486,9 +780,51 @@ if (isMain) {
   const usage =
     'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--pid N] [--branch REF] ' +
     '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] | --status | --clear | ' +
-    '--agent-check [--worktree PATH] [--branch REF] [--log PATH]'
+    '--agent-check [--worktree PATH] [--branch REF] [--log PATH] | --handover-check | --adopt'
 
-  if (argv[0] === '--agent-check') {
+  if (argv[0] === '--handover-check') {
+    // May the boundary hand the declared work to a successor (point 675)?
+    // Read-only twin of what `batch-boundary.mjs --prepare/--commit` enforces.
+    const t = gatherHandoverTransfer(sid)
+    if (t.blocked) {
+      console.error(t.message)
+      process.exit(1)
+    }
+    console.log(
+      t.note
+        ? `TRANSFERABLE — ${t.note}. A boundary commit will mark it transferred; the successor adopts it ` +
+            'with `node scripts/batch-in-flight.mjs --adopt`.'
+        : 'nothing is declared in flight — the handover is unconstrained.',
+    )
+    process.exit(0)
+  } else if (argv[0] === '--adopt') {
+    if (!sid) fail('no batch lock owner — only the session that owns the batch lock may adopt. Nothing adopted.')
+    const a = adoptTransferred(sid)
+    for (const alert of a.alerts) console.error(`ALERT: ${alert}`)
+    if (!a.adopted) {
+      // The self-adoption refusals carry their OWN way forward in the alert
+      // above; repeating the generic "re-declare with --waiting-on" here would
+      // contradict it under a live committed marker, where `sealedCommitRefusal`
+      // denies exactly that.
+      if (a.reason === 'own-commit' || a.reason === 'own-transfer' || a.reason === 'sealed-commit') {
+        fail('ADOPTION REFUSED — this record is not this session\'s to adopt; see the alert above for the way forward.')
+      }
+      fail(
+        a.reason === 'no-transferred-declaration'
+          ? 'no transferred declaration exists — nothing to adopt.'
+          : 'ADOPTION REFUSED — the transferred declaration no longer describes live, verifiable work (see the ' +
+              'alerts above). Do NOT treat this as a green light: LOOK at each named worktree/branch yourself, ' +
+              'then either re-declare what is really running (`--waiting-on …`) or, if the work is finished or ' +
+              'gone, act on it and `--clear`.',
+      )
+    }
+    console.log(
+      `ADOPTED the transferred declaration (${a.kept} evidence item(s) kept, ${a.dropped} dropped and named ` +
+        'above). This session now waits on that work under the ordinary rules: act the moment it lands, ' +
+        're-declare or --clear as it changes.',
+    )
+    process.exit(0)
+  } else if (argv[0] === '--agent-check') {
     const opt = (name) => {
       const i = argv.indexOf(name)
       return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null
@@ -521,6 +857,8 @@ if (isMain) {
     )
     process.exit(1)
   } else if (argv[0] === '--clear') {
+    const refusal = transferredMutationRefusal({ declaration: readDeclaration(), marker: readBoundaryMarker() })
+    if (refusal) fail(refusal)
     clearDeclaration()
     // …and the lease extension the declaration bought (point 556). The lock must
     // not go on carrying a `declaredWait` whose declaration is gone: the marker is
@@ -548,6 +886,11 @@ if (isMain) {
   } else if (argv[0] === '--waiting-on') {
     const waitingOn = String(argv[1] ?? '').trim()
     if (!waitingOn) fail(`--waiting-on needs a description of the wait.\n${usage}`)
+    const marker = readBoundaryMarker()
+    const transferRefusal = transferredMutationRefusal({ declaration: readDeclaration(), marker })
+    if (transferRefusal) fail(transferRefusal)
+    const commitRefusal = sealedCommitRefusal({ marker, sid })
+    if (commitRefusal) fail(commitRefusal)
     const evidence = []
     let slotsFreeReason = ''
     for (let i = 2; i < argv.length; i += 2) {
@@ -654,6 +997,21 @@ if (isMain) {
     // same discipline the evidence check above follows.
     const slots = gatherSlots(declaration)
     if (slots.needsReason) fail(`${slotsRemedy({ slots, cap: POOL_CAP })}\nNothing recorded.`)
+    // THE BOARD'S PROMISE MUST NOT AGE UNDER THIS WAIT (point 661): a wait is
+    // this session's licence to produce no turn end for up to an hour, so the
+    // `now-eta-past` audit would sleep exactly that long. Refuse the wait while
+    // a current-work "~HH:MM" already lies in the past — every re-declaration
+    // then bounds the staleness. FAIL-OPEN on an unreadable or absent board
+    // (html null → no refusal): a broken board must not trap the session.
+    const boardHtml = (() => {
+      try {
+        return readFileSync(boardFilePath(), 'utf8')
+      } catch {
+        return null
+      }
+    })()
+    const etaRefusal = waitEtaRefusal({ html: boardHtml, nowMinutes: berlinMinutes() })
+    if (etaRefusal) fail(etaRefusal)
     writeDeclaration(declaration)
     // THE DECLARATION EXTENDS THE LEASE (point 556, and the piece
     // docs/batch-resilience.md §3 left explicitly unbuilt: "nothing yet WRITES a

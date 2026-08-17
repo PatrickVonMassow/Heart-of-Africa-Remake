@@ -73,6 +73,8 @@ import {
   detectQuotaSignature,
   judgeSpawnOutcome,
   announceSpawn,
+  firewallTopUpDecision,
+  staleEtaLogLine,
   RUNAWAY_FAIL_LIMIT,
 } from './batch-autostart-core.mjs'
 import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
@@ -233,6 +235,92 @@ function readRunLogSegment(from) {
 // server routinely is. The 600-second ceiling used to end exactly those, and
 // `state.lastPid` alone cannot track them because a handover overwrites it. A
 // leaked session holds ports, and that breaks the next session's verify suites.
+// --- THE FIREWALL TOP-UP: reachability decays while nobody looks ------------
+// The container's allowlist is an ipset of ADDRESSES, filled at boot by
+// `init-firewall.sh` from a `dig A` of each domain. Cloudflare-fronted hosts
+// rotate theirs, so that snapshot goes stale WHILE THE SESSION RUNS — no restart
+// needed. Measured 11.08.2026: after a restart at 22:04, chatgpt.com resolved to
+// addresses that were not in the set, and every Sol review silently fell back to
+// one of our own models, which costs the four-eyes rule the cross-vendor
+// decorrelation it exists for. The boot script cannot fix this: it is baked into
+// the image and runs once, and the addresses it wrote were already wrong minutes
+// later.
+//
+// So the tick re-applies it. It is additive and cannot seal the container (that
+// is the whole point of `firewall-allow.mjs`), and it needs no network of its own
+// beyond DNS.
+//
+// IT IS DETACHED, NOT AWAITED (GPT-5.6 Sol, 11.08.2026). Run synchronously it sat
+// in front of every later duty of the tick — the spawn decision, the chat inbox,
+// the leaked-worker sweep — and `timeout` on a sync call is no ceiling at all:
+// node signals the child and then waits for it to actually exit, so a wedged
+// resolver stalls the launcher for as long as it likes. The top-up has no result
+// this tick needs, so it is launched and let go: its own log records what it did,
+// and the tick proceeds at once. A firewall hiccup must never be able to hold up
+// the mechanism that keeps the batch alive.
+// AND IT IS SINGLE-FILE (second review, 11.08.2026). A detached child belongs to no
+// ledger — the tick's reaper only knows its own Claude workers — so one wedged in DNS
+// would survive while every later tick started another, a slow pile-up nobody watches.
+// The previous child's pid is therefore written down and probed first: while it still
+// runs, this tick starts nothing and says so. A stale record is harmless (an unrelated
+// pid at most costs one skipped tick), and the top-up is idempotent anyway.
+// A LIVE PID IS NOT PROOF OF OUR CHILD, and a lost record is not proof of none
+// (third review, 11.08.2026). `kill(pid, 0)` says only that SOMEBODY owns that
+// number: after reuse an unrelated long-lived process would read as "busy" and
+// suppress the top-up for as long as IT lives — not for one tick, forever. So the
+// recorded pid is confirmed against what that process actually IS. And the record is
+// written under the same try as the spawn: if it fails, the child is killed rather
+// than left running unrecorded, because an untracked child is the very class this
+// bounds.
+try {
+  const PIDFILE = C('firewall-topup.pid')
+  // A MISSING RECORD IS THE NORMAL FIRST TICK, NOT A FAILURE (measured 12.08.2026).
+  // This read sat unguarded inside the outer try, so the ENOENT of a container that
+  // had just come up took the WHOLE block with it: every tick logged "firewall
+  // top-up skipped (ENOENT …)" and the top-up never ran once — the pid file is
+  // written only after a spawn, so the first failure made itself permanent. The
+  // firewall it was meant to top up then aged out under the container twice, which
+  // is how it was found. The decision itself is pure and swept by the Vitest layer.
+  let pidText = null
+  try {
+    pidText = readFileSync(PIDFILE, 'utf8')
+  } catch {
+    pidText = null
+  }
+  // The identity check, not just liveness. Linux only; elsewhere the read throws
+  // and the decision falls to "start" — a redundant top-up is the safe direction,
+  // since it is idempotent and short.
+  const cmdlineOf = (pid) => {
+    try {
+      return readFileSync(`/proc/${pid}/cmdline`, 'utf8')
+    } catch {
+      return null
+    }
+  }
+  const decision = firewallTopUpDecision({ pidText, cmdlineOf })
+  if (!decision.start) {
+    log(`firewall top-up ${decision.reason} — not starting a second`)
+  } else {
+    const out = openSync(C('firewall-topup.log'), 'a')
+    const child = spawn(process.execPath, [R('firewall-allow.mjs')], {
+      cwd: REPO,
+      detached: true,
+      stdio: ['ignore', out, out],
+      windowsHide: true,
+    })
+    child.on('error', (e) => log(`firewall top-up could not start (${(e && e.message) || e})`))
+    try {
+      if (child.pid) writeFileSync(PIDFILE, String(child.pid))
+      child.unref()
+    } catch (e) {
+      try { if (child.pid) process.kill(child.pid) } catch { /* already gone */ }
+      log(`firewall top-up stopped — its pid could not be recorded (${(e && e.message) || e})`)
+    }
+  }
+} catch (e) {
+  log(`firewall top-up skipped (${(e && e.message) || e})`)
+}
+
 // Narrow by construction (see reapableSpawns): our own spawn by pid AND start
 // time, past its boot window, not the lock owner, and superseded.
 //
@@ -437,15 +525,37 @@ if (batchParked) {
 // Bounded by a timeout and wrapped fail-open on top, because the launcher's job
 // is bringing the batch back and a board check may never be a reason it does not.
 try {
-  const out = execFileSync(process.execPath, [R('board-watchdog.mjs'), '--last-key', state.boardWatchKey ?? ''], {
-    windowsHide: true,
-    cwd: REPO,
-    encoding: 'utf8',
-    timeout: 60000,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
+  const out = execFileSync(
+    process.execPath,
+    [
+      R('board-watchdog.mjs'),
+      '--last-key',
+      state.boardWatchKey ?? '',
+      // THE CONSECUTIVE-FAILURE COUNT lives here, between ticks (point 562): the
+      // child is a fresh process every quarter of an hour and can hold no memory
+      // of its own, and only consecutive failures may escalate — one success
+      // anywhere resets it to zero.
+      '--streak',
+      String(state.boardProbeStreak ?? 0),
+    ],
+    {
+      windowsHide: true,
+      cwd: REPO,
+      encoding: 'utf8',
+      // Two probes of two attempts with a brief pause between them (point 562)
+      // fit far inside this; the child bounds every attempt at 15 s itself.
+      timeout: 90000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  )
   const r = JSON.parse(out.trim().split('\n').filter(Boolean).pop())
+  state.boardProbeStreak = Number(r.streak) || 0
+  if (r.rescued) log('board: a probe failed and its immediate retry succeeded — a flicker, not a fault')
   if (r.verdict !== 'current') log(`board: ${r.verdict}${r.reason ? ` — ${r.reason}` : ''} (${BOARD_PAGE_URL})`)
+  // The PUBLISHED promise must not age unwatched (point 661): the child hands
+  // back the live page's overdue "~HH:MM" cards, the pure sibling decides.
+  const etaLine = staleEtaLogLine({ overdue: r.etaOverdue })
+  if (etaLine) log(`${etaLine} (${BOARD_PAGE_URL})`)
   if (r.notified) {
     log(`BOARD ALERT: ${r.message}`)
     state.boardWatchKey = r.key
@@ -783,11 +893,17 @@ if (dispossessed) {
   // "handed-over" is not death: the owner finished a point and passed the batch
   // on (point 388). Logged distinctly so the end-to-end chain can be READ out of
   // this file rather than inferred.
+  // An IDLE release is neither death nor a handover: the owner reserved the batch
+  // and never ran a thing (point 612). It is a routine, healthy transition — like
+  // a handover — so it is logged distinctly and nobody's phone is buzzed for it.
   log(
     assessment.reason === 'handed-over'
       ? `HANDOVER accepted: ${lock.sessionId} handed the batch over${lock.handoverPoint ? ` at point ${lock.handoverPoint}` : ''} — spawning the successor`
-      : `owner provably dead (${assessment.reason}) — taking over`,
+      : assessment.reason === 'idle'
+        ? `IDLE owner superseded: ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) held the batch without working — spawning the successor`
+        : `owner provably dead (${assessment.reason}) — taking over`,
   )
+  if (assessment.reason === 'idle' && assessment.detail) log(`  ${assessment.detail}`)
 } else {
   // The headless path leaves no lock at all: a `claude -p` that ends at a
   // boundary exits, and SessionEnd releases the lock before this tick runs. Said

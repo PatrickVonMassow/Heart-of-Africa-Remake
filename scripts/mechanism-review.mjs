@@ -39,10 +39,12 @@ import { dirname } from 'node:path'
 import { execSync } from 'node:child_process'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
+import { accountUnion, formatAccounting, parseListText, summaryLine, validateInputs } from './blind-merge-core.mjs'
 import {
   formatArgErrors,
   KNOWN_FLAGS,
   modelFromTrailers,
+  modelsFromTrailers,
   MODES,
   parseArgs,
   validateRecord,
@@ -96,6 +98,42 @@ export function appendRecord(record, path = RECORDS_PATH) {
 }
 
 /**
+ * COUNT the union from the files themselves, and return the receipt line.
+ *
+ * The recorder does the accounting rather than trusting a pasted line: the two
+ * lists and the union are read here, and a union that does not account for every
+ * entry cannot be recorded as a merge at all. Returns { ok, summary, errors }.
+ */
+export function countUnionFiles({ unionPath, listAPath, listBPath }) {
+  const read = (p) => {
+    try {
+      return readFileSync(p, 'utf8')
+    } catch (e) {
+      throw new Error(`cannot read ${p}: ${(e && e.message) || e}`)
+    }
+  }
+  let union
+  try {
+    union = JSON.parse(read(unionPath))
+  } catch (e) {
+    return { ok: false, errors: [`--union ${unionPath}: ${(e && e.message) || e}`] }
+  }
+  let a
+  let b
+  try {
+    a = parseListText('A', read(listAPath))
+    b = parseListText('B', read(listBPath))
+  } catch (e) {
+    return { ok: false, errors: [(e && e.message) || String(e)] }
+  }
+  const inputs = validateInputs(a, b)
+  if (!inputs.ok) return { ok: false, errors: inputs.errors }
+  const result = accountUnion({ a, b, union })
+  if (!result.ok) return { ok: false, errors: [formatAccounting(result)] }
+  return { ok: true, summary: summaryLine(result), errors: [] }
+}
+
+/**
  * Build the record for `sha`, reading the authoring model from the commit itself.
  * Returns { ok, record, errors } — the caller prints and exits.
  */
@@ -107,15 +145,56 @@ export function buildRecord({
   point = '',
   mode = '',
   framing = '',
+  mergedBy = '',
+  mergeFallback = '',
+  accounting = '',
+  unionPath = '',
+  listAPath = '',
+  listBPath = '',
   now = Date.now(),
   resolve = resolveCommit,
+  countUnion = countUnionFiles,
 } = {}) {
   // A MISSING --record NEVER REACHES GIT (point 540). With an empty sha the
   // resolve step used to answer `fatal: ambiguous argument '^{commit}'` from
   // deep inside git, so the one refusal that names what the command wants — the
   // usage block below — was the one the caller never saw.
   if (!String(sha).trim()) {
-    return { ok: false, errors: validateRecord({ sha: '', model, verdict, evidence, mode, framing }).errors }
+    return {
+      ok: false,
+      errors: validateRecord({
+        sha: '',
+        model,
+        verdict,
+        evidence,
+        mode,
+        framing,
+        mergedBy,
+        mergeFallback,
+        accounting,
+      }).errors,
+    }
+  }
+  // THE RECEIPT IS COUNTED HERE WHERE IT CAN BE (four-eyes review, third round):
+  // a typed `--accounting` line is a claim, and the recorder can turn it into a
+  // measurement by reading the two lists and the union itself. Hand the files to
+  // `--union/--list-a/--list-b` and the line is COMPUTED, not believed.
+  const paths = [
+    ['--union', unionPath],
+    ['--list-a', listAPath],
+    ['--list-b', listBPath],
+  ]
+  const missing = paths.filter(([, v]) => !String(v ?? '').trim()).map(([flag]) => flag)
+  let source = 'stated'
+  let receipt = accounting
+  if (missing.length < paths.length) {
+    if (missing.length) {
+      return { ok: false, errors: [`counting the union needs all three files; missing ${missing.join(' and ')}`] }
+    }
+    const counted = countUnion({ unionPath, listAPath, listBPath })
+    if (!counted.ok) return { ok: false, errors: counted.errors }
+    receipt = counted.summary
+    source = 'computed'
   }
   const commit = resolve(sha)
   const check = validateRecord({
@@ -124,8 +203,14 @@ export function buildRecord({
     verdict,
     evidence,
     authoredBy: commit.authoredBy,
+    // EVERY model named in the trailers, not only the first: two co-authors mean
+    // two list authors, and the merger has to be neither (four-eyes, point 634).
+    authors: commit.authors,
     mode,
     framing,
+    mergedBy,
+    mergeFallback,
+    accounting: receipt,
   })
   const errors = [...check.errors]
   // Optional, but never sloppy: a mistyped point number would record a review
@@ -151,6 +236,16 @@ export function buildRecord({
       // outlives the CLI that wrote it.
       mode: String(mode).trim(),
       ...(String(framing).trim() ? { framing: String(framing).trim() } : {}),
+      // WHO FOLDED THE TWO LISTS (point 634). A blind-parallel record carries it
+      // — the merge is the one step where a finding can vanish, so the model
+      // that wrote neither list does it and the record NAMES that model. Rows
+      // written before this flag carry none, and read as unrecorded.
+      ...(String(mergedBy).trim() ? { mergedBy: String(mergedBy).trim() } : {}),
+      ...(String(mergeFallback).trim() ? { mergeFallback: String(mergeFallback).trim() } : {}),
+      // The count itself, so the ledger holds the receipt and not only the claim
+      // — and WHERE it came from: `computed` was measured from the files here,
+      // `stated` was typed by whoever ran the merge.
+      ...(String(receipt).trim() ? { accounting: String(receipt).trim(), accountingSource: source } : {}),
       ...(wanted ? { point: Number(wanted) } : {}),
       at: now,
       atIso: new Date(now).toISOString(),
@@ -169,6 +264,7 @@ export function resolveCommit(sha) {
     sha: resolved || full,
     subject: subject ?? '',
     authoredBy: modelFromTrailers(trailers),
+    authors: modelsFromTrailers(trailers),
   }
 }
 
@@ -177,6 +273,8 @@ export const usage = () =>
   `usage: node scripts/mechanism-review.mjs --record <sha> --model <name> ` +
   `--verdict <${VERDICTS.join('|')}> --evidence "<one line>" \\\n` +
   `           --mode <${MODES.join('|')}> [--framing "<one line>"] [--point <N>]\n` +
+  `           --merged-by "<model>" --accounting "<the blind-merge summary line>" \\\n` +
+  `           [--merge-fallback "<which model was unavailable>"]           (blind-parallel)\n` +
   `       node scripts/mechanism-review.mjs --list        (the recorded reviews)\n` +
   `\n--mode names which half of the four-eyes principle this verdict covers ` +
   `(CLAUDE.md §6):\n` +
@@ -186,6 +284,19 @@ export const usage = () =>
   `                       same inputs without seeing each other's result\n` +
   `--framing records how a second blind run by the SAME model was decorrelated, and\n` +
   `       belongs to blind-parallel alone.\n` +
+  `--merged-by names the model that folded the two lists into the union — the one that\n` +
+  `       wrote NEITHER of them, because a merge can lose a finding silently — and the\n` +
+  `       COUNT says none did. Hand over the FILES and it is counted here:\n` +
+  `       --union <U.json> --list-a <A> --list-b <B>   (preferred; --accounting then\n` +
+  `       needs no value). Or run node scripts/blind-merge.mjs first and pass the line\n` +
+  `       it prints as --accounting "<summary>".\n` +
+  `\nWHO REVIEWS (CLAUDE.md §6): the OTHER vendor, never an author of the range.\n` +
+  `       Claude authored it → GPT-5.6 Sol at reasoning effort high, and when Sol is\n` +
+  `       unavailable the first of Fable 5 / Opus 5 / Opus 4.8 that wrote no part of it.\n` +
+  `       SOL authored it → the first of Opus 5 / Fable 5 / Opus 4.8 that wrote no part\n` +
+  `       of it, which also runs the suites, judges the picture and lands the point.\n` +
+  `       Run it — never a hand-typed codex line — with:\n` +
+  `       node scripts/review-sol.mjs --sha <sha> --brief "<what to judge>"\n` +
   `\nThe GATES are separate commands and answer --status themselves:\n` +
   `       node scripts/mechanism-review-guard.mjs --status\n` +
   `       node scripts/criticality-review-guard.mjs --status`
@@ -216,7 +327,9 @@ if (isMainModule(import.meta.url)) {
             // A row from before --mode existed has none; it reads as unrecorded,
             // never as one of the two modes.
             `[${r.mode || 'mode not recorded'}]  ${r.atIso ?? ''}` +
-            `\n      ${r.evidence ?? ''}${r.framing ? `\n      framing: ${r.framing}` : ''}`,
+            `\n      ${r.evidence ?? ''}${r.framing ? `\n      framing: ${r.framing}` : ''}` +
+            `${r.mergedBy ? `\n      union merged by: ${r.mergedBy}${r.mergeFallback ? ` (two-model fallback: ${r.mergeFallback})` : ''}` : ''}` +
+            `${r.accounting ? `\n      accounting: ${r.accounting}` : ''}`,
         )
       }
       process.exit(0)

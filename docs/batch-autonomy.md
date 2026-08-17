@@ -324,19 +324,53 @@ what changed is that ending became a legal way to finish a turn.
 
 How it works:
 
-1. The session merges the point, ticks it on `main`, lets any delegated agent pool
-   DRAIN (a subagent lives inside the session — ending mid-flight throws its
-   unfinished work away, and only its pushed commits survive), and then runs
-   `node scripts/batch-boundary.mjs <point>`. That command REFUSES unless the work
-   order confirms the point closed and the launcher is armed, so the session
-   finds out at the boundary rather than at a blocked turn end. On success it
-   writes `.claude/batch-boundary.json` (session id + point + timestamp).
+1. The session merges the point and ticks it on `main`. The condition is "the
+   point I was LANDING is landed" (point 675) — a delegated author still
+   building does NOT hold the boundary: when its checkpoints are committed AND
+   pushed, its in-flight declaration is transferred at the commit and the
+   successor ADOPTS it (`node scripts/batch-in-flight.mjs --adopt`, expired or
+   contradicted evidence alerting loudly). ADOPTION IS THE SUCCESSOR'S VERB
+   ALONE: the session named in the record's `transfer.by` is refused for good —
+   not merely while its marker is fresh, since a session that could adopt its own
+   handover an hour later would have handed over and kept working, which is the
+   defeat this whole point closes. Under a live commit the way back is
+   `batch-boundary.mjs --clear`; past it the record is mutable again, so genuinely
+   resumed work is RE-DECLARED (`--waiting-on …`) rather than recorded as a
+   handover that never happened. A session under its OWN committed marker adopts
+   nothing behind that seal whoever transferred the record — adoption writes the
+   declaration under the adopter's identity, which is declaring a wait, the very
+   thing the seal denies. Work WITHOUT a pushed checkpoint
+   blocks the handover with named recovery choices and drains first
+   (`--handover-check` tells the two states apart). The boundary is TWO-PHASE
+   (point 675 closed the marker-deletion defeat): `node scripts/batch-boundary.mjs
+   --prepare <point>` validates the condition and names ALL the bookkeeping (the
+   card, the publish) while writing NO marker — so the bookkeeping can no longer
+   delete one, only a RECEIPT (`.claude/batch-boundary-prepared.json`) that
+   `--commit` requires for its own session, cause and point, since a phase that
+   can be skipped is not a phase; a withdrawal (`--clear`) drops it, so a
+   re-taken boundary starts at phase one again. The receipt also records the
+   handover cards ALREADY on the board, and the commit reads the board for a
+   card of this cause and destination that is NOT one of them — the board's
+   undated `Stand HH:MM` cannot tell a leftover card from a fresh one, and a
+   handover the board does not explain is the half of the mechanism the reader
+   sees — and `--commit <point>` is the
+   session's LAST repository action:
+   it writes a SEALED `.claude/batch-boundary.json` (phase `committed`), and any
+   later mutation is DENIED loudly (`--clear` is the deliberate way back; the
+   user's own prompt still withdraws). Both refuse unless the work order
+   confirms the point closed and the launcher is armed, so the session finds out
+   at the boundary rather than at a blocked turn end. The CONTEXT WATERMARK
+   closes the third defeat: past 150k measured context tokens
+   (`scripts/context-watermark.mjs`, read from the session's own transcript — an
+   unobtainable reading fails loudly, never silently) the guard demands the same
+   two-phase handover with `--context` in place of a point, and the board card
+   names the watermark as the reason.
 2. At the turn end `batch-progress-guard` re-judges the claim itself — the marker
    is a claim, not proof. It ALLOWS the stop only when the point is closed per
-   `TASKS.md` + `docs/tasks-archive.md`, the marker is fresh and belongs to this
-   session, and the launcher reports an armed state — `Get-ScheduledTask -TaskName
-   HoA-Batch-Autostart` on Windows, the daemon's own record on Linux. It then
-   consumes the marker.
+   `TASKS.md` + `docs/tasks-archive.md` (or the marker records a real watermark
+   reading), the marker is fresh and belongs to this session, and the launcher
+   reports an armed state — `Get-ScheduledTask -TaskName HoA-Batch-Autostart` on
+   Windows, the daemon's own record on Linux.
 3. Anything else blocks exactly as before: a point still open, a stale or foreign
    marker, an unhandled parallel-session alert, an unparseable work order — and,
    the important one, an **unarmed launcher**. A disabled launcher must never be
@@ -1777,7 +1811,7 @@ unreadable page is **never** called current.
     node scripts/board-queue.mjs import      # take over cards the data file lacks
     node scripts/board.mjs title <N> "…"     # retitle a now- OR queue card
     node scripts/board.mjs none "<Grund>"    # the gap card, with NO point to close
-    node scripts/board.mjs closing "<Grund>" # …still owed: the closing duties
+    node scripts/board.mjs closing <N> "<Grund>"  # …still owed: its closing duties
 
 **Every text goes in on stdin, and a flag is never prose.** `--text-stdin` now
 fills whichever field it follows in both commands, `--none`'s reason included —
@@ -1821,14 +1855,34 @@ and `none` rewrites only the reason, never the title. Measured 07.08.2026: a
 finished retrospective refresh could not be committed, filing the point about it
 was itself blocked, and the session raised the next queue point early just to get
 a card it could stand behind — working AROUND the guard, the one thing this chain
-cannot afford. `board.mjs closing "<Grund>"` writes an unnumbered third state
-card ("Abschlussarbeiten zum gerade beendeten Punkt"). It is not the claim to
-stop, so the duties go through; it replaces whichever state card stands and a
-promotion sweeps it away, like the other two; the card guards read it as the
-unnumbered card it is, so naming the point it closes is no cross-reference; the
-publish-time structure gate refuses a section that mixes two kinds or stacks one;
-and `batch-boundary.mjs` still prints `board.mjs none`, so the claim to stop is
-made exactly once, at the end.
+cannot afford. `board.mjs closing <N> "<Grund>"` writes the third state card. It
+is not the claim to stop, so the duties go through; it replaces whichever state
+card stands and a promotion sweeps it away, like the other two; the publish-time
+structure gate refuses a section that mixes two kinds or stacks one; and
+`batch-boundary.mjs` still prints `board.mjs none`, so the claim to stop is made
+exactly once, at the end.
+
+**EVERY CARD NAMES ITS POINT AND ITS SUBJECT (point 655, user 11.08.2026).** The
+closing card's title was one constant sentence — "Abschlussarbeiten zum gerade
+beendeten Punkt" — so on the phone it named the STAGE and nothing else, and the
+one screen the reader has said neither which point had ended nor what it was
+about. Every current-work card therefore carries the same numbered CHIP the queue
+cards use plus a title naming the subject; `closing <N>` composes "<Betreff>:
+Abschlussarbeiten" from the subject the board already knows (`--title` supplies
+one for a point that stands nowhere any more) and leads the body with that
+subject before the owed duties. Because the title is per point, the matchers that
+find and REPLACE a state card key on a `data-state` marker rather than the
+literal text — the two must change together or the card becomes unfindable and
+its state can never be replaced. The publish gate refuses a card with no chip, a
+title that is only a stage word (`Abschlussarbeiten`, `Nacharbeit`,
+`Vorbereitung`, `Aufräumen` and their English forms), and — for the ONE
+deliberately unnumbered card, the handover card, which belongs to no point — a
+text that names no follow-on point or a shape that is not the handover card's at
+all. Every `board.mjs` edit AND the publish itself lift a card written before the
+chip into the new shape, so the strict demand traps no board and nothing is ever
+repaired by hand; a card that carries no number counts as a STATE card, so
+writing one replaces it whatever it says, and every refusal names a command that
+actually repairs the card it refused.
 
 **A READ IS JUDGED AS ONE (point 473).** The first classifier matched regexes over
 the whole command STRING, and within minutes it denied two pure reads: a `grep` of
@@ -1909,12 +1963,74 @@ deadlock). `board.mjs queue` is a different command — it MOVES a current-work
 card back — and it throws on a point that has no card at all, which is precisely
 the case the refusal catches.
 
+**An appended point is ranked ONCE, deliberately** (point 590, 09.08.2026). With
+the queue's sequence derived from the work order (point 608), the END of that
+order is what the user sees — and append-and-defer puts every new point there by
+DEFAULT, which is not a judgment: the freshly appended 589 sat at the very back
+although the user wanted it worked at once. So `queue-order-guard` refuses to end
+the turn that appended a point until its rank was settled, one of two ways: MOVE
+the point's block inside `TASKS.md` to where it belongs (verbatim, with its
+number — one edit, visible in the diff), or record that last is right with `node
+scripts/queue-rank.mjs --ranked <N> --why "<one line>"`. One decision per new
+point, at the moment its content is freshest.
+
+WHICH POINT COUNTS AS APPENDED is read off PROVENANCE, never off the numbers or
+the positions (three cross-vendor passes refuted every position heuristic). The
+tracked record `.claude/queue-rank.json` — tracked, because a clone that
+inherited nothing would re-ask about every point ever appended — carries the
+deliberate decisions AND a `settled` baseline: the open set as it stood the last
+time no rank question was outstanding. A point is new exactly when it is missing
+from that set. Position could not tell the difference: a point left standing last
+because the point behind it CLOSED was asked about though nobody had appended
+anything, and points appended in DESCENDING order (`[9, 5]` plus the reopened 4,
+then 3) hid behind the running-maximum walk that questioned only the last of
+them. A new point standing BEFORE one the baseline remembers was placed
+deliberately and is not asked about; a REOPENED point re-entering at the end is
+asked like any append, and so is a new point placed before another new one — two
+points appended in one turn arrive exactly like that, and reading that as a
+judgment would let the earlier of them through unasked. The baseline moves only
+while nothing is outstanding (`settleRecord`, which the guard runs at the turn
+end), and it is only ever ARMED by hand (`--seed --why`), which is also what a
+checkout carrying no baseline is asked for once, instead of the gate falling
+silent there. RESIDUAL, taken deliberately: an order that reads as EMPTY settles
+nothing, so where the work order really is empty the baseline FREEZES and the
+last point of a finished batch is never asked about again when it reopens. The
+alternative — letting an empty read erase the baseline — hands back every open
+point as an append the moment the file reads badly, and nothing can tell a
+finished work order from a mangled one without guessing. A record that does not
+PARSE is torn: the gate stays quiet — every
+guard here is fail-open — while the CLI refuses to write over it, and a `ranked`
+entry without a reason is no decision and is dropped. Whether the gate is armed
+is read off `settled` alone, so an emptied `ranked` cannot pose as a fresh
+checkout. The decision logic is pure in `scripts/queue-rank-core.mjs`, which
+imports nothing: it judges provenance, `board-queue-core.mjs` renders the order,
+and neither owns a copy of the other's fact.
+
 The watchdog runs as its own process (`scripts/board-watchdog.mjs`), called by
 the launcher. That is not tidiness: on this platform a `process.exit()` after any
 `fetch` tears undici's socket down mid-close and ABORTS the process
 (`UV_HANDLE_CLOSING`, exit 127 — measured). The launcher exits that way at
 fifteen points, so it holds no fetch at all, and the child cannot take a
 resurrection down with it.
+
+**A failed fetch is not a board that is gone** (point 562). On 08.08.2026 at
+13:39 a flickering probe climbed the escalation ladder and PAUSED the whole
+batch: `.claude/batch-launcher.log` shows `board: unreachable — fetch failed`
+interleaved with successful probes of the same URL, while a counter-probe
+answered HTTP 200 and `board-publish.mjs --check` reported CURRENT. Four rules
+now separate the flicker from the outage, all pure in
+`scripts/board-probe-core.mjs`: a failed probe is **retried at once** (briefly
+spaced) before it counts as anything; a failed currency probe is **corroborated
+against the other transport** — raw.githubusercontent.com carries the
+fingerprint, the Pages viewer is what the reader opens — and while either
+answers the fault is a TRANSPORT hiccup, reported at `default` priority, which
+the ladder may never pause on (`PAUSE_MIN_PRIORITY`); only **consecutive** full
+failures count, one success anywhere resetting the streak, which the launcher
+carries between ticks (`--streak`); and only at `UNREACHABLE_STREAK` consecutive
+full failures does the board count as unreachable — the one verdict that still
+climbs to the pause, because that is what a real outage is for. The alert names
+which of the two happened, since a failed fetch says nothing about the board's
+currency and only staleness is worth waking anybody for.
 
 **What each layer buys, honestly.** The due mark (`lock-heartbeat-hook.mjs`)
 notices a changed open-point set after any tool call and persists `publishDue`,
@@ -1942,7 +2058,7 @@ raw file opened straight from disk):
 
 | property | owner | what enforces it |
 |---|---|---|
-| the queue's titles, prose, estimates and **the user's order** | `.claude/board-queue.json`, projected over the work order by `board-queue.mjs` | the data file is the only home of the order; `queueOrder` appends anything unlisted by number, which is explicitly *not* the user's prioritisation |
+| the queue's titles, prose and estimates | `.claude/board-queue.json`, projected over the work order by `board-queue.mjs` | the data file holds no sequence at all (point 608): the order is DERIVED from the open points of `TASKS.md`, and `queue-order-guard` blocks a rendered sequence that disagrees with it |
 | the 30-second self-refresh | `board-refresher-core.mjs`, embedded verbatim | `structureViolations` refuses a board without it; jsdom runs it against both page shapes |
 | the phone viewport | a `<meta name="viewport">` in the fragment itself | `structureViolations` → `viewport-missing` |
 | prose instead of placeholders | the generator's stub is a stop-gap, not a resting state | `dashboard-guard-core` → `queue-stubbed` above a quarter of the cards or three in a row |

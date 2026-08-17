@@ -40,9 +40,12 @@ export const BG_WAIT_CEILING_OVERRIDE_ENV = 'HOA_BG_WAIT_CEILING_MS'
 /** 0 = wait indefinitely (the runtime's own documented value). */
 export const BG_WAIT_CEILING_DEFAULT = '0'
 
-/** Model policy (CLAUDE.md §6, 25.07.2026): Opus 5 is the worker at any
- *  difficulty, the fallback CHAIN is Opus 5 → Fable 5 → Opus 4.8. The CLI takes a
- *  single --fallback-model, so Fable is wired as the first fallback; the
+/** Model policy (CLAUDE.md §6, 25.07./12.08.2026): the fallback CHAIN is
+ *  Opus 5 → Fable 5 → Opus 4.8, so the SESSION this launcher spawns is Opus 5.
+ *  That is the spawn, not the whole policy: the hard cases — work judged
+ *  difficult, complex or error-prone — are DELEGATED to Fable 5 from the start by
+ *  the session itself, which is a choice no `--model` flag here can make. The CLI
+ *  takes a single --fallback-model, so Fable is wired as the first fallback; the
  *  model-guard Stop hook enforces the allowlist from inside either way. */
 export const SPAWN_MODEL = 'claude-opus-5[1m]'
 export const SPAWN_FALLBACK_MODEL = 'claude-fable-5'
@@ -115,15 +118,22 @@ export const RESUME_PROMPT =
   'abgehakt, committet und gepusht — folgt die Punktgrenze; bei Rot wird zuerst der genannte Schritt ' +
   'repariert. ' +
   'Dashboard-Guard + ' +
-  'prep-guard gruen halten, Vorarbeit waehrend jeder Validierung. WARTEN IST SICHTBAR (28.07.2026): ' +
-  'waehrend ein delegierter Agent baut, POLLE innerhalb des Zuges (TaskOutput, Branch-Tip, Logdatei) ' +
-  'statt still zu sitzen — jeder Werkzeugaufruf frischt den Heartbeat, und eine still wartende Sitzung ' +
-  'ist von einer toten nicht zu unterscheiden; kannst du im Zug nicht weiter pollen, deklariere die ' +
-  'Wartestellung mit `node scripts/batch-in-flight.mjs --waiting-on ...`. PUNKT-GRENZE (27.07.2026): der ' +
-  'Kontext ist der groesste Kostenfaktor des Batches — wenn der gemergte und abgehakte Punkt fertig ist ' +
-  'UND kein delegierter Agent mehr laeuft (Pool erst leerlaufen lassen), fuehre `node ' +
-  'scripts/batch-boundary.mjs <punkt>` aus und BEENDE die Session, statt den naechsten Punkt in denselben ' +
-  'Kontext zu ziehen; der OS-Task startet die naechste Session. Halte sonst NICHT still an. Wenn ein git ' +
+  'prep-guard gruen halten, Vorarbeit waehrend jeder Validierung. WARTEN IST SICHTBAR, ABER NICHT DURCH ' +
+  'POLLEN (28.07.2026, praezisiert 10.08.2026): laeuft eine Suite oder baut ein delegierter Agent, WARTE ' +
+  'BLOCKIEREND — `node scripts/verify/run-wait.mjs --await` ist EIN Aufruf, der mit der Quittung des Laufs ' +
+  'zurueckkommt, und `--plan <tier>` sagt vorher, ob ein blockierender Aufruf ueberhaupt reicht. Eine ' +
+  'Poll-Schleife ist verboten: gemessen 10,9 % der gewichteten Ausgabe, laengste Kette 437 Antworten fuer ' +
+  'ein Wort. Sichtbar bleibt die Wartestellung trotzdem — der PostToolUse-Hook setzt die ' +
+  'In-Flight-Markierung, solange ein Lauf nachweislich laeuft, und nimmt sie zurueck, sobald er vorbei ist. ' +
+  'Dauert der Lauf laenger, als ein blockierender Aufruf dauern darf, deklariere die ' +
+  'Wartestellung mit `node scripts/batch-in-flight.mjs --waiting-on ...`. PUNKT-GRENZE (27.07.2026, ' +
+  'zweiphasig seit Punkt 675): der Kontext ist der groesste Kostenfaktor des Batches — sobald der Punkt, ' +
+  'den du gelandet hast, gemergt und abgehakt ist, fuehre `node scripts/batch-boundary.mjs --prepare ' +
+  '<punkt>` aus, erledige dessen Buchhaltung, dann `--commit <punkt>` als LETZTE Repository-Aktion, und ' +
+  'BEENDE die Session, statt den naechsten Punkt in denselben Kontext zu ziehen; ein noch bauender Agent ' +
+  'mit gepushten Checkpoints wird dabei an den Nachfolger uebergeben (`--adopt`), und die ' +
+  'Kontext-Wassermarke erzwingt dieselbe Uebergabe auch ohne gelandeten Punkt (`--context`). Der OS-Task ' +
+  'startet die naechste Session. Halte sonst NICHT still an. Wenn ein git ' +
   'push scheitert, schreibe .claude/push-failed und benachrichtige via scripts/notify.mjs. WICHTIG: Wenn ' +
   'der SessionStart-Hook meldet, dass eine ANDERE Session den Batch-Lock haelt (STAND DOWN), dann arbeite ' +
   'NICHT am Batch und beende dich sofort. Wenn alles erledigt ist: Closing fahren. ' +
@@ -825,4 +835,77 @@ export function judgeSpawnOutcome({
  */
 export function announceSpawn({ quota = null } = {}) {
   return !quota
+}
+
+/**
+ * SHOULD THIS TICK START A FIREWALL TOP-UP? PURE.
+ *
+ * The container's egress allowance is an ipset of RESOLVED IPs, so it ages out
+ * under a running container and the tick re-resolves it. Only one top-up may run
+ * at a time, and the previous one's pid is written down — but a MISSING record is
+ * the normal first tick of a fresh container, not a fault. Reading it threw there,
+ * which took the whole spawn with it and made the first failure permanent: the pid
+ * file is only written after a spawn that never happened. Measured 12.08.2026 —
+ * the top-up had not run once since the container came up, and the allowance for
+ * api.openai.com aged out twice under it.
+ *
+ * A LIVE PID IS NOT PROOF OF OUR CHILD either: after pid reuse an unrelated
+ * long-lived process would suppress the top-up for as long as IT lives. So the
+ * record only counts while the process it names really IS a top-up.
+ *
+ * @param {{pidText: string|null, cmdlineOf: (pid: number) => string|null}} io
+ *   `pidText` is the recorded pid file's content (null when there is none);
+ *   `cmdlineOf` answers what a pid actually is (null when it cannot be read).
+ * @returns {{start: boolean, reason: string, pid: number}}
+ */
+export function firewallTopUpDecision({ pidText = null, cmdlineOf = () => null } = {}) {
+  const pid = Number(String(pidText ?? '').trim()) || 0
+  if (pid > 0) {
+    const cmdline = cmdlineOf(pid)
+    if (cmdline && cmdline.includes('firewall-allow')) {
+      return { start: false, reason: `still running (pid ${pid})`, pid }
+    }
+    return { start: true, reason: `the recorded pid ${pid} is not a top-up any more`, pid }
+  }
+  return { start: true, reason: 'no top-up on record', pid: 0 }
+}
+
+// --- THE PUBLISHED PROMISE MUST NOT AGE UNWATCHED (point 661) ------------------
+// The in-flight refusal (batch-in-flight-core.mjs) bounds the staleness of a
+// now-card's "~HH:MM" while a session is waiting — but only while a session
+// exists to re-declare. The launcher tick is the layer that still speaks in the
+// ownerless case, so it calls out a PUBLISHED board whose current-work promise
+// lies more than one tick in the past. A log line in the board watchdog's style,
+// never a spawn reason and never a failure: the launcher's job is resurrecting
+// the batch, and a stale promise may not get in that job's way.
+
+/** How far past a published "~HH:MM" may stand before the tick calls it out:
+ *  one launcher tick — anything younger may simply not have been seen yet. */
+export const ETA_OVERDUE_ALERT_MIN = 15
+
+/**
+ * The launcher's log line for overdue published promises, or null when there is
+ * nothing to say. PURE, pinned like its board-behind sibling. `overdue` is the
+ * watchdog child's `etaOverdue` — `pastEtaCards` of the LIVE page — and anything
+ * malformed answers null (the child is a separate process; its output is data,
+ * not trusted structure).
+ */
+export function staleEtaLogLine({ overdue, tickMin = ETA_OVERDUE_ALERT_MIN } = {}) {
+  // No coercion (Sol review, point 661): a numeric STRING is malformed child
+  // output, and malformed answers nothing — `Number("16")` would alert on it.
+  const stale = (Array.isArray(overdue) ? overdue : []).filter(
+    (c) => typeof c?.minutesPast === 'number' && Number.isFinite(c.minutesPast) && c.minutesPast > tickMin,
+  )
+  if (stale.length === 0) return null
+  const cards = stale
+    .map(
+      (c) =>
+        `${Array.isArray(c.points) && c.points.length ? c.points.join(', ') : '?'} ` +
+        `("${c.meta ?? ''}", ${Math.round(c.minutesPast)} min past)`,
+    )
+    .join('; ')
+  return (
+    `board: the published now-card ETA has passed by more than a tick — point ${cards}. ` +
+    'The reader sees a stalled batch; the working session must refresh the "~HH:MM" and republish.'
+  )
 }

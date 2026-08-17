@@ -28,6 +28,12 @@ describe('deps-preflight', () => {
     expect(text).toContain('NOT a defect in the code')
   })
 
+  it('names the WORKTREE repair too — the cause an agent meets on its first command', () => {
+    // A fresh worktree never had node_modules; sending that agent to `npm
+    // install` costs it minutes for what a link does in a second.
+    expect(DIAGNOSIS(['vite'])).toContain('worktree-bootstrap.mjs')
+  })
+
   it('runs ahead of the compiler in the build script, or it can never speak', () => {
     const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'))
     expect(pkg.scripts.build.indexOf('deps-preflight')).toBeLessThan(pkg.scripts.build.indexOf('tsc'))

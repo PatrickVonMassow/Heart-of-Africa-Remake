@@ -1,6 +1,8 @@
 // Global keyboard state: polled by scenes each frame, plus one-shot key events.
 
+import { installKeyboardLock, preventsBrowserChord } from './keyboardGuard'
 import { createEngageLatch } from './touchInput'
+import { UNSTUCK_KEY_CODE } from './unstuck'
 
 const pressed = new Set<string>()
 
@@ -16,11 +18,18 @@ function isTypingTarget(e: Event): boolean {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('keydown', (e) => {
-    if (isTypingTarget(e)) return
+    const typing = isTypingTarget(e)
+    // A modifier chord on a key the game binds belongs to the game, not to the
+    // browser (work-order 601): holding the label modifier while walking must
+    // not bookmark, print or save the page. The three RESERVED chords
+    // (Ctrl+W/T/N) ignore this — the keyboard lock below is what covers them.
+    if (preventsBrowserChord(e, { typing })) e.preventDefault()
+    if (typing) return
     pressed.add(e.code)
   })
   window.addEventListener('keyup', (e) => pressed.delete(e.code))
   window.addEventListener('blur', () => pressed.clear())
+  installKeyboardLock()
 }
 
 export function isKeyDown(code: string): boolean {
@@ -58,10 +67,23 @@ export function wheelTargetsScene(target: EventTarget | null): boolean {
   return el.closest(SCROLLABLE_OVERLAY_SELECTOR) === null
 }
 
+export interface KeyPressOptions {
+  /**
+   * Ignore a press carrying Ctrl, Alt or Meta (work-order 601). For a key whose
+   * CHORD is left to the browser — the calendar row of §21.1, see
+   * PREVENTED_CHORD_CODES — the handler must stand down, or the one press does
+   * two things at once: Ctrl+3 would switch the browser to tab 3 AND jump the
+   * expedition to March. Shift is not a chord any browser binds, so it still
+   * reaches the handler.
+   */
+  ignoreModified?: boolean
+}
+
 /** Register a keydown handler for a specific code; returns unsubscribe. */
-export function onKeyPress(code: string, cb: () => void): () => void {
+export function onKeyPress(code: string, cb: () => void, options: KeyPressOptions = {}): () => void {
   const handler = (e: KeyboardEvent) => {
     if (isTypingTarget(e)) return
+    if (options.ignoreModified && (e.ctrlKey || e.altKey || e.metaKey)) return
     if (e.code === code) cb()
   }
   window.addEventListener('keydown', handler)
@@ -140,7 +162,9 @@ export function gamepadMove(): { x: number; y: number } {
 
 // Buttons re-enter the keyboard pipeline as synthetic keydown events, so
 // every existing key handler serves the gamepad unchanged.
-const GAMEPAD_BUTTON_KEYS: Record<number, string> = {
+// Exported for the map's own test (src/systems/gamepadMap.test.ts): a binding
+// that exists only in the poll loop cannot be checked without a browser.
+export const GAMEPAD_BUTTON_KEYS: Record<number, string> = {
   0: 'Space', // A: interact / enter (the use key, design.md §17.5)
   1: 'Escape', // B: close dialogs/panels
   2: 'KeyG', // X: dig
@@ -149,6 +173,12 @@ const GAMEPAD_BUTTON_KEYS: Record<number, string> = {
   5: 'KeyC', // RB: camp
   8: 'KeyP', // Select: position query
   9: 'F1', // Start: debug menu
+  // L3 (left stick press): the escape from a wedge (work-order 610). The pad had
+  // no route to it at all, so a pad-only player who was stuck still lost the
+  // expedition — the exact loss the escape exists to prevent. L3 is the button
+  // §17.5's map leaves free, and it sits under the thumb that was pushing him
+  // into the wedge.
+  10: UNSTUCK_KEY_CODE,
 }
 const gamepadButtonDown: Record<number, boolean> = {}
 

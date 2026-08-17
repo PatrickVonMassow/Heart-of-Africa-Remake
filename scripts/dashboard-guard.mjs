@@ -67,9 +67,11 @@ const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
  * Minutes since midnight in Europe/Berlin — the clock the board is written
  * against, so a card's expected end is judged in the reader's timezone rather
  * than the machine's. Returns null when the locale data is unavailable, and the
- * pure check then simply does not run.
+ * pure check then simply does not run. Exported as the ONE copy of this clock:
+ * batch-in-flight.mjs (the wait refusal) and board-watchdog.mjs (the published
+ * ETA alert) judge the same "~HH:MM" promises and must read the same clock.
  */
-function berlinMinutes() {
+export function berlinMinutes() {
   try {
     const s = new Intl.DateTimeFormat('de-DE', {
       timeZone: 'Europe/Berlin',

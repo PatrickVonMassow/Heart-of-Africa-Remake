@@ -31,6 +31,31 @@ the Playwright browser suites against the dev server → the production-preview
 smoke test. The runner itself is `scripts/verify/run-all.mjs`; the three npm
 commands above reach it through the LOGGED wrapper described next.
 
+### In a WORKTREE, bootstrap the dependencies FIRST (points 569/573/606)
+
+```
+node scripts/worktree-bootstrap.mjs      # first command in a new worktree; no-op in the main tree
+```
+
+`node_modules/` is git-ignored, so a git worktree — where CLAUDE.md §6 builds
+every point — checks out without it and **no gate can start**: npm resolves
+`vitest` and `oxlint` from `node_modules/.bin` before a script runs. The
+bootstrap derives the main checkout from git's COMMON directory
+(`git rev-parse --git-common-dir`, whose parent is the main working tree), and
+links its `node_modules` when the two `package-lock.json` files are byte
+identical — seconds instead of a per-worktree install. A branch that CHANGED the
+lockfile gets a real `npm ci` instead, because linking would silently verify
+against the wrong dependency tree. The decision table is pure in
+`scripts/worktree-bootstrap-core.mjs`.
+
+Remove such a worktree only with `scripts/worktree-cleanup.mjs`: it DETACHES the
+link first, where `git worktree remove` and `rm -rf` follow it and delete the
+main tree's dependencies.
+
+**Anything a test SPAWNS resolves through `scripts/local-bin.mjs`, never through
+`process.cwd()`.** That is the fix behind those points and the rule that keeps
+them fixed — see "A spawn that never ran is not a rejection" below.
+
 ### The run's output goes to a FILE, the caller reads a digest (point 373 e)
 
 `npm test`, `npm run test:small` and `npm run test:large` run through
@@ -73,6 +98,75 @@ Which lines survive is the pure module `scripts/verify/run-digest-core.mjs`,
 pinned by `run-digest-core.test.mjs` in the Vitest layer — including the
 asymmetry that matters: an indented block continuing a `#` heading is kept (the
 quiet-machine report), an indented failure dump following a verdict line is not.
+
+### A run is AWAITED, never polled (point 592)
+
+Measured over six days (09.08.2026): **2857 responses were polls — 10.9 % of the
+weighted spend** — and another 1189 were bare idle holders (3.6 %). The longest
+unbroken poll chain was **437 responses** for a result that is one word, and a
+42-minute LARGE run polled every 30 s costs ~1.9 M weighted **for the loop
+alone**. So the loop is gone, and three things replace it.
+
+**1. Ask what the run costs before you start it.**
+
+```
+node scripts/verify/run-wait.mjs --plan large    # or small, or a suite name
+```
+
+It answers from the measured medians of `docs/picture-check-cost.md` §1 (kept in
+lockstep by `run-wait-core.test.mjs`, which parses that table back out): how long
+the run is expected to take, how many frames it owes, and — the decision that
+matters — whether it may be **one blocking foreground call** at all, or is longer
+than a shell call may run and has to go to the **background**, where the harness'
+own completion notification announces the exit.
+
+**2. Await it.**
+
+```
+node scripts/verify/run-wait.mjs --await [<log>] [--timeout <s>]   # ONE blocking call
+node scripts/verify/run-wait.mjs --receipt [<log>]                 # a finished run, again
+```
+
+`--await` returns when the run is over and prints its receipt; neither counts as
+a poll, because nobody looked. With no `<log>` both resolve the newest run.
+
+**3. Where a look is genuinely unavoidable, it is COUNTED.**
+
+```
+node scripts/verify/run-wait.mjs --status [<log>]
+```
+
+The first wait is **0.9 × the measured median**, not 30 s; five looks are the
+whole budget; past **2.5 ×** the expectation the run is *hung*, not slow. Each
+`--status` raises the count, says how many are left, and names the two ways out.
+The count is printed in the receipt, so the rule is visible in the transcript
+rather than remembered.
+
+**The receipt.** `run-logged.mjs` writes a RUN RECORD beside the log
+(`<log>.run.json`) before it spawns anything and closes it with a structured
+receipt: exit code, the backend(s) read off the run's own banners, the suites,
+the `git HEAD` it ran on, the log path, the failing names **uncut**, the polls,
+and **frames expected against frames written**. That last pair is the half point
+375 cannot see — its shutter refuses a frame whose subject is missing, but a
+frame that was never written at all is silent, and a run that photographs 60 of
+its 94 frames exits 0 today. The expectation is a measured **floor** (the table
+of 09.08.2026 plus `startup`'s one frame, which the recorder never logged), so
+*fewer* is the alarm and *more* only means suites have gained frames since.
+
+The **backend** in the receipt is the lane each suite really opened, not the pass
+it sat in: `laneFor` routes `touch`/`voice` to WebGL 2 inside a WebGPU gate, so
+an unpinned `npm test -- voice` reports WebGL 2 and a SMALL run reports both.
+
+**The wait is still visible.** Point 402 (b) demanded polling because a silently
+waiting session was indistinguishable from a dead one. That is now the hook's
+job, not a model turn's: duty (8) of `scripts/lock-heartbeat-hook.mjs` writes the
+`batch-in-flight` declaration while a run is provably going — same file, same
+shape, same evidence `batch-progress-guard` re-probes at every turn end — and
+withdraws it the moment the run is over, so the guard blocks a stop again exactly
+when the result becomes the session's next action. The decision is pure in
+`scripts/wait-marker-core.mjs`; it never overwrites a declaration a person wrote,
+never fires for a non-owner or a paused batch, and refuses a run whose log has
+gone quiet (that is a wedge, not a wait).
 
 ### Host bring-up — once per machine (point 475)
 
@@ -412,6 +506,38 @@ front of each turns one into a declaration.
   section; where they do not, the section repeats the jump itself. Prove it by
   running every section alone once and diffing its checks against the whole
   run's — that sweep is how `calf-jitter` and `elephant-trampling` were caught.
+
+## A spawn that never ran is not a rejection (points 573/606)
+
+Two rules, both from one defect. `scope.test.mjs` resolved its linter as
+`resolve(process.cwd(), 'node_modules/.bin/oxlint')`, which does not exist in a
+worktree — and the suite lied in **both** directions: its ACCEPT cases went red
+for the environment (five per worktree run, which teaches the pool to discount
+red), while its REJECT cases stayed **green**, because a spawn that never started
+exits non-zero exactly like a tool that ran and refused. A lint rule the suite
+exists to keep armed could have rotted away unnoticed.
+
+1. **Resolve through `scripts/local-bin.mjs`**, never through `process.cwd()`.
+   `findLocalBin(name)` walks up from the checkout, then reaches the MAIN working
+   tree via git's common directory (a worktree outside the main checkout has no
+   ancestor holding `node_modules`), then falls back to PATH; nothing found is
+   REPORTED by `describeMissing` — the tool and every directory searched — not
+   guessed. Where a red would only mean "this machine has no linter", the case
+   SKIPS with that reason printed: a red must mean a defect.
+2. **Establish that the process RAN before reading its exit code.** `didRun()`
+   takes a spawn result and an optional `expect` shape for the tool's OUTPUT
+   (never its NAME — the shell says `oxlint: not found` too), and `NOT_RUN()`
+   words the failure identically everywhere. Any "it rejected" assertion goes
+   through a helper that checks the run FIRST, so a missing binary reports itself
+   instead of being counted as a verdict.
+
+`scripts/verify/spawn-assertion-gate.test.mjs` keeps rule 2 from coming back: it
+reads the test files, and a negative exit-code assertion about a spawned process
+that nothing in its case establishes as having RUN turns it red. It is a pure
+gate in the fast layer — the same build as the frame-subject gate, not another
+Stop hook. Satisfy it by asserting something POSITIVE about that spawn's output
+(`toContain` on its stdout/stderr) or by going through `didRun`; a `.not.toContain`
+proves nothing, because empty output satisfies it.
 
 ## Is the machine QUIET? — before the run (point 296)
 
@@ -825,6 +951,40 @@ non-zero exit on a real regression.
 (`SERVERLESS_SUITES` in `tiers.mjs`; a `docs`-only run starts no vite at all) and
 the baseline runs the baseline tree's OWN copy of it.
 
+## What a fix must PROVE (point 589)
+
+Twelve defects shipped in ONE mechanic whose twelve points had all been accepted
+as finished, and the gate reported green throughout. The cause was not too few
+tests: the tests checked the MECHANISM and not the RESULT. `speechProbe` counted
+the syllables a source PLANNED, so it could not hear the same tone multiplied by
+zero further down the bus; the label tests checked the visibility rule and the
+presence in the DOM, not whether the note stood at the speaker's head; the
+catch-game tests checked the game logic, not whether two children occupied one
+point in space. That is the "green against a proxy" failure CLAUDE.md §7.2 warns
+about — the rule existed, this area did not follow it. Two rules bind every fix
+from here:
+
+**1. Per fix, ONE assertion at the level the player experiences it.** SOUND is
+judged at the END of the chain — the level that actually reaches the output, not
+the level a source planned. POSITION is judged in WORLD space — do two bodies
+overlap, does the note sit within a hand's breadth of the head — not by the rule
+that was supposed to place it. A fix whose assertion can only reach the mechanism
+NAMES IN ITS COMMIT why the result is not assertable; that is a permitted
+outcome, silently asserting the proxy instead is not. The worked example is
+`playSpeech` (`src/systems/ambience.ts`): it asserts the level that actually
+LEAVES the graph — peak × speech bus × master — against the player's own slider,
+because point 577's tone was planned at a perfect level and multiplied by zero
+one node further down, with every plan-level measurement green.
+
+**2. One PLAY ACCEPTANCE per package.** A package of play-session fixes is not
+finished by its suites. The parts were each accepted and the COMPOSITION never
+was — nobody ever stood in the village as a player, with sound, for two minutes.
+So the MERGED result is entered as a player — the scene, the sound, two minutes —
+and what was SEEN and HEARD is recorded with the merge.
+
+And for anything time-dependent, neither rule reaches far enough: see the
+long-run alarm below.
+
 ## Adding tests for a new feature (do this every time)
 
 Every new feature must get a test on **one or both** layers — pick by what the
@@ -844,6 +1004,30 @@ test observes:
 
 Never add a store/logic/HUD-text assert to Playwright when it can live in
 Vitest — that is exactly the coupling this split removed.
+
+### A system that must KEEP PRODUCING carries a long-run alarm (point 589)
+
+Twelve defects shipped in one mechanic whose twelve points had all passed their
+gates, and one of them — the adults falling permanently silent after minutes —
+was out of reach of every suite by construction: a suite simulates seconds. So
+the running game measures it. `watchProducer` (`src/systems/devAssert.ts`) is the
+existing assert channel's LONG-RUN family: a producer that has emitted nothing
+for longer than its own specified window raises the ordinary `console.error`,
+which every suite's console gate fails on and every manual session shows. Wired
+so far: `errands-silent` (the adults' utterances and the errands they stage),
+`tag-silent` (the children's play — a catch or a fresh round), and
+`child-speech-silent` (what the children say). `window.__longRun` reports every
+watch live.
+
+Two rules keep it worth having: it judges the OUTPUT (an utterance staged, a
+round played), never the timer that was supposed to produce one; and a producer
+that is legitimately quiet — nobody to speak to, nothing to speak about, a group
+of one — is not judged at all. Each window is a `balance` value, debug-editable,
+and each is covered in the fast layer both ways: a stalled producer trips it, a
+healthy one stays silent through half an hour of simulated play.
+
+When a new system must keep producing, add a watch rather than a test that hopes
+to be looking at the right second.
 
 ## Old → new coverage map
 
@@ -871,7 +1055,7 @@ ported asserts now live in Vitest:
 | `i18n.mjs` | 5 localization screenshots + console gate | `src/i18n/i18n.test.ts`, `src/ui/{StatusBar,JournalPanel,Dialogs,DebugMenu}.test.tsx` |
 | `health.mjs` | vultures at poor condition (RAF) + console gate | `src/state/store.health.test.ts`, `src/ui/Hud.test.tsx` (veil, defeat) |
 | `events.mjs` | touch-a-lion / touch-a-hyena contact (RAF scene) | `src/systems/events.test.ts`, `src/state/store.events.test.ts` |
-| `settings.mjs` | eye-height, in-scene walk measures, `user-select` CSS, lion-feed, ambience/proximity audio, village speech really scheduling audio (§13.4: near vs. out of earshot vs. phrase) and the live sub-bus gains behind it (point 577: the syllables survive `ambientVolume` 0, and only their own slider silences them), Tab focus, TRAA pipeline toggle (rebuild + non-black frame + leak gate, WebGL 2 path), the DEV render-resource leak invariant across scene switches / detail levels / effect toggles incl. a forced real leak (point 295) | `src/config/balance.test.ts`, `src/systems/movement.test.ts`, `src/systems/ambience.test.ts` (the speech scheduling and its bus routing), `src/communication/speaking.test.ts` (pace, pause, attenuation, hearing), `src/state/store.debug.test.ts`, `src/ui/DebugMenu.test.tsx` (incl. the TRAA checkbox) |
+| `settings.mjs` | eye-height, in-scene walk measures, `user-select` CSS, lion-feed, ambience/proximity audio, village speech really scheduling audio (§13.4: near vs. out of earshot vs. phrase) and the live sub-bus gains behind it (point 577: the syllables survive `ambientVolume` 0, and only their own slider silences them), Tab focus, TRAA pipeline toggle (rebuild + non-black frame + leak gate, WebGL 2 path), the DEV render-resource leak invariant across scene switches / detail levels / effect toggles incl. a forced real leak (point 295), the keyboard-lock WIRING (work-order 601: the shipped bundle asks for the lock at the fullscreen + pointer-lock transition and gives it back with either or a hidden tab) | `src/config/balance.test.ts`, `src/systems/keyboardGuard.test.ts` (the chord set and the lock's state machine), `src/systems/movement.test.ts`, `src/systems/ambience.test.ts` (the speech scheduling and its bus routing), `src/communication/speaking.test.ts` (pace, pause, attenuation, hearing), `src/state/store.debug.test.ts`, `src/ui/DebugMenu.test.tsx` (incl. the TRAA checkbox) |
 | `enrichments.mjs` | all wildlife/RAF, drei map/region labels, river/graveyard scene, layout geometry, real WheelEvent, screenshots | `src/systems/movement.test.ts`, `src/state/store.*.test.ts`, `src/ui/{StatusBar,Hud,DebugMenu}.test.tsx` |
 | `voice.mjs` | movement-while-journal-open (scene), TTS read-aloud (assets from the local `.cache/tts/` record-and-replay cache — first run records from the CDNs, later runs are strictly offline; delete the dir to re-prime), the cold-load main-thread liveness gate (see `liveness.mjs`), screenshots | `src/journal/voiceMarkup.test.ts`, `src/i18n/i18n.test.ts`, `src/ui/JournalPanel.test.tsx`, `scripts/verify/liveness.test.mjs` |
 | `touch.mjs` | touch/tablet layer (`hasTouch` context, real CDP touch): guard mounts the overlay on first touch + mobile quality preset, virtual-stick walk, right-half look drag, tappable prompt, two-finger pinch zoom | `src/systems/touchInput.test.ts`, `src/state/ui.test.ts`, `src/ui/Hud.test.tsx` (touch absence/presence), `src/ui/DebugMenu.test.tsx` (SSAO/shadow checkboxes) |
@@ -906,11 +1090,15 @@ its own subject never occurred:
   suite RAY-PROBES clear first (a camera dropped on a fixed bearing lands inside
   a hut in a dense settlement and would photograph a wall), each forced through
   the dev hook `__placeForceGesture` and awaited on the GESTURE's own clock, not
-  the wall clock. Then the ambient conversation is sampled over 60 reads: every
-  live gesture is one of the four kinds, none runs past its own duration, the
-  pair takes turns, and a figure between gestures stands exactly at rest. The
-  state machine itself is pure (`src/render/gesture.test.ts`); only the poses the
-  renderer actually DRAWS need the browser.
+  the wall clock. Then the standing conversation is sampled over 60 reads: since
+  point 580 the pair must be QUIET — it used to cycle the four gestures as
+  ambient dressing with no utterance behind them, a mute pantomime at any
+  distance — so no live gesture may appear, none may run past its own duration,
+  the two never gesture over each other, and a figure that is not speaking stands
+  exactly at rest. The state machine itself is pure
+  (`src/render/gesture.test.ts`), and so is the rule that binds a gesture to the
+  range its utterance carries (`src/communication/spokenGesture.test.ts`); only
+  the poses the renderer actually DRAWS need the browser.
 - **The hypothesis over the speaker's head (point 485).** The label's lifetime
   and its binding to the note are pure Vitest; the browser owes only the
   ATTACHMENT, which no unit test can see. A named inhabitant is made to speak a

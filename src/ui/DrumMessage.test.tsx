@@ -171,7 +171,7 @@ describe('the drums are waited out before the message is understood', () => {
     const plan = drumMessagePlan()
     render(<DrumMessageWatcher />)
     act(() => {
-      useUi.getState().startDrumMessage(plan.duration, performance.now())
+      useUi.getState().startDrumMessage(plan, performance.now())
     })
     act(() => {
       vi.advanceTimersByTime(plan.duration * 1000 - 50)
@@ -191,7 +191,7 @@ describe('the drums are waited out before the message is understood', () => {
     const plan = drumMessagePlan()
     render(<DrumMessageWatcher />)
     act(() => {
-      useUi.getState().startDrumMessage(plan.duration, performance.now())
+      useUi.getState().startDrumMessage(plan, performance.now())
       useUi.getState().setDialog({ kind: 'trade', building: 'market' })
     })
     act(() => {
@@ -205,8 +205,8 @@ describe('the drums are waited out before the message is understood', () => {
     const plan = drumMessagePlan()
     const started = performance.now()
     act(() => {
-      useUi.getState().startDrumMessage(plan.duration, started)
-      useUi.getState().startDrumMessage(plan.duration, started + 5000)
+      useUi.getState().startDrumMessage(plan, started)
+      useUi.getState().startDrumMessage(plan, started + 5000)
     })
     expect(useUi.getState().drumPerformance?.startedAt).toBe(started)
   })
@@ -259,6 +259,7 @@ describe('the chief sends the message (design.md §12 gift condition)', () => {
     expect(useUi.getState().dialog).toBeNull()
     const beating = useUi.getState().drumPerformance
     expect(beating).not.toBeNull()
+    expect(beating!.plan).toEqual(drumMessagePlan())
     expect((beating!.endsAt - beating!.startedAt) / 1000).toBeCloseTo(drumMessagePlan().duration, 6)
     // Nothing is understood yet — the drums have only just started.
     expect(g().drumMessageHeard).toBe(false)

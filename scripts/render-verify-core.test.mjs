@@ -23,7 +23,14 @@ import {
   pointStatusesFrom,
   chargeablePoints,
   chargeFor,
+  chargeReds,
   runVerdict,
+  formatSuspectEnv,
+  parseSuspectEnv,
+  parseSuspectReds,
+  suspectRedsOf,
+  unexplainedRuns,
+  SUSPECT_UNNAMED,
 } from './render-verify-core.mjs'
 import { RED_CHARGES } from './render-verify-charges.mjs'
 import { failedChecks } from './verify/baseline-classify-core.mjs'
@@ -33,7 +40,10 @@ const VERIFY_DIR = join(dirname(fileURLToPath(import.meta.url)), 'verify')
 
 /** A passing run record as the recorder writes it. */
 function run(backend, at, overrides = {}) {
-  return { backend, suite: 'enrichments', startedAt: at - 60_000, at, exit: 0, asserted: true, ...overrides }
+  // `startedAt` sits just before `at`: these fixtures model runs that BEGAN
+  // after the edit they are judged against, which is what a real repair loop
+  // does. The case where a run began BEFORE the edit has its own tests below.
+  return { backend, suite: 'enrichments', startedAt: at - 10, at, exit: 0, asserted: true, ...overrides }
 }
 
 /** The motivating scenario: a committed water-shader change, edited at t=1000. */
@@ -569,7 +579,7 @@ const red = (name, point = null, kind = 'check') => ({ name, key: name.toLowerCa
 const redRun = (backend, at, reds, overrides = {}) => ({
   backend,
   suite: 'polish',
-  startedAt: at - 60_000,
+  startedAt: at - 10,
   at,
   exit: 1,
   asserted: true,
@@ -708,6 +718,390 @@ describe('runVerdict — clean, accounted for, or red', () => {
   })
 })
 
+describe('runVerdict — the run that passed only on the RETRY (point 640)', () => {
+  const openPoints = [506, 546]
+  /** The record the retry writes: it exited 0, and it carries what the FIRST
+   *  attempt failed on. */
+  const suspectRun = (backend, at, names = ['the goat stance — worst travel 0.967'], overrides = {}) => ({
+    ...run(backend, at),
+    suite: 'polish',
+    suspect: true,
+    suspectOf: names,
+    ...overrides,
+  })
+
+  it('calls it SUSPECT even though it exited 0, and never lets it cover', () => {
+    const v = runVerdict(suspectRun('webgpu', 2000), { openPoints })
+    expect(v.status).toBe('suspect')
+    expect(v.covers).toBe(false)
+    expect(coveringRun([suspectRun('webgpu', 2000)], 'webgpu', 1000, { openPoints })).toBeNull()
+  })
+
+  it('names the check the first attempt failed on, so the red is not lost with the log line', () => {
+    const v = runVerdict(suspectRun('webgpu', 2000, ['the goat stance', 'the eaves column']), { openPoints })
+    expect(v.unaccounted).toHaveLength(1)
+    expect(v.unaccounted[0].name).toMatch(/"the goat stance"; "the eaves column"/)
+    expect(v.unaccounted[0].name).toMatch(/RETRY/)
+  })
+
+  it('says so even when the first attempt named no check (a crash, a timeout kill)', () => {
+    expect(runVerdict(suspectRun('webgpu', 2000, []), { openPoints }).status).toBe('suspect')
+  })
+
+  it('BLOCKS a render change whose only evidence is a retry pass, and names the three ways out', () => {
+    const result = evaluate(
+      renderChange({ runs: [suspectRun('webgpu', 2000), suspectRun('webgl', 2000)], openPoints }),
+    )
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/passed only on the RETRY/)
+    expect(result.reason).toMatch(/THREE WAYS/)
+    expect(result.reason).toMatch(/CAUSE is named and fixed/)
+    expect(result.reason).toMatch(/CHARGED/)
+    expect(result.reason).toMatch(/becomes an OPEN point/)
+    expect(result.reason).toMatch(/throttle-probe\.mjs/)
+  })
+
+  it('judges a retry that failed AGAIN on its reds, not on being a retry — a charged red still accounts', () => {
+    const again = { ...redRun('webgpu', 2000, [red('goat stance', 506)]), suspect: true, suspectOf: ['goat stance'] }
+    const v = runVerdict(again, { openPoints })
+    expect(v.status).toBe('accounted')
+    expect(v.covers).toBe(true)
+  })
+
+  it('leaves an ordinary run alone — only the recorded flag makes a run suspect', () => {
+    expect(runVerdict({ ...run('webgpu', 2000), suspectOf: [] }, { openPoints }).status).toBe('clean')
+    expect(runVerdict({ ...run('webgpu', 2000), suspect: false }, { openPoints }).status).toBe('clean')
+  })
+
+  it('is total on a malformed suspect record, and on a null options bag', () => {
+    expect(() => runVerdict({ exit: 0, suspect: true, suspectOf: 'nonsense' }, { openPoints })).not.toThrow()
+    expect(runVerdict({ exit: 0, suspect: true, suspectOf: null }, { openPoints }).covers).toBe(false)
+    expect(() => runVerdict(run('webgpu', 1), null)).not.toThrow()
+    expect(() => coveringRun([], 'webgpu', 0, null)).not.toThrow()
+    expect(() => unexplainedRuns([], 0, null)).not.toThrow()
+    expect(() => chargeFor(red('x'), null)).not.toThrow()
+  })
+})
+
+describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 640)', () => {
+  const openPoints = [506, 546]
+  const suspectRun = (backend, at) => ({ ...run(backend, at), suite: 'polish', suspect: true, suspectOf: ['the goat stance'] })
+  const unfiled = (backend, at) => redRun(backend, at, [red('a NEW check nobody filed')])
+
+  it('BLOCKS although a later clean run of both backends exists — the whole fourth route', () => {
+    const result = evaluate(
+      renderChange({
+        runs: [unfiled('webgpu', 1500), run('webgpu', 2000), run('webgl', 2100)],
+        openPoints,
+      }),
+    )
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/UNEXPLAINED RED/)
+    expect(result.reason).toMatch(/A LATER GREEN DOES NOT CLOSE IT/)
+    expect(result.reason).toMatch(/a NEW check nobody filed/)
+  })
+
+  it('blocks the same way when the failure was a retry pass followed by a clean run', () => {
+    const result = evaluate(
+      renderChange({ runs: [suspectRun('webgpu', 1500), run('webgpu', 2000), run('webgl', 2100)], openPoints }),
+    )
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/passed only on the RETRY/)
+  })
+
+  it('blocks a clean run that a SUSPECT run followed — the order does not matter', () => {
+    const result = evaluate(
+      renderChange({ runs: [run('webgpu', 1500), run('webgl', 1600), suspectRun('webgpu', 2000)], openPoints }),
+    )
+    expect(result.decision).toBe('block')
+  })
+
+  it('names the three ways out and the throttle probe, and offers the loud deferral', () => {
+    const { reason } = evaluate(
+      renderChange({ runs: [unfiled('webgpu', 1500), run('webgpu', 2000), run('webgl', 2100)], openPoints }),
+    )
+    expect(reason).toMatch(/CAUSE is named and FIXED/)
+    expect(reason).toMatch(/CHARGED in scripts\/render-verify-charges\.mjs/)
+    expect(reason).toMatch(/becomes an OPEN point/)
+    expect(reason).toMatch(/throttle-probe\.mjs polish --section=<name> --runs 8/)
+    expect(reason).toMatch(/--defer/)
+  })
+
+  it('lets the FIX through — but only once the suite that reddened is shown green on the new code', () => {
+    // The red is in `polish`; the two clean runs below are `polish` too, after
+    // an edit that came after the red. That is a fix demonstrated, not asserted.
+    const green = (backend, at) => ({ ...run(backend, at), suite: 'polish' })
+    const result = evaluate(
+      renderChange({
+        latestChangeAt: 3000,
+        runs: [unfiled('webgpu', 1500), green('webgpu', 3500), green('webgl', 3600)],
+        openPoints,
+      }),
+    )
+    expect(result).toEqual({ decision: 'allow', clear: true })
+  })
+
+  it('does NOT let an unrelated edit plus a green of ANOTHER suite drop the red', () => {
+    // The old rule dropped every red older than the newest render edit, so an
+    // edit that had nothing to do with it plus any covering run closed it —
+    // silently, and without a cause.
+    const result = evaluate(
+      renderChange({
+        latestChangeAt: 3000,
+        runs: [unfiled('webgpu', 1500), run('webgpu', 3500), run('webgl', 3600)],
+        openPoints,
+      }),
+    )
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/UNEXPLAINED RED/)
+  })
+
+  it('does NOT let a green of the same suite on the SAME code drop it — that is repetition', () => {
+    const green = (backend, at) => ({ ...run(backend, at), suite: 'polish' })
+    const result = evaluate(
+      renderChange({ runs: [unfiled('webgpu', 1500), green('webgpu', 2000), green('webgl', 2100)], openPoints }),
+    )
+    expect(result.decision).toBe('block')
+  })
+
+  it('lets a CHARGED red through — it is explained, and the run still accounts', () => {
+    const charged = redRun('webgpu', 1500, [red('goat stance', 506)])
+    const result = evaluate(renderChange({ runs: [charged, run('webgpu', 2000), run('webgl', 2100)], openPoints }))
+    expect(result.decision).toBe('allow')
+  })
+
+  it('lets the loud DEFERRAL through — and NAMES the reds it waved, so the bypass has a price', () => {
+    const result = evaluate(
+      renderChange({
+        runs: [unfiled('webgpu', 1500), suspectRun('webgl', 1600)],
+        deferral: { head: 'def5678', reason: 'the red was the check helper, fixed off the render set', at: 1700 },
+        openPoints,
+      }),
+    )
+    expect(result).toMatchObject({ decision: 'allow', clear: true, deferred: true })
+    expect(result.waved.map((w) => [w.backend, w.status])).toEqual([
+      ['webgpu', 'red'],
+      ['webgl', 'suspect'],
+    ])
+  })
+
+  it('names EVERY red it waved, not one per run', () => {
+    const twoReds = redRun('webgpu', 1500, [red('the first nobody filed'), red('the second nobody filed')])
+    const result = evaluate(
+      renderChange({
+        runs: [twoReds],
+        deferral: { head: 'def5678', reason: 'the dev server had died', at: 1700 },
+        openPoints,
+      }),
+    )
+    expect(result.waved.map((w) => w.name)).toEqual(['the first nobody filed', 'the second nobody filed'])
+  })
+
+  it('names both reds of a SUSPECT run, which runVerdict summarises into one sentence', () => {
+    const twoNames = {
+      ...run('webgpu', 1500),
+      suite: 'polish',
+      suspect: true,
+      suspectOf: [{ name: 'the goat stance', kind: 'check' }, { name: 'the eaves column', kind: 'check' }],
+    }
+    const result = evaluate(
+      renderChange({ runs: [twoNames], deferral: { head: 'def5678', reason: 'the lane was software', at: 1700 }, openPoints }),
+    )
+    expect(result.wavedCount).toBe(2)
+    expect(result.waved.map((w) => w.name)).toEqual(['the goat stance', 'the eaves column'])
+  })
+
+  it('keeps the TRUE count when the named list hits its cap', () => {
+    const many = redRun('webgpu', 1500, Array.from({ length: 25 }, (_, i) => red(`nobody filed number ${i}`)))
+    const result = evaluate(
+      renderChange({ runs: [many], deferral: { head: 'def5678', reason: 'the dev server had died', at: 1700 }, openPoints }),
+    )
+    expect(result.wavedCount).toBe(25)
+    expect(result.waved).toHaveLength(20)
+  })
+
+  it('quotes the red that is STILL open, not the one a charge has taken over', () => {
+    const ledger = [{ point: 506, match: /the goat stance/, why: 'the software lane cannot draw fast enough' }]
+    const mixed = redRun('webgpu', 1500, [red('the goat stance'), red('a NEW check nobody filed')])
+    const green = (backend, at) => ({ ...run(backend, at), suite: 'polish' })
+    const result = evaluate(renderChange({ runs: [mixed, green('webgpu', 2000), green('webgl', 2100)], openPoints, ledger }))
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/1 unaccounted red\(s\) — "a NEW check nobody filed"/)
+    expect(result.reason).not.toMatch(/the goat stance/)
+  })
+
+  it('counts ONE failure once, though a real retry leaves two records of it', () => {
+    // What run-all really writes: the first attempt's red record, then the
+    // retry's suspect record carrying the same check name.
+    const firstAttempt = redRun('webgpu', 1500, [red('the goat stance')])
+    const retry = {
+      ...run('webgpu', 1600),
+      suite: 'polish',
+      suspect: true,
+      suspectOf: [{ name: 'the goat stance', kind: 'check' }],
+    }
+    const result = evaluate(
+      renderChange({
+        runs: [firstAttempt, retry],
+        deferral: { head: 'def5678', reason: 'the lane was software', at: 1700 },
+        openPoints,
+      }),
+    )
+    expect(result.wavedCount).toBe(1)
+    expect(result.waved).toHaveLength(1)
+  })
+
+  it('a deferral with nothing to wave says nothing — the list is evidence, not decoration', () => {
+    const result = evaluate(
+      renderChange({ runs: [], deferral: { head: 'def5678', reason: 'headless WebGPU washes the frame out', at: 1600 } }),
+    )
+    expect(result).toEqual({ decision: 'allow', clear: true, deferred: true })
+  })
+
+  it('ignores PARTIAL runs in both directions, so the throttle probe blocks nobody', () => {
+    const probeRun = (at) => ({ ...redRun('webgpu', at, [red('the goat stance')]), partial: true, section: 'goat-stance' })
+    const result = evaluate(
+      renderChange({
+        runs: [probeRun(1500), probeRun(1600), probeRun(1700), run('webgpu', 2000), run('webgl', 2100)],
+        openPoints,
+      }),
+    )
+    expect(result.decision).toBe('allow')
+  })
+
+  // The closing routes must work on a run that is ALREADY recorded: the charge is
+  // stamped at record time, so a rule reading only the record would leave "charge
+  // it" and "file it as a point" nominal — nothing but a code edit could ever
+  // satisfy them (four-eyes finding, 11.08.2026).
+  it('a red CHARGED after the fact stops blocking — no re-run, no code edit', () => {
+    const ledger = [{ point: 641, match: /the Giza settlement edge/, why: 'filed 11.08.2026 as its own point' }]
+    const runs = [
+      redRun('webgpu', 1500, [red('the Giza settlement edge is drawn')]),
+      run('webgpu', 2000),
+      run('webgl', 2100),
+    ]
+    expect(evaluate(renderChange({ runs, openPoints })).decision).toBe('block')
+    expect(evaluate(renderChange({ runs, openPoints: [...openPoints, 641], ledger })).decision).toBe('allow')
+  })
+
+  it('a SUSPECT run whose first-attempt check is charged stops blocking too', () => {
+    const ledger = [{ point: 506, match: /the goat stance/, why: 'the software lane cannot draw fast enough' }]
+    const runs = [suspectRun('webgpu', 1500), run('webgpu', 2000), run('webgl', 2100)]
+    expect(evaluate(renderChange({ runs, openPoints })).decision).toBe('block')
+    expect(evaluate(renderChange({ runs, openPoints, ledger })).decision).toBe('allow')
+  })
+
+  it('does NOT talk a CRASH away with a charge — a run that died judged no picture', () => {
+    const ledger = [{ point: 506, match: /goat/, why: 'the software lane cannot draw fast enough' }]
+    const crashed = redRun('webgpu', 1500, [red('goat stance', 506)], { crashed: true })
+    const result = evaluate(renderChange({ runs: [crashed, run('webgpu', 2000), run('webgl', 2100)], openPoints, ledger }))
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/UNEXPLAINED RED/)
+  })
+
+  it('a charge to a point that is NOT open explains nothing', () => {
+    const ledger = [{ point: 387, match: /the Giza settlement edge/, why: 'a point that has since been ticked' }]
+    const runs = [redRun('webgpu', 1500, [red('the Giza settlement edge is drawn')]), run('webgpu', 2000), run('webgl', 2100)]
+    expect(evaluate(renderChange({ runs, openPoints, ledger })).decision).toBe('block')
+  })
+
+  // Four-eyes, 11.08.2026: a run is judged by when it STARTED. A suite loads the
+  // page at its beginning, so one that began before the edit tested the old code
+  // however late it finished — it can neither prove the fix nor condemn it.
+  it('does not let a run that BEGAN before the edit cover the code that followed', () => {
+    const straddling = { ...run('webgpu', 2000), startedAt: 500 }
+    expect(coveringRun([straddling], 'webgpu', 1000, { openPoints })).toBeNull()
+  })
+
+  it('carries a red from a run that STRADDLED the edit until that suite is shown green', () => {
+    const straddling = { ...unfiled('webgpu', 2000), startedAt: 500 }
+    expect(unexplainedRuns([straddling], 1000, { openPoints })).toHaveLength(1)
+    const shownGone = { ...run('webgpu', 3000), suite: 'polish' }
+    expect(unexplainedRuns([straddling, shownGone], 1000, { openPoints })).toEqual([])
+  })
+
+  it('unexplainedRuns is total, and reports oldest first', () => {
+    expect(unexplainedRuns(null, 0)).toEqual([])
+    expect(() => unexplainedRuns([null, 7, { at: 'soon' }], 0)).not.toThrow()
+    const found = unexplainedRuns([unfiled('webgl', 2000), unfiled('webgpu', 1000)], 0, { openPoints })
+    expect(found.map((u) => u.at)).toEqual([1000, 2000])
+  })
+})
+
+describe('the retry marker travels in the environment (point 640)', () => {
+  it('formats the first attempt\'s failing checks, and reads them back', () => {
+    const value = formatSuspectEnv([{ name: 'the goat stance' }, 'the eaves column'])
+    expect(parseSuspectEnv(value)).toEqual(['the goat stance', 'the eaves column'])
+  })
+
+  it('carries each red\'s KIND, so a console charge answers a console red and not a check', () => {
+    const value = formatSuspectEnv([
+      { name: 'console error: renderTargets grew back', kind: 'console' },
+      { name: 'the goat stance', kind: 'check' },
+    ])
+    expect(parseSuspectReds(value)).toEqual([
+      { name: 'console error: renderTargets grew back', kind: 'console' },
+      { name: 'the goat stance', kind: 'check' },
+    ])
+  })
+
+  it('reads a record written before the kind travelled — bare names are checks', () => {
+    expect(suspectRedsOf({ suspectOf: ['the goat stance'] })).toEqual([{ name: 'the goat stance', kind: 'check' }])
+    expect(suspectRedsOf({ suspectOf: [{ name: 'a leak', kind: 'console' }] })).toEqual([
+      { name: 'a leak', kind: 'console' },
+    ])
+    expect(suspectRedsOf(null)).toEqual([])
+  })
+
+  it('does not release a CONSOLE red on a charge written for a check of the same wording', () => {
+    const openPoints = [506]
+    const suspectConsole = {
+      ...run('webgpu', 1500),
+      suite: 'polish',
+      suspect: true,
+      suspectOf: [{ name: 'console error: the label layer threw', kind: 'console' }],
+    }
+    const runs = [suspectConsole, run('webgpu', 2000), run('webgl', 2100)]
+    const checkOnly = [{ point: 506, kind: 'check', match: /the label layer threw/, why: 'a charge for a failing check' }]
+    const consoleOnly = [{ point: 506, kind: 'console', match: /the label layer threw/, why: 'the charge that fits' }]
+    expect(evaluate(renderChange({ runs, openPoints, ledger: checkOnly })).decision).toBe('block')
+    expect(evaluate(renderChange({ runs, openPoints, ledger: consoleOnly })).decision).toBe('allow')
+  })
+
+  it('never formats to an empty value — a nameless failure still marks the retry', () => {
+    expect(parseSuspectEnv(formatSuspectEnv([]))).toEqual([SUSPECT_UNNAMED])
+  })
+
+  it('reads an unset or blank variable as "not a retry" — a stale export condemns nothing', () => {
+    expect(parseSuspectEnv(undefined)).toEqual([])
+    expect(parseSuspectEnv('')).toEqual([])
+    expect(parseSuspectEnv('  \n \n')).toEqual([])
+  })
+
+  it('bounds what it puts in an environment variable, and SAYS what it dropped', () => {
+    const many = Array.from({ length: 40 }, (_, i) => `check ${i} `.padEnd(500, 'x'))
+    const parsed = parseSuspectEnv(formatSuspectEnv(many))
+    expect(parsed).toHaveLength(9)
+    for (const name of parsed.slice(0, 8)) expect(name.length).toBeLessThanOrEqual(200)
+    // The ninth entry is the truncation itself, so the dropped reds cannot go
+    // quiet once the eight that fitted are charged.
+    expect(parsed[8]).toMatch(/32 further red\(s\) of the first attempt were NOT carried/)
+  })
+
+  it('a truncated first attempt cannot be charged away', () => {
+    const openPoints = [506]
+    const marker = formatSuspectEnv(Array.from({ length: 12 }, (_, i) => ({ name: `red number ${i}` })))
+    const suspectMany = { ...run('webgpu', 1500), suite: 'polish', suspect: true, suspectOf: parseSuspectReds(marker) }
+    // A DELIBERATELY BROAD charge: even one that matches the truncation entry's
+    // wording cannot own it, because what was never carried is not chargeable.
+    const ledger = [{ point: 506, match: /red|further|first attempt/, why: 'as broad as a ledger entry gets' }]
+    const runs = [suspectMany, run('webgpu', 2000), run('webgl', 2100)]
+    const result = evaluate(renderChange({ runs, openPoints, ledger }))
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/NOT carried/)
+  })
+})
+
 describe('coveringRun / evaluate — the accounted-for run clears the gate', () => {
   const openPoints = [506, 546]
   const accountedRun = (backend) => redRun(backend, 2000, [red('goat stance', 506)])
@@ -762,6 +1156,7 @@ describe('the shipped charge ledger', () => {
       expect(String(c.why).length).toBeGreaterThan(40)
       if (c.backend) expect(BACKENDS).toContain(c.backend)
       if (c.kind) expect(['check', 'console']).toContain(c.kind)
+      if (c.detailMatch) expect(c.detailMatch).toBeInstanceOf(RegExp)
     }
   })
 
@@ -770,10 +1165,90 @@ describe('the shipped charge ledger', () => {
     expect(RED_CHARGES.filter((c) => !open.has(c.point)).map((c) => c.point)).toEqual([])
   })
 
-  it('charges the goat-stance red on the software lane only', () => {
+  // THE TWO LANES ANSWER TO DIFFERENT POINTS, and that separation is the whole
+  // value of the charge (13.08.2026). Point 506 is the software lane's rate
+  // problem and says in its own words that on WebGL 2 the check "stays a real
+  // red" — so it must never swallow a hardware-lane occurrence. When one
+  // appeared, it did not become 506's: it became point 671, which must classify
+  // it by measurement. The pairing below is what stops the two from merging back
+  // together, and 671's entry dies with 671, which is the point of the charge.
+  it('charges the goat-stance red to a DIFFERENT point on each lane', () => {
     const goat = red('settlement walker (goat): the planted foot holds its ground spot')
     expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu' }).point).toBe(506)
     expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' })).toBeNull()
+  })
+
+  it('charges only the measured children composition and leaves every other red uncovered', () => {
+    const child = (detail) => ({
+      ...red('no child walks without getting anywhere'),
+      detail,
+    })
+    const measured = child(
+      'worst child 3 at 0.39 % of its own judged time — worst child 3 at 8.9s, 1.29 m walked inside 0.32 m',
+    )
+    // The owner is 694, not the point that delivered the acceptance: an entry
+    // charged to 666 would have expired at 666's own tick, taking the
+    // acceptance with it on the very landing that made it.
+    expect(chargeFor(measured, { suite: 'polish', backend: 'webgl' }).point).toBe(694)
+
+    // The player-reported permanent shiver has the same check label, but not
+    // the accepted single-event signature. Missing details are equally unsafe,
+    // and the evidence names WebGL 2 only: all three remain real reds.
+    const shiver = child('worst child 3 at 99.89 % — worst child 3 at 0.1s, 3.41 m walked inside 0.14 m')
+    expect(chargeFor(shiver, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(red('no child walks without getting anywhere'), { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(measured, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+  })
+
+  it('a detailMatch charge fires at RECORD time and can never be applied afterwards', () => {
+    // MEASURED 14.08.2026, through the real parser and the real recorder path.
+    // A suite prints `FAIL  <name> — <detail>`; failedChecks parses the detail
+    // out, so chargeReds CAN read it and stamps the point. What it then STORES
+    // is name/key/kind/point — the detail is dropped, and 0 of 99 recorded reds
+    // carry one. So the ledger's promise that a charge "counts at once, no
+    // re-run needed" holds for `match` and NOT for `detailMatch`: a red that was
+    // already recorded can never be charged retroactively, which is why a
+    // WebGPU children red of 14.08.2026 stayed unexplained after its entry was
+    // written. Point 694 owns the repair. Fail-safe either way — an unmatched
+    // red stays loudly uncharged, it is never blessed.
+    const line =
+      'FAIL  no child walks without getting anywhere — worst child 1 at 0.29 % of its own judged ' +
+      'time — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m  [--section=children-motion]'
+    const [parsed] = failedChecks(line)
+    expect(parsed.detail).toContain('1.42 m walked inside 0.31 m')
+
+    // At record time the charge sees the detail and stamps the owner.
+    const [stored] = chargeReds([parsed], { suite: 'polish', backend: 'webgpu' })
+    expect(stored.point).toBe(694)
+
+    // What survives into the record carries no detail.
+    expect(stored.detail).toBeUndefined()
+
+    // AND THE CASE THAT ACTUALLY BIT: a red recorded BEFORE the entry existed —
+    // uncharged, and without the detail the new entry would need. Adding the
+    // entry afterwards cannot reach it, however the ledger now reads.
+    const [beforeTheRule] = chargeReds([parsed], { suite: 'polish', backend: 'webgpu', ledger: [] })
+    expect(beforeTheRule.point).toBeNull()
+    expect(beforeTheRule.detail).toBeUndefined()
+    expect(chargeFor(beforeTheRule, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+  })
+
+  it('charges the same composition on the OTHER backend to the same owner, by its own signature', () => {
+    // The WebGL-2-only scoping was disproved the night it was written: the same
+    // composition appeared on WebGPU at a different measurement (point 694).
+    // Each entry still answers for ITS signature alone — which is precisely why
+    // 694 must replace them both with a rule about the SHAPE.
+    const child = (detail) => ({ ...red('no child walks without getting anywhere'), detail })
+    const onWebgpu = child('worst child 1 at 0.29 % — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m')
+    expect(chargeFor(onWebgpu, { suite: 'polish', backend: 'webgpu' }).point).toBe(694)
+    // Not on the other backend, and no blanket over the check itself.
+    expect(chargeFor(onWebgpu, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(
+      chargeFor(child('worst child 2 at 18.4 % — worst child 2 at 3.0s, 9.10 m walked inside 0.12 m'), {
+        suite: 'polish',
+        backend: 'webgpu',
+      }),
+    ).toBeNull()
   })
 
   it('charges the fixed render-target leak to NOBODY — a mended red is a red again', () => {

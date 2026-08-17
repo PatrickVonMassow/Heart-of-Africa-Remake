@@ -499,6 +499,18 @@ textarea {
   min-height: 44px;
 }
 
+/* On touch the stuck hint is a tappable button — the only route to the escape
+   key for a player with no keyboard (work-order 610). Visually identical to the
+   plain toast, with a comfortable tap target, and ABOVE the touch layer
+   (z-index 5) so the look surface cannot swallow the tap. */
+.toast-tappable {
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  min-height: 44px;
+  z-index: 6;
+}
+
 /* Touch controls (design.md §17.5, point 84): a transparent full-screen layer;
    only the stick and the look surface capture pointer events, so the rest of
    the HUD stays clickable. Mounted only while ui.touchActive. */
@@ -925,6 +937,12 @@ textarea {
    game shows in the village's own tongue. */
 .dialog.drum-message {
   max-width: 640px;
+}
+
+/* The guess at what one speaker just said (point 588): a single utterance most
+   of the time, so the box stays narrow. */
+.dialog.speech-guess {
+  max-width: 460px;
 }
 
 /* The chief's answer inside the audience (point 487). */
@@ -1472,7 +1490,9 @@ textarea {
    (§17.4). */
 .speech-label {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   padding: 3px 8px;
   border: 1px solid var(--hud-border);
   border-radius: 4px;
@@ -1481,6 +1501,28 @@ textarea {
   white-space: nowrap;
   pointer-events: none;
   transform: translateY(-8px);
+}
+
+/* The atoms of a phrase stand side by side, in the order they are spoken. */
+.speech-label .speech-atoms {
+  display: flex;
+  gap: 8px;
+}
+
+/* The note a click would take (point 588): unmistakably the one in front, so
+   the invitation under it can only be read as being about this speaker. */
+.speech-label.targeted {
+  border-color: #d8b45a;
+  background: rgba(40, 30, 14, 0.86);
+  box-shadow: 0 0 6px rgba(216, 180, 90, 0.45);
+}
+
+/* Spoken to the player, not shouted at him — no text-transform here. */
+.speech-label .speech-invite {
+  margin-top: 1px;
+  font-size: 11px;
+  color: #d8b45a;
+  letter-spacing: 0.3px;
 }
 
 .speech-label .speech-atom {

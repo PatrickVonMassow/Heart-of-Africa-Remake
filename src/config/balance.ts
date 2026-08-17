@@ -83,6 +83,35 @@ export interface BalanceConfig {
    *  slider over the single ambience volume, so the birds can be turned down on
    *  their own. 1 = the design gain, 0 = silent. */
   birdsongVolume: number
+  /** The optional meaningless village drum BED (not the message drums). It is
+   *  silent by default so it cannot be mistaken for communication; the switch
+   *  and every calibration value remain exposed in the debug menu. */
+  drumBed: {
+    /** Debug audition switch. False is the shipped, silent state. */
+    enabled: boolean
+    /** Seconds between the eight subdivisions of a bar. */
+    stepSeconds: number
+    /** Number of varied bars in one phrase before the audible pause. */
+    phraseBars: number
+    /** Random bounds of the silence after each phrase. */
+    phraseGapMinSeconds: number
+    phraseGapMaxSeconds: number
+    /** Per-village tempo and pitch spread around the values above/below. */
+    tempoSpread: number
+    pitchSpread: number
+    /** Pitch fall and body length of the low, soft bed membrane. */
+    pitchStartHz: number
+    pitchEndHz: number
+    hitSeconds: number
+    /** How much one secondary accent moves around the phrase (0..1). */
+    accentShift: number
+    /** When thinning reaches its maximum, and how much it stretches pauses. */
+    thinAfterSeconds: number
+    thinMaxGapFactor: number
+    /** Layer gains while inside a village and while passing nearby. */
+    villageGain: number
+    nearbyGain: number
+  }
   /** Coastal surf fade (point 153, design.md §19.1): the ocean-surf bed is only
    *  audible near the coast — full within `nearRadius`, silent at/beyond
    *  `cutoff`, smooth between, keyed on the distance to the nearest coast in
@@ -665,6 +694,12 @@ export interface BalanceConfig {
       variation: number
       /** Seconds without real movement before a child is nudged free. */
       unstuckSeconds: number
+      /** Seconds a child keeps going the same way ROUND an obstacle, so it
+       *  follows its edge instead of pacing to and fro at its face. */
+      edgeSeconds: number
+      /** Dev-mode alarm: a group that could play and has produced neither a
+       *  catch nor a fresh round for this long raises `tag-silent`. */
+      silenceSeconds: number
       /** Forward lean (rad) at the full sprint. */
       leanAtSprint: number
       /** How fast the drawn body may turn, in rad/s. */
@@ -688,6 +723,9 @@ export interface BalanceConfig {
       refusalChance: number
       /** How long after a call a refusal still reads as its answer. */
       replySeconds: number
+      /** Dev-mode alarm: a group of children that could speak and has said
+       *  nothing for this long raises `child-speech-silent`. */
+      silenceSeconds: number
     }
     /** The adults' errands, which teach the five landscape and action concepts
      *  (work-order point 483). */
@@ -728,6 +766,9 @@ export interface BalanceConfig {
       maxSpeed: number
       /** Seconds wedged before the escape nudge is asked for. */
       wedgeSeconds: number
+      /** Sweeps a group may take in one frame, so a CHAIN of three or more
+       *  figures comes apart in the frame it formed. */
+      passes: number
     }
   }
   /** Village speech and drums (design.md §13.4, docs/communication-poc-spec.md). */
@@ -797,6 +838,30 @@ export const balance: BalanceConfig = {
   footstepVolume: 2, // footsteps twice as loud as the rest (user request)
   ambientVolume: 0.5, // every other ambient sound half as loud (user request)
   birdsongVolume: 1, // per-source birdsong slider (point 153); 1 = design gain
+  drumBed: {
+    // Message drums bypass this switch. The meaningless ambient bed ships off.
+    enabled: false,
+    // Two bars establish a phrase, followed by enough silence that the bed
+    // cannot read as an endlessly repeated loop. All are calibratable (§2).
+    stepSeconds: 0.25,
+    phraseBars: 2,
+    phraseGapMinSeconds: 1.4,
+    phraseGapMaxSeconds: 3,
+    // A village keeps its own small, deterministic character for the visit;
+    // neither spread is wide enough to turn the bed into message drumming.
+    tempoSpread: 0.07,
+    pitchSpread: 0.08,
+    pitchStartHz: 112,
+    pitchEndHz: 48,
+    hitSeconds: 0.18,
+    accentShift: 0.35,
+    // After roughly a minute the pauses are 2.6x their opening length. The
+    // bed remains present as place character, but demands progressively less.
+    thinAfterSeconds: 60,
+    thinMaxGapFactor: 2.6,
+    villageGain: 0.42,
+    nearbyGain: 0.14,
+  },
   surf: { nearRadius: 0.4, cutoff: 3 }, // surf full within 0.4° of the coast, silent beyond 3° (point 153, calibratable)
   daysPerUnit: 0.2,
   foodPerDay: 0, // demo start preset (point 104): no hunger by default; debug-editable
@@ -1139,6 +1204,18 @@ export const balance: BalanceConfig = {
       trendLeave: 0.12,
       variation: 0.2,
       unstuckSeconds: 1.5,
+      // How long a child keeps to ONE way round what is in front of it (point
+      // 648). The commitment normally ends by itself, the moment the child is
+      // travelling where it wanted again; this is only the backstop on a side
+      // that turned out to be the long way round. At the trot that is some four
+      // metres of edge — a hut is round in two — and short enough that a child
+      // never circles a whole compound before it thinks again.
+      edgeSeconds: 3,
+      // The long-run alarm's window (point 589). The longest LEGITIMATE gap
+      // between two round events is a tenure that runs to the backstop plus the
+      // idle break after it (45 + 8 s); this sits well clear of it, so only a
+      // game that has genuinely stopped producing trips it.
+      silenceSeconds: 90,
       leanAtSprint: 0.28,
       // ~3.6 rad/s: a body turns a half circle in about a second — quick enough
       // for a chase to read as agile, slow enough that no figure snaps about-face.
@@ -1159,6 +1236,9 @@ export const balance: BalanceConfig = {
       actionPace: 1.6, // a brisk errand walk, well under the chase's trot
       refusalChance: 0.35,
       replySeconds: 5,
+      // The long-run alarm's window (point 589): well clear of the interval and
+      // its spread, so only a group that has genuinely stopped speaking trips it.
+      silenceSeconds: 60,
     },
     // The adults' errands (work-order point 483). Calibratable starting values
     // (educated guess, CLAUDE.md §2): slower than the children's chatter,
@@ -1200,15 +1280,35 @@ export const balance: BalanceConfig = {
     //  - THE CATCH WINS (point 578.4): the children's catch distance is 0.8 m,
     //    three times the separation two children settle at, so a chaser is
     //    always well inside its tag before the bodies ever touch.
-    //  - the slop and the stiffness are the anti-jitter half: nothing is
-    //    corrected inside a centimetre, and a correction never takes more than
-    //    half of what is left, so it settles instead of ringing.
+    //  - THE SLOP is the anti-jitter half, and it is the whole of it: nothing is
+    //    corrected inside a centimetre, so a settled pair has nothing left to
+    //    trade. The STIFFNESS was the other half and was the bug (point 648):
+    //    taking half of the overlap per frame is less than two children running
+    //    at each other ADD per frame, so the pass never caught up and the pair
+    //    stayed visibly inside one another. At 1 the overlap is gone in the step
+    //    it appeared, and nothing rings because the push never overshoots.
+    //  - MAX SPEED bounds only the deep spawn stack. 8 m/s is above the fastest
+    //    pair that can close (a chaser at 3.4 and a runner at 3.81 = 7.21 m/s),
+    //    so it can never again throttle an ordinary crossing, while a stack of
+    //    two adults still unwinds over a couple of frames rather than snapping.
+    //  - PASSES is the chain half. One sweep resolves a PAIR; pushing the middle
+    //    of THREE out of one neighbour presses it back into the other, which was
+    //    resolved already, so a cluster kept a residual overlap for ever.
+    //    Measured over 600 s of the children's game alone: one sweep left 192–537
+    //    overlapping pair-frames (worst 0.07 m of a 0.264 m contact), two left
+    //    NONE. The SETTLEMENT holds more than the children, though — the adults,
+    //    the porters and the routine walkers share one body set — so its chains
+    //    are longer, and two sweeps still left a tenth of a percent of frames
+    //    touching in the reported village. Four clears it. It is a CEILING, not a
+    //    cost: the sweeping stops the moment one moves nobody, so an ordinary
+    //    frame pays for one and only a real cluster pays for more.
     separation: {
       bodyRadius: 0.24,
       slop: 0.01,
-      stiffness: 0.5,
-      maxSpeed: 1.2,
+      stiffness: 1,
+      maxSpeed: 8,
       wedgeSeconds: 1.5,
+      passes: 4,
     },
   },
   communication: {
@@ -1217,6 +1317,12 @@ export const balance: BalanceConfig = {
     // radius is a bit over twice the interact radius (4.5), so the children's
     // group and the adults' group are never heard at once from the middle.
     phrasePauseSeconds: 0.9,
+    // THE RANGE OF THE WHOLE ACT, not of the voice alone (point 580): a figure
+    // gestures only where it is also heard and read, so this one value bounds
+    // the utterance, the note over the head AND the arms. Beyond it a villager
+    // stands still rather than miming a concept the player gets no word for.
+    // The rule lives in src/communication/spokenGesture.ts and follows this
+    // value wherever the debug menu sets it.
     hearingRadius: 10,
     // One five-syllable atom takes 1.5 s at this pace — slow enough to count
     // the beats by ear, quick enough that a seven-atom message stays short.
@@ -1235,17 +1341,14 @@ export const balance: BalanceConfig = {
     // stay in one human speaking range, so the two read as one voice.
     speechPitchHz: 140,
     speechPitchInterval: 1.68,
-    // Calibrated against the audio graph, not by feel (point 605). At the
-    // master's input a syllable spoken beside the player arrives at
-    // SPEECH_PEAK × ambienceVolume × this × the syllable's own synthesis gain
-    // (0.18 × 1.5 × ~2.07), a village drum beat at 0.9 × its layer 0.5 ×
-    // ambientVolume 0.5 — so the voices sit ~2.5× over the drums they must
-    // carry through, and the loudest realistic moment (two close speakers, the
-    // drum bed, a footstep) still stays under full scale. 0.5, the level
-    // inherited from the ambient bus in point 577, left them BELOW the drums,
-    // which is what "zu leise" meant. src/systems/ambience.test.ts measures the
-    // relation on the live buses.
-    speechVolume: 1.5,
+    // Calibrated against the deployed audio graph after the ambient drum bed
+    // went silent (point 673). At the master's input a syllable beside the
+    // player reaches 0.612, while the conservative sum of every remaining
+    // active village layer and gain modulation reaches 0.2275: 2.69×, or
+    // 8.6 dB, above that ambience floor. The failed deployed value was 1.5;
+    // src/systems/ambience.test.ts measures this margin on the live buses and
+    // still checks the louder debug drum mix for headroom.
+    speechVolume: 2,
     // A hand's breadth over the head, no more (point 582). The note used to
     // hang at a flat 2.3 m over the speaker's FEET — 0.85 m over a grown
     // villager's head and about twice a child's own height over a child's — so

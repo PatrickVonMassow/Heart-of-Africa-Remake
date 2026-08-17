@@ -46,6 +46,16 @@
 //     batch and for every session that never held a fence, and shares duty (6)'s
 //     channel — the two can never collide, since a fenced-out session is by
 //     definition not the owner duty (6) speaks for.
+// (8) THE WAIT MARKER (point 592): while a verify run is provably going, write
+//     the `batch-in-flight` declaration on the session's behalf — and withdraw
+//     it again the moment that run is over. Measured, the idle holder it
+//     replaces (`echo idle`, and the hand-typed `--waiting-on`) cost 1189
+//     responses in six days, 3.6 % of the weighted spend, for a turn that does
+//     nothing but feed a counter. It writes the SAME declaration in the SAME
+//     shape, so `batch-progress-guard` re-probes it exactly as it re-probes a
+//     hand-written one and cannot go blind on it. It lives here for duty (5)'s
+//     reason — .claude/settings.json is a protected path an unattended session
+//     cannot edit — and with no verify run record on disk it costs one readdir.
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { basename } from 'node:path'
 import { heartbeat, noteActivity, readFence, readFenceNotice, recordFenceNotice } from './batch-singleton.mjs'
@@ -55,6 +65,7 @@ import { handoverSurvivesCall, hookCallTimestamp } from './batch-boundary-core.m
 import { classifyPublishResponse, publishStatePatch } from './publish-outcome-core.mjs'
 import { openFingerprintOfTasks, publishDuePatch } from './board-currency-core.mjs'
 import { repoPath } from './repo-paths.mjs'
+import { armWaitMarker } from './wait-marker.mjs'
 import {
   STATE_PATH,
   ACTIVITY_PATH,
@@ -212,4 +223,11 @@ try {
 } catch {
   /* a notice we cannot compute may never break a tool call */
 }
+
+// (8) the wait marker — see the header. Silent: it writes a state file, never
+// stdout, so it can never collide with duties (6) and (7). Owner-only and
+// paused-aware inside `armWaitMarker`, which also swallows every error, so this
+// call has no failure mode of its own.
+armWaitMarker({ sid, ownsBatch, paused })
+
 process.exit(0)

@@ -17,6 +17,11 @@
 // scripts/mechanism-review-guard.mjs (fail-open) and the record CLI
 // scripts/mechanism-review.mjs. Pinned by mechanism-review-core.test.mjs.
 
+// The ONE import: what a co-author trailer naming a MODEL looks like. It is the
+// author allowlist's own answer (scripts/model-guard-core.mjs, which imports
+// nothing), so "who authored this" cannot drift from "who may author at all".
+import { modelNamesIn } from './model-guard-core.mjs'
+
 /** The verdicts a review may end in, weakest refusal last. */
 export const VERDICTS = Object.freeze(['merge', 'merge-with-fixes', 'do-not-merge'])
 
@@ -59,12 +64,22 @@ export const BLOCKING_VERDICT = 'do-not-merge'
  *                              fence and a narrowing denies reads. Its sweep is
  *                              named with it, for the same reason guard-hooks'
  *                              is: the rules are only as true as the test.
+ *   scripts/blind-merge*.mjs   the accounting that makes a blind-parallel MERGE
+ *                              countable (point 634). Its name carries no
+ *                              guard/gate either, and a weakening there lets the
+ *                              one step where a finding vanishes go uncounted
+ *                              again — the CLI half included, because the exit
+ *                              code is what anyone actually reads.
  */
 export const NAMED_MECHANISM_FILES = Object.freeze([
   '.claude/settings.json',
   'scripts/guard-hooks.test.mjs',
   'scripts/command-classify-core.mjs',
   'scripts/command-classify-core.test.mjs',
+  'scripts/blind-merge-core.mjs',
+  'scripts/blind-merge-core.test.mjs',
+  'scripts/blind-merge-cli.test.mjs',
+  'scripts/blind-merge.mjs',
 ])
 
 /**
@@ -129,7 +144,12 @@ export function parseModel(name) {
     .toLowerCase()
   return {
     raw,
-    family: (cleaned.match(/[a-z]+/) ?? [''])[0],
+    // ONE FAMILY PER MODEL, WHICHEVER HALF OF THE NAME IS WRITTEN (point 667).
+    // Sol's designation carries its vendor's word in FRONT of it — "GPT-5.6
+    // Sol" — so reading the first word as the family made it a different model
+    // from the bare "Sol". Harmless while Sol only reviewed; now that it also
+    // AUTHORS, that difference is how a self-review would pass the ledger.
+    family: /\bsol\b/.test(cleaned) ? 'sol' : (cleaned.match(/[a-z]+/) ?? [''])[0],
     version: (cleaned.match(/\d+(?:\.\d+)?/) ?? [''])[0],
   }
 }
@@ -155,12 +175,270 @@ export function sameModel(a, b) {
   return x.version === y.version
 }
 
-/** The first Claude co-author out of a `Co-Authored-By` trailer field. */
-export function modelFromTrailers(field) {
-  for (const part of String(field ?? '').split(/[;,]/)) {
-    if (/\bclaude\b/i.test(part)) return part.trim()
+/** The family words of a model this project would recognise. */
+const MODEL_FAMILY = 'sol|gpt|fable|opus|claude|sonnet|haiku|gemini|grok|llama|mistral|qwen|deepseek'
+
+/** A model designation this project would recognise, for the fallback below. */
+const MODEL_NAMED = new RegExp(`\\b(${MODEL_FAMILY})\\b`, 'gi')
+
+/** …with its version where one is given: "Opus 4.8", "GPT-5.6", plain "Sol". */
+const MODEL_WITH_VERSION = new RegExp(`\\b(?:${MODEL_FAMILY})(?:[\\s-]*\\d+(?:\\.\\d+)?)?`, 'gi')
+
+/**
+ * …and the fallback has to say the model was NOT THERE, not merely name one.
+ *
+ * `failed` and `refused` are deliberately BOUND to what failed (four-eyes
+ * review, sixth round): bare, they matched "Sol failed the review", which is a
+ * model that was very much there.
+ */
+const UNAVAILABLE = new RegExp(
+  [
+    /\b(unavailable|unreachable|inaccessible|offline|absent|missing|down|no access)\b/.source,
+    /\bnot (available|reachable|there|running|up)\b/.source,
+    /\bcould ?n[o']?t be reached\b/.source,
+    /\bfailed to (respond|answer|reply|start|run|reach|load|launch)\b/.source,
+    /\b(call|request|session|login|connection|command|run|attempt)s? (failed|refused|timed out|died)\b/.source,
+    /\btimed out\b/.source,
+    /\bonly two\b/.source,
+  ].join('|'),
+  'i',
+)
+
+/** "…was NOT unavailable" is not an absence; it is the opposite of one. */
+const NEGATED_ABSENCE = /\bnot\s+(unavailable|unreachable|inaccessible|offline|absent|missing|down)\b/i
+
+/**
+ * Does `text` name a model that is NOT the one that merged?
+ *
+ * A designation carrying a VERSION is judged by sameModel, so an Opus 5 merger
+ * may name Opus 4.8 as the model that was missing (four-eyes review, sixth
+ * round: the family-word test refused that legitimate case). A bare family word
+ * falls back to the words of the merger's own name, so "Sol was unreachable"
+ * cannot be written by GPT-5.6 Sol about itself.
+ */
+export function namesOtherModel(text, who) {
+  const mine = new Set([...String(who ?? '').matchAll(MODEL_NAMED)].map((m) => m[1].toLowerCase()))
+  for (const [designation] of String(text ?? '').matchAll(MODEL_WITH_VERSION)) {
+    const family = (designation.match(/[a-z]+/i) ?? [''])[0].toLowerCase()
+    if (family === 'claude') continue
+    if (parseModel(designation).version) {
+      if (!sameModel(designation, who)) return true
+      continue
+    }
+    if (!mine.has(family)) return true
   }
-  return ''
+  return false
+}
+
+/**
+ * The RECEIPT that a union was counted: the summary line
+ * `scripts/blind-merge.mjs` prints when every input entry is accounted for.
+ * The shape is asserted against a real summaryLine() in blind-merge-core.test.mjs,
+ * so the two halves cannot drift apart — the regex lives HERE because this core
+ * must not import the accounting one (that one already imports this).
+ */
+export const ACCOUNTING_RECEIPT =
+  /^(\d+) A \+ (\d+) B entries → (\d+) union entries \((\d+) merged, (\d+) only A, (\d+) only B\): every input entry accounted for$/
+
+/**
+ * Is this receipt a line the accounting could actually have printed?
+ *
+ * The shape alone is a copyable string, so the NUMBERS are checked against each
+ * other (four-eyes review, third round): every input entry has exactly one
+ * disposition, so merged + only A + only B must equal the two list sizes; a
+ * union cannot hold more entries than it folded, nor fewer than one when there
+ * was anything to fold; and a "fold" of one entry is not a fold. It does not
+ * make a fabricated line impossible — only one that has to add up.
+ */
+export function receiptBalances(line) {
+  const m = ACCOUNTING_RECEIPT.exec(String(line ?? '').trim())
+  if (!m) return false
+  const [a, b, union, merged, onlyA, onlyB] = m.slice(1).map(Number)
+  if (merged + onlyA + onlyB !== a + b) return false
+  if (merged === 1) return false
+  if (onlyA > a || onlyB > b) return false
+  // THE UNION'S SIZE FOLLOWS FROM THE DISPOSITIONS (four-eyes review, fourth
+  // round). Every entry standing alone is one union entry, and the merged ones
+  // form between one fold (all of them together) and merged/2 folds (pairs) —
+  // so a count claiming fewer union entries than singles is arithmetic nobody
+  // could have produced.
+  const singles = onlyA + onlyB
+  if (!merged) return union === singles
+  return union > singles && union <= singles + Math.floor(merged / 2)
+}
+
+/**
+ * From when a blind-parallel record OWES its merger and its count.
+ *
+ * The ledger is tracked and outlives the CLI that wrote it, so the rows written
+ * before this rule existed carry neither and must keep clearing the gate. A
+ * cutoff grandfathers them by DATE instead of by "the field is missing", which
+ * is what let a hand-edited row omit the fields and pass (four-eyes review,
+ * second round). 11.08.2026, the day the rule landed.
+ */
+export const MERGE_ACCOUNTING_SINCE = Date.UTC(2026, 7, 11)
+
+/**
+ * May THIS model MERGE the two lists of a blind-parallel stage? (point 634)
+ *
+ * The merge goes to the model that wrote NEITHER list. Until now it was done by
+ * one of the two authors, which is the same self-judgment sameModel() refuses one
+ * stage earlier for the review — and it sits at the one step where work can
+ * disappear without a trace, because the errors of a fold are one-sided:
+ * collapsing two entries that were not the same LOSES a finding silently, while
+ * keeping them apart costs one duplicated review.
+ *
+ * `fallback` is the one honest way past it: where only two models were available,
+ * that is RECORDED as such rather than silently merged by an author. It waives
+ * the identity rule, never the counting — the union still has to account for
+ * every entry (scripts/blind-merge.mjs).
+ */
+export function validateMerger({ mergedBy, authors = [], fallback = '' } = {}) {
+  const errors = []
+  const who = String(mergedBy ?? '').trim()
+  const reason = String(fallback ?? '').trim()
+  const named = authors.map((m) => String(m ?? '').trim()).filter(Boolean)
+  if (!who) {
+    errors.push(
+      'no merging model named: the union of a blind-parallel stage is folded by the model that ' +
+        'wrote NEITHER list (CLAUDE.md §6), and the record has to name it',
+    )
+    return { ok: false, errors, fallback: false }
+  }
+  const conflict = named.find((m) => sameModel(who, m))
+  if (conflict && !reason) {
+    errors.push(
+      `"${who}" authored one of the two lists (${conflict}) and may not merge them: the merge is the one ` +
+        'step where a finding can vanish, so it goes to the third model. Where only two models were ' +
+        'available, record that as the fallback instead of merging silently.',
+    )
+  }
+  if (reason && !conflict) {
+    errors.push(`a two-model fallback is recorded, but "${who}" authored neither list — no fallback was needed`)
+  }
+  if (reason) {
+    // A FALLBACK HAS TO SAY WHICH MODEL WAS NOT THERE (four-eyes review of point
+    // 634, rounds one and five). Any eight characters would otherwise buy an
+    // author the right to merge its own list — the escape hatch would be the
+    // rule — and so would a line that merely mentions a model ("Opus 5 performed
+    // the merge"). Nothing can VERIFY the claim; what is enforced is that it is
+    // a checkable one: a model OTHER than the merger, and said to be absent.
+    const named = [...String(reason).matchAll(MODEL_NAMED)].map((m) => m[1].toLowerCase())
+    // THE NAME AND THE ABSENCE MUST BE THE SAME CLAIM (four-eyes review, sixth
+    // round). Checked apart, "GPT-5.6 Sol was present; Opus 5 was unavailable"
+    // satisfied both halves and said the opposite of what the exception means.
+    // So one CLAUSE has to carry the other model AND its absence. The period
+    // splits sentences but not version numbers ("GPT-5.6" stays whole).
+    const clauses = String(reason).split(/[;,]|(?<!\d)\.|\.(?!\d)|\band\b|\bbut\b|\bwhile\b|\bso\b|\bhowever\b/i)
+    const bound = clauses.some(
+      (c) => UNAVAILABLE.test(c) && !NEGATED_ABSENCE.test(c) && namesOtherModel(c, who),
+    )
+    if (!named.length) {
+      errors.push(
+        `the two-model fallback has to NAME the model that was unavailable ("${reason}" names none) — ` +
+          'it is the reason an author was allowed to merge, and an unnamed reason cannot be checked',
+      )
+    } else if (!namesOtherModel(reason, who)) {
+      errors.push(
+        `the two-model fallback names only "${who}" itself: it has to say which OTHER model was ` +
+          'unavailable, since that is what made an author the merger',
+      )
+    } else if (!bound) {
+      errors.push(
+        `the two-model fallback does not say that the OTHER model was the absent one ("${reason}") — ` +
+          'name it and say it was unreachable, in one breath: the exception is that model\'s absence',
+      )
+    }
+  }
+  return { ok: errors.length === 0, errors, fallback: Boolean(conflict && reason) }
+}
+
+/**
+ * The merge half of a RECORD: who folded the two lists, on what count, and does
+ * that model owe the two-model fallback? Required under blind-parallel and
+ * meaningless under a review, which judges one artefact and folds nothing.
+ *
+ * The list authors are the record's own models: `model` reviewed, and the commit
+ * trailers name who wrote it — EVERY Claude co-author (`authors`), not just the
+ * first, since a second one named there could otherwise merge its own list
+ * (four-eyes review of point 634). The merger has to be none of them.
+ *
+ * `accounting` is the receipt from `scripts/blind-merge.mjs`. Without it the
+ * identity rule would stand alone and a record could claim a merge nobody
+ * counted — the same review's second finding — so a blind-parallel record
+ * carries the line that says every input entry was accounted for.
+ */
+export function validateMergedBy({
+  mode,
+  mergedBy,
+  mergeFallback,
+  accounting,
+  model,
+  authoredBy,
+  authors,
+} = {}) {
+  const m = String(mode ?? '').trim()
+  const who = String(mergedBy ?? '').trim()
+  const reason = String(mergeFallback ?? '').trim()
+  const receipt = String(accounting ?? '').trim()
+  if (m && m !== BLIND_PARALLEL) {
+    const errors = []
+    if (who || reason) {
+      errors.push(
+        `--merged-by is meaningless under --mode ${m}: it names the model that folded two blind lists ` +
+          'into one union, and a review has no such fold.',
+      )
+    }
+    if (receipt) errors.push(`--accounting is meaningless under --mode ${m}: there is no union to count.`)
+    return { ok: errors.length === 0, errors }
+  }
+  if (m !== BLIND_PARALLEL) return { ok: true, errors: [] }
+  const wrote = (Array.isArray(authors) && authors.length ? authors : [authoredBy]).filter(Boolean)
+  const { errors } = validateMerger({ mergedBy: who, authors: [model, ...wrote], fallback: reason })
+  if (!receipt) {
+    errors.push(
+      '--accounting "<the summary line>": the union of a blind-parallel stage is COUNTED, not trusted. ' +
+        'Run `node scripts/blind-merge.mjs --a <A> --b <B> --union <U>` and record the line it prints.',
+    )
+  } else if (!receiptBalances(receipt)) {
+    errors.push(
+      `--accounting: "${receipt}" is not the line blind-merge.mjs prints for a union that balances ` +
+        '("<n> A + <m> B entries → <k> union entries …: every input entry accounted for"). A merge that ' +
+        'leaves an entry unaccounted for is not recorded as one.',
+    )
+  }
+  return { ok: errors.length === 0, errors }
+}
+
+/** The first MODEL co-author out of a `Co-Authored-By` trailer field. */
+export function modelFromTrailers(field) {
+  return modelsFromTrailers(field)[0] ?? ''
+}
+
+/**
+ * EVERY model co-author of a commit, not just the first.
+ *
+ * The single-author read is right for "who wrote this" — the gate compares one
+ * author against one reviewer — but wrong for the merge: a commit naming two
+ * models has two list authors, and taking only the first would let the second
+ * merge its own list (four-eyes review of point 634).
+ *
+ * IT ASKS THE AUTHOR ALLOWLIST WHAT A MODEL TRAILER LOOKS LIKE (point 667), and
+ * no longer "does it say Claude". Since Sol authors too, a Claude-only reading
+ * would report a Sol-authored commit as having no author at all — and every
+ * self-review refusal downstream is built on knowing who wrote it. Human
+ * co-authors still name no model and are still dropped.
+ */
+export function modelsFromTrailers(field) {
+  const out = []
+  for (const part of String(field ?? '').split(/[;,\n]/)) {
+    // ASKED OF THE PARSED NAME, not the raw line (second cross-vendor round of
+    // point 667): the raw line carries the ADDRESS, so a human co-author writing
+    // from `build@sol.example` was returned as a model author — and would then
+    // block a legitimate review as a self-review.
+    if (part.trim() && modelNamesIn(part).length) out.push(part.trim())
+  }
+  return out
 }
 
 // ---------------------------------------------------------------------------
@@ -192,6 +470,12 @@ export const FLAG_SPEC = Object.freeze({
   '--point': true,
   '--mode': true,
   '--framing': true,
+  '--merged-by': true,
+  '--merge-fallback': true,
+  '--accounting': true,
+  '--union': true,
+  '--list-a': true,
+  '--list-b': true,
   '--list': false,
 })
 
@@ -207,6 +491,12 @@ const VALUE_KEY = Object.freeze({
   '--point': 'point',
   '--mode': 'mode',
   '--framing': 'framing',
+  '--merged-by': 'mergedBy',
+  '--merge-fallback': 'mergeFallback',
+  '--accounting': 'accounting',
+  '--union': 'unionPath',
+  '--list-a': 'listAPath',
+  '--list-b': 'listBPath',
 })
 
 /** Levenshtein distance — small inputs only, so the simple two-row form. */
@@ -319,6 +609,50 @@ export function formatArgErrors(errors = []) {
   return ['mechanism-review: refusing this command line.', '', ...errors.map((e) => `  · ${e}`)].join('\n')
 }
 
+/**
+ * An answer that ADMITS no review took place: "I could not read the diff",
+ * "none of my commands reached the repository", "no access to the patch".
+ *
+ * It lives here rather than beside the runner that first needed it because BOTH
+ * halves must refuse it: the runner when a model answers that way, and
+ * validateRecord when a hand writes the same sentence into the ledger. Kept
+ * deliberately narrow — about ACCESS, not about findings — so that an ordinary
+ * finding ("the parser could not handle CRLF") is still a review.
+ *
+ * It is a SAFETY NET, never a proof: no pattern list catches every way of
+ * saying "I never saw it", and each round of the cross-vendor review found one
+ * more phrasing. What keeps the gate honest is the runner falling back on any
+ * unusable answer at all; this only stops the ones that would otherwise read as
+ * a verdict.
+ */
+export const BLIND_REVIEWER = new RegExp(
+  [
+    // "I could not read/see/access …", "we were unable to inspect …"
+    /\b(?:i|we)\s+(?:could\s+not|couldn't|can(?:no|')t|(?:was|were)\s+(?:unable|not\s+able)\s+to|did\s+not\s+(?:get|receive|have))\b[^.\n]{0,80}\b(?:read|see|inspect|access|reach|open|review|view|retrieve|fetch|verify|validate|confirm|check|examine|evaluate|assess)\b/
+      .source,
+    // "…because the repository was unavailable" — the reason half of the same
+    // admission, whatever verb the first half used (fifth cross-vendor round).
+    /\b(?:repository|repo|diff|patch|material|files?|change|workspace|content)\s+(?:was|were|is|are)\s+(?:unavailable|unreachable|inaccessible|not\s+(?:available|reachable|accessible))\b/
+      .source,
+    // "no access to the diff", "without access to the files", "had no material"
+    /\b(?:no|without|lacking|denied)\s+access\b/.source,
+    /\bno\s+(?:material|patch|diff)\b/.source,
+    // "none of my commands reached …", "repository access failed"
+    /\bnone\s+of\s+my\s+commands\b/.source,
+    /\b(?:repository|repo|file|material|workspace)\s+access\s+(?:failed|denied|was\s+denied)\b/.source,
+    // "the diff could not be read", "the patch was not supplied/provided"
+    /\b(?:could\s+not|unable\s+to)\s+(?:read|inspect|access|retrieve)\s+(?:the\s+)?(?:diff|patch|files?|repository|material|change)\b/
+      .source,
+    // …and the same sentence in the passive, which the active form above does
+    // NOT match: "the diff could not be read" (third cross-vendor round).
+    /\b(?:diff|patch|files?|repository|material|change)\s+(?:could\s+not|cannot|can't)\s+be\s+(?:read|inspected|accessed|retrieved|seen)\b/
+      .source,
+    /\b(?:diff|patch|material|files?)\s+(?:was|were)\s+(?:not\s+(?:supplied|provided|available|accessible)|un(?:available|supplied|provided))\b/
+      .source,
+  ].join('|'),
+  'i',
+)
+
 /** Shortest form a message should print a sha in. */
 const short = (sha) => String(sha ?? '').slice(0, 7)
 
@@ -369,20 +703,55 @@ export function validateMode({ mode, framing } = {}) {
  * trailer. A match is REFUSED here rather than warned about: a self-review that
  * lands in the ledger is worse than none, because the gate then reads green.
  */
-export function validateRecord({ sha, model, verdict, evidence, authoredBy, mode, framing } = {}) {
+export function validateRecord({
+  sha,
+  model,
+  verdict,
+  evidence,
+  authoredBy,
+  mode,
+  framing,
+  mergedBy,
+  mergeFallback,
+  accounting,
+  authors,
+} = {}) {
   const errors = []
   errors.push(...validateMode({ mode, framing }).errors)
+  errors.push(...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors }).errors)
   if (!/^[0-9a-f]{7,40}$/i.test(String(sha ?? '').trim())) {
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
   }
   if (!String(model ?? '').trim()) {
-    errors.push('--model <name>: which model performed the review (e.g. "Fable 5")')
+    // The example NAMES the reviewer the rule prefers (point 624): reviews go to
+    // GPT-5.6 Sol first and to Fable 5 when Sol is unavailable, and nothing here
+    // restricts the value — a reviewer this recorder refused could not be used.
+    errors.push('--model <name>: which model performed the review (e.g. "GPT-5.6 Sol", "Fable 5")')
   }
   if (!VERDICTS.includes(String(verdict ?? '').trim())) {
     errors.push(`--verdict <v>: one of ${VERDICTS.join(' | ')}`)
   }
-  if (String(evidence ?? '').trim().length < 10) {
+  const ev = String(evidence ?? '').trim()
+  if (ev.length < 10) {
     errors.push('--evidence "<one line>": what was actually checked — one honest line, not a word')
+  } else if (BLIND_REVIEWER.test(ev)) {
+    // AN EVIDENCE LINE THAT ADMITS THE REVIEWER NEVER SAW THE CHANGE IS REFUSED
+    // (point 624, second cross-vendor round). The first real cross-vendor run
+    // answered `do-not-merge` because none of its commands reached the
+    // repository — a well-formed verdict for a review that never happened. The
+    // runner already falls back on such an answer; the RECORDER must refuse it
+    // too, or a hand-typed line reopens the hole the runner closed.
+    errors.push(
+      `--evidence: "${ev}" says the reviewer could not see the change — that is not a review. ` +
+        'Have it reviewed, then record what was actually read.',
+    )
+  } else if (/^<.*>$/.test(ev)) {
+    // A LINE STILL IN ITS ANGLE BRACKETS IS THE PLACEHOLDER, not an observation
+    // (four-eyes finding on point 624). The commands that print a record command
+    // for a review still to be done leave the evidence as `<…>`, and the length
+    // rule above waves a long placeholder straight through — which would put a
+    // ledger line naming nothing in front of a gate that then reads green.
+    errors.push(`--evidence: "${ev}" is still the placeholder — write what the review actually checked`)
   }
   if (String(model ?? '').trim() && String(authoredBy ?? '').trim() && sameModel(model, authoredBy)) {
     errors.push(
@@ -392,6 +761,39 @@ export function validateRecord({ sha, model, verdict, evidence, authoredBy, mode
     )
   }
   return { ok: errors.length === 0, errors }
+}
+
+/**
+ * What is wrong with the MERGE this record claims, or '' if nothing is.
+ *
+ * The gate needs the same answer the recorder gives, on a row that may have been
+ * hand-edited or written by a CLI that predates the rule: a blind-parallel row
+ * from the rule's era owes a merging model, a receipt that the union balanced,
+ * and a merger that wrote neither list (or a recorded two-model fallback).
+ * `commit.authorModels` carries EVERY co-author where the wrapper could read it,
+ * so a second one named in the trailers cannot merge its own list either.
+ */
+export function mergeProblem(record = {}, commit = {}) {
+  if (String(record.mode ?? '') !== BLIND_PARALLEL) return ''
+  // A row is grandfathered only by a REAL timestamp older than the rule. A row
+  // with NO `at` is not old, it is unstamped — reading a missing field as legacy
+  // was itself a bypass (four-eyes review, third round): omit `at`, `mergedBy`
+  // and `accounting` together and nothing was ever checked.
+  const at = Number(record.at)
+  if (Number.isFinite(at) && at > 0 && at < MERGE_ACCOUNTING_SINCE) return ''
+  const who = String(record.mergedBy ?? '').trim()
+  if (!who) return 'no-merger'
+  if (!receiptBalances(record.accounting)) return 'no-count'
+  // The FALLBACK is judged, not merely present: any word in that field used to
+  // buy an author the merge, while the recorder demanded it name the model that
+  // was missing. One function answers for both halves.
+  const authors = (commit.authorModels ?? [commit.authorModel]).filter(Boolean)
+  const check = validateMerger({
+    mergedBy: who,
+    authors: [...authors, record.model].filter(Boolean),
+    fallback: record.mergeFallback,
+  })
+  return check.ok ? '' : 'self-merge'
 }
 
 /**
@@ -431,8 +833,15 @@ export function evaluateMechanismReview({
     const wellFormed = covering.filter(
       (r) => VERDICTS.includes(String(r.verdict)) && String(r.model ?? '').trim(),
     )
-    const selfReviews = wellFormed.filter((r) => sameModel(r.model, commit?.authorModel))
-    const valid = wellFormed.filter((r) => !sameModel(r.model, commit?.authorModel))
+    // A SELF-MERGE IS AS EMPTY AS A SELF-REVIEW, and the ledger is a tracked file
+    // anyone can hand-edit (four-eyes review of point 634): the recorder refuses
+    // a blind-parallel row whose merger wrote one of the lists or whose union was
+    // never counted, and the gate refuses the same row when it arrives some other
+    // way — by an edit, or from a branch whose CLI predates the rule. Rows older
+    // than MERGE_ACCOUNTING_SINCE are grandfathered by DATE; treating a MISSING
+    // field as legacy is what let an edited row simply omit it.
+    const selfReviews = wellFormed.filter((r) => sameModel(r.model, commit?.authorModel) || mergeProblem(r, commit))
+    const valid = wellFormed.filter((r) => !sameModel(r.model, commit?.authorModel) && !mergeProblem(r, commit))
 
     if (!valid.length) {
       findings.push({
@@ -475,12 +884,29 @@ export function formatMechanismReviewVerdict(verdict) {
       )
       continue
     }
+    const blind = (f.records ?? []).find((r) => mergeProblem(r, c))
+    const mergeLine = () => {
+      const who = String(blind?.mergedBy ?? '').trim()
+      const problem = mergeProblem(blind, c)
+      if (problem === 'no-merger') {
+        return "      the record is blind-parallel and names no merging model — the union's fold is unowned"
+      }
+      if (problem === 'no-count') {
+        return `      ${who} merged the union, but the record carries no count of it — a merge nobody counted`
+      }
+      return (
+        `      the union was merged by ${who}, which wrote one of the two lists — ` +
+        'a self-merge is where a finding disappears'
+      )
+    }
     lines.push(
       `  ✗ ${short(c.sha)} ${c.subject ?? ''}`,
       `      ${files}`,
-      f.kind === 'self-review'
-        ? `      the only review on record is by ${author}'s own model — a self-review is not a review`
-        : `      authored by ${author}; no review recorded`,
+      f.kind !== 'self-review'
+        ? `      authored by ${author}; no review recorded`
+        : blind
+          ? mergeLine()
+          : `      the only review on record is by ${author}'s own model — a self-review is not a review`,
     )
   }
   lines.push(

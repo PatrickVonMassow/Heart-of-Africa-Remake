@@ -29,6 +29,7 @@ import {
   noteTopLevelSession,
   findClaudeAncestor,
   probePid,
+  transitionOwnerSession,
 } from './batch-singleton.mjs'
 import { gatherOwnerWork } from './batch-owner-work.mjs'
 import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
@@ -146,9 +147,13 @@ function clearAuthorized() {
 // A missing id falls back to a fresh random id, which errs toward NOT resuming
 // (an unknown session can never own the lock → it stands down).
 let sessionId = randomUUID()
+let assertedSessionId = ''
+let sessionSource = ''
 try {
   const parsed = JSON.parse(readFileSync(0, 'utf8'))
-  if (typeof parsed.session_id === 'string' && parsed.session_id) sessionId = parsed.session_id
+  if (typeof parsed.session_id === 'string') assertedSessionId = parsed.session_id
+  if (assertedSessionId) sessionId = assertedSessionId
+  if (typeof parsed.source === 'string') sessionSource = parsed.source
 } catch {
   // no/!JSON stdin — keep the random fallback
 }
@@ -164,9 +169,10 @@ const RESUME_BODY =
   'backends); TASKS.md is MAIN-only — tick the point on main at the merge; cross-cutting ' +
   'changes (guards, docs, dashboard, process files) go directly to main. MAXIMAL ' +
   'DELEGATION (user decision 22.07.2026): delegate implementation AND infra/guard/doc/' +
-  'dashboard work to parallel WORKTREE-ISOLATED subagents on NON-OVERLAPPING files — with ' +
-  'OPUS 5, per the model policy stated below; Fable only reviews or stands in ' +
-  '(each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
+  'dashboard work to parallel WORKTREE-ISOLATED subagents on NON-OVERLAPPING files — under ' +
+  'the model policy stated above, so the mechanical and mid-difficulty points go to GPT-5.6 ' +
+  'Sol, the hard cases to Fable 5 from the start, and only a point whose verification is the ' +
+  'work stays with Opus 5 (each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
   'session keeps only the picture-verification on both backends, the serial merge -> ' +
   'fast-gate -> tick -> deploy -> cleanup, and the board publish. Every defect the user ' +
   'reports on the deployed build during the batch is APPENDED as its own implementation-ready ' +
@@ -180,13 +186,18 @@ const RESUME_BODY =
   'CLOSING FREEZE (user decision 22.07.2026): during a closing run the code is FROZEN — ' +
   'no parallel agent work lands/merges while the closing runs; merge or park in-flight ' +
   'branches first, resume the pool only after. ' +
-  'POINT BOUNDARY (user 27.07.2026): the context is the batch\'s dominant cost, so a session ' +
-  'carries ONE stretch of work, not point after point. Once the merged-and-ticked point is done ' +
-  'AND no delegated agent is still in flight (let the pool drain — ending mid-flight throws its ' +
-  'work away), run `node scripts/batch-boundary.mjs <point>` and END THE SESSION instead of ' +
-  'starting the next point here. The launcher brings up a fresh session and ' +
-  'this hook re-orients it; batch-progress-guard permits that stop only against a verifiably ' +
-  'closed point and an armed launcher, and blocks every other end as before. ' +
+  'POINT BOUNDARY (user 27.07.2026, two-phase since point 675): the context is the batch\'s ' +
+  'dominant cost, so a session carries ONE stretch of work, not point after point. Once the ' +
+  'point you were landing is LANDED (merged and ticked), hand over: `node scripts/batch-boundary.mjs ' +
+  '--prepare <point>`, its bookkeeping, then `--commit <point>` as the LAST repository action, and ' +
+  'END THE SESSION instead of starting the next point here. A delegated author still building does ' +
+  'NOT hold the boundary — with pushed checkpoints its declaration is transferred at the commit; ' +
+  'a PREDECESSOR may equally have left one for YOU: if `node scripts/batch-in-flight.mjs --status` ' +
+  'shows a transferred declaration, ADOPT it first (`node scripts/batch-in-flight.mjs --adopt`) and ' +
+  'act on that work before taking a new point. The context watermark ends a session the same way ' +
+  'even without a landed point (`--prepare --context` / `--commit --context`). The launcher brings ' +
+  'up a fresh session and this hook re-orients it; batch-progress-guard permits the stop only ' +
+  'against the verified condition and an armed launcher, and blocks every other end as before. ' +
   'First check git status AND the checked-out branch above for work already underway, and ' +
   'do not double-start regressions. This session now holds the batch lock ' +
   '(.claude/batch-lock.json); the PostToolUse heartbeat keeps it fresh while you work.'
@@ -218,12 +229,20 @@ try {
     // forbidden commit.
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
-      'MODEL POLICY (25.07.2026): Opus 5 is the WORKER at any difficulty; the fallback chain ' +
-      'is Opus 5 -> Fable 5 -> Opus 4.8. Fable is used ONLY for four-eyes review (one model ' +
-      'plans/builds, the other checks) or as that fallback — never because a task looks hard. ' +
-      'Sonnet, Haiku and every other model are NOT acceptable: if the serving model is not one ' +
-      'of the three, do NOT work — create .claude/batch-paused (reason: forbidden serving ' +
-      'model) and send an ntfy alert via scripts/notify.mjs instead.'
+      'MODEL POLICY (25.07.-13.08.2026, CLAUDE.md par.6): AUTHORING HAS THREE LANES. ' +
+      'GPT-5.6 Sol authors the MECHANICAL and MID-DIFFICULTY points via ' +
+      'scripts/author-sol.mjs; FABLE 5 authors the HARD cases — difficult, complex or ' +
+      'error-prone — from the start, and takes over Opus work once Sol still finds problems ' +
+      'after a re-work; OPUS 5 keeps what only the main session can finish, a point whose ' +
+      'VERIFICATION is the work. scripts/author-routing-core.mjs makes the cut, and ' +
+      'scripts/sol-share.mjs --status says what the switch routes right now. REVIEW is ' +
+      'CROSS-VENDOR: Sol reads Anthropic-authored work (scripts/review-sol.mjs), Claude ' +
+      'reads Sol-authored work, and no model reviews its own. ' +
+      'THE SERVING MODEL of this session — the one running the batch — is Opus 5, then ' +
+      'Fable 5, then Opus 4.8. Sonnet, Haiku and every other model are NOT acceptable: if ' +
+      'the serving model is not one of those three, do NOT work — create ' +
+      '.claude/batch-paused (reason: forbidden serving model) and send an ntfy alert via ' +
+      'scripts/notify.mjs instead.'
     const now = Date.now()
     if (isPaused()) {
       const why = pauseReason()
@@ -234,6 +253,21 @@ try {
           'or delete .claude/batch-paused) before resuming.',
       )
     } else {
+      // A compaction is the one trusted transition event: ordinary guards can
+      // prove process ownership, but may NEVER use an asserted payload id to
+      // rename the lock. The transition itself rechecks the observed generation
+      // and process under the takeover mutex. A refusal is loud and leaves the
+      // prior owner intact; acquire below then merely acts with process permission.
+      if (sessionSource === 'compact') {
+        const observed = readOwnerLock()
+        const transition = transitionOwnerSession(assertedSessionId, { lock: observed })
+        if (!transition.transitioned && transition.reason !== 'already-current') {
+          console.error(
+            `[batch-resume] OWNER SESSION TRANSITION REFUSED (${transition.reason}); ` +
+              `the lock still names ${observed?.sessionId || 'no owner'}.`,
+          )
+        }
+      }
       // A RESERVATION (point 395): the user claimed the batch back into the window
       // they are sitting at. A freshly started session — most of all one the OS
       // launcher spawned — must NOT take the lock the owner is about to release

@@ -7,7 +7,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { render, fireEvent } from '@testing-library/react'
 import { Hud, LoadMenu } from './Hud'
 import { en } from '../i18n/en'
+import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
+import { UNSTUCK_KEY_CODE, UNSTUCK_KEY_LABEL } from '../systems/unstuck'
 import { useGame, canCampHere } from '../state/store'
 import { START_YEAR } from '../config/balance'
 import { MONTH_KEYS } from '../systems/season'
@@ -450,6 +452,47 @@ describe('Touch controls mount only with ui.touchActive (design.md §17.5, point
     window.removeEventListener('keydown', onKey)
     expect(sawSpace).toBe(true)
   })
+
+  // Work-order 610: a touch-only player has no U key, so the hint that names it
+  // must BE the button — otherwise the escape of 604 exists but is unreachable
+  // for him, and a wedge still costs the expedition.
+  it('makes the stuck hint tappable on touch and dispatches the key it names', () => {
+    g().setToast(en.toasts.stuckHint(UNSTUCK_KEY_LABEL))
+    const { rerender } = render(<Hud />)
+    // Desktop: a plain notice, nothing to press.
+    expect(document.querySelector('.toast')?.tagName).toBe('DIV')
+    expect(document.querySelector('.toast-tappable')).toBeNull()
+    useUi.setState({ touchActive: true })
+    rerender(<Hud />)
+    const tappable = document.querySelector('.toast-tappable') as HTMLButtonElement
+    expect(tappable).not.toBeNull()
+    expect(tappable.tagName).toBe('BUTTON')
+    expect(tappable.textContent).toBe(en.toasts.stuckHint(UNSTUCK_KEY_LABEL))
+    const seen: string[] = []
+    const onKey = (e: KeyboardEvent) => seen.push(e.code)
+    window.addEventListener('keydown', onKey)
+    fireEvent.click(tappable)
+    window.removeEventListener('keydown', onKey)
+    expect(seen).toContain(UNSTUCK_KEY_CODE)
+  })
+
+  it('leaves every other toast a plain label, even on touch', () => {
+    useUi.setState({ touchActive: true })
+    g().setToast(en.toasts.unstuckFreed)
+    render(<Hud />)
+    expect(document.querySelector('.toast')?.tagName).toBe('DIV')
+    expect(document.querySelector('.toast-tappable')).toBeNull()
+  })
+
+  it('the tappable hint follows the language, so a German player taps his own text', () => {
+    useUi.setState({ touchActive: true })
+    useLocale.getState().setLang('de')
+    g().setToast(de.toasts.stuckHint(UNSTUCK_KEY_LABEL))
+    render(<Hud />)
+    const tappable = document.querySelector('.toast-tappable') as HTMLButtonElement
+    expect(tappable).not.toBeNull()
+    expect(tappable.textContent).toBe(de.toasts.stuckHint(UNSTUCK_KEY_LABEL))
+  })
 })
 
 describe('inventory bar sorts alphabetically by localized name (point 104)', () => {
@@ -531,6 +574,30 @@ describe('month keys (design.md §21.1 — stepping the seasons)', () => {
     ])
     expect(MONTH_KEYS).toHaveLength(12)
     expect(new Set(MONTH_KEYS).size).toBe(12) // no key means two months
+  })
+
+  // Work-order 601: the chords on this row were handed back to the browser
+  // (Ctrl+1–9 tab jumps, Ctrl +/−/0 zoom). The handler must therefore stand
+  // down under a modifier, or one press does BOTH — switching the tab and
+  // silently moving the expedition's date.
+  it('does not move the date on a Ctrl press, and leaves the chord to the browser', () => {
+    render(<Hud />)
+    const monthOf = () =>
+      new Date(Date.UTC(START_YEAR, 0, 1) + useGame.getState().day * 86400000).getUTCMonth()
+    const before = useGame.getState().day
+    const notPrevented = window.dispatchEvent(
+      new KeyboardEvent('keydown', { code: 'Digit3', ctrlKey: true, cancelable: true }),
+    )
+    expect(useGame.getState().day).toBe(before) // the date did not move
+    expect(notPrevented).toBe(true) // …and the browser keeps its tab jump
+    // Alt and Meta are the same case.
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Equal', altKey: true, cancelable: true }))
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit1', metaKey: true, cancelable: true }))
+    expect(useGame.getState().day).toBe(before)
+    // The PLAIN press still jumps, exactly as before.
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit3', cancelable: true }))
+    expect(monthOf()).toBe(2) // March
+    expect(useGame.getState().day).not.toBe(before)
   })
 
   it('jumps the store to that month, keeping the year', () => {

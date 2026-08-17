@@ -49,11 +49,16 @@ export function boardHtml({
     typeof c === 'number' ? `${c} — Task ${c}` : c,
   )
   const now = nowTitles
-    .map(
-      (t) => `<details class="now"><summary><span class="t">${t}</span>
+    .map((t) => {
+      // The CHIP the reader sees since point 655: a numbered title is rendered
+      // the way every writer renders it now, so the fixture stays a board the
+      // publish gate would accept.
+      const lead = t.match(/^(\d+)\s*—\s*([\s\S]*)$/)
+      const head = lead ? `<span class="num">${lead[1]}</span><span class="t">${lead[2]}</span>` : `<span class="t">${t}</span>`
+      return `<details class="now"><summary>${head}
 <span class="right"><span class="meta">09:00 · bis ~11:00</span></span></summary>
-<div class="body"><p>Status (Stand 09:00): der point-200-Vergleich darf hier NICHT zählen.</p></div></details>`,
-    )
+<div class="body"><p>Status (Stand 09:00): der point-200-Vergleich darf hier NICHT zählen.</p></div></details>`
+    })
     .join('\n')
   // Every section folds behind its heading and the Erledigt section links its
   // archive page (point 371) — the fixture has to be a VALID board, or the

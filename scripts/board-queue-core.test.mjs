@@ -15,8 +15,9 @@ import { boardMissingPoints } from './board-currency-core.mjs'
 import { queueCard, toNow } from './board-core.mjs'
 import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
 import { evaluate as evaluateTopic } from './dashboard-card-topic-guard-core.mjs'
-import { FINDER_POINTS, RELEASE_TAG_POINT } from './queue-order-guard-core.mjs'
 import {
+  FINDER_POINTS,
+  RELEASE_TAG_POINT,
   QUEUE_STUB_BODY,
   assertNotFlagValue,
   boardTitleReport,
@@ -66,35 +67,53 @@ ${queue}
 </main>`
 
 describe('normaliseQueueData — a hand-editable file must degrade, never throw', () => {
-  it('drops everything hostile and keeps the order unique', () => {
-    const d = normaliseQueueData({ order: [3, '3', 0, -1, 'x', 2], points: { 5: { body: ' b ' }, 0: { body: 'n' }, z: {} } })
-    expect(d.order).toEqual([3, 2])
+  it('keeps the prose and drops everything hostile', () => {
+    const d = normaliseQueueData({ points: { 5: { body: ' b ' }, 0: { body: 'n' }, z: {} } })
     expect(d.points).toEqual({ 5: { title: null, body: ['b'], estimate: null } })
   })
   it('survives junk of every shape', () => {
     for (const raw of [null, undefined, 'x', 42, [], { points: 'no' }, { order: 'no' }]) {
       expect(() => normaliseQueueData(raw)).not.toThrow()
-      expect(normaliseQueueData(raw)).toEqual({ order: [], points: {} })
+      expect(normaliseQueueData(raw)).toEqual({ points: {} })
     }
+  })
+  // POINT 608: the file used to carry its own `order`, and the two drifted.
+  it('drops a stored order rather than giving the sequence a second home', () => {
+    expect(normaliseQueueData({ order: [3, 2], points: {} })).toEqual({ points: {} })
   })
 })
 
-describe('queueOrder — judgment first, work order second, finders last', () => {
-  it('keeps the listed order and appends the unlisted ascending', () => {
-    expect(queueOrder([9, 4, 7, 2], { order: [7, 4] })).toEqual([7, 4, 2, 9])
+describe('queueOrder — the WORK ORDER is the sequence (point 608)', () => {
+  it('renders the open points in the sequence the work order lists them', () => {
+    expect(queueOrder([9, 4, 7, 2])).toEqual([9, 4, 7, 2])
   })
-  it('ignores listed points that are no longer open', () => {
-    expect(queueOrder([4], { order: [7, 4] })).toEqual([4])
+  it('re-sequencing the work order re-sequences the queue, with nothing else edited', () => {
+    expect(queueOrder([2, 7, 4, 9])).toEqual([2, 7, 4, 9])
+  })
+  it('ignores a stored order — a leftover file may not steer the board any more', () => {
+    // The old second argument WAS the data file. Handing it in now must change
+    // nothing, or the drift this point ended could come back through a stale call.
+    expect(queueOrder([9, 4, 7, 2], { order: [7, 4] })).toEqual([9, 4, 7, 2])
+  })
+  it('drops duplicates and anything that is not a point number', () => {
+    expect(queueOrder([9, 9, 0, -1, 'x', 4])).toEqual([9, 4])
   })
   it('pushes the bug-FINDING points behind the fixes, by construction', () => {
     const finder = [...FINDER_POINTS][0]
-    const out = queueOrder([finder, 999], { order: [finder, 999] })
-    expect(out.indexOf(finder)).toBeGreaterThan(out.indexOf(999))
+    expect(queueOrder([finder, 999])).toEqual([999, finder])
   })
-  it('puts the release tag last of all', () => {
+  it('keeps the release tag where the work order put it, ahead of the finder block', () => {
+    // User 10.08.2026: v0.3 ships once the communication mechanic and the critical
+    // bugs are done. The finders and audits are POST-release work, so they sink
+    // past the tag instead of gating it — while an ordinary fix keeps whatever
+    // position the work order gave it.
     const finder = [...FINDER_POINTS][0]
-    const out = queueOrder([RELEASE_TAG_POINT, finder, 999], null)
-    expect(out[out.length - 1]).toBe(RELEASE_TAG_POINT)
+    expect(queueOrder([999, RELEASE_TAG_POINT, finder])).toEqual([999, RELEASE_TAG_POINT, finder])
+    expect(queueOrder([finder, RELEASE_TAG_POINT, 999])).toEqual([RELEASE_TAG_POINT, 999, finder])
+  })
+  it('keeps two finders in their work-order sequence behind the fixes', () => {
+    const [a, b] = [...FINDER_POINTS]
+    expect(queueOrder([b, 999, a])).toEqual([999, b, a])
   })
 })
 
@@ -126,32 +145,37 @@ describe('queueEntries — every open point gets a card, and never two', () => {
 describe('the user gate (point 450) — a point waiting on the user never jams the queue', () => {
   const gates = (...lines) => gateSets(lines.join('\n'))
 
-  it('moves a gated point behind every workable one, whatever the stored order says', () => {
+  it('moves a gated point behind every workable one, whatever the work order says', () => {
     const g = gates('- [ ] 7. GATED AWAITING-USER(2026-07-29; needs a ruling)')
-    expect(queueOrder([7, 8, 9], { order: [7, 8, 9] }, g)).toEqual([8, 9, 7])
+    expect(queueOrder([7, 8, 9], g)).toEqual([8, 9, 7])
   })
 
-  it('keeps several gated points out of the way at once, in their listed order', () => {
+  it('keeps several gated points out of the way at once, in their work-order sequence', () => {
     const g = gates(
       '- [ ] 7. A AWAITING-USER(2026-07-29; a)',
       '- [ ] 8. B AWAITING-USER(2026-07-30; b)',
     )
-    expect(queueOrder([7, 8, 9], { order: [7, 8, 9] }, g)).toEqual([9, 7, 8])
+    expect(queueOrder([7, 8, 9], g)).toEqual([9, 7, 8])
   })
 
   it('puts an ANSWERED point back at the very HEAD, ahead of work appended while it waited', () => {
     const g = gates('- [ ] 9. ANSWERED USER-ANSWERED(2026-08-07)')
-    expect(queueOrder([7, 8, 9], { order: [7, 8, 9] }, g)).toEqual([9, 7, 8])
+    expect(queueOrder([7, 8, 9], g)).toEqual([9, 7, 8])
   })
 
-  it('lets an answered point outrank even the head of the stored order', () => {
+  it('lets an answered point outrank even the head of the work order', () => {
     const g = gates('- [ ] 9. ANSWERED USER-ANSWERED(2026-08-07)', '- [ ] 7. GATED AWAITING-USER(2026-01-01; why)')
-    expect(queueOrder([7, 8, 9], { order: [7, 8, 9] }, g)).toEqual([9, 8, 7])
+    expect(queueOrder([7, 8, 9], g)).toEqual([9, 8, 7])
   })
 
-  it('orders exactly as before when nothing is gated', () => {
-    expect(queueOrder([9, 4, 7, 2], { order: [7, 4] }, null)).toEqual(queueOrder([9, 4, 7, 2], { order: [7, 4] }))
-    expect(queueOrder([9, 4], { order: [4] }, gates('- [ ] 4. PLAIN POINT.'))).toEqual([4, 9])
+  it('orders exactly as the work order does when nothing is gated', () => {
+    expect(queueOrder([9, 4, 7, 2], null)).toEqual(queueOrder([9, 4, 7, 2]))
+    expect(queueOrder([9, 4], gates('- [ ] 4. PLAIN POINT.'))).toEqual([9, 4])
+  })
+
+  it('takes the raw work order as its gate argument, not only a parsed one', () => {
+    const tasks = '- [ ] 7. GATED AWAITING-USER(2026-07-29; needs a ruling)\n- [ ] 8. B.\n- [ ] 9. C.'
+    expect(queueOrder([7, 8, 9], tasks)).toEqual([8, 9, 7])
   })
 
   it('marks the card as waiting on the USER instead of promising a duration', () => {
@@ -306,20 +330,22 @@ describe('paragraphs — a body is a list, however it was written', () => {
 })
 
 describe('the one-time import from a hand-written board', () => {
-  it('reads back the prose, the order and a real estimate', () => {
+  it('reads back the prose and a real estimate, but no sequence', () => {
     const html = board(
       renderQueueCard({ point: 8, title: 'Acht', body: 'Text acht.', meta: '~2 h' }) +
         renderQueueCard({ point: 3, title: 'Drei', body: 'Text drei.', meta: QUEUE_STUB_META }),
     )
     const data = importQueueFromHtml(html)
-    expect(data.order).toEqual([8, 3])
+    // POINT 608: the card sequence is the work order's, so importing it back
+    // would re-create the second home the point removed.
+    expect(data.order).toBeUndefined()
     expect(data.points[8]).toEqual({ title: 'Acht', body: ['Text acht.'], estimate: '~2 h' })
     // The stub meta is not an estimate anybody made — it must not be imported
     // as one, or the point would look estimated for ever.
     expect(data.points[3].estimate).toBeNull()
   })
   it('returns an empty projection rather than throwing on a board with no queue', () => {
-    expect(importQueueFromHtml('<main></main>')).toEqual({ order: [], points: {} })
+    expect(importQueueFromHtml('<main></main>')).toEqual({ points: {} })
   })
 
   // POINT 530: the round trip data → board → data is what destroyed 46 cards.
@@ -375,43 +401,41 @@ describe('a data file that does not parse stops the command (point 530, finding 
 
 describe('import is additive — it may never destroy a stored body (point 530)', () => {
   const stored = {
-    order: [8],
     points: { 8: { title: 'Acht', body: ['Erster Absatz.', 'Zweiter Absatz.', 'Dritter Absatz.'], estimate: '~2 h' } },
   }
 
   it('keeps the stored paragraphs when the board says the same point differently', () => {
-    const fromBoard = { order: [8], points: { 8: { title: 'Eight', body: ['Alles in einem Block.'], estimate: '~9 h' } } }
+    const fromBoard = { points: { 8: { title: 'Eight', body: ['Alles in einem Block.'], estimate: '~9 h' } } }
     const { data, added, kept } = mergeQueueImport(stored, fromBoard)
     expect(data.points[8]).toEqual(stored.points[8])
     expect(added).toEqual([])
     expect(kept).toBe(1)
   })
 
-  it('adds a point the data does not know yet, behind the stored order', () => {
-    const fromBoard = { order: [12, 8], points: { 12: { title: 'Zwölf', body: ['Neu.'], estimate: null } } }
+  it('adds a point the data does not know yet, and stores no sequence for it', () => {
+    const fromBoard = { points: { 12: { title: 'Zwölf', body: ['Neu.'], estimate: null } } }
     const { data, added } = mergeQueueImport(stored, fromBoard)
     expect(added).toEqual([12])
-    expect(data.order).toEqual([8, 12])
+    expect(data.order).toBeUndefined()
     expect(data.points[12].body).toEqual(['Neu.'])
     expect(data.points[8].body).toEqual(stored.points[8].body)
   })
 
   it('fills only the fields the stored card has nothing for', () => {
-    const partial = { order: [5], points: { 5: { title: null, body: ['Text.'], estimate: null } } }
-    const { data } = mergeQueueImport(partial, { order: [5], points: { 5: { title: 'Fünf', body: ['Anders.'], estimate: '~3 h' } } })
+    const partial = { points: { 5: { title: null, body: ['Text.'], estimate: null } } }
+    const { data } = mergeQueueImport(partial, { points: { 5: { title: 'Fünf', body: ['Anders.'], estimate: '~3 h' } } })
     expect(data.points[5]).toEqual({ title: 'Fünf', body: ['Text.'], estimate: '~3 h' })
   })
 
   it('keeps a stored point the board no longer shows, and is pure', () => {
     const before = JSON.parse(JSON.stringify(stored))
-    const { data } = mergeQueueImport(stored, { order: [], points: {} })
+    const { data } = mergeQueueImport(stored, { points: {} })
     expect(data.points[8]).toEqual(stored.points[8])
     expect(stored).toEqual(before)
   })
 
   it('imports neither an empty stub card nor a fallback title', () => {
     const fromBoard = {
-      order: [4, 5, 6],
       points: {
         4: { title: 'Punkt 4', body: null, estimate: null },
         5: { title: 'THE ENGLISH HEADLINE', body: null, estimate: null },
@@ -421,15 +445,13 @@ describe('import is additive — it may never destroy a stored body (point 530)'
     const { data, added } = mergeQueueImport(null, fromBoard, { titles: { 5: 'THE ENGLISH HEADLINE' } })
     expect(added).toEqual([6])
     expect(Object.keys(data.points)).toEqual(['6'])
-    // The order is still learnt, so a card keeps its judged place in the queue.
-    expect(data.order).toEqual([4, 5, 6])
   })
 
   it('degrades to the board alone when there is no data file yet', () => {
-    const { data, added, kept } = mergeQueueImport(null, { order: [3], points: { 3: { body: ['A.'] } } })
+    const { data, added, kept } = mergeQueueImport(null, { points: { 3: { body: ['A.'] } } })
     expect(added).toEqual([3])
     expect(kept).toBe(0)
-    expect(data.order).toEqual([3])
+    expect(data.points[3].body).toEqual(['A.'])
   })
 })
 
@@ -461,17 +483,23 @@ describe('the conciseness budget is enforced at the IMPORT, not only at the turn
 })
 
 describe('setQueueEntry — the commands edit the DATA, never the HTML', () => {
-  it('appends a new point and keeps what it was not given', () => {
+  it('adds a new point and keeps what it was not given', () => {
     const one = setQueueEntry(null, 5, { body: 'Erst.', estimate: '~1 h' })
-    expect(one.order).toEqual([5])
+    expect(one.points[5]).toEqual({ title: null, body: 'Erst.', estimate: '~1 h' })
     const two = setQueueEntry(one, 5, { body: 'Neu.' })
     expect(two.points[5]).toEqual({ title: null, body: 'Neu.', estimate: '~1 h' })
-    expect(two.order).toEqual([5])
+  })
+  // POINT 608: writing a card must not put a sequence back into the file — the
+  // next write is what finally clears a leftover one.
+  it('writes no order, and drops a leftover one from the file it rewrites', () => {
+    const written = setQueueEntry({ order: [9, 5], points: {} }, 5, { body: 'Text.' })
+    expect(written.order).toBeUndefined()
+    expect(Object.keys(written)).toEqual(['points'])
   })
   it('is pure — the input is not mutated', () => {
-    const before = { order: [5], points: { 5: { title: null, body: 'a', estimate: null } } }
+    const before = { points: { 5: { title: null, body: 'a', estimate: null } } }
     setQueueEntry(before, 6, { body: 'b' })
-    expect(before).toEqual({ order: [5], points: { 5: { title: null, body: 'a', estimate: null } } })
+    expect(before).toEqual({ points: { 5: { title: null, body: 'a', estimate: null } } })
   })
   it('refuses anything that is not a point number', () => {
     for (const bad of [0, -1, 'x', null, 1.5]) expect(() => setQueueEntry(null, bad, { body: 'b' })).toThrow()
@@ -685,10 +713,19 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
     expect(rendered).toEqual(entries.map((e) => e.point))
     expect(new Set(rendered).size).toBe(rendered.length)
     expect(rendered.slice().sort((a, b) => a - b)).toEqual(open.slice().sort((a, b) => a - b))
-    // The order is the queue's own judgment, undisturbed: the fixes first, the
-    // bug-FINDING point behind them, the release tag last of all.
-    expect(rendered).toEqual([295, 439, 465, 184, RELEASE_TAG_POINT])
+    // The work order's sequence, with only the finder sunk past it (point 608).
+    expect(rendered).toEqual([465, 439, 295, RELEASE_TAG_POINT, 184])
     expect(FINDER_POINTS.has(184)).toBe(true)
+  })
+
+  // POINT 608, the failure itself: the work order was re-sequenced twice on
+  // 10.08.2026 and the published board kept showing the old plan.
+  it('re-sequencing the work order re-sequences the rendered cards, nothing else edited', () => {
+    const data = { points: { 439: { title: 'A', body: 'Eins.' }, 465: { title: 'B', body: 'Zwei.' } } }
+    const cards = (open) =>
+      [...built(open, data).html.matchAll(/class="num">(\d+)</g)].map((m) => Number(m[1]))
+    expect(cards([439, 465, 295])).toEqual([439, 465, 295])
+    expect(cards([295, 465, 439])).toEqual([295, 465, 439])
   })
 
   it('carries NO `open` attribute — the reader’s own choice owns that (house rule)', () => {
@@ -714,7 +751,8 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
   it('lets the one-command loop find and promote a card', () => {
     const { html } = built([439, 465])
     expect(queueCard(html, 439)).toContain('<span class="num">439</span>')
-    expect(toNow(html, 439, 'Läuft.', { stamp: '16:20' })).toContain('<span class="t">439 — ')
+    // The promoted card keeps the chip the queue card carried (point 655).
+    expect(toNow(html, 439, 'Läuft.', { stamp: '16:20' })).toContain('<span class="num">439</span><span class="t">')
   })
 
   it('reads its own cards back on import, paragraph split intact', () => {
@@ -749,7 +787,6 @@ describe('setQueueEntry — a title lands without disturbing anything else', () 
     const before = setQueueEntry(null, 452, { body: 'Der Text.', estimate: '~3 h' })
     const after = setQueueEntry(before, 452, { title: 'Ein deutscher Titel' })
     expect(after.points[452]).toEqual({ title: 'Ein deutscher Titel', body: ['Der Text.'], estimate: '~3 h' })
-    expect(after.order).toEqual([452])
   })
   it('and an estimate lands without disturbing title or body', () => {
     const before = setQueueEntry(null, 452, { title: 'Titel', body: 'Text.' })
@@ -791,7 +828,7 @@ describe('the pending-request card', () => {
   it('carries no point number, so no parser reads it as a queued point', () => {
     const html = renderRequestsCard([req('Eine Anfrage')])
     expect(parseQueuePoints(`<h2>Warteschlange</h2>${html}`).size).toBe(0)
-    expect(importQueueFromHtml(board(html)).order).toEqual([])
+    expect(importQueueFromHtml(board(html)).points).toEqual({})
   })
 
   it('neutralises a title that would trip the board guards on the OWNER’s turn', () => {

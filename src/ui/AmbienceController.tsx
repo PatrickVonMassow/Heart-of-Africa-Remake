@@ -21,12 +21,14 @@ export function AmbienceController() {
       const s = useGame.getState()
       const place = s.placeId ? placeById(s.placeId) : null
       let nearVillage = false
+      let villageId = place?.kind === 'village' ? place.id : null
       if (s.mode === 'travel') {
         for (const p of PLACES) {
           if (p.kind !== 'village') continue
           const w = latLonToWorld(p.lat, p.lon)
           if (Math.hypot(s.pos.x - w.x, s.pos.z - w.z) < DRUM_RADIUS) {
             nearVillage = true
+            villageId = p.id
             break
           }
         }
@@ -36,6 +38,7 @@ export function AmbienceController() {
         mode: s.mode,
         placeKind: place?.kind ?? null,
         nearVillage,
+        villageId,
       })
       // Coastal surf (point 153): fade the surf bed with the distance to the
       // nearest coast — the place's own coordinates in a settlement, the

@@ -19,7 +19,7 @@
 // does, which is the preflight's entire promise.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { AUTO_END, AUTO_START } from './retro-core.mjs'
@@ -307,17 +307,62 @@ describe('queue-order-guard', () => {
       '</body></html>',
     ].join('\n')
 
+  /** The provenance baseline: what the work order held when nothing was outstanding. */
+  const rankRecord = (points) =>
+    write(
+      '.claude/queue-rank.json',
+      JSON.stringify({ ranked: {}, settled: { at: '2026-08-10T09:00:00.000Z', points } }),
+    )
+
   it('BLOCKS when a queue card claims done what TASKS.md still has open', () => {
     write('TASKS.md', '# TASKS\n\n## Checklist\n\n- [ ] 2. Still open work.\n')
+    rankRecord([2])
     write('.batch-dashboard.html', board('Das Problem ist behoben.'))
     const hook = expectHookAgrees('queue-order-guard.mjs', 'queue-order-guard', { blocks: true })
     expect(hook.decision.reason).toBe(preflight()['queue-order-guard'].reason)
     expect(hook.decision.reason).toMatch(/CLAIMS DONE WHAT IS OPEN/)
   })
 
-  it('ALLOWS a board that matches the work order', () => {
+  it('ALLOWS a board that matches the work order, and settles the rank baseline as it goes', () => {
+    // The one thing this guard WRITES (point 590): the baseline drops a point
+    // that has closed, so a reopened point cannot ride back in on an old
+    // membership. It may only move while nothing is outstanding, and never throw.
+    rankRecord([2, 999])
     write('.batch-dashboard.html', board('Noch offen, wird als naechstes angegangen.'))
     expectHookAgrees('queue-order-guard.mjs', 'queue-order-guard', { blocks: false })
+    expect(JSON.parse(readFileSync(resolve(repo, '.claude/queue-rank.json'), 'utf8')).settled.points).toEqual([2])
+  })
+
+  it('BLOCKS the turn that appended a point until its rank is settled (point 590)', () => {
+    write('TASKS.md', '# TASKS\n\n## Checklist\n\n- [ ] 2. Still open work.\n- [ ] 3. Frisch angehängt.\n')
+    try {
+      const hook = expectHookAgrees('queue-order-guard.mjs', 'queue-order-guard', { blocks: true })
+      expect(hook.decision.reason).toMatch(/APPENDED POINT NOT RANKED.*3/)
+      // …and the decision releases it, without any board change.
+      write(
+        '.claude/queue-rank.json',
+        JSON.stringify({
+          ranked: { 3: { at: '2026-08-10T09:00:00.000Z', why: 'nothing waits on it' } },
+          settled: { at: '2026-08-10T09:00:00.000Z', points: [2] },
+        }),
+      )
+      expectHookAgrees('queue-order-guard.mjs', 'queue-order-guard', { blocks: false })
+    } finally {
+      write('TASKS.md', '# TASKS\n\n## Checklist\n\n- [ ] 2. Still open work.\n')
+      rankRecord([2])
+    }
+  })
+
+  it('asks for the baseline where the checkout has none', () => {
+    rmSync(resolve(repo, '.claude/queue-rank.json'))
+    try {
+      const hook = expectHookAgrees('queue-order-guard.mjs', 'queue-order-guard', { blocks: true })
+      expect(hook.decision.reason).toMatch(/QUEUE RANK BASELINE MISSING/)
+      // …and it does not arm itself out of that state: only --seed does that.
+      expect(existsSync(resolve(repo, '.claude/queue-rank.json'))).toBe(false)
+    } finally {
+      rankRecord([2])
+    }
   })
 
   it('stands down, rather than blocking, on a checkout without TASKS.md (F7)', () => {
@@ -596,6 +641,10 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
     commit(`ordinary work on the trunk\n\n${AUTHOR}`)
 
     const merge = git('merge', '--no-ff', '--no-commit', 'side')
+    // The non-zero exit ALONE would be satisfied by a git that never ran at all
+    // (point 573), and this whole case rests on the conflict being real — so the
+    // claim is git's own word for it, not its exit code.
+    expect(`${merge.stdout}${merge.stderr}`, 'the fixture needs a real conflict to resolve').toContain('CONFLICT')
     expect(merge.status, 'the fixture needs a real conflict to resolve').not.toBe(0)
     write('conflict.txt', 'resolved\n')
     write('scripts/demo3-guard.mjs', '// rewritten while resolving the conflict\n')

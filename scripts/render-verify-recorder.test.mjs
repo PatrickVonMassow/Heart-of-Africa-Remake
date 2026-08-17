@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { tapOutput } from './render-verify-recorder.mjs'
 import { failedChecks } from './verify/baseline-classify-core.mjs'
-import { chargeReds, runVerdict } from './render-verify-core.mjs'
+import { RETRY_ENV, chargeReds, formatSuspectEnv, runVerdict } from './render-verify-core.mjs'
 
 // The record is stubbed, not written: these cases exercise the REAL arming and
 // the REAL exit handler, and a test must never append to the checkout's own
@@ -166,7 +166,12 @@ describe('the captured lines charge the way the guard reads them', () => {
     expect(pointOf('a NEW check nobody has filed')).toBeNull()
   })
 
-  it('charges the same output differently on the other lane, where the goat red is real', () => {
+  it('charges the same output to the OTHER point on the other lane, where the goat red is real', () => {
+    // 506 is the software lane's rate problem and disclaims the hardware lane in
+    // its own words, so a hardware-lane occurrence is charged to nobody and
+    // blocks. Charging it to the point that must classify it was tried and
+    // refused by the cross-vendor review: an open owner would excuse every later
+    // red of the same wording on the lane whose verdicts we trust.
     const lines = 'FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967'
     const reds = chargeReds(failedChecks(lines), { suite: 'polish', backend: 'webgl' })
     expect(reds.map((r) => r.point)).toEqual([null])
@@ -283,6 +288,42 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
       expect(runVerdict(record, { openPoints }).covers).toBe(true)
     } finally {
       if (before !== undefined) process.env.VERIFY_SECTION = before
+    }
+  })
+
+  // Point 640: the same chain for the RETRY. The runner knows a run is the second
+  // attempt; the suite cannot, and the "PASSED ON RETRY" log line was the only
+  // trace it left. Now the record carries it and the gate reads it.
+  it('stamps the retry SUSPECT with what the first attempt failed on, and it covers nothing', async () => {
+    const before = process.env[RETRY_ENV]
+    process.env[RETRY_ENV] = formatSuspectEnv(['settlement walker (goat): the planted foot holds its ground spot'])
+    try {
+      const run = await armed('polish')
+      const record = run.exit(0)
+      expect(record.suspect).toBe(true)
+      expect(record.suspectOf).toEqual([
+        { name: 'settlement walker (goat): the planted foot holds its ground spot', kind: 'check' },
+      ])
+      const verdict = runVerdict(record, { openPoints })
+      expect(verdict.status).toBe('suspect')
+      expect(verdict.covers).toBe(false)
+    } finally {
+      if (before === undefined) delete process.env[RETRY_ENV]
+      else process.env[RETRY_ENV] = before
+    }
+  })
+
+  it('leaves a first attempt unstamped — the runner blanks the variable, so a stale export condemns nothing', async () => {
+    const before = process.env[RETRY_ENV]
+    process.env[RETRY_ENV] = ''
+    try {
+      const run = await armed('polish')
+      const record = run.exit(0)
+      expect(record.suspect).toBeUndefined()
+      expect(runVerdict(record, { openPoints }).covers).toBe(true)
+    } finally {
+      if (before === undefined) delete process.env[RETRY_ENV]
+      else process.env[RETRY_ENV] = before
     }
   })
 })

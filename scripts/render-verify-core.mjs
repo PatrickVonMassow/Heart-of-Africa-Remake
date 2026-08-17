@@ -69,6 +69,8 @@ export const NON_RENDER_VERIFY = new Set([
   'backend-lane-core.mjs', // WHICH lanes exist and whether a renderer is software; the check drives the browser
   'baseline-classify-core.mjs',
   'baseline-classify.mjs',
+  'childMotionMetric.mjs', // the children's shuffle/rescue verdict over a recorded trace; polish.mjs and the replay test record it
+  'cropLuma.mjs', // how a ground crop's pixels become one reading; polish.mjs captures them
   'docs.mjs',
   'eavesColumn.mjs', // the head-clearance verdict over a recorded window; polish.mjs records it
   'fixedWaits.mjs',
@@ -82,10 +84,14 @@ export const NON_RENDER_VERIFY = new Set([
   'run-all.mjs',
   'run-digest-core.mjs', // which of a run's OUTPUT lines the caller reads; it draws nothing
   'run-logged.mjs', // the logging wrapper around run-all; it spawns the runner, it does not render
+  'run-record.mjs', // the run's own bookkeeping file (point 592); it counts frames, it draws none
+  'run-wait-core.mjs', // the poll budget and the receipt's shape; pure arithmetic over a run
+  'run-wait.mjs', // AWAITS a run instead of polling it; it opens no page
   'sceneReady-core.mjs', // the scene-readiness verdict; frameSubject.mjs polls the page for it
   'sectionScope.mjs', // a TEXT audit of the suites' section blocks; it opens no page
   'sections.mjs', // WHICH block of a suite a --section run selects; the suite does the driving
   'snowMetric.mjs', // the snow-vs-sand pixel verdict; enrichments.mjs feeds it a crop
+  'spawnAssertion.mjs', // a TEXT audit of the test files' spawn assertions; it opens no page
   'stanceSlip.mjs', // the planted-foot verdict over a sample series; polish.mjs records the samples
   'system-chrome.mjs', // WHERE the lane's browser is on this host; _browser.mjs opens it
   'tagFrameReading.mjs', // the tag frame's readability verdict; polish.mjs takes the reading
@@ -181,8 +187,10 @@ export function chargeablePoints(text) {
  * `backend` are the run's own, so a charge scoped to one lane cannot excuse the
  * other. Total: a malformed entry matches nothing rather than throwing.
  */
-export function chargeFor(red, { suite = '', backend = '', ledger = RED_CHARGES } = {}) {
-  const name = String(red?.name ?? '')
+export function chargeFor(red, options) {
+  const { suite = '', backend = '', ledger = RED_CHARGES } = options ?? {}
+  const name = text(red?.name)
+  const detail = text(red?.detail)
   if (!name) return null
   for (const charge of Array.isArray(ledger) ? ledger : []) {
     try {
@@ -191,6 +199,10 @@ export function chargeFor(red, { suite = '', backend = '', ledger = RED_CHARGES 
       if (charge.backend && charge.backend !== backend) continue
       if (charge.kind && red?.kind && charge.kind !== red.kind) continue
       if (!charge.match?.test?.(name)) continue
+      // Some checks have more than one red cause behind the same stable label.
+      // Such a charge must name the measured signature in the detail instead
+      // of swallowing every future failure of that check.
+      if (charge.detailMatch && !charge.detailMatch?.test?.(detail)) continue
       return charge
     } catch {
       /* a broken ledger entry charges nothing — the red stays unaccounted */
@@ -202,11 +214,12 @@ export function chargeFor(red, { suite = '', backend = '', ledger = RED_CHARGES 
 /** Every red of a run, each with the point it is charged to (null: nothing owns
  *  it). Written into the run record at record time, so the record itself names
  *  what was charged and a later ledger edit cannot bless a run after the fact. */
-export function chargeReds(reds, { suite = '', backend = '', ledger = RED_CHARGES } = {}) {
+export function chargeReds(reds, options) {
+  const { suite = '', backend = '', ledger = RED_CHARGES } = options ?? {}
   return (Array.isArray(reds) ? reds : []).map((red) => {
     const charge = chargeFor(red, { suite, backend, ledger })
     return {
-      name: String(red?.name ?? '').slice(0, 200),
+      name: text(red?.name).slice(0, 200),
       key: red?.key ?? '',
       kind: red?.kind === 'console' ? 'console' : 'check',
       point: charge ? charge.point : null,
@@ -215,7 +228,106 @@ export function chargeReds(reds, { suite = '', backend = '', ledger = RED_CHARGE
 }
 
 /**
- * WHAT ONE RECORDED RUN IS WORTH (point 550). Four verdicts, and the difference
+ * THE ENV VAR THAT MARKS A RETRY (point 640). run-all.mjs sets it on the RETRY
+ * child only, carrying what the FIRST attempt failed on; the recorder stamps the
+ * record SUSPECT from it. Same principle as the section flag: the runner knows a
+ * run is a retry, the suite cannot, and a suite must not be able to forget it.
+ */
+export const RETRY_ENV = 'VERIFY_RETRY_AFTER'
+
+/** What run-all puts in that variable: the first attempt's failing check names,
+ *  newline-separated. A retry that has no names to give (a crash, a wall-timeout
+ *  kill) still says SOMETHING — the run is a retry either way, and an empty value
+ *  would read as "not a retry". Bounded, because it travels in an environment. */
+export const SUSPECT_UNNAMED = 'the first attempt failed without naming a check'
+const MAX_SUSPECT_NAMES = 8
+/** The kind of the entry that stands for the reds the marker could not carry.
+ *  Deliberately outside the two kinds a charge may name, so nothing can own it:
+ *  what was never carried cannot be charged, and must keep the run blocked. */
+export const TRUNCATED_KIND = 'truncated'
+const MAX_SUSPECT_NAME_LEN = 200
+
+/** A value as text, or '' — `String(x)` itself throws on an object whose
+ *  toString does, and these two must be total on whatever a suite printed. */
+function text(value) {
+  try {
+    return String(value ?? '')
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Format the first attempt's reds for the env var: one per line, each written
+ * `<kind>\t<name>`.
+ *
+ * The KIND travels with the name because the ledger charges by kind (a charge
+ * written for a console error must not be answered by a failing check of the
+ * same wording, nor the reverse) — a marker that carried names alone would hand
+ * every red back as a `check` and charge it as one. Total: never throws.
+ */
+export function formatSuspectEnv(reds) {
+  const all = (Array.isArray(reds) ? reds : [])
+    .map((r) => ({ name: (text(r?.name) || text(r)).trim().slice(0, MAX_SUSPECT_NAME_LEN), kind: r?.kind }))
+    .filter((r) => r.name)
+  const list = all.slice(0, MAX_SUSPECT_NAMES).map((r) => `${r.kind === 'console' ? 'console' : 'check'}\t${r.name}`)
+  // A first attempt with more reds than the marker can carry says SO, as one
+  // more red — a truncation nobody is told about is a red that quietly stops
+  // blocking once the eight that fitted are charged. Deliberately worded so no
+  // ledger entry can match it: what is missing cannot be charged.
+  if (all.length > MAX_SUSPECT_NAMES) {
+    // Its own KIND, not a check: a truncation is not a red anybody can own, and
+    // a ledger entry with a broad enough regex would otherwise charge it away
+    // together with the eight that fitted.
+    list.push(`${TRUNCATED_KIND}\t${all.length - MAX_SUSPECT_NAMES} further red(s) of the first attempt were NOT carried`)
+  }
+  return (list.length ? list : [`check\t${SUSPECT_UNNAMED}`]).join('\n')
+}
+
+/** Read it back as reds — `[{ name, kind }]`. `[]` means "this run is not a
+ *  retry": an unset or blank value must never mark an ordinary run suspect (a
+ *  stale export would else condemn every run in the shell). A line without a
+ *  kind is a `check`, which is what an older marker wrote. Total. */
+export function parseSuspectReds(value) {
+  const out = []
+  for (const line of text(value).split('\n')) {
+    const [head, ...rest] = line.split('\t')
+    const kind =
+      rest.length && (head === 'console' || head === 'check' || head === TRUNCATED_KIND) ? head : 'check'
+    const name = (rest.length ? rest.join('\t') : head).trim()
+    if (!name) continue
+    out.push({ name, kind })
+    // One more than the marker carries: the "further red(s) … NOT carried" line
+    // is itself one of them and must never be the entry dropped here.
+    if (out.length >= MAX_SUSPECT_NAMES + 1) break
+  }
+  return out
+}
+
+/** The same, as bare names — what a message prints. Total. */
+export function parseSuspectEnv(value) {
+  return parseSuspectReds(value).map((r) => r.name)
+}
+
+/** What the FIRST attempt of a suspect run failed on, as reds. The record holds
+ *  `{ name, kind }` entries; a record written by an older recorder holds bare
+ *  names, which read as checks. Total. */
+export function suspectRedsOf(run) {
+  const list = Array.isArray(run?.suspectOf) ? run.suspectOf : []
+  const out = []
+  for (const entry of list) {
+    const name = text(entry?.name) || text(entry)
+    if (!name.trim()) continue
+    const kind = entry?.kind === 'console' || entry?.kind === TRUNCATED_KIND ? entry.kind : 'check'
+    out.push({ name: name.trim(), kind })
+  }
+  // One more than the marker carries: the last may be the "further red(s) … NOT
+  // carried" entry, which is the one that must never be dropped.
+  return out.slice(0, MAX_SUSPECT_NAMES + 1)
+}
+
+/**
+ * WHAT ONE RECORDED RUN IS WORTH (point 550). Five verdicts, and the difference
  * between the first two must stay visible everywhere it is reported:
  *
  *   clean     — exit 0. The picture was judged and nothing was red.
@@ -230,12 +342,25 @@ export function chargeReds(reds, { suite = '', backend = '', ledger = RED_CHARGE
  *               so the record says nothing about the rest. Judged FIRST, before
  *               the exit code, because its exit code is exactly what must not
  *               clear the gate.
+ *   suspect   — it PASSED ON THE RETRY (point 640): the first attempt of the same
+ *               suite failed, and nothing about the second run explains why. "It
+ *               worked the next time" is consistent with a fixed defect, a rare
+ *               one, a timing race and an idle machine — it distinguishes none of
+ *               them, so it proves nothing and covers nothing. Judged before the
+ *               exit code for the same reason as partial: the exit 0 is exactly
+ *               what must not clear the gate. The way OUT is a cause: fix it, or
+ *               charge the red to the open point that owns it, or file it as one.
+ *
+ * A retry that failed AGAIN is not judged here — its own reds are, below: two
+ * failures are evidence, and a red every one of whose checks a known open point
+ * owns stays ACCOUNTED FOR whether it was a retry or not.
  *
  * `openPoints` is the chargeable set (chargeablePoints); omitted, NOTHING is
  * chargeable and only a clean run covers — the strict default, so a caller that
  * has not read the work order can never widen the gate by accident.
  */
-export function runVerdict(run, { openPoints = null } = {}) {
+export function runVerdict(run, options) {
+  const { openPoints = null } = options ?? {}
   if (!run || typeof run !== 'object') {
     return { status: 'red', covers: false, charges: [], unaccounted: [] }
   }
@@ -249,6 +374,21 @@ export function runVerdict(run, { openPoints = null } = {}) {
       covers: false,
       charges: [],
       unaccounted: [{ name: `the run covered only section ${which} of the suite (--section)`, point: null }],
+    }
+  }
+  if (run.suspect === true && Number(run.exit) === 0) {
+    const names = suspectRedsOf(run).map((r) => r.name)
+    const which = names.length ? names.map((n) => `"${n}"`).join('; ') : SUSPECT_UNNAMED
+    return {
+      status: 'suspect',
+      covers: false,
+      charges: [],
+      unaccounted: [
+        {
+          name: `it passed only on the RETRY — the first attempt failed on ${which}, and nothing here says why`,
+          point: null,
+        },
+      ],
     }
   }
   if (Number(run.exit) === 0) return { status: 'clean', covers: true, charges: [], unaccounted: [] }
@@ -273,7 +413,7 @@ export function runVerdict(run, { openPoints = null } = {}) {
   const charges = []
   const unaccounted = []
   for (const red of reds) {
-    const name = String(red?.name ?? '(unnamed red)')
+    const name = text(red?.name) || '(unnamed red)'
     const point = Number.isInteger(red?.point) ? red.point : null
     if (point === null) unaccounted.push({ name, point: null })
     else if (!open.has(point)) unaccounted.push({ name, point })
@@ -335,18 +475,166 @@ export function isBackendSensitivePath(path) {
  * itself asks that way, so a compat lane still proves the WebGPU picture rather than
  * blocking every render change on a host that has no core adapter.
  */
-export function coveringRun(runs, backend, since, { featureLevel = null, openPoints = null } = {}) {
+/**
+ * DID THIS RUN SEE THE CODE AS IT NOW STANDS? Judged on when it STARTED, not on
+ * when it finished (four-eyes, 11.08.2026): a suite loads the page at its
+ * beginning, so a run that began before the last edit and ended after it tested
+ * the OLD code either way — counting it by its end would let it cover a fix it
+ * never loaded, and let a pre-fix failure condemn one. `at` stands in for a
+ * record that carries no start. Total.
+ */
+export function sawCodeSince(run, since) {
+  const from = Number.isFinite(since) ? since : 0
+  // No edit time known (or none at all): the freshness question does not apply,
+  // and the guard's fail-open posture says accept rather than invent a window.
+  if (from <= 0) return true
+  const started = Number(run?.startedAt)
+  const ended = Number(run?.at)
+  const when = Number.isFinite(started) ? started : ended
+  return Number.isFinite(when) && when >= from
+}
+
+export function coveringRun(runs, backend, since, options) {
+  const { featureLevel = null, openPoints = null } = options ?? {}
   if (!Array.isArray(runs)) return null
   let best = null
   for (const r of runs) {
     if (!r || r.backend !== backend) continue
     if (!runVerdict(r, { openPoints }).covers) continue
     if (featureLevel && r.featureLevel !== featureLevel) continue
-    const at = Number(r.at ?? 0)
-    if (at < since) continue
-    if (!best || at > Number(best.at ?? 0)) best = r
+    if (!sawCodeSince(r, since)) continue
+    if (!best || Number(r.at ?? 0) > Number(best.at ?? 0)) best = r
   }
   return best
+}
+
+/**
+ * EVERY RUN IN THE WINDOW THAT FAILED AND WAS NEVER EXPLAINED (point 640) — an
+ * unaccounted red, or a pass that only came on the retry.
+ *
+ * This is what stops the fourth closing. Refusing the retry's own record was
+ * only half of it: the gate reads the most recent COVERING run, so running the
+ * same code again until it comes up green cleared it just as well — which is
+ * the very argument the point forbids. A red therefore stays in force until
+ * something explains it: a fix (which edits a render file and moves the window
+ * past the red), a CHARGE to the open point that owns it, a point of its own, or
+ * the loud deferral valve.
+ *
+ * PARTIAL (`--section`) runs are excluded in BOTH directions: they are not
+ * evidence about the picture, so they neither cover a backend nor condemn one.
+ * That is also what lets the throttle probe reproduce a red eight times over
+ * without blocking anybody's turn.
+ *
+ * WHAT COUNTS AS FIXED, and what does not (four-eyes, 11.08.2026). Route (1) is
+ * not "an edit happened": it is the red's OWN suite, on its OWN backend, coming
+ * up covering on code that postdates it. An unrelated edit plus a green run of
+ * another suite therefore proves nothing, and neither does a green run with no
+ * edit at all — with nothing newer than the red, no run can resolve it.
+ *
+ * KNOWN LIMIT, stated rather than hidden: a fix confined OUTSIDE the render set
+ * moves no window, so route (1) cannot be demonstrated for it; that fix names
+ * itself in `--defer "<the cause, and where it was fixed>"`, which signs for the
+ * red rather than closing it. And a deliberate no-op render edit followed by a
+ * green run of the reddened suite will still release it — an evader can always
+ * do that, as they can always `--defer`; the rule is aimed at the honest "it
+ * passed three times since".
+ *
+ * THE CHARGE IS READ AS IT STANDS NOW, not as it stood when the run was recorded
+ * (four-eyes finding, 11.08.2026). The recorder stamps the charge at record time
+ * so no later ledger edit can BLESS a finished run, and that stays: a run still
+ * only COVERS on what it was charged then. But "is this red still an open
+ * question?" is the opposite question — charging it, or filing the point that
+ * owns it and charging it there, IS closing way (2) and way (3), and a rule that
+ * could only be satisfied by editing a render file would have left those two
+ * routes nominal.
+ *
+ * Total: never throws on partial input.
+ */
+export function unexplainedRuns(runs, since, options) {
+  const { openPoints = null, ledger = RED_CHARGES } = options ?? {}
+  const from = Number.isFinite(since) ? since : 0
+  const all = Array.isArray(runs) ? runs : []
+  /**
+   * Was this red DEMONSTRATED GONE? Only its own suite on its own backend can
+   * say so, and only on code that came after it: a covering run of that pair
+   * which started after the last render edit, where that edit itself came after
+   * the red. The edit alone used to be enough — so an unrelated render change
+   * plus a green run of ANY suite dropped the red, which is the fourth closing
+   * wearing a fix's clothes (four-eyes, 11.08.2026). Repetition still proves
+   * nothing: with no edit after the red, `from` cannot postdate it and no run
+   * can resolve it.
+   */
+  const shownGone = (r) => {
+    const when = Number(r?.startedAt ?? r?.at)
+    if (!Number.isFinite(when) || from <= when) return false
+    return all.some(
+      (later) =>
+        later &&
+        later.partial !== true &&
+        later.backend === r.backend &&
+        later.suite === r.suite &&
+        sawCodeSince(later, from) &&
+        runVerdict(later, { openPoints, ledger }).covers,
+    )
+  }
+  const open = new Set(Array.isArray(openPoints) ? openPoints : openPoints ? [...openPoints] : [])
+  /** Is this red owned by an OPEN point — by the charge it was recorded with, or
+   *  by one the ledger carries today? */
+  const owned = (red, suite, backend) => {
+    // Reds that never reached the record cannot be owned by anything.
+    if (red?.kind === TRUNCATED_KIND) return false
+    const recorded = Number.isInteger(red?.point) ? red.point : null
+    if (recorded !== null && open.has(recorded)) return true
+    const now = chargeFor(red, { suite, backend, ledger })
+    return !!now && open.has(now.point)
+  }
+  const out = []
+  for (const r of Array.isArray(runs) ? runs : []) {
+    if (!r || typeof r !== 'object') continue
+    const at = Number(r.at ?? 0)
+    if (!Number.isFinite(at)) continue
+    // A red is carried until its own suite is shown green on newer code. Runs
+    // that saw the current code are judged directly; older ones only leave the
+    // list once that demonstration exists.
+    if (!sawCodeSince(r, from) && shownGone(r)) continue
+    const verdict = runVerdict(r, { openPoints })
+    if (verdict.status !== 'red' && verdict.status !== 'suspect') continue
+    const suite = typeof r.suite === 'string' && r.suite ? r.suite : 'unknown'
+    const backend = typeof r.backend === 'string' ? r.backend : 'unknown'
+    // A crash explains nothing about the picture whatever its reds say, so it is
+    // never talked away by the ledger — runVerdict says so and this must not
+    // undo it.
+    let unowned = null
+    if (r.crashed !== true) {
+      const reds = verdict.status === 'suspect' ? suspectRedsOf(r) : Array.isArray(r.reds) ? r.reds : []
+      if (reds.length > 0) {
+        // Only the reds NOBODY owns are still open. Counting the whole run's
+        // reds would report a charged one as waved through beside its
+        // unexplained neighbour.
+        unowned = reds.filter((red) => !owned(red, suite, backend))
+        if (unowned.length === 0) continue
+      }
+    }
+    // The individual reds, NOT the one sentence runVerdict writes about them: a
+    // suspect run's whole first attempt is summarised into a single unaccounted
+    // entry, and a caller counting those would report two reds as one.
+    const open_ = unowned ?? (verdict.status === 'suspect' ? suspectRedsOf(r) : verdict.unaccounted)
+    const names = open_.map((x) => text(x?.name)).filter(Boolean)
+    // What is REPORTED is what is still open — never the verdict's own list,
+    // which still holds the reds a charge has since taken over: quoting one of
+    // those as the blocker would name the wrong red and count one too many.
+    const stillOpen = open_
+      .map((x) => ({ name: text(x?.name) || '(unnamed red)', point: Number.isInteger(x?.point) ? x.point : null }))
+    out.push({
+      backend,
+      suite,
+      at,
+      status: verdict.status,
+      unaccounted: stillOpen.length > 0 ? stillOpen : verdict.unaccounted,
+      reds: names.length > 0 ? names : ['(unnamed red)'],
+    })
+  }
+  return out.sort((a, b) => a.at - b.at)
 }
 
 /** The most recent run of `backend` since `since`, covering or not — what the
@@ -356,9 +644,11 @@ export function latestRun(runs, backend, since) {
   let best = null
   for (const r of runs) {
     if (!r || r.backend !== backend) continue
-    const at = Number(r.at ?? 0)
-    if (at < since) continue
-    if (!best || at > Number(best.at ?? 0)) best = r
+    // The same freshness reading the rest of the file uses: a run that BEGAN
+    // before the edit tested the old code, so quoting its red as "why the last
+    // attempt did not count" would point at the wrong code.
+    if (!sawCodeSince(r, since)) continue
+    if (!best || Number(r.at ?? 0) > Number(best.at ?? 0)) best = r
   }
   return best
 }
@@ -428,6 +718,11 @@ export function suggestSuite(runs, changedRenderPaths) {
 
 const ALLOW = { decision: 'allow' }
 
+/** How many waved-through reds one deferral record keeps. A bound, because the
+ *  state file is read on every turn — never a silent one: the count that goes
+ *  with it is the real number. */
+const MAX_WAVED = 20
+
 /**
  * Decide whether the turn may end. Inputs (all optional — missing data errs
  * fail-open, matching the wrapper's contract):
@@ -456,6 +751,7 @@ export function evaluate(input) {
     runs = [],
     deferral = null,
     openPoints = null,
+    ledger = RED_CHARGES,
   } = input ?? {}
 
   // Garbage where the path list should be: fail open, but do NOT advance the
@@ -468,24 +764,90 @@ export function evaluate(input) {
     return { decision: 'allow', clear: !!head && head !== clearedHead }
   }
 
-  // The loud escape valve: an explicit deferral covers the CURRENT head only —
-  // any further commit reopens the gate.
-  if (deferral && head && deferral.head === head) {
-    return { decision: 'allow', clear: true, deferred: true }
-  }
-
   const since = Number.isFinite(latestChangeAt) ? latestChangeAt : 0
-  const opts = { openPoints }
+  const opts = { openPoints, ledger }
   // Two backends only where the two backends can DIFFER; otherwise one passing
   // run is the whole proof, and the second is a picture inspection bought for
   // nothing (user 26.07.2026).
   const dual = changedRenderPaths.some(isBackendSensitivePath)
+
+  // A RED IS NOT CLOSED BY THE RUNS THAT FOLLOWED IT (point 640). Refusing the
+  // retry's own record was only half the job: the gate reads the most recent
+  // COVERING run, so re-running the same code until it came up green cleared it
+  // just as well — "it passed three times since" wearing a mechanism's clothes.
+  // So an unexplained failure in the window holds the gate whatever came after,
+  // and the way out is a CAUSE: fix it (which moves the window past the red),
+  // charge it to the open point that owns it, file it as a point, or record the
+  // loud deferral.
+  const unexplained = unexplainedRuns(runs, since, opts)
+
+  // The loud escape valve: an explicit deferral covers the CURRENT head only —
+  // any further commit reopens the gate. It is judged AFTER the reds are read,
+  // so what it waves through is named in the result: a bypass whose cost is
+  // invisible is one nobody weighs (four-eyes finding, 11.08.2026). The wrapper
+  // prints and records that list beside the deferral's own reason.
+  if (deferral && head && deferral.head === head) {
+    // EVERY red, not one per run: a run with three unexplained reds waved three
+    // reds through, and a record naming the first would understate exactly what
+    // the reader is being asked to accept.
+    // ONE ENTRY PER RED, not per record: a real retry leaves TWO records of the
+    // same failure — the first attempt's red one and the retry's SUSPECT one,
+    // which carries the same check names — and counting both would report one
+    // failure as two.
+    const waved = []
+    const seen = new Set()
+    let wavedCount = 0
+    for (const u of unexplained) {
+      for (const name of u.reds) {
+        const key = `${u.backend}|${u.suite}|${name}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        wavedCount++
+        if (waved.length < MAX_WAVED) waved.push({ backend: u.backend, suite: u.suite, status: u.status, name })
+      }
+    }
+    // The LIST is bounded; the COUNT is not. A record that showed twenty where
+    // twenty-one were waved would understate the very thing it exists to state.
+    return wavedCount > 0
+      ? { decision: 'allow', clear: true, deferred: true, waved, wavedCount }
+      : { decision: 'allow', clear: true, deferred: true }
+  }
+
   const covering = new Map(BACKENDS.map((b) => [b, coveringRun(runs, b, since, opts)]))
   const missing = dual
     ? BACKENDS.filter((b) => !covering.get(b))
     : BACKENDS.some((b) => covering.get(b))
       ? []
       : [BACKENDS[0]]
+
+  // Coverage exists, but something in the window failed and was never explained.
+  // (Where a backend is missing too, the message below says so with the same
+  // three ways out — this one is for the case the old gate waved through.)
+  if (missing.length === 0 && unexplained.length > 0) {
+    const named = unexplained
+      .slice(0, 3)
+      .map((u) => {
+        const what = u.status === 'suspect' ? 'passed only on the RETRY' : `${u.unaccounted.length} unaccounted red(s)`
+        const first = u.unaccounted[0]?.name
+        return `${u.backend}/${u.suite}: ${what}${first ? ` — "${first}"` : ''}`
+      })
+      .join(' | ')
+    return {
+      decision: 'block',
+      reason:
+        `UNEXPLAINED RED SINCE THE LAST RENDER EDIT: ${unexplained.length} recorded run(s) failed and nothing ` +
+        `says why — ${named}${unexplained.length > 3 ? ', …' : ''}. A LATER GREEN DOES NOT CLOSE IT (point 640): ` +
+        'three greens are consistent with a fixed defect, a rare one, a timing race and an idle machine alike. ' +
+        'A red closes in exactly THREE ways: (1) its CAUSE is named and FIXED — the fix edits the code, which ' +
+        'moves this window past the red; (2) it is CHARGED in scripts/render-verify-charges.mjs to the OPEN ' +
+        'point that owns it — the charge counts at once, no re-run needed; (3) it becomes an OPEN ' +
+        'point of its own, charged there. Is it load? MEASURE it: ' +
+        `node scripts/throttle-probe.mjs ${unexplained[0].suite} --section=<name> --runs 8. If the cause lies ` +
+        'outside the render set (a fixed helper, a dead dev server), say so loudly instead: ' +
+        'node scripts/render-verify-guard.mjs --defer "<reason>".',
+    }
+  }
+
   if (missing.length === 0) {
     // An ACCOUNTED-FOR run is never reported as a clean pass: name every red it
     // carried and the point it was charged to, so the record keeps the difference.
@@ -546,10 +908,12 @@ export function evaluate(input) {
       'passing runs are recorded automatically by the suite itself), then INSPECT the frames of ' +
       'both backends. ' +
       (whyNot.length
-        ? `WHY THE LAST ATTEMPT DID NOT COUNT — ${whyNot.join(' | ')}. A red that a KNOWN open ` +
-          'point already owns is charged to it in scripts/render-verify-charges.mjs and the run ' +
-          'then counts as ACCOUNTED FOR (never as a pass); a red nobody has filed is a FINDING, ' +
-          'not a ledger entry. '
+        ? `WHY THE LAST ATTEMPT DID NOT COUNT — ${whyNot.join(' | ')}. A RED CLOSES IN EXACTLY ` +
+          'THREE WAYS (point 640): (1) its CAUSE is named and fixed; (2) it is CHARGED in ' +
+          'scripts/render-verify-charges.mjs to the OPEN point that owns it, and the run then ' +
+          'counts as ACCOUNTED FOR (never as a pass); (3) it becomes an OPEN point of its own. ' +
+          'Running it again until it passes is none of them. To ask whether it is load rather ' +
+          'than argue it: node scripts/throttle-probe.mjs <suite> --section=<name> --runs 8. '
         : '') +
       'ONLY if one backend genuinely cannot be judged headless (e.g. a washed-out ' +
       'WebGPU frame — that is a FINDING, not a pass), record a loud deferral: ' +

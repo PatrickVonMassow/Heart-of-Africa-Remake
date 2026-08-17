@@ -273,7 +273,11 @@ describe('the catch', () => {
     expect(s.chaser).toBeGreaterThanOrEqual(0)
   })
 
-  it('immunity is PAIR-scoped: the new chaser may tag a third child at once (unique)', () => {
+  it('THE WINDOW IS THE WHOLE GROUP’S: no third child is tagged inside it (point 648, unique)', () => {
+    // The role used to be free to run round a knot — A tags B, B tags C, C tags
+    // A, each catch clearing the last protection — and at the reported seed it
+    // changed every two or three FRAMES, leaving three children trembling within
+    // 7 cm of one another. No catch at all resolves while the window runs.
     const s = game([
       [0, 0],
       [0.3, 0],
@@ -284,7 +288,15 @@ describe('the catch', () => {
     stepTagGame(s, 1e-6, CFG, OPEN)
     expect(s.tags).toBe(1)
     const second = s.chaser
-    // A third child standing beside the new chaser was never immune.
+    // A third child standing right beside the new chaser, the whole window long.
+    for (let i = 0; i < 100; i++) {
+      s.children[2].x = s.children[second].x + CFG.catchDistance * 0.4
+      s.children[2].z = s.children[second].z
+      stepTagGame(s, CFG.immunitySeconds / 200, CFG, OPEN)
+      expect(s.tags).toBe(1)
+    }
+    // And is fair game the moment it has run out.
+    s.immuneFor = 1e-9
     s.children[2].x = s.children[second].x + CFG.catchDistance * 0.4
     s.children[2].z = s.children[second].z
     stepTagGame(s, 1e-6, CFG, OPEN)
@@ -292,7 +304,34 @@ describe('the catch', () => {
     expect(s.chaser).toBe(2)
   })
 
-  it('a chained tag clears the stale immunity — the first child is catchable again (unique)', () => {
+  it('the role changes at most once per window, whoever is standing about (unique)', () => {
+    const s = game([
+      [0, 0],
+      [0.3, 0],
+      [0.5, 0],
+      [0.2, 0.3],
+    ])
+    s.chaser = 0
+    s.playing = true
+    let swaps = 0
+    let last = s.chaser
+    // Ten seconds with the whole group inside one another's catch ring.
+    for (let i = 0; i < 60 * 10; i++) {
+      s.children.forEach((c, k) => {
+        c.x = k * 0.2
+        c.z = 0
+      })
+      stepTagGame(s, 1 / 60, CFG, OPEN)
+      if (s.chaser !== last) {
+        swaps++
+        last = s.chaser
+      }
+    }
+    expect(swaps).toBeGreaterThan(0)
+    expect(swaps).toBeLessThanOrEqual(Math.ceil(10 / CFG.immunitySeconds) + 1)
+  })
+
+  it('the child that just tagged stays out of the quarry while its window runs (unique)', () => {
     const s = game([
       [0, 0],
       [0.3, 0],
@@ -301,14 +340,19 @@ describe('the catch', () => {
     s.chaser = 0
     s.playing = true
     stepTagGame(s, 1e-6, CFG, OPEN) // 0 tags 1 → 0 immune
-    const a = s.immune
-    stepTagGame(s, 1e-6, CFG, OPEN) // 1 tags 2 → 1 immune, 0's protection is stale
-    expect(s.immune).not.toBe(a)
     expect(s.immuneFor).toBe(CFG.immunitySeconds)
-    // Only ONE child is ever immune, so the first one is fair game again.
-    s.children[a].x = s.children[s.chaser].x + CFG.catchDistance * 0.4
-    s.children[a].z = s.children[s.chaser].z
-    expect(nearestCatchable(s)).toBe(a)
+    const gone = s.immune
+    // Standing nearest the new chaser buys it nothing while it is protected —
+    // the third child, well away, is the quarry instead.
+    s.children[gone].x = s.children[s.chaser].x + CFG.catchDistance * 0.4
+    s.children[gone].z = s.children[s.chaser].z
+    s.children[2].x = s.children[s.chaser].x + 5
+    s.children[2].z = s.children[s.chaser].z
+    expect(nearestCatchable(s)).not.toBe(gone)
+    // Once the window is out it is the nearest catchable child like any other.
+    s.immuneFor = 0
+    s.immune = -1
+    expect(nearestCatchable(s)).toBe(gone)
   })
 
   it('is never reached THROUGH a wall (unique)', () => {
@@ -751,6 +795,128 @@ describe('the settlement: the chase runs THROUGH it, never into it', () => {
   })
 })
 
+describe('another inhabitant’s body is ground to walk round (point 657)', () => {
+  const SEP = balance.villageLife.separation
+  const KID_SCALE = 0.55
+  const KID_BODY = SEP.bodyRadius * KID_SCALE
+  /** An adult standing in the ground, judged the way the settlement judges it:
+   *  the PAIR'S contact distance — the adult's contact radius plus the child's. */
+  const adultReach = SEP.bodyRadius + KID_BODY
+  /** THE SHIPPED WIRING in miniature (PlaceLife's Kids): bodies OUTSIDE the
+   *  game are walls, a playmate never is — see the wiring comment there for
+   *  the measurements behind that rule. */
+  const adultsOccupy =
+    (adults: ReadonlyArray<{ x: number; z: number }>) =>
+    (_self: number, _partner: number, x: number, z: number): boolean =>
+      adults.some((a) => Math.hypot(x - a.x, z - a.z) < adultReach)
+  /** STRICTER THAN SHIPPED, on purpose: every playmate a wall, only self and
+   *  the tag partner excluded. The shipped wiring walls NO playmate (aligned
+   *  with production per GPT-5.6 Sol's review) — the cases below that use this
+   *  pin the tagGame LAYER's partner parameter, the contract any future
+   *  wiring that does wall playmates would lean on for the catch. */
+  const layerWalls =
+    (s: TagState, extra?: { x: number; z: number }) =>
+    (self: number, partner: number, x: number, z: number): boolean => {
+      if (extra && Math.hypot(x - extra.x, z - extra.z) < adultReach) return true
+      const reach = KID_BODY * 2
+      return s.children.some(
+        (o, j) => j !== self && j !== partner && Math.hypot(x - o.x, z - o.z) < reach,
+      )
+    }
+
+  it('an errand walks ROUND a standing body instead of pressing into it', () => {
+    // The cause of point 657 in one child: the way to where it was sent passes
+    // straight through a body. With `occupied` the step deflects round it — the
+    // child never enters the body's ground and still arrives; without it, this
+    // very walk pressed into the body and was pushed back out frame after frame.
+    const s = game([[0, 0]])
+    const world: TagWorld = {
+      ...OPEN,
+      occupied: (_self, _partner, x, z) => Math.hypot(x - 3, z) < adultReach,
+    }
+    let nearest = Infinity
+    run(
+      s,
+      10,
+      world,
+      CFG,
+      1 / 60,
+      (st) => {
+        const c = st.children[0]
+        nearest = Math.min(nearest, Math.hypot(c.x - 3, c.z))
+      },
+      (i, st) => {
+        const c = st.children[i]
+        // Arrived: the claim ends and the child stands, like a real errand.
+        if (Math.hypot(6 - c.x, c.z) < 0.5) return null
+        return { heading: Math.atan2(6 - c.x, 0 - c.z), pace: 1.2 }
+      },
+    )
+    const c = s.children[0]
+    // It got there — past the body, not onto it.
+    expect(Math.hypot(c.x - 6, c.z)).toBeLessThan(1)
+    expect(nearest).toBeGreaterThanOrEqual(adultReach - 1e-6)
+    // And the walk was a detour, not a struggle: little more than the straight
+    // six metres, nothing walked on the spot against the body.
+    expect(c.walked).toBeLessThan(6 * 1.6)
+  })
+
+  it('the chase flows ROUND an adult standing in its ground, and the game still catches', () => {
+    const s = game(FOUR)
+    const adult = { x: 7, z: 6.5 } // amid the four spawn spots
+    // The SHIPPED policy: the adult is a wall, the playmates are not.
+    const world: TagWorld = { ...OPEN, occupied: adultsOccupy([adult]) }
+    let nearest = Infinity
+    run(s, 60, world, CFG, 1 / 60, (st) => {
+      for (const c of st.children) nearest = Math.min(nearest, Math.hypot(c.x - adult.x, c.z - adult.z))
+    })
+    // Nobody ever stood on the adult's ground: every landed step was probed
+    // against it, so the chase went round the body the way it rounds a hut.
+    expect(nearest).toBeGreaterThanOrEqual(adultReach - 1e-6)
+    // And the avoidance is not rescue-driven: the hover watch fires its
+    // centimetre-scale correction about once per child-minute in the OPEN world
+    // too (measured, 3 in this same minute without `occupied`), so the bound is
+    // that scale, far under the live gate of 6 per child-minute.
+    for (const c of s.children) expect(c.nudges).toBeLessThanOrEqual(2)
+    expect(s.tags).toBeGreaterThan(0)
+  })
+
+  it('the pair is never walled off from its own catch: first catches still arrive early', () => {
+    // THE LAYER CONTRACT, not the shipped wiring (which walls no playmate):
+    // under a wiring that walls EVERY playmate, the occupied signature's
+    // partner parameter is the one thing that keeps the catch reachable —
+    // treating the quarry as a wall would hold the chaser at arm's length.
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const s = game(FOUR, seed)
+      const world: TagWorld = { ...OPEN, occupied: layerWalls(s) }
+      let first = Infinity
+      run(s, CFG.resolveCapSeconds, world, CFG, 1 / 60, (st, t) => {
+        if (st.tags > 0 && first === Infinity) first = t
+      })
+      expect(first).toBeLessThan(CFG.resolveCapSeconds * 0.6)
+    }
+  })
+
+  it('a catch past a third child’s body counts — occupied steers, it is not a wall', () => {
+    // `lineClear` stays a WALL test on purpose: a tag reached past a bystander
+    // is a tag, through a hut it is not. The bystander stands exactly on the
+    // line at the moment of the catch — under the stricter layer wiring, so
+    // the pin holds even for a wiring that walls playmates (the shipped one
+    // does not, and passes a fortiori).
+    const s = game([
+      [0, 0],
+      [0.7, 0],
+      [0.35, 0.05],
+    ])
+    const world: TagWorld = { ...OPEN, occupied: layerWalls(s) }
+    s.playing = true
+    s.chaser = 0
+    s.target = 1
+    stepTagGame(s, 1 / 60, CFG, world)
+    expect(s.tags).toBe(1)
+  })
+})
+
 describe('the paces the eye reads', () => {
   it('nobody ever falls below the floor while a chase runs — winded, never frozen', () => {
     const s = game(FOUR)
@@ -983,6 +1149,42 @@ describe('the armed invariants (point 207(i)) — the channel every session list
     stepTagGame(s, 1 / 3600, CFG, OPEN)
     expect(codes().join(' ')).toContain('tag-pinned')
   })
+
+  // THE LONG-RUN ALARM (point 589): the play itself is a producer, and what it
+  // produces is what the player sees happen — a catch, or a fresh round. The
+  // defect class is the one no suite reaches: a game that runs for minutes and
+  // then stops producing while every timer inside it keeps moving.
+  it('says nothing over half an hour of a healthy game', () => {
+    const s = game(FOUR, 5)
+    run(s, 1800)
+    expect(codes()).toEqual([])
+    expect(s.play.produced).toBeGreaterThan(1)
+  })
+
+  it('nor when a tenure runs all the way to the backstop and the group idles after it', () => {
+    // The longest LEGITIMATE gap between two round events, at the shipped
+    // calibration: nobody is ever caught, so each round runs to the cap and the
+    // idle break follows it. The window must sit clear of exactly this.
+    const cfg: TagConfig = { ...CFG, catchDistance: 0 }
+    const s = game(FOUR, 5, cfg)
+    run(s, 600, OPEN, cfg)
+    expect(codes()).toEqual([])
+  })
+
+  it('FIRES when the game produces neither a catch nor a fresh round for its window', () => {
+    // A round that can never end: nobody catchable, and the backstop pushed out
+    // of reach. Every timer still runs — which is why only the RESULT catches it.
+    const cfg: TagConfig = { ...CFG, catchDistance: 0, resolveCapSeconds: 1e6 }
+    const s = game(FOUR, 5, cfg)
+    run(s, cfg.silenceSeconds + 20, OPEN, cfg)
+    expect(codes().join(' ')).toContain('tag-silent')
+  })
+
+  it('nor with a single child, who has nobody to play with', () => {
+    const s = game([[6, 6]], 5)
+    run(s, CFG.silenceSeconds * 3)
+    expect(codes()).toEqual([])
+  })
 })
 
 describe('the group never tires in unison (the per-child spread)', () => {
@@ -1117,10 +1319,12 @@ describe('an outside claim on a child: what was SAID steers it (point 481)', () 
     expect(asked).toBe(false)
   })
 
-  it('keeps the floor pace while a round runs, whatever the claim asks for', () => {
+  it('keeps the floor pace for every child the CHASE steers, claim or no claim', () => {
     const s = game(FOUR)
     run(s, 1)
     const floor = floorPace(CFG)
+    // Only the odd children are claimed: the rest are the chase's own, and the
+    // floor is theirs — winded, never frozen.
     run(
       s,
       3,
@@ -1129,10 +1333,78 @@ describe('an outside claim on a child: what was SAID steers it (point 481)', () 
       1 / 60,
       (st) => {
         if (!st.playing) return
-        for (const c of st.children) expect(c.pace).toBeGreaterThanOrEqual(floor - 1e-6)
+        st.children.forEach((c, i) => {
+          if (i % 2 === 0 || i === st.chaser) expect(c.pace).toBeGreaterThanOrEqual(floor - 1e-6)
+        })
       },
-      () => ({ heading: 0, pace: 0 }),
+      (i) => (i % 2 === 1 ? { heading: 0, pace: 2 } : null),
     )
+  })
+
+  it('lets a child that was TOLD to stand actually stand, mid-round (point 648)', () => {
+    // The refusal, the held spot and a reached errand target all ask for a pace
+    // of zero. Forcing the chase's floor on them walked the child forward at
+    // 1.16 m/s into whatever stood in front of it, and the blocked-step fallback
+    // then turned it a quarter every frame — it spun on the spot instead of
+    // standing (the user's "Kind zittert auf der Stelle herum").
+    const s = game(FOUR)
+    run(s, 1)
+    expect(s.playing).toBe(true)
+    const still = s.children.findIndex((_, i) => i !== s.chaser)
+    s.immune = still // uncatchable, so the role cannot move onto it mid-run
+    s.immuneFor = 1e4
+    const at = { x: s.children[still].x, z: s.children[still].z }
+    const walked = s.children[still].walked
+    run(s, 3, OPEN, CFG, 1 / 60, undefined, (i, st) =>
+      i === still && i !== st.chaser ? { heading: 1.2, pace: 0 } : null,
+    )
+    expect(s.children[still].pace).toBe(0)
+    expect(s.children[still].held).toBe(true)
+    expect(Math.hypot(s.children[still].x - at.x, s.children[still].z - at.z)).toBeLessThan(0.01)
+    // Its legs stay still with it, and it never counts as pinned on geometry.
+    expect(s.children[still].walked - walked).toBeLessThan(0.01)
+    expect(s.children[still].pinned).toBe(0)
+  })
+
+  it('settles a child at the target it was sent to instead of oscillating (point 648)', () => {
+    // The situations' own shape: walk to a spot, and once there ask for nothing.
+    // A child that is pushed on regardless overshoots its mark and turns back on
+    // it, frame after frame — the alternating step that reads as a jitter.
+    const s = game(FOUR)
+    run(s, 1)
+    const sent = s.children.findIndex((_, i) => i !== s.chaser)
+    // Off the chaser's list for the whole run, so the round cannot hand it the
+    // role halfway through and turn the measurement into one of a chase.
+    s.immune = sent
+    s.immuneFor = 1e4
+    const mark = { x: s.children[sent].x + 3, z: s.children[sent].z }
+    const arrived: Array<{ x: number; z: number }> = []
+    run(
+      s,
+      6,
+      OPEN,
+      CFG,
+      1 / 60,
+      (st) => {
+        const c = st.children[sent]
+        if (Math.hypot(c.x - mark.x, c.z - mark.z) <= 0.8) arrived.push({ x: c.x, z: c.z })
+      },
+      (i, st) => {
+        if (i !== sent || i === st.chaser) return null
+        const c = st.children[i]
+        const d = Math.hypot(c.x - mark.x, c.z - mark.z)
+        return d <= 0.8
+          ? { heading: c.heading, pace: 0 }
+          : { heading: Math.atan2(mark.x - c.x, mark.z - c.z), pace: 1.6 }
+      },
+    )
+    expect(arrived.length).toBeGreaterThan(60) // it got there and stayed
+    // CONVERGED, not alternating: every reading after the first sits on the same
+    // spot, so the position does not swing back and forth across the mark.
+    const spread = Math.max(
+      ...arrived.map((p) => Math.hypot(p.x - arrived[0].x, p.z - arrived[0].z)),
+    )
+    expect(spread).toBeLessThan(0.05)
   })
 
   it('leaves every child where a walker may stand, claim or no claim', () => {
@@ -1155,6 +1427,138 @@ describe('an outside claim on a child: what was SAID steers it (point 481)', () 
           ? { heading: Math.atan2(-st.children[i].x, -st.children[i].z), pace: 3 }
           : null,
     )
+  })
+})
+
+describe('a village of huts does not make the children shuffle (point 648)', () => {
+  // The user's "Kind zittert auf der Stelle herum", in the shape that produces
+  // it: a walled compound with a fence across the yard, which is what turns a run
+  // into a run PAST things. Open ground barely shows it at all — the defect is in
+  // the DEFLECTION, which re-minimised the turn every frame while which turns are
+  // free depends on where the child is standing, so the minimum flipped between
+  // two values that undid one another.
+  const huts: Collider[] = Array.from({ length: 8 }, (_, i) => {
+    const a = (i / 8) * Math.PI * 2
+    return boxCollider(Math.sin(a) * 5.5, Math.cos(a) * 5.5, 2.6, 2.6, a)
+  })
+  huts.push(boxCollider(0, 1.6, 6, 0.3, 0.4)) // a fence across the yard
+  const village: TagWorld = {
+    radius: 10,
+    childRadius: CHILD_R,
+    blocked: (x, z) => Math.hypot(x, z) > 10 || !standingClear(huts, x, z, CHILD_R),
+    nudge: (x, z) => {
+      const r = tryNudgeToFree(huts, x, z, CHILD_R)
+      return { x: r.pos[0], z: r.pos[1], found: r.found }
+    },
+  }
+
+  it('lets a step reverse the one before it only rarely, over a long game', () => {
+    const s = game([
+      [0, 0],
+      [0.9, -0.7],
+      [-1.1, -0.5],
+      [1.4, -1.4],
+    ])
+    const prev = s.children.map((c) => ({ x: c.x, z: c.z }))
+    const last: Array<{ x: number; z: number } | null> = s.children.map(() => null)
+    let steps = 0
+    let reversals = 0
+    run(s, 40, village, CFG, 1 / 30, (st) => {
+      st.children.forEach((c, k) => {
+        const v = { x: c.x - prev[k].x, z: c.z - prev[k].z }
+        const u = last[k]
+        // Only real steps have a direction to compare at all.
+        if (u && Math.hypot(u.x, u.z) >= 1e-3 && Math.hypot(v.x, v.z) >= 1e-3) {
+          steps++
+          if (u.x * v.x + u.z * v.z < 0) reversals++
+        }
+        if (Math.hypot(v.x, v.z) >= 1e-3) last[k] = v
+        prev[k] = { x: c.x, z: c.z }
+      })
+    })
+    expect(steps).toBeGreaterThan(2000) // they really ran
+    // Measured on this fixture: 1.0 % with the course rule and 3.3 % without it,
+    // against 0.2–0.4 % on open ground with no huts at all. The gate sits between
+    // the two, so it can only be tripped by the defect coming back — not by a run
+    // of unlucky evasions.
+    expect(reversals / steps).toBeLessThan(0.02)
+  })
+})
+
+describe('a child cornered by the settlement walks out (point 648)', () => {
+  // A dead-end lane between two huts: the only free ground is BEHIND the child.
+  // The wildlife's ±90° deflection cannot see it, so the child used to stand
+  // there until the unstuck timer teleported it — the user's "Kind hängt kurz
+  // fest", measured at his seed as every stalled frame having free ground
+  // 105–150° off the heading it wanted.
+  const deadEnd: TagWorld = {
+    radius: 20,
+    childRadius: CHILD_R,
+    blocked: (x, z) => z > -0.5 || Math.abs(x) > 0.35,
+    nudge: (x, z) => ({ x, z, found: false }),
+  }
+
+  it('keeps walking instead of standing there, and needs no teleport', () => {
+    const s = game([[0, -1]]) // a lone child: the round idles, the claim steers
+    let left = 0
+    let walked = 0
+    let stillest = Infinity
+    let window = 0
+    run(
+      s,
+      4,
+      deadEnd,
+      CFG,
+      1 / 60,
+      (st) => {
+        const c = st.children[0]
+        left = Math.max(left, Math.hypot(c.x, c.z + 1))
+        expect(deadEnd.blocked(c.x, c.z)).toBe(false)
+        // The least ground covered in any half second: a child that stood there
+        // for its unstuck window would leave a zero here.
+        if (c.walked - window >= 0 && st.clock % 0.5 < 1 / 60) {
+          stillest = Math.min(stillest, c.walked - window)
+          window = c.walked
+        }
+        walked = c.walked
+      },
+      // Sent straight at the dead end, the way a chase or an errand would.
+      () => ({ heading: 0, pace: 2 }),
+    )
+    expect(left).toBeGreaterThan(0.8) // it turned round and left the pocket
+    expect(walked).toBeGreaterThan(6) // and kept walking the whole time
+    expect(stillest).toBeGreaterThan(0.2) // never froze in any half second
+    expect(s.children[0].pinned).toBe(0) // never stalled long enough to be nudged
+  })
+
+  it('lets the way round AGE while the child stands, so it never sets off on a stale one', () => {
+    // The commitment is a hysteresis, and a hysteresis that only ticks while the
+    // child WALKS never runs out on one that stands. A child told to stay put
+    // would keep the way round it committed to before it stopped and set off on
+    // it again however much later — a side that by then means nothing.
+    const s = game([[0, -1]])
+    // Sent into the pocket until it has turned aside and committed to a side.
+    run(s, 0.2, deadEnd, CFG, 1 / 60, undefined, () => ({ heading: 0, pace: 2 }))
+    expect(s.children[0].edgeFor).toBeGreaterThan(0)
+    expect(s.children[0].edgeSide).not.toBe(0)
+
+    // Now TOLD to stand, for longer than the window lasts.
+    run(s, CFG.edgeSeconds + 0.2, deadEnd, CFG, 1 / 60, undefined, (i, st) => ({
+      heading: st.children[i].heading,
+      pace: 0,
+    }))
+    expect(s.children[0].edgeFor).toBe(0)
+    expect(s.children[0].edgeSide).toBe(0)
+    expect(s.children[0].held).toBe(true)
+
+    // And set off again on the direction it is GIVEN, not the one it kept. Read
+    // in the OPEN, where nothing deflects it: the way out it was holding pointed
+    // back down the lane (−Z), so a stale one would still be showing there.
+    const before = { x: s.children[0].x, z: s.children[0].z }
+    run(s, 0.2, OPEN, CFG, 1 / 60, undefined, () => ({ heading: Math.PI / 2, pace: 2 }))
+    const c = s.children[0]
+    expect(c.x - before.x).toBeGreaterThan(0.3) // heading PI/2 is +X, as asked
+    expect(Math.abs(c.z - before.z)).toBeLessThan(0.01)
   })
 })
 
@@ -1185,5 +1589,156 @@ describe('the play ground is a disc of its own (point 481.4)', () => {
     })
     // And it is still a GAME in there: somebody was caught.
     expect(s.tags).toBeGreaterThan(0)
+  })
+})
+
+describe('the rescue is a finding, not an escape (point 656)', () => {
+  /** A world whose only free ground is a small island — everything else is
+   *  refused, and a rescue sets the child down at a known free spot. */
+  function island(radius: number, cx = 0, cz = 0, escape: [number, number] = [12, 12]): TagWorld {
+    return {
+      radius: RADIUS,
+      childRadius: CHILD_R,
+      // The island, and the open ground a rescue sets the child down on — so a
+      // freed child is really free and does not simply stall again where it
+      // landed.
+      blocked: (x, z) =>
+        Math.hypot(x - cx, z - cz) > radius && Math.hypot(x - escape[0], z - escape[1]) > 4,
+      nudge: () => ({ x: escape[0], z: escape[1], found: true }),
+    }
+  }
+
+  it('counts the teleport that frees a child which cannot move at all', () => {
+    // The island is narrower than one probe, so every direction reads shut and
+    // the child stands: the stall watch of the MOVE is the one that fires.
+    const world = island(0.05)
+    const s = game([
+      [0, 0],
+      [0.02, 0.01],
+    ])
+    run(s, 1.4, world, CFG)
+    expect(s.children[0].nudges).toBe(0) // still inside its window
+    expect(s.children[0].pinned).toBeGreaterThan(1.2)
+    run(s, 0.3, world, CFG)
+    // Freed exactly ONCE, though both watches were running out together: the
+    // rescue re-takes the anchor, so the frame that picked the child up cannot
+    // be charged a second time by the progress watch a few lines later.
+    expect(s.children[0].nudges).toBe(1)
+    // Set down on the open ground and walking again from there.
+    expect(Math.hypot(s.children[0].x - 12, s.children[0].z - 12)).toBeLessThan(2)
+    expect(s.children[0].pinned).toBe(0)
+  })
+
+  it('and records HOW FAR it carried it, which nothing outside could work out', () => {
+    // The counter the checks read (point 656). A watcher outside sees one vector
+    // per frame with the child's walking and the settlement's correction added
+    // together, and `walked` is a scalar that cannot say which way the legs
+    // went — so the distance is taken HERE, at the teleport, where it is known.
+    const world = island(0.05)
+    const s = game([
+      [0, 0],
+      [0.02, 0.01],
+    ])
+    const c = s.children[0]
+    expect(c.carried).toBe(0)
+    let before = { x: c.x, z: c.z }
+    for (let i = 0; i < 240 && c.nudges === 0; i++) {
+      before = { x: c.x, z: c.z }
+      stepTagGame(s, 1 / 60, CFG, world)
+    }
+    expect(c.nudges).toBe(1)
+    // On this island the child is blocked on every probe, so the frame that
+    // freed it moved it by the teleport and by nothing else.
+    expect(c.carried).toBeCloseTo(Math.hypot(c.x - before.x, c.z - before.z), 6)
+    expect(c.carried).toBeGreaterThan(10) // it really was carried, to open ground
+    expect(c.walked).toBe(0) // and not a centimetre of it counts as walking
+  })
+
+  it('counts the teleport that frees a child which walks without getting anywhere', () => {
+    // The reported symptom itself: a child at a full walking pace whose heading
+    // is turned right round every quarter second, so it paces a few centimetres
+    // to and fro on open ground. Nothing blocks it — `pinned` never moves — and
+    // the PROGRESS watch is the only one that can see it.
+    // A lone child, so the group idles and the claim is the only thing steering
+    // it: the role can never move to the child under test half way through.
+    const s = game([[0, 0]])
+    const steer: TagSteer = (_i, st) => ({
+      heading: Math.floor(st.clock * 4) % 2 === 0 ? 0 : Math.PI,
+      pace: 1.5,
+    })
+    run(s, 4, OPEN, CFG, 1 / 60, undefined, steer)
+    const c = s.children[0]
+    expect(c.pinned).toBe(0) // never blocked by anything
+    expect(c.walked).toBeGreaterThan(4) // and walking the whole time
+    expect(c.nudges).toBeGreaterThanOrEqual(2) // rescued once per window
+  })
+
+  it('finishes the progress window when a shiver crosses the old anchor radius', () => {
+    // The shipped failure (point 666): at sprint pace each 0.28 s leg crosses
+    // the old 0.9 m anchor radius, then reverses. Re-taking the anchor on every
+    // crossing reset `anchorFor` forever even though five metres of walking
+    // covered barely one metre of ground in each rescue window.
+    const s = game([[0, 0]])
+    const steer: TagSteer = (_i, st) => ({
+      heading: Math.floor(st.clock / 0.28) % 2 === 0 ? 0 : Math.PI,
+      pace: CFG.sprintSpeed,
+    })
+    let crossedOldRadius = false
+    run(s, CFG.unstuckSeconds + 0.3, OPEN, CFG, 1 / 60, (st) => {
+      const c = st.children[0]
+      crossedOldRadius ||= Math.hypot(c.x - c.anchorX, c.z - c.anchorZ) > CHILD_R * 3
+    }, steer)
+    const c = s.children[0]
+    expect(crossedOldRadius).toBe(true)
+    expect(c.walked).toBeGreaterThan(CFG.sprintSpeed * CFG.unstuckSeconds)
+    expect(c.pinned).toBe(0) // it moved every frame; only progress can see it
+    expect(c.nudges).toBe(1)
+  })
+
+  it('does not rescue an efficient walk merely because its window completed', () => {
+    const s = game([[0, 0]])
+    run(
+      s,
+      CFG.unstuckSeconds * 3,
+      OPEN,
+      CFG,
+      1 / 60,
+      undefined,
+      () => ({ heading: 0, pace: CFG.sprintSpeed }),
+    )
+    const c = s.children[0]
+    expect(c.walked).toBeGreaterThan(CFG.sprintSpeed * CFG.unstuckSeconds * 2)
+    expect(c.nudges).toBe(0)
+    expect(c.anchorFor).toBeLessThan(CFG.unstuckSeconds)
+  })
+
+  it('a child told to stand loses the stall it walked in with', () => {
+    // A stale count from BEFORE a hold would fire a teleport on the first
+    // blocked frame after it, on a child that had just been asked to stand.
+    const s = game([
+      [0, 0],
+      [3, 0],
+    ])
+    stepTagGame(s, 1 / 60, CFG, OPEN)
+    const still = s.children.findIndex((_, i) => i !== s.chaser)
+    s.children[still].pinned = CFG.unstuckSeconds * 0.99
+    const hold: TagSteer = (i) => (i === still ? { heading: 0, pace: 0 } : null)
+    stepTagGame(s, 1 / 60, CFG, OPEN, hold)
+    expect(s.children[still].held).toBe(true)
+    expect(s.children[still].pinned).toBe(0)
+    expect(s.children[still].nudges).toBe(0)
+  })
+
+  it('and the round breaking off clears it for everyone', () => {
+    const s = game(FOUR)
+    run(s, 0.5)
+    for (const c of s.children) c.pinned = CFG.unstuckSeconds * 0.99
+    s.chaserFor = CFG.resolveCapSeconds
+    stepTagGame(s, 1 / 60, CFG, OPEN)
+    expect(s.playing).toBe(false)
+    for (const c of s.children) {
+      expect(c.pinned).toBe(0)
+      expect(c.nudges).toBe(0)
+    }
   })
 })

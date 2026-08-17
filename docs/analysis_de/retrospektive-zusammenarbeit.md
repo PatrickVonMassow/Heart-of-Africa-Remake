@@ -47,6 +47,9 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 09.08. | Ein Punkt wartete auf ein Tor, das nicht aufgehen konnte: die Zuordnung der Fehlschläge war getroffen, aber nie in das Register eingetragen, das der Wächter liest (§3.97) |
 | 09.08. abends | Spielsitzung: zwölf Defekte in einer Mechanik, deren zwölf Punkte alle abgenommen waren — grün gegen einen Stellvertreter (Punkt 589); die veröffentlichte Reihenfolge zweimal falsch, weil sie eine zweite Heimat hat (Punkt 590, Rückfall in §3.77); ein abgehakter Punkt mit unerfülltem drittem Liefergegenstand, gefunden durch eine Nutzerfrage (§3.99) |
 
+| 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
+| 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
+
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
 ---
@@ -82,6 +85,10 @@ Die Eindämmung ist am **27.07.2026** wieder aufgehoben: Der Scheduled Task ist 
 Der erste Ansatz („Buch führen, Regeln vorschlagen") scheiterte, weil Präfix-Matching an zusammengesetzten Kommandos, `cd`-Präfixen und Heredocs vorbeigreift. Gelöst durch breite Whole-Tool-Allows plus zwei nicht offensichtliche Einsichten: Settings greifen **erst nach Session-Neustart**, und die größten Prompt-Verursacher waren **selbstverschuldete Kommandoformen**.
 
 **Lehre:** Bei wiederholter Umgebungs-Reibung erst die Mechanik des Matchings verstehen, statt Regeln zu stapeln — und die eigenen Gewohnheiten als Mitverursacher prüfen.
+
+**Nachtrag 11.08.2026 — die Einstellung, die die laufende Sitzung nicht mehr erreicht.** Die Rückfragen kamen weiter, obwohl `permissions.defaultMode: bypassPermissions` auf beiden Ebenen stand und die Zustimmung zum Modus vermerkt war. Das Protokoll der Sitzung entschied es: ihr gespeicherter Modus war `acceptEdits` — Datei-Änderungen still, jede Kommandozeile mit Rückfrage, genau das beobachtete Muster. `defaultMode` gibt einer Sitzung ihren Modus nur bei der Anlage; eine mit `--resume` fortgesetzte trägt den alten weiter, und keine Einstellungsdatei kommt an ihn heran. Die Freigabe muss deshalb dort ansetzen, wo die Rückfrage entsteht, nicht in einer Vorgabe für neue Sitzungen. Die Lehre aus 3.3 hatte das halb vorweggenommen („Settings greifen erst nach Session-Neustart") — sie war als Wartezeit gelesen worden, nicht als Aussage darüber, welchen Zustand eine Einstellung überhaupt noch erreicht.
+
+**Lehre:** Eine Einstellung, die einen Zustand nur INITIALISIERT, ist kein Hebel auf einen bestehenden Zustand. Bevor eine Konfigurationsänderung als Behebung gilt, muss belegt sein, dass sie den laufenden Fall erreicht — sonst wird sie mehrfach „behoben" gemeldet und wirkt kein einziges Mal.
 
 ### 3.4 Das Dashboard: Aktualität und Formtreue
 
@@ -710,6 +717,8 @@ Bemerkenswert ist die Asymmetrie. Was versioniert im Repository liegt, zieht sel
 
 **Lehre:** Eine Umgebung ist Teil des Systems, auch wenn sie nicht im Repository steht. Was ein Projekt zum Arbeiten braucht und NICHT versioniert ist, gehört auf eine ausdrückliche Liste, die ein Umzug abarbeitet — sonst ist der erste Beweis für ihre Existenz ihr Fehlen. Und die Prüfung „läuft das Projekt hier?" ist nicht dieselbe wie „arbeitet die Mechanik hier?": Die erste war in fünf Minuten grün, die zweite kostete einen halben Tag.
 
+**Nachtrag 11.08.2026 — die zweite Hälfte derselben Lücke.** Repariert wurde damals der Wächter: Er liest das Token seither aus dem Projekt. Das Kommandozeilenwerkzeug `gh` selbst blieb unangemeldet — und eine Wartestellung, die ich von Hand darauf baute, prüfte zehn Minuten lang einen Lauf ab, der längst grün war. Der Grund ist die eigentliche Lehre: Meine Schleife behandelte den Anmeldefehler wie ein „läuft noch". Ein Warten, dessen Abbruchbedingung nur den Erfolgsfall kennt, kann durch einen Fehler nie enden — es sieht von außen exakt aus wie Geduld. Wer wartet, muss den Fehlerfall genauso auswerten wie den Erfolgsfall, und wer ein Werkzeug von Hand aufruft, wo das Projekt einen eigenen Weg hat, zahlt dessen Umgebungsschulden erneut.
+
 ---
 
 ### 3.76 Ein Urteil gehört dem Stand, den es gemessen hat
@@ -1016,6 +1025,201 @@ der Besitz des Stapels) nur an ein Lebenszeichen gebunden ist, gehört es an ein
 FORTSCHRITT gebunden — sonst blockiert der Untätige den Fleißigen, ohne dass eine
 Regel verletzt wäre.
 
+### 3.104 Eine Sitzung wächst an Anliegen, nicht an Punkten
+
+Die Regel gegen aufgeblähten Kontext ist geschrieben für einen delegierten Punkt: Ein
+Auftrag, eine Sitzung, dann der Grenzstein. Am 10.08.2026 nahm eine begleitete Sitzung
+sechs getrennte Anliegen des Nutzers hintereinander auf — eine Frage zur Tafel, die zu
+einer Neusortierung wurde, dazu die Neufassung des Release-Tors, das Aufräumen der
+Arbeitsordnung, die Ergebnisse einer Vier-Augen-Analyse über 148 Punkte und fünf
+Zweig-Landungen. Nichts hielt das auf, und zwar aus einem strukturellen Grund: **Der
+Grenzstein hängt an einem ABGESCHLOSSENEN Punkt**, und eine begleitete Sitzung mitten
+im Gespräch erreicht diesen Zustand nie. Sie kann also beliebig wachsen, ohne eine
+einzige Regel zu verletzen.
+
+Der Nutzer hat die richtige Konsequenz benannt: Die Einsicht allein ändert nichts.
+Sie hätte in jeder der sechs Übernahmen genauso richtig danebengestanden.
+
+**Lehre:** Eine Obergrenze, die nur einen Arbeitstyp kennt, ist keine Obergrenze,
+sondern eine Einladung, in den anderen auszuweichen. Was den Verbrauch treibt, ist
+nicht die Art der Arbeit, sondern die ZAHL DER THEMEN in einem Fenster — und die
+wächst bei einer begleiteten Sitzung am schnellsten, weil jede Rückfrage des Nutzers
+wie eine Fortsetzung aussieht und keine ist. Der Durchsetzer muss deshalb den
+Verbrauch der begleiteten Sitzung genauso zählen, und ein NEUES Thema jenseits der
+Grenze wird angehängt statt begonnen. Das ist zugleich die billigste Bauform: Der
+Zähler existiert bereits, ihm fehlte nur der zweite Fall.
+
+---
+
+### 3.105 Derselbe Defekt, zweimal beauftragt — und die zweite Bestellung war schneller
+
+Am 09.08.2026 wurde festgehalten, dass die Kartenreihenfolge der Tafel eine zweite,
+handgepflegte Heimat hat und deshalb immer wieder vom Arbeitsauftrag abdriftet. Einen Tag
+später fiel derselbe Defekt erneut auf — und wurde als eigener Punkt aufgeschrieben,
+gebaut und gemergt. Der erste Punkt lief unterdessen bei einem Agenten und kam mit einer
+vollständigen, viermal fremdgeprüften Lösung zurück, von der drei Viertel bereits auf
+`main` standen. Bemerkt wurde es erst beim Landen, als das Zusammenführen in Konflikten
+endete, die kein Textkonflikt waren, sondern zwei Implementierungen derselben Sache.
+
+Keine Regel war verletzt. Der Befund wurde ordentlich aufgenommen, ordentlich beauftragt,
+ordentlich geliefert. Nur fragt die Aufnahme eines neuen Punktes bis heute niemanden, ob
+die Warteschlange dieselbe Sache schon enthält — und ausgerechnet dieses Projekt hat die
+Antwort im Haus: Die Regel „ein Befund geht zuerst in ein bestehendes Bündel" existiert,
+sie greift aber beim Bündeln von Findings, nicht beim Anlegen eines Punktes. Teuer war
+nicht die doppelte Arbeit des Agenten, sondern dass die Dopplung an der Stelle sichtbar
+wurde, an der sie am meisten kostet: nach dem Bauen, nach vier Reviews, im Merge.
+
+Gerettet wurde, was nur der erste Punkt hatte — das Anhänge-Tor —, und der Auftrag wurde
+auf genau diese Hälfte zusammengestrichen. Der Nebenbefund ist lehrreicher als der
+Hauptbefund: Der zweite Punkt hatte im Alleingang auch eine Lücke im Wächter geschlossen,
+die der erste ebenfalls geschlossen hatte, und eine dritte, die nur der erste kannte,
+wäre mit dem verworfenen Zweig verschwunden.
+
+**Lehre:** Ein neuer Punkt braucht dieselbe Frage wie ein neuer Befund — steht das schon
+irgendwo? Das ist billig, solange nur die Beschreibung existiert, und wird mit jedem
+Schritt danach teurer. Und wird ein Zweig verworfen, ist die Diff-Liste das
+Übergabeprotokoll: Was er über seinen eigenen Auftrag hinaus mitgebracht hat, geht sonst
+mit ihm unter.
+
+---
+
+### 3.106 Unsere eigene Aufräumung hat fremde Arbeit vernichtet
+
+Am 11.08.2026 landete ein Punkt mit dem Sammelbefehl, dessen letzter Schritt Zweig und
+Arbeitsbaum löscht. Gelöscht wurde auch der Arbeitsbaum eines Agenten, der an einem
+ANDEREN Punkt mitten in der Arbeit war; von da an wies jeder seiner Befehle sich selbst
+ab. Verloren war seine fertige, getestete, viermal gegengeprüfte, aber nicht committete
+Antwort auf sechs Prüfbefunde. Kein Absturz, kein Fremdeinfluss — die Werkstatt hat ihr
+eigenes Werkstück weggeräumt.
+
+Zwei Ursachen, und die zweite ist die unbequemere. Die Aufräumung handelte nach einem
+NAMEN, nicht nach einem Eigentumsnachweis, und fragte nirgends, ob in dem Baum noch
+jemand arbeitet — obwohl das Projekt die Lebendprüfung dafür längst besitzt und sie im
+Wartemechanismus täglich benutzt. Und der Agent stand überhaupt erst deshalb ungeschützt
+da, weil er seine Arbeit als EINEN Block bis zur Grünmeldung führte: Die Regel, nach jedem
+abgeschlossenen Schritt zu committen und zu pushen, existiert seit Wochen und war hier
+nicht befolgt. Sie ist genau für diesen Fall geschrieben.
+
+**Lehre:** Ein löschender Schritt braucht einen Eigentumsnachweis, keinen plausiblen Namen
+— und wo er ihn nicht führen kann, lässt er stehen und sagt es. Das gilt doppelt, wo
+parallel gearbeitet wird: Zerstörungsrisiko und Nebenläufigkeit treffen sich genau dann,
+wenn der Betrieb am produktivsten ist. Die zweite Hälfte ist billiger und wird trotzdem
+übersprungen: Nicht gepushte Arbeit ist der einzige Zustand, den nichts retten kann.
+
+---
+
+### 3.107 Die Schicht über den eigenen Einstellungen
+
+Der Nutzer verlangte, dass in seinem Editor niemals eine Rückfrage erscheint — und es
+erschienen welche, obwohl beide Einstellungsdateien das Werkzeug als GANZES erlauben. Die
+Messung schied den Verdacht sauber aus: Dieselbe Schreibzeile läuft in jeden Ordner still
+durch und fragt nur bei `.claude/` nach, und unsere Node-Skripte, die exakt dieselben
+Dateien schreiben, fragten die ganze Nacht kein einziges Mal. Die Sperre sitzt also
+oberhalb unserer Erlaubnisliste und ist durch einen Eintrag dort nicht abzustellen.
+
+Die Lösung liegt deshalb nicht in den Einstellungen, sondern eine Stufe früher: Ein
+Wächter verweigert solche Shell-Zeilen selbst und nennt den richtigen Weg. Eine
+Verweigerung kommt VOR der Rückfrage — aus einer Frage an den Nutzer wird eine Anweisung
+an den Agenten.
+
+**Lehre:** Wenn eine Konfiguration nachweislich das Richtige sagt und das Verhalten
+trotzdem abweicht, ist die nächste Frage nicht „welcher Eintrag fehlt", sondern „wer
+entscheidet oberhalb davon". Und wo eine fremde Schicht nicht zu konfigurieren ist, kann
+man ihr oft zuvorkommen, statt gegen sie anzuschreiben.
+
+---
+
+### 3.108 Eine Checkliste, die Anwesenheit prüft und nicht Reihenfolge
+
+Der Nutzer hakte am 11.08.2026 zum Release nach und beschrieb den Ablauf, den er für
+etabliert hielt: volle Regression, gründliches Aufräumen von Altlasten, noch einmal volle
+Regression. Die Prüfung ergab ein gemischtes Bild. Die Aufräumschritte sind alle
+verankert — Toter Code, veraltete Dokumente, veraltete Kommentare, der Dokumenten-Audit —
+und ohne sie verweigert der Wächter den Tag. Was fehlt, ist die Ordnung: Es gibt EINEN
+Regressionsschritt und keinerlei Aussage darüber, ob er vor oder nach dem Aufräumen liegt.
+Ein Aufräumen nach der einzigen grünen Regression ist heute vollständig regelkonform, und
+der Tag trüge eine ungetestete Änderung.
+
+Das ist die allgemeine Form: Eine Liste von Häkchen prüft, DASS etwas geschehen ist, nie
+WANN. Solange jeder Schritt für sich steht, ist das gleichgültig; sobald ein Schritt den
+Stand ändert, den ein anderer beweist, wird die Liste zur Zusicherung, die sie nicht
+einlöst. Derselbe Wächter, der einen Tag ohne Nachweis verweigert, lässt einen mit
+veraltetem Nachweis durch. Der zweite Teil des Nachhakens traf eine andere Lücke am selben
+Ort: Das Aufräumen ist eine AUFZÄHLENDE Stufe — was ist tot, was ist veraltet —, und für
+die schreibt §6 blind-parallele Vier-Augen vor; kein Abschlussschritt verlangt sie.
+
+**Lehre:** Wo ein Schritt den Gegenstand verändert, den ein anderer bezeugt, muss der
+Nachweis JÜNGER sein als die Änderung — sonst prüft die Liste eine Vergangenheit. Und eine
+allgemeine Regel greift nur dort, wo ein konkreter Schritt sie einfordert: §6 gilt seit
+Wochen für jede aufzählende Stufe, und der Abschluss hat sie trotzdem nie angewandt.
+
+### 3.109 Die Wiederholung als Allzweck-Beleg — in beide Richtungen
+
+Der Nutzer hat am 11.08.2026 eine Gewohnheit benannt: „Du behauptest oft, ein Fehlschlagen
+sei aufgrund von Last passiert und nicht wegen eines Bugs. Und als Beleg dafür nennst du,
+dass es jetzt x mal hintereinander geklappt hat. Das ist aber kein Beweis." Er hat recht,
+und ich hatte es am selben Morgen getan: Das Giza-Rot am Siedlungsrand wurde für Last
+erklärt, gestützt allein auf drei grüne Abschnittsläufe danach.
+
+Das ist der Spiegel von §3.48, und zusammen ergeben die beiden ein unangenehmes Bild.
+Dort hieß zweimal rot „also nicht die Last"; hier heißt dreimal grün „also war es die
+Last". Dieselbe Beobachtungsform hat in beiden Fällen genau den Schluss getragen, der
+gerade gebraucht wurde — und das ist das Kennzeichen eines Belegs, der keiner ist. Drei
+grüne Läufe sind mit einem behobenen Defekt vereinbar, mit einem seltenen, mit einem
+Wettlauf zweier Zugriffe und mit einer Maschine, die zufällig ruhig war. Sie
+unterscheiden keine dieser vier Möglichkeiten voneinander.
+
+Wie ein Beweis aussieht, stand am selben Tag daneben, im Nachbarfall: Der Agent von Punkt
+600 hat nicht aus Wiederholung argumentiert. Er hat den Fehlschlag unter einer
+CPU-Drosselung **deterministisch reproduziert** (8 von 8), den Mechanismus **benannt** —
+die Prüfung las Zustand und DOM in zwei getrennten Zugriffen und verglich unter Last eine
+volle Liste gegen eine leere —, ihn behoben und danach 0 von 8 gezeigt; dazu dieselbe
+Drosselung am alten Stand, um zu belegen, dass der Defekt älter war als der Zweig. Das ist
+eine Ursache. Der Unterschied zur Wiederholung ist nicht die Sorgfalt, sondern die
+Richtung: Die Drosselung **erzeugt** die vermutete Ursache, statt auf ihre Abwesenheit zu
+hoffen.
+
+**Lehre:** Ein Rot ist auf genau drei Wegen erledigt — seine Ursache ist benannt und
+behoben, es ist einem offenen Punkt zugeschrieben, der es besitzt, oder es wird selbst
+einer. „Es lief danach durch" ist keiner davon. Und wo eine Beobachtung beide Schlüsse
+gleich gut trägt, ist sie kein Beleg, sondern eine Erzählung: Der Prüfstein ist, ob das
+Gegenteil dieselbe Beobachtung erzeugt hätte.
+
+
+### 3.110 Die Gegenprüfung schweigt auch da, wo sie nichts gesehen hat
+
+Punkt 629 lief am 11.08.2026 durch fünf Gegenprüfungen. In JEDER meldete der Prüfer
+beiläufig, `worktree-cleanup.mjs` und der Schwanz seiner Testdatei seien abgeschnitten
+oder weggelassen — der Zweig-Diff stößt bei rund 200 000 Zeichen an die Materialgrenze.
+Vier Runden lang habe ich das gelesen und nicht gehandelt. Erst als es zum fünften Mal
+dastand, habe ich die Datei selbst aufgeschlagen und darin binnen Minuten einen Defekt
+gefunden: Das Freigeben der Sperre prüfte nicht, ob die Sperre noch die eigene ist, sodass
+ein Aufräum-Lauf, der das Wettrennen verloren hatte, dem Gewinner die Sperre wegnahm.
+
+Der Punkt ist nicht, dass der Prüfer etwas übersehen hätte — er hat nichts übersehen, er
+hat es angesagt. Der Punkt ist, wie sein Ergebnis GELESEN wird. Ein Befund zu einer Datei
+heißt „hier ist etwas falsch". Das Ausbleiben eines Befunds zu einer Datei, die nie im
+Material lag, heißt NICHTS — und liest sich doch genau wie „dort ist alles in Ordnung".
+Das ist §3.46 in anderer Kleidung: Dort waren 3546 grüne Tests über einer stillschweigend
+geschrumpften Menge grün, hier ist eine Gegenprüfung über einem stillschweigend
+beschnittenen Material sauber. Beide Male trägt das Verfahren sein eigenes Loch, ohne zu
+lügen.
+
+Erschwerend kommt hinzu, dass die Beschneidung mit der GRÜNDLICHKEIT wächst. Je länger an
+einem Punkt gearbeitet wird, desto größer der Zweig-Diff, desto mehr fällt heraus — die
+Prüfung wird also genau dort blind, wo am meisten geändert wurde. Die fünfte Runde, auf den
+letzten Abschnitt statt auf den ganzen Zweig geschnitten, passte wieder ins Material und
+fand prompt vier Befunde; die anschließende Prüfung des ganzen Zweigs meldete erneut
+Beschneidung — und fand trotzdem zwei weitere, diesmal in der Klasse des ursprünglichen
+Unfalls.
+
+Die Lehre ist billig und gilt ab sofort: Ein Prüfergebnis wird zusammen mit seiner
+ABDECKUNG gelesen. Nennt der Prüfer beschnittenes Material, ist das Ergebnis eine
+TEILprüfung; die ungesehenen Pfade werden benannt und anders gedeckt — durch einen
+zweiten, auf den Rest geschnittenen Lauf oder durch eigenes Lesen. Was hier noch fehlt,
+ist der Mechanismus: Solange die Abdeckung nur in der Prosa des Prüfers steht, hängt sie
+daran, dass jemand sie liest — und vier Runden lang hat das niemand getan.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -1105,7 +1309,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 10.08.2026, 14:17 · Quellen-Fingerprint: `134955f9abb1…`
+Zuletzt aktualisiert: Montag, 17.08.2026, 10:33 · Quellen-Fingerprint: `ccdb68be6e80…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1118,13 +1322,14 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | The batch dashboard — its live GH-Pages transport, its BINDING four-section structure (never change without explicit user go) and update discipline | 11 | hoch | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | A blocked tool call means the wrong path, not a missing permission — search the repo for its own command; never hand the user manual steps | 1 | niedrig | findings-guard.mjs | ✔ Mechanismus |
+| board.mjs commands must run SEQUENTIALLY — two in one turn raced and tore the dashboard's section structure | 1 | niedrig | board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | The batch dashboard may leave the private claude.ai artifact for a publicly readable transport — privacy is no longer a constraint | 1 | niedrig | board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Take the session boundary as the LAST action and with bare commands — a pipe makes the call count as work and silently deletes the marker | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Delegate via `node scripts/point-brief.mjs <N>` — the AGENT generates its own brief; board changes go through `scripts/board.mjs`; expect 529 agent deaths and commit-per-step | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | F6 bug-report zips the user hands over are saved into the repo's git-ignored local/ folder — search there first, not only Downloads | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A newly found problem goes into an EXISTING bundle point first; a new standalone point is the exception, and may instead re-cut the bundles | 1 | niedrig | bundle-first-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
 | Work packages are SPOKEN by name, never by letter — the user cannot read \"bundle H\"; the letter stays only as an internal ID | 1 | niedrig | bundle-first-guard.mjs | ✔ Mechanismus |
-| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 12 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
+| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 7 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
@@ -1134,10 +1339,12 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | hoa dashboard \"Woran ich gerade arbeite\" holds ONE CARD PER parallel point being actively worked (not a single card); cards move from Warteschlange into it (possibly several at once); a point is NEVER in both sections at once | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Never put a hardcoded `open` attribute on a dashboard `<details>` card — default all closed; localStorage persistence keeps user-opened cards open across refresh | 1 | niedrig | batch-autostart.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | The batch dashboard \"Von dir zu klären\" section holds ONLY genuine user decisions — no done items, no announcements for in-progress work | 2 | mittel | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
-| When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, and needs the user's reason | 1 | niedrig | doc-budget-guard.mjs | ✔ Mechanismus |
+| When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 2 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Fable is ONLY for four-eyes review and as the first fallback when Opus 5 is unavailable — never for \"hard\" tasks; Opus 5 handles those (user rule 25.07.2026, supersedes the earlier hard-task delegation) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Fable 5 authors work judged difficult/complex/error-prone from the start, and takes over Opus work once Sol still finds problems after a re-work; Fable is NOT the default (smaller volume) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| What survives of the 25.07. rule: Fable is NOT the default lane because its volume is the scarcest — but difficulty IS a reason for it, and review is cross-vendor, not Fable-by-default | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | All journal texts (de + en) must carry emotional voice markup; English read-aloud runs via Kokoro TTS | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1145,6 +1352,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | After every change, npm run lint (oxlint) and npm audit must be clean — zero lint errors/warnings, zero CVEs. Standing user directive. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | hoa PERMANENT process — delegate as much implementation as possible to worktree-isolated subagents; keep only picture-verify + merge at the main session; run a pool of parallel agents on non-overlapping files | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | The \"Maximum QA\" QA process and the \"new demo\" trigger (append it + closing + increment tag + publish) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| State only what was just measured, with its reading time; never assert machine/repo state from a plausible model | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Before building, triage difficulty × criticality; HIGH/critical work gets a second, different model — in which FORM (blind-parallel vs. review) is normative in CLAUDE.md §6, not here | 2 | mittel | criticality-review-guard.mjs, model-guard.mjs | ✔ Mechanismus |
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
@@ -1154,20 +1362,24 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Always take the point boundary autonomously at a closed point — never ask the user whether to hand over or /clear | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
 | Per-point QA runs scoped (Vitest always, browser suites by diff mapping, flake-retry single suites) — WATCHDOG duty to report any bug that slips through | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Edits to .claude/settings.json and .git/hooks ALWAYS trigger a permission prompt (harness safety layer, allowlist cannot override); never schedule such work for unattended night batches | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| How to read Patrick's two usage dashboards (they count in OPPOSITE directions); the OpenAI-first emergency ended 17.08.2026 and the normal split of CLAUDE.md §6 applies | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | hoa uses a feature-branch workflow — each TASKS point on feat/<point>-<slug>, push the branch after every commit, merge to main only when done+verified; cross-cutting changes go straight to main | 2 | mittel | commit-scope-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Direct pushes to main are approved despite GitHub's branch protection — never ask about switching to pull requests again | 1 | niedrig | push-arrival-guard.mjs | ✔ Mechanismus |
 | Order the TASKS/queue so known-bug fixes + user-requested extensions come BEFORE the big bug-FINDING / QA-framework tickets | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
 | Before the 224 demo checkpoint queue ONLY bugfixes + almost-done points; new features go to v0.3 (after 224) | 2 | mittel | queue-order-guard.mjs | ✔ Mechanismus |
 | Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Queue order for this release — communication mechanic first, then 633 (closing), then 174 (tag); a new point of that kind is moved to the front in the same turn | 1 | niedrig | lock-release-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
+| Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 3 | mittel | model-guard.mjs | ✔ Mechanismus |
+| ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix; a cut vX.Y is frozen | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | TASKS.md and all new entries in it are written in English | 1 | niedrig | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | TASKS.md entries state the final correct target directly — never keep a 'first defined wrong, then clarified/corrected' trail in the spec | 1 | niedrig | batch-doctor-states.mjs, tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
-| TASKS.md points get [*] when started and a tracking line (start, finish, minutes, ~tokens) when done — mandated 2026-07-14 | 3 | mittel | tasks-archive-guard.mjs, tasks-spec-guard.mjs, timestamp-guard.mjs | ✔ Mechanismus |
+| TASKS.md points get [*] when started and a tracking line (start, finish, minutes, ~tokens) when done — mandated 2026-07-14 | 6 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs, timestamp-guard.mjs | ✔ Mechanismus |
 | Think harder about what to test; when in doubt add MORE tests — never skimp on fast browserless Vitest cases | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Tests and probes must use IN-GAME-achievable zoom (non-debug 0.125–0.5 at least), never a debug-only zoom — testing at an unrealistic zoom has passed while the player still saw the bug, repeatedly | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Permissions are deliberately maximally broad (whole-tool allows incl. Bash); NEVER narrow or \"tidy\" them again — standing user directive | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1180,13 +1392,190 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 1 | niedrig | container-ask-guard.mjs | ✔ Mechanismus |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 47 Prozess-/Meta-TASKS-Punkte (davon 21 offen).
+Erfasste Quellen: 81 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 54 Prozess-/Meta-TASKS-Punkte (davon 20 offen).
 
-<!-- RETRO-FINGERPRINT: 134955f9abb1d21d89f1aa0df20e0f6016fc3ef1f0f14afba7dbc226db7991c7 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-10T12:17:59.580Z -->
+<!-- RETRO-FINGERPRINT: ccdb68be6e80871e961761aa235a68c1a2e9606463da4977bb2aa5821c9df1db -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-17T08:33:47.507Z -->
 <!-- AUTO-GENERATED:END -->
+
+### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
+
+Am selben Abend dreimal derselbe Fehlschluss, jedes Mal mit einer Messung in der Hand. Die Vorgängersitzung starb, weil ein VS-Code-Neustart im Devcontainer den Container mitnimmt — ich hatte aus `PPID 1` geschlossen, sie hänge nicht am Fenster, und aus `uptime` von zwei Tagen, dass nichts neu gestartet sei; beide Werte sind in einem Container über den Neustart hinweg genau so zu erwarten und unterscheiden die Hypothesen nicht. Danach lief eine Rechte-Sonde durch, und „durchgelaufen" wurde als „keine Rückfrage" gelesen — der Nutzer hatte geklickt. Erst sein Bildschirmfoto deckte es auf.
+
+Das ist nicht die Klasse aus `measure-dont-assume` (eine Behauptung ohne Messung), sondern die gefährlichere Nachbarin: Es WURDE gemessen, nur konnte die Messung die konkurrierenden Erklärungen gar nicht trennen. Ein Erfolg beweist, dass etwas gelang — nicht, WARUM. Wo ein Mensch im Spiel ist, der zustimmen kann, ist ein Erfolg überhaupt kein Signal über die Automatik.
+
+**Lehre:** Vor der Messung benennen, welches Ergebnis welche Hypothese AUSSCHLIESSEN würde. Kann ein Wert unter allen Hypothesen gleich ausfallen, ist er kein Beleg. Und Verifikationen, deren Ausgang von einem Klick des Nutzers abhängen kann, sind erst dann Belege, wenn er bestätigt, nicht geklickt zu haben.
+
+### 3.112 Der Mechanismus war verdrahtet, feuerte — und war völlig wirkungslos
+
+Der Freigabe-Haken vom 11.08.2026 stand in der Hook-Kette, wurde bei jeder Rückfrage
+ausgeführt und beendete sich mit Erfolg. Trotzdem erschien der Dialog weiter, denn seine
+Ausgabe hatte das falsche FORMAT: Das Ereignis erteilt eine Freigabe über ein
+Entscheidungs-Objekt, geschrieben war das flache Feld eines anderen Ereignisses. Eine
+unbekannte Eigenschaft wird nicht abgelehnt, sondern ignoriert — es gibt also keine
+Fehlermeldung, keinen roten Lauf, kein Protokoll. Von außen ist ein wirkungsloser
+Mechanismus von einem wirksamen nicht zu unterscheiden.
+
+Das ist eine eigene Klasse neben „der Wächter kann nie auslösen" (den fängt
+`guard-health-guard` an der Verdrahtung ab): Hier stimmt die Verdrahtung, es ist die
+SPRACHE zur Gegenseite, die nicht ankommt. Unser eigener Test hat es nicht gefunden,
+weil er die Ausgabe der Implementierung nachbaute statt des fremden Vertrags — er hätte
+jede beliebige Erfindung genauso bestätigt. Gefunden haben es zwei Modelle zweier
+Hersteller, unabhängig, als jeweils ERSTEN Punkt; und dieselbe Prüfrunde deckte danach
+zweimal einen Fehler auf, den erst das BEHEBEN eingebaut hatte — darunter eine Ausnahme,
+die den unbeaufsichtigten Betrieb angehalten hätte, weil dort „keine Entscheidung" nicht
+Rückfrage bedeutet, sondern Ablehnung.
+
+**Lehre:** Wo ein Mechanismus mit einer fremden Schnittstelle spricht, ist der Test gegen
+die eigene Ausgabe wertlos — geprüft wird gegen die dokumentierte Gegenseite, und der
+Schlüsselsatz wird festgenagelt (welche Felder genau, nicht nur welcher Wert). Und ein
+Durchsetzer, dessen Wirkung man nicht am Verhalten sieht, braucht einen Beleg, dass er
+nicht nur LIEF, sondern etwas BEWIRKT hat.
+
+### 3.113 Der erste Fehlschlag macht sich selbst dauerhaft
+
+Die Netzfreigabe des Containers merkt sich aufgelöste IP-Adressen. Weil die Adressen hinter
+`api.openai.com` im Tagesverlauf wechseln, hält der Startlauf nur eine Momentaufnahme — die
+Auffrischung alle 15 Minuten war genau dafür gebaut. Sie hat seit dem Containerstart kein
+einziges Mal gelaufen: Ihre Datei mit der Kennnummer des vorigen Laufs existiert auf einem
+frischen Container nicht, das Lesen warf, und der Fang lag um den GANZEN Block. Geschrieben
+wird diese Datei erst nach einem Start — der damit nie stattfand. Der erste Fehlschlag hat
+sich also selbst verewigt, und das Protokoll meldete brav bei jedem Takt „übersprungen
+(ENOENT)", vier Wochen lang gelesen von niemandem.
+
+Das ist nicht §3.112 (die falsche Sprache zur Gegenseite), sondern die Klasse davor: Der
+Mechanismus spricht mit sich selbst — sein eigener ZUSTAND ist die Vorbedingung seines
+ersten Laufs. Verwandt mit „ein Wächter, der nie auslösen kann", nur entsteht die Lähmung
+hier erst im Betrieb, beim Start aus dem Nichts. Zwei Sitzungen haben die Freigabe danach
+von Hand nachgezogen und die Störung damit als erledigt gelesen — die Handreparatur ist der
+zuverlässigste Weg, eine tote Automatik unsichtbar zu halten.
+
+**Lehre:** Ein wiederkehrender Mechanismus wird gegen den LEEREN Zustand geprüft — kein
+Protokoll, keine Kennnummer, keine Vorgeschichte —, denn genau so beginnt er nach jedem
+Neustart. Und „übersprungen" ist kein Betriebszustand: Was ein Durchsetzer nicht tut, gehört
+laut gemeldet, sonst ist sein Schweigen von Erfolg nicht zu unterscheiden.
+
+---
+
+### 3.114 Der Messlauf überlebte seinen Agenten — im flüchtigen Verzeichnis
+
+Der Beweis für Punkt 657 besteht aus zehn Live-Läufen auf einer bewusst unbelasteten
+Maschine; sie sind der teure Teil der Arbeit, nicht der Code. Der bearbeitende Agent startete
+sie im Hintergrund, wartete blockierend — und starb während des Wartens an einem Serverfehler
+der Modell-API. Neun der zehn Läufe liefen zu Ende. Ihr Ergebnis existierte, vollständig und
+korrekt, aber ausschließlich in der Ausgabedatei des Hintergrundlaufs unter `/tmp`. Die
+Nachfolgesitzung hat es von Hand geborgen; ohne diese Bergung wäre zwanzig Minuten
+Messzeit ein zweites Mal bezahlt worden.
+
+Gerettet hat es die In-Flight-Deklaration: Sie benennt Zweig, Arbeitsbaum und Protokollpfad
+als BELEG, und genau dieser Beleg war die Spur zum Ergebnis. Das ist die gute Hälfte. Die
+schlechte: Der Ablageort war `/tmp`. Dieses Projekt weiß aus eigener Erfahrung, dass ein
+Neustart der Entwicklungsumgebung den ganzen Container mitnimmt — dann wäre mit dem Agenten
+auch sein fertiges Messergebnis verschwunden, und niemand hätte gewusst, dass es je existiert
+hat. Ein Ergebnis, das den Erzeuger überlebt, aber nur an einem Ort liegt, den der nächste
+Neustart löscht, ist nicht gesichert, sondern bloß noch nicht verloren.
+
+**Lehre:** Was lange läuft, schreibt sein Ergebnis dorthin, wo die Arbeitsordnung es
+wiederfindet — in das git-ignorierte `local/` des Repositories, nicht nur in den Kratzraum des
+Prozesses. Und die Wartedeklaration ist der richtige Zeiger darauf: Sie ist ohnehin das
+Einzige, was eine tote Sitzung über ihre laufende Arbeit hinterlässt.
+
+### 3.115 Der Prüfer fand den Fehler — und die Kur war schlechter als der Fehler
+
+Punkt 657 war gelandet, gemessen und am Bild geprüft, als die Nachprüfung durch das
+Fremdmodell eine zweite Klippe im geheilten Mechanismus benannte: Der Vorzeichen-Test, der
+entscheidet, welchen Weg herum ein fliehendes Kind nimmt, hat seine eigene Sprungstelle, und
+die liegt mitten im Bereich, den die Kur der zweiten Runde gerade geglättet hatte. Der Befund
+war richtig — nachgerechnet, reproduziert, kein Fehlalarm.
+
+Der reflexhafte nächste Schritt wäre gewesen, ihn zu beheben: Die Korrektur ist klein, sie
+schließt die Klippe nachweislich, und ein grüner Test hätte sie bestätigt. Gemessen wurde
+trotzdem, über zehn Dorf-Minuten und fünf Varianten der Kur — und jede einzelne verschlechterte
+gesunde Dörfer um ein Viertel mehr Rettungseingriffe bei weniger Fängen. Es ist dieselbe
+Messlatte, an der in derselben Woche schon zwei andere Kuren gescheitert sind: Eine Regel, die
+stark genug ist, ein seltenes Fehlverhalten zu unterbinden, verbiegt das Spiel überall dort,
+wo es nichts zu unterbinden gibt.
+
+Der Ausgang ist deshalb kein Fix, sondern eine Buchung: Der Auslöser hängt an der bestehenden
+Zuschreibung des Rest-Rots, die Messwerte stehen im Code neben der Stelle, die sie betreffen,
+und ein neuer Test schützt die intakte Hälfte des Mechanismus gegen späteres Abdriften. Das
+Fremdmodell hat diese Entscheidung in der zweiten Runde ausdrücklich freigegeben.
+
+**Lehre:** Ein bestätigter Prüferbefund verpflichtet zur Untersuchung, nicht zur Änderung. Die
+Frage ist nie „lässt sich das beheben?", sondern „was kostet die Behebung an anderer Stelle?" —
+und die Antwort darauf ist eine Messung, kein Urteil. Ein Befund, dessen Kur teurer ist als er
+selbst, wird mit seinem Mechanismus und seinen Zahlen aktenkundig gemacht und dem Punkt
+zugeschrieben, der ihn erbt; verschwiegen werden darf er nicht, still behoben aber auch nicht.
+
+### 3.116 Die Mechanik schlägt sich selbst, sobald man die Regel befolgt
+
+An einem Tag (13.08.2026) sind zwei Durchsetzungen an genau derselben Stelle gescheitert: nicht
+an Nachlässigkeit, sondern daran, dass die vorgeschriebene Benutzung ihre eigene Voraussetzung
+zerstört.
+
+Die Übergabe an eine frische Sitzung setzt eine Markierung und verlangt danach, die Übergabe auf
+der Tafel zu veröffentlichen. Genau dieses Veröffentlichen zählt als Arbeit — und Arbeit löscht
+die Markierung. Wer die Anweisung vollständig befolgt, hebt seine eigene Übergabe auf; wer sie
+unvollständig befolgt, übergibt ohne Eintrag. Gemessen an einem Tag dreimal, einmal stand der
+Stapel danach vierzig Minuten still, und der Nutzer hat dreimal dasselbe gefragt.
+
+Am selben Tag hing ein Wächter, den eine Sitzung befragte, weil die Regel „frage die Wächter,
+bevor du handelst" es verlangt: Von Hand gestartet wartet er endlos auf eine Eingabe, die nur der
+automatische Aufruf mitliefert. Zwei solcher Prozesse liefen noch, einer seit vierunddreißig
+Minuten. Beide Male war die Regel richtig, die Befolgung richtig — und das Ergebnis Stillstand.
+
+**Lehre:** Eine Mechanik ist nicht fertig, wenn sie das Richtige tut, sondern erst, wenn die
+Handlungsfolge, die sie selbst vorschreibt, sie nicht aufhebt. Die Prüffrage dafür ist billig und
+gehört an jeden neuen Durchsetzer: *Was passiert, wenn jemand die Anweisung ganz genau befolgt —
+und was, wenn er sie zusätzlich von Hand aufruft?* Beide Fälle sind Tests, nicht Gedankenspiele.
+
+### 3.117 Das Werkzeug empfiehlt eine Ressource, die es nicht sehen kann
+
+Am 14.08.2026 hat die Routing-Tabelle, die entscheidet welches Modell einen Punkt schreibt, den
+ersten Punkt des Tages an Fable 5 geschickt — „hohe Kritikalität, also ein harter Fall". Der
+delegierte Agent starb am allerersten Aufruf: Das Wochenkontingent dieses Modells war seit dem
+Vortag aufgebraucht. Die Ersatzkette zeigte danach auf Opus 5, also auf genau die Ausgabe, die
+der Nutzer am Abend zuvor untersagt hatte, weil das knappe Anthropic-Kontingent für Prüfung,
+Bild und Landung reichen muss. Die Statusausgabe derselben Spur nennt harte Fälle obendrein
+„niemals an Sol" — was wie ein Verbot dessen liest, was die stehende Anweisung verlangt.
+
+Kein Skript log. Jedes einzelne war für sich korrekt: Die Routing-Tabelle kennt Schwierigkeit,
+die Statusausgabe kennt Rollen, die Ersatzkette kennt Rangfolge. Keines kennt den Füllstand der
+Töpfe, aus denen es schöpfen lässt. Die einzige Stelle, an der die richtige Antwort stand, war
+eine Merk-Datei, die kein Werkzeug liest — sie hat den Tag gerettet, und sie hätte auch fehlen
+können.
+
+**Lehre:** Ein Werkzeug, das eine Ressource empfiehlt, erbt die Pflicht, deren Verfügbarkeit zu
+kennen — sonst ist seine Empfehlung eine Behauptung über einen Zustand, den es nie geprüft hat.
+Und wo die Korrektur zu einer Mechanik nur in einer Merk-Datei lebt, ist sie nicht durchgesetzt,
+sondern erinnert: Sie hält genau so lange, wie jemand sich erinnert. Beides gehört an dieselbe
+Prüffrage bei jedem neuen Empfehler: *Woher weiß er, dass es das Empfohlene noch gibt?*
+
+### 3.118 Der Ausfall kippte nicht die Funktion, sondern die Vereinbarung
+
+Am 17.08.2026 war GPT-5.6 Sol aus dem Container nicht erreichbar. Die Ursache lag nicht beim
+Anbieter: Die Freigabeliste, mit der der Container hochfährt, stammt aus dem Abbild vom
+04.08.2026 und kennt die OpenAI-Adressen nicht; die aktuelle Liste liegt seit dem 10.08. im
+Projekt und wird von nichts installiert, weil der Startbefehl den Pfad im Abbild aufruft. Jeder
+gewöhnliche Neustart nimmt die Strecke also wieder weg, und nur ein Neubau des Abbilds würde sie
+zurückbringen.
+
+Das Bemerkenswerte ist nicht der Ausfall, sondern seine Form. Kein Werkzeug ging kaputt: Die
+Gegenlese reicht die Arbeit ordnungsgemäß an die Claude-Kette weiter, die Leseaufträge steigen
+sauber mit Code 3 aus. Jedes für sich verhält sich richtig — und zusammen verschieben sie die
+gesamte Last auf den Anbieter, von dem sie der Nutzer ausdrücklich weg verteilt hatte, ohne dass
+irgendwo eine Entscheidung getroffen oder gemeldet wurde. Die Zwei-Anbieter-Aufteilung und das
+Vier-Augen-Prinzip, das auf ihr steht, waren außer Kraft, und die Sitzung hätte weiterarbeiten
+können, ohne es zu merken.
+
+**Lehre:** Ein sauberer Rückfallpfad ist eine Funktionsgarantie, keine Politikgarantie. Wo eine
+Vereinbarung *welcher* Anbieter etwas tut an einer Erreichbarkeit hängt, muss deren Wegfall
+gemeldet werden — mit dem, was er kostet: nicht „Sol nicht erreichbar", sondern „solange dies
+gilt, ist die Aufteilung ausgesetzt". Die Prüffrage bei jedem Rückfallpfad lautet deshalb:
+*Welche Zusage bricht er still, während er die Funktion rettet?*

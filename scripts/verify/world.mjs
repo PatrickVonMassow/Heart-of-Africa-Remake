@@ -165,6 +165,84 @@ if (section('communication-errand')) {
     })
     await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
 
+    // Work-order 585: the erratic stands ON the ground, and on dry ground. The
+    // report was a boulder out in the river with daylight under it, and the two
+    // halves of that live in different places — the SITE decides where the block
+    // stands, the SCENE decides how high it is drawn, and the defect was the
+    // scene lifting it off the site's ground with a floor value of its own. So
+    // both are read here from the live run: the height the mesh was given against
+    // the height the site says the ground is, and the terrain under the block
+    // against the water.
+    // AND THE COMPARISON IS AGAINST A SECOND SOURCE, not against itself (four-eyes
+    // review by GPT-5.6 Sol, 11.08.2026). This check used to read `r.y` against
+    // `r.groundY` — BOTH fields of the same site object — so it proved only that the
+    // scene copied the number it was handed. A block drawn a metre high on a site
+    // that also said a metre would have passed. The height the block is drawn at is
+    // now held against the terrain the WORLD reports under it, sampled independently,
+    // which is the field the bird's-eye mesh is built from; the site's own value is
+    // reported beside it so a divergence names which of the two moved.
+    // The quantity is the LOWEST ground under the whole footprint — the centre
+    // sample is the wrong one (Sol's re-review, 11.08.2026): a base above the
+    // footprint minimum but below the centre would have passed, and that IS the
+    // float this point was filed for. So the footprint is re-sampled here on a
+    // DENSE grid of its own, not on the site's ring pattern, and the drawn base
+    // must equal that minimum within a tolerance smaller than the smallest float a
+    // player can see (the block is ~3 world units tall; 0.02 is under 1 % of it).
+    const seat = await page.evaluate(async () => {
+      const t = await import('/src/world/terrain.ts')
+      const r = window.__communicationRock
+      const seed = window.__game.getState().seed
+      const centre = t.sampleTerrain(r.lat, r.lon, seed)
+      const rock = await import('/src/world/communicationRock.ts')
+      const rad = rock.ROCK_FOOTPRINT_UNITS / 10 // world units → degrees
+      // THE SAME POINTS, READ AGAIN — not the same NUMBER read twice. The site's
+      // stored ground value is what this check may not trust; the coordinates it is
+      // computed over are public, so they are re-sampled here from the terrain
+      // field. A dense grid instead would measure a slightly different quantity and
+      // could disagree with a correctly seated block on rolling ground (Sol's third
+      // pass), so it is reported beside the verdict, never asserted on.
+      let lo = Infinity
+      for (let k = 0; k < 2; k++) {
+        const f = k === 0 ? 0.5 : 1
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2
+          const h = t.sampleTerrain(r.lat + Math.cos(a) * rad * f, r.lon + Math.sin(a) * rad * f, seed).height
+          lo = Math.min(lo, h)
+        }
+      }
+      lo = Math.min(lo, centre.height)
+      let dense = Infinity
+      for (let i = -4; i <= 4; i++) {
+        for (let j = -4; j <= 4; j++) {
+          const dLat = (i / 4) * rad
+          const dLon = (j / 4) * rad
+          if (Math.hypot(dLat, dLon) > rad + 1e-12) continue
+          dense = Math.min(dense, t.sampleTerrain(r.lat + dLat, r.lon + dLon, seed).height)
+        }
+      }
+      return { drawnY: r.y, groundY: r.groundY, type: centre.type, terrainH: centre.height, lo, dense }
+    })
+    // Numerical, not generous: both sides are the same field read over the same
+    // coordinates, so anything above float noise is a real divergence.
+    const SEAT_TOLERANCE = 1e-6
+    const seated = Math.abs(seat.drawnY - seat.lo) <= SEAT_TOLERANCE
+    console.log(
+      `${seated ? 'PASS' : 'FAIL'}  the erratic is drawn at the lowest ground under its footprint ` +
+        `(drawn ${seat.drawnY.toFixed(6)}, re-measured ${seat.lo.toFixed(6)}, ` +
+        `site ${seat.groundY.toFixed(6)}, dense grid ${seat.dense.toFixed(6)})`,
+    )
+    if (!seated) {
+      errors.push(
+        `the erratic is drawn at y ${seat.drawnY}, the lowest ground under its footprint is ` +
+          `${seat.lo} (its site says ${seat.groundY})`,
+      )
+    }
+    const dry = seat.type !== 'water' && seat.type !== 'ocean' && seat.groundY <= seat.terrainH + 1e-9
+    console.log(
+      `${dry ? 'PASS' : 'FAIL'}  the erratic stands on dry ground, its base not above it (${seat.type})`,
+    )
+    if (!dry) errors.push(`the erratic stands on ${seat.type} with its base at ${seat.groundY}`)
+
     // Point 487, the errand's end, driven in the REAL browser against the
     // placement the scene drew (window.__communicationRock, not a coordinate this
     // script computed): digging away from the block finds nothing, digging at it

@@ -99,6 +99,33 @@ export const BANK_STAND_INSET = 1.5
  *  walkable region however the calibratable river width moves the waterline. */
 export const BANK_STRETCH_ANGLE_FRAC = 0.8
 
+/** The smallest stand-off any object keeps from the top of the bank, whatever
+ *  its own footprint — a tuft of grass has no radius worth the name and must
+ *  still not sprout on the slope. */
+export const BANK_DRESSING_CLEARANCE = 0.9
+
+/**
+ * Does a body of radius `r` stand on the settlement's FLAT ground plate, clear
+ * of the shore?
+ *
+ * NOTHING STANDS ON THE SHORE (work-order 584/585). Past the top of the bank the
+ * ground slopes away under the water, while the dressing is placed and drawn on
+ * the plate at height zero — so anything that lands there hovers over a shore it
+ * does not follow, out over the river. Seed 1425108822 dropped a boulder 1.8 m
+ * past the Bambara waterline, which is how it was found, and grass tufts stood
+ * out in the same water because they were scattered by a rule of their own.
+ * There is one rule now, and every scatter reads it.
+ */
+export function standsOnGroundPlate(
+  bank: Pick<PlaceRiverBank, 'nx' | 'nz' | 'walkEdge'> | null | undefined,
+  x: number,
+  z: number,
+  r = 0,
+): boolean {
+  if (!bank) return true
+  return x * bank.nx + z * bank.nz + Math.max(r, BANK_DRESSING_CLEARANCE) <= bank.walkEdge
+}
+
 /** A point on the settlement ground. */
 export interface BankPoint {
   x: number

@@ -1,7 +1,9 @@
 // Stop hook (user mandate 22.07.2026): GUARANTEE the batch never idle-stops.
 // While open, non-deferred TASKS points remain and .claude/batch-paused is absent,
 // this BLOCKS the turn from ending — the assistant must continue the next item (and
-// wait for a running validation by POLLING within the turn, never by yielding).
+// wait for a running validation by AWAITING it inside the turn, never by yielding
+// and never by a poll loop: point 592 measured 2857 poll responses in six days,
+// 10.9 % of the weighted spend, the longest chain 437 answers for one word).
 //
 // HARD SINGLETON (24.07.2026, after the e9407cae double-session incident):
 //   - It pushes ONLY the session that holds the live batch lock. A non-owner
@@ -63,10 +65,11 @@ import {
   DOCTOR_STATE_PATH,
 } from './batch-singleton.mjs'
 import { otherSessionsIn, gateDemandSatisfied } from './batch-doctor-core.mjs'
-import { gatherBoundary } from './batch-boundary.mjs'
+import { gatherBoundary, probeLauncherState } from './batch-boundary.mjs'
+import { gatherWatermark } from './context-watermark.mjs'
 import { launcherRemedy } from './batch-launcher-core.mjs'
 import { gatherOwnerWork } from './batch-owner-work.mjs'
-import { gatherInFlight } from './batch-in-flight.mjs'
+import { gatherInFlight, gatherHandoverTransfer } from './batch-in-flight.mjs'
 import { POOL_CAP, slotsRemedy, describeInFlight } from './batch-in-flight-core.mjs'
 import { clearClaim, gatherClaim, gitOperationInProgress, handBackToClaimant } from './batch-claim.mjs'
 import { describeClaim, releaseDecision, reservationDecision } from './batch-claim-core.mjs'
@@ -88,8 +91,14 @@ const record = (line) => {
 }
 
 let sid = ''
+let transcriptPath = ''
 try {
-  sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+  const payload = JSON.parse(readFileSync(0, 'utf8'))
+  sid = payload.session_id || ''
+  // The hook's own transcript path is the context watermark's measuring point
+  // (point 675, defeat 3) — the one file that records what this session's
+  // context actually measures.
+  transcriptPath = payload.transcript_path || ''
 } catch {
   /* no/!JSON stdin — sid stays empty → this session can never be conscripted */
 }
@@ -263,6 +272,44 @@ try {
     }
   }
 
+  // THE CONTEXT WATERMARK (point 675, defeat 3) — measured for the owner only,
+  // from the session's own transcript. A demand is raised ONLY off a REAL
+  // reading past the mark AND an armed launcher (never demand what the CLI
+  // would refuse); an UNREADABLE state surfaces loudly below instead of
+  // silently never firing.
+  let watermark = null
+  let watermarkDemand = false
+  if (ownership === 'mine' || ownership === 'acquired') {
+    try {
+      watermark = gatherWatermark({ transcriptPath, sid })
+    } catch (e) {
+      watermark = { state: 'unreadable', tokens: null, watermark: null, alert: true, transcript: String(e?.message ?? e) }
+    }
+    if (watermark.state === 'past' && !(bound.boundary && bound.boundary.valid)) {
+      try {
+        const launcher = bound.launcher === 'armed' ? 'armed' : probeLauncherState()
+        watermarkDemand = launcher === 'armed'
+      } catch {
+        watermarkDemand = false
+      }
+    }
+  }
+
+  // MAY THE DECLARED WORK CROSS A BOUNDARY (point 675, defeat 2)? Only asked
+  // when it would change the verdict — a live wait beside a DUE boundary or a
+  // watermark demand — so an ordinary turn end pays nothing. Fail direction:
+  // unverifiable → NOT transferable, i.e. the wait is honoured
+  // (drain-before-boundary); the other direction would demand a handover whose
+  // commit the CLI then refuses — a loop.
+  let inFlightTransferable = true
+  if (inFlight.live === true && (bound.due || watermarkDemand)) {
+    try {
+      inFlightTransferable = gatherHandoverTransfer(sid).blocked !== true
+    } catch {
+      inFlightTransferable = false
+    }
+  }
+
   // IS THIS A CLEAN MOMENT TO HAND THE BATCH BACK? Only asked when a claim is
   // actually honoured, so the git probe costs an ordinary turn end nothing. A
   // merge, a building agent and a running verification all make it 'wait' — the
@@ -292,9 +339,20 @@ try {
     launcher: bound.launcher,
     boundaryDue: bound.due,
     inFlight: inFlight.live === true,
+    inFlightTransferable,
     slotsNeedReason: inFlight.slots?.needsReason === true,
     claim: claimVerdict.verdict,
+    contextPastWatermark: watermarkDemand,
   })
+
+  // FAIL VISIBLY, NEVER SILENTLY NEVER-FIRE (point 675, defeat 3): an owner
+  // whose context cannot be measured must hear it, or the watermark is defeated
+  // by the very silence it exists to end. Appended to whatever this guard says.
+  const watermarkNote =
+    watermark && watermark.state === 'unreadable'
+      ? ' NOTE: the CONTEXT WATERMARK could not be measured this turn (no readable transcript/usage record), so ' +
+        'the context handover CANNOT fire — check `node scripts/context-watermark.mjs --status`.'
+      : ''
 
   if (decision === 'allow-release') {
     // HAND THE BATCH BACK. A real release, not a handover: the user is not the
@@ -372,7 +430,8 @@ try {
         `(merge the agent, read the suite result), then either re-declare what is still running ` +
         `(\`node scripts/batch-in-flight.mjs --waiting-on …\`) or clear it (\`--clear\`).` +
         (bound.due ? ` Note: the boundary for point ${bound.due} is still DUE — take it once the wait is over.` : '') +
-        claimNote,
+        claimNote +
+        watermarkNote,
     )
     process.exit(0)
   }
@@ -394,10 +453,16 @@ try {
     // never by being spent, so a Stop guard that sends the session back for a
     // timestamp or a review record does not un-take the boundary.
     const point = bound.boundary?.point ?? null
+    // A CONTEXT boundary (point 675) records no point; every line here must say
+    // which of the two it was, or the log reads "point ?" for a handover that
+    // was perfectly deliberate.
+    const isContext = bound.boundary?.reason === 'context-boundary'
+    const what = isContext ? 'context watermark' : `point ${point ?? '?'}`
+    const retry = isContext ? '--commit --context' : String(point ?? '<point>')
     const handed = markHandover(sid, { point })
     if (handed.handed) {
       record(
-        `HANDOVER point ${point ?? '?'} by ${sid} — lock marked handed-over; the launcher may spawn the ` +
+        `HANDOVER ${what} by ${sid} — lock marked handed-over; the launcher may spawn the ` +
           `successor.${handed.attempts > 1 ? ` (the write needed ${handed.attempts} attempts)` : ''}`,
       )
       process.exit(0)
@@ -405,12 +470,12 @@ try {
     // The stop may proceed — a guard never traps a session — but it must NEVER
     // proceed silently, or the session stops believing it passed the batch on.
     const why = handed.reason === 'write-failed' ? String(handed.error?.message ?? handed.error) : handed.reason
-    record(`HANDOVER FAILED point ${point ?? '?'} by ${sid} — ${why}; the lock is unchanged and still held.`)
+    record(`HANDOVER FAILED ${what} by ${sid} — ${why}; the lock is unchanged and still held.`)
     warn(
-      `THE HANDOVER DID NOT HAPPEN. The boundary for point ${point ?? '?'} is valid and this stop is allowed, ` +
+      `THE HANDOVER DID NOT HAPPEN. The boundary (${what}) is valid and this stop is allowed, ` +
         `but the batch lock could NOT be marked handed-over (${why}), so the launcher will keep seeing a live ` +
         `owner and will NOT spawn a successor. Do not stop believing the batch was passed on: retry with ` +
-        `\`node scripts/batch-boundary.mjs ${point ?? '<point>'}\` and end the turn again, or release the lock ` +
+        `\`node scripts/batch-boundary.mjs ${retry}\` and end the turn again, or release the lock ` +
         `by hand (\`node scripts/batch-singleton.mjs release\`) once this session is really finished. The ` +
         `boundary marker was deliberately left in place, so a retry needs no new one.`,
     )
@@ -419,17 +484,33 @@ try {
 
   if (decision === 'block-take-boundary') {
     block(
-      `TAKE THE POINT BOUNDARY — point ${bound.due} was closed in this session and no boundary is recorded, so ` +
+      `TAKE THE POINT BOUNDARY — point ${bound.due} was LANDED in this session and no boundary is recorded, so ` +
         `ending here would leave the batch STANDING STILL: the session would sit alive on the batch lock and the ` +
-        `launcher would skip every tick (that cost five and a half idle hours on 28.07.2026). Do ONE of two ` +
-        `things. (a) If the point is finished and NO delegated agent is still in flight, hand over: run ` +
-        `\`node scripts/batch-boundary.mjs ${bound.due}\` and then stop — the batch is passed to a fresh session ` +
-        `that the launcher starts and batch-resume-hook re-orients, which is how the context cost stays down. ` +
-        `(b) If work is still in flight (an agent pool draining, a verification running, the merge unfinished), ` +
-        `CONTINUE it in this turn — poll, never idle — and take the boundary when it is done. If you cannot ` +
-        `poll it inside this turn, DECLARE the wait instead: \`node scripts/batch-in-flight.mjs --waiting-on ` +
-        `"<what>" --branch <agent branch> --pid <background run> --log <its log>\`. The stop is then allowed ` +
-        `while a probe still finds that work running — and blocked again the moment it does not.` +
+        `launcher would skip every tick (that cost five and a half idle hours on 28.07.2026). The condition is ` +
+        `"the point I was landing is landed" — it is (point 675) — so hand over NOW, in two phases: ` +
+        `\`node scripts/batch-boundary.mjs --prepare ${bound.due}\`, do the bookkeeping it names (the card, the ` +
+        `publish), then \`node scripts/batch-boundary.mjs --commit ${bound.due}\` as the LAST repository action, ` +
+        `and stop. A delegated author still building does NOT hold you here: a declared wait with pushed ` +
+        `checkpoints is handed over at the commit and ADOPTED by the successor — only work WITHOUT a ` +
+        `committed-and-pushed checkpoint waits this demand out (declare it: \`node scripts/batch-in-flight.mjs ` +
+        `--waiting-on "<what>" --branch <agent branch> --worktree <its worktree>\`; \`--handover-check\` says ` +
+        `which of the two states holds). A mid-merge, or a verification you can await in ONE blocking call ` +
+        `(\`node scripts/verify/run-wait.mjs --await\`), is finished first — then hand over.` +
+        claimNote,
+    )
+  }
+
+  if (decision === 'block-context-handover') {
+    block(
+      `HAND OVER — THE CONTEXT PASSED THE WATERMARK: this session's own transcript measures ` +
+        `${watermark?.tokens ?? '?'} tokens of context against the ${watermark?.watermark ?? '?'} watermark, and ` +
+        `context above that mark is the batch's dominant cost (87–94 % of the spend sat there; a session that ` +
+        `answers and files for hours never reaches a point boundary on its own — measured three times on ` +
+        `13.08.2026). This turn's step is done, so hand over NOW, in two phases: ` +
+        `\`node scripts/batch-boundary.mjs --prepare --context\`, do the bookkeeping it names (the watermark ` +
+        `board card SAYS WHY, the publish), then \`node scripts/batch-boundary.mjs --commit --context\` as the ` +
+        `LAST repository action, and stop — and say in your closing message that the watermark is why. ` +
+        `Transferable in-flight work is handed over at the commit and adopted by the successor.` +
         claimNote,
     )
   }
@@ -482,8 +563,9 @@ try {
       `paused. Continue the NEXT queue item now — on its own feat/<point>-<slug> branch off main: ` +
       `implement it, commit + push the branch after every commit, merge to main only when it is ` +
       `complete + verified, and tick it in TASKS.md on main at the merge (CLAUDE.md §6). If a validation ` +
-      `is running, WAIT by POLLING within this turn (read the log file / TaskOutput), never by ending the ` +
-      `turn to idle. Keep the dashboard current as you go. The batch went idle for HOURS after silent ` +
+      `is running, AWAIT it within this turn — \`node scripts/verify/run-wait.mjs --await\` is ONE blocking ` +
+      `call that returns with the run's receipt — never a poll loop and never by ending the turn to idle. ` +
+      `Keep the dashboard current as you go. The batch went idle for HOURS after silent ` +
       `stops; that must not recur. The legitimate ways to end this turn: (a) every point is done; ` +
       `(a2) you are WAITING on work already handed out that you cannot poll further in this turn — a ` +
       `delegated agent still building, a suite occupying the machine: DECLARE it with \`node ` +
@@ -491,14 +573,17 @@ try {
       `--pid <background run> --log <its log>\` and the stop is allowed while a probe still finds that work ` +
       `alive (it expires, and one dead item ends it — so act as soon as the work lands); ` +
       `(b) the user asked you to stop — then create .claude/batch-paused and stop; (c) you have just ` +
-      `MERGED AND TICKED a point, and NO delegated agent is still in flight — that is a POINT BOUNDARY, so ` +
+      `MERGED AND TICKED a point — that is a POINT BOUNDARY, so ` +
       `END THE SESSION instead of pulling the next point into this context (the context is the batch's ` +
-      `dominant cost): run \`node scripts/batch-boundary.mjs <the closed point>\`, and when it confirms, ` +
-      `stop. The OS launcher starts a fresh session and batch-resume-hook re-orients it from TASKS.md. ` +
-      `Let a running agent pool DRAIN first — ending mid-flight throws its work away. If you are blocked on a ` +
+      `dominant cost): \`node scripts/batch-boundary.mjs --prepare <the landed point>\`, its bookkeeping, then ` +
+      `\`--commit <the landed point>\` as the last action, and stop. The OS launcher starts a fresh session and ` +
+      `batch-resume-hook re-orients it from TASKS.md. A delegated author still building is handed over WITH the ` +
+      `boundary and adopted by the successor when its checkpoints are pushed (point 675); only unpushed, ` +
+      `non-transferable work drains first — ending on it throws its work away. If you are blocked on a ` +
       `user decision for EVERY open item, that is also a legitimate pause: create .claude/batch-paused with ` +
       `a reason and add a "Von dir zu klären" dashboard card. Otherwise pick a DIFFERENT open item.` +
-      claimNote,
+      claimNote +
+      watermarkNote,
   )
 } catch (e) {
   // Never hard-block on a guard error — but never allow a stop SILENTLY either:

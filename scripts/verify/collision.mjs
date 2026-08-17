@@ -69,6 +69,18 @@ await page.addInitScript(() => {
   }
   window.__colliderSize = (c) => (c.kind === 'box' ? Math.max(c.hx, c.hz) : c.r)
 })
+// A virtual standard-mapped pad (work-order 610), so the unstuck section can
+// prove the escape is reachable without a keyboard. Nothing is pressed and no
+// axis is pushed, so the deliberate-input guard keeps it dormant for every other
+// section — an idle pad steers nothing (design.md §17.5).
+await page.addInitScript(() => {
+  window.__pad = {
+    id: 'virtual', index: 0, connected: true, mapping: 'standard', timestamp: 0,
+    axes: [0, 0, 0, 0],
+    buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+  }
+  Object.defineProperty(navigator, 'getGamepads', { value: () => [window.__pad] })
+})
 // Point 375: every frame declares what it must show and the shutter projects
 // that subject before the file is written. It lives ABOVE the section blocks
 // because three of them photograph — a helper declared inside one section is
@@ -784,7 +796,122 @@ if (section('unstuck')) {
       p.pitch = 0
     })
     await shot('604-unstuck-freed', { place: 'bambara-village', label: 'the freed position' })
+
+    // AND THE PAD REACHES IT TOO (work-order 610). The escape was keyboard-only:
+    // no button carried it, so a pad-only player who was wedged still lost the
+    // expedition — the very loss it exists to prevent. The MAP is pinned in the
+    // unit layer; what only the live scene can show is that the rAF button poll
+    // turns the press into the key the handler listens for, and that the handler
+    // then frees him for real. The button is pulsed with clean edges until the
+    // key lands, never on a fixed wall-clock tap (point 184).
+    await page.evaluate((w) => {
+      window.__padKeys = []
+      window.addEventListener('keydown', (e) => window.__padKeys.push(e.code))
+      const p = window.__placePlayer
+      p.x = w.x
+      p.z = w.z
+      p.yaw = 0
+      p.pitch = 0
+      window.__game.getState().setToast(null)
+    }, wedge)
+    const L3 = 10 // left stick press: the button design.md §17.5's map leaves free
+    // Pressed ONCE and held: the poll fires on the rising edge, so the wait is on
+    // the key's own arrival, never on the wall clock (the button is released
+    // afterwards, and the handler has already run by then — it is synchronous
+    // with the keydown the poll dispatches).
+    await page.evaluate((i) => (window.__pad.buttons[i] = { pressed: true, touched: true, value: 1 }), L3)
+    const padKeyed = await page
+      .waitForFunction(() => (window.__padKeys ?? []).includes('KeyU'), null, { timeout: 30000 })
+      .then(() => true)
+      .catch(() => false)
+    await page.evaluate((i) => (window.__pad.buttons[i] = { pressed: false, touched: false, value: 0 }), L3)
+    check(
+      'PoC village: a gamepad button reaches the escape at all (L3 → the U handler)',
+      padKeyed,
+      padKeyed ? 'the poll dispatched KeyU' : 'no KeyU reached the keyboard pipeline',
+    )
+    const padFreed = await page.evaluate((w) => {
+      const p = window.__placePlayer
+      let worst = Infinity
+      for (const c of window.__placeColliders) worst = Math.min(worst, window.__clearanceTo(c, p.x, p.z) - 0.35)
+      return { clearance: worst, moved: Math.hypot(p.x - w.x, p.z - w.z), toast: document.querySelector('.toast')?.textContent ?? '' }
+    }, wedge)
+    check(
+      'PoC village: and the pad press frees him for real, not just as a message',
+      padKeyed && padFreed.clearance >= 0 && padFreed.moved > 0,
+      `clearance ${padFreed.clearance.toFixed(3)} m, moved ${padFreed.moved.toFixed(2)} m, toast "${padFreed.toast}"`,
+    )
   }
+}
+
+// === No inhabitant at an unplaced transform (work-order 509) =================
+// The other failure of the layer point 155 closed: not a figure that walked
+// itself into a corner but one that was never placed at all. A vignette writing
+// its figures' transforms only from its frame callback leaves them at React's
+// identity transform — the settlement origin — for as long as they do not move,
+// and the walkers spend most of their day at home. Invisible to the eye, solid
+// to a ray probe, and an EXACT zero, which is the signature of a placement that
+// never happened.
+//
+// Swept over EVERY settlement, from the world model's own list, because the
+// defect belongs to the shared life layer rather than to one village.
+if (section('inhabitant-placement')) {
+  const ids = await page.evaluate(() => window.__settlementIds ?? [])
+  check(
+    'the sweep reads every settlement from the world model',
+    ids.length >= 30,
+    `${ids.length} settlements`,
+  )
+  const offenders = []
+  let figuresSeen = 0
+  const emptyOf = []
+  for (const id of ids) {
+    await enterSettlement(id)
+    const res = await page.evaluate((placeId) => {
+      const scene = window.__placeScene
+      const layout = window.__placeLayout
+      if (!scene || !layout) return { placeId, error: 'scene or layout missing' }
+      // The tolerance is float NOISE, not a zone: a transform nothing wrote is
+      // exactly (0,0,0), while a villager may legitimately walk over the middle
+      // of its own village and must not be reported for it (src/scenes/place/
+      // placement.ts, UNPLACED_EPS).
+      const EPS = 0.01
+      // The settlement's own placement set: a settlement that genuinely puts
+      // someone at its origin is not an offender.
+      const anchors = [...layout.dwellings.map((d) => [d.x, d.z]), ...layout.errands]
+      const originIsASpot = anchors.some(([x, z]) => Math.abs(x) <= EPS && Math.abs(z) <= EPS)
+      let seen = 0
+      let atOrigin = 0
+      scene.traverse((o) => {
+        if (o.name !== 'inhabitant') return
+        seen++
+        // The figure group always sits at its parent's origin — the PARENT is
+        // the placement, so the world matrix is what has to be read.
+        o.updateWorldMatrix(true, false)
+        const e = o.matrixWorld.elements
+        if (Math.abs(e[12]) <= EPS && Math.abs(e[13]) <= EPS && Math.abs(e[14]) <= EPS) atOrigin++
+      })
+      return { placeId, seen, atOrigin, originIsASpot }
+    }, id)
+    if (res.error) {
+      offenders.push(`${id}(${res.error})`)
+      continue
+    }
+    figuresSeen += res.seen
+    if (res.seen === 0) emptyOf.push(id)
+    if (res.atOrigin > 0 && !res.originIsASpot) offenders.push(`${id}:${res.atOrigin}`)
+  }
+  check(
+    'no inhabitant of any settlement stands at the settlement origin (point 509)',
+    offenders.length === 0,
+    offenders.length ? `at the origin: ${offenders.join(',')}` : `${figuresSeen} figures over ${ids.length} settlements`,
+  )
+  // Non-vacuous: a sweep that found no figures would have proved nothing.
+  check(
+    'every settlement of the sweep actually drew inhabitants',
+    emptyOf.length === 0 && figuresSeen > 0,
+    emptyOf.length ? `no figures in: ${emptyOf.join(',')}` : `${figuresSeen} figures`,
+  )
 }
 
 // A selected section that never executed is a FAILURE, not a quiet pass: it is

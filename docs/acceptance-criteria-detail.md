@@ -88,22 +88,23 @@ condition for a hint — not mere observation (`design.md` §12). The village tr
 barters the baseline goods for gifts and buys gear back for gifts — money has no value
 there (§9).
 
-## 7. Language/direction system.
+## 7. Language and communication.
 
-The full system of `design.md` §13 is implemented: the regional direction systems and
-glossary names of §13.2, taught by the village elder (a second talk reveals what the
-region reveres, §8); hints combine landmark, direction word and coordinate (§13.1); a raw
-hint deciphers retroactively in either order (§13.2).
+BUILT (`design.md` §13.4, `docs/communication-poc-spec.md`), in `src/communication/`: the
+Bambara village speaks eleven concepts as five-syllable tone words (`lexicon`); voice and
+gesture carry equally far (`speaking`, `spokenGesture`); what is audible is recorded with
+day and village (`heard`). The children's tag teaches six concepts and the adults' errands
+five more, look-alikes apart (`src/scenes/place/childSituations`, `adultErrands`). The
+player's OWN reading — never judged — stands over the nearest speaker and is written by
+clicking him (`speechLabel`, `speechTarget`, `src/ui/SpeechGuess.tsx`), one note with the
+journal. On earned trust the chief drums a seven-concept message (`drumMessage`); the
+artefact dug at the erratic it names is answered untranslated (`chiefReply`). The
+§13.1–13.3 layer stands unchanged beside it (`src/world/lore.ts`): the elder's lesson, the
+glossary and the retroactively deciphered hints that carry criterion 10.
 
-OPEN (`design.md` §13.4): this criterion pins what is BUILT, not the target state.
-Understanding the inhabitants is to become a central mechanic — learned by observing and
-testing rather than handed over by an elder, with one invented-but-researched language per
-region (a Chants-of-Sennaar-like direction; e.g. a West African drum-signal tongue). The
-mechanic is undecided and needs its own research pass first, so §13.2's glossary and
-§13.3's delivery are placeholders under review. Do not build on them — and do not PROTECT
-them either: until the new mechanic is settled, disturbing this system is not a reason to
-compromise a change elsewhere. Once it IS settled and built, it becomes load-bearing like
-any other system.
+REMAINDER (§13.4): ONE lect is built, `tonalWestCentre`; the other regions' invented
+languages and the zone cut of `docs/communication-1890.md` stay the user's decision, so
+§13.2's word lists remain placeholders. What is built is load-bearing.
 
 ## 8. Chronicle/journal.
 
@@ -355,7 +356,8 @@ canteen's consumption
 rates and capacity are editable (§21.2), as is the parental rescue
 burst (`balance.family.rescueBurst`, §19.8 pt. 12 — the field's
 write-through pinned in `src/ui/DebugMenu.test.tsx`). Modal windows and full-screen
-overlays always render above the in-scene floating labels (§17.4).
+overlays always render above the in-scene floating labels (§17.4). The §17.8
+hold key is REBINDABLE in both languages (Ctrl default, Shift safe from Ctrl+W).
 
 ## 21. Water realism.
 

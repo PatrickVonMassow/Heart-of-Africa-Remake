@@ -3,11 +3,12 @@
 // porters and traders in the wealthier ports. Inhabitants interact with each
 // other and with the props: pairs stand in conversation, a fire tender stokes
 // the fire, food is fetched from the huts and cooked over it, grain is
-// pounded in a mortar, a drummer plays, and water is carried from the well.
+// pounded in a mortar, a drummer waits for the chief's message, and water is
+// carried from the well.
 // Pure animation, no mechanics.
 
 import { createContext, useContext, useEffect, useMemo, useRef, type RefObject } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
 import {
@@ -23,7 +24,6 @@ import {
 } from '../../render/fauna'
 import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
 import {
-  GESTURE_KINDS,
   advanceGesture,
   aimAt,
   armAim,
@@ -51,7 +51,7 @@ import { nudgeToFree, nudgeWhere, resolveMove, spawnPointFree, standingClear, tr
 import { insidePlace } from './boundary'
 import type { PlaceRiverBank } from './riverBank'
 import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, type NavPoint } from './routing'
-import { createTagGame, stepTagGame, type TagChild, type TagWorld } from './tagGame'
+import { absorbSeparation, createTagGame, stepTagGame, type TagChild, type TagWorld } from './tagGame'
 import {
   childSteer,
   createChildSpeech,
@@ -72,14 +72,8 @@ import {
   type ErrandView,
   type SpokenErrand,
 } from './adultErrands'
-import { isWithinHearing } from '../../communication/heard'
+import { gestureIfHeard, speechReach } from '../../communication/spokenGesture'
 import { phrasePlan, utterancePlan } from '../../communication/speaking'
-import {
-  drumMessagePlan,
-  drumStrikeAt,
-  drumStrikeProgress,
-  type DrumMessagePlan,
-} from '../../communication/drumMessage'
 import { speechLabelSeconds } from '../../communication/speechLabel'
 import { playSpeech } from '../../systems/ambience'
 import { speakOverhead, speechClock } from './speechChannel'
@@ -89,21 +83,25 @@ import {
   addBodies,
   createBodies,
   createInhabitantSet,
+  groundOccupied,
   releaseBodies,
   separateBody,
+  separateGroup,
+  stepRoundBodies,
   type InhabitantBody,
   type InhabitantSet,
 } from './inhabitantBodies'
 import {
-  drumHandPose,
   drumHeadY,
-  drumStroke,
+  drummerPoseAt,
   DRUMMER_LEAN,
   HIGH_DRUM,
   LOW_DRUM,
   type DrumGeometry,
 } from './drummerPose'
 import { childPlayGround, PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations } from './lifeSpots'
+import { buildWedgeCarve } from './wedgeCarve'
+import { figureStance, unplacedInhabitant, type PlaceSpot } from './placement'
 
 /** Collision radius of inhabitants (matches the player's). */
 const NPC_RADIUS = WALKER_RADIUS
@@ -444,10 +442,12 @@ const KID_SCALE = 0.55
  * curve, the reading over the speaker's head, and the gesture on its own arms,
  * aimed at the world point the situation named.
  *
- * The DISTANCE decides all three. What the player could not hear teaches him
- * nothing however plainly he saw the gesture, so the same range gate that
- * silences the voice keeps the utterance out of his memory and the note off the
- * speaker's head (docs/communication-poc-spec.md).
+ * The DISTANCE decides all three, as ONE decision (point 580): what the player
+ * could not hear teaches him nothing however plainly he saw the gesture, so the
+ * same range gate that silences the voice keeps the utterance out of his memory,
+ * the note off the speaker's head AND the arms at rest — a mute pantomime is
+ * worse than silence, because it shows a concept with no word attached to it
+ * (docs/communication-poc-spec.md, src/communication/spokenGesture.ts).
  */
 function speakSituation(
   said: SpokenSituation,
@@ -459,8 +459,9 @@ function speakSituation(
   const distance = placePlayerPosition.active
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
     : Infinity
+  const reach = speechReach(distance)
   playSpeech(utterancePlan(said.utterance, distance))
-  if (isWithinHearing(distance)) {
+  if (reach.audible) {
     useGame.getState().hearUtterance(said.utterance)
     if (anchor) {
       speakOverhead(`kid-${said.speaker}`, [said.utterance], anchor, {
@@ -469,8 +470,9 @@ function speakSituation(
     }
   }
   // The aim is taken in the speaker's OWN frame, so a child that turns takes it
-  // with it; the shoulder is the child's, not a grown figure's.
-  gesture.current = startGesture(said.gesture, {
+  // with it; the shoulder is the child's, not a grown figure's. Out of earshot
+  // the same call hands back REST, so the child never mimes unheard.
+  gesture.current = gestureIfHeard(distance, said.gesture, {
     ...aimAt(
       { x: speaker.x, z: speaker.z, yaw: speaker.facing },
       said.aim,
@@ -529,22 +531,61 @@ function Kids({
   const legLength = FIGURE_LIMBS.hipY * KID_SCALE
   const cadence = useMemo(() => gaitCadence(legLength), [legLength])
 
+  // The body each child presents to every other inhabitant (point 578), and the
+  // whole settlement's registry — claimed BEFORE the world below, because the
+  // chase steers by both (point 657).
+  const bodySet = useContext(InhabitantBodiesContext)
+  const bodies = useInhabitantBodies(count, { scale: KID_SCALE })
+  // Which bodies are the game's own playmates, for the world's occupied rules.
+  const kidIndex = useMemo(() => new Set(bodies), [bodies])
+
   // The settlement as the chase sees it: ONE predicate for the colliders, the
   // fire ring (a collider like any other), the walkable rim and the PLAY GROUND
   // — so a child can never end a step where a walker may not stand, and never
-  // wander out of its group into the adults' earshot (point 481.4).
+  // wander out of its group into the adults' earshot (point 481.4) — and beside
+  // it the OTHER INHABITANTS' BODIES as ground the chase walks round (point
+  // 657): without that, a child whose way crossed an adult standing in the
+  // ground read it as open, walked into the body, and the separation pushed it
+  // straight back out — walking on the spot, the user's own report.
   const world = useMemo<TagWorld>(() => {
     const rim = Math.max(1, radius - NPC_RADIUS * 2)
+    // The ground between two boundaries that pinch below a passage is not
+    // offered to the chase at all (point 657): the reported village carried a
+    // dead-end slot between two hut clearances and a corridor a
+    // rim-straddling hut closes to nothing, and every live red window of the
+    // measurement sat in one of the two — evaders pacing the pinch, groups
+    // herding into the corridor. See `buildWedgeCarve`.
+    const carve = buildWedgeCarve(colliders, NPC_RADIUS, { x, z, radius: playRadius })
     const blocked = (px: number, pz: number) =>
       Math.hypot(px, pz) > rim ||
       Math.hypot(px - x, pz - z) > playRadius ||
-      !standingClear(colliders, px, pz, NPC_RADIUS)
+      !standingClear(colliders, px, pz, NPC_RADIUS) ||
+      carve(px, pz)
     return {
       radius: playRadius,
       centerX: x,
       centerZ: z,
       childRadius: NPC_RADIUS,
       blocked,
+      // WHICH BODIES ARE A CHILD'S WALLS: everybody OUTSIDE the game — adults,
+      // porters, errand walkers, the standing and slow-crossing figures the
+      // measured red windows coincided with — and NEVER a playmate. Both
+      // alternatives were measured and rejected (12.08.2026): playmates as
+      // mutual walls degraded the game itself (maasai worst child 0.48 %
+      // against the 0.25 % gate — two movers re-decide against each other
+      // every frame and dance in place), and a one-sided yield read 0.70 % on
+      // bambara. Child-child contact stays the separation pass's job, which
+      // held it at 0.00-0.03 % on every shipped village.
+      occupied: (_self, _partner, px, pz) =>
+        groundOccupied(
+          bodySet,
+          px,
+          pz,
+          balance.villageLife.separation,
+          // The child's OWN body radius, so the line is the pair's contact.
+          balance.villageLife.separation.bodyRadius * KID_SCALE,
+          (b) => kidIndex.has(b),
+        ),
       // The escape lands on ground the GAME calls free, not merely out of the
       // huts: a collider-only nudge teleported a child clean out of its own play
       // ground once the ground moved in among the buildings (point 524), and the
@@ -560,7 +601,7 @@ function Kids({
         return { x: r.pos[0], z: r.pos[1], found: r.found }
       },
     }
-  }, [colliders, radius, x, z, playRadius])
+  }, [colliders, radius, x, z, playRadius, bodySet, kidIndex])
 
   // The group, spawned on validated ground (point 155): a play spot covered by a
   // hut is nudged to the nearest free one before the first frame — INSIDE the
@@ -599,13 +640,6 @@ function Kids({
     }),
     [game, x, z, playRadius],
   )
-  // The body each child presents to every other inhabitant (point 578). The
-  // chase collides with the huts and the fences but never with the other
-  // children, which is why a converging chase used to leave three of them
-  // standing inside one another.
-  const bodySet = useContext(InhabitantBodiesContext)
-  const bodies = useInhabitantBodies(count, { scale: KID_SCALE })
-
   const gestures = useRef<Array<RefObject<GestureState>>>([])
   if (gestures.current.length !== count) {
     gestures.current = Array.from(
@@ -645,19 +679,29 @@ function Kids({
     // the collisions, the stamina and the floor pace.
     stepTagGame(game, dt, balance.villageLife.tag, world, (i) => childSteer(speech, view, i, cfg))
     // THE BODIES (point 578), resolved where the chase left them and before
-    // anything is drawn: a child's body is its own scale's, the push is damped
-    // so a separated pair does not tremble, and it is far smaller than the catch
-    // distance — the tag always wins over the separation.
+    // anything is drawn: a child's body is its own scale's, and it is far
+    // smaller than the catch distance — the tag always wins over the separation.
+    //
+    // EVERY body is written FIRST and the group resolved as one (point 648).
+    // Writing and separating one child at a time resolved each against where its
+    // neighbours stood a frame ago, and a single sweep cannot take a chain of
+    // three apart at all — together that was the user's "Kinder klemmen kurz
+    // ineinander". `separateGroup` sweeps until nobody moves.
     const sep = balance.villageLife.separation
     for (let i = 0; i < game.children.length; i++) {
-      const c = game.children[i]
       const b = bodies[i]
       if (!b) continue
-      b.x = c.x
-      b.z = c.z
-      separateBody(bodySet, b, dt, sep, world)
-      c.x = b.x
-      c.z = b.z
+      b.x = game.children[i].x
+      b.z = game.children[i].z
+    }
+    separateGroup(bodySet, bodies, dt, sep, world)
+    for (let i = 0; i < game.children.length; i++) {
+      const b = bodies[i]
+      if (!b) continue
+      // The resolved position AND whatever the separation's own wedge escape
+      // did (point 656 follow-up): its teleport is a rescue like any other, and
+      // uncounted it read as the child walking out of its pocket.
+      absorbSeparation(game.children[i], b)
     }
     const said = stepChildSpeech(speech, view, dt, cfg, speechRand)
     if (said) speakSituation(said, game.children[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
@@ -699,6 +743,13 @@ function Kids({
       // The game's OWN clock: the verification samples an interval of GAME,
       // never a count of frames, which buy different amounts of it per machine.
       clock: game.clock,
+      // Of that clock, the part actually PLAYED (point 656) — the game's own
+      // count, so a check need not decide from a sampled flag which side of a
+      // round's first frame an interval falls on.
+      playedClock: game.playedClock,
+      // The radius a child's BODY occupies, so a live check can judge an overlap
+      // against the real figure rather than against a guessed one (point 648).
+      bodyRadius: balance.villageLife.separation.bodyRadius * KID_SCALE,
       children: game.children.map((c) => ({
         x: c.x,
         z: c.z,
@@ -708,6 +759,23 @@ function Kids({
         press: c.press,
         pace: c.pace,
         pinned: c.pinned,
+        // How often the settlement had to pick this child up and set it down on
+        // free ground (point 656). A live check needs it: the teleport is what
+        // ENDS a snag, so without the count the correction reads as the child
+        // having walked out of the pocket by itself.
+        nudges: c.nudges,
+        // And how far it was carried doing so (point 656). Nothing outside the
+        // game can work this out: one frame vector holds the child's walking and
+        // the settlement's correction added together, and `walked` is a scalar
+        // that cannot say which way the legs went.
+        carried: c.carried,
+        // Standing because it was TOLD to (point 481), not because it stalled —
+        // the difference between an obeyed stillness and the reported snag.
+        held: c.held,
+        walked: c.walked,
+        // And how much of that walking happened while the round was ON — the
+        // settlement's own counter, for the same reason (point 656).
+        walkedWhilePlaying: c.walkedWhilePlaying,
       })),
     })
     // What the group has SAID so far this visit (point 481), by situation — a
@@ -725,9 +793,12 @@ function Kids({
 
   return (
     <>
-      {game.children.map((_, i) => (
+      {game.children.map((c, i) => (
         <group
           key={i}
+          // Born on its play spot (point 509), not at the settlement origin the
+          // frame callback would only move it off from.
+          position={figureStance(c)}
           ref={(el) => {
             refs.current[i] = el
           }}
@@ -867,9 +938,11 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
   }, [])
   return (
     <>
-      {anchors.map((_, i) => (
+      {anchors.map((a, i) => (
         <group
           key={i}
+          // Born on its grazing spot (point 509).
+          position={figureStance(a)}
           ref={(el) => {
             refs.current[i] = el
           }}
@@ -951,10 +1024,15 @@ function Porters({
       const z = r.az + (r.bz - r.az) * u
       const dir = Math.cos(t * r.speed + r.phase) >= 0 ? 1 : -1
       const p = (pos.current[i] ??= { x, z })
-      const [px0, pz0] = resolveMove(colliders, x, z, NPC_RADIUS, [p.x, p.z])
+      const b = bodies[i]
+      // Point 657: where the route's next step lands in another inhabitant, the
+      // porter walks ROUND the body instead of discovering it by collision.
+      const want = b
+        ? stepRoundBodies(bodySet, b, p.x, p.z, x, z, balance.villageLife.separation, separationWorld.blocked)
+        : { x, z }
+      const [px0, pz0] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [p.x, p.z])
       p.x = px0
       p.z = pz0
-      const b = bodies[i]
       if (b) {
         b.x = p.x
         b.z = p.z
@@ -970,9 +1048,11 @@ function Porters({
   })
   return (
     <>
-      {routes.map((_, i) => (
+      {routes.map((r, i) => (
         <group
           key={i}
+          // Born at the end of its route it starts from (point 509).
+          position={figureStance({ x: r.ax, z: r.az })}
           ref={(el) => {
             refs.current[i] = el
           }}
@@ -988,9 +1068,6 @@ function Porters({
     </>
   )
 }
-
-/** Seconds of quiet between two gestures in the conversation. */
-const TALKER_GESTURE_GAP = 1.6
 
 /** Where a talker stands and which way it faces. */
 interface TalkerStance {
@@ -1029,27 +1106,36 @@ function talkerAim(
 }
 
 /**
- * Two inhabitants standing together in conversation, gesturing (point 479).
+ * Two inhabitants standing together in conversation (point 479): they turn
+ * toward each other and shift their weight, and they say nothing the player
+ * cannot read.
  *
- * The two take turns: one beckons, points at something in the settlement,
- * refuses, or waves a direction, while the other listens. THE GESTURE EXPLAINS
- * NOTHING — there is no label and no caption; it is the body half of an exchange
- * whose other half is whatever happens next, which is the rule this project set
- * for the whole communication PoC.
+ * THEY NO LONGER GESTURE ON THEIR OWN (point 580). The pair used to cycle the
+ * four gestures as ambient dressing, with no utterance behind any of them — the
+ * mute pantomime the user reported from the picture ("they gesture, but I see
+ * no texts over their heads"), and at ANY distance, since nothing it did could
+ * ever be heard. Those four gestures are the very ones the teaching situations
+ * use for COME, GO_THERE, THERE and NO, so an ambient pair performing them
+ * showed the player concepts with no word attached to them. Gesturing now
+ * belongs to the figures that SPEAK: the children's situations and the adults'
+ * errands, which drive the same `gesture` refs through the hearing gate
+ * (`src/communication/spokenGesture.ts`).
  *
- * This scheduler is the AMBIENT driver. The speaking layer (`src/communication/`)
- * is vocabulary and audio so far — no inhabitant utters anything in the scene
- * yet. When the teaching situations put words in a figure's mouth, they drive
- * the very same `gesture` refs through `startGesture`, so a figure saying COME
- * beckons in step — the coupling point is the ref, and nothing about the figure
- * has to change for it.
+ * The dev hook below still drives the pair's arms directly — it is the rig the
+ * headless verification poses the four gestures on (point 479), and it never
+ * runs outside a dev build.
+ *
+ * OPEN: design.md §19.10 still lists this vignette as "pairs stand together in
+ * conversation, GESTURING", which point 580's rule contradicts for a pair that
+ * says nothing. design.md is not changed unilaterally, so the wording is left to
+ * the user's decision: either it drops the gesturing here, or the pair is given
+ * real utterances and gestures again behind the hearing gate.
  */
 function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   const a = useRef<THREE.Group>(null)
   const b = useRef<THREE.Group>(null)
   const gestureA = useRef<GestureState>(restGesture())
   const gestureB = useRef<GestureState>(restGesture())
-  const schedule = useRef({ wait: 1.2, turn: 0, step: 0 })
 
   // The two stand half a metre apart facing each other, so figure A looks along
   // world +x and figure B along −x. Their aims are computed in each one's own
@@ -1065,10 +1151,9 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   // apart, well clear of the separation distance, so it never pushes itself.
   useStandingBodies(stances)
 
-  useFrame(({ clock }, rawDt) => {
-    const dt = Math.min(rawDt, 0.1)
+  useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    // Slight turns toward each other, as before — the conversation's idle.
+    // Slight turns toward each other — the conversation's idle, and all of it.
     if (a.current) {
       a.current.rotation.y = Math.PI / 2 + Math.sin(t * 1.15) * 0.18
       a.current.position.y = Math.max(0, Math.sin(t * 2.3)) * 0.03
@@ -1077,25 +1162,12 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
       b.current.rotation.y = -Math.PI / 2 + Math.sin(t * 1.15 + Math.PI) * 0.18
       b.current.position.y = Math.max(0, Math.sin(t * 2.3 + Math.PI)) * 0.03
     }
-    const s = schedule.current
-    // Only schedule while BOTH are at rest: a gesture is never cut short by the
-    // clock, and the pair never talks over each other.
-    if (gestureA.current.kind !== null || gestureB.current.kind !== null) return
-    s.wait -= dt
-    if (s.wait > 0) return
-    const kind = GESTURE_KINDS[s.step % GESTURE_KINDS.length]
-    const who = s.turn
-    const aim = talkerAim(stances, kind, who)
-    const next = startGesture(kind, { ...aim, phase: who * 1.7 })
-    if (who === 0) gestureA.current = next
-    else gestureB.current = next
-    s.step++
-    s.turn = 1 - who
-    s.wait = TALKER_GESTURE_GAP
   })
 
   // Dev hook for the headless verification (CLAUDE.md §7.2): the live gesture
   // state and the pose it draws, plus a way to hold one pose for a screenshot.
+  // It is the ONLY thing that poses this pair — in a real run the two stand and
+  // talk, and every gesture in the settlement belongs to a figure being heard.
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
@@ -1113,9 +1185,6 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
       const next = startGesture(kind, { ...aim, duration: seconds, phase: who * 1.7 })
       if (who === 0) gestureA.current = next
       else gestureB.current = next
-      // The scheduler already stands down while a gesture runs; this only resets
-      // the quiet gap, so the ambient conversation resumes normally afterwards.
-      schedule.current.wait = TALKER_GESTURE_GAP
     }
     w.__placeTalkers = stances
     return () => {
@@ -1196,11 +1265,6 @@ function Drum({ drum, headRef }: { drum: DrumGeometry; headRef: RefObject<THREE.
   )
 }
 
-/** The stroke each drum is beaten with, solved once from its own dimensions
- *  (`drummerPose.ts`): which hand, aimed where, between which elevations. */
-const LOW_STROKE = drumStroke(LOW_DRUM)
-const HIGH_STROKE = drumStroke(HIGH_DRUM)
-
 /**
  * Drummer at his pair of drums — the audible village drums made visible, and
  * the voice the chief's message goes out on (design.md §13.4, point 486).
@@ -1209,10 +1273,8 @@ const HIGH_STROKE = drumStroke(HIGH_DRUM)
  * speaks `BA` and stands to his LEFT — and neither side is stated twice: each
  * drum's stroke reads its hand off the drum's OWN placement (`drummerPose.ts`),
  * so the hand that falls is always the one standing over the drum that sounds,
- * and that drum's head dips under it. While no message is going out the two
- * hands keep the village's own idle beat half a beat apart, the large drum on
- * the strong beat and the small one on the lighter off-beat, as the ambient drum
- * bar sounds them.
+ * and that drum's head dips under it. While no message is going out his arms
+ * use the figure's genuine rest pose and both drum heads stay still.
  *
  * Both the falling hand and the sounding beat come from the ONE plan
  * (src/communication/drumMessage.ts) the ambience engine plays, so the picture
@@ -1224,42 +1286,18 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   const pose = useRef<FigurePose | null>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: DRUMMER_LEAN, turn: 0 })
   const lowHead = useRef<THREE.Mesh>(null)
   const highHead = useRef<THREE.Mesh>(null)
-  // The plan of the message currently going out, kept with the start it was
-  // built for, so a re-sent message rebuilds it against the live balance values.
-  const sending = useRef<{ startedAt: number; plan: DrumMessagePlan } | null>(null)
-  useFrame(({ clock }) => {
+  useFrame(() => {
     const p = pose.current
     if (!p) return
     const beating = useUi.getState().drumPerformance
-    // Each hand's swing on its OWN drum: 0 is on the head, 1 the top of the lift.
-    let lowSwing = 1
-    let highSwing = 1
-    if (beating) {
-      if (sending.current?.startedAt !== beating.startedAt) {
-        sending.current = { startedAt: beating.startedAt, plan: drumMessagePlan() }
-      }
-      // The wall clock, the one the performance and the scheduled audio run on.
-      const elapsed = (speechClock() * 1000 - beating.startedAt) / 1000
-      const strike = drumStrikeAt(sending.current.plan, elapsed)
-      // The hand falls at the beat and rises again through the strike's ring;
-      // between two beats both hands wait raised over their own drum.
-      const swing = strike ? drumStrikeProgress(strike, elapsed) : 1
-      if (strike?.drum === 'low') lowSwing = swing
-      else if (strike?.drum === 'high') highSwing = swing
-    } else {
-      sending.current = null
-      // The idle village beat (design.md §19): the two hands half a beat apart,
-      // each on its OWN drum and each dipping the head it strikes — the large
-      // drum on the strong beat, the small one on the lighter off-beat, as the
-      // ambient drum bar sounds them.
-      const t = clock.elapsedTime * 4.2
-      lowSwing = Math.abs(Math.sin(t))
-      highSwing = Math.abs(Math.cos(t))
-    }
-    Object.assign(p[LOW_STROKE.side], drumHandPose(LOW_STROKE, lowSwing))
-    Object.assign(p[HIGH_STROKE.side], drumHandPose(HIGH_STROKE, highSwing))
-    if (lowHead.current) lowHead.current.position.y = drumHeadY(LOW_DRUM, lowSwing)
-    if (highHead.current) highHead.current.position.y = drumHeadY(HIGH_DRUM, highSwing)
+    const elapsed = beating ? (speechClock() * 1000 - beating.startedAt) / 1000 : 0
+    const frame = drummerPoseAt(beating?.plan ?? null, elapsed)
+    Object.assign(p.left, frame.pose.left)
+    Object.assign(p.right, frame.pose.right)
+    p.lean = frame.pose.lean
+    p.turn = frame.pose.turn
+    if (lowHead.current) lowHead.current.position.y = drumHeadY(LOW_DRUM, frame.lowSwing)
+    if (highHead.current) highHead.current.position.y = drumHeadY(HIGH_DRUM, frame.highSwing)
   })
   return (
     <group position={[x, 0, z]} rotation={[0, Math.atan2(-x + 3.5, -z + 2.5), 0]}>
@@ -1387,6 +1425,11 @@ function TaskWalker({
     if (s.mode === 'inside') {
       stand.visible = false
       kneel.visible = false
+      // Both bodies follow the state while it is at home (point 509): neither
+      // may keep the identity transform that would park it at the settlement
+      // origin until its first outing writes one.
+      stand.position.set(s.x, 0, s.z)
+      kneel.position.set(s.x, 0, s.z)
       s.timer -= dt
       if (s.timer <= 0) {
         s.mode = 'go'
@@ -1435,7 +1478,12 @@ function TaskWalker({
       s.z += (dz / d) * step
       s.yaw = Math.atan2(dx, dz)
     } else {
-      const [nx, nz] = resolveMove(colliders, s.x + (dx / d) * step, s.z + (dz / d) * step, NPC_RADIUS, [s.x, s.z])
+      // Point 657: another inhabitant on the way to the field is walked round,
+      // not walked into.
+      const want = body
+        ? stepRoundBodies(bodySet, body, s.x, s.z, s.x + (dx / d) * step, s.z + (dz / d) * step, balance.villageLife.separation, separationWorld.blocked)
+        : { x: s.x + (dx / d) * step, z: s.z + (dz / d) * step }
+      const [nx, nz] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [s.x, s.z])
       if (Math.hypot(nx - s.x, nz - s.z) < step * 0.25) s.seg++ // blocked: skip ahead
       s.x = nx
       s.z = nz
@@ -1457,7 +1505,7 @@ function TaskWalker({
 
   return (
     <>
-      <group ref={standing} visible={false}>
+      <group ref={standing} visible={false} position={figureStance(home)}>
         <Figure cloth={cloth} pose={HEAD_CARRY_POSE} />
         {carry === 'bundle' ? (
           <mesh position={[0, 1.42, 0]} castShadow>
@@ -1471,7 +1519,7 @@ function TaskWalker({
           </mesh>
         )}
       </group>
-      <group ref={kneeling} visible={false}>
+      <group ref={kneeling} visible={false} position={figureStance(home)}>
         <Figure cloth={cloth} kneel />
       </group>
     </>
@@ -1612,8 +1660,13 @@ function Walkers({
 
       if (s.mode === 'inside') {
         settleBody(i, s, false)
-        // Invisible while at home; step out through the door when done.
+        // Invisible while at home; step out through the door when done. The
+        // transform follows the state HERE too (point 509): this branch used to
+        // return without writing it, so a walker that had not been out yet kept
+        // the identity transform — a figure standing at the settlement origin
+        // for its whole first stay indoors, and several of them on one spot.
         g.visible = false
+        g.position.set(s.x, 0, s.z)
         s.timer -= dt
         if (s.timer <= 0) {
           const e = errands.length > 0 ? errands[Math.floor(Math.random() * errands.length)] : ([0, 2] as [number, number])
@@ -1669,8 +1722,13 @@ function Walkers({
         s.yaw = Math.atan2(dx, dz)
       } else {
         // Solid objects block inhabitants too; slide along and skip the
-        // waypoint if blocked for too long (design.md §2 collision).
-        const [nx, nz] = resolveMove(colliders, s.x + (dx / d) * step, s.z + (dz / d) * step, NPC_RADIUS, [s.x, s.z])
+        // waypoint if blocked for too long (design.md §2 collision) — and
+        // another inhabitant's body is walked ROUND like one (point 657).
+        const b657 = bodies[i]
+        const want = b657
+          ? stepRoundBodies(bodySet, b657, s.x, s.z, s.x + (dx / d) * step, s.z + (dz / d) * step, balance.villageLife.separation, separationWorld.blocked)
+          : { x: s.x + (dx / d) * step, z: s.z + (dz / d) * step }
+        const [nx, nz] = resolveMove(colliders, want.x, want.z, NPC_RADIUS, [s.x, s.z])
         const moved = Math.hypot(nx - s.x, nz - s.z)
         s.x = nx
         s.z = nz
@@ -1725,6 +1783,9 @@ function Walkers({
         <group
           key={i}
           visible={false}
+          // Born inside its own dwelling (point 509) — where it actually is
+          // while it is at home, and never at the settlement origin.
+          position={figureStance(def.home)}
           ref={(el) => {
             refs.current[i] = el
           }}
@@ -1981,8 +2042,17 @@ function ErrandVillagers({
           const az = aim.z - me.z
           const ad = Math.hypot(ax, az) || 1
           const step = Math.max(0, cfg.pace) * dt
-          const wantX = me.x + (ax / ad) * step
-          const wantZ = me.z + (az / ad) * step
+          // Point 657: a child (or anyone else) standing on the straight line is
+          // walked ROUND — these strolls cross the children's play ground, and a
+          // walker that discovered a body only by pressing on it is what the
+          // children then could not get past.
+          const b657 = bodies[i]
+          const direct = { x: me.x + (ax / ad) * step, z: me.z + (az / ad) * step }
+          const want = b657
+            ? stepRoundBodies(bodySet, b657, me.x, me.z, direct.x, direct.z, balance.villageLife.separation, separationWorld.blocked)
+            : direct
+          const wantX = want.x
+          const wantZ = want.z
           // The WALKABLE SHAPE, not a circle of its own (work-order 482): the
           // errands send a villager out onto the bank lobe, and a circular rim
           // would have frozen it at the plain radius short of the water.
@@ -2086,7 +2156,8 @@ function ErrandVillagers({
       last: errands.last ? { ...errands.last } : null,
       // How long the village has been quiet — what point 586 is measured by,
       // and what the `errands-silent` assert fires on.
-      silence: errands.silence,
+      silence: errands.speech.silence,
+      spoken: errands.speech.produced,
       geography: {
         bank: geography.bank,
         upstream: geography.upstream,
@@ -2114,9 +2185,11 @@ function ErrandVillagers({
 
   return (
     <>
-      {people.map((_, i) => (
+      {people.map((p, i) => (
         <group
           key={i}
+          // Born on its spawn spot (point 509).
+          position={figureStance(p)}
           ref={(el) => {
             refs.current[i] = el
           }}
@@ -2133,8 +2206,9 @@ function ErrandVillagers({
  * curve, one reading per atom over the speaker's head, and the gesture on its
  * own arms, aimed at the world point the errand named.
  *
- * The DISTANCE decides all three, exactly as it does for the children: what the
- * player could not hear teaches him nothing however plainly he saw the walk.
+ * The DISTANCE decides all three, exactly as it does for the children (point
+ * 580): what the player could not hear teaches him nothing however plainly he
+ * saw the walk, so beyond the hearing radius the villager's arms stay down.
  */
 function speakErrand(
   said: SpokenErrand,
@@ -2147,8 +2221,9 @@ function speakErrand(
   const distance = placePlayerPosition.active
     ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
     : Infinity
+  const reach = speechReach(distance)
   playSpeech(phrasePlan(said.utterances, distance))
-  if (isWithinHearing(distance)) {
+  if (reach.audible) {
     const store = useGame.getState()
     // Each atom of the phrase is observed on its own, in order.
     for (const atom of said.utterances) store.hearUtterance(atom)
@@ -2158,7 +2233,7 @@ function speakErrand(
       })
     }
   }
-  gesture.current = startGesture(said.gesture, {
+  gesture.current = gestureIfHeard(distance, said.gesture, {
     ...aimAt({ x: speaker.x, z: speaker.z, yaw }, said.aim, FIGURE_LIMBS.shoulderY),
     phase: said.speaker * 1.1, // no two villagers beat in lockstep
   })
@@ -2199,6 +2274,42 @@ function Traders({ seed, cloth }: { seed: number; cloth: string[] }) {
       ))}
     </>
   )
+}
+
+/**
+ * The dev-mode watch of point 509.3: NO inhabitant may stand at a transform no
+ * placement ever wrote. It reads the drawn scene rather than any one vignette's
+ * state, so it catches the next occurrence wherever it is born — a new vignette
+ * that forgets to place its figures is reported by any run, headless or manual,
+ * instead of by a passing observation.
+ *
+ * The world position is what it judges, because the figure group itself always
+ * sits at its parent's origin: the parent IS the placement. Sampled about once
+ * a second — a transform nothing wrote does not heal between frames, and a full
+ * scene traverse per frame would cost the settlement real time.
+ */
+function useUnplacedInhabitantWatch(placeId: string, anchors: readonly PlaceSpot[]): void {
+  const scene = useThree((s) => s.scene)
+  const probe = useMemo(() => new THREE.Vector3(), [])
+  const nextCheck = useRef(0)
+  useFrame(({ clock }) => {
+    if (!import.meta.env.DEV) return
+    if (clock.elapsedTime < nextCheck.current) return
+    nextCheck.current = clock.elapsedTime + 1
+    let unplaced = 0
+    scene.traverse((o) => {
+      if (o.name !== 'inhabitant') return
+      o.getWorldPosition(probe)
+      if (unplacedInhabitant(probe, anchors)) unplaced++
+    })
+    devAssert(
+      unplaced === 0,
+      'inhabitant-unplaced',
+      () =>
+        `${placeId}: ${unplaced} inhabitant(s) stand at the settlement origin — ` +
+        'a transform no placement ever wrote',
+    )
+  })
 }
 
 export function PlaceLife({
@@ -2254,6 +2365,25 @@ export function PlaceLife({
   // per mounted settlement: every vignette claims its slots from it and gives
   // them back when it goes.
   const inhabitantBodies = useMemo(() => createInhabitantSet(), [])
+
+  // Dev hook for the headless verification and for diagnosing motion defects
+  // (point 657): the whole body registry, so a live trace can say WHAT stood
+  // where a figure pressed. Dev-only, like `__placeTag`.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placeBodies = () =>
+      inhabitantBodies.bodies.map((b) => ({
+        x: b.x,
+        z: b.z,
+        scale: b.scale,
+        active: b.active,
+        fixed: b.fixed,
+      }))
+    return () => {
+      delete w.__placeBodies
+    }
+  }, [inhabitantBodies])
 
   // The cold-weather dress of §19.13, from THIS settlement's own place and the
   // date — like the settlement's weather, and for the same reason. Almost every
@@ -2330,6 +2460,18 @@ export function PlaceLife({
       `${placeId}: the play ground clears the adults by only ${playGround.clearance.toFixed(1)} m ` +
       `(fabric ${playGround.fabric.toFixed(2)}) — the two teaching voices need another means of being told apart`,
   )
+
+  // Every spot this settlement hands out (point 509): what tells an inhabitant
+  // standing at the middle of a village apart from one that was never placed —
+  // a settlement whose own layout puts a figure at its origin is not reported.
+  const placementAnchors = useMemo<PlaceSpot[]>(() => {
+    const out: PlaceSpot[] = homes.map((h) => ({ x: h.x, z: h.z }))
+    for (const [ax, az] of villageAdultStations(firePos)) out.push({ x: ax, z: az })
+    for (const [ex, ez] of errands) out.push({ x: ex, z: ez })
+    for (const [bx, bz] of buildings) out.push({ x: bx, z: bz })
+    return out
+  }, [homes, firePos, errands, buildings])
+  useUnplacedInhabitantWatch(placeId, placementAnchors)
 
   if (kind === 'port') {
     return (
