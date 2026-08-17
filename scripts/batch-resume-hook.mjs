@@ -171,8 +171,8 @@ const RESUME_BODY =
   'DELEGATION (user decision 22.07.2026): delegate implementation AND infra/guard/doc/' +
   'dashboard work to parallel WORKTREE-ISOLATED subagents on NON-OVERLAPPING files — under ' +
   'the model policy stated above, so the mechanical and mid-difficulty points go to GPT-5.6 ' +
-  'Sol, the hard cases to Fable 5 from the start, and only a point whose verification is the ' +
-  'work stays with Opus 5 (each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
+  'Sol, while the hard cases and any point whose verification is the work stay with Opus 5 ' +
+  '(each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
   'session keeps only the picture-verification on both backends, the serial merge -> ' +
   'fast-gate -> tick -> deploy -> cleanup, and the board publish. Every defect the user ' +
   'reports on the deployed build during the batch is APPENDED as its own implementation-ready ' +
@@ -229,12 +229,13 @@ try {
     // forbidden commit.
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
-      'MODEL POLICY (25.07.-13.08.2026, CLAUDE.md par.6): AUTHORING HAS THREE LANES. ' +
+      'MODEL POLICY (25.07.-17.08.2026, CLAUDE.md par.6): AUTHORING HAS THREE LANES. ' +
       'GPT-5.6 Sol authors the MECHANICAL and MID-DIFFICULTY points via ' +
-      'scripts/author-sol.mjs; FABLE 5 authors the HARD cases — difficult, complex or ' +
-      'error-prone — from the start, and takes over Opus work once Sol still finds problems ' +
-      'after a re-work; OPUS 5 keeps what only the main session can finish, a point whose ' +
-      'VERIFICATION is the work. scripts/author-routing-core.mjs makes the cut, and ' +
+      'scripts/author-sol.mjs; OPUS 5 keeps the HARD cases — difficult, complex or ' +
+      'error-prone — as well as a point whose VERIFICATION is the work; FABLE 5 is the ' +
+      'ESCALATION and takes over Opus work once Sol still finds problems after a re-work, ' +
+      'never a hard case from the start (user 17.08.2026 — its weekly pool is the ' +
+      'scarcest). scripts/author-routing-core.mjs makes the cut, and ' +
       'scripts/sol-share.mjs --status says what the switch routes right now. REVIEW is ' +
       'CROSS-VENDOR: Sol reads Anthropic-authored work (scripts/review-sol.mjs), Claude ' +
       'reads Sol-authored work, and no model reviews its own. ' +

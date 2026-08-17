@@ -26,7 +26,7 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(authorLaneFor()).toMatchObject({ lane: 'sol', model: 'GPT-5.6 Sol' })
   })
 
-  it('keeps the hard cases with Fable, in CLAUDE.md §6’s own words', () => {
+  it('keeps the hard cases with Opus, in CLAUDE.md §6’s own words (user 17.08.2026)', () => {
     for (const body of [
       'This is difficult: the lock is taken twice.',
       'A complex rebuild of the launcher.',
@@ -36,13 +36,16 @@ describe('authorLaneFor — which lane authors a point', () => {
       'A deadlock between the hook and the gate.',
       'A migration of every recorded review row.',
     ]) {
-      expect(lane(body), body).toBe('fable')
+      expect(lane(body), body).toBe('opus')
     }
     expect(authorLaneFor({ body: 'A complex rebuild.' }).why[0]).toMatch(/hard case \(complex\)/)
+    // The hard cases are no longer routed to Fable from the start: its weekly
+    // pool is the scarcest, and Fable is now reached only by the re-work branch.
+    expect(authorLaneFor({ body: 'A complex rebuild.' }).why[0]).toMatch(/stay with Opus/)
   })
 
   it('treats a HIGH-criticality tag as a hard case by definition', () => {
-    expect(lane('Anything at all.', { criticality: 'high' })).toBe('fable')
+    expect(lane('Anything at all.', { criticality: 'high' })).toBe('opus')
     // …and med/low/none leave the decision to the text.
     expect(lane('Anything at all.', { criticality: 'med' })).toBe('sol')
     expect(lane('Anything at all.', { criticality: 'low' })).toBe('sol')
@@ -146,8 +149,8 @@ describe('authorLaneFor — which lane authors a point', () => {
 
   it('names the subjects its own comments promise (cross-vendor P1)', () => {
     // The list claimed locks and state migration and held only the noun.
-    expect(lane('The batch lock is taken twice.')).toBe('fable')
-    expect(lane('Migrating every recorded review row.')).toBe('fable')
+    expect(lane('The batch lock is taken twice.')).toBe('opus')
+    expect(lane('Migrating every recorded review row.')).toBe('opus')
     // …and "visually inspect" is how half the render points are written.
     expect(lane('Visually inspect the horizon banding.')).toBe('opus')
   })
@@ -157,9 +160,9 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(d.signals).toMatchObject({ criticality: 'med', reworked: false })
     expect(d.signals.hard).toEqual(['complex'])
     expect(d.signals.verification).toEqual(['screenshot'])
-    // Hard beats verification: the hard-case lane authors it, and the main
-    // session judges the picture for every point regardless.
-    expect(d.lane).toBe('fable')
+    // Hard and verification now answer alike — both stay with Opus — but the
+    // signals are still reported separately, so a dispatcher sees which fired.
+    expect(d.lane).toBe('opus')
   })
 
   it('answers for every lane and cannot be handed something it throws on', () => {

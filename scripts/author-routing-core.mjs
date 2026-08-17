@@ -11,11 +11,14 @@
 //
 //   sol    GPT-5.6 Sol authors the MECHANICAL and MID-DIFFICULTY points, and
 //          Claude then reviews, runs the suites, judges the picture and lands.
-//   fable  Fable 5 keeps the HARD cases — difficult, complex, error-prone — and
-//          the work that has already come back from Sol with findings.
-//   opus   Opus 5 keeps what only the main lane can honestly finish: a point
-//          whose VERIFICATION is the work (a picture judged on both backends is
-//          the main session's job, so authoring it elsewhere buys nothing).
+//   opus   Opus 5 keeps the HARD cases — difficult, complex, error-prone — as
+//          well as what only the main lane can honestly finish: a point whose
+//          VERIFICATION is the work (a picture judged on both backends is the
+//          main session's job, so authoring it elsewhere buys nothing).
+//   fable  Fable 5 takes ONE case and no longer the hard ones by default (user
+//          17.08.2026): work Opus authored that Sol still rejects after a
+//          re-work. Its weekly pool is the scarcest of the three, and routing
+//          every hard case there spent it on points Opus finishes itself.
 //
 // WHY A FUNCTION RATHER THAN A JUDGMENT CALL: the point says the cut is named,
 // not guessed. A dispatcher's taste is not reviewable and drifts with whoever
@@ -208,8 +211,11 @@ export function authorLaneFor({ body = '', criticality = null, reworked = false,
   // re-work therefore stayed with Sol.
   if (reworked) return decide('fable', 'Sol still found problems after a re-work — §6 moves such work to Fable')
   if (tag) return decide(tag, `the point itself carries \`Author lane: ${tag}\``)
-  if (criticality === 'high') return decide('fable', 'the point is tagged HIGH criticality — a hard case by definition')
-  if (hard.length) return decide('fable', `the spec names it a hard case (${hard.join(', ')})`)
+  // A HARD CASE STAYS IN THE OPUS LANE (user 17.08.2026). It used to go to Fable
+  // from the start, which spent the scarcest weekly pool on work the main lane
+  // finishes itself; Fable is now the ESCALATION, reached by the branch above.
+  if (criticality === 'high') return decide('opus', 'the point is tagged HIGH criticality — a hard case, and hard cases stay with Opus')
+  if (hard.length) return decide('opus', `the spec names it a hard case (${hard.join(', ')}) — hard cases stay with Opus`)
   if (verification.length) {
     return decide('opus', `its VERIFICATION is the work (${verification.join(', ')}) — the main session judges that anyway`)
   }
