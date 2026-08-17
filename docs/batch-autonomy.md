@@ -341,7 +341,19 @@ How it works:
    declaration under the adopter's identity, which is declaring a wait, the very
    thing the seal denies. Work WITHOUT a pushed checkpoint
    blocks the handover with named recovery choices and drains first
-   (`--handover-check` tells the two states apart). The boundary is TWO-PHASE
+   (`--handover-check` tells the two states apart) — EXCEPT a RUNNING
+   VERIFICATION (point 700): a declared `--log` whose run record
+   (`<log>.run.json`, written by `scripts/verify/run-logged.mjs`) names the
+   run — suites, backends, the HEAD it covers, pid, and the receipt path the
+   record becomes at close — TRANSFERS like a pushed branch, and the successor
+   awaits the receipt and reads the verdict instead of the session draining a
+   25-minute suite past the very mark at which leaving is worth the most. The
+   record is held to the same evidence bar as a checkpoint: it must name a
+   LIVE run (pid probed alive) or a receipt that already exists, and it must
+   cover the HEAD being handed over — a record saying "running" over a dead
+   pid, or a run of another commit, BLOCKS by name, because a successor would
+   otherwise await a receipt that never arrives. A bare log with no record
+   still proves nothing and still blocks. The boundary is TWO-PHASE
    (point 675 closed the marker-deletion defeat): `node scripts/batch-boundary.mjs
    --prepare <point>` validates the condition and names ALL the bookkeeping (the
    card, the publish) while writing NO marker — so the bookkeeping can no longer
@@ -364,7 +376,28 @@ How it works:
    (`scripts/context-watermark.mjs`, read from the session's own transcript — an
    unobtainable reading fails loudly, never silently) the guard demands the same
    two-phase handover with `--context` in place of a point, and the board card
-   names the watermark as the reason.
+   names the watermark as the reason. Since point 700 the watermark BINDS during
+   the turn, not only at its end: a PreToolUse fence
+   (`scripts/context-fence-guard.mjs`, pure core `context-fence-core.mjs`)
+   measures the owner's context on every state-changing call and DENIES the
+   ones that would START a new unit of work past the mark — spawning a
+   delegated agent, starting a browser verify run (`npm test`, `test:small`,
+   `test:large`, `run-all`/`run-logged`), delegating an author, and AUTHORING a
+   work-order point, a memory or a doc section, whose refusal names the
+   findings CARRIER (`node scripts/finding.mjs --record …`) as the way to keep
+   a finding cheaply. Everything that FINISHES the step in flight — commits,
+   pushes, the landing, the board, the boundary bookkeeping, the fast
+   build/lint/unit gates — and every read passes untouched, so the fence ends a
+   session and never idles one; it stands down for a non-owner, a paused batch
+   and a worktree-isolated agent (whose calls carry the parent's session id
+   while its own context is small), and it fails OPEN on an unreadable
+   measurement — a fence may end a session early at worst, never trap one.
+   EVERY boundary marker, point or context, additionally RECORDS the context
+   reading it was taken at (`tokens`/`watermark` on the marker; null when
+   honestly unmeasurable), and a commit further past the mark than the stated
+   margin (`CONTEXT_MARGIN_TOKENS`, context-watermark-core.mjs) prints the
+   distance and demands it in the closing report — so how far past the mark a
+   session really left stays a number somebody reads, not a claim.
 2. At the turn end `batch-progress-guard` re-judges the claim itself — the marker
    is a claim, not proof. It ALLOWS the stop only when the point is closed per
    `TASKS.md` + `docs/tasks-archive.md` (or the marker records a real watermark
