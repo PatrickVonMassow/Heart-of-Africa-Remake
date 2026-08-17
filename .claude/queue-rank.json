@@ -127,10 +127,14 @@
     "708": {
       "at": "2026-08-17T14:29:14.792Z",
       "why": "Groesserer Umbau der Ablaeufe; er lohnt erst nach 707, das dieselbe Vorabpruefung braucht"
+    },
+    "715": {
+      "at": "2026-08-17T22:08:35.893Z",
+      "why": "Filed directly beside 714 in the process-fix block, not appended last: it is the class the whole Stop chain rests on and the check meant to catch it currently certifies it."
     }
   },
   "settled": {
-    "at": "2026-08-17T19:55:39.080Z",
+    "at": "2026-08-17T22:08:35.894Z",
     "points": [
       174,
       184,
@@ -334,7 +338,8 @@
       710,
       712,
       713,
-      714
+      714,
+      715
     ]
   }
 }

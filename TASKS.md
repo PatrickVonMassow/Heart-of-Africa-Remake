@@ -539,6 +539,38 @@ put it is the mistake this line exists to stop.
   Criticality: high — it does not produce a wrong answer, it produces an unearned CLEARANCE, and
   the four-eyes rule the whole model policy rests on is only worth what its records cover.
   Bundle: unbundled (review tooling).
+
+- [ ] 715. The wiring check condemns one relative hook path and certifies thirty-nine identical ones
+  (measured 18.08.2026 by counting `.claude/settings.json`; found by GPT-5.6 Sol reviewing the
+  anchoring commit 91cf64eb, then confirmed here). 39 hook entries stand as `node scripts/<x>.mjs` —
+  cwd-RELATIVE — and exactly 2 are anchored through `CLAUDE_PROJECT_DIR`. `guard-health-guard`
+  flagged the ONE newly wired hook (`rule-echo-guard`) for precisely this, in its own words: a
+  session whose working directory is not the repository root gets a non-blocking `Cannot find
+  module`, so the hook is SILENTLY DEAD while its rule still counts as covered. After that one entry
+  was anchored the check reports `OK (40 Durchsetzer, alle verdrahtet und geprüft)` — while 39
+  enforcers carry the defect it had just called fatal. So the check does not test the rule it states:
+  it condemns the newest entry and grandfathers every standing one, which is the worst shape a health
+  check can take, because its OK is read as "all 40 are sound". SECOND, from the same review and also
+  confirmed: the anchored form ITSELF fails silently when `CLAUDE_PROJECT_DIR` is unset — it expands
+  to `/scripts/rule-echo-guard.mjs`, which resolves nowhere, and enforcement disappears exactly as
+  before. Anchoring alone is therefore not the fix.
+  FINAL STATE:
+  - EVERY hook command in `.claude/settings.json` is anchored, not only the newest.
+  - `guard-health` judges EVERY entry by the rule it states, so its OK means all of them are sound,
+    and a STANDING violation is reported as loudly as a new one. A check that grandfathers what
+    already exists is what this project calls a guard that cannot fire.
+  - The anchoring form survives an unset variable: it either falls back to a path that still
+    resolves or FAILS LOUDLY — never to a non-existent absolute path that disarms the hook in
+    silence.
+  VERIFIABLE: Vitest per half — a settings file with one relative entry among anchored ones is
+  reported (not passed), the reported count matches the entries actually judged, and an unset
+  `CLAUDE_PROJECT_DIR` does not silently disarm a hook but produces a loud failure.
+  NOTE ON EXECUTION: `.claude/settings.json` is a protected path whose edits prompt, so the wiring
+  half needs an attended session; the check's own rule and the unset-variable behaviour do not.
+  Criticality: high — it is the class the whole Stop chain rests on, and the check meant to detect it
+  currently certifies it.
+  Bundle: unbundled (guard hygiene).
+
 - [ ] 662. The context boundary must also fire without a tick (user 12.08.2026: "Außerdem ist
   der Kontext dieser Session wieder ziemlich groß geworden. Hättest du in der Zwischenzeit
   nicht mal an eine andere übergeben können? So bekommen wir das sonst nie in den Griff.").
