@@ -455,6 +455,14 @@ put it is the mistake this line exists to stop.
     of dropped: text after `--estimate` that does not read as a duration aborts and names the right
     order. The same holds for `--title` followed by more than a title.
   - The success line names EVERY field it set, so a missing one is visible in the output.
+  - `queue <N>` on a point that IS the standing now-card does not silently empty the now section.
+    Measured 17.08.2026: refreshing the stale queue text of the point in active work moved the card
+    OUT of "Woran ich gerade arbeite" and reported `700 returned to the queue`, leaving that section
+    blank — the exact state point 713 exists to prevent — and the next `now <N>` then failed with
+    `no queue card for point 700`, because the round trip had consumed the queue card the command
+    reads from. Either the queue text of a point in active work is editable WITHOUT unseating its
+    now-card, or the attempt is refused and names `status <N>` as the way to restate it; a command
+    that moves a card between sections says which section it left.
   - The REBUILD does not write a card the card guard then blocks. Measured 17.08.2026: a queue
     rebuild regenerates every card body from the work-order spec, and a spec that names another
     point therefore lands in the card verbatim — `dashboard-card-topic-guard` blocked the turn end
@@ -464,7 +472,8 @@ put it is the mistake this line exists to stop.
   VERIFIABLE: Vitest over `parseSetArgs` with exactly this call — the mixed form refused with the
   correct order named, the well-formed three-field call accepted, and the success line listing each
   field it wrote; plus a case that renders a spec naming another point and asserts the generated
-  card body passes the card-topic rule.
+  card body passes the card-topic rule; plus a case that edits the queue text of the point holding
+  the now-card and asserts the now section still holds it afterwards.
   Criticality: low — one command's argument handling, but it silently discards the user-visible
   text of a board card.
   Bundle: Chat & Tafel.
