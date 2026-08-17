@@ -359,9 +359,27 @@ function authoringDirDestination(dest, resolvePath) {
  *     outside, and the ordinary reads (the Read tool, `sed -n`, `grep`, `cat`)
  *     all stay open, so the session keeps a way to find anything out.
  * Everything that READS stays allowed — `sed -n '1,20p' TASKS.md`, `grep …
- * TASKS.md`, a copy OUT of the target — and where a form cannot be told apart
- * cheaply the READING side wins: a missed authoring call costs one unfenced
- * edit, a denied read costs the session its way forward.
+ * TASKS.md`, a copy OUT of the target.
+ *
+ * WHAT THIS CLASSIFIER CLAIMS — AND WHAT IT DOES NOT. It catches the
+ * ORDINARY shell forms that write the fenced documents: redirection, the
+ * in-place editors, tee, a copy or move in, dd, the inline evals. It is NOT
+ * argv-complete, and does not try to be: shell argv has no classifiable
+ * closure (every tool's option table is its own, and open-ended), and Sol
+ * rounds 7 and 9 are where that limit was measured — four rounds in, the
+ * findings had turned from real escapes into ever more exotic spellings and
+ * FALSE DENIALS, the signature of a rule fighting an unbounded surface. A
+ * session that constructs an unusual spelling to get past this classifier
+ * has already decided to defeat its own fence — the same boundary already
+ * ruled for the constructed-symlink class (see resolveThroughAncestors),
+ * and for the same reason. Every remaining ambiguity therefore resolves
+ * toward the READ: a missed authoring call costs one unfenced edit, while a
+ * false denial teaches the session to fight its own tooling — which costs
+ * far more. The known residual, each pinned INTENDED by test: a directory
+ * destination carrying no evidence is judged a file (`cp notes.md docs`
+ * passes), a detached option value before an eval flag hides the eval
+ * (`node --require esm -e …` passes), and only `t` is modelled as a
+ * value-taking short. None of these is a defect to be chased.
  */
 function shellAuthoringTarget(head, args, resolvePath, isDirectory) {
   const texts = args.map((a) => a.text)

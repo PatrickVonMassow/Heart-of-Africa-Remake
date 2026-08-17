@@ -278,6 +278,29 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
       expect(decide(call).block, name).toBe(false)
     })
   }
+
+  // THE RESIDUAL IS INTENDED (Sol rounds 7/9 — the classifier's contract
+  // note): the classifier catches the ORDINARY shell forms that write the
+  // fenced documents and is NOT argv-complete; ambiguity resolves toward the
+  // READ, because a missed authoring call costs one unfenced edit while a
+  // false denial costs the session its way of working. These pins hold that
+  // direction — each names a real miss that must STAY a miss rather than
+  // grow another parser.
+  const residual = [
+    ['a directory named with NO evidence is judged a file — the copy-in is missed, the copy-out stays open', {
+      toolName: 'Bash',
+      command: 'cp notes.md docs',
+    }],
+    ['a detached option value before the eval flag hides the eval — ordinary script calls must not idle', {
+      toolName: 'Bash',
+      command: `node --require esm -e "fs.appendFileSync('TASKS.md','x')"`,
+    }],
+  ]
+  for (const [name, call] of residual) {
+    it(`INTENDED residual: ${name}`, () => {
+      expect(decide(call).block, name).toBe(false)
+    })
+  }
 })
 
 describe('over the mark, FINISHING calls and reads stay allowed', () => {
