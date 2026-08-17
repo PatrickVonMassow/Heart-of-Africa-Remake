@@ -21,9 +21,9 @@
 // then names each file, and re-stamping is per FILE, so the stamp cannot be
 // refreshed for a place nobody opened.
 //
-// The fingerprint is over the source text with whitespace collapsed, so a
-// re-wrap of the same sentence does not fire — only a change in the words does.
-// Pure: no I/O, no clock. The reading and the blocking live in
+// The fingerprint is over the source text as written; only line endings and
+// trailing whitespace are normalised, because collapsing more hid real Markdown
+// edits. Pure: no I/O, no clock. The reading and the blocking live in
 // scripts/rule-echo.mjs and scripts/rule-echo-guard.mjs.
 
 import { createHash } from 'node:crypto'
@@ -41,8 +41,8 @@ import { createHash } from 'node:crypto'
  * version of the rule", which is exactly the check being made.
  *
  * `optional: true` marks a path outside the repository (the memory directory).
- * It is checked when present and silently skipped when not, so the guard cannot
- * fail a machine that has no memory tree.
+ * It is skipped only when the whole TREE is absent, so a machine keeping no
+ * memories is never blocked while a DELETED entry still is.
  */
 export const RULE_REGISTRY = Object.freeze([
   Object.freeze({
@@ -71,20 +71,19 @@ export const STAMP_PATTERN = /rule:([a-z0-9-]+)@([0-9a-f]{8})/g
 /**
  * The fingerprint of a rule's source text.
  *
- * It ignores TRAILING whitespace and runs of spaces INSIDE a line, and nothing
- * else. Leading indentation and the line breaks are kept, because in Markdown
- * they carry meaning — indentation is list nesting, two trailing spaces are a
- * hard break (cross-vendor review, P2: the first version collapsed all
- * whitespace and its test blessed exactly that). The cost is a re-wrap of the
- * same sentence firing the guard, and that is the cheap direction: re-stamping
- * costs one command, a missed change costs the drift this exists to prevent.
+ * It normalises line endings and strips whitespace at the very END of the block,
+ * and NOTHING else. Two earlier versions tried to be clever — collapsing all
+ * whitespace, then collapsing runs inside a line — and the cross-vendor review
+ * caught both: in Markdown, leading indentation is list nesting and two trailing
+ * spaces are a hard break, so every collapse hid a real edit while the comment
+ * claimed otherwise (rounds 1 and 2, P2). The cost of being literal is that a
+ * pure re-wrap fires the guard, and that is the cheap direction: re-stamping is
+ * one command, a missed change is the drift this exists to prevent.
  */
 export function fingerprint(text) {
   const normalized = String(text ?? '')
-    .split('\n')
-    .map((line) => line.replace(/[ \t]+/g, ' ').replace(/\s+$/, ''))
-    .join('\n')
-    .replace(/^\n+|\n+$/g, '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\s+$/, '')
   return createHash('sha256').update(normalized).digest('hex').slice(0, 8)
 }
 
@@ -163,7 +162,13 @@ export function checkRule(rule = {}, files = {}) {
   const stale = []
   const unstamped = []
   for (const echo of rule.echoes ?? []) {
-    const text = files[echo.file]
+    const entry = files[echo.file]
+    // A PATH MAY RESOLVE TO SEVERAL COPIES (cross-vendor review round 2, P1):
+    // this project has two memory directories, and joining their contents let a
+    // current stamp in the first copy cover a stale one in the second. Each copy
+    // is therefore judged on its own, and the worst answer wins.
+    const copies = Array.isArray(entry) ? entry : [entry]
+    const text = copies.length === 1 ? copies[0] : copies.find((c) => c === null || c === undefined) ?? copies[0]
     if (text === null || text === undefined) {
       // AN OPTIONAL PATH IS SKIPPED ONLY WHEN ITS WHOLE TREE IS ABSENT
       // (cross-vendor review, P1). Skipping every missing optional file could
@@ -174,9 +179,12 @@ export function checkRule(rule = {}, files = {}) {
       if (!treeGone) unstamped.push({ file: echo.file, had: '' })
       continue
     }
-    const mine = stampsIn(text).filter((s) => s.id === rule.id)
-    if (!mine.length) unstamped.push({ file: echo.file, had: '' })
-    else if (!mine.some((s) => s.hash === hash)) stale.push({ file: echo.file, had: mine[0].hash })
+    const perCopy = copies.map((c) => stampsIn(c ?? '').filter((s) => s.id === rule.id))
+    if (perCopy.some((m) => !m.length)) unstamped.push({ file: echo.file, had: '' })
+    else if (perCopy.some((m) => !m.some((s) => s.hash === hash))) {
+      const behind = perCopy.find((m) => !m.some((s) => s.hash === hash))
+      stale.push({ file: echo.file, had: behind[0].hash })
+    }
   }
   const kind = stale.length ? 'stale' : unstamped.length ? 'unstamped' : 'ok'
   return { id: rule.id, kind, hash, stale, unstamped, detail: '' }
@@ -209,6 +217,13 @@ export function unregisteredStamps(registry = RULE_REGISTRY, stamped = {}) {
     }
   }
   return out
+}
+
+/** Every rule a given file restates — a file may echo more than one. */
+export function rulesForFile(file = '', registry = RULE_REGISTRY) {
+  return (Array.isArray(registry) ? registry : []).filter((rule) =>
+    (rule.echoes ?? []).some((e) => e.file === file),
+  )
 }
 
 /** Which files a caller has to read to decide everything. */

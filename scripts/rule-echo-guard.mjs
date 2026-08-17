@@ -10,7 +10,7 @@
 // The failure is not silent — it goes to stderr, where the session sees it — but
 // it does not block. A guard that blocked on its own bug would be the one defect
 // this project has decided it will not accept.
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { resolve } from 'node:path'
@@ -24,10 +24,10 @@ import { isMainModule } from './is-main.mjs'
  * TWO candidates, deliberately: the slug is derived from the repository path,
  * and a trailing slash there produces a trailing dash — which is how this
  * project ended up with two memory directories, the index in one and the
- * findings carrier in the other. BOTH are read and their contents concatenated
- * (cross-vendor review, P1: taking the first hit meant a second copy of the same
- * filename was never checked and never stamped). Windows separators are slugged
- * too, so a `C:\…` root cannot slip through unnormalised.
+ * findings carrier in the other. BOTH are read, and each copy is judged on its
+ * own (review rounds 1 and 2, P1: taking the first hit, and then joining the
+ * two, each let a second copy go unchecked). Windows separators are slugged too,
+ * so a `C:\…` root cannot slip through unnormalised.
  */
 export function memoryDirs({ home = homedir(), root = REPO_ROOT } = {}) {
   const slug = String(root)
@@ -49,7 +49,10 @@ export function gatherRuleEchoInputs(registry = RULE_REGISTRY) {
       ? dirs.map((dir) => resolve(dir, rel.slice('memory/'.length)))
       : [resolve(REPO_ROOT, rel)]
     const found = candidates.filter((p) => existsSync(p))
-    files[rel] = found.length ? found.map((p) => readFileSync(p, 'utf8')).join('\n') : null
+    // EACH COPY SEPARATELY (cross-vendor review round 2, P1): joining them let a
+    // current stamp in one directory cover a stale one in the other, which is
+    // the first-candidate blind spot in a second shape.
+    files[rel] = found.length ? found.map((p) => readFileSync(p, 'utf8')) : null
   }
   return { applicable: true, inputs: { files } }
 }
@@ -70,10 +73,16 @@ export function gatherStampedFiles() {
     })
       .split('\n')
       .filter(Boolean)
-  } catch {
-    return {} // no git, or no match at all — both mean nothing to report
+  } catch (e) {
+    // `git grep` exits 1 for "no match", which is an ANSWER. Anything else — no
+    // git, a timeout, a broken repository — silently disabled this check, and
+    // fail-open must still be VISIBLE (cross-vendor review round 2, P1).
+    if (!e || e.status !== 1) {
+      console.error(`rule-echo-guard: stray-stamp scan skipped (${(e && e.message) || 'unknown error'})`)
+    }
+    return memoryStampedFiles()
   }
-  const out = {}
+  const out = memoryStampedFiles()
   for (const rel of paths) {
     // The registry and its own tests NAME stamps as examples; they are not
     // restatements of any rule, and reading them as stray ones would block the
@@ -81,6 +90,26 @@ export function gatherStampedFiles() {
     if (rel.startsWith('scripts/rule-echo')) continue
     const full = resolve(REPO_ROOT, rel)
     if (existsSync(full)) out[rel] = readFileSync(full, 'utf8')
+  }
+  return out
+}
+
+/**
+ * The same scan over the memory directories, which `git grep` cannot see.
+ *
+ * Without it a memory entry carrying a stamp but missing from the registry was
+ * searched by neither path (cross-vendor review round 2, P1). The directories
+ * are small, so a plain read of their Markdown files is cheap.
+ */
+export function memoryStampedFiles() {
+  const out = {}
+  for (const dir of memoryDirs()) {
+    if (!existsSync(dir)) continue
+    for (const name of readdirSync(dir)) {
+      if (!name.endsWith('.md')) continue
+      const text = readFileSync(resolve(dir, name), 'utf8')
+      if (/rule:[a-z0-9-]+@[0-9a-f]{8}/.test(text)) out[`memory/${name}`] = text
+    }
   }
   return out
 }

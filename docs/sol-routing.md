@@ -111,7 +111,7 @@ node scripts/author-sol.mjs --point 651 --dry-run  # the prompt and the argv, no
 node scripts/author-sol.mjs --point 651 --findings f.md   # the second leg: answer the review
 ```
 
-<!-- rule:model-policy@db1baff0 -->
+<!-- rule:model-policy@8b2f41d7 -->
 **The cut is a function, not a taste.** `scripts/author-routing-core.mjs` reads
 the point's own text: the hard cases (difficult, complex, error-prone, or tagged
 HIGH criticality) stay with **Opus 5** (user 17.08.2026 — they used to go to

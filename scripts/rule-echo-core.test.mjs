@@ -11,6 +11,7 @@ import {
   restamp,
   sourceTextOf,
   stampFor,
+  rulesForFile,
   stampsIn,
   treeKeyOf,
   unregisteredStamps,
@@ -53,16 +54,18 @@ describe('sourceTextOf', () => {
 })
 
 describe('fingerprint', () => {
-  it('ignores trailing whitespace and doubled spaces INSIDE a line', () => {
-    expect(fingerprint('a  b')).toBe(fingerprint('a b'))
-    expect(fingerprint('a b   \n')).toBe(fingerprint('a b'))
+  it('normalises line endings and the block’s trailing whitespace, nothing else', () => {
+    expect(fingerprint('a b\r\nc')).toBe(fingerprint('a b\nc'))
+    expect(fingerprint('a b\n\n  ')).toBe(fingerprint('a b'))
   })
 
-  it('does NOT ignore indentation or line breaks — they carry meaning in Markdown', () => {
-    // The first version collapsed all whitespace, so a list could be re-nested
-    // and a hard line break introduced without the fingerprint moving
-    // (cross-vendor review, P2).
+  it('keeps every whitespace that carries MEANING in Markdown (review rounds 1+2, P2)', () => {
+    // Round 1 collapsed all whitespace and round 2 collapsed runs inside a line;
+    // each hid a real edit. Indentation is list nesting, two trailing spaces are
+    // a hard break, and a re-wrap can change which line a word sits on.
     expect(fingerprint('- a\n  - b')).not.toBe(fingerprint('- a\n- b'))
+    expect(fingerprint('a b  \nc')).not.toBe(fingerprint('a b\nc'))
+    expect(fingerprint('a  b')).not.toBe(fingerprint('a b'))
     expect(fingerprint('a b c')).not.toBe(fingerprint('a b\nc'))
   })
 
@@ -304,5 +307,40 @@ describe('treeKeyOf', () => {
     expect(treeKeyOf({ file: 'x.md' })).toBe('')
     expect(treeKeyOf({ file: 'a/b/c.md', tree: 'a/b/' })).toBe('a/b/')
     expect(treeKeyOf()).toBe('')
+  })
+})
+
+describe('several copies of one path', () => {
+  it('is stale when ANY copy is behind, not when the first one is current', () => {
+    // The two memory directories: a current stamp in one used to cover a stale
+    // stamp in the other, first by taking the first hit and then by joining the
+    // texts (cross-vendor review rounds 1 and 2, P1).
+    const r = checkRule(RULE, filesWith({ 'memory/c.md': [`x rule:demo@${HASH}`, 'y rule:demo@00000000'] }))
+    expect(r.kind).toBe('stale')
+    expect(r.stale).toEqual([{ file: 'memory/c.md', had: '00000000' }])
+  })
+
+  it('is unstamped when one copy carries no stamp at all', () => {
+    const r = checkRule(RULE, filesWith({ 'memory/c.md': [`x rule:demo@${HASH}`, 'no stamp here'] }))
+    expect(r.kind).toBe('unstamped')
+  })
+
+  it('passes when every copy is current', () => {
+    const r = checkRule(RULE, filesWith({ 'memory/c.md': [`x rule:demo@${HASH}`, `y rule:demo@${HASH}`] }))
+    expect(r.kind).toBe('ok')
+  })
+})
+
+describe('rulesForFile', () => {
+  it('answers with EVERY rule a file restates, not the first', () => {
+    const second = { ...RULE, id: 'other', echoes: [{ file: 'a.mjs' }] }
+    expect(rulesForFile('a.mjs', [RULE, second]).map((r) => r.id)).toEqual(['demo', 'other'])
+    expect(rulesForFile('b.md', [RULE, second]).map((r) => r.id)).toEqual(['demo'])
+  })
+
+  it('answers empty for an unwatched file, and never throws', () => {
+    expect(rulesForFile('nowhere.md', [RULE])).toEqual([])
+    expect(rulesForFile()).toEqual([])
+    expect(rulesForFile('a.mjs', null)).toEqual([])
   })
 })
