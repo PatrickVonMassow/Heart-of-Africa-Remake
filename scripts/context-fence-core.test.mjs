@@ -175,8 +175,11 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
     // its root (Sol round 7, finding 2).
     ['cp into a directory UNDER docs', { toolName: 'Bash', command: 'cp notes.md docs/reviews/' }],
     // Several sources with a directory destination: EVERY source lands there,
-    // so every join is judged — here the .md rides second.
-    ['cp with several sources into the docs directory', { toolName: 'Bash', command: 'cp img.png notes.md docs/' }],
+    // so every join is judged — here the .md rides second. Exercised through
+    // -t, where ALL operands are sources: the trailing-slash spelling of this
+    // case already denied before the multiple-source change and pinned
+    // nothing (Sol round 9, finding 3).
+    ['cp -t with several sources — every join is judged', { toolName: 'Bash', command: 'cp -t docs img.png notes.md' }],
     // An ABSOLUTE spelling of the repo's own docs tree anchors through the
     // injected resolver (`resolvePath('docs')` names that tree's real path).
     ['cp into the repo docs tree by absolute path — the resolver anchors it', {
@@ -486,8 +489,11 @@ describe("the fence's claim is BOUNDED — a constructed escape is outside it (r
     // intended limit below — allowed, like the cp it is equivalent to.
     expect(decide({ toolName: 'Bash', command: 'ln scripts/verify/world.mjs /tmp/world.mjs' }).block).toBe(false)
     // An ln -s pointing ELSEWHERE is ordinary file work: only the link
-    // TARGET is judged, never the link name or destination directory.
-    expect(decide({ toolName: 'Bash', command: 'ln -s /tmp/notes.md scripts/verify-notes.md' }).block).toBe(false)
+    // TARGET is judged, never the link name — shown by a link NAME inside
+    // the verify tree itself, which the pre-narrowing rule denied (a name
+    // outside the tree, `scripts/verify-notes.md`, never matched under any
+    // version and pinned nothing — Sol round 9, finding 3).
+    expect(decide({ toolName: 'Bash', command: 'ln -s /tmp/notes.md scripts/verify/note-link' }).block).toBe(false)
   })
 
   it('INTENDED LIMIT, not an oversight: the copy-based constructed escape PASSES — the class has no lexical closure and the fence is not a sandbox', () => {
