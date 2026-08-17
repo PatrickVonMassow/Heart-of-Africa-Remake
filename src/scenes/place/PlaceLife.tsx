@@ -15,12 +15,14 @@ import {
   buildGoatParts,
   createFaunaMaterial,
   faceVelocity,
+  footPlantPose,
   gaitBodyLift,
   gaitCadence,
   gaitPhase,
   gaitRig,
   isStance,
   legSwingAngle,
+  type FootPlant,
 } from '../../render/fauna'
 import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
 import {
@@ -841,13 +843,24 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
   const scene = useMemo(() => animalScene(colliders, bodies), [colliders, bodies])
   const refs = useRef<Array<THREE.Group | null>>([])
   // Per-goat leg-pivot groups (four each) and gait state (last position, walked
-  // distance, held facing) so the swing rides distance and the body faces travel.
+  // distance, held facing and each stance's world contact) so the swing rides
+  // distance, the body faces travel and a planted foot does not follow either.
   const legRefs = useRef<Array<Array<THREE.Group | null>>>([])
-  const gait = useRef<Array<{ x: number; z: number; dist: number; yaw: number }>>([])
+  const gait = useRef<Array<{ x: number; z: number; dist: number; yaw: number; plants: Array<FootPlant | null> }>>([])
   // Scratch vector for the DEV foot probe below — never allocated per frame.
   const footProbe = useMemo(() => new THREE.Vector3(), [])
+  // Scratch vectors for aiming a straight leg from its moving hip to the held
+  // world contact. All four legs share them sequentially inside one frame.
+  const legDown = useMemo(() => new THREE.Vector3(0, -1, 0), [])
+  const legDirection = useMemo(() => new THREE.Vector3(), [])
   if (gait.current.length !== anchors.length) {
-    gait.current = anchors.map((a) => ({ x: a.x, z: a.z, dist: 0, yaw: 0 }))
+    gait.current = anchors.map((a) => ({
+      x: a.x,
+      z: a.z,
+      dist: 0,
+      yaw: 0,
+      plants: parts.legs.map(() => null),
+    }))
   }
   useFrame(({ clock }, rawDt) => {
     const t = clock.elapsedTime
@@ -890,25 +903,46 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
       s.x = px
       s.z = pz
       // Swing the legs on the distance-driven phase at this rig's own cadence,
-      // and drop the body onto the stance leg (point 300): the planted foot then
-      // holds its ground spot while the goat walks over it, instead of skating.
+      // and drop the body onto the stance leg. Distance matching supplies the
+      // natural touchdown and lift-off pose; the world-space planting below is
+      // what holds that contact while collision response translates the body
+      // sideways or its bounded facing turns over the stance.
       const phase = gaitPhase(s.dist, rig.cadence)
-      g.position.set(px, gaitBodyLift(phase, rig.legLength), pz)
+      const lift = gaitBodyLift(phase, rig.legLength)
+      g.position.set(px, lift, pz)
       g.rotation.y = s.yaw
       const legs = legRefs.current[i]
       if (legs) {
         for (let li = 0; li < parts.legs.length; li++) {
           const lg = legs[li]
-          if (lg) lg.rotation.x = legSwingAngle(phase, parts.legs[li].phaseOffset)
+          if (!lg) continue
+          const leg = parts.legs[li]
+          const legPhase = phase + leg.phaseOffset
+          const swing = legSwingAngle(phase, leg.phaseOffset)
+          const planting = footPlantPose(
+            s.plants[li],
+            isStance(legPhase),
+            { x: px, y: lift, z: pz, yaw: s.yaw },
+            leg.hip,
+            swing,
+            rig.legLength,
+          )
+          s.plants[li] = planting.contact
+          if (planting.contact) {
+            legDirection.set(...planting.direction)
+            lg.quaternion.setFromUnitVectors(legDown, legDirection)
+            lg.scale.set(1, planting.stretch, 1)
+          } else {
+            lg.rotation.set(swing, 0, 0)
+            lg.scale.set(1, 1, 1)
+          }
         }
       }
       if (import.meta.env.DEV) {
         // The live no-skate probe (point 300) tracks one foot through its stance:
-        // its world spot must hold while the body advances. Reported straight
-        // from the rendered leg group, so the probe reads what is DRAWN. `yaw`
-        // rides along because a goat on this wandering path also TURNS, and the
-        // probe measures the foot's travel in the walker's own heading frame —
-        // the rigid pivot of a turning body is not the gait's doing.
+        // its world spot must hold while the body advances and turns. Reported
+        // straight from the rendered leg group, so the probe reads what is
+        // DRAWN rather than the intended planting state.
         const lg = legRefs.current[i]?.[0]
         if (lg) {
           const foot = footProbe.set(0, -rig.legLength, 0)
