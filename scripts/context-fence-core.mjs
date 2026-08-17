@@ -231,6 +231,77 @@ function pathTokensOf(text) {
 }
 
 /**
+ * cp/mv/install/ln argv, split into its bare OPERANDS and the
+ * `-t <dir>`/`--target-directory=<dir>` destination where one is given (Sol
+ * round 7, finding 2: both forms leave one positional, so a `pos.length < 2`
+ * rule read them as having no destination at all). Judged on the whole token
+ * however it was quoted — a quoted `-t` is still the flag.
+ */
+function destinationSplit(args) {
+  let targetDir = null
+  const operands = []
+  for (let i = 0; i < args.length; i++) {
+    const t = args[i].text
+    if (t === '-t' || t === '--target-directory') {
+      targetDir = args[i + 1] ? args[i + 1].text : null
+      i++
+      continue
+    }
+    if (t.startsWith('--target-directory=')) {
+      targetDir = t.slice('--target-directory='.length)
+      continue
+    }
+    if (t.startsWith('-')) continue
+    operands.push(t)
+  }
+  return { targetDir, operands }
+}
+
+/**
+ * Is this DESTINATION a directory of the fenced trees — the repository's OWN
+ * docs/ tree or the PROJECT-MEMORY directory? ANCHORED, not name-matched
+ * (Sol round 7, finding 1: `/(?:^|\/)(docs|memory)$/` took any path ENDING in
+ * the name, so `cp TASKS.md /tmp/docs/` — the very copy-out the rule promises
+ * to keep open — was denied). The anchor is judged the way the rest of the
+ * fence resolves repo-relative paths:
+ *   - a RELATIVE spelling resolves against the repo root (where the guard
+ *     resolves every relative word), so a normalised `docs` or `docs/<sub>`
+ *     IS the repo's own tree — and any directory UNDER it counts (finding 2:
+ *     `docs/reviews/` is as much an authoring destination as the root);
+ *   - an ABSOLUTE or `..` spelling counts only where the injected resolver
+ *     PROVES it lies under the repo's own docs/ (`resolvePath('docs')` names
+ *     that tree's real path). No resolver, no proof, no anchor — an
+ *     unprovable destination stays the read it claims to be, the fail
+ *     direction the caller states;
+ *   - the project-memory directory lives OUTSIDE any repository, so no repo
+ *     anchor exists for it; it is identified by its FULL shape
+ *     (`.claude/projects/<slug>/memory`), which a scratch tree does not
+ *     carry — a bare `/tmp/memory/` anchors nothing.
+ * Returns the directory the dir/<source basename> joins are judged under, or
+ * null.
+ */
+const MEMORY_DIR_SHAPE = /(?:^|\/)\.claude\/projects\/[^/]+\/memory(?:\/|$)/i
+
+function authoringDirDestination(dest, resolvePath) {
+  const norm = posixNormalizePath(dest)
+  if (/^docs(?:\/|$)/i.test(norm) || MEMORY_DIR_SHAPE.test(norm)) return norm
+  if (typeof resolvePath !== 'function') return null
+  let docsRoot = null
+  let real = null
+  try {
+    docsRoot = resolvePath('docs')
+    real = resolvePath(norm)
+  } catch {
+    return null // unresolvable → no anchor; the reading side wins
+  }
+  if (typeof docsRoot !== 'string' || !docsRoot || typeof real !== 'string' || !real) return null
+  const rootNorm = posixNormalizePath(docsRoot)
+  const realNorm = posixNormalizePath(real)
+  if (realNorm === rootNorm || realNorm.startsWith(`${rootNorm}/`)) return realNorm
+  return MEMORY_DIR_SHAPE.test(realNorm) ? realNorm : null
+}
+
+/**
  * Authoring by SHELL MUTATION (Sol round 6, finding A). The redirection rule
  * below caught only parsed `>`/`>>` targets, while a shell mutates the work
  * order just as ORDINARILY through an in-place editor, tee, a copy INTO the
@@ -238,10 +309,14 @@ function pathTokensOf(text) {
  * refused with the carrier named. Caught by the TOOL plus its TARGET:
  *   - `sed` WITH an in-place flag whose file operand is an authoring target;
  *   - `tee` (with or without -a) naming one as its output;
- *   - `cp`/`mv`/`install` whose DESTINATION is one — including the docs/ or
- *     memory DIRECTORY as destination, judged as dir/<source basename>
- *     (`cp notes.md docs/`; bounded to those dirs so the backup direction,
- *     `cp TASKS.md /tmp/backup/`, stays the read it is);
+ *   - `cp`/`mv`/`install` whose DESTINATION is one — the last operand or the
+ *     `-t <dir>`/`--target-directory=<dir>` form (Sol round 7, finding 2) —
+ *     including a DIRECTORY as destination, judged as dir/<source basename>
+ *     for EVERY source (`cp notes.md docs/reviews/`). The directory must be
+ *     ANCHORED in the repo's own docs/ tree or the project-memory directory
+ *     (`authoringDirDestination`), so the backup direction — `cp TASKS.md
+ *     /tmp/backup/`, and equally `cp TASKS.md /tmp/docs/`, a foreign tree
+ *     that merely CARRIES the name — stays the read it is (finding 1);
  *   - `dd of=<target>`;
  *   - `node -e` / `python -c` / `perl -e` whose script text or arguments name
  *     one. DELIBERATE OVER-REACH on the eval forms: an eval that only READS
@@ -253,7 +328,7 @@ function pathTokensOf(text) {
  * cheaply the READING side wins: a missed authoring call costs one unfenced
  * edit, a denied read costs the session its way forward.
  */
-function shellAuthoringTarget(head, args) {
+function shellAuthoringTarget(head, args, resolvePath) {
   const texts = args.map((a) => a.text)
   const pos = texts.filter((t) => !t.startsWith('-'))
   const firstNamed = (candidates) => {
@@ -266,18 +341,23 @@ function shellAuthoringTarget(head, args) {
   if (head === 'sed' && args.some((a) => !a.quoted && inPlaceFlag(a.text))) return firstNamed(pos)
   if (head === 'tee') return firstNamed(pos)
   if (head === 'cp' || head === 'mv' || head === 'install') {
-    if (pos.length < 2) return null
-    const dest = pos[pos.length - 1]
-    const direct = authoringTarget(dest)
+    const { targetDir, operands } = destinationSplit(args)
+    const sources = targetDir === null ? operands.slice(0, -1) : operands
+    const dest = targetDir === null ? (operands.length >= 2 ? operands[operands.length - 1] : null) : targetDir
+    if (dest === null) return null
+    // The direct check judges the destination as a FILE, so it sees the
+    // NORMALISED spelling: `/tmp/memory/` with its trailing slash would
+    // otherwise satisfy the file-level `/memory/` rule while naming no file.
+    const direct = authoringTarget(posixNormalizePath(dest))
     if (direct) return direct
-    // Into the docs/ or memory DIRECTORY itself: the file that appears there
-    // is dir/<source basename>. ONLY these dirs — joining the basename onto
-    // an arbitrary destination would deny the backup direction
-    // (`cp TASKS.md /tmp/backup/`), which is a READ of the work order.
-    const destNorm = posixNormalizePath(dest).toLowerCase()
-    if (/(?:^|\/)(docs|memory)$/.test(destNorm)) {
-      return firstNamed(pos.slice(0, -1).map((src) => `${destNorm}/${basenameOf(src)}`))
-    }
+    // Into a DIRECTORY of the fenced trees: the file that appears there is
+    // dir/<source basename>, and with several sources EVERY one lands there,
+    // so each join is judged. The directory must be ANCHORED
+    // (`authoringDirDestination`) — joining the basename onto an arbitrary
+    // destination would deny the backup direction (`cp TASKS.md /tmp/backup/`,
+    // `cp TASKS.md /tmp/docs/`), which is a READ of the work order.
+    const dir = authoringDirDestination(dest, resolvePath)
+    if (dir) return firstNamed(sources.map((src) => `${dir}/${basenameOf(src)}`))
     return null
   }
   if (head === 'dd') return firstNamed(texts.filter((t) => /^of=/i.test(t)).map((t) => t.slice(3)))
@@ -325,7 +405,7 @@ function segmentStart(seg, resolvePath) {
     if (target) return { what: `${target} via redirection (\`${seg.raw}\`)`, authoring: true }
   }
   // Authoring by SHELL MUTATION — the tool-plus-target forms the helper names.
-  const mutated = shellAuthoringTarget(head, args)
+  const mutated = shellAuthoringTarget(head, args, resolvePath)
   if (mutated) return { what: `${mutated} via a shell mutation (\`${seg.raw}\`)`, authoring: true }
   return null
 }

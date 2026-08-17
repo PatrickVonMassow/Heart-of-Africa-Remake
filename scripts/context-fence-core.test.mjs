@@ -160,6 +160,30 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
     ['cp INTO an authoring target', { toolName: 'Bash', command: 'cp notes.md docs/new-section.md' }],
     ['mv onto the work order', { toolName: 'Bash', command: 'mv draft.md TASKS.md' }],
     ['cp into the docs DIRECTORY — the effective target is dir/<basename>', { toolName: 'Bash', command: 'cp notes.md docs/' }],
+    // The `-t` destination forms leave ONE positional and evaded the old
+    // last-operand rule (Sol round 7, finding 2).
+    ['cp -t into the docs directory', { toolName: 'Bash', command: 'cp -t docs notes.md' }],
+    ['cp --target-directory= into the docs directory', { toolName: 'Bash', command: 'cp --target-directory=docs notes.md' }],
+    ['mv -t into the docs directory', { toolName: 'Bash', command: 'mv -t docs draft.md' }],
+    // Any directory UNDER the docs tree is an authoring destination, not only
+    // its root (Sol round 7, finding 2).
+    ['cp into a directory UNDER docs', { toolName: 'Bash', command: 'cp notes.md docs/reviews/' }],
+    // Several sources with a directory destination: EVERY source lands there,
+    // so every join is judged — here the .md rides second.
+    ['cp with several sources into the docs directory', { toolName: 'Bash', command: 'cp img.png notes.md docs/' }],
+    // An ABSOLUTE spelling of the repo's own docs tree anchors through the
+    // injected resolver (`resolvePath('docs')` names that tree's real path).
+    ['cp into the repo docs tree by absolute path — the resolver anchors it', {
+      toolName: 'Bash',
+      command: 'cp notes.md /workspace/hoa/docs/reviews/',
+      resolvePath: (p) => (p === 'docs' ? '/workspace/hoa/docs' : p.startsWith('/') ? p : null),
+    }],
+    // The project-memory directory anchors by its FULL shape — it lives
+    // outside the repo, so `.claude/projects/<slug>/memory` is its identity.
+    ['cp into the project-memory directory', {
+      toolName: 'Bash',
+      command: 'cp new-rule.md /home/node/.claude/projects/-workspace-hoa/memory/',
+    }],
     ['dd of= an authoring target', { toolName: 'Bash', command: 'dd if=notes.md of=TASKS.md' }],
     ['a wrapped shell mutation', { toolName: 'Bash', command: `bash -c "sed -i 's/a/b/' TASKS.md"` }],
   ]
@@ -187,6 +211,16 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
     ['cat on the archive', { toolName: 'Bash', command: 'cat docs/tasks-archive.md' }],
     ['sed WITHOUT -i on the work order (stdout only)', { toolName: 'Bash', command: "sed 's/x/y/' TASKS.md" }],
     ['a copy OUT of the target — the destination decides', { toolName: 'Bash', command: 'cp TASKS.md /tmp/tasks-backup.md' }],
+    // The directory-destination rule is ANCHORED to the repo's own trees (Sol
+    // round 7, finding 1): a foreign directory that merely CARRIES the name
+    // docs/memory is the backup direction the comment promises to keep open.
+    ['a copy-out into a FOREIGN docs directory', { toolName: 'Bash', command: 'cp TASKS.md /tmp/docs/' }],
+    ['a copy-out into a foreign memory directory', { toolName: 'Bash', command: 'cp TASKS.md /tmp/memory/' }],
+    ['a copy-out into a foreign docs directory, resolver present — the anchor still refuses it', {
+      toolName: 'Bash',
+      command: 'cp TASKS.md /tmp/docs/',
+      resolvePath: (p) => (p === 'docs' ? '/workspace/hoa/docs' : p.startsWith('/') ? p : null),
+    }],
     ['sed -i on repo CODE — finishing the step, not authoring', { toolName: 'Bash', command: "sed -i 's/x/y/' src/config/balance.ts" }],
     ['tee into a scratch file', { toolName: 'Bash', command: 'npm run lint | tee /tmp/lint-log.txt' }],
     ['node -e naming no fenced path', { toolName: 'Bash', command: 'node -e "console.log(process.version)"' }],
