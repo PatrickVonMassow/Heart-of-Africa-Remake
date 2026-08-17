@@ -529,12 +529,16 @@ describe('point 700 — the handover state cannot block the handover', () => {
     })
     const updated = toQueue(drifted, 700, { text: 'Zurückgestellt: Übergabe an den Nachfolger.', estimate: '~3 h' })
     expect([...parseQueuePoints(updated)]).toEqual([700, 701])
-    expect(updated).toContain('Zurückgestellt: Übergabe an den Nachfolger.')
-    expect(updated).toContain('~3 h')
-    expect(updated).not.toContain('~5 h')
-    expect(updated).not.toContain('Warum das ansteht.')
+    // Judged on the 700 CARD, not the document — the 701 fixture card shares
+    // the stub body, which must survive untouched.
+    const card700 = queueCard(updated, 700)
+    expect(card700).toContain('Zurückgestellt: Übergabe an den Nachfolger.')
+    expect(card700).toContain('~3 h')
+    expect(card700).not.toContain('~5 h')
+    expect(card700).not.toContain('Warum das ansteht.')
+    expect(queueCard(updated, 701)).toContain('Warum das ansteht.')
     // A partial update keeps the standing card's OTHER half.
-    const textOnly = toQueue(drifted, 700, { text: 'Nur neuer Text.' })
+    const textOnly = queueCard(toQueue(drifted, 700, { text: 'Nur neuer Text.' }), 700)
     expect(textOnly).toContain('Nur neuer Text.')
     expect(textOnly).toContain('~5 h')
     // …and the SECOND identical call throws: the move already happened, there
