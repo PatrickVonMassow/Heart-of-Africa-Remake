@@ -237,17 +237,21 @@ put it is the mistake this line exists to stop.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 705. The board is republished once per guard correction, instead of once at the end
-  (measured 17.08.2026, the cause behind the throttling that point 704 only survives). Reading
-  `board/board.html` from `raw.githubusercontent.com` answered HTTP 429 from inside the
-  container AND in the user's browser, so it is not the reader's address that is throttled — it
-  is the WRITE RATE: one session published about a dozen times in fifty minutes. That is not
-  carelessness but the design. `scripts/board.mjs` couples the card edit and the publish into
-  one step — its `edit()` applies the transform, rotates the archive and publishes — and there
-  is no edit-without-publish mode at all. The guard chain then multiplies it: `board-first-guard`,
-  `dashboard-guard`'s focus reconcile, `dashboard-conciseness-guard`, `dashboard-card-topic-guard`
-  and `queue-order-guard` each demanded a correction one after another, and every correction was
-  another publish of the whole board. Point 704 makes the READING side survive a refusal; this
-  point removes what causes it.
+  (measured 17.08.2026). One session published the whole board about a dozen times in fifty
+  minutes, and that is not carelessness but the design. `scripts/board.mjs` couples the card
+  edit and the publish into one step — its `edit()` applies the transform, rotates the archive
+  and publishes — and there is no edit-without-publish mode at all. The guard chain then
+  multiplies it: `board-first-guard`, `dashboard-guard`'s focus reconcile,
+  `dashboard-conciseness-guard`, `dashboard-card-topic-guard` and `queue-order-guard` each
+  demanded a correction one after another, and every correction was another publish plus another
+  commit on `refs/heads/board`.
+  WHAT THIS POINT IS NOT: it is not the cause of the HTTP 429 that took the board offline the
+  same day. That was measured separately and is a READ limit on `raw.githubusercontent.com`
+  covering the whole repository — `main/README.md` and `main/package.json`, which nobody
+  published, answered 429 in the same minute as `board/board.html`. Publishing pushes to
+  `github.com` and spends none of that quota. The reading side is point 704's subject; this
+  point stands on its own cost — a dozen full-board publishes per session, each one a commit,
+  a push and a model call in a context that is already large.
   FINAL STATE:
   - `board.mjs` gains a staged mode in which several card edits accumulate in the file and the
     publish is one explicit closing step. The one-shot form stays the default for a single edit,
@@ -290,6 +294,26 @@ put it is the mistake this line exists to stop.
   text of a board card.
   Bundle: Chat & Tafel.
 
+- [ ] 710. The remaining forty-five sequences of the multi-step analysis are worked into the
+  order, bundle-first (the blind-parallel stage of 17.08.2026, run on the user's instruction).
+  The union in `local/multistep-analysis-17-08/multistep-union.json` holds 57 accounted entries;
+  its six priority findings already resolve to points 700, 701, 705, 707 and 708, but 45 entries
+  named only by Sol's list stand nowhere in the work order, each with its own defect line — and
+  `local/` is git-ignored, so nothing but this point keeps them from rotting with the checkout.
+  FINAL STATE:
+  - Every union entry is either MAPPED to a standing point (named in the mapping), FILED into an
+    existing bundle per bundle-first (a new point only where no bundle fits), or REJECTED with a
+    one-line reason. The mapping is committed under `docs/` so it survives the checkout.
+  - The analysis artefacts (lists A and B and the union) move with it into the repository, since
+    they are now the evidence a committed mapping cites.
+  - Priority follows the user's instruction of 17.08.2026: process cleanup, redundant consumption
+    and session sizes first; nothing is filed as a feature point.
+  VERIFIABLE: the committed mapping accounts for all 57 ids — a Vitest case over the mapping file
+  checks the id set against the union and fails on an unaccounted entry.
+  Criticality: low — it is bookkeeping over an existing analysis, but losing it silently would
+  discard a paid-for four-eyes stage.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 709. A unit test passes or fails by how deeply the test runner happens to be nested
   (measured 17.08.2026, three reproductions in a row, after the same suite had been green
   twenty minutes earlier on the identical commit). `scripts/container-ask-guard-core.test.mjs`
@@ -324,26 +348,6 @@ put it is the mistake this line exists to stop.
   Criticality: medium — it is a gate that blocks correct work and passes incorrect work
   depending on who started it, and the red it produces names nothing that would lead anyone to
   the cause.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 710. The remaining forty-five sequences of the multi-step analysis are worked into the
-  order, bundle-first (the blind-parallel stage of 17.08.2026, run on the user's instruction).
-  The union in `local/multistep-analysis-17-08/multistep-union.json` holds 57 accounted entries;
-  its six priority findings already resolve to points 700, 701, 705, 707 and 708, but 45 entries
-  named only by Sol's list stand nowhere in the work order, each with its own defect line — and
-  `local/` is git-ignored, so nothing but this point keeps them from rotting with the checkout.
-  FINAL STATE:
-  - Every union entry is either MAPPED to a standing point (named in the mapping), FILED into an
-    existing bundle per bundle-first (a new point only where no bundle fits), or REJECTED with a
-    one-line reason. The mapping is committed under `docs/` so it survives the checkout.
-  - The analysis artefacts (lists A and B and the union) move with it into the repository, since
-    they are now the evidence a committed mapping cites.
-  - Priority follows the user's instruction of 17.08.2026: process cleanup, redundant consumption
-    and session sizes first; nothing is filed as a feature point.
-  VERIFIABLE: the committed mapping accounts for all 57 ids — a Vitest case over the mapping file
-  checks the id set against the union and fails on an unaccounted entry.
-  Criticality: low — it is bookkeeping over an existing analysis, but losing it silently would
-  discard a paid-for four-eyes stage.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 662. The context boundary must also fire without a tick (user 12.08.2026: "Außerdem ist
