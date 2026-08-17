@@ -605,7 +605,12 @@ export function assessTransfer({ items = [], headNow = null } = {}) {
     if (item?.kind === 'log' && item.run && typeof item.run.recordPath === 'string' && item.run.recordPath) {
       const run = item.run
       const describe = String(item.describe ?? 'log')
-      const receiptExists = run.hasReceipt === true || run.status === 'finished'
+      // A RECEIPT IS A RECEIPT (Sol review of 534c2ba): only `hasReceipt` —
+      // the probed existence of the receipt on the record itself — counts. A
+      // self-declared `status: 'finished'` never substitutes: the whole point
+      // of this bar is that the successor can READ the verdict, and a record
+      // stamped finished without its receipt offers nothing to read.
+      const receiptExists = run.hasReceipt === true
       const live = run.status === 'running' && run.alive === true
       if (!receiptExists && !live) {
         blockers.push({

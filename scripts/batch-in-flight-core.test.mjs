@@ -1954,6 +1954,16 @@ describe('assessTransfer — committed-and-pushed checkpoints decide transferabi
     expect(t.runs).toEqual([finished])
   })
 
+  it('a self-declared "finished" WITHOUT its receipt blocks — status never substitutes for the readable verdict', () => {
+    const unstamped = { ...run, status: 'finished', alive: false, hasReceipt: false }
+    const t = assessTransfer({ items: [logItem(unstamped)], headNow: HEAD_NOW })
+    expect(t.transferable).toBe(false)
+    expect(t.blockers[0].why).toContain('no receipt')
+    // …and an ABSENT hasReceipt field is the same absence of evidence.
+    const { hasReceipt: _drop, ...bare } = unstamped
+    expect(assessTransfer({ items: [logItem(bare)], headNow: HEAD_NOW }).transferable).toBe(false)
+  })
+
   it('a record still saying "running" over a DEAD pid blocks — the receipt would never arrive', () => {
     const t = assessTransfer({ items: [logItem({ ...run, alive: false })], headNow: HEAD_NOW })
     expect(t.transferable).toBe(false)
