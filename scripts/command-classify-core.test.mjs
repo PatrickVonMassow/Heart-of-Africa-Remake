@@ -18,9 +18,11 @@ import {
   isMutatingSegment,
   firstMutatingSegment,
   segmentInvokesScript,
+  segmentInvokesPathWhere,
   segmentMentionsFile,
   nestedCommands,
   expandSegments,
+  posixNormalizePath,
 } from './command-classify-core.mjs'
 
 describe('the lexer', () => {
@@ -348,6 +350,46 @@ describe('segmentInvokesScript', () => {
   it('is total on junk', () => {
     expect(segmentInvokesScript(null, ['x.mjs'])).toBe(false)
     expect(segmentInvokesScript('node x.mjs', null)).toBe(false)
+  })
+})
+
+describe('posixNormalizePath', () => {
+  it('resolves dot and parent segments, on both separators', () => {
+    expect(posixNormalizePath('scripts/./verify/world.mjs')).toBe('scripts/verify/world.mjs')
+    expect(posixNormalizePath('scripts/verify/../board-publish.mjs')).toBe('scripts/board-publish.mjs')
+    expect(posixNormalizePath('scripts\\foo\\..\\verify\\x.mjs')).toBe('scripts/verify/x.mjs')
+    expect(posixNormalizePath('/a//b/./c')).toBe('/a/b/c')
+  })
+  it('keeps a leading parent segment of a relative path, and clamps at an absolute root', () => {
+    expect(posixNormalizePath('../scripts/verify/x.mjs')).toBe('../scripts/verify/x.mjs')
+    expect(posixNormalizePath('/../a')).toBe('/a')
+    expect(posixNormalizePath('')).toBe('')
+  })
+})
+
+describe('segmentInvokesPathWhere — the INVOKED path, normalised', () => {
+  const underVerify = (p) => /(?:^|\/)scripts\/verify\//.test(p)
+  it('judges the script an interpreter runs, and the program word itself', () => {
+    expect(segmentInvokesPathWhere('node scripts/verify/world.mjs', underVerify)).toBe(true)
+    expect(segmentInvokesPathWhere('./scripts/verify/world.mjs --frames', underVerify)).toBe(true)
+  })
+  it('sees through a dot spelling, and through a `..` that leaves the tree', () => {
+    expect(segmentInvokesPathWhere('node scripts/./verify/world.mjs', underVerify)).toBe(true)
+    // …resolves to scripts/board-publish.mjs, which is NOT under the prefix.
+    expect(segmentInvokesPathWhere('node scripts/verify/../board-publish.mjs', underVerify)).toBe(false)
+  })
+  it('a matching path standing LATER is data, not an invocation', () => {
+    expect(segmentInvokesPathWhere('node tools/report.mjs scripts/verify/world.mjs', underVerify)).toBe(false)
+    expect(segmentInvokesPathWhere('grep -rn scripts/verify/world.mjs docs/', underVerify)).toBe(false)
+  })
+  it('flags before the script make it undecidable — then every word is judged (false-deny side)', () => {
+    expect(segmentInvokesPathWhere('node -r esm scripts/verify/world.mjs', underVerify)).toBe(true)
+    expect(segmentInvokesPathWhere('node --experimental-vm-modules tools/x.mjs', underVerify)).toBe(false)
+  })
+  it('is total on junk', () => {
+    expect(segmentInvokesPathWhere('', underVerify)).toBe(false)
+    expect(segmentInvokesPathWhere('node', underVerify)).toBe(false)
+    expect(segmentInvokesPathWhere('node x.mjs', null)).toBe(false)
   })
 })
 

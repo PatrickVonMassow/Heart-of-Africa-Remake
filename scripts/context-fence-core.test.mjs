@@ -47,6 +47,13 @@ describe('over the mark, a STARTING call is denied — naming the mark', () => {
     // scripts/verify/ path prefix, no suite list enumerated (Sol finding 4b).
     ['a direct suite call', { toolName: 'Bash', command: 'node scripts/verify/world.mjs' }],
     ['a direct suite call by absolute path', { toolName: 'Bash', command: 'node /workspace/hoa/scripts/verify/polish.mjs' }],
+    // The path is judged NORMALISED: a dot-spelled path is the same suite and
+    // must not evade the prefix (Sol round 3, finding 4b).
+    ['a dot-spelled suite call', { toolName: 'Bash', command: 'node scripts/./verify/world.mjs' }],
+    ['a suite call through a parent segment', { toolName: 'Bash', command: 'node scripts/foo/../verify/world.mjs' }],
+    // Flags before the script make the invoked word undecidable; every path
+    // word is judged then — the false-DENY direction, never an escape hatch.
+    ['a suite call behind an interpreter flag', { toolName: 'Bash', command: 'node -r esm scripts/verify/world.mjs' }],
     ['delegating to Sol', { toolName: 'Bash', command: 'node scripts/author-sol.mjs 701' }],
     ['a cross-vendor review run', { toolName: 'Bash', command: 'node scripts/review-sol.mjs --commit abc' }],
     ['a delegated ask run', { toolName: 'Bash', command: 'node scripts/ask-sol.mjs --kind audit --brief "x"' }],
@@ -104,6 +111,13 @@ describe('over the mark, FINISHING calls and reads stay allowed', () => {
     ['the board publish', { toolName: 'Bash', command: 'node scripts/board-publish.mjs' }],
     ['the boundary itself', { toolName: 'Bash', command: 'node scripts/batch-boundary.mjs --prepare --context' }],
     ['awaiting a running verify', { toolName: 'Bash', command: 'node scripts/verify/run-wait.mjs --await' }],
+    // The verify-path rule judges what is INVOKED, on the NORMALISED path
+    // (Sol round 3, finding 4b): a finishing script reached through the
+    // verify directory's spelling is a finisher, and a verify path handed to
+    // ANOTHER program is data, not an invocation.
+    ['a finishing script spelled through the verify dir', { toolName: 'Bash', command: 'node scripts/verify/../board-publish.mjs' }],
+    ['a finisher reached through a parent segment', { toolName: 'Bash', command: 'node scripts/verify/x/../run-wait.mjs --await' }],
+    ['a verify path passed as data to another script', { toolName: 'Bash', command: 'node tools/report.mjs scripts/verify/world.mjs' }],
     ['a build behind a value-taking npm option', { toolName: 'Bash', command: 'npm --prefix . run build' }],
     ['a build behind an option value no list names', { toolName: 'Bash', command: 'npm --loglevel warn run build' }],
     ['the fast gate behind a leading option', { toolName: 'Bash', command: 'npm --silent run test:unit' }],

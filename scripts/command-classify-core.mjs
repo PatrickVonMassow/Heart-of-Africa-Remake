@@ -652,23 +652,66 @@ export function segmentInvokesScript(segment, names = []) {
 }
 
 /**
- * Like `segmentInvokesScript`, but judged by a caller PREDICATE over the
- * slash-normalised path word — for a rule that hangs on a directory PREFIX
- * rather than an enumerable script name (the context fence's
- * `scripts/verify/` rule, point 700). Same interpreter guard, so a grep that
- * merely mentions such a path never matches.
+ * POSIX-normalise a path for CLASSIFICATION: backslashes to slashes, `.` and
+ * empty segments dropped, `..` resolved against the segment before it. A
+ * PREFIX rule must see the path the OS will resolve, not its spelling —
+ * `scripts/./verify/world.mjs` IS under scripts/verify/ and
+ * `scripts/verify/../board-publish.mjs` is NOT, and a lexical test got both
+ * wrong (Sol round 3, finding 4b). Pure string work, no filesystem.
+ */
+export function posixNormalizePath(path) {
+  const raw = String(path ?? '').replace(/\\/g, '/')
+  const abs = raw.startsWith('/')
+  const out = []
+  for (const seg of raw.split('/')) {
+    if (!seg || seg === '.') continue
+    if (seg === '..') {
+      if (out.length && out[out.length - 1] !== '..') {
+        out.pop()
+        continue
+      }
+      if (abs) continue // `/..` cannot climb above the root
+      out.push('..')
+      continue
+    }
+    out.push(seg)
+  }
+  return (abs ? '/' : '') + out.join('/')
+}
+
+/**
+ * Like `segmentInvokesScript`, but judged by a caller PREDICATE — for a rule
+ * that hangs on a directory PREFIX rather than an enumerable script name (the
+ * context fence's `scripts/verify/` rule, point 700). Two rules sharpen it
+ * beyond the interpreter guard (Sol round 3, finding 4b):
+ *   - The predicate sees the POSIX-NORMALISED path (`posixNormalizePath`), so
+ *     a dot-spelled path cannot evade a prefix nor a `..` path falsely match
+ *     one, and a finisher reached through `..` is still its basename.
+ *   - Only the path being INVOKED is judged: the program word itself, or the
+ *     FIRST non-flag argument after an interpreter. A matching path standing
+ *     LATER is an argument — data handed to another program, not an
+ *     invocation (`node tools/report.mjs scripts/verify/world.mjs`).
+ * EXCEPT when flags stand before the interpreter's first non-flag word: a
+ * detached flag value is indistinguishable from the script without every
+ * interpreter's option table, so there EVERY path word is judged — the
+ * false-DENY direction, chosen so `node -r esm scripts/verify/world.mjs`
+ * cannot slip an invocation past as ambiguity.
  */
 export function segmentInvokesPathWhere(segment, predicate) {
   const seg = asSegments(segment)[0]
   if (!seg || typeof predicate !== 'function') return false
   const matches = (text) => {
-    const p = String(text).replace(/\\/g, '/')
+    const p = String(text)
     if (/\s/.test(p)) return false // a whole quoted command line is judged unwrapped, not here
-    return predicate(p) === true
+    return predicate(posixNormalizePath(p)) === true
   }
   const head = commandHead(seg)
   if (!INTERPRETERS.has(head)) return matches(seg.words[0] ? seg.words[0].text : '')
-  return argsOf(seg).some((a) => matches(a.text))
+  const args = argsOf(seg)
+  const first = args.findIndex((a) => !a.text.startsWith('-'))
+  if (first === -1) return false
+  if (first === 0) return matches(args[0].text) // unambiguous: the script, then data
+  return args.some((a) => matches(a.text)) // flags in front → ambiguous → judge every word
 }
 
 /** Does this segment NAME one of these files as an argument? */

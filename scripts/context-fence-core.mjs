@@ -91,14 +91,19 @@ const CARRIER_SCRIPT = 'finding.mjs'
 const CARRIER_BASENAME = 'findings-carrier.md'
 
 /** Any `.mjs` under this prefix is the verify work itself (a suite or its
- *  launcher) — matched as a PREFIX so nothing is enumerated. */
+ *  launcher) — matched as a PREFIX so nothing is enumerated. The path it
+ *  tests arrives POSIX-NORMALISED from `segmentInvokesPathWhere` (Sol round
+ *  3, finding 4b): `scripts/./verify/world.mjs` matches, and
+ *  `scripts/verify/../board-publish.mjs` — which never runs verify work —
+ *  does not. */
 const VERIFY_PREFIX = /(?:^|\/)scripts\/verify\/[^\s]+\.mjs$/i
 
 /** The finishing helpers under that prefix, allowed by name: awaiting a
- *  receipt ends a step, it starts none. */
+ *  receipt ends a step, it starts none. Applied AFTER normalisation, so a
+ *  finisher reached through a `..` spelling is still the finisher. */
 const VERIFY_FINISHERS = new Set(['run-wait.mjs'])
 
-/** Does this path word name verify work that STARTS (not a finisher)? */
+/** Does this (normalised) path word name verify work that STARTS? */
 function startsVerifyPath(p) {
   if (!VERIFY_PREFIX.test(p)) return false
   const norm = p.toLowerCase()
