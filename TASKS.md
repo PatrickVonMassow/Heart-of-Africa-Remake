@@ -104,6 +104,15 @@ put it is the mistake this line exists to stop.
     the work moves to a fresh session immediately, and the target is fewer tokens PER POINT, not
     fewer per hour. A build of this that reduces throughput has missed the point; measure it
     against 701's per-point ledger, not against a rate.
+    FILING A POINT IS STARTING WORK, AND THE FENCE MUST SAY SO (user 17.08.2026, on this very
+    session: »Hättest du vor dem Start von 700 nicht auch an eine neue Session übergeben
+    können?« — yes, and that is the whole pattern). Writing a work-order point, a memory or a
+    retrospective section past the mark FEELS like bookkeeping and costs like work: this session
+    wrote three points and two documents after the watermark fired, each time judging "just this
+    one more". Past the mark a finding goes to the CARRIER — one line, one command, already built
+    for exactly this — and the successor writes the point in a cheap context. The fence therefore
+    denies authoring in the work order and the documents too, and its refusal names the carrier
+    as the way to keep the finding.
   - A RUNNING VERIFICATION IS TRANSFERABLE, so it is never a reason to stay: the run records what
     it is (suite, backend, log path, pid, the commit it covers) where a successor can adopt it,
     and `--prepare --context` accepts that instead of demanding a drain. The successor waits for
