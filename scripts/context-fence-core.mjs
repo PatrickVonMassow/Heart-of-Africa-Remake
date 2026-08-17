@@ -204,6 +204,10 @@ export function authoringTarget(filePath) {
   return null
 }
 
+/** The verify tree itself, as a directory — for the one constructed-escape
+ *  catch below (a link TARGETING it), matched on the normalised path. */
+const VERIFY_TREE = /(?:^|\/)scripts\/verify(?:\/|$)/i
+
 /** sed's in-place flag: `-i`, `-i.bak`, a cluster carrying it (`-ri`), or the
  *  long form. Without one, sed writes to stdout — a READ, and it stays one. */
 const inPlaceFlag = (t) => /^-[A-Za-z]*i/.test(t) || t === '--in-place' || t.startsWith('--in-place=')
@@ -302,6 +306,15 @@ function segmentStart(seg, resolvePath) {
   if (segmentInvokesPathWhere(seg, startsVerifyPath, { resolvePath })) {
     return { what: `starting a verify script directly (\`${seg.raw}\`)`, authoring: false }
   }
+  // A segment that CREATES a link into scripts/verify counts as starting a
+  // verify run itself (Sol round 6, finding B — the one cheap catch): `ln -s
+  // scripts/verify late-link` exists only to run the fenced work through a
+  // name the resolver cannot see yet (the link is unborn when it runs). This
+  // closes that literal construction; the CLASS of constructed escapes stays
+  // outside the fence's claim — see resolveThroughAncestors.
+  if (head === 'ln' && args.some((a) => !a.text.startsWith('-') && VERIFY_TREE.test(posixNormalizePath(a.text)))) {
+    return { what: `constructing a link into the verify tree (\`${seg.raw}\`)`, authoring: false }
+  }
   // Authoring by REDIRECTION — `echo "- [ ] 999. x" >> TASKS.md` writes the
   // work order without the Edit tool. Judged on the parsed redirect TARGET,
   // so a `>` inside a quoted argument never counts (that false deny is the
@@ -328,6 +341,22 @@ function segmentStart(seg, resolvePath) {
  * caller then judges the LEXICAL shape, which can still DENY but never
  * becomes an accept. Pure over the injected `realpath` — this core still
  * touches no disk; the guard passes `realpathSync`.
+ *
+ * THE BOUNDARY OF THIS CLAIM (ruled at Sol round 6). Resolution exists to see
+ * through links that ALREADY EXIST for ordinary reasons — not to defeat a
+ * session constructing an escape in the same command. Sol's `ln -s
+ * scripts/verify late-link && node late-link/world.mjs` beats the resolver
+ * (the link is unborn when the call is judged, so the lexical spelling
+ * outside scripts/verify is what gets judged), and `cp -r scripts/verify
+ * /tmp/x && node /tmp/x/world.mjs` is the same escape with no symlink in it:
+ * the class has no lexical closure. This fence binds a COOPERATING session
+ * against its own watermark; it is not a sandbox and cannot become one — a
+ * command built to run the fenced work through a fresh name has already
+ * decided to defeat its own fence. One cheap catch is taken (an `ln` whose
+ * TARGET lies under scripts/verify counts as starting a verify run —
+ * `segmentStart`), which closes the literal example; the copy-based
+ * constructed escape PASSES and is pinned by test as the intended limit,
+ * not an oversight.
  */
 export function resolveThroughAncestors(abs, { realpath } = {}) {
   if (typeof realpath !== 'function') return null

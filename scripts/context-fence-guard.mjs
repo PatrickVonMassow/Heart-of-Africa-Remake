@@ -56,6 +56,15 @@ const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
 // then denied — the false-DENY direction, one refusal against an escape
 // hatch. Fail-open means a guard BUG must not trap the session, not that
 // every refusal must be avoidable.
+// THE CLAIM IS BOUNDED (ruled at Sol round 6): resolution sees through links
+// that ALREADY EXIST for ordinary reasons; it does not defeat a session that
+// CONSTRUCTS an escape in the guarded command itself (`ln -s scripts/verify
+// late-link && node late-link/world.mjs` — the link is unborn when judged,
+// and the copy-based variant needs no link at all). The fence binds a
+// cooperating session against its own watermark; it is not a sandbox. The one
+// cheap catch — an `ln` targeting scripts/verify counts as starting a verify
+// run — lives in the core; the rest of the class is pinned as the intended
+// limit (see resolveThroughAncestors in context-fence-core.mjs).
 // KNOWN, BOUNDED LIMIT: paths resolve relative to REPO_ROOT. A `cd` earlier
 // in the same command changes the base a relative word really resolves
 // against, so a symlink reached only through that cd is missed; fixing it

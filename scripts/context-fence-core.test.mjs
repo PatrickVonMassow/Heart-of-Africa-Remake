@@ -369,3 +369,46 @@ describe('a resolver failure falls back to the lexical spelling — INTENDED fal
   })
 })
 
+describe("the fence's claim is BOUNDED — a constructed escape is outside it (ruled, Sol round 6)", () => {
+  // Path resolution exists to see through links that ALREADY EXIST for
+  // ordinary reasons; the fence binds a COOPERATING session against its own
+  // watermark, it is not a sandbox. The realistic resolver below is what the
+  // guard's ancestor walk sees BEFORE the constructed name exists: only the
+  // repo root resolves, so the fresh spelling is judged lexically.
+  const preConstructionResolver = (p) =>
+    resolveThroughAncestors(p.startsWith('/') ? p : `/workspace/hoa/${p}`, {
+      realpath: (abs) => {
+        if (abs === '/workspace/hoa') return '/workspace/hoa'
+        throw Object.assign(new Error(`ENOENT: ${abs}`), { code: 'ENOENT' })
+      },
+    })
+
+  it("denies Sol's literal example — an `ln -s` TARGETING scripts/verify counts as starting a verify run (the one cheap catch)", () => {
+    const v = decide({
+      toolName: 'Bash',
+      command: 'ln -s scripts/verify late-link && node late-link/world.mjs',
+      resolvePath: preConstructionResolver,
+    })
+    expect(v.block).toBe(true)
+    expect(v.reason).toContain('link into the verify tree')
+  })
+
+  it('denies the bare link construction on its own, dot-spellings included', () => {
+    expect(decide({ toolName: 'Bash', command: 'ln -s scripts/verify late-link' }).block).toBe(true)
+    expect(decide({ toolName: 'Bash', command: 'ln -s ./scripts/./verify late-link' }).block).toBe(true)
+  })
+
+  it('INTENDED LIMIT, not an oversight: the copy-based constructed escape PASSES — the class has no lexical closure and the fence is not a sandbox', () => {
+    const v = decide({
+      toolName: 'Bash',
+      command: 'cp -r scripts/verify /tmp/x && node /tmp/x/world.mjs',
+      resolvePath: preConstructionResolver,
+    })
+    expect(v.block).toBe(false)
+  })
+
+  it('an ln that has nothing to do with the verify tree stays allowed', () => {
+    expect(decide({ toolName: 'Bash', command: 'ln -s ../hoa/docs docs-link' }).block).toBe(false)
+    expect(decide({ toolName: 'Bash', command: 'ln -s scripts/verify-tools tools-link' }).block).toBe(false)
+  })
+})
