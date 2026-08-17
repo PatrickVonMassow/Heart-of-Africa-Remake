@@ -364,7 +364,22 @@ How it works:
    (`scripts/context-watermark.mjs`, read from the session's own transcript — an
    unobtainable reading fails loudly, never silently) the guard demands the same
    two-phase handover with `--context` in place of a point, and the board card
-   names the watermark as the reason.
+   names the watermark as the reason. Since point 700 the watermark BINDS during
+   the turn, not only at its end: a PreToolUse fence
+   (`scripts/context-fence-guard.mjs`, pure core `context-fence-core.mjs`)
+   measures the owner's context on every state-changing call and DENIES the
+   ones that would START a new unit of work past the mark — spawning a
+   delegated agent, starting a browser verify run (`npm test`, `test:small`,
+   `test:large`, `run-all`/`run-logged`), delegating an author, and AUTHORING a
+   work-order point, a memory or a doc section, whose refusal names the
+   findings CARRIER (`node scripts/finding.mjs --record …`) as the way to keep
+   a finding cheaply. Everything that FINISHES the step in flight — commits,
+   pushes, the landing, the board, the boundary bookkeeping, the fast
+   build/lint/unit gates — and every read passes untouched, so the fence ends a
+   session and never idles one; it stands down for a non-owner, a paused batch
+   and a worktree-isolated agent (whose calls carry the parent's session id
+   while its own context is small), and it fails OPEN on an unreadable
+   measurement — a fence may end a session early at worst, never trap one.
 2. At the turn end `batch-progress-guard` re-judges the claim itself — the marker
    is a claim, not proof. It ALLOWS the stop only when the point is closed per
    `TASKS.md` + `docs/tasks-archive.md` (or the marker records a real watermark
