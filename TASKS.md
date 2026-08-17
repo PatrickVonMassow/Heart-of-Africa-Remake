@@ -273,7 +273,7 @@ put it is the mistake this line exists to stop.
   failure is invisible to the session that causes it.
   Bundle: Chat & Tafel.
 
-- [ ] 706. A queue command swallows the text behind a flag and still reports success
+- [ ] 706. The queue commands lose the card text one way and re-write a blocked one the other
   (measured 17.08.2026 against the code and the stored state, while filing points). `parseSetArgs`
   in `scripts/board-queue-core.mjs` treats `--title`/`--estimate` as a MODE switch and pushes every
   following argument into THAT bucket (`buckets[field].push(a)`). So `set 702 --estimate "~2 h"
@@ -287,9 +287,16 @@ put it is the mistake this line exists to stop.
     of dropped: text after `--estimate` that does not read as a duration aborts and names the right
     order. The same holds for `--title` followed by more than a title.
   - The success line names EVERY field it set, so a missing one is visible in the output.
+  - The REBUILD does not write a card the card guard then blocks. Measured 17.08.2026: a queue
+    rebuild regenerates every card body from the work-order spec, and a spec that names another
+    point therefore lands in the card verbatim — `dashboard-card-topic-guard` blocked the turn end
+    on a cross-point sentence the rebuild had just written, and the hand-fix in the board file
+    survives only until the next rebuild. The generator strips or rewrites the cross-point passage
+    the way the guard demands, so a rebuilt board is publishable without a hand pass.
   VERIFIABLE: Vitest over `parseSetArgs` with exactly this call — the mixed form refused with the
   correct order named, the well-formed three-field call accepted, and the success line listing each
-  field it wrote.
+  field it wrote; plus a case that renders a spec naming another point and asserts the generated
+  card body passes the card-topic rule.
   Criticality: low — one command's argument handling, but it silently discards the user-visible
   text of a board card.
   Bundle: Chat & Tafel.
