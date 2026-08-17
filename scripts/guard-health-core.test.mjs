@@ -287,6 +287,13 @@ describe('auditHookAnchoring — can it fire from ANY working directory', () => 
     expect(refAnchoring('scripts/a.mjs')).toBe('relative')
     expect(refAnchoring('$CLAUDE_PROJECT_DIR/scripts/a.mjs')).toBe('project-dir')
     expect(refAnchoring('/srv/hoa/scripts/a.mjs')).toBe('absolute')
+    // The DEFAULTED form is anchored: set, it is the anchored path; unset, it
+    // degrades to the relative one, which is never worse than the bare form's
+    // `/scripts/a.mjs` (that resolves nowhere from any cwd).
+    expect(refAnchoring('${CLAUDE_PROJECT_DIR:-.}/scripts/a.mjs')).toBe('project-dir')
+    expect(refAnchoring('${CLAUDE_PROJECT_DIR:-/srv/hoa}/scripts/a.mjs')).toBe('project-dir')
+    // …but a MALFORMED default is not: the substitution itself would fail.
+    expect(refAnchoring('${CLAUDE_PROJECT_DIR:-./scripts/a.mjs')).toBe('relative')
     expect(anchorCommand('node /srv/hoa/scripts/a.mjs')).toBe('node /srv/hoa/scripts/a.mjs')
     expect(anchorCommand('node scripts/a.mjs')).toBe('node "$CLAUDE_PROJECT_DIR/scripts/a.mjs"')
   })

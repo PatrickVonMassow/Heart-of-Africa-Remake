@@ -540,35 +540,37 @@ put it is the mistake this line exists to stop.
   the four-eyes rule the whole model policy rests on is only worth what its records cover.
   Bundle: unbundled (review tooling).
 
-- [ ] 715. The wiring check condemns one relative hook path and certifies thirty-nine identical ones
-  (measured 18.08.2026 by counting `.claude/settings.json`; found by GPT-5.6 Sol reviewing the
-  anchoring commit 91cf64eb, then confirmed here). 39 hook entries stand as `node scripts/<x>.mjs` —
-  cwd-RELATIVE — and exactly 2 are anchored through `CLAUDE_PROJECT_DIR`. `guard-health-guard`
-  flagged the ONE newly wired hook (`rule-echo-guard`) for precisely this, in its own words: a
-  session whose working directory is not the repository root gets a non-blocking `Cannot find
-  module`, so the hook is SILENTLY DEAD while its rule still counts as covered. After that one entry
-  was anchored the check reports `OK (40 Durchsetzer, alle verdrahtet und geprüft)` — while 39
-  enforcers carry the defect it had just called fatal. So the check does not test the rule it states:
-  it condemns the newest entry and grandfathers every standing one, which is the worst shape a health
-  check can take, because its OK is read as "all 40 are sound". SECOND, from the same review and also
-  confirmed: the anchored form ITSELF fails silently when `CLAUDE_PROJECT_DIR` is unset — it expands
-  to `/scripts/rule-echo-guard.mjs`, which resolves nowhere, and enforcement disappears exactly as
-  before. Anchoring alone is therefore not the fix.
+- [ ] 715. The staged rewiring of the hook paths is finished, and the check accepts the defaulted
+  anchor (measured 18.08.2026 against `scripts/guard-health-core.mjs` and `.claude/settings.json`).
+  39 of the 41 hook entries stand as `node scripts/<x>.mjs` — cwd-relative — so a session whose
+  working directory is not the repository root gets a non-blocking `Cannot find module` and the hook
+  is silently dead while its rule still counts as covered.
+  WHAT THIS IS NOT, recorded because I first filed it as one: this is NOT a check that certifies what
+  it condemns. `RELATIVE_WIRING_ROLLOUT` in `guard-health-core.mjs` records every one of those 39 as
+  the deliberate, staged rollout of point 438 — `.claude/settings.json` is a protected path, so each
+  line is rewired by an ATTENDED session, the pilot (`lock-heartbeat-hook`) first and verified from a
+  cwd outside the repo root, and a name leaves the list in the SAME commit that anchors its line. A
+  newly wired hook that is neither anchored nor recorded is reported at once, which is exactly what
+  happened to `rule-echo-guard`. So `guard-health`'s OK is honest, and what remains is not a blind
+  check but an UNFINISHED rollout plus one gap in what the check recognises. I had confirmed Sol's
+  count of 39 and inferred its conclusion without reading the rollout record — the count was right
+  and the reading was wrong.
   FINAL STATE:
-  - EVERY hook command in `.claude/settings.json` is anchored, not only the newest.
-  - `guard-health` judges EVERY entry by the rule it states, so its OK means all of them are sound,
-    and a STANDING violation is reported as loudly as a new one. A check that grandfathers what
-    already exists is what this project calls a guard that cannot fire.
-  - The anchoring form survives an unset variable: it either falls back to a path that still
-    resolves or FAILS LOUDLY — never to a non-existent absolute path that disarms the hook in
-    silence.
-  VERIFIABLE: Vitest per half — a settings file with one relative entry among anchored ones is
-  reported (not passed), the reported count matches the entries actually judged, and an unset
-  `CLAUDE_PROJECT_DIR` does not silently disarm a hook but produces a loud failure.
-  NOTE ON EXECUTION: `.claude/settings.json` is a protected path whose edits prompt, so the wiring
-  half needs an attended session; the check's own rule and the unset-variable behaviour do not.
-  Criticality: high — it is the class the whole Stop chain rests on, and the check meant to detect it
-  currently certifies it.
+  - The rollout is CARRIED TO ITS END: every hook line is anchored and `RELATIVE_WIRING_ROLLOUT` is
+    empty, each removal in the same commit as its anchoring, in the attended sessions the record
+    itself prescribes. Until then the list stays the honest statement of what is left.
+  - The DEFAULTED anchor form is recognised as anchored — `${CLAUDE_PROJECT_DIR:-.}/scripts/x.mjs`,
+    which is the anchored path when the variable is set and degrades to the relative one when it is
+    not, never worse than the bare form (whose unset expansion `/scripts/x.mjs` resolves nowhere from
+    any cwd). DONE 18.08.2026 in `refAnchoring`, with the malformed-default case pinned as relative.
+  VERIFIABLE: Vitest — a settings file with one unrecorded relative entry among anchored ones is
+  reported; a name left in the rollout after its line was anchored is reported as a stale record; the
+  defaulted form counts as anchored and a malformed default does not; and `RELATIVE_WIRING_ROLLOUT`
+  being empty leaves the audit clean.
+  NOTE ON EXECUTION: `.claude/settings.json` is a protected path whose edits prompt, so the remaining
+  rewiring needs attended sessions and cannot be delegated to a headless batch run.
+  Criticality: medium — the rollout is recorded and progressing, so nothing is silently uncovered;
+  what is left is finishing it, not repairing a blind check.
   Bundle: unbundled (guard hygiene).
 
 - [ ] 662. The context boundary must also fire without a tick (user 12.08.2026: "Außerdem ist

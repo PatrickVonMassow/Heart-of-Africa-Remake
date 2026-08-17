@@ -150,6 +150,14 @@ export function refAnchoring(ref) {
   // The braces must MATCH: `"${CLAUDE_PROJECT_DIR/scripts/x.mjs"` is a bad
   // substitution at runtime, and an independently optional `{`/`}` cleared it.
   if (/^(\$CLAUDE_PROJECT_DIR|\$\{CLAUDE_PROJECT_DIR\}|%CLAUDE_PROJECT_DIR%)[/\\]/.test(text)) return 'project-dir'
+  // THE DEFAULTED FORM COUNTS TOO: `${CLAUDE_PROJECT_DIR:-.}/scripts/x.mjs`.
+  // With the variable set it is exactly the anchored form; unset, it degrades to
+  // the relative path — which is what the bare form does anyway, only louder
+  // (`$CLAUDE_PROJECT_DIR` unset expands to `/scripts/x.mjs`, resolving nowhere
+  // from any cwd). So the default is never WORSE and is right whenever the cwd
+  // happens to be the repo root. Judged here rather than left to the rollout
+  // list, because a line written in this form is not an unfinished one.
+  if (/^\$\{CLAUDE_PROJECT_DIR:-[^}]*\}[/\\]/.test(text)) return 'project-dir'
   if (/^([A-Za-z]:[/\\]|[/\\])/.test(text)) return 'absolute'
   return 'relative'
 }
