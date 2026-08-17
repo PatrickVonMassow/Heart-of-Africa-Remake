@@ -53,6 +53,7 @@ import {
   transitionOwnerSession,
   validTransitionSessionId,
   ourClaudeProcess,
+  findClaudeAncestor,
   statePathsFor,
   LOCK_PATH,
   BOUNDARY_LOG_PATH,
@@ -63,6 +64,7 @@ import {
   PARALLEL_ALERT_PATH,
   DOCTOR_STATE_PATH,
   ANCESTOR_CACHE_PATH,
+  CLAUDE_ANCESTOR_HOPS,
   DEAD_CONFIRM_MS,
   LEGACY_STALE_MS,
   PARALLEL_FRESH_MS,
@@ -1548,6 +1550,28 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     acquire('s1', opts())
     expect(acquire('s2', opts())).toBe('held')
     expect(readOwnerLock(lockPath).sessionId).toBe('s1')
+  })
+
+  it('findClaudeAncestor inspects ten parents, never an eleventh', () => {
+    const names = new Map(Array.from({ length: 11 }, (_, i) => [100 + i, 'node']))
+    const readProcFileFn = (path) => {
+      const pid = Number(path.split('/')[2])
+      if (path.endsWith('/comm')) return `${names.get(pid)}\n`
+      return `${pid} (node) S ${pid + 1}`
+    }
+    const options = {
+      platform: 'linux',
+      parentPid: 100,
+      readProcFileFn,
+      processStartTimeFn: () => NOW,
+    }
+
+    expect(CLAUDE_ANCESTOR_HOPS).toBe(10)
+    names.set(109, 'claude')
+    expect(findClaudeAncestor(options)).toEqual({ pid: 109, startedAt: NOW })
+    names.set(109, 'node')
+    names.set(110, 'claude')
+    expect(findClaudeAncestor(options)).toBe(null)
   })
 
   it('ourClaudeProcess memoises the walk, and re-validates a cached pid', () => {

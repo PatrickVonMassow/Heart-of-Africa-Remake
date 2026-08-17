@@ -254,6 +254,12 @@ describe('tasks-spec-guard', () => {
     expectHookAgrees('tasks-spec-guard.mjs', 'tasks-spec-guard', { blocks: false })
   })
 
+  it('BLOCKS on a newly written uppercase title and gives the replacement', () => {
+    write('TASKS.md', '# TASKS\n\n## Checklist\n\n- [ ] 2. THIS TITLE SHOUTS\n  Final-state body.\n')
+    const hook = expectHookAgrees('tasks-spec-guard.mjs', 'tasks-spec-guard', { blocks: true })
+    expect(hook.decision.reason).toContain('2: "This title shouts"')
+  })
+
   it('stands down silently while the batch is paused', () => {
     write('TASKS.md', '# TASKS\n\n## Checklist\n\n- [ ] 2. This point was originally specified differently.\n')
     write('.claude/batch-paused', 'test')

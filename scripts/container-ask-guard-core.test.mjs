@@ -425,6 +425,18 @@ describe('the exemption ladder, rung by rung', () => {
   })
 })
 
+// Unit-layer process-ancestry sweep (17.08.2026), recorded where the one
+// environment-dependent case lived:
+// - container-ask-guard-core.test.mjs: the real wrapper case below now injects
+//   its owner; it asserts the wrapper's lock/alert behaviour, not its launcher.
+// - batch-singleton-core.test.mjs: its real children test atomic lock races;
+//   its process-identity cases supply `ancestor` or `findAncestorFn`.
+// - verify/machine-load.test.mjs: "covers self, its children and its ancestor
+//   chain" uses a synthetic process table and launches no process.
+// - local-bin.test.mjs: `ancestors` means filesystem paths; its real spawns do
+//   not assert cwd depth or a process parent chain.
+// No other unit test both launches a real process and asserts process ancestry,
+// cwd depth, or the parent chain.
 describe('the wrapper (spawned the way the hook spawns it)', () => {
   const guard = resolve(process.cwd(), 'scripts', 'container-ask-guard.mjs')
   const run = (args, input) =>
@@ -452,7 +464,7 @@ describe('the wrapper (spawned the way the hook spawns it)', () => {
     expect(r.stdout.trim()).toBe('')
   })
 
-  it('a real guard under matching ancestry cannot restamp its asserted test id or raise an alert', () => {
+  it('a real guard under injected matching ancestry cannot restamp its asserted test id or raise an alert', () => {
     const dir = mkdtempSync(resolve(tmpdir(), 'container-ask-lock-'))
     const lockPath = resolve(dir, 'batch-lock.json')
     const singletonUrl = pathToFileURL(resolve(process.cwd(), 'scripts', 'batch-singleton.mjs')).href
@@ -461,7 +473,6 @@ describe('the wrapper (spawned the way the hook spawns it)', () => {
       import { dirname, resolve } from 'node:path'
       import { spawnSync } from 'node:child_process'
       const singleton = await import(${JSON.stringify(singletonUrl)})
-      process.title = 'claude'
       const now = Date.now()
       const startedAt = singleton.processStartTime(process.pid)
       const lockPath = ${JSON.stringify(lockPath)}
@@ -481,18 +492,20 @@ describe('the wrapper (spawned the way the hook spawns it)', () => {
       const child = spawnSync(process.execPath, [${JSON.stringify(guard)}], {
         encoding: 'utf8',
         input: JSON.stringify({ session_id: 'x', hook_event_name: 'Stop' }),
-        env: { ...process.env, VITEST: 'true', HOA_TEST_BATCH_LOCK_PATH: lockPath },
+        env: {
+          ...process.env,
+          VITEST: 'true',
+          HOA_TEST_BATCH_LOCK_PATH: lockPath,
+          HOA_TEST_BATCH_ANCESTOR: JSON.stringify({ pid: process.pid, startedAt }),
+        },
       })
       const after = readFileSync(lockPath, 'utf8')
-      const cachePath = resolve(dirname(lockPath), 'session-process.json')
-      const cache = existsSync(cachePath) ? JSON.parse(readFileSync(cachePath, 'utf8')) : {}
       console.log(JSON.stringify({
         status: child.status,
         stdout: child.stdout,
         stderr: child.stderr,
         unchanged: after === before,
         alert: existsSync(resolve(dirname(lockPath), 'parallel-alert.json')),
-        matchedAncestorPid: cache.x?.pid === process.pid,
       }))
     `
     try {
@@ -508,7 +521,6 @@ describe('the wrapper (spawned the way the hook spawns it)', () => {
         stderr: '',
         unchanged: true,
         alert: false,
-        matchedAncestorPid: true,
       })
     } finally {
       rmSync(dir, { recursive: true, force: true })

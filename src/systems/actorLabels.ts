@@ -77,17 +77,38 @@ export interface ActorCandidate {
    * one — that is the rule which keeps it from leaking an undiscovered name.
    */
   mapPoint?: boolean
+  /**
+   * This thing already carries a PERMANENT label of its own — one its scene
+   * draws whether the key is held or not (a pitched camp says "Camp" at all
+   * times). Naming it again stacks two identical boxes over one object, which
+   * reads as a defect rather than as an aid. Stated once here as a rule about
+   * permanent labels, so it holds whoever draws them: the village elder, whose
+   * own standing name showed the same doubling first, is simply left unmarked;
+   * this flag is for an object that must STAY in the roster for the layer's
+   * other readers.
+   */
+  permanentLabel?: boolean
+  /**
+   * Part of the TRAVELLER'S OWN outfit — the canoe he rides, or drags behind
+   * him over land. The layer's promise is "what am I looking at", and the
+   * player's own vehicle is not that. The same canoe SET DOWN in the world
+   * carries no such flag and keeps its name.
+   */
+  ownedByPlayer?: boolean
 }
 
 /**
  * Can this thing MOVE, or can the player DO something with it? That is the
  * whole test (§17.8) — and it is answered by the roster above rather than by a
  * guess, so a plant, a rock, a house wall or a horizon silhouette simply is not
- * on it.
+ * on it. The flags then take out what the roster alone cannot see: a name
+ * already standing in the picture, and the player's own gear.
  */
 export function qualifiesAsActor(c: ActorCandidate): boolean {
   if (c.mapPoint === true) return false
   if (c.concealed === true) return false
+  if (c.permanentLabel === true) return false
+  if (c.ownedByPlayer === true) return false
   return ACTOR_KIND_SET.has(c.kind)
 }
 
@@ -134,6 +155,59 @@ export interface Positioned {
   x: number
   y: number
   z: number
+}
+
+/** One label box as it would stand in the picture, in CSS pixels: the centre it
+ *  is drawn around, its measured size, and how far its subject is from the
+ *  camera. */
+export interface ScreenLabel {
+  x: number
+  y: number
+  width: number
+  height: number
+  /** Camera distance — the NEARER label keeps its place. */
+  depth: number
+}
+
+/** Clear space demanded between two boxes, in CSS pixels. */
+const LABEL_GAP = 3
+/** How many line-steps a box may rise before it is dropped instead. Three keeps
+ *  the highest label still plainly over its own subject; beyond that the label
+ *  starts to point at the wrong figure, which is worse than saying nothing. */
+const MAX_LIFT_STEPS = 3
+
+/**
+ * Keep two labels from fusing into one unreadable box. Returns, per label, how
+ * far UP it must be drawn (0 = where it sits), or null when it must be dropped.
+ *
+ * Nearest first, so the subject the player is closest to keeps its place and a
+ * further one yields: first by rising a line — which keeps it over its own
+ * figure — and only when even the top step is taken by dropping out entirely.
+ * The measured picture is the reason (point 628): two villagers standing close
+ * printed "Villager llager" and "Villa Villager", each label correct and the
+ * pair unreadable, while every DOM check went on passing.
+ */
+export function declutterLabels(labels: readonly ScreenLabel[]): (number | null)[] {
+  const lifts: (number | null)[] = labels.map(() => null)
+  const placed: ScreenLabel[] = []
+  const order = labels.map((_, i) => i).sort((a, b) => labels[a].depth - labels[b].depth)
+  for (const i of order) {
+    const label = labels[i]
+    const step = label.height + LABEL_GAP
+    for (let s = 0; s <= MAX_LIFT_STEPS; s++) {
+      const y = label.y - s * step
+      const clash = placed.some(
+        (p) =>
+          Math.abs(p.x - label.x) < (p.width + label.width) / 2 + LABEL_GAP &&
+          Math.abs(p.y - y) < (p.height + label.height) / 2 + LABEL_GAP,
+      )
+      if (clash) continue
+      placed.push({ ...label, y })
+      lifts[i] = s * step
+      break
+    }
+  }
+  return lifts
 }
 
 /**

@@ -528,6 +528,209 @@ export function isAncestor(ancestorSha, sha, { cwd = REPO_ROOT } = {}) {
   }
 }
 
+/** The full command line of `pid`, or null when it cannot be read. Linux/WSL
+ *  reads /proc (NUL-separated argv); Windows asks CIM. Null means UNKNOWN,
+ *  never "not it" — the caller decides what unknown identity is worth.
+ *  MIRRORED by `selfCommandLine` in scripts/verify/run-record.mjs (the record
+ *  writer's own reading, kept as evidence beside the pid): the two must
+ *  present a process identically or the recorded evidence stops matching
+ *  what a live probe would see — change them together. A static
+ *  import either way is off the table: scripts/verify/ is deliberately absent
+ *  from the temp copies the spawned guard tests run in (see runRecordFor). */
+export function processCommandOf(pid) {
+  const n = Number(pid)
+  if (!Number.isInteger(n) || n <= 0) return null
+  if (process.platform !== 'win32') {
+    try {
+      const raw = readFileSync(`/proc/${n}/cmdline`, 'utf8')
+      const cmd = raw.split('\0').filter(Boolean).join(' ').trim()
+      return cmd || null
+    } catch {
+      return null
+    }
+  }
+  try {
+    const out = execFileSync(
+      'powershell',
+      ['-NoProfile', '-Command', `(Get-CimInstance Win32_Process -Filter "ProcessId=${n}").CommandLine`],
+      { windowsHide: true, encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim()
+    return out || null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Does this command line say it IS the process a run record describes? PURE,
+ * so the identity rule is pinned without a process table.
+ *
+ * A wrapper NAME identifies only the program, never the RUN: a recycled pid
+ * running `run-logged.mjs polish` satisfied a record for `world`, and `node
+ * unrelated.mjs run-logged.mjs` passed because every argv word was scanned
+ * (Sol round 3, finding 2). Identity is therefore the RECORD's own, in two
+ * gates:
+ *   1. Cheap first gate: the INVOKED script must be run-logged.mjs — the
+ *      first non-flag word after the interpreter, or the program word itself
+ *      when the script runs directly. A process merely HANDED the name as a
+ *      later argument is not the wrapper. Program names are CASE-FOLDED here
+ *      (a Windows spelling is still the program).
+ *   2. The RECORDED LOG PATH must stand as the VALUE of `--log-file` —
+ *      detached (`--log-file <path>`) or attached (`--log-file=<path>`).
+ *      Every RUNNING wrapper's argv carries it there: a `--log-file` launch
+ *      by hand, the default launch by RE-EXEC (run-logged.mjs). Anywhere
+ *      else in argv the path is an OPERAND, not the run — `run-logged.mjs
+ *      --show <log>` is a READER of the recorded log, and gate 1 alone only
+ *      proves "some run-logged.mjs process" (Sol round 5; a plain
+ *      any-word scan stood here and read the reader as alive). A verbatim
+ *      command-line equality stood here even earlier and was an accepted
+ *      break (Sol round 4): a bare default argv is not an identity.
+ *      The path compare is CASE-SENSITIVE: on POSIX `x.log` and `X.log` are
+ *      two files, and folding them conflated two runs (Sol round 5). Only
+ *      separators are normalised (`\` → `/`), matching the record's own
+ *      display form.
+ * ARGV BOUNDARIES: the probed command line is read space-joined from /proc,
+ * so a log path CONTAINING whitespace has no recoverable spelling here. Such
+ * a candidate DENIES outright rather than being matched piecewise (Sol round
+ * 5) — the repo's own log paths carry no spaces, and the false-DENY side is
+ * the rule this whole function follows: one refused transfer and a re-run,
+ * never a mis-read identity.
+ * A caller that can supply NO identity gets false, never a lenient true: the
+ * false-DENY side costs one refused transfer and a re-run, while a stranger
+ * process adopted as the run costs a receipt that never arrives.
+ */
+export function commandNamesRun(command, { logPaths = [] } = {}) {
+  const words = String(command ?? '')
+    .replace(/\\/g, '/')
+    .split(/\s+/)
+    .filter(Boolean)
+  if (words.length === 0) return false
+  const isScript = (w) => {
+    const l = w.toLowerCase()
+    return l === 'run-logged.mjs' || l.endsWith('/run-logged.mjs')
+  }
+  const w0 = words[0].toLowerCase()
+  const prog = w0.slice(w0.lastIndexOf('/') + 1).replace(/\.(exe|cmd|bat)$/, '')
+  if (['node', 'nodejs', 'bun', 'deno', 'tsx'].includes(prog)) {
+    // The invoked script is the first non-flag word. A detached interpreter
+    // flag value (`node -r esm run-logged.mjs`) would misread here — that
+    // launch shape does not exist for the wrapper, and the miss DENIES.
+    const invoked = words.slice(1).find((w) => !w.startsWith('-'))
+    if (!invoked || !isScript(invoked)) return false
+  } else if (!isScript(words[0])) {
+    return false
+  }
+  const candidates = (Array.isArray(logPaths) ? logPaths : [logPaths])
+    .map((p) => String(p ?? '').replace(/\\/g, '/').trim())
+    .filter(Boolean)
+  if (candidates.length === 0 || candidates.some((c) => /\s/.test(c))) return false
+  for (let i = 0; i < words.length; i++) {
+    if (words[i] === '--log-file' && words[i + 1] !== undefined && candidates.includes(words[i + 1])) return true
+    if (words[i].startsWith('--log-file=') && candidates.includes(words[i].slice('--log-file='.length))) return true
+  }
+  return false
+}
+
+/**
+ * THE RUN RECORD BESIDE A DECLARED LOG (point 700), reduced to what a successor
+ * needs to adopt the run: what it is (suites, backends), what it covers (HEAD),
+ * what proves it (pid, log) and where its receipt lands (`recordPath` — the
+ * same file, stamped `finished` with the receipt by run-logged.mjs). Null when
+ * no record can be read: a bare log proves nothing and stays non-transferable.
+ * `read` is injectable so the reduction is pinned without a disk.
+ *
+ * The `<log>.run.json` pairing repeats run-record.mjs's `recordPathFor` rather
+ * than importing it: scripts/verify/ is deliberately absent from the temp
+ * copies the spawned guard tests run in, and batch-progress-guard imports this
+ * module — a static import would take every one of those guards down.
+ *
+ * `alive` and `hasReceipt` ride along because the transfer bar demands them
+ * (Sol review of d0aebb6, finding 2): the pid is PROBED here, not believed,
+ * and the receipt's existence is read off the record itself.
+ *
+ * EXISTENCE IS NOT IDENTITY (Sol review of 534c2ba): a signal-0 probe alone
+ * would read a RECYCLED pid — any stranger process that inherited the number
+ * after the wrapper died — as a live run, and the successor would await a
+ * receipt that never arrives. Identity is judged on the process's COMMAND
+ * LINE against the RECORD's own LOG PATH standing as the `--log-file` VALUE
+ * (`commandNamesRun`, Sol rounds 3/5): every RUNNING wrapper's argv carries
+ * it there — a `--log-file` launch by hand, the default launch by RE-EXEC
+ * (run-logged.mjs) — while a `--show` READER of the same log does not, and
+ * must not read as the run. NOT a verbatim command-line
+ * equality: that stood here and broke (Sol round 4) — a recycled pid
+ * re-running the identical bare default invocation compared equal, and an
+ * unrelated run read as alive. A probe that cannot show the recorded path —
+ * a record from before the re-exec existed among them — reads NOT alive:
+ * the false-deny side, one re-run, never a stranger adopted as the run.
+ * DELIBERATELY NOT a start-time compare: the measured 04.08.2026 incident
+ * (findings carrier) showed the derived start time DRIFTS against a recorded
+ * one in this WSL2 container, growing with process age (~3 s at 30 min), and
+ * a fixed-tolerance equality declared LIVE batch owners "pid-reused" and
+ * double-spawned sessions. The probe's start time is at most corroboration
+ * and never the discriminator here. An unreadable command line answers
+ * UNKNOWN (null), which the transfer bar refuses as not-live.
+ */
+export function runRecordFor(logPath, { read, probe = probePid, commandOf = processCommandOf } = {}) {
+  try {
+    const declared = absPath(logPath)
+    if (!declared) return null
+    const path = `${declared}.run.json`
+    const readOne = read ?? ((p) => JSON.parse(readFileSync(p, 'utf8')))
+    const r = readOne(path)
+    if (!r || typeof r !== 'object') return null
+    const pid = typeof r.pid === 'number' ? r.pid : null
+    let alive = null
+    if (pid !== null && pid > 0) {
+      try {
+        if (probe(pid).exists !== true) {
+          alive = false
+        } else {
+          const cmd = commandOf(pid)
+          alive =
+            cmd == null
+              ? null
+              : commandNamesRun(cmd, {
+                  logPaths: [typeof r.log === 'string' ? r.log : '', declared],
+                })
+        }
+      } catch {
+        alive = null // an unprobeable pid is UNKNOWN, which the bar reads as not-live
+      }
+    }
+    return {
+      recordPath: path,
+      suites: Array.isArray(r.suites) ? r.suites : [],
+      backends: Array.isArray(r.backends) ? r.backends : [],
+      head: typeof r.head === 'string' ? r.head : null,
+      pid,
+      alive,
+      log: typeof r.log === 'string' ? r.log : null,
+      status: typeof r.status === 'string' ? r.status : null,
+      hasReceipt: r.receipt != null && typeof r.receipt === 'object',
+    }
+  } catch {
+    return null
+  }
+}
+
+/** The short HEAD of this checkout, or null — what a handed-over run must
+ *  cover. Any git failure answers null, which the transfer bar refuses as
+ *  unverifiable rather than waving through. */
+export function currentHeadOf({ cwd = REPO_ROOT } = {}) {
+  try {
+    const out = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    return out || null
+  } catch {
+    return null
+  }
+}
+
 /** The declaration's evidence, annotated with checkpoints for `assessTransfer`. */
 export function transferItems(declaration, { cwd = REPO_ROOT } = {}) {
   const out = []
@@ -541,6 +744,9 @@ export function transferItems(declaration, { cwd = REPO_ROOT } = {}) {
         describe: `worktree ${e.path}`,
         checkpoint: ref ? checkpointOf(ref, { cwd }) : null,
       })
+    } else if (e?.kind === 'log') {
+      // A declared run is adoptable through its run record (point 700).
+      out.push({ kind: 'log', describe: `log ${e.path}`, checkpoint: null, run: runRecordFor(e.path) })
     } else {
       out.push({ kind: String(e?.kind ?? ''), describe: `${e?.kind ?? '?'} ${e?.pid ?? e?.path ?? ''}`.trim(), checkpoint: null })
     }
@@ -561,8 +767,17 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
   const path = statePathsFor(lockPath).inFlightPath
   const declaration = readDeclaration(path)
   if (!declaration) return { blocked: false, note: '', commit: null }
-  const summarise = (checkpoints) =>
-    (checkpoints ?? []).map((c) => `${c.ref ?? '?'}@${String(c.sha).slice(0, 8)}`).join(', ') || 'no checkpoints'
+  const summarise = (checkpoints, runs) =>
+    [
+      ...(checkpoints ?? []).map((c) => `${c.ref ?? '?'}@${String(c.sha).slice(0, 8)}`),
+      // A handed-over RUN is named by what it is and where its receipt lands
+      // (point 700), so the successor's first command is a read, not a restart.
+      ...(runs ?? []).map(
+        (r) =>
+          `run ${(r.suites ?? []).join('+') || '?'}${(r.backends ?? []).length ? `@${r.backends.join('/')}` : ''} ` +
+          `(receipt ${r.recordPath})`,
+      ),
+    ].join(', ') || 'no checkpoints'
   // IDEMPOTENT (Sol review of 807c2bf, finding 6): a declaration already
   // transferred and not yet adopted is not re-judged and not re-transferred —
   // the record awaiting adoption IS the handover's state, and `commit` only
@@ -570,8 +785,8 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
   if (declaration.transfer && !declaration.adopted) {
     return {
       blocked: false,
-      note: `a transferred declaration already awaits adoption (${summarise(declaration.transfer.checkpoints)})`,
-      commit: () => summarise(declaration.transfer.checkpoints),
+      note: `a transferred declaration already awaits adoption (${summarise(declaration.transfer.checkpoints, declaration.transfer.runs)})`,
+      commit: () => summarise(declaration.transfer.checkpoints, declaration.transfer.runs),
     }
   }
   // SESSION-BOUND (same finding): a declaration this owner cannot be resolved
@@ -594,17 +809,19 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
       commit: null,
     }
   }
-  const assessment = assessTransfer({ items: transferItems(declaration, { cwd }) })
+  const assessment = assessTransfer({ items: transferItems(declaration, { cwd }), headNow: currentHeadOf({ cwd }) })
   if (!assessment.transferable) {
     return { blocked: true, message: transferBlockMessage(assessment), note: '', commit: null }
   }
-  const summary =
-    assessment.checkpoints.map((c) => `${c.ref ?? '?'}@${String(c.sha).slice(0, 8)}`).join(', ') || 'no checkpoints'
+  const summary = summarise(assessment.checkpoints, assessment.runs)
   return {
     blocked: false,
-    note: `the declared in-flight work is transferable (pushed checkpoints: ${summary})`,
+    note: `the declared in-flight work is transferable (${summary})`,
     commit: () => {
-      writeDeclaration(markTransferred({ declaration, bySid: sid, now, checkpoints: assessment.checkpoints }), path)
+      writeDeclaration(
+        markTransferred({ declaration, bySid: sid, now, checkpoints: assessment.checkpoints, runs: assessment.runs }),
+        path,
+      )
       return summary
     },
   }

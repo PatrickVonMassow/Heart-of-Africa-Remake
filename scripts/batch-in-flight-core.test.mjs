@@ -65,7 +65,10 @@ import { LEASE_MS } from './batch-lease-core.mjs'
 import {
   absPath,
   adoptTransferred,
+  commandNamesRun,
   gatherHandoverTransfer,
+  processCommandOf,
+  runRecordFor,
   gatherInFlight,
   maxAgeMs,
   readDeclaration,
@@ -80,6 +83,7 @@ import {
   worktreeFilesActiveAt,
   runningBranchFiles,
 } from './batch-in-flight.mjs'
+import { selfCommandLine } from './verify/run-record.mjs'
 
 const NOW = 1_785_100_000_000
 const SID = 'session-owner'
@@ -1917,6 +1921,316 @@ describe('assessTransfer — committed-and-pushed checkpoints decide transferabi
     })
     expect(msg).toContain('feat/700-x')
     for (const word of ['CHECKPOINT', 'DRAIN', 'RE-DECLARE', 'ABANDON']) expect(msg).toContain(word)
+  })
+
+  // --- A RUNNING VERIFICATION IS TRANSFERABLE (point 700) --------------------
+  // The 17.08.2026 defeat: a background suite run (pid + log, no branch) made
+  // `--prepare --context` demand a DRAIN, pinning the session past the very
+  // mark at which leaving is worth the most. A log whose RUN RECORD can be read
+  // is a named, awaitable run, so it is adoptable output — held to the same
+  // evidence bar as a branch (Sol review of d0aebb6, finding 2): live or
+  // receipted, and covering the HEAD being handed over.
+  const HEAD_NOW = 'abc1234'
+  const run = {
+    recordPath: '/repo/local/verify-logs/x.log.run.json',
+    suites: ['world', 'polish'],
+    backends: ['webgl'],
+    head: 'abc1234',
+    pid: 4242,
+    alive: true,
+    log: 'local/verify-logs/x.log',
+    status: 'running',
+    hasReceipt: false,
+  }
+  const logItem = (r) => ({ kind: 'log', describe: 'log x.log', checkpoint: null, run: r })
+
+  it('a LIVE declared run transfers — the handover proceeds instead of demanding a drain', () => {
+    const t = assessTransfer({ items: [logItem(run)], headNow: HEAD_NOW })
+    expect(t.transferable).toBe(true)
+    expect(t.runs).toEqual([run])
+  })
+
+  it('a FINISHED run with its receipt transfers too — the verdict is readable now, dead pid or not', () => {
+    const finished = { ...run, status: 'finished', alive: false, hasReceipt: true }
+    const t = assessTransfer({ items: [logItem(finished)], headNow: HEAD_NOW })
+    expect(t.transferable).toBe(true)
+    expect(t.runs).toEqual([finished])
+  })
+
+  it('a self-declared "finished" WITHOUT its receipt blocks — status never substitutes for the readable verdict', () => {
+    const unstamped = { ...run, status: 'finished', alive: false, hasReceipt: false }
+    const t = assessTransfer({ items: [logItem(unstamped)], headNow: HEAD_NOW })
+    expect(t.transferable).toBe(false)
+    expect(t.blockers[0].why).toContain('no receipt')
+    // …and an ABSENT hasReceipt field is the same absence of evidence.
+    const { hasReceipt: _drop, ...bare } = unstamped
+    expect(assessTransfer({ items: [logItem(bare)], headNow: HEAD_NOW }).transferable).toBe(false)
+  })
+
+  it('a record still saying "running" over a DEAD pid blocks — the receipt would never arrive', () => {
+    const t = assessTransfer({ items: [logItem({ ...run, alive: false })], headNow: HEAD_NOW })
+    expect(t.transferable).toBe(false)
+    expect(t.blockers[0].why).toContain('receipt that never arrives')
+    // …and an UNPROBEABLE pid is unknown, which is not evidence of life either.
+    expect(assessTransfer({ items: [logItem({ ...run, alive: null })], headNow: HEAD_NOW }).transferable).toBe(false)
+  })
+
+  it('a run of ANOTHER HEAD blocks, naming both commits', () => {
+    const t = assessTransfer({ items: [logItem({ ...run, head: 'ffff999' })], headNow: HEAD_NOW })
+    expect(t.transferable).toBe(false)
+    expect(t.blockers[0].why).toContain('ffff999')
+    expect(t.blockers[0].why).toContain(HEAD_NOW)
+  })
+
+  it('an UNVERIFIABLE HEAD blocks — established evidence only', () => {
+    expect(assessTransfer({ items: [logItem({ ...run, head: null })], headNow: HEAD_NOW }).transferable).toBe(false)
+    expect(assessTransfer({ items: [logItem(run)], headNow: null }).transferable).toBe(false)
+    // A short recorded head still covers the full sha it abbreviates.
+    expect(
+      assessTransfer({ items: [logItem(run)], headNow: 'abc1234def5678900000' }).transferable,
+    ).toBe(true)
+  })
+
+  it('an abbreviation below git\'s meaningful length is NO match — nor is anything non-hex', () => {
+    const full = 'abc1234def5678900000'
+    // The hole the old prefix test left: a one-character recorded head
+    // "covered" any HEAD starting with that character.
+    expect(assessTransfer({ items: [logItem({ ...run, head: 'a' })], headNow: full }).transferable).toBe(false)
+    // The 6-vs-7 boundary: six hex chars refuse, seven match.
+    expect(assessTransfer({ items: [logItem({ ...run, head: 'abc123' })], headNow: full }).transferable).toBe(false)
+    expect(assessTransfer({ items: [logItem({ ...run, head: 'abc1234' })], headNow: full }).transferable).toBe(true)
+    // Non-hex never abbreviates a sha, whatever its length.
+    expect(
+      assessTransfer({ items: [logItem({ ...run, head: 'mainline' })], headNow: 'mainline' }).transferable,
+    ).toBe(false)
+  })
+
+  it('a declared run WITHOUT a record keeps today\'s refusal — a bare log proves nothing', () => {
+    const t = assessTransfer({ items: [logItem(null)], headNow: HEAD_NOW })
+    expect(t.transferable).toBe(false)
+    expect(t.blockers[0].why).toContain('only pids/logs')
+  })
+
+  it('a run rides beside a pushed branch, and both are recorded for the successor', () => {
+    const t = assessTransfer({
+      items: [{ kind: 'branch', describe: 'branch feat/700-x', checkpoint: pushed }, logItem(run)],
+      headNow: HEAD_NOW,
+    })
+    expect(t.transferable).toBe(true)
+    expect(t.checkpoints).toHaveLength(1)
+    expect(t.runs).toEqual([run])
+  })
+
+  it('a run does not excuse an UNPUSHED branch — the branch still blocks by name', () => {
+    const t = assessTransfer({
+      items: [
+        { kind: 'branch', describe: 'branch feat/700-x', checkpoint: { ...pushed, remoteSha: null } },
+        logItem(run),
+      ],
+      headNow: HEAD_NOW,
+    })
+    expect(t.transferable).toBe(false)
+  })
+
+  it('markTransferred carries the runs to the successor, and omits the field when none were declared', () => {
+    const declaration = { v: 1, sessionId: 's1', at: 1, waitingOn: 'a run', evidence: [{ kind: 'log', path: 'x.log' }] }
+    const withRun = markTransferred({ declaration, bySid: 's1', now: 9, checkpoints: [], runs: [run] })
+    expect(withRun.transfer.runs).toEqual([run])
+    const withoutRun = markTransferred({ declaration, bySid: 's1', now: 9, checkpoints: [] })
+    expect(withoutRun.transfer.runs).toBeUndefined()
+  })
+})
+
+describe('runRecordFor — the run record beside a declared log, reduced for the transfer', () => {
+  // The bare default invocation, as a RECYCLED pid would re-run it. The live
+  // wrapper's argv always carries its log path (`--log-file`, by hand or via
+  // the default launch's re-exec — Sol round 4).
+  const wrapperCmd = 'node /repo/scripts/verify/run-logged.mjs world'
+  const liveWrapperCmd = 'node /repo/scripts/verify/run-logged.mjs --log-file local/verify-logs/x.log world'
+
+  const record = {
+    suites: ['world'],
+    backends: ['webgpu'],
+    head: 'abc1234',
+    pid: 77,
+    log: 'local/verify-logs/x.log',
+    cmdline: wrapperCmd,
+    status: 'running',
+    polls: 3,
+    receipt: null,
+  }
+
+  it('pairs <log>.run.json, PROBES the pid and keeps only what the successor needs', () => {
+    const seen = []
+    const r = runRecordFor('/repo/local/verify-logs/x.log', {
+      read: (p) => {
+        seen.push(p)
+        return record
+      },
+      probe: (pid) => ({ exists: pid === 77, startedAt: null }),
+      commandOf: () => liveWrapperCmd,
+    })
+    expect(seen[0].replace(/\\/g, '/')).toBe('/repo/local/verify-logs/x.log.run.json')
+    expect(r).toEqual({
+      recordPath: seen[0],
+      suites: ['world'],
+      backends: ['webgpu'],
+      head: 'abc1234',
+      pid: 77,
+      alive: true,
+      log: 'local/verify-logs/x.log',
+      status: 'running',
+      hasReceipt: false,
+    })
+  })
+
+  it('a dead pid, a throwing probe and an absent pid read false / null / null — never assumed alive', () => {
+    const withProbe = (probe, rec = record) =>
+      runRecordFor('/repo/x.log', { read: () => rec, probe, commandOf: () => liveWrapperCmd })
+    expect(withProbe(() => ({ exists: false })).alive).toBe(false)
+    expect(
+      withProbe(() => {
+        throw new Error('EPERM')
+      }).alive,
+    ).toBe(null)
+    expect(withProbe(() => ({ exists: true }), { ...record, pid: null }).alive).toBe(null)
+  })
+
+  it('a RECYCLED pid — existing, but running something else — is NOT alive; identity, not existence', () => {
+    const withCommand = (commandOf, rec = record) =>
+      runRecordFor('/repo/x.log', { read: () => rec, probe: () => ({ exists: true, startedAt: null }), commandOf })
+    // The stranger process that inherited the wrapper's number.
+    expect(withCommand(() => '/usr/bin/chrome --headless=new').alive).toBe(false)
+    // A command that merely MENTIONS the wrapper is not the wrapper.
+    expect(withCommand(() => 'grep -rn run-logged.mjs docs/').alive).toBe(false)
+    // An unreadable command line is UNKNOWN — refused by the bar, never assumed.
+    expect(withCommand(() => null).alive).toBe(null)
+    // The genuine wrapper: its argv names the record's log — EVERY wrapper's
+    // does, because the default launch re-execs itself with `--log-file`.
+    expect(
+      withCommand(() => 'node /repo/scripts/verify/run-logged.mjs --log-file local/verify-logs/x.log world').alive,
+    ).toBe(true)
+    // …the DECLARED absolute spelling of the same log counts too.
+    expect(withCommand(() => 'node /repo/scripts/verify/run-logged.mjs --log-file /repo/x.log world').alive).toBe(true)
+    // A recycled pid re-running the IDENTICAL bare invocation is not this run
+    // (Sol round 4): without the log path in argv there is no identity,
+    // however verbatim-equal the command line reads against the recorded one.
+    expect(withCommand(() => wrapperCmd).alive).toBe(false)
+    // The SAME wrapper on ANOTHER run — a recycled pid running run-logged.mjs
+    // for a different suite — is not THIS record's process (Sol round 3).
+    expect(withCommand(() => 'node /repo/scripts/verify/run-logged.mjs polish').alive).toBe(false)
+    // A wrapper on a DIFFERENT log is another run, not this record's.
+    expect(
+      withCommand(() => 'node /repo/scripts/verify/run-logged.mjs --log-file local/verify-logs/other.log world')
+        .alive,
+    ).toBe(false)
+  })
+
+  it('commandNamesRun demands the record log path in the argv, not just the wrapper name', () => {
+    const logs = { logPaths: ['local/verify-logs/x.log'] }
+    // The recorded log path standing in the wrapper's argv, in either path
+    // style, is the identity.
+    expect(
+      commandNamesRun('node scripts\\verify\\run-logged.mjs --log-file local\\verify-logs\\x.log world', logs),
+    ).toBe(true)
+    // The wrapper name ALONE identifies no run — an IDENTICAL bare argv
+    // included (Sol round 4: a recycled pid re-running the same default
+    // invocation verbatim must not read as this record's run).
+    expect(commandNamesRun('node scripts/verify/run-logged.mjs world', logs)).toBe(false)
+    expect(commandNamesRun('node run-logged.mjs', { logPaths: [] })).toBe(false)
+    // A different program carrying the log path is not the wrapper.
+    expect(commandNamesRun('node scripts/verify/run-all.mjs --log-file local/verify-logs/x.log', logs)).toBe(false)
+    expect(commandNamesRun('', logs)).toBe(false)
+    expect(commandNamesRun(null, logs)).toBe(false)
+  })
+
+  it('commandNamesRun demands the path as the --log-file VALUE — a --show reader is not the run (Sol round 5)', () => {
+    const logs = { logPaths: ['local/verify-logs/x.log'] }
+    // The READER of the recorded log: gate 1 passes (it IS run-logged.mjs),
+    // but the path stands behind --show — a process reading the record's log,
+    // not the run that writes it. The any-word scan read this as ALIVE.
+    expect(commandNamesRun('node scripts/verify/run-logged.mjs --show local/verify-logs/x.log --tail 40', logs)).toBe(
+      false,
+    )
+    // The path as a bare operand is not the run either.
+    expect(commandNamesRun('node scripts/verify/run-logged.mjs local/verify-logs/x.log', logs)).toBe(false)
+    // The attached spelling is the same value.
+    expect(commandNamesRun('node scripts/verify/run-logged.mjs --log-file=local/verify-logs/x.log world', logs)).toBe(
+      true,
+    )
+    // A trailing --log-file with no value names nothing.
+    expect(commandNamesRun('node scripts/verify/run-logged.mjs --log-file', logs)).toBe(false)
+  })
+
+  it('commandNamesRun compares the path case-sensitively; only the program name folds (Sol round 5)', () => {
+    const logs = { logPaths: ['local/verify-logs/x.log'] }
+    // POSIX: X.log and x.log are two files — the folded compare conflated two
+    // runs into one identity.
+    expect(commandNamesRun('node scripts/verify/run-logged.mjs --log-file local/verify-logs/X.log world', logs)).toBe(
+      false,
+    )
+    // The program-name gate still folds: a Windows spelling is the wrapper.
+    expect(commandNamesRun('NODE C:/repo/scripts/verify/Run-Logged.mjs --log-file local/verify-logs/x.log', logs)).toBe(
+      true,
+    )
+    // A candidate log path CONTAINING whitespace has no recoverable argv
+    // spelling (the /proc reading is space-joined) — it DENIES outright,
+    // never a piecewise match.
+    expect(
+      commandNamesRun('node scripts/verify/run-logged.mjs --log-file "local/verify logs/x.log"', {
+        logPaths: ['local/verify logs/x.log'],
+      }),
+    ).toBe(false)
+  })
+
+  it('commandNamesRun judges the INVOKED script — run-logged.mjs as data is not the wrapper', () => {
+    // The program word is node, the invoked script unrelated.mjs; the wrapper
+    // name and even the log path ride along as arguments (Sol round 3,
+    // finding 2).
+    expect(
+      commandNamesRun('node unrelated.mjs run-logged.mjs local/verify-logs/x.log', {
+        logPaths: ['local/verify-logs/x.log'],
+      }),
+    ).toBe(false)
+    // The recorded log path merely MENTIONED by a non-wrapper is not the run.
+    expect(
+      commandNamesRun('grep -rn local/verify-logs/x.log docs/', { logPaths: ['local/verify-logs/x.log'] }),
+    ).toBe(false)
+    // The recorded log path standing in the WRAPPER's argv is.
+    expect(
+      commandNamesRun('node scripts/verify/run-logged.mjs --log-file local/verify-logs/x.log test:small', {
+        logPaths: ['local/verify-logs/x.log'],
+      }),
+    ).toBe(true)
+    // The script executed directly still counts as the wrapper.
+    expect(
+      commandNamesRun('scripts/verify/run-logged.mjs --log-file local/verify-logs/x.log world', {
+        logPaths: ['local/verify-logs/x.log'],
+      }),
+    ).toBe(true)
+  })
+
+  it('selfCommandLine and processCommandOf read one process through one lens', () => {
+    if (process.platform === 'win32') return // the CIM path needs a real CIM round trip
+    expect(selfCommandLine()).toBe(processCommandOf(process.pid))
+    expect(selfCommandLine()).toBeTruthy()
+  })
+
+  it('reads the receipt off the record itself', () => {
+    const done = { ...record, status: 'finished', receipt: { exitCode: 0 } }
+    expect(runRecordFor('/repo/x.log', { read: () => done, probe: () => ({ exists: false }) }).hasReceipt).toBe(true)
+  })
+
+  it('answers null for a missing or unreadable record, and for an empty path', () => {
+    expect(
+      runRecordFor('/repo/x.log', {
+        read: () => {
+          throw new Error('ENOENT')
+        },
+      }),
+    ).toBe(null)
+    expect(runRecordFor('/repo/x.log', { read: () => 'not an object', probe: () => ({ exists: false }) })).toBe(null)
+    expect(runRecordFor('', { read: () => record })).toBe(null)
   })
 })
 

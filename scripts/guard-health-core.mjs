@@ -56,6 +56,12 @@ export const INTENTIONALLY_DORMANT = {
     'cleared before it is armed: it reports 29 open points in no bundle of docs/work-packages.md, which is ' +
     'the drift it exists to catch, and a worktree agent may not edit that file either. Reconcile the scheme ' +
     '(`node scripts/bundle-first-guard.mjs --status`), THEN wire it and REMOVE THIS ENTRY IN THE SAME COMMIT.',
+  'context-fence-guard.mjs':
+    'Built 17.08.2026 by a worktree agent (point 700), which may not touch .claude/settings.json — the ' +
+    'PreToolUse line ("Edit|Write|NotebookEdit|Agent|Task|Bash|PowerShell" → node scripts/context-fence-guard.mjs) ' +
+    'is a protected-path edit and needs an attended session. Its core and its spawned wrapper are fully ' +
+    'tested, so it is correct the moment it is armed. REMOVE THIS ENTRY IN THE SAME COMMIT THAT ADDS THE ' +
+    'HOOK LINE.',
 }
 
 /**
@@ -150,6 +156,18 @@ export function refAnchoring(ref) {
   // The braces must MATCH: `"${CLAUDE_PROJECT_DIR/scripts/x.mjs"` is a bad
   // substitution at runtime, and an independently optional `{`/`}` cleared it.
   if (/^(\$CLAUDE_PROJECT_DIR|\$\{CLAUDE_PROJECT_DIR\}|%CLAUDE_PROJECT_DIR%)[/\\]/.test(text)) return 'project-dir'
+  // A DEFAULTED form counts ONLY when its default is itself ABSOLUTE:
+  // `${CLAUDE_PROJECT_DIR:-/srv/hoa}/scripts/x.mjs` fires from any cwd whether
+  // the variable is set or not, which is this function's whole contract.
+  // `:-.` does NOT qualify and `:-` (empty) least of all — the first is
+  // cwd-relative when the variable is unset, the second expands to the already
+  // rejected `/scripts/x.mjs`. I first accepted any default on the argument that
+  // it is "never worse than the bare form"; Sol's re-review of 044ec3dd showed
+  // that misses the point — the contract is ANY working directory, not "no worse
+  // than the other broken one", and the test then merely pinned the
+  // misclassification. A `:-.` line is an unfinished rollout line and belongs in
+  // RELATIVE_WIRING_ROLLOUT, where it is visible, not silently blessed here.
+  if (/^\$\{CLAUDE_PROJECT_DIR:-[/\\][^}]*\}[/\\]/.test(text)) return 'project-dir'
   if (/^([A-Za-z]:[/\\]|[/\\])/.test(text)) return 'absolute'
   return 'relative'
 }
@@ -251,6 +269,11 @@ export const RELATIVE_WIRING_ROLLOUT = {
     'queue-order-guard.mjs',
     'render-verify-guard.mjs',
     'retro-currency-guard.mjs',
+    // Wired 17.08.2026 as `${CLAUDE_PROJECT_DIR:-.}/scripts/rule-echo-guard.mjs`.
+    // The default makes it fire from the repo root when the variable is unset,
+    // which is better than the bare form but still not "from ANY cwd" — so it is
+    // an unfinished rollout line like the rest, recorded rather than blessed.
+    'rule-echo-guard.mjs',
     'rule-review-guard.mjs',
     'tasks-archive-guard.mjs',
     'tasks-spec-guard.mjs',

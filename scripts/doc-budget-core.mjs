@@ -60,8 +60,15 @@ export const DOC_BUDGETS = [
     // measured +5 lines / +66 words on this guard's own counter, after
     // tightening the §7.2 BATCH-family line to pay one line back. The same
     // small margin as before rides on top (0.4 % lines, 0.3 % words).
-    maxLines: 781,
-    maxWords: 6617,
+    // RAISED 781/6617 → 787/6688 by point 700, the same sanctioned raise: the
+    // §6 boundary paragraph gains three genuinely new rules (the binding
+    // PreToolUse context fence with the carrier as the findings path, the
+    // transferable running verification, the recorded boundary context),
+    // measured 784 lines / 6668 words after the edit — one tight sentence
+    // each, the detail in docs/batch-autonomy.md, which is unbudgeted
+    // reference — plus the customary margin (0.4 % lines, 0.3 % words).
+    maxLines: 787,
+    maxWords: 6688,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {

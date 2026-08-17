@@ -287,6 +287,17 @@ describe('auditHookAnchoring — can it fire from ANY working directory', () => 
     expect(refAnchoring('scripts/a.mjs')).toBe('relative')
     expect(refAnchoring('$CLAUDE_PROJECT_DIR/scripts/a.mjs')).toBe('project-dir')
     expect(refAnchoring('/srv/hoa/scripts/a.mjs')).toBe('absolute')
+    // A DEFAULTED form is anchored ONLY when the default is itself ABSOLUTE —
+    // then it fires from any cwd set or unset, which is the contract.
+    expect(refAnchoring('${CLAUDE_PROJECT_DIR:-/srv/hoa}/scripts/a.mjs')).toBe('project-dir')
+    // `:-.` is cwd-relative when the variable is unset, so it is NOT anchored,
+    // however much better it reads than the bare form (Sol re-review of
+    // 044ec3dd: "never worse than the other broken one" is not the contract).
+    expect(refAnchoring('${CLAUDE_PROJECT_DIR:-.}/scripts/a.mjs')).toBe('relative')
+    // An EMPTY default is the dead form outright: it expands to `/scripts/a.mjs`.
+    expect(refAnchoring('${CLAUDE_PROJECT_DIR:-}/scripts/a.mjs')).toBe('relative')
+    // …and a MALFORMED default is not anchored either: the substitution fails.
+    expect(refAnchoring('${CLAUDE_PROJECT_DIR:-./scripts/a.mjs')).toBe('relative')
     expect(anchorCommand('node /srv/hoa/scripts/a.mjs')).toBe('node /srv/hoa/scripts/a.mjs')
     expect(anchorCommand('node scripts/a.mjs')).toBe('node "$CLAUDE_PROJECT_DIR/scripts/a.mjs"')
   })

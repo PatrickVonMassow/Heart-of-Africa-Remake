@@ -1,9 +1,5 @@
 {
   "ranked": {
-    "628": {
-      "at": "2026-08-11T04:00:08.693Z",
-      "why": "Kosmetische Nachfolge zu 600: doppelter Kasten und das eigene Boot, kein Spielabbruch — hinten ist richtig, die Reparaturen und die Urlaubsfestigkeit gehen vor"
-    },
     "643": {
       "at": "2026-08-11T15:00:17.845Z",
       "why": "Not release-blocking: the closing run proves the build with two full regressions rather than relying on a released red, and 643 refines a mechanism that only landed today. It waits behind the release work."
@@ -48,10 +44,6 @@
       "at": "2026-08-13T15:12:02.801Z",
       "why": "Small evidence-plumbing fix; it belongs with the other verification-chain hardening rather than ahead of the release fixes"
     },
-    "673": {
-      "at": "2026-08-13T16:20:28.320Z",
-      "why": "Calibrated against the mix that 672 leaves, so it follows it immediately"
-    },
     "676": {
       "at": "2026-08-13T17:13:15.401Z",
       "why": "Grosse Infrastruktur, kein Bugfix: vor dem Demo-Checkpoint gilt Bugfixes zuerst, und 675 deckt die drei mechanischen Niederlagen der Uebergabe bereits ohne diese Ebene ab"
@@ -91,10 +83,58 @@
     "693": {
       "at": "2026-08-13T23:44:58.490Z",
       "why": "Der Umweg ist bekannt und kostenlos (author-sol --anyway, in der Merk-Datei festgehalten), deshalb steht der Punkt hinter den Spielfehlern und dem Verständigungsumbau, die der Nutzer für diese Auslieferung zuerst sehen will"
+    },
+    "694": {
+      "at": "2026-08-14T01:20:00.398Z",
+      "why": "Es erbt nur die Freigabe eines seltenen, bekannten Rots und hat keinen Spieler-Effekt; die Bugfixes und fast fertigen Punkte davor gehen vor."
+    },
+    "695": {
+      "at": "2026-08-14T02:25:45.277Z",
+      "why": "Es blockiert das Bild-Tor jeder Sitzung, gehört aber hinter die laufenden Spieler-Fixes; als Werkzeug-Punkt kommt es mit dem nächsten Werkzeug-Block."
+    },
+    "696": {
+      "at": "2026-08-14T05:13:27.358Z",
+      "why": "Sits with the other infrastructure fixes filed the same night (693-695), behind the communication-slice points the release is cut for"
+    },
+    "698": {
+      "at": "2026-08-17T09:12:55.330Z",
+      "why": "Kalibrierung, kein Defekt: Sie gehoert hinter die uebrigen Sprachpunkte, weil 688-691 die Mechanik noch aendern und die Dichte erst danach sinnvoll eingestellt wird."
+    },
+    "699": {
+      "at": "2026-08-17T09:44:54.861Z",
+      "why": "Kosmetisch und eng verwandt mit 628: Sie wartet hinter den gemeldeten Fehlern und den fast fertigen Punkten, wie es die Warteschlangenregel fuer Fundstuecke vorsieht."
+    },
+    "703": {
+      "at": "2026-08-17T13:31:30.746Z",
+      "why": "Kleiner Tafel-Fix, den der Nutzer heute angestoßen hat; laeuft bereits bei Sol und landet noch heute, die Reihung dahinter ist folgenlos"
+    },
+    "704": {
+      "at": "2026-08-17T13:43:56.910Z",
+      "why": "Tafel-Fix aus dem heutigen 429; klein und eigenstaendig, die Reihung hinter den laufenden Punkten ist folgenlos"
+    },
+    "705": {
+      "at": "2026-08-17T14:29:14.631Z",
+      "why": "Ursache der Tafel-Drosselung, aber die Lesesite (704) faengt den Nutzer schon ab; die Reihung hinter den laufenden Punkten ist folgenlos"
+    },
+    "706": {
+      "at": "2026-08-17T14:29:14.683Z",
+      "why": "Kleiner Argument-Fehler in einem Hilfsbefehl; nichts haengt daran, letzte Stelle ist richtig"
+    },
+    "707": {
+      "at": "2026-08-17T14:29:14.742Z",
+      "why": "Zug-Ersparnis, kein Produktfehler; sie zahlt sich ueber viele Sitzungen aus und hat keine Frist"
+    },
+    "708": {
+      "at": "2026-08-17T14:29:14.792Z",
+      "why": "Groesserer Umbau der Ablaeufe; er lohnt erst nach 707, das dieselbe Vorabpruefung braucht"
+    },
+    "715": {
+      "at": "2026-08-17T22:08:35.893Z",
+      "why": "Filed directly beside 714 in the process-fix block, not appended last: it is the class the whole Stop chain rests on and the check meant to catch it currently certifies it."
     }
   },
   "settled": {
-    "at": "2026-08-13T23:44:58.491Z",
+    "at": "2026-08-17T22:08:35.894Z",
     "points": [
       174,
       184,
@@ -239,7 +279,6 @@
       625,
       626,
       627,
-      628,
       630,
       632,
       633,
@@ -262,11 +301,9 @@
       663,
       664,
       665,
-      666,
       668,
       669,
       670,
-      673,
       676,
       677,
       678,
@@ -283,7 +320,26 @@
       690,
       691,
       692,
-      693
+      693,
+      694,
+      695,
+      696,
+      697,
+      698,
+      699,
+      700,
+      701,
+      703,
+      704,
+      705,
+      706,
+      707,
+      708,
+      710,
+      712,
+      713,
+      714,
+      715
     ]
   }
 }
