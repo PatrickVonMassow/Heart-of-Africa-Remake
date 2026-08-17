@@ -59,6 +59,7 @@ export const RULE_REGISTRY = Object.freeze([
     title: 'which model authors, reviews and serves',
     source: Object.freeze({ file: 'CLAUDE.md', startsWith: '- **Model policy' }),
     echoes: Object.freeze([
+      Object.freeze({ file: 'docs/analysis_de/retrospektive-zusammenarbeit.md' }),
       Object.freeze({ file: 'docs/maximum-qa.md' }),
       Object.freeze({ file: 'docs/sol-routing.md' }),
       Object.freeze({ file: 'scripts/author-routing-core.mjs' }),
@@ -337,6 +338,26 @@ export function restamp(text = '', id = '', hash = '') {
   const pattern = new RegExp(`rule:${String(id).replace(/[^a-z0-9-]/gi, '')}@[0-9a-f]{8}`, 'g')
   if (!pattern.test(current)) return ''
   return current.replace(pattern, stampFor(id, hash))
+}
+
+/**
+ * What stamping a file WOULD do, decided purely (review round 5, P2: the
+ * one-copy quote rule, the all-copy rewrite and the returned paths lived inside
+ * a private function of the CLI, so a regression there left the suite green).
+ *
+ * `texts` is every physical copy of the file. ONE of them has to carry the quote
+ * — two copies may word the rule differently — while EVERY one is rewritten, and
+ * every one must already carry a stamp for this rule, so a copy nobody marked
+ * cannot be cleared by its sibling.
+ */
+export function stampPlan({ id = '', hash = '', texts = [], quote = '' } = {}) {
+  const copies = Array.isArray(texts) ? texts : [texts]
+  if (!copies.length) return { ok: false, reason: 'there is no such file here', nexts: [] }
+  const verdicts = copies.map((text) => quoteIsInFile(text ?? '', quote, { id }))
+  if (!verdicts.some((v) => v.ok)) return { ok: false, reason: verdicts[0].reason, nexts: [] }
+  const nexts = copies.map((text) => restamp(text ?? '', id, hash))
+  if (nexts.some((n) => !n)) return { ok: false, reason: 'no-stamp-yet', nexts: [] }
+  return { ok: true, reason: '', nexts }
 }
 
 /** The blocking message, or '' when nothing is owed. PURE. */

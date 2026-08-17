@@ -11,6 +11,7 @@ import {
   restamp,
   sourceTextOf,
   stampFor,
+  stampPlan,
   rulesForFile,
   passageOf,
   stampsIn,
@@ -195,6 +196,7 @@ describe('the registry itself', () => {
     const rule = RULE_REGISTRY.find((r) => r.id === 'model-policy')
     expect(rule.source).toEqual({ file: 'CLAUDE.md', startsWith: '- **Model policy' })
     expect(rule.echoes.map((e) => e.file)).toEqual([
+      'docs/analysis_de/retrospektive-zusammenarbeit.md',
       'docs/maximum-qa.md',
       'docs/sol-routing.md',
       'scripts/author-routing-core.mjs',
@@ -404,5 +406,33 @@ describe('passageOf', () => {
     expect(passageOf('nothing here', 'one')).toBe('')
     expect(passageOf()).toBe('')
     expect(passageOf('rule:one@aaaaaaaa', '')).toBe('')
+  })
+})
+
+
+describe('stampPlan', () => {
+  const passage = 'the passage that states the rule, long enough to quote from'
+  const copy = (h) => `${passage}\nrule:demo@${h}`
+
+  it('rewrites EVERY copy when ONE of them carries the quote (round 4/5, P1)', () => {
+    const plan = stampPlan({ id: 'demo', hash: 'ffffffff', texts: [copy('00000000'), `other wording entirely\nrule:demo@00000000`], quote: passage })
+    expect(plan.ok).toBe(true)
+    expect(plan.nexts).toEqual([`${passage}\nrule:demo@ffffffff`, 'other wording entirely\nrule:demo@ffffffff'])
+  })
+
+  it('refuses when no copy carries the quote', () => {
+    const plan = stampPlan({ id: 'demo', hash: 'ffffffff', texts: [copy('00000000')], quote: 'a phrase that appears nowhere at all' })
+    expect(plan.ok).toBe(false)
+    expect(plan.reason).toBe('that phrase does not occur in the file')
+  })
+
+  it('refuses when a copy carries no stamp to rewrite, so a sibling cannot clear it', () => {
+    const plan = stampPlan({ id: 'demo', hash: 'ffffffff', texts: [copy('00000000'), passage], quote: passage })
+    expect(plan).toMatchObject({ ok: false, reason: 'no-stamp-yet' })
+  })
+
+  it('refuses an empty file list and never throws on nothing', () => {
+    expect(stampPlan({ id: 'demo', hash: 'ffffffff', texts: [], quote: passage }).ok).toBe(false)
+    expect(stampPlan().ok).toBe(false)
   })
 })

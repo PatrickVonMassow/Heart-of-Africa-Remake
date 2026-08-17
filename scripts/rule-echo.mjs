@@ -23,11 +23,10 @@ import {
   RULE_REGISTRY,
   checkAll,
   fingerprint,
-  quoteIsInFile,
-  restamp,
   rulesForFile,
   sourceTextOf,
   stampFor,
+  stampPlan,
   unregisteredStamps,
 } from './rule-echo-core.mjs'
 import { gatherRuleEchoInputs, gatherStampedFiles, memoryDirs } from './rule-echo-guard.mjs'
@@ -106,34 +105,26 @@ function stampOne(rule, file, quote) {
   const fulls = fullPathsOf(file)
   if (!fulls.length) return { ok: false, message: `rule-echo: ${file} does not exist here.` }
   const texts = fulls.map((p) => readFileSync(p, 'utf8'))
-  // ONE copy has to carry the quote, not every one (review round 4, P1): two
-  // copies may word the rule differently, and demanding a phrase present in both
-  // could leave a file with no quote able to clear it at all. Every copy is
-  // stamped and every path is named back, so nothing is cleared invisibly.
-  const perCopy = texts.map((text) => quoteIsInFile(text, quote, { id: rule.id }))
-  const q = perCopy.some((r) => r.ok) ? { ok: true, reason: '' } : perCopy[0]
-  if (!q.ok) {
-    return {
-      ok: false,
-      message:
-        `rule-echo: ${file} not stamped — ${q.reason}.\n` +
-        'Stamping needs a verbatim phrase FROM the file, so the list of names alone cannot clear\n' +
-        `the guard:\n  node scripts/rule-echo.mjs --stamp ${file} --quote "<a phrase from it>"`,
+  const plan = stampPlan({ id: rule.id, hash, texts, quote })
+  if (!plan.ok) {
+    if (plan.reason === 'no-stamp-yet') {
+      return {
+        ok: false,
+        message:
+          `rule-echo: ${file} carries no stamp yet. Add this line where the file states the rule,\n` +
+          `in whatever comment syntax it uses, then run --stamp again:\n  ${stampFor(rule.id, hash)}`,
+      }
     }
-  }
-  // EVERY copy, not the first (review round 2, P1): stamping one of two copies
-  // left the other stale with no command able to reach it.
-  const nexts = texts.map((text) => restamp(text, rule.id, hash))
-  if (nexts.some((n) => !n)) {
     return {
       ok: false,
       message:
-        `rule-echo: ${file} carries no stamp yet. Add this line where the file states the rule,\n` +
-        `in whatever comment syntax it uses, then run --stamp again:\n  ${stampFor(rule.id, hash)}`,
+        `rule-echo: ${file} not stamped — ${plan.reason}.\n` +
+        'Stamping needs a verbatim phrase FROM the passage that states the rule, so the guard\'s\n' +
+        `own output cannot clear it:\n  node scripts/rule-echo.mjs --stamp ${file} --quote "<a phrase from it>"`,
     }
   }
   let written = 0
-  nexts.forEach((next, i) => {
+  plan.nexts.forEach((next, i) => {
     if (next === texts[i]) return
     writeFileSync(fulls[i], next)
     written += 1
