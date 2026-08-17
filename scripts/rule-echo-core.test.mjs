@@ -421,9 +421,20 @@ describe('passageOf', () => {
     expect(passageOf(text, 'one')).toBe('rule:one@aaaaaaaa Opus authors.')
   })
 
-  it('reads content in any script, not only ASCII (round 10)', () => {
-    const text = ['before', '', 'rule:one@aaaaaaaa Modellregel gilt für Opus', '', 'after'].join('\n')
-    expect(passageOf(text, 'one')).not.toContain('before')
+  it('reads content in any script, not only ASCII (rounds 10+11)', () => {
+    // Letters that are ENTIRELY non-ASCII: an ASCII-only detector would call
+    // this block empty and hand back its neighbours.
+    const text = ['before', '', 'rule:one@aaaaaaaa ルール適用', '', 'after'].join('\n')
+    expect(passageOf(text, 'one')).toBe('rule:one@aaaaaaaa ルール適用')
+  })
+
+  it('treats punctuation of any script as no content (round 11)', () => {
+    // A lone stamp wrapped in comment syntax, an em dash, a full-width stop:
+    // none of it states a rule, so the paragraph beside it is still the passage.
+    for (const wrapper of ['<!-- rule:one@aaaaaaaa -->', '// rule:one@aaaaaaaa —', '# rule:one@aaaaaaaa 。', '(rule:one@aaaaaaaa)']) {
+      const text = ['lead-in line', '', wrapper, '', 'right after'].join('\n')
+      expect(passageOf(text, 'one'), wrapper).toContain('right after')
+    }
   })
 
   it('reaches the neighbours only for a LONE stamp line', () => {
