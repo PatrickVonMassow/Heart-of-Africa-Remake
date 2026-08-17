@@ -256,6 +256,34 @@ const VERIFY_TREE = /(?:^|\/)scripts\/verify(?:\/|$)/i
  *     (`-W ignore`, `-X utf8` probed detached);
  *   - `node --help` + probes: -C conditions, -e eval, -p print, -r require —
  *     all required (`-r fs`, `-C default` probed detached).
+ *
+ * THE LONG NAMES of exactly these letters ride beside them in
+ * `VALUE_TAKING_LONGS` (round 16): `--require` is only the long spelling of
+ * the `-r` already in hand, so its detached value is as knowable as `-r`'s —
+ * the residual "a long option's detached value hides the eval" was missing
+ * implementation, not information, which disqualifies it as a residual. This
+ * is NOT the open-ended per-tool long-option table the contract refuses:
+ * only the letters already modelled get their long spelling, exact-name
+ * matched (an ABBREVIATED long option — getopt_long's `--suf` — is a
+ * constructed spelling and stays outside the claim). The mode is checked per
+ * OPTION against the installed tool, not copied blindly from the letter:
+ *   - cp/mv/ln `--help`: -S is --suffix, -t is --target-directory — required;
+ *   - `install --help` adds -g/--group, -m/--mode, -o/--owner (probed:
+ *     `install --mode 644 …` detached) — required;
+ *   - `sed --help`: -e/--expression, -f/--file, -l/--line-length (each
+ *     probed detached) — required; --in-place[=SUFFIX] attaches only
+ *     (probed: `sed --in-place .bak f.sed` reads .bak as the script) —
+ *     optional;
+ *   - `node --help`: -C/--conditions, -e/--eval, -r/--require — required
+ *     (probed: `node --require esm2` dies "Cannot find module 'esm2'", the
+ *     detached word IS the value); --print brackets its value (`[...]`) and
+ *     leaves a following option an option (probed: `node --print --eval
+ *     "2+2"` prints 4) — optional, though no verdict hinges on it: --print
+ *     is itself an eval flag, judged on its own token;
+ *   - perl has NO long options at all (perlrun: single-letter switches
+ *     only), and python3's long roster (--check-hash-based-pycs, --help-*)
+ *     aliases none of -c/-m/-W/-X — a letter with no long alias simply has
+ *     none.
  */
 const req = 'required'
 const opt = 'optional'
@@ -272,6 +300,18 @@ const VALUE_TAKING_SHORTS = new Map([
 ])
 const NO_VALUE_SHORTS = new Map()
 const valueShortsOf = (head) => VALUE_TAKING_SHORTS.get(head) ?? NO_VALUE_SHORTS
+
+const COREUTILS_LONGS = new Map([['--suffix', req], ['--target-directory', req]])
+const VALUE_TAKING_LONGS = new Map([
+  ['cp', COREUTILS_LONGS],
+  ['mv', COREUTILS_LONGS],
+  ['ln', COREUTILS_LONGS],
+  ['install', new Map([...COREUTILS_LONGS, ['--group', req], ['--mode', req], ['--owner', req]])],
+  ['sed', new Map([['--expression', req], ['--file', req], ['--line-length', req], ['--in-place', opt]])],
+  ['node', new Map([['--conditions', req], ['--eval', req], ['--print', opt], ['--require', req]])],
+])
+const NO_VALUE_LONGS = new Map()
+const valueLongsOf = (head) => VALUE_TAKING_LONGS.get(head) ?? NO_VALUE_LONGS
 
 /**
  * ONE short-flag token, read with the table: the option letters up to and
@@ -359,7 +399,13 @@ function pathTokensOf(text) {
  *     and with `targetOption`, the value of `t` (attached `-tdocs` or
  *     detached) and of `--target-directory[=<dir>]` is the destination. A
  *     letter whose value rides ATTACHED consumes nothing (`-St`: the `t` is
- *     `-S`'s value, so no `-t` fires — Sol round 12).
+ *     `-S`'s value, so no `-t` fires — Sol round 12);
+ *   - with `longValueTaking` (the tool's `VALUE_TAKING_LONGS` entry), a LONG
+ *     option is read the same way (round 16): a required-value name standing
+ *     bare takes the NEXT word as its value (`node --require esm`, `cp
+ *     --suffix .bak`), which is consumed — an `=` spelling carries its value
+ *     in the token, and an optional-value name (`--in-place`, `--print`)
+ *     never swallows the next word.
  * Judged on the whole token however it was quoted — a quoted `-t` is still
  * the flag. Returns:
  *   operands     — the non-option words, the post-`--` region included;
@@ -369,7 +415,7 @@ function pathTokensOf(text) {
  *                  where an interpreter's OWN options live;
  *   targetDir    — the target-directory value, or null.
  */
-function splitArgv(args, { targetOption = false, valueTaking = NO_VALUE_SHORTS } = {}) {
+function splitArgv(args, { targetOption = false, valueTaking = NO_VALUE_SHORTS, longValueTaking = NO_VALUE_LONGS } = {}) {
   const operands = []
   const flags = []
   const leadingFlags = []
@@ -394,6 +440,16 @@ function splitArgv(args, { targetOption = false, valueTaking = NO_VALUE_SHORTS }
     }
     if (t.startsWith('--target-directory=')) {
       if (targetOption) targetDir = t.slice('--target-directory='.length)
+      continue
+    }
+    // A LONG option through the tool's own long-name table (round 16): a
+    // required-value name standing BARE consumes the next word as its value
+    // (`node --require esm`, `cp --suffix .bak`) — an `=` spelling carries
+    // the value in the token, an optional-value name (`--in-place`,
+    // `--print`) swallows nothing, and an unmodelled name is judged as the
+    // bare flag it looks like, exactly as before.
+    if (t.startsWith('--')) {
+      if (!t.includes('=') && longValueTaking.get(t) === req) i++
       continue
     }
     const cluster = splitShortCluster(t, valueTaking)
@@ -527,20 +583,18 @@ function authoringDirDestination(dest, resolvePath) {
  * it falls on. The round-14 test for membership: an item may stand here only
  * if the information needed to close it is NOT already in hand — the
  * required/optional metadata closed two items the round-12 text had
- * rationalised as intended (the detached-short-value miss, and the
- * `sed -i -f` refused read, both decided by the table now):
+ * rationalised as intended, and round 16 closed a third the same way (the
+ * long-option detached value: `--require` is `-r`'s long name, already
+ * modelled, so `VALUE_TAKING_LONGS` decides it — what was missing was
+ * implementation, not information):
  *   - MISSED WRITE: a directory destination carrying no evidence is judged
  *     the file it was spelled as, so `cp notes.md docs` passes — closing it
- *     needs the filesystem fact, which is exactly what the injected
- *     `isDirectory` supplies where the guard can;
- *   - MISSED WRITE: a LONG option's detached value standing before an eval
- *     flag ends the leading-flag region and hides the eval (`node --require
- *     esm -e …` passes) — the short-option table cannot decide a long
- *     option, and long-option tables per interpreter are the open-ended
- *     surface this contract refuses to chase;
+ *     needs a FILESYSTEM fact (is `docs` a directory?), which argv cannot
+ *     carry and exactly what the injected `isDirectory` supplies where the
+ *     guard can;
  *   - REFUSED READ: the deliberate eval over-reach above — an eval that only
  *     READS a fenced document is denied; deciding an eval's intent means
- *     reading its program, not its argv, so no table closes it. The ordinary
+ *     reading its PROGRAM, not its argv, so no table closes it. The ordinary
  *     reads stay open.
  * Each miss is one unfenced edit in a spelling a cooperating session has no
  * reason to write; each refusal costs one message that names the boundary
@@ -565,12 +619,16 @@ function shellAuthoringTarget(head, args, resolvePath, isDirectory) {
     // sed's own table consumes -e/-f/-l detached values (round 14): a script
     // file that NAMES a fenced document (`sed -i -f TASKS.md src/x.ts`) is
     // that option's value — a READ of it — not a file operand to deny.
-    const { flags, operands } = splitArgv(args, { valueTaking: valueShortsOf('sed') })
+    const { flags, operands } = splitArgv(args, { valueTaking: valueShortsOf('sed'), longValueTaking: valueLongsOf('sed') })
     return flags.some(inPlaceFlag) ? firstNamed(operands) : null
   }
   if (head === 'tee') return firstNamed(splitArgv(args).operands)
   if (head === 'cp' || head === 'mv' || head === 'install') {
-    const { targetDir, operands } = splitArgv(args, { targetOption: true, valueTaking: valueShortsOf(head) })
+    const { targetDir, operands } = splitArgv(args, {
+      targetOption: true,
+      valueTaking: valueShortsOf(head),
+      longValueTaking: valueLongsOf(head),
+    })
     const sources = targetDir === null ? operands.slice(0, -1) : operands
     const dest = targetDir === null ? (operands.length >= 2 ? operands[operands.length - 1] : null) : targetDir
     if (dest === null) return null
@@ -623,13 +681,13 @@ function shellAuthoringTarget(head, args, resolvePath, isDirectory) {
     // consumes a required-value short's detached value (round 14): `node -r
     // esm -e …` / `python3 -W ignore -c …` / `perl -I lib -e …` keep their
     // eval flag in the leading region — round 12 left these open, and that
-    // was a real defect, not a residual. BOUNDED MISS, the reading side
-    // winning as stated above: a LONG option's detached value before the
-    // flag (`node --require esm -e …`) still reads as the first non-flag
-    // word — long-option tables per interpreter stay unmodelled — so that
-    // spelling passes: one unfenced edit, against idling ordinary script
-    // calls.
-    if (splitArgv(args, { valueTaking: valueShortsOf(head) }).leadingFlags.some(isEvalFlag)) {
+    // was a real defect, not a residual. The LONG spellings of the same
+    // options consume by the same rule through the long-name table (round
+    // 16): `node --require esm -e …` is only `-r esm -e …` written out, so
+    // the detached value no longer ends the leading region and the eval
+    // behind it is seen — that spelling stood pinned as a residual, wrongly:
+    // the information was already in hand.
+    if (splitArgv(args, { valueTaking: valueShortsOf(head), longValueTaking: valueLongsOf(head) }).leadingFlags.some(isEvalFlag)) {
       return firstNamed(texts.flatMap(pathTokensOf))
     }
   }
@@ -666,7 +724,11 @@ function segmentStart(seg, resolvePath, isDirectory) {
   // This closes the literal construction; the CLASS of constructed escapes
   // stays outside the fence's claim — see resolveThroughAncestors.
   if (head === 'ln') {
-    const { targetDir, operands, flags } = splitArgv(args, { targetOption: true, valueTaking: valueShortsOf('ln') })
+    const { targetDir, operands, flags } = splitArgv(args, {
+      targetOption: true,
+      valueTaking: valueShortsOf('ln'),
+      longValueTaking: valueLongsOf('ln'),
+    })
     const symbolic = flags.some((t) => t === '--symbolic' || shortOptionLetters(t, valueShortsOf('ln')).includes('s'))
     const linkTargets = targetDir !== null || operands.length < 2 ? operands : operands.slice(0, -1)
     if (symbolic && linkTargets.some((t) => VERIFY_TREE.test(posixNormalizePath(t)))) {

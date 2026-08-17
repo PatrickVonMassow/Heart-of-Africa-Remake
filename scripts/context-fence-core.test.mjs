@@ -222,6 +222,20 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
     // stays the destination.
     ['mv -S with a leading detached value', { toolName: 'Bash', command: 'mv -S .bak draft.md TASKS.md' }],
     ['install -m with a detached mode', { toolName: 'Bash', command: 'install -m 644 notes.md TASKS.md' }],
+    // The LONG spellings of the modelled letters consume by the same table
+    // (round 16, `VALUE_TAKING_LONGS`): `--suffix` is -S's long name and
+    // `--mode` is -m's (cp/install --help), so the trailing detached value no
+    // longer poses as the destination — both commands here were ALLOWED at
+    // d224c8c6 (verified against that revision) while they write the work
+    // order.
+    ['cp with a trailing --suffix whose detached value would otherwise look like the destination', {
+      toolName: 'Bash',
+      command: 'cp notes.md TASKS.md --suffix .bak',
+    }],
+    ['install with a trailing --mode and its detached value', {
+      toolName: 'Bash',
+      command: 'install notes.md TASKS.md --mode 644',
+    }],
     // A REQUIRED-value short's DETACHED value is consumed by the interpreter's
     // own table (round 14): before the metadata, the detached value became the
     // first operand, ended the leading-flag region and HID the eval — all
@@ -246,6 +260,29 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
       toolName: 'Bash',
       command: `perl -x -e 'open(F, ">>", "TASKS.md")'`,
     }],
+    // The LONG spelling of a modelled letter consumes detached by the same
+    // required/optional rule (round 16): `--require` is -r's long name and
+    // `--conditions` -C's (`node --help`; probed: `node --require esm2` dies
+    // on module 'esm2' — the detached word IS the value). Both spellings
+    // here were ALLOWED at d224c8c6 (verified against that revision): the
+    // detached value read as the first operand and hid the eval. This is the
+    // residual the round-14 membership rule struck: the letters were already
+    // in the table, so the information was in hand.
+    ['node --require with a detached value before the eval flag', {
+      toolName: 'Bash',
+      command: `node --require esm -e "fs.appendFileSync('TASKS.md','x')"`,
+    }],
+    ['node --conditions with a detached value before the eval flag', {
+      toolName: 'Bash',
+      command: `node --conditions development -e "fs.appendFileSync('TASKS.md','x')"`,
+    }],
+    // Same-verdict REGRESSION GUARD (denied before and after round 16): the
+    // ATTACHED `--require=esm` is a flag token, never an operand, so it never
+    // hid the eval — and the long-name table must not turn it into one.
+    ['node --require= with the module attached before the eval flag', {
+      toolName: 'Bash',
+      command: `node --require=esm -e "fs.appendFileSync('TASKS.md','x')"`,
+    }],
     // node accepts the attached long spellings too (`node --help`: --eval=...,
     // --print=...); the exact-token match let this write pass.
     ['node --eval= with the script attached', {
@@ -265,6 +302,13 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
     ['sed -i.bak — the attached suffix still carries the in-place flag', {
       toolName: 'Bash',
       command: "sed -i.bak 's/x/y/' TASKS.md",
+    }],
+    // Same-verdict REGRESSION GUARD (denied before and after round 16): with
+    // `--expression`'s detached script consumed, the work order is still the
+    // file operand this in-place edit writes.
+    ['sed --in-place --expression with the script detached — the work order stays the file operand', {
+      toolName: 'Bash',
+      command: "sed --in-place --expression 's/x/y/' TASKS.md",
     }],
     ['dd of= an authoring target', { toolName: 'Bash', command: 'dd if=notes.md of=TASKS.md' }],
     ['a wrapped shell mutation', { toolName: 'Bash', command: `bash -c "sed -i 's/a/b/' TASKS.md"` }],
@@ -351,6 +395,14 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
       toolName: 'Bash',
       command: 'sed -i -f TASKS.md src/x.ts',
     }],
+    // The long spelling of the same read (round 16): `--file` is -f's long
+    // name, so its detached value is the sed SCRIPT here too. This command
+    // was DENIED at d224c8c6 (verified against that revision) — the same
+    // false deny the short flip removed, in its long clothes.
+    ['sed --in-place --file with the work order as the DETACHED script file — the same read, spelled long', {
+      toolName: 'Bash',
+      command: 'sed --in-place --file TASKS.md src/x.ts',
+    }],
     ['perl -M with the module ATTACHED — an ordinary script run over the work order', {
       toolName: 'Bash',
       command: 'perl -MFile::Spec report.pl TASKS.md',
@@ -387,18 +439,16 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
   // false denial costs the session its way of working. An item may be pinned
   // here only while the information to close it is NOT in hand (round 14:
   // the detached-SHORT-value pin that stood here locked in a miss the table
-  // decides — it moved to the denies above, with `python3 -W`/`node -r`).
+  // decides — it moved to the denies above, with `python3 -W`/`node -r`;
+  // round 16 struck the LONG-option pin the same way: `--require` is -r's
+  // long name, so `VALUE_TAKING_LONGS` decides its detached value too).
+  // What stands here needs a fact argv does not carry: a FILESYSTEM type.
+  // The refused-read residual — the eval over-reach, which would need the
+  // eval's PROGRAM read for intent — is pinned among the denies above.
   const residual = [
     ['a directory named with NO evidence is judged a file — the copy-in is missed, the copy-out stays open', {
       toolName: 'Bash',
       command: 'cp notes.md docs',
-    }],
-    // Only the LONG spelling remains on this side: the short-option table
-    // cannot decide a long option's detached value, and long-option tables
-    // per interpreter are the surface the contract refuses to chase.
-    ['a LONG option\'s detached value before the eval flag hides the eval — ordinary script calls must not idle', {
-      toolName: 'Bash',
-      command: `node --require esm -e "fs.appendFileSync('TASKS.md','x')"`,
     }],
   ]
   for (const [name, call] of residual) {
