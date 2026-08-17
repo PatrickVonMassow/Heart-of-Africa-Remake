@@ -38,22 +38,31 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
 import { isWorktreeCheckout } from './board-first-core.mjs'
 import { gatherWatermark } from './context-watermark.mjs'
-import { contextFenceDecision } from './context-fence-core.mjs'
+import { contextFenceDecision, resolveThroughAncestors } from './context-fence-core.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
 
 // The verify-prefix rule judges SYMLINK spellings on their resolved target
 // (Sol round 4: `verify-link -> scripts/verify` passed the lexical rule while
 // running the fenced work). The guard injects the real resolver so the pure
-// core never touches the disk; a path that does not exist answers null and is
-// judged on its lexical shape — never an automatic accept.
-const resolveRealPath = (p) => {
-  try {
-    return realpathSync(resolve(REPO_ROOT, p))
-  } catch {
-    return null
-  }
-}
+// core never touches the disk. A LEAF that does not exist yet is resolved
+// through its longest EXISTING ancestor (Sol round 5): a compound command
+// that creates `verify-link/new.mjs` and runs it in the same call must not
+// escape the resolved judgment because realpath threw on the unborn leaf.
+// A path that resolves nowhere answers null and is judged on its lexical
+// shape — never an automatic accept. That lexical fallback holds for a
+// resolver FAILURE (EACCES) too, and it is INTENDED (Sol round 5 read it as
+// a fail-open breach): an outside target SPELLED under scripts/verify is
+// then denied — the false-DENY direction, one refusal against an escape
+// hatch. Fail-open means a guard BUG must not trap the session, not that
+// every refusal must be avoidable.
+// KNOWN, BOUNDED LIMIT: paths resolve relative to REPO_ROOT. A `cd` earlier
+// in the same command changes the base a relative word really resolves
+// against, so a symlink reached only through that cd is missed; fixing it
+// would mean tracking cd state through the classifier — a second code path
+// for a miss bounded to relative spellings behind a cd, which the lexical
+// rule still judges.
+const resolveRealPath = (p) => resolveThroughAncestors(resolve(REPO_ROOT, p), { realpath: realpathSync })
 
 // ---- CLI: --status --------------------------------------------------------
 if (process.argv.includes('--status')) {

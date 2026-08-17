@@ -35,6 +35,7 @@
 // (quotes honoured, wrappers unwrapped, `bash -c`/`eval`/`$(…)` expanded):
 // each segment's actual invocation decides, and the carrier exemption covers
 // exactly the segment that IS the carrier call.
+import { basename, dirname, join } from 'node:path'
 import {
   expandSegments,
   headAndArgs,
@@ -230,6 +231,37 @@ function segmentStart(seg, resolvePath) {
     if (target) return { what: `${target} via redirection (\`${seg.raw}\`)`, authoring: true }
   }
   return null
+}
+
+/**
+ * Resolve an ABSOLUTE path through `realpath`, seeing through a symlinked
+ * DIRECTORY even when the LEAF does not exist yet (Sol round 5): a compound
+ * command may CREATE `verify-link/new.mjs` and run it in the same guarded
+ * call, and a leaf realpath cannot reach used to fall back to its lexical
+ * spelling — the symlinked directory went unseen. So the longest EXISTING
+ * ancestor is resolved and the unresolved tail re-appended. Null when nothing
+ * resolves at all (no such tree, or the resolver denied every level): the
+ * caller then judges the LEXICAL shape, which can still DENY but never
+ * becomes an accept. Pure over the injected `realpath` — this core still
+ * touches no disk; the guard passes `realpathSync`.
+ */
+export function resolveThroughAncestors(abs, { realpath } = {}) {
+  if (typeof realpath !== 'function') return null
+  let dir = String(abs ?? '')
+  if (!dir) return null
+  const tail = []
+  for (;;) {
+    try {
+      const real = realpath(dir)
+      if (typeof real === 'string' && real) return tail.length ? join(real, ...tail.reverse()) : real
+      return null
+    } catch {
+      const parent = dirname(dir)
+      if (!parent || parent === dir) return null // ran out of ancestors
+      tail.push(basename(dir))
+      dir = parent
+    }
+  }
 }
 
 /**

@@ -9,6 +9,7 @@ import {
   classifyFenceCall,
   contextFenceDecision,
   fenceRefusal,
+  resolveThroughAncestors,
 } from './context-fence-core.mjs'
 
 const PAST = { state: 'past', tokens: 434_440, watermark: 150_000 }
@@ -74,6 +75,22 @@ describe('over the mark, a STARTING call is denied — naming the mark', () => {
       toolName: 'Bash',
       command: 'node verify-link/world.mjs',
       resolvePath: (p) => (p === 'verify-link/world.mjs' ? '/workspace/hoa/scripts/verify/world.mjs' : null),
+    }],
+    // The leaf does NOT exist at judgment time (Sol round 5): a compound
+    // command creates `verify-link/new.mjs` and runs it in the same call.
+    // The resolver walks to the longest existing ancestor — the symlinked
+    // directory — and re-appends the tail, so the spelling still denies.
+    ['a suite call into a symlinked dir whose leaf does not exist yet', {
+      toolName: 'Bash',
+      command: 'cp scripts/verify/world.mjs verify-link/new.mjs && node verify-link/new.mjs',
+      resolvePath: (p) =>
+        resolveThroughAncestors(`/workspace/hoa/${p}`, {
+          realpath: (abs) => {
+            if (abs === '/workspace/hoa/verify-link') return '/workspace/hoa/scripts/verify'
+            if (abs.startsWith('/workspace/hoa/scripts/verify/') && abs.endsWith('world.mjs')) return abs
+            throw Object.assign(new Error(`ENOENT: ${abs}`), { code: 'ENOENT' })
+          },
+        }),
     }],
     ['delegating to Sol', { toolName: 'Bash', command: 'node scripts/author-sol.mjs 701' }],
     ['a cross-vendor review run', { toolName: 'Bash', command: 'node scripts/review-sol.mjs --commit abc' }],
@@ -231,5 +248,59 @@ describe('the refusal text', () => {
     expect(plain).not.toContain('finding.mjs')
     const authored = fenceRefusal({ tokens: 200_000, watermark: 150_000, what: 'authoring a memory', authoring: true })
     expect(authored).toContain('finding.mjs --record')
+  })
+})
+
+describe('resolveThroughAncestors — the symlinked directory is seen even for an unborn leaf (Sol round 5)', () => {
+  const treeRealpath = (links) => (abs) => {
+    if (Object.prototype.hasOwnProperty.call(links, abs)) return links[abs]
+    throw Object.assign(new Error(`ENOENT: ${abs}`), { code: 'ENOENT' })
+  }
+
+  it('resolves the longest existing ancestor and re-appends the unresolved tail', () => {
+    const realpath = treeRealpath({ '/repo/verify-link': '/repo/scripts/verify' })
+    expect(resolveThroughAncestors('/repo/verify-link/new.mjs', { realpath })).toBe('/repo/scripts/verify/new.mjs')
+    // A deeper unborn tail survives the walk in order.
+    expect(resolveThroughAncestors('/repo/verify-link/sub/new.mjs', { realpath })).toBe(
+      '/repo/scripts/verify/sub/new.mjs',
+    )
+  })
+
+  it('an existing path resolves exactly as before', () => {
+    const realpath = treeRealpath({ '/repo/scripts/verify/world.mjs': '/repo/scripts/verify/world.mjs' })
+    expect(resolveThroughAncestors('/repo/scripts/verify/world.mjs', { realpath })).toBe(
+      '/repo/scripts/verify/world.mjs',
+    )
+  })
+
+  it('answers null when nothing resolves — the caller then judges the lexical shape', () => {
+    const denies = () => {
+      throw Object.assign(new Error('EACCES'), { code: 'EACCES' })
+    }
+    expect(resolveThroughAncestors('/repo/scripts/verify/world.mjs', { realpath: denies })).toBe(null)
+    expect(resolveThroughAncestors('', { realpath: () => '/x' })).toBe(null)
+    expect(resolveThroughAncestors('/repo/x', {})).toBe(null)
+    expect(resolveThroughAncestors('/repo/x', { realpath: () => 42 })).toBe(null)
+  })
+})
+
+describe('a resolver failure falls back to the lexical spelling — INTENDED false deny (Sol round 5)', () => {
+  it('denies a path SPELLED under scripts/verify when the resolver denies every level (EACCES)', () => {
+    // Sol round 5 read this as a fail-open breach: the word's real target may
+    // lie OUTSIDE the verify tree, yet the spelling denies. Ruled INTENDED —
+    // the false-DENY direction, one refusal against an escape hatch, exactly
+    // as the sibling ambiguous-interpreter-flag rule is pinned. Fail-open
+    // means a guard BUG must not trap the session, not that every refusal
+    // must be avoidable.
+    const denies = () => {
+      throw Object.assign(new Error('EACCES'), { code: 'EACCES' })
+    }
+    const v = decide({
+      toolName: 'Bash',
+      command: 'node scripts/verify/world.mjs',
+      resolvePath: (p) => resolveThroughAncestors(`/workspace/hoa/${p}`, { realpath: denies }),
+    })
+    expect(v.block).toBe(true)
+    expect(v.reason).toContain(FENCE_END_COMMAND)
   })
 })
