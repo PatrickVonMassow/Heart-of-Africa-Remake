@@ -416,8 +416,18 @@ describe('passageOf', () => {
     expect(passage).not.toContain('after')
   })
 
-  it('is the stamp’s block plus its neighbours, not the whole file', () => {
-    const text = ['far away paragraph', '', 'lead-in line', '<!-- rule:one@aaaaaaaa -->', '', 'right after', '', 'much later'].join('\n')
+  it('keeps a SHORT own text to itself too, not only a long one (round 10)', () => {
+    const text = ['before', '', 'rule:one@aaaaaaaa Opus authors.', '', 'after'].join('\n')
+    expect(passageOf(text, 'one')).toBe('rule:one@aaaaaaaa Opus authors.')
+  })
+
+  it('reads content in any script, not only ASCII (round 10)', () => {
+    const text = ['before', '', 'rule:one@aaaaaaaa Modellregel gilt für Opus', '', 'after'].join('\n')
+    expect(passageOf(text, 'one')).not.toContain('before')
+  })
+
+  it('reaches the neighbours only for a LONE stamp line', () => {
+    const text = ['lead-in line', '', '<!-- rule:one@aaaaaaaa -->', '', 'right after', '', 'much later'].join('\n')
     const passage = passageOf(text, 'one')
     expect(passage).toContain('lead-in line')
     expect(passage).toContain('right after')

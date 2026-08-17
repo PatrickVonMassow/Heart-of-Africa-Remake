@@ -327,11 +327,15 @@ export function passageOf(text = '', id = '') {
   // the same class of bypass through them (rounds 8 and 9). So the neighbours
   // are reached only when the stamp's own block says nothing else — the shape a
   // Markdown file uses, `<!-- rule:x@… -->` on a line above the paragraph.
+  // ANY content of its own, not a length (review round 10): a character count
+  // let `rule:x@… Opus authors.` reach for its neighbours although it states the
+  // rule itself, and an ASCII-only test would have said the same of a block
+  // written in another script. Comment and quote punctuation is not content.
   const stripped = own
-    .map((line) => line.replace(new RegExp(mark.source, 'g'), '').replace(/[^A-Za-z0-9]+/g, ' ').trim())
+    .map((line) => line.replace(new RegExp(mark.source, 'g'), ''))
     .join(' ')
-    .trim()
-  if (stripped.length >= 24) return own.join('\n')
+    .replace(/[\s/*#<>!'"`|,.;:+-]+/gu, '')
+  if (stripped.length > 0) return own.join('\n')
   return blocks
     .slice(Math.max(0, at - 1), at + 2)
     .map((b) => b.join('\n'))
