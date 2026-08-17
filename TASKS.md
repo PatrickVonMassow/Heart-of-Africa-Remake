@@ -1329,7 +1329,7 @@ put it is the mistake this line exists to stop.
   retrofitted (after one-topic-per-card), so the class needs a structural gate, not
   another reminder.
 
-- [ ] 669. A working author's pushes run ci over, and the supervisor pays for it (measured
+- [ ] 669. A working author's pushes run CI over, and the supervisor pays for it (measured
   13.08.2026 on BOTH author lanes). `scripts/author-sol.mjs` pushes the working branch every ~2
   minutes so a dying run loses nothing. Every push starts a CI run, and the workflow's
   `concurrency: ci-${{ github.ref }}` with `cancel-in-progress: true` kills the previous one:
@@ -1684,7 +1684,7 @@ put it is the mistake this line exists to stop.
   Criticality: HIGH — a suite that can fail from load makes every red arguable, which is the
   door point 640 closes from the other side.
 
-- [ ] 630. A shell write into `.claude/` raises a prompt in the user's vs code window
+- [ ] 630. A shell write into `.claude/` raises a prompt in the user's VS Code window
   (measured twice 11.08.2026 — once by a delegated agent, once by a direct probe; user
   requirement the same day: "Es dürfen niemals Rückfragen hier in VS Code kommen"). THE
   RULE, as measured: a write by SHELL REDIRECTION into `.claude/` raises the harness
@@ -1982,7 +1982,7 @@ put it is the mistake this line exists to stop.
   Criticality: MAXIMUM — it acts unattended and its mistakes are permanent. Verified under
   the regime of point 639.
 
-- [ ] 638. A ticket i open myself gets its urgency decided, not its default (user
+- [ ] 638. A ticket I open myself gets its urgency decided, not its default (user
   11.08.2026: "Wenn du selbständig neue Tickets anlegst, bewerte deren Dringlichkeit …
   Wenn du unsicher bist, lege mir eine Karte unter 'Von dir zu klären' an. Das muss
   zuverlässig verankert sein"). Append-and-defer puts every new point LAST — the right
@@ -2343,7 +2343,7 @@ Build order, chosen so no two parallel agents own the same file:
   wave 4  481 (children teach) · 483 (adults teach)
   wave 5  486 (drums) · 487 (digging)
 
-- [ ] 552. The ci guard replays a frozen reason and sends the reader at a green run
+- [ ] 552. The CI guard replays a frozen reason and sends the reader at a green run
   (measured 07.08.2026, cost two turns of false search; bundle Testinfrastruktur).
   `ci-status-guard` caches its verdict per sha in `.claude/ci-status-guard-state.json`
   and re-asks GitHub every `RECHECK_MS`. The VERDICT is re-derived correctly — a sha
@@ -2815,7 +2815,7 @@ Build order, chosen so no two parallel agents own the same file:
   `main`) and on the two residuals of item 4, plus the one real deploy run of
   item 1 with its run id recorded.
 
-- [ ] 507. A lost webgpu device ends the run quietly and the picture black
+- [ ] 507. A lost WebGPU device ends the run quietly and the picture black
   (measured 05.08.2026, both quiet runs of `invariants` on the software WebGPU
   lane). The suite ends `2 pass, 0 fail` with 9 and 2 console errors —
   `AbortError: Failed to execute 'mapAsync' on 'GPUBuffer': A valid external
@@ -3676,7 +3676,7 @@ Build order, chosen so no two parallel agents own the same file:
   cited `panoramaVicinityRadius` never existed in any commit, it came from a spec
   draft; a doc's symbol citations must be checked against the code that shipped.
 
-- [ ] 347. The starting quality level from the url (user 25.07.2026; design.md §21.1
+- [ ] 347. The starting quality level from the URL (user 25.07.2026; design.md §21.1
   states the target). `?quality=low|medium|high` on any deployment URL — the GH-Pages
   root, `/poc/`, a `/vX.Y/` folder — opens the session at that level, so a link handed
   to someone whose hardware is known already fits it. Case-insensitive; an unknown,
@@ -3829,7 +3829,7 @@ Build order, chosen so no two parallel agents own the same file:
   start stamp is rejected, one with `start · ~end` passes) and the gate's refusal; a live
   handover leaves no stale card behind.
 
-- [ ] 466. The doc verification checks a sentence the readme no longer has (30.07.2026,
+- [ ] 466. The doc verification checks a sentence the README no longer has (30.07.2026,
   found by the agent that shrank the always-loaded instruction file; reproduced on unmodified
   `main`, so it is PRE-EXISTING and was not caused by that work; bundle Testinfrastruktur).
   `scripts/verify/docs.mjs` fails two checks — "README states an acceptance-criteria count"
@@ -4124,7 +4124,7 @@ Build order, chosen so no two parallel agents own the same file:
   fixture written with `\n` passes before the fix and proves nothing), plus one asserting the
   empty-parse report fires for a non-empty source.
 
-- [ ] 491. Queue prose written only into the html is lost on the next rebuild
+- [ ] 491. Queue prose written only into the HTML is lost on the next rebuild
   (measured 04.08.2026, and it cost the German text of thirteen cards). The
   Warteschlange is a PROJECTION: `scripts/board-queue.mjs` renders it from
   `.claude/board-queue.json`. But `node scripts/board.mjs queue <N> "<text>"`
@@ -4184,7 +4184,7 @@ Build order, chosen so no two parallel agents own the same file:
   `node scripts/guard-health-guard.mjs --status` names a hook whose bit was
   removed.
 
-- [ ] 497. The german-language rule has no mechanism at all, and the audit
+- [ ] 497. The German-language rule has no mechanism at all, and the audit
   PASSED IT ANYWAY (user 04.08.2026: "Warum schreibst du die ganze Zeit auf
   Englisch? Klappt der Mechanismus nicht? Falls ja, klappen vielleicht auch
   andere Mechanismen nicht."). Answers to the user are German (memory
@@ -4347,7 +4347,7 @@ Build order, chosen so no two parallel agents own the same file:
   finding must name the second card's point, and a single-now-card board must behave
   exactly as it does today.
 
-- [ ] 514. The compatibility lane has two reds the webgl lane does not (measured
+- [ ] 514. The compatibility lane has two reds the WebGL lane does not (measured
   05.08.2026 on `main`, both lanes run minutes apart on the same machine, right
   after the lane moved onto the card in point 505). `enrichments` on the WebGPU
   compatibility lane died twice for different reasons — run 1 after 157 green
@@ -4470,7 +4470,7 @@ Build order, chosen so no two parallel agents own the same file:
   `docs/picture-check-levers.md`, which is a result, not a failure. Nothing diff-based is
   enabled by this point itself.
 
-- [ ] 529. A stop hook in the user scope now enforces what a project guard
+- [ ] 529. A Stop hook in the user scope now enforces what a project guard
   ALREADY HARD-BLOCKS (measured 06.08.2026 while taking the turn-cost inventory).
   `~/.claude/hooks/check-reply-timestamp.cjs` is registered as a Stop hook in the
   user scope and checks the chat timestamp — the same rule
@@ -4767,7 +4767,7 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: medium — it may be a real regression against a closed criterion, and until
   it is owned it blocks every render-set change from ever recording a covering run.
 
-- [ ] 265. Elderly (GERIATRIC) ANIMAL VARIANTS — an OLD version of each suitable
+- [ ] 265. Elderly (geriatric) animal variants — an OLD version of each suitable
   species, visibly aged AND behaviourally distinct, plus natural death of old age
   (user 23.07.2026). PRIORITY/POSITION: queued BEFORE point 203 (do this content
   feature before the 203 visual bug-finder). RESEARCH FIRST (a standalone Fable pass,
@@ -5012,7 +5012,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS in the same commit: `docs/acceptance-evidence.md` §15/§25 gain the chain, and
   `docs/graphics-detail-levels.md` the new per-level entries.
 
-- [ ] 391. The giza monuments stand at a monumental scale in the first-person view (user
+- [ ] 391. The Giza monuments stand at a monumental scale in the first-person view (user
   28.07.2026). Standing on the plateau, the pyramids and the Sphinx must read as GIANTS —
   markedly larger than today, so that a person at their foot is a speck against them. The
   stated reason is a planned later feature and belongs in the record: the user intends a
@@ -5066,7 +5066,7 @@ Build order, chosen so no two parallel agents own the same file:
   in `scripts/doc-budget-core.mjs`, or by shortening elsewhere — the guard decides, not a
   round number.
 
-- [ ] 320. Springs as real 3d bubbling water (user 25.07.2026: the springs still
+- [ ] 320. Springs as real 3D bubbling water (user 25.07.2026: the springs still
   read as a mere symbol — animated now, but flat; they should LOOK like a spring
   with water bubbling three-dimensionally). Rework the §11.3 spring depiction at
   travel scale into a small 3D water feature. ANCHOR (25.07, main session): the
@@ -5261,7 +5261,7 @@ Build order, chosen so no two parallel agents own the same file:
   stepped down — judged on the image, not on the flag; no console errors; the F8
   before/after numbers are recorded.
 
-- [ ] 346. Horizon maps baked from the dem — self-shadowing and sky occlusion at
+- [ ] 346. Horizon maps baked from the DEM — self-shadowing and sky occlusion at
   PLANETARY RANGE (user 25.07.2026; design.md §2.7 states the target). A new offline
   step beside `scripts/build-geodata.mjs` measures, per DEM texel, the HORIZON ANGLE —
   how high the land rises around that point — and the terrain shader reads it. Two
@@ -5716,7 +5716,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
   acceptance-evidence line under §12.
 
-- [ ] 379. Abu simbel becomes a walkable site (user 27.07.2026; a FEATURE, and the user's
+- [ ] 379. Abu Simbel becomes a walkable site (user 27.07.2026; a FEATURE, and the user's
   own instruction is that the open DEFECTS come first — it waits behind them). The world carries
   eight built cultural landmarks (Meroë, Giza, Great Zimbabwe, Lalibela, Kilwa, Aksum,
   Gondar, Bandiagara) and four natural ones; the rock temples of Abu Simbel are absent,
@@ -5921,7 +5921,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS in the same commit: design.md §19 where the wildlife is described, and
   `docs/graphics-detail-levels.md`.
 
-- [ ] 415. The tuareg tent reads as a heap of sand (29.07.2026, user in the Tuareg
+- [ ] 415. The Tuareg tent reads as a heap of sand (29.07.2026, user in the Tuareg
   village, North: "what are these cones supposed to be? Sand piles? They look more like
   mini tents"). They ARE tents — `Tent` in `PlaceScene.tsx` is a single
   `coneGeometry(r·1.25, h)` in the cloth material, a 0.45-unit pole and a small dark
@@ -5988,7 +5988,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS in the same commit: the evidence section `docs/acceptance-evidence.md` §31 records
   the pitched-view check beside the existing eye-level one.
 
-- [ ] 591. Does the project still obey its own rules? a full adherence audit (user
+- [ ] 591. Does the project still obey its own rules? A full adherence audit (user
   09.08.2026: "Wir scheinen so einige unserer eigenen Projektregeln zu verletzen. Lege
   auch einen Task an, der ein Review des ganzen Projekts macht, um zu prüfen, ob es noch
   mehr in der Richtung gibt"). THIS IS A DIFFERENT AXIS FROM POINT 307. That audit
@@ -6077,7 +6077,7 @@ to land than a mechanism that needs a review.
   `scripts/verify/*.mjs`. VERIFIABLE: a written report per reviewed area with a verdict
   (valid / stale→fixed), each stale test fixed with its correction. No player-visible text.
 
-- [ ] 285. Hunt accumulation bugs and memory leaks — a repeatable fable analysis
+- [ ] 285. Hunt accumulation bugs and memory leaks — a repeatable Fable analysis
   (user 24.07.2026, learning from point 278: a fixed anchor drew ever more animals
   because streamed wildlife re-seeded on every return without releasing the
   re-homed originals — an UNBOUNDED growth that a normal test never caught because
@@ -7149,7 +7149,7 @@ to land than a mechanism that needs a review.
   Criticality: HIGH — this is the landmark the communication goal is dug up at, and the
   check that was supposed to protect it does not.
 
-- [ ] 627. The victoria falls frame photographs somewhere else (measured 11.08.2026 on
+- [ ] 627. The Victoria Falls frame photographs somewhere else (measured 11.08.2026 on
   `main` at 3f639f0d, after the point-585 landing; bundle Testinfrastruktur). `world`
   reds on ONE of its seven landmark frames: `15-worldmodel-victoria-falls — its subject is
   not in the rendered picture: off the left and bottom edge of the frame`. It survived the
@@ -7860,7 +7860,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — it wastes a delegation per hard case whenever a pool runs dry, which is
   exactly when the batch can least afford one.
 
-- [ ] 694. The children's accepted webgl 2 composition needs a home that survives a tick
+- [ ] 694. The children's accepted WebGL 2 composition needs a home that survives a tick
   (found 14.08.2026 by the cross-vendor review of point 666 — Claude Opus 5 on the Sol-authored
   branch — and verified against the mechanism itself, not argued). Point 666 answered the
   player-visible standstill with a behaviour fix and settled its REMAINING WebGL 2 red by its
