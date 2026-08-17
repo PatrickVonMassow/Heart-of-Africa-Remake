@@ -111,10 +111,14 @@
     "703": {
       "at": "2026-08-17T13:31:30.746Z",
       "why": "Kleiner Tafel-Fix, den der Nutzer heute angestoßen hat; laeuft bereits bei Sol und landet noch heute, die Reihung dahinter ist folgenlos"
+    },
+    "704": {
+      "at": "2026-08-17T13:43:56.910Z",
+      "why": "Tafel-Fix aus dem heutigen 429; klein und eigenstaendig, die Reihung hinter den laufenden Punkten ist folgenlos"
     }
   },
   "settled": {
-    "at": "2026-08-17T13:31:30.747Z",
+    "at": "2026-08-17T13:43:56.911Z",
     "points": [
       174,
       184,
@@ -310,7 +314,8 @@
       700,
       701,
       702,
-      703
+      703,
+      704
     ]
   }
 }
