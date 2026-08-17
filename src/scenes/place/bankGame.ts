@@ -162,6 +162,11 @@ export interface BankChild extends TagChild {
    *  waypoint it could not reach for two hundred seconds and 400 m of legs. */
   wayFor: number
   wayBest: number
+  /** The corner a shut leg made the walk give its route up over, and the spot
+   *  the child stood on when it did. While the child is still near that spot, a
+   *  fresh plan whose first corner is this one is REFUSED — a stalled child has
+   *  barely moved, so the planner would only hand the same route back. */
+  refused: { x: number; z: number; fromX: number; fromZ: number } | null
 }
 
 /**
@@ -392,6 +397,7 @@ export function createBankGame(
       replan: 0,
       wayFor: 0,
       wayBest: Infinity,
+      refused: null,
     }
   })
   return {
@@ -1015,6 +1021,9 @@ function inPlace(
 const WAYPOINT_RADIUS = 1.2
 const REPLAN_SECONDS = 1
 const WAYPOINT_STALL_SECONDS = 4
+/** How far a child must get from the spot a refusal was made on before a plan
+ *  may name the refused corner again — genuinely elsewhere, not a step aside. */
+const REFUSAL_LEAVE_DISTANCE = WAYPOINT_RADIUS * 2
 
 /** Drops the route a child is no longer walking. */
 function clearPath(c: BankChild): void {
@@ -1047,15 +1056,32 @@ export function wayTo(
   if (c.pathTo && (c.pathTo.x !== goal.x || c.pathTo.z !== goal.z)) clearPath(c)
   const blocked = shut(c.x, c.z, goal.x, goal.z)
   if (!blocked) {
-    // Back on the open line: the detour it has already got past is dropped.
+    // Back on the open line: the detour it has already got past is dropped,
+    // and so is any refusal — whatever the shut leg was avoiding has cleared.
     const had = !!c.path
     clearPath(c)
+    c.refused = null
     return { ...goal, advanced: had }
   }
   if (!c.path && c.replan <= 0) {
-    c.path = world.route(c, goal)
-    c.pathTo = { x: goal.x, z: goal.z }
     c.replan = REPLAN_SECONDS
+    const fresh = world.route(c, goal)
+    // THE CORNER A SHUT LEG REFUSED STAYS REFUSED FROM THE SAME SPOT (cross-
+    // vendor finding, 17.08.2026). A stalled child has barely moved when the
+    // throttle lets it plan again, so the planner can only hand back the route
+    // it just gave up — the same corner, another four seconds of stall, for
+    // ever. Such a plan is discarded and the child keeps walking at its goal;
+    // the refusal lapses once the child has genuinely left the spot, so a
+    // corner that was only briefly stood on is not banned for good.
+    const banned =
+      c.refused !== null &&
+      dist(c, { x: c.refused.fromX, z: c.refused.fromZ }) < REFUSAL_LEAVE_DISTANCE &&
+      fresh.length > 0 &&
+      dist(fresh[0], c.refused) <= WAYPOINT_RADIUS
+    if (!banned) {
+      c.path = fresh
+      c.pathTo = { x: goal.x, z: goal.z }
+    }
   }
   if (!c.path || c.path.length === 0) return { ...goal, advanced: false }
   let dropped = false
@@ -1078,6 +1104,7 @@ export function wayTo(
     c.wayFor += dt
     if (c.wayFor > WAYPOINT_STALL_SECONDS) {
       if (c.path.length > 1) {
+        const corner = c.path[0]
         c.path.shift()
         // THE LEG THE DROP OPENS UP IS CHECKED, NOT ASSUMED OPEN (cross-vendor
         // finding, 14.08.2026). Dropping the corner is right where it fell in a
@@ -1087,13 +1114,18 @@ export function wayTo(
         // the child into the obstruction, and nothing re-plans while a path
         // exists, so it stays there until the corners run out.
         //
-        // A shut leg therefore drops the whole route instead. The child walks at
-        // its goal meanwhile, deflecting off what it meets like any other walk,
-        // and the throttle above plans a fresh way from where it has got to —
-        // which cannot re-instate this corner from the same spot, because the
-        // child has moved by then.
+        // A shut leg therefore drops the whole route, and the CORNER it stalled
+        // on is remembered as refused. A stalled child has NOT moved when the
+        // throttle lets it plan again — its replan budget ran out seconds ago —
+        // so an unguarded re-plan simply gets the identical route back and the
+        // stall repeats on a four-second cycle. What is guaranteed instead: the
+        // child walks at its goal, deflecting off what it meets like any other
+        // walk, and no plan made near this spot may steer it at this corner
+        // again; only once it has genuinely got away does the corner come back
+        // into consideration.
         if (shut(c.x, c.z, c.path[0].x, c.path[0].z)) {
           clearPath(c)
+          c.refused = { x: corner.x, z: corner.z, fromX: c.x, fromZ: c.z }
           return { ...goal, advanced: true }
         }
         c.wayBest = dist(c, c.path[0])

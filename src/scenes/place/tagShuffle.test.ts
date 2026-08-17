@@ -1571,6 +1571,47 @@ describe('the walk drops a corner it cannot reach, but not into a wall', () => {
     expect(aims).not.toContainEqual({ x: 0, z: 6 })
     expect(aims).toContainEqual(GOAL)
   })
+
+  it('never re-plans the refused corner from the spot it stalled on (work-order 687)', () => {
+    const c = childAt(0, 0)
+    const CORNER = { x: 6, z: 2 }
+    // The shut-leg give-up: the child stalls at the first corner, the leg the
+    // drop opens is shut, the route is cleared. The child is HELD STILL — which
+    // is what a stalled child is — so the planner, asked again a second later,
+    // can only hand back the identical route with the identical corner. Before
+    // the fix that was a four-second cycle: stall, give up, re-plan the same
+    // corner, stall again, for the whole window.
+    const world = worldWith([CORNER, { x: 0, z: 6 }, GOAL], (_ax, _az, bx, bz) => bx === 0 && bz === 6)
+    const aims = stallAt(c, world)
+    const gaveUp = aims.findIndex((a) => a.x === GOAL.x && a.z === GOAL.z)
+    // The give-up happened (one stall window in)...
+    expect(gaveUp).toBeGreaterThan(0)
+    // ...and from then on, over the remaining ~15 s, the corner NEVER comes
+    // back: every aim is the goal itself. Not "rarely" — the guarantee is that
+    // no plan made near the refusal spot may re-instate that corner.
+    expect(aims.slice(gaveUp)).not.toContainEqual(CORNER)
+  })
+
+  it('may plan the refused corner again once the child has genuinely left the spot', () => {
+    const c = childAt(0, 0)
+    const CORNER = { x: 6, z: 2 }
+    const world = worldWith([CORNER, { x: 0, z: 6 }, GOAL], (_ax, _az, bx, bz) => bx === 0 && bz === 6)
+    stallAt(c, world)
+    // Carry the child well past the leave distance by hand (the harness has no
+    // real mover). The refusal is scoped to the SPOT the stall happened on, not
+    // to the corner for ever — from genuinely elsewhere the same corner may be
+    // a sound way round, and banning it for good could strand a child walking
+    // at a wall with no route allowed at all.
+    c.x = 5
+    c.z = 0
+    const dt = 1 / 60
+    const aims: Array<{ x: number; z: number }> = []
+    for (let t = 0; t < 2; t += dt) {
+      const aim = wayTo(c, GOAL, dt, world)
+      aims.push({ x: aim.x, z: aim.z })
+    }
+    expect(aims).toContainEqual(CORNER)
+  })
 })
 
 /** The measure as point 648 left it, kept for exactly one purpose: to show on a
