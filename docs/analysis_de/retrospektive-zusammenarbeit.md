@@ -1309,7 +1309,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 17.08.2026, 10:33 · Quellen-Fingerprint: `ccdb68be6e80…`
+Zuletzt aktualisiert: Montag, 17.08.2026, 14:07 · Quellen-Fingerprint: `af5df160c48a…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1345,6 +1345,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Fable 5 authors work judged difficult/complex/error-prone from the start, and takes over Opus work once Sol still finds problems after a re-work; Fable is NOT the default (smaller volume) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | What survives of the 25.07. rule: Fable is NOT the default lane because its volume is the scarcest — but difficulty IS a reason for it, and review is cross-vendor, not Fable-by-default | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | All journal texts (de + en) must carry emotional voice markup; English read-aloud runs via Kokoro TTS | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1398,10 +1399,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 81 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 54 Prozess-/Meta-TASKS-Punkte (davon 20 offen).
+Erfasste Quellen: 82 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 54 Prozess-/Meta-TASKS-Punkte (davon 20 offen).
 
-<!-- RETRO-FINGERPRINT: ccdb68be6e80871e961761aa235a68c1a2e9606463da4977bb2aa5821c9df1db -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-17T08:33:47.507Z -->
+<!-- RETRO-FINGERPRINT: af5df160c48aa87488e96e139d8a648e51578d1899954a48022f09af524d64ee -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-17T12:07:03.552Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1579,3 +1580,26 @@ Vereinbarung *welcher* Anbieter etwas tut an einer Erreichbarkeit hängt, muss d
 gemeldet werden — mit dem, was er kostet: nicht „Sol nicht erreichbar", sondern „solange dies
 gilt, ist die Aufteilung ausgesetzt". Die Prüffrage bei jedem Rückfallpfad lautet deshalb:
 *Welche Zusage bricht er still, während er die Funktion rettet?*
+
+### 3.119 Die Marke mahnt beim Aufhören, nicht beim Anfangen
+
+Am 17.08.2026 meldete der Kontext-Wächter einer Sitzung 434 000 Token gegen eine Marke von
+150 000 — und die Sitzung arbeitete danach noch etwa eine Stunde weiter, startete zwei
+vollständige Browser-Suiten und eine weitere Agentenrunde. Der Nutzer las denselben Befund an
+seiner eigenen Verbrauchsanzeige ab: 81 % des Wochenverbrauchs lagen oberhalb dieser Marke.
+
+Zwei Ursachen, beide gemessen, und keine davon Vergesslichkeit. Erstens sitzt der Wächter in der
+Stop-Kette: Er spricht, wenn ein Zug ENDEN will. Jeder Aufruf, der etwas ANFÄNGT, geht ungehindert
+durch — genau dort, wo die Marke binden müsste, schweigt sie. Zweitens verweigerte ausgerechnet
+die Schutzregel für laufende Arbeit die Übergabe: Ein Prüflauf ist eine Prozessnummer und eine
+Logdatei, kein Zweig, gilt damit als „nicht übergebbar", und der einzige angebotene Ausweg hieß
+abwarten — also in der Sitzung bleiben. Ein Lauf von 25 Minuten hält die Sitzung so fest, wenn
+Verlassen am meisten wert wäre.
+
+**Lehre:** Eine Obergrenze, die erst beim Aufhören spricht, ist keine Grenze, sondern ein
+Kommentar. Sie muss die ERSTE Handlung nach ihrem Überschreiten verwehren, nicht die letzte
+kommentieren — und alles, was den laufenden Schritt abschließt, weiter erlauben, sonst ist der
+einzige Weg heraus, sie zu ignorieren. Die zweite Hälfte gehört dazu: Was eine Sitzung festhält,
+muss übergebbar werden, sonst zwingt die Schutzregel genau das Verhalten herbei, das die Grenze
+verhindern soll. Prüffrage bei jeder Grenze: *Was verwehrt sie, und wem lässt sie den Ausweg,
+einfach weiterzumachen?*
