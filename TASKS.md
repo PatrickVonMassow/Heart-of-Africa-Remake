@@ -8111,3 +8111,38 @@ to land than a mechanism that needs a review.
   Criticality: medium — the board is what the user reads, and a command that lies about having
   written is the failure mode that makes every other board rule unreliable.
   Bundle: Chat & Tafel.
+
+- [ ] 704. The board defeats every cache, so a reader who reloads is rate-limited out of it
+  (user 17.08.2026, with the screenshot: »Was ist denn mit dem Dashboard los?« — the page showed
+  "Das Board konnte nicht geladen werden … (HTTP 429)", and the source URL opened directly
+  answered `429: Too Many Requests`). Measured the same day from the container: the GitHub-Pages
+  shell at `…/board/` answers 200, so the page itself is served; the CONTENT is fetched by the
+  browser from `raw.githubusercontent.com`, and that host is what refuses. It is a rate limit,
+  not an outage, and the page makes it easy to hit: `public/board/index.html` requests the
+  content as `SOURCE + '?t=' + Date.now()` with `cache: 'no-store'`, so every single load is a
+  fresh unauthenticated request, and the `max-age=300` the host serves can never help. A reader
+  checking the board from a phone the way this one is meant to be checked spends the quota by
+  design. The cache-busting was a deliberate choice for freshness, and freshness is worth
+  keeping; what is not defensible is that the page has no answer when the host says no.
+  FINAL STATE:
+  - The viewer stops paying for a request it does not need: the content is fetched WITHOUT the
+    cache-buster so the host's own five-minute freshness applies, and a reader who reloads
+    inside that window is served from the cache instead of the quota. A deliberate refresh — the
+    reader asking for the newest state — may still bypass it, so nothing becomes less current
+    than a reader asks for.
+  - A refusal is survived rather than displayed: on 429 the page retries with a backoff, and
+    while it waits it shows the last board it successfully read, marked with the time that copy
+    was taken. A stale board with an honest timestamp is worth more to the reader than an error
+    page, and the current message already says the right thing — that no work has stopped — but
+    it says it in front of nothing.
+  - The last good copy survives a reload, kept beside the reader's open-card state, so the
+    fallback also covers the case where the very first fetch of a session is the one refused.
+  - The rate limit is separated from every other failure in what the page says: a 429 names the
+    limit and when the page will try again; a genuine network failure keeps today's wording.
+  VERIFIABLE: Vitest over the extracted viewer block, the way `chat-viewer.test.mjs` already
+  extracts and runs one — a 429 answer produces the retry and the cached render, a 200 replaces
+  it, a first-ever 429 with no cached copy still produces today's message; plus the page loaded
+  twice inside five minutes making one request, not two.
+  Criticality: medium — the board is the user's only window into the batch, and it currently
+  goes blank exactly when he checks it often.
+  Bundle: Chat & Tafel.
