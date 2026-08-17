@@ -182,6 +182,150 @@ put it is the mistake this line exists to stop.
   the user has asked for the cause twice.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 705. The board is republished once per guard correction, instead of once at the end
+  (measured 17.08.2026, the cause behind the throttling that point 704 only survives). Reading
+  `board/board.html` from `raw.githubusercontent.com` answered HTTP 429 from inside the
+  container AND in the user's browser, so it is not the reader's address that is throttled — it
+  is the WRITE RATE: one session published about a dozen times in fifty minutes. That is not
+  carelessness but the design. `scripts/board.mjs` couples the card edit and the publish into
+  one step — its `edit()` applies the transform, rotates the archive and publishes — and there
+  is no edit-without-publish mode at all. The guard chain then multiplies it: `board-first-guard`,
+  `dashboard-guard`'s focus reconcile, `dashboard-conciseness-guard`, `dashboard-card-topic-guard`
+  and `queue-order-guard` each demanded a correction one after another, and every correction was
+  another publish of the whole board. Point 704 makes the READING side survive a refusal; this
+  point removes what causes it.
+  FINAL STATE:
+  - `board.mjs` gains a staged mode in which several card edits accumulate in the file and the
+    publish is one explicit closing step. The one-shot form stays the default for a single edit,
+    so no caller has to learn a new protocol for the common case.
+  - The board checks run TOGETHER against the FILE before that one publish, so every objection
+    appears in one pass instead of one per turn. `guard-preflight.mjs` already does nearly this —
+    it named all three board guards in a single call — so the staged publish asks it, rather than
+    discovering the guards one refusal at a time.
+  - A ceiling on publishes per turn that ABORTS LOUDLY when it is reached, naming what was
+    published and what was refused. A rate that silently keeps writing is how the quota was spent
+    without anyone noticing.
+  - The batch pause written for this throttling (`.claude/batch-paused`, 17.08.2026) is lifted as
+    part of this point, once the transport answers 200 again.
+  VERIFIABLE: Vitest over the staged controller — several edits accumulate with no publish, the
+  closing step publishes once, the ceiling aborts on the publish past the limit and names both
+  sides; plus a driven run of the sequence that produced this finding (a card edit that five
+  guards object to in turn) ending with exactly one publish.
+  Criticality: medium — it spends a shared quota the user's only window depends on, and the
+  failure is invisible to the session that causes it.
+  Bundle: Chat & Tafel.
+
+- [ ] 706. A queue command swallows the text behind a flag and still reports success
+  (measured 17.08.2026 against the code and the stored state, while filing points). `parseSetArgs`
+  in `scripts/board-queue-core.mjs` treats `--title`/`--estimate` as a MODE switch and pushes every
+  following argument into THAT bucket (`buckets[field].push(a)`). So `set 702 --estimate "~2 h"
+  "<prose>"` files the prose under `estimate`, where `setQueueEntry` discards it while normalising —
+  what remains stored is `~2 h`, and the card text was never there. The command reported `estimate
+  for point 702 stored` and said nothing about the swallowed argument. The cost is not only the lost
+  text: it forces three calls per card (title, body, estimate) instead of the ONE the usage line
+  offers, and with the edit-publish coupling each of those was another publish.
+  FINAL STATE:
+  - An argument the parser does not use as what the caller plainly meant is REFUSED LOUDLY instead
+    of dropped: text after `--estimate` that does not read as a duration aborts and names the right
+    order. The same holds for `--title` followed by more than a title.
+  - The success line names EVERY field it set, so a missing one is visible in the output.
+  VERIFIABLE: Vitest over `parseSetArgs` with exactly this call — the mixed form refused with the
+  correct order named, the well-formed three-field call accepted, and the success line listing each
+  field it wrote.
+  Criticality: low — one command's argument handling, but it silently discards the user-visible
+  text of a board card.
+  Bundle: Chat & Tafel.
+
+- [ ] 707. The preflight cannot judge four wired guards, and those four then block one at a time
+  (measured 17.08.2026). `guard-preflight.mjs --for answer` says so itself: `ci-status-guard,
+  timestamp-guard, decision-card-guard, batch-progress-guard are wired and were NOT JUDGED here`.
+  Exactly those four blocked the turn afterwards, one after another, and a blocked turn produces
+  nothing — the loop around `batch-progress-guard` alone cost seven answers after the marker carried
+  the predecessor's session id while the hook measured the current one. The preflight is blind where
+  it would be worth the most: the whole point of the tool is to name every objection in ONE pass.
+  FINAL STATE:
+  - `ci-status-guard` is judged in the pass. It is read-only decidable — it costs a network round
+    trip, which the report makes rather than skips.
+  - `timestamp-guard` and `decision-card-guard` judge a reply that does not exist yet, so the report
+    names the CONDITION they will be judged against — which time form is expected, which "Von dir zu
+    klären" cards stand — instead of only `not judged`.
+  - `batch-progress-guard` gets a read-only variant that answers "would a boundary stop be
+    permitted" without acquiring or handing over the batch lock, and the report uses that.
+  - Where a guard is genuinely not decidable in advance, the report names WHICH ACTION settles it,
+    so that action can fall into the same turn.
+  VERIFIABLE: Vitest over the preflight core — each of the four reported with its new status, the
+  read-only progress variant leaving the lock file untouched (asserted on its mtime), and a fixture
+  where the CI verdict is red surfacing as a block rather than as `not judged`.
+  Criticality: medium — it is the tool that exists to save turns, and it costs them where it is blind.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 708. Only the landing is one command; the beginning and the turn's end are hand-driven chains
+  (analysed 17.08.2026 against the code). The project knows the pattern: `land-point.mjs` drives 15
+  steps — merge, gate, tick, archive, push, board, cleanup — as ONE command, and CLAUDE.md calls it
+  out as "The landing is ONE command". What was bundled is the RARE, dangerous end. What runs MANY
+  times per point stayed unbundled, and four gaps were measured:
+  (1) THE SESSION BOUNDARY prints a card it could set itself — `batch-boundary.mjs` composes the text
+  via `boundaryCardText`, imports `PUBLISH_CMD` and has `execFileSync`, but neither puts the card up
+  nor publishes; that cost three refused `--commit` runs in one day (card missing, card naming no
+  point, card byte-identical inside the same minute) plus a correction for card brevity.
+  (2) FILING A POINT is about ten calls with no helper at all: append to TASKS.md, `tasks-spec-guard`,
+  `tasks-archive-guard`, `doc-budget-guard`, commit, push, `board-queue set` for title, body and
+  estimate, render the queue, publish the board, `queue-rank --ranked`. No script in the tree appends
+  a point, and `queue-order-guard` blocks the turn end when the ranking step is missing — so the chain
+  is MANDATORY and still unbundled. It ran three times in one day.
+  (3) HANDING A POINT OUT is three calls with no helper: `git worktree add -b feat/<n>-<slug>`,
+  `worktree-bootstrap.mjs`, `author-sol.mjs --point` — and `author-sol` explicitly demands an existing
+  worktree and branch. There are 15 bundled steps for the END and none for the BEGINNING.
+  (4) THE TURN'S END has no command at all: `focus set`, `board-publish`, `dashboard-guard --synced`,
+  `board.mjs attest`, `guard-preflight`. `attest` bundles three of them, but neither the publish nor
+  the focus, and `batch-progress-guard` alone names seven different commands across its remedies.
+  FINAL STATE: one command per sequence, built like `land-point.mjs` — fixed order, one verdict per
+  step, STOPS at the first red, leaves no half state and bypasses no guard. Built in this order, by
+  how often each runs: (2) file a point, (4) end the turn, (1) take the boundary, (3) hand a point out.
+  Each carries a `--dry` that prints the plan without touching anything, as the landing does.
+  VERIFIABLE: Vitest over each sequence's pure plan — the step list, the stop-at-first-red behaviour
+  and the `--dry` output; plus one driven run per command against a fixture repository, ending in the
+  state the hand-driven chain produced.
+  Criticality: medium — it is the per-point overhead of every session, and each hand-driven chain is
+  a place a step gets forgotten.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 709. A unit test passes or fails by how deeply the test runner happens to be nested
+  (measured 17.08.2026, three reproductions in a row, after the same suite had been green
+  twenty minutes earlier on the identical commit). `scripts/container-ask-guard-core.test.mjs`
+  → "a real guard under matching ancestry cannot restamp its asserted test id or raise an
+  alert" spawns a helper, has the helper spawn the real guard, and asserts
+  `matchedAncestorPid: true` — that the guard resolved the HELPER as the session process.
+  The guard resolves it with `findClaudeAncestor` (`scripts/batch-singleton.mjs`), which walks
+  at most TEN ancestors looking for a process whose `comm` matches `claude` and otherwise falls
+  back to the parent. So the assertion holds only where no `claude` process sits within ten
+  hops: in CI, where none exists at all, and in a deeply nested local run. Run the same suite
+  DIRECTLY from a session — `npx vitest run` — and the walk reaches the live `claude` process
+  (measured: two hops from a plain node), the guard resolves THAT pid, and the test fails.
+  Run it through `land-point.mjs`, four processes deeper, and it passes. The consequence is the
+  worst kind: the pre-push gate blocked a push whose commits touched neither the test nor its
+  subject, while CI was green on the same tree, and nothing in the red named the real reason.
+  FINAL STATE:
+  - The test states the ancestry it needs instead of inheriting it: the helper is spawned so
+    that the guard's walk cannot reach the session — by naming the ancestor explicitly through
+    the injection the singleton already supports (`opts.ancestor` / `findAncestorFn`), which is
+    what every other test of this file uses. The test then asserts the guard's BEHAVIOUR, not
+    the shell it happened to run in.
+  - Any remaining case that genuinely needs a real walk asserts the walk's OUTCOME against what
+    the environment actually offers, and SKIPS with a named reason where it cannot be
+    established — never a silent pass and never an environment-dependent fail.
+  - A sweep of the unit layer for the same shape: every test that spawns a real process and
+    asserts something about ancestry, cwd depth or the parent chain is either injected or
+    stated. The sweep's result is written down, including the tests it cleared.
+  VERIFIABLE: Vitest — the repaired case green both when run directly (`npx vitest run
+  scripts/container-ask-guard-core.test.mjs` from the session shell) and through the fast gate,
+  proven by running it both ways in the same commit; plus a case that pins the ten-hop budget
+  itself, so a later change to `findClaudeAncestor` cannot silently move it.
+  Criticality: medium — it is a gate that blocks correct work and passes incorrect work
+  depending on who started it, and the red it produces names nothing that would lead anyone to
+  the cause.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 662. The context boundary must also fire without a tick (user 12.08.2026: "Außerdem ist
   der Kontext dieser Session wieder ziemlich groß geworden. Hättest du in der Zwischenzeit
   nicht mal an eine andere übergeben können? So bekommen wir das sonst nie in den Griff.").
@@ -1363,7 +1507,6 @@ put it is the mistake this line exists to stop.
   Claude lane showing a supervising session whose turn ends are not held by its agent.
   Criticality: medium — it does not corrupt work, but it blocks the supervising session's turn
   ends, which is how the batch stalls.
-
 
 - [ ] 697. The settlement goat's planted foot slides with the body (measured 14.08.2026, on a
   quiet machine — every leftover vite server, suite and automation browser killed first, load
@@ -7459,7 +7602,6 @@ to land than a mechanism that needs a review.
   Criticality: low — it costs a re-run, but it is the difference between closing a red by its
   cause and closing it by a green, which is exactly what point 640 forbids.
 
-
 - [ ] 676. An authoring lane must survive the session that spawned it (specified 13.08.2026 by
   the blind-parallel four-eyes stage of CLAUDE.md §6; the counted union, the final proposal and
   the rejected alternatives are `docs/handover-architecture.md`). TWO RULES OF THIS HOUSE
@@ -7507,7 +7649,6 @@ to land than a mechanism that needs a review.
   MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2) per step, not once at the end.
   Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
   here loses work rather than merely slowing it.
-
 
 - [ ] 677. A guard run by hand hangs forever on its own stdin (measured 13.08.2026, 19:20). The
   house rule says to ASK THE GUARDS BEFORE THE ACTION (CLAUDE.md §7.2), and a session that does
@@ -8043,8 +8184,6 @@ to land than a mechanism that needs a review.
   visual untidiness one layer out, found while proving the layer below it correct.
   Bundle: Chat & Tafel.
 
-
-
 - [ ] 703. A board command writes, then reports failure, and the retry doubles the card (user
   17.08.2026: »Aber warum hast du diese Karte zweimal eingestellt? Auch das darf nicht passieren
   können«). Reproduced the same day: the same question stood twice under "Von dir zu klären".
@@ -8110,147 +8249,3 @@ to land than a mechanism that needs a review.
   Criticality: medium — the board is the user's only window into the batch, and it currently
   goes blank exactly when he checks it often.
   Bundle: Chat & Tafel.
-
-- [ ] 705. The board is republished once per guard correction, instead of once at the end
-  (measured 17.08.2026, the cause behind the throttling that point 704 only survives). Reading
-  `board/board.html` from `raw.githubusercontent.com` answered HTTP 429 from inside the
-  container AND in the user's browser, so it is not the reader's address that is throttled — it
-  is the WRITE RATE: one session published about a dozen times in fifty minutes. That is not
-  carelessness but the design. `scripts/board.mjs` couples the card edit and the publish into
-  one step — its `edit()` applies the transform, rotates the archive and publishes — and there
-  is no edit-without-publish mode at all. The guard chain then multiplies it: `board-first-guard`,
-  `dashboard-guard`'s focus reconcile, `dashboard-conciseness-guard`, `dashboard-card-topic-guard`
-  and `queue-order-guard` each demanded a correction one after another, and every correction was
-  another publish of the whole board. Point 704 makes the READING side survive a refusal; this
-  point removes what causes it.
-  FINAL STATE:
-  - `board.mjs` gains a staged mode in which several card edits accumulate in the file and the
-    publish is one explicit closing step. The one-shot form stays the default for a single edit,
-    so no caller has to learn a new protocol for the common case.
-  - The board checks run TOGETHER against the FILE before that one publish, so every objection
-    appears in one pass instead of one per turn. `guard-preflight.mjs` already does nearly this —
-    it named all three board guards in a single call — so the staged publish asks it, rather than
-    discovering the guards one refusal at a time.
-  - A ceiling on publishes per turn that ABORTS LOUDLY when it is reached, naming what was
-    published and what was refused. A rate that silently keeps writing is how the quota was spent
-    without anyone noticing.
-  - The batch pause written for this throttling (`.claude/batch-paused`, 17.08.2026) is lifted as
-    part of this point, once the transport answers 200 again.
-  VERIFIABLE: Vitest over the staged controller — several edits accumulate with no publish, the
-  closing step publishes once, the ceiling aborts on the publish past the limit and names both
-  sides; plus a driven run of the sequence that produced this finding (a card edit that five
-  guards object to in turn) ending with exactly one publish.
-  Criticality: medium — it spends a shared quota the user's only window depends on, and the
-  failure is invisible to the session that causes it.
-  Bundle: Chat & Tafel.
-
-- [ ] 706. A queue command swallows the text behind a flag and still reports success
-  (measured 17.08.2026 against the code and the stored state, while filing points). `parseSetArgs`
-  in `scripts/board-queue-core.mjs` treats `--title`/`--estimate` as a MODE switch and pushes every
-  following argument into THAT bucket (`buckets[field].push(a)`). So `set 702 --estimate "~2 h"
-  "<prose>"` files the prose under `estimate`, where `setQueueEntry` discards it while normalising —
-  what remains stored is `~2 h`, and the card text was never there. The command reported `estimate
-  for point 702 stored` and said nothing about the swallowed argument. The cost is not only the lost
-  text: it forces three calls per card (title, body, estimate) instead of the ONE the usage line
-  offers, and with the edit-publish coupling each of those was another publish.
-  FINAL STATE:
-  - An argument the parser does not use as what the caller plainly meant is REFUSED LOUDLY instead
-    of dropped: text after `--estimate` that does not read as a duration aborts and names the right
-    order. The same holds for `--title` followed by more than a title.
-  - The success line names EVERY field it set, so a missing one is visible in the output.
-  VERIFIABLE: Vitest over `parseSetArgs` with exactly this call — the mixed form refused with the
-  correct order named, the well-formed three-field call accepted, and the success line listing each
-  field it wrote.
-  Criticality: low — one command's argument handling, but it silently discards the user-visible
-  text of a board card.
-  Bundle: Chat & Tafel.
-
-- [ ] 707. The preflight cannot judge four wired guards, and those four then block one at a time
-  (measured 17.08.2026). `guard-preflight.mjs --for answer` says so itself: `ci-status-guard,
-  timestamp-guard, decision-card-guard, batch-progress-guard are wired and were NOT JUDGED here`.
-  Exactly those four blocked the turn afterwards, one after another, and a blocked turn produces
-  nothing — the loop around `batch-progress-guard` alone cost seven answers after the marker carried
-  the predecessor's session id while the hook measured the current one. The preflight is blind where
-  it would be worth the most: the whole point of the tool is to name every objection in ONE pass.
-  FINAL STATE:
-  - `ci-status-guard` is judged in the pass. It is read-only decidable — it costs a network round
-    trip, which the report makes rather than skips.
-  - `timestamp-guard` and `decision-card-guard` judge a reply that does not exist yet, so the report
-    names the CONDITION they will be judged against — which time form is expected, which "Von dir zu
-    klären" cards stand — instead of only `not judged`.
-  - `batch-progress-guard` gets a read-only variant that answers "would a boundary stop be
-    permitted" without acquiring or handing over the batch lock, and the report uses that.
-  - Where a guard is genuinely not decidable in advance, the report names WHICH ACTION settles it,
-    so that action can fall into the same turn.
-  VERIFIABLE: Vitest over the preflight core — each of the four reported with its new status, the
-  read-only progress variant leaving the lock file untouched (asserted on its mtime), and a fixture
-  where the CI verdict is red surfacing as a block rather than as `not judged`.
-  Criticality: medium — it is the tool that exists to save turns, and it costs them where it is blind.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 708. Only the landing is one command; the beginning and the turn's end are hand-driven chains
-  (analysed 17.08.2026 against the code). The project knows the pattern: `land-point.mjs` drives 15
-  steps — merge, gate, tick, archive, push, board, cleanup — as ONE command, and CLAUDE.md calls it
-  out as "The landing is ONE command". What was bundled is the RARE, dangerous end. What runs MANY
-  times per point stayed unbundled, and four gaps were measured:
-  (1) THE SESSION BOUNDARY prints a card it could set itself — `batch-boundary.mjs` composes the text
-  via `boundaryCardText`, imports `PUBLISH_CMD` and has `execFileSync`, but neither puts the card up
-  nor publishes; that cost three refused `--commit` runs in one day (card missing, card naming no
-  point, card byte-identical inside the same minute) plus a correction for card brevity.
-  (2) FILING A POINT is about ten calls with no helper at all: append to TASKS.md, `tasks-spec-guard`,
-  `tasks-archive-guard`, `doc-budget-guard`, commit, push, `board-queue set` for title, body and
-  estimate, render the queue, publish the board, `queue-rank --ranked`. No script in the tree appends
-  a point, and `queue-order-guard` blocks the turn end when the ranking step is missing — so the chain
-  is MANDATORY and still unbundled. It ran three times in one day.
-  (3) HANDING A POINT OUT is three calls with no helper: `git worktree add -b feat/<n>-<slug>`,
-  `worktree-bootstrap.mjs`, `author-sol.mjs --point` — and `author-sol` explicitly demands an existing
-  worktree and branch. There are 15 bundled steps for the END and none for the BEGINNING.
-  (4) THE TURN'S END has no command at all: `focus set`, `board-publish`, `dashboard-guard --synced`,
-  `board.mjs attest`, `guard-preflight`. `attest` bundles three of them, but neither the publish nor
-  the focus, and `batch-progress-guard` alone names seven different commands across its remedies.
-  FINAL STATE: one command per sequence, built like `land-point.mjs` — fixed order, one verdict per
-  step, STOPS at the first red, leaves no half state and bypasses no guard. Built in this order, by
-  how often each runs: (2) file a point, (4) end the turn, (1) take the boundary, (3) hand a point out.
-  Each carries a `--dry` that prints the plan without touching anything, as the landing does.
-  VERIFIABLE: Vitest over each sequence's pure plan — the step list, the stop-at-first-red behaviour
-  and the `--dry` output; plus one driven run per command against a fixture repository, ending in the
-  state the hand-driven chain produced.
-  Criticality: medium — it is the per-point overhead of every session, and each hand-driven chain is
-  a place a step gets forgotten.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 709. A unit test passes or fails by how deeply the test runner happens to be nested
-  (measured 17.08.2026, three reproductions in a row, after the same suite had been green
-  twenty minutes earlier on the identical commit). `scripts/container-ask-guard-core.test.mjs`
-  → "a real guard under matching ancestry cannot restamp its asserted test id or raise an
-  alert" spawns a helper, has the helper spawn the real guard, and asserts
-  `matchedAncestorPid: true` — that the guard resolved the HELPER as the session process.
-  The guard resolves it with `findClaudeAncestor` (`scripts/batch-singleton.mjs`), which walks
-  at most TEN ancestors looking for a process whose `comm` matches `claude` and otherwise falls
-  back to the parent. So the assertion holds only where no `claude` process sits within ten
-  hops: in CI, where none exists at all, and in a deeply nested local run. Run the same suite
-  DIRECTLY from a session — `npx vitest run` — and the walk reaches the live `claude` process
-  (measured: two hops from a plain node), the guard resolves THAT pid, and the test fails.
-  Run it through `land-point.mjs`, four processes deeper, and it passes. The consequence is the
-  worst kind: the pre-push gate blocked a push whose commits touched neither the test nor its
-  subject, while CI was green on the same tree, and nothing in the red named the real reason.
-  FINAL STATE:
-  - The test states the ancestry it needs instead of inheriting it: the helper is spawned so
-    that the guard's walk cannot reach the session — by naming the ancestor explicitly through
-    the injection the singleton already supports (`opts.ancestor` / `findAncestorFn`), which is
-    what every other test of this file uses. The test then asserts the guard's BEHAVIOUR, not
-    the shell it happened to run in.
-  - Any remaining case that genuinely needs a real walk asserts the walk's OUTCOME against what
-    the environment actually offers, and SKIPS with a named reason where it cannot be
-    established — never a silent pass and never an environment-dependent fail.
-  - A sweep of the unit layer for the same shape: every test that spawns a real process and
-    asserts something about ancestry, cwd depth or the parent chain is either injected or
-    stated. The sweep's result is written down, including the tests it cleared.
-  VERIFIABLE: Vitest — the repaired case green both when run directly (`npx vitest run
-  scripts/container-ask-guard-core.test.mjs` from the session shell) and through the fast gate,
-  proven by running it both ways in the same commit; plus a case that pins the ten-hop budget
-  itself, so a later change to `findClaudeAncestor` cannot silently move it.
-  Criticality: medium — it is a gate that blocks correct work and passes incorrect work
-  depending on who started it, and the red it produces names nothing that would lead anyone to
-  the cause.
-  Bundle: Session- & Repo-Hygiene.
