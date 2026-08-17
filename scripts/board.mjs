@@ -50,8 +50,6 @@ import {
   addVdzk,
   berlinStamp,
   closeCard,
-  dropStrayNowCards,
-  normaliseLineEndings,
   parseClosingArgs,
   parseDoneArgs,
   pointSubject,
@@ -65,14 +63,14 @@ import {
   toNoCurrentWork,
   toNow,
   toQueue,
-  upgradeNowCards,
 } from './board-core.mjs'
-import { PUBLISH_CMD } from './board-remedy.mjs'
+import { runBoardEdit } from './board-edit-core.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { QUEUE_DATA_PATH, setQueueEntry } from './board-queue-core.mjs'
 import { readJson } from './dashboard-state.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
+const TASKS = resolve(REPO_ROOT, 'TASKS.md')
 const PUBLISH_SCRIPT = 'scripts/board-publish.mjs'
 const run = (args) => execFileSync(process.execPath, args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })
 
@@ -131,40 +129,18 @@ function edit(fn, done) {
   // beside it blocks the state writers — so the board would stay unpublishable.
   // It is said out loud, because an edit that silently swallowed a card's prose
   // would be its own defect.
-  const swept = dropStrayNowCards(normaliseLineEndings(readFileSync(BOARD, 'utf8')))
-  for (const { title, text } of swept.dropped) {
-    console.error(`board: dropped the current-work card "${title}" — it named neither a point nor a state.`)
-    console.error(`  its text, so nothing is lost unsaid: ${text}`)
-  }
-  const edited = dropStrayNowCards(upgradeNowCards(normaliseLineEndings(fn(swept.html))))
-  writeTextAtomic(BOARD, edited.html)
-  console.log(done)
-  console.log(run(['scripts/board-archive-rotate.mjs']).trim().split('\n')[0])
-  // THE LIVE PAGE IS PUBLISHED HERE (point 400, delta D — four-eyes finding 2).
-  // This is the one-command board loop, so a loop that only synced a local copy
-  // left the LIVE page behind on every edit while the due mark was cleared — the
-  // launcher would then alert about a board the session had updated exactly as
-  // documented, which trains the reader to ignore the one channel that speaks
-  // when a session is wedged.
-  //
-  // A REFUSAL MUST BE READABLE (four-eyes NEW-2). The child's stdio is piped, so
-  // a non-zero exit throws — and an uncaught throw here would abort the rest of
-  // the loop AND reduce the publisher's whole remedy text to `e.message`. The
-  // refusal is the most useful thing it ever prints, so it is printed, and the
-  // mirror still runs: the board file is already written either way.
-  let published = true
-  try {
-    console.log(run([PUBLISH_SCRIPT]).trim().split('\n')[0])
-  } catch (e) {
-    published = false
-    console.error(String(e.stderr || '').trimEnd() || `board-publish failed: ${e.message}`)
-    console.error(`The LIVE page was NOT updated — fix the above, then: ${PUBLISH_CMD}`)
-    process.exitCode = 1
-  }
-  // The success line is GATED (four-eyes NEW-3): printed unconditionally it sat
-  // two lines under "The LIVE page was NOT updated", so a session skimming the
-  // tail read success in exactly the failure case this reporting exists for.
-  if (published) console.log('The live page is updated. NEXT: node scripts/board.mjs attest')
+  const result = runBoardEdit({
+    html: readFileSync(BOARD, 'utf8'),
+    tasksText: readFileSync(TASKS, 'utf8'),
+    transform: fn,
+    done,
+    write: (html) => writeTextAtomic(BOARD, html),
+    rotate: () => run(['scripts/board-archive-rotate.mjs']),
+    publish: () => run([PUBLISH_SCRIPT]),
+    stdout: (line) => console.log(line),
+    stderr: (line) => console.error(line),
+  })
+  if (!result.published) process.exitCode = 1
 }
 
 const [cmd, ...rest] = process.argv.slice(2)
