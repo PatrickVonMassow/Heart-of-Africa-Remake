@@ -596,10 +596,18 @@ export function assessTransfer({ items = [], headNow = null } = {}) {
   const checkpoints = []
   const runs = []
   let output = 0
+  // Both sides must LOOK like a sha at git's own minimum meaningful
+  // abbreviation (7 — this repo's short-sha length) before either may
+  // abbreviate the other (Sol review of 534c2ba): `runRecordFor` accepts
+  // arbitrary non-empty head strings, and a bare prefix test let a
+  // one-character recorded head "match" any HEAD that happened to start
+  // with it. Shorter or non-hex is no identity, so it is no match.
+  const HEX_SHA = /^[0-9a-f]{7,40}$/
   const sameHead = (a, b) => {
     const x = String(a ?? '').toLowerCase()
     const y = String(b ?? '').toLowerCase()
-    return x.length > 0 && y.length > 0 && (x.startsWith(y) || y.startsWith(x))
+    if (!HEX_SHA.test(x) || !HEX_SHA.test(y)) return false
+    return x.startsWith(y) || y.startsWith(x)
   }
   for (const item of list) {
     if (item?.kind === 'log' && item.run && typeof item.run.recordPath === 'string' && item.run.recordPath) {

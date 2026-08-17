@@ -1988,6 +1988,20 @@ describe('assessTransfer — committed-and-pushed checkpoints decide transferabi
     ).toBe(true)
   })
 
+  it('an abbreviation below git\'s meaningful length is NO match — nor is anything non-hex', () => {
+    const full = 'abc1234def5678900000'
+    // The hole the old prefix test left: a one-character recorded head
+    // "covered" any HEAD starting with that character.
+    expect(assessTransfer({ items: [logItem({ ...run, head: 'a' })], headNow: full }).transferable).toBe(false)
+    // The 6-vs-7 boundary: six hex chars refuse, seven match.
+    expect(assessTransfer({ items: [logItem({ ...run, head: 'abc123' })], headNow: full }).transferable).toBe(false)
+    expect(assessTransfer({ items: [logItem({ ...run, head: 'abc1234' })], headNow: full }).transferable).toBe(true)
+    // Non-hex never abbreviates a sha, whatever its length.
+    expect(
+      assessTransfer({ items: [logItem({ ...run, head: 'mainline' })], headNow: 'mainline' }).transferable,
+    ).toBe(false)
+  })
+
   it('a declared run WITHOUT a record keeps today\'s refusal — a bare log proves nothing', () => {
     const t = assessTransfer({ items: [logItem(null)], headNow: HEAD_NOW })
     expect(t.transferable).toBe(false)
