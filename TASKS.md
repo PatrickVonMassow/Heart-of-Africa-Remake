@@ -10,8 +10,8 @@ ORDER is the dashboard's Warteschlange, held by `queue-order-guard`; ordering pr
 here went stale describing finished points, and a second place for one fact is
 the drift this project keeps paying for.
 
-This file and every entry in it are written in English. Commit messages never
-reference the point number.
+This file and every entry in it are written in English. Point titles use sentence case rather than full uppercase;
+acronyms and individual emphasised words may stay capitalised. Commit messages never reference the point number.
 
 **A point may state its acceptance condition machine-readably**, because prose
 alone let a point be ticked for feeling finished. A body line beginning `PROOF:`
