@@ -199,9 +199,29 @@ put it is the mistake this line exists to stop.
     permitted" without acquiring or handing over the batch lock, and the report uses that.
   - Where a guard is genuinely not decidable in advance, the report names WHICH ACTION settles it,
     so that action can fall into the same turn.
+  ALSO — THE PREFLIGHT MUST JUDGE *WHICH POINT IS BEING WORKED*, not only the order it is
+  ranked in (user 17.08.2026, 19:41: »Warum holst du dir mit der 697 wieder einen neuen (nicht
+  sonderlich wichtigen) Task, anstatt erstmal die offenen Branches zu erledigen? Wenn du neue
+  Tasks angehst, die nichts mit der Optimierung vom Tokenverbrauch zu tun haben, sollten es die
+  Tasks sein, die mit der Kommunikationsmechanik zu tun haben. Das ist das am höchsten
+  priorisierte Feature. Nur die Tasks zur Reduktion vom Token-Verbrauch sind aktuell noch höher
+  priorisiert.«). MEASURED the same evening: nine open feature branches stood in the tree
+  (336 13 d, 686 4 d, 687 3 d, 687-roam-bound-fixes 9 h, 581 10 h, 595-598 8 h, 703 4 h, 700
+  14 min, 711 7 min), the two OLDEST being 686 and 687 — the communication mechanic itself —
+  while a fresh tier-3 point (697) was opened. THE RULE, three tiers: (1) token-consumption
+  reduction, (2) the communication mechanic, (3) everything else; and open BRANCHES are drained
+  before any fresh point is opened. Nothing checks it today: `queue-order-guard` judges the
+  ranking and the board's agreement with it, never whether the point actually being WORKED is
+  the front of that order, and nothing counts open branches against opening a new one.
+  FINAL STATE: the preflight reports, for the action that STARTS work on a point, whether that
+  point is the front of the derived order and which tier it falls in, and it names every open
+  feature branch older than the point being opened. Opening out of tier or ahead of an
+  undrained branch is REPORTED with its reason demanded, not silently allowed — the session may
+  still do it (a bugfix on `main`'s own red is a real reason) but it must say so.
   VERIFIABLE: Vitest over the preflight core — each of the four reported with its new status, the
-  read-only progress variant leaving the lock file untouched (asserted on its mtime), and a fixture
-  where the CI verdict is red surfacing as a block rather than as `not judged`.
+  read-only progress variant leaving the lock file untouched (asserted on its mtime), a fixture
+  where the CI verdict is red surfacing as a block rather than as `not judged`, and a fixture
+  where a tier-3 point is opened against two older open branches, which must be reported.
   Criticality: medium — it is the tool that exists to save turns, and it costs them where it is blind.
   Bundle: Session- & Repo-Hygiene.
 
