@@ -39,12 +39,19 @@ export function memoryDirs({ home = homedir(), root = REPO_ROOT } = {}) {
 
 /** Read every watched file. A `memory/…` entry resolves outside the repository. */
 export function gatherRuleEchoInputs(registry = RULE_REGISTRY) {
+  // THE PREFLIGHT CALLS EVERY GATHER AS `gather({ sessionId })`, so a positional
+  // registry parameter silently receives that context and the watch reads an
+  // EMPTY registry — which reports "the anchor matches no line", i.e. a broken
+  // watch, while the wrapper's own run says clean. Found 18.08.2026 when the two
+  // disagreed after this guard was registered there. A non-array argument is
+  // therefore not a registry and falls back to the real one.
+  const reg = Array.isArray(registry) ? registry : RULE_REGISTRY
   const files = {}
   const dirs = memoryDirs()
   // Whether the memory TREE exists at all — the difference between "this machine
   // keeps no memory entries" and "a registered entry was deleted".
   files['memory/'] = dirs.some((d) => existsSync(d)) ? '' : null
-  for (const rel of filesToRead(registry)) {
+  for (const rel of filesToRead(reg)) {
     const candidates = rel.startsWith('memory/')
       ? dirs.map((dir) => resolve(dir, rel.slice('memory/'.length)))
       : [resolve(REPO_ROOT, rel)]

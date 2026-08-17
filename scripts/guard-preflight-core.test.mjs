@@ -659,3 +659,18 @@ describe('the focus reconcile, asked BEFORE the closing reply', () => {
     expect(result.status).toBe(STATUS.clean)
   })
 })
+
+// A GATHER IS CALLED AS `gather({ sessionId })` (guard-preflight-core.mjs), so a
+// wrapper whose gather takes a positional parameter must not mistake that
+// context for its argument. Measured 18.08.2026: gatherRuleEchoInputs(registry)
+// read `{ sessionId }` as an empty registry, so the preflight reported "the
+// watch is broken" while the wrapper's own run said clean — the exact
+// preflight-vs-hook divergence a registration exists to prevent.
+describe('a gather survives the context the preflight hands it', () => {
+  it('gatherRuleEchoInputs ignores a non-registry argument', () => {
+    const withCtx = gatherRuleEchoInputs({ sessionId: 'abc' })
+    const bare = gatherRuleEchoInputs()
+    expect(Object.keys(withCtx.inputs.files).sort()).toEqual(Object.keys(bare.inputs.files).sort())
+    expect(Object.keys(bare.inputs.files).length).toBeGreaterThan(1)
+  })
+})
