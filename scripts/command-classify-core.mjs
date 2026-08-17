@@ -682,11 +682,20 @@ export function posixNormalizePath(path) {
 /**
  * Like `segmentInvokesScript`, but judged by a caller PREDICATE — for a rule
  * that hangs on a directory PREFIX rather than an enumerable script name (the
- * context fence's `scripts/verify/` rule, point 700). Two rules sharpen it
- * beyond the interpreter guard (Sol round 3, finding 4b):
+ * context fence's `scripts/verify/` rule, point 700). Three rules sharpen it
+ * beyond the interpreter guard (Sol rounds 3/4, finding 4b):
  *   - The predicate sees the POSIX-NORMALISED path (`posixNormalizePath`), so
  *     a dot-spelled path cannot evade a prefix nor a `..` path falsely match
  *     one, and a finisher reached through `..` is still its basename.
+ *   - An injectable RESOLVER (`resolvePath` — the impure caller passes
+ *     `realpathSync`, this core touches no disk) sees the raw word first: a
+ *     SYMLINK spelling — `verify-link -> scripts/verify`, then `node
+ *     verify-link/world.mjs` — normalises lexically to a path outside the
+ *     prefix and would pass the rule while running the very work it fences
+ *     (Sol round 4). Where the word resolves, the predicate judges the
+ *     RESOLVED target; a word that does not resolve is judged on its lexical
+ *     normalised shape, so unresolvability can still DENY but never becomes
+ *     an ACCEPT.
  *   - Only the path being INVOKED is judged: the program word itself, or the
  *     FIRST non-flag argument after an interpreter. A matching path standing
  *     LATER is an argument — data handed to another program, not an
@@ -695,15 +704,32 @@ export function posixNormalizePath(path) {
  * detached flag value is indistinguishable from the script without every
  * interpreter's option table, so there EVERY path word is judged — the
  * false-DENY direction, chosen so `node -r esm scripts/verify/world.mjs`
- * cannot slip an invocation past as ambiguity.
+ * cannot slip an invocation past as ambiguity. Sol round 4 re-found this as
+ * a defect (`node --experimental-vm-modules tools/report.mjs
+ * scripts/verify/world.mjs` — the verify path is data, yet denied); it is
+ * ruled INTENDED and pinned: one refusal against an escape hatch.
  */
-export function segmentInvokesPathWhere(segment, predicate) {
+export function segmentInvokesPathWhere(segment, predicate, { resolvePath = null } = {}) {
   const seg = asSegments(segment)[0]
   if (!seg || typeof predicate !== 'function') return false
-  const matches = (text) => {
+  const judgedPath = (text) => {
     const p = String(text)
-    if (/\s/.test(p)) return false // a whole quoted command line is judged unwrapped, not here
-    return predicate(posixNormalizePath(p)) === true
+    if (/\s/.test(p)) return null // a whole quoted command line is judged unwrapped, not here
+    const lexical = posixNormalizePath(p)
+    if (typeof resolvePath !== 'function') return lexical
+    let real = null
+    try {
+      real = resolvePath(p)
+    } catch {
+      real = null
+    }
+    // A word that cannot be resolved is judged on its LEXICAL shape —
+    // unresolvability must never turn into an accept.
+    return typeof real === 'string' && real ? posixNormalizePath(real) : lexical
+  }
+  const matches = (text) => {
+    const p = judgedPath(text)
+    return p !== null && predicate(p) === true
   }
   const head = commandHead(seg)
   if (!INTERPRETERS.has(head)) return matches(seg.words[0] ? seg.words[0].text : '')

@@ -32,7 +32,7 @@
 // repeating the suite start is exactly what the measured session of 17.08.2026
 // did for another hour. It cannot trap: the allowed set contains the whole
 // exit (finish, board, boundary, end).
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
@@ -42,13 +42,26 @@ import { contextFenceDecision } from './context-fence-core.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
 
+// The verify-prefix rule judges SYMLINK spellings on their resolved target
+// (Sol round 4: `verify-link -> scripts/verify` passed the lexical rule while
+// running the fenced work). The guard injects the real resolver so the pure
+// core never touches the disk; a path that does not exist answers null and is
+// judged on its lexical shape — never an automatic accept.
+const resolveRealPath = (p) => {
+  try {
+    return realpathSync(resolve(REPO_ROOT, p))
+  } catch {
+    return null
+  }
+}
+
 // ---- CLI: --status --------------------------------------------------------
 if (process.argv.includes('--status')) {
   const argv = process.argv.slice(2)
   const tIdx = argv.indexOf('--transcript')
   const sid = readOwnerLock()?.sessionId ?? ''
   const wm = gatherWatermark({ transcriptPath: tIdx >= 0 ? argv[tIdx + 1] ?? '' : '', sid })
-  const starting = contextFenceDecision({ ...wm, toolName: 'Agent' })
+  const starting = contextFenceDecision({ ...wm, toolName: 'Agent', resolvePath: resolveRealPath })
   console.log(JSON.stringify({ ownerSessionId: sid || null, ...wm }, null, 2))
   console.log(
     `verdict for a STARTING call (agent spawn, browser suite, work-order/doc/memory authoring): ${
@@ -86,6 +99,7 @@ try {
     toolName: payload.tool_name,
     command: input.command,
     filePath: input.file_path ?? input.notebook_path,
+    resolvePath: resolveRealPath,
   })
   if (verdict.block) {
     process.stdout.write(

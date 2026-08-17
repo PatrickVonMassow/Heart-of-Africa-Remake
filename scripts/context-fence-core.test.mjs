@@ -60,7 +60,21 @@ describe('over the mark, a STARTING call is denied — naming the mark', () => {
     ['a suite call through a parent segment', { toolName: 'Bash', command: 'node scripts/foo/../verify/world.mjs' }],
     // Flags before the script make the invoked word undecidable; every path
     // word is judged then — the false-DENY direction, never an escape hatch.
+    // Sol round 4 re-found the data-argument shape as a defect; it is ruled
+    // INTENDED and pinned here.
     ['a suite call behind an interpreter flag', { toolName: 'Bash', command: 'node -r esm scripts/verify/world.mjs' }],
+    ['a verify path as data behind an interpreter flag (INTENDED false deny)', {
+      toolName: 'Bash',
+      command: 'node --experimental-vm-modules tools/report.mjs scripts/verify/world.mjs',
+    }],
+    // A SYMLINK spelling of the verify tree is judged on its resolved target
+    // (Sol round 4): the injected resolver — realpathSync at the guard — sees
+    // through `verify-link -> scripts/verify`.
+    ['a suite call through a symlink to the verify tree', {
+      toolName: 'Bash',
+      command: 'node verify-link/world.mjs',
+      resolvePath: (p) => (p === 'verify-link/world.mjs' ? '/workspace/hoa/scripts/verify/world.mjs' : null),
+    }],
     ['delegating to Sol', { toolName: 'Bash', command: 'node scripts/author-sol.mjs 701' }],
     ['a cross-vendor review run', { toolName: 'Bash', command: 'node scripts/review-sol.mjs --commit abc' }],
     ['a delegated ask run', { toolName: 'Bash', command: 'node scripts/ask-sol.mjs --kind audit --brief "x"' }],
@@ -124,6 +138,19 @@ describe('over the mark, FINISHING calls and reads stay allowed', () => {
     // ANOTHER program is data, not an invocation.
     ['a finishing script spelled through the verify dir', { toolName: 'Bash', command: 'node scripts/verify/../board-publish.mjs' }],
     ['a finisher reached through a parent segment', { toolName: 'Bash', command: 'node scripts/verify/x/../run-wait.mjs --await' }],
+    // The resolver serves the deny rule, not a new one of its own: a finisher
+    // reached through a symlink is still the finisher, and a symlink resolving
+    // OUTSIDE the verify tree starts nothing.
+    ['a finisher reached through a symlink', {
+      toolName: 'Bash',
+      command: 'node waitlink/run-wait.mjs --await',
+      resolvePath: (p) => (p === 'waitlink/run-wait.mjs' ? '/workspace/hoa/scripts/verify/run-wait.mjs' : null),
+    }],
+    ['a symlink resolving outside the verify tree', {
+      toolName: 'Bash',
+      command: 'node datalink/report.mjs',
+      resolvePath: () => '/workspace/hoa/tools/report.mjs',
+    }],
     ['a verify path passed as data to another script', { toolName: 'Bash', command: 'node tools/report.mjs scripts/verify/world.mjs' }],
     ['a build behind a value-taking npm option', { toolName: 'Bash', command: 'npm --prefix . run build' }],
     ['a build behind an option value no list names', { toolName: 'Bash', command: 'npm --loglevel warn run build' }],

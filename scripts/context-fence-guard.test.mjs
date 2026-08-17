@@ -9,7 +9,7 @@
 // the worktree stand-down and the fail-open promises.
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
@@ -95,6 +95,26 @@ describe('context-fence-guard (spawned)', () => {
 
   it('denies a Task spawn like an Agent spawn — the arming matcher must carry both', () => {
     expect(denial(callGuard('Task', { prompt: 'build point 701' }))).toContain('WATERMARK')
+  })
+
+  it('denies a suite start through a SYMLINK to the verify tree — the real resolver is wired (Sol round 4)', () => {
+    // The temp-repo copy excludes scripts/verify; give it a real target so
+    // realpathSync in the spawned guard resolves through the link.
+    const verifyDir = resolve(repo, 'scripts', 'verify')
+    const link = resolve(repo, 'verify-link')
+    mkdirSync(verifyDir, { recursive: true })
+    writeFileSync(resolve(verifyDir, 'world.mjs'), '// stub suite for the symlink pin\n')
+    try {
+      try {
+        symlinkSync(verifyDir, link, 'dir')
+      } catch {
+        return // a filesystem without symlink rights cannot host this evasion
+      }
+      expect(denial(callGuard('Bash', { command: 'node verify-link/world.mjs' }))).toContain('WATERMARK')
+    } finally {
+      rmSync(link, { force: true })
+      rmSync(verifyDir, { recursive: true, force: true })
+    }
   })
 
   it('lets every finishing call and read through past the mark', () => {

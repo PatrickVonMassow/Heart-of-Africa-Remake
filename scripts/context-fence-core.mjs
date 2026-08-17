@@ -95,7 +95,10 @@ const CARRIER_BASENAME = 'findings-carrier.md'
  *  tests arrives POSIX-NORMALISED from `segmentInvokesPathWhere` (Sol round
  *  3, finding 4b): `scripts/./verify/world.mjs` matches, and
  *  `scripts/verify/../board-publish.mjs` — which never runs verify work —
- *  does not. */
+ *  does not. A SYMLINK spelling is judged on its resolved target through the
+ *  injected `resolvePath` (Sol round 4: `verify-link -> scripts/verify` made
+ *  `node verify-link/world.mjs` pass lexically); the guard injects the real
+ *  resolver, this core stays disk-free. */
 const VERIFY_PREFIX = /(?:^|\/)scripts\/verify\/[^\s]+\.mjs$/i
 
 /** The finishing helpers under that prefix, allowed by name: awaiting a
@@ -202,7 +205,7 @@ export function authoringTarget(filePath) {
 /** What ONE parsed segment starts, or null. The carrier call itself starts
  *  nothing — but ONLY that segment: the exemption must not cover whatever
  *  rides beside it on the same line (Sol finding 1). */
-function segmentStart(seg) {
+function segmentStart(seg, resolvePath) {
   if (segmentInvokesScript(seg, [CARRIER_SCRIPT])) return null
   const { head, args } = headAndArgs(seg)
   if (npmStartsSuite(head, args.map((a) => a.text))) {
@@ -212,8 +215,9 @@ function segmentStart(seg) {
     if (segmentInvokesScript(seg, [script])) return { what: `${what} (\`${seg.raw}\`)`, authoring: false }
   }
   // A DIRECT call into scripts/verify/ starts the same browser work the
-  // sanctioned launchers do — judged on the path prefix, finishers excepted.
-  if (segmentInvokesPathWhere(seg, startsVerifyPath)) {
+  // sanctioned launchers do — judged on the path prefix (symlink spellings
+  // resolved where a resolver is injected), finishers excepted.
+  if (segmentInvokesPathWhere(seg, startsVerifyPath, { resolvePath })) {
     return { what: `starting a verify script directly (\`${seg.raw}\`)`, authoring: false }
   }
   // Authoring by REDIRECTION — `echo "- [ ] 999. x" >> TASKS.md` writes the
@@ -232,8 +236,11 @@ function segmentStart(seg) {
  * Does this call START a new unit of work? PURE.
  * Returns { starts, what, authoring } — `authoring` marks the refusals that
  * must name the carrier as the way to keep a finding.
+ * `resolvePath` is the injectable path resolver for the verify-prefix rule
+ * (the guard passes `realpathSync`; without one the rule stays lexical) —
+ * the core itself never touches the disk.
  */
-export function classifyFenceCall({ toolName, command, filePath } = {}) {
+export function classifyFenceCall({ toolName, command, filePath, resolvePath } = {}) {
   const tool = String(toolName ?? '').trim()
   if (AGENT_TOOLS.has(tool)) {
     return { starts: true, what: 'spawning a delegated agent', authoring: false }
@@ -245,7 +252,7 @@ export function classifyFenceCall({ toolName, command, filePath } = {}) {
     // by one. Any starting segment denies; a line of finishing segments
     // passes whatever suite names its quoted arguments mention.
     for (const seg of expandSegments(cmd)) {
-      const start = segmentStart(seg)
+      const start = segmentStart(seg, resolvePath)
       if (start) return { starts: true, ...start }
     }
     return { starts: false, what: null, authoring: false }
@@ -283,9 +290,9 @@ export function fenceRefusal({ tokens, watermark, what, authoring = false } = {}
  * and 'unreadable' fails OPEN (never a deny on an assumption).
  * Returns { block, reason }.
  */
-export function contextFenceDecision({ state, tokens, watermark, toolName, command, filePath } = {}) {
+export function contextFenceDecision({ state, tokens, watermark, toolName, command, filePath, resolvePath } = {}) {
   if (state !== 'past') return { block: false, reason: null }
-  const call = classifyFenceCall({ toolName, command, filePath })
+  const call = classifyFenceCall({ toolName, command, filePath, resolvePath })
   if (!call.starts) return { block: false, reason: null }
   return { block: true, reason: fenceRefusal({ tokens, watermark, what: call.what, authoring: call.authoring }) }
 }

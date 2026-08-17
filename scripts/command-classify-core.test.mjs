@@ -385,6 +385,35 @@ describe('segmentInvokesPathWhere — the INVOKED path, normalised', () => {
   it('flags before the script make it undecidable — then every word is judged (false-deny side)', () => {
     expect(segmentInvokesPathWhere('node -r esm scripts/verify/world.mjs', underVerify)).toBe(true)
     expect(segmentInvokesPathWhere('node --experimental-vm-modules tools/x.mjs', underVerify)).toBe(false)
+    // Sol round 4 re-found the ambiguous case as a defect — a matching path
+    // that IS data, denied because a flag stands before the script. Ruled
+    // INTENDED: without every interpreter's option table the invoked word is
+    // undecidable, and the false-deny side is the fence's chosen direction.
+    expect(
+      segmentInvokesPathWhere('node --experimental-vm-modules tools/report.mjs scripts/verify/world.mjs', underVerify),
+    ).toBe(true)
+  })
+  it('judges a SYMLINK spelling on its resolved target — resolver injected, no disk in this core', () => {
+    // `verify-link -> scripts/verify`: lexically outside the prefix, really
+    // the fenced work itself (Sol round 4).
+    const viaLink = (p) => (p.startsWith('verify-link/') ? `/repo/scripts/verify/${p.slice('verify-link/'.length)}` : null)
+    expect(segmentInvokesPathWhere('node verify-link/world.mjs', underVerify, { resolvePath: viaLink })).toBe(true)
+    // A word resolving OUTSIDE the prefix does not match…
+    expect(
+      segmentInvokesPathWhere('node data-link/world.mjs', underVerify, { resolvePath: () => '/repo/tools/world.mjs' }),
+    ).toBe(false)
+    // …and an UNRESOLVABLE word is judged on its lexical shape — a null or a
+    // throwing resolver must never turn a matching path into an accept.
+    expect(segmentInvokesPathWhere('node scripts/verify/world.mjs', underVerify, { resolvePath: () => null })).toBe(true)
+    expect(
+      segmentInvokesPathWhere('node scripts/verify/world.mjs', underVerify, {
+        resolvePath: () => {
+          throw new Error('ENOENT')
+        },
+      }),
+    ).toBe(true)
+    // Without a resolver the lexical rule stands as before.
+    expect(segmentInvokesPathWhere('node verify-link/world.mjs', underVerify)).toBe(false)
   })
   it('is total on junk', () => {
     expect(segmentInvokesPathWhere('', underVerify)).toBe(false)
