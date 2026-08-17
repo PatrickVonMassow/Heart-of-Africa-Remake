@@ -555,15 +555,27 @@ const CADENCES: Array<[string, (rand: () => number) => number]> = [
   ['2-12 frames', (rand) => 2 + Math.floor(rand() * 11)],
 ]
 
-/** Every child's path through `seconds` of the game, sampled every frame. */
-function play(placeId: string, seed: number, seconds: number, dt = 1 / 60): Track[][] {
+/** Every child's path through `seconds` of the game, sampled every frame — and
+ *  the settlement that walked it, for a case that must also read the ROUND's own
+ *  counters off the very replay it judged. */
+function playRound(
+  placeId: string,
+  seed: number,
+  seconds: number,
+  dt = 1 / 60,
+): { v: ReturnType<typeof village>; paths: Track[][] } {
   const v = village(placeId, seed)
   const paths: Track[][] = v.children.map(() => [])
   for (let t = 0; t < seconds; t += dt) {
     frame(v, dt)
     sample(v, paths)
   }
-  return paths
+  return { v, paths }
+}
+
+/** Every child's path through `seconds` of the game, sampled every frame. */
+function play(placeId: string, seed: number, seconds: number, dt = 1 / 60): Track[][] {
+  return playRound(placeId, seed, seconds, dt).paths
 }
 
 /**
@@ -1521,6 +1533,66 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       // running to meet the group is the first across the middle, and most
       // runs end in tags short of it, which is why the event is sparse.
       expect(side.filter((s) => s.crossed).length).toBeGreaterThan(0)
+    })
+  }
+
+  /**
+   * AND THE CARVE'S REMOVAL IS PAID FOR, CHILD BY CHILD (work-order 687 item 11,
+   * cross-vendor finding 18.08.2026). `PlaceLife` takes `buildWedgeCarve` off
+   * EVERY bank phase, because at the verification's own seed the only route from
+   * the children's quarter to the water ran through one carved wedge and the
+   * group stood in a pocket instead. That is right, and it has a COST: a roaming
+   * child is steered LOCALLY, so with the carve gone nothing but its own steering
+   * keeps it out of a dead-end wedge. Nothing measured that. The per-child
+   * shuffle measure ran over `bambara@2972259115`, `maasai@42` and `swahili@99`
+   * — and the last two stand on no river, so they never play this round at all —
+   * while the cases above assert reachable ground and a played cycle, never
+   * per-child progress. Three of the four river layouts were ungated.
+   *
+   * THE WINDOW IS 120 s BECAUSE THAT IS WHERE THE WHOLE CYCLE FITS, and the
+   * carve is gone from all of it. Measured over the four layouts: at 60 s the
+   * round has not left its opening phases in ANY of them (roam 55 s, gather 5 s,
+   * no run at all), so a minute would gate the roaming and nothing else; at
+   * 120 s every one of them has closed a full cycle — roam 75.5-88.5 s, gather
+   * 20.8-33.9 s, run 2.4-3.3 s, part 8 s, runs 1, cycles 1.
+   */
+  for (const [placeId, seed] of RIVER_VILLAGES) {
+    it(`${placeId} at seed ${seed} keeps every child covering ground with the carve gone`, () => {
+      const { v, paths } = playRound(placeId, seed, 120)
+      // THE WINDOW HELD A WHOLE CYCLE, read off the very replay judged below —
+      // not a second one that could have diverged. Without this the gate could
+      // pass on a round stalled in its roam, which is the one state the phases
+      // above are bounded to prevent.
+      expect({ runs: v.bank!.runs > 0, cycles: v.bank!.cycles > 0 }).toEqual({ runs: true, cycles: true })
+      expectLively(paths)
+      const r = shuffleWindows(paths)
+      const burst = shuffleWindows(paths, CHILD_MOTION.short)
+      // AND BOTH MEASURES LOOKED AT SOMETHING: a share is 0 when nothing was bad
+      // and equally when nothing was judged. Measured over the 120 s cycle, the
+      // same in all four layouts: 476 judged child-seconds and least judgeable
+      // child 0.992 on the one-second window, 478 and 0.996 on the burst — the
+      // missing part is the tail no window can reach into.
+      expect(judgedEnough(r)).toBe(true)
+      expect(judgedEnough(burst)).toBe(true)
+      // THE VERDICT OFF THE WORST CHILD, because one child wedged among three
+      // healthy ones is divided by four in every group average — which is the
+      // whole shape of the cost being gated here. Measured with the carve gone,
+      // worst child of each layout: bambara@42 0.000 %, bambara@2972259115
+      // 0.000 %, nubian@42 0.000 %, mandinka@99 0.000 % against the 0.25 % gate
+      // — exactly zero, not a rounded value: not one window of the cycle is bad
+      // in any of the four, and the burst window reads 0.000 % in all four too.
+      expect(r.leastJudged).toBeGreaterThan(CHILD_MOTION.judgedGate)
+      expect(r.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
+      expect(burst.worstShare).toBeLessThan(CHILD_MOTION.shareGate)
+      // AND NOBODY IS CARRIED OUT OF A WEDGE INSTEAD: the rescue teleport is what
+      // ENDS a snag, so a layout that keeps its share down only by picking a
+      // child up would fail here rather than pass above. Measured: not one rescue
+      // and not one carried metre falls in the cycle, in any of the four.
+      const rescues = rescueRate(paths)
+      expect(rescues.carriedPublished).toBe(true)
+      expect(rescues.nudgesPublished).toBe(true)
+      expect(rescues.worstPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildRescueGate)
+      expect(rescues.worstCarriedMetresPerChildMinute).toBeLessThan(CHILD_MOTION.worstChildCarryGate)
     })
   }
 })
