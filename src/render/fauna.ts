@@ -220,6 +220,14 @@ export interface FootPlantPose {
 }
 
 /**
+ * Maximum reach of a planted leg as a multiple of its built length. Ten per
+ * cent gives the simple straight-leg rig enough compliance for curved travel
+ * and collision jitter; beyond that the limb reads as elastic, so the contact
+ * must release and be captured again on the next stance frame.
+ */
+export const FOOT_PLANT_MAX_STRETCH = 1.1
+
+/**
  * Hold a stance foot at one world point while its body translates and turns.
  *
  * Matching stride distance to a fore/aft leg sweep cancels translation only
@@ -274,10 +282,15 @@ export function footPlantPose(
   const vz = dx * sy + dz * cy - hip[2]
   const reach = Math.hypot(vx, vy, vz)
   if (!(reach > 0)) return { contact, direction: [0, -1, 0], stretch: 0 }
+  const direction: [number, number, number] = [vx / reach, vy / reach, vz / reach]
+  const stretch = Math.min(reach / legLength, FOOT_PLANT_MAX_STRETCH)
+  if (reach > legLength * FOOT_PLANT_MAX_STRETCH) {
+    return { contact: null, direction, stretch }
+  }
   return {
     contact,
-    direction: [vx / reach, vy / reach, vz / reach],
-    stretch: reach / legLength,
+    direction,
+    stretch,
   }
 }
 

@@ -26,6 +26,7 @@ import {
   footForwardOffset,
   footHeight,
   footPlantPose,
+  FOOT_PLANT_MAX_STRETCH,
   gaitBodyLift,
   gaitCadence,
   gaitFootFraction,
@@ -799,6 +800,53 @@ describe('animal gait (design.md §19, points 228/255/300 — planted feet, no s
     expect(Math.hypot(lastBody.x - firstBody.x, lastBody.z - firstBody.z)).toBeGreaterThan(GOAT.legLength * 0.5)
     expect(lastBody.yaw - firstBody.yaw).toBeGreaterThan(0.25)
     expect(footPlantPose(contact, false, lastBody, leg.hip, 0, GOAT.legLength).contact).toBeNull()
+  })
+
+  it('releases a planted foot before an in-place turn can stretch its leg', () => {
+    const leg = buildGoatParts().legs[0]
+    const body = { x: 0, y: 0, z: 0, yaw: 0 }
+    const planted = footPlantPose(null, true, body, leg.hip, 0, GOAT.legLength)
+    let pose = planted
+    let released = false
+
+    for (let k = 1; k <= 80; k++) {
+      pose = footPlantPose(planted.contact, true, { ...body, yaw: (k / 80) * Math.PI }, leg.hip, 0, GOAT.legLength)
+      expect(pose.stretch).toBeLessThanOrEqual(FOOT_PLANT_MAX_STRETCH)
+      if (!pose.contact) released = true
+    }
+
+    expect(released).toBe(true)
+    expect(pose.contact).toBeNull()
+    expect(pose.stretch).toBe(FOOT_PLANT_MAX_STRETCH)
+    // The caller stores the null release; the next stance frame captures the
+    // ordinary gait endpoint at the body's new heading instead of stretching.
+    const replanted = footPlantPose(pose.contact, true, { ...body, yaw: Math.PI }, leg.hip, 0, GOAT.legLength)
+    expect(replanted.contact).not.toBeNull()
+    expect(replanted.stretch).toBeCloseTo(1, 12)
+  })
+
+  it('keeps an ordinary straight walking stance planted at its built leg length', () => {
+    const leg = buildGoatParts().legs.find((candidate) => candidate.phaseOffset === 0)!
+    const touchdownPhase = -Math.PI / 2
+    const stanceTravel = GOAT.stride * GAIT_DUTY
+    let contact = null as ReturnType<typeof footPlantPose>['contact']
+
+    for (let k = 0; k <= 80; k++) {
+      const distance = (k / 80) * stanceTravel
+      const phase = touchdownPhase + gaitPhase(distance, GOAT.cadence)
+      const pose = footPlantPose(
+        contact,
+        true,
+        { x: 0, y: gaitBodyLift(phase, GOAT.legLength), z: distance, yaw: 0 },
+        leg.hip,
+        legSwingAngle(phase, leg.phaseOffset),
+        GOAT.legLength,
+      )
+      contact = pose.contact
+
+      expect(contact).not.toBeNull()
+      expect(pose.stretch).toBeCloseTo(1, 12)
+    }
   })
 
   it('one stride carries the body exactly the foot’s stance ground-travel (no skate, no mince)', () => {
