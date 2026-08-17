@@ -3410,6 +3410,15 @@ Build order, chosen so no two parallel agents own the same file:
   exactly: a streaming behaviour measured against a settle rather than against its own
   condition. Fix it by polling until the anchor's instance count is non-zero, not by
   lengthening the settle.
+  MEASURED AGAIN 17.08.2026 ON MAIN, and it is no longer only a branch's problem: the same
+  check read `{samples:[0,0,0,0,0]}` TWICE in one enrichments run on a feature branch and
+  then again on plain `main` in a section-only run — same numbers every time, no rotation.
+  Two agents were building during all three, so the quiet-machine reading that would tell
+  the known load flake apart from a DEAD streamer is still owed, and it is the deciding
+  measurement: `{samples:[18,…]}` confirms the flake and the poll fix above, another
+  `{samples:[0,…]}` on a quiet box means the desert anchor streams nothing at all any more,
+  which is a player-visible regression of the §19.9 dressing and belongs in its own point
+  rather than here. Take that reading before touching the check.
 
 - [ ] 309. SERVING-MODEL DEGRADATION: REPAIR + TRIPWIRE (user 25.07.2026). REPAIR: the
   late-evening session of 24.07 ran silently on Haiku 4.5 (proven by the Co-Authored-By
