@@ -182,60 +182,6 @@ put it is the mistake this line exists to stop.
   the user has asked for the cause twice.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 705. The board is republished once per guard correction, instead of once at the end
-  (measured 17.08.2026, the cause behind the throttling that point 704 only survives). Reading
-  `board/board.html` from `raw.githubusercontent.com` answered HTTP 429 from inside the
-  container AND in the user's browser, so it is not the reader's address that is throttled — it
-  is the WRITE RATE: one session published about a dozen times in fifty minutes. That is not
-  carelessness but the design. `scripts/board.mjs` couples the card edit and the publish into
-  one step — its `edit()` applies the transform, rotates the archive and publishes — and there
-  is no edit-without-publish mode at all. The guard chain then multiplies it: `board-first-guard`,
-  `dashboard-guard`'s focus reconcile, `dashboard-conciseness-guard`, `dashboard-card-topic-guard`
-  and `queue-order-guard` each demanded a correction one after another, and every correction was
-  another publish of the whole board. Point 704 makes the READING side survive a refusal; this
-  point removes what causes it.
-  FINAL STATE:
-  - `board.mjs` gains a staged mode in which several card edits accumulate in the file and the
-    publish is one explicit closing step. The one-shot form stays the default for a single edit,
-    so no caller has to learn a new protocol for the common case.
-  - The board checks run TOGETHER against the FILE before that one publish, so every objection
-    appears in one pass instead of one per turn. `guard-preflight.mjs` already does nearly this —
-    it named all three board guards in a single call — so the staged publish asks it, rather than
-    discovering the guards one refusal at a time.
-  - A ceiling on publishes per turn that ABORTS LOUDLY when it is reached, naming what was
-    published and what was refused. A rate that silently keeps writing is how the quota was spent
-    without anyone noticing.
-  - The batch pause written for this throttling (`.claude/batch-paused`, 17.08.2026) is lifted as
-    part of this point, once the transport answers 200 again.
-  VERIFIABLE: Vitest over the staged controller — several edits accumulate with no publish, the
-  closing step publishes once, the ceiling aborts on the publish past the limit and names both
-  sides; plus a driven run of the sequence that produced this finding (a card edit that five
-  guards object to in turn) ending with exactly one publish.
-  Criticality: medium — it spends a shared quota the user's only window depends on, and the
-  failure is invisible to the session that causes it.
-  Bundle: Chat & Tafel.
-
-- [ ] 706. A queue command swallows the text behind a flag and still reports success
-  (measured 17.08.2026 against the code and the stored state, while filing points). `parseSetArgs`
-  in `scripts/board-queue-core.mjs` treats `--title`/`--estimate` as a MODE switch and pushes every
-  following argument into THAT bucket (`buckets[field].push(a)`). So `set 702 --estimate "~2 h"
-  "<prose>"` files the prose under `estimate`, where `setQueueEntry` discards it while normalising —
-  what remains stored is `~2 h`, and the card text was never there. The command reported `estimate
-  for point 702 stored` and said nothing about the swallowed argument. The cost is not only the lost
-  text: it forces three calls per card (title, body, estimate) instead of the ONE the usage line
-  offers, and with the edit-publish coupling each of those was another publish.
-  FINAL STATE:
-  - An argument the parser does not use as what the caller plainly meant is REFUSED LOUDLY instead
-    of dropped: text after `--estimate` that does not read as a duration aborts and names the right
-    order. The same holds for `--title` followed by more than a title.
-  - The success line names EVERY field it set, so a missing one is visible in the output.
-  VERIFIABLE: Vitest over `parseSetArgs` with exactly this call — the mixed form refused with the
-  correct order named, the well-formed three-field call accepted, and the success line listing each
-  field it wrote.
-  Criticality: low — one command's argument handling, but it silently discards the user-visible
-  text of a board card.
-  Bundle: Chat & Tafel.
-
 - [ ] 707. The preflight cannot judge four wired guards, and those four then block one at a time
   (measured 17.08.2026). `guard-preflight.mjs --for answer` says so itself: `ci-status-guard,
   timestamp-guard, decision-card-guard, batch-progress-guard are wired and were NOT JUDGED here`.
@@ -290,6 +236,60 @@ put it is the mistake this line exists to stop.
   a place a step gets forgotten.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 705. The board is republished once per guard correction, instead of once at the end
+  (measured 17.08.2026, the cause behind the throttling that point 704 only survives). Reading
+  `board/board.html` from `raw.githubusercontent.com` answered HTTP 429 from inside the
+  container AND in the user's browser, so it is not the reader's address that is throttled — it
+  is the WRITE RATE: one session published about a dozen times in fifty minutes. That is not
+  carelessness but the design. `scripts/board.mjs` couples the card edit and the publish into
+  one step — its `edit()` applies the transform, rotates the archive and publishes — and there
+  is no edit-without-publish mode at all. The guard chain then multiplies it: `board-first-guard`,
+  `dashboard-guard`'s focus reconcile, `dashboard-conciseness-guard`, `dashboard-card-topic-guard`
+  and `queue-order-guard` each demanded a correction one after another, and every correction was
+  another publish of the whole board. Point 704 makes the READING side survive a refusal; this
+  point removes what causes it.
+  FINAL STATE:
+  - `board.mjs` gains a staged mode in which several card edits accumulate in the file and the
+    publish is one explicit closing step. The one-shot form stays the default for a single edit,
+    so no caller has to learn a new protocol for the common case.
+  - The board checks run TOGETHER against the FILE before that one publish, so every objection
+    appears in one pass instead of one per turn. `guard-preflight.mjs` already does nearly this —
+    it named all three board guards in a single call — so the staged publish asks it, rather than
+    discovering the guards one refusal at a time.
+  - A ceiling on publishes per turn that ABORTS LOUDLY when it is reached, naming what was
+    published and what was refused. A rate that silently keeps writing is how the quota was spent
+    without anyone noticing.
+  - The batch pause written for this throttling (`.claude/batch-paused`, 17.08.2026) is lifted as
+    part of this point, once the transport answers 200 again.
+  VERIFIABLE: Vitest over the staged controller — several edits accumulate with no publish, the
+  closing step publishes once, the ceiling aborts on the publish past the limit and names both
+  sides; plus a driven run of the sequence that produced this finding (a card edit that five
+  guards object to in turn) ending with exactly one publish.
+  Criticality: medium — it spends a shared quota the user's only window depends on, and the
+  failure is invisible to the session that causes it.
+  Bundle: Chat & Tafel.
+
+- [ ] 706. A queue command swallows the text behind a flag and still reports success
+  (measured 17.08.2026 against the code and the stored state, while filing points). `parseSetArgs`
+  in `scripts/board-queue-core.mjs` treats `--title`/`--estimate` as a MODE switch and pushes every
+  following argument into THAT bucket (`buckets[field].push(a)`). So `set 702 --estimate "~2 h"
+  "<prose>"` files the prose under `estimate`, where `setQueueEntry` discards it while normalising —
+  what remains stored is `~2 h`, and the card text was never there. The command reported `estimate
+  for point 702 stored` and said nothing about the swallowed argument. The cost is not only the lost
+  text: it forces three calls per card (title, body, estimate) instead of the ONE the usage line
+  offers, and with the edit-publish coupling each of those was another publish.
+  FINAL STATE:
+  - An argument the parser does not use as what the caller plainly meant is REFUSED LOUDLY instead
+    of dropped: text after `--estimate` that does not read as a duration aborts and names the right
+    order. The same holds for `--title` followed by more than a title.
+  - The success line names EVERY field it set, so a missing one is visible in the output.
+  VERIFIABLE: Vitest over `parseSetArgs` with exactly this call — the mixed form refused with the
+  correct order named, the well-formed three-field call accepted, and the success line listing each
+  field it wrote.
+  Criticality: low — one command's argument handling, but it silently discards the user-visible
+  text of a board card.
+  Bundle: Chat & Tafel.
+
 - [ ] 709. A unit test passes or fails by how deeply the test runner happens to be nested
   (measured 17.08.2026, three reproductions in a row, after the same suite had been green
   twenty minutes earlier on the identical commit). `scripts/container-ask-guard-core.test.mjs`
@@ -324,6 +324,26 @@ put it is the mistake this line exists to stop.
   Criticality: medium — it is a gate that blocks correct work and passes incorrect work
   depending on who started it, and the red it produces names nothing that would lead anyone to
   the cause.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 710. The remaining forty-five sequences of the multi-step analysis are worked into the
+  order, bundle-first (the blind-parallel stage of 17.08.2026, run on the user's instruction).
+  The union in `local/multistep-analysis-17-08/multistep-union.json` holds 57 accounted entries;
+  its six priority findings already resolve to points 700, 701, 705, 707 and 708, but 45 entries
+  named only by Sol's list stand nowhere in the work order, each with its own defect line — and
+  `local/` is git-ignored, so nothing but this point keeps them from rotting with the checkout.
+  FINAL STATE:
+  - Every union entry is either MAPPED to a standing point (named in the mapping), FILED into an
+    existing bundle per bundle-first (a new point only where no bundle fits), or REJECTED with a
+    one-line reason. The mapping is committed under `docs/` so it survives the checkout.
+  - The analysis artefacts (lists A and B and the union) move with it into the repository, since
+    they are now the evidence a committed mapping cites.
+  - Priority follows the user's instruction of 17.08.2026: process cleanup, redundant consumption
+    and session sizes first; nothing is filed as a feature point.
+  VERIFIABLE: the committed mapping accounts for all 57 ids — a Vitest case over the mapping file
+  checks the id set against the union and fails on an unaccounted entry.
+  Criticality: low — it is bookkeeping over an existing analysis, but losing it silently would
+  discard a paid-for four-eyes stage.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 662. The context boundary must also fire without a tick (user 12.08.2026: "Außerdem ist
