@@ -1452,13 +1452,20 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       const span = Math.hypot(down.x - up.x, down.z - up.z) || 1
       const ax = (down.x - up.x) / span
       const az = (down.z - up.z) / span
-      // Long enough for the roaming phase (~55 s, and it waits for the off-game
-      // boulder to be named) and the whole cycle that follows it.
+      // The window is a BOUND, not the cost: every condition measured below is
+      // monotone — counts only grow, the nearest distances only shrink, a
+      // crossing once seen stays seen — so the replay stops at the first frame
+      // on which all of them already hold, and 600 s is how long it may take.
+      // The bound is wide by need: a run-phase crossing is a sparse event under
+      // the shipped roam length (roaming is ~65 % of the round's time), and the
+      // latest first crossing measured below falls at 447 s.
+      const stood = BANK_CFG.standOff + BANK_CFG.reachDistance
       const nearest = { up: Infinity, down: Infinity }
       const side = v.children.map(() => ({ before: 0, crossed: false }))
       const dt = 1 / 60
-      for (let t = 0; t < 200; t += dt) {
+      for (let t = 0; t < 600; t += dt) {
         frame(v, dt)
+        const running = v.bank!.phase === 'run'
         for (let i = 0; i < v.children.length; i++) {
           const c = v.children[i]
           nearest.up = Math.min(nearest.up, Math.hypot(c.x - up.x, c.z - up.z))
@@ -1469,9 +1476,23 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
           const along = (c.x - mid.x) * ax + (c.z - mid.z) * az
           if (Math.abs(along) <= 1) continue
           const now = along > 0 ? 1 : -1
-          if (side[i].before !== 0 && now !== side[i].before) side[i].crossed = true
+          // The side is TRACKED through every phase — so the side a child holds
+          // when a run opens is known — but a flip COUNTS only while the round
+          // is in its run phase: a child drifting across the middle while
+          // roaming or walking down with the gather is not "the stretch was
+          // run", however many runs happen elsewhere in the window.
+          if (running && side[i].before !== 0 && now !== side[i].before) side[i].crossed = true
           side[i].before = now
         }
+        if (
+          v.bank!.runs > 0 &&
+          v.bank!.cycles > 0 &&
+          nearest.up <= stood &&
+          nearest.down <= stood &&
+          Math.min(nearest.up, nearest.down) <= BANK_CFG.reachDistance &&
+          side.some((s) => s.crossed)
+        )
+          break
       }
       // A CYCLE WAS PLAYED — not merely a phase clock ticking over a group that
       // never arrived, which is exactly what the plain circle produced.
@@ -1479,18 +1500,23 @@ describe('the children`s bank round can reach its own stage (work-order 687)', (
       expect(v.bank!.cycles).toBeGreaterThan(0)
       // BOTH ENDS OF THE STAGE WERE STOOD AT: a child at its station is
       // `standOff` from its rock, so this is the group at each end rather than
-      // near one of them. Measured up/down: 1.50/1.61 (bambara), 1.50/1.50
-      // (nubian), 1.50/2.70 (mandinka).
-      const stood = BANK_CFG.standOff + BANK_CFG.reachDistance
+      // near one of them.
       expect(nearest.up).toBeLessThanOrEqual(stood)
       expect(nearest.down).toBeLessThanOrEqual(stood)
       // ...and one of them was TOUCHED, inside the reach the arrival is judged
       // by — so a run can end in a `ROCK` at the far stone and not only in tags.
       expect(Math.min(nearest.up, nearest.down)).toBeLessThanOrEqual(BANK_CFG.reachDistance)
-      // AND THE STRETCH WAS RUN: somebody went from one side of its middle to the
-      // other. That middle is where the browser section plants the traveller, so
-      // this is the pure half of "the children walk PAST him". All four crossed
-      // in all three villages.
+      // AND THE STRETCH WAS RUN: somebody went from one side of its middle to
+      // the other DURING A RUN. That middle is where the browser section plants
+      // the traveller, so this is the pure half of "the children walk PAST him"
+      // — and it must be the run that carries them past, not a drift across the
+      // middle while roaming beside an unrelated run, which the uncoupled count
+      // accepted. Measured with the phase coupling over the full 600 s bound:
+      // 2 of 4 children cross during runs (bambara@42, first at 251 s), 3 of 4
+      // (bambara@2972259115, first at 80 s), 1 of 4 (nubian@42, first at
+      // 447 s), 4 of 4 (mandinka@99, first at 228 s) — often the catcher
+      // running to meet the group is the first across the middle, and most
+      // runs end in tags short of it, which is why the event is sparse.
       expect(side.filter((s) => s.crossed).length).toBeGreaterThan(0)
     })
   }
