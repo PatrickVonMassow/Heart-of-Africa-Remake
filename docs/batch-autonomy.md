@@ -343,13 +343,17 @@ How it works:
    blocks the handover with named recovery choices and drains first
    (`--handover-check` tells the two states apart) — EXCEPT a RUNNING
    VERIFICATION (point 700): a declared `--log` whose run record
-   (`<log>.run.json`, written by `scripts/verify/run-logged.mjs`) can be read
-   names the run — suites, backends, the HEAD it covers, pid, and the receipt
-   path the record becomes at close — so it TRANSFERS like a pushed branch, and
-   the successor awaits the receipt and reads the verdict instead of the
-   session draining a 25-minute suite past the very mark at which leaving is
-   worth the most. A bare log with no record still proves nothing and still
-   blocks. The boundary is TWO-PHASE
+   (`<log>.run.json`, written by `scripts/verify/run-logged.mjs`) names the
+   run — suites, backends, the HEAD it covers, pid, and the receipt path the
+   record becomes at close — TRANSFERS like a pushed branch, and the successor
+   awaits the receipt and reads the verdict instead of the session draining a
+   25-minute suite past the very mark at which leaving is worth the most. The
+   record is held to the same evidence bar as a checkpoint: it must name a
+   LIVE run (pid probed alive) or a receipt that already exists, and it must
+   cover the HEAD being handed over — a record saying "running" over a dead
+   pid, or a run of another commit, BLOCKS by name, because a successor would
+   otherwise await a receipt that never arrives. A bare log with no record
+   still proves nothing and still blocks. The boundary is TWO-PHASE
    (point 675 closed the marker-deletion defeat): `node scripts/batch-boundary.mjs
    --prepare <point>` validates the condition and names ALL the bookkeeping (the
    card, the publish) while writing NO marker — so the bookkeeping can no longer

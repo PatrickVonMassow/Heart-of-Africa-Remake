@@ -1924,35 +1924,70 @@ describe('assessTransfer — committed-and-pushed checkpoints decide transferabi
   // The 17.08.2026 defeat: a background suite run (pid + log, no branch) made
   // `--prepare --context` demand a DRAIN, pinning the session past the very
   // mark at which leaving is worth the most. A log whose RUN RECORD can be read
-  // is a named, awaitable run, so it is adoptable output.
+  // is a named, awaitable run, so it is adoptable output — held to the same
+  // evidence bar as a branch (Sol review of d0aebb6, finding 2): live or
+  // receipted, and covering the HEAD being handed over.
+  const HEAD_NOW = 'abc1234'
   const run = {
     recordPath: '/repo/local/verify-logs/x.log.run.json',
     suites: ['world', 'polish'],
     backends: ['webgl'],
     head: 'abc1234',
     pid: 4242,
+    alive: true,
     log: 'local/verify-logs/x.log',
     status: 'running',
+    hasReceipt: false,
   }
+  const logItem = (r) => ({ kind: 'log', describe: 'log x.log', checkpoint: null, run: r })
 
-  it('a declared run WITH a record transfers — the handover proceeds instead of demanding a drain', () => {
-    const t = assessTransfer({ items: [{ kind: 'log', describe: 'log x.log', checkpoint: null, run }] })
+  it('a LIVE declared run transfers — the handover proceeds instead of demanding a drain', () => {
+    const t = assessTransfer({ items: [logItem(run)], headNow: HEAD_NOW })
     expect(t.transferable).toBe(true)
     expect(t.runs).toEqual([run])
   })
 
+  it('a FINISHED run with its receipt transfers too — the verdict is readable now, dead pid or not', () => {
+    const finished = { ...run, status: 'finished', alive: false, hasReceipt: true }
+    const t = assessTransfer({ items: [logItem(finished)], headNow: HEAD_NOW })
+    expect(t.transferable).toBe(true)
+    expect(t.runs).toEqual([finished])
+  })
+
+  it('a record still saying "running" over a DEAD pid blocks — the receipt would never arrive', () => {
+    const t = assessTransfer({ items: [logItem({ ...run, alive: false })], headNow: HEAD_NOW })
+    expect(t.transferable).toBe(false)
+    expect(t.blockers[0].why).toContain('receipt that never arrives')
+    // …and an UNPROBEABLE pid is unknown, which is not evidence of life either.
+    expect(assessTransfer({ items: [logItem({ ...run, alive: null })], headNow: HEAD_NOW }).transferable).toBe(false)
+  })
+
+  it('a run of ANOTHER HEAD blocks, naming both commits', () => {
+    const t = assessTransfer({ items: [logItem({ ...run, head: 'ffff999' })], headNow: HEAD_NOW })
+    expect(t.transferable).toBe(false)
+    expect(t.blockers[0].why).toContain('ffff999')
+    expect(t.blockers[0].why).toContain(HEAD_NOW)
+  })
+
+  it('an UNVERIFIABLE HEAD blocks — established evidence only', () => {
+    expect(assessTransfer({ items: [logItem({ ...run, head: null })], headNow: HEAD_NOW }).transferable).toBe(false)
+    expect(assessTransfer({ items: [logItem(run)], headNow: null }).transferable).toBe(false)
+    // A short recorded head still covers the full sha it abbreviates.
+    expect(
+      assessTransfer({ items: [logItem(run)], headNow: 'abc1234def5678900000' }).transferable,
+    ).toBe(true)
+  })
+
   it('a declared run WITHOUT a record keeps today\'s refusal — a bare log proves nothing', () => {
-    const t = assessTransfer({ items: [{ kind: 'log', describe: 'log x.log', checkpoint: null, run: null }] })
+    const t = assessTransfer({ items: [logItem(null)], headNow: HEAD_NOW })
     expect(t.transferable).toBe(false)
     expect(t.blockers[0].why).toContain('only pids/logs')
   })
 
   it('a run rides beside a pushed branch, and both are recorded for the successor', () => {
     const t = assessTransfer({
-      items: [
-        { kind: 'branch', describe: 'branch feat/700-x', checkpoint: pushed },
-        { kind: 'log', describe: 'log x.log', checkpoint: null, run },
-      ],
+      items: [{ kind: 'branch', describe: 'branch feat/700-x', checkpoint: pushed }, logItem(run)],
+      headNow: HEAD_NOW,
     })
     expect(t.transferable).toBe(true)
     expect(t.checkpoints).toHaveLength(1)
@@ -1963,8 +1998,9 @@ describe('assessTransfer — committed-and-pushed checkpoints decide transferabi
     const t = assessTransfer({
       items: [
         { kind: 'branch', describe: 'branch feat/700-x', checkpoint: { ...pushed, remoteSha: null } },
-        { kind: 'log', describe: 'log x.log', checkpoint: null, run },
+        logItem(run),
       ],
+      headNow: HEAD_NOW,
     })
     expect(t.transferable).toBe(false)
   })
@@ -1990,13 +2026,14 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
     receipt: null,
   }
 
-  it('pairs <log>.run.json and keeps only what the successor needs', () => {
+  it('pairs <log>.run.json, PROBES the pid and keeps only what the successor needs', () => {
     const seen = []
     const r = runRecordFor('/repo/local/verify-logs/x.log', {
       read: (p) => {
         seen.push(p)
         return record
       },
+      probe: (pid) => ({ exists: pid === 77, startedAt: null }),
     })
     expect(seen[0].replace(/\\/g, '/')).toBe('/repo/local/verify-logs/x.log.run.json')
     expect(r).toEqual({
@@ -2005,9 +2042,27 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
       backends: ['webgpu'],
       head: 'abc1234',
       pid: 77,
+      alive: true,
       log: 'local/verify-logs/x.log',
       status: 'running',
+      hasReceipt: false,
     })
+  })
+
+  it('a dead pid, a throwing probe and an absent pid read false / null / null — never assumed alive', () => {
+    const withProbe = (probe, rec = record) => runRecordFor('/repo/x.log', { read: () => rec, probe })
+    expect(withProbe(() => ({ exists: false })).alive).toBe(false)
+    expect(
+      withProbe(() => {
+        throw new Error('EPERM')
+      }).alive,
+    ).toBe(null)
+    expect(withProbe(() => ({ exists: true }), { ...record, pid: null }).alive).toBe(null)
+  })
+
+  it('reads the receipt off the record itself', () => {
+    const done = { ...record, status: 'finished', receipt: { exitCode: 0 } }
+    expect(runRecordFor('/repo/x.log', { read: () => done, probe: () => ({ exists: false }) }).hasReceipt).toBe(true)
   })
 
   it('answers null for a missing or unreadable record, and for an empty path', () => {
@@ -2018,7 +2073,7 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
         },
       }),
     ).toBe(null)
-    expect(runRecordFor('/repo/x.log', { read: () => 'not an object' })).toBe(null)
+    expect(runRecordFor('/repo/x.log', { read: () => 'not an object', probe: () => ({ exists: false }) })).toBe(null)
     expect(runRecordFor('', { read: () => record })).toBe(null)
   })
 })

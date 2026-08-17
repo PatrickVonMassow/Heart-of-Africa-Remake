@@ -576,17 +576,56 @@ export function assessInFlight({
  * session past the watermark by demanding a drain. A log WITHOUT a record
  * still proves nothing and still counts as none.
  *
+ * THE RECORD IS HELD TO THE SAME EVIDENCE BAR AS A BRANCH (Sol review of
+ * d0aebb6, finding 2 — a nonempty recordPath alone proved nothing). Like a
+ * checkpoint must be committed AND pushed, a run must be VERIFIABLY worth
+ * inheriting: (a) it names a LIVE run (`status: running` with its pid probed
+ * alive) or a receipt that ALREADY exists (`finished`/receipt written — the
+ * verdict is readable now), and (b) it covers the HEAD being handed over
+ * (`headNow`). A record that says `running` over a dead pid is a wrapper that
+ * died unstamped — a successor would await a receipt that never arrives, the
+ * exact failure this mechanism exists to prevent — and a run of another HEAD
+ * verifies nothing about the state being handed over. Each failure BLOCKS by
+ * name; evidence that cannot be established never counts as established.
+ *
  * Returns { transferable, blockers: [{ describe, why }], checkpoints, runs }.
  */
-export function assessTransfer({ items = [] } = {}) {
+export function assessTransfer({ items = [], headNow = null } = {}) {
   const list = Array.isArray(items) ? items : []
   const blockers = []
   const checkpoints = []
   const runs = []
   let output = 0
+  const sameHead = (a, b) => {
+    const x = String(a ?? '').toLowerCase()
+    const y = String(b ?? '').toLowerCase()
+    return x.length > 0 && y.length > 0 && (x.startsWith(y) || y.startsWith(x))
+  }
   for (const item of list) {
     if (item?.kind === 'log' && item.run && typeof item.run.recordPath === 'string' && item.run.recordPath) {
-      runs.push(item.run)
+      const run = item.run
+      const describe = String(item.describe ?? 'log')
+      const receiptExists = run.hasReceipt === true || run.status === 'finished'
+      const live = run.status === 'running' && run.alive === true
+      if (!receiptExists && !live) {
+        blockers.push({
+          describe,
+          why:
+            run.status === 'running'
+              ? 'its run record says "running" but the pid is gone or unverifiable — a successor would await a receipt that never arrives'
+              : `its run record is in state "${run.status ?? 'unknown'}" with no receipt — nothing to await and nothing to read`,
+        })
+      } else if (!sameHead(run.head, headNow)) {
+        blockers.push({
+          describe,
+          why:
+            run.head && headNow
+              ? `its run covers HEAD ${run.head}, not the ${headNow} being handed over`
+              : 'the commit its run covers could not be verified against the HEAD being handed over',
+        })
+      } else {
+        runs.push(run)
+      }
       continue
     }
     if (!OUTPUT_KINDS.has(item?.kind)) continue

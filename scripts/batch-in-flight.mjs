@@ -540,8 +540,12 @@ export function isAncestor(ancestorSha, sha, { cwd = REPO_ROOT } = {}) {
  * than importing it: scripts/verify/ is deliberately absent from the temp
  * copies the spawned guard tests run in, and batch-progress-guard imports this
  * module — a static import would take every one of those guards down.
+ *
+ * `alive` and `hasReceipt` ride along because the transfer bar demands them
+ * (Sol review of d0aebb6, finding 2): the pid is PROBED here, not believed,
+ * and the receipt's existence is read off the record itself.
  */
-export function runRecordFor(logPath, { read } = {}) {
+export function runRecordFor(logPath, { read, probe = probePid } = {}) {
   try {
     const declared = absPath(logPath)
     if (!declared) return null
@@ -549,15 +553,44 @@ export function runRecordFor(logPath, { read } = {}) {
     const readOne = read ?? ((p) => JSON.parse(readFileSync(p, 'utf8')))
     const r = readOne(path)
     if (!r || typeof r !== 'object') return null
+    const pid = typeof r.pid === 'number' ? r.pid : null
+    let alive = null
+    if (pid !== null && pid > 0) {
+      try {
+        alive = probe(pid).exists === true
+      } catch {
+        alive = null // an unprobeable pid is UNKNOWN, which the bar reads as not-live
+      }
+    }
     return {
       recordPath: path,
       suites: Array.isArray(r.suites) ? r.suites : [],
       backends: Array.isArray(r.backends) ? r.backends : [],
       head: typeof r.head === 'string' ? r.head : null,
-      pid: typeof r.pid === 'number' ? r.pid : null,
+      pid,
+      alive,
       log: typeof r.log === 'string' ? r.log : null,
       status: typeof r.status === 'string' ? r.status : null,
+      hasReceipt: r.receipt != null && typeof r.receipt === 'object',
     }
+  } catch {
+    return null
+  }
+}
+
+/** The short HEAD of this checkout, or null — what a handed-over run must
+ *  cover. Any git failure answers null, which the transfer bar refuses as
+ *  unverifiable rather than waving through. */
+export function currentHeadOf({ cwd = REPO_ROOT } = {}) {
+  try {
+    const out = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    return out || null
   } catch {
     return null
   }
@@ -641,7 +674,7 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
       commit: null,
     }
   }
-  const assessment = assessTransfer({ items: transferItems(declaration, { cwd }) })
+  const assessment = assessTransfer({ items: transferItems(declaration, { cwd }), headNow: currentHeadOf({ cwd }) })
   if (!assessment.transferable) {
     return { blocked: true, message: transferBlockMessage(assessment), note: '', commit: null }
   }
