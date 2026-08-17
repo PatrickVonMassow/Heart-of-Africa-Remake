@@ -373,6 +373,15 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   die Kur gegen gesunde Fälle. Ist sie teurer als der Fehler, **buche** ihn mit Zahlen und
   verworfener Kur — verschweigen gilt nicht, still beheben auch nicht."
 
+- **Deine Reihenfolge wird gerankt, aber nicht befolgt.** Die Aufgabenliste ist sortiert, und die
+  KI fängt trotzdem etwas Kleines, Neues an, während halbfertige Zweige herumliegen — das
+  wichtigste Feature ist der älteste unfertige davon. Prüfungen der Sortierung sind dabei grün:
+  Sie prüfen die Liste, nie den Punkt, an dem tatsächlich gearbeitet wird.
+  → *Prompt:* „Bevor du einen **neuen** Punkt anfängst: nenn ihn, nenn den vordersten offenen
+  Punkt der Reihenfolge und jeden angefangenen Zweig, der älter ist. Weichst du ab, **begründe es
+  in einem Satz** — abweichen darfst du, unbemerkt abweichen nicht. Und leere angefangene Arbeit,
+  bevor du neue aufmachst."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -411,4 +420,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: d500cf347ac0ed00b030aa0ff1753cbebe2e9a62364a292a3f6ae6d948056c09 -->
+<!-- GUIDE-FINGERPRINT: 9ed80d43be131ea0c3d47b29a98a44aa6acb8b2b752611ef67a0faea26f2bb4c -->
