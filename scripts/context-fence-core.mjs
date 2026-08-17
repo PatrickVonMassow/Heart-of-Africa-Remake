@@ -35,7 +35,12 @@
 // (quotes honoured, wrappers unwrapped, `bash -c`/`eval`/`$(…)` expanded):
 // each segment's actual invocation decides, and the carrier exemption covers
 // exactly the segment that IS the carrier call.
-import { expandSegments, headAndArgs, segmentInvokesScript } from './command-classify-core.mjs'
+import {
+  expandSegments,
+  headAndArgs,
+  segmentInvokesPathWhere,
+  segmentInvokesScript,
+} from './command-classify-core.mjs'
 
 /** The one command that ends the session — every refusal names it. */
 export const FENCE_END_COMMAND = 'node scripts/batch-boundary.mjs --prepare --context'
@@ -59,14 +64,18 @@ export const FILE_WRITING_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit'])
  *   reaches), delegating an author (`author-sol.mjs`), starting a
  *   cross-vendor review (`review-sol.mjs`) and a delegated ask
  *   (`ask-sol.mjs`) — each begins an expensive new unit of work.
- *   CONSCIOUSLY NOT: `run-wait.mjs` (it AWAITS a receipt — finishing),
- *   `land-point.mjs` and the board/boundary scripts (the exit itself), the
- *   fast gates (`npm run test:unit`/`build`/`lint` gate the in-flight
- *   commit), and a DIRECT `node scripts/verify/<suite>.mjs` call — the
- *   sanctioned launchers are covered, a direct call is outside the sanctioned
- *   path anyway (it writes no transferable run record), and enumerating the
- *   suite list here would couple this core to scripts/verify/, which the
- *   spawned guard tests deliberately run without. Named residual.
+ *   ALSO COVERED: any DIRECT `node scripts/verify/<x>.mjs` call, judged on
+ *   the PATH PREFIX rather than a suite list (Sol review of 534c2ba,
+ *   finding 4b) — it starts exactly the browser work the fence exists to
+ *   prevent, and a prefix enumerates nothing, so the core stays uncoupled
+ *   from scripts/verify/. The AWAITING helper under that prefix
+ *   (`run-wait.mjs` — a receipt-await is finishing, not starting) is
+ *   explicitly allowed; a future finishing helper there joins
+ *   VERIFY_FINISHERS.
+ *   CONSCIOUSLY NOT: `run-wait.mjs` (above), `land-point.mjs` and the
+ *   board/boundary scripts (the exit itself), and the fast gates
+ *   (`npm run test:unit`/`build`/`lint` gate the in-flight commit). No
+ *   further starting path through scripts/verify/ remains known.
  */
 const START_SCRIPTS = {
   'run-all.mjs': 'starting a browser verify run',
@@ -81,12 +90,62 @@ const START_SCRIPTS = {
 const CARRIER_SCRIPT = 'finding.mjs'
 const CARRIER_BASENAME = 'findings-carrier.md'
 
+/** Any `.mjs` under this prefix is the verify work itself (a suite or its
+ *  launcher) — matched as a PREFIX so nothing is enumerated. */
+const VERIFY_PREFIX = /(?:^|\/)scripts\/verify\/[^\s]+\.mjs$/i
+
+/** The finishing helpers under that prefix, allowed by name: awaiting a
+ *  receipt ends a step, it starts none. */
+const VERIFY_FINISHERS = new Set(['run-wait.mjs'])
+
+/** Does this path word name verify work that STARTS (not a finisher)? */
+function startsVerifyPath(p) {
+  if (!VERIFY_PREFIX.test(p)) return false
+  const norm = p.toLowerCase()
+  return !VERIFY_FINISHERS.has(norm.slice(norm.lastIndexOf('/') + 1))
+}
+
+/** npm options that CONSUME the next word as their value. Without consuming
+ *  it, `npm --prefix . test` would read `.` as the subcommand and classify as
+ *  not-starting (Sol review of 534c2ba, finding 4a). The `--opt=value` form
+ *  carries its value inside the flag word and needs no entry here. */
+const NPM_VALUE_OPTIONS = new Set([
+  '--prefix',
+  '-C',
+  '--workspace',
+  '-w',
+  '--registry',
+  '--loglevel',
+  '--userconfig',
+  '--script-shell',
+  '--cache',
+  '--globalconfig',
+  '--omit',
+  '--include',
+])
+
+/** npm's positional words, with every option AND its value stripped, so an
+ *  option value can never be mistaken for the subcommand. */
+function npmPositionals(argTexts) {
+  const pos = []
+  for (let i = 0; i < argTexts.length; i += 1) {
+    const t = argTexts[i]
+    if (!t) continue
+    if (t.startsWith('-')) {
+      if (!t.includes('=') && NPM_VALUE_OPTIONS.has(t)) i += 1 // skip the value too
+      continue
+    }
+    pos.push(t)
+  }
+  return pos
+}
+
 /** `npm test` / `npm t` / `npm run test[:small|:large]` start the browser
  *  regression; `npm run test:unit` (and build/lint) finish the step in
  *  flight. Judged on npm's SUBCOMMAND, never on the string. */
 function npmStartsSuite(head, argTexts) {
   if (head !== 'npm') return false
-  const pos = argTexts.filter((t) => t && !t.startsWith('-'))
+  const pos = npmPositionals(argTexts)
   const sub = (pos[0] ?? '').toLowerCase()
   if (sub === 'test' || sub === 't' || sub === 'tst') return true
   if (sub === 'run' || sub === 'run-script') {
@@ -127,6 +186,11 @@ function segmentStart(seg) {
   }
   for (const [script, what] of Object.entries(START_SCRIPTS)) {
     if (segmentInvokesScript(seg, [script])) return { what: `${what} (\`${seg.raw}\`)`, authoring: false }
+  }
+  // A DIRECT call into scripts/verify/ starts the same browser work the
+  // sanctioned launchers do — judged on the path prefix, finishers excepted.
+  if (segmentInvokesPathWhere(seg, startsVerifyPath)) {
+    return { what: `starting a verify script directly (\`${seg.raw}\`)`, authoring: false }
   }
   // Authoring by REDIRECTION — `echo "- [ ] 999. x" >> TASKS.md` writes the
   // work order without the Edit tool. Judged on the parsed redirect TARGET,

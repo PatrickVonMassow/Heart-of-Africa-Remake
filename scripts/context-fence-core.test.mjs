@@ -33,6 +33,13 @@ describe('over the mark, a STARTING call is denied — naming the mark', () => {
     ['run-logged', { toolName: 'Bash', command: 'node scripts/verify/run-logged.mjs --suite world' }],
     ['run-logged under a wrapper', { toolName: 'Bash', command: 'timeout 600 node scripts/verify/run-logged.mjs' }],
     ['run-all', { toolName: 'Bash', command: 'node scripts/verify/run-all.mjs world' }],
+    // npm option VALUES must never be read as the subcommand (Sol finding 4a).
+    ['npm test behind a value-taking option', { toolName: 'Bash', command: 'npm --prefix . test' }],
+    ['npm test behind a value-less flag', { toolName: 'Bash', command: 'npm --silent test' }],
+    // A DIRECT suite call is the browser work itself — judged on the
+    // scripts/verify/ path prefix, no suite list enumerated (Sol finding 4b).
+    ['a direct suite call', { toolName: 'Bash', command: 'node scripts/verify/world.mjs' }],
+    ['a direct suite call by absolute path', { toolName: 'Bash', command: 'node /workspace/hoa/scripts/verify/polish.mjs' }],
     ['delegating to Sol', { toolName: 'Bash', command: 'node scripts/author-sol.mjs 701' }],
     ['a cross-vendor review run', { toolName: 'Bash', command: 'node scripts/review-sol.mjs --commit abc' }],
     ['a delegated ask run', { toolName: 'Bash', command: 'node scripts/ask-sol.mjs --kind audit --brief "x"' }],
@@ -90,6 +97,7 @@ describe('over the mark, FINISHING calls and reads stay allowed', () => {
     ['the board publish', { toolName: 'Bash', command: 'node scripts/board-publish.mjs' }],
     ['the boundary itself', { toolName: 'Bash', command: 'node scripts/batch-boundary.mjs --prepare --context' }],
     ['awaiting a running verify', { toolName: 'Bash', command: 'node scripts/verify/run-wait.mjs --await' }],
+    ['a build behind a value-taking npm option', { toolName: 'Bash', command: 'npm --prefix . run build' }],
     ['a source edit finishing the step', { toolName: 'Edit', filePath: 'src/world/world.ts' }],
     ['a scripts edit finishing the step', { toolName: 'Edit', filePath: 'scripts/board-core.mjs' }],
     ['the board file', { toolName: 'Edit', filePath: '.batch-dashboard.html' }],

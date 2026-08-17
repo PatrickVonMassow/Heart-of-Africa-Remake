@@ -651,6 +651,26 @@ export function segmentInvokesScript(segment, names = []) {
   return args.some((a) => matches(a.text))
 }
 
+/**
+ * Like `segmentInvokesScript`, but judged by a caller PREDICATE over the
+ * slash-normalised path word — for a rule that hangs on a directory PREFIX
+ * rather than an enumerable script name (the context fence's
+ * `scripts/verify/` rule, point 700). Same interpreter guard, so a grep that
+ * merely mentions such a path never matches.
+ */
+export function segmentInvokesPathWhere(segment, predicate) {
+  const seg = asSegments(segment)[0]
+  if (!seg || typeof predicate !== 'function') return false
+  const matches = (text) => {
+    const p = String(text).replace(/\\/g, '/')
+    if (/\s/.test(p)) return false // a whole quoted command line is judged unwrapped, not here
+    return predicate(p) === true
+  }
+  const head = commandHead(seg)
+  if (!INTERPRETERS.has(head)) return matches(seg.words[0] ? seg.words[0].text : '')
+  return argsOf(seg).some((a) => matches(a.text))
+}
+
 /** Does this segment NAME one of these files as an argument? */
 export function segmentMentionsFile(segment, names = []) {
   const seg = asSegments(segment)[0]
