@@ -507,6 +507,38 @@ put it is the mistake this line exists to stop.
   discard a paid-for four-eyes stage.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 714. A review record silently covers files no reviewer ever saw, once a range outgrows the
+  material budget (measured 17.08.2026 on point 700, round 6). `scripts/review-sol.mjs` assembles
+  the WHOLE range `main..<sha>` as review material and tells the reviewer that a record at the head
+  clears every commit it contains, back to the branch point. At 201567 characters the material was
+  TRUNCATED: the patch ended in `[TRUNCATED: 40207 characters not shown]` and 19 touched files were
+  marked `OMITTED ENTIRELY` — among them `scripts/context-fence-guard.mjs`, its tests, both shim
+  files and the boundary/transfer wiring. Sol reported this itself and refused the whole-range
+  verdict on that ground: the guard's top-level fail-open handling, the reachability of the remedy
+  commands, the signal propagation and the merge itself were not reviewable at all. NOTHING TOLD
+  THE CALLER. The truncation notice is written INTO the material, so it reaches the caller only if
+  the model chooses to mention it — a model that did not would have produced a clean-looking
+  `--record` line covering files nobody read, and the ledger would carry it as a cleared range.
+  That is the worst shape a review record can take, and it gets worse with size: the point big
+  enough to need the review most is the one whose record covers least of it.
+  FINAL STATE:
+  - The tool KNOWS when its material did not fit — it compares what it assembled against what it
+    sent — and on a short-fall it REFUSES to print the record command for the whole range, naming
+    every file that was truncated or omitted. A record is offered only for what was actually read.
+  - A range too large is reviewed in PASSES whose union covers it, each pass a set of files that
+    fits, and the record names the passes it rests on. `mechanism-review.mjs` accepts that
+    composition rather than forcing one verdict over material no single call could hold.
+  - The size at which this begins is MEASURED and named in the tool's own output before the round
+    is spent, so a caller can split the review instead of discovering the gap in the verdict.
+  - Fail-open: a tool that cannot tell whether it fit says so and refuses the record, rather than
+    assuming it did.
+  VERIFIABLE: Vitest over the pure assembly — material under the budget yields a record command,
+  material over it yields the refusal naming the dropped files, and a two-pass composition yields a
+  record naming both passes; plus a case pinning that a truncation notice inside the material alone
+  never satisfies the check.
+  Criticality: high — it does not produce a wrong answer, it produces an unearned CLEARANCE, and
+  the four-eyes rule the whole model policy rests on is only worth what its records cover.
+  Bundle: unbundled (review tooling).
 - [ ] 662. The context boundary must also fire without a tick (user 12.08.2026: "Außerdem ist
   der Kontext dieser Session wieder ziemlich groß geworden. Hättest du in der Zwischenzeit
   nicht mal an eine andere übergeben können? So bekommen wir das sonst nie in den Griff.").
@@ -8449,35 +8481,3 @@ to land than a mechanism that needs a review.
   goes blank exactly when he checks it often.
   Bundle: Chat & Tafel.
 
-- [ ] 714. A review record silently covers files no reviewer ever saw, once a range outgrows the
-  material budget (measured 17.08.2026 on point 700, round 6). `scripts/review-sol.mjs` assembles
-  the WHOLE range `main..<sha>` as review material and tells the reviewer that a record at the head
-  clears every commit it contains, back to the branch point. At 201567 characters the material was
-  TRUNCATED: the patch ended in `[TRUNCATED: 40207 characters not shown]` and 19 touched files were
-  marked `OMITTED ENTIRELY` — among them `scripts/context-fence-guard.mjs`, its tests, both shim
-  files and the boundary/transfer wiring. Sol reported this itself and refused the whole-range
-  verdict on that ground: the guard's top-level fail-open handling, the reachability of the remedy
-  commands, the signal propagation and the merge itself were not reviewable at all. NOTHING TOLD
-  THE CALLER. The truncation notice is written INTO the material, so it reaches the caller only if
-  the model chooses to mention it — a model that did not would have produced a clean-looking
-  `--record` line covering files nobody read, and the ledger would carry it as a cleared range.
-  That is the worst shape a review record can take, and it gets worse with size: the point big
-  enough to need the review most is the one whose record covers least of it.
-  FINAL STATE:
-  - The tool KNOWS when its material did not fit — it compares what it assembled against what it
-    sent — and on a short-fall it REFUSES to print the record command for the whole range, naming
-    every file that was truncated or omitted. A record is offered only for what was actually read.
-  - A range too large is reviewed in PASSES whose union covers it, each pass a set of files that
-    fits, and the record names the passes it rests on. `mechanism-review.mjs` accepts that
-    composition rather than forcing one verdict over material no single call could hold.
-  - The size at which this begins is MEASURED and named in the tool's own output before the round
-    is spent, so a caller can split the review instead of discovering the gap in the verdict.
-  - Fail-open: a tool that cannot tell whether it fit says so and refuses the record, rather than
-    assuming it did.
-  VERIFIABLE: Vitest over the pure assembly — material under the budget yields a record command,
-  material over it yields the refusal naming the dropped files, and a two-pass composition yields a
-  record naming both passes; plus a case pinning that a truncation notice inside the material alone
-  never satisfies the check.
-  Criticality: high — it does not produce a wrong answer, it produces an unearned CLEARANCE, and
-  the four-eyes rule the whole model policy rests on is only worth what its records cover.
-  Bundle: unbundled (review tooling).
