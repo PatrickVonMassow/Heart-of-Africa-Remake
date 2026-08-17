@@ -522,6 +522,26 @@ describe('point 700 — the handover state cannot block the handover', () => {
     expect([...parseNowCardPoints(after)]).toEqual([])
   })
 
+  it('toQueue HONOURS text and estimate on the standing card — an update is never swallowed (Sol finding 5)', () => {
+    const drifted = fullBoard({
+      now: running(),
+      queue: queueEntry(700, 'Die Kontextmarke', '~5 h') + queueEntry(701, 'Nächster Punkt', '~2 h'),
+    })
+    const updated = toQueue(drifted, 700, { text: 'Zurückgestellt: Übergabe an den Nachfolger.', estimate: '~3 h' })
+    expect([...parseQueuePoints(updated)]).toEqual([700, 701])
+    expect(updated).toContain('Zurückgestellt: Übergabe an den Nachfolger.')
+    expect(updated).toContain('~3 h')
+    expect(updated).not.toContain('~5 h')
+    expect(updated).not.toContain('Warum das ansteht.')
+    // A partial update keeps the standing card's OTHER half.
+    const textOnly = toQueue(drifted, 700, { text: 'Nur neuer Text.' })
+    expect(textOnly).toContain('Nur neuer Text.')
+    expect(textOnly).toContain('~5 h')
+    // …and the SECOND identical call throws: the move already happened, there
+    // is no now-card left — the deliberate contract, not an oversight.
+    expect(() => toQueue(toQueue(drifted, 700), 700)).toThrow(/no current-work card/)
+  })
+
   it('toQueue is IDEMPOTENT against board drift — a standing queue card is kept, never doubled', () => {
     // The measured red: the queue already lists the point while its now-card
     // stands; a second card is the dup-in-section that blocked the handover.

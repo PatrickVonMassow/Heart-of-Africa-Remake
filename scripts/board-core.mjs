@@ -504,7 +504,13 @@ export function toNow(html, point, status, { stamp = berlinStamp() } = {}) {
  */
 export function toQueue(html, point, { text, estimate } = {}) {
   const card = nowCard(html, point)
+  // DELIBERATE CONTRACT: after the move (drift path included) there is no
+  // now-card left, so a SECOND identical call throws here — pinned by a case.
   if (!card) throw new Error(`board: no current-work card for point ${point}`)
+  const renderEntry = (title, meta, body) =>
+    `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
+    `<span class="right"><span class="meta">${meta}</span></span>` +
+    `</summary>\n  <div class="body">\n${renderCardBody(body)}\n  </div>\n</details>\n`
   // IDEMPOTENT AGAINST BOARD DRIFT (point 700, measured 17.08.2026): a board
   // that already lists the point in the Warteschlange — however it came to —
   // must not receive a SECOND card for it, because the resulting
@@ -519,16 +525,23 @@ export function toQueue(html, point, { text, estimate } = {}) {
   } catch {
     /* no queue section — the insertion below reports it */
   }
-  if (standing) return html.replace(card, '')
+  if (standing) {
+    const out = html.replace(card, '')
+    // A caller's UPDATE is honoured on the standing card, never swallowed
+    // (Sol review of d0aebb6, finding 5): text replaces its body, estimate its
+    // meta, and what was not given keeps the standing card's own value. The
+    // bare handover call (`queue <n>`) leaves it untouched.
+    if (!text?.trim() && estimate == null) return out
+    const body = text?.trim() || statusOf(standing)
+    if (!body) throw new Error('board: refusing to queue a card with an empty body')
+    const meta = estimate ?? (metaOf(standing).trim() || QUEUE_STUB_META)
+    return out.replace(standing, renderEntry(stripPointPrefix(titleOf(standing), point), meta, body))
+  }
   const body = text?.trim() || statusOf(card)
   if (!body) throw new Error('board: refusing to queue a card with an empty body')
   const hours = spanHours(metaOf(card))
   const meta = estimate ?? (hours == null ? QUEUE_STUB_META : hoursLabel(hours))
-  const title = stripPointPrefix(titleOf(card), point)
-  const entry =
-    `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
-    `<span class="right"><span class="meta">${meta}</span></span>` +
-    `</summary>\n  <div class="body">\n${renderCardBody(body)}\n  </div>\n</details>\n`
+  const entry = renderEntry(stripPointPrefix(titleOf(card), point), meta, body)
   const out = html.replace(card, '')
   const { from } = sectionBounds(out, 'queue')
   return `${out.slice(0, from)}\n${entry}${out.slice(from).replace(/^\n/, '')}`
