@@ -100,6 +100,10 @@ put it is the mistake this line exists to stop.
     beginning a new point. What stays allowed is everything that FINISHES the step in flight
     (commits, pushes, the landing, the board, the boundary itself) and every read. The refusal
     names the mark, the measurement and the one command that ends the session.
+    IT MUST NOT SLOW THE BATCH (user 17.08.2026): the fence ENDS a session, it never idles one —
+    the work moves to a fresh session immediately, and the target is fewer tokens PER POINT, not
+    fewer per hour. A build of this that reduces throughput has missed the point; measure it
+    against 701's per-point ledger, not against a rate.
   - A RUNNING VERIFICATION IS TRANSFERABLE, so it is never a reason to stay: the run records what
     it is (suite, backend, log path, pid, the commit it covers) where a successor can adopt it,
     and `--prepare --context` accepts that instead of demanding a drain. The successor waits for
@@ -128,6 +132,217 @@ put it is the mistake this line exists to stop.
   Criticality: high — it is the batch's dominant cost, the user has now raised it twice, and the
   existing mechanism demonstrably does not bind.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 701. WHAT A TASK COSTS, AND WHETHER THE BUILT LEVERS ACTUALLY MOVE IT (user 17.08.2026:
+  »Ich verstehe nicht, warum der Verbrauch trotz aller bisheriger Maßnahmen so extrem hoch ist«
+  and »Es geht nicht darum, weniger Token pro Zeit zu verbrauchen, sondern darum, dass es weniger
+  pro Task wird«). THE BINDING TARGET IS COST PER FINISHED POINT. Throughput is NOT a lever:
+  slowing the batch, shrinking the agent pool or deferring work is explicitly excluded — a
+  measure that lowers the hourly rate while leaving the per-point cost untouched has failed.
+  WHY THIS POINT EXISTS: a row of levers is BUILT (the point boundary, the context watermark, the
+  bounded verify digest, the delegation brief, the open/archive split of the work order, the doc
+  budgets) and the spend is still dominated by large contexts — 81 % of a week's usage above the
+  150k mark, by the user's own panel. Nobody knows WHICH of those levers is used, how often, and
+  what it saves, because none of them is measured in operation. Four more measures are FILED AND
+  UNBUILT (553 budget per point, 596 the running tail, 597 large tool output, 662 the boundary
+  without a tick) — that alone may be the answer, and it must be established rather than assumed.
+  FINAL STATE:
+  - A LEDGER PER POINT, written where a later session can read it: for every landed point, the
+    tokens it cost, split by origin — the main session, each delegated agent, the cross-vendor
+    reviews, and the big single items (picture reads, suite digests, agent reports). It is
+    derived from what the harness already records (the session transcripts, the agent logs), not
+    from a new accounting layer nobody maintains.
+  - AN EFFECTIVENESS READING PER LEVER, from that same data: how often each built lever actually
+    fired (boundaries taken, watermark crossings, briefs used instead of whole-document reads,
+    digests instead of raw logs), and the measured difference between the points where it fired
+    and the ones where it did not. A lever that cannot be shown to move the per-point cost is
+    named as such — that verdict is the point's product, and a lever that fails is a candidate
+    for removal, because an unused mechanism still costs to carry.
+  - THE THREE LARGEST ITEMS NAMED WITH NUMBERS, since the fix follows the measurement: today's
+    suspects are the picture judgment (a full 1440x900 frame read whole where a crop answers the
+    question), the agent reports (multi-thousand-token prose per round), and the review rounds
+    (a diff plus files per round, three rounds on one small bar today). Each gets a measured
+    share, and only then a proposal.
+  - THE READING IS REPEATABLE, not a one-off study: one command prints it for the last N points,
+    so the next session can ask "did it get cheaper" and get an answer rather than an opinion.
+  VERIFIABLE: the command runs on the real transcripts of the last ten landed points and prints
+  the per-point split; the per-lever reading names, for each built lever, its firing count and
+  the measured difference; and the closing report of this point states the three largest items
+  with their shares. Vitest over the pure parsing/aggregation with recorded fixtures.
+  Criticality: high — it is the measurement every other cost point is currently guessing at, and
+  the user has asked for the cause twice.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 662. THE CONTEXT BOUNDARY MUST ALSO FIRE WITHOUT A TICK (user 12.08.2026: "Außerdem ist
+  der Kontext dieser Session wieder ziemlich groß geworden. Hättest du in der Zwischenzeit
+  nicht mal an eine andere übergeben können? So bekommen wir das sonst nie in den Griff.").
+  THE GAP: the boundary duty (batch-boundary + batch-progress-guard) is keyed to a TICKED
+  point. A point that lands in HALVES — 657's first half merged without a tick — or a day of
+  review rounds on one branch never produces a tick, so one session carried the batch for ~14
+  hours and >150k context while every rule held. The 656 landing WAS a tickable boundary and
+  the session pulled the next point in anyway; nothing blocked that.
+  FINAL STATE: the boundary becomes reachable and OWED at safe moments even without a tick:
+  (1) after any MERGE to main (ticked or not) with no delegated agent in flight, the
+  batch-progress-guard demands the boundary exactly as it does after a tick — a merge is a
+  clean handover point by definition; (2) a session that has held the batch longer than a
+  measured ceiling (calibrate from the cost data: hours or landed merges, not tokens the
+  scripts cannot read) must take the next safe handover instead of choosing to continue; the
+  guard blocks "continue the next queue item" once the ceiling is passed. Attended sessions
+  ask for /clear at the same moments. VERIFIABLE: Vitest over the guard core — a merge without
+  tick and no agent in flight demands the boundary; under the ceiling it does not; the ceiling
+  case refuses the continue-path and allows the boundary path.
+  Criticality: high — 91 % of the project's spend sits above 150k context, and this is the
+  door it walks through.
+  Bundle: unbundled (infrastructure).
+
+- [ ] 553. AN EXPLICIT CONTEXT BUDGET PER POINT, AND A WRITTEN HANDOFF WHEN IT IS SPENT
+  (08.08.2026, chosen BY MEASUREMENT as point 373 requires — the closing measurement is
+  recorded in `docs/batch-autonomy.md`, "The closing measurement under the built levers").
+  THE STATE THE MEASUREMENT LEAVES: under the boundary and the bounded verify digest the
+  rate is 0.988 %/h in the honest full scope (1.091 %/h top-level only), against the
+  ~0.6 %/h that fits the weekly quota — about 1.6× the ceiling, so a further lever is owed.
+  WHY THIS LEVER AND NOT THE OTHERS, from the same figures: 62 % of the counted turns and
+  58 % of the weighted spend come from DELEGATED-AGENT transcripts, so option (b) — moving
+  the reading-heavy part of a point into an agent — only RELOCATES the cost unless the
+  agent's own context is bounded too, and option (a), a boundary at a bundle member, cuts
+  where the bundle scheme no longer claims a saving (`docs/work-packages.md`). Option (c)
+  cuts inside both, which is why it is the one built here.
+  WHAT IS BUILT: a context budget that is MEASURED, not estimated, and that applies to the
+  main session AND to a delegated agent.
+  (a) THE BUDGET IS READ FROM THE SAME PLACE THE MEASUREMENT IS — the turn's context size,
+  derived by the pure core `scripts/measure-context-cost-core.mjs` already uses, so a
+  second accounting is never invented. A calibratable ceiling per point sits with the other
+  batch constants, and the shipped starting value is justified against the measured
+  distribution (median peak 153k, p90 307k in the full scope), not guessed.
+  (b) THE HANDOFF IS WRITTEN, NOT IMPLIED. On crossing the ceiling mid-point the session
+  writes a handoff — what the point is, what is done, what the next session must do first,
+  the branch and the last commit — through a command (`scripts/point-handoff.mjs`) that
+  owns the file's shape, and ENDS. `batch-resume-hook` hands the successor that handoff the
+  way it hands a fresh session the work order, so the successor resumes the POINT rather
+  than re-deriving it. A handoff that names no branch or no next action is refused at the
+  writing, not discovered at the reading.
+  (c) A DELEGATED AGENT OBEYS THE SAME CEILING. Its brief carries the budget, and an agent
+  that spends it returns its handoff as its report instead of building on; the parent
+  re-delegates from that handoff. An agent silently continuing past the ceiling is the case
+  that makes the whole lever cosmetic, so the parent CHECKS the returned report against the
+  agent's own transcript size rather than trusting the claim.
+  (d) `batch-progress-guard` LEARNS THE THIRD LEGAL STOP. Ending is already legal at a
+  closed point with an armed launcher; a spent budget with a written handoff and an armed
+  launcher joins it. Every other stop stays illegal, so the guard can never be talked into
+  an idle stop by writing a handoff for work that was never started.
+  (e) AN ORPHANED BRANCH IS SURFACED, NOT LEFT TO CHANCE (found 11.08.2026). The handoff
+  covers the session that hands over deliberately; it does nothing for the agent that dies
+  without one, and that is the case that actually cost work. Two feature branches sat in
+  the tree unreported — one carrying ~2000 lines for points that still read as untouched,
+  one fully superseded — and the only thing that found them was a resuming session running
+  `git worktree list` on a hunch. So the resume path REPORTS every branch that has commits
+  `main` does not contain and no live agent behind it, with its point, its last commit and
+  its age, exactly as it reports the work order; and a branch whose work has landed under
+  another number is ENDED at that landing rather than left to be re-triaged. VERIFIABLE by
+  Vitest on the pure core — an orphan is listed, a branch with a live agent is not, a
+  contained branch is not — plus the resume hook printing it.
+  MEASURE THE RESULT, as 373 did and on the same tool: `node scripts/measure-context-cost.mjs`
+  for a full day after the lever lands, in BOTH scopes, against the 0.988 %/h this point
+  starts from and the 0.6 %/h that fits. The point counts as delivered when the rate is
+  measured and reported honestly — met or not — never when the mechanism merely runs.
+  VERIFIABLE: pure Vitest on the decision core — a session under the ceiling continues; one
+  over it with a written handoff and an armed launcher may stop; one over it with NO handoff
+  blocks; a handoff missing its branch or its next action is refused; an unreadable
+  transcript ALLOWS the stop (fail-open, as every guard here). Live: one point actually
+  handed over mid-way and finished by the successor from the handoff alone.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): this changes a guard.
+  FOLDED IN FROM POINT 572 (measure 10, "the window boundary inside a point"): that
+  proposal is this lever, differing only in the cut TRIGGER and in demanding a pilot, so
+  it is decided HERE rather than appended as a second owner. THE TRIGGER QUESTION: cut at
+  every green, pushed commit, or at the measured context ceiling this point already
+  defines? Whichever is chosen, it is PILOTED on ONE point and MEASURED against the median
+  (`measure-task-cost.mjs --tasks`) before any rollout, and the rollout is a separate
+  decision taken on that measurement. ACCEPTANCE: a session after a cut continues WITHOUT
+  ASKING A QUESTION — if that does not hold, the pilot is reported as FAILED rather than
+  tuned. Measured target: context per response is a median of 190k and re-read context is
+  75.8 % of the weighted spend; a cut every ~60 responses would put the mean context near
+  73k. This is the one measure on the list that can silently lower work quality — what an
+  agent has learned and not written down is lost at the cut — which is why it is piloted
+  and measured rather than adopted.
+  Criticality: high — this is the batch's dominant running cost, and a lever that reports
+  a saving it did not make is worse than none: it retires the question. The measurement is
+  therefore part of the delivery, not a follow-up.
+  AND IT BINDS THE ATTENDED SESSION, NOT ONLY A DELEGATED POINT (measured 10.08.2026).
+  One attended session absorbed SIX separate user requests plus the two full reports of a
+  blind-parallel analysis in a SINGLE stretch — a dashboard question that grew into a
+  re-ranking, a release re-gating, a work-order cleanup and five branch landings. Nothing
+  stopped it, because every existing ceiling is written for a delegated point and the
+  boundary rule fires only at a CLOSED point, which an attended session in the middle of a
+  conversation never reaches. FINAL STATE: the same budget mechanism counts an attended
+  session's spend, and on crossing the ceiling the Stop chain requires ONE of two answers
+  before the turn may end — the written handoff and a boundary, or a stated reason why this
+  stretch must continue (a merge in flight, a user waiting on this very answer). A NEW topic
+  that is not a continuation of the current one may not be started past the ceiling; it is
+  APPENDED to the work order and taken by the next session. The ceiling is measured, not
+  guessed: it is derived from the same recorded spend this point already reads.
+
+- [ ] 596. THE TAIL IS VISIBLE WHILE IT RUNS (point 572's measure 6). A point's running
+  cost is measurable DURING the point, not only after it: a hook reports when a branch
+  passes three times the median (≈ 17 M weighted), and that report is a DECISION point —
+  re-cut, re-staff, or continue deliberately — never an automatic abort. In the same
+  mechanism, an agent that has run the same browser suite red three times STOPS, writes a
+  diagnosis of what is red and what was tried, and escalates instead of looping.
+  MEASURED TARGET: 10 of 64 points carry 48.8 % of the point-assigned cost, the costliest
+  single point 15.8 % of it with 89.0 % of that in verification.
+  THE DIAGNOSIS MUST LAND WHERE THE SUCCESSOR LOOKS — on the work order or the board, not
+  only inside the agent's report, which nobody reads again. Otherwise the next attempt is
+  the same attempt.
+  THE AUTOMATIC ABORT IS REFUSED, and the refusal is recorded here so it is not proposed a
+  fourth time: a hard turn cap or a four-hour timeout discards work that may be nearly done
+  AND pays a second 5.0 M build socle against a 5.82 M median point; its progress metric
+  ("share of tests passed") is a proxy, and judging by a proxy is the one thing this project
+  does not trade. Our tail points were expensive because the work was hard — the costliest
+  carried 89 % verification — not because a loop ran away.
+  A WALL-CLOCK TRIGGER may join the token trigger once point 599 delivers an honest calendar
+  decomposition; until then there is no honest wall-clock per point to trigger on.
+  A SILENT RUN IS THE THIRD TRIGGER, AND IT IS THE ONE THAT ACTUALLY BLED (measured
+  13.08.2026, ~09:00). On point 657 the third measurement recording produced NO BYTE of
+  output from 02:32 onwards, and the owning session waited on it in 30-second polls past
+  09:00 — six and a half hours spent on a task that was already dead. Nothing puts a
+  DEADLINE on a background recording, nothing harvests a task that stopped writing, and the
+  hand-over the board card itself promised ("should the agent fail again, the fallback model
+  takes it") had no enforcer behind it. So: a delegated run that has written nothing for
+  longer than a calibratable silence window is REPORTED as stalled at the next hook (with
+  its task id, its last output time and its point), the owner is handed the two legal moves
+  — re-run or hand to the fallback model — and the stall lands where the successor looks,
+  on the work order or the board, exactly as the red-three-times diagnosis does. This is NOT
+  the refused automatic abort: nothing is killed on a timer, the silence is only made
+  VISIBLE, because the cost here was not the dead task but the six hours nobody was told.
+  Point 567 (remains of killed runs) owns the reaping; this point owns the report.
+  Criticality: medium — a cap that let a red state pass as green would be worse than the
+  cost it saves, so the escalation path is the mechanism and the abort is not.
+  NOT ON ITS BRANCH 17.08.2026: `feat/595-598-verification-ladder-brief` is named for this point
+  but contains NOTHING of it — measured by reading the whole net diff. It must be built, here or
+  on its own branch; the shared branch lands 595 and 598 alone.
+
+- [ ] 597. LARGE TOOL OUTPUT NEVER ENTERS THE CONTEXT WHOLE (point 572's measure 7). The
+  bounded-output discipline `scripts/verify/run-logged.mjs` already applies to verify runs
+  extends to the other big producers: `git diff` (`--stat` first), `grep` (`-c` or a head
+  bound), file reads (`offset`/`limit` instead of a whole file), `npm ls`, `gh run view`.
+  ERROR OUTPUT STAYS UNCUT — every failing test keeps its name.
+  THE ON-DEMAND PATH IS NAMED, not reinvented: `node scripts/verify/run-logged.mjs --show
+  <log>` already hands back the whole run when the digest is not enough. What must NOT be
+  adopted is the tempting inverse — a runner that returns only the names of failing suites
+  by default; error output stays uncut.
+  MEASURED TARGET: a 10k output entering a point's context at response 20 is re-read by
+  its remaining ~218 responses at 218k weighted, ten responses' worth; the trade pays up
+  to a follow-up-query rate of ~85 %.
+  THE STANDING LOAD IS THE SAME ARITHMETIC ON A LARGER SCALE: 1k of permanently carried
+  text costs 3.27 M per window, so CLAUDE.md alone (~11.4k tokens) is ~4.2 % of it, and
+  per-turn injected text that CHANGES additionally breaks the cache prefix. So: a hook that
+  succeeded says nothing, and the per-turn injections are audited. CONDITIONAL on point
+  599's cache reading, and it cuts TEXT only — never a duty that is enforced rather than
+  remembered.
+  Criticality: low — the one real risk is cutting an error message, which the rule
+  excludes.
+  NOT ON ITS BRANCH 17.08.2026: `feat/595-598-verification-ladder-brief` is named for this point
+  but contains NOTHING of it — measured by reading the whole net diff. It must be built, here or
+  on its own branch; the shared branch lands 595 and 598 alone.
 
 - [ ] 686. THE TAUGHT LANGUAGE IS FIVE CONCEPTS, AND THE CHIEF'S MESSAGE IS FOUR OF THEM (user
   13.08.2026, playing the deployed communication slice).
@@ -1000,28 +1215,6 @@ put it is the mistake this line exists to stop.
   incident's timestamps ends with the working session allowed to push.
   Criticality: high — it silently strands finished work locally, which is the one state nothing
   can rescue.
-  Bundle: unbundled (infrastructure).
-
-- [ ] 662. THE CONTEXT BOUNDARY MUST ALSO FIRE WITHOUT A TICK (user 12.08.2026: "Außerdem ist
-  der Kontext dieser Session wieder ziemlich groß geworden. Hättest du in der Zwischenzeit
-  nicht mal an eine andere übergeben können? So bekommen wir das sonst nie in den Griff.").
-  THE GAP: the boundary duty (batch-boundary + batch-progress-guard) is keyed to a TICKED
-  point. A point that lands in HALVES — 657's first half merged without a tick — or a day of
-  review rounds on one branch never produces a tick, so one session carried the batch for ~14
-  hours and >150k context while every rule held. The 656 landing WAS a tickable boundary and
-  the session pulled the next point in anyway; nothing blocked that.
-  FINAL STATE: the boundary becomes reachable and OWED at safe moments even without a tick:
-  (1) after any MERGE to main (ticked or not) with no delegated agent in flight, the
-  batch-progress-guard demands the boundary exactly as it does after a tick — a merge is a
-  clean handover point by definition; (2) a session that has held the batch longer than a
-  measured ceiling (calibrate from the cost data: hours or landed merges, not tokens the
-  scripts cannot read) must take the next safe handover instead of choosing to continue; the
-  guard blocks "continue the next queue item" once the ceiling is passed. Attended sessions
-  ask for /clear at the same moments. VERIFIABLE: Vitest over the guard core — a merge without
-  tick and no agent in flight demands the boundary; under the ceiling it does not; the ceiling
-  case refuses the continue-path and allows the boundary path.
-  Criticality: high — 91 % of the project's spend sits above 150k context, and this is the
-  door it walks through.
   Bundle: unbundled (infrastructure).
 
 - [ ] 663. THE DEPLOY DIES ON A FROZEN TAG'S FLAKY DOWNLOAD (measured 12.08.2026, twice on
@@ -2019,155 +2212,6 @@ put it is the mistake this line exists to stop.
   judgments belongs before them, not after.
   Criticality: low — pure measurement; it changes no behaviour, and it is the precondition
   for judging the remaining structural levers.
-
-- [ ] 597. LARGE TOOL OUTPUT NEVER ENTERS THE CONTEXT WHOLE (point 572's measure 7). The
-  bounded-output discipline `scripts/verify/run-logged.mjs` already applies to verify runs
-  extends to the other big producers: `git diff` (`--stat` first), `grep` (`-c` or a head
-  bound), file reads (`offset`/`limit` instead of a whole file), `npm ls`, `gh run view`.
-  ERROR OUTPUT STAYS UNCUT — every failing test keeps its name.
-  THE ON-DEMAND PATH IS NAMED, not reinvented: `node scripts/verify/run-logged.mjs --show
-  <log>` already hands back the whole run when the digest is not enough. What must NOT be
-  adopted is the tempting inverse — a runner that returns only the names of failing suites
-  by default; error output stays uncut.
-  MEASURED TARGET: a 10k output entering a point's context at response 20 is re-read by
-  its remaining ~218 responses at 218k weighted, ten responses' worth; the trade pays up
-  to a follow-up-query rate of ~85 %.
-  THE STANDING LOAD IS THE SAME ARITHMETIC ON A LARGER SCALE: 1k of permanently carried
-  text costs 3.27 M per window, so CLAUDE.md alone (~11.4k tokens) is ~4.2 % of it, and
-  per-turn injected text that CHANGES additionally breaks the cache prefix. So: a hook that
-  succeeded says nothing, and the per-turn injections are audited. CONDITIONAL on point
-  599's cache reading, and it cuts TEXT only — never a duty that is enforced rather than
-  remembered.
-  Criticality: low — the one real risk is cutting an error message, which the rule
-  excludes.
-  NOT ON ITS BRANCH 17.08.2026: `feat/595-598-verification-ladder-brief` is named for this point
-  but contains NOTHING of it — measured by reading the whole net diff. It must be built, here or
-  on its own branch; the shared branch lands 595 and 598 alone.
-
-- [ ] 596. THE TAIL IS VISIBLE WHILE IT RUNS (point 572's measure 6). A point's running
-  cost is measurable DURING the point, not only after it: a hook reports when a branch
-  passes three times the median (≈ 17 M weighted), and that report is a DECISION point —
-  re-cut, re-staff, or continue deliberately — never an automatic abort. In the same
-  mechanism, an agent that has run the same browser suite red three times STOPS, writes a
-  diagnosis of what is red and what was tried, and escalates instead of looping.
-  MEASURED TARGET: 10 of 64 points carry 48.8 % of the point-assigned cost, the costliest
-  single point 15.8 % of it with 89.0 % of that in verification.
-  THE DIAGNOSIS MUST LAND WHERE THE SUCCESSOR LOOKS — on the work order or the board, not
-  only inside the agent's report, which nobody reads again. Otherwise the next attempt is
-  the same attempt.
-  THE AUTOMATIC ABORT IS REFUSED, and the refusal is recorded here so it is not proposed a
-  fourth time: a hard turn cap or a four-hour timeout discards work that may be nearly done
-  AND pays a second 5.0 M build socle against a 5.82 M median point; its progress metric
-  ("share of tests passed") is a proxy, and judging by a proxy is the one thing this project
-  does not trade. Our tail points were expensive because the work was hard — the costliest
-  carried 89 % verification — not because a loop ran away.
-  A WALL-CLOCK TRIGGER may join the token trigger once point 599 delivers an honest calendar
-  decomposition; until then there is no honest wall-clock per point to trigger on.
-  A SILENT RUN IS THE THIRD TRIGGER, AND IT IS THE ONE THAT ACTUALLY BLED (measured
-  13.08.2026, ~09:00). On point 657 the third measurement recording produced NO BYTE of
-  output from 02:32 onwards, and the owning session waited on it in 30-second polls past
-  09:00 — six and a half hours spent on a task that was already dead. Nothing puts a
-  DEADLINE on a background recording, nothing harvests a task that stopped writing, and the
-  hand-over the board card itself promised ("should the agent fail again, the fallback model
-  takes it") had no enforcer behind it. So: a delegated run that has written nothing for
-  longer than a calibratable silence window is REPORTED as stalled at the next hook (with
-  its task id, its last output time and its point), the owner is handed the two legal moves
-  — re-run or hand to the fallback model — and the stall lands where the successor looks,
-  on the work order or the board, exactly as the red-three-times diagnosis does. This is NOT
-  the refused automatic abort: nothing is killed on a timer, the silence is only made
-  VISIBLE, because the cost here was not the dead task but the six hours nobody was told.
-  Point 567 (remains of killed runs) owns the reaping; this point owns the report.
-  Criticality: medium — a cap that let a red state pass as green would be worse than the
-  cost it saves, so the escalation path is the mechanism and the abort is not.
-  NOT ON ITS BRANCH 17.08.2026: `feat/595-598-verification-ladder-brief` is named for this point
-  but contains NOTHING of it — measured by reading the whole net diff. It must be built, here or
-  on its own branch; the shared branch lands 595 and 598 alone.
-
-- [ ] 553. AN EXPLICIT CONTEXT BUDGET PER POINT, AND A WRITTEN HANDOFF WHEN IT IS SPENT
-  (08.08.2026, chosen BY MEASUREMENT as point 373 requires — the closing measurement is
-  recorded in `docs/batch-autonomy.md`, "The closing measurement under the built levers").
-  THE STATE THE MEASUREMENT LEAVES: under the boundary and the bounded verify digest the
-  rate is 0.988 %/h in the honest full scope (1.091 %/h top-level only), against the
-  ~0.6 %/h that fits the weekly quota — about 1.6× the ceiling, so a further lever is owed.
-  WHY THIS LEVER AND NOT THE OTHERS, from the same figures: 62 % of the counted turns and
-  58 % of the weighted spend come from DELEGATED-AGENT transcripts, so option (b) — moving
-  the reading-heavy part of a point into an agent — only RELOCATES the cost unless the
-  agent's own context is bounded too, and option (a), a boundary at a bundle member, cuts
-  where the bundle scheme no longer claims a saving (`docs/work-packages.md`). Option (c)
-  cuts inside both, which is why it is the one built here.
-  WHAT IS BUILT: a context budget that is MEASURED, not estimated, and that applies to the
-  main session AND to a delegated agent.
-  (a) THE BUDGET IS READ FROM THE SAME PLACE THE MEASUREMENT IS — the turn's context size,
-  derived by the pure core `scripts/measure-context-cost-core.mjs` already uses, so a
-  second accounting is never invented. A calibratable ceiling per point sits with the other
-  batch constants, and the shipped starting value is justified against the measured
-  distribution (median peak 153k, p90 307k in the full scope), not guessed.
-  (b) THE HANDOFF IS WRITTEN, NOT IMPLIED. On crossing the ceiling mid-point the session
-  writes a handoff — what the point is, what is done, what the next session must do first,
-  the branch and the last commit — through a command (`scripts/point-handoff.mjs`) that
-  owns the file's shape, and ENDS. `batch-resume-hook` hands the successor that handoff the
-  way it hands a fresh session the work order, so the successor resumes the POINT rather
-  than re-deriving it. A handoff that names no branch or no next action is refused at the
-  writing, not discovered at the reading.
-  (c) A DELEGATED AGENT OBEYS THE SAME CEILING. Its brief carries the budget, and an agent
-  that spends it returns its handoff as its report instead of building on; the parent
-  re-delegates from that handoff. An agent silently continuing past the ceiling is the case
-  that makes the whole lever cosmetic, so the parent CHECKS the returned report against the
-  agent's own transcript size rather than trusting the claim.
-  (d) `batch-progress-guard` LEARNS THE THIRD LEGAL STOP. Ending is already legal at a
-  closed point with an armed launcher; a spent budget with a written handoff and an armed
-  launcher joins it. Every other stop stays illegal, so the guard can never be talked into
-  an idle stop by writing a handoff for work that was never started.
-  (e) AN ORPHANED BRANCH IS SURFACED, NOT LEFT TO CHANCE (found 11.08.2026). The handoff
-  covers the session that hands over deliberately; it does nothing for the agent that dies
-  without one, and that is the case that actually cost work. Two feature branches sat in
-  the tree unreported — one carrying ~2000 lines for points that still read as untouched,
-  one fully superseded — and the only thing that found them was a resuming session running
-  `git worktree list` on a hunch. So the resume path REPORTS every branch that has commits
-  `main` does not contain and no live agent behind it, with its point, its last commit and
-  its age, exactly as it reports the work order; and a branch whose work has landed under
-  another number is ENDED at that landing rather than left to be re-triaged. VERIFIABLE by
-  Vitest on the pure core — an orphan is listed, a branch with a live agent is not, a
-  contained branch is not — plus the resume hook printing it.
-  MEASURE THE RESULT, as 373 did and on the same tool: `node scripts/measure-context-cost.mjs`
-  for a full day after the lever lands, in BOTH scopes, against the 0.988 %/h this point
-  starts from and the 0.6 %/h that fits. The point counts as delivered when the rate is
-  measured and reported honestly — met or not — never when the mechanism merely runs.
-  VERIFIABLE: pure Vitest on the decision core — a session under the ceiling continues; one
-  over it with a written handoff and an armed launcher may stop; one over it with NO handoff
-  blocks; a handoff missing its branch or its next action is refused; an unreadable
-  transcript ALLOWS the stop (fail-open, as every guard here). Live: one point actually
-  handed over mid-way and finished by the successor from the handoff alone.
-  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): this changes a guard.
-  FOLDED IN FROM POINT 572 (measure 10, "the window boundary inside a point"): that
-  proposal is this lever, differing only in the cut TRIGGER and in demanding a pilot, so
-  it is decided HERE rather than appended as a second owner. THE TRIGGER QUESTION: cut at
-  every green, pushed commit, or at the measured context ceiling this point already
-  defines? Whichever is chosen, it is PILOTED on ONE point and MEASURED against the median
-  (`measure-task-cost.mjs --tasks`) before any rollout, and the rollout is a separate
-  decision taken on that measurement. ACCEPTANCE: a session after a cut continues WITHOUT
-  ASKING A QUESTION — if that does not hold, the pilot is reported as FAILED rather than
-  tuned. Measured target: context per response is a median of 190k and re-read context is
-  75.8 % of the weighted spend; a cut every ~60 responses would put the mean context near
-  73k. This is the one measure on the list that can silently lower work quality — what an
-  agent has learned and not written down is lost at the cut — which is why it is piloted
-  and measured rather than adopted.
-  Criticality: high — this is the batch's dominant running cost, and a lever that reports
-  a saving it did not make is worse than none: it retires the question. The measurement is
-  therefore part of the delivery, not a follow-up.
-  AND IT BINDS THE ATTENDED SESSION, NOT ONLY A DELEGATED POINT (measured 10.08.2026).
-  One attended session absorbed SIX separate user requests plus the two full reports of a
-  blind-parallel analysis in a SINGLE stretch — a dashboard question that grew into a
-  re-ranking, a release re-gating, a work-order cleanup and five branch landings. Nothing
-  stopped it, because every existing ceiling is written for a delegated point and the
-  boundary rule fires only at a CLOSED point, which an attended session in the middle of a
-  conversation never reaches. FINAL STATE: the same budget mechanism counts an attended
-  session's spend, and on crossing the ceiling the Stop chain requires ONE of two answers
-  before the turn may end — the written handoff and a boundary, or a stated reason why this
-  stretch must continue (a merge in flight, a user waiting on this very answer). A NEW topic
-  that is not a continuation of the current one may not be started past the ceiling; it is
-  APPENDED to the work order and taken by the next session. The ceiling is measured, not
-  guessed: it is derived from the same recorded spend this point already reads.
 
 - [ ] 512. THE BUILD ORDER IS PAID AGAIN BY EVERY SUBAGENT (user decision
   05.08.2026 on the card "Bauanleitung für Subagenten aufteilen?"). Measured:
@@ -7989,4 +8033,5 @@ to land than a mechanism that needs a review.
   Criticality: low — both labels stay half-readable and nothing is misnamed; it is the same
   visual untidiness one layer out, found while proving the layer below it correct.
   Bundle: Chat & Tafel.
+
 
