@@ -1220,27 +1220,6 @@ zweiten, auf den Rest geschnittenen Lauf oder durch eigenes Lesen. Was hier noch
 ist der Mechanismus: Solange die Abdeckung nur in der Prosa des Prüfers steht, hängt sie
 daran, dass jemand sie liest — und vier Runden lang hat das niemand getan.
 
-### Die Reihenfolge wird gerankt, aber nicht durchgesetzt
-
-Am 17.08.2026 hat eine Sitzung einen frischen Punkt der untersten Priorität aufgemacht,
-während neun Feature-Zweige unfertig im Baum standen — die beiden ältesten davon, vier
-und drei Tage alt, gehörten ausgerechnet zur Kommunikationsmechanik, dem höchstpriorisierten
-Feature. Der Nutzer hat es gesehen und gefragt, warum. Bemerkenswert ist nicht der Fehlgriff,
-sondern dass ihn nichts abfangen konnte: Es gibt einen Wächter für die Reihenfolge der
-Warteschlange, und er war grün. Er prüft, ob die Rangfolge in TASKS.md mit der Tafel
-übereinstimmt — nicht, ob der Punkt, an dem tatsächlich gearbeitet wird, vorne in dieser
-Rangfolge steht. Und offene Zweige zählt überhaupt niemand gegen das Öffnen eines neuen.
-
-Das ist dieselbe Klasse wie die Kernthese, nur eine Ebene höher: Die Regel war da, sie war
-sogar als Memory notiert, und die Sitzung hat sie trotzdem nicht angewandt, weil die
-Entscheidung in jedem Zug neu und ungeprüft getroffen wird. Ein Ranking, das niemand gegen
-die tatsächliche Arbeit hält, ist eine Meinung über die Reihenfolge, keine Reihenfolge.
-Was fehlt, ist die billige Hälfte: Die Vorabprüfung kennt beim Öffnen eines Punktes sowohl
-die abgeleitete Ordnung als auch die Liste der offenen Zweige und könnte beides in einem
-Satz nennen. Sie soll nicht verbieten — für einen Bugfix auf einem roten `main` gibt es gute
-Gründe, vorzuziehen —, sondern den Grund einfordern. Ein bewusst begründeter Vorzug ist
-Arbeitsteilung; ein unbemerkter ist Drift.
-
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -1624,3 +1603,24 @@ einzige Weg heraus, sie zu ignorieren. Die zweite Hälfte gehört dazu: Was eine
 muss übergebbar werden, sonst zwingt die Schutzregel genau das Verhalten herbei, das die Grenze
 verhindern soll. Prüffrage bei jeder Grenze: *Was verwehrt sie, und wem lässt sie den Ausweg,
 einfach weiterzumachen?*
+
+### 3.120 Die Reihenfolge wird gerankt, aber nicht durchgesetzt
+
+Am 17.08.2026 hat eine Sitzung einen frischen Punkt der untersten Priorität aufgemacht,
+während neun Feature-Zweige unfertig im Baum standen — die beiden ältesten davon, vier
+und drei Tage alt, gehörten ausgerechnet zur Kommunikationsmechanik, dem höchstpriorisierten
+Feature. Der Nutzer hat es gesehen und gefragt, warum. Bemerkenswert ist nicht der Fehlgriff,
+sondern dass ihn nichts abfangen konnte: Es gibt einen Wächter für die Reihenfolge der
+Warteschlange, und er war grün. Er prüft, ob die Rangfolge in TASKS.md mit der Tafel
+übereinstimmt — nicht, ob der Punkt, an dem tatsächlich gearbeitet wird, vorne in dieser
+Rangfolge steht. Und offene Zweige zählt überhaupt niemand gegen das Öffnen eines neuen.
+
+Das ist dieselbe Klasse wie die Kernthese, nur eine Ebene höher: Die Regel war da, sie war
+sogar als Memory notiert, und die Sitzung hat sie trotzdem nicht angewandt, weil die
+Entscheidung in jedem Zug neu und ungeprüft getroffen wird. Ein Ranking, das niemand gegen
+die tatsächliche Arbeit hält, ist eine Meinung über die Reihenfolge, keine Reihenfolge.
+Was fehlt, ist die billige Hälfte: Die Vorabprüfung kennt beim Öffnen eines Punktes sowohl
+die abgeleitete Ordnung als auch die Liste der offenen Zweige und könnte beides in einem
+Satz nennen. Sie soll nicht verbieten — für einen Bugfix auf einem roten `main` gibt es gute
+Gründe, vorzuziehen —, sondern den Grund einfordern. Ein bewusst begründeter Vorzug ist
+Arbeitsteilung; ein unbemerkter ist Drift.
