@@ -424,6 +424,7 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
         'queue-order-guard',
         'render-verify-guard',
         'retro-currency-guard',
+        'rule-echo-guard',
         'rule-review-guard',
         'tasks-archive-guard',
         'tasks-spec-guard',

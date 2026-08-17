@@ -44,6 +44,13 @@ import { createHash } from 'node:crypto'
  * restates the rule — the stamp says "somebody read this file against that
  * version of the rule", which is exactly the check being made.
  *
+ * A GENERATED FILE IS NOT AN ECHO EITHER. The retrospective's rule table is
+ * built from the memory entries by scripts/retro-refresh.mjs, so it cannot go
+ * stale unless its SOURCE does — and those entries are watched here. Registering
+ * it would demand a stamp inside a block the next refresh overwrites (review
+ * round 6). What kept it stale on 17.08. was a memory DESCRIPTION left behind by
+ * its own body, which is a reason to read both halves, not to watch the output.
+ *
  * THE WORK ORDER IS NOT AN ECHO. TASKS.md quotes the policy inside point specs
  * (678, 693 as of 17.08.2026), and those quotes are corrected by working the
  * points, not by re-stamping a file that changes every day. They are carried as
@@ -59,7 +66,6 @@ export const RULE_REGISTRY = Object.freeze([
     title: 'which model authors, reviews and serves',
     source: Object.freeze({ file: 'CLAUDE.md', startsWith: '- **Model policy' }),
     echoes: Object.freeze([
-      Object.freeze({ file: 'docs/analysis_de/retrospektive-zusammenarbeit.md' }),
       Object.freeze({ file: 'docs/maximum-qa.md' }),
       Object.freeze({ file: 'docs/sol-routing.md' }),
       Object.freeze({ file: 'scripts/author-routing-core.mjs' }),

@@ -196,7 +196,6 @@ describe('the registry itself', () => {
     const rule = RULE_REGISTRY.find((r) => r.id === 'model-policy')
     expect(rule.source).toEqual({ file: 'CLAUDE.md', startsWith: '- **Model policy' })
     expect(rule.echoes.map((e) => e.file)).toEqual([
-      'docs/analysis_de/retrospektive-zusammenarbeit.md',
       'docs/maximum-qa.md',
       'docs/sol-routing.md',
       'scripts/author-routing-core.mjs',

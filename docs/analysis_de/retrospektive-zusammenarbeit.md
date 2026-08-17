@@ -1302,7 +1302,6 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ---
 
-<!-- rule:model-policy@8b2f41d7 — die Regeltabelle unten zitiert die Modell-Regel mit; scripts/rule-echo.mjs -->
 <!-- AUTO-GENERATED:START -->
 <!-- Dieser Abschnitt wird maschinell von scripts/retro-refresh.mjs gepflegt.
      NICHT von Hand editieren — der naechste Refresh ueberschreibt ihn.

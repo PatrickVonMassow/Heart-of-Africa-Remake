@@ -76,6 +76,8 @@ import { evaluateRuleReview } from './rule-review-core.mjs'
 import { gatherFindingsInputs } from './findings-guard.mjs'
 import { auditFindings, formatFindings } from './findings-core.mjs'
 import { gatherGuardHealthInputs } from './guard-health-guard.mjs'
+import { gatherRuleEchoInputs, gatherStampedFiles } from './rule-echo-guard.mjs'
+import { RULE_REGISTRY, checkAll, formatVerdict, unregisteredStamps } from './rule-echo-core.mjs'
 import { auditGuardHealth, formatGuardHealth } from './guard-health-core.mjs'
 import { gatherDashboardSyncInputs } from './dashboard-sync.mjs'
 import { evaluate as dashboardSyncEvaluate } from './dashboard-sync-core.mjs'
@@ -312,6 +314,19 @@ export const GUARDS = [
     decide: (inputs) => {
       const { ok, violations } = auditGuardHealth(inputs)
       return { block: !ok, reason: ok ? '' : formatGuardHealth(violations) }
+    },
+  },
+  {
+    id: 'rule-echo-guard',
+    gather: gatherRuleEchoInputs,
+    decide: ({ files }) => {
+      // The same two halves the wrapper's own main path runs: the registry
+      // check over the watched files, plus stamps that sit outside it. The
+      // stray scan reads the tree itself, so it is taken here rather than in
+      // gather — gather owns the watched FILES, which is what the drift check
+      // compares against the wrapper.
+      const reason = formatVerdict(checkAll(RULE_REGISTRY, files), unregisteredStamps(RULE_REGISTRY, gatherStampedFiles()))
+      return { block: !!reason, reason: reason || '' }
     },
   },
   {
