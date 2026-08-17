@@ -437,7 +437,14 @@ if (section('panorama-wildlife')) {
   // renderer now keeps a stance contact in world space even as its body turns,
   // so the judgment reads that world travel directly; compensating for a rigid
   // body's yaw would manufacture movement for a contact whose coordinates did
-  // not change. The interval population and the under-0.25 bar are unchanged.
+  // not change.
+  //
+  // OPEN MEASUREMENT — the browser reviewer owes this lane after the planted-leg
+  // reach limit is in place: run several consecutive
+  // `VERIFY_GL=webgl npm test -- polish --section=panorama-wildlife` passes and
+  // record each pass's worst foot/body figure and interval count here. Until
+  // that WebGL 2 spread is recorded, neither the new interval population nor
+  // the result against the 0.25 bar is claimed as measured evidence.
   {
     /** Record the tracked walkers frame by frame, inside the page: one round trip
      *  for the whole series, so no sample window can be stretched by the host.
