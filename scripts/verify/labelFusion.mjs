@@ -71,17 +71,22 @@ export const FUSE_MAX_SHARE = 0.05
  * frame before the shutter and the first one after — i.e. one that both
  * appears and vanishes inside the capture itself — nor (2) a shallow
  * (< FUSE_HARD) fusion that coincides with the capture while staying inside
- * the FUSE_MAX_SHARE tolerance of the merged series. It cannot, because no
+ * the FUSE_MAX_SHARE tolerance of the merged series, nor (3) the label FLOOR
+ * at that same instant (third Sol round): both windows can satisfy `minLabels`
+ * while the labels are gone from the captured composite alone, so the bar can
+ * certify a screenshot without the crowd it demands. It cannot, because no
  * script-side reading exists for the compositor's exact screenshot instant:
  * rAF sampling observes the frames around the capture, never the captured
  * composite itself — which is the very reason the shutter is bracketed rather
- * than "measured". What makes the hole improbable rather than impossible: the
- * declutter decides at 10 Hz and its decisions PERSIST across frames (the
- * lifts stand until the next refresh), so a fusion absent from both adjacent
- * 45-frame windows would have to be created and undone within a single
- * capture — there is no mechanism state that changes on that timescale. A
- * defect of the class this bar exists for stands for whole refresh intervals
- * and lands in at least one window.
+ * than "measured". What makes the hole improbable rather than impossible, and
+ * the honest form of that claim (same round): the SUBJECTS move every frame, so
+ * geometry does change on the capture's timescale — but the placement does not.
+ * The declutter's decisions persist until its next 10 Hz refresh, so per-frame
+ * drift moves a box by the distance a villager walks in ~16 ms, which is the
+ * shallow class (2) already names, not the full-line overlap this bar exists
+ * for. A defect of THAT class stands for whole refresh intervals and lands in
+ * at least one window; only a capture-synchronous unmount could take the floor
+ * out, and nothing schedules one.
  */
 export function mergeFusionReadings(a, b) {
   // BOTH halves are required (Sol re-review, 17.08.): a merge that fell back to
