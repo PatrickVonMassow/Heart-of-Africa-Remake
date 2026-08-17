@@ -398,8 +398,22 @@ reach the raw candidate set (`scripts/verify/enrichments.mjs`), and
 every inhabitant figure the settlement draws carries its mark, is
 offered, and is still named where it now stands after it has walked
 (`scripts/verify/polish.mjs`). The roster's usable objects are exercised
-too: a camp pitched where the traveller stands names itself under Ctrl
-(`scripts/verify/enrichments.mjs`).
+too, and with them what the layer must NOT say (point 628): a camp
+pitched where the traveller stands reaches the layer as a candidate yet
+carries exactly ONE name in the whole scene — the permanent one it draws
+itself — and the canoe the traveller rides or drags is offered and never
+named, since the layer answers what he is looking AT
+(`scripts/verify/enrichments.mjs`; the rules themselves, over every kind,
+in `src/systems/actorLabels.test.ts` and
+`src/scenes/actorLabelRoster.test.ts`). And no two labels print into each
+other: the further of two boxes that would overlap rises a line and, with
+no row left, yields entirely (`src/systems/actorLabels.test.ts`,
+`src/scenes/ActorLabels.test.tsx`), which is asserted live on the
+rectangles the browser really laid out, sampled over many frames rather
+than one instant, in BOTH scenes — the open savanna
+(`scripts/verify/enrichments.mjs`) and the crowded village at the very
+frame that once showed the defect (`scripts/verify/polish.mjs`; the bar:
+`scripts/verify/labelFusion.mjs`).
 
 ## 10. Goal scaffolding.
 

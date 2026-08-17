@@ -28,10 +28,8 @@ export interface ProjectingCamera {
  * label layer both go through it, so "is it in the picture" is answered the same
  * way everywhere (point 172: the true frustum, never an assumed radius).
  *
- * Written out rather than delegated to `Vector3.project` so it is callable with
- * a plain matrix pair, and so the behind-the-camera case is handled explicitly:
- * a point behind the lens has a negative clip w and would otherwise fold back
- * into the frame with its sign flipped.
+ * The projection itself is written out below rather than delegated to
+ * `Vector3.project`, so it is callable with a plain matrix pair.
  */
 export function pointOnScreen(
   camera: ProjectingCamera,
@@ -40,6 +38,34 @@ export function pointOnScreen(
   z: number,
   margin = 0,
 ): boolean {
+  return projectPoint(camera, x, y, z, margin, scratch).onScreen
+}
+
+/** A projected point: its normalized device coordinates and whether that puts
+ *  it inside the frame. Filled into a caller-supplied object so the projection
+ *  can run per animal per frame without allocating. */
+export interface ProjectedPoint {
+  /** NDC, −1 … 1 left to right and bottom to top. Zero behind the camera. */
+  x: number
+  y: number
+  onScreen: boolean
+}
+
+const scratch: ProjectedPoint = { x: 0, y: 0, onScreen: false }
+
+/**
+ * Project a WORLD point through this camera. `pointOnScreen` asks only for the
+ * verdict; the §17.8 label layer needs the COORDINATES too, because two labels
+ * overlap or not in the picture's own pixels and nowhere else.
+ */
+export function projectPoint(
+  camera: ProjectingCamera,
+  x: number,
+  y: number,
+  z: number,
+  margin = 0,
+  out: ProjectedPoint = { x: 0, y: 0, onScreen: false },
+): ProjectedPoint {
   const v = camera.matrixWorldInverse.elements
   // Column-major, affine view matrix: no perspective row to carry.
   const vx = v[0] * x + v[4] * y + v[8] * z + v[12]
@@ -47,11 +73,21 @@ export function pointOnScreen(
   const vz = v[2] * x + v[6] * y + v[10] * z + v[14]
   const p = camera.projectionMatrix.elements
   const cw = p[3] * vx + p[7] * vy + p[11] * vz + p[15]
-  if (cw <= 0) return false // behind the camera
+  if (cw <= 0) {
+    // Behind the lens: a point there would otherwise fold back into the frame
+    // with its sign flipped.
+    out.x = 0
+    out.y = 0
+    out.onScreen = false
+    return out
+  }
   const nx = (p[0] * vx + p[4] * vy + p[8] * vz + p[12]) / cw
   const ny = (p[1] * vx + p[5] * vy + p[9] * vz + p[13]) / cw
   const nz = (p[2] * vx + p[6] * vy + p[10] * vz + p[14]) / cw
-  return nz < 1 && Math.abs(nx) <= 1 + margin && Math.abs(ny) <= 1 + margin
+  out.x = nx
+  out.y = ny
+  out.onScreen = nz < 1 && Math.abs(nx) <= 1 + margin && Math.abs(ny) <= 1 + margin
+  return out
 }
 
 /** Installed by TravelScene each mount; projects a ground point via the live

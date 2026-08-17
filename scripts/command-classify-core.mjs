@@ -317,6 +317,19 @@ export function commandHead(segment) {
   return splitHeadAndArgs(seg).head
 }
 
+/**
+ * The head AND its own argument words, as one exported pair (point 700) — for
+ * a caller whose rule hangs on a SUBCOMMAND (`npm test` vs `npm run build`).
+ * The same split the head uses, so the two can never disagree about where the
+ * command starts.
+ */
+export function headAndArgs(segment) {
+  const seg = asSegments(segment)[0]
+  if (!seg) return { head: '', args: [] }
+  const { head, args } = splitHeadAndArgs(seg)
+  return { head, args }
+}
+
 /** The words after the head, in order — the head's own arguments. */
 function argsOf(seg) {
   return splitHeadAndArgs(seg).args
@@ -636,6 +649,95 @@ export function segmentInvokesScript(segment, names = []) {
   const args = argsOf(seg)
   if (!INTERPRETERS.has(head)) return matches(seg.words[0] ? seg.words[0].text : '')
   return args.some((a) => matches(a.text))
+}
+
+/**
+ * POSIX-normalise a path for CLASSIFICATION: backslashes to slashes, `.` and
+ * empty segments dropped, `..` resolved against the segment before it. A
+ * PREFIX rule must see the path the OS will resolve, not its spelling —
+ * `scripts/./verify/world.mjs` IS under scripts/verify/ and
+ * `scripts/verify/../board-publish.mjs` is NOT, and a lexical test got both
+ * wrong (Sol round 3, finding 4b). Pure string work, no filesystem.
+ */
+export function posixNormalizePath(path) {
+  const raw = String(path ?? '').replace(/\\/g, '/')
+  const abs = raw.startsWith('/')
+  const out = []
+  for (const seg of raw.split('/')) {
+    if (!seg || seg === '.') continue
+    if (seg === '..') {
+      if (out.length && out[out.length - 1] !== '..') {
+        out.pop()
+        continue
+      }
+      if (abs) continue // `/..` cannot climb above the root
+      out.push('..')
+      continue
+    }
+    out.push(seg)
+  }
+  return (abs ? '/' : '') + out.join('/')
+}
+
+/**
+ * Like `segmentInvokesScript`, but judged by a caller PREDICATE — for a rule
+ * that hangs on a directory PREFIX rather than an enumerable script name (the
+ * context fence's `scripts/verify/` rule, point 700). Three rules sharpen it
+ * beyond the interpreter guard (Sol rounds 3/4, finding 4b):
+ *   - The predicate sees the POSIX-NORMALISED path (`posixNormalizePath`), so
+ *     a dot-spelled path cannot evade a prefix nor a `..` path falsely match
+ *     one, and a finisher reached through `..` is still its basename.
+ *   - An injectable RESOLVER (`resolvePath` — the impure caller passes
+ *     `realpathSync`, this core touches no disk) sees the raw word first: a
+ *     SYMLINK spelling — `verify-link -> scripts/verify`, then `node
+ *     verify-link/world.mjs` — normalises lexically to a path outside the
+ *     prefix and would pass the rule while running the very work it fences
+ *     (Sol round 4). Where the word resolves, the predicate judges the
+ *     RESOLVED target; a word that does not resolve is judged on its lexical
+ *     normalised shape, so unresolvability can still DENY but never becomes
+ *     an ACCEPT.
+ *   - Only the path being INVOKED is judged: the program word itself, or the
+ *     FIRST non-flag argument after an interpreter. A matching path standing
+ *     LATER is an argument — data handed to another program, not an
+ *     invocation (`node tools/report.mjs scripts/verify/world.mjs`).
+ * EXCEPT when flags stand before the interpreter's first non-flag word: a
+ * detached flag value is indistinguishable from the script without every
+ * interpreter's option table, so there EVERY path word is judged — the
+ * false-DENY direction, chosen so `node -r esm scripts/verify/world.mjs`
+ * cannot slip an invocation past as ambiguity. Sol round 4 re-found this as
+ * a defect (`node --experimental-vm-modules tools/report.mjs
+ * scripts/verify/world.mjs` — the verify path is data, yet denied); it is
+ * ruled INTENDED and pinned: one refusal against an escape hatch.
+ */
+export function segmentInvokesPathWhere(segment, predicate, { resolvePath = null } = {}) {
+  const seg = asSegments(segment)[0]
+  if (!seg || typeof predicate !== 'function') return false
+  const judgedPath = (text) => {
+    const p = String(text)
+    if (/\s/.test(p)) return null // a whole quoted command line is judged unwrapped, not here
+    const lexical = posixNormalizePath(p)
+    if (typeof resolvePath !== 'function') return lexical
+    let real = null
+    try {
+      real = resolvePath(p)
+    } catch {
+      real = null
+    }
+    // A word that cannot be resolved is judged on its LEXICAL shape —
+    // unresolvability must never turn into an accept.
+    return typeof real === 'string' && real ? posixNormalizePath(real) : lexical
+  }
+  const matches = (text) => {
+    const p = judgedPath(text)
+    return p !== null && predicate(p) === true
+  }
+  const head = commandHead(seg)
+  if (!INTERPRETERS.has(head)) return matches(seg.words[0] ? seg.words[0].text : '')
+  const args = argsOf(seg)
+  const first = args.findIndex((a) => !a.text.startsWith('-'))
+  if (first === -1) return false
+  if (first === 0) return matches(args[0].text) // unambiguous: the script, then data
+  return args.some((a) => matches(a.text)) // flags in front → ambiguous → judge every word
 }
 
 /** Does this segment NAME one of these files as an argument? */

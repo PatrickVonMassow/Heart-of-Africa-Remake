@@ -127,6 +127,9 @@ scripts/.tile-cache
 # Same shape for the CRITICALITY gate (point 298), which shares that ledger and
 # keeps its own per-branch baseline.
 .claude/criticality-review-baseline.json
+# Per-branch baseline for title casing in the open work order. Historical title
+# drift is grandfathered; a point added or edited after this local marker is not.
+.claude/tasks-spec-guard-baseline.json
 # The pre-push gate's memory of the last green unit run (test-file count). Per
 # CHECKOUT on purpose: each worktree has its own dependency tree, and a baseline
 # shared across them would compare two different worlds.

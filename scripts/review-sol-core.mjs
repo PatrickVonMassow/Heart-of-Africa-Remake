@@ -1,5 +1,6 @@
 // Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624).
 //
+// rule:model-policy@8b2f41d7
 // WHY IT EXISTS: our two reviewers were Opus 5 and Fable 5 — one house, similar
 // training, therefore CORRELATED blind spots, which is exactly what the
 // four-eyes rule is bought against (CLAUDE.md §6). A model from a different

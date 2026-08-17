@@ -839,6 +839,8 @@ const HOUSE_FACTS = [
   '- If this brief proves INSUFFICIENT, or contradicts the code you find: ESCALATE (stop and',
   '  report what is missing) rather than guess. A guessed spec costs a rebuild, which is more',
   '  expensive than the question.',
+  '- Point titles use sentence case rather than full uppercase; acronyms and individual',
+  '  emphasised words may stay capitalised.',
   '',
   'HOUSE FACTS NO POINT STATES — each of these cost a real agent real work today (27.07.2026),',
   'which is why they are delivered rather than remembered:',

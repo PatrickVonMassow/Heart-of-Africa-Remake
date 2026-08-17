@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// THE SWITCH THAT MOVES READ-ONLY WORK TOWARDS OPENAI (work-order point 654, A2).
+// THE SWITCH THAT MOVES WORK TOWARDS OPENAI (work-order point 654, A2; widened by 667).
 //
 //   node scripts/sol-share.mjs --status     # what goes where right now, in ONE line
 //   node scripts/sol-share.mjs --more       # one step towards Sol
@@ -9,12 +9,14 @@
 //
 // WHY IT EXISTS (user 11.08.2026): two vendors, two allowances that run out at different
 // times. Rather than wait until the Anthropic volume is nearly spent, the user wants to
-// shift load to OpenAI EARLIER — and the cheap way to do that is to move the work that
-// needs no write access at all: diagnoses, audits, enumerations, explanations.
+// shift load to OpenAI EARLIER — first the work that needs no write access at all:
+// diagnoses, audits, enumerations, explanations.
 //
-// WHY IT IS CHEAP: Sol AUTHORS NOTHING under this switch. No commit carries its trailer,
-// so the author allowlist, the `commit-msg` hook and `model-guard` are untouched, and
-// none of the auditability machinery a role swap would need is required here.
+// AND SINCE POINT 667, AUTHORING TOO. At `prefer-sol` the `author` kind goes to Sol for
+// the mechanical and mid-difficulty points, which is the largest single item of the
+// spend; the role swap it needs is built — Sol stands in the author allowlist, the
+// `commit-msg` hook takes its trailer, and Claude reviews, runs the suites, judges the
+// picture and lands. What no setting routes is in NEVER_ROUTED below.
 //
 // The setting lives in the MAIN checkout's `.claude/sol-share.json` (git-ignored, this
 // machine's state), and every consumer — `scripts/ask-sol.mjs`, `scripts/review-sol.mjs`,
@@ -121,7 +123,9 @@ export const usage = () =>
     ...SETTINGS.map((s) => `  ${s.padEnd(12)} ${SETTING_NOTES[s]}`),
     '',
     'The board shows a non-default setting while it is on, and the delegation brief tells',
-    'every agent which kinds to hand over. Sol authors nothing at any setting.',
+    'every agent which kinds to hand over. At prefer-sol Sol also AUTHORS the mechanical',
+    'and mid-difficulty points; Claude reviews them. What no setting routes is listed under',
+    '"NEVER routed" by --status.',
   ].join('\n')
 
 if (isMainModule(import.meta.url)) {

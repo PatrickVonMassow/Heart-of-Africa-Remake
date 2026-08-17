@@ -1992,7 +1992,10 @@ function LandmarkLabels() {
   )
 }
 
-/** Free camps (design.md §6): an X of lashed poles marks each pitched camp. */
+/** Free camps (design.md §6): an X of lashed poles marks each pitched camp.
+ *  Its name stands here permanently, so the §17.8 Ctrl layer is told not to
+ *  print the same word a second time (`permanentLabel`) — the camp stays a
+ *  candidate, it is simply already labelled. */
 function CampMarkers() {
   const t = useStrings()
   const camps = useGame((s) => s.freeCamps)
@@ -2003,7 +2006,11 @@ function CampMarkers() {
         const p = latLonToWorld(c.lat, c.lon)
         const y = Math.max(0.2, sampleTerrain(c.lat, c.lon, seed).height)
         return (
-          <group key={c.id} position={[p.x, y + 0.4, p.z]} userData={markActor({ kind: 'camp', height: 2.2 })}>
+          <group
+            key={c.id}
+            position={[p.x, y + 0.4, p.z]}
+            userData={markActor({ kind: 'camp', height: 2.2, permanentLabel: true })}
+          >
             <mesh rotation={[0, 0, Math.PI / 4]} castShadow>
               <cylinderGeometry args={[0.09, 0.09, 2.0, 6]} />
               <meshStandardMaterial color="#7c5a34" roughness={0.95} />
@@ -2643,8 +2650,15 @@ function Player() {
 
   return (
     <group ref={ref} name="traveller-root">
-      {/* Ridden dugout, shown only while travelling water (toggled in useFrame). */}
-      <group ref={boat} visible={false} userData={markActor({ kind: 'canoe', height: 0.9 })}>
+      {/* Ridden dugout, shown only while travelling water (toggled in useFrame).
+          The traveller's OWN boat: marked, but never named by the §17.8 layer,
+          which says what the player is looking AT — a canoe set down in the
+          world is that, the one he sits in is not. */}
+      <group
+        ref={boat}
+        visible={false}
+        userData={markActor({ kind: 'canoe', height: 0.9, ownedByPlayer: true })}
+      >
         <CanoeHull />
         {/* Paddle held to the right, dipping with the stroke. */}
         <group ref={paddle} position={[0.34, 0.16, 0.05]}>
@@ -2661,7 +2675,11 @@ function Player() {
       {/* Dragged canoe on land: a trailer following the walked path around
           obstacles, lying on the terrain behind the figure (posed per frame
           from canoeDrag.ts — child of the root, not of the yawing figure). */}
-      <group ref={carry} visible={false} userData={markActor({ kind: 'canoe', height: 0.7 })}>
+      <group
+        ref={carry}
+        visible={false}
+        userData={markActor({ kind: 'canoe', height: 0.7, ownedByPlayer: true })}
+      >
         <CanoeHull />
         {/* Paddle stowed lengthwise inside the hull. */}
         <group position={[0.09, 0.0, 0.1]} rotation={[Math.PI / 2, 0, 0.05]}>

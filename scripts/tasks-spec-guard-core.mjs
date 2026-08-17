@@ -12,6 +12,11 @@
 // turn end: any OPEN point whose text carries retrospective change-history
 // framing blocks the Stop until the point is rewritten clean.
 //
+// The second invariant is title casing: a point added or edited after the
+// wrapper's local baseline may not shout in full uppercase. Historic titles are
+// grandfathered so adoption cannot be blocked by the corpus it was built to
+// repair; touching the point makes its title answer to the rule.
+//
 // Marker calibration: whole-PHRASE markers only, each specific to retrospective
 // spec-history framing ("originally planned", "instead of the earlier", "war
 // ursprünglich"). Deliberately NO broad single words ("instead", "changed",
@@ -177,20 +182,79 @@ export function specTrailOffenders(tasksMd) {
   return offenders
 }
 
-/** Top-level decision on the raw TASKS.md content. Total: any bad input → allow. */
-export function evaluate({ tasksMd } = {}) {
-  try {
-    const offenders = specTrailOffenders(tasksMd)
-    if (offenders.length === 0) return { block: false, reason: '' }
-    const list = offenders.map((o) => `${o.point} (found: '${o.phrase}')`).join('; ')
-    return {
-      block: true,
-      reason:
-        `TASKS SPEC READS AS AN ITERATIVE PATCH TRAIL: point(s) ${list}. A changed point must be ` +
-        'REWRITTEN COMPLETELY to state only its final correct target state — no "first X, then ' +
-        'changed to Y" history, no reference to the superseded plan (git history carries the change ' +
-        'record; memory tasks-spec-final-state-only). Rewrite the point(s) clean in TASKS.md.',
+/**
+ * The title carried by a point's first line: after `<number>. ` and before the
+ * first ` (` (the attribution/qualifier convention) or the line end.
+ */
+export function pointTitle(block) {
+  if (!block || typeof block.text !== 'string') return ''
+  const firstLine = block.text.split('\n', 1)[0]
+  return firstLine.match(/^- \[[ xX]\] \d+\. (.*?)(?: \(|$)/)?.[1] ?? ''
+}
+
+/** A deterministic copy-ready correction, not an attempt to infer proper nouns. */
+export function sentenceCaseTitle(title) {
+  if (typeof title !== 'string') return ''
+  const lower = title.toLocaleLowerCase('en-US')
+  return lower.replace(/\p{L}/u, (letter) => letter.toLocaleUpperCase('en-US'))
+}
+
+/**
+ * Whether a title crosses the deliberately narrow shouting threshold: at least
+ * eight letters, with fewer than five percent lowercase. Symbols, digits and
+ * punctuation never make a short acronym or number-heavy label fail.
+ */
+export function isShoutingTitle(title) {
+  if (typeof title !== 'string') return false
+  const letters = title.match(/\p{L}/gu) ?? []
+  if (letters.length < 8) return false
+  const lowercase = letters.filter((letter) => /\p{Ll}/u.test(letter)).length
+  return lowercase / letters.length < 0.05
+}
+
+/**
+ * Uppercase-title findings among points that are new or edited since the
+ * baseline. Equality is over the whole point block on purpose: changing a body
+ * revalidates its title too, so old casing cannot be carried forward by editing
+ * around it.
+ */
+export function titleCaseOffenders(tasksMd, baselineTasksMd = '') {
+  const baseline = new Map(parsePointBlocks(baselineTasksMd).map((block) => [block.point, block.text]))
+  const offenders = []
+  for (const block of parsePointBlocks(tasksMd)) {
+    if (baseline.get(block.point) === block.text) continue
+    const title = pointTitle(block)
+    if (isShoutingTitle(title)) {
+      offenders.push({ point: block.point, title, expected: sentenceCaseTitle(title) })
     }
+  }
+  return offenders
+}
+
+/** Top-level decision on the raw TASKS.md content. Total: any bad input → allow. */
+export function evaluate({ tasksMd, baselineTasksMd } = {}) {
+  try {
+    const trails = specTrailOffenders(tasksMd)
+    const titles = titleCaseOffenders(tasksMd, baselineTasksMd)
+    if (trails.length === 0 && titles.length === 0) return { block: false, reason: '' }
+    const reasons = []
+    if (trails.length) {
+      const list = trails.map((o) => `${o.point} (found: '${o.phrase}')`).join('; ')
+      reasons.push(
+        `TASKS SPEC READS AS AN ITERATIVE PATCH TRAIL: point(s) ${list}. A changed point must be ` +
+          'REWRITTEN COMPLETELY to state only its final correct target state — no "first X, then ' +
+        'changed to Y" history, no reference to the superseded plan (git history carries the change ' +
+          'record; memory tasks-spec-final-state-only). Rewrite the point(s) clean in TASKS.md.',
+      )
+    }
+    if (titles.length) {
+      const list = titles.map((o) => `${o.point}: "${o.expected}"`).join('; ')
+      reasons.push(
+        `TASK TITLE SHOUTS: point(s) ${list}. Titles with at least eight letters must use sentence ` +
+          'case (at least five percent lowercase). Replace each title with the copy-ready form shown.',
+      )
+    }
+    return { block: true, reason: reasons.join('\n\n') }
   } catch {
     return { block: false, reason: '' } // total by contract — the wrapper's fail-open must never depend on luck
   }

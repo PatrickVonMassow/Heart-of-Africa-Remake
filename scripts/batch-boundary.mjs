@@ -58,6 +58,7 @@ import { launcherRemedy } from './batch-launcher-core.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
 import { gatherHandoverTransfer as gatherTransfer } from './batch-in-flight.mjs'
 import { gatherWatermark, watermarkTokens } from './context-watermark.mjs'
+import { contextDistanceNote } from './context-watermark-core.mjs'
 import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
@@ -556,6 +557,11 @@ if (isMain) {
     // --prepare <point>|--context | --commit <point>|--context | <point> (legacy)
     const phaseFlag = arg === '--prepare' || arg === '--commit' ? arg : null
     const contextMode = phaseFlag !== null && argv[1] === '--context'
+    // The transcript flag serves BOTH causes since point 700: the context
+    // boundary fires on the reading, and the point boundary RECORDS it — every
+    // boundary carries the context it was actually taken at.
+    const tIdx = argv.indexOf('--transcript')
+    const transcriptArg = tIdx >= 0 ? argv[tIdx + 1] ?? '' : ''
 
     if (contextMode) {
       // THE CONTEXT BOUNDARY (point 675, defeat 3): no closed point — the
@@ -567,8 +573,7 @@ if (isMain) {
             'boundary. Nothing recorded.',
         )
       }
-      const tIdx = argv.indexOf('--transcript')
-      const wm = gatherWatermark({ transcriptPath: tIdx >= 0 ? argv[tIdx + 1] : '', sid })
+      const wm = gatherWatermark({ transcriptPath: transcriptArg, sid })
       if (wm.state === 'unreadable') {
         fail(
           'NO CONTEXT READING COULD BE TAKEN' +
@@ -700,6 +705,11 @@ if (isMain) {
               'with `node scripts/batch-in-flight.mjs --adopt`.'
             : ''),
       )
+      // The distance is a NUMBER somebody reads, not a claim (point 700): a
+      // commit further past the mark than the stated margin owes the closing
+      // report a sentence.
+      const distance = contextDistanceNote({ tokens: wm.tokens, watermark: wm.watermark })
+      if (distance) console.log(`\n${distance}`)
       process.exit(0)
     }
 
@@ -717,6 +727,12 @@ if (isMain) {
           'boundary. Nothing recorded.',
       )
     }
+    // EVERY BOUNDARY RECORDS THE CONTEXT IT WAS TAKEN AT (point 700): the point
+    // boundary does not FIRE on the reading, but it carries it, so the distance
+    // between the mark and the real handover is a number somebody can read. An
+    // unreadable measurement records null — honestly unmeasured, never assumed.
+    const wmPoint = gatherWatermark({ transcriptPath: transcriptArg, sid })
+    const contextTokens = wmPoint.state === 'unreadable' ? null : wmPoint.tokens
     // THE CONDITION (point 675, defeat 2): the point this session was LANDING is
     // LANDED. Delegated authors still building do not hold the boundary — the
     // successor adopts them through the transferred in-flight declaration.
@@ -831,7 +847,19 @@ if (isMain) {
     try {
       transferred = commitSealedBoundary({
         transfer,
-        marker: { v: 2, phase: BOUNDARY_PHASES.COMMITTED, cause: BOUNDARY_CAUSES.POINT, sessionId: sid, point, at: Date.now() },
+        marker: {
+          v: 2,
+          phase: BOUNDARY_PHASES.COMMITTED,
+          cause: BOUNDARY_CAUSES.POINT,
+          sessionId: sid,
+          point,
+          // The context this boundary was taken at (point 700) — informational
+          // for a POINT cause (assessBoundary judges only a CONTEXT claim by
+          // it), recorded so the reading outlives the session.
+          tokens: contextTokens,
+          watermark: wmPoint.watermark,
+          at: Date.now(),
+        },
       })
     } catch (e) {
       fail(
@@ -854,5 +882,9 @@ if (isMain) {
         '(withdraw deliberately with `node scripts/batch-boundary.mjs --clear` if you truly must work again).' +
         transferLine,
     )
+    // Point 700: a boundary further past the mark than the stated margin — or
+    // one whose context could not be measured — owes the closing report a line.
+    const distance = contextDistanceNote({ tokens: contextTokens, watermark: wmPoint.watermark })
+    if (distance) console.log(`\n${distance}`)
   }
 }

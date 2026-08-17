@@ -562,18 +562,85 @@ export function assessInFlight({
  * the remote-tracking ref could not be read) and null for pid/log kinds.
  *
  * The rule: every branch/worktree item needs a PUSHED checkpoint (local tip ==
- * remote-tracking tip), and at least ONE such item must exist — a declaration of
- * only pids and logs names nothing a successor could adopt: the process dies
- * with this session and the log proves nothing about what survives.
+ * remote-tracking tip), and at least ONE ADOPTABLE item must exist — a
+ * declaration of only bare pids and logs names nothing a successor could adopt:
+ * the process dies with this session and the log proves nothing about what
+ * survives.
  *
- * Returns { transferable, blockers: [{ describe, why }], checkpoints }.
+ * A RUNNING VERIFICATION IS ADOPTABLE (point 700): a log item annotated with
+ * its RUN RECORD (`run` — the `<log>.run.json` scripts/verify/run-logged.mjs
+ * writes: suites, backends, the HEAD it covers, pid, and the receipt once it
+ * closes) is a named, awaitable run, not a process that merely dies. It counts
+ * as adoptable output and is recorded for the successor, which awaits the
+ * receipt and reads the verdict — so a 25-minute suite never again PINS a
+ * session past the watermark by demanding a drain. A log WITHOUT a record
+ * still proves nothing and still counts as none.
+ *
+ * THE RECORD IS HELD TO THE SAME EVIDENCE BAR AS A BRANCH (Sol review of
+ * d0aebb6, finding 2 — a nonempty recordPath alone proved nothing). Like a
+ * checkpoint must be committed AND pushed, a run must be VERIFIABLY worth
+ * inheriting: (a) it names a LIVE run (`status: running` with its pid probed
+ * alive) or a receipt that ALREADY exists (`finished`/receipt written — the
+ * verdict is readable now), and (b) it covers the HEAD being handed over
+ * (`headNow`). A record that says `running` over a dead pid is a wrapper that
+ * died unstamped — a successor would await a receipt that never arrives, the
+ * exact failure this mechanism exists to prevent — and a run of another HEAD
+ * verifies nothing about the state being handed over. Each failure BLOCKS by
+ * name; evidence that cannot be established never counts as established.
+ *
+ * Returns { transferable, blockers: [{ describe, why }], checkpoints, runs }.
  */
-export function assessTransfer({ items = [] } = {}) {
+export function assessTransfer({ items = [], headNow = null } = {}) {
   const list = Array.isArray(items) ? items : []
   const blockers = []
   const checkpoints = []
+  const runs = []
   let output = 0
+  // Both sides must LOOK like a sha at git's own minimum meaningful
+  // abbreviation (7 — this repo's short-sha length) before either may
+  // abbreviate the other (Sol review of 534c2ba): `runRecordFor` accepts
+  // arbitrary non-empty head strings, and a bare prefix test let a
+  // one-character recorded head "match" any HEAD that happened to start
+  // with it. Shorter or non-hex is no identity, so it is no match.
+  const HEX_SHA = /^[0-9a-f]{7,40}$/
+  const sameHead = (a, b) => {
+    const x = String(a ?? '').toLowerCase()
+    const y = String(b ?? '').toLowerCase()
+    if (!HEX_SHA.test(x) || !HEX_SHA.test(y)) return false
+    return x.startsWith(y) || y.startsWith(x)
+  }
   for (const item of list) {
+    if (item?.kind === 'log' && item.run && typeof item.run.recordPath === 'string' && item.run.recordPath) {
+      const run = item.run
+      const describe = String(item.describe ?? 'log')
+      // A RECEIPT IS A RECEIPT (Sol review of 534c2ba): only `hasReceipt` —
+      // the probed existence of the receipt on the record itself — counts. A
+      // self-declared `status: 'finished'` never substitutes: the whole point
+      // of this bar is that the successor can READ the verdict, and a record
+      // stamped finished without its receipt offers nothing to read.
+      const receiptExists = run.hasReceipt === true
+      const live = run.status === 'running' && run.alive === true
+      if (!receiptExists && !live) {
+        blockers.push({
+          describe,
+          why:
+            run.status === 'running'
+              ? 'its run record says "running" but the pid is gone or unverifiable — a successor would await a receipt that never arrives'
+              : `its run record is in state "${run.status ?? 'unknown'}" with no receipt — nothing to await and nothing to read`,
+        })
+      } else if (!sameHead(run.head, headNow)) {
+        blockers.push({
+          describe,
+          why:
+            run.head && headNow
+              ? `its run covers HEAD ${run.head}, not the ${headNow} being handed over`
+              : 'the commit its run covers could not be verified against the HEAD being handed over',
+        })
+      } else {
+        runs.push(run)
+      }
+      continue
+    }
     if (!OUTPUT_KINDS.has(item?.kind)) continue
     output += 1
     const cp = item.checkpoint
@@ -590,13 +657,15 @@ export function assessTransfer({ items = [] } = {}) {
       checkpoints.push({ ref: cp.ref ?? null, sha: cp.localSha })
     }
   }
-  if (output === 0 && list.length > 0) {
+  if (output === 0 && runs.length === 0 && list.length > 0) {
     blockers.push({
       describe: 'the whole declaration',
-      why: 'it names only pids/logs — nothing with a committed-and-pushed checkpoint a successor could adopt',
+      why:
+        'it names only pids/logs — nothing with a committed-and-pushed checkpoint, and no run record beside ' +
+        'a log, that a successor could adopt',
     })
   }
-  return { transferable: blockers.length === 0, blockers, checkpoints }
+  return { transferable: blockers.length === 0, blockers, checkpoints, runs }
 }
 
 /**
@@ -631,11 +700,20 @@ export function transferBlockMessage({ blockers = [] } = {}) {
  * mutation protection the moment it crossed a SECOND boundary — the very
  * record a chain of handovers depends on most.
  */
-export function markTransferred({ declaration, bySid, now, checkpoints = [] } = {}) {
+export function markTransferred({ declaration, bySid, now, checkpoints = [], runs = [] } = {}) {
   const { adopted: _superseded, ...rest } = declaration ?? {}
   return {
     ...rest,
-    transfer: { v: 1, by: String(bySid ?? ''), at: Number(now), checkpoints },
+    transfer: {
+      v: 1,
+      by: String(bySid ?? ''),
+      at: Number(now),
+      checkpoints,
+      // The RUNNING VERIFICATIONS handed over (point 700): the successor awaits
+      // each record's receipt rather than restarting the run. Only present when
+      // one was declared, so branch-only transfers keep their shape.
+      ...(Array.isArray(runs) && runs.length > 0 ? { runs } : {}),
+    },
   }
 }
 

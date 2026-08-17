@@ -18309,3 +18309,234 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   it is the player watching a child shiver in place for minutes in the shipped build, with the
   rescue unable to fire.
   Bundle: Dorfleben.
+
+- [x] 628. THE HOLD-CTRL LAYER LABELS A CAMP TWICE AND NAMES THE PLAYER'S OWN BOAT
+  (found 11.08.2026 while re-testing the roster for point 600, and deliberately not fixed
+  there: both halves are a judgment about what the layer PROMISES, not a defect in the
+  state coverage that point closed).
+  FINAL STATE:
+  1. A PITCHED CAMP CARRIES EXACTLY ONE LABEL. `CampMarkers` in
+     `src/scenes/travel/TravelScene.tsx` draws a permanent `map-label` reading
+     `labels.camp` AND registers the same object with the hold-Ctrl layer, whose text is
+     that same word — so holding Ctrl stacks two identical boxes over one camp. The camp
+     STAYS in point 342's roster, which names "a pitched camp, a set-down canoe"
+     explicitly, so the cure is the one the elder already uses: an object that carries a
+     permanent label of its own is not offered a second time by the Ctrl layer, whoever
+     draws it. Stating that as a rule about permanent labels, not a per-object exception,
+     is the point — a second exception list would rot the way the first one nearly did.
+  2. THE TRAVELLER'S OWN CANOE IS NOT NAMED. The marked canoe groups at the same call site
+     are the boat the player rides or drags. The layer's promise is "what am I looking
+     at", and the player's own vehicle is not that. A canoe SET DOWN in the world keeps
+     its label, per the same roster line.
+  3. TWO LABELS NEVER OVERLAP INTO ONE UNREADABLE BOX (seen 11.08.2026 in
+     `verification/148-ctrl-actor-labels-village.png`, the point-600 evidence frame). Where
+     two villagers stand close, their boxes overlap and the picture reads "Villager llager"
+     and "Villa Villager" — each label is correct, the PICTURE is not, and no test looks at
+     it because every check asks the DOM whether the text is present. The layer therefore
+     declutters: boxes that would overlap are offset, or the further one is dropped while
+     the nearer keeps its name. Which of the two is a judgment to make at the picture, on a
+     crowd, not in the abstract.
+  VERIFIABLE: the pure source/roster test gains both cases — a pitched camp yields exactly
+  one offered label, a ridden or dragged canoe yields none while a set-down one yields its
+  own; the declutter is judged AT THE FRAME on a crowded village, since a DOM assertion is
+  exactly the proxy that let this through; plus the browser check that asks the scene what
+  it DREW asserts that no two labels of identical text stand at one position.
+  Criticality: low — nothing breaks, but a doubled box is exactly the noise the elder
+  exception exists to prevent, and naming the player's own boat makes the layer read as
+  though it labels everything indiscriminately.
+
+- [x] 702. A point's title shouts, because nothing ever told a session not to (user 17.08.2026:
+  »Wieso passiert es eigentlich immer wieder mal, dass es Tasks mit englischem Titel in komplett
+  Uppercase gibts — jetzt gerade für 701 passiert. Ergreife eine Maßnahme dagegen«). Measured on
+  the corpus the same day: of 691 points, 432 carry a title in full uppercase, and the drift is
+  not occasional but total — 0 of the first 200 points, 49 of 200-299, then 87, 98, 97 and 98
+  per hundred, every point from 600 on. There is no rule about it anywhere in CLAUDE.md, in this
+  file's framing sections or in any guard, so nothing ever pulled it back; each new point was
+  written by a session imitating its neighbours, and the style ratcheted. The cost is
+  readability: a work order whose every headline is a shout has no emphasis left for the line
+  that needs it, and the user reads this file.
+  SCOPE: titles only. The capitalised words INSIDE a body are this project's established
+  emphasis and appear in CLAUDE.md and design.md as well; changing those is a separate decision
+  that belongs to the user, not to this point.
+  FINAL STATE:
+  - `scripts/tasks-spec-guard-core.mjs` gains a title check beside its trail-marker check: the
+    title of a point — the text between `<n>. ` and the first ` (` or the end of the first line
+    — is refused when it has at least eight letters and fewer than five percent of them are
+    lowercase. An acronym-only or number-heavy title stays legal, and a title may still carry a
+    capitalised word for emphasis; only a title that is uppercase throughout is refused.
+  - The guard names the offending point and prints the sentence-case form it expects, so the fix
+    is a copy, not a puzzle.
+  - Like `model-guard`, it binds against a BASELINE rather than the whole corpus: a point added
+    or edited after the baseline must pass, so the check cannot be blocked by history.
+  - The 193 open points are normalised in one mechanical commit — title to sentence case, body
+    untouched — and `docs/tasks-archive.md` is left as it stands, because it is the record of
+    what was written, not a document anybody plans by.
+  - The rule is written where a session writing a point actually looks: one sentence in this
+    file's framing section beside "This file and every entry in it are written in English", and
+    the delegation brief (`scripts/point-brief.mjs`) carries it into every agent prompt.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it is a new gate in the Stop chain.
+  VERIFIABLE: Vitest over the pure check — an uppercase title refused, a sentence-case one
+  passed, an acronym title passed, a title of fewer than eight letters passed, and a pre-baseline
+  offender ignored; plus `node scripts/tasks-spec-guard.mjs` green on the normalised file.
+  Criticality: low — it is a readability rule with a mechanical check; it touches no game code.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 709. A unit test passes or fails by how deeply the test runner happens to be nested
+  (measured 17.08.2026, three reproductions in a row, after the same suite had been green
+  twenty minutes earlier on the identical commit). `scripts/container-ask-guard-core.test.mjs`
+  → "a real guard under matching ancestry cannot restamp its asserted test id or raise an
+  alert" spawns a helper, has the helper spawn the real guard, and asserts
+  `matchedAncestorPid: true` — that the guard resolved the HELPER as the session process.
+  The guard resolves it with `findClaudeAncestor` (`scripts/batch-singleton.mjs`), which walks
+  at most TEN ancestors looking for a process whose `comm` matches `claude` and otherwise falls
+  back to the parent. So the assertion holds only where no `claude` process sits within ten
+  hops: in CI, where none exists at all, and in a deeply nested local run. Run the same suite
+  DIRECTLY from a session — `npx vitest run` — and the walk reaches the live `claude` process
+  (measured: two hops from a plain node), the guard resolves THAT pid, and the test fails.
+  Run it through `land-point.mjs`, four processes deeper, and it passes. The consequence is the
+  worst kind: the pre-push gate blocked a push whose commits touched neither the test nor its
+  subject, while CI was green on the same tree, and nothing in the red named the real reason.
+  FINAL STATE:
+  - The test states the ancestry it needs instead of inheriting it: the helper is spawned so
+    that the guard's walk cannot reach the session — by naming the ancestor explicitly through
+    the injection the singleton already supports (`opts.ancestor` / `findAncestorFn`), which is
+    what every other test of this file uses. The test then asserts the guard's BEHAVIOUR, not
+    the shell it happened to run in.
+  - Any remaining case that genuinely needs a real walk asserts the walk's OUTCOME against what
+    the environment actually offers, and SKIPS with a named reason where it cannot be
+    established — never a silent pass and never an environment-dependent fail.
+  - A sweep of the unit layer for the same shape: every test that spawns a real process and
+    asserts something about ancestry, cwd depth or the parent chain is either injected or
+    stated. The sweep's result is written down, including the tests it cleared.
+  VERIFIABLE: Vitest — the repaired case green both when run directly (`npx vitest run
+  scripts/container-ask-guard-core.test.mjs` from the session shell) and through the fast gate,
+  proven by running it both ways in the same commit; plus a case that pins the ten-hop budget
+  itself, so a later change to `findClaudeAncestor` cannot silently move it.
+  Criticality: medium — it is a gate that blocks correct work and passes incorrect work
+  depending on who started it, and the red it produces names nothing that would lead anyone to
+  the cause.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 711. A GitHub-side deploy transient stays red, because the one retry is granted only for
+  a cleared queue stall (user 17.08.2026, 18:14: »Die Pipeline für main ist gerade mehrfach
+  fehlgeschlagen.«). The reds were GitHub-side, not ours — but one half IS ours: the retry built
+  in reaction to the 06.08.2026 queue stall is wired to that one cause and lets every other
+  transient through to red. The deploy workflow has exactly one retry step, gated on
+  `steps.unblock.outputs.retry`, and `shouldRetryDeploy` in
+  `scripts/pages-deploy-unblock-core.mjs` sets that flag ONLY when the unblock step actually
+  cancelled a stuck Pages deployment. Both of the day's red deploys failed with nothing stuck,
+  so the retry was SKIPPED on commits whose CI was green: run 32040260819 (16:53) took HTTP 503
+  from the Pages deployment API in `actions/deploy-pages@v4`, and run 32044141828 (18:02) took
+  HTTP 429 three times while DOWNLOADING that action — the latter inside `Set up job`, before
+  any step of the job existed. RATE, so the size is not guessed: over the last 100 deploy runs
+  on `main` (13.–17.08.2026) 91 green, 2 failed (both above), 7 `cancelled` by the `pages`
+  concurrency group, which is ordinary supersession and not a failure. WHAT IT COSTS:
+  `ci-status-guard` reads every workflow's newest run on a head and any red makes the head red,
+  so a GitHub-side transient blocks the turn end until a human re-runs the job by hand — and
+  until then the Pages site, the only thing the user ever judges a render change against, serves
+  the older `main`. The asymmetry is the argument: a retry not taken costs a red run, a blocked
+  turn end and a stale site; a retry taken needlessly costs at most one bounded extra attempt
+  whose outcome the verdict already prints.
+  FINAL STATE:
+  - `shouldRetryDeploy` grants the one retry on ANY failure of the deploy step, not only on a
+    cleared stall. What stays distinct is the REASON, not the verdict: `cleared <n> stuck Pages
+    deployment(s) (<shas>) — deploying again` when something was cancelled, and a second reason
+    for the case where nothing was, naming it as a possible GitHub-side transient and saying a
+    repeat is safe here. The safety is structural and already recorded in the file's header: the
+    `deploy` job talks to the Pages API only, and `needs: build` means the build succeeded before
+    it starts, so a retry driven from here can never re-run and never mask a build failure. This
+    point extends exactly that argument to the case the current condition excludes.
+  - The cost of retrying a DETERMINISTIC deploy failure — an oversized or missing artifact, the
+    case the current comment names as the reason to stay narrow — is bounded and stays visible:
+    the retry step's `timeout: 300000` bounds it, `timeout-minutes: 25` bounds the job, and the
+    `Verdict` step already prints `first attempt: <outcome>, retry: <outcome>`, so a run that
+    failed twice names both attempts instead of blurring them.
+  - The header comment of `shouldRetryDeploy` states the new rule and why the old one was too
+    narrow, naming both runs above.
+  - The `Set up job` 429 is RECORDED AS A RESIDUAL in the deploy workflow's comment and not
+    fixed: an action download that fails before the job's steps exist is out of reach of every
+    step in that file, and only a job-level re-run helps. No code changes for it.
+  CONSTRAINTS: the build/deploy job split stays as it is — it is what makes the retry safe, so
+  never move a build step into the `deploy` job and never let the retry re-run `build`. The retry
+  stays ONE; "once" is structural (a single retry step in the workflow) and this point changes
+  only whether it runs, never how often. `shouldRetryDeploy` stays pure and Vitest-covered; the
+  decision does not move into the YAML. `cancelled` runs are the concurrency group superseding an
+  older run and nothing here treats them as failures.
+  VERIFIABLE: `scripts/pages-deploy-unblock-core.test.mjs` covers the full truth table — deploy
+  failed and nothing cleared → `retry: true` with the transient reason (the case that changes);
+  deploy failed and a stall cleared → `retry: true` with the cleared reason, shas named
+  (unchanged); deploy succeeded → `retry: false` (unchanged). The reason strings are asserted,
+  not just the flag, because the report is what a human reads off a red run.
+  Criticality: medium — no game code, but a red deploy blocks every turn end and leaves the
+  deployed site behind `main`, which is what the user judges render work against.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 700. The context watermark reminds and does not bind — a session ran to 2.9x it (measured
+  17.08.2026, and raised by the user the same day: »Diese Sitzung ist inzwischen sehr gewachsen.
+  Musst du den Kontext so weit anwachsen lassen? … Nicht nur mir zustimmen und es machen, sondern
+  dafür sorgen, dass es in Zukunft auch eingehalten wird.«). MEASURED on this session: the Stop
+  hook reported 434440 tokens against the 150000 watermark and demanded the handover — and the
+  session kept working for roughly another hour, starting two full browser suites and one more
+  delegated agent round AFTER the mark. The user's own usage panel says the same thing from the
+  other side: 81 % of the week's spend sat above 150k context.
+  TWO CAUSES, BOTH MEASURED HERE, AND NEITHER IS FORGETFULNESS:
+  (a) NOTHING DENIES NEW WORK PAST THE MARK. The watermark speaks only in the Stop chain, which
+      fires when a turn tries to END. Every call that starts something — a suite, an agent, a new
+      point — goes through untouched, so the mark is advisory exactly where it should bind.
+  (b) THE HANDOVER WAS REFUSED BY ANOTHER RULE. `batch-boundary.mjs --prepare --context` stopped
+      with "declared in-flight work is NOT transferable" because the in-flight item was a
+      background SUITE RUN (a pid and a log, no branch), and the only recovery it offered was
+      DRAIN — i.e. stay in the session and wait. A verification that takes 25 minutes therefore
+      PINS the session past the mark, which is precisely when leaving is worth the most.
+  FINAL STATE:
+  - A PreToolUse FENCE past the watermark: while the measured context is over the mark, a call
+    that STARTS a new unit of work is DENIED — spawning an agent, starting a verify suite,
+    beginning a new point. What stays allowed is everything that FINISHES the step in flight
+    (commits, pushes, the landing, the board, the boundary itself) and every read. The refusal
+    names the mark, the measurement and the one command that ends the session.
+    IT MUST NOT SLOW THE BATCH (user 17.08.2026): the fence ENDS a session, it never idles one —
+    the work moves to a fresh session immediately, and the target is fewer tokens PER POINT, not
+    fewer per hour. A build of this that reduces throughput has missed the point; measure it
+    against 701's per-point ledger, not against a rate.
+    FILING A POINT IS STARTING WORK, AND THE FENCE MUST SAY SO (user 17.08.2026, on this very
+    session: »Hättest du vor dem Start von 700 nicht auch an eine neue Session übergeben
+    können?« — yes, and that is the whole pattern). Writing a work-order point, a memory or a
+    retrospective section past the mark FEELS like bookkeeping and costs like work: this session
+    wrote three points and two documents after the watermark fired, each time judging "just this
+    one more". Past the mark a finding goes to the CARRIER — one line, one command, already built
+    for exactly this — and the successor writes the point in a cheap context. The fence therefore
+    denies authoring in the work order and the documents too, and its refusal names the carrier
+    as the way to keep the finding.
+  - A RUNNING VERIFICATION IS TRANSFERABLE, so it is never a reason to stay: the run records what
+    it is (suite, backend, log path, pid, the commit it covers) where a successor can adopt it,
+    and `--prepare --context` accepts that instead of demanding a drain. The successor waits for
+    the receipt and reads the verdict — which is work a fresh context does better anyway.
+  - THE RULE IS MEASURED, not assumed: every boundary records the context it was actually taken
+    at, so the distance between the mark and the real handover is a number somebody can read
+    rather than a claim. A session that ends more than a stated margin past the mark says so in
+    its closing report.
+  - AND THE HANDOVER STATE MUST NOT BLOCK THE HANDOVER (measured 17.08.2026, twice, on the live
+    board): `scripts/board-core.test.mjs` ("promotes, returns, archives and answers without a new
+    violation") goes RED with `dup-in-section` as soon as the board carries the UNNUMBERED
+    handover card instead of a numbered now-card — the audit simulates "the now-card back into
+    the queue" and finds no now-card to move. Green again the moment a numbered card stands
+    there. Because the pre-push gate runs the unit layer, every commit is refused from the moment
+    a session prepares its handover, which is the most expensive moment there is; one commit was
+    dropped here rather than fought for. Decide which it is — the handover state is legitimate
+    and the audit must know it, or the board owes a numbered card even then — and pin the answer
+    with a case, so the last bookkeeping of a session cannot be blocked by the session ending.
+  VERIFIABLE: Vitest cases over the pure fence (over the mark + a starting call → deny, naming
+  the mark; over the mark + a finishing call or a read → allow; under the mark → allow all;
+  unreadable measurement → fail-open) and over the transferable-run record (a declared run with
+  a receipt path → `--prepare --context` proceeds; without one → today's refusal); plus the real
+  proof — the next session that crosses the mark hands over inside its current step, and its
+  recorded boundary context is within the margin.
+  ALSO IN SCOPE: `runIsLive` in `scripts/verify/run-record.mjs` — the consumer behind the wait
+  marker and `activeRecordPath` — judges liveness from `status:'running'` plus bare pid existence,
+  so a recycled pid keeps a stale record looking live on that path. It is the same defect class the
+  cross-vendor rounds closed in `commandNamesRun`, in the other consumer. FINAL STATE: it reads the
+  SAME run identity, rather than bypassing it.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it is a new fence and it changes the boundary.
+  Criticality: high — it is the batch's dominant cost, the user has now raised it twice, and the
+  existing mechanism demonstrably does not bind.
+  Bundle: Session- & Repo-Hygiene.
