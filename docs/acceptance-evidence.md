@@ -397,8 +397,11 @@ in `src/systems/actorLabels.test.ts` and
 other: the further of two boxes that would overlap rises a line and, with
 no row left, yields entirely (`src/systems/actorLabels.test.ts`,
 `src/scenes/ActorLabels.test.tsx`), which is asserted live on the
-rectangles the browser really laid out — no pair of them overlaps
-(`scripts/verify/enrichments.mjs`).
+rectangles the browser really laid out, sampled over many frames rather
+than one instant, in BOTH scenes — the open savanna
+(`scripts/verify/enrichments.mjs`) and the crowded village at the very
+frame that once showed the defect (`scripts/verify/polish.mjs`; the bar:
+`scripts/verify/labelFusion.mjs`).
 
 ## 10. Goal scaffolding.
 

@@ -14,6 +14,7 @@
 // gate. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { animalShare, readsAsAnimal, waterFloor } from './animalShare.mjs'
+import { FUSE_TOLERANCE, judgeLabelFusion } from './labelFusion.mjs'
 import { frameShutter, captureFrame, capturePixels, waitForSceneReady } from './frameSubject.mjs'
 import { snowFraction } from './snowMetric.mjs'
 import { sectionGate } from './sections.mjs'
@@ -8612,38 +8613,59 @@ if (section('ctrl-actor-labels')) {
 
   // NO TWO LABELS FUSE INTO ONE BOX (point 628). Every earlier check asks the
   // DOM whether a text is PRESENT, which is exactly what let "Villager llager"
-  // through: two correct labels printed into each other. This one asks where the
-  // boxes really stand — the rectangles the browser laid out — and no pair of
-  // them may overlap, whatever they say.
-  const overlaps = await page.evaluate(() => {
-    // The layout runs on the layer's own refresh (10/s) while the subjects walk
-    // on every frame, so a couple of pixels of drift between two refreshes is
-    // the mechanism working, not failing. A FUSED pair is what this looks for:
-    // the reported one shared more than half a word.
-    const TOLERANCE = 6
-    const boxes = [...document.querySelectorAll('.actor-label')].map((el) => {
-      const r = el.getBoundingClientRect()
-      return { text: (el.textContent ?? '').trim(), left: r.left, right: r.right, top: r.top, bottom: r.bottom }
-    })
-    const clashes = []
-    for (let i = 0; i < boxes.length; i++) {
-      for (let j = i + 1; j < boxes.length; j++) {
-        const a = boxes[i]
-        const b = boxes[j]
-        const across = Math.min(a.right, b.right) - Math.max(a.left, b.left)
-        const down = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
-        if (across > TOLERANCE && down > TOLERANCE) {
-          clashes.push(`"${a.text}" × "${b.text}" (${across.toFixed(0)}×${down.toFixed(0)} px)`)
+  // through: two correct labels printed into each other. This one asks where
+  // the boxes really stand — the rectangles the browser laid out — SAMPLED
+  // over many frames rather than one instant: the declutter decides at the
+  // layer's 10 Hz refresh while the subjects walk every frame, and the single
+  // moment a converged poll returns is the one least able to catch a stale
+  // decision. The dense-crowd twin of this check lives in polish.mjs at the
+  // village frame; the verdict and its bar are scripts/verify/labelFusion.mjs.
+  const overlaps = await page.evaluate(
+    (TOLERANCE) =>
+      new Promise((res) => {
+        const SAMPLES = 90
+        let sampled = 0
+        let fusedFrames = 0
+        let worstDepth = 0
+        let worstPair = null
+        let labelsMax = 0
+        const read = () => {
+          const boxes = [...document.querySelectorAll('.actor-label')]
+            .map((el) => {
+              const r = el.getBoundingClientRect()
+              return { text: (el.textContent ?? '').trim(), left: r.left, right: r.right, top: r.top, bottom: r.bottom }
+            })
+            .filter((b) => b.right > b.left && b.bottom > b.top)
+          labelsMax = Math.max(labelsMax, boxes.length)
+          let fusedHere = false
+          for (let i = 0; i < boxes.length; i++) {
+            for (let j = i + 1; j < boxes.length; j++) {
+              const a = boxes[i]
+              const b = boxes[j]
+              const across = Math.min(a.right, b.right) - Math.max(a.left, b.left)
+              const down = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+              if (across > TOLERANCE && down > TOLERANCE) {
+                fusedHere = true
+                const depth = Math.min(across, down)
+                if (depth > worstDepth) {
+                  worstDepth = depth
+                  worstPair = `"${a.text}"×"${b.text}" ${across.toFixed(0)}×${down.toFixed(0)} px`
+                }
+              }
+            }
+          }
+          if (fusedHere) fusedFrames++
+          if (++sampled >= SAMPLES) return res({ samples: sampled, fusedFrames, worstDepth, worstPair, labelsMax })
+          requestAnimationFrame(read)
         }
-      }
-    }
-    return { count: boxes.length, clashes }
-  })
-  check(
-    'no two Ctrl labels print into each other (point 628)',
-    overlaps.count > 0 && overlaps.clashes.length === 0,
-    `${overlaps.count} labels, overlapping pairs [${overlaps.clashes.slice(0, 4).join(', ')}]`,
+        requestAnimationFrame(read)
+      }),
+    FUSE_TOLERANCE,
   )
+  // minLabels 1: a lone animal is a legitimate savanna (its presence bar is the
+  // 'holding Ctrl names the animals' check above); the village twin demands 2.
+  const overlapVerdict = judgeLabelFusion(overlaps, { minLabels: 1 })
+  check('no two Ctrl labels print into each other (point 628)', overlapVerdict.ok, overlapVerdict.detail)
 
   await shot('147-ctrl-actor-labels', {
     world: { lat: -2.6, lon: 35.2 },
