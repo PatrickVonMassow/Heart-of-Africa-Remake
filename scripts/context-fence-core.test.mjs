@@ -138,6 +138,70 @@ describe('over the mark, AUTHORING is denied — and the refusal names the carri
   })
 })
 
+describe('over the mark, authoring by SHELL MUTATION is denied — tool plus target (Sol round 6, finding A)', () => {
+  // The defect: only parsed `>`/`>>` redirect targets counted as authoring, so
+  // an ordinary shell mutation of the work order sailed past the fence.
+  const mutations = [
+    ['sed -i on the work order', { toolName: 'Bash', command: "sed -i 's/x/y/' TASKS.md" }],
+    ['sed --in-place on the archive', { toolName: 'Bash', command: "sed --in-place=.bak 's/x/y/' docs/tasks-archive.md" }],
+    ['tee -a into a doc', { toolName: 'Bash', command: 'printf "## New section" | tee -a docs/new-section.md' }],
+    ['tee (truncating) into a doc', { toolName: 'Bash', command: 'tee docs/new-section.md' }],
+    ['node -e appending to the work order', {
+      toolName: 'Bash',
+      command: `node -e "fs.appendFileSync('TASKS.md', '- [ ] 999. x')"`,
+    }],
+    ['node -e writing a memory', {
+      toolName: 'Bash',
+      command: `node -e "fs.writeFileSync('/home/node/.claude/projects/-workspace-hoa/memory/new-rule.md', 'x')"`,
+    }],
+    ['python -c appending to the memory index', { toolName: 'Bash', command: `python -c "open('MEMORY.md','a').write('x')"` }],
+    ['perl -e opening a doc for append', { toolName: 'Bash', command: `perl -e 'open(F, ">>", "docs/x.md")'` }],
+    ['perl -pi -e on the work order', { toolName: 'Bash', command: `perl -pi -e 's/x/y/' TASKS.md` }],
+    ['cp INTO an authoring target', { toolName: 'Bash', command: 'cp notes.md docs/new-section.md' }],
+    ['mv onto the work order', { toolName: 'Bash', command: 'mv draft.md TASKS.md' }],
+    ['cp into the docs DIRECTORY — the effective target is dir/<basename>', { toolName: 'Bash', command: 'cp notes.md docs/' }],
+    ['dd of= an authoring target', { toolName: 'Bash', command: 'dd if=notes.md of=TASKS.md' }],
+    ['a wrapped shell mutation', { toolName: 'Bash', command: `bash -c "sed -i 's/a/b/' TASKS.md"` }],
+  ]
+  for (const [name, call] of mutations) {
+    it(`denies ${name}, pointing at the carrier`, () => {
+      const v = decide(call)
+      expect(v.block, name).toBe(true)
+      expect(v.reason).toContain('finding.mjs --record')
+    })
+  }
+
+  // DELIBERATE OVER-REACH, pinned: an eval that only READS the target is
+  // denied too — an eval's intent is not cheaply decidable, and the ordinary
+  // reads (Read, sed -n, grep, cat — pinned allowed below) all stay open.
+  it('denies a node -e that merely READS the work order (INTENDED false deny — the ordinary reads stay open)', () => {
+    const v = decide({ toolName: 'Bash', command: `node -e "console.log(fs.readFileSync('TASKS.md','utf8').length)"` })
+    expect(v.block).toBe(true)
+  })
+
+  // The READING side is the one that must never be fenced: these are how a
+  // session answers a question about the repository past the mark.
+  const reads = [
+    ['sed -n printing a range of the work order', { toolName: 'Bash', command: "sed -n '1,20p' TASKS.md" }],
+    ['grep counting open points', { toolName: 'Bash', command: 'grep -c "^- \\[ \\]" TASKS.md' }],
+    ['cat on the archive', { toolName: 'Bash', command: 'cat docs/tasks-archive.md' }],
+    ['sed WITHOUT -i on the work order (stdout only)', { toolName: 'Bash', command: "sed 's/x/y/' TASKS.md" }],
+    ['a copy OUT of the target — the destination decides', { toolName: 'Bash', command: 'cp TASKS.md /tmp/tasks-backup.md' }],
+    ['sed -i on repo CODE — finishing the step, not authoring', { toolName: 'Bash', command: "sed -i 's/x/y/' src/config/balance.ts" }],
+    ['tee into a scratch file', { toolName: 'Bash', command: 'npm run lint | tee /tmp/lint-log.txt' }],
+    ['node -e naming no fenced path', { toolName: 'Bash', command: 'node -e "console.log(process.version)"' }],
+    ['tee -a into the CARRIER — the sanctioned place for a finding', {
+      toolName: 'Bash',
+      command: 'printf "- [ ] x" | tee -a /home/node/.claude/projects/-workspace-hoa-/memory/findings-carrier.md',
+    }],
+  ]
+  for (const [name, call] of reads) {
+    it(`never denies ${name}`, () => {
+      expect(decide(call).block, name).toBe(false)
+    })
+  }
+})
+
 describe('over the mark, FINISHING calls and reads stay allowed', () => {
   const finishing = [
     ['a commit', { toolName: 'Bash', command: 'git commit -m "finish the step"' }],
@@ -304,3 +368,4 @@ describe('a resolver failure falls back to the lexical spelling — INTENDED fal
     expect(v.reason).toContain(FENCE_END_COMMAND)
   })
 })
+

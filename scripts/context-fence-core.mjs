@@ -39,6 +39,7 @@ import { basename, dirname, join } from 'node:path'
 import {
   expandSegments,
   headAndArgs,
+  posixNormalizePath,
   segmentInvokesPathWhere,
   segmentInvokesScript,
 } from './command-classify-core.mjs'
@@ -203,6 +204,86 @@ export function authoringTarget(filePath) {
   return null
 }
 
+/** sed's in-place flag: `-i`, `-i.bak`, a cluster carrying it (`-ri`), or the
+ *  long form. Without one, sed writes to stdout — a READ, and it stays one. */
+const inPlaceFlag = (t) => /^-[A-Za-z]*i/.test(t) || t === '--in-place' || t.startsWith('--in-place=')
+
+/** Inline-eval heads and the flag that makes an argument the SCRIPT. perl's
+ *  is a cluster test (`-pe`, `-ne`, `-pi -e` all carry it). */
+const EVAL_FLAGS = new Map([
+  ['node', (t) => t === '-e' || t === '--eval' || t === '-p' || t === '--print'],
+  ['python', (t) => t === '-c'],
+  ['python3', (t) => t === '-c'],
+  ['perl', (t) => /^-[A-Za-z]*[eE]/.test(t)],
+])
+
+/** Path-like tokens inside an inline script's text: split on the characters
+ *  none of the fenced paths contain. `fs.appendFileSync('TASKS.md', …)` yields
+ *  the token `TASKS.md`. */
+function pathTokensOf(text) {
+  return String(text ?? '')
+    .split(/[\s'"`()[\]{},;=]+/)
+    .filter(Boolean)
+}
+
+/**
+ * Authoring by SHELL MUTATION (Sol round 6, finding A). The redirection rule
+ * below caught only parsed `>`/`>>` targets, while a shell mutates the work
+ * order just as ORDINARILY through an in-place editor, tee, a copy INTO the
+ * target, dd, or an inline eval — and past the mark such a call must be
+ * refused with the carrier named. Caught by the TOOL plus its TARGET:
+ *   - `sed` WITH an in-place flag whose file operand is an authoring target;
+ *   - `tee` (with or without -a) naming one as its output;
+ *   - `cp`/`mv`/`install` whose DESTINATION is one — including the docs/ or
+ *     memory DIRECTORY as destination, judged as dir/<source basename>
+ *     (`cp notes.md docs/`; bounded to those dirs so the backup direction,
+ *     `cp TASKS.md /tmp/backup/`, stays the read it is);
+ *   - `dd of=<target>`;
+ *   - `node -e` / `python -c` / `perl -e` whose script text or arguments name
+ *     one. DELIBERATE OVER-REACH on the eval forms: an eval that only READS
+ *     the target is denied too — its intent is not cheaply decidable from
+ *     outside, and the ordinary reads (the Read tool, `sed -n`, `grep`, `cat`)
+ *     all stay open, so the session keeps a way to find anything out.
+ * Everything that READS stays allowed — `sed -n '1,20p' TASKS.md`, `grep …
+ * TASKS.md`, a copy OUT of the target — and where a form cannot be told apart
+ * cheaply the READING side wins: a missed authoring call costs one unfenced
+ * edit, a denied read costs the session its way forward.
+ */
+function shellAuthoringTarget(head, args) {
+  const texts = args.map((a) => a.text)
+  const pos = texts.filter((t) => !t.startsWith('-'))
+  const firstNamed = (candidates) => {
+    for (const c of candidates) {
+      const target = authoringTarget(c)
+      if (target) return target
+    }
+    return null
+  }
+  if (head === 'sed' && args.some((a) => !a.quoted && inPlaceFlag(a.text))) return firstNamed(pos)
+  if (head === 'tee') return firstNamed(pos)
+  if (head === 'cp' || head === 'mv' || head === 'install') {
+    if (pos.length < 2) return null
+    const dest = pos[pos.length - 1]
+    const direct = authoringTarget(dest)
+    if (direct) return direct
+    // Into the docs/ or memory DIRECTORY itself: the file that appears there
+    // is dir/<source basename>. ONLY these dirs — joining the basename onto
+    // an arbitrary destination would deny the backup direction
+    // (`cp TASKS.md /tmp/backup/`), which is a READ of the work order.
+    const destNorm = posixNormalizePath(dest).toLowerCase()
+    if (/(?:^|\/)(docs|memory)$/.test(destNorm)) {
+      return firstNamed(pos.slice(0, -1).map((src) => `${destNorm}/${basenameOf(src)}`))
+    }
+    return null
+  }
+  if (head === 'dd') return firstNamed(texts.filter((t) => /^of=/i.test(t)).map((t) => t.slice(3)))
+  const isEvalFlag = EVAL_FLAGS.get(head)
+  if (isEvalFlag && args.some((a) => !a.quoted && isEvalFlag(a.text))) {
+    return firstNamed(texts.flatMap(pathTokensOf))
+  }
+  return null
+}
+
 /** What ONE parsed segment starts, or null. The carrier call itself starts
  *  nothing — but ONLY that segment: the exemption must not cover whatever
  *  rides beside it on the same line (Sol finding 1). */
@@ -230,6 +311,9 @@ function segmentStart(seg, resolvePath) {
     const target = authoringTarget(r.target)
     if (target) return { what: `${target} via redirection (\`${seg.raw}\`)`, authoring: true }
   }
+  // Authoring by SHELL MUTATION — the tool-plus-target forms the helper names.
+  const mutated = shellAuthoringTarget(head, args)
+  if (mutated) return { what: `${mutated} via a shell mutation (\`${seg.raw}\`)`, authoring: true }
   return null
 }
 
