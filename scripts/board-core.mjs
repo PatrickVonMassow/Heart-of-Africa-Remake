@@ -1120,7 +1120,17 @@ export function addVdzk(html, title, text) {
   const body = renderCardBody(text, { escape: esc })
   if (!head) throw new Error('board: vdzk-add needs a title — the collapsed card shows nothing else')
   if (!body) throw new Error('board: vdzk-add needs the question itself as the card body')
-  const { from } = sectionBounds(html, 'vdzk')
+  const { from, end } = sectionBounds(html, 'vdzk')
+  const section = html.slice(from, end)
+  const standing = [...section.matchAll(/<details>\s*<summary><span class="t">[\s\S]*?<\/details>\s*/g)]
+    .map((card) => titleOf(card[0]))
+    .find((standingTitle) => standingTitle === head)
+  if (standing) {
+    throw new Error(
+      `board: open question "${standing}" already stands under "Von dir zu klären" — ` +
+        'a genuinely new question needs a distinguishable title',
+    )
+  }
   const card =
     `<details>\n  <summary><span class="t">${head}</span></summary>\n` +
     `  <div class="body">\n${body}\n  </div>\n</details>\n`

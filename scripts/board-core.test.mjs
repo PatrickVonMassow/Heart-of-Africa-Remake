@@ -442,6 +442,20 @@ describe('addVdzk — a decision asked of the user gets a card', () => {
     expect(() => addVdzk(b, 'Ein Titel', '   ')).toThrow(/needs the question itself/)
   })
 
+  it('refuses a title that already stands, names it, and accepts a distinguishable one', () => {
+    const once = addVdzk(fullBoard({}), 'Kartenschrift wählen', 'Welche Variante?')
+    expect(() => addVdzk(once, 'Kartenschrift wählen', 'Dieselbe Frage noch einmal.')).toThrow(
+      /"Kartenschrift wählen" already stands/,
+    )
+
+    const distinct = addVdzk(once, 'Kartenschrift für Überschriften wählen', 'Welche Variante?')
+    const cards = parseCards(sliceSections(distinct).sections['Von dir zu klären'])
+    expect(cards.map((card) => card.title)).toEqual([
+      'Kartenschrift für Überschriften wählen',
+      'Kartenschrift wählen',
+    ])
+  })
+
   it('never touches another section', () => {
     const out = addVdzk(fullBoard({ queue: queueEntry(372, 'Ein Befehl', '~2 h') }), 'Eine Frage', 'Wie weiter?')
     const { sections } = sliceSections(out)
