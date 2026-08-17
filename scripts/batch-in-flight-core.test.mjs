@@ -67,6 +67,7 @@ import {
   adoptTransferred,
   commandNamesRun,
   gatherHandoverTransfer,
+  processCommandOf,
   runRecordFor,
   gatherInFlight,
   maxAgeMs,
@@ -82,6 +83,7 @@ import {
   worktreeFilesActiveAt,
   runningBranchFiles,
 } from './batch-in-flight.mjs'
+import { selfCommandLine } from './verify/run-record.mjs'
 
 const NOW = 1_785_100_000_000
 const SID = 'session-owner'
@@ -2040,18 +2042,19 @@ describe('assessTransfer — committed-and-pushed checkpoints decide transferabi
 })
 
 describe('runRecordFor — the run record beside a declared log, reduced for the transfer', () => {
+  const wrapperCmd = 'node /repo/scripts/verify/run-logged.mjs world'
+
   const record = {
     suites: ['world'],
     backends: ['webgpu'],
     head: 'abc1234',
     pid: 77,
     log: 'local/verify-logs/x.log',
+    cmdline: wrapperCmd,
     status: 'running',
     polls: 3,
     receipt: null,
   }
-
-  const wrapperCmd = 'node /repo/scripts/verify/run-logged.mjs world'
 
   it('pairs <log>.run.json, PROBES the pid and keeps only what the successor needs', () => {
     const seen = []
@@ -2090,24 +2093,69 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
   })
 
   it('a RECYCLED pid — existing, but running something else — is NOT alive; identity, not existence', () => {
-    const withCommand = (commandOf) =>
-      runRecordFor('/repo/x.log', { read: () => record, probe: () => ({ exists: true, startedAt: null }), commandOf })
+    const withCommand = (commandOf, rec = record) =>
+      runRecordFor('/repo/x.log', { read: () => rec, probe: () => ({ exists: true, startedAt: null }), commandOf })
     // The stranger process that inherited the wrapper's number.
     expect(withCommand(() => '/usr/bin/chrome --headless=new').alive).toBe(false)
     // A command that merely MENTIONS the wrapper is not the wrapper.
     expect(withCommand(() => 'grep -rn run-logged.mjs docs/').alive).toBe(false)
     // An unreadable command line is UNKNOWN — refused by the bar, never assumed.
     expect(withCommand(() => null).alive).toBe(null)
-    // The genuine wrapper, by its own argv word, stays alive.
+    // The genuine wrapper, by the record's own recorded command line.
     expect(withCommand(() => wrapperCmd).alive).toBe(true)
+    // The SAME wrapper on ANOTHER run — a recycled pid running run-logged.mjs
+    // for a different suite — is not THIS record's process (Sol round 3).
+    expect(withCommand(() => 'node /repo/scripts/verify/run-logged.mjs polish').alive).toBe(false)
+    // A record with NO self-identity (pre-cmdline shape, default launch whose
+    // argv names no log) refuses even the genuine-looking wrapper: false deny
+    // over a stranger adopted as the run.
+    expect(withCommand(() => wrapperCmd, { ...record, cmdline: undefined }).alive).toBe(false)
+    // …unless the argv itself carries the recorded log path (--log-file launch).
+    expect(
+      withCommand(
+        () => 'node /repo/scripts/verify/run-logged.mjs --log-file local/verify-logs/x.log world',
+        { ...record, cmdline: undefined },
+      ).alive,
+    ).toBe(true)
   })
 
-  it('commandNamesRun judges the argv word, in either path style', () => {
-    expect(commandNamesRun('node scripts\\verify\\run-logged.mjs --suite world')).toBe(true)
-    expect(commandNamesRun('node run-logged.mjs')).toBe(true)
-    expect(commandNamesRun('node scripts/verify/run-all.mjs world')).toBe(false)
-    expect(commandNamesRun('')).toBe(false)
-    expect(commandNamesRun(null)).toBe(false)
+  it('commandNamesRun demands the record identity, not just the wrapper name', () => {
+    const cmd = 'node scripts\\verify\\run-logged.mjs --suite world'
+    // The record's own command line, in either path style, is the identity.
+    expect(commandNamesRun(cmd, { cmdline: 'node scripts/verify/run-logged.mjs --suite world' })).toBe(true)
+    // The wrapper name ALONE identifies no run: no identity supplied → false.
+    expect(commandNamesRun(cmd)).toBe(false)
+    expect(commandNamesRun('node run-logged.mjs', { cmdline: null, logPaths: [] })).toBe(false)
+    // A different run of the same wrapper does not satisfy this record.
+    expect(commandNamesRun('node run-logged.mjs polish', { cmdline: 'node run-logged.mjs world' })).toBe(false)
+    expect(commandNamesRun('node scripts/verify/run-all.mjs world', { cmdline: 'node scripts/verify/run-all.mjs world' })).toBe(false)
+    expect(commandNamesRun('', { cmdline: '' })).toBe(false)
+    expect(commandNamesRun(null, { cmdline: null })).toBe(false)
+  })
+
+  it('commandNamesRun judges the INVOKED script — run-logged.mjs as data is not the wrapper', () => {
+    // The program word is node, the invoked script unrelated.mjs; the wrapper
+    // name rides along as an argument (Sol round 3, finding 2).
+    const asData = 'node unrelated.mjs run-logged.mjs'
+    expect(commandNamesRun(asData, { cmdline: asData })).toBe(false)
+    // The recorded log path merely MENTIONED by a non-wrapper is not the run.
+    expect(
+      commandNamesRun('grep -rn local/verify-logs/x.log docs/', { logPaths: ['local/verify-logs/x.log'] }),
+    ).toBe(false)
+    // The recorded log path standing in the WRAPPER's argv is.
+    expect(
+      commandNamesRun('node scripts/verify/run-logged.mjs --log-file local/verify-logs/x.log test:small', {
+        logPaths: ['local/verify-logs/x.log'],
+      }),
+    ).toBe(true)
+    // The script executed directly still counts as the wrapper.
+    expect(commandNamesRun('scripts/verify/run-logged.mjs world', { cmdline: 'scripts/verify/run-logged.mjs world' })).toBe(true)
+  })
+
+  it('selfCommandLine and processCommandOf read one process through one lens', () => {
+    if (process.platform === 'win32') return // the CIM path needs a real CIM round trip
+    expect(selfCommandLine()).toBe(processCommandOf(process.pid))
+    expect(selfCommandLine()).toBeTruthy()
   })
 
   it('reads the receipt off the record itself', () => {

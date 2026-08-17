@@ -530,7 +530,12 @@ export function isAncestor(ancestorSha, sha, { cwd = REPO_ROOT } = {}) {
 
 /** The full command line of `pid`, or null when it cannot be read. Linux/WSL
  *  reads /proc (NUL-separated argv); Windows asks CIM. Null means UNKNOWN,
- *  never "not it" — the caller decides what unknown identity is worth. */
+ *  never "not it" — the caller decides what unknown identity is worth.
+ *  MIRRORED by `selfCommandLine` in scripts/verify/run-record.mjs (the record
+ *  writer's own reading): the two must present a process identically or a
+ *  recorded identity can never compare equal — change them together. A static
+ *  import either way is off the table: scripts/verify/ is deliberately absent
+ *  from the temp copies the spawned guard tests run in (see runRecordFor). */
 export function processCommandOf(pid) {
   const n = Number(pid)
   if (!Number.isInteger(n) || n <= 0) return null
@@ -555,19 +560,53 @@ export function processCommandOf(pid) {
   }
 }
 
-/** Does this command line say it IS what a run record describes — the verify
- *  wrapper (`run-logged.mjs`) that wrote the record about its own pid? PURE,
- *  so the identity rule is pinned without a process table. The program must
- *  be an interpreter (or the script itself) with run-logged.mjs as an argv
- *  word — a process that merely MENTIONS the name (a grep) is not the
- *  wrapper. */
-export function commandNamesRun(command) {
-  const words = String(command ?? '').replace(/\\/g, '/').toLowerCase().split(/\s+/).filter(Boolean)
+/** Slash-normalise, lower-case and collapse whitespace — the one lens both
+ *  sides of an identity compare are read through. */
+const normCmdText = (s) =>
+  String(s ?? '')
+    .replace(/\\/g, '/')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+
+/**
+ * Does this command line say it IS the process a run record describes? PURE,
+ * so the identity rule is pinned without a process table.
+ *
+ * A wrapper NAME identifies only the program, never the RUN: a recycled pid
+ * running `run-logged.mjs polish` satisfied a record for `world`, and `node
+ * unrelated.mjs run-logged.mjs` passed because every argv word was scanned
+ * (Sol round 3, finding 2). Identity is therefore the RECORD's own, in two
+ * gates:
+ *   1. Cheap first gate: the INVOKED script must be run-logged.mjs — the
+ *      first non-flag word after the interpreter, or the program word itself
+ *      when the script runs directly. A process merely HANDED the name as a
+ *      later argument is not the wrapper.
+ *   2. The line must carry what the record knows of its writer: the writer's
+ *      own recorded command line (read through the same lens as the probe, so
+ *      the same process compares EQUAL — `cmdline`), or the recorded log path
+ *      standing as an argv word (`--log-file` launches — `logPaths`).
+ * A caller that can supply NO identity gets false, never a lenient true: the
+ * false-DENY side costs one refused transfer and a re-run, while a stranger
+ * process adopted as the run costs a receipt that never arrives.
+ */
+export function commandNamesRun(command, { cmdline = null, logPaths = [] } = {}) {
+  const words = normCmdText(command).split(' ').filter(Boolean)
   if (words.length === 0) return false
   const isScript = (w) => w === 'run-logged.mjs' || w.endsWith('/run-logged.mjs')
   const prog = words[0].slice(words[0].lastIndexOf('/') + 1).replace(/\.(exe|cmd|bat)$/, '')
-  if (!['node', 'nodejs', 'bun', 'deno', 'tsx'].includes(prog)) return isScript(words[0])
-  return words.slice(1).some(isScript)
+  if (['node', 'nodejs', 'bun', 'deno', 'tsx'].includes(prog)) {
+    // The invoked script is the first non-flag word. A detached interpreter
+    // flag value (`node -r esm run-logged.mjs`) would misread here — that
+    // launch shape does not exist for the wrapper, and the miss DENIES.
+    const invoked = words.slice(1).find((w) => !w.startsWith('-'))
+    if (!invoked || !isScript(invoked)) return false
+  } else if (!isScript(words[0])) {
+    return false
+  }
+  if (cmdline && normCmdText(cmdline) === normCmdText(command)) return true
+  const candidates = (Array.isArray(logPaths) ? logPaths : [logPaths]).map(normCmdText).filter(Boolean)
+  return candidates.length > 0 && words.some((w) => candidates.includes(w))
 }
 
 /**
@@ -591,8 +630,12 @@ export function commandNamesRun(command) {
  * would read a RECYCLED pid — any stranger process that inherited the number
  * after the wrapper died — as a live run, and the successor would await a
  * receipt that never arrives. Identity is judged on the process's COMMAND
- * LINE naming the run wrapper the record was written by (`commandNamesRun`),
- * which is drift-free: it either names run-logged.mjs or it does not.
+ * LINE against the RECORD'S OWN identity (`commandNamesRun`, Sol round 3):
+ * the writer's recorded `cmdline` (captured through the same lens the probe
+ * reads), or the recorded log path standing in the argv. A record carrying
+ * neither — one written before `cmdline` existed, on a default launch whose
+ * argv names no log — reads NOT alive: the false-deny side, one re-run,
+ * never a stranger adopted as the run.
  * DELIBERATELY NOT a start-time compare: the measured 04.08.2026 incident
  * (findings carrier) showed the derived start time DRIFTS against a recorded
  * one in this WSL2 container, growing with process age (~3 s at 30 min), and
@@ -617,7 +660,13 @@ export function runRecordFor(logPath, { read, probe = probePid, commandOf = proc
           alive = false
         } else {
           const cmd = commandOf(pid)
-          alive = cmd == null ? null : commandNamesRun(cmd)
+          alive =
+            cmd == null
+              ? null
+              : commandNamesRun(cmd, {
+                  cmdline: typeof r.cmdline === 'string' ? r.cmdline : null,
+                  logPaths: [typeof r.log === 'string' ? r.log : '', declared],
+                })
         }
       } catch {
         alive = null // an unprobeable pid is UNKNOWN, which the bar reads as not-live

@@ -44,7 +44,7 @@ import { dirname, isAbsolute, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DEFAULTS, buildDigest, createSelector, failureSurface, showWindow } from './run-digest-core.mjs'
 import { backendsFrom, buildReceipt, formatReceipt, planRun } from './run-wait-core.mjs'
-import { framesWrittenSince, gitPosition, readRecord, recordPathFor, writeRecord } from './run-record.mjs'
+import { framesWrittenSince, gitPosition, readRecord, recordPathFor, selfCommandLine, writeRecord } from './run-record.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
@@ -189,6 +189,10 @@ function runVerify() {
     polls: 0,
     status: 'running',
     pid: process.pid,
+    // The writer's own identity, same lens as the transfer probe: without it a
+    // recycled pid running the same wrapper on ANOTHER run would satisfy this
+    // record (the default launch's argv names no log path to tell them apart).
+    cmdline: selfCommandLine(),
     finishedAt: null,
     exitCode: null,
     framesWritten: null,

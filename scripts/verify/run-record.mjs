@@ -40,6 +40,38 @@ export function recordPathFor(logPath) {
   return `${full}.run.json`
 }
 
+/** This process's OWN command line — the run record stores it beside the pid
+ *  (point 700, Sol round 3) so a later probe can ask "is pid N still the
+ *  process that WROTE this record?" instead of "does something by the
+ *  wrapper's name exist?". Read through the SAME LENS the probe uses
+ *  (`processCommandOf` in scripts/batch-in-flight.mjs: /proc cmdline joined
+ *  with single spaces; CIM CommandLine on Windows), so the same process
+ *  compares EQUAL — the two implementations must present identically, change
+ *  them together (a static import either way is ruled out there). Null when
+ *  unreadable: the record then carries no self-identity and a transfer probe
+ *  refuses the run as not-alive — the false-deny side, chosen over adopting a
+ *  stranger process as the run. */
+export function selfCommandLine() {
+  if (process.platform !== 'win32') {
+    try {
+      const raw = readFileSync('/proc/self/cmdline', 'utf8')
+      return raw.split('\0').filter(Boolean).join(' ').trim() || null
+    } catch {
+      return null
+    }
+  }
+  try {
+    const out = execFileSync(
+      'powershell',
+      ['-NoProfile', '-Command', `(Get-CimInstance Win32_Process -Filter "ProcessId=${process.pid}").CommandLine`],
+      { windowsHide: true, encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim()
+    return out || null
+  } catch {
+    return null
+  }
+}
+
 export function readRecord(path) {
   try {
     const r = JSON.parse(readFileSync(path, 'utf8'))
