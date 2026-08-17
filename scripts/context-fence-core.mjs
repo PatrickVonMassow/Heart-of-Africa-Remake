@@ -161,8 +161,10 @@ function npmWordsOf(argTexts) {
  *   - A suite token among the OTHER positionals also reads STARTING: the
  *     recognised word may itself have been an option's value standing in
  *     front of the real subcommand (`npm --loglevel ls test`).
- * The false denies this buys (`npm ls test` past the mark) each cost one
- * refusal naming the boundary command; the escapes it closes cost the fence.
+ * The false denies this buys (`npm ls test`, `npm view test` past the mark
+ * — the latter re-found as a defect by Sol round 4 and ruled INTENDED) each
+ * cost one refusal naming the boundary command; the escapes it closes cost
+ * the fence.
  */
 function npmStartsSuite(head, argTexts) {
   if (head !== 'npm') return false

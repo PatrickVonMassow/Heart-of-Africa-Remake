@@ -43,6 +43,13 @@ describe('over the mark, a STARTING call is denied — naming the mark', () => {
     ['npm with no recognisable subcommand', { toolName: 'Bash', command: 'npm --fetch-retries 3' }],
     ['npm test shadowed by a value that is itself a subcommand', { toolName: 'Bash', command: 'npm --loglevel ls test' }],
     ['npm run test with a flag standing between', { toolName: 'Bash', command: 'npm run --script-shell bash test' }],
+    // npm READS whose operand is a suite token are INTENDED false denies
+    // (Sol round 4, ruled deliberate): the recognised subcommand may itself
+    // be an option's value standing before the real one, so a suite token
+    // among the positionals reads fail-closed as starting — one refusal
+    // naming the boundary command, against an escape that costs the fence.
+    ['an npm view whose operand is a suite token (INTENDED false deny)', { toolName: 'Bash', command: 'npm view test' }],
+    ['an npm ls whose operand is a suite token (INTENDED false deny)', { toolName: 'Bash', command: 'npm ls test' }],
     // A DIRECT suite call is the browser work itself — judged on the
     // scripts/verify/ path prefix, no suite list enumerated (Sol finding 4b).
     ['a direct suite call', { toolName: 'Bash', command: 'node scripts/verify/world.mjs' }],
