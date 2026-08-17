@@ -198,6 +198,18 @@ put it is the mistake this line exists to stop.
   render that would blank existing prose refuses; a card for a point no longer in flight is removed;
   the unnumbered handover card beside a numbered one passes and alone does not; a non-owner session
   and a paused batch are waved through.
+  A SECOND, BLIND SPECIFICATION EXISTS and is owed a counted merge BEFORE this point is built (user
+  17.08.2026: »Lasse Sol das auch nochmal blind spezifizieren.«). Both halves stand in
+  `local/blind-713/` (list-a, Opus 5, 14 entries; list-b, Sol, 21 entries; material.md, the shared
+  input) and `blind-merge.mjs` reports 0 identical against 56 candidate pairs. Per CLAUDE.md §6 the
+  merge goes to a model that wrote NEITHER list and is recorded with `--union … --merged-by`, every
+  entry accounted for. Four of Sol's entries CONTRADICT the wording above and the merge decides them,
+  it does not average them: only the structured record may create a card (a `feat/<N>` branch absent
+  from it creates none); the empty state is a parser-distinct NON-card element rather than a "nothing
+  running" card, which also keeps the duplicate audit honest; the exact-set check runs at PUBLISH
+  time as one serialized operation, with a failed publish a named non-zero obligation; and the split
+  failure mode — the Stop hook fails OPEN, the publish preflight fails CLOSED, because no publication
+  beats a knowingly false board. Sol also rates the point CRITICAL against the MEDIUM-HIGH below.
   Criticality: MEDIUM-HIGH for the user-facing half of the batch — this section is what the user reads
   to know whether anything is happening at all, and it told him the opposite of the truth. Both a
   guard core and the board render change, so the other model's recorded review is required before the
