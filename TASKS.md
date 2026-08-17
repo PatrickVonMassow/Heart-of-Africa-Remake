@@ -7928,3 +7928,27 @@ to land than a mechanism that needs a review.
   Criticality: medium — nothing is broken, but the round's whole purpose is a picture the player
   currently has to wait minutes for.
   Bundle: Dorfleben.
+
+- [ ] 699. AN ACTOR LABEL IS DRAWN THROUGH THE LANDMARK LABEL BEHIND IT (seen 17.08.2026 in the
+  hold-Ctrl evidence frame `verification/147-ctrl-actor-labels.png`, on WebGL 2 and WebGPU
+  alike, while judging the picture of the Ctrl layer's declutter). The declutter that point 628
+  delivered keeps ACTOR labels apart from one another, and the picture proves it does. It does
+  not know the OTHER label layer: the italic world labels of the discovery-gated map naming
+  (`§17.2`). In the frame, the box `Adult giraffe` sits on top of `Unknown landmark` and cuts
+  its last letters away — the same thing the player reported about two villagers, one layer
+  further out. A zoomed crop is at `local/699-actor-over-landmark-label.png`.
+  FINAL STATE:
+  - The declutter reasons over EVERY drawn label box, not only the actor ones: a world label and
+    an actor label that would overlap are separated by the same rule that separates two actor
+    labels, and neither is drawn through the other.
+  - Where they cannot both be placed, the ACTOR label yields — a world label names a place the
+    player is navigating by, and it is the rarer of the two; a villager's name may wait a metre.
+    If the measurement contradicts that ranking, say so and rank the other way, but rank it.
+  - The measurement covers it: the sampled fusion check point 628 built (`scripts/verify/
+    labelFusion.mjs`) takes the world labels into its rect set, so this defect fails a check
+    rather than needing an eye. It must be shown to FAIL on today's code before it passes.
+  VERIFIABLE: the fusion check extended and shown red on the current frame, green after; plus
+  the picture — frame 147 with no box cutting into another, judged on both backends.
+  Criticality: low — both labels stay half-readable and nothing is misnamed; it is the same
+  visual untidiness one layer out, found while proving the layer below it correct.
+  Bundle: Chat & Tafel.

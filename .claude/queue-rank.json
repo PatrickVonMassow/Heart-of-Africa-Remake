@@ -103,10 +103,14 @@
     "698": {
       "at": "2026-08-17T09:12:55.330Z",
       "why": "Kalibrierung, kein Defekt: Sie gehoert hinter die uebrigen Sprachpunkte, weil 688-691 die Mechanik noch aendern und die Dichte erst danach sinnvoll eingestellt wird."
+    },
+    "699": {
+      "at": "2026-08-17T09:44:54.861Z",
+      "why": "Kosmetisch und eng verwandt mit 628: Sie wartet hinter den gemeldeten Fehlern und den fast fertigen Punkten, wie es die Warteschlangenregel fuer Fundstuecke vorsieht."
     }
   },
   "settled": {
-    "at": "2026-08-17T09:12:55.331Z",
+    "at": "2026-08-17T09:44:54.861Z",
     "points": [
       174,
       184,
@@ -298,7 +302,8 @@
       695,
       696,
       697,
-      698
+      698,
+      699
     ]
   }
 }
