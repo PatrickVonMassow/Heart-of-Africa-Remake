@@ -1424,6 +1424,17 @@ put it is the mistake this line exists to stop.
   that same function, not a second parser). A rule in `scripts/dashboard-guard-core.mjs` refuses a
   card body whose first paragraph still opens with a second `Stand HH:MM`, so the strip cannot
   quietly stop working.
+  
+  THIRD, THE ESCALATION CARD THAT OUTLIVES ITS PAUSE. Measured 17.08.2026 on the live board: the
+  watchdog writes a "Von dir zu klären" card when it pauses the batch after unanswered alerts, and
+  nothing withdraws that card when the pause ends. The card still told the reader the batch was
+  paused and asked him to lift it while `.claude/batch-paused` was gone and the batch was running;
+  it surfaced only because the card-topic guard tripped over an unrelated cross-point reference in
+  it. A card whose premise is a FILE withdraws itself when that file goes: the writer records the
+  premise on the card, and the same publish path that renders the board drops a card whose premise
+  no longer holds, so no reader is asked to act on a state that has passed. TESTS: cases in
+  `scripts/board-core.test.mjs` for a premise-bearing card kept while its file exists, dropped once
+  it is gone, and an ordinary question card — which carries no premise — never touched.
 
 - [ ] 665. Every board card names its problem before its status — and a mechanism enforces it
   (user 12.08.2026, 23:21–23:24, asking about the 641 now-card).
