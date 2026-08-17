@@ -134,11 +134,16 @@ export function blockingDeployments(inspected, { alsoConsider = [] } = {}) {
 }
 
 /**
- * Retry the deploy exactly when this run actually CLEARED something.
- * A deploy failure with nothing blocking is not a queue stall — an oversized or
- * missing upload from the build job fails the same way, and retrying that would
- * only lose time and blur the report. There is one retry step in the workflow,
+ * Retry once after ANY failure of the deploy step. The old queue-stall-only
+ * rule was too narrow: run 32040260819 reached the step but got HTTP 503 from
+ * the Pages deployment API with nothing stuck to clear, while run 32044141828
+ * got HTTP 429 downloading the action before any step existed (the workflow
+ * records that unreachable residual). There is one retry step in the workflow,
  * so "once" is structural; this decides whether it runs at all.
+ *
+ * A deterministic failure can cost one extra attempt, but cannot be hidden:
+ * the deploy job only follows a successful build, both attempts are bounded,
+ * and the workflow verdict prints both outcomes.
  * @returns {{retry:boolean, reason:string}}
  */
 export function shouldRetryDeploy({ deployFailed = false, cancelled = [] } = {}) {
@@ -146,9 +151,9 @@ export function shouldRetryDeploy({ deployFailed = false, cancelled = [] } = {})
   if (!deployFailed) return { retry: false, reason: 'the deployment succeeded — nothing to retry' }
   if (cleared.length === 0) {
     return {
-      retry: false,
+      retry: true,
       reason:
-        'the deploy failed with no stuck Pages deployment to clear — the cause is not a queue stall, so it stays red at once',
+        'the deploy failed with no stuck Pages deployment to clear — this may be a GitHub-side transient, and repeating the deploy step once is safe because the build already succeeded',
     }
   }
   return {
