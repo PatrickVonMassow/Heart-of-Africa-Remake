@@ -341,11 +341,14 @@ function authoringDirDestination(dest, resolvePath) {
  *   - `cp`/`mv`/`install` whose DESTINATION is one — the last operand or the
  *     `-t <dir>`/`--target-directory=<dir>` form (Sol round 7, finding 2) —
  *     including a DIRECTORY as destination, judged as dir/<source basename>
- *     for EVERY source (`cp notes.md docs/reviews/`). The directory must be
+ *     for EVERY source (`cp notes.md docs/reviews/`). A destination counts
+ *     as a directory only ON EVIDENCE — the -t form, a trailing slash, or
+ *     the injected type resolver (Sol round 9, finding 1) — and must be
  *     ANCHORED in the repo's own docs/ tree or the project-memory directory
  *     (`authoringDirDestination`), so the backup direction — `cp TASKS.md
- *     /tmp/backup/`, and equally `cp TASKS.md /tmp/docs/`, a foreign tree
- *     that merely CARRIES the name — stays the read it is (finding 1);
+ *     /tmp/backup/`, `cp TASKS.md /tmp/docs/` (a foreign tree that merely
+ *     CARRIES the name), and `cp TASKS.md docs/task-backup` (a plain-file
+ *     destination) — stays the read it is (findings 7.1/9.1);
  *   - `dd of=<target>`;
  *   - `node -e` / `python -c` / `perl -e` — the eval flag standing among the
  *     INTERPRETER OPTIONS, before the first non-flag word; behind it the
@@ -360,7 +363,7 @@ function authoringDirDestination(dest, resolvePath) {
  * cheaply the READING side wins: a missed authoring call costs one unfenced
  * edit, a denied read costs the session its way forward.
  */
-function shellAuthoringTarget(head, args, resolvePath) {
+function shellAuthoringTarget(head, args, resolvePath, isDirectory) {
   const texts = args.map((a) => a.text)
   const firstNamed = (candidates) => {
     for (const c of candidates) {
@@ -390,6 +393,24 @@ function shellAuthoringTarget(head, args, resolvePath) {
     // otherwise satisfy the file-level `/memory/` rule while naming no file.
     const direct = authoringTarget(posixNormalizePath(dest))
     if (direct) return direct
+    // A destination is a DIRECTORY only ON EVIDENCE (Sol round 9, finding 1:
+    // a relative `docs/<sub>` was ASSUMED a directory, so `cp TASKS.md
+    // docs/task-backup` — a plain-file destination, the very copy-out this
+    // rule promises to keep open — was judged docs/task-backup/TASKS.md and
+    // denied). Evidence is: the -t/--target-directory form (a directory by
+    // the flag's own meaning), a trailing slash, or the injected
+    // `isDirectory` type resolver saying so. Without evidence the
+    // destination is judged the FILE it was spelled as — the reading side —
+    // and the direct check above has already judged that file.
+    const provedDir = () => {
+      if (typeof isDirectory !== 'function') return false
+      try {
+        return isDirectory(dest) === true
+      } catch {
+        return false
+      }
+    }
+    if (targetDir === null && !/\/$/.test(dest) && !provedDir()) return null
     // Into a DIRECTORY of the fenced trees: the file that appears there is
     // dir/<source basename>, and with several sources EVERY one lands there,
     // so each join is judged. The directory must be ANCHORED
@@ -425,7 +446,7 @@ function shellAuthoringTarget(head, args, resolvePath) {
 /** What ONE parsed segment starts, or null. The carrier call itself starts
  *  nothing — but ONLY that segment: the exemption must not cover whatever
  *  rides beside it on the same line (Sol finding 1). */
-function segmentStart(seg, resolvePath) {
+function segmentStart(seg, resolvePath, isDirectory) {
   if (segmentInvokesScript(seg, [CARRIER_SCRIPT])) return null
   const { head, args } = headAndArgs(seg)
   if (npmStartsSuite(head, args.map((a) => a.text))) {
@@ -469,7 +490,7 @@ function segmentStart(seg, resolvePath) {
     if (target) return { what: `${target} via redirection (\`${seg.raw}\`)`, authoring: true }
   }
   // Authoring by SHELL MUTATION — the tool-plus-target forms the helper names.
-  const mutated = shellAuthoringTarget(head, args, resolvePath)
+  const mutated = shellAuthoringTarget(head, args, resolvePath, isDirectory)
   if (mutated) return { what: `${mutated} via a shell mutation (\`${seg.raw}\`)`, authoring: true }
   return null
 }
@@ -526,10 +547,13 @@ export function resolveThroughAncestors(abs, { realpath } = {}) {
  * Returns { starts, what, authoring } — `authoring` marks the refusals that
  * must name the carrier as the way to keep a finding.
  * `resolvePath` is the injectable path resolver for the verify-prefix rule
- * (the guard passes `realpathSync`; without one the rule stays lexical) —
- * the core itself never touches the disk.
+ * (the guard passes `realpathSync`; without one the rule stays lexical), and
+ * `isDirectory` the injectable TYPE resolver for the directory-destination
+ * evidence (a stat-based check at the guard; without one, a destination
+ * carrying no trailing-slash or -t evidence is judged a FILE — the reading
+ * side) — the core itself never touches the disk.
  */
-export function classifyFenceCall({ toolName, command, filePath, resolvePath } = {}) {
+export function classifyFenceCall({ toolName, command, filePath, resolvePath, isDirectory } = {}) {
   const tool = String(toolName ?? '').trim()
   if (AGENT_TOOLS.has(tool)) {
     return { starts: true, what: 'spawning a delegated agent', authoring: false }
@@ -541,7 +565,7 @@ export function classifyFenceCall({ toolName, command, filePath, resolvePath } =
     // by one. Any starting segment denies; a line of finishing segments
     // passes whatever suite names its quoted arguments mention.
     for (const seg of expandSegments(cmd)) {
-      const start = segmentStart(seg, resolvePath)
+      const start = segmentStart(seg, resolvePath, isDirectory)
       if (start) return { starts: true, ...start }
     }
     return { starts: false, what: null, authoring: false }
@@ -579,9 +603,18 @@ export function fenceRefusal({ tokens, watermark, what, authoring = false } = {}
  * and 'unreadable' fails OPEN (never a deny on an assumption).
  * Returns { block, reason }.
  */
-export function contextFenceDecision({ state, tokens, watermark, toolName, command, filePath, resolvePath } = {}) {
+export function contextFenceDecision({
+  state,
+  tokens,
+  watermark,
+  toolName,
+  command,
+  filePath,
+  resolvePath,
+  isDirectory,
+} = {}) {
   if (state !== 'past') return { block: false, reason: null }
-  const call = classifyFenceCall({ toolName, command, filePath, resolvePath })
+  const call = classifyFenceCall({ toolName, command, filePath, resolvePath, isDirectory })
   if (!call.starts) return { block: false, reason: null }
   return { block: true, reason: fenceRefusal({ tokens, watermark, what: call.what, authoring: call.authoring }) }
 }

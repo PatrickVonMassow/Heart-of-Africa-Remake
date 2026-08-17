@@ -190,6 +190,14 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
       toolName: 'Bash',
       command: 'cp new-rule.md /home/node/.claude/projects/-workspace-hoa/memory/',
     }],
+    // Directory evidence can come from the injected TYPE resolver where the
+    // spelling carries none (Sol round 9, finding 1) — the same command
+    // without it is pinned ALLOWED among the reads below.
+    ['cp into docs named without a slash — the injected type resolver supplies the evidence', {
+      toolName: 'Bash',
+      command: 'cp notes.md docs',
+      isDirectory: (p) => p === 'docs',
+    }],
     ['dd of= an authoring target', { toolName: 'Bash', command: 'dd if=notes.md of=TASKS.md' }],
     ['a wrapped shell mutation', { toolName: 'Bash', command: `bash -c "sed -i 's/a/b/' TASKS.md"` }],
     // Quoting does not change argv (Sol round 7, finding 3): a token that
@@ -237,6 +245,14 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
       toolName: 'Bash',
       command: 'cp TASKS.md /tmp/docs/',
       resolvePath: (p) => (p === 'docs' ? '/workspace/hoa/docs' : p.startsWith('/') ? p : null),
+    }],
+    // A destination is a DIRECTORY only on evidence — a trailing slash, the
+    // -t form, or the injected type resolver (Sol round 9, finding 1). With
+    // none, it is judged the plain FILE it was spelled as, so this copy-out
+    // under docs/ stays the read it is.
+    ['a copy-out to a plain-file destination under docs — no directory evidence, judged as the file it names', {
+      toolName: 'Bash',
+      command: 'cp TASKS.md docs/task-backup',
     }],
     ['sed -i on repo CODE — finishing the step, not authoring', { toolName: 'Bash', command: "sed -i 's/x/y/' src/config/balance.ts" }],
     ['tee into a scratch file', { toolName: 'Bash', command: 'npm run lint | tee /tmp/lint-log.txt' }],
