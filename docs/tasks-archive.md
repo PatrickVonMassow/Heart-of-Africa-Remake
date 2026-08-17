@@ -18470,3 +18470,73 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — no game code, but a red deploy blocks every turn end and leaves the
   deployed site behind `main`, which is what the user judges render work against.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 700. The context watermark reminds and does not bind — a session ran to 2.9x it (measured
+  17.08.2026, and raised by the user the same day: »Diese Sitzung ist inzwischen sehr gewachsen.
+  Musst du den Kontext so weit anwachsen lassen? … Nicht nur mir zustimmen und es machen, sondern
+  dafür sorgen, dass es in Zukunft auch eingehalten wird.«). MEASURED on this session: the Stop
+  hook reported 434440 tokens against the 150000 watermark and demanded the handover — and the
+  session kept working for roughly another hour, starting two full browser suites and one more
+  delegated agent round AFTER the mark. The user's own usage panel says the same thing from the
+  other side: 81 % of the week's spend sat above 150k context.
+  TWO CAUSES, BOTH MEASURED HERE, AND NEITHER IS FORGETFULNESS:
+  (a) NOTHING DENIES NEW WORK PAST THE MARK. The watermark speaks only in the Stop chain, which
+      fires when a turn tries to END. Every call that starts something — a suite, an agent, a new
+      point — goes through untouched, so the mark is advisory exactly where it should bind.
+  (b) THE HANDOVER WAS REFUSED BY ANOTHER RULE. `batch-boundary.mjs --prepare --context` stopped
+      with "declared in-flight work is NOT transferable" because the in-flight item was a
+      background SUITE RUN (a pid and a log, no branch), and the only recovery it offered was
+      DRAIN — i.e. stay in the session and wait. A verification that takes 25 minutes therefore
+      PINS the session past the mark, which is precisely when leaving is worth the most.
+  FINAL STATE:
+  - A PreToolUse FENCE past the watermark: while the measured context is over the mark, a call
+    that STARTS a new unit of work is DENIED — spawning an agent, starting a verify suite,
+    beginning a new point. What stays allowed is everything that FINISHES the step in flight
+    (commits, pushes, the landing, the board, the boundary itself) and every read. The refusal
+    names the mark, the measurement and the one command that ends the session.
+    IT MUST NOT SLOW THE BATCH (user 17.08.2026): the fence ENDS a session, it never idles one —
+    the work moves to a fresh session immediately, and the target is fewer tokens PER POINT, not
+    fewer per hour. A build of this that reduces throughput has missed the point; measure it
+    against 701's per-point ledger, not against a rate.
+    FILING A POINT IS STARTING WORK, AND THE FENCE MUST SAY SO (user 17.08.2026, on this very
+    session: »Hättest du vor dem Start von 700 nicht auch an eine neue Session übergeben
+    können?« — yes, and that is the whole pattern). Writing a work-order point, a memory or a
+    retrospective section past the mark FEELS like bookkeeping and costs like work: this session
+    wrote three points and two documents after the watermark fired, each time judging "just this
+    one more". Past the mark a finding goes to the CARRIER — one line, one command, already built
+    for exactly this — and the successor writes the point in a cheap context. The fence therefore
+    denies authoring in the work order and the documents too, and its refusal names the carrier
+    as the way to keep the finding.
+  - A RUNNING VERIFICATION IS TRANSFERABLE, so it is never a reason to stay: the run records what
+    it is (suite, backend, log path, pid, the commit it covers) where a successor can adopt it,
+    and `--prepare --context` accepts that instead of demanding a drain. The successor waits for
+    the receipt and reads the verdict — which is work a fresh context does better anyway.
+  - THE RULE IS MEASURED, not assumed: every boundary records the context it was actually taken
+    at, so the distance between the mark and the real handover is a number somebody can read
+    rather than a claim. A session that ends more than a stated margin past the mark says so in
+    its closing report.
+  - AND THE HANDOVER STATE MUST NOT BLOCK THE HANDOVER (measured 17.08.2026, twice, on the live
+    board): `scripts/board-core.test.mjs` ("promotes, returns, archives and answers without a new
+    violation") goes RED with `dup-in-section` as soon as the board carries the UNNUMBERED
+    handover card instead of a numbered now-card — the audit simulates "the now-card back into
+    the queue" and finds no now-card to move. Green again the moment a numbered card stands
+    there. Because the pre-push gate runs the unit layer, every commit is refused from the moment
+    a session prepares its handover, which is the most expensive moment there is; one commit was
+    dropped here rather than fought for. Decide which it is — the handover state is legitimate
+    and the audit must know it, or the board owes a numbered card even then — and pin the answer
+    with a case, so the last bookkeeping of a session cannot be blocked by the session ending.
+  VERIFIABLE: Vitest cases over the pure fence (over the mark + a starting call → deny, naming
+  the mark; over the mark + a finishing call or a read → allow; under the mark → allow all;
+  unreadable measurement → fail-open) and over the transferable-run record (a declared run with
+  a receipt path → `--prepare --context` proceeds; without one → today's refusal); plus the real
+  proof — the next session that crosses the mark hands over inside its current step, and its
+  recorded boundary context is within the margin.
+  ALSO IN SCOPE: `runIsLive` in `scripts/verify/run-record.mjs` — the consumer behind the wait
+  marker and `activeRecordPath` — judges liveness from `status:'running'` plus bare pid existence,
+  so a recycled pid keeps a stale record looking live on that path. It is the same defect class the
+  cross-vendor rounds closed in `commandNamesRun`, in the other consumer. FINAL STATE: it reads the
+  SAME run identity, rather than bypassing it.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it is a new fence and it changes the boundary.
+  Criticality: high — it is the batch's dominant cost, the user has now raised it twice, and the
+  existing mechanism demonstrably does not bind.
+  Bundle: Session- & Repo-Hygiene.
