@@ -8045,42 +8045,6 @@ to land than a mechanism that needs a review.
 
 
 
-- [ ] 702. A point's title shouts, because nothing ever told a session not to (user 17.08.2026:
-  »Wieso passiert es eigentlich immer wieder mal, dass es Tasks mit englischem Titel in komplett
-  Uppercase gibts — jetzt gerade für 701 passiert. Ergreife eine Maßnahme dagegen«). Measured on
-  the corpus the same day: of 691 points, 432 carry a title in full uppercase, and the drift is
-  not occasional but total — 0 of the first 200 points, 49 of 200-299, then 87, 98, 97 and 98
-  per hundred, every point from 600 on. There is no rule about it anywhere in CLAUDE.md, in this
-  file's framing sections or in any guard, so nothing ever pulled it back; each new point was
-  written by a session imitating its neighbours, and the style ratcheted. The cost is
-  readability: a work order whose every headline is a shout has no emphasis left for the line
-  that needs it, and the user reads this file.
-  SCOPE: titles only. The capitalised words INSIDE a body are this project's established
-  emphasis and appear in CLAUDE.md and design.md as well; changing those is a separate decision
-  that belongs to the user, not to this point.
-  FINAL STATE:
-  - `scripts/tasks-spec-guard-core.mjs` gains a title check beside its trail-marker check: the
-    title of a point — the text between `<n>. ` and the first ` (` or the end of the first line
-    — is refused when it has at least eight letters and fewer than five percent of them are
-    lowercase. An acronym-only or number-heavy title stays legal, and a title may still carry a
-    capitalised word for emphasis; only a title that is uppercase throughout is refused.
-  - The guard names the offending point and prints the sentence-case form it expects, so the fix
-    is a copy, not a puzzle.
-  - Like `model-guard`, it binds against a BASELINE rather than the whole corpus: a point added
-    or edited after the baseline must pass, so the check cannot be blocked by history.
-  - The 193 open points are normalised in one mechanical commit — title to sentence case, body
-    untouched — and `docs/tasks-archive.md` is left as it stands, because it is the record of
-    what was written, not a document anybody plans by.
-  - The rule is written where a session writing a point actually looks: one sentence in this
-    file's framing section beside "This file and every entry in it are written in English", and
-    the delegation brief (`scripts/point-brief.mjs`) carries it into every agent prompt.
-  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it is a new gate in the Stop chain.
-  VERIFIABLE: Vitest over the pure check — an uppercase title refused, a sentence-case one
-  passed, an acronym title passed, a title of fewer than eight letters passed, and a pre-baseline
-  offender ignored; plus `node scripts/tasks-spec-guard.mjs` green on the normalised file.
-  Criticality: low — it is a readability rule with a mechanical check; it touches no game code.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 703. A board command writes, then reports failure, and the retry doubles the card (user
   17.08.2026: »Aber warum hast du diese Karte zweimal eingestellt? Auch das darf nicht passieren
   können«). Reproduced the same day: the same question stood twice under "Von dir zu klären".
