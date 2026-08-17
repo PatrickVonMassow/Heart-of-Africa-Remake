@@ -47,22 +47,12 @@ steuert oder Arbeit vernichten kann, wird immer gegengeprüft; was ein schneller
 sofort zeigt, nie.
 
 **Kontingent ist nicht austauschbar.** Ist ein Modell knapp, gib das Schreiben von Code — den
-größten Verbraucher — dem anderen und behalte für das knappe, was **nur** es kann. Wer
-verteilt, muss dabei die Töpfe sehen: Ein Verteiler, der den Füllstand nicht liest, empfiehlt
-ein längst leeres Modell.
+größten Verbraucher — dem anderen und behalte für das knappe, was **nur** es kann. Ein
+Verteiler, der den Füllstand nicht liest, empfiehlt ein längst leeres Modell.
 
-> *Prompt:* „Sag mir, bevor ein Kontingent zur Neige geht, welche Arbeit an das Modell mit
-> Restvolumen geht und welche beim knappen bleiben muss. Der Verteiler liest den Füllstand:
-> Eine leere Spur empfiehlt er nie."
-
-**Ein sauberer Rückfall rettet die Funktion und bricht die Zusage.** Ist das zweite Modell
-einmal nicht erreichbar, reicht ein gut gebautes Werkzeug die Arbeit anstandslos an das erste
-weiter — und schon prüft das Projekt sich selbst, ohne dass jemand das entschieden hat. Der
-Rückfall muss deshalb nicht nur sagen, *dass* er greift, sondern was er kostet.
-
-> *Prompt:* „Wenn das zweite Modell nicht erreichbar ist, arbeite nicht stillschweigend
-> einspurig weiter: Melde es mit der Folge — solange das gilt, gibt es kein Vier-Augen — und
-> nenne den einen Befehl, der es repariert."
+> *Prompt:* „Sag mir vor Ende eines Kontingents, welche Arbeit an das Modell mit Restvolumen
+> geht; eine leere Spur empfiehlst du nie. Ist das zweite Modell nicht erreichbar, melde die
+> Folge — kein Vier-Augen, solange das gilt —, statt einspurig weiterzuarbeiten."
 
 ---
 
