@@ -156,14 +156,18 @@ export function refAnchoring(ref) {
   // The braces must MATCH: `"${CLAUDE_PROJECT_DIR/scripts/x.mjs"` is a bad
   // substitution at runtime, and an independently optional `{`/`}` cleared it.
   if (/^(\$CLAUDE_PROJECT_DIR|\$\{CLAUDE_PROJECT_DIR\}|%CLAUDE_PROJECT_DIR%)[/\\]/.test(text)) return 'project-dir'
-  // THE DEFAULTED FORM COUNTS TOO: `${CLAUDE_PROJECT_DIR:-.}/scripts/x.mjs`.
-  // With the variable set it is exactly the anchored form; unset, it degrades to
-  // the relative path — which is what the bare form does anyway, only louder
-  // (`$CLAUDE_PROJECT_DIR` unset expands to `/scripts/x.mjs`, resolving nowhere
-  // from any cwd). So the default is never WORSE and is right whenever the cwd
-  // happens to be the repo root. Judged here rather than left to the rollout
-  // list, because a line written in this form is not an unfinished one.
-  if (/^\$\{CLAUDE_PROJECT_DIR:-[^}]*\}[/\\]/.test(text)) return 'project-dir'
+  // A DEFAULTED form counts ONLY when its default is itself ABSOLUTE:
+  // `${CLAUDE_PROJECT_DIR:-/srv/hoa}/scripts/x.mjs` fires from any cwd whether
+  // the variable is set or not, which is this function's whole contract.
+  // `:-.` does NOT qualify and `:-` (empty) least of all — the first is
+  // cwd-relative when the variable is unset, the second expands to the already
+  // rejected `/scripts/x.mjs`. I first accepted any default on the argument that
+  // it is "never worse than the bare form"; Sol's re-review of 044ec3dd showed
+  // that misses the point — the contract is ANY working directory, not "no worse
+  // than the other broken one", and the test then merely pinned the
+  // misclassification. A `:-.` line is an unfinished rollout line and belongs in
+  // RELATIVE_WIRING_ROLLOUT, where it is visible, not silently blessed here.
+  if (/^\$\{CLAUDE_PROJECT_DIR:-[/\\][^}]*\}[/\\]/.test(text)) return 'project-dir'
   if (/^([A-Za-z]:[/\\]|[/\\])/.test(text)) return 'absolute'
   return 'relative'
 }
@@ -265,6 +269,11 @@ export const RELATIVE_WIRING_ROLLOUT = {
     'queue-order-guard.mjs',
     'render-verify-guard.mjs',
     'retro-currency-guard.mjs',
+    // Wired 17.08.2026 as `${CLAUDE_PROJECT_DIR:-.}/scripts/rule-echo-guard.mjs`.
+    // The default makes it fire from the repo root when the variable is unset,
+    // which is better than the bare form but still not "from ANY cwd" — so it is
+    // an unfinished rollout line like the rest, recorded rather than blessed.
+    'rule-echo-guard.mjs',
     'rule-review-guard.mjs',
     'tasks-archive-guard.mjs',
     'tasks-spec-guard.mjs',
