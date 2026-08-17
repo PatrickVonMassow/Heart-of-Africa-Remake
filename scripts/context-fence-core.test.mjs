@@ -519,6 +519,16 @@ describe("the fence's claim is BOUNDED — a constructed escape is outside it (r
     expect(decide({ toolName: 'Bash', command: 'ln -s /tmp/notes.md scripts/verify/note-link' }).block).toBe(false)
   })
 
+  it("an attached -t VALUE is not read as option letters: `-tstage` is `-t stage`, not `-s` (Sol round 11)", () => {
+    // The whole-token letter scan matched the `s` of `stage` and denied this
+    // hard link — the copy-out direction the rule keeps open. The link target
+    // is judged, no `-s` is present, so nothing here constructs a symlink.
+    expect(decide({ toolName: 'Bash', command: 'ln -tstage scripts/verify/world.mjs' }).block).toBe(false)
+    // The same token shape WITH a real -s still denies: `-st` is `-s` plus a
+    // `-t` whose value stands detached.
+    expect(decide({ toolName: 'Bash', command: 'ln -st /tmp scripts/verify' }).block).toBe(true)
+  })
+
   it('INTENDED LIMIT, not an oversight: the copy-based constructed escape PASSES — the class has no lexical closure and the fence is not a sandbox', () => {
     const v = decide({
       toolName: 'Bash',

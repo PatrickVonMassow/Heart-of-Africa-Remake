@@ -287,6 +287,21 @@ function splitArgv(args, { targetOption = false } = {}) {
 }
 
 /**
+ * The OPTION LETTERS of one short-flag token — the cluster WITHOUT the value an
+ * attached `-t` swallows. `-tstage` IS `-t stage`, so its only option letter is
+ * `t`; the `s` of `stage` is part of a directory name. Sol round 11: scanning
+ * the whole token read that `s` as `-s` and denied `ln -tstage
+ * scripts/verify/world.mjs` — a permitted hard-link copy-out — which also showed
+ * `-St` was not the last deny-side residual. A long flag carries no cluster.
+ */
+function shortOptionLetters(token) {
+  const t = String(token ?? '')
+  if (!t.startsWith('-') || t.startsWith('--')) return ''
+  const attached = /^-([A-Za-z]*?)t(.+)$/.exec(t)
+  return attached ? `${attached[1]}t` : t.slice(1)
+}
+
+/**
  * Is this DESTINATION a directory of the fenced trees — the repository's OWN
  * docs/ tree or the PROJECT-MEMORY directory? ANCHORED, not name-matched
  * (Sol round 7, finding 1: `/(?:^|\/)(docs|memory)$/` took any path ENDING in
@@ -380,6 +395,18 @@ function authoringDirDestination(dest, resolvePath) {
  * passes), a detached option value before an eval flag hides the eval
  * (`node --require esm -e …` passes), and only `t` is modelled as a
  * value-taking short. None of these is a defect to be chased.
+ *
+ * TWO of the residual sit on the DENY side, so they are named separately: a
+ * cluster whose EARLIER letter consumes the `t` (`cp -St <suffix> …`) reads the
+ * suffix as a target directory, and the sed/perl letter tests still scan a whole
+ * token because no value-taking short is modelled for them, so an attached
+ * option value could carry a matching letter. Both cost one refusal that NAMES
+ * the boundary command, in spellings measured as ones a cooperating session does
+ * not write; closing them means a per-tool option table, which is the fourth
+ * parser this contract exists to refuse. Sol round 11 found the same class in
+ * `ln`, where a value-taking `t` IS modelled — that one was a defect and is
+ * fixed (`shortOptionLetters`), because there the modelling made the letter
+ * knowable.
  */
 function shellAuthoringTarget(head, args, resolvePath, isDirectory) {
   const texts = args.map((a) => a.text)
@@ -492,7 +519,7 @@ function segmentStart(seg, resolvePath, isDirectory) {
   // stays outside the fence's claim — see resolveThroughAncestors.
   if (head === 'ln') {
     const { targetDir, operands, flags } = splitArgv(args, { targetOption: true })
-    const symbolic = flags.some((t) => /^-[A-Za-z]*s/.test(t) || t === '--symbolic')
+    const symbolic = flags.some((t) => t === '--symbolic' || shortOptionLetters(t).includes('s'))
     const linkTargets = targetDir !== null || operands.length < 2 ? operands : operands.slice(0, -1)
     if (symbolic && linkTargets.some((t) => VERIFY_TREE.test(posixNormalizePath(t)))) {
       return { what: `constructing a link into the verify tree (\`${seg.raw}\`)`, authoring: false }
