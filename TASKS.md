@@ -909,6 +909,30 @@ put it is the mistake this line exists to stop.
        range), so the re-review covers it: the guard was loosened from demanding a
        clear r+1.6 m yard to only refusing to leave a sibling in the wall band, and
        that must be shown to be a correction rather than a weakening.
+ 11. THE CARVE REMOVAL IS GATED PER CHILD, IN EVERY RIVER VILLAGE (cross-vendor
+     finding, GPT-5.6 Sol at effort high on `59740c15..206ae092`, 18.08.2026,
+     verdict merge-with-fixes; counted and confirmed before filing).
+     `src/scenes/place/PlaceLife.tsx` takes `buildWedgeCarve` off EVERY bank phase
+     (`const carve = stage ? () => false : …`), on the measured ground that at the
+     verification's own seed the only route from the children's quarter to the bank
+     ran through one carved wedge — with the carve the group stood in a pocket and
+     never reached the water. That reason stands. What is missing is the gate on
+     its cost: a roaming child is steered LOCALLY, so with the carve gone nothing
+     keeps an individual child out of a dead-end wedge. The per-child measure that
+     would catch it — "the children never shuffle on the spot", which reads
+     `worstShare` and `leastJudged` off the WORST child — runs over
+     `bambara-village@2972259115`, `maasai-village@42` and `swahili-village@99`,
+     and the last two stand on no river, so they never play this round at all. The
+     round's own cross-layout test asserts stations reachable, both rocks stood at,
+     one rock touched and one run-phase crossing — never per-child progress. Three
+     of the four river layouts are therefore ungated. FINAL STATE: the per-child
+     shuffle measure runs over the bank-round replay in all four river villages
+     (`bambara@42`, `bambara@2972259115`, `nubian@42`, `mandinka@99`), gating
+     `worstShare` and `leastJudged` there as the shuffle pin does, and the measured
+     numbers are stated at the site. Restoring the carve for the locally steered
+     phases is the alternative and is second choice: it puts back a wall the
+     measurement showed was in the wrong place, so it may only be taken if the
+     measure cannot be made to hold.
 
   Test: Vitest over a replayed cycle — the phases alternate; the caller becomes the
   first catcher; the direction alternates with the side swap; `ROCK` occurs once
