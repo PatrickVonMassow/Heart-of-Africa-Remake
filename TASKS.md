@@ -142,37 +142,37 @@ put it is the mistake this line exists to stop.
   existing mechanism demonstrably does not bind.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 701. WHAT A TASK COSTS, AND WHETHER THE BUILT LEVERS ACTUALLY MOVE IT (user 17.08.2026:
+- [ ] 701. What a task costs, and whether the built levers actually move it (user 17.08.2026:
   »Ich verstehe nicht, warum der Verbrauch trotz aller bisheriger Maßnahmen so extrem hoch ist«
   and »Es geht nicht darum, weniger Token pro Zeit zu verbrauchen, sondern darum, dass es weniger
-  pro Task wird«). THE BINDING TARGET IS COST PER FINISHED POINT. Throughput is NOT a lever:
+  pro Task wird«). The binding target is the cost per finished point. Throughput is not a lever:
   slowing the batch, shrinking the agent pool or deferring work is explicitly excluded — a
   measure that lowers the hourly rate while leaving the per-point cost untouched has failed.
-  WHY THIS POINT EXISTS: a row of levers is BUILT (the point boundary, the context watermark, the
+  Why this point exists: a row of levers is built (the point boundary, the context watermark, the
   bounded verify digest, the delegation brief, the open/archive split of the work order, the doc
   budgets) and the spend is still dominated by large contexts — 81 % of a week's usage above the
-  150k mark, by the user's own panel. Nobody knows WHICH of those levers is used, how often, and
-  what it saves, because none of them is measured in operation. Four more measures are FILED AND
-  UNBUILT (553 budget per point, 596 the running tail, 597 large tool output, 662 the boundary
+  150k mark, by the user's own panel. Nobody knows which of those levers is used, how often, and
+  what it saves, because none of them is measured in operation. Four more measures are filed and
+  unbuilt (553 budget per point, 596 the running tail, 597 large tool output, 662 the boundary
   without a tick) — that alone may be the answer, and it must be established rather than assumed.
   FINAL STATE:
-  - A LEDGER PER POINT, written where a later session can read it: for every landed point, the
+  - A ledger per point, written where a later session can read it: for every landed point, the
     tokens it cost, split by origin — the main session, each delegated agent, the cross-vendor
     reviews, and the big single items (picture reads, suite digests, agent reports). It is
     derived from what the harness already records (the session transcripts, the agent logs), not
     from a new accounting layer nobody maintains.
-  - AN EFFECTIVENESS READING PER LEVER, from that same data: how often each built lever actually
+  - An effectiveness reading per lever, from that same data: how often each built lever actually
     fired (boundaries taken, watermark crossings, briefs used instead of whole-document reads,
     digests instead of raw logs), and the measured difference between the points where it fired
     and the ones where it did not. A lever that cannot be shown to move the per-point cost is
     named as such — that verdict is the point's product, and a lever that fails is a candidate
     for removal, because an unused mechanism still costs to carry.
-  - THE THREE LARGEST ITEMS NAMED WITH NUMBERS, since the fix follows the measurement: today's
+  - The three largest items named with numbers, since the fix follows the measurement: today's
     suspects are the picture judgment (a full 1440x900 frame read whole where a crop answers the
     question), the agent reports (multi-thousand-token prose per round), and the review rounds
     (a diff plus files per round, three rounds on one small bar today). Each gets a measured
     share, and only then a proposal.
-  - THE READING IS REPEATABLE, not a one-off study: one command prints it for the last N points,
+  - The reading is repeatable, not a one-off study: one command prints it for the last N points,
     so the next session can ask "did it get cheaper" and get an answer rather than an opinion.
   VERIFIABLE: the command runs on the real transcripts of the last ten landed points and prints
   the per-point split; the per-lever reading names, for each built lever, its firing count and
@@ -8044,3 +8044,39 @@ to land than a mechanism that needs a review.
   Bundle: Chat & Tafel.
 
 
+
+- [ ] 702. A point's title shouts, because nothing ever told a session not to (user 17.08.2026:
+  »Wieso passiert es eigentlich immer wieder mal, dass es Tasks mit englischem Titel in komplett
+  Uppercase gibts — jetzt gerade für 701 passiert. Ergreife eine Maßnahme dagegen«). Measured on
+  the corpus the same day: of 691 points, 432 carry a title in full uppercase, and the drift is
+  not occasional but total — 0 of the first 200 points, 49 of 200-299, then 87, 98, 97 and 98
+  per hundred, every point from 600 on. There is no rule about it anywhere in CLAUDE.md, in this
+  file's framing sections or in any guard, so nothing ever pulled it back; each new point was
+  written by a session imitating its neighbours, and the style ratcheted. The cost is
+  readability: a work order whose every headline is a shout has no emphasis left for the line
+  that needs it, and the user reads this file.
+  SCOPE: titles only. The capitalised words INSIDE a body are this project's established
+  emphasis and appear in CLAUDE.md and design.md as well; changing those is a separate decision
+  that belongs to the user, not to this point.
+  FINAL STATE:
+  - `scripts/tasks-spec-guard-core.mjs` gains a title check beside its trail-marker check: the
+    title of a point — the text between `<n>. ` and the first ` (` or the end of the first line
+    — is refused when it has at least eight letters and fewer than five percent of them are
+    lowercase. An acronym-only or number-heavy title stays legal, and a title may still carry a
+    capitalised word for emphasis; only a title that is uppercase throughout is refused.
+  - The guard names the offending point and prints the sentence-case form it expects, so the fix
+    is a copy, not a puzzle.
+  - Like `model-guard`, it binds against a BASELINE rather than the whole corpus: a point added
+    or edited after the baseline must pass, so the check cannot be blocked by history.
+  - The 193 open points are normalised in one mechanical commit — title to sentence case, body
+    untouched — and `docs/tasks-archive.md` is left as it stands, because it is the record of
+    what was written, not a document anybody plans by.
+  - The rule is written where a session writing a point actually looks: one sentence in this
+    file's framing section beside "This file and every entry in it are written in English", and
+    the delegation brief (`scripts/point-brief.mjs`) carries it into every agent prompt.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it is a new gate in the Stop chain.
+  VERIFIABLE: Vitest over the pure check — an uppercase title refused, a sentence-case one
+  passed, an acronym title passed, a title of fewer than eight letters passed, and a pre-baseline
+  offender ignored; plus `node scripts/tasks-spec-guard.mjs` green on the normalised file.
+  Criticality: low — it is a readability rule with a mechanical check; it touches no game code.
+  Bundle: Session- & Repo-Hygiene.
