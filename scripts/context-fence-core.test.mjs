@@ -186,6 +186,13 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
     }],
     ['dd of= an authoring target', { toolName: 'Bash', command: 'dd if=notes.md of=TASKS.md' }],
     ['a wrapped shell mutation', { toolName: 'Bash', command: `bash -c "sed -i 's/a/b/' TASKS.md"` }],
+    // Quoting does not change argv (Sol round 7, finding 3): a token that
+    // EQUALS the flag is the flag however it was written.
+    ['a QUOTED -i — still the in-place flag', { toolName: 'Bash', command: "sed '-i' 's/x/y/' TASKS.md" }],
+    ['a QUOTED --eval — still the eval flag', {
+      toolName: 'Bash',
+      command: `node '--eval' "fs.writeFileSync('TASKS.md','x')"`,
+    }],
   ]
   for (const [name, call] of mutations) {
     it(`denies ${name}, pointing at the carrier`, () => {
@@ -210,6 +217,10 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
     ['grep counting open points', { toolName: 'Bash', command: 'grep -c "^- \\[ \\]" TASKS.md' }],
     ['cat on the archive', { toolName: 'Bash', command: 'cat docs/tasks-archive.md' }],
     ['sed WITHOUT -i on the work order (stdout only)', { toolName: 'Bash', command: "sed 's/x/y/' TASKS.md" }],
+    // A flag STRING inside a longer argument is not the flag: the whole-token
+    // start-anchored match keeps this substitution a read (Sol round 7,
+    // finding 3's counterpart).
+    ['a sed SUBSTITUTION whose pattern spells -i', { toolName: 'Bash', command: "sed 's/-i/x/' TASKS.md" }],
     ['a copy OUT of the target — the destination decides', { toolName: 'Bash', command: 'cp TASKS.md /tmp/tasks-backup.md' }],
     // The directory-destination rule is ANCHORED to the repo's own trees (Sol
     // round 7, finding 1): a foreign directory that merely CARRIES the name

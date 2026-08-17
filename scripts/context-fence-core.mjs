@@ -338,7 +338,13 @@ function shellAuthoringTarget(head, args, resolvePath) {
     }
     return null
   }
-  if (head === 'sed' && args.some((a) => !a.quoted && inPlaceFlag(a.text))) return firstNamed(pos)
+  // A token that EQUALS a flag is the flag however it was written (Sol round
+  // 7, finding 3): quoting changes nothing about argv, so `sed '-i' …` edits
+  // in place exactly as the unquoted form does. The protection quoting really
+  // owes — a flag STRING inside a longer script body — is already given by
+  // the start-anchored whole-token patterns: `sed 's/-i/x/' TASKS.md` is a
+  // substitution whose token starts with `s`, and it stays the read it is.
+  if (head === 'sed' && args.some((a) => inPlaceFlag(a.text))) return firstNamed(pos)
   if (head === 'tee') return firstNamed(pos)
   if (head === 'cp' || head === 'mv' || head === 'install') {
     const { targetDir, operands } = destinationSplit(args)
@@ -362,7 +368,11 @@ function shellAuthoringTarget(head, args, resolvePath) {
   }
   if (head === 'dd') return firstNamed(texts.filter((t) => /^of=/i.test(t)).map((t) => t.slice(3)))
   const isEvalFlag = EVAL_FLAGS.get(head)
-  if (isEvalFlag && args.some((a) => !a.quoted && isEvalFlag(a.text))) {
+  // The same whole-token rule as sed's above (Sol round 7, finding 3): a
+  // quoted `--eval` IS the eval flag, and the flag patterns' start-anchored
+  // whole-token matches already keep a flag-shaped string inside a longer
+  // quoted script body from counting.
+  if (isEvalFlag && args.some((a) => isEvalFlag(a.text))) {
     return firstNamed(texts.flatMap(pathTokensOf))
   }
   return null
