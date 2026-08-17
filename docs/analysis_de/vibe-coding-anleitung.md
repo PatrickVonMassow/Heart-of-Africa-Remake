@@ -55,6 +55,15 @@ ein längst leeres Modell.
 > Restvolumen geht und welche beim knappen bleiben muss. Der Verteiler liest den Füllstand:
 > Eine leere Spur empfiehlt er nie."
 
+**Ein sauberer Rückfall rettet die Funktion und bricht die Zusage.** Ist das zweite Modell
+einmal nicht erreichbar, reicht ein gut gebautes Werkzeug die Arbeit anstandslos an das erste
+weiter — und schon prüft das Projekt sich selbst, ohne dass jemand das entschieden hat. Der
+Rückfall muss deshalb nicht nur sagen, *dass* er greift, sondern was er kostet.
+
+> *Prompt:* „Wenn das zweite Modell nicht erreichbar ist, arbeite nicht stillschweigend
+> einspurig weiter: Melde es mit der Folge — solange das gilt, gibt es kein Vier-Augen — und
+> nenne den einen Befehl, der es repariert."
+
 ---
 
 ## So setzt du ein Projekt auf (Prompts zum Kopieren)
@@ -412,4 +421,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: c94bfe87c89f26815984b4912fd969656bd77e74db3a9b3aadb814541bb1c5cc -->
+<!-- GUIDE-FINGERPRINT: ccdb68be6e80871e961761aa235a68c1a2e9606463da4977bb2aa5821c9df1db -->

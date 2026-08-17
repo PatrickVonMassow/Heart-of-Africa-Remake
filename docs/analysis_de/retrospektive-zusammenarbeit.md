@@ -1309,7 +1309,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 14.08.2026, 01:49 · Quellen-Fingerprint: `c94bfe87c89f…`
+Zuletzt aktualisiert: Montag, 17.08.2026, 10:33 · Quellen-Fingerprint: `ccdb68be6e80…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1343,7 +1343,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable 5 authors work judged difficult/complex/error-prone from the start, and takes over Opus work once Sol still finds problems after a re-work; Fable is NOT the default (smaller volume) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Fable is ONLY for four-eyes review and as the first fallback when Opus 5 is unavailable — never for \"hard\" tasks; Opus 5 handles those (user rule 25.07.2026, supersedes the earlier hard-task delegation) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| What survives of the 25.07. rule: Fable is NOT the default lane because its volume is the scarcest — but difficulty IS a reason for it, and review is cross-vendor, not Fable-by-default | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1362,7 +1362,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Always take the point boundary autonomously at a closed point — never ask the user whether to hand over or /clear | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
 | Per-point QA runs scoped (Vitest always, browser suites by diff mapping, flake-retry single suites) — WATCHDOG duty to report any bug that slips through | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Edits to .claude/settings.json and .git/hooks ALWAYS trigger a permission prompt (harness safety layer, allowlist cannot override); never schedule such work for unattended night batches | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| How to read Patrick's two usage dashboards, and the standing order to spend OpenAI volume before Anthropic | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| How to read Patrick's two usage dashboards (they count in OPPOSITE directions); the OpenAI-first emergency ended 17.08.2026 and the normal split of CLAUDE.md §6 applies | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | hoa uses a feature-branch workflow — each TASKS point on feat/<point>-<slug>, push the branch after every commit, merge to main only when done+verified; cross-cutting changes go straight to main | 2 | mittel | commit-scope-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Direct pushes to main are approved despite GitHub's branch protection — never ask about switching to pull requests again | 1 | niedrig | push-arrival-guard.mjs | ✔ Mechanismus |
 | Order the TASKS/queue so known-bug fixes + user-requested extensions come BEFORE the big bug-FINDING / QA-framework tickets | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
@@ -1372,7 +1372,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Queue order for this release — communication mechanic first, then 633 (closing), then 174 (tag); a new point of that kind is moved to the front in the same turn | 1 | niedrig | lock-release-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 3 | mittel | model-guard.mjs | ✔ Mechanismus |
-| 13.08.2026: Sol (GPT-5.6) authors as much as possible from now on — Fable's pool is empty and Opus is nearly out until the Monday 10:00 reset; Claude only reviews, verifies the picture and lands | 3 | mittel | — (Regel/Memory) | ◐ Regel |
+| ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1400,8 +1400,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 81 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 54 Prozess-/Meta-TASKS-Punkte (davon 20 offen).
 
-<!-- RETRO-FINGERPRINT: c94bfe87c89f26815984b4912fd969656bd77e74db3a9b3aadb814541bb1c5cc -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-13T23:49:02.834Z -->
+<!-- RETRO-FINGERPRINT: ccdb68be6e80871e961761aa235a68c1a2e9606463da4977bb2aa5821c9df1db -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-17T08:33:47.507Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1556,3 +1556,26 @@ kennen — sonst ist seine Empfehlung eine Behauptung über einen Zustand, den e
 Und wo die Korrektur zu einer Mechanik nur in einer Merk-Datei lebt, ist sie nicht durchgesetzt,
 sondern erinnert: Sie hält genau so lange, wie jemand sich erinnert. Beides gehört an dieselbe
 Prüffrage bei jedem neuen Empfehler: *Woher weiß er, dass es das Empfohlene noch gibt?*
+
+### 3.118 Der Ausfall kippte nicht die Funktion, sondern die Vereinbarung
+
+Am 17.08.2026 war GPT-5.6 Sol aus dem Container nicht erreichbar. Die Ursache lag nicht beim
+Anbieter: Die Freigabeliste, mit der der Container hochfährt, stammt aus dem Abbild vom
+04.08.2026 und kennt die OpenAI-Adressen nicht; die aktuelle Liste liegt seit dem 10.08. im
+Projekt und wird von nichts installiert, weil der Startbefehl den Pfad im Abbild aufruft. Jeder
+gewöhnliche Neustart nimmt die Strecke also wieder weg, und nur ein Neubau des Abbilds würde sie
+zurückbringen.
+
+Das Bemerkenswerte ist nicht der Ausfall, sondern seine Form. Kein Werkzeug ging kaputt: Die
+Gegenlese reicht die Arbeit ordnungsgemäß an die Claude-Kette weiter, die Leseaufträge steigen
+sauber mit Code 3 aus. Jedes für sich verhält sich richtig — und zusammen verschieben sie die
+gesamte Last auf den Anbieter, von dem sie der Nutzer ausdrücklich weg verteilt hatte, ohne dass
+irgendwo eine Entscheidung getroffen oder gemeldet wurde. Die Zwei-Anbieter-Aufteilung und das
+Vier-Augen-Prinzip, das auf ihr steht, waren außer Kraft, und die Sitzung hätte weiterarbeiten
+können, ohne es zu merken.
+
+**Lehre:** Ein sauberer Rückfallpfad ist eine Funktionsgarantie, keine Politikgarantie. Wo eine
+Vereinbarung *welcher* Anbieter etwas tut an einer Erreichbarkeit hängt, muss deren Wegfall
+gemeldet werden — mit dem, was er kostet: nicht „Sol nicht erreichbar", sondern „solange dies
+gilt, ist die Aufteilung ausgesetzt". Die Prüffrage bei jedem Rückfallpfad lautet deshalb:
+*Welche Zusage bricht er still, während er die Funktion rettet?*
