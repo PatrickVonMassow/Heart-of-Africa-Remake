@@ -25,6 +25,7 @@ import {
   footBodyOffset,
   footForwardOffset,
   footHeight,
+  footPlantPose,
   gaitBodyLift,
   gaitCadence,
   gaitFootFraction,
@@ -751,6 +752,53 @@ describe('animal gait (design.md §19, points 228/255/300 — planted feet, no s
       expect(stanceDistance).toBeGreaterThan(0.05 * rig.legLength)
       expect(moved).toBeLessThan(1e-9)
     }
+  })
+
+  it('holds one world contact through body travel and turn for the whole stance', () => {
+    const leg = buildGoatParts().legs[0]
+    const radius = 1.2
+    const stanceTravel = GOAT.stride * GAIT_DUTY * 0.98
+    let contact = null as ReturnType<typeof footPlantPose>['contact']
+    let firstBody = { x: 0, z: 0, yaw: 0 }
+    let lastBody = firstBody
+
+    for (let k = 0; k <= 80; k++) {
+      const distance = (k / 80) * stanceTravel
+      const arc = distance / radius
+      const phase = -Math.PI / 2 + 0.01 + gaitPhase(distance, GOAT.cadence)
+      expect(isStance(phase + leg.phaseOffset)).toBe(true)
+      const body = {
+        x: radius * (1 - Math.cos(arc)),
+        y: gaitBodyLift(phase, GOAT.legLength),
+        z: radius * Math.sin(arc),
+        yaw: arc,
+      }
+      if (k === 0) firstBody = body
+      lastBody = body
+      const pose = footPlantPose(contact, true, body, leg.hip, legSwingAngle(phase, leg.phaseOffset), GOAT.legLength)
+      contact = pose.contact
+
+      // Rebuild the rendered endpoint from the pure pose. It must land on the
+      // same world point despite both the hip translation and the yaw change.
+      const reach = GOAT.legLength * pose.stretch
+      const localX = leg.hip[0] + pose.direction[0] * reach
+      const localY = leg.hip[1] + pose.direction[1] * reach
+      const localZ = leg.hip[2] + pose.direction[2] * reach
+      const cy = Math.cos(body.yaw)
+      const sy = Math.sin(body.yaw)
+      const foot = {
+        x: body.x + localX * cy + localZ * sy,
+        y: body.y + localY,
+        z: body.z - localX * sy + localZ * cy,
+      }
+      expect(foot.x).toBeCloseTo(contact!.x, 12)
+      expect(foot.y).toBeCloseTo(contact!.y, 12)
+      expect(foot.z).toBeCloseTo(contact!.z, 12)
+    }
+
+    expect(Math.hypot(lastBody.x - firstBody.x, lastBody.z - firstBody.z)).toBeGreaterThan(GOAT.legLength * 0.5)
+    expect(lastBody.yaw - firstBody.yaw).toBeGreaterThan(0.25)
+    expect(footPlantPose(contact, false, lastBody, leg.hip, 0, GOAT.legLength).contact).toBeNull()
   })
 
   it('one stride carries the body exactly the foot’s stance ground-travel (no skate, no mince)', () => {
