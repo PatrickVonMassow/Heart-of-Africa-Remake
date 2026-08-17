@@ -14,7 +14,7 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
-import { FUSE_TOLERANCE, judgeLabelFusion } from './labelFusion.mjs'
+import { FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
 import { READ_COUNT, READ_GAP_FRAMES, CONFIRM_READS, READ_GAP_NET_MS, READ_GAP_MS, SHOT_DRIFT_BAR, luminanceSamples, settleReading, shotDrift, shotReading } from './cropLuma.mjs'
 import {
   CHILD_MOTION,
@@ -4843,10 +4843,12 @@ if (section('ctrl-actor-labels')) {
   // photographs — and SAMPLED over many frames rather than one instant, since
   // the declutter decides at the layer's 10 Hz refresh while the subjects walk
   // every frame (the verdict and its reasoning: scripts/verify/labelFusion.mjs).
-  const fusion = await page.evaluate(
-    (TOLERANCE) =>
+  // The shutter is BRACKETED: one window before the frame, one after, judged as
+  // one series — a sample that closed before the capture would certify a
+  // picture it never measured (the Sol-review gap, 17.08.).
+  const sampleFusion = (windowFrames) => page.evaluate(
+    ({ TOLERANCE, SAMPLES }) =>
       new Promise((res) => {
-        const SAMPLES = 90
         let sampled = 0
         let fusedFrames = 0
         let worstDepth = 0
@@ -4885,15 +4887,18 @@ if (section('ctrl-actor-labels')) {
         }
         requestAnimationFrame(read)
       }),
-    FUSE_TOLERANCE,
+    { TOLERANCE: FUSE_TOLERANCE, SAMPLES: windowFrames },
   )
-  const fusionVerdict = judgeLabelFusion(fusion)
-  check('no two Ctrl labels fuse in the village crowd (point 628)', fusionVerdict.ok, fusionVerdict.detail)
+  const fusionPre = await sampleFusion(45)
 
   await frame('148-ctrl-actor-labels-village', {
     place: 'maasai-village',
     label: 'the Maasai village with the Ctrl labels over its inhabitants',
   })
+
+  const fusionPost = await sampleFusion(45)
+  const fusionVerdict = judgeLabelFusion(mergeFusionReadings(fusionPre, fusionPost))
+  check('no two Ctrl labels fuse in the village crowd (point 628)', fusionVerdict.ok, fusionVerdict.detail)
 
   await page.keyboard.up('Control')
   const cleared = await page

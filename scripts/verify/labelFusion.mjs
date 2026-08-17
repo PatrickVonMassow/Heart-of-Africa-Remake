@@ -57,6 +57,29 @@ export const FUSE_MAX_SHARE = 0.05
  * presence bar is a separate check). It clamps at 1 — no caller may accept an
  * empty picture.
  */
+/**
+ * Merge two sampled windows into one reading. The suites sample a window
+ * BEFORE their screenshot and a second one AFTER it (Sol review, 17.08.): a
+ * check that closes its sample and then opens the shutter certifies a picture
+ * it never measured — a fusion beginning in the gap is photographed green.
+ * No page-side sampler can read the compositor's exact screenshot moment, so
+ * the capture is BRACKETED: it lies between two adjacent measured windows,
+ * and a standing defect at the shutter is standing in at least one of them.
+ */
+export function mergeFusionReadings(a, b) {
+  if (!a || a.samples <= 0) return b ?? a
+  if (!b || b.samples <= 0) return a
+  const deeper = b.worstDepth > a.worstDepth ? b : a
+  return {
+    samples: a.samples + b.samples,
+    fusedFrames: a.fusedFrames + b.fusedFrames,
+    worstDepth: deeper.worstDepth,
+    worstPair: deeper.worstPair,
+    labelsMin: Math.min(a.labelsMin, b.labelsMin),
+    labelsMax: Math.max(a.labelsMax, b.labelsMax),
+  }
+}
+
 export function judgeLabelFusion(
   reading,
   { tolerance = FUSE_TOLERANCE, hard = FUSE_HARD, maxShare = FUSE_MAX_SHARE, minLabels = 2 } = {},

@@ -2,7 +2,7 @@
 // series may show and what it must red on. The page-side sampler only counts;
 // THIS is where the judgment lives.
 import { describe, expect, it } from 'vitest'
-import { FUSE_HARD, FUSE_MAX_SHARE, FUSE_TOLERANCE, judgeLabelFusion } from './labelFusion.mjs'
+import { FUSE_HARD, FUSE_MAX_SHARE, FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
 
 const clean = { samples: 90, fusedFrames: 0, worstDepth: 0, worstPair: null, labelsMin: 19, labelsMax: 19 }
 
@@ -57,5 +57,26 @@ describe('judgeLabelFusion (point 628)', () => {
     expect(judgeLabelFusion({ ...clean, labelsMin: 1, labelsMax: 1 }, { minLabels: 1 }).ok).toBe(true)
     // minLabels: 0 is CLAMPED to 1 — an empty picture never passes any caller.
     expect(judgeLabelFusion({ ...clean, labelsMin: 0, labelsMax: 0 }, { minLabels: 0 }).ok).toBe(false)
+  })
+})
+
+describe('mergeFusionReadings — the shutter is bracketed by two windows (Sol review, 17.08.)', () => {
+  const pre = { samples: 45, fusedFrames: 1, worstDepth: 8, worstPair: '"A"×"B" 10×8 px', labelsMin: 18, labelsMax: 20 }
+  const post = { samples: 45, fusedFrames: 3, worstDepth: 22, worstPair: '"C"×"D" 40×22 px', labelsMin: 17, labelsMax: 21 }
+
+  it('sums the counts and keeps the deeper pair, the lower floor and the higher peak', () => {
+    const m = mergeFusionReadings(pre, post)
+    expect(m).toEqual({ samples: 90, fusedFrames: 4, worstDepth: 22, worstPair: '"C"×"D" 40×22 px', labelsMin: 17, labelsMax: 21 })
+  })
+
+  it('a fusion in EITHER window reaches the judge — the post-shutter one must not vanish', () => {
+    expect(judgeLabelFusion(mergeFusionReadings({ ...clean, samples: 45 }, post)).ok).toBe(false)
+    expect(judgeLabelFusion(mergeFusionReadings(post, { ...clean, samples: 45 })).ok).toBe(false)
+  })
+
+  it('an empty window degrades to the other rather than diluting it', () => {
+    expect(mergeFusionReadings(null, post)).toEqual(post)
+    expect(mergeFusionReadings(pre, { samples: 0 })).toEqual(pre)
+    expect(judgeLabelFusion(mergeFusionReadings(null, null)).ok).toBe(false)
   })
 })

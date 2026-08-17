@@ -14,7 +14,7 @@
 // gate. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { animalShare, readsAsAnimal, waterFloor } from './animalShare.mjs'
-import { FUSE_TOLERANCE, judgeLabelFusion } from './labelFusion.mjs'
+import { FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
 import { frameShutter, captureFrame, capturePixels, waitForSceneReady } from './frameSubject.mjs'
 import { snowFraction } from './snowMetric.mjs'
 import { sectionGate } from './sections.mjs'
@@ -8620,10 +8620,12 @@ if (section('ctrl-actor-labels')) {
   // moment a converged poll returns is the one least able to catch a stale
   // decision. The dense-crowd twin of this check lives in polish.mjs at the
   // village frame; the verdict and its bar are scripts/verify/labelFusion.mjs.
-  const overlaps = await page.evaluate(
-    (TOLERANCE) =>
+  // The shot is BRACKETED between two windows judged as one series — a sample
+  // that closed before the capture would certify a picture it never measured
+  // (the Sol-review gap, 17.08.).
+  const sampleFusion = (windowFrames) => page.evaluate(
+    ({ TOLERANCE, SAMPLES }) =>
       new Promise((res) => {
-        const SAMPLES = 90
         let sampled = 0
         let fusedFrames = 0
         let worstDepth = 0
@@ -8662,17 +8664,20 @@ if (section('ctrl-actor-labels')) {
         }
         requestAnimationFrame(read)
       }),
-    FUSE_TOLERANCE,
+    { TOLERANCE: FUSE_TOLERANCE, SAMPLES: windowFrames },
   )
-  // minLabels 1: a lone animal is a legitimate savanna (its presence bar is the
-  // 'holding Ctrl names the animals' check above); the village twin demands 2.
-  const overlapVerdict = judgeLabelFusion(overlaps, { minLabels: 1 })
-  check('no two Ctrl labels print into each other (point 628)', overlapVerdict.ok, overlapVerdict.detail)
+  const overlapsPre = await sampleFusion(45)
 
   await shot('147-ctrl-actor-labels', {
     world: { lat: -2.6, lon: 35.2 },
     label: 'the savanna with the Ctrl labels over its animals',
   })
+
+  const overlapsPost = await sampleFusion(45)
+  // minLabels 1: a lone animal is a legitimate savanna (its presence bar is the
+  // 'holding Ctrl names the animals' check above); the village twin demands 2.
+  const overlapVerdict = judgeLabelFusion(mergeFusionReadings(overlapsPre, overlapsPost), { minLabels: 1 })
+  check('no two Ctrl labels print into each other (point 628)', overlapVerdict.ok, overlapVerdict.detail)
 
   await page.keyboard.up('Control')
   const cleared = await page
