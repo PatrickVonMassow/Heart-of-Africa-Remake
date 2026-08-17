@@ -1979,7 +1979,14 @@ put it is the mistake this line exists to stop.
   `VERIFY_GL=webgpu` suite settles it.
   ALSO: `docs/work-packages.md` is measurably behind — it ranks archived points at the
   head and `bundle-first-guard --status` reports 52 unbundled open points against the 29
-  its own text claims. Reconcile it in the same pass; it is the precondition 542 names.
+  its own text claims. It has also STOPPED RECEIVING NEW POINTS (measured 17.08.2026 while
+  filing 711): the newest numbers in its bundle rows stop around 649, and 700, 703, 704 and
+  709 appear nowhere in it, while the "Work packages (bundles)" paragraph of this file states
+  "Every open point appears there exactly once; a new point joins a bundle when appended".
+  So the stated rule is broken for at least ten points, and a session that follows it for its
+  own point writes into a table the others are missing from. Reconcile it in the same pass —
+  back-fill the missing points AND either restore the rule or withdraw it in this file, so the
+  paragraph and the table say the same thing; it is the precondition 542 names.
   VERIFIABLE: after the pass, every merged point is gone from `TASKS.md` with its unique
   clauses present in the survivor; `tasks-archive-guard`, `queue-order-guard` and
   `bundle-first-guard --status` are clean; and the open count drops by the number of
