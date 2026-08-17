@@ -22,6 +22,8 @@ import {
   wiredStopHookIds,
 } from './guard-preflight-core.mjs'
 import { GUARDS, resolveSessionId, unregisteredHooks } from './guard-preflight.mjs'
+import { gatherRuleEchoInputs, gatherStampedFiles } from './rule-echo-guard.mjs'
+import { RULE_REGISTRY, checkAll, formatVerdict, unregisteredStamps } from './rule-echo-core.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 
@@ -398,6 +400,36 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
   // future change reimplements the gathering inside the preflight, the identity
   // check below fails — which is the whole intent.
   const byId = Object.fromEntries(GUARDS.map((g) => [g.id, g]))
+
+  // PARITY, not merely presence (Sol review of 657fc45): the rule-echo step was
+  // registered so the preflight JUDGES that guard instead of leaving it wired and
+  // unreported. A registration whose verdict can differ from the wrapper's is
+  // worse than none — the preflight would say "clean" while the Stop hook blocks.
+  // So the step's decide is held against the wrapper's OWN expression over the
+  // same inputs, across the three outcomes the core distinguishes.
+  it('the rule-echo step returns exactly what the wrapper would, clean or blocked', () => {
+    const step = byId['rule-echo-guard']
+    const wrapperVerdict = (files, stamped) =>
+      formatVerdict(checkAll(RULE_REGISTRY, files), unregisteredStamps(RULE_REGISTRY, stamped))
+    // The real repository, read through the step's own gather — the case that
+    // actually runs at a turn end.
+    const { inputs } = gatherRuleEchoInputs()
+    const expected = wrapperVerdict(inputs.files, gatherStampedFiles())
+    const got = step.decide(inputs)
+    expect(got.block).toBe(!!expected)
+    expect(got.reason).toBe(expected || '')
+    // A STALE restatement must block, and say so in the same words.
+    const stale = { ...inputs.files }
+    for (const key of Object.keys(stale)) {
+      if (key !== 'memory/' && Array.isArray(stale[key])) {
+        stale[key] = stale[key].map((t) => t.replace(/rule:([a-z0-9-]+)@[0-9a-f]{8}/g, 'rule:$1@deadbeef'))
+      }
+    }
+    const staleExpected = wrapperVerdict(stale, [])
+    const staleGot = step.decide({ files: stale })
+    expect(staleGot.block).toBe(!!staleExpected)
+    expect(staleGot.reason).toBe(staleExpected || '')
+  })
 
   it('registers every guard whose wrapper exports a gather step', () => {
     expect(Object.keys(byId).sort()).toEqual(
