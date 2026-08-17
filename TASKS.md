@@ -1368,6 +1368,17 @@ put it is the mistake this line exists to stop.
   the script adds those. The periodic top-up that was meant to re-resolve never ran once (fixed
   12.08.2026 in `scripts/batch-autostart.mjs`: a missing pid file on a fresh container threw out
   of the whole block), and even now it runs on the launcher's 15-minute tick.
+  MEASURED AGAIN 17.08.2026, 09:50, AND ONE SENTENCE ABOVE IS WRONG: the boot run IS part of
+  what is missing. Every Sol call failed, and the cause was not rotation — `chatgpt.com`,
+  `auth.openai.com` and `api.openai.com` were absent from the set ENTIRELY. `postStartCommand`
+  runs `/usr/local/bin/init-firewall.sh`, the copy baked into the IMAGE on 04.08.2026, whose
+  domain list predates those three names; the repository's `.devcontainer/init-firewall.sh` has
+  carried them since 10.08.2026 and nothing installs it, so only a container REBUILD would ever
+  pick them up while every ordinary restart drops the lane again. Repaired for this container
+  with `node scripts/firewall-allow.mjs` (additive, no flush). The cost is not only the outage:
+  with Sol unreachable `review-sol.mjs` hands the review to the Anthropic chain and
+  `ask-sol.mjs` exits 3 — each correct alone, together they move the whole load back onto the
+  scarcer pool and SUSPEND the two-vendor policy of CLAUDE.md §6 without anyone deciding to.
   FINAL STATE: a cross-vendor review, a model call or a package fetch never fails on a stale
   allowance, on a container that has just come up or one that has run for a day. Concretely:
   1. The refresh is TTL-AWARE, not tick-shaped: it re-resolves at about half the shortest TTL
@@ -1381,6 +1392,16 @@ put it is the mistake this line exists to stop.
      refused, the set missing, DNS returning nothing, an insert failing, or the post-refresh
      probe still unreachable. A DNS failure keeps the last entries for a bounded grace period
      and is reported as a failure, never as a successful refresh.
+  5. THE LIST THE CONTAINER BOOTS FROM IS THE REPOSITORY'S (17.08.2026). A domain added to
+     `.devcontainer/init-firewall.sh` takes effect on the NEXT restart with no image rebuild —
+     either the start path installs that file over the image copy, or it reads the domain list
+     from the checkout. A name that is in the repository's list but not in the running set is
+     itself one of the loud failures of (4).
+  6. A session LEARNS OF THE CUT-OFF BEFORE IT WASTES A CALL ON IT: the batch's start-up check
+     reports the OpenAI lane as unreachable, names `node scripts/firewall-allow.mjs` as the
+     repair, and says what it costs in policy terms — while it holds, cross-vendor review is
+     unavailable and authoring cannot go to Sol, so the §6 split is suspended, not ignored. It
+     REPORTS; it never repairs the firewall unasked.
   NOT IN SCOPE, recorded so it is not re-derived: name-based matching in netfilter itself does
   not exist — a hostname in a rule is resolved once into literals. The only real name policy is
   a DNS-coupled set (dnsmasq `ipset=`/`nftset=` populating the set as answers are issued) or an
@@ -7708,40 +7729,37 @@ to land than a mechanism that needs a review.
 
 - [ ] 693. THE AUTHOR ROUTING RECOMMENDS A LANE WHOSE POOL IS EMPTY (measured 14.08.2026,
   01:33–01:40, at the start of an autonomous batch session). `scripts/author-routing-core.mjs`
-  routed point 666 to Fable 5 — "tagged HIGH criticality, a hard case by definition" — the
-  delegated Fable agent died on its FIRST API call with "You've reached your Fable 5 limit", and
-  the fallback chain then pointed at Opus 5, which is the one spend the user's standing order of
-  13.08.2026 23:20 forbids while the pool is short (Anthropic 91 % used, Fable 100 % used, reset
-  Monday 10:00): Anthropic volume is reserved for review, the picture and the landing, and every
-  point Sol can author goes to Sol, because a failed Sol attempt costs no Anthropic tokens.
-  TWO MECHANISMS CONTRADICT EACH OTHER. `sol-share.mjs --status` prints "NEVER routed, at any
-  setting: the HARD cases", which reads as a prohibition on exactly what the standing order
-  requires; the resolution — override the cut with `--anyway` — lives ONLY in a memory file no
-  script reads, so the tools mislead any session that trusts them. Cost as measured: one wasted
-  delegation per hard case, plus the standing risk of spending scarce Anthropic tokens on
-  authoring rather than on the landing only Claude can do.
+  routed point 666 to Fable 5 — "tagged HIGH criticality, a hard case by definition" — and the
+  delegated Fable agent died on its FIRST API call with "You've reached your Fable 5 limit". The
+  routing knows only the point's text; it cannot know that the lane it names has nothing left,
+  so it keeps naming it and every delegation to that lane is wasted before it starts. The
+  fallback chain then walks to the next Anthropic model, which is a spend nobody chose.
+  ONE HALF IS ALREADY DONE (17.08.2026, commit "State all three authoring lanes where the
+  routing is described"): the texts that contradicted each other about who authors what were
+  corrected, and the shortage wording that lived only in a memory file is retired with the
+  emergency itself. What is left is the pool state, which no text can carry.
   FINAL STATE:
-  - The routing cut reads the share setting AND a recorded pool state. At `prefer-sol` a HARD
-    case routes to **Sol**, with the shortage named as the reason in the printed line, instead of
-    requiring `--anyway`; at `default` the cut stays exactly as it is today.
-  - A lane whose provider is recorded EXHAUSTED is never the printed recommendation. The pool
-    state is a small operator file beside `sol-share.json`, written by hand or by an author run
-    that hit a limit error, and carrying a reset timestamp after which the exhaustion lapses on
-    its own. A missing or unusable file means "nothing known", which routes exactly as today —
-    the shortage may never be inferred from silence.
-  - `sol-share.mjs --status` states the rule it actually applies. The "NEVER routed" list keeps
-    the two entries that are genuinely absolute (reviewing what Sol itself authored; the landing
-    and the picture) and moves the hard cases to a line that names the current setting.
-  - An author run that dies on a provider limit RECORDS that provider as exhausted before it
-    exits, so the next session does not repeat the delegation.
-  VERIFIABLE: Vitest cases over the pure core for each cut — hard case at `default` → Fable, hard
-  case at `prefer-sol` → Sol with the shortage reason, exhausted lane never recommended, missing
-  and corrupt pool file → today's routing, lapsed reset timestamp → today's routing; plus one
-  real `--routing` run whose printed reason names the setting it applied.
+  - The routing cut reads a recorded POOL STATE beside `sol-share.json`: a small operator file
+    naming, per provider, that it is exhausted and the timestamp at which its allowance resets.
+    A lane whose provider is recorded exhausted is never the printed recommendation — the next
+    lane is named instead, WITH the reason, so the reader sees it was a substitution and not the
+    ordinary cut.
+  - A missing, unreadable or lapsed file means "nothing known", and routes exactly as today. The
+    exhaustion may never be inferred from silence, and it expires on its own at the reset
+    timestamp rather than needing anyone to remember to clear it.
+  - An author or agent run that dies on a provider limit RECORDS that provider as exhausted
+    before it exits, so the next session does not repeat the delegation that just failed.
+  - The ordinary cut of `authorLaneFor` is UNCHANGED: mechanical and mid-difficulty to Sol, the
+    hard cases to Fable, the verification-is-the-work points to Opus. This point adds a veto on
+    an empty lane, not a second opinion about difficulty.
+  VERIFIABLE: Vitest cases over the pure core — exhausted lane never recommended and the
+  substitution named in the reason; missing, corrupt and lapsed pool file → today's routing
+  unchanged; a recorded exhaustion that has not lapsed → the next lane; plus one real
+  `--routing` run whose printed reason names what it applied.
   MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes which vendor authors, which is the
   decision the four-eyes principle rests on.
-  Criticality: medium — it wastes a delegation per hard case and points the batch at the wrong
-  pool exactly while the pool is the binding constraint.
+  Criticality: medium — it wastes a delegation per hard case whenever a pool runs dry, which is
+  exactly when the batch can least afford one.
 
 - [ ] 694. THE CHILDREN'S ACCEPTED WEBGL 2 COMPOSITION NEEDS A HOME THAT SURVIVES A TICK
   (found 14.08.2026 by the cross-vendor review of point 666 — Claude Opus 5 on the Sol-authored
@@ -7868,4 +7886,3 @@ to land than a mechanism that needs a review.
   can silently share a worktree with its predecessor, and the damage (a lost delegated run) is
   invisible in git.
   Bundle: Session- & Repo-Hygiene.
-
