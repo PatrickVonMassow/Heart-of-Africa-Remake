@@ -1284,6 +1284,13 @@ put it is the mistake this line exists to stop.
   worktree away before the branch has been judged is what point 629 exists to prevent.
   Criticality: medium — it reorders the proof but must not dilute it; the both-backend
   picture proof stays exactly as binding as it is today.
+  BRANCH STATE 17.08.2026: `feat/595-598-verification-ladder-brief` DELIVERS this point and is
+  synced with main, gates green, pushed (five conflicts resolved, the real one in
+  `scripts/verify/world.mjs` where main's point-585 check was kept verbatim). What it still owes
+  before it can land: the both-backend picture proof — nine render-relevant suites were
+  re-sectioned and `world.mjs` gained conflict-resolved code, and only ONE cheap browser suite
+  (`health`, WebGPU) has been run on the merged state. The branch carries 596 and 597 in its
+  NAME only; see their entries.
 
 - [ ] 598. THE BRIEF ORIENTS IN THE CODE, NOT ONLY IN THE SPEC (point 572's measure 8).
   The delegation brief carries a GENERATED orientation: the paths the specification itself
@@ -1305,6 +1312,13 @@ put it is the mistake this line exists to stop.
   after. The brief is 1.9 % of the spend and exists to avoid the ~108k wholesale read.
   Criticality: low — a wrong list would misdirect, which generation-from-the-tree and the
   hint framing address.
+  BRANCH STATE 17.08.2026: `feat/595-598-verification-ladder-brief` DELIVERS this point and is
+  synced with main, gates green, pushed (five conflicts resolved, the real one in
+  `scripts/verify/world.mjs` where main's point-585 check was kept verbatim). What it still owes
+  before it can land: the both-backend picture proof — nine render-relevant suites were
+  re-sectioned and `world.mjs` gained conflict-resolved code, and only ONE cheap browser suite
+  (`health`, WebGPU) has been run on the merged state. The branch carries 596 and 597 in its
+  NAME only; see their entries.
 
 - [ ] 453. WHAT IS THE LION EATING? (user bug report 30.07.2026,
   `local/WasFrisstDerLoewe.zip`, seed 1608676381, east region at the river, WebGPU/high:
@@ -1974,6 +1988,9 @@ put it is the mistake this line exists to stop.
   remembered.
   Criticality: low — the one real risk is cutting an error message, which the rule
   excludes.
+  NOT ON ITS BRANCH 17.08.2026: `feat/595-598-verification-ladder-brief` is named for this point
+  but contains NOTHING of it — measured by reading the whole net diff. It must be built, here or
+  on its own branch; the shared branch lands 595 and 598 alone.
 
 - [ ] 596. THE TAIL IS VISIBLE WHILE IT RUNS (point 572's measure 6). A point's running
   cost is measurable DURING the point, not only after it: a hook reports when a branch
@@ -2010,6 +2027,9 @@ put it is the mistake this line exists to stop.
   Point 567 (remains of killed runs) owns the reaping; this point owns the report.
   Criticality: medium — a cap that let a red state pass as green would be worse than the
   cost it saves, so the escalation path is the mechanism and the abort is not.
+  NOT ON ITS BRANCH 17.08.2026: `feat/595-598-verification-ladder-brief` is named for this point
+  but contains NOTHING of it — measured by reading the whole net diff. It must be built, here or
+  on its own branch; the shared branch lands 595 and 598 alone.
 
 - [ ] 553. AN EXPLICIT CONTEXT BUDGET PER POINT, AND A WRITTEN HANDOFF WHEN IT IS SPENT
   (08.08.2026, chosen BY MEASUREMENT as point 373 requires — the closing measurement is
