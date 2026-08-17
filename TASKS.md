@@ -77,6 +77,133 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 712. The queue binds the board and not the picker, and a finished agent's branch frees
+  its slot (user 17.08.2026, 19:41: »Warum holst du dir mit der 697 wieder einen neuen (nicht
+  sonderlich wichtigen) Task, anstatt erstmal die offenen Branches zu erledigen? … Nur die Tasks zur
+  Reduktion vom Token-Verbrauch sind aktuell noch höher priorisiert.«; 19:47: »Erstelle einen Punkt,
+  der das als Mechanismus erzwingt.«). The priority has now been stated three times over three weeks
+  and keeps slipping — the signature of a rule living only in prose. Point 590 recorded the same class
+  once already ("a declared priority that only the reader can see is not a priority"), after twelve
+  user-first points sat at queue position 60; the ORDER was single-sourced afterwards, the SELECTION
+  never was. MEASURED the same evening, both halves:
+  (a) THE PICK ANSWERS TO NOTHING. Point 697 (a tier-3 polish defect) was commissioned while the
+      sequence the work order derives read `700 701 707 708 711 705 706 710 662 553 596 597 686 687
+      688 689 690 691 692 659 …` — 697 sits far behind every one of them. `queue-order-guard` judges
+      the completeness of a ranking, the board's agreement with it and honest card claims — never
+      whether the point being WORKED is at the front. The one artefact that knows the priority is the
+      one the picker never consults, and the failure is silent: no guard fired.
+  (b) A SLOT FREES ITSELF, THE BRANCH STAYS. The pool cap of 3 (CLAUDE.md §6) counts CONCURRENT
+      AGENTS, so an agent that finishes returns its slot and leaves its branch standing; branches then
+      accumulate unbounded. Nine stood open on 17.08.2026: 336-croc-staging (13 d, 1679 commits behind
+      `main`), 686-five-word-lexicon (4 d, 81 behind), 687-bank-game (3 d, 81 behind),
+      687-roam-bound-fixes (9 h), 581 (10 h), 595-598 (8 h), 703 (4 h), 700, 711. The two OLDEST are
+      686 and 687 — the communication mechanic, the feature this release exists for. Built work that
+      never lands delivers nothing and costs more to merge every day it ages against a moving `main`.
+  NO NEW LIST IS DECLARED, deliberately: this project's named failure is a second place for one fact,
+  and the work order's header says so. The tiers the user names ARE the sequence of blocks in this
+  file; re-ranking already means moving a block (point 590). No tier field, no bundle-to-tier table,
+  no ordering prose — this point makes the existing sequence BIND.
+  FINAL STATE:
+  - COMMISSIONING A POINT IS CHECKED AGAINST THE FRONT OF THE QUEUE. Opening work on point N —
+    spawning its agent, creating its worktree, creating a `feat/<N>-…` branch — is refused when N is
+    not among the front-most WORKABLE candidates of `queueOrder`: the first three open points that
+    are neither user-gated nor already in flight, matching the pool cap. The refusal NAMES the
+    candidates it expected and N's actual position. It is overridable by a RECORDED one-line reason
+    (a red on `main` that masks other suites is a real one), never by silence — the reason is stored
+    with the point and printed by the reporting command, so an override is visible afterwards rather
+    than only at the moment it is taken.
+  - A SLOT IS NOT FREE UNTIL ITS BRANCH IS GONE. The pool cap counts OPEN `feat/*` BRANCHES, not
+    running agents. While three or more stand open, opening a further point is refused, and the
+    refusal lists them oldest first with each one's age and behind-count and names the two ways out:
+    LAND it, or PARK it explicitly. A parked branch is recorded with a reason and drops out of the
+    count — `feat/336-croc-staging` at 13 days and 1679 commits behind is exactly that case, and
+    today it is indistinguishable from live work.
+  - BOTH REFUSALS STAND DOWN where every guard here does: a session that does not own the batch lock
+    (`heldByOtherLiveOwner`) and a paused batch (`.claude/batch-paused`), so they never fire on a
+    subagent or a paused run. Fail-open on their own error, like the rest of the chain.
+  - The decision logic is PURE and lives in one core beside the ranking it reads
+    (`scripts/board-queue-core.mjs` owns `queueOrder`; the branch/slot judgment belongs with
+    `scripts/batch-in-flight-core.mjs`, which holds the free-slot judgment today). The wrappers stay
+    thin I/O. Point 707 carries both refusals into the preflight report; it does not decide them.
+  CONSTRAINTS: no second list, and do NOT rebuild what 608 delivered — the board already renders the
+  derived sequence, the `order` array is gone, and `queueOrderDrift` already blocks a published
+  sequence that differs. The pool cap stays 3 and stays a TARGET as well as a cap (CLAUDE.md §6,
+  `--slots-free`): this point changes what occupies a slot, not how many there are. The override
+  must remain possible; what is forbidden is taking it silently.
+  USER GATE, deliberately left open: the spec introduces no tier FIELD. If the user wants the three
+  tiers named as data rather than left implicit in the block order, that is a different point and
+  needs his word first.
+  VERIFIABLE: pure Vitest — the real 17.08.2026 state (697 commissioned against that queue) is
+  refused and the refusal names 700/701/707; a front candidate is accepted; a gated or in-flight
+  point is skipped when the front three are chosen; an override with a recorded reason is accepted
+  and the reason is reported back; nine open branches refuse a new point while two do not; a parked
+  branch does not count; a non-owner session and a paused batch are waved through unchanged.
+  Both files are guard-side decision cores, so the other model's recorded review is required before
+  the merge (`mechanism-review-guard`).
+  Criticality: HIGH for the batch's usefulness — it is the mechanism that makes the user's stated
+  priority actually govern what gets built, and the one that stops built work from rotting unlanded.
+  No player-visible behaviour.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 713. The board's now-section answers to nothing, so it stood empty while three strands were
+  in flight (user 17.08.2026, reading the live board: »Die Sektion Woran ich gerade arbeite ist
+  leer. Soll das so sein?«; and at 20:07: »Lege einen neuen Punkt an, um das Problem mit dem
+  inkonsistenten Dashboard zu beheben.«). MEASURED the same evening, twice: at 19:59 the section was
+  EMPTY while three points were in flight; at 20:07 the published board carried exactly ONE card —
+  point 700 — while the owner's own in-flight declaration named THREE handed-over strands, all
+  pushed and none merged (700 `feat/700-context-fence@4f988b03`, 697
+  `feat/697-goat-foot-planting@82b9bdf1`, 711 `feat/711-deploy-retry@808b76a`). The board understated
+  the live state by two of three points, and the reader it is written for concluded that nothing was
+  running — which is worse than a stale card, because a wrong emptiness reads as "the batch stopped".
+  THE GAP IS A MISSING TIE, NOT A FORGOTTEN EDIT. The rule already exists (memory
+  `dashboard-multiple-now-cards`: one now-card PER point in active work) and the board guards already
+  enforce conciseness, one topic per card, honest done-claims, queue completeness and the queue's
+  agreement with the work order. NONE of them looks at the now-section's COMPLETENESS, and nothing
+  compares it against the in-flight declaration — the one record that already knows what is being
+  worked, by branch and worktree evidence. The queue was single-sourced by points 590/608; this
+  section is the last part of the board with no source but a hand.
+  FINAL STATE:
+  - THE SET OF NOW-CARDS IS DERIVED, THE PROSE IS AUTHORED — the same split the Warteschlange already
+    uses. A render reads the in-flight declaration (its `evidence` branches and worktrees, and the
+    open `feat/<N>-…` branches) and makes the section carry exactly one card per point in active
+    work: it CREATES a stub card for a point that has none and REMOVES one whose point is no longer
+    in flight. The card's text stays written by hand.
+  - AN EXISTING CARD'S PROSE SURVIVES THE RENDER — point 491's lesson applied before it can be
+    repeated: a projection that regenerates the section must never blank text a session wrote, and a
+    render that would drop prose refuses or restores it. A created card is a STUB that says it needs
+    its text, so an unwritten card is visibly unwritten rather than silently empty.
+  - AN EMPTY SECTION IS EITHER TRUE OR BLOCKED. While anything is in flight, an empty now-section
+    blocks the turn end, naming the missing point numbers. When genuinely nothing is in flight, the
+    section SAYS so in one card, so the reader can tell "nothing is running" from "nobody wrote it" —
+    today those two look identical, and the user read the second as the first.
+  - THE HANDOVER STATE GETS ITS ANSWER, which point 700's spec leaves open: the unnumbered handover
+    card is legitimate BESIDE the numbered cards, never instead of them. That also settles the red it
+    names — `scripts/board-core.test.mjs` ("promotes, returns, archives and answers without a new
+    violation") fails with `dup-in-section` only when the unnumbered card stands ALONE, and under this
+    rule a numbered card always stands there while work is in flight. Point 700's clause is answered
+    here rather than decided twice, and is struck from its spec in the commit that lands this.
+  - The check STANDS DOWN for a session that does not own the batch lock (`heldByOtherLiveOwner`) and
+    for a paused batch (`.claude/batch-paused`), and fails OPEN on its own error. The decision logic
+    is pure and lives beside the board's other cores; the wrapper stays thin I/O.
+  CONSTRAINTS: the BINDING four-section structure of the board is not touched (memory
+  `batch-dashboard-artifact`) — this point changes what FILLS the now-section, never the sections
+  themselves. No second record of what is in flight: the declaration from `scripts/batch-in-flight.mjs`
+  is the source and nothing new is hand-maintained beside it. The board CLI is not parallel-safe
+  (memory `board-cli-is-not-parallel-safe`), so the render must never run concurrently with another
+  `board.mjs` call and this point must not introduce a path that does.
+  VERIFIABLE: pure Vitest over the real 17.08.2026 state — a declaration naming 700/697/711 against a
+  section holding only 700 is reported incomplete and names 697 and 711; an empty section with those
+  three in flight blocks; an empty section with nothing in flight is accepted only with the explicit
+  "nothing running" card; a render creates the two missing stubs without touching 700's prose; a
+  render that would blank existing prose refuses; a card for a point no longer in flight is removed;
+  the unnumbered handover card beside a numbered one passes and alone does not; a non-owner session
+  and a paused batch are waved through.
+  Criticality: MEDIUM-HIGH for the user-facing half of the batch — this section is what the user reads
+  to know whether anything is happening at all, and it told him the opposite of the truth. Both a
+  guard core and the board render change, so the other model's recorded review is required before the
+  merge (`mechanism-review-guard`).
+  Bundle: Chat & Tafel.
+
 - [ ] 700. The context watermark reminds and does not bind — a session ran to 2.9x it (measured
   17.08.2026, and raised by the user the same day: »Diese Sitzung ist inzwischen sehr gewachsen.
   Musst du den Kontext so weit anwachsen lassen? … Nicht nur mir zustimmen und es machen, sondern
@@ -199,29 +326,26 @@ put it is the mistake this line exists to stop.
     permitted" without acquiring or handing over the batch lock, and the report uses that.
   - Where a guard is genuinely not decidable in advance, the report names WHICH ACTION settles it,
     so that action can fall into the same turn.
-  ALSO — THE PREFLIGHT MUST JUDGE *WHICH POINT IS BEING WORKED*, not only the order it is
-  ranked in (user 17.08.2026, 19:41: »Warum holst du dir mit der 697 wieder einen neuen (nicht
-  sonderlich wichtigen) Task, anstatt erstmal die offenen Branches zu erledigen? Wenn du neue
-  Tasks angehst, die nichts mit der Optimierung vom Tokenverbrauch zu tun haben, sollten es die
-  Tasks sein, die mit der Kommunikationsmechanik zu tun haben. Das ist das am höchsten
-  priorisierte Feature. Nur die Tasks zur Reduktion vom Token-Verbrauch sind aktuell noch höher
-  priorisiert.«). MEASURED the same evening: nine open feature branches stood in the tree
-  (336 13 d, 686 4 d, 687 3 d, 687-roam-bound-fixes 9 h, 581 10 h, 595-598 8 h, 703 4 h, 700
-  14 min, 711 7 min), the two OLDEST being 686 and 687 — the communication mechanic itself —
-  while a fresh tier-3 point (697) was opened. THE RULE, three tiers: (1) token-consumption
-  reduction, (2) the communication mechanic, (3) everything else; and open BRANCHES are drained
-  before any fresh point is opened. Nothing checks it today: `queue-order-guard` judges the
-  ranking and the board's agreement with it, never whether the point actually being WORKED is
-  the front of that order, and nothing counts open branches against opening a new one.
-  FINAL STATE: the preflight reports, for the action that STARTS work on a point, whether that
-  point is the front of the derived order and which tier it falls in, and it names every open
-  feature branch older than the point being opened. Opening out of tier or ahead of an
-  undrained branch is REPORTED with its reason demanded, not silently allowed — the session may
-  still do it (a bugfix on `main`'s own red is a real reason) but it must say so.
+  ALSO: when point 712 lands its two refusals — the pick checked against the front of the queue,
+  and the slot counted in open branches — the preflight REPORTS both for the action that starts
+  work on a point, including any recorded override reason, so a session sees them in the same
+  single pass as everything else rather than at the moment it is denied. The decision itself
+  stays in 712's cores; this point only carries it into the report.
+  AND ONE GUARD IS MISSING THE STAND-DOWN EVERY OTHER ONE HAS (measured 17.08.2026, 20:03 with
+  `guard-preflight --for answer`): 17 guards report `not-applicable: another live session owns the
+  batch lock` and `guide-brevity-guard` ALONE reports `would-block`. It honours
+  `.claude/batch-paused` but has no `heldByOtherLiveOwner` check, unlike `bundle-first-guard`,
+  `ci-status-guard`, `dashboard-guard`, `dashboard-card-topic-guard`, `queue-order-guard` and
+  `branch-hygiene-guard`. Observed live the same evening: the batch owner pushed the beginner guide
+  over its budget, and the Stop chain of a DIFFERENT, stood-down session was blocked by it, demanding
+  that session shorten a file the live owner was editing at that moment. Two sessions editing one
+  file is the collision the lease exists to prevent, so the demand is not merely misdirected but
+  harmful. FINAL STATE: `guide-brevity-guard` takes the same stand-down as its siblings; its budget
+  verdict is unchanged and stays the OWNER's to satisfy. A case pins the stand-down, and a second
+  pins that the owner still gets the verdict.
   VERIFIABLE: Vitest over the preflight core — each of the four reported with its new status, the
-  read-only progress variant leaving the lock file untouched (asserted on its mtime), a fixture
-  where the CI verdict is red surfacing as a block rather than as `not judged`, and a fixture
-  where a tier-3 point is opened against two older open branches, which must be reported.
+  read-only progress variant leaving the lock file untouched (asserted on its mtime), and a fixture
+  where the CI verdict is red surfacing as a block rather than as `not judged`.
   Criticality: medium — it is the tool that exists to save turns, and it costs them where it is blind.
   Bundle: Session- & Repo-Hygiene.
 
