@@ -10,6 +10,10 @@
 // matched, and a memory claiming a guard did not exist while it sat wired in the
 // Stop chain.
 //
+// NOT THE SAME AS `rule-review-guard` BESIDE IT: that one is a CADENCE — the
+// whole rule corpus gets read through periodically. This one is CHANGE-TRIGGERED
+// and narrow: one rule moved, so these files must be visited now.
+//
 // WHAT IT DOES NOT DO: judge whether two texts SAY the same thing. No mechanism
 // here can read prose. What it can do is notice that the SOURCE moved while a
 // restatement did not, and refuse the turn until somebody has looked at each one.
@@ -257,7 +261,7 @@ export function filesToRead(registry = RULE_REGISTRY) {
  * still matches. The stamp itself does not count: it is the one string every
  * file on the list is guaranteed to contain.
  */
-export function quoteIsInFile(text = '', quote = '', { minLength = 24, id = '', window = 1500 } = {}) {
+export function quoteIsInFile(text = '', quote = '', { minLength = 24, id = '' } = {}) {
   const flat = (s) => String(s ?? '').replace(/\s+/g, ' ').trim()
   const needle = flat(quote)
   if (needle.length < minLength) return { ok: false, reason: `the quote must be at least ${minLength} characters` }
@@ -265,20 +269,55 @@ export function quoteIsInFile(text = '', quote = '', { minLength = 24, id = '', 
   // let `// rule:x@abcdef01` through, so the guard's own output could clear the
   // very file it was complaining about.
   if (/rule:[a-z0-9-]+@[0-9a-f]{8}/.test(needle)) return { ok: false, reason: 'a stamp is not a quote from the text' }
-  const haystack = flat(text)
-  const at = haystack.indexOf(needle)
-  if (at < 0) return { ok: false, reason: 'that phrase does not occur in the file' }
+  if (!flat(text).includes(needle)) return { ok: false, reason: 'that phrase does not occur in the file' }
   if (!id) return { ok: true, reason: '' }
-  // AND IT MUST BELONG TO THIS RULE'S PASSAGE (round 3, P1): a file may restate
-  // two rules, and a phrase from one says nothing about the other. "Near the
-  // stamp" is the available proxy for "in the passage" — the stamp is written
-  // where the file states the rule.
-  const marks = [...haystack.matchAll(new RegExp(`rule:${String(id).replace(/[^a-z0-9-]/gi, '')}@[0-9a-f]{8}`, 'g'))]
-  if (!marks.length) return { ok: true, reason: '' }
-  const near = marks.some((m) => Math.abs(m.index - at) <= window)
-  return near
+  const passage = passageOf(text, id)
+  if (!passage) return { ok: true, reason: '' }
+  return flat(passage).includes(needle)
     ? { ok: true, reason: '' }
-    : { ok: false, reason: `that phrase is not near this file's rule:${id} stamp — quote the passage that states THIS rule` }
+    : {
+        ok: false,
+        reason: `that phrase is outside the passage that states rule:${id} — quote from where the stamp sits`,
+      }
+}
+
+/**
+ * The passage a rule's stamp belongs to: the block of consecutive non-blank
+ * lines holding the stamp, plus the block before and after it.
+ *
+ * A radius in characters was the first attempt and the review was right about it
+ * (round 4, P1): it let unrelated prose a few lines away clear the gate, and it
+ * measured from the FIRST occurrence of the phrase rather than the nearest. The
+ * document's own paragraph structure is the honest boundary — and the
+ * neighbouring blocks belong to it because a stamp is often written on a line of
+ * its own, immediately above the paragraph it marks.
+ *
+ * RESIDUAL, plainly: a file whose two rules are stated in ADJACENT paragraphs
+ * shares a passage, and a quote from one clears the other. Nothing short of
+ * reading prose can separate those, and the registry has no such file today.
+ */
+export function passageOf(text = '', id = '') {
+  const lines = String(text ?? '').split('\n')
+  const mark = new RegExp(`rule:${String(id).replace(/[^a-z0-9-]/gi, '')}@[0-9a-f]{8}`)
+  const blocks = []
+  let current = null
+  lines.forEach((line) => {
+    if (line.trim() === '') {
+      current = null
+      return
+    }
+    if (!current) {
+      current = []
+      blocks.push(current)
+    }
+    current.push(line)
+  })
+  const at = blocks.findIndex((b) => b.some((line) => mark.test(line)))
+  if (at < 0) return ''
+  return blocks
+    .slice(Math.max(0, at - 1), at + 2)
+    .map((b) => b.join('\n'))
+    .join('\n\n')
 }
 
 /**

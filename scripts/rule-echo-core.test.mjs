@@ -12,6 +12,7 @@ import {
   sourceTextOf,
   stampFor,
   rulesForFile,
+  passageOf,
   stampsIn,
   treeKeyOf,
   unregisteredStamps,
@@ -278,18 +279,29 @@ describe('quoteIsInFile', () => {
     expect(quoteIsInFile('a <!-- rule:x@abcdef01 --> b', '<!-- rule:x@abcdef01 -->').ok).toBe(false)
   })
 
-  it('demands the quote sit near THIS rule’s stamp when an id is given (round 3, P1)', () => {
-    const text =
-      'passage about rule one, which is long enough to quote. rule:one@aaaaaaaa\n' +
-      `${'filler '.repeat(400)}\n` +
-      'passage about rule two, which is also long enough. rule:two@bbbbbbbb'
+  it('demands the quote come from THIS rule’s passage (rounds 3+4, P1)', () => {
+    const text = [
+      'passage about rule one, which is long enough to quote. rule:one@aaaaaaaa',
+      '',
+      'an unrelated paragraph in between, also long enough to quote.',
+      '',
+      'passage about rule two, which is also long enough. rule:two@bbbbbbbb',
+    ].join('\n')
     expect(quoteIsInFile(text, 'passage about rule one, which is long enough to quote', { id: 'one' }).ok).toBe(true)
-    expect(quoteIsInFile(text, 'passage about rule one, which is long enough to quote', { id: 'two' })).toMatchObject({
+    // A character radius let a neighbouring paragraph through; the paragraph
+    // boundary does not (round 4, P1).
+    expect(quoteIsInFile(text, 'passage about rule two, which is also long enough', { id: 'one' })).toMatchObject({
       ok: false,
-      reason: expect.stringContaining('not near'),
+      reason: expect.stringContaining('outside the passage'),
     })
     // Without an id the file-wide check stands, which is the single-rule case.
-    expect(quoteIsInFile(text, 'passage about rule one, which is long enough to quote').ok).toBe(true)
+    expect(quoteIsInFile(text, 'passage about rule two, which is also long enough').ok).toBe(true)
+  })
+
+  it('accepts a quote from the paragraph a lone stamp line marks', () => {
+    // The common shape in Markdown: the stamp on its own line above the prose.
+    const text = ['<!-- rule:one@aaaaaaaa -->', 'The cut is a function, not a taste, and it says so.'].join('\n')
+    expect(quoteIsInFile(text, 'The cut is a function, not a taste', { id: 'one' }).ok).toBe(true)
   })
 
   it('never throws on nothing', () => {
@@ -375,5 +387,22 @@ describe('rulesForFile', () => {
     expect(rulesForFile('nowhere.md', [RULE])).toEqual([])
     expect(rulesForFile()).toEqual([])
     expect(rulesForFile('a.mjs', null)).toEqual([])
+  })
+})
+
+
+describe('passageOf', () => {
+  it('is the stamp’s block plus its neighbours, not the whole file', () => {
+    const text = ['far away paragraph', '', 'lead-in line', '<!-- rule:one@aaaaaaaa -->', '', 'right after', '', 'much later'].join('\n')
+    const passage = passageOf(text, 'one')
+    expect(passage).toContain('lead-in line')
+    expect(passage).toContain('right after')
+    expect(passage).not.toContain('much later')
+  })
+
+  it('answers empty when the rule has no stamp there, and never throws', () => {
+    expect(passageOf('nothing here', 'one')).toBe('')
+    expect(passageOf()).toBe('')
+    expect(passageOf('rule:one@aaaaaaaa', '')).toBe('')
   })
 })

@@ -106,7 +106,12 @@ function stampOne(rule, file, quote) {
   const fulls = fullPathsOf(file)
   if (!fulls.length) return { ok: false, message: `rule-echo: ${file} does not exist here.` }
   const texts = fulls.map((p) => readFileSync(p, 'utf8'))
-  const q = texts.map((text) => quoteIsInFile(text, quote, { id: rule.id })).find((r) => !r.ok) ?? { ok: true, reason: '' }
+  // ONE copy has to carry the quote, not every one (review round 4, P1): two
+  // copies may word the rule differently, and demanding a phrase present in both
+  // could leave a file with no quote able to clear it at all. Every copy is
+  // stamped and every path is named back, so nothing is cleared invisibly.
+  const perCopy = texts.map((text) => quoteIsInFile(text, quote, { id: rule.id }))
+  const q = perCopy.some((r) => r.ok) ? { ok: true, reason: '' } : perCopy[0]
   if (!q.ok) {
     return {
       ok: false,
@@ -133,12 +138,12 @@ function stampOne(rule, file, quote) {
     writeFileSync(fulls[i], next)
     written += 1
   })
-  const where = fulls.length > 1 ? ` (${fulls.length} copies)` : ''
+  const where = fulls.length > 1 ? `\n  copies: ${fulls.join(', ')} — read them all, both were stamped` : ''
   return {
     ok: true,
     message: written
-      ? `rule-echo: ${file} stamped @${hash}${where}.`
-      : `rule-echo: ${file} already stamped @${hash}${where}.`,
+      ? `rule-echo: ${file} stamped @${hash}.${where}`
+      : `rule-echo: ${file} already stamped @${hash}.${where}`,
   }
 }
 
