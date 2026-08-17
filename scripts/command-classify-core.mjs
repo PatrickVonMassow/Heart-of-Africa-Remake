@@ -317,6 +317,19 @@ export function commandHead(segment) {
   return splitHeadAndArgs(seg).head
 }
 
+/**
+ * The head AND its own argument words, as one exported pair (point 700) — for
+ * a caller whose rule hangs on a SUBCOMMAND (`npm test` vs `npm run build`).
+ * The same split the head uses, so the two can never disagree about where the
+ * command starts.
+ */
+export function headAndArgs(segment) {
+  const seg = asSegments(segment)[0]
+  if (!seg) return { head: '', args: [] }
+  const { head, args } = splitHeadAndArgs(seg)
+  return { head, args }
+}
+
 /** The words after the head, in order — the head's own arguments. */
 function argsOf(seg) {
   return splitHeadAndArgs(seg).args

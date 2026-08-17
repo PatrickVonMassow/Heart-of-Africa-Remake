@@ -24,9 +24,18 @@ describe('over the mark, a STARTING call is denied — naming the mark', () => {
     ['test:large', { toolName: 'Bash', command: 'npm run test:large' }],
     ['a bare npm run test', { toolName: 'Bash', command: 'npm run test' }],
     ['a suite chained behind the fast gate', { toolName: 'Bash', command: 'npm run test:unit && npm test' }],
+    ['a suite chained behind the CARRIER — the exemption covers only its own segment', {
+      toolName: 'Bash',
+      command: 'node scripts/finding.mjs --record "x" --detail "y" && npm test',
+    }],
+    ['the npm test alias', { toolName: 'Bash', command: 'npm t' }],
+    ['a wrapped suite start', { toolName: 'Bash', command: 'bash -c "npm test"' }],
     ['run-logged', { toolName: 'Bash', command: 'node scripts/verify/run-logged.mjs --suite world' }],
+    ['run-logged under a wrapper', { toolName: 'Bash', command: 'timeout 600 node scripts/verify/run-logged.mjs' }],
     ['run-all', { toolName: 'Bash', command: 'node scripts/verify/run-all.mjs world' }],
     ['delegating to Sol', { toolName: 'Bash', command: 'node scripts/author-sol.mjs 701' }],
+    ['a cross-vendor review run', { toolName: 'Bash', command: 'node scripts/review-sol.mjs --commit abc' }],
+    ['a delegated ask run', { toolName: 'Bash', command: 'node scripts/ask-sol.mjs --kind audit --brief "x"' }],
   ]
   for (const [name, call] of starts) {
     it(`denies ${name}`, () => {
@@ -89,6 +98,24 @@ describe('over the mark, FINISHING calls and reads stay allowed', () => {
   ]
   for (const [name, call] of finishing) {
     it(`allows ${name}`, () => {
+      expect(decide(call).block, name).toBe(false)
+    })
+  }
+
+  // The FALSE-DENY direction is the one that idles a session, which the fence
+  // may never do (Sol review of d0aebb6, finding 1): a suite name QUOTED in an
+  // argument is text, not an action — only the segment's real invocation counts.
+  const quotedNotStarted = [
+    ['a search whose pattern quotes a suite name', { toolName: 'Bash', command: 'rg "npm test" docs' }],
+    ['a grep for the launcher path', { toolName: 'Bash', command: 'grep -rn "scripts/verify/run-logged.mjs" docs/' }],
+    ['a commit message mentioning npm test', { toolName: 'Bash', command: 'git commit -m "note: npm test moved to the successor"' }],
+    ['a commit message quoting a chain', { toolName: 'Bash', command: 'git commit -m "fence denies npm test && npm run test:large"' }],
+    ['a commit message quoting a redirect target', { toolName: 'Bash', command: 'git commit -m "stop appending >> TASKS.md"' }],
+    ['an echo of the review command name', { toolName: 'Bash', command: 'echo "run scripts/review-sol.mjs later"' }],
+    ['the fast gate with a filter argument named test', { toolName: 'Bash', command: 'npx vitest run scripts/context-fence-core.test.mjs' }],
+  ]
+  for (const [name, call] of quotedNotStarted) {
+    it(`never denies ${name}`, () => {
       expect(decide(call).block, name).toBe(false)
     })
   }

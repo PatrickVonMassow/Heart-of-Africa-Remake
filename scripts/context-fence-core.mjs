@@ -25,6 +25,17 @@
 // 'unreadable' → no block). The watermark's own Stop-chain guard already
 // alerts loudly on an unobtainable reading; a fence that guessed would deny on
 // an assumption, which the measurement rule forbids.
+//
+// A COMMAND IS CLASSIFIED BY WHAT IT RUNS, NOT BY ITS TEXT (Sol review of
+// d0aebb6, finding 1). The first build pattern-matched the raw string, which
+// was wrong in both directions: `rg "npm test" docs` — a read whose ARGUMENT
+// quotes a suite name — was denied, and `node scripts/finding.mjs … && npm
+// test` sailed through because the carrier exemption short-circuited the whole
+// line. The classification now runs on `command-classify-core`'s segments
+// (quotes honoured, wrappers unwrapped, `bash -c`/`eval`/`$(…)` expanded):
+// each segment's actual invocation decides, and the carrier exemption covers
+// exactly the segment that IS the carrier call.
+import { expandSegments, headAndArgs, segmentInvokesScript } from './command-classify-core.mjs'
 
 /** The one command that ends the session — every refusal names it. */
 export const FENCE_END_COMMAND = 'node scripts/batch-boundary.mjs --prepare --context'
@@ -40,24 +51,50 @@ export const AGENT_TOOLS = new Set(['Agent', 'Task'])
  *  TASKS.md is a read, and every read stays allowed whatever the mark says. */
 export const FILE_WRITING_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit'])
 
-/** Command patterns that START a browser verify run or delegate new authoring.
- *  Deliberately NOT the fast gates: `npm run test:unit`, `npm run build` and
- *  `npm run lint` finish the step in flight (they gate its commit/landing). */
-const SUITE_START_RES = [
-  // npm test / npm run test / test:small / test:large — never test:unit.
-  { re: /\bnpm\s+(?:run\s+)?test\b(?!:unit)/i, what: 'starting a browser verify run' },
-  { re: /scripts[\\/]verify[\\/]run-(?:all|logged)\.mjs/i, what: 'starting a browser verify run' },
-  { re: /scripts[\\/]author-sol\.mjs/i, what: 'delegating a new authoring run' },
-]
+/**
+ * WHAT COUNTS AS STARTING A NEW UNIT, BY THE SCRIPT IT RUNS — widened
+ * deliberately, and the coverage stated (Sol review of d0aebb6, finding 3):
+ *   COVERED: the two sanctioned suite launchers (`run-all.mjs`,
+ *   `run-logged.mjs` — everything `npm test`/`test:small`/`test:large` also
+ *   reaches), delegating an author (`author-sol.mjs`), starting a
+ *   cross-vendor review (`review-sol.mjs`) and a delegated ask
+ *   (`ask-sol.mjs`) — each begins an expensive new unit of work.
+ *   CONSCIOUSLY NOT: `run-wait.mjs` (it AWAITS a receipt — finishing),
+ *   `land-point.mjs` and the board/boundary scripts (the exit itself), the
+ *   fast gates (`npm run test:unit`/`build`/`lint` gate the in-flight
+ *   commit), and a DIRECT `node scripts/verify/<suite>.mjs` call — the
+ *   sanctioned launchers are covered, a direct call is outside the sanctioned
+ *   path anyway (it writes no transferable run record), and enumerating the
+ *   suite list here would couple this core to scripts/verify/, which the
+ *   spawned guard tests deliberately run without. Named residual.
+ */
+const START_SCRIPTS = {
+  'run-all.mjs': 'starting a browser verify run',
+  'run-logged.mjs': 'starting a browser verify run',
+  'author-sol.mjs': 'delegating a new authoring run',
+  'review-sol.mjs': 'starting a cross-vendor review run',
+  'ask-sol.mjs': 'starting a delegated ask run',
+}
 
-/** A shell redirection INTO the work order, a document or a memory file —
- *  authoring by `>>` instead of by the Edit tool must not slip the fence. */
-const AUTHORING_REDIRECT_RE =
-  />>?\s*"?[^\s"'|&;]*(?:tasks\.md|tasks-archive\.md|memory\.md|(?:docs|memory)[\\/][^\s"'|&;]*\.md)/i
-
-/** The carrier file stays writable past the mark — it is the sanctioned place
- *  for a finding, and the refusal points at it. */
+/** The carrier SCRIPT and file stay usable past the mark — they are the
+ *  sanctioned place for a finding, and the refusal points at them. */
+const CARRIER_SCRIPT = 'finding.mjs'
 const CARRIER_BASENAME = 'findings-carrier.md'
+
+/** `npm test` / `npm t` / `npm run test[:small|:large]` start the browser
+ *  regression; `npm run test:unit` (and build/lint) finish the step in
+ *  flight. Judged on npm's SUBCOMMAND, never on the string. */
+function npmStartsSuite(head, argTexts) {
+  if (head !== 'npm') return false
+  const pos = argTexts.filter((t) => t && !t.startsWith('-'))
+  const sub = (pos[0] ?? '').toLowerCase()
+  if (sub === 'test' || sub === 't' || sub === 'tst') return true
+  if (sub === 'run' || sub === 'run-script') {
+    const script = (pos[1] ?? '').toLowerCase()
+    return script === 'test' || script === 'test:small' || script === 'test:large'
+  }
+  return false
+}
 
 const basenameOf = (p) => {
   const parts = String(p ?? '').replace(/\\/g, '/').toLowerCase().split('/')
@@ -79,6 +116,30 @@ export function authoringTarget(filePath) {
   return null
 }
 
+/** What ONE parsed segment starts, or null. The carrier call itself starts
+ *  nothing — but ONLY that segment: the exemption must not cover whatever
+ *  rides beside it on the same line (Sol finding 1). */
+function segmentStart(seg) {
+  if (segmentInvokesScript(seg, [CARRIER_SCRIPT])) return null
+  const { head, args } = headAndArgs(seg)
+  if (npmStartsSuite(head, args.map((a) => a.text))) {
+    return { what: `starting a browser verify run (\`${seg.raw}\`)`, authoring: false }
+  }
+  for (const [script, what] of Object.entries(START_SCRIPTS)) {
+    if (segmentInvokesScript(seg, [script])) return { what: `${what} (\`${seg.raw}\`)`, authoring: false }
+  }
+  // Authoring by REDIRECTION — `echo "- [ ] 999. x" >> TASKS.md` writes the
+  // work order without the Edit tool. Judged on the parsed redirect TARGET,
+  // so a `>` inside a quoted argument never counts (that false deny is the
+  // classifier defect this whole rewrite removes).
+  for (const r of Array.isArray(seg?.redirects) ? seg.redirects : []) {
+    if (!r.op.includes('>') || r.op.endsWith('&') || !r.target) continue
+    const target = authoringTarget(r.target)
+    if (target) return { what: `${target} via redirection (\`${seg.raw}\`)`, authoring: true }
+  }
+  return null
+}
+
 /**
  * Does this call START a new unit of work? PURE.
  * Returns { starts, what, authoring } — `authoring` marks the refusals that
@@ -91,13 +152,13 @@ export function classifyFenceCall({ toolName, command, filePath } = {}) {
   }
   const cmd = typeof command === 'string' ? command.trim() : ''
   if (cmd) {
-    // The carrier command may quote .md paths of its own — never a deny.
-    if (/scripts[\\/]finding\.mjs/i.test(cmd)) return { starts: false, what: null, authoring: false }
-    for (const { re, what } of SUITE_START_RES) {
-      if (re.test(cmd)) return { starts: true, what, authoring: false }
-    }
-    if (AUTHORING_REDIRECT_RE.test(cmd) && !cmd.toLowerCase().includes(CARRIER_BASENAME)) {
-      return { starts: true, what: 'authoring in the work order/documents via redirection', authoring: true }
+    // Every segment the command really runs — quotes honoured, wrappers
+    // (`sudo`, `timeout`, `bash -c`, `eval`, `$(…)`) unwrapped — judged one
+    // by one. Any starting segment denies; a line of finishing segments
+    // passes whatever suite names its quoted arguments mention.
+    for (const seg of expandSegments(cmd)) {
+      const start = segmentStart(seg)
+      if (start) return { starts: true, ...start }
     }
     return { starts: false, what: null, authoring: false }
   }
