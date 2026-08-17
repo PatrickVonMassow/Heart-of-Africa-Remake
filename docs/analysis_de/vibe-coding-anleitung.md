@@ -152,8 +152,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 ## Die häufigsten Fallstricke → und was hilft
 
 - **Grüner Test, falsches Bild.** Der Test ist grün, das Ergebnis falsch — er prüfte einen
-  Hilfswert, einen unerreichbaren Zustand, einen geratenen Wert. Oder das Beweisbild entstand
-  vor der fertigen Szene.
+  Hilfswert, einen unerreichbaren Zustand. Oder das Beweisbild entstand vor der fertigen Szene.
   → *Prompt:* „Eine sichtbare Änderung gilt erst als fertig, wenn sie am **echten gerenderten
   Bild** unter einer erreichbaren Bedingung geprüft wurde — und ein Prüfbild entsteht erst, wenn
   die Darstellung fertig ist." *(≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen richtig aus?)*
@@ -171,15 +170,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende Prüfung
   verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie sollte. Ein
-  Fehlalarm meldet sich selbst, ein ausgefallener nie.
+  Fehlalarm meldet sich, ein ausgefallener nie.
   → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND
-  echte Treffer noch da. Die Fälle erfindet das **andere Modell**, gemessen an der Mechanik statt
-  an Testnamen, die **eingeräumten** Grenzen zuerst — eine zugegebene Lücke wird geglaubt, eine
-  verschwiegene gesucht." *(Kosten ≈ 1,3x.)*
+  echte Treffer noch da. Die Fälle erfindet das **andere Modell**, an der Mechanik gemessen statt
+  an Testnamen." *(Kosten ≈ 1,3x.)*
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
-  die das Werkzeug liest; oder die Verbesserung ist getestet und dokumentiert, nur führt nichts
-  jemanden dorthin. Kein Test schlägt an: Was niemand kennt, verletzt nichts.
+  die das Werkzeug liest; oder die Verbesserung ist fertig, nur führt nichts jemanden dorthin.
+  Kein Test schlägt an: Was niemand kennt, verletzt nichts.
   → *Prompt:* „Eine Ausnahme trägst du **im selben Zug** dort ein, wo der Mechanismus sie liest;
   bei einer Fähigkeit die Stelle, an der jemand danach greift, und **woran** man ihre Benutzung
   erkennt. Und wenn etwas ‚wartet': **worauf genau**?"
@@ -221,12 +219,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Beleg nach jeder Aktion mit Fernwirkung den **Zielzustand** statt der
   Erfolgsmeldung; eine Abfrage ohne Treffer ist ein Befund."
 
-- **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an
-  Widersprüchen und an Regeln, deren Absicherung enger greift als ihr Satz: Sie feuert, wird
-  geglaubt, deckt aber nur einen Teil.
+- **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an Widersprüchen
+  und an Regeln, deren Absicherung enger greift als ihr Satz: Sie feuert, wird geglaubt, deckt
+  nur einen Teil.
   → *Prompt:* „Sieh den Bestand periodisch durch — Aktualität, Dopplung, Widerspruch,
-  **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander**: Welche Fälle nennt der Satz, die
-  das Muster nicht trifft? Zieh **den Code auf den Satz**." *(einmalig hoch)*
+  **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander** und zieh **den Code auf den
+  Satz**." *(einmalig hoch)*
 
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht
   gefährlicher als ein Grün.
@@ -234,11 +232,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der **Gegenstand** meldet —
   nie eine Uhr. Schlag auch fehl, wenn der Wert *unerwartet* ausschlägt."
 
-- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, pflegt nur die
-  Stelle, an der er schreibt.
+- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, pflegt nur, wo er
+  schreibt.
   → *Prompt:* „Gib jedem Fakt genau **einen** verbindlichen Ort; alle anderen verweisen darauf.
-  Unvermeidbare Wiederholung prüft ein Test gegen den **Code**, dem der Fakt gehört, nie gegen
-  die Nachbarprosa. Berührt eine Änderung das Design, aktualisiere Doc und Code im **selben** Commit."
+  Unvermeidbare Wiederholung prüft ein Test gegen den **Code**, dem der Fakt gehört. Berührt eine
+  Änderung das Design, aktualisiere Doc und Code im **selben** Commit."
 
 - **„Aufgeräumt" ohne Beweisliste.** Man räumt dort auf, wo man den Schaden vermutet.
   → *Prompt:* „Erzwing nach jedem Zwischenfall eine **Beweisliste**: Liegt alles am Zielort? Gibt es Reste? Passen Dokumente und Code zusammen?"
@@ -249,8 +247,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Schätze vor dem Bau **Schwierigkeit × Kritikalität** und zieh bei Kritischem **ein
   anderes Modell** hinzu. Beim **Finden** blind parallel: gleiche Vorgabe, je ein vollständiges
   Ergebnis; beim **Beurteilen** Gegenlesen, aber **erst das Ergebnis, dann die Begründung**.
-  **Vereinigt** wird nach Bedeutung, vom Modell, das an **keiner** Liste mitschrieb, jeder
-  Eingang auffindbar — Verschmelzen verliert lautlos."
+  **Vereinigt** wird nach Bedeutung, vom Modell, das an **keiner** Liste mitschrieb."
   *(≈ 2x für den Fundschritt)*
 
 - **Die Lehre gilt als versorgt, sobald ihr Wächter benannt ist** — gebaut ist er damit nicht.
@@ -268,9 +265,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.** Jede
   Ergänzung ist berechtigt; am teuersten die, die wiederholt, was eine Prüfung erzwingt.
   → *Prompt:* „Gib jedem Dokument, das bei jedem Start gelesen wird, eine **gemessene
-  Obergrenze**. Blockiert sie eine Ergänzung: kürzen, **zusammenführen**, auslagern — die
-  Grenze anheben ist das **letzte** Mittel. Und der Commit, der eine Prüfung einführt,
-  streicht den Text, den sie ersetzt."
+  Obergrenze**. Blockiert sie eine Ergänzung: kürzen, **zusammenführen**, auslagern — anheben
+  ist das **letzte** Mittel. Der Commit, der eine Prüfung einführt, streicht ihren Merktext."
 
 - **Jedes Teil grün, die Kette trotzdem tot.** Alle Bausteine sind getestet, am Ende
   passiert trotzdem nichts — dazwischen hat niemand nachgesehen.
@@ -295,12 +291,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   auch bei gesperrter Aufgabenliste schreibt, und eine Prüfung, die einen Zug **nicht enden
   lässt**, der untersucht und nichts hinterlassen hat."
 
-- **Still ersetzt statt sichtbar gescheitert.** Fehlt eine Angabe, setzt das Programm
-  klaglos einen Ersatz ein — im Code sieht das nach Sorgfalt aus, der Folgefehler taucht
-  weit entfernt auf.
-  → *Prompt:* „Jede eingabeverarbeitende Stelle wird gegen **mehrere Eingabeformen** getestet
-  und scheitert **sichtbar**, statt einen plausiblen Ersatz einzusetzen; jeder Rückfall wird
-  **gemeldet**, mit dem Befehl, der ihn behebt."
+- **Still ersetzt statt sichtbar gescheitert.** Fehlt eine Angabe, setzt das Programm klaglos
+  einen Ersatz ein — im Code sieht das nach Sorgfalt aus, der Folgefehler taucht weit weg auf.
+  → *Prompt:* „Jede eingabeverarbeitende Stelle wird gegen **mehrere Eingabeformen** getestet und
+  scheitert **sichtbar**; jeder Rückfall wird **gemeldet**, mit dem Befehl, der ihn behebt."
 
 - **Die Gegenprüfung wurde angestoßen, nie abgeschlossen** — der Zweig sieht geprüft aus.
   → *Prompt:* „Wer eine Gegenprüfung beauftragt, bleibt dran, bis sie da ist. Ein ‚nicht
@@ -362,8 +356,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   die **Nachbarschaft**, und wo das als Test schreibbar ist, schreib es als Test."
 
 - **Der erste Fehlschlag macht sich selbst dauerhaft.** Eine wiederkehrende Aufgabe liest ihre
-  eigene Spur, die es beim ersten Lauf nicht gibt — und bricht von da an immer ab. Von außen:
-  „übersprungen".
+  eigene Spur, die es beim ersten Lauf nicht gibt — und bricht von da an immer ab.
   → *Prompt:* „Prüf jede wiederkehrende Aufgabe gegen den **leeren Zustand**; so beginnt sie nach
   jedem Neustart. ‚Übersprungen' ist **kein Betriebszustand** — was sie nicht tut, meldet sie laut."
 
@@ -373,14 +366,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   die Kur gegen gesunde Fälle. Ist sie teurer als der Fehler, **buche** ihn mit Zahlen und
   verworfener Kur — verschweigen gilt nicht, still beheben auch nicht."
 
-- **Deine Reihenfolge wird gerankt, aber nicht befolgt.** Die Aufgabenliste ist sortiert, und die
-  KI fängt trotzdem etwas Kleines, Neues an, während halbfertige Zweige herumliegen — das
-  wichtigste Feature ist der älteste unfertige davon. Prüfungen der Sortierung sind dabei grün:
-  Sie prüfen die Liste, nie den Punkt, an dem tatsächlich gearbeitet wird.
-  → *Prompt:* „Bevor du einen **neuen** Punkt anfängst: nenn ihn, nenn den vordersten offenen
-  Punkt der Reihenfolge und jeden angefangenen Zweig, der älter ist. Weichst du ab, **begründe es
-  in einem Satz** — abweichen darfst du, unbemerkt abweichen nicht. Und leere angefangene Arbeit,
-  bevor du neue aufmachst."
+- **Die Reihenfolge wird gerankt, nicht befolgt.** Die KI fängt Neues an, während halbfertige
+  Zweige liegen. Prüfungen der Sortierung sind grün: Sie prüfen die Liste, nie den Punkt, an
+  dem gearbeitet wird.
+  → *Prompt:* „Vor jedem **neuen** Punkt: nenn ihn, den vordersten offenen und jeden älteren
+  angefangenen Zweig. Weichst du ab, **begründe es**; leere Angefangenes zuerst."
 
 ---
 
