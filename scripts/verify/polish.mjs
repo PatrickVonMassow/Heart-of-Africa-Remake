@@ -433,18 +433,11 @@ if (section('panorama-wildlife')) {
   // the page makes the sample window the frame it actually is, and lets the
   // judgment demand an UNBROKEN stance across the whole interval, so a wrap is
   // not filtered out — it cannot occur. The judgment itself is the pure,
-  // Vitest-covered `judgeStanceSlip` (scripts/verify/stanceSlip.mjs), which also
-  // removes the turning body's rigid leg swing through the interval's MEAN
-  // heading rather than the heading at its start (measured: a 0.4 rad turn cost
-  // 0.200 of spurious slip the old way and 0.006 this way).
-  //
-  // THE SPREAD, RECORDED (point 549, the way point 387 recorded its five). Four
-  // consecutive WebGL 2 runs on this host after the fix reported worst foot/body
-  // travel 0.049, 0.047, 0.049 and 0.059 against the unchanged bar of 0.25 — a
-  // spread of 0.012 where the eight runs before it spanned 0.278–1.549 and
-  // straddled the bar. The interval count came out 37, 43, 43 and 42, so the
-  // verdict rests on a comparable population each time rather than on whatever
-  // the host managed to draw.
+  // Vitest-covered `judgeStanceSlip` (scripts/verify/stanceSlip.mjs). The
+  // renderer now keeps a stance contact in world space even as its body turns,
+  // so the judgment reads that world travel directly; compensating for a rigid
+  // body's yaw would manufacture movement for a contact whose coordinates did
+  // not change. The interval population and the under-0.25 bar are unchanged.
   {
     /** Record the tracked walkers frame by frame, inside the page: one round trip
      *  for the whole series, so no sample window can be stretched by the host.
