@@ -65,6 +65,23 @@ export const FUSE_MAX_SHARE = 0.05
  * No page-side sampler can read the compositor's exact screenshot moment, so
  * the capture is BRACKETED: it lies between two adjacent measured windows,
  * and a standing defect at the shutter is standing in at least one of them.
+ *
+ * RESIDUAL (Sol re-review, 17.08.; accepted, not fixable from the page): the
+ * bracket cannot see (1) a fusion that exists ONLY between the last measured
+ * frame before the shutter and the first one after — i.e. one that both
+ * appears and vanishes inside the capture itself — nor (2) a shallow
+ * (< FUSE_HARD) fusion that coincides with the capture while staying inside
+ * the FUSE_MAX_SHARE tolerance of the merged series. It cannot, because no
+ * script-side reading exists for the compositor's exact screenshot instant:
+ * rAF sampling observes the frames around the capture, never the captured
+ * composite itself — which is the very reason the shutter is bracketed rather
+ * than "measured". What makes the hole improbable rather than impossible: the
+ * declutter decides at 10 Hz and its decisions PERSIST across frames (the
+ * lifts stand until the next refresh), so a fusion absent from both adjacent
+ * 45-frame windows would have to be created and undone within a single
+ * capture — there is no mechanism state that changes on that timescale. A
+ * defect of the class this bar exists for stands for whole refresh intervals
+ * and lands in at least one window.
  */
 export function mergeFusionReadings(a, b) {
   // BOTH halves are required (Sol re-review, 17.08.): a merge that fell back to
