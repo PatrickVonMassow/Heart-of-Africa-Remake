@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // THE COMMAND BESIDE THE RULE-ECHO GUARD (user 17.08.2026).
 //
-//   node scripts/rule-echo.mjs --status            # what is owed, and why
-//   node scripts/rule-echo.mjs --stamp <file>      # I read this file: it matches
+//   node scripts/rule-echo.mjs --status
+//   node scripts/rule-echo.mjs --stamp <file> --quote "<a phrase from that file>"
 //   node scripts/rule-echo.mjs --list              # the rules and their echoes
 //
 // STAMPING IS PER FILE ON PURPOSE. A `--stamp-all` would turn the check into a
@@ -10,18 +10,23 @@
 // and compared it with the rule. One command per file is the friction that buys
 // that, and it is small — the list is under a dozen files.
 //
+// AND IT NEEDS A QUOTE FROM THE FILE (cross-vendor review, P0). Without one, the
+// commands could be generated straight from the guard's own output without any
+// file being opened, which is exactly the check being claimed. The quote is not
+// proof of understanding — it is proof the file was in front of somebody.
+//
 // A file that already says the right thing is stamped just the same. The stamp
 // records that it was READ against this version of the rule, not that it changed.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { RULE_REGISTRY, checkAll, fingerprint, restamp, sourceTextOf, stampFor } from './rule-echo-core.mjs'
-import { gatherRuleEchoInputs, memoryDirs } from './rule-echo-guard.mjs'
+import { RULE_REGISTRY, checkAll, fingerprint, quoteIsInFile, restamp, sourceTextOf, stampFor, unregisteredStamps } from './rule-echo-core.mjs'
+import { gatherRuleEchoInputs, gatherStampedFiles, memoryDirs } from './rule-echo-guard.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 
 const USAGE = [
   'usage: node scripts/rule-echo.mjs --status',
-  '       node scripts/rule-echo.mjs --stamp <file>',
+  '       node scripts/rule-echo.mjs --stamp <file> --quote "<a phrase from that file>"',
   '       node scripts/rule-echo.mjs --list',
 ].join('\n')
 
@@ -48,12 +53,28 @@ function statusText() {
     for (const u of r.unstamped) lines.push(`  unstamped ${u.file}`)
     if (r.detail) lines.push(`  ${r.detail}`)
   }
+  for (const s of unregisteredStamps(RULE_REGISTRY, gatherStampedFiles())) {
+    lines.push(`stray stamp ${s.file} → rule:${s.id} (${s.why})`)
+  }
   return lines.join('\n')
 }
 
-function stamp(file) {
-  const rule = ruleForFile(file)
-  if (!rule) return { ok: false, message: `rule-echo: ${file} restates no watched rule (see --list).` }
+function stamp(file, quote) {
+  // EVERY rule this file restates, not the first (cross-vendor review, P2): a
+  // file may echo two rules, and stamping only one left the other stale on every
+  // Stop with no command able to clear it.
+  const rules = RULE_REGISTRY.filter((r) => r.echoes.some((e) => e.file === file))
+  if (!rules.length) return { ok: false, message: `rule-echo: ${file} restates no watched rule (see --list).` }
+  const messages = []
+  for (const rule of rules) {
+    const r = stampOne(rule, file, quote)
+    if (!r.ok) return r
+    messages.push(r.message)
+  }
+  return { ok: true, message: messages.join('\n') }
+}
+
+function stampOne(rule, file, quote) {
   const sourcePath = resolve(REPO_ROOT, rule.source.file)
   if (!existsSync(sourcePath)) return { ok: false, message: `rule-echo: the rule's source ${rule.source.file} is missing.` }
   const sourceText = sourceTextOf(readFileSync(sourcePath, 'utf8'), rule.source)
@@ -64,6 +85,16 @@ function stamp(file) {
   const full = fullPathOf(file)
   if (!full || !existsSync(full)) return { ok: false, message: `rule-echo: ${file} does not exist here.` }
   const text = readFileSync(full, 'utf8')
+  const q = quoteIsInFile(text, quote)
+  if (!q.ok) {
+    return {
+      ok: false,
+      message:
+        `rule-echo: ${file} not stamped — ${q.reason}.\n` +
+        'Stamping needs a verbatim phrase FROM the file, so the list of names alone cannot clear\n' +
+        `the guard:\n  node scripts/rule-echo.mjs --stamp ${file} --quote "<a phrase from it>"`,
+    }
+  }
   const next = restamp(text, rule.id, hash)
   if (!next) {
     return {
@@ -94,11 +125,12 @@ if (isMainModule(import.meta.url)) {
     }
     if (at('--stamp') >= 0) {
       const file = argv[at('--stamp') + 1]
+      const quote = at('--quote') >= 0 ? argv[at('--quote') + 1] : ''
       if (!file) {
         console.error(`rule-echo: --stamp needs a file.\n\n${USAGE}`)
         process.exit(2)
       }
-      const r = stamp(file)
+      const r = stamp(file, quote)
       console.log(r.message)
       process.exit(r.ok ? 0 : 1)
     }

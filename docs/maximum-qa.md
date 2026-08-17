@@ -7,8 +7,8 @@ technique the project has built up (points 173, 184, 195–200, 203/203A, 204,
 **No ultracode / no large agent fan-outs.** Ultracode workflows burn the
 session/weekly token budget in minutes. Maximum QA runs as ordinary inline
 work: sequential checks, the driven visual sweep inspected in the main loop, and
-at most a *single* background subagent for model-diverse audit (Fable vs. the
-author) whose findings are always harvested and verified inline. See the memory
+at most a *single* model-diverse audit pass by the OTHER vendor (`scripts/review-sol.mjs`
+/ `scripts/ask-sol.mjs --kind audit`) whose findings are always harvested and verified inline. See the memory
 `workflows-token-budget`.
 
 Run the phases **in the order below**. Each real finding becomes its own atomic
@@ -47,7 +47,7 @@ must pass clean before any tag.
 ---
 
 ## Phase 1 — World & functionality coherence audit (FIRST — may rebuild the game)
-- A model-diverse (Fable-lens) read of design.md + the §7.1 systems: does each
+- A model-diverse read of design.md + the §7.1 systems by the other vendor: does each
   system have a PURPOSE, real USE in the loop, COHERENCE with the others,
   SETTING FIT (~1890 accuracy), and WORTH? Plus world plausibility (ecology,
   economy, exploration, survival, cross-system loop).
@@ -87,9 +87,9 @@ must pass clean before any tag.
 ## Phase 5 — Code audit with model diversity
 - Sweep the subsystems (systems/state, travel/world, render/ui/i18n) of the
   rebuilt code for test gaps AND real bugs, reading it against the design.
-- Mix in a **different model than the recent author** for a blind pass (e.g. a
-  single Fable subagent when the batch runs on Opus, or vice versa) — fresh
-  blind spots find more (memory `audit-with-model-diversity`). ONE agent,
+- Mix in a **different model than the recent author** for a blind pass — the
+  cross-vendor default, so Sol reads Anthropic-authored code and Claude reads
+  Sol's (CLAUDE.md §6; memory `audit-with-model-diversity`). ONE pass,
   harvested and every finding re-verified inline before it is filed.
 - **Leak & accumulation code-review class (point 285, prong A):** the same
   fresh-model pass explicitly sweeps for the dispose/prune/re-seed/effect-cleanup

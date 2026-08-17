@@ -1,7 +1,9 @@
 // SessionStart hook: auto-resume the TASKS.md batch (user mandate 2026-07-14 —
 // the batch must complete autonomously; no session may sit idle waiting for a
-// "continue"). It states the model policy to every session it resumes:
-// rule:model-policy@3ffcd6dc Prints the resume instruction only while TASKS.md still has
+// "continue"). It states the model policy to every session it resumes —
+// rule:model-policy@db1baff0
+//
+// Prints the resume instruction only while TASKS.md still has
 // unticked points AND this session actually WINS the batch ownership:
 //   - a user PAUSE marker (.claude/batch-paused) suppresses auto-resume entirely
 //     until an explicit go;

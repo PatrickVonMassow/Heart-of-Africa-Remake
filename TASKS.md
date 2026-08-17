@@ -7906,16 +7906,28 @@ to land than a mechanism that needs a review.
   processes behind, and it fires exactly on the session that follows the rule.
 
 - [ ] 678. A lane is routed to when it has nothing left, and what dies there is rescued by hand
-  (measured 13.08.2026, 20:0x, on point 675). The routing sends difficult, complex or error-prone
-  work to Fable 5 from the start (`scripts/author-routing-core.mjs`), and it does so without ever
-  asking whether that lane still has volume. Today the Fable author built five commits of the
+  (measured 13.08.2026, 20:0x, on point 675). The routing names Fable 5 as the ESCALATION lane for
+  work Opus authored and Sol still rejects after a re-work (`scripts/author-routing-core.mjs`), and
+  it does so without ever asking whether that lane still has volume. Today the Fable author built five commits of the
   handover mechanism, two cross-vendor review rounds deep, and was then terminated mid-answer by
   the provider's limit — with ELEVEN files uncommitted in its worktree, among them a recorded
   review. Nothing in the machinery noticed: the agent reported a failure, its worktree still held
   the work, and the only reason none of it was lost is that the supervising session opened that
-  worktree and looked. The routing table still sends the next two open points to the same empty
-  lane, so the same death is queued up twice.
-  FINAL STATE, two halves from one incident:
+  worktree and looked. Any escalation the routing names next walks into the same empty lane, so the
+  same death stays queued.
+  MEASURED AGAIN 17.08.2026, 23:1x–23:2x (read-only), and it moves the weight of this point from the
+  routing table to the SERVING chain. Of 538 Fable commits, 491 sit directly on `main` — they come
+  from the serving role, not from a delegation; of 268 point merges only 11 branches carry any Fable
+  commit at all, and the `Author lane:` override appears 0× in the work order. The user's usage page
+  shows SEPARATE weekly pools ("all models" 15 %, Fable 22 % after ~13 h), and the Fable share was
+  spent in ONE block: a batch session committed as Fable 5 from 10:00 to 14:36, then as Opus 5 from
+  15:13. CAUSE CANDIDATE, not proven: `buildSpawnArgs` (`scripts/batch-autostart-core.mjs`) starts
+  EVERY session with `--model claude-opus-5[1m] --fallback-model claude-fable-5`, so a brief Opus 5
+  outage at spawn puts a multi-hour session on the scarcest pool. The evidence gap is the load-bearing
+  part: neither `.claude/autostart.log` nor `.claude/batch-launcher.log` records WHICH model a session
+  runs on or whether the fallback fired — the commit trailers are the only trace, and they appear
+  hours in.
+  FINAL STATE, three halves from two incidents:
   (1) A LANE HAS AN AVAILABILITY SWITCH and the routing consults it, the way `scripts/sol-share.mjs`
   already gates the Sol lane. A lane marked unavailable does not receive work: the routing falls
   to the next model of the CLAUDE.md §6 chain and NAMES the fall in its verdict, so a session
@@ -7928,18 +7940,27 @@ to land than a mechanism that needs a review.
   the subject, `Rescue: <what was interrupted>` trailer, the AUTHOR's model in the co-author line,
   never the supervisor's) and pushed, and only then may the worktree be removed. A worktree removal
   that would discard uncommitted work is REFUSED, naming what it holds.
+  (3) A SESSION KNOWS AND RECORDS WHICH MODEL IT RUNS ON, at its start rather than hours later.
+  The launcher logs the model it asked for AND the one the session came up on, so the fallback
+  firing is visible in `.claude/autostart.log` instead of being reconstructed from commit trailers.
+  A session that finds itself on the ESCALATION lane rather than the one the chain intended says so
+  in its first turn and on the board, because a multi-hour run on the scarcest pool is a decision
+  nobody made. The spawn's own fallback is therefore Opus 4.8, not Fable — the scarce lane is
+  reached by escalation, never by an outage.
   VERIFIABLE: Vitest over the routing (an available lane keeps its work, an unavailable one falls
   to the next chain member with the reason in the verdict, and an unknown lane name is an error
   rather than a silent pass-through); Vitest over the rescue path (a dirty worktree produces a
   rescue commit with both halves and the author's model, a clean one produces nothing, an unpushed
   commit is pushed, and `worktree-cleanup` refuses a dirty tree); plus one observed delegated run
-  that is killed mid-work and whose branch afterwards carries everything the worktree held.
+  that is killed mid-work and whose branch afterwards carries everything the worktree held; plus a
+  case over the spawn arguments asserting the fallback is Opus 4.8 and that the launcher log names
+  both the requested and the actual model.
   UNTIL IT IS BUILT, the rule is operational and stated by the user (13.08.2026, 19:55): NOTHING is
-  delegated to Fable 5 while its quota is out — not authoring, not four-eyes review — and a hard
-  case whose Fable author died goes to the OpenAI lane with `node scripts/author-sol.mjs --point <N>
-  --anyway`, explicitly overriding the routing rule that keeps hard cases away from Sol. The main
-  session stays on Opus 5. That instruction is what half (1) mechanises, and it expires with the
-  quota reset while the mechanism does not.
+  delegated to Fable 5 while its quota is out — not authoring, not four-eyes review. A hard case
+  needs no substitute lane for that, because a hard case is authored by Opus 5 and only ESCALATES to
+  Fable when Sol still rejects the re-work; while the Fable quota is out, such work stays with Opus.
+  That instruction is what half (1) mechanises, and it expires with the quota reset while the
+  mechanism does not.
   Criticality: high — it is the only failure mode on record that can destroy finished work outright,
   and it fired today.
 
@@ -8221,8 +8242,9 @@ to land than a mechanism that needs a review.
   - An author or agent run that dies on a provider limit RECORDS that provider as exhausted
     before it exits, so the next session does not repeat the delegation that just failed.
   - The ordinary cut of `authorLaneFor` is UNCHANGED: mechanical and mid-difficulty to Sol, the
-    hard cases to Fable, the verification-is-the-work points to Opus. This point adds a veto on
-    an empty lane, not a second opinion about difficulty.
+    hard cases and the verification-is-the-work points to Opus 5, and Fable only as the escalation
+    for Opus work Sol still rejects after a re-work. This point adds a veto on an empty lane, not a
+    second opinion about difficulty.
   VERIFIABLE: Vitest cases over the pure core — exhausted lane never recommended and the
   substitution named in the reason; missing, corrupt and lapsed pool file → today's routing
   unchanged; a recorded exhaustion that has not lapsed → the next lane; plus one real

@@ -7,10 +7,13 @@ import {
   filesToRead,
   fingerprint,
   formatVerdict,
+  quoteIsInFile,
   restamp,
   sourceTextOf,
   stampFor,
   stampsIn,
+  treeKeyOf,
+  unregisteredStamps,
 } from './rule-echo-core.mjs'
 
 const RULE = {
@@ -50,9 +53,17 @@ describe('sourceTextOf', () => {
 })
 
 describe('fingerprint', () => {
-  it('ignores re-wrapping and indentation, so only the words matter', () => {
-    expect(fingerprint('a  b\n   c')).toBe(fingerprint('a b c'))
-    expect(fingerprint(' a b c ')).toBe(fingerprint('a b c'))
+  it('ignores trailing whitespace and doubled spaces INSIDE a line', () => {
+    expect(fingerprint('a  b')).toBe(fingerprint('a b'))
+    expect(fingerprint('a b   \n')).toBe(fingerprint('a b'))
+  })
+
+  it('does NOT ignore indentation or line breaks — they carry meaning in Markdown', () => {
+    // The first version collapsed all whitespace, so a list could be re-nested
+    // and a hard line break introduced without the fingerprint moving
+    // (cross-vendor review, P2).
+    expect(fingerprint('- a\n  - b')).not.toBe(fingerprint('- a\n- b'))
+    expect(fingerprint('a b c')).not.toBe(fingerprint('a b\nc'))
   })
 
   it('changes when a word changes', () => {
@@ -96,8 +107,12 @@ describe('checkRule', () => {
     expect(r.unstamped).toEqual([{ file: 'b.md', had: '' }])
   })
 
-  it('skips an OPTIONAL path that is absent, but not a required one', () => {
-    expect(checkRule(RULE, filesWith({ 'memory/c.md': null })).kind).toBe('ok')
+  it('skips an OPTIONAL path only when its whole TREE is absent', () => {
+    // No memory directory on this machine → nothing is owed…
+    expect(checkRule(RULE, filesWith({ 'memory/c.md': null, 'memory/': null })).kind).toBe('ok')
+    // …but a tree that EXISTS and lost the file is a deleted restatement, not a
+    // machine without memories (cross-vendor review, P1).
+    expect(checkRule(RULE, filesWith({ 'memory/c.md': null, 'memory/': '' })).kind).toBe('unstamped')
     expect(checkRule(RULE, filesWith({ 'a.mjs': null })).kind).toBe('unstamped')
   })
 
@@ -165,11 +180,24 @@ describe('formatVerdict', () => {
 })
 
 describe('the registry itself', () => {
-  it('watches the model policy, whose drift is what built this', () => {
+  it('watches the model policy at EXACTLY these places (cross-vendor review, P1)', () => {
+    // Pinned as a LIST, not a count: an echo silently dropped from the registry
+    // leaves the watch, and "more than four" could not see that.
     const rule = RULE_REGISTRY.find((r) => r.id === 'model-policy')
-    expect(rule).toBeTruthy()
-    expect(rule.source.file).toBe('CLAUDE.md')
-    expect(rule.echoes.length).toBeGreaterThan(4)
+    expect(rule.source).toEqual({ file: 'CLAUDE.md', startsWith: '- **Model policy' })
+    expect(rule.echoes.map((e) => e.file)).toEqual([
+      'docs/sol-routing.md',
+      'scripts/author-routing-core.mjs',
+      'scripts/author-sol-core.mjs',
+      'scripts/batch-autostart-core.mjs',
+      'scripts/batch-resume-hook.mjs',
+      'scripts/model-guard-core.mjs',
+      'scripts/review-sol-core.mjs',
+      'scripts/sol-share-core.mjs',
+      'memory/fable-authors-hard-cases.md',
+      'memory/fable-sparingly.md',
+      'memory/serving-model-watch.md',
+    ])
   })
 
   it('names each file once, so a stamp cannot be owed twice for one place', () => {
@@ -210,5 +238,71 @@ describe('memoryDirs', () => {
     expect(memoryDirs({ home: '/home/x', root: '/workspace/hoa/' })).toEqual(
       memoryDirs({ home: '/home/x', root: '/workspace/hoa' }),
     )
+  })
+})
+
+describe('quoteIsInFile', () => {
+  it('accepts a verbatim phrase, across a line break too', () => {
+    expect(quoteIsInFile('the hard cases stay\n  with Opus 5 from now on', 'the hard cases stay with Opus 5').ok).toBe(true)
+  })
+
+  it('refuses a phrase that is not in the file — the whole point of it', () => {
+    expect(quoteIsInFile('some other text entirely, at length', 'the hard cases stay with Opus 5')).toMatchObject({
+      ok: false,
+      reason: 'that phrase does not occur in the file',
+    })
+  })
+
+  it('refuses a quote too short to prove anything', () => {
+    expect(quoteIsInFile('a short file', 'a short').ok).toBe(false)
+  })
+
+  it('refuses the stamp itself, which every listed file is guaranteed to carry', () => {
+    expect(quoteIsInFile('x rule:model-policy@abcdef01 y', 'rule:model-policy@abcdef01')).toMatchObject({
+      ok: false,
+      reason: 'the stamp itself is not a quote from the text',
+    })
+  })
+
+  it('never throws on nothing', () => {
+    expect(quoteIsInFile().ok).toBe(false)
+    expect(quoteIsInFile(null, null).ok).toBe(false)
+  })
+})
+
+describe('unregisteredStamps', () => {
+  it('names a file stamped for a rule it is not registered under', () => {
+    expect(unregisteredStamps([RULE], { 'z.md': 'rule:demo@aaaaaaaa' })).toEqual([
+      { file: 'z.md', id: 'demo', why: 'not in this rule\u2019s echo list' },
+    ])
+  })
+
+  it('names a stamp for a rule that does not exist at all', () => {
+    expect(unregisteredStamps([RULE], { 'a.mjs': 'rule:gone@aaaaaaaa' })).toEqual([
+      { file: 'a.mjs', id: 'gone', why: 'no such rule' },
+    ])
+  })
+
+  it('says nothing about a registered echo, and never throws on nothing', () => {
+    expect(unregisteredStamps([RULE], { 'a.mjs': 'rule:demo@aaaaaaaa' })).toEqual([])
+    expect(unregisteredStamps()).toEqual([])
+    expect(unregisteredStamps([RULE], {})).toEqual([])
+  })
+
+  it('is reported by formatVerdict even when every rule is otherwise clean', () => {
+    const text = formatVerdict([{ id: 'demo', kind: 'ok', stale: [], unstamped: [] }], [
+      { file: 'z.md', id: 'demo', why: 'not in this rule\u2019s echo list' },
+    ])
+    expect(text).toContain('z.md')
+    expect(text).toContain('RULE_REGISTRY')
+  })
+})
+
+describe('treeKeyOf', () => {
+  it('is the path\u2019s first directory, which is how a tree is reported', () => {
+    expect(treeKeyOf({ file: 'memory/x.md' })).toBe('memory/')
+    expect(treeKeyOf({ file: 'x.md' })).toBe('')
+    expect(treeKeyOf({ file: 'a/b/c.md', tree: 'a/b/' })).toBe('a/b/')
+    expect(treeKeyOf()).toBe('')
   })
 })
