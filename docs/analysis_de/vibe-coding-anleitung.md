@@ -123,12 +123,10 @@ jede Änderung braucht die volle Batterie — sonst wird Testen umgangen. Bewäh
 **abgestufte Umfänge**:
 
 - **Schnell (nach JEDER Änderung):** die Unit-Schicht ohne Browser — Logik, Zustand, reine
-  Funktionen. Läuft in Sekunden, kann nie durch Browser-Timing flackern. Hierhin gehört
-  alles, was ohne Browser prüfbar ist.
+  Funktionen. Läuft in Sekunden, kann nie durch Browser-Timing flackern.
 - **Klein (bei Sichtbarem/Interaktion):** die schnelle Schicht + ein Kernsatz echter
-  Browser-/E2E-Tests — nur für das, was einen Browser braucht (Rendering, Layout,
-  Klick-Flows). Gibt es mehrere Unterbauten, prüf auf dem der Nutzer, nicht auf dem
-  bequemeren Ersatzweg.
+  Browser-/E2E-Tests (Rendering, Layout, Klick-Flows). Gibt es mehrere Unterbauten, prüf
+  auf dem der Nutzer, nicht auf dem bequemeren Ersatzweg.
 - **Groß (vor jedem Release):** die volle Regression über alle Suiten und **alle
   Ziel-Backends/Geräte**, mehrfach flakefrei.
 
@@ -177,7 +175,6 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
   die das Werkzeug liest; oder die Verbesserung ist fertig, nur führt nichts jemanden dorthin.
-  Kein Test schlägt an: Was niemand kennt, verletzt nichts.
   → *Prompt:* „Eine Ausnahme trägst du **im selben Zug** dort ein, wo der Mechanismus sie liest;
   bei einer Fähigkeit die Stelle, an der jemand danach greift, und **woran** man ihre Benutzung
   erkennt. Und wenn etwas ‚wartet': **worauf genau**?"
@@ -242,8 +239,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Erzwing nach jedem Zwischenfall eine **Beweisliste**: Liegt alles am Zielort? Gibt es Reste? Passen Dokumente und Code zusammen?"
 
 - **Der Autor sieht seine eigene Annahme nicht — und wer eine fertige Liste prüft, hakt sie ab.**
-  Wer baut, prüft gegen dieselbe Vorstellung, aus der der Fehler stammt; wer eine fertige Liste
-  prüft, nennt weit weniger als vor dem leeren Blatt — falsch, wenn der **übersehene** Punkt zählt.
+  Wer baut, prüft gegen dieselbe Vorstellung, aus der der Fehler stammt.
   → *Prompt:* „Schätze vor dem Bau **Schwierigkeit × Kritikalität** und zieh bei Kritischem **ein
   anderes Modell** hinzu. Beim **Finden** blind parallel: gleiche Vorgabe, je ein vollständiges
   Ergebnis; beim **Beurteilen** Gegenlesen, aber **erst das Ergebnis, dann die Begründung**.
@@ -251,10 +247,15 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   *(≈ 2x für den Fundschritt)*
 
 - **Die Lehre gilt als versorgt, sobald ihr Wächter benannt ist** — gebaut ist er damit nicht.
-  → *Prompt:* „Trenne **benannt** von **gebaut**: ‚gebaut' wird am Haken des genannten Punktes
-  geprüft, nicht der Prosa geglaubt, und ein Bericht nennt jede Lehre, deren Wächter seit Wochen
-  nur benannt ist. Kein Blocker auf die Lücke selbst — eine benannte Lücke ist mehr wert als eine
-  erfundene Deckung."
+  → *Prompt:* „Trenne **benannt** von **gebaut**: ‚gebaut' wird am Haken des Punktes geprüft, nicht
+  der Prosa geglaubt; ein Bericht nennt jede Lehre, deren Wächter seit Wochen nur benannt ist.
+  Kein Blocker auf die Lücke selbst — eine benannte Lücke ist mehr wert als erfundene Deckung."
+
+- **Die aufgeschriebene Grenze deckt nicht, was sie behauptet.** Der Satz, was ein Mechanismus
+  *nicht* leistet, wird zur Ablage für das, was bloß nicht getan wurde — zweimal stand so ein
+  echter Defekt als „gewollte Restlücke" im Vertrag, einmal mit grünem Test.
+  → *Prompt:* „Liegt die Information zum **Schließen** vor, wird geschlossen. Jede verbleibende
+  Grenze nennt ihre **Richtung**: zu viel durchgelassen oder zu viel verweigert."
 
 - **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, ein zweiter Lauf, ein
   zweites Modell kosten ein Vielfaches — pauschal gefordert, zahlst du sie auch dort, wo sie
@@ -285,20 +286,19 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den geprüften
   Wert. Wird etwas ohne Code-Änderung rot, frag: welcher **Zustand** hat sich geändert?"
 
-- **Der Befund stirbt mit dem Gespräch.** Ein echter Fehler fällt nebenbei auf und
-  bleibt im Chat, weil die Aufgabenliste gesperrt ist.
-  → *Prompt:* „Etabliere einen Mechanismus, der Befunde sichert: ein billiges Kommando, das
-  auch bei gesperrter Aufgabenliste schreibt, und eine Prüfung, die einen Zug **nicht enden
-  lässt**, der untersucht und nichts hinterlassen hat."
+- **Der Befund stirbt mit dem Gespräch.** Ein echter Fehler fällt nebenbei auf und bleibt im Chat.
+  → *Prompt:* „Etabliere einen Mechanismus, der Befunde sichert: ein billiges Kommando, das immer
+  schreibt, und eine Prüfung, die einen Zug **nicht enden lässt**, der untersucht und nichts
+  hinterlassen hat."
 
 - **Still ersetzt statt sichtbar gescheitert.** Fehlt eine Angabe, setzt das Programm klaglos
-  einen Ersatz ein — im Code sieht das nach Sorgfalt aus, der Folgefehler taucht weit weg auf.
+  einen Ersatz ein — der Folgefehler taucht weit weg auf.
   → *Prompt:* „Jede eingabeverarbeitende Stelle wird gegen **mehrere Eingabeformen** getestet und
   scheitert **sichtbar**; jeder Rückfall wird **gemeldet**, mit dem Befehl, der ihn behebt."
 
 - **Die Gegenprüfung wurde angestoßen, nie abgeschlossen** — der Zweig sieht geprüft aus.
   → *Prompt:* „Wer eine Gegenprüfung beauftragt, bleibt dran, bis sie da ist. Ein ‚nicht
-  zusammenführen' ist erst durch ein **späteres** Urteil über den korrigierten Stand erledigt."
+  zusammenführen' erledigt erst ein **späteres** Urteil über den korrigierten Stand."
 
 - **Der Ausfall kommt nie an der bequemen Stelle.** Am tückischsten bei **zwei Hälften**, deren
   zweite bei der Gegenseite liegt: fällt sie dazwischen aus, meldet jede Seite korrektes Verhalten.
@@ -410,4 +410,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 9ed80d43be131ea0c3d47b29a98a44aa6acb8b2b752611ef67a0faea26f2bb4c -->
+<!-- GUIDE-FINGERPRINT: 9f6ca283d0abf1bf5d50634aa58f65d9fa072155c2cb9252899331c042756b33 -->

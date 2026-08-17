@@ -1309,7 +1309,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 17.08.2026, 19:45 · Quellen-Fingerprint: `9ed80d43be13…`
+Zuletzt aktualisiert: Montag, 17.08.2026, 23:14 · Quellen-Fingerprint: `9f6ca283d0ab…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1371,6 +1371,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Priority tiers for picking the next point — token-reduction work first, then the communication mechanic, then everything else; open branches before a fresh point | 2 | mittel | lock-release-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
+| A declared \"intended residual\" is where real defects hide — legitimate only when the information to close it is genuinely not at hand | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 3 | mittel | model-guard.mjs | ✔ Mechanismus |
 | ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 3 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1399,10 +1400,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 82 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 55 Prozess-/Meta-TASKS-Punkte (davon 21 offen).
+Erfasste Quellen: 83 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 55 Prozess-/Meta-TASKS-Punkte (davon 21 offen).
 
-<!-- RETRO-FINGERPRINT: 9ed80d43be131ea0c3d47b29a98a44aa6acb8b2b752611ef67a0faea26f2bb4c -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-17T17:45:21.642Z -->
+<!-- RETRO-FINGERPRINT: 9f6ca283d0abf1bf5d50634aa58f65d9fa072155c2cb9252899331c042756b33 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-17T21:14:36.772Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1624,3 +1625,32 @@ die abgeleitete Ordnung als auch die Liste der offenen Zweige und könnte beides
 Satz nennen. Sie soll nicht verbieten — für einen Bugfix auf einem roten `main` gibt es gute
 Gründe, vorzuziehen —, sondern den Grund einfordern. Ein bewusst begründeter Vorzug ist
 Arbeitsteilung; ein unbemerkter ist Drift.
+
+### 3.121 Die erklärte Restlücke ist der Ort, an dem Defekte überleben
+
+Ein Mechanismus, der seine Fläche nicht vollständig abdecken kann, soll aufschreiben, was er
+NICHT beansprucht. Das ist richtig — und genau dieser Schritt hat am Kontext-Zaun zweimal
+hintereinander einen echten Defekt konserviert, beide Male von der herstellerübergreifenden
+Gegenlese gefunden, nie vom Autor.
+
+Zuerst hatte ich zwei Lücken als „nur Ablehnungsseite, je ein überflüssiges Nein in einer
+Schreibweise, die niemand tippt" notiert. Der Prüfer zeigte: Eine davon ließ einen echten
+Schreibzugriff auf den Arbeitsauftrag DURCH, und die übrigen wiesen ganz gewöhnliche
+Leseaufrufe ab — beides das Gegenteil meiner Behauptung. Eine Runde später stand
+„ein abgesetzter Optionswert verdeckt den eval-Aufruf" als Restlücke im Vertrag, mit einem
+Test, der den Fehlgriff als beabsichtigt festschrieb. Der Prüfer zeigte, dass die betroffenen
+Buchstaben bereits als pflichtwertig in der eigenen Tabelle standen: Die Information zum
+Schließen lag die ganze Zeit im Haus.
+
+Das Muster ist deutlicher als die Einzelfälle. Der CODE wurde über die Runden besser; die
+BEGRÜNDUNGEN waren das, was wiederholt durchfiel. Eine Restlücke ist eine Aussage darüber,
+was nicht wissbar ist — bequem zu behaupten, teuer zu prüfen — und rutscht deshalb dahin,
+auch das zu decken, was bloß nicht getan wurde.
+
+Die Regel daraus: Vor jedem Eintrag in eine Restlücke wird gefragt, ob die Information zum
+Schließen schon vorliegt (eine gebaute Tabelle, eine gezogene Unterscheidung). Liegt sie vor,
+wird geschlossen. Und jeder Überlebende nennt die SEITE, auf die er fällt — verpasster
+Schreibzugriff oder abgelehntes Lesen. Das Verwischen dieser beiden Seiten hat beide Fehler
+durchgelassen; eine leere Schreibzugriffs-Hälfte ist ein besseres Ergebnis als eine ordentlich
+aussehende Liste. Ein grüner Test, der eine Lücke ohne diese Angabe als gewollt festschreibt,
+ist der Weg, auf dem ein Defekt dauerhaft wird.
