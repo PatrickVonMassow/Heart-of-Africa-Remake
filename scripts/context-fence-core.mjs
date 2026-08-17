@@ -208,17 +208,106 @@ export function authoringTarget(filePath) {
  *  catch below (a link TARGETING it), matched on the normalised path. */
 const VERIFY_TREE = /(?:^|\/)scripts\/verify(?:\/|$)/i
 
-/** sed's in-place flag: `-i`, `-i.bak`, a cluster carrying it (`-ri`), or the
- *  long form. Without one, sed writes to stdout — a READ, and it stays one. */
-const inPlaceFlag = (t) => /^-[A-Za-z]*i/.test(t) || t === '--in-place' || t.startsWith('--in-place=')
+/**
+ * THE VALUE-TAKING SHORT OPTIONS of exactly the tool families this classifier
+ * reads — ONE table, consulted by every place that interprets a short cluster
+ * (Sol round 12). A cluster STOPS at the first value-taking letter: what
+ * follows is that option's ATTACHED VALUE, never more option letters. Modelling
+ * only `t` was wrong in both directions — `cp -St notes.md TASKS.md` (GNU reads
+ * `-St` as `-S t` and copies ONTO the work order) matched the `-t` pattern,
+ * read `notes.md` as a target directory and ALLOWED the write; and the sed/perl
+ * letter scans denied ordinary READS whose attached value carried the trigger
+ * letter (`sed -ffilters.sed TASKS.md`, `perl -MFile::Spec report.pl TASKS.md`).
+ * Each letter checked against the INSTALLED tool, not guessed:
+ *   - `cp/mv/ln --help`: only -S SUFFIX and -t DIRECTORY take values;
+ *   - `install --help`: -g GROUP, -m MODE, -o OWNER, -S, -t;
+ *   - `sed --help`: -e script, -f script-file, -l N, and -i[SUFFIX] (optional,
+ *     attached only — it never consumes the next word);
+ *   - `perl -h`: -e/-E commandline, -m/-M module, -Idirectory, -F/pattern/,
+ *     -i[extension], -x[directory], -C[list] and -D[letters] attach values.
+ *     NOT -l and NOT -s: -l[octnum] attaches only DIGITS (the non-letter stop
+ *     covers those) and -s takes nothing, so `-lne`/`-se` stay the evals they
+ *     really are — listing either here would read their `e` as a value and
+ *     MISS the write;
+ *   - `python3 -h`: -c cmd, -m mod, -W arg, -X opt (all attach);
+ *   - `node --help`: -C conditions, -e eval, -p print, -r require.
+ * The copy-family/ln letters all take REQUIRED values (detachable, consumed in
+ * `splitArgv`); the sed/perl/python/node entries serve the LETTER SCANS, where
+ * only attachment matters — their detached values stay in the operand list,
+ * the noise it always carried.
+ */
+const VALUE_TAKING_SHORTS = new Map([
+  ['cp', new Set(['S', 't'])],
+  ['mv', new Set(['S', 't'])],
+  ['install', new Set(['g', 'm', 'o', 'S', 't'])],
+  ['ln', new Set(['S', 't'])],
+  ['sed', new Set(['e', 'f', 'l', 'i'])],
+  ['perl', new Set(['e', 'E', 'm', 'M', 'I', 'F', 'i', 'x', 'C', 'D'])],
+  ['python', new Set(['c', 'm', 'W', 'X'])],
+  ['python3', new Set(['c', 'm', 'W', 'X'])],
+  ['node', new Set(['C', 'e', 'p', 'r'])],
+])
+const NO_VALUE_SHORTS = new Set()
+const valueShortsOf = (head) => VALUE_TAKING_SHORTS.get(head) ?? NO_VALUE_SHORTS
 
-/** Inline-eval heads and the flag that makes an argument the SCRIPT. perl's
- *  is a cluster test (`-pe`, `-ne`, `-pi -e` all carry it). */
+/**
+ * ONE short-flag token, read with the table: the option letters up to and
+ * INCLUDING the first value-taking one, plus what that leaves. `-ffilters.sed`
+ * with `f` value-taking is the single option `f` (value `filters.sed`);
+ * `-St` with `S` value-taking is the single option `S` (value `t` — no `-t`
+ * in it); `-tstage` is `t` with value `stage`; `-ri` is `r` plus `i`. A
+ * non-letter also ends the letters (`-i.bak`, `-l72`): the rest is an
+ * attached value. Null for anything that is not a short-option token.
+ */
+function splitShortCluster(token, valueTaking) {
+  const t = String(token ?? '')
+  if (!t.startsWith('-') || t.startsWith('--') || t === '-') return null
+  const body = t.slice(1)
+  let letters = ''
+  let valueLetter = null
+  let attached = null
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i]
+    if (!/[A-Za-z]/.test(ch)) {
+      attached = body.slice(i)
+      break
+    }
+    letters += ch
+    if (valueTaking.has(ch)) {
+      valueLetter = ch
+      attached = body.slice(i + 1) || null
+      break
+    }
+  }
+  return { letters, valueLetter, attached }
+}
+
+/** sed's in-place flag: `-i`, `-i.bak`, a cluster carrying it (`-ri`), or the
+ *  long form — judged on the cluster's OPTION LETTERS, so an attached value
+ *  carrying an `i` (`-ffilters.sed`) is not the flag. Without one, sed writes
+ *  to stdout — a READ, and it stays one. */
+const inPlaceFlag = (t) =>
+  shortOptionLetters(t, valueShortsOf('sed')).includes('i') || t === '--in-place' || t.startsWith('--in-place=')
+
+/** Inline-eval heads and the flag that makes an argument the SCRIPT — each
+ *  judged on its cluster's OPTION LETTERS through the one table, so perl's
+ *  `-pe`/`-ne`/`-pi -e` all carry it while `-MFile::Spec` carries only `M`,
+ *  and python's attached `-c<code>` counts like the detached form. node's
+ *  `--eval=`/`--print=` spellings are the flag too, as sed's `--in-place=`
+ *  is above. */
 const EVAL_FLAGS = new Map([
-  ['node', (t) => t === '-e' || t === '--eval' || t === '-p' || t === '--print'],
-  ['python', (t) => t === '-c'],
-  ['python3', (t) => t === '-c'],
-  ['perl', (t) => /^-[A-Za-z]*[eE]/.test(t)],
+  [
+    'node',
+    (t) =>
+      t === '--eval' ||
+      t === '--print' ||
+      t.startsWith('--eval=') ||
+      t.startsWith('--print=') ||
+      /[ep]/.test(shortOptionLetters(t, valueShortsOf('node'))),
+  ],
+  ['python', (t) => shortOptionLetters(t, valueShortsOf('python')).includes('c')],
+  ['python3', (t) => shortOptionLetters(t, valueShortsOf('python3')).includes('c')],
+  ['perl', (t) => /[eE]/.test(shortOptionLetters(t, valueShortsOf('perl')))],
 ])
 
 /** Path-like tokens inside an inline script's text: split on the characters
@@ -238,12 +327,14 @@ function pathTokensOf(text) {
  *   - `--` ENDS THE OPTIONS: every later token is an OPERAND however it is
  *     spelled. `cp -- -notes.md docs/new.md` copies a dash-named file, and
  *     `node -- -e x` runs a FILE named `-e` — no eval;
- *   - with `targetOption`, the `-t <dir>`/`--target-directory[=<dir>]`
- *     destination is read with its value DETACHED, ATTACHED (`-tdocs`) or
- *     closing a short cluster (`ln -st /tmp`). Only `t` is modelled as
- *     value-taking — the one letter these rules read; the utilities' other
- *     value-taking shorts stay unmodelled (see the claim note on
- *     `shellAuthoringTarget`).
+ *   - with `valueTaking` (the tool's `VALUE_TAKING_SHORTS` entry), a short
+ *     cluster is read through `splitShortCluster`: a value-taking letter
+ *     ENDING its cluster takes the NEXT word as its value (`cp -S .bak`,
+ *     `ln -st /tmp`), which is consumed, not an operand — and with
+ *     `targetOption`, the value of `t` (attached `-tdocs` or detached) and
+ *     of `--target-directory[=<dir>]` is the destination. A letter whose
+ *     value rides ATTACHED consumes nothing (`-St`: the `t` is `-S`'s value,
+ *     so no `-t` fires — Sol round 12).
  * Judged on the whole token however it was quoted — a quoted `-t` is still
  * the flag. Returns:
  *   operands     — the non-option words, the post-`--` region included;
@@ -253,7 +344,7 @@ function pathTokensOf(text) {
  *                  where an interpreter's OWN options live;
  *   targetDir    — the target-directory value, or null.
  */
-function splitArgv(args, { targetOption = false } = {}) {
+function splitArgv(args, { targetOption = false, valueTaking = NO_VALUE_SHORTS } = {}) {
   const operands = []
   const flags = []
   const leadingFlags = []
@@ -271,34 +362,41 @@ function splitArgv(args, { targetOption = false } = {}) {
     }
     flags.push(t)
     if (operands.length === 0) leadingFlags.push(t)
-    if (targetOption) {
-      if (t === '-t' || t === '--target-directory' || /^-[A-Za-z]*t$/.test(t)) {
-        targetDir = args[i + 1] ? args[i + 1].text : null
-        i++
-      } else if (t.startsWith('--target-directory=')) {
-        targetDir = t.slice('--target-directory='.length)
-      } else {
-        const attached = /^-([A-Za-z]*?)t(.+)$/.exec(t)
-        if (attached) targetDir = attached[2]
-      }
+    if (t === '--target-directory' && targetOption) {
+      targetDir = args[i + 1] ? args[i + 1].text : null
+      i++
+      continue
     }
+    if (t.startsWith('--target-directory=')) {
+      if (targetOption) targetDir = t.slice('--target-directory='.length)
+      continue
+    }
+    const cluster = splitShortCluster(t, valueTaking)
+    if (!cluster || cluster.valueLetter === null) continue
+    if (cluster.attached !== null) {
+      if (targetOption && cluster.valueLetter === 't') targetDir = cluster.attached
+      continue
+    }
+    // A required-value option ending its cluster takes the next word — it is
+    // the option's value, never an operand (all copy-family/ln table letters
+    // take required values; only they reach here with a table).
+    if (targetOption && cluster.valueLetter === 't') targetDir = args[i + 1] ? args[i + 1].text : null
+    i++
   }
   return { operands, flags, leadingFlags, targetDir }
 }
 
 /**
- * The OPTION LETTERS of one short-flag token — the cluster WITHOUT the value an
- * attached `-t` swallows. `-tstage` IS `-t stage`, so its only option letter is
- * `t`; the `s` of `stage` is part of a directory name. Sol round 11: scanning
- * the whole token read that `s` as `-s` and denied `ln -tstage
- * scripts/verify/world.mjs` — a permitted hard-link copy-out — which also showed
- * `-St` was not the last deny-side residual. A long flag carries no cluster.
+ * The OPTION LETTERS of one short-flag token — the cluster WITHOUT the value
+ * the first value-taking letter swallows (`splitShortCluster` above, on the
+ * one table). `-tstage` IS `-t stage`, so its only option letter is `t`; the
+ * `s` of `stage` is part of a directory name (Sol round 11: the whole-token
+ * scan read that `s` as `-s` and denied a permitted hard-link copy-out). A
+ * long flag carries no cluster.
  */
-function shortOptionLetters(token) {
-  const t = String(token ?? '')
-  if (!t.startsWith('-') || t.startsWith('--')) return ''
-  const attached = /^-([A-Za-z]*?)t(.+)$/.exec(t)
-  return attached ? `${attached[1]}t` : t.slice(1)
+function shortOptionLetters(token, valueTaking = NO_VALUE_SHORTS) {
+  const cluster = splitShortCluster(token, valueTaking)
+  return cluster ? cluster.letters : ''
 }
 
 /**
@@ -390,23 +488,34 @@ function authoringDirDestination(dest, resolvePath) {
  * and for the same reason. Every remaining ambiguity therefore resolves
  * toward the READ: a missed authoring call costs one unfenced edit, while a
  * false denial teaches the session to fight its own tooling — which costs
- * far more. The known residual, each pinned INTENDED by test: a directory
- * destination carrying no evidence is judged a file (`cp notes.md docs`
- * passes), a detached option value before an eval flag hides the eval
- * (`node --require esm -e …` passes), and only `t` is modelled as a
- * value-taking short. None of these is a defect to be chased.
+ * far more. Short-option VALUES are no longer such an ambiguity: the
+ * classified families' value-taking letters are recorded in
+ * `VALUE_TAKING_SHORTS` (checked against the installed tools), which is what
+ * makes `-St`, `-ffilters.sed` and `-MFile::Spec` KNOWABLE rather than
+ * guessed at (Sol rounds 11/12 — both directions of the `t`-only model were
+ * real defects, an allowed write and two refused reads, not a residual).
  *
- * TWO of the residual sit on the DENY side, so they are named separately: a
- * cluster whose EARLIER letter consumes the `t` (`cp -St <suffix> …`) reads the
- * suffix as a target directory, and the sed/perl letter tests still scan a whole
- * token because no value-taking short is modelled for them, so an attached
- * option value could carry a matching letter. Both cost one refusal that NAMES
- * the boundary command, in spellings measured as ones a cooperating session does
- * not write; closing them means a per-tool option table, which is the fourth
- * parser this contract exists to refuse. Sol round 11 found the same class in
- * `ln`, where a value-taking `t` IS modelled — that one was a defect and is
- * fixed (`shortOptionLetters`), because there the modelling made the letter
- * knowable.
+ * THE RESIDUAL after that, each item pinned by test and named with the SIDE
+ * it falls on:
+ *   - MISSED WRITE: a directory destination carrying no evidence is judged
+ *     the file it was spelled as, so `cp notes.md docs` passes;
+ *   - MISSED WRITE: a DETACHED option value standing before an eval flag
+ *     ends the leading-flag region and hides the eval (`node --require esm
+ *     -e …` passes; likewise a detached short value, `perl -I lib -e …`,
+ *     since detached values are consumed only for the copy family/ln, whose
+ *     table letters ALL take required values — sed's and perl's `-i` attach
+ *     optionally, and a blanket consumption would eat their operands);
+ *   - REFUSED READ: the deliberate eval over-reach above — an eval that only
+ *     READS a fenced document is denied, the ordinary reads staying open;
+ *   - REFUSED READ: a detached sed option value that itself NAMES a fenced
+ *     document still rides the operand list, so `sed -i -f TASKS.md
+ *     src/x.ts` — the work order as the sed SCRIPT, a read of it — is
+ *     denied by the same non-consumption.
+ * Each miss is one unfenced edit in a spelling a cooperating session has no
+ * reason to write; each refusal costs one message that names the boundary
+ * command. Closing any of them means modelling required-vs-optional values
+ * per tool and long-option tables per interpreter — the open-ended surface
+ * this contract refuses to chase.
  */
 function shellAuthoringTarget(head, args, resolvePath, isDirectory) {
   const texts = args.map((a) => a.text)
@@ -429,7 +538,7 @@ function shellAuthoringTarget(head, args, resolvePath, isDirectory) {
   }
   if (head === 'tee') return firstNamed(splitArgv(args).operands)
   if (head === 'cp' || head === 'mv' || head === 'install') {
-    const { targetDir, operands } = splitArgv(args, { targetOption: true })
+    const { targetDir, operands } = splitArgv(args, { targetOption: true, valueTaking: valueShortsOf(head) })
     const sources = targetDir === null ? operands.slice(0, -1) : operands
     const dest = targetDir === null ? (operands.length >= 2 ? operands[operands.length - 1] : null) : targetDir
     if (dest === null) return null
@@ -518,8 +627,8 @@ function segmentStart(seg, resolvePath, isDirectory) {
   // This closes the literal construction; the CLASS of constructed escapes
   // stays outside the fence's claim — see resolveThroughAncestors.
   if (head === 'ln') {
-    const { targetDir, operands, flags } = splitArgv(args, { targetOption: true })
-    const symbolic = flags.some((t) => t === '--symbolic' || shortOptionLetters(t).includes('s'))
+    const { targetDir, operands, flags } = splitArgv(args, { targetOption: true, valueTaking: valueShortsOf('ln') })
+    const symbolic = flags.some((t) => t === '--symbolic' || shortOptionLetters(t, valueShortsOf('ln')).includes('s'))
     const linkTargets = targetDir !== null || operands.length < 2 ? operands : operands.slice(0, -1)
     if (symbolic && linkTargets.some((t) => VERIFY_TREE.test(posixNormalizePath(t)))) {
       return { what: `constructing a link into the verify tree (\`${seg.raw}\`)`, authoring: false }

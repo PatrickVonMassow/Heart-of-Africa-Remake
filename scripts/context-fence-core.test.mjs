@@ -201,6 +201,42 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
       command: 'cp notes.md docs',
       isDirectory: (p) => p === 'docs',
     }],
+    // A cluster stops at the first VALUE-TAKING letter (Sol round 12): GNU cp
+    // reads `-St` as `-S t` — a backup suffix, no `-t` in it — so this command
+    // copies notes.md ONTO the work order. The t-only model took `-St` for a
+    // target-directory option, consumed notes.md as the directory and ALLOWED
+    // the write.
+    ['cp -St — the t is -S\'s attached value, the last operand is the real destination', {
+      toolName: 'Bash',
+      command: 'cp -St notes.md TASKS.md',
+    }],
+    // The same table consumes a required value standing DETACHED, wherever the
+    // option rides (GNU permutes trailing options): without the consumption,
+    // `.bak` read as the last operand and the write onto TASKS.md passed.
+    ['cp with a trailing -S whose detached value would otherwise look like the destination', {
+      toolName: 'Bash',
+      command: 'cp notes.md TASKS.md -S .bak',
+    }],
+    // node accepts the attached long spellings too (`node --help`: --eval=...,
+    // --print=...); the exact-token match let this write pass.
+    ['node --eval= with the script attached', {
+      toolName: 'Bash',
+      command: `node --eval="fs.appendFileSync('TASKS.md','x')"`,
+    }],
+    // python attaches -c's value (`python3 -ccode` runs code); the exact-token
+    // match let the attached spelling pass.
+    ['python3 -c with the code attached', {
+      toolName: 'Bash',
+      command: `python3 -c"open('MEMORY.md','a').write('x')"`,
+    }],
+    // Same-verdict REGRESSION GUARD (denied before and after round 12): the
+    // in-place test moved from a whole-token regex to the cluster letters, and
+    // the attached-suffix spelling must survive that move — `i`'s value rides
+    // attached (`sed --help`: -i[SUFFIX]).
+    ['sed -i.bak — the attached suffix still carries the in-place flag', {
+      toolName: 'Bash',
+      command: "sed -i.bak 's/x/y/' TASKS.md",
+    }],
     ['dd of= an authoring target', { toolName: 'Bash', command: 'dd if=notes.md of=TASKS.md' }],
     ['a wrapped shell mutation', { toolName: 'Bash', command: `bash -c "sed -i 's/a/b/' TASKS.md"` }],
     // Quoting does not change argv (Sol round 7, finding 3): a token that
@@ -224,6 +260,28 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
   // reads (Read, sed -n, grep, cat — pinned allowed below) all stay open.
   it('denies a node -e that merely READS the work order (INTENDED false deny — the ordinary reads stay open)', () => {
     const v = decide({ toolName: 'Bash', command: `node -e "console.log(fs.readFileSync('TASKS.md','utf8').length)"` })
+    expect(v.block).toBe(true)
+  })
+
+  // Same-verdict GUARD on the table itself (denied before and after round 12):
+  // perl -h shows -l[octnum] attaching only DIGITS and -s taking nothing, so
+  // NEITHER is value-taking — `-lne` really is `-l -n -e`, an eval, and this
+  // read of the work order stays inside the pinned eval over-reach. Listing
+  // `l` or `s` as value-taking (the round-12 directive proposed both) would
+  // read the `e` as an attached value and MISS every `-lne`/`-se` write.
+  it("denies perl -lne on the work order — `l` takes no letter value, so the cluster still carries the eval (INTENDED false deny)", () => {
+    const v = decide({ toolName: 'Bash', command: `perl -lne 'print' TASKS.md` })
+    expect(v.block).toBe(true)
+  })
+
+  // A detached sed option value that itself NAMES a fenced document rides the
+  // operand list — detached values are consumed only for the copy family/ln,
+  // whose table letters all take REQUIRED values (sed's -i attaches
+  // optionally; blanket consumption would eat its operands). This read of the
+  // work order as a sed SCRIPT costs one refusal; pinned as the deny-side
+  // residual the classifier's contract names.
+  it('denies sed -i -f TASKS.md on repo code — the script-file operand is not consumed (INTENDED false deny)', () => {
+    const v = decide({ toolName: 'Bash', command: 'sed -i -f TASKS.md src/x.ts' })
     expect(v.block).toBe(true)
   })
 
@@ -258,6 +316,23 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
       command: 'cp TASKS.md docs/task-backup',
     }],
     ['sed -i on repo CODE — finishing the step, not authoring', { toolName: 'Bash', command: "sed -i 's/x/y/' src/config/balance.ts" }],
+    // Ordinary reads through standard ATTACHED-value syntax (Sol round 12 —
+    // these were DENIED): `f` takes the script file as its value, so the `i`
+    // inside `filters` is part of a filename, not the in-place flag; `M`
+    // takes the module, so the `e` inside `File` is no eval flag; the same
+    // holds for -C's attached feature letters (`perl -h`: -C[list]).
+    ['sed -f with the script file ATTACHED — a stdout rewrite of the work order', {
+      toolName: 'Bash',
+      command: 'sed -ffilters.sed TASKS.md',
+    }],
+    ['perl -M with the module ATTACHED — an ordinary script run over the work order', {
+      toolName: 'Bash',
+      command: 'perl -MFile::Spec report.pl TASKS.md',
+    }],
+    ['perl -CE — attached -C feature letters, not an -E eval', {
+      toolName: 'Bash',
+      command: 'perl -CE report.pl TASKS.md',
+    }],
     ['tee into a scratch file', { toolName: 'Bash', command: 'npm run lint | tee /tmp/lint-log.txt' }],
     ['node -e naming no fenced path', { toolName: 'Bash', command: 'node -e "console.log(process.version)"' }],
     // An eval flag stands among the INTERPRETER OPTIONS, before the first
@@ -294,6 +369,13 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
     ['a detached option value before the eval flag hides the eval — ordinary script calls must not idle', {
       toolName: 'Bash',
       command: `node --require esm -e "fs.appendFileSync('TASKS.md','x')"`,
+    }],
+    // The short spelling of the same miss: -I's detached value is not consumed
+    // (consumption is copy-family/ln only), so `lib` ends the leading-flag
+    // region and the -e behind it goes unseen.
+    ['a detached SHORT option value before the eval flag — the same class, same side', {
+      toolName: 'Bash',
+      command: `perl -I lib -e 'open(F, ">>", "TASKS.md")'`,
     }],
   ]
   for (const [name, call] of residual) {
