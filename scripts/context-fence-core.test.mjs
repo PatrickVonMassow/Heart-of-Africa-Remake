@@ -235,6 +235,11 @@ describe('over the mark, authoring by SHELL MUTATION is denied — tool plus tar
     ['sed -i on repo CODE — finishing the step, not authoring', { toolName: 'Bash', command: "sed -i 's/x/y/' src/config/balance.ts" }],
     ['tee into a scratch file', { toolName: 'Bash', command: 'npm run lint | tee /tmp/lint-log.txt' }],
     ['node -e naming no fenced path', { toolName: 'Bash', command: 'node -e "console.log(process.version)"' }],
+    // An eval flag stands among the INTERPRETER OPTIONS, before the first
+    // non-flag word (Sol round 7, finding 4): behind the script word, -e is
+    // that script's own argument — an ordinary call, not an eval at all.
+    ["-e as the invoked script's own argument", { toolName: 'Bash', command: 'node tools/report.mjs -e TASKS.md' }],
+    ["a perl script's own -e-shaped argument", { toolName: 'Bash', command: 'perl tools/check.pl -export TASKS.md' }],
     ['tee -a into the CARRIER — the sanctioned place for a finding', {
       toolName: 'Bash',
       command: 'printf "- [ ] x" | tee -a /home/node/.claude/projects/-workspace-hoa-/memory/findings-carrier.md',

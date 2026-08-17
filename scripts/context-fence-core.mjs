@@ -318,7 +318,10 @@ function authoringDirDestination(dest, resolvePath) {
  *     /tmp/backup/`, and equally `cp TASKS.md /tmp/docs/`, a foreign tree
  *     that merely CARRIES the name — stays the read it is (finding 1);
  *   - `dd of=<target>`;
- *   - `node -e` / `python -c` / `perl -e` whose script text or arguments name
+ *   - `node -e` / `python -c` / `perl -e` — the eval flag standing among the
+ *     INTERPRETER OPTIONS, before the first non-flag word; behind it the
+ *     token is the invoked script's own argument, not an eval (Sol round 7,
+ *     finding 4) — whose script text or arguments name
  *     one. DELIBERATE OVER-REACH on the eval forms: an eval that only READS
  *     the target is denied too — its intent is not cheaply decidable from
  *     outside, and the ordinary reads (the Read tool, `sed -n`, `grep`, `cat`)
@@ -368,12 +371,23 @@ function shellAuthoringTarget(head, args, resolvePath) {
   }
   if (head === 'dd') return firstNamed(texts.filter((t) => /^of=/i.test(t)).map((t) => t.slice(3)))
   const isEvalFlag = EVAL_FLAGS.get(head)
-  // The same whole-token rule as sed's above (Sol round 7, finding 3): a
-  // quoted `--eval` IS the eval flag, and the flag patterns' start-anchored
-  // whole-token matches already keep a flag-shaped string inside a longer
-  // quoted script body from counting.
-  if (isEvalFlag && args.some((a) => isEvalFlag(a.text))) {
-    return firstNamed(texts.flatMap(pathTokensOf))
+  if (isEvalFlag) {
+    // An eval flag is an INTERPRETER option, and an interpreter option stands
+    // BEFORE the first non-flag word — the same line
+    // `segmentInvokesPathWhere` already draws (Sol round 7, finding 4).
+    // Behind that word a `-e` belongs to the invoked script (`node
+    // tools/report.mjs -e TASKS.md` runs no eval at all), and the approved
+    // over-reach covers read-only EVALS, not ordinary calls. The whole-token
+    // rule as sed's above holds here too (finding 3): a quoted `--eval` IS
+    // the flag, while the start-anchored patterns keep a flag-shaped string
+    // inside a longer script body from counting. BOUNDED MISS, the reading
+    // side winning as stated above: a detached option VALUE before the flag
+    // (`node --require esm -e …`) reads as the first non-flag word without
+    // every interpreter's option table, so that spelling passes — one
+    // unfenced edit, against idling ordinary script calls.
+    const firstBare = args.findIndex((a) => !a.text.startsWith('-'))
+    const options = firstBare === -1 ? args : args.slice(0, firstBare)
+    if (options.some((a) => isEvalFlag(a.text))) return firstNamed(texts.flatMap(pathTokensOf))
   }
   return null
 }
