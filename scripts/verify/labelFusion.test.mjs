@@ -74,9 +74,15 @@ describe('mergeFusionReadings — the shutter is bracketed by two windows (Sol r
     expect(judgeLabelFusion(mergeFusionReadings(post, { ...clean, samples: 45 })).ok).toBe(false)
   })
 
-  it('an empty window degrades to the other rather than diluting it', () => {
-    expect(mergeFusionReadings(null, post)).toEqual(post)
-    expect(mergeFusionReadings(pre, { samples: 0 })).toEqual(pre)
-    expect(judgeLabelFusion(mergeFusionReadings(null, null)).ok).toBe(false)
+  it('refuses a merge with an empty or absent half, NAMING it — a bracket must not degrade to one window (Sol re-review)', () => {
+    const noPre = judgeLabelFusion(mergeFusionReadings(null, post))
+    expect(noPre.ok).toBe(false)
+    expect(noPre.detail).toContain('pre-shutter')
+    const noPost = judgeLabelFusion(mergeFusionReadings(pre, { samples: 0 }))
+    expect(noPost.ok).toBe(false)
+    expect(noPost.detail).toContain('post-shutter')
+    const neither = judgeLabelFusion(mergeFusionReadings(null, null))
+    expect(neither.ok).toBe(false)
+    expect(neither.detail).toContain('both windows')
   })
 })

@@ -67,8 +67,16 @@ export const FUSE_MAX_SHARE = 0.05
  * and a standing defect at the shutter is standing in at least one of them.
  */
 export function mergeFusionReadings(a, b) {
-  if (!a || a.samples <= 0) return b ?? a
-  if (!b || b.samples <= 0) return a
+  // BOTH halves are required (Sol re-review, 17.08.): a merge that fell back to
+  // one side would silently degrade the bracketed certification to exactly the
+  // one-sided check the bracket replaced. An empty half judges as a FAILURE
+  // that names itself.
+  const aEmpty = !a || !(a.samples > 0)
+  const bEmpty = !b || !(b.samples > 0)
+  if (aEmpty || bEmpty) {
+    const missing = aEmpty && bEmpty ? 'both windows' : aEmpty ? 'the pre-shutter window' : 'the post-shutter window'
+    return { samples: 0, missing }
+  }
   const deeper = b.worstDepth > a.worstDepth ? b : a
   return {
     samples: a.samples + b.samples,
@@ -85,7 +93,10 @@ export function judgeLabelFusion(
   { tolerance = FUSE_TOLERANCE, hard = FUSE_HARD, maxShare = FUSE_MAX_SHARE, minLabels = 2 } = {},
 ) {
   if (!reading || reading.samples <= 0) {
-    return { ok: false, detail: 'nothing sampled — the layer must be up while the sampler runs' }
+    const cause = reading?.missing
+      ? `${reading.missing} of the bracket measured no frames — an empty half certifies nothing`
+      : 'the layer must be up while the sampler runs'
+    return { ok: false, detail: `nothing sampled — ${cause}` }
   }
   const { samples, fusedFrames, worstDepth, worstPair, labelsMin, labelsMax } = reading
   if (!Number.isFinite(labelsMin)) {
