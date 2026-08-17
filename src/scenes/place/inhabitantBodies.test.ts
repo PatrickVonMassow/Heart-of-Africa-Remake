@@ -8,9 +8,13 @@ import {
   claimBodies,
   createBodies,
   createInhabitantSet,
+  groundOccupied,
   releaseBodies,
   separateAll,
   separateBody,
+  separateGroup,
+  stepRoundBodies,
+  type InhabitantBody,
   type SeparationConfig,
 } from './inhabitantBodies'
 import { createTagGame, stepTagGame, type TagWorld } from './tagGame'
@@ -85,21 +89,29 @@ describe('inhabitant bodies', () => {
     const dt = 1 / 60
     let closest = Infinity
     let violations = 0
+    let worst = 0
     // 600 s of game — long enough for several rounds, catches and idle breaks.
     for (let step = 0; step < 600 / dt; step++) {
       stepTagGame(game, dt, cfg, world)
-      for (let i = 0; i < game.children.length; i++) {
-        const c = game.children[i]
-        const b = bodies[i]
-        b.x = c.x
-        b.z = c.z
-        separateBody(set, b, dt, SEP, world)
-        c.x = b.x
-        c.z = b.z
+      // EVERY body written, THEN the group resolved: a loop that wrote and
+      // separated one child at a time would resolve each against where its
+      // neighbours stood a frame ago (point 648).
+      for (let i = 0; i < bodies.length; i++) {
+        bodies[i].x = game.children[i].x
+        bodies[i].z = game.children[i].z
       }
-      // After the first half second (the stack is coming apart) no pair may be
-      // nearer than their two bodies — EXCEPT inside the catch distance, where
-      // the tag is being made and wins over the separation (point 578.4).
+      separateGroup(set, bodies, dt, SEP, world)
+      for (let i = 0; i < bodies.length; i++) {
+        game.children[i].x = bodies[i].x
+        game.children[i].z = bodies[i].z
+      }
+      // After the first half second (the stack is coming apart) NO pair may be
+      // nearer than their two bodies. There is no exemption for the catch: the
+      // catch fires at 0.8 m, three times the 0.264 m at which the bodies meet,
+      // so a chaser has always made its tag long before anything touches — which
+      // is why the condition that USED to except it (`d > catchDistance`, with
+      // catchDistance ABOVE the contact distance) could never fire at all, and
+      // let the user's "Kinder klemmen kurz ineinander" through (point 648).
       if (step * dt > 0.5) {
         for (let i = 0; i < game.children.length; i++) {
           for (let j = i + 1; j < game.children.length; j++) {
@@ -108,17 +120,104 @@ describe('inhabitant bodies', () => {
               game.children[i].z - game.children[j].z,
             )
             closest = Math.min(closest, d)
-            if (d < CHILD_R * 2 - SEP.slop - 1e-6 && d > cfg.catchDistance) violations++
+            if (d < CHILD_R * 2 - SEP.slop - 1e-6) {
+              violations++
+              worst = Math.max(worst, CHILD_R * 2 - SEP.slop - d)
+            }
           }
         }
       }
     }
-    expect(violations).toBe(0)
+    expect({ violations, worst }).toEqual({ violations: 0, worst: 0 })
     // The bodies really do touch — a separation that never engaged would prove
     // nothing at all.
     expect(closest).toBeLessThan(cfg.catchDistance)
     // NO DEADLOCK: the chase still catches its runner.
     expect(game.tags).toBeGreaterThan(0)
+  })
+
+  it('never lets two children closing head-on end a frame inside one another (point 648)', () => {
+    // The reported "Kinder klemmen kurz ineinander". The pair the game can build
+    // fastest is a chaser at the sprint speed meeting a runner at its boosted
+    // one, head-on: they ADD, and the correction has to undo that much in the
+    // frame it appeared. The pre-648 pass took half of the remaining overlap and
+    // was capped at 1.2 m/s, several times less than the pair closed at, so it
+    // fell behind and the two stayed merged for the whole crossing.
+    const tag = balance.villageLife.tag
+    const closing = tag.sprintSpeed + tag.sprintSpeed * tag.runnerBoost
+    const set = createInhabitantSet()
+    const [a, b] = claimBodies(set, 2, { scale: KID_SCALE })
+    a.x = -3
+    b.x = 3
+    const dt = 1 / 60
+    let worst = 0
+    for (let i = 0; i < 400; i++) {
+      a.x += (closing / 2) * dt
+      b.x -= (closing / 2) * dt
+      separateGroup(set, [a, b], dt, SEP)
+      worst = Math.max(worst, CHILD_R * 2 - SEP.slop - Math.hypot(a.x - b.x, a.z - b.z))
+    }
+    expect(worst).toBeLessThan(1e-9) // nothing an eye or a renderer could read
+    // The cap is what makes that possible, so it is stated: it must stay above
+    // the fastest pair that can close, or it throttles the ordinary crossing.
+    expect(SEP.maxSpeed).toBeGreaterThan(closing)
+  })
+
+  it('takes a CHAIN of three apart in the frame it formed, which one sweep cannot (point 648)', () => {
+    // Why the group is swept more than once. Resolved one body at a time, the
+    // middle of three is pushed out of one neighbour straight into the other —
+    // which was resolved already and is not looked at again, so a residual
+    // overlap survives every frame. That is the second half of the reported
+    // clipping, and no single-sweep pass of any stiffness can close it.
+    const overlaps = (bodies: readonly InhabitantBody[]) => {
+      let worst = 0
+      for (let i = 0; i < bodies.length; i++) {
+        for (let j = i + 1; j < bodies.length; j++) {
+          const d = Math.hypot(bodies[i].x - bodies[j].x, bodies[i].z - bodies[j].z)
+          worst = Math.max(worst, SEP.bodyRadius * 2 - SEP.slop - d)
+        }
+      }
+      return worst
+    }
+    const dt = 1 / 60
+
+    // ONE sweep — what `separateBody` per figure does — leaves the chain behind.
+    const one = createInhabitantSet()
+    const oneBodies = claimBodies(one, 3)
+    const gap = SEP.bodyRadius * 2 - SEP.slop - 0.02
+    oneBodies[0].x = -gap
+    oneBodies[2].x = gap
+    for (const b of oneBodies) separateBody(one, b, dt, SEP)
+    expect(overlaps(oneBodies)).toBeGreaterThan(1e-6)
+
+    // The group solve closes it inside the same frame.
+    const many = createInhabitantSet()
+    const manyBodies = claimBodies(many, 3)
+    manyBodies[0].x = -gap
+    manyBodies[2].x = gap
+    separateGroup(many, manyBodies, dt, SEP)
+    expect(overlaps(manyBodies)).toBeLessThanOrEqual(1e-9)
+  })
+
+  it('charges the wedge timer per FRAME, not per sweep, so a solver pass never teleports', () => {
+    // The escape nudge is a teleport, and it is meant for a figure that has been
+    // unable to move for `wedgeSeconds`. Charging it once per sweep would fire it
+    // `passes` times as fast on a figure that was never stuck that long.
+    const world = {
+      blocked: (x: number, z: number) => x > 1e-4 || Math.abs(z) > 1e-4,
+      nudge: () => ({ x: 5, z: 5, found: true }),
+    }
+    const set = createInhabitantSet()
+    claimBodies(set, 1, { x: -0.1, z: 0, fixed: true })
+    const [stuck] = claimBodies(set, 1, { x: 0, z: 0 })
+    const dt = 1 / 60
+    let seconds = 0
+    while (stuck.x === 0 && seconds < SEP.wedgeSeconds * 3) {
+      separateGroup(set, [stuck], dt, SEP, world)
+      seconds += dt
+    }
+    expect(seconds).toBeGreaterThan(SEP.wedgeSeconds - 0.05)
+    expect(seconds).toBeLessThanOrEqual(SEP.wedgeSeconds + 0.05)
   })
 
   it('states the catch against the body, so a chaser can always reach its tag', () => {
@@ -167,6 +266,50 @@ describe('inhabitant bodies', () => {
     expect(stuck.x).toBe(5)
   })
 
+  it('counts the wedge rescue on the body, so a trace can see the teleport', () => {
+    // THE THIRD RESCUE PATH (point 656 follow-up). The chase's own two rescues
+    // raise the child's `nudges` where they fire; the escape above fires a
+    // layer below and used to be counted by NOBODY — a child freed this way
+    // jumped in the trace while its rescue count stood still, and the motion
+    // metric, which breaks the walked path at every rise of `nudges`, read the
+    // settlement's correction as the child walking out of its own pocket.
+    const world = {
+      blocked: (x: number, z: number) => x > 1e-4 || Math.abs(z) > 1e-4,
+      nudge: () => ({ x: 5, z: 5, found: true }),
+    }
+    const set = createInhabitantSet()
+    claimBodies(set, 1, { x: -0.1, z: 0, fixed: true })
+    const [stuck] = claimBodies(set, 1, { x: 0, z: 0 })
+    expect(stuck.nudges).toBe(0)
+    expect(stuck.carried).toBe(0)
+    let seconds = 0
+    while (stuck.nudges === 0 && seconds < SEP.wedgeSeconds * 3) {
+      separateBody(set, stuck, 1 / 60, SEP, world)
+      seconds += 1 / 60
+    }
+    expect(stuck.nudges).toBe(1)
+    // And the carry is the teleport's own distance, taken where it is known.
+    expect(stuck.carried).toBeCloseTo(Math.hypot(5, 5), 6)
+
+    // An escape that found NO free ground still counts — the body stood its
+    // whole window unable to move, which is the finding — only nothing was
+    // carried, because nothing moved.
+    const nowhere = {
+      blocked: world.blocked,
+      nudge: () => ({ x: 0, z: 0, found: false }),
+    }
+    const set2 = createInhabitantSet()
+    claimBodies(set2, 1, { x: -0.1, z: 0, fixed: true })
+    const [stillStuck] = claimBodies(set2, 1, { x: 0, z: 0 })
+    seconds = 0
+    while (stillStuck.nudges === 0 && seconds < SEP.wedgeSeconds * 3) {
+      separateBody(set2, stillStuck, 1 / 60, SEP, nowhere)
+      seconds += 1 / 60
+    }
+    expect(stillStuck.nudges).toBe(1)
+    expect(stillStuck.carried).toBe(0)
+  })
+
   it('separates a child from an adult at the two OWN girths, live off the config', () => {
     const set = createInhabitantSet()
     const [adult] = claimBodies(set, 1, { x: 0, z: 0, fixed: true })
@@ -200,5 +343,162 @@ describe('inhabitant bodies', () => {
     // And back in again, the way a remount re-joins the very same bodies.
     addBodies(set, bodies)
     expect(set.bodies).toHaveLength(2)
+  })
+
+  // THE CAP IS PER FRAME, NOT PER SWEEP (GPT-5.6 Sol's re-review of point 648,
+  // 12.08.2026). Every sweep used to be handed the whole frame's allowance, so a
+  // body in a deep stack could be corrected `passes` times the documented ceiling
+  // — at the shipped 8 m/s and 4 passes an effective 32 m/s — and a stack snapped
+  // apart instead of easing apart. Pinned against the pass count, since that is
+  // the knob that broke it.
+  it('never moves a body further in one frame than the cap allows, whatever the pass count', () => {
+    const dt = 1 / 60
+    for (const passes of [1, 2, 4, 12]) {
+      const cfg: SeparationConfig = { ...SEP, passes }
+      const set = createInhabitantSet()
+      // Five bodies on ONE spot: the deepest stack the settlement can produce,
+      // and the case where the sweeps have most to undo.
+      const bodies = claimBodies(set, 5, { x: 0, z: 0 })
+      for (const b of bodies) {
+        b.x = 0
+        b.z = 0
+      }
+      const before = bodies.map((b) => ({ x: b.x, z: b.z }))
+      separateGroup(set, bodies, dt, cfg)
+      const cap = cfg.maxSpeed * dt
+      for (let i = 0; i < bodies.length; i++) {
+        const moved = Math.hypot(bodies[i].x - before[i].x, bodies[i].z - before[i].z)
+        expect(moved).toBeLessThanOrEqual(cap + 1e-9)
+      }
+      releaseBodies(set, bodies)
+    }
+  })
+
+  it('spends more passes on a better resolution, not on a faster one', () => {
+    const dt = 1 / 60
+    const travel = (passes: number) => {
+      const set = createInhabitantSet()
+      const bodies = claimBodies(set, 4, { x: 0, z: 0 })
+      for (const b of bodies) {
+        b.x = 0
+        b.z = 0
+      }
+      separateGroup(set, bodies, dt, { ...SEP, passes })
+      return Math.max(...bodies.map((b) => Math.hypot(b.x, b.z)))
+    }
+    // Four sweeps may not carry a body further than one sweep's allowance does.
+    expect(travel(4)).toBeLessThanOrEqual(travel(1) + 1e-9)
+  })
+
+  describe('the ground another body stands on (point 657)', () => {
+    it('reads occupied inside the pair’s contact distance and free beyond it', () => {
+      const set = createInhabitantSet()
+      const [adult] = claimBodies(set, 1, { x: 2, z: 0 })
+      const moverBody = SEP.bodyRadius * KID_SCALE
+      const reach = SEP.bodyRadius * adult.scale + moverBody
+      expect(groundOccupied(set, 2 + reach - 1e-3, 0, SEP, moverBody)).toBe(true)
+      expect(groundOccupied(set, 2 + reach + 1e-3, 0, SEP, moverBody)).toBe(false)
+    })
+
+    it('judges each body at its own scale — a child occupies less ground than an adult', () => {
+      const set = createInhabitantSet()
+      claimBodies(set, 1, { x: 2, z: 0, scale: KID_SCALE })
+      const moverBody = SEP.bodyRadius * KID_SCALE
+      const kidReach = SEP.bodyRadius * KID_SCALE + moverBody
+      const adultReach = SEP.bodyRadius + moverBody
+      expect(groundOccupied(set, 2 + kidReach - 1e-3, 0, SEP, moverBody)).toBe(true)
+      expect(groundOccupied(set, 2 + adultReach - 1e-3, 0, SEP, moverBody)).toBe(false)
+    })
+
+    it('a boxed-in walker gets its ORIGIN back, never the occupied destination', () => {
+      // The walk-in/push-out loop, one layer up (GPT-5.6 Sol, 12.08.2026): a
+      // returned OCCUPIED destination reads as a successful move to the
+      // caller's static resolveMove, its stuck counter resets, and the
+      // separation shoves the figure back — for ever. Here the destination is
+      // inside another body and every deflection heading is statically
+      // blocked, so the only honest answer is "you stay where you stand".
+      const set = createInhabitantSet()
+      const [self] = claimBodies(set, 1, { x: 0, z: 0 })
+      claimBodies(set, 1, { x: 0.4, z: 0 }) // dead ahead, inside one step
+      const wall = (x: number, z: number) => Math.hypot(x, z) > 0.05 // everything but the origin
+      const r = stepRoundBodies(set, self, 0, 0, 0.4, 0, SEP, wall)
+      expect(r.x).toBe(0)
+      expect(r.z).toBe(0)
+      // And a caller measuring its own progress reads the frame as BLOCKED —
+      // the distance its stuck counter judges is zero, not a body-deep step.
+      expect(Math.hypot(r.x - 0, r.z - 0)).toBe(0)
+    })
+
+    it('a long step is judged along its WHOLE segment, not at its endpoint', () => {
+      // The porter case (GPT-5.6 Sol, 12.08.2026): the wanted point comes from
+      // the route clock, so one long frame can put the endpoint BEYOND a body
+      // with the body in between — endpoint-only, the step crossed the child
+      // without the deflection ever waking. The destination here is free; the
+      // body sits mid-segment; the returned step must not cross it.
+      const set = createInhabitantSet()
+      const [self] = claimBodies(set, 1, { x: 0, z: 0 })
+      const [child] = claimBodies(set, 1, { x: 1.5, z: 0, scale: KID_SCALE })
+      const open = () => false
+      const r = stepRoundBodies(set, self, 0, 0, 3, 0, SEP, open)
+      // Not the raw destination (the straight line is refused) …
+      const reach = SEP.bodyRadius * (1 + KID_SCALE)
+      // … and no point of the returned move enters the child's ground.
+      const steps = 30
+      for (let i = 1; i <= steps; i++) {
+        const px = (r.x * i) / steps
+        const pz = (r.z * i) / steps
+        expect(Math.hypot(px - child.x, pz - child.z)).toBeGreaterThanOrEqual(reach - 1e-6)
+      }
+    })
+
+    it('a GRAZING crossing is caught — the test is continuous, not sampled', () => {
+      // GPT-5.6 Sol (12.08.2026): a sampled sweep let a near-tangent crossing
+      // slip through, because a graze's chord through the occupied disc can be
+      // shorter than any sampling gap. This body dips 12 mm into the straight
+      // line, centred between where the old sub-body samples fell (0.2308 m
+      // spacing put them 0.378 m from the centre, just outside the 0.372 m
+      // reach) — the sampled version walked straight through it.
+      const set = createInhabitantSet()
+      const [self] = claimBodies(set, 1, { x: 0, z: 0 })
+      const [child] = claimBodies(set, 1, { x: 1.2692, z: 0.36, scale: KID_SCALE })
+      const reach = SEP.bodyRadius * (1 + KID_SCALE)
+      const open = () => false
+      const r = stepRoundBodies(set, self, 0, 0, 3, 0, SEP, open)
+      // The raw destination is refused …
+      expect(r.x === 3 && r.z === 0).toBe(false)
+      // … and the move that IS returned clears the body continuously: the
+      // closed-form segment-to-centre distance never dips under the reach.
+      const len2 = r.x * r.x + r.z * r.z
+      const t = len2 > 0 ? Math.max(0, Math.min(1, (child.x * r.x + child.z * r.z) / len2)) : 0
+      const d = Math.hypot(r.x * t - child.x, r.z * t - child.z)
+      expect(d).toBeGreaterThanOrEqual(reach - 1e-9)
+    })
+
+    it('a deflection that would cross a SECOND body is refused — the figure waits', () => {
+      // GPT-5.6 Sol (12.08.2026): the one-body case never exercised this path.
+      // The straight way is shut by body A near the endpoint; the first
+      // point-clear deflection (+15°) passes RIGHT THROUGH body B standing
+      // mid-way on it — the swept test must refuse it, and with the static
+      // walls closing the mirror side, the figure stays where it stands.
+      const set = createInhabitantSet()
+      const [self] = claimBodies(set, 1, { x: 0, z: 0 })
+      claimBodies(set, 1, { x: -0.1, z: 2.05 }) // A: shuts the straight endpoint
+      claimBodies(set, 1, { x: 0.26, z: 0.97, scale: KID_SCALE }) // B: mid-deflection
+      const corridor = (x: number) => Math.abs(x) > 0.7
+      const r = stepRoundBodies(set, self, 0, 0, 0, 2, SEP, (x) => corridor(x))
+      expect(r.x).toBe(0)
+      expect(r.z).toBe(0)
+    })
+
+    it('never counts an excluded body or an inactive one', () => {
+      const set = createInhabitantSet()
+      const [self, partner, sleeper] = claimBodies(set, 3, { x: 0, z: 0 })
+      sleeper.active = false
+      // All three stand on the very spot asked about; none of them counts.
+      expect(groundOccupied(set, 0, 0, SEP, 0.3, (b) => b === self || b === partner)).toBe(false)
+      // A fourth, unrelated body on the spot does.
+      claimBodies(set, 1, { x: 0, z: 0 })
+      expect(groundOccupied(set, 0, 0, SEP, 0.3, (b) => b === self || b === partner)).toBe(true)
+    })
   })
 })

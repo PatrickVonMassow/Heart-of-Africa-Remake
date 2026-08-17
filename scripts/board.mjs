@@ -13,7 +13,7 @@
 //                                                     # archive + promote in ONE write
 //   node scripts/board.mjs done   <point> --none "<reason>"   # …or name the gap
 //   node scripts/board.mjs none   "<reason>"           # the gap card, no point to close
-//   node scripts/board.mjs closing "<reason>"          # …still owed: the closing duties
+//   node scripts/board.mjs closing <point> "<reason>"  # …still owed: its closing duties
 //   node scripts/board.mjs vdzk-add "<title>" "<question>"  # ask the user a decision
 //   node scripts/board.mjs vdzk-remove "<title>"      # drop an answered question
 //   node scripts/board.mjs focus  <point> "<note>"    # declare focus + stamp
@@ -41,7 +41,7 @@
 //
 // Every editing command publishes the live page itself, so the loop is exactly:
 // (1) an editing command, (2) `attest`.
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -50,8 +50,11 @@ import {
   addVdzk,
   berlinStamp,
   closeCard,
+  dropStrayNowCards,
   normaliseLineEndings,
+  parseClosingArgs,
   parseDoneArgs,
+  pointSubject,
   promoteToNow,
   promotionEstimateWarning,
   removeVdzk,
@@ -62,6 +65,7 @@ import {
   toNoCurrentWork,
   toNow,
   toQueue,
+  upgradeNowCards,
 } from './board-core.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
@@ -87,6 +91,23 @@ const stdinText = process.argv.includes(TEXT_STDIN_FLAG)
   : ''
 
 
+/**
+ * The German subject of a point that no longer stands on the BOARD: the archive
+ * page it was rotated into, else the queue data file the titles are kept in
+ * (both survive the card itself). Null when neither knows it — `toClosingWork`
+ * then names `--title` as the way in.
+ */
+function fallbackSubject(point) {
+  const archive = resolve(REPO_ROOT, '.batch-dashboard-archive.html')
+  if (existsSync(archive)) {
+    const found = pointSubject(readFileSync(archive, 'utf8'), point)
+    if (found) return found
+  }
+  const data = readJson(resolve(REPO_ROOT, QUEUE_DATA_PATH))
+  const title = data?.points?.[String(Number(point))]?.title
+  return typeof title === 'string' && title.trim() ? title.trim() : null
+}
+
 /** Apply a pure card edit, rotate the archive overflow, publish, and say what is left by hand. */
 function edit(fn, done) {
   // Both ends of the round trip name their encoding (point 410). The write used
@@ -99,7 +120,24 @@ function edit(fn, done) {
   // Windows text mode left it MIXED, and the archive rotation then could not
   // find the Erledigt section at all — `attest` crashed on a board that looked
   // perfect in the browser. No writer has to be trusted with the line ending.
-  writeTextAtomic(BOARD, normaliseLineEndings(fn(normaliseLineEndings(readFileSync(BOARD, 'utf8')))))
+  // UPGRADED ON THE WAY OUT (point 655): a card still carrying its number inside
+  // its title is lifted into the numbered chip, and the two state cards get
+  // their kind marker. The board is one living file — without this the only way
+  // to satisfy the new publish gate would be a hand edit, the act that wrecked
+  // the line endings above.
+  // A CARD THAT NAMES NEITHER A POINT NOR A STATE IS DROPPED, on the way IN as
+  // well as out (four-eyes review, 12.08.2026): nothing else can remove one —
+  // every point command needs the number it lacks, and a numbered card standing
+  // beside it blocks the state writers — so the board would stay unpublishable.
+  // It is said out loud, because an edit that silently swallowed a card's prose
+  // would be its own defect.
+  const swept = dropStrayNowCards(normaliseLineEndings(readFileSync(BOARD, 'utf8')))
+  for (const { title, text } of swept.dropped) {
+    console.error(`board: dropped the current-work card "${title}" — it named neither a point nor a state.`)
+    console.error(`  its text, so nothing is lost unsaid: ${text}`)
+  }
+  const edited = dropStrayNowCards(upgradeNowCards(normaliseLineEndings(fn(swept.html))))
+  writeTextAtomic(BOARD, edited.html)
   console.log(done)
   console.log(run(['scripts/board-archive-rotate.mjs']).trim().split('\n')[0])
   // THE LIVE PAGE IS PUBLISHED HERE (point 400, delta D — four-eyes finding 2).
@@ -228,13 +266,25 @@ try {
     // session had to raise the next queue point early just to get a card it could
     // stand behind. This card says it truthfully, and the deny lets the duties
     // through; `board.mjs none` at the boundary replaces it with the idle card.
-    const reason = textOf(rest)
-    if (!reason) throw new Error(`usage: board.mjs closing "<reason>"|${TEXT_STDIN_FLAG}`)
+    //
+    // IT NAMES ITS POINT (point 655). The title was one constant sentence for
+    // every point — "Abschlussarbeiten zum gerade beendeten Punkt" — so the card
+    // said the STAGE and nothing else, and the reader on his phone learned
+    // neither which point had ended nor what it was about. The command takes the
+    // point and composes the title from the subject the board already knows, so
+    // the caller cannot get it wrong; `--title` covers the case where the point
+    // stands nowhere on the board any more.
+    const { point, subject, words } = parseClosingArgs(rest)
+    if (!point) throw new Error(`usage: board.mjs closing <point> ["--title <Betreff>"] "<reason>"|${TEXT_STDIN_FLAG}`)
+    const reason = textOf(words)
+    if (!reason) throw new Error(`usage: board.mjs closing <point> "<reason>"|${TEXT_STDIN_FLAG}`)
     const at = berlinStamp()
+    const known = subject || fallbackSubject(point)
     edit(
-      (html) => toClosingWork(html, reason, { stamp: at }),
-      `the board now names the closing duties still owed (Stand ${at}) — this is NOT a claim to stop: ` +
-        'the board gate lets those duties through. End with node scripts/board.mjs none "<Grund>".',
+      (html) => toClosingWork(html, point, { subject: known, reason, stamp: at }),
+      `the board now names point ${point} and the closing duties still owed (Stand ${at}) — this is ` +
+        'NOT a claim to stop: the board gate lets those duties through. End with ' +
+        'node scripts/board.mjs none "<Grund, der den nächsten Punkt nennt>".',
     )
   } else if (cmd === 'vdzk-add') {
     // EVERY decision asked of the user belongs here (point 421): the chat is an
@@ -273,7 +323,7 @@ try {
     console.error(
       'usage: board.mjs now|status|title|queue <point> "<text>" | ' +
         'done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] | ' +
-        'none "<reason>" | closing "<reason>" | ' +
+        'none "<reason>" | closing <point> ["--title <Betreff>"] "<reason>" | ' +
         'vdzk-add "<title>" "<question>" | vdzk-remove "<title>" | ' +
         'promote <point> "<times>" "<title>" "<status>" | focus <point> "<note>" | attest\n' +
         `Any "<text>" may be replaced by ${TEXT_STDIN_FLAG} and piped in — use that for German prose.`,

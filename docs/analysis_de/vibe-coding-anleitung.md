@@ -21,33 +21,39 @@ Regel —, und zwar ab der ersten Formulierung, nicht erst beim zweiten Schaden.
 
 ### Wie die Prompts in dieser Anleitung formuliert sind
 
-Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merksätze: „Jedes
-neue Feature bekommt einen Test" wird vergessen, „Etabliere einen Mechanismus, der das
-garantiert" nicht. Wo einer prinzipiell **nicht** möglich ist, steht das dabei.
-
-Eine **Schätzung** wie *(Kosten ≈ 2x)* meint den Mehrverbrauch der betroffenen Arbeit,
-nicht des Projekts.
+Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merksätze; wo einer
+prinzipiell **nicht** möglich ist, steht das dabei. Eine **Schätzung** wie *(Kosten ≈ 2x)*
+meint den Mehrverbrauch der betroffenen Arbeit, nicht des Projekts.
 
 ### Primäres und sekundäres Modell
 
 Lege **zwei** Modelle fest und gib ihnen klare Rollen:
 
-- Ein **primäres Modell** macht die Arbeit — bei *jeder* Schwierigkeit. Nimm die
-  jeweils stärkste verfügbare Version.
-- Ein **sekundäres, anderes Modell** ist für das **Vier-Augen-Prinzip** da (in welcher
-  Form, sagt der Fallstrick weiter unten) und springt als **Ausweichstufe** ein, wenn
-  das primäre nicht in seiner höchsten Version verfügbar ist.
+- Ein **primäres Modell** macht die gewöhnliche Arbeit. Nimm die jeweils stärkste
+  verfügbare Version.
+- Ein **sekundäres, anderes Modell** übernimmt das **Vier-Augen-Prinzip**, die
+  **Ausweichstufe** — und die **harten Fälle**: als schwierig/fehleranfällig
+  Eingeschätztes, und was nach einer Nachbesserung immer noch durchfällt.
 
-> *Prompt:* „Arbeite grundsätzlich mit **\<primäres Modell\>**, unabhängig von der
-> Schwierigkeit. **\<sekundäres Modell\>** setzt du nur für das Vier-Augen-Prinzip ein
-> oder als Ausweichstufe. Etabliere einen Mechanismus, der ein Arbeitsergebnis eines
-> **anderen** Modells erkennt und die Arbeit stoppt, statt sie stillschweigend zu
-> übernehmen."
+> *Prompt:* „Gewöhnliche Arbeit macht **\<primäres Modell\>**. **\<sekundäres Modell\>**
+> übernimmt Vier-Augen, Ausweichstufe und als schwierig/fehleranfällig eingeschätzte
+> Aufgaben — ebenso Arbeit, die nach einer Nachbesserung erneut durchfällt. Etabliere
+> einen Mechanismus, der ein Arbeitsergebnis eines **anderen** Modells erkennt und die
+> Arbeit stoppt, statt sie stillschweigend zu übernehmen."
 
 Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere blinde
 Flecken** hat. Die **Obergrenze** zieht die **Sichtbarkeit des Fehlers**: Was den Ablauf
 steuert oder Arbeit vernichten kann, wird immer gegengeprüft; was ein schneller Test
 sofort zeigt, nie.
+
+**Kontingent ist nicht austauschbar.** Ist ein Modell knapp, gib das Schreiben von Code — den
+größten Verbraucher — dem anderen und behalte für das knappe, was **nur** es kann. Wer
+verteilt, muss dabei die Töpfe sehen: Ein Verteiler, der den Füllstand nicht liest, empfiehlt
+ein längst leeres Modell.
+
+> *Prompt:* „Sag mir, bevor ein Kontingent zur Neige geht, welche Arbeit an das Modell mit
+> Restvolumen geht und welche beim knappen bleiben muss. Der Verteiler liest den Füllstand:
+> Eine leere Spur empfiehlt er nie."
 
 ---
 
@@ -55,15 +61,11 @@ sofort zeigt, nie.
 
 1. **Zielbild zuerst — und nimm dir dafür Zeit.** Jede Stunde hier spart ein Vielfaches
    an Umbau: Ein Modell baut sehr schnell sehr viel vom Falschen, wenn das Ziel unscharf
-   ist. Das Ausarbeiten ist selbst eine ideale LLM-Aufgabe — lass dich befragen, dir
-   Lücken und Widersprüche zeigen und das Ergebnis ausformulieren; du entscheidest, es
-   schreibt.
-   > „Bevor wir irgendetwas bauen, erarbeiten wir gemeinsam ein `design.md`, das
-   > beschreibt, was am Ende existieren soll. Frag mich so lange aus, bis keine
-   > wesentliche Lücke bleibt, zeig mir Widersprüche und offene Entscheidungen, und
-   > formuliere es dann aus. Danach ist es die alleinige Quelle der Wahrheit: Ändere
-   > es nie eigenmächtig; wenn ich etwas ändere, aktualisiere `design.md` und den
-   > Code gemeinsam."
+   ist. Das Ausarbeiten ist selbst eine ideale LLM-Aufgabe — du entscheidest, es schreibt.
+   > „Bevor wir bauen, erarbeiten wir gemeinsam ein `design.md`, das beschreibt, was am Ende
+   > existieren soll. Frag mich aus, bis keine wesentliche Lücke bleibt, und zeig mir Widersprüche
+   > und offene Entscheidungen. Danach ist es die alleinige Quelle der Wahrheit: Ändere es nie
+   > eigenmächtig; ändere ich etwas, aktualisiere `design.md` und den Code gemeinsam."
 
 2. **Ein dauerhaftes Arbeitsprotokoll.**
    > „Lege ein `TASKS.md` an und **etabliere einen Mechanismus, der seine Regeln
@@ -150,36 +152,35 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 ## Die häufigsten Fallstricke → und was hilft
 
-- **Grüner Test, falsches Bild.** Der Test ist grün, das Ergebnis falsch — er prüfte
-  einen Hilfswert, einen unerreichbaren Zustand, einen geratenen Wert. Oder das
-  Beweisbild entstand vor der fertigen Szene.
+- **Grüner Test, falsches Bild.** Der Test ist grün, das Ergebnis falsch — er prüfte einen
+  Hilfswert, einen unerreichbaren Zustand, einen geratenen Wert. Oder das Beweisbild entstand
+  vor der fertigen Szene.
   → *Prompt:* „Eine sichtbare Änderung gilt erst als fertig, wenn sie am **echten gerenderten
   Bild** unter einer erreichbaren Bedingung geprüft wurde — und ein Prüfbild entsteht erst, wenn
   die Darstellung fertig ist." *(≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen richtig aus?)*
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
-  → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft
-  und nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die
-  im Entwicklungsmodus laut meckern — jeder Testlauf wird so zum Detektor."
+  → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
+  nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die im
+  Entwicklungsmodus laut meckern — jeder Testlauf wird so zum Detektor."
 
 - **Angeblich behoben — und im Präsens behauptet.** Der Fix gilt als fertig, das Symptom bleibt;
   „das Feld wird bereits gesetzt" steht so im Code nicht.
   → *Prompt:* „Fertig ist ein Fix, wenn das **Symptom am Ort des Symptoms** behoben ist **und** der
   gleiche Versuch am **alten Stand** noch durchgeht. Was du im **Präsens** behauptest, sieh vorher
-  nach; was erst gebaut wird, steht in der Zukunftsform. Beißt du dich zweimal fest, wechsle das
-  Modell."
+  nach; Gebautes erst in der Zukunftsform. Zweimal festgebissen: wechsle das Modell."
 
-- **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende
-  Prüfung verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie
-  sollte. Ein Fehlalarm meldet sich selbst, ein ausgefallener nie.
-  → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme
-  weg UND echte Treffer noch da. Die Fälle erfindet das **andere Modell**, gemessen an der
-  Mechanik statt an Testnamen, die **eingeräumten** Grenzen zuerst — eine zugegebene
-  Lücke wird geglaubt, eine verschwiegene gesucht." *(Kosten ≈ 1,3x.)*
+- **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende Prüfung
+  verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie sollte. Ein
+  Fehlalarm meldet sich selbst, ein ausgefallener nie.
+  → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND
+  echte Treffer noch da. Die Fälle erfindet das **andere Modell**, gemessen an der Mechanik statt
+  an Testnamen, die **eingeräumten** Grenzen zuerst — eine zugegebene Lücke wird geglaubt, eine
+  verschwiegene gesucht." *(Kosten ≈ 1,3x.)*
 
-- **Gebaut — und nie in Betrieb genommen.** Die Ausnahme ist entschieden, steht aber im Fließtext
-  statt in der Datei, die das Werkzeug liest. Oder die Verbesserung ist getestet und dokumentiert —
-  nur führt nichts jemanden dorthin. Kein Test schlägt an: Was niemand kennt, verletzt nichts.
+- **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
+  die das Werkzeug liest; oder die Verbesserung ist getestet und dokumentiert, nur führt nichts
+  jemanden dorthin. Kein Test schlägt an: Was niemand kennt, verletzt nichts.
   → *Prompt:* „Eine Ausnahme trägst du **im selben Zug** dort ein, wo der Mechanismus sie liest;
   bei einer Fähigkeit die Stelle, an der jemand danach greift, und **woran** man ihre Benutzung
   erkennt. Und wenn etwas ‚wartet': **worauf genau**?"
@@ -199,8 +200,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   oder hängt an einer Rückfrage — beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
   Aufgabe. Bleib **nie mit einer Rückfrage stehen**: vernünftigste Annahme treffen, sichtbar
-  festhalten, was mich braucht, weitergehen. Und jedes Warten bricht auch beim **Fehler** ab —
-  sonst wartet es auf etwas, das nie kommt."
+  festhalten, was mich braucht, weitergehen. Jedes Warten bricht auch beim **Fehler** ab."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, kurz,
@@ -245,15 +245,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Erzwing nach jedem Zwischenfall eine **Beweisliste**: Liegt alles am Zielort? Gibt es Reste? Passen Dokumente und Code zusammen?"
 
 - **Der Autor sieht seine eigene Annahme nicht — und wer eine fertige Liste prüft, hakt sie ab.**
-  Wer baut, prüft gegen dieselbe Vorstellung, aus der der Fehler stammt; und wer eine fertige Liste
+  Wer baut, prüft gegen dieselbe Vorstellung, aus der der Fehler stammt; wer eine fertige Liste
   prüft, nennt weit weniger als vor dem leeren Blatt — falsch, wenn der **übersehene** Punkt zählt.
   → *Prompt:* „Schätze vor dem Bau **Schwierigkeit × Kritikalität** und zieh bei Kritischem **ein
   anderes Modell** hinzu. Beim **Finden** blind parallel: gleiche Vorgabe, je ein vollständiges
-  Ergebnis, vereinigt **nach Bedeutung**, Einzelnennungen **markiert statt gestrichen**. Beim
-  **Beurteilen** Gegenlesen, aber **erst das Ergebnis, dann die Begründung**. Das **Vereinigen**
-  macht das Modell, das an **keiner** Liste mitschrieb, und jeder Eingang bleibt darin auffindbar
-  (nur A, nur B, verschmolzen mit X) — Verschmelzen verliert lautlos." *(≈ 2x für den Fundschritt,
-  das Vereinigen kostet wenige Prozent)*
+  Ergebnis; beim **Beurteilen** Gegenlesen, aber **erst das Ergebnis, dann die Begründung**.
+  **Vereinigt** wird nach Bedeutung, vom Modell, das an **keiner** Liste mitschrieb, jeder
+  Eingang auffindbar — Verschmelzen verliert lautlos."
+  *(≈ 2x für den Fundschritt)*
 
 - **Die Lehre gilt als versorgt, sobald ihr Wächter benannt ist** — gebaut ist er damit nicht.
   → *Prompt:* „Trenne **benannt** von **gebaut**: ‚gebaut' wird am Haken des genannten Punktes
@@ -280,12 +279,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   und lies das Ergebnis aus den Protokollen, nicht aus den Tests. Wo eine Prüfung auch
   etwas ausführt, melde ein Scheitern im selben Atemzug wie die Freigabe."
 
-- **Die Messung sah weniger, als sie behauptet.** Sie schaut nur die letzten *n* Einträge
-  an, misst erst *nach* dem Vorgang, oder ein Teil der Testdateien lud gar nicht — nicht
-  geladen ist nicht rot, sondern abwesend, und liest sich *grüner* als ein Fehlschlag.
-  → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: eine Frage über
-  einen Zeitraum nach Zeit, nie nach Anzahl. Melde die **Zahl der ausgeführten Prüfungen**
-  mit — ein Rückgang ist ein Rot."
+- **Die Messung — und die Gegenprüfung — sah weniger, als sie behauptet.** Nur die letzten *n*
+  Einträge, ein Teil der Tests lud nicht, dem Prüfer wurde die Hälfte nie gereicht. Nicht
+  geliefert ist nicht rot, sondern abwesend — und liest sich *grüner* als ein Fehlschlag.
+  → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
+  Anzahl. Melde die **Abdeckung** mit; ein Urteil über unvollständigem Material ist **Teilprüfung**."
 
 - **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren dieselbe Regel
   getrennt — eines schreibt, eines prüft; das blockiert *alle* Arbeit.
@@ -305,8 +303,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   und scheitert **sichtbar**, statt einen plausiblen Ersatz einzusetzen; jeder Rückfall wird
   **gemeldet**, mit dem Befehl, der ihn behebt."
 
-- **Die Gegenprüfung wurde angestoßen, nie abgeschlossen.** Der Helfer ist fertig, bevor das Urteil
-  kommt — der Zweig sieht geprüft aus.
+- **Die Gegenprüfung wurde angestoßen, nie abgeschlossen** — der Zweig sieht geprüft aus.
   → *Prompt:* „Wer eine Gegenprüfung beauftragt, bleibt dran, bis sie da ist. Ein ‚nicht
   zusammenführen' ist erst durch ein **späteres** Urteil über den korrigierten Stand erledigt."
 
@@ -316,62 +313,66 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Prüf die Erholung mit Abbrüchen zu **zufälligen** Zeiten und frag: ‚läuft es **dort** weiter, wo
   es sollte?'"
 
-- **Der Umzug nimmt nur mit, was versioniert ist.** Das Projekt kommt an, die Mechanik nicht:
-  Aufgaben, Geheimnisse, Werkzeuge — und die **Scharfstellung** der Wächter. Ein stummer
-  Wächter ist schlimmer als keiner: die Regel gilt als durchgesetzt.
+- **Der Umzug nimmt nur mit, was versioniert ist.** Das Projekt kommt an, die Mechanik nicht —
+  und ein stummer Wächter ist schlimmer als keiner: die Regel gilt als durchgesetzt.
   → *Prompt:* „Führe eine Liste dessen, was das Projekt braucht und **nicht** im Repository
   liegt, und prüfe sie bei jedem Start gegen eine **Beobachtung**."
 
 - **Der Alarm, der nie spricht.** Fällt die Quelle aus, meldet ein Alarm auf ein *Ereignis*
-  nichts; und ein Ersatzkanal, den du für scharf hältst, hat oft nie gefeuert. Wer anhalten
-  darf, addiert zudem auf — eine flackernde Leitung erreicht jede Schwelle, nur später.
-  → *Prompt:* „Überwache den **Zustand** statt des Ereignisses. Bevor du eine Meldung dämpfst,
-  **löse den verbleibenden Kanal einmal echt aus**. Und was den Betrieb anhalten darf,
-  wiederholt erst und eskaliert nur auf **aufeinanderfolgende** Fehlschläge."
+  nichts — und ein Ersatzkanal, den du für scharf hältst, hat oft nie gefeuert.
+  → *Prompt:* „Überwache den **Zustand** statt des Ereignisses, und **löse jeden Ersatzkanal
+  einmal echt aus**. Was anhalten darf, eskaliert nur auf **aufeinanderfolgende** Fehlschläge."
 
-- **Eine Priorität, die nur in Prosa steht, wirkt nicht.** Sie landet getreu in der Aufgabenliste
-  — aber die Reihenfolge, aus der gearbeitet wird, steht woanders, und die Nachfolge-Sitzung
-  kennt deinen Chat nicht.
+- **Eine Priorität, die nur in Prosa steht, wirkt nicht.** Die Reihenfolge, aus der gearbeitet
+  wird, steht woanders — und die Nachfolge-Sitzung kennt deinen Chat nicht.
   → *Prompt:* „Trag Priorisiertes dort ein, wo die Arbeit gezogen wird, und lass eine Prüfung
   fehlschlagen, wenn beides auseinanderläuft. Priorisiere das **Ziel**: Was das Feature
   schneller fertig macht, kommt mit nach vorn."
 
-- **Blockiert heißt nicht: du bist dran.** Bei fehlender Berechtigung bekommst du
-  gern einen Befehl gereicht — oft einen, der gar nicht funktionieren kann.
-  → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir. **Miss** erst, ob der Weg trägt.
-  Fehlt wirklich eine Fähigkeit, bitte **einmal um die Fähigkeit** — nie um ihre Ausführung."
+- **Blockiert heißt nicht: du bist dran.** Bei fehlender Berechtigung bekommst du gern einen
+  Befehl gereicht — oft einen, der gar nicht funktionieren kann.
+  → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir; **miss** erst, ob der Weg trägt. Fehlt
+  wirklich eine Fähigkeit, bitte **einmal um die Fähigkeit** — nie um ihre Ausführung."
 
 - **Nicht jedes Rot ist deins.** Eine Prüfung, die nur „rot" und „grün" kennt, schiebt fremde
   Ausfälle deinem Code zu.
-  → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — **lief überhaupt ein eigener
-  Schritt?** Liegt sie außerhalb, nenn den **echten Griff** dort."
+  → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — lief überhaupt ein eigener
+  Schritt? Liegt sie außerhalb, nenn den **echten Griff** dort."
 
-- **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er sitzt
-  — Netz, Rechte, Umgebung —, verliert mit dem Fehlschlag die nächste Reparatur mit.
+- **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er sitzt,
+  verliert mit dem Fehlschlag die nächste Reparatur mit.
   → *Prompt:* „Bevor du deine eigene Umgebung änderst: Gibt es eine **kleinere Handlung**, die nur
   **ergänzt**? Und lass jeden Neuaufbau nach **offen** scheitern — ein zugesperrter Stand ist
   nicht mehr reparierbar."
 
-- **Verschlucken sieht aus wie Erfolg — und ein Werkzeug, das nie startete, wie ein strenges.** Ein
-  Fehlschlag, der innen zum Ersatzwert wird, läuft als Lüge weiter; ein nie gestarteter Prozess
-  liefert den Fehlercode eines korrekten Ablehnens.
-  → *Prompt:* „Ein Ersatzwert im `catch` darf nur verschluckt werden, wenn er zu **weniger** Aktion
-  führt. ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
+- **Verschlucken sieht aus wie Erfolg — ein nie gestartetes Werkzeug wie ein strenges.**
+  → *Prompt:* „Ein Ersatzwert im `catch` gilt nur, wenn er zu **weniger** Aktion führt.
+  ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
 
-- **Einigkeit ist keine Evidenz.** Mehrere Modelle können sich über eine Ursache einig sein und
-  gemeinsam danebenliegen; die Einigkeit fühlt sich dann an wie ein Beweis.
-  → *Prompt:* „Bevor du Versuche vorschlägst: Welcher **eine Test** macht die Ursache **sichtbar**?"
+- **Einigkeit und Erfolg sind keine Evidenz.** Modelle können gemeinsam danebenliegen, und
+  „es lief durch" beweist den Weg nicht — du hattest den Dialog weggeklickt.
+  → *Prompt:* „Welcher **eine Test** macht die Ursache **sichtbar**? Sag **vor** der Messung,
+  welches Ergebnis welche Erklärung ausschließt."
 
-- **Zwei Aufträge für einen Fehler.** Fällt derselbe Mangel erneut auf, schreibst du ihn arglos
-  ein zweites Mal auf — sichtbar wird das erst, wenn beide Ergebnisse aufeinandertreffen.
+- **Zwei Aufträge für einen Fehler.** Derselbe Mangel wird arglos ein zweites Mal aufgeschrieben.
   → *Prompt:* „Vor jedem neuen Punkt: Such die offenen nach demselben Problem ab — gibt es einen,
-  **erweitere ihn**. Wird ein Zweig verworfen, rette, was er über seinen Auftrag hinaus mitbrachte."
+  **erweitere ihn**. Verwirfst du einen Zweig, rette, was über seinen Auftrag hinaus darin steckt."
 
-- **Gebaut heißt nicht auffindbar.** Ein Feature kann korrekt sein und trotzdem als fehlend
-  gemeldet werden, weil seine Bedienung unter der falschen Überschrift steht: Dein Test fragt
-  „wirkt es?", der Nutzer „komme ich dorthin?".
-  → *Prompt:* „Meldet er etwas erneut, das repariert ist, nimm an, er **erreicht** es nicht. Prüf
-  die **Nachbarschaft** — und wo das als Test schreibbar ist, schreib es als Test."
+- **Gebaut heißt nicht auffindbar.** Dein Test fragt „wirkt es?", der Nutzer „komme ich dorthin?".
+  → *Prompt:* „Meldet er etwas erneut, das repariert ist, nimm an, er **erreicht** es nicht — prüf
+  die **Nachbarschaft**, und wo das als Test schreibbar ist, schreib es als Test."
+
+- **Der erste Fehlschlag macht sich selbst dauerhaft.** Eine wiederkehrende Aufgabe liest ihre
+  eigene Spur, die es beim ersten Lauf nicht gibt — und bricht von da an immer ab. Von außen:
+  „übersprungen".
+  → *Prompt:* „Prüf jede wiederkehrende Aufgabe gegen den **leeren Zustand**; so beginnt sie nach
+  jedem Neustart. ‚Übersprungen' ist **kein Betriebszustand** — was sie nicht tut, meldet sie laut."
+
+- **Die Kur ist teurer als der Fehler.** Eine Regel, die ein seltenes Fehlverhalten sicher
+  unterbindet, verbiegt das Verhalten überall sonst mit.
+  → *Prompt:* „Ein bestätigter Befund verpflichtet zur **Untersuchung**, nicht zur Änderung: Miss
+  die Kur gegen gesunde Fälle. Ist sie teurer als der Fehler, **buche** ihn mit Zahlen und
+  verworfener Kur — verschweigen gilt nicht, still beheben auch nicht."
 
 ---
 
@@ -409,7 +410,6 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 > sie erzwingt. Bei Kritischem hol ein zweites Modell als Gegenprüfer. Frag nach, wenn das
 > Zielbild unklar ist — rate nicht."
 
-Sie setzt auf, woran alles andere hängt: eine Wahrheit, eine Arbeitsordnung, zwei
-Testschichten, den Reflex zum Check. Die Fallstricke oben ersetzt sie nicht.
+Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 9cab0148483975dedd45d1023a4fbd0902292dc6d1ddf20007764eee8e056bc8 -->
+<!-- GUIDE-FINGERPRINT: c94bfe87c89f26815984b4912fd969656bd77e74db3a9b3aadb814541bb1c5cc -->

@@ -48,14 +48,18 @@ import { dirname, join, sep as sep_ } from 'node:path'
 import { createHash } from 'node:crypto'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
+import { currentSetting, settingProblemLine } from './sol-share.mjs'
+import { routeFor } from './sol-share-core.mjs'
 import {
   addedFilesAreCoveredByPatch,
   buildReviewPrompt,
+  causeTextFor,
   classifyOutcome,
   codexArgs,
   CODEX_BIN,
   coverageDecision,
   decideReview,
+  OUTCOME,
   FALLBACK_CHAIN,
   formatReviewMaterial,
   formatReviewReport,
@@ -67,6 +71,7 @@ import {
   PROBE_MAX_AGE_MS,
   REVIEW_TIMEOUT_MS,
   savedAuthPathFrom,
+  solAuthored,
   SOL_MODEL_ID,
   SOL_MODEL_NAME,
   SOL_REASONING_EFFORT,
@@ -212,8 +217,15 @@ function authorsIn(sha, base) {
   return String(log).split('\n').flatMap((line) => modelsInTrailerField(line))
 }
 
-/** Run codex once and hand back everything the classifier needs. */
-function runCodex({ prompt, input = '', modelId = SOL_MODEL_ID, timeoutMs = REVIEW_TIMEOUT_MS }) {
+/**
+ * Run codex once and hand back everything the classifier needs.
+ *
+ * EXPORTED so `scripts/ask-sol.mjs` runs the SAME path rather than a second one of its
+ * own (point 654): the sandbox flags, the stdin hand-off, the temp output file and the
+ * timeout are decisions this file already got right the hard way, and two copies of them
+ * would drift the day one is fixed.
+ */
+export function runCodex({ prompt, input = '', modelId = SOL_MODEL_ID, timeoutMs = REVIEW_TIMEOUT_MS }) {
   const outFile = join(tmpdir(), `review-sol-${process.pid}-${Date.now()}.txt`)
   const args = codexArgs({ modelId, effort: SOL_REASONING_EFFORT, cwd: REPO_ROOT, outputFile: outFile, prompt })
   const res = spawnSync(CODEX_BIN, args, {
@@ -258,7 +270,7 @@ export const PROBE_RECEIPT_FILE = join(STATE_DIR, 'review-sol-probe.json')
  * (fifth cross-vendor round). Hashed, because the account id is not ours to
  * scatter through a repository's state files.
  */
-function codexFingerprint() {
+export function codexFingerprint() {
   const version = spawnSync(CODEX_BIN, ['--version'], { encoding: 'utf8', windowsHide: true }).stdout ?? ''
   const which = spawnSync('sh', ['-c', `command -v ${CODEX_BIN}`], { encoding: 'utf8', windowsHide: true }).stdout ?? ''
   let account = ''
@@ -270,7 +282,7 @@ function codexFingerprint() {
   return createHash('sha256').update(`${version.trim()}|${which.trim()}|${account}`).digest('hex').slice(0, 16)
 }
 
-function readProbeReceipt() {
+export function readProbeReceipt() {
   try {
     return JSON.parse(readFileSync(PROBE_RECEIPT_FILE, 'utf8'))
   } catch {
@@ -279,7 +291,7 @@ function readProbeReceipt() {
 }
 
 /** `--probe`: prove the -m flag is honoured rather than silently substituted. */
-function probe() {
+export function probe() {
   const bogus = 'gpt-does-not-exist-9.9'
   const res = runCodex({ prompt: 'Answer with the single word: ok', modelId: bogus, timeoutMs: 120_000 })
   const text = `${res.stderr}\n${res.stdout}`
@@ -303,6 +315,21 @@ function probe() {
       `  until this passes again.\n  codex said: ${text.trim().split('\n').slice(-3).join(' | ') || '(nothing)'}`,
   )
   return 1
+}
+
+/**
+ * Is `-m` PROVEN honoured on this machine, proving it now where the receipt is missing
+ * or stale? Returns false when the proof could not be obtained.
+ *
+ * EXPORTED for `scripts/ask-sol.mjs` (point 654): every kind of work attributed to Sol
+ * rests on the same proof, since nothing in a run's output names the model that answered.
+ * A second implementation of this check would be a second place for it to be skipped.
+ */
+export function ensureModelProven({ log = console.error, who = 'review-sol' } = {}) {
+  const freshness = probeFreshness(readProbeReceipt(), Date.now(), PROBE_MAX_AGE_MS, codexFingerprint())
+  if (freshness.fresh) return true
+  log(`${who}: ${freshness.warning}\n  proving the model id first …`)
+  return probe() === 0
 }
 
 /**
@@ -458,6 +485,41 @@ if (isMainModule(import.meta.url)) {
     }
     const full = (resolved.stdout ?? '').trim()
 
+    // THE SHARE SWITCH IS ASKED FIRST (point 654). At `claude-only` the operator has
+    // moved the load off OpenAI, so no request is sent at all — and the review lands
+    // exactly where every unavailable Sol lands: with a Claude reviewer that authored
+    // none of the range, and with NO verdict, because nobody has reviewed it yet.
+    const share = currentSetting()
+    // A fallback nobody is told about is a setting nobody chose (cross-vendor review).
+    if (share.problem) console.error(settingProblemLine(share, 'review-sol'))
+    if (routeFor('review', share.setting) !== 'sol') {
+      const base = mergeBase(flag('--since') || 'main', full, { explicit: Boolean(flag('--since')) })
+      const decision = decideReview({
+        outcome: { ok: false, kind: OUTCOME.SWITCHED_OFF, cause: causeTextFor(OUTCOME.SWITCHED_OFF) },
+        parsed: { ok: false },
+        authorModel: authorsIn(full, base),
+      })
+      console.log(formatReviewReport({ decision, sha: full, mode, point, partial: null }))
+      process.exit(3)
+    }
+
+    // WHO WROTE IT DECIDES WHO MAY JUDGE IT, and that is asked BEFORE a codex
+    // call is paid for (point 667). Sol AUTHORS now, and a review it may not
+    // give is not worth an allowance: a Sol-authored range goes straight to the
+    // Claude reviewer that also runs the suites, judges the picture and lands.
+    const sinceFlag = flag('--since')
+    const base = mergeBase(sinceFlag || 'main', full, { explicit: Boolean(sinceFlag) })
+    const rangeAuthors = authorsIn(full, base)
+    if (solAuthored(rangeAuthors)) {
+      const decision = decideReview({
+        outcome: { ok: false, kind: OUTCOME.SELF_REVIEW, cause: causeTextFor(OUTCOME.SELF_REVIEW) },
+        parsed: { ok: false },
+        authorModel: rangeAuthors,
+      })
+      console.log(formatReviewReport({ decision, sha: full, mode, point, partial: null }))
+      process.exit(3)
+    }
+
     console.error(
       `review-sol: asking ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) to review ${full.slice(0, 7)} …`,
     )
@@ -468,24 +530,18 @@ if (isMainModule(import.meta.url)) {
     // was printed either way. The probe therefore RUNS when its receipt is
     // missing or stale, and a failed probe stops the review before a word of it
     // can be attributed to a model that may not have written it.
-    const freshness = probeFreshness(readProbeReceipt(), Date.now(), PROBE_MAX_AGE_MS, codexFingerprint())
-    if (!freshness.fresh) {
-      console.error(`review-sol: ${freshness.warning}\n  proving the model id first …`)
-      if (probe() !== 0) {
-        console.error('review-sol: the model id is not proven honoured — refusing to attribute a review to it.')
-        process.exit(2)
-      }
+    if (!ensureModelProven()) {
+      console.error('review-sol: the model id is not proven honoured — refusing to attribute a review to it.')
+      process.exit(2)
     }
 
-    const since = flag('--since')
-    const base = mergeBase(since || 'main', full, { explicit: Boolean(since) })
     // What a record at this sha would CLEAR: everything back to where the branch
     // left `main`. A narrower review is allowed, but it may not be recorded.
     // FAILING TO ANSWER IS NOT AN ANSWER OF "FULL COVERAGE" (fourth round): a
     // sha with no merge base against `main` used to leave this empty, which
     // switched the check OFF and printed a record for a range nobody bounded.
     // The decision itself is pure and tested (coverageDecision).
-    const coverageBase = since ? git(['merge-base', 'main', full], { required: false }) : base
+    const coverageBase = sinceFlag ? git(['merge-base', 'main', full], { required: false }) : base
     const partial = coverageDecision({ reviewedBase: base, coverageBase })
     const material = gatherMaterial(full, base)
     console.error(
@@ -498,7 +554,7 @@ if (isMainModule(import.meta.url)) {
     // WHO AUTHORED IT decides who may review it if Sol is unavailable: Fable
     // cannot review its own commit (see fallbackReviewerFor), and the record
     // covers the whole range, so every author in it counts.
-    const decision = decideReview({ outcome, parsed, authorModel: authorsIn(full, base) })
+    const decision = decideReview({ outcome, parsed, authorModel: rangeAuthors })
     // THE FINDINGS ARE THE POINT, not the verdict word: a `do-not-merge` whose
     // reasons were never printed cannot be acted on, and the evidence line the
     // ledger carries is one sentence by design. So the reviewer's whole answer

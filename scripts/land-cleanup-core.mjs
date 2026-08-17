@@ -155,16 +155,40 @@ export function judgeCleanupTarget({ worktree, branch, mainRoot, evidence = null
   const at = (disposition, reason) => ({ path, branch: has, disposition, reason })
 
   if (!path) return at(DISPOSITION.unproven, 'git named a worktree without a path')
-  if (normPath(path) === normPath(mainRoot)) return at(DISPOSITION.foreign, 'the MAIN checkout')
+  if (normPath(path) === normPath(mainRoot)) {
+    // THE MAIN CHECKOUT IS NEVER REMOVED — but "never removed" is not "proves
+    // nothing" (sixth review, finding 2). This returned `foreign` before the
+    // detached-HEAD handling below could see it, so a main checkout DETACHED
+    // during the cleanup — mid-rebase, mid-bisect, a `checkout --detach` — fell out
+    // of `reported`, matched no branch in the fallback comparison, and blocked
+    // neither branch deletion. That is finding 5 in the one checkout the landing
+    // itself runs in.
+    return has
+      ? at(DISPOSITION.foreign, 'the MAIN checkout')
+      : at(
+          DISPOSITION.unproven,
+          `the MAIN checkout with a detached HEAD — nothing proves it is not standing on ${want || 'the landed branch'}`,
+        )
+  }
 
   // ── OWNERSHIP ──────────────────────────────────────────────────────────────
   if (!want) return at(DISPOSITION.unproven, 'the landing named no branch, so nothing can be tied to it')
   if (!has) {
-    // A detached agent worktree is the shape that cannot be judged: it may be the
-    // landed point's own tree mid-rebase, or another agent's. Say so.
-    return agent
-      ? at(DISPOSITION.unproven, `an agent worktree with a detached HEAD — nothing proves it belongs to ${want}`)
-      : at(DISPOSITION.foreign, 'a detached worktree outside the agent directory')
+    // A DETACHED TREE IS UNPROVEN WHEREVER IT SITS (whole-branch review, finding 5).
+    // A detached HEAD reports no branch, so nothing here can tell a tree that is
+    // rebasing the landed branch from one that has never heard of it — and calling
+    // the non-agent case `foreign` made that ignorance look like knowledge: it
+    // dropped out of `reported`, its empty branch matched nothing in the fallback
+    // comparison, and BOTH branch deletions were permitted while a live manual
+    // checkout stood on the branch mid-rebase. That is the incident's own shape one
+    // level up, so the answer is the same on both sides of the isolation directory:
+    // unproven, reported, and the branch stays.
+    return at(
+      DISPOSITION.unproven,
+      agent
+        ? `an agent worktree with a detached HEAD — nothing proves it belongs to ${want}`
+        : `a detached worktree outside the agent directory — nothing proves it is NOT standing on ${want}`,
+    )
   }
   if (has !== want) return at(DISPOSITION.foreign, `checked out on ${has}, not on ${want}`)
   if (!agent) {
@@ -301,6 +325,43 @@ export function selectCleanupTargets({ worktrees = [], branch, mainRoot, evidenc
         }
       : { delete: true, reason: '' },
   }
+}
+
+/**
+ * MAY THE BRANCH BE DELETED — JUDGED AT THE MOMENT OF DELETION? PURE.
+ *
+ * WHY THIS IS NOT SIMPLY `selection.branch` (whole-branch review, finding 6). The
+ * landing used the selection it took MINUTES earlier and never listed the
+ * worktrees again before deleting, so a checkout that appeared in between — a
+ * detached one above all, which reports no branch at all — was invisible to the
+ * decision that then removed the branch it was standing on. So the caller takes a
+ * FRESH selection for this question, and asks it TWICE: once before the local
+ * deletion and once before the remote one, because `git branch -d` and `git push
+ * --delete` are two commands and a live tree can recreate the local branch between
+ * them.
+ *
+ * Inputs (every one of them a reason to STOP):
+ *   selection  a selection taken NOW — its `branch.delete` already folds in every
+ *              tree that was kept
+ *   refused    how many removals were refused at the last moment
+ *   failed     how many removals reported a problem
+ *   recreated  the local branch exists again after it was deleted — asked only
+ *              before the REMOTE deletion
+ *
+ * Returns the reason not to delete, or '' when nothing stands in the way. A
+ * selection that could not be taken at all blocks: an unlistable worktree set is
+ * exactly the state in which nothing can be proven.
+ */
+export function branchDeletionBlocker({ selection = null, refused = 0, failed = 0, recreated = false } = {}) {
+  const branch = selection && typeof selection === 'object' ? selection.branch : null
+  if (!branch || typeof branch !== 'object') {
+    return 'the worktrees could not be listed at the moment of deletion, so nothing proves the branch is free'
+  }
+  if (branch.delete === false) return str(branch.reason) || 'a worktree was kept and may still be standing on it'
+  if (recreated) return 'the local branch exists again — something recreated it after the deletion, so the remote is left alone'
+  if (Number(refused) > 0) return 'a worktree was refused at the last moment and may still be standing on it'
+  if (Number(failed) > 0) return 'a worktree could not be removed and may still be standing on it'
+  return ''
 }
 
 /**

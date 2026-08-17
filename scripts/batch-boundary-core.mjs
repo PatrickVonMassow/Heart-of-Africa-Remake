@@ -110,16 +110,82 @@ export function pointClosure(n, tasksOpenText, archiveText) {
  *   freshMs   — override for tests
  * Returns { valid, point, reason }.
  */
-export function assessBoundary({ marker, sid, now, closure, freshMs = BOUNDARY_FRESH_MS }) {
+/**
+ * IS THIS MARKER FRESH? PURE, and the one place that decides it (Sol's review of
+ * ffa0a78). A FUTURE stamp is not fresh: `now - at < freshMs` alone accepted a
+ * marker dated forward, which would authorise a stop and hold the seal far
+ * beyond the window — a clock that jumped, or a hand-written marker. An age
+ * below zero is therefore treated exactly like an expired one: the boundary is
+ * re-taken, which costs one command.
+ */
+export function markerFresh(marker, now, freshMs = BOUNDARY_FRESH_MS) {
+  const at = marker?.at
+  if (typeof at !== 'number' || !Number.isFinite(at)) return false
+  const age = now - at
+  return age >= 0 && age < freshMs
+}
+
+export function assessBoundary({ marker, sid, now, closure, freshMs = BOUNDARY_FRESH_MS, watermarkNow = null }) {
   if (!marker || typeof marker !== 'object') {
     return { valid: false, point: null, reason: 'no-marker' }
+  }
+  // A CONTEXT boundary (point 675, defeat 3) records no point and needs no
+  // closure: its licence is the recorded watermark reading, taken at commit time
+  // from a real measurement — and the marker is a CLAIM, re-judged here (Sol
+  // review of 807c2bf, finding 5): the reading must actually clear the recorded
+  // mark, or a marker carrying one token would authorise a stop. Freshness and
+  // session binding hold exactly as for a point boundary.
+  if (marker.cause === BOUNDARY_CAUSES.CONTEXT) {
+    // Only `--commit --context` writes a context marker, and it always seals it
+    // — there is no legacy context format, so an unphased context claim is a
+    // hand-written one and authorises nothing (Sol re-review of cd6faaa,
+    // finding 3).
+    if (marker.phase !== BOUNDARY_PHASES.COMMITTED) {
+      return { valid: false, point: null, reason: 'context-marker-uncommitted' }
+    }
+    if (
+      typeof marker.tokens !== 'number' ||
+      !(marker.tokens > 0) ||
+      typeof marker.watermark !== 'number' ||
+      !(marker.watermark > 0)
+    ) {
+      return { valid: false, point: null, reason: 'context-marker-unmeasured' }
+    }
+    // The claim may not bring its own yardstick (Sol final round, finding 1):
+    // `{tokens: 1, watermark: 1}` would pass a check that trusts the recorded
+    // mark alone. Where the caller supplies the CURRENTLY configured mark, the
+    // reading must clear the HIGHER of the two.
+    const mark = Math.max(
+      marker.watermark,
+      typeof watermarkNow === 'number' && watermarkNow > 0 ? watermarkNow : 0,
+    )
+    if (marker.tokens < mark) {
+      return { valid: false, point: null, reason: 'context-below-watermark' }
+    }
+    if (!markerFresh(marker, now, freshMs)) {
+      return { valid: false, point: null, reason: 'marker-stale' }
+    }
+    if (!sid || marker.sessionId !== sid) {
+      return { valid: false, point: null, reason: 'marker-foreign-session' }
+    }
+    return { valid: true, point: null, reason: 'context-boundary' }
   }
   const point = Number(marker.point)
   if (!Number.isInteger(point) || point <= 0) {
     return { valid: false, point: null, reason: 'marker-malformed' }
   }
-  if (typeof marker.at !== 'number' || !(now - marker.at < freshMs)) {
+  if (!markerFresh(marker, now, freshMs)) {
     return { valid: false, point, reason: 'marker-stale' }
+  }
+  // A POINT MARKER MUST BE COMMITTED TOO (Sol's review of abdde93). The legacy
+  // shape was tolerated while the one-shot form still wrote it; that form is
+  // retired, so an unphased marker is now either a leftover of the old code or a
+  // hand-written claim — and either way it would authorise a stop that skipped
+  // `--prepare`, its receipt, the card proof, the transfer and the seal. It is
+  // refused like an old receipt: the boundary is re-taken, which costs the two
+  // commands it should have been taken with.
+  if (markerPhase(marker) !== 'committed') {
+    return { valid: false, point, reason: 'marker-uncommitted' }
   }
   // Bound to the session that recorded it: a marker left by a previous session
   // must never authorise this one's stop.
@@ -197,6 +263,403 @@ export function boundaryDueFrom({ tick, ownerSince, now, dueMs = BOUNDARY_DUE_MS
 // KEPT one lets a successor spawn beside a working session, which is the
 // incident class this whole apparatus exists to prevent.
 
+// --- The TWO-PHASE boundary (point 675, defeat 1) ------------------------------
+//
+// The marker used to be written FIRST and the bookkeeping done after — and the
+// bookkeeping (the card publish, every guard remedy a blocked turn forces)
+// counted as work and cleared the marker. Measured twice on 13.08.2026; once it
+// left the batch idle for forty minutes. The boundary is now two-phase:
+//   --prepare  does/validates ALL bookkeeping and writes NO marker — there is
+//              nothing to delete while the session finishes ending;
+//   --commit   is the session's LAST repository action: it seals the marker
+//              (phase 'committed'), and any mutation attempted afterwards is an
+//              EXPLICIT, LOUD error (a PreToolUse deny naming `--clear` as the
+//              way back) rather than a silent marker deletion.
+
+/** Marker phases. A legacy marker (no phase field) keeps the old withdrawal
+ *  semantics; only a COMMITTED marker is sealed. */
+export const BOUNDARY_PHASES = Object.freeze({ COMMITTED: 'committed' })
+
+/** What kind of boundary the marker records: a closed point, or the context
+ *  watermark (point 675, defeat 3 — a session can outgrow its context without
+ *  ever closing a point). */
+export const BOUNDARY_CAUSES = Object.freeze({ POINT: 'point', CONTEXT: 'context' })
+
+export function markerPhase(marker) {
+  if (!marker || typeof marker !== 'object') return 'none'
+  return marker.phase === BOUNDARY_PHASES.COMMITTED ? 'committed' : 'legacy'
+}
+
+/**
+ * THE PREPARE RECEIPT (Sol's review of 4e93933): two phases are only two phases
+ * if the first one is REQUIRED. `--commit --context` could be called with no
+ * `--prepare` at all, so the board card that says WHY the batch handed over —
+ * the part of defeat 3 the reader actually sees — could be skipped silently; the
+ * point commit checked only that the OLD current-work card was gone.
+ *
+ * `--prepare` therefore leaves a receipt, and `--commit` refuses without a fresh
+ * one of its own session, cause and point. The receipt is NOT a marker: nothing
+ * withdraws it and no guard reads it, so it cannot revive defeat 1 (work
+ * deleting what the boundary needs), and its refusal names a ONE-COMMAND way
+ * back — `--prepare` is runnable whenever `--commit` would be, so this can
+ * refuse a session but never trap one.
+ *
+ * RESIDUAL, deliberately: a session that prepares, then works for a while, then
+ * commits within the freshness window still passes. The receipt proves the
+ * bookkeeping phase RAN, not that nothing followed it; what follows the commit
+ * is the sealed marker's business.
+ */
+/** RAISED with every change to what `cardsBefore` HOLDS (Sol's review of
+ *  ebf7d00): v2 stored regions cut only at the card ends, so an old receipt's
+ *  prefixed string would no longer equal the region this code now cuts, and the
+ *  unchanged card would read as fresh. A receipt of an older version is refused
+ *  and re-taken rather than compared across representations. */
+export const PREPARED_RECEIPT_V = 4
+
+export function preparedReceipt({
+  sid,
+  cause = BOUNDARY_CAUSES.POINT,
+  point = null,
+  now,
+  destination = null,
+  board = { readable: false, cards: [] },
+}) {
+  const { readable = false, cards = [] } = board ?? {}
+  return {
+    v: PREPARED_RECEIPT_V,
+    sessionId: String(sid ?? ''),
+    cause,
+    point: point ?? null,
+    at: Number(now),
+    // WHERE the batch was going when the card was written (Sol's review of
+    // 7ecebed): a claim appearing or expiring between the phases changes the
+    // card's text, so the commit must re-prepare rather than judge the new
+    // destination against the old board reading.
+    destination,
+    // The handover cards ALREADY on the board when the preparation looked — the
+    // leftovers of earlier handovers. `--commit` demands a card that is not one
+    // of them, which is the only thing that tells this handover's card from a
+    // predecessor's (Sol's review of bcf820c).
+    cardsBefore: Array.isArray(cards) ? cards : [],
+    // …and WHETHER that reading happened at all: an unreadable board is not an
+    // empty one (Sol's review of 456be8f). Collapsed into an empty list, a
+    // failed reading would make every standing card look newly added once the
+    // board came back, and a leftover card would prove the handover.
+    boardRead: readable === true,
+  }
+}
+
+/** May `--commit` run at all? PURE. Null = prepared; otherwise the refusal. */
+export function unpreparedRefusal({
+  receipt,
+  sid,
+  cause = BOUNDARY_CAUSES.POINT,
+  point = null,
+  destination = null,
+  now,
+  freshMs = BOUNDARY_FRESH_MS,
+} = {}) {
+  const how =
+    cause === BOUNDARY_CAUSES.CONTEXT
+      ? 'node scripts/batch-boundary.mjs --prepare --context --transcript <path>'
+      : `node scripts/batch-boundary.mjs --prepare ${point ?? '<point>'}`
+  const refuse = (why) =>
+    `THE COMMIT IS NOT PREPARED (${why}) — the boundary is TWO-PHASE, and the first phase is where the board ` +
+    `card, the publish and the checks happen. Run \`${how}\`, do the bookkeeping it names, then commit. ` +
+    'Nothing recorded.'
+  if (!receipt || typeof receipt !== 'object') return refuse('no --prepare receipt exists')
+  // A receipt of an OLDER SHAPE proves less than the commit now asks — without
+  // its board reading the stale-card check has nothing to compare against, so it
+  // is refused rather than silently downgraded (Sol's review of 7ecebed).
+  if (
+    receipt.v !== PREPARED_RECEIPT_V ||
+    !Array.isArray(receipt.cardsBefore) ||
+    !receipt.cardsBefore.every((r) => typeof r === 'string')
+  ) {
+    return refuse('the receipt is of an older shape and carries no usable board reading')
+  }
+  if (!sid || receipt.sessionId !== sid) return refuse(`the receipt belongs to session ${receipt.sessionId || '?'}`)
+  if (destination !== null && receipt.destination !== destination) {
+    return refuse(`the batch now goes elsewhere than at the preparation (${receipt.destination ?? '?'} → ${destination})`)
+  }
+  if (receipt.cause !== cause) {
+    return refuse(
+      `the receipt prepared ${receipt.cause === BOUNDARY_CAUSES.CONTEXT ? 'a CONTEXT boundary' : 'a POINT boundary'}`,
+    )
+  }
+  if (cause === BOUNDARY_CAUSES.POINT && Number(receipt.point) !== Number(point)) {
+    return refuse(`the receipt prepared point ${receipt.point ?? '?'}, not point ${point ?? '?'}`)
+  }
+  // A FUTURE age is not freshness (Sol's review of ffa0a78): `now - at < freshMs`
+  // alone accepts a hand-written receipt dated forward, which would stay valid
+  // until that date plus the window. An age below zero is a broken or forged
+  // stamp, and both are refused the same way.
+  const age = typeof receipt.at === 'number' && Number.isFinite(receipt.at) ? now - receipt.at : NaN
+  if (!(age >= 0 && age < freshMs)) {
+    return refuse('the receipt is stale — the bookkeeping it named is no longer this turn\'s')
+  }
+  return null
+}
+
+/** The card sentence each boundary cause opens with — the reader's proof that
+ *  the handover was announced, and what `boardCarriesCard` looks for. */
+export const BOUNDARY_CARD_HEADS = Object.freeze({
+  [BOUNDARY_CAUSES.CONTEXT]:
+    'Der Kontext dieser Sitzung hat die Wasserstandsmarke erreicht; ich übergebe deshalb jetzt, statt weiter in diesem teuren Kontext zu arbeiten.',
+  [BOUNDARY_CAUSES.POINT]: 'Der Punkt ist abgeschlossen.',
+})
+
+/**
+ * WHAT PROVES THIS CARD IS ON THE BOARD? PURE — the fragments that identify a
+ * card of exactly this cause AND destination (Sol's reviews of ffa0a78/389bbc7:
+ * the receipt proves `--prepare` ran, not that the bookkeeping it printed was
+ * done, and the absence of the OLD card is no evidence for the new one).
+ *
+ * The fragments are deliberately ASCII: the card goes through the board's HTML,
+ * and a check that hangs on an umlaut would block a correct boundary the day
+ * that pipeline starts escaping one. They are pinned against the real card text
+ * by a test, so a reworded card breaks the test rather than the mechanism.
+ */
+/** Where one board card ENDS: every card is a `<details>` block, so this is the
+ *  real boundary the proof is cut at, not a guessed distance. */
+export const CARD_END = '</details>'
+
+/** …and where one begins, so a region is cut back to the card itself rather than
+ *  to whatever stood between it and the card before it. */
+export const CARD_START = '<details'
+
+/** The fallback for a board carrying no card markup at all — one card's length
+ *  (the longest card is ~900 characters, the slack covers its surroundings).
+ *  A distance can only ever be a fallback: adjacent cards are as close as their
+ *  markup puts them (Sol's review of 1589da5). */
+export const CARD_PROOF_WINDOW = 2000
+
+export function cardProofFragments({ cause = BOUNDARY_CAUSES.POINT, destination } = {}) {
+  const head =
+    cause === BOUNDARY_CAUSES.CONTEXT
+      ? 'Der Kontext dieser Sitzung hat die Wasserstandsmarke erreicht'
+      : 'Der Punkt ist abgeschlossen.'
+  // The head alone identifies a WATERMARK card; a point head is one short
+  // sentence, so the destination sentence carries the identification there.
+  const where =
+    destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
+      ? 'Der Stapel geht NICHT an eine frische Sitzung'
+      : 'Der Launcher startet sie innerhalb seines Intervalls'
+  return [head, where]
+}
+
+/**
+ * DOES THE BOARD CARRY THAT CARD? PURE. Returns
+ * { carries, verifiable, missing } — `verifiable` false for a board that could
+ * not be read at all.
+ *
+ * An unreadable board does NOT refuse: a session that cannot reach its board
+ * must still be able to hand over, or a missing file ends the batch instead of
+ * a session. The caller SAYS SO rather than passing in silence — the one
+ * outcome this whole point forbids.
+ *
+ * RESIDUAL, named because no check here can close it: a card left standing from
+ * a PREVIOUS handover satisfies these fragments. Telling this handover's card
+ * from the last one needs an identity on the card itself, which is the board's
+ * user-owned structure, not this mechanism's to change.
+ */
+/** The rounding slack on a `HH:MM` stamp compared with a millisecond clock: one
+ *  minute at each end, and nothing more. The acceptable arc is otherwise the
+ *  REAL interval between the preparation and now — bounded by the receipt's own
+ *  freshness rather than by an invented window (Sol's review of 46c994e). */
+export const CARD_STAMP_SLACK_MIN = 1
+
+/** Berlin wall-clock minute of the day — the board stamps `Stand HH:MM` in that
+ *  zone, so a comparison must be made in it. PURE for a given instant. */
+export function berlinMinuteOfDay(ms) {
+  const [h, m] = new Intl.DateTimeFormat('de-DE', {
+    timeZone: 'Europe/Berlin',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+    .format(new Date(ms))
+    .split(':')
+    .map(Number)
+  return (Number(h) % 24) * 60 + Number(m)
+}
+
+/**
+ * IS THIS CARD THIS HANDOVER'S, or the last one's (Sol's reviews of
+ * 9096fb7/46c994e)? PURE. The fragments identify a card of the right cause and
+ * destination — and the card the PREVIOUS handover left standing has both. What
+ * tells them apart is the board's own `Stand HH:MM`, which must fall inside the
+ * REAL interval between the preparation and now, plus a minute of rounding at
+ * each end. That interval is bounded by the receipt's freshness, so the arc a
+ * stale card could land in is the elapsed hour at most — not a window this
+ * function invents.
+ *
+ * An UNSTAMPED region does not prove currency where the board stamps at all: it
+ * is refused, exactly because every generated state card carries a stamp. On a
+ * board that stamps nothing it passes, so a card format without stamps cannot
+ * trap a session at its boundary.
+ *
+ * RESIDUAL, named: the stamp carries no DATE, so a card from an earlier day
+ * whose wall clock falls in that same elapsed arc passes. Dating the stamp is
+ * the board's user-owned structure, not this mechanism's to change.
+ */
+export function cardStampIsCurrent(
+  region,
+  { sinceMs = null, nowMs = null, boardStamps = true, slackMin = CARD_STAMP_SLACK_MIN } = {},
+) {
+  if (typeof sinceMs !== 'number' || !Number.isFinite(sinceMs)) return true
+  const m = String(region ?? '').match(/Stand\s+(\d{1,2}):(\d{2})/)
+  if (!m) return boardStamps !== true
+  const stamp = (Number(m[1]) % 24) * 60 + Number(m[2])
+  const now = typeof nowMs === 'number' && Number.isFinite(nowMs) ? nowMs : sinceMs
+  const slack = slackMin * 60_000
+  // THE STAMP IS RESOLVED TO A REAL INSTANT, not to an arc on a clock face
+  // (Sol's review of 9dcc783). Modular minute arithmetic reads Berlin's DST
+  // rollback — where 02:00–03:00 happens twice — as a nearly full day, and a
+  // stale card of that night walks through. So the LATEST instant not after the
+  // commit whose Berlin wall clock shows this stamp is found, and that instant
+  // is compared with the preparation. The doubled hour resolves to its second
+  // occurrence, which is the correct one, and the search costs at most a day of
+  // minutes on one command.
+  for (let back = 0; back <= 1500; back += 1) {
+    const t = now + slack - back * 60_000
+    if (berlinMinuteOfDay(t) !== stamp) continue
+    return t >= sinceMs - slack
+  }
+  return false
+}
+
+/**
+ * THE CARD REGIONS OF THE BOARD that carry ALL these fragments. PURE.
+ *
+ * The board is cut at its real card boundaries — every card is a `<details>`
+ * block, so each `</details>` ends one (Sol's reviews of 9f93aeb/1589da5:
+ * searched independently, a context/fresh-session card BESIDE a
+ * point/claiming-window card satisfied a proof no card on that board ever made,
+ * and a DISTANCE cannot tell adjacent cards apart). A board without that markup
+ * falls back to one card's length, which is still better than the whole file.
+ */
+export function cardRegions(boardText, fragments = [], { windowChars = CARD_PROOF_WINDOW } = {}) {
+  const text = typeof boardText === 'string' ? boardText : ''
+  const list = (Array.isArray(fragments) ? fragments : []).filter(Boolean)
+  if (list.length === 0) return []
+  const [head, ...rest] = list
+  let regions
+  if (text.includes(CARD_END)) {
+    regions = text.split(CARD_END)
+  } else {
+    regions = []
+    for (let at = text.indexOf(head); at >= 0; at = text.indexOf(head, at + 1)) {
+      regions.push(text.slice(at, at + windowChars))
+    }
+  }
+  return regions
+    .filter((r) => r.includes(head) && rest.every((f) => r.includes(f)))
+    // THE REGION IS THE CARD, not what precedes it (Sol's review of 04cea00):
+    // split at the card ends, a region also carries whatever stood between the
+    // previous card and this one — a section header, another card's tail — so an
+    // unrelated edit there would make an UNCHANGED stale card look new. Each
+    // region is therefore cut back to its own opening tag.
+    .map((r) => {
+      const start = r.lastIndexOf(CARD_START, r.indexOf(head))
+      return start >= 0 ? r.slice(start) : r
+    })
+}
+
+export function boardCarriesCard(
+  boardText,
+  fragments = [],
+  { windowChars = CARD_PROOF_WINDOW, sinceMs = null, nowMs = null, knownRegions = null } = {},
+) {
+  if (typeof boardText !== 'string' || !boardText.trim()) return { carries: true, verifiable: false, missing: [] }
+  const list = (Array.isArray(fragments) ? fragments : []).filter(Boolean)
+  const missing = list.filter((f) => !boardText.includes(f))
+  if (missing.length > 0) return { carries: false, verifiable: true, missing }
+  if (list.length < 2) return { carries: true, verifiable: true, missing: [] }
+  const rest = list.slice(1)
+  const whole = cardRegions(boardText, list, { windowChars })
+  if (whole.length === 0) return { carries: false, verifiable: true, missing: rest, split: true }
+  // …AND IT MUST BE THIS HANDOVER'S CARD, not the one the last handover left
+  // standing (Sol's reviews of 9096fb7/bcf820c). Two things are asked, and the
+  // FIRST is the one that decides, because no reading of an undated `HH:MM` ever
+  // can: the card must not be BYTE-IDENTICAL to a card that was already on the
+  // board when `--prepare` looked. A leftover card is exactly that; a card put
+  // up after the preparation is not. The stamp is asked afterwards, as the
+  // cheaper second signal, and only where the board stamps at all.
+  // A RECORDED REGION THAT IS NOT A CARD is a broken reading, not an empty one
+  // (Sol's review of 9ff9311): `['not a card']` would match nothing, and every
+  // leftover card would count as new. Every entry `--prepare` writes carries the
+  // head fragment by construction, so one that does not means the receipt cannot
+  // be judged against — say so instead of passing.
+  if (
+    Array.isArray(knownRegions) &&
+    knownRegions.some((r) => typeof r !== 'string' || !list.every((f) => r.includes(f)))
+  ) {
+    return { carries: false, verifiable: true, missing: [], malformedKnown: true }
+  }
+  const known = Array.isArray(knownRegions) ? new Set(knownRegions) : null
+  const fresh = known ? whole.filter((r) => !known.has(r)) : whole
+  if (fresh.length === 0) return { carries: false, verifiable: true, missing: [], stale: true }
+  const boardStamps = /Stand\s+\d{1,2}:\d{2}/.test(boardText)
+  if (!fresh.some((r) => cardStampIsCurrent(r, { sinceMs, nowMs, boardStamps }))) {
+    return { carries: false, verifiable: true, missing: [], stale: true }
+  }
+  return { carries: true, verifiable: true, missing: [] }
+}
+
+/**
+ * MUST THIS CALL BE DENIED BECAUSE THE BOUNDARY IS COMMITTED? PURE.
+ *
+ * Only a fresh, committed marker belonging to the asking session denies, and only
+ * a call that is NOT part of ending (the closing set stays open, so the card
+ * publish and `--clear` itself are never blocked). Everything else — a stale
+ * marker, a foreign one, a legacy one — denies nothing: the deny is a seal on a
+ * deliberate `--commit`, never a trap, and its reason names the one-command way
+ * back. Returns { deny, reason }.
+ *
+ * THE SEAL EXPIRES WITH THE MARKER, deliberately (Sol's review of 4e93933 called
+ * this a fail-open route; it is the fail-open RULE). A marker past `freshMs` no
+ * longer authorises a stop either — `assessBoundary` calls it `marker-stale` —
+ * so a session that outsits its own seal has not handed over and kept working:
+ * its handover lapsed and must be re-taken from `--prepare`. The alternative, a
+ * seal without end, is the one thing a guard here may never be: a session
+ * trapped by a marker nothing can time out.
+ */
+export function sealedBoundaryDeny({
+  marker,
+  sid,
+  now,
+  toolName,
+  command,
+  filePath,
+  freshMs = BOUNDARY_FRESH_MS,
+} = {}) {
+  if (markerPhase(marker) !== 'committed') return { deny: false, reason: null }
+  if (!sid || marker.sessionId !== sid) return { deny: false, reason: null }
+  if (!markerFresh(marker, now, freshMs)) return { deny: false, reason: null }
+  if (handoverSurvivesCall({ toolName, command, filePath }).survives) return { deny: false, reason: null }
+  const what = marker.cause === BOUNDARY_CAUSES.CONTEXT ? 'the context watermark' : `point ${marker.point ?? '?'}`
+  return {
+    deny: true,
+    reason:
+      `THE BOUNDARY IS COMMITTED (${what}) — \`batch-boundary.mjs --commit\` was this session's last ` +
+      `repository action, so this call is refused instead of silently deleting the marker (that silent ` +
+      `deletion defeated every handover on 13.08.2026). END THE SESSION NOW. If you genuinely must work ` +
+      `again, withdraw the boundary FIRST: \`node scripts/batch-boundary.mjs --clear\` — then this call is ` +
+      `allowed and the boundary must be re-taken afterwards.`,
+  }
+}
+
+// THE CLOSING SET IS CLASSIFIED BY TARGET, NOT BY OPERATION, and that is the
+// design rather than a hole in it (Sol's review of 4e93933). These files and
+// scripts are precisely what a BLOCKED Stop demands of a session that has
+// already committed: publish the board, file the finding it uncovered, record
+// the review. Denying them would put the session back in the loop the two-phase
+// boundary closes — blocked from ending, forced into a call that deletes the
+// marker. What the seal denies is everything that is not ending: a commit, a
+// test run, a source edit, a merge. The residual is that the closing set can be
+// used for more bookkeeping than the boundary strictly needs; that costs a few
+// closing calls, while the alternative costs the handover.
 /** Files whose modification is part of ENDING the batch, by basename. */
 export const CLOSING_SET_FILES = new Set([
   'batch-dashboard.html',
@@ -212,17 +675,24 @@ export const CLOSING_SET_FILES = new Set([
   'tasks-archive.md',
 ])
 
-/** Scripts that exist to SATISFY a Stop guard or to run the handover itself. */
+/** Scripts that exist to SATISFY a Stop guard or to run the handover itself.
+ *  `board-publish` and `batch-in-flight` joined for point 675: publishing the
+ *  handover card IS ending (its absence from this list was one of the measured
+ *  marker deletions of 13.08.2026), and transferring/adopting the in-flight
+ *  declaration is boundary bookkeeping, not batch work. */
 export const CLOSING_SET_SCRIPTS = [
   'dashboard-publish',
   'dashboard-sync',
   'focus',
   'board',
+  'board-publish',
   'mechanism-review',
   'retro-refresh',
   'batch-boundary',
   'batch-handover-observe',
+  'batch-in-flight',
   'batch-singleton',
+  'context-watermark',
   'guard-preflight',
 ]
 
@@ -431,8 +901,12 @@ export function boundaryCardCommand({ point, pointCardStanding = false } = {}) {
     : `${NONE_CARD_CMD} --text-stdin`
 }
 
-export function boundaryCardText({ destination, claimantSid = null } = {}) {
-  const head = 'Der Punkt ist abgeschlossen.'
+export function boundaryCardText({ destination, claimantSid = null, cause = BOUNDARY_CAUSES.POINT } = {}) {
+  // The WATERMARK head (point 675, defeat 3): the reader must see that the
+  // handover happens BECAUSE the context passed the mark, not because a point
+  // closed — a card that says "der Punkt ist abgeschlossen" over a watermark
+  // handover claims a closure that never happened.
+  const head = BOUNDARY_CARD_HEADS[cause] ?? BOUNDARY_CARD_HEADS[BOUNDARY_CAUSES.POINT]
   if (destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW && claimantSid) {
     // The reservation is stated with its LIMIT, not as a promise. It survives the
     // release now (point 461 — the freed lock stays that window's while its

@@ -28,6 +28,7 @@ const OUT_MSG = { ...VECTOR.message, direction: 'outbox' }
 
 const VIEWER = resolve(process.cwd(), 'public', 'board', 'index.html')
 const viewerHtml = readFileSync(VIEWER, 'utf8')
+const faviconSvg = readFileSync(resolve(process.cwd(), 'public', 'board', 'favicon.svg'), 'utf8')
 
 /** The page's crypto block, extracted between its markers and made callable. */
 function browserCrypto() {
@@ -71,6 +72,24 @@ async function settle(dom, cond, tries = 200) {
 }
 
 const okResponse = (body) => ({ ok: true, status: 200, statusText: 'OK', text: async () => body })
+
+describe('the board favicon artwork', () => {
+  it('is a square, self-contained, single-path silhouette', () => {
+    const doc = new JSDOM(faviconSvg, { contentType: 'image/svg+xml' }).window.document
+    const svg = doc.documentElement
+    const paper = svg.firstElementChild
+
+    expect(svg.getAttribute('viewBox')).toBe('0 0 64 64')
+    expect(svg.hasAttribute('style')).toBe(false)
+    expect(paper.tagName).toBe('rect')
+    expect(paper.getAttribute('width')).toBe('64')
+    expect(paper.getAttribute('height')).toBe('64')
+    expect(paper.getAttribute('fill')).toBe('#f0e8d2')
+    expect(svg.querySelectorAll('path')).toHaveLength(1)
+    expect(svg.querySelector('path').getAttribute('fill')).toBe('#3a2e1c')
+    expect(svg.querySelectorAll('text, linearGradient, radialGradient, image, use')).toHaveLength(0)
+  })
+})
 
 describe('the page speaks the same protocol as chat-core', () => {
   const api = browserCrypto()
@@ -141,6 +160,29 @@ describe('the chat survives the document the board writes over it', () => {
     dom.window.injectChat()
     expect(dom.window.document.querySelectorAll('#hoa-chat')).toHaveLength(1)
     expect(dom.window.document.querySelectorAll('#hoa-chat-style')).toHaveLength(1)
+    dom.window.close()
+  })
+
+  it('restores exactly one favicon after the board replaces the source head', async () => {
+    const dom = await loadViewer({ fetchImpl: async () => okResponse(board) })
+    const doc = dom.window.document
+    // The fetched board really replaced the viewer head; its title is live and
+    // the viewer-only color-scheme metadata is gone.
+    expect(doc.title).toBe('b')
+    expect(doc.querySelector('meta[name="color-scheme"]')).toBeNull()
+
+    // A later replacement can lose the runtime link too. The same swap route
+    // that restores the chat must put it back, and repeated injection stays
+    // idempotent.
+    doc.head.replaceChildren(doc.createElement('title'))
+    dom.window.dispatchEvent(new dom.window.Event('hoa-board-swapped'))
+    dom.window.injectChat()
+    dom.window.injectChat()
+
+    const icons = doc.querySelectorAll('link[rel~="icon"]')
+    expect(icons).toHaveLength(1)
+    expect(icons[0].getAttribute('type')).toBe('image/svg+xml')
+    expect(icons[0].getAttribute('href')).toBe('favicon.svg')
     dom.window.close()
   })
 

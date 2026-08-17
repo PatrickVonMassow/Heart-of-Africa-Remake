@@ -460,6 +460,19 @@ describe('lesson→mechanism ledger', () => {
     expect(v.reason).toMatch(/never-built-guard\.mjs.*does not exist/s)
   })
 
+  // The extension alternation is longest-first, and `.jsonl` is the trap `.json`
+  // set: read one letter short, a real ledger file is reported as a dead claim.
+  it('reads a .jsonl claim whole instead of stopping at .json', () => {
+    const rows = [...full]
+    rows[0] = '| 3.1 | Der Batch, der stehen blieb | 1 | scripts/a-guard.mjs schreibt .claude/reviews.jsonl |'
+    const v = evaluateLedger({
+      retroText: retro,
+      ledgerText: ledger(rows),
+      pathExists: (p) => ['scripts/a-guard.mjs', 'scripts/b-guard.mjs', '.claude/reviews.jsonl'].includes(p),
+    })
+    expect(v).toBeNull()
+  })
+
   it('BLOCKS an outcome outside 1/2/3', () => {
     const rows = [...full]
     rows[1] = '| 3.2 | Parallele Sessions | 4 | scripts/b-guard.mjs |'

@@ -26,6 +26,19 @@ import {
   isOutputPagerSegment,
   describeWithdrawalTrigger,
   hookCallTimestamp,
+  berlinMinuteOfDay,
+  boardCarriesCard,
+  cardProofFragments,
+  cardRegions,
+  cardStampIsCurrent,
+  CARD_PROOF_WINDOW,
+  markerFresh,
+  markerPhase,
+  preparedReceipt,
+  PREPARED_RECEIPT_V,
+  sealedBoundaryDeny,
+  unpreparedRefusal,
+  BOUNDARY_CAUSES,
   WITHDRAWAL_TRIGGER_MAX,
 } from './batch-boundary-core.mjs'
 import { NO_CURRENT_WORK_TITLE } from './board-core.mjs'
@@ -35,10 +48,17 @@ import {
   topicViolations,
 } from './dashboard-card-topic-guard-core.mjs'
 import { progressGuardDecision } from './batch-singleton.mjs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { clearBoundary, commitSealedBoundary, standingCards } from './batch-boundary.mjs'
 
 const NOW = 1_785_000_000_000
 const SID = 'session-abc'
-const marker = (over = {}) => ({ v: 1, sessionId: SID, point: 373, at: NOW - 1000, ...over })
+// A marker as `--commit` writes it — SEALED. The unphased shape the retired
+// one-shot form wrote is no longer a boundary claim (Sol's review of abdde93),
+// and the case below pins that.
+const marker = (over = {}) => ({ v: 2, phase: 'committed', sessionId: SID, point: 373, at: NOW - 1000, ...over })
 
 // ---------------------------------------------------------------------------
 describe('classifyLauncherState — armed means "will fire again on its own"', () => {
@@ -131,6 +151,16 @@ describe('assessBoundary', () => {
     expect(assessBoundary({ marker: old, sid: SID, now: NOW, closure: 'closed' }).reason).toBe(
       'marker-stale',
     )
+  })
+
+  it('refuses an UNPHASED point marker — the one-shot form that wrote it is retired (Sol on abdde93)', () => {
+    // Such a marker would authorise a stop that skipped --prepare, its receipt,
+    // the card proof, the transfer and the seal.
+    const legacy = { v: 1, sessionId: SID, point: 373, at: NOW - 1000 }
+    const b = assessBoundary({ marker: legacy, sid: SID, now: NOW, closure: 'closed' })
+    expect(b.valid).toBe(false)
+    expect(b.reason).toBe('marker-uncommitted')
+    expect(boundaryVerdict({ boundary: b, launcher: 'armed' })).toBe(null)
   })
 
   it('refuses a malformed marker', () => {
@@ -569,5 +599,734 @@ describe('the boundary card names where the batch actually goes', () => {
     expect(boundaryCardText({ point: 1, ...boundaryDestination({ claimHonoured: true, claimantSid: 's' }) })).toContain(
       'Fenster s hat ihn beansprucht',
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE TWO-PHASE BOUNDARY (point 675, defeat 1): a committed marker is SEALED —
+// a later mutation is an explicit, loud DENY, never a silent marker deletion,
+// and everything `--prepare` prescribes stays inside the closing set so the
+// bookkeeping can never delete a marker either.
+// ---------------------------------------------------------------------------
+describe('markerPhase — only a committed marker is sealed', () => {
+  it('distinguishes none / legacy / committed', () => {
+    expect(markerPhase(null)).toBe('none')
+    expect(markerPhase(undefined)).toBe('none')
+    expect(markerPhase(marker({ phase: undefined }))).toBe('legacy')
+    expect(markerPhase(marker())).toBe('committed')
+    expect(markerPhase(marker({ phase: 'prepared' }))).toBe('legacy') // unknown phases are not sealed
+  })
+})
+
+describe('sealedBoundaryDeny — a mutation after --commit errors loudly (point 675)', () => {
+  const sealed = marker({ phase: 'committed' })
+  const call = { toolName: 'Bash', command: 'git commit -m x' }
+
+  it('DENIES a non-closing mutation after commit, naming --clear as the way back', () => {
+    const d = sealedBoundaryDeny({ marker: sealed, sid: SID, now: NOW, ...call })
+    expect(d.deny).toBe(true)
+    expect(d.reason).toContain('COMMITTED')
+    expect(d.reason).toContain('--clear')
+  })
+
+  it('a file edit outside the closing set is denied too', () => {
+    expect(
+      sealedBoundaryDeny({ marker: sealed, sid: SID, now: NOW, toolName: 'Write', filePath: 'src/App.tsx' }).deny,
+    ).toBe(true)
+  })
+
+  it('NEVER denies the closing set — the card publish, the board, --clear itself', () => {
+    for (const command of [
+      'node scripts/board.mjs none --text-stdin',
+      'node scripts/board-publish.mjs',
+      'node scripts/batch-boundary.mjs --clear',
+      'node scripts/batch-boundary.mjs --status',
+      'node scripts/batch-in-flight.mjs --status',
+      'node scripts/guard-preflight.mjs --for answer --session s',
+    ]) {
+      expect(sealedBoundaryDeny({ marker: sealed, sid: SID, now: NOW, toolName: 'Bash', command }).deny).toBe(false)
+    }
+  })
+
+  it('a legacy (un-phased) marker denies nothing — it authorises nothing either', () => {
+    expect(sealedBoundaryDeny({ marker: marker({ phase: undefined }), sid: SID, now: NOW, ...call }).deny).toBe(false)
+  })
+
+  it('a stale or foreign committed marker denies nothing — the seal is not a trap', () => {
+    expect(
+      sealedBoundaryDeny({
+        marker: marker({ phase: 'committed', at: NOW - BOUNDARY_FRESH_MS - 1 }),
+        sid: SID,
+        now: NOW,
+        ...call,
+      }).deny,
+    ).toBe(false)
+    expect(sealedBoundaryDeny({ marker: sealed, sid: 'other-session', now: NOW, ...call }).deny).toBe(false)
+    expect(sealedBoundaryDeny({ marker: sealed, sid: '', now: NOW, ...call }).deny).toBe(false)
+    expect(sealedBoundaryDeny({ marker: null, sid: SID, now: NOW, ...call }).deny).toBe(false)
+  })
+
+  it('names the context watermark when that is what was committed', () => {
+    const d = sealedBoundaryDeny({
+      marker: marker({ phase: 'committed', cause: 'context', point: null, tokens: 160_000 }),
+      sid: SID,
+      now: NOW,
+      ...call,
+    })
+    expect(d.deny).toBe(true)
+    expect(d.reason).toContain('context watermark')
+  })
+})
+
+describe('the marker survives everything --prepare prescribes (point 675)', () => {
+  it('every bookkeeping command the prepare phase names is in the closing set', () => {
+    // These are the commands `batch-boundary.mjs --prepare` prints. If one of
+    // them ever left the closing set, running it would withdraw a taken
+    // boundary again — the exact measured defeat of 13.08.2026 (board-publish
+    // was the missing one).
+    for (const command of [
+      'node scripts/board.mjs done 675 --none --text-stdin',
+      'node scripts/board.mjs none --text-stdin',
+      'node scripts/board-publish.mjs',
+      'node scripts/guard-preflight.mjs --for answer --session s',
+      'node scripts/batch-boundary.mjs --prepare 675',
+      'node scripts/batch-boundary.mjs --commit 675',
+      'node scripts/batch-in-flight.mjs --handover-check',
+      'node scripts/batch-in-flight.mjs --adopt',
+      'node scripts/context-watermark.mjs --status',
+    ]) {
+      expect(handoverSurvivesCall({ toolName: 'Bash', command }).survives, command).toBe(true)
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE CONTEXT BOUNDARY (point 675, defeat 3): valid without a closed point,
+// but ONLY on a recorded real measurement.
+// ---------------------------------------------------------------------------
+describe('assessBoundary — the context-watermark cause', () => {
+  const ctx = (over = {}) =>
+    marker({ phase: 'committed', cause: 'context', point: null, tokens: 165_000, watermark: 150_000, ...over })
+
+  it('is valid without any point closure, on a recorded measurement', () => {
+    const b = assessBoundary({ marker: ctx(), sid: SID, now: NOW, closure: 'unknown' })
+    expect(b).toEqual({ valid: true, point: null, reason: 'context-boundary' })
+  })
+
+  it('REFUSES a context marker with no recorded token reading — assumption is not measurement', () => {
+    expect(assessBoundary({ marker: ctx({ tokens: undefined }), sid: SID, now: NOW, closure: 'unknown' }).valid).toBe(
+      false,
+    )
+    expect(assessBoundary({ marker: ctx({ tokens: 0 }), sid: SID, now: NOW, closure: 'unknown' }).reason).toBe(
+      'context-marker-unmeasured',
+    )
+    // …and the recorded MARK is as mandatory as the reading (Sol finding 5).
+    expect(assessBoundary({ marker: ctx({ watermark: undefined }), sid: SID, now: NOW, closure: 'unknown' }).reason).toBe(
+      'context-marker-unmeasured',
+    )
+  })
+
+  it('an UNPHASED context marker authorises nothing — only --commit writes one (Sol re-review, finding 3)', () => {
+    expect(assessBoundary({ marker: ctx({ phase: undefined }), sid: SID, now: NOW, closure: 'unknown' })).toEqual({
+      valid: false,
+      point: null,
+      reason: 'context-marker-uncommitted',
+    })
+    expect(assessBoundary({ marker: ctx({ phase: 'prepared' }), sid: SID, now: NOW, closure: 'unknown' }).valid).toBe(
+      false,
+    )
+  })
+
+  it('RE-JUDGES the claim: a reading below the recorded mark authorises nothing (Sol finding 5)', () => {
+    const b = assessBoundary({ marker: ctx({ tokens: 1 }), sid: SID, now: NOW, closure: 'unknown' })
+    expect(b).toEqual({ valid: false, point: null, reason: 'context-below-watermark' })
+    expect(
+      assessBoundary({ marker: ctx({ tokens: 149_999 }), sid: SID, now: NOW, closure: 'unknown' }).valid,
+    ).toBe(false)
+    // At the mark exactly is past it — the same >= the live decision uses.
+    expect(assessBoundary({ marker: ctx({ tokens: 150_000 }), sid: SID, now: NOW, closure: 'unknown' }).valid).toBe(true)
+  })
+
+  it('keeps the freshness and session binding of every marker', () => {
+    expect(
+      assessBoundary({ marker: ctx({ at: NOW - BOUNDARY_FRESH_MS - 1 }), sid: SID, now: NOW, closure: 'unknown' })
+        .reason,
+    ).toBe('marker-stale')
+    expect(assessBoundary({ marker: ctx(), sid: 'other', now: NOW, closure: 'unknown' }).reason).toBe(
+      'marker-foreign-session',
+    )
+  })
+
+  it('the claim may not bring its own yardstick — the CURRENT mark is judged too (Sol final round)', () => {
+    // {tokens: 1, watermark: 1} is internally consistent and must still fail.
+    expect(
+      assessBoundary({ marker: ctx({ tokens: 1, watermark: 1 }), sid: SID, now: NOW, closure: 'unknown', watermarkNow: 150_000 })
+        .reason,
+    ).toBe('context-below-watermark')
+    expect(
+      assessBoundary({ marker: ctx(), sid: SID, now: NOW, closure: 'unknown', watermarkNow: 150_000 }).valid,
+    ).toBe(true)
+    // A mark recalibrated DOWN since the commit still honours the recorded, higher one.
+    expect(
+      assessBoundary({ marker: ctx({ tokens: 120_000 }), sid: SID, now: NOW, closure: 'unknown', watermarkNow: 100_000 })
+        .valid,
+    ).toBe(false)
+    // …and a broken watermarkNow input falls back to the recorded mark alone.
+    expect(
+      assessBoundary({ marker: ctx(), sid: SID, now: NOW, closure: 'unknown', watermarkNow: NaN }).valid,
+    ).toBe(true)
+  })
+
+  it('feeds boundaryVerdict exactly like a point boundary', () => {
+    const boundary = assessBoundary({ marker: ctx(), sid: SID, now: NOW, closure: 'unknown' })
+    expect(boundaryVerdict({ boundary, launcher: 'armed' })).toBe('allow-boundary')
+    expect(boundaryVerdict({ boundary, launcher: 'disabled' })).toBe('block-launcher')
+  })
+})
+
+describe('commitSealedBoundary — the marker is the LAST write (Sol findings 1/4)', () => {
+  it('records the transfer first, then writes the marker', () => {
+    const order = []
+    const out = commitSealedBoundary({
+      transfer: { commit: () => (order.push('transfer'), 'feat/x@abcd') },
+      marker: { v: 2 },
+      write: () => order.push('marker'),
+    })
+    expect(order).toEqual(['transfer', 'marker'])
+    expect(out).toBe('feat/x@abcd')
+  })
+
+  it('a THROWING transfer leaves NO marker behind, and names its stage', () => {
+    let wrote = false
+    let caught = null
+    try {
+      commitSealedBoundary({
+        transfer: {
+          commit: () => {
+            throw new Error('declaration unwritable')
+          },
+        },
+        marker: { v: 2 },
+        write: () => {
+          wrote = true
+        },
+      })
+    } catch (e) {
+      caught = e
+    }
+    expect(caught?.message).toBe('declaration unwritable')
+    expect(caught?.stage).toBe('transfer')
+    expect(wrote).toBe(false)
+  })
+
+  it('a THROWING marker write is reported as the MARKER stage, with the transfer kept (Sol round 3)', () => {
+    let caught = null
+    try {
+      commitSealedBoundary({
+        transfer: { commit: () => 'feat/x@abcd' },
+        marker: { v: 2 },
+        write: () => {
+          throw new Error('disk says no')
+        },
+      })
+    } catch (e) {
+      caught = e
+    }
+    // The transfer already stands — reporting "nothing recorded" here would
+    // send the session to redo a done transfer and distrust a half-taken state.
+    expect(caught?.stage).toBe('marker')
+    expect(caught?.transferred).toBe('feat/x@abcd')
+    expect(caught?.message).toBe('disk says no')
+  })
+
+  it('no transfer at all still writes the marker', () => {
+    let marker = null
+    expect(commitSealedBoundary({ transfer: null, marker: { v: 2, point: 675 }, write: (m) => (marker = m) })).toBeNull()
+    expect(marker).toEqual({ v: 2, point: 675 })
+  })
+})
+
+describe('boundaryCardText — the watermark variant says WHY (point 675)', () => {
+  it('a context boundary names the watermark, not a closed point', () => {
+    const text = boundaryCardText({ ...boundaryDestination({}), cause: 'context' })
+    expect(text).toContain('Wasserstandsmarke')
+    expect(text).not.toContain('Der Punkt ist abgeschlossen')
+  })
+
+  it('the point variant is untouched, and the claiming-window variant carries the head too', () => {
+    expect(boundaryCardText({ ...boundaryDestination({}) })).toContain('Der Punkt ist abgeschlossen')
+    expect(
+      boundaryCardText({ ...boundaryDestination({ claimHonoured: true, claimantSid: 's' }), cause: 'context' }),
+    ).toContain('Wasserstandsmarke')
+  })
+})
+
+describe('progressGuardDecision — the context watermark demands a handover (point 675)', () => {
+  const base = { sid: SID, paused: false, openCount: 3, formatSuspect: false, ownership: 'mine', unhandledAlert: false }
+
+  it('past the watermark, an owner with no other verdict is told to hand over', () => {
+    expect(progressGuardDecision({ ...base, contextPastWatermark: true })).toBe('block-context-handover')
+  })
+
+  it('a TRANSFERABLE wait does not shield the session from the watermark — the successor adopts', () => {
+    expect(progressGuardDecision({ ...base, contextPastWatermark: true, inFlight: true })).toBe(
+      'block-context-handover',
+    )
+  })
+
+  it('NON-transferable work drains first — the safe degraded mode', () => {
+    expect(
+      progressGuardDecision({ ...base, contextPastWatermark: true, inFlight: true, inFlightTransferable: false }),
+    ).toBe('allow-in-flight')
+  })
+
+  it('a due POINT boundary outranks the watermark, and a valid boundary still hands over', () => {
+    expect(progressGuardDecision({ ...base, contextPastWatermark: true, boundaryDue: 675 })).toBe(
+      'block-take-boundary',
+    )
+    expect(
+      progressGuardDecision({
+        ...base,
+        contextPastWatermark: true,
+        boundary: { valid: true, point: null, reason: 'context-boundary' },
+        launcher: 'armed',
+      }),
+    ).toBe('allow-boundary')
+  })
+
+  it('never fires for a non-owner, a paused batch or an empty queue', () => {
+    expect(progressGuardDecision({ ...base, ownership: 'held', contextPastWatermark: true })).toBe('stand-down')
+    expect(progressGuardDecision({ ...base, paused: true, contextPastWatermark: true })).toBe('allow')
+    expect(progressGuardDecision({ ...base, openCount: 0, contextPastWatermark: true })).toBe('allow')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE PREPARE RECEIPT (Sol's review of 4e93933): two phases are only two phases
+// if the first one is required. `--commit --context` could be called with no
+// `--prepare` at all — so the board card that says WHY the batch handed over
+// could be skipped in silence — and the point commit checked only that the OLD
+// current-work card was gone.
+// ---------------------------------------------------------------------------
+describe('unpreparedRefusal — --commit refuses what --prepare never prepared (point 675)', () => {
+  const fresh = (over = {}) => ({ ...preparedReceipt({ sid: SID, point: 675, now: NOW - 1000 }), ...over })
+
+  it('lets the matching receipt through, for both causes', () => {
+    expect(unpreparedRefusal({ receipt: fresh(), sid: SID, point: 675, now: NOW })).toBeNull()
+    expect(
+      unpreparedRefusal({
+        receipt: preparedReceipt({ sid: SID, cause: BOUNDARY_CAUSES.CONTEXT, now: NOW - 1000 }),
+        sid: SID,
+        cause: BOUNDARY_CAUSES.CONTEXT,
+        now: NOW,
+      }),
+    ).toBeNull()
+  })
+
+  it('refuses a MISSING receipt and names the one command that fixes it', () => {
+    const point = unpreparedRefusal({ receipt: null, sid: SID, point: 675, now: NOW })
+    expect(point).toContain('NOT PREPARED')
+    expect(point).toContain('--prepare 675')
+    // The context refusal must name the context form, or it sends the session
+    // to a command that cannot prepare a watermark boundary.
+    expect(
+      unpreparedRefusal({ receipt: null, sid: SID, cause: BOUNDARY_CAUSES.CONTEXT, now: NOW }),
+    ).toContain('--prepare --context --transcript')
+  })
+
+  it('reads the board through standingCards, and tells a failed reading from an empty one', () => {
+    // Through the real function, not an injected shape: reverting it to a bare
+    // array must fail here (Sol on 68d6b5e).
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-board-'))
+    try {
+      const path = join(dir, 'board.html')
+      const cause = BOUNDARY_CAUSES.CONTEXT
+      const destination = BOUNDARY_DESTINATIONS.FRESH_SESSION
+      // A board that is not there at all — not the same as one without cards.
+      expect(standingCards({ cause, destination, path })).toEqual({ readable: false, cards: [] })
+      writeFileSync(path, '<details class="sect"><summary>Leer</summary></details>')
+      expect(standingCards({ cause, destination, path })).toEqual({ readable: true, cards: [] })
+      writeFileSync(
+        path,
+        `<details class="card"><p>${boundaryCardText({ destination, cause })}</p></details>`,
+      )
+      const seen = standingCards({ cause, destination, path })
+      expect(seen.readable).toBe(true)
+      expect(seen.cards).toHaveLength(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('records WHETHER the board was read, not merely what it held (Sol on 456be8f)', () => {
+    const read = preparedReceipt({
+      sid: SID,
+      point: 675,
+      now: NOW,
+      board: { readable: true, cards: ['<details class="card">…</details>'] },
+    })
+    expect(read.boardRead).toBe(true)
+    expect(read.cardsBefore).toHaveLength(1)
+    // An unreadable board leaves an empty list — and says that it is not the
+    // same thing as a board with no cards on it.
+    const unread = preparedReceipt({ sid: SID, point: 675, now: NOW, board: { readable: false, cards: [] } })
+    expect(unread.boardRead).toBe(false)
+    expect(unread.cardsBefore).toEqual([])
+  })
+
+  it('refuses a receipt of an OLDER SHAPE, and one whose destination has since changed (Sol on 7ecebed)', () => {
+    // A v1 receipt carries no board reading, so the stale-card check would have
+    // nothing to compare against — refused rather than silently downgraded.
+    const legacy = { v: 1, sessionId: SID, cause: BOUNDARY_CAUSES.POINT, point: 675, at: NOW - 1000 }
+    expect(unpreparedRefusal({ receipt: legacy, sid: SID, point: 675, now: NOW })).toContain('older shape')
+    // …and so is a receipt of the PREVIOUS version, whose recorded regions were
+    // cut differently and would no longer equal the ones read now.
+    expect(
+      unpreparedRefusal({ receipt: { ...fresh(), v: PREPARED_RECEIPT_V - 1 }, sid: SID, point: 675, now: NOW }),
+    ).toContain('older shape')
+    expect(
+      unpreparedRefusal({ receipt: { ...fresh(), cardsBefore: 'nope' }, sid: SID, point: 675, now: NOW }),
+    ).toContain('older shape')
+    // …including an ARRAY whose contents are not card text: a Set built from it
+    // would match no region, and every standing card would count as new.
+    expect(
+      unpreparedRefusal({ receipt: { ...fresh(), cardsBefore: [{ card: 'x' }] }, sid: SID, point: 675, now: NOW }),
+    ).toContain('older shape')
+    // A claim appearing between the phases changes the card's text, so the old
+    // board reading no longer covers it.
+    const prepared = preparedReceipt({
+      sid: SID,
+      point: 675,
+      now: NOW - 1000,
+      destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
+    })
+    expect(
+      unpreparedRefusal({
+        receipt: prepared,
+        sid: SID,
+        point: 675,
+        destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW,
+        now: NOW,
+      }),
+    ).toContain('goes elsewhere')
+    expect(
+      unpreparedRefusal({
+        receipt: prepared,
+        sid: SID,
+        point: 675,
+        destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
+        now: NOW,
+      }),
+    ).toBeNull()
+  })
+
+  it('refuses a FOREIGN, a STALE, a WRONG-CAUSE and a WRONG-POINT receipt', () => {
+    expect(unpreparedRefusal({ receipt: fresh({ sessionId: 'other' }), sid: SID, point: 675, now: NOW })).toContain(
+      'belongs to session other',
+    )
+    expect(
+      unpreparedRefusal({ receipt: fresh({ at: NOW - BOUNDARY_FRESH_MS - 1 }), sid: SID, point: 675, now: NOW }),
+    ).toContain('stale')
+    // A context commit may not ride on a point preparation, whose bookkeeping
+    // names a closed point rather than the watermark — and the reverse.
+    expect(
+      unpreparedRefusal({ receipt: fresh(), sid: SID, cause: BOUNDARY_CAUSES.CONTEXT, now: NOW }),
+    ).toContain('POINT boundary')
+    expect(unpreparedRefusal({ receipt: fresh(), sid: SID, point: 676, now: NOW })).toContain('point 675, not point 676')
+  })
+
+  it('is not satisfied by a receipt with no time at all', () => {
+    expect(unpreparedRefusal({ receipt: fresh({ at: 'now-ish' }), sid: SID, point: 675, now: NOW })).toContain('stale')
+    expect(unpreparedRefusal({ receipt: fresh({ at: NaN }), sid: SID, point: 675, now: NOW })).toContain('stale')
+  })
+
+  it('refuses a FUTURE-dated receipt — a forward stamp is not freshness', () => {
+    expect(
+      unpreparedRefusal({
+        receipt: preparedReceipt({ sid: SID, point: 675, now: NOW + 60_000 }),
+        sid: SID,
+        point: 675,
+        now: NOW,
+      }),
+    ).toContain('stale')
+  })
+})
+
+describe('clearBoundary — a partial withdrawal leaves the SEAL, never the receipt (Sol on 389bbc7)', () => {
+  const run = (failOn) => {
+    const removed = []
+    const out = clearBoundary('marker.json', {
+      preparedPath: 'receipt.json',
+      remove: (p) => {
+        if (p === failOn) throw new Error('EPERM')
+        removed.push(p)
+      },
+    })
+    return { out, removed }
+  }
+
+  it('removes both, receipt first', () => {
+    const { out, removed } = run(null)
+    expect(out).toEqual({ marker: true, prepared: true })
+    expect(removed).toEqual(['receipt.json', 'marker.json'])
+  })
+
+  it('keeps the MARKER when the receipt cannot go — the bypass is the other order', () => {
+    // Marker gone + fresh receipt = no seal and a prepared commit: exactly what
+    // the withdrawal must never leave behind.
+    const { out, removed } = run('receipt.json')
+    expect(out).toEqual({ marker: false, prepared: false })
+    expect(removed).toEqual([])
+  })
+
+  it('reports a marker that could not be removed', () => {
+    const { out } = run('marker.json')
+    expect(out).toEqual({ marker: false, prepared: true })
+  })
+})
+
+describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced handover (Sol on ffa0a78)', () => {
+  it('calls a FUTURE-dated marker unfresh at every predicate that reads one', () => {
+    const future = marker({ at: NOW + 60_000 })
+    expect(markerFresh(future, NOW)).toBe(false)
+    // …so it authorises no stop…
+    expect(assessBoundary({ marker: future, sid: SID, now: NOW, closure: 'closed' }).reason).toBe('marker-stale')
+    // …and holds no seal either, which is the direction that cannot trap a session.
+    expect(
+      sealedBoundaryDeny({
+        marker: { ...future, phase: 'committed' },
+        sid: SID,
+        now: NOW,
+        toolName: 'Bash',
+        command: 'git commit -m x',
+      }).deny,
+    ).toBe(false)
+    expect(markerFresh(marker(), NOW)).toBe(true)
+    expect(markerFresh({ at: 'soon' }, NOW)).toBe(false)
+    expect(markerFresh(null, NOW)).toBe(false)
+  })
+
+  it('proves each real card by fragments that are actually in it — for both causes and both destinations', () => {
+    for (const cause of [BOUNDARY_CAUSES.CONTEXT, BOUNDARY_CAUSES.POINT]) {
+      for (const destination of [BOUNDARY_DESTINATIONS.FRESH_SESSION, BOUNDARY_DESTINATIONS.CLAIMING_WINDOW]) {
+        const card = boundaryCardText({ destination, claimantSid: 'window-7', cause })
+        const proof = boardCarriesCard(`<div><p>${card}</p></div>`, cardProofFragments({ cause, destination }))
+        expect(proof).toEqual({ carries: true, verifiable: true, missing: [] })
+      }
+    }
+    // The fragments stay ASCII: the card crosses the board's HTML, and a check
+    // hanging on an umlaut would block a correct boundary the day it is escaped.
+    for (const cause of [BOUNDARY_CAUSES.CONTEXT, BOUNDARY_CAUSES.POINT]) {
+      for (const f of cardProofFragments({ cause, destination: BOUNDARY_DESTINATIONS.FRESH_SESSION })) {
+        expect(f).toMatch(/^[\x20-\x7e]+$/)
+      }
+    }
+  })
+
+  it('refuses the WRONG card, and the wrong destination', () => {
+    const pointCard = boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.POINT })
+    // A point card is no watermark card: it claims a closure that never happened.
+    const asContext = boardCarriesCard(
+      pointCard,
+      cardProofFragments({ cause: BOUNDARY_CAUSES.CONTEXT, destination: BOUNDARY_DESTINATIONS.FRESH_SESSION }),
+    )
+    expect(asContext.carries).toBe(false)
+    expect(asContext.missing[0]).toContain('Wasserstandsmarke')
+    // …and a card announcing a fresh session does not prove one that must name
+    // the claiming window the launcher will actually hand the batch to.
+    expect(
+      boardCarriesCard(
+        pointCard,
+        cardProofFragments({ cause: BOUNDARY_CAUSES.POINT, destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW }),
+      ).carries,
+    ).toBe(false)
+  })
+
+  it('will not assemble a card out of TWO ADJACENT cards on the board (Sol on 9f93aeb/1589da5)', () => {
+    // A watermark card announcing a fresh session, IMMEDIATELY followed by a
+    // point card that names a claiming window — the real markup, with no gap
+    // manufactured between them. No card on this board is a watermark handover
+    // to a claiming window, and the proof must not add the two together.
+    const card = (cause, destination) =>
+      `<details class="card"><summary>Übergabe</summary><p>${boundaryCardText({ destination, claimantSid: 'window-7', cause })}</p></details>`
+    const board =
+      `<details class="sect"><summary><h2>Aktuell</h2></summary>` +
+      card(BOUNDARY_CAUSES.CONTEXT, BOUNDARY_DESTINATIONS.FRESH_SESSION) +
+      card(BOUNDARY_CAUSES.POINT, BOUNDARY_DESTINATIONS.CLAIMING_WINDOW) +
+      '</details>'
+    const proof = boardCarriesCard(
+      board,
+      cardProofFragments({ cause: BOUNDARY_CAUSES.CONTEXT, destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW }),
+    )
+    expect(proof.carries).toBe(false)
+    expect(proof.split).toBe(true)
+    // …while each card that IS on it proves itself.
+    expect(
+      boardCarriesCard(
+        board,
+        cardProofFragments({ cause: BOUNDARY_CAUSES.CONTEXT, destination: BOUNDARY_DESTINATIONS.FRESH_SESSION }),
+      ).carries,
+    ).toBe(true)
+    expect(
+      boardCarriesCard(
+        board,
+        cardProofFragments({ cause: BOUNDARY_CAUSES.POINT, destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW }),
+      ).carries,
+    ).toBe(true)
+  })
+
+  it('reads the board stamp in BERLIN, whatever the machine is set to', () => {
+    // 12:00 UTC on a summer day is 14:00 in Berlin; the board stamps that.
+    expect(berlinMinuteOfDay(Date.UTC(2026, 7, 13, 12, 0))).toBe(14 * 60)
+    expect(berlinMinuteOfDay(Date.UTC(2026, 0, 13, 12, 0))).toBe(13 * 60)
+  })
+
+  it('falls back to one card\'s length on a board with no card markup', () => {
+    const plain =
+      boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT }) +
+      '\n'.padEnd(CARD_PROOF_WINDOW, '.') +
+      boundaryCardText({ destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW, claimantSid: 'w', cause: BOUNDARY_CAUSES.POINT })
+    expect(
+      boardCarriesCard(
+        plain,
+        cardProofFragments({ cause: BOUNDARY_CAUSES.CONTEXT, destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW }),
+      ).carries,
+    ).toBe(false)
+    expect(
+      boardCarriesCard(
+        plain,
+        cardProofFragments({ cause: BOUNDARY_CAUSES.CONTEXT, destination: BOUNDARY_DESTINATIONS.FRESH_SESSION }),
+      ).carries,
+    ).toBe(true)
+  })
+
+  const stamped = (hhmm) =>
+    `<details class="card"><summary>Übergabe</summary><p><span class="stamp">Stand ${hhmm}</span> ` +
+    `${boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</p></details>`
+  const frags = cardProofFragments({
+    cause: BOUNDARY_CAUSES.CONTEXT,
+    destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
+  })
+
+  it('refuses the card the preparation ALREADY SAW, whatever its stamp reads (Sol on bcf820c)', () => {
+    // The undated `HH:MM` can alias — the rollback night has two 02:10s, and
+    // yesterday's card can fall inside today's interval. What cannot alias is
+    // that the preparation already found this exact card on the board.
+    const leftover = stamped('02:10')
+    const prepared = Date.UTC(2026, 9, 25, 0, 55)
+    const now = Date.UTC(2026, 9, 25, 1, 10)
+    const known = cardRegions(leftover, frags)
+    expect(known.length).toBe(1)
+    const stale = boardCarriesCard(leftover, frags, { sinceMs: prepared, nowMs: now, knownRegions: known })
+    expect(stale.carries).toBe(false)
+    expect(stale.stale).toBe(true)
+    // The card put up AFTER the preparation is a different region — even one
+    // minute later, since the stamp is part of it.
+    expect(
+      boardCarriesCard(stamped('02:11'), frags, { sinceMs: prepared, nowMs: now, knownRegions: known }).carries,
+    ).toBe(true)
+    // A board that carried no such card at preparation time proves it outright.
+    expect(boardCarriesCard(leftover, frags, { sinceMs: prepared, nowMs: now, knownRegions: [] }).carries).toBe(true)
+    // …but a reading that records something which is no card at all is BROKEN,
+    // not empty: it would match nothing and wave every leftover through.
+    // Every fragment must be there, not just the head: a recorded string that
+    // carries only the head matches no real region either.
+    for (const bogus of [['not a card'], [''], [42], [frags[0]]]) {
+      const broken = boardCarriesCard(leftover, frags, { sinceMs: prepared, nowMs: now, knownRegions: bogus })
+      expect(broken.carries).toBe(false)
+      expect(broken.malformedKnown).toBe(true)
+    }
+  })
+
+  it('cuts the region back to the CARD, so an edit around it does not make a stale card look new (Sol on 04cea00)', () => {
+    const section = (head) => `<details class="sect"><summary><h2>${head}</h2></summary>${stamped('02:10')}</details>`
+    const known = cardRegions(section('Aktuell'), frags)
+    expect(known.length).toBe(1)
+    expect(known[0].startsWith('<details class="card"')).toBe(true)
+    // The section header changes; the card does not — and it is still the card
+    // the preparation saw.
+    const proof = boardCarriesCard(section('Aktuelle Arbeit'), frags, {
+      sinceMs: Date.UTC(2026, 9, 25, 0, 55),
+      nowMs: Date.UTC(2026, 9, 25, 1, 10),
+      knownRegions: known,
+    })
+    expect(proof.carries).toBe(false)
+    expect(proof.stale).toBe(true)
+  })
+
+  it('refuses the card the PREVIOUS handover left standing (Sol on 9096fb7)', () => {
+    // 13.08.2026, 14:30 Berlin (CEST = UTC+2) — the preparation; the commit
+    // seventeen minutes later.
+    const prepared = Date.UTC(2026, 7, 13, 12, 30)
+    const now = Date.UTC(2026, 7, 13, 12, 47)
+    const at = (hhmm) => boardCarriesCard(stamped(hhmm), frags, { sinceMs: prepared, nowMs: now })
+    // Stamped before this preparation → the last handover's card.
+    expect(at('11:05').carries).toBe(false)
+    expect(at('11:05').stale).toBe(true)
+    // Stamped between the preparation and the commit → this handover's.
+    expect(at('14:30').carries).toBe(true)
+    expect(at('14:38').carries).toBe(true)
+    expect(at('14:47').carries).toBe(true)
+    // A stamp AFTER the commit resolves to the day BEFORE and is refused, as is
+    // yesterday's card at the very same minute — the arc the fixed window let
+    // through (Sol on 46c994e).
+    expect(at('14:52').carries).toBe(false)
+    expect(at('15:40').carries).toBe(false)
+    // Across midnight the card is still the newer one.
+    expect(
+      boardCarriesCard(stamped('00:10'), frags, {
+        sinceMs: Date.UTC(2026, 7, 13, 21, 55),
+        nowMs: Date.UTC(2026, 7, 13, 22, 15),
+      }).carries,
+    ).toBe(true)
+    // …and with no preparation time to compare against, the stamp decides nothing.
+    expect(boardCarriesCard(stamped('01:00'), frags, { sinceMs: null }).carries).toBe(true)
+  })
+
+  it('survives the DST ROLLBACK, where 02:00–03:00 happens twice (Sol on 9dcc783)', () => {
+    // 25.10.2026: 03:00 CEST becomes 02:00 CET. Preparation at the FIRST 02:55
+    // (00:55 UTC), commit at the SECOND 02:10 (01:10 UTC) — fifteen real
+    // minutes, which a clock-face arc reads as almost a whole day.
+    const prepared = Date.UTC(2026, 9, 25, 0, 55)
+    const now = Date.UTC(2026, 9, 25, 1, 10)
+    const at = (hhmm) => boardCarriesCard(stamped(hhmm), frags, { sinceMs: prepared, nowMs: now })
+    // The card written in those fifteen minutes counts…
+    expect(at('02:10').carries).toBe(true)
+    expect(at('02:55').carries).toBe(true)
+    // …and the stale card of the same night does not.
+    expect(at('01:00').carries).toBe(false)
+    expect(at('23:30').carries).toBe(false)
+  })
+
+  it('does not let an UNSTAMPED card prove currency where the board stamps at all', () => {
+    const prepared = Date.UTC(2026, 7, 13, 12, 30)
+    // The board stamps its cards, so a matching region without one is not proof.
+    expect(cardStampIsCurrent('<p>no stamp here</p>', { sinceMs: prepared, boardStamps: true })).toBe(false)
+    // A board that stamps nothing at all is a format without stamps — passing
+    // there, because a boundary check may not trap a session on a format change.
+    expect(cardStampIsCurrent('<p>no stamp here</p>', { sinceMs: prepared, boardStamps: false })).toBe(true)
+    const card =
+      `<details class="card"><p>${boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</p></details>`
+    const frags = cardProofFragments({
+      cause: BOUNDARY_CAUSES.CONTEXT,
+      destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
+    })
+    expect(boardCarriesCard(card, frags, { sinceMs: prepared, nowMs: prepared }).carries).toBe(true)
+    expect(
+      boardCarriesCard(`<details class="card"><p><span class="stamp">Stand 09:00</span> x</p></details>${card}`, frags, {
+        sinceMs: prepared,
+        nowMs: prepared,
+      }).carries,
+    ).toBe(false)
+  })
+
+  it('never traps on a board it cannot read — but says it could not verify', () => {
+    for (const text of ['', '   ', null, undefined, 42]) {
+      expect(boardCarriesCard(text, cardProofFragments({}))).toEqual({
+        carries: true,
+        verifiable: false,
+        missing: [],
+      })
+    }
   })
 })

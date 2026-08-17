@@ -43,6 +43,11 @@ scripts/.tile-cache
 # runtime state, keyed by session ids that mean nothing in a clone.
 .claude/fence-notice.json
 .claude/fence-notice.json.tmp-*
+# The firewall top-up's pid record (scripts/batch-autostart.mjs): a live process
+# number on THIS machine, meaningless in a clone — and its absence is the normal
+# state of a container that has just come up.
+.claude/firewall-topup.pid
+.claude/firewall-topup.log
 .batch-dashboard.html
 .batch-dashboard-archive.html
 # The derived queue's prose and order (point 400, delta C) — session state that
@@ -109,6 +114,8 @@ scripts/.tile-cache
 .claude/decision-card-guard-state.json
 .claude/batch-boundary.json
 .claude/batch-boundary.json.tmp-*
+.claude/batch-boundary-prepared.json
+.claude/batch-boundary-prepared.json.tmp-*
 .claude/batch-in-flight.json
 .claude/batch-in-flight.json.tmp-*
 .claude/batch-claim.json
@@ -127,6 +134,14 @@ scripts/.tile-cache
 
 # Runtime state of the batch-resilience layers (child-retry, alert-escalation).
 .claude/resilience/
+
+# Which vendor the read-only work goes to (scripts/sol-share.mjs, point 654). THIS
+# MACHINE's operator setting, flipped when one of the two allowances runs short — a
+# committed one would hand a clone somebody else's routing, and it would conflict on
+# every branch that touched it. It lives in the MAIN checkout, so every worktree agent
+# reads the setting the user actually flipped.
+.claude/sol-share.json
+.claude/sol-share.json.tmp-*
 
 # Local GitHub PAT (ci-status-guard.mjs probes this path) — never committed
 .secrets/

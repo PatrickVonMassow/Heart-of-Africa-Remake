@@ -63,6 +63,13 @@ jobs:
       # needs no workflow edit. Each tag is guarded so the workflow still deploys
       # the ones that exist while another does not.
       - name: Build each tag's frozen site (all version tags + poc)
+        # The CUDA download is SKIPPED: onnxruntime-node is a transitive server-side
+        # dep of kokoro-js that a `vite build` never executes, its postinstall pulls a
+        # ~300 MB GPU tarball from a GitHub release, and that download ECONNRESET
+        # three times in one evening (12.08.2026) — a frozen tag's build died on an
+        # asset it does not use. The npm ci retry matches the main build's, above.
+        env:
+          npm_config_onnxruntime_node_install_cuda: skip
         run: |
           VERSION_TAGS=$(git ls-remote --tags origin 'refs/tags/v*' | sed 's#.*refs/tags/##' | grep -vE '\^\{\}$' | sort -u)
           for tag in $VERSION_TAGS poc; do
@@ -72,7 +79,7 @@ jobs:
             fi
             git fetch --depth 1 origin tag "$tag"
             git worktree add "src-$tag" "$tag"
-            ( cd "src-$tag" && npm ci && npx tsc -b && npx vite build --base="/Heart-of-Africa-Remake/$tag/" )
+            ( cd "src-$tag" && { n=0; until npm ci; do n=$((n+1)); [ "$n" -ge 3 ] && exit 1; echo "npm ci failed, retry $n after 15s"; sleep 15; done; } && npx tsc -b && npx vite build --base="/Heart-of-Africa-Remake/$tag/" )
             mkdir -p "dist/$tag"
             cp -r "src-$tag/dist/." "dist/$tag/"
           done

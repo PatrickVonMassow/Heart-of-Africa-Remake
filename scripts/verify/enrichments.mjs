@@ -329,6 +329,42 @@ if (section('settlement-sizes')) {
   check('Village: landscape backdrop mesh present', village.backdrop > 1000, `${village.backdrop} vertices`)
   await shot('77-enrich-village-life', { place: 'maasai-village', label: 'the inhabited village' })
 
+  // Point 672: with no message going out the drummer WAITS — arms at the
+  // figure's own rest, both drum heads undisturbed. The wide village frame
+  // above cannot show a pose, so he is photographed from close up, standing on
+  // the side he faces. His spot is VILLAGE_SPOTS.drummer in
+  // src/scenes/place/lifeSpots.ts; the check below fails loudly if the frame's
+  // standpoint ever leaves the walkable radius.
+  const DRUMMER = { x: -2.2, z: 0.2 }
+  const drummerStand = await page.evaluate(
+    ({ d }) => {
+      // The figure is turned towards (3.5, 2.5) — stand out along that heading
+      // and look back, so hands and drums face the camera.
+      const dx = 3.5 - d.x
+      const dz = 2.5 - d.z
+      const len = Math.hypot(dx, dz) || 1
+      const gap = 4.0
+      const p = window.__placePlayer
+      p.x = d.x + (dx / len) * gap
+      p.z = d.z + (dz / len) * gap
+      p.yaw = Math.atan2(-(d.x - p.x), -(d.z - p.z))
+      // Eye height looks over a seated drummer's hands; tip the view down so
+      // the arms and both drum heads are in the picture, not below its edge.
+      p.pitch = -0.16
+      return { x: p.x, z: p.z, radius: window.__placeLayout.radius }
+    },
+    { d: DRUMMER },
+  )
+  await shot('672-drummer-at-rest', {
+    local: { x: DRUMMER.x, y: 1.1, z: DRUMMER.z },
+    label: 'the drummer waiting still at his drums',
+  })
+  check(
+    'the drummer frame is taken from inside the settlement',
+    Math.hypot(drummerStand.x, drummerStand.z) < drummerStand.radius,
+    `at ${drummerStand.x.toFixed(1)}/${drummerStand.z.toFixed(1)} of radius ${drummerStand.radius}`,
+  )
+
   // Point 14: the backdrop of a mountainous settlement (Berber Village, at the
   // Atlas) must read as a distant range on the horizon, not loom over the camera
   // and arc overhead (the former clipping error). The steepest backdrop vertex

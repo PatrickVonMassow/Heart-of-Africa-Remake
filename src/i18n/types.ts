@@ -519,6 +519,21 @@ export interface Strings {
     ambientVolume: string
     birdsongVolume: string
     speechVolume: string
+    drumBedEnabled: string
+    drumBedStep: string
+    drumBedPhraseBars: string
+    drumBedGapMin: string
+    drumBedGapMax: string
+    drumBedTempoSpread: string
+    drumBedPitchSpread: string
+    drumBedPitchStart: string
+    drumBedPitchEnd: string
+    drumBedHitSeconds: string
+    drumBedAccentShift: string
+    drumBedThinAfter: string
+    drumBedThinFactor: string
+    drumBedVillageGain: string
+    drumBedNearbyGain: string
     surfNearRadius: string
     surfCutoff: string
     /** Village speech: pace, phrase pause and how far an utterance carries (§13.4). */
@@ -555,6 +570,7 @@ export interface Strings {
     tagTrendLeave: string
     tagVariation: string
     tagUnstuck: string
+    tagEdge: string
     tagSilence: string
     tagLean: string
     tagTurnRate: string
@@ -580,6 +596,7 @@ export interface Strings {
     separationStiffness: string
     separationSpeed: string
     separationWedge: string
+    separationPasses: string
     foodPerDay: string
     canteenDrain: string
     canteenDesertDrain: string

@@ -3,8 +3,9 @@
 // three defective deliveries in 14 minutes; no config review could have caught
 // it live, but every commit records its author model in the Co-Authored-By
 // trailer. Any commit after the committed baseline authored by a model outside
-// the user's allowlist (Opus 5 / Opus 4.8 / Fable 5 — Sonnet and Haiku are NOT
-// acceptable) blocks the turn end with a pause instruction and pings ntfy.
+// the user's allowlist (Opus 5 / Opus 4.8 / Fable 5 / GPT-5.6 Sol — Sonnet and
+// Haiku are NOT acceptable) blocks the turn end with a pause instruction and
+// pings ntfy.
 //
 // Decision logic: model-guard-core.mjs (pure, Vitest-covered). This wrapper
 // gathers `git log` output and is fail-OPEN — an internal error never traps

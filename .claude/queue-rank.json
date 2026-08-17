@@ -8,13 +8,101 @@
       "at": "2026-08-11T15:00:17.845Z",
       "why": "Not release-blocking: the closing run proves the build with two full regressions rather than relying on a released red, and 643 refines a mechanism that only landed today. It waits behind the release work."
     },
-    "644": {
-      "at": "2026-08-11T15:12:32.611Z",
-      "why": "Placed by hand at the head of the verification-integrity block instead: it is the only red on main right now, and a red main mails the user."
+    "646": {
+      "at": "2026-08-11T18:08:06.988Z",
+      "why": "Zweite Tuer zum selben Loeschen wie 629 — hinter den Spielfehlern, aber vor der Release-Mechanik"
+    },
+    "647": {
+      "at": "2026-08-11T18:08:07.037Z",
+      "why": "Der unerklaerte Rot-Lauf ist auf einem Zweig, nicht auf main; das Fast-Gate steht davor"
+    },
+    "650": {
+      "at": "2026-08-11T18:34:39.594Z",
+      "why": "Verfahrensschaerfe an der Gegenpruefung; wichtig, aber kein Spielfehler und niemand ist darauf blockiert"
+    },
+    "652": {
+      "at": "2026-08-11T21:10:35.758Z",
+      "why": "Last is right: it is a guard over the session's own answers, which costs nothing the deployed game shows — and 174 gates the release."
+    },
+    "653": {
+      "at": "2026-08-11T21:10:45.801Z",
+      "why": "Last is right for the mechanism; the ONE stale section it names (criterion 7) is corrected inside point 174, which gates the release anyway."
+    },
+    "662": {
+      "at": "2026-08-12T20:10:55.614Z",
+      "why": "Prozessluecke mit hoher Kostenwirkung, aber hinter der Verstaendigungs-Kette; vor 633 einsortiert bei den Infrastruktur-Nachbarn"
+    },
+    "663": {
+      "at": "2026-08-12T20:20:48.210Z",
+      "why": "Infrastruktur-Aergernis mit Retry als Sofort-Handgriff; hinter den Release-Punkten bei den Infrastruktur-Nachbarn"
+    },
+    "668": {
+      "at": "2026-08-13T12:07:50.425Z",
+      "why": "Small landing-chain hardening; the red is loud and the remedy obvious, so it waits behind the release-critical fixes"
+    },
+    "669": {
+      "at": "2026-08-13T13:50:49.371Z",
+      "why": "Blocks the supervising session's turn ends on every Sol run, so it belongs right behind the lane that causes it"
+    },
+    "670": {
+      "at": "2026-08-13T15:12:02.801Z",
+      "why": "Small evidence-plumbing fix; it belongs with the other verification-chain hardening rather than ahead of the release fixes"
+    },
+    "676": {
+      "at": "2026-08-13T17:13:15.401Z",
+      "why": "Grosse Infrastruktur, kein Bugfix: vor dem Demo-Checkpoint gilt Bugfixes zuerst, und 675 deckt die drei mechanischen Niederlagen der Uebergabe bereits ohne diese Ebene ab"
+    },
+    "677": {
+      "at": "2026-08-13T17:13:15.449Z",
+      "why": "Haengt nur den Aufrufer, nicht das Projekt, und hat mit '< /dev/null' einen sofort verfuegbaren Umweg — vor dem Release gehen die Release-Punkte vor"
+    },
+    "678": {
+      "at": "2026-08-13T18:14:11.985Z",
+      "why": "Vor dem Release gehen die Release-Punkte vor; die akute Haelfte — die Rettung ungesicherter Arbeit — fuehre ich bis dahin von Hand aus, und die leere Spur ist ab jetzt bekannt"
+    },
+    "680": {
+      "at": "2026-08-13T18:48:25.602Z",
+      "why": "Es blockiert 666 nicht sofort — die Diagnose kann auch aus dem Seed nachgestellt werden —, aber jeder weitere Bericht dieser Art bleibt ohne es undiagnostizierbar; Release-Punkte gehen trotzdem vor"
+    },
+    "681": {
+      "at": "2026-08-13T18:54:12.170Z",
+      "why": "Gehoert zum Release-Thema Verstaendigung und wird zusammen mit 682 und 659 gespielt; die Reihenfolge dort entscheidet 659"
+    },
+    "682": {
+      "at": "2026-08-13T18:54:12.244Z",
+      "why": "Gehoert zum Release-Thema Verstaendigung; 659 spielt die Kette durch und entscheidet, was zuerst greifen muss"
+    },
+    "683": {
+      "at": "2026-08-13T20:19:36.791Z",
+      "why": "Letzter Rest eines Siegels, das gegen jede andere Mutation haelt — hinter die Release-Bugfixes gestellt"
+    },
+    "684": {
+      "at": "2026-08-13T20:19:40.069Z",
+      "why": "Betrifft die Abdeckung jeder Gegenpruefung, aber kein ausgeliefertes Spielverhalten — nach den Release-Bugfixes"
+    },
+    "685": {
+      "at": "2026-08-13T21:09:57.053Z",
+      "why": "Kleine Nachbesserung am gerade gelieferten Symbol; sie kostet nichts, wenn sie hinter den Release-Bugfixes wartet"
+    },
+    "693": {
+      "at": "2026-08-13T23:44:58.490Z",
+      "why": "Der Umweg ist bekannt und kostenlos (author-sol --anyway, in der Merk-Datei festgehalten), deshalb steht der Punkt hinter den Spielfehlern und dem Verständigungsumbau, die der Nutzer für diese Auslieferung zuerst sehen will"
+    },
+    "694": {
+      "at": "2026-08-14T01:20:00.398Z",
+      "why": "Es erbt nur die Freigabe eines seltenen, bekannten Rots und hat keinen Spieler-Effekt; die Bugfixes und fast fertigen Punkte davor gehen vor."
+    },
+    "695": {
+      "at": "2026-08-14T02:25:45.277Z",
+      "why": "Es blockiert das Bild-Tor jeder Sitzung, gehört aber hinter die laufenden Spieler-Fixes; als Werkzeug-Punkt kommt es mit dem nächsten Werkzeug-Block."
+    },
+    "696": {
+      "at": "2026-08-14T05:13:27.358Z",
+      "why": "Sits with the other infrastructure fixes filed the same night (693-695), behind the communication-slice points the release is cut for"
     }
   },
   "settled": {
-    "at": "2026-08-11T15:12:32.611Z",
+    "at": "2026-08-14T09:53:59.546Z",
     "points": [
       174,
       184,
@@ -160,7 +248,6 @@
       626,
       627,
       628,
-      629,
       630,
       632,
       633,
@@ -169,10 +256,44 @@
       637,
       638,
       639,
-      641,
       642,
       643,
-      644
+      646,
+      647,
+      650,
+      652,
+      653,
+      658,
+      659,
+      660,
+      662,
+      663,
+      664,
+      665,
+      668,
+      669,
+      670,
+      676,
+      677,
+      678,
+      680,
+      681,
+      682,
+      683,
+      684,
+      685,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      693,
+      694,
+      695,
+      696,
+      697
     ]
   }
 }

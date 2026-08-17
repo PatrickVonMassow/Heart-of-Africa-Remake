@@ -236,12 +236,12 @@ export function noWorkClaimReason(segment = '') {
     'Do ONE of these:\n' +
     `  - ${NOW_CARD_CMD} <N> "<was gerade läuft>"   → puts a card up for the work; it REPLACES the ` +
     'claim, and this call goes through.\n' +
-    `  - ${CLOSING_CARD_CMD} "<welche Abschlussarbeiten noch offen sind>"   → for the state between ` +
+    `  - ${CLOSING_CARD_CMD} <N> "<welche Abschlussarbeiten noch offen sind>"   → for the state between ` +
     'the two: the point is merged and TICKED, and its closing duties (the four-eyes record, the ' +
     'retrospective) are still owed. That is neither idle nor a numbered point, and it is what this ' +
     'card is for.\n' +
-    '  - STOP: end the turn. The session-ending path (node scripts/batch-boundary.mjs <point>, the ' +
-    'focus stamp, the board publish, the work-order tick) is never blocked by this rule.\n' +
+    '  - STOP: end the turn. The session-ending path (node scripts/batch-boundary.mjs --prepare/--commit ' +
+    '<point>, the focus stamp, the board publish, the work-order tick) is never blocked by this rule.\n' +
     `If the claim itself is wrong, rewrite it — ${NONE_CARD_CMD} "<Grund>" replaces the standing card ` +
     'rather than adding a second one.\nReads are never blocked — a call is judged SEGMENT BY SEGMENT ' +
     'on the command itself, never on what stands inside its quotes, so a call whose every part reads ' +
