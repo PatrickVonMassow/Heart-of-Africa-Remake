@@ -182,6 +182,15 @@ put it is the mistake this line exists to stop.
     violation") fails with `dup-in-section` only when the unnumbered card stands ALONE, and under this
     rule a numbered card always stands there while work is in flight. Point 700's clause is answered
     here rather than decided twice, and is struck from its spec in the commit that lands this.
+  - WHICH now-card the focus points at is decided, not left to insertion order. Measured 17.08.2026,
+    with two legitimate now-cards standing (700 and 697): `board.mjs now` PREPENDS, while the focus
+    reconciliation reads the FIRST card in the section — so opening a second strand silently moved the
+    focus to it, `board.mjs focus 700` answered `the dashboard now-card is titled 697`, and the only
+    way to point the focus back at the older strand was to reorder the two cards by hand in the file.
+    A rule that sanctions several now-cards must let the focus name WHICH of them it means: the
+    reconciliation matches the declared focus against ANY now-card present, and the section's order is
+    the render's to decide (the focused strand first), never a side effect of which card was touched
+    last.
   - The check STANDS DOWN for a session that does not own the batch lock (`heldByOtherLiveOwner`) and
     for a paused batch (`.claude/batch-paused`), and fails OPEN on its own error. The decision logic
     is pure and lives beside the board's other cores; the wrapper stays thin I/O.
