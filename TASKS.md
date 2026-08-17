@@ -8110,3 +8110,36 @@ to land than a mechanism that needs a review.
   Criticality: medium — the board is the user's only window into the batch, and it currently
   goes blank exactly when he checks it often.
   Bundle: Chat & Tafel.
+
+- [ ] 705. The board is republished once per guard correction, instead of once at the end
+  (measured 17.08.2026, the cause behind the throttling that point 704 only survives). Reading
+  `board/board.html` from `raw.githubusercontent.com` answered HTTP 429 from inside the
+  container AND in the user's browser, so it is not the reader's address that is throttled — it
+  is the WRITE RATE: one session published about a dozen times in fifty minutes. That is not
+  carelessness but the design. `scripts/board.mjs` couples the card edit and the publish into
+  one step — its `edit()` applies the transform, rotates the archive and publishes — and there
+  is no edit-without-publish mode at all. The guard chain then multiplies it: `board-first-guard`,
+  `dashboard-guard`'s focus reconcile, `dashboard-conciseness-guard`, `dashboard-card-topic-guard`
+  and `queue-order-guard` each demanded a correction one after another, and every correction was
+  another publish of the whole board. Point 704 makes the READING side survive a refusal; this
+  point removes what causes it.
+  FINAL STATE:
+  - `board.mjs` gains a staged mode in which several card edits accumulate in the file and the
+    publish is one explicit closing step. The one-shot form stays the default for a single edit,
+    so no caller has to learn a new protocol for the common case.
+  - The board checks run TOGETHER against the FILE before that one publish, so every objection
+    appears in one pass instead of one per turn. `guard-preflight.mjs` already does nearly this —
+    it named all three board guards in a single call — so the staged publish asks it, rather than
+    discovering the guards one refusal at a time.
+  - A ceiling on publishes per turn that ABORTS LOUDLY when it is reached, naming what was
+    published and what was refused. A rate that silently keeps writing is how the quota was spent
+    without anyone noticing.
+  - The batch pause written for this throttling (`.claude/batch-paused`, 17.08.2026) is lifted as
+    part of this point, once the transport answers 200 again.
+  VERIFIABLE: Vitest over the staged controller — several edits accumulate with no publish, the
+  closing step publishes once, the ceiling aborts on the publish past the limit and names both
+  sides; plus a driven run of the sequence that produced this finding (a card edit that five
+  guards object to in turn) ending with exactly one publish.
+  Criticality: medium — it spends a shared quota the user's only window depends on, and the
+  failure is invisible to the session that causes it.
+  Bundle: Chat & Tafel.
