@@ -1,10 +1,13 @@
 // WHICH AUTHORING LANE A POINT GOES TO (point 667).
 //
-// The user pays two vendors and has far more OpenAI volume left than Anthropic,
-// so authoring — the largest single item of the spend — moves where the room is.
-// It does NOT all move: CLAUDE.md §6 names three lanes with different jobs, and
-// the cut between them is decided HERE, from the point's own text, rather than
-// by whoever happens to be dispatching.
+// The user pays two vendors, and authoring is the largest single item of the
+// spend, so it is split across both rather than sitting on one. It does NOT all
+// move: CLAUDE.md §6 names three lanes with different jobs, and the cut between
+// them is decided HERE, from the point's own text, rather than by whoever
+// happens to be dispatching. The SPLIT is the standing policy; how full each
+// pool happens to be on a given day is not a reason this file knows about
+// (cross-vendor audit 17.08.2026 — the header used to argue from one day's
+// quota reading, which then outlived it).
 //
 //   sol    GPT-5.6 Sol authors the MECHANICAL and MID-DIFFICULTY points, and
 //          Claude then reviews, runs the suites, judges the picture and lands.

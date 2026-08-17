@@ -1,13 +1,12 @@
-// THE CHEAP SWITCH THAT MOVES READ-ONLY WORK BETWEEN THE TWO VENDORS (point 654).
+// THE SWITCH THAT MOVES WORK BETWEEN THE TWO VENDORS (point 654, widened by 667).
 //
-// WHY IT IS CHEAP, and why that is the whole design: the user pays two vendors whose
-// allowances run out at different times and wants to shift load towards OpenAI BEFORE
-// the Anthropic volume is nearly spent. Moving READ-ONLY work costs almost nothing to
-// build, because Sol AUTHORS NOTHING under this switch — no commit carries its trailer,
-// so the author allowlist (scripts/model-guard-core.mjs), the `commit-msg` hook and the
-// whole auditability machinery a role swap would need are untouched. The moment Sol
-// authors, all of that becomes necessary; that is part B of the point and deliberately
-// not built here.
+// WHY IT EXISTS: the user pays two vendors whose allowances run out at different times,
+// and wants the load moved BEFORE one of them is nearly spent. It began as a read-only
+// switch, which cost almost nothing to build because nothing Sol did carried a commit
+// trailer. Point 667 then added the `author` kind, and with it the machinery a role swap
+// needs — Sol stands in the author allowlist (scripts/model-guard-core.mjs), the
+// `commit-msg` hook takes its trailer, and where Sol authored, CLAUDE reviews, runs the
+// suites, judges the picture and lands.
 //
 // Side-effect free: reading and writing the file, and the printing, belong to
 // scripts/sol-share.mjs. Pinned by sol-share-core.test.mjs.
@@ -22,7 +21,15 @@ import { mainCheckoutFrom } from './review-sol-core.mjs'
  */
 export const SETTINGS = Object.freeze(['claude-only', 'default', 'prefer-sol'])
 
-/** What the file says when nothing has been set — today's behaviour. */
+/**
+ * What an ABSENT file routes as — not the project's standing policy.
+ *
+ * The name is a file-format default, and the two are different things (cross-vendor
+ * audit, 17.08.2026): CLAUDE.md §6 has Sol authoring the mechanical and mid-difficulty
+ * points, which only `prefer-sol` routes. A checkout that never set the switch therefore
+ * runs BELOW the standing policy rather than at it — deliberately, because an unset file
+ * must never spend a vendor nobody chose.
+ */
 export const DEFAULT_SETTING = 'default'
 
 /**
@@ -125,8 +132,8 @@ const ROUTING = Object.freeze({
 /** One line per setting, saying what it is FOR — printed by `--status` and by `--help`. */
 export const SETTING_NOTES = Object.freeze({
   'claude-only': 'the escape hatch when the ChatGPT side is the scarce one — nothing goes to Sol',
-  default: "today's behaviour: reviews to Sol, everything else to Claude",
-  'prefer-sol': 'every read-only kind AND the authoring of a mechanical point goes to Sol; Claude reviews it, runs the suites, judges the picture and lands',
+  default: 'reviews to Sol, everything else to Claude — BELOW the standing policy of CLAUDE.md §6',
+  'prefer-sol': 'the standing policy of CLAUDE.md §6: every read-only kind AND the authoring of a mechanical or mid-difficulty point goes to Sol; Claude reviews it, runs the suites, judges the picture and lands',
 })
 
 /** WHAT IS NEVER ROUTED, whatever the setting says. Printed, so nobody has to ask. */

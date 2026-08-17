@@ -228,14 +228,20 @@ try {
     // forbidden commit.
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
-      'MODEL POLICY (25.07./12.08.2026): Opus 5 is the ORDINARY worker; the fallback chain ' +
-      'is Opus 5 -> Fable 5 -> Opus 4.8. FABLE 5 AUTHORS THE HARD CASES: work judged ' +
-      'difficult, complex or error-prone goes to Fable from the start, and Opus work moves ' +
-      'to Fable once Sol still finds problems after a re-work (CLAUDE.md par.6). Fable is ' +
-      'not the default (smaller volume); it also serves four-eyes review and the fallback. ' +
-      'Sonnet, Haiku and every other model are NOT acceptable: if the serving model is not one ' +
-      'of the three, do NOT work — create .claude/batch-paused (reason: forbidden serving ' +
-      'model) and send an ntfy alert via scripts/notify.mjs instead.'
+      'MODEL POLICY (25.07.-13.08.2026, CLAUDE.md par.6): AUTHORING HAS THREE LANES. ' +
+      'GPT-5.6 Sol authors the MECHANICAL and MID-DIFFICULTY points via ' +
+      'scripts/author-sol.mjs; FABLE 5 authors the HARD cases — difficult, complex or ' +
+      'error-prone — from the start, and takes over Opus work once Sol still finds problems ' +
+      'after a re-work; OPUS 5 keeps what only the main session can finish, a point whose ' +
+      'VERIFICATION is the work. scripts/author-routing-core.mjs makes the cut, and ' +
+      'scripts/sol-share.mjs --status says what the switch routes right now. REVIEW is ' +
+      'CROSS-VENDOR: Sol reads Anthropic-authored work (scripts/review-sol.mjs), Claude ' +
+      'reads Sol-authored work, and no model reviews its own. ' +
+      'THE SERVING MODEL of this session — the one running the batch — is Opus 5, then ' +
+      'Fable 5, then Opus 4.8. Sonnet, Haiku and every other model are NOT acceptable: if ' +
+      'the serving model is not one of those three, do NOT work — create ' +
+      '.claude/batch-paused (reason: forbidden serving model) and send an ntfy alert via ' +
+      'scripts/notify.mjs instead.'
     const now = Date.now()
     if (isPaused()) {
       const why = pauseReason()
