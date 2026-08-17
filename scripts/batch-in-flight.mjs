@@ -528,6 +528,48 @@ export function isAncestor(ancestorSha, sha, { cwd = REPO_ROOT } = {}) {
   }
 }
 
+/** The full command line of `pid`, or null when it cannot be read. Linux/WSL
+ *  reads /proc (NUL-separated argv); Windows asks CIM. Null means UNKNOWN,
+ *  never "not it" — the caller decides what unknown identity is worth. */
+export function processCommandOf(pid) {
+  const n = Number(pid)
+  if (!Number.isInteger(n) || n <= 0) return null
+  if (process.platform !== 'win32') {
+    try {
+      const raw = readFileSync(`/proc/${n}/cmdline`, 'utf8')
+      const cmd = raw.split('\0').filter(Boolean).join(' ').trim()
+      return cmd || null
+    } catch {
+      return null
+    }
+  }
+  try {
+    const out = execFileSync(
+      'powershell',
+      ['-NoProfile', '-Command', `(Get-CimInstance Win32_Process -Filter "ProcessId=${n}").CommandLine`],
+      { windowsHide: true, encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim()
+    return out || null
+  } catch {
+    return null
+  }
+}
+
+/** Does this command line say it IS what a run record describes — the verify
+ *  wrapper (`run-logged.mjs`) that wrote the record about its own pid? PURE,
+ *  so the identity rule is pinned without a process table. The program must
+ *  be an interpreter (or the script itself) with run-logged.mjs as an argv
+ *  word — a process that merely MENTIONS the name (a grep) is not the
+ *  wrapper. */
+export function commandNamesRun(command) {
+  const words = String(command ?? '').replace(/\\/g, '/').toLowerCase().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return false
+  const isScript = (w) => w === 'run-logged.mjs' || w.endsWith('/run-logged.mjs')
+  const prog = words[0].slice(words[0].lastIndexOf('/') + 1).replace(/\.(exe|cmd|bat)$/, '')
+  if (!['node', 'nodejs', 'bun', 'deno', 'tsx'].includes(prog)) return isScript(words[0])
+  return words.slice(1).some(isScript)
+}
+
 /**
  * THE RUN RECORD BESIDE A DECLARED LOG (point 700), reduced to what a successor
  * needs to adopt the run: what it is (suites, backends), what it covers (HEAD),
@@ -544,8 +586,22 @@ export function isAncestor(ancestorSha, sha, { cwd = REPO_ROOT } = {}) {
  * `alive` and `hasReceipt` ride along because the transfer bar demands them
  * (Sol review of d0aebb6, finding 2): the pid is PROBED here, not believed,
  * and the receipt's existence is read off the record itself.
+ *
+ * EXISTENCE IS NOT IDENTITY (Sol review of 534c2ba): a signal-0 probe alone
+ * would read a RECYCLED pid — any stranger process that inherited the number
+ * after the wrapper died — as a live run, and the successor would await a
+ * receipt that never arrives. Identity is judged on the process's COMMAND
+ * LINE naming the run wrapper the record was written by (`commandNamesRun`),
+ * which is drift-free: it either names run-logged.mjs or it does not.
+ * DELIBERATELY NOT a start-time compare: the measured 04.08.2026 incident
+ * (findings carrier) showed the derived start time DRIFTS against a recorded
+ * one in this WSL2 container, growing with process age (~3 s at 30 min), and
+ * a fixed-tolerance equality declared LIVE batch owners "pid-reused" and
+ * double-spawned sessions. The probe's start time is at most corroboration
+ * and never the discriminator here. An unreadable command line answers
+ * UNKNOWN (null), which the transfer bar refuses as not-live.
  */
-export function runRecordFor(logPath, { read, probe = probePid } = {}) {
+export function runRecordFor(logPath, { read, probe = probePid, commandOf = processCommandOf } = {}) {
   try {
     const declared = absPath(logPath)
     if (!declared) return null
@@ -557,7 +613,12 @@ export function runRecordFor(logPath, { read, probe = probePid } = {}) {
     let alive = null
     if (pid !== null && pid > 0) {
       try {
-        alive = probe(pid).exists === true
+        if (probe(pid).exists !== true) {
+          alive = false
+        } else {
+          const cmd = commandOf(pid)
+          alive = cmd == null ? null : commandNamesRun(cmd)
+        }
       } catch {
         alive = null // an unprobeable pid is UNKNOWN, which the bar reads as not-live
       }

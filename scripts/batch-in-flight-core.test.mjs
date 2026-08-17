@@ -65,6 +65,7 @@ import { LEASE_MS } from './batch-lease-core.mjs'
 import {
   absPath,
   adoptTransferred,
+  commandNamesRun,
   gatherHandoverTransfer,
   runRecordFor,
   gatherInFlight,
@@ -2050,6 +2051,8 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
     receipt: null,
   }
 
+  const wrapperCmd = 'node /repo/scripts/verify/run-logged.mjs world'
+
   it('pairs <log>.run.json, PROBES the pid and keeps only what the successor needs', () => {
     const seen = []
     const r = runRecordFor('/repo/local/verify-logs/x.log', {
@@ -2058,6 +2061,7 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
         return record
       },
       probe: (pid) => ({ exists: pid === 77, startedAt: null }),
+      commandOf: () => wrapperCmd,
     })
     expect(seen[0].replace(/\\/g, '/')).toBe('/repo/local/verify-logs/x.log.run.json')
     expect(r).toEqual({
@@ -2074,7 +2078,8 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
   })
 
   it('a dead pid, a throwing probe and an absent pid read false / null / null — never assumed alive', () => {
-    const withProbe = (probe, rec = record) => runRecordFor('/repo/x.log', { read: () => rec, probe })
+    const withProbe = (probe, rec = record) =>
+      runRecordFor('/repo/x.log', { read: () => rec, probe, commandOf: () => wrapperCmd })
     expect(withProbe(() => ({ exists: false })).alive).toBe(false)
     expect(
       withProbe(() => {
@@ -2082,6 +2087,27 @@ describe('runRecordFor — the run record beside a declared log, reduced for the
       }).alive,
     ).toBe(null)
     expect(withProbe(() => ({ exists: true }), { ...record, pid: null }).alive).toBe(null)
+  })
+
+  it('a RECYCLED pid — existing, but running something else — is NOT alive; identity, not existence', () => {
+    const withCommand = (commandOf) =>
+      runRecordFor('/repo/x.log', { read: () => record, probe: () => ({ exists: true, startedAt: null }), commandOf })
+    // The stranger process that inherited the wrapper's number.
+    expect(withCommand(() => '/usr/bin/chrome --headless=new').alive).toBe(false)
+    // A command that merely MENTIONS the wrapper is not the wrapper.
+    expect(withCommand(() => 'grep -rn run-logged.mjs docs/').alive).toBe(false)
+    // An unreadable command line is UNKNOWN — refused by the bar, never assumed.
+    expect(withCommand(() => null).alive).toBe(null)
+    // The genuine wrapper, by its own argv word, stays alive.
+    expect(withCommand(() => wrapperCmd).alive).toBe(true)
+  })
+
+  it('commandNamesRun judges the argv word, in either path style', () => {
+    expect(commandNamesRun('node scripts\\verify\\run-logged.mjs --suite world')).toBe(true)
+    expect(commandNamesRun('node run-logged.mjs')).toBe(true)
+    expect(commandNamesRun('node scripts/verify/run-all.mjs world')).toBe(false)
+    expect(commandNamesRun('')).toBe(false)
+    expect(commandNamesRun(null)).toBe(false)
   })
 
   it('reads the receipt off the record itself', () => {
