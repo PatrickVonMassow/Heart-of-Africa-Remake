@@ -285,9 +285,14 @@ coverage map live in `scripts/verify/README.md`.
   SEALED: later mutations are denied loudly (`--clear` withdraws), never a
   silent deletion. The condition is "the point I was LANDING is landed": work
   with pushed checkpoints is transferred at the commit and ADOPTED by the
-  successor (`batch-in-flight.mjs --adopt`); unpushed work drains first. Past
+  successor (`batch-in-flight.mjs --adopt`); unpushed work drains first, but a
+  RUNNING verify transfers via its run record. Past
   the CONTEXT WATERMARK (150k measured tokens, `context-watermark.mjs`) the
-  same handover fires with `--context`, and the board card says so. The guard
+  same handover fires with `--context`, and the board card says so; a
+  PreToolUse fence (`context-fence-guard.mjs`, point 700) then DENIES starting
+  new work — agents, browser suites, authoring points/docs/memories (findings
+  go to the carrier) — while finishing, reads and the boundary stay allowed,
+  and every boundary marker records the context it was taken at. The guard
   enforces all three against an armed launcher (`batch-launcher.mjs --start` on
   Linux, the `HoA-Batch-Autostart` task on Windows), then marks the lock HANDED
   OVER so it spawns the successor.
