@@ -33,7 +33,13 @@ import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
-import { formatCleanupNotes, isAgentWorktree, reproveRemoval, selectCleanupTargets } from './land-cleanup-core.mjs'
+import {
+  branchDeletionBlocker,
+  formatCleanupNotes,
+  isAgentWorktree,
+  reproveRemoval,
+  selectCleanupTargets,
+} from './land-cleanup-core.mjs'
 import { worktreeActiveAt } from './batch-in-flight.mjs'
 import { probePid } from './batch-singleton.mjs'
 import {
@@ -337,6 +343,29 @@ export function reproveOne({ path, expected, since, mergeTarget = null, cwd = RE
 }
 
 /**
+ * THE BY-HAND REPAIR, AND WHY IT MUST NOT UNDO THE MECHANISM (ninth review,
+ * finding 1). This line prints exactly when a tree was KEPT or a removal REFUSED
+ * — i.e. when something may still stand on this branch — and the line that stood
+ * here (`git branch -D`, then a bare `git push origin --delete`) told the operator
+ * to force through both deletions that `deleteLandedBranch` exists to make
+ * conditional. A repair hint is read at the worst moment and pasted, so it repeats
+ * the CONDITIONAL commands: clear the named blocker first, then `-d`, which git
+ * refuses for a checked-out or unmerged branch, and the remote under the SAME
+ * lease, chained with `&&` so it cannot run after a failed local deletion.
+ *
+ * Exported so a test pins it; the string is the whole mechanism at this step.
+ */
+export function branchRepairHint(branch) {
+  const b = String(branch ?? '').trim()
+  if (!b) return 'clear what the keep-reasons above name, then delete the branch by hand'
+  return (
+    `clear what the keep-reasons above name (e.g. node scripts/worktree-cleanup.mjs <path>), then: ` +
+    `SHA=$(git rev-parse ${b}) && git branch -d ${b} && ` +
+    `git push origin --force-with-lease=refs/heads/${b}:"$SHA" --delete ${b}`
+  )
+}
+
+/**
  * DELETE THE LANDED BRANCH — local FIRST, remote ONLY IF THE LOCAL ONE SUCCEEDED.
  *
  * THE SEQUENCE IS THE POINT (second review, finding 3). The two deletions used to
@@ -350,27 +379,126 @@ export function reproveOne({ path, expected, since, mergeTarget = null, cwd = RE
  * `blocked` is the reason not to delete at all (a kept worktree, a refused or
  * failed removal); it skips both. Exported and taking an injected `runGit` so the
  * ORDER can be pinned by a test rather than by reading.
+ *
+ * AND EACH DELETION IS GATED BY THE STRONGEST THING AVAILABLE TO IT — a snapshot
+ * is used NOWHERE as the last word (sixth review, finding 3). Measured on git
+ * 2.39.5, in this order of strength:
+ *
+ *   THE REMOTE: `git push --force-with-lease=refs/heads/<b>:<sha> --delete <b>` is
+ *   a real COMPARE-AND-SWAP, and it is what runs here. Verified against a throwaway
+ *   remote: with the lease naming a sha the remote has moved off, the deletion is
+ *   REJECTED (`! [rejected] (delete) -> <b> (stale info)`, exit 1) and the branch
+ *   survives; with a matching lease it deletes. The check happens at the server, at
+ *   the instant of the update, so NO window exists between our read and the delete:
+ *   anything pushed to that branch after the sha we merged makes the deletion fail.
+ *   This is what closes the "somebody pushed since the snapshot" race outright,
+ *   rather than narrowing it.
+ *
+ *   THE LOCAL: `git branch -d` carries git's own two refusals, both taken inside the
+ *   deleting process. Verified: it refuses a branch a worktree has CHECKED OUT
+ *   (`Cannot delete branch '<b>' checked out at '<path>'`), and it refuses one that
+ *   is NOT FULLY MERGED — `-d`, never `-D`, so the ref cannot vanish while it
+ *   carries commits `main` does not have.
+ *
+ *   THE RESIDUAL, AND WHY IT IS ACCEPTABLE HERE. One case no primitive can see: a
+ *   worktree DETACHED on that branch's commit. Verified in the same probe — with the
+ *   tree detached, `branch -d` deletes without complaint, because a detached HEAD
+ *   holds no reference to the branch and there is nothing for git to check. That is
+ *   what `recheck` and the fresh selection are for, and they remain a snapshot. What
+ *   the residual costs is bounded and is NOT this file's failure class: nothing is
+ *   deleted from the working tree, no commit becomes unreachable (the tree's own
+ *   HEAD and reflog hold them), and the loss is a NAME. So the sha is carried out
+ *   and printed, and restoring it is `git branch <b> <sha>` — one command, against
+ *   the destroyed-work class this cleanup exists to prevent, which cannot be
+ *   reached from here at all.
+ *
+ * `recheck` runs BETWEEN the two deletions and any reason it returns skips the
+ * remote one. A recheck that throws blocks too: an unanswerable question is not
+ * permission.
  */
-export function deleteLandedBranch({ branch, blocked = '', git: runGit = git } = {}) {
-  if (blocked) return { local: 'skipped', remote: 'skipped', problems: [] }
+export function deleteLandedBranch({ branch, blocked = '', recheck = null, git: runGit = git } = {}) {
+  if (blocked) return { local: 'skipped', remote: 'skipped', problems: [], note: '', sha: '' }
+  // READ FIRST, DELETE SECOND: after `branch -d` the ref is gone and the lease for
+  // the remote deletion could no longer be formed.
+  let sha = ''
+  try {
+    sha = String(runGit(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { stdio: ['ignore', 'pipe', 'pipe'] }) ?? '').trim()
+  } catch {
+    /* an unreadable ref leaves the lease empty, which SKIPS the remote deletion */
+  }
   try {
     runGit(['branch', '-d', branch], { stdio: ['ignore', 'pipe', 'pipe'] })
   } catch (e) {
     return {
       local: 'failed',
       remote: 'skipped',
+      note: '',
+      sha,
       problems: [
         `local branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0],
         `remote branch: NOT deleted — the local deletion failed, and the usual cause is a worktree still standing on ${branch}`,
       ],
     }
   }
-  try {
-    runGit(['push', 'origin', '--delete', branch], { stdio: ['ignore', 'pipe', 'pipe'] })
-  } catch (e) {
-    return { local: 'ok', remote: 'failed', problems: [`remote branch: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0]] }
+  let stop = ''
+  if (typeof recheck === 'function') {
+    try {
+      stop = String(recheck() ?? '')
+    } catch (e) {
+      stop = `the state could not be re-read before the remote deletion: ${`${(e && e.message) || e}`.split('\n')[0]}`
+    }
   }
-  return { local: 'ok', remote: 'ok', problems: [] }
+  if (!stop && !sha) {
+    stop = 'the commit that branch stood on could not be read, so the remote deletion could not be made conditional on it'
+  }
+  if (stop) {
+    return {
+      local: 'ok',
+      remote: 'skipped',
+      problems: [],
+      sha,
+      note: `the remote branch ${branch} was NOT deleted — ${stop}`,
+    }
+  }
+  try {
+    // COMPARE-AND-SWAP, not a plain delete: the server refuses if origin/<branch>
+    // is no longer the commit the landing merged.
+    runGit(['push', 'origin', `--force-with-lease=refs/heads/${branch}:${sha}`, '--delete', branch], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+  } catch (e) {
+    const said = `${(e && (e.stderr || e.message)) || e}`
+    const stale = /stale info|force-with-lease|rejected/i.test(said)
+    return {
+      local: 'ok',
+      remote: 'failed',
+      note: '',
+      sha,
+      problems: [
+        stale
+          ? `remote branch: NOT deleted — origin/${branch} has moved off ${sha.slice(0, 8)} since the landing merged it, so somebody pushed to it; the remote branch is left standing on purpose`
+          : `remote branch: ${said}`.split('\n')[0],
+      ],
+    }
+  }
+  return { local: 'ok', remote: 'ok', problems: [], note: '', sha }
+}
+
+/**
+ * DOES THIS LOCAL BRANCH EXIST RIGHT NOW? Asked between the two deletions.
+ *
+ * `rev-parse --verify --quiet` exits 1 for a ref that is not there, and that exit
+ * code is the ONLY thing read as absence: any other failure means the question
+ * could not be answered, which reads as PRESENT and blocks the remote deletion,
+ * like every other unproven fact in this cleanup.
+ */
+export function localBranchExists(branch, { cwd = REPO_ROOT } = {}) {
+  try {
+    git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+    return true
+  } catch (e) {
+    return !(e && e.status === 1)
+  }
 }
 
 /**
@@ -734,31 +862,50 @@ async function main(argv) {
         problems.push(`worktree ${path}: ${(e && (e.stderr || e.message)) || e}`.split('\n')[0])
       }
     }
-    // A KEPT WORKTREE KEEPS ITS BRANCH, and so does one that could not be removed
-    // (review finding 6): git refuses `branch -d` on a branch a worktree has
-    // checked out, and the REMOTE deletion is independent — it would succeed while
-    // the local one failed, deleting the branch the retained tree is standing on.
-    // Both are therefore gated on the same three conditions, and skipped with the
-    // reason printed rather than attempted and reported as debris.
-    const branchBlocked = !cleanup.branch.delete
-      ? cleanup.branch.reason
-      : refused.length
-        ? 'a worktree was refused at the last moment and may still be standing on it'
-        : problems.length
-          ? 'a worktree could not be removed and may still be standing on it'
-          : ''
-    problems.push(...deleteLandedBranch({ branch, blocked: branchBlocked }).problems)
+    // A KEPT WORKTREE KEEPS ITS BRANCH, and so does one that could not be removed:
+    // git refuses `branch -d` on a branch a worktree has checked out, and the
+    // REMOTE deletion is independent — it would succeed while the local one failed,
+    // deleting the branch the retained tree is standing on.
+    //
+    // AND THE STATE IS READ AGAIN HERE (whole-branch review, finding 6). `cleanup`
+    // was taken before the removals ran; a checkout that appeared since — a
+    // DETACHED one above all, which reports no branch at all — was invisible to it,
+    // and the branch would have gone out from under it. So the worktrees are listed
+    // again for this decision, and once more between the local deletion and the
+    // remote one, where a live tree can recreate the local branch.
+    const atDeletion = selectCleanup({ branch, since, mergeTarget: 'HEAD' })
+    const branchBlocked = branchDeletionBlocker({
+      selection: atDeletion,
+      refused: refused.length,
+      failed: problems.length,
+    })
+    const branchResult = deleteLandedBranch({
+      branch,
+      blocked: branchBlocked,
+      recheck: () =>
+        branchDeletionBlocker({
+          selection: selectCleanup({ branch, since, mergeTarget: 'HEAD' }),
+          recreated: localBranchExists(branch),
+        }),
+    })
+    problems.push(...branchResult.problems)
     if (refused.length) {
       console.log('land-point: the cleanup refused these at the moment of deletion — they changed under it:')
       for (const line of refused) console.log(line)
     }
-    // `formatCleanupNotes` already speaks for the selection's own reason; this line
-    // covers the two the selection could not know about (a last-moment refusal, a
-    // removal that failed), so it is not printed twice for the same cause.
-    if (branchBlocked && branchBlocked !== cleanup.branch.reason) {
-      console.log(`land-point: the branch ${branch} was NOT deleted — ${branchBlocked}`)
+    if (branchResult.note) console.log(`land-point: ${branchResult.note}`)
+    // THE SHA THE BRANCH STOOD ON, PRINTED. The one case no git primitive can see
+    // is a worktree DETACHED on that commit, and what it loses is the NAME — so the
+    // name is one command away for as long as this line is in the log.
+    if (branchResult.local === 'ok' && branchResult.sha) {
+      console.log(`land-point: deleted branch ${branch} (was ${branchResult.sha}) — restore it with: git branch ${branch} ${branchResult.sha}`)
     }
-    for (const line of formatCleanupNotes(cleanup)) console.log(line)
+    // The kept TREES come from the selection the removals ran against; the branch
+    // line carries the blocker taken at the deletion, so the reason printed is the
+    // one that actually decided and it is never printed twice.
+    for (const line of formatCleanupNotes({ ...cleanup, branch: { delete: !branchBlocked, reason: branchBlocked } })) {
+      console.log(line)
+    }
     if (problems.length) {
       // NOT a failure of the landing — the point IS on main, ticked and archived.
       // Reported loudly as debris, because `branch-hygiene-guard` is the backstop
@@ -766,7 +913,7 @@ async function main(argv) {
       step('cleanup', VERDICT.failed, problems.join(' | '))
       error = new LandingError('the point landed, but its branch/worktree could not be removed', {
         step: 'cleanup',
-        repair: `node scripts/worktree-cleanup.mjs <path>; git branch -D ${branch}; git push origin --delete ${branch}`,
+        repair: branchRepairHint(branch),
       })
       throw error
     }
@@ -774,7 +921,7 @@ async function main(argv) {
     step(
       'cleanup',
       VERDICT.ok,
-      `${branchBlocked ? 'branch KEPT' : 'branch'}${
+      `${branchBlocked ? 'branch KEPT' : branchResult.remote === 'ok' ? 'branch' : 'branch (remote KEPT)'}${
         cleanup.remove.length - refused.length > 0 ? ` + ${cleanup.remove.length - refused.length} worktree(s)` : ''
       }${kept ? `, ${kept} kept on purpose` : ''}`,
     )
@@ -796,8 +943,9 @@ async function main(argv) {
     '\nDONE BY THIS COMMAND: the merge, the gate, the tick, the archive move, the tick\n' +
       'COMMIT and the push of main, the board publish and the branch/worktree cleanup.\n' +
       'NOT DONE: the picture verification on both backends (it belongs BEFORE the merge,\n' +
-      'on the branch), and the point boundary — run\n' +
-      `  node scripts/batch-boundary.mjs ${number}\n` +
+      'on the branch), and the point boundary — two-phase (point 675):\n' +
+      `  node scripts/batch-boundary.mjs --prepare ${number}   (then its bookkeeping)\n` +
+      `  node scripts/batch-boundary.mjs --commit ${number}    (the LAST repository action)\n` +
       'and end the session.',
   )
   return landingExit(full)

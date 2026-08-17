@@ -277,45 +277,52 @@ coverage map live in `scripts/verify/README.md`.
   resolves nowhere, and where one section number exists in two documents it
   prints BOTH — no resolver can decide that, so the reader is told. Every brief
   carries the revision it was cut from; regenerate rather than reuse an old one.
-- **Context boundary at a point boundary (users 27./28.07.2026).** 87–94 % of
-  the spend sat above 150k context, one session carrying point after
-  point. A batch session ENDS at its boundary, and the boundary is
-  TAKEN: after merge and tick run `node scripts/batch-boundary.mjs
-  <point>` and stop. `batch-progress-guard` BLOCKS a stop that closed a point
-  without that marker, allows one only against the work order and an armed
-  launcher (`scripts/batch-launcher.mjs --start` on Linux, the
-  `HoA-Batch-Autostart` task on Windows), then marks the lock HANDED OVER so it spawns
-  the successor — five hours were lost to a session that stopped holding it.
+- **Context boundary at a point boundary (users 27./28.07.2026; rebuilt by point
+  675).** 87–94 % of the spend sat above 150k context, one session carrying
+  point after point. A batch session ENDS at its boundary, TAKEN in TWO PHASES:
+  after merge and tick, `batch-boundary.mjs --prepare <point>`, the bookkeeping
+  it names, then `--commit <point>` LAST, and stop — a committed marker is
+  SEALED: later mutations are denied loudly (`--clear` withdraws), never a
+  silent deletion. The condition is "the point I was LANDING is landed": work
+  with pushed checkpoints is transferred at the commit and ADOPTED by the
+  successor (`batch-in-flight.mjs --adopt`); unpushed work drains first. Past
+  the CONTEXT WATERMARK (150k measured tokens, `context-watermark.mjs`) the
+  same handover fires with `--context`, and the board card says so. The guard
+  enforces all three against an armed launcher (`batch-launcher.mjs --start` on
+  Linux, the `HoA-Batch-Autostart` task on Windows), then marks the lock HANDED
+  OVER so it spawns the successor.
   Attended, ask for `/clear`. OWNERSHIP IS A LEASE (30.07.2026): `leaseUntil` on
   the lock, renewed BEFORE each call; an owner that stops renewing stops owning
-  the batch — arithmetic, nothing killed. A PreToolUse fence then refuses it
-  merge/push, the tick, the board publish and `dashboard-state.json`.
+  the batch. A PreToolUse fence then refuses it merge/push, the tick, the board
+  publish and `dashboard-state.json`.
   THE WAY BACK (28.07.2026): a returning window runs `node
   scripts/batch-claim.mjs --session <id>`; the owner sees it at its next hook,
   finishes — never mid-merge, never with an agent or a verification running —
-  releases, and the same command takes it. A claim expires, a dead claimant's is
-  ignored, one session ever wins.
+  releases, and the same command takes it. A claim expires, a dead claimant's
+  is ignored, one session wins.
   A MESSAGE WAKES IT TOO (29.07.2026): `scripts/chat-watcher.mjs` spawns a light
   responder from the chat inbox — only with no live owner and no honoured claim,
   under a bounded claim; the launcher tick supervises it.
-- **Model policy (users 25.07./10.08.2026, points 309/624). AUTHOR AND REVIEWER
-  ARE SEPARATE ROLES.** AUTHORS: **Opus 5**, then **Fable 5**, then **Opus
-  4.8** — the chain `scripts/batch-autostart.mjs` launches. DIFFICULTY IS NO
-  REASON to hand work to Fable: Opus 5 works at any difficulty. REVIEWERS (both
-  modes): **GPT-5.6 Sol** at effort HIGH, else the first of **Fable 5**, **Opus
-  5**, **Opus 4.8** that authored none of it. A reviewer is bought for its
-  DIFFERENT errors, and another VENDOR decorrelates further than our own; never
-  "simplify" that away. Reviews run through `node scripts/review-sol.mjs`,
-  never a hand-typed `codex` line: it names the cause, HANDS the review on, and
-  RECORDS who ran it. Sonnet and Haiku are NOT acceptable: a degraded session
-  is a capability breach; the batch STOPS. Every commit NAMES its author model
+- **Model policy (users 25.07.–13.08.2026, points 309/624/667). AUTHOR AND REVIEWER ARE
+  SEPARATE ROLES, AND AUTHORING HAS TWO LANES.** ANTHROPIC: **Opus 5**, then **Fable
+  5**, then **Opus 4.8** — the chain `scripts/batch-autostart.mjs` launches. **FABLE 5
+  AUTHORS THE HARD CASES** (12.08.2026): difficult, complex or error-prone work goes to
+  Fable FROM THE START, and Opus work MOVES there once Sol still finds problems after a
+  re-work. OPENAI: **GPT-5.6 Sol** AUTHORS the MECHANICAL and MID-DIFFICULTY points
+  through `node scripts/author-sol.mjs` (13.08.2026), the cut made by
+  `scripts/author-routing-core.mjs` — never a hard case, never one whose verification IS
+  the work. REVIEWERS:
+  the OTHER vendor, never an author of the range —
+  Sol at effort HIGH on Claude's work; where SOL authored, CLAUDE reviews, runs the
+  suites, judges the picture and lands. Reviews run through `node
+  scripts/review-sol.mjs`, never a hand-typed `codex` line: it names the cause, hands
+  the review on and records who ran it. Sonnet and Haiku are NOT acceptable: a degraded
+  session is a capability breach; the batch STOPS. Every commit NAMES its author model
   in a `Co-Authored-By` trailer the `commit-msg` hook enforces;
-  `scripts/model-guard-core.mjs` holds the AUTHOR allowlist (`ALLOWED`) and
-  `scripts/model-guard.mjs` blocks the turn end on any commit after its
-  baseline authored outside it: HARD on a NAMED forbidden model (pause),
-  resolvably on an UNNAMED one, which transcripts settle. (History: a degraded
-  session merged three defective Haiku deliveries in 14 minutes; only the
-  trailers could have caught it.)
+  `scripts/model-guard-core.mjs` holds the
+  AUTHOR allowlist (`ALLOWED`) and `scripts/model-guard.mjs` blocks the turn end on any
+  commit after its baseline authored outside it: HARD on a NAMED forbidden model
+  (pause), resolvably on an UNNAMED one, which transcripts settle.
 - **The four-eyes principle has TWO MODES, chosen by the STAGE (user
   25.07.2026). This is its normative wording; everywhere else refers here.** A
   DIVERGENT stage — what could go wrong, which cases to test, which designs are
@@ -435,10 +442,11 @@ detail section change in the SAME commit.
    Detail: docs/acceptance-criteria-detail.md §6.
    Evidence: docs/acceptance-evidence.md §6.
 
-7. **Language/direction system.** The full system of `design.md` §13 is
-   implemented: the regional direction systems and glossary taught by the
-   village elder, hints of landmark, direction word and coordinate, deciphered
-   retroactively in either order.
+7. **Language and communication.** The tonal village speech of `design.md`
+   §13.4 is implemented — heard, guessed at, never translated — beside the
+   §13.1–13.3 direction words, glossary and retroactively deciphered hints,
+   which still stand. The village has no standing drum bed; only the chief's
+   message makes the drummer strike, from the message's own plan.
    Detail: docs/acceptance-criteria-detail.md §7.
    Evidence: docs/acceptance-evidence.md §7.
 
@@ -670,9 +678,9 @@ After completion and after every major system:
   behind (30.07.2026). The families: the BOARD (published,
   concise, one topic per card, consistent with the real state, every decision
   asked of the user standing as a card); the BATCH (no idle wait or idle stop,
-  the §6 model allowlist — a named breach pauses, an unnamed author is looked
-  up — a red CI, a branch already contained in `main`, the retrospective's
-  currency, the chat timestamp); the WORK ORDER (queue order, final-state-only specs,
+  the §6 context watermark and model allowlist — a named breach pauses, an
+  unnamed author is looked up — a red CI, a branch already in `main`, the
+  retrospective's currency, the chat timestamp); the WORK ORDER (queue order, final-state-only specs,
   the open/archived split, the measured doc ceilings in
   `scripts/doc-budget-core.mjs`); the FINDING (a turn that investigated and left
   nothing durable, and a carrier the owner has not drained); and the

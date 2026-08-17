@@ -65,6 +65,22 @@ import {
   normaliseFence,
 } from './batch-lease-core.mjs'
 import { IDLE_WINDOW_MS, ownershipVerdict } from './batch-ownership-core.mjs'
+import { markerFresh } from './batch-boundary-core.mjs'
+
+/**
+ * Does a SEALED boundary marker protect the handover for THIS session right now
+ * (point 675, defeat 1)? Only a committed marker that is FRESH and the
+ * session's own: a stale or foreign one protects nothing (Sol review of
+ * 807c2bf, finding 2) — past its freshness the marker cannot authorise a stop
+ * anyway, so keeping the handover alive beside resumed work would let the
+ * launcher spawn a successor next to a working session.
+ */
+function sealedMarkerHolds(marker, sessionId, now) {
+  // The freshness test is the boundary core's, so a future-dated marker cannot
+  // hold the seal here while `assessBoundary` calls the same marker stale (Sol's
+  // review of ffa0a78).
+  return marker?.phase === 'committed' && !!sessionId && marker.sessionId === sessionId && markerFresh(marker, now)
+}
 
 // --- Constants (exported for tests and callers) -------------------------------
 
@@ -310,7 +326,12 @@ export function assessOwner(lock, { now, bootTime, probe, work, leaseMs = LEASE_
  * Being wrong toward "not mine" costs a stand-down; being wrong the other way
  * costs the incident this module was written for.
  *
- * Returns { mine, via, restamp }.
+ * Process ancestry is permission to act for the recorded owner, never permission
+ * to replace that owner's identity. A session-id change has its own explicit,
+ * generation-checked door (`transitionOwnerSession`) below.
+ *
+ * Returns { mine, via, restamp }. `restamp` is always false; it remains in the
+ * result shape so callers cannot mistake a process match for a transition.
  */
 export function resolveOwnership({ lock, sessionId, ancestor, tolerance = PID_START_TOLERANCE_MS }) {
   const no = (via) => ({ mine: false, via, restamp: false })
@@ -319,7 +340,7 @@ export function resolveOwnership({ lock, sessionId, ancestor, tolerance = PID_ST
   // through: five registered gathers ask `heldByOtherLiveOwner('preflight-test')`,
   // and when the BATCH OWNER runs the unit suite in its own tree, the Vitest
   // process's claude ancestor IS the lock's pid — so ownership resolved `via:
-  // 'process'` and the restamp below rewrote the LIVE lock's sessionId to
+  // 'process'` and the former implicit restamp rewrote the LIVE lock's sessionId to
   // `preflight-test`. The launcher then read `owner=preflight-test` beside the
   // real session and reported a parallel batch. Refused here, in the pure
   // resolver, so every door that asks — ownsLock, heldByOtherLiveOwner, acquire —
@@ -337,7 +358,7 @@ export function resolveOwnership({ lock, sessionId, ancestor, tolerance = PID_ST
     return no('start-time-unknown')
   }
   if (Math.abs(ancestor.startedAt - lock.pidStartedAt) > tolerance) return no('pid-reused')
-  return { mine: true, via: 'process', restamp: true }
+  return { mine: true, via: 'process', restamp: false }
 }
 
 /**
@@ -509,10 +530,12 @@ export function ownerStateKey(lock, suffix = '') {
  * guard and its `acquire` is on its own Stop path. The restamp above is the path
  * that exists, and it needs no free lock, which fits the frequency far better.)
  *
- * A real session id is a UUID and can never carry this prefix, so the namespace is
- * reserved rather than shared. Three consequences: `resolveOwnership` never answers
- * "mine" for a probe (so nothing restamps a lock to one), `acquire` refuses it the
- * lock outright, and the classifier below is blind to one on either side.
+ * The repository reserves this prefix for its own probes. That is a namespace
+ * contract, not an assumption about the harness's session-id syntax. Three
+ * consequences remain useful beyond the general no-restamp invariant:
+ * `resolveOwnership` never grants a probe permission to act for the owner,
+ * `acquire` refuses it the lock outright, and the classifier below is blind to
+ * one on either side.
  */
 export const PROBE_SESSION_PREFIX = 'preflight-'
 
@@ -593,8 +616,10 @@ export function progressGuardDecision({
   launcher = 'unknown', // 'armed' | 'disabled' | 'unknown'
   boundaryDue = null, // point number closed in THIS session without a marker | null
   inFlight = false, // declared work PROVEN still running (assessInFlight().live)
+  inFlightTransferable = true, // false ONLY when declared work lacks a pushed checkpoint (point 675)
   slotsNeedReason = false, // free pool slots + an independent queued point + no reason (point 427)
   claim = 'none', // 'none' | 'wait' | 'release' from batch-claim-core's releaseDecision
+  contextPastWatermark = false, // a REAL context reading past the watermark, launcher armed (point 675)
 }) {
   if (paused) return 'allow'
   if (formatSuspect) return 'block-format'
@@ -642,8 +667,25 @@ export function progressGuardDecision({
   // only once the idle slots are accounted for: either the pool is at its cap, the
   // queue's remaining points all touch the running branch, the batch is paused, a
   // closing freeze is recorded, or the declaration carries a written reason.
-  if (inFlight === true) return slotsNeedReason === true ? 'block-slots-free' : 'allow-in-flight'
+  // THE CONDITION IS "THE POINT I WAS LANDING IS LANDED" (point 675, defeat 2),
+  // not "the pool has drained". A declared wait therefore shields the session
+  // from the boundary demand ONLY while the work could not survive it — no
+  // committed-and-pushed checkpoint, so a successor could neither verify nor
+  // rescue it (drain-before-boundary stays the safe degraded mode). Transferable
+  // work is ADOPTED by the successor instead of waited out, so the boundary (and
+  // the context watermark) is demanded right through it.
+  if (inFlight === true && inFlightTransferable !== true) {
+    return slotsNeedReason === true ? 'block-slots-free' : 'allow-in-flight'
+  }
   if (Number.isInteger(boundaryDue) && boundaryDue > 0) return 'block-take-boundary'
+  // THE CONTEXT WATERMARK (point 675, defeat 3): a session that answers
+  // questions and files points for hours never closes a point, so nothing above
+  // ever fires — but its context is the batch's dominant cost all the same.
+  // The caller sets this ONLY from a real measurement AND an armed launcher
+  // (never demand what the CLI would refuse), so a block here always names a
+  // handover the session can actually take.
+  if (contextPastWatermark === true) return 'block-context-handover'
+  if (inFlight === true) return slotsNeedReason === true ? 'block-slots-free' : 'allow-in-flight'
   return 'block-continue'
 }
 
@@ -950,11 +992,12 @@ export function acquire(sessionId, opts = {}) {
 
   const lock = readOwnerLock(lockPath)
   if (lock && typeof lock.fence === 'number') priorFence = lock.fence
-  // Ours by id, or ours by PROCESS under a session id a compaction renamed. The
-  // restamp inside ownsLock puts the current id back on the lock, so this is the
-  // one place that pays for the ancestor walk.
-  if (lock && ownsLock(sessionId, { ...opts, lockPath, lock, now }).mine) {
-    heartbeat(sessionId, { lockPath, now })
+  // Ours by id, or permission by PROCESS to act for the recorded owner. Process
+  // ancestry never changes identity; a genuine compaction has already used
+  // transitionOwnerSession from the SessionStart hook.
+  const ownership = lock ? ownsLock(sessionId, { ...opts, lockPath, lock, now }) : null
+  if (ownership?.mine) {
+    heartbeat(ownership.via === 'process' ? lock.sessionId : sessionId, { lockPath, now })
     return 'mine'
   }
   if (lock) {
@@ -1246,7 +1289,19 @@ export function heartbeat(sessionId, opts = {}) {
       now,
       settleMs: opts.settleMs,
     })
-    if (opts.preserveHandover === true && next.handedOver === true) {
+    // A SEALED (committed) boundary marker carries the handover through EVERY
+    // later hook (point 675, defeat 1): post-commit mutations are denied loudly
+    // at PreToolUse, and the reads that do run must not un-take the flag the
+    // launcher spawns on. Bound to freshness and to THIS session (Sol review of
+    // 807c2bf, finding 2) — a stale or foreign marker carries nothing. Only
+    // read when a handover actually stands, so the hot path pays nothing.
+    let sealed = false
+    try {
+      sealed = sealedMarkerHolds(readJson(statePathsFor(lockPath).boundaryPath), sessionId, now)
+    } catch {
+      /* an unreadable marker is not sealed */
+    }
+    if ((opts.preserveHandover === true || sealed) && next.handedOver === true) {
       next.handedOverAt = now
     } else if (causal) {
       delete next.handedOver
@@ -1327,12 +1382,12 @@ export function ourClaudeProcess(sessionId, opts = {}) {
 
 /**
  * Ownership, by session id first and by PROCESS second. Returns
- * `{ mine, via, lock }`. On a process match the lock is RE-STAMPED with the
- * current session id, so every later check is the cheap string compare again and
- * the state file stops lying about who holds it.
+ * `{ mine, via, lock }`. A process match is deliberately READ-ONLY: ancestry
+ * grants the caller permission to act for the existing owner, but never lets an
+ * asserted session id become that owner's identity.
  *
  * `processIdentity: false` keeps the old id-only behaviour for a caller that
- * wants it; `restamp: false` asks the same question without writing.
+ * wants it.
  */
 export function ownsLock(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
@@ -1356,21 +1411,104 @@ export function ownsLock(sessionId, opts = {}) {
   // name itself the owner. Ancestry is established or it is not.
   const ancestor = opts.ancestor !== undefined ? opts.ancestor : ourClaudeProcess(sessionId, opts)
   const verdict = resolveOwnership({ lock, sessionId, ancestor })
-  if (verdict.mine && verdict.restamp && opts.restamp !== false) {
+  return { mine: verdict.mine, via: verdict.via, lock }
+}
+
+/**
+ * Is this a session id safe to put on the owner lock? PURE.
+ *
+ * This intentionally does NOT prescribe UUID syntax. The hook harness owns the
+ * id format and may change it; authenticity comes from the explicit compaction
+ * path plus the lock-generation/process checks below, not from a string shape.
+ */
+export function validTransitionSessionId(sessionId) {
+  const containsControlCharacter =
+    typeof sessionId === 'string' &&
+    [...sessionId].some((character) => {
+      const code = character.charCodeAt(0)
+      return code <= 31 || code === 127
+    })
+  return (
+    typeof sessionId === 'string' &&
+    sessionId.length > 0 &&
+    sessionId.length <= 512 &&
+    sessionId === sessionId.trim() &&
+    !containsControlCharacter &&
+    !isProbeSessionId(sessionId)
+  )
+}
+
+/** A stable acquisition generation, never a heartbeat timestamp. PURE. */
+function ownerLockGeneration(lock) {
+  if (!lock || typeof lock !== 'object') return null
+  if (typeof lock.fence === 'number' && Number.isFinite(lock.fence)) return `fence:${lock.fence}`
+  if (typeof lock.acquiredAt === 'number' && Number.isFinite(lock.acquiredAt)) return `acquired:${lock.acquiredAt}`
+  if (typeof lock.startedAt === 'number' && Number.isFinite(lock.startedAt)) return `started:${lock.startedAt}`
+  return null
+}
+
+/**
+ * THE ONLY DOOR THAT CHANGES A LIVE OWNER'S SESSION ID.
+ *
+ * SessionStart calls this for an explicit compaction event. Its `lock` argument
+ * is the generation that event observed. Under the same mutex used for lock
+ * takeover, this re-reads the authority and requires that generation, owner id,
+ * pid and pid start time to be unchanged, then verifies that the caller really
+ * runs under that exact process. A stale observation can therefore never stamp
+ * over a successor, even if a recycled pid happens to match later.
+ *
+ * Rejections are data, never silence: `{ transitioned: false, reason }`. The
+ * SessionStart wrapper prints the reason so a refused genuine transition cannot
+ * turn into an inexplicably ownerless batch.
+ */
+export function transitionOwnerSession(sessionId, opts = {}) {
+  const rejected = (reason) => ({ transitioned: false, reason })
+  if (!validTransitionSessionId(sessionId)) return rejected('invalid-session-id')
+
+  const lockPath = opts.lockPath ?? LOCK_PATH
+  const observed = opts.lock !== undefined ? opts.lock : readOwnerLock(lockPath)
+  if (!observed || typeof observed.sessionId !== 'string') return rejected('no-lock')
+  if (observed.sessionId === sessionId) return { transitioned: false, reason: 'already-current' }
+  if (observed.kind === 'pending-spawn') return rejected('pending-spawn')
+
+  const generation = ownerLockGeneration(observed)
+  if (generation === null) return rejected('lock-without-generation')
+  const ancestor = opts.ancestor !== undefined ? opts.ancestor : (opts.findAncestorFn ?? findClaudeAncestor)()
+  const permission = resolveOwnership({ lock: observed, sessionId, ancestor })
+  if (!permission.mine || permission.via !== 'process') return rejected(`not-owner:${permission.via}`)
+
+  const mutexPath = `${lockPath}.reaping`
+  if (!enterReapMutex(mutexPath)) return rejected('transition-busy')
+  try {
+    const current = readOwnerLock(lockPath)
+    if (
+      !current ||
+      current.sessionId !== observed.sessionId ||
+      current.kind !== observed.kind ||
+      current.pid !== observed.pid ||
+      current.pidStartedAt !== observed.pidStartedAt ||
+      ownerLockGeneration(current) !== generation
+    ) {
+      return rejected('lock-generation-changed')
+    }
+    const currentPermission = resolveOwnership({ lock: current, sessionId, ancestor })
+    if (!currentPermission.mine || currentPermission.via !== 'process') {
+      return rejected(`not-owner:${currentPermission.via}`)
+    }
     try {
-      // Only the id moves. claimedAt is NOT bumped (that would count as work and
-      // silently withdraw a handover) and no other field is touched.
       writeJsonAtomic(lockPath, {
-        ...lock,
+        ...current,
         sessionId,
-        sessionIdBefore: lock.sessionId,
+        sessionIdBefore: current.sessionId,
         sessionIdRestampedAt: opts.now ?? Date.now(),
       })
-    } catch {
-      /* the verdict stands; the next call simply pays for the walk again */
+    } catch (error) {
+      return rejected(`write-failed:${error && error.message ? error.message : 'unknown error'}`)
     }
+    return { transitioned: true, reason: 'transitioned', sessionIdBefore: current.sessionId }
+  } finally {
+    exitReapMutex(mutexPath)
   }
-  return { mine: verdict.mine, via: verdict.via, lock }
 }
 
 export function isOwner(sessionId, lockPath = LOCK_PATH) {
@@ -1515,6 +1653,13 @@ export function withdrawalIsCausal({
  * heartbeat lands (four-eyes review, finding 1). Calling this from a PreToolUse
  * hook closes that window BEFORE the long call starts.
  */
+/** The boundary marker beside a lock, or null — for callers (the PreToolUse
+ *  gate) that must judge a sealed boundary without importing the boundary CLI's
+ *  whole dependency set. */
+export function readBoundaryMarker(lockPath = LOCK_PATH) {
+  return readJson(statePathsFor(lockPath).boundaryPath)
+}
+
 export function withdrawHandover(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
   const lock = readOwnerLock(lockPath)
@@ -1532,6 +1677,26 @@ export function withdrawHandover(sessionId, opts = {}) {
   // is protected by the same test as the flag — deleting it is what forces the
   // re-take, and that re-take loop is what point 388 was opened on.
   const marker = readJson(boundaryPath)
+  // A COMMITTED marker is SEALED (point 675, defeat 1): `--commit` was the
+  // session's last repository action, so a later call never silently un-takes
+  // the boundary — the PreToolUse gate DENIES the call loudly instead
+  // (`sealedBoundaryDeny`), and only the deliberate `--clear` (or the user's own
+  // prompt, `force`) withdraws. Without this, the seal would deny a mutation and
+  // this withdrawal would still eat the marker for the call that was denied.
+  if (sealedMarkerHolds(marker, sessionId, opts.now ?? Date.now()) && opts.force !== true) {
+    try {
+      appendFileSync(
+        opts.logPath ?? statePathsFor(lockPath).boundaryLogPath,
+        `[${new Date(opts.now ?? Date.now()).toISOString()}] SEALED MARKER KEPT for ` +
+          `${marker.cause === 'context' ? 'the context watermark' : `point ${marker.point ?? '?'}`} by ${sessionId} — ` +
+          `a post-commit call (${opts.trigger ?? 'unrecorded'}) does not withdraw a committed boundary; ` +
+          `only \`batch-boundary.mjs --clear\` or the user's own prompt does.\n`,
+      )
+    } catch {
+      /* best effort */
+    }
+    return false
+  }
   const writtenAt = Math.max(
     typeof lock.handedOverAt === 'number' ? lock.handedOverAt : 0,
     typeof marker?.at === 'number' ? marker.at : 0,

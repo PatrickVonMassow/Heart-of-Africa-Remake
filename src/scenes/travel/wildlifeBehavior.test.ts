@@ -2484,6 +2484,106 @@ describe('deflectedStep (scripted walks obey the land constraint, point 83)', ()
     // It did NOT step straight into the pocket column.
     expect(Math.abs(r.heading)).toBeGreaterThan(0.01)
   })
+
+  // A DEAD-END CORRIDOR is what a settlement has and a coast does not: the only
+  // way out is backwards (work-order 648). The default arc is the open-country
+  // ±90° and stands still in one; a caller that lives among walls asks for the
+  // full circle and turns round.
+  const corridor = (x: number, z: number) => z > -0.5 || Math.abs(x) > 0.35
+  it('stands in a dead-end corridor on the default ±90° arc', () => {
+    const r = deflectedStep(0, -1, 0, 0.03, corridor, 0.6)
+    expect(r.moved).toBe(false)
+  })
+
+  it('turns round out of it when the caller allows the full circle', () => {
+    const r = deflectedStep(0, -1, 0, 0.03, corridor, 0.6, 12)
+    expect(r.moved).toBe(true)
+    expect(corridor(r.x, r.z)).toBe(false)
+    expect(Math.abs(r.heading)).toBeGreaterThan(Math.PI / 2) // it went backwards
+  })
+
+  // THE COURSE RULE (work-order 648). The search takes the SMALLEST free turn,
+  // and which turns are free depends on where the walker is standing — so the
+  // minimum flips between two values that undo one another, and the walker
+  // shuffles on the spot instead of walking. Told what it is travelling on, it
+  // may no longer undo its own step.
+  it('undoes its own step with no course to keep', () => {
+    const a = deflectedStep(0, -1, 0, 0.03, corridor, 0.6, 12)
+    const b = deflectedStep(a.x, a.z, 0, 0.03, corridor, 0.6, 12)
+    expect(a.moved && b.moved).toBe(true)
+    expect(Math.cos(b.heading - a.heading)).toBeLessThan(0)
+  })
+
+  it('keeps the course it is on instead, and still gets somewhere', () => {
+    const a = deflectedStep(0, -1, 0, 0.03, corridor, 0.6, 12)
+    const b = deflectedStep(a.x, a.z, 0, 0.03, corridor, 0.6, 12, a.heading)
+    expect(b.moved).toBe(true)
+    expect(corridor(b.x, b.z)).toBe(false)
+    expect(Math.cos(b.heading - a.heading)).toBeGreaterThanOrEqual(0)
+  })
+
+  it('gives the course up rather than stand, when nothing that keeps it is free', () => {
+    // Walking INTO the pocket is exactly that case: the only free ground is
+    // behind, so the rule yields instead of pinning the walker.
+    const r = deflectedStep(0, -1, 0, 0.03, corridor, 0.6, 12, 0)
+    expect(r.moved).toBe(true)
+    expect(Math.abs(r.heading)).toBeGreaterThan(Math.PI / 2)
+  })
+
+  it('never constrains the heading the caller ASKED for, however sharply it turned', () => {
+    // The rule is about the DEFLECTION. A walker that changed its mind and has a
+    // clear way there takes it — an evading runner turning round is not a bug.
+    const r = deflectedStep(0, 0, Math.PI, 0.03, () => false, 0.06, 6, 0)
+    expect(r.moved).toBe(true)
+    expect(r.heading).toBe(Math.PI)
+  })
+
+  // THE COMMITTED SIDE (work-order 648): a caller going ROUND something says
+  // which way round, and the search takes that side even where the other one is
+  // the smaller turn — which is what makes it follow an edge rather than take
+  // whichever flank is momentarily nearer.
+  describe('a committed side', () => {
+    // A wall straight ahead, open on both flanks: the free turns are symmetric,
+    // so nothing but the commitment can decide between them.
+    const wall = (x: number, z: number) => z > 0.5 && Math.abs(x) < 0.4
+
+    it('takes the side it is given, either way', () => {
+      const plus = deflectedStep(0, 0, 0, 0.1, wall, 0.6, 12, NaN, 1)
+      const minus = deflectedStep(0, 0, 0, 0.1, wall, 0.6, 12, NaN, -1)
+      expect(plus.moved && minus.moved).toBe(true)
+      expect(plus.heading).toBeGreaterThan(0)
+      expect(minus.heading).toBeLessThan(0)
+    })
+
+    it('leaves the search exactly as it was with no side committed', () => {
+      const bare = deflectedStep(0, 0, 0, 0.1, wall, 0.6, 12)
+      const zero = deflectedStep(0, 0, 0, 0.1, wall, 0.6, 12, NaN, 0)
+      expect(zero).toEqual(bare)
+    })
+
+    it('takes a clear way ahead whatever side is committed', () => {
+      const r = deflectedStep(0, 0, 0, 0.1, () => false, 0.6, 12, NaN, -1)
+      expect(r.heading).toBe(0)
+    })
+
+    it('never gives the COURSE up for the sake of its side', () => {
+      // The way out on the committed side is a turn RIGHT ROUND, and a smaller
+      // turn keeping the course is free on the other one. Preferring the side
+      // there would undo the walker's own step — the shuffle all over again.
+      const lane = (x: number, z: number) => z > 0.5 || x < -0.4
+      const r = deflectedStep(0, 0, 0, 0.1, lane, 0.6, 12, 0, -1)
+      expect(r.moved).toBe(true)
+      expect(Math.cos(r.heading)).toBeGreaterThanOrEqual(0) // it kept its course
+    })
+
+    it('falls back to the other side rather than stand', () => {
+      // Everything on the committed side is shut; the walker still walks.
+      const shut = (x: number, z: number) => x > 0.05 || z > 0.5
+      const r = deflectedStep(0, 0, 0, 0.1, shut, 0.6, 12, NaN, 1)
+      expect(r.moved).toBe(true)
+      expect(shut(r.x, r.z)).toBe(false)
+    })
+  })
 })
 
 describe('escapeCorridorHeading (point 188 — the walk-off picks a land corridor, not the seaward radial)', () => {

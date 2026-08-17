@@ -135,7 +135,7 @@ function AudienceDialog() {
   const sendDrumMessage = () => {
     const plan = drumMessagePlan()
     setDialog(null)
-    useUi.getState().startDrumMessage(plan.duration)
+    useUi.getState().startDrumMessage(plan)
     playDrumMessage(plan)
     setToast(t.toasts.drumsSending)
   }

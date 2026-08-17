@@ -347,7 +347,7 @@ const SUB_HEADING_RE = /^#{3,6}\s+(.*)$/
  *  alternation is LONGEST-FIRST: with `js` before `json`, `.claude/settings.json`
  *  matched as `.claude/settings.js` and the guard reported a live file as dead
  *  (caught by the against-the-real-documents check below, not by the unit cases). */
-export const LEDGER_PATH_RE = /(?:[\w.-]+\/)+[\w.-]+\.(?:json|mjs|cjs|jsx|tsx|ts|js|md)/g
+export const LEDGER_PATH_RE = /(?:[\w.-]+\/)+[\w.-]+\.(?:jsonl|json|mjs|cjs|jsx|tsx|ts|js|md)/g
 
 /** Marker that a (3) row is an ADMITTED GAP rather than a considered "none" —
  *  the point's instruction that a lesson with no enforcement is REPORTED, never

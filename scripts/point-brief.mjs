@@ -17,6 +17,7 @@ import { relative } from 'node:path'
 import { ARCHIVE_PATH, readTasksAll, TASKS_PATH } from './tasks-source.mjs'
 import { BriefError, buildBrief, BRIEF_TOKEN_CEILING } from './point-brief-core.mjs'
 import { CLAUDE_PATH, DESIGN_PATH, REPO_ROOT, readDocCorpus } from './doc-corpus.mjs'
+import { currentSetting, settingProblemLine } from './sol-share.mjs'
 
 /**
  * The git half of the brief's provenance stamp: which commit, and whether the
@@ -53,6 +54,11 @@ if (!number) {
   process.exit(1)
 }
 
+// The routing the brief will state — READ, never assumed, and a state file that is there
+// but unusable is NAMED rather than silently presented as the operator's choice.
+const solShare = currentSetting()
+if (solShare.problem) console.error(settingProblemLine(solShare, 'point-brief'))
+
 try {
   if (!existsSync(DESIGN_PATH)) throw new BriefError(`design.md not found at ${DESIGN_PATH}`)
   const { brief, tokens, designRefs, referenced } = buildBrief({
@@ -65,6 +71,11 @@ try {
     docs: readDocCorpus(),
     number,
     revision: gitRevision(),
+    // Which vendor the read-only work goes to right now (point 654). READ, never
+    // assumed: the brief tells the agent what the switch actually says.
+    // The whole STATE, not just the setting: a fallback must reach the brief AS a
+    // fallback, and a separate flag is a thing a caller can forget.
+    solShare,
   })
   process.stdout.write(brief.endsWith('\n') ? brief : `${brief}\n`)
   if (showTokens || tokens > BRIEF_TOKEN_CEILING) {

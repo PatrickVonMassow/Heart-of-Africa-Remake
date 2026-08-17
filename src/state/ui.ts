@@ -2,6 +2,7 @@
 
 import { create } from 'zustand'
 import type { UtteranceId } from '../communication/lexicon'
+import type { DrumMessagePlan } from '../communication/drumMessage'
 import type { TreasureId } from '../systems/economy'
 import { QUALITY_PRESETS, nextDetailLevel, type DetailLevel } from '../config/quality'
 
@@ -180,16 +181,17 @@ export interface UiState {
   /**
    * The chief's drums beating his message out (design.md §13.4, point 486), on
    * the WALL clock: what the player hears and watches, not in-game days. The
-   * drummer figure animates from `startedAt` and the message display opens at
-   * `endsAt`; null while no message is being sent. Transient scene furniture —
-   * what the message TAUGHT lives in the game state and is saved there.
+   * drummer figure animates from the exact `plan` sent to WebAudio and the
+   * message display opens at `endsAt`; null while no message is being sent.
+   * Transient scene furniture — what the message TAUGHT lives in the game state
+   * and is saved there.
    */
-  drumPerformance: { startedAt: number; endsAt: number } | null
+  drumPerformance: { startedAt: number; endsAt: number; plan: DrumMessagePlan } | null
   /** Open bazaar bid awaiting accept/decline (design.md §10). */
   bazaarBid: { treasure: TreasureId; amount: number } | null
   setBazaarBid: (bid: { treasure: TreasureId; amount: number } | null) => void
-  /** The chief sends his message: the drums start now and beat for `seconds`. */
-  startDrumMessage: (seconds: number, now?: number) => void
+  /** The chief sends this exact plan: sound and hands share its strike times. */
+  startDrumMessage: (plan: DrumMessagePlan, now?: number) => void
   /** The drums have finished (or the settlement was left) — clears the beating. */
   clearDrumMessage: () => void
   setDialog: (d: Dialog) => void
@@ -271,11 +273,17 @@ export const useUi = create<UiState>()((set) => ({
   setBazaarBid: (bazaarBid) => set({ bazaarBid }),
   // A message already being beaten out is never restarted — asking twice while
   // the drums sound would double the strikes over one another.
-  startDrumMessage: (seconds, now) =>
+  startDrumMessage: (plan, now) =>
     set((s) => {
       if (s.drumPerformance) return s
       const startedAt = now ?? (typeof performance === 'undefined' ? Date.now() : performance.now())
-      return { drumPerformance: { startedAt, endsAt: startedAt + Math.max(0, seconds) * 1000 } }
+      return {
+        drumPerformance: {
+          startedAt,
+          endsAt: startedAt + Math.max(0, plan.duration) * 1000,
+          plan,
+        },
+      }
     }),
   clearDrumMessage: () => set((s) => (s.drumPerformance ? { drumPerformance: null } : s)),
   // Closing or switching a dialog always discards a pending bazaar bid.

@@ -162,6 +162,7 @@ const TAG_FIELDS: ReadonlyArray<{
   { key: 'trendLeave', label: 'tagTrendLeave', step: 0.02, min: 0 },
   { key: 'variation', label: 'tagVariation', step: 0.05, min: 0, max: 0.9 },
   { key: 'unstuckSeconds', label: 'tagUnstuck', step: 0.5, min: 0.1 },
+  { key: 'edgeSeconds', label: 'tagEdge', step: 0.1, min: 0 },
   { key: 'silenceSeconds', label: 'tagSilence', step: 5, min: 1 },
   { key: 'leanAtSprint', label: 'tagLean', step: 0.02, min: 0 },
   { key: 'turnRate', label: 'tagTurnRate', step: 0.2, min: 0.1 },
@@ -231,6 +232,35 @@ const SEPARATION_FIELDS: ReadonlyArray<{
   { key: 'stiffness', label: 'separationStiffness', step: 0.05, min: 0.05, max: 1 },
   { key: 'maxSpeed', label: 'separationSpeed', step: 0.1, min: 0.1 },
   { key: 'wedgeSeconds', label: 'separationWedge', step: 0.5, min: 0.1 },
+  { key: 'passes', label: 'separationPasses', step: 1, min: 1, max: 8 },
+]
+
+/** Every numeric choice in the non-semantic village drum bed. The patterns
+ *  themselves are musical figures; all timing, dynamics, voice and variation
+ *  around those figures are live calibration values. */
+type DrumBedNumberKey = Exclude<keyof typeof balance.drumBed, 'enabled'>
+const DRUM_BED_FIELDS: ReadonlyArray<{
+  key: DrumBedNumberKey
+  label: DebugLabelKey
+  step: number
+  min: number
+  max?: number
+  integer?: boolean
+}> = [
+  { key: 'stepSeconds', label: 'drumBedStep', step: 0.01, min: 0.02 },
+  { key: 'phraseBars', label: 'drumBedPhraseBars', step: 1, min: 1, max: 8, integer: true },
+  { key: 'phraseGapMinSeconds', label: 'drumBedGapMin', step: 0.1, min: 0 },
+  { key: 'phraseGapMaxSeconds', label: 'drumBedGapMax', step: 0.1, min: 0 },
+  { key: 'tempoSpread', label: 'drumBedTempoSpread', step: 0.01, min: 0, max: 0.5 },
+  { key: 'pitchSpread', label: 'drumBedPitchSpread', step: 0.01, min: 0, max: 0.5 },
+  { key: 'pitchStartHz', label: 'drumBedPitchStart', step: 5, min: 20 },
+  { key: 'pitchEndHz', label: 'drumBedPitchEnd', step: 5, min: 20 },
+  { key: 'hitSeconds', label: 'drumBedHitSeconds', step: 0.01, min: 0.04 },
+  { key: 'accentShift', label: 'drumBedAccentShift', step: 0.05, min: 0, max: 1 },
+  { key: 'thinAfterSeconds', label: 'drumBedThinAfter', step: 5, min: 1 },
+  { key: 'thinMaxGapFactor', label: 'drumBedThinFactor', step: 0.1, min: 1 },
+  { key: 'villageGain', label: 'drumBedVillageGain', step: 0.05, min: 0 },
+  { key: 'nearbyGain', label: 'drumBedNearbyGain', step: 0.05, min: 0 },
 ]
 
 function NumberField({
@@ -751,6 +781,17 @@ export function DebugMenu() {
         refreshAmbienceVolume()
         bump()
       }, 0.1),
+      check(t.debug.drumBedEnabled, balance.drumBed.enabled, (v) => {
+        balance.drumBed.enabled = v
+        refreshAmbienceVolume()
+        bump()
+      }),
+      ...tableRows(DRUM_BED_FIELDS, (f) => balance.drumBed[f.key], (f, v) => {
+        balance.drumBed[f.key] = f.integer ? Math.round(v) : v
+        // Gain edits affect the standing layer immediately; the other values
+        // are picked up by the next phrase without restarting the audio graph.
+        refreshAmbienceVolume()
+      }),
       num(t.debug.surfNearRadius, balance.surf.nearRadius,
         (v) => { balance.surf.nearRadius = Math.max(0, v); bump() }, 0.1),
       num(t.debug.surfCutoff, balance.surf.cutoff,

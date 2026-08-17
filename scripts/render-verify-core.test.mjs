@@ -23,6 +23,7 @@ import {
   pointStatusesFrom,
   chargeablePoints,
   chargeFor,
+  chargeReds,
   runVerdict,
   formatSuspectEnv,
   parseSuspectEnv,
@@ -1155,6 +1156,7 @@ describe('the shipped charge ledger', () => {
       expect(String(c.why).length).toBeGreaterThan(40)
       if (c.backend) expect(BACKENDS).toContain(c.backend)
       if (c.kind) expect(['check', 'console']).toContain(c.kind)
+      if (c.detailMatch) expect(c.detailMatch).toBeInstanceOf(RegExp)
     }
   })
 
@@ -1163,10 +1165,90 @@ describe('the shipped charge ledger', () => {
     expect(RED_CHARGES.filter((c) => !open.has(c.point)).map((c) => c.point)).toEqual([])
   })
 
-  it('charges the goat-stance red on the software lane only', () => {
+  // THE TWO LANES ANSWER TO DIFFERENT POINTS, and that separation is the whole
+  // value of the charge (13.08.2026). Point 506 is the software lane's rate
+  // problem and says in its own words that on WebGL 2 the check "stays a real
+  // red" — so it must never swallow a hardware-lane occurrence. When one
+  // appeared, it did not become 506's: it became point 671, which must classify
+  // it by measurement. The pairing below is what stops the two from merging back
+  // together, and 671's entry dies with 671, which is the point of the charge.
+  it('charges the goat-stance red to a DIFFERENT point on each lane', () => {
     const goat = red('settlement walker (goat): the planted foot holds its ground spot')
     expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu' }).point).toBe(506)
     expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' })).toBeNull()
+  })
+
+  it('charges only the measured children composition and leaves every other red uncovered', () => {
+    const child = (detail) => ({
+      ...red('no child walks without getting anywhere'),
+      detail,
+    })
+    const measured = child(
+      'worst child 3 at 0.39 % of its own judged time — worst child 3 at 8.9s, 1.29 m walked inside 0.32 m',
+    )
+    // The owner is 694, not the point that delivered the acceptance: an entry
+    // charged to 666 would have expired at 666's own tick, taking the
+    // acceptance with it on the very landing that made it.
+    expect(chargeFor(measured, { suite: 'polish', backend: 'webgl' }).point).toBe(694)
+
+    // The player-reported permanent shiver has the same check label, but not
+    // the accepted single-event signature. Missing details are equally unsafe,
+    // and the evidence names WebGL 2 only: all three remain real reds.
+    const shiver = child('worst child 3 at 99.89 % — worst child 3 at 0.1s, 3.41 m walked inside 0.14 m')
+    expect(chargeFor(shiver, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(red('no child walks without getting anywhere'), { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(measured, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+  })
+
+  it('a detailMatch charge fires at RECORD time and can never be applied afterwards', () => {
+    // MEASURED 14.08.2026, through the real parser and the real recorder path.
+    // A suite prints `FAIL  <name> — <detail>`; failedChecks parses the detail
+    // out, so chargeReds CAN read it and stamps the point. What it then STORES
+    // is name/key/kind/point — the detail is dropped, and 0 of 99 recorded reds
+    // carry one. So the ledger's promise that a charge "counts at once, no
+    // re-run needed" holds for `match` and NOT for `detailMatch`: a red that was
+    // already recorded can never be charged retroactively, which is why a
+    // WebGPU children red of 14.08.2026 stayed unexplained after its entry was
+    // written. Point 694 owns the repair. Fail-safe either way — an unmatched
+    // red stays loudly uncharged, it is never blessed.
+    const line =
+      'FAIL  no child walks without getting anywhere — worst child 1 at 0.29 % of its own judged ' +
+      'time — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m  [--section=children-motion]'
+    const [parsed] = failedChecks(line)
+    expect(parsed.detail).toContain('1.42 m walked inside 0.31 m')
+
+    // At record time the charge sees the detail and stamps the owner.
+    const [stored] = chargeReds([parsed], { suite: 'polish', backend: 'webgpu' })
+    expect(stored.point).toBe(694)
+
+    // What survives into the record carries no detail.
+    expect(stored.detail).toBeUndefined()
+
+    // AND THE CASE THAT ACTUALLY BIT: a red recorded BEFORE the entry existed —
+    // uncharged, and without the detail the new entry would need. Adding the
+    // entry afterwards cannot reach it, however the ledger now reads.
+    const [beforeTheRule] = chargeReds([parsed], { suite: 'polish', backend: 'webgpu', ledger: [] })
+    expect(beforeTheRule.point).toBeNull()
+    expect(beforeTheRule.detail).toBeUndefined()
+    expect(chargeFor(beforeTheRule, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+  })
+
+  it('charges the same composition on the OTHER backend to the same owner, by its own signature', () => {
+    // The WebGL-2-only scoping was disproved the night it was written: the same
+    // composition appeared on WebGPU at a different measurement (point 694).
+    // Each entry still answers for ITS signature alone — which is precisely why
+    // 694 must replace them both with a rule about the SHAPE.
+    const child = (detail) => ({ ...red('no child walks without getting anywhere'), detail })
+    const onWebgpu = child('worst child 1 at 0.29 % — worst child 1 at 22.2s, 1.42 m walked inside 0.31 m')
+    expect(chargeFor(onWebgpu, { suite: 'polish', backend: 'webgpu' }).point).toBe(694)
+    // Not on the other backend, and no blanket over the check itself.
+    expect(chargeFor(onWebgpu, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(
+      chargeFor(child('worst child 2 at 18.4 % — worst child 2 at 3.0s, 9.10 m walked inside 0.12 m'), {
+        suite: 'polish',
+        backend: 'webgpu',
+      }),
+    ).toBeNull()
   })
 
   it('charges the fixed render-target leak to NOBODY — a mended red is a red again', () => {

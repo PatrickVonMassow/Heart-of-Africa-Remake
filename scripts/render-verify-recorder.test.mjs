@@ -166,7 +166,12 @@ describe('the captured lines charge the way the guard reads them', () => {
     expect(pointOf('a NEW check nobody has filed')).toBeNull()
   })
 
-  it('charges the same output differently on the other lane, where the goat red is real', () => {
+  it('charges the same output to the OTHER point on the other lane, where the goat red is real', () => {
+    // 506 is the software lane's rate problem and disclaims the hardware lane in
+    // its own words, so a hardware-lane occurrence is charged to nobody and
+    // blocks. Charging it to the point that must classify it was tried and
+    // refused by the cross-vendor review: an open owner would excuse every later
+    // red of the same wording on the lane whose verdicts we trust.
     const lines = 'FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967'
     const reds = chargeReds(failedChecks(lines), { suite: 'polish', backend: 'webgl' })
     expect(reds.map((r) => r.point)).toEqual([null])

@@ -28,8 +28,17 @@ import { mkdtempSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, it, expect } from 'vitest'
-import { cleanupEvidence, deleteLandedBranch, listWorktrees, reproveOne, runCommand, selectCleanup } from './land-point.mjs'
-import { DISPOSITION, judgeCleanupTarget } from './land-cleanup-core.mjs'
+import {
+  branchRepairHint,
+  cleanupEvidence,
+  deleteLandedBranch,
+  listWorktrees,
+  localBranchExists,
+  reproveOne,
+  runCommand,
+  selectCleanup,
+} from './land-point.mjs'
+import { DISPOSITION, branchDeletionBlocker, judgeCleanupTarget } from './land-cleanup-core.mjs'
 
 /** A child that takes a measurable, deterministic amount of time. */
 const slowChild = (ms) => ({ cmd: process.execPath, args: ['-e', `setTimeout(() => {}, ${ms})`], id: 'slow' })
@@ -249,14 +258,41 @@ describe('the probe must not become its own evidence', () => {
   })
 })
 
+describe('the by-hand repair does not undo the mechanism', () => {
+  // Ninth review, finding 1. The hint prints when a tree was KEPT or a removal
+  // REFUSED — the very state where something may still stand on the branch — and
+  // it used to read `git branch -D <b>; git push origin --delete <b>`: the two
+  // forced deletions this file exists to make conditional, handed to the operator
+  // at the worst possible moment.
+  it('names only CONDITIONAL commands — never -D, never a lease-less remote delete', () => {
+    const hint = branchRepairHint('feat/608-x')
+    expect(hint).not.toMatch(/branch\s+-D\b/)
+    expect(hint).toMatch(/git branch -d feat\/608-x/)
+    // The remote deletion carries the same lease the automated path uses …
+    expect(hint).toMatch(/--force-with-lease=refs\/heads\/feat\/608-x:/)
+    // … and every step is chained with && so none runs after a failure.
+    expect(hint).not.toMatch(/;\s*git (branch|push)/)
+    expect(hint).toMatch(/&& git push origin/)
+  })
+
+  it('asks for the blocker to be cleared first, and says nothing forceful without a branch', () => {
+    expect(branchRepairHint('feat/608-x')).toMatch(/keep-reasons/)
+    for (const empty of ['', '   ', null, undefined]) {
+      const hint = branchRepairHint(empty)
+      expect(hint, String(empty)).not.toMatch(/-D|--delete/)
+    }
+  })
+})
+
 describe('the branch deletion is a SEQUENCE, not two independent commands', () => {
-  /** A git that records every call and fails the ones it is told to. */
-  const recorder = (failing = []) => {
+  const SHA = '1234567890abcdef1234567890abcdef12345678'
+  /** A git that records every call, answers rev-parse, and fails what it is told to. */
+  const recorder = (failing = [], { sha = SHA, error = 'git said no' } = {}) => {
     const calls = []
     const run = (args) => {
       calls.push(args.join(' '))
-      if (failing.some((f) => args.join(' ').includes(f))) throw new Error('git said no')
-      return ''
+      if (failing.some((f) => args.join(' ').includes(f))) throw new Error(error)
+      return args[0] === 'rev-parse' ? sha : ''
     }
     return { calls, run }
   }
@@ -268,14 +304,42 @@ describe('the branch deletion is a SEQUENCE, not two independent commands', () =
     const { calls, run } = recorder(['branch -d'])
     const r = deleteLandedBranch({ branch: 'feat/608-x', git: run })
     expect(r).toMatchObject({ local: 'failed', remote: 'skipped' })
-    expect(calls.some((c) => c.includes('push origin --delete'))).toBe(false)
+    expect(calls.some((c) => c.includes('push origin'))).toBe(false)
     expect(r.problems.join('\n')).toMatch(/remote branch: NOT deleted/)
   })
 
-  it('deletes the remote only after the local one succeeded, in that order', () => {
+  it('deletes the remote only after the local one succeeded, under a LEASE on the merged sha', () => {
+    // Sixth review, finding 3: a plain `--delete` is unconditional, so anything
+    // pushed to the branch between the snapshot and the command was deleted with
+    // it. `--force-with-lease=<ref>:<sha>` makes the deletion a compare-and-swap at
+    // the server — measured against a throwaway remote: a stale lease is rejected
+    // and the branch survives.
     const { calls, run } = recorder()
-    expect(deleteLandedBranch({ branch: 'feat/608-x', git: run })).toMatchObject({ local: 'ok', remote: 'ok' })
-    expect(calls).toEqual(['branch -d feat/608-x', 'push origin --delete feat/608-x'])
+    expect(deleteLandedBranch({ branch: 'feat/608-x', git: run })).toMatchObject({ local: 'ok', remote: 'ok', sha: SHA })
+    expect(calls).toEqual([
+      'rev-parse --verify --quiet refs/heads/feat/608-x',
+      'branch -d feat/608-x',
+      `push origin --force-with-lease=refs/heads/feat/608-x:${SHA} --delete feat/608-x`,
+    ])
+    // The sha is READ BEFORE the local deletion — afterwards the ref is gone and no
+    // lease could be formed at all.
+    expect(calls.indexOf('rev-parse --verify --quiet refs/heads/feat/608-x')).toBeLessThan(calls.indexOf('branch -d feat/608-x'))
+  })
+
+  it('SKIPS the remote when the branch\'s commit could not be read — no lease, no deletion', () => {
+    const { calls, run } = recorder([], { sha: '' })
+    const r = deleteLandedBranch({ branch: 'feat/608-x', git: run })
+    expect(r).toMatchObject({ local: 'ok', remote: 'skipped' })
+    expect(r.note).toMatch(/could not be made conditional/)
+    expect(calls.some((c) => c.includes('push origin'))).toBe(false)
+  })
+
+  it('names a REJECTED lease for what it is — somebody pushed to that branch', () => {
+    const { run } = recorder(['push origin'], { error: '! [rejected] (delete) -> feat/608-x (stale info)' })
+    const r = deleteLandedBranch({ branch: 'feat/608-x', git: run })
+    expect(r).toMatchObject({ local: 'ok', remote: 'failed' })
+    expect(r.problems.join('\n')).toMatch(/has moved off 12345678 since the landing merged it/)
+    expect(r.problems.join('\n')).toMatch(/left standing on purpose/)
   })
 
   it('reports a remote failure without pretending the local one failed too', () => {
@@ -290,6 +354,157 @@ describe('the branch deletion is a SEQUENCE, not two independent commands', () =
     const r = deleteLandedBranch({ branch: 'feat/608-x', blocked: 'a worktree was kept', git: run })
     expect(r).toMatchObject({ local: 'skipped', remote: 'skipped', problems: [] })
     expect(calls).toEqual([])
+  })
+
+  it('SKIPS the remote when the state changed between the two commands', () => {
+    // Whole-branch review, finding 6: the two deletions are two commands, and a
+    // live tree that recreates the local branch after `branch -d` — or one that
+    // appears in that instant — would keep its local branch and lose its remote.
+    const { calls, run } = recorder()
+    const r = deleteLandedBranch({
+      branch: 'feat/608-x',
+      git: run,
+      recheck: () => 'the local branch exists again',
+    })
+    expect(r).toMatchObject({ local: 'ok', remote: 'skipped', problems: [] })
+    expect(r.note).toMatch(/remote branch feat\/608-x was NOT deleted/)
+    expect(calls).toEqual(['rev-parse --verify --quiet refs/heads/feat/608-x', 'branch -d feat/608-x'])
+  })
+
+  it('a recheck that THROWS blocks the remote too — an unanswerable question is not permission', () => {
+    const { calls, run } = recorder()
+    const r = deleteLandedBranch({
+      branch: 'feat/608-x',
+      git: run,
+      recheck: () => {
+        throw new Error('git is unreachable')
+      },
+    })
+    expect(r).toMatchObject({ local: 'ok', remote: 'skipped' })
+    expect(r.note).toMatch(/could not be re-read/)
+    expect(calls).toEqual(['rev-parse --verify --quiet refs/heads/feat/608-x', 'branch -d feat/608-x'])
+  })
+
+  it('runs the recheck AFTER the local deletion and before the remote one, and deletes when it is clear', () => {
+    const { calls, run } = recorder()
+    const r = deleteLandedBranch({
+      branch: 'feat/608-x',
+      git: run,
+      recheck: () => {
+        calls.push('recheck')
+        return ''
+      },
+    })
+    expect(r).toMatchObject({ local: 'ok', remote: 'ok' })
+    expect(calls).toEqual([
+      'rev-parse --verify --quiet refs/heads/feat/608-x',
+      'branch -d feat/608-x',
+      'recheck',
+      `push origin --force-with-lease=refs/heads/feat/608-x:${SHA} --delete feat/608-x`,
+    ])
+  })
+
+  it('never asks the recheck when the deletion was blocked outright', () => {
+    let asked = false
+    const { run } = recorder()
+    deleteLandedBranch({
+      branch: 'feat/608-x',
+      blocked: 'a worktree was kept',
+      git: run,
+      recheck: () => {
+        asked = true
+        return ''
+      },
+    })
+    expect(asked).toBe(false)
+  })
+})
+
+// THE CAPABILITY THE REMOTE DELETION NOW RESTS ON, measured rather than assumed:
+// git's `--force-with-lease` makes a DELETION a compare-and-swap at the server. If
+// a future git ever stopped honouring it on a delete, this fails here rather than
+// silently taking a branch somebody pushed to (sixth review, finding 3).
+describe('the remote deletion is a compare-and-swap, against a real remote', () => {
+  /** A repo whose landed branch is merged into main and pushed to a bare remote. */
+  function remoteScene() {
+    const root = mkdtempSync(join(tmpdir(), 'land-remote-'))
+    roots.push(root)
+    const remote = join(root, 'remote.git')
+    const work = join(root, 'work')
+    git(['init', '-q', '--bare', remote], root)
+    git(['init', '-q', '--initial-branch=main', 'work'], root)
+    git(['config', 'user.email', 't@example.com'], work)
+    git(['config', 'user.name', 'T'], work)
+    writeFileSync(join(work, 'a.txt'), 'a\n')
+    git(['add', '.'], work)
+    git(['commit', '-q', '-m', 'first'], work)
+    git(['remote', 'add', 'origin', remote], work)
+    git(['checkout', '-q', '-b', 'feat/608-x'], work)
+    writeFileSync(join(work, 'b.txt'), 'b\n')
+    git(['add', '.'], work)
+    git(['commit', '-q', '-m', 'the point'], work)
+    git(['push', '-q', 'origin', 'feat/608-x'], work)
+    git(['checkout', '-q', 'main'], work)
+    git(['merge', '-q', '--no-ff', '-m', 'land it', 'feat/608-x'], work)
+    const run = (args) => git(args, work)
+    const remoteHeads = () => git(['for-each-ref', '--format=%(refname)', 'refs/heads'], remote)
+    return { root, work, remote, run, remoteHeads }
+  }
+
+  it('deletes the remote branch when the lease still names what was merged', () => {
+    const { run, remoteHeads } = remoteScene()
+    const r = deleteLandedBranch({ branch: 'feat/608-x', git: run })
+    expect(r).toMatchObject({ local: 'ok', remote: 'ok' })
+    expect(r.sha).toMatch(/^[0-9a-f]{40}$/)
+    expect(remoteHeads()).not.toContain('feat/608-x')
+  })
+
+  it('REFUSES to delete a remote branch somebody pushed to since the landing merged it', () => {
+    const { work, run, remoteHeads } = remoteScene()
+    // An agent commits and pushes to its branch after the landing took its snapshot.
+    git(['checkout', '-q', '-b', 'late'], work)
+    writeFileSync(join(work, 'c.txt'), 'work the landing never took\n')
+    git(['add', '.'], work)
+    git(['commit', '-q', '-m', 'pushed after the merge'], work)
+    git(['push', '-q', '--force', 'origin', 'late:feat/608-x'], work)
+    git(['checkout', '-q', 'main'], work)
+
+    const r = deleteLandedBranch({ branch: 'feat/608-x', git: run })
+    expect(r).toMatchObject({ local: 'ok', remote: 'failed' })
+    expect(r.problems.join('\n')).toMatch(/has moved off/)
+    // The branch — and the commit only it points at — is STILL on the remote.
+    expect(remoteHeads()).toContain('feat/608-x')
+  })
+})
+
+describe('the branch blocker is read at the moment of deletion, not from the plan', () => {
+  it('a worktree that appears AFTER the selection blocks BOTH branch deletions', () => {
+    // The plan is taken minutes before the deletion. A checkout that appears in
+    // between — DETACHED above all, which reports no branch at all — was invisible
+    // to it, and the branch went out from under it.
+    const { root, own } = scene()
+    const planned = select(root)
+    expect(branchDeletionBlocker({ selection: planned })).toBe('')
+
+    // A manual checkout appears, detached on the landed branch's commit.
+    const late = join(root, 'local', 'rebasing')
+    mkdirSync(join(root, 'local'), { recursive: true })
+    git(['worktree', 'add', '-q', '--detach', late, 'feat/608-x'], root)
+
+    const now = select(root)
+    expect(branchDeletionBlocker({ selection: now })).toMatch(/rebasing/)
+    // …while the landed point's OWN dead tree is still removable: the branch is
+    // what is kept, not the cleanup.
+    expect(now.remove).toEqual([own])
+  })
+
+  it('reads the local branch back, and an unanswerable question reads as PRESENT', () => {
+    const { root } = scene()
+    expect(localBranchExists('feat/608-x', { cwd: root })).toBe(true)
+    expect(localBranchExists('feat/there-is-no-such-branch', { cwd: root })).toBe(false)
+    // Not a repository at all: git fails with something other than exit 1, and the
+    // answer is "present", which BLOCKS the remote deletion.
+    expect(localBranchExists('feat/608-x', { cwd: tmpdir() })).toBe(true)
   })
 })
 

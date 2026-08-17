@@ -280,6 +280,20 @@ export function turnToward(from: number, to: number, maxDelta: number): number {
  * otherwise. A play area that sits in a corner of a settlement (point 481.4) is
  * still a disc; only its middle is somewhere else, and the pull must bend toward
  * THAT one or it drags every runner out of its own ground.
+ *
+ * THE TWO PULLS CAN OPPOSE ONE ANOTHER, and that was a bug the player saw
+ * (work-order 648). With the chaser standing between a cornered runner and the
+ * middle, fleeing points straight out and the pull points straight in — and
+ * between two OPPOSITE bearings there are two equally good ways round. Taken
+ * always the SHORT way, the choice flips to the other side the moment the
+ * geometry passes through opposition, which is an about-face: measured at the
+ * reported seed, a runner ran 1.2 m along the rim, turned right round, ran the
+ * same 1.2 m back and turned again — 3.25 m walked for 0 cm gained. So where
+ * the two pulls are within 30° of opposing, the way round is decided by the way
+ * the runner is ALREADY running (`current`) rather than by the geometry, and it
+ * therefore holds across frames: the runner breaks along the rim and stays on
+ * that break. Further from opposition there is only one sensible way round and
+ * the short one is always taken.
  */
 export function evadeHeading(
   x: number,
@@ -291,6 +305,7 @@ export function evadeHeading(
   cz = 0,
   inner = 0.55,
   strength = 0.85,
+  current = NaN,
 ): number {
   const away = headingToward(chaserX, chaserZ, x, z, Math.atan2(x - cx, z - cz))
   if (!(radius > 0)) return away
@@ -298,5 +313,58 @@ export function evadeHeading(
   const start = radius * clamp(inner, 0, 0.99)
   if (d <= start) return away
   const t = clamp((d - start) / (radius - start), 0, 1) * clamp(strength, 0, 1)
-  return blendHeading(away, headingToward(x, z, cx, cz, away), t)
+  const inward = headingToward(x, z, cx, cz, away)
+  let delta = Math.atan2(Math.sin(inward - away), Math.cos(inward - away))
+  if (Number.isFinite(current) && Math.abs(delta) > RELEASE) {
+    // Near opposition the two ways round are as good as each other, so the
+    // runner's own is taken: the long way, if that is the side it is running to.
+    const toCurrent = Math.atan2(Math.sin(current - away), Math.cos(current - away))
+    if (toCurrent !== 0 && Math.sign(toCurrent) !== Math.sign(delta)) {
+      // AND THE COMMITMENT RELEASES ON A RAMP, NOT A CLIFF (point 657, second
+      // round). Applied whole above `OPPOSED` and dropped whole below it, the
+      // un-wrap made the heading JUMP by 2π·t the frame the short-way delta
+      // slipped under the band: measured at the reported seed, two co-walking
+      // evaders flipped 197° in open ground at (8.4, -5.5), each walking the
+      // jump as 1.29 m of floor-pace legs inside 0.3 m — out and back on one
+      // line, the exact signature the 0.25 % pacing gate reads, and rare
+      // enough to red roughly one live trace in five. Fading the un-wrap over
+      // the 30° below the band turns that snap into a walked curve: the
+      // heading rotates only as fast as the geometry moves the delta through
+      // the ramp, and every value between the two ways round is passed
+      // through instead of jumped over. Two downstream cures were measured
+      // first and rejected for degrading healthy villages (the wedgeCarve.ts
+      // record): a rate-limited bank (a third hover rescue in the
+      // adult-in-ground minute — its sweep hugs the progress anchor) and a
+      // 0.8 s committed ±60° breakaway (pacing loops against the demand it
+      // suppressed: bambara 0.30 %, maasai bursts 0.73 % at the fixed
+      // cadence, against 0.00-0.03 % before).
+      // A THIRD CURE FAMILY WAS MEASURED AND REJECTED TOO (Sol re-review +
+      // measurements 13.08.2026). The sign test below has its own boundary:
+      // inside the ramp band the un-wrapped delta crosses zero near 131°,
+      // the output settles onto `away`, the runner's heading follows — and
+      // the frame it overshoots to delta's own side this branch is skipped
+      // whole, a one-frame jump of |delta|·t (~0.71 rad at t≈0.31). Fading
+      // the un-wrap with |toCurrent| closes that cliff, and every shape of
+      // it degraded healthy villages: a fixed 30° band (and 10°/45°), a
+      // t-scaled band and a band scoped to the ramp (vanishing at w=1) all
+      // measured +25 % hover rescues (44→55 over ten adult-in-ground
+      // minutes, seeds 1-10) with tags 78→75. The jump's live signature is
+      // exactly the rare pacing composition CHARGED to point 666 in
+      // scripts/render-verify-charges.mjs; it is closed by reading the
+      // trace, not by a cure that bends the game everywhere else.
+      const w = Math.min(1, (Math.abs(delta) - RELEASE) / (OPPOSED - RELEASE))
+      delta -= Math.sign(delta) * Math.PI * 2 * w
+    }
+  }
+  return away + delta * t
 }
+
+/** How near opposition the flee and the pull must come before the runner's own
+ *  way round decides it WHOLLY — 30°, wide enough to cover the whole band in
+ *  which the short way is about to flip to the other side. */
+const OPPOSED = Math.PI - Math.PI / 6
+
+/** Where the way-round commitment has faded to nothing — 30° below `OPPOSED`.
+ *  Between the two the un-wrap is blended linearly; see the ramp comment in
+ *  `evadeHeading`. */
+const RELEASE = OPPOSED - Math.PI / 6

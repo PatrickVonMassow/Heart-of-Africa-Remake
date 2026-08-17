@@ -30,8 +30,10 @@ export function parseTasks(text) {
 }
 
 /**
- * ALL leading point numbers of the now-SECTION card TITLES
- * (`<span class="t">210 — …`), as a Set in document order. With the
+ * ALL point numbers of the now-SECTION cards — from the numbered CHIP
+ * (`<span class="num">210</span>`, the shape every now-card carries since
+ * point 655) or, for a card written before that, the leading number of its
+ * TITLE (`<span class="t">210 — …`). As a Set in document order. With the
  * feature-branch + worktree workflow several TASKS points are worked in
  * parallel, so "Woran ich gerade arbeite" holds one card PER point in active
  * work (user decision 22.07.2026) — every invariant below reads this SET, not
@@ -52,7 +54,9 @@ export function parseNowCardPoints(html) {
   // a non-numeric now-card read the VDZK 206 card as its point).
   const nextH2 = html.indexOf('<h2>', nowStart + 1)
   const section = html.slice(nowStart, nextH2 < 0 ? undefined : nextH2)
-  for (const m of section.matchAll(/class="t">\s*(\d+)/g)) points.add(Number(m[1]))
+  // BOTH SHAPES, one pass: the chip and the legacy title number carry the same
+  // value on a card that has both, and a Set makes the double read harmless.
+  for (const m of section.matchAll(/class="(?:num|t)">\s*(\d+)/g)) points.add(Number(m[1]))
   return points
 }
 

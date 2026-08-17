@@ -48,6 +48,8 @@
 import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
 import { CLOSING_STEPS, missingSteps } from './closing-guard-core.mjs'
 import { parseGateLine } from './user-gate-core.mjs'
+import { SECTION_TITLES, sliceSections, parseCards, etaStatus } from './dashboard-guard-core.mjs'
+import { NOW_CARD_CMD, REPUBLISH } from './board-remedy.mjs'
 
 /** How old a declaration may be before the guard stops honouring it — where
  *  nothing in it is producing OUTPUT (point 434 (6b); a declaration whose branch
@@ -534,6 +536,158 @@ export function assessInFlight({
 }
 
 // ---------------------------------------------------------------------------
+// THE DECLARATION AS A TRANSFERABLE ADOPTION RECORD (point 675, defeat 2;
+// merged proposal M4/M7/M28–M34)
+// ---------------------------------------------------------------------------
+//
+// A handover used to be allowed only when no delegated agent was in flight, so a
+// session that kept the pool busy could never hand over. The condition is now
+// "the point I was LANDING is landed", and a running AUTHOR is ADOPTED by the
+// successor through this declaration. That only works when the declaration is
+// more than a PID: it must carry identity a successor can verify (batch-less
+// today, so: the work's own branch and its committed-and-pushed checkpoint,
+// plus the process-start identity the pid evidence already records), it must
+// stay probeable after the transfer, and it must ALERT loudly rather than
+// silently unblock when its evidence expires or contradicts itself (M7). A
+// worker that cannot produce a committed-and-pushed checkpoint is
+// NON-TRANSFERABLE and blocks the handover with named recovery choices (M29):
+// it would die, unrescued, with the session that spawned it.
+
+/**
+ * IS THE DECLARED WORK TRANSFERABLE TO A SUCCESSOR? PURE.
+ *
+ * `items` is one entry per piece of declared evidence, pre-annotated by the IO
+ * half: { kind, describe, checkpoint } where checkpoint is
+ * { ref, localSha, remoteSha } for branch/worktree kinds (null when the ref or
+ * the remote-tracking ref could not be read) and null for pid/log kinds.
+ *
+ * The rule: every branch/worktree item needs a PUSHED checkpoint (local tip ==
+ * remote-tracking tip), and at least ONE such item must exist — a declaration of
+ * only pids and logs names nothing a successor could adopt: the process dies
+ * with this session and the log proves nothing about what survives.
+ *
+ * Returns { transferable, blockers: [{ describe, why }], checkpoints }.
+ */
+export function assessTransfer({ items = [] } = {}) {
+  const list = Array.isArray(items) ? items : []
+  const blockers = []
+  const checkpoints = []
+  let output = 0
+  for (const item of list) {
+    if (!OUTPUT_KINDS.has(item?.kind)) continue
+    output += 1
+    const cp = item.checkpoint
+    if (!cp || typeof cp.localSha !== 'string' || !cp.localSha) {
+      blockers.push({ describe: String(item.describe ?? item.kind), why: 'no committed checkpoint could be read' })
+    } else if (typeof cp.remoteSha !== 'string' || !cp.remoteSha) {
+      blockers.push({ describe: String(item.describe ?? item.kind), why: `branch ${cp.ref ?? '?'} was never pushed` })
+    } else if (cp.localSha !== cp.remoteSha) {
+      blockers.push({
+        describe: String(item.describe ?? item.kind),
+        why: `branch ${cp.ref ?? '?'} has unpushed commits (local ${cp.localSha.slice(0, 8)} ≠ origin ${cp.remoteSha.slice(0, 8)})`,
+      })
+    } else {
+      checkpoints.push({ ref: cp.ref ?? null, sha: cp.localSha })
+    }
+  }
+  if (output === 0 && list.length > 0) {
+    blockers.push({
+      describe: 'the whole declaration',
+      why: 'it names only pids/logs — nothing with a committed-and-pushed checkpoint a successor could adopt',
+    })
+  }
+  return { transferable: blockers.length === 0, blockers, checkpoints }
+}
+
+/**
+ * THE REFUSAL, with its NAMED RECOVERY CHOICES (M29). PURE, so the wording is
+ * pinned by a test rather than improvised at the one moment it matters.
+ */
+export function transferBlockMessage({ blockers = [] } = {}) {
+  const lines = blockers.map((b) => `  ${b.describe} — ${b.why}`).join('\n')
+  return (
+    'THE HANDOVER IS BLOCKED: declared in-flight work is NOT transferable — a successor could neither ' +
+    `verify nor rescue it, so ending now would throw it away:\n${lines}\n` +
+    'Recovery choices, by name:\n' +
+    '  (a) CHECKPOINT — have the worker commit and PUSH its branch (a rescue commit per CLAUDE.md §6 if it ' +
+    'is mid-step), then retry the boundary;\n' +
+    '  (b) DRAIN — await the work in this session (`node scripts/verify/run-wait.mjs --await` for a run; let ' +
+    'the agent finish), then retry;\n' +
+    '  (c) RE-DECLARE — if the pid/log evidence merely rides beside a real branch, declare the branch/worktree ' +
+    'too (`node scripts/batch-in-flight.mjs --waiting-on … --branch <ref> --worktree <path>`), then retry;\n' +
+    '  (d) ABANDON — if the work is genuinely disposable, `node scripts/batch-in-flight.mjs --clear` and say so ' +
+    'in the closing report.\n' +
+    'Nothing recorded.'
+  )
+}
+
+/**
+ * MARK A DECLARATION TRANSFERRED at boundary commit. PURE. The original
+ * evidence stays probeable (M7); the transfer block records who handed it over,
+ * when, and the checkpoints the successor can verify against.
+ *
+ * A previous ADOPTION is DROPPED (Sol re-review of cd6faaa, finding 1): a new
+ * transfer supersedes it, and a record still stamped `adopted` would lose the
+ * mutation protection the moment it crossed a SECOND boundary — the very
+ * record a chain of handovers depends on most.
+ */
+export function markTransferred({ declaration, bySid, now, checkpoints = [] } = {}) {
+  const { adopted: _superseded, ...rest } = declaration ?? {}
+  return {
+    ...rest,
+    transfer: { v: 1, by: String(bySid ?? ''), at: Number(now), checkpoints },
+  }
+}
+
+/**
+ * MAY A SUCCESSOR ADOPT THIS TRANSFERRED DECLARATION, and what must it be TOLD?
+ * PURE (M4/M7).
+ *
+ * `items` are `checkEvidence` results for the declaration's evidence;
+ * `checkpointStates` re-reads each recorded checkpoint:
+ * { ref, recordedSha, localSha } (localSha null = branch gone).
+ *
+ * The asymmetry is deliberate: adoption DROPS evidence that no longer checks out
+ * (an old session's child pid is dead by construction) but must SAY so — and it
+ * REFUSES when nothing survives or a checkpoint contradicts itself (a branch
+ * rewound below its recorded checkpoint is not the work that was handed over).
+ * Silence is the one forbidden outcome.
+ *
+ * Returns { adopt, alerts, kept, dropped }.
+ */
+export function adoptionAssessment({ items = [], checkpointStates = [] } = {}) {
+  const alerts = []
+  const kept = []
+  const dropped = []
+  for (const item of Array.isArray(items) ? items : []) {
+    if (item?.ok === true) kept.push(item)
+    else {
+      dropped.push(item)
+      alerts.push(`evidence expired since the transfer: ${item?.describe ?? '?'} — ${item?.detail ?? '?'}`)
+    }
+  }
+  let contradiction = false
+  for (const cp of Array.isArray(checkpointStates) ? checkpointStates : []) {
+    if (!cp || typeof cp.recordedSha !== 'string') continue
+    if (typeof cp.localSha !== 'string' || !cp.localSha) {
+      contradiction = true
+      alerts.push(`checkpoint CONTRADICTED: branch ${cp.ref ?? '?'} (recorded ${cp.recordedSha.slice(0, 8)}) is gone`)
+    } else if (cp.localSha !== cp.recordedSha && cp.ancestor !== true) {
+      contradiction = true
+      alerts.push(
+        `checkpoint CONTRADICTED: branch ${cp.ref ?? '?'} no longer carries recorded ${cp.recordedSha.slice(0, 8)} ` +
+          `(now ${cp.localSha.slice(0, 8)}, not a descendant)`,
+      )
+    }
+  }
+  const adopt = !contradiction && kept.length > 0
+  if (!adopt && kept.length === 0 && !contradiction) {
+    alerts.push('NOTHING in the transferred declaration still checks out — there is nothing left to adopt')
+  }
+  return { adopt, alerts, kept, dropped }
+}
+
+// ---------------------------------------------------------------------------
 // NEVER REPLACE AN AGENT WITHOUT ASKING ITS OUTPUT FIRST (point 434 (5))
 // ---------------------------------------------------------------------------
 //
@@ -998,4 +1152,57 @@ export function describeInFlight(assessment, declaration) {
       ? ` [silent but NOT counted as dead: ${assessment.ignored.join('; ')}]`
       : ''
   return `${what}${age}: ${assessment?.summary || 'no evidence'} — judged on ${on}${ignored}`
+}
+
+// --- THE BOARD'S PROMISE MUST NOT AGE UNDER A DECLARED WAIT (point 661) --------
+// The "~HH:MM" on a current-work card is a promise to a reader on a phone, and
+// the `now-eta-past` audit speaks only at a turn end (`--synced`/attest). A
+// session waiting on a delegated agent produces no turn end for an hour —
+// measured 12.08.2026: the published promise stood 50 minutes past while every
+// mechanism held green. The waiting heartbeat that DOES still run is the
+// re-declaration (`batch-in-flight.mjs --waiting-on`, at most `IN_FLIGHT_MAX_AGE_MS`
+// apart), so that is where the check lives: a wait whose now-card ETA already
+// lies in the past is refused until the estimate is refreshed, which bounds the
+// staleness by the re-declaration interval.
+
+/**
+ * The current-work cards whose "~HH:MM" promise has already PASSED. PURE.
+ * `html` is the board's content, `nowMinutes` minutes since midnight in
+ * Europe/Berlin (the clock the board is written against). Anything unreadable —
+ * no html, no clock, no current-work section — answers []: a broken board must
+ * never trap the session; only a READABLE promise that broke may refuse.
+ * @returns {{points: number[], title: string, meta: string|null, minutesPast: number}[]}
+ */
+export function pastEtaCards({ html, nowMinutes } = {}) {
+  if (typeof html !== 'string' || !Number.isFinite(nowMinutes)) return []
+  const nowSection = sliceSections(html).sections[SECTION_TITLES[0]]
+  if (typeof nowSection !== 'string') return []
+  const out = []
+  for (const card of parseCards(nowSection)) {
+    const status = etaStatus({ meta: card.meta, nowMinutes })
+    if (status && status.state === 'past') {
+      out.push({ points: card.points, title: card.title, meta: card.meta, minutesPast: -status.minutesLeft })
+    }
+  }
+  return out
+}
+
+/**
+ * MAY THIS WAIT BE RECORDED against this board? Null = yes; otherwise the
+ * refusal message, naming each broken card and the remedy. Decided here so the
+ * Vitest layer sweeps the refusal exactly as the wrapper prints it.
+ */
+export function waitEtaRefusal({ html, nowMinutes } = {}) {
+  const past = pastEtaCards({ html, nowMinutes })
+  if (past.length === 0) return null
+  const cards = past
+    .map((c) => `  point ${c.points.length ? c.points.join(', ') : '?'} — "${c.meta}" (${c.minutesPast} min past)`)
+    .join('\n')
+  return (
+    'the current-work card\'s "~HH:MM" promise has ALREADY PASSED, and a declared wait would let it age ' +
+    'unwatched until the next re-declaration:\n' +
+    `${cards}\n` +
+    `Give each card a realistic new "~HH:MM" (${NOW_CARD_CMD} …), ${REPUBLISH}, then re-declare this wait. ` +
+    'Nothing recorded.'
+  )
 }

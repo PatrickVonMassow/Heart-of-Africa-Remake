@@ -165,7 +165,162 @@ export function refreshFooter(html, { openCount, now = new Date() } = {}) {
     .filter((s) => s && !/^Stand:/.test(s) && !/^\d+\s+offene[rn]?\s+Punkte?$/.test(s))
   const count = openCount === 1 ? '1 offener Punkt' : `${openCount} offene Punkte`
   const segments = [`Stand: ${berlinDateStamp(now)} (Europe/Berlin)`, count, ...(kept.length ? kept : [FOOTER_TAIL])]
-  return html.replace(m[0], `<footer>${segments.join(' · ')}</footer>`)
+  return html.replace(m[0], () => `<footer>${segments.join(' · ')}</footer>`)
+}
+
+/**
+ * THE NUMBERED CHIP (point 655, user 11.08.2026). Every card in "Woran ich
+ * gerade arbeite" carries its point number in the SAME chip the queue cards
+ * use, and its title names the SUBJECT rather than the stage of the work. The
+ * board is read on a phone at a glance by someone who does not carry the work
+ * order in his head, and a card titled "Abschlussarbeiten zum gerade beendeten
+ * Punkt" told him neither which point nor what it was about.
+ *
+ * The one deliberate exception is the handover card (`NO_CURRENT_WORK_TITLE`):
+ * it belongs to NO point, so it keeps its unnumbered form and names the
+ * successor's point in prose instead.
+ */
+const numberChip = (point) => `<span class="num">${point}</span>`
+
+/**
+ * A card TITLE as markup-safe text (four-eyes review, 12.08.2026). Every reader
+ * of a title — the gate, the finders, the retitle itself — matches `[^<]*`, so a
+ * raw `<` in a title made the card unreadable to all of them AND unrepairable by
+ * the very command that had written it. Entity-aware, so a title carried from
+ * one card to another does not gain a second `&amp;` on each move.
+ */
+export function escapeCardTitle(text) {
+  return String(text ?? '')
+    .replace(/&(?!(?:[a-z]+|#\d+);)/gi, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+/**
+ * THE DASH between a legacy title's number and its subject — em, en or plain.
+ * ONE definition for every matcher (four-eyes review, 12.08.2026): the strip,
+ * the upgrade, the finder and the retitle each carried their own list, and a
+ * card written with the plain hyphen fell between them — refused by the gate,
+ * upgraded by nothing, found by nothing, and removable by nothing.
+ */
+const DASH = '[—–-]'
+
+/** Whatever stands inside a title span — bounded by its closing tag, not by `<`. */
+const TITLE_TEXT = '((?:(?!</span>)[\\s\\S])*)'
+
+/**
+ * Lift every current-work card written BEFORE point 655 into the shape this
+ * module now writes: the number out of the title and into the chip, the two
+ * state cards marked with their kind.
+ *
+ * WHY A MIGRATION AND NOT A ONE-OFF FIX. The board is a single living file that
+ * is never checked out fresh, so on the day this lands its cards are all in the
+ * old shape — and the publish gate refuses a now-card without a chip. The only
+ * repair left would be hand-editing the board HTML, which is what wrecked the
+ * line endings on 30.07.2026 and stacked three idle cards on the user's phone.
+ * Every `board.mjs` edit runs this on the way out instead, so the board heals
+ * itself on the next command whatever that command was.
+ */
+export function upgradeNowCards(html) {
+  let out = String(html ?? '')
+  for (const [kind, title] of Object.entries(LEGACY_STATE_TITLE)) {
+    out = out.replace(
+      new RegExp(`<details class="now"([^>]*)>(${WITHIN_CARD}<span class="t">${title}</span>)`, 'g'),
+      (_m, attrs, head) => `<details class="now"${attrs.replace(/\s*data-state="[^"]*"/, '')}${STATE_ATTR(kind)}>${head}`,
+    )
+  }
+  return out.replace(
+    new RegExp(
+      `<details class="now"([^>]*)>(\\s*<summary>)<span class="t">(\\d+)\\s*${DASH}\\s*${TITLE_TEXT}</span>`,
+      'g',
+    ),
+    (_m, attrs, head, point, title) =>
+      `<details class="now"${attrs}>${head}${numberChip(point)}<span class="t">${title.trim()}</span>`,
+  )
+}
+
+/**
+ * The document without the current-work cards that name NEITHER a point NOR a
+ * state — the shape no command could otherwise remove (four-eyes review,
+ * 12.08.2026). Returns the cleaned document and, for each card removed, its
+ * title AND its text: this is the ONE place the board loses content, so what it
+ * loses is handed back for the caller to print. Nothing else deletes a card —
+ * the state writers replace only what really is that state.
+ *
+ * Such a card is refused by the publish gate anyway, and every way of repairing
+ * it needs a number it does not have — while a numbered card standing beside it
+ * blocks the state writers. So the sanctioned edits drop it, and the board that
+ * could not be published becomes publishable by the next command, whichever it
+ * was.
+ */
+/** A card as the plain text it showed — what a removal hands back to be printed. */
+const cardText = (card) => String(card).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+
+export function dropStrayNowCards(html) {
+  const dropped = []
+  const doc = String(html ?? '')
+  // WHERE the card stands decides whether being a state card saves it: the state
+  // writers replace only inside the current-work section, so an unnumbered state
+  // card that has drifted OUT of it is reachable by nothing else and would stand
+  // for ever (four-eyes review, 12.08.2026). Here it is removed and reported,
+  // which is the whole point of this being the one removal path.
+  let inSection = () => true
+  try {
+    const { from, end } = sectionBounds(doc, 'now')
+    inSection = (at) => at >= from && at < end
+  } catch {
+    /* no section — judge the fragment as it stands */
+  }
+  const out = doc.replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card, at) => {
+    const summary = (card.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+    const title = (summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? ''
+    // A NUMBER, or the handover card's own title — nothing else is repairable:
+    // a numbered card is reached by `title`/`queue`/`done`, and the handover
+    // card by `none`. A marker alone does not save a card here either, or an
+    // impostor wearing one would be exactly as unremovable as before.
+    // OUTSIDE THE SECTION NOTHING IS REACHABLE (four-eyes review, 12.08.2026):
+    // every writer and every state removal works inside the current-work section,
+    // so a card that has drifted out — numbered or not — can be repaired by
+    // nothing. It is swept HERE, where the removal is reported, and the
+    // `now-card-outside` violation goes with it.
+    if (!inSection(at)) {
+      dropped.push({ title: title.trim() || '<untitled>', text: cardText(card) })
+      return ''
+    }
+    const { chip, legacy } = summaryPoint(summary)
+    if (chip || legacy) return card
+    if (isStateCardTitle(title)) return card
+    // A genuine state card that lost its chip is still replaceable by its own
+    // command (`none`, `closing <N>`), so it is kept rather than swept.
+    if (/data-state="closing"/.test(card) && looksLikeClosingTitle(title)) return card
+    dropped.push({ title: title.trim() || '<untitled>', text: cardText(card) })
+    return ''
+  })
+  return { html: out, dropped }
+}
+
+/**
+ * The point a SUMMARY names, and where it names it: `{ chip, legacy }`.
+ *
+ * HEAD-ANCHORED, because that is what the point commands can find (four-eyes
+ * review, 12.08.2026). A chip buried behind another span passed the publish gate
+ * while `title`, `status`, `queue` and `done` all missed it — a card accepted as
+ * numbered that no numbered command could reach. One definition, so the gate and
+ * the finders cannot disagree about what "numbered" means.
+ */
+export function summaryPoint(summary) {
+  const text = String(summary ?? '')
+  const chip = text.match(/^\s*<span class="num">\s*(\d+)\s*<\/span>\s*<span class="t">/)
+  if (chip) return { chip: chip[1], legacy: null }
+  const legacy = text.match(new RegExp(`^\\s*<span class="t">\\s*(\\d+)\\s*${DASH}`))
+  return { chip: null, legacy: legacy ? legacy[1] : null }
+}
+
+/** A title without the leading "651 — " a card written before the chip carried. */
+export function stripPointPrefix(title, point) {
+  return String(title ?? '')
+    .replace(new RegExp(`^\\s*${point}\\s*${DASH}\\s*`), '')
+    .trim()
 }
 
 /** The queue card for `point`, or null. Exported so the caller can check first. */
@@ -187,8 +342,19 @@ export function promoteToNow(html, point, { title, times, status, stamp = berlin
   const card = queueCard(html, point)
   if (!card) throw new Error(`board: no queue card for point ${point}`)
   if (!title || !status) throw new Error('board: promote needs a title and a status')
+  // THE QUEUE TITLE IS THE NOW-CARD'S TITLE, so the rule that governs one governs
+  // the other (four-eyes review, 12.08.2026): promoting a card titled
+  // "Vorbereitung" would write exactly the card the publish gate refuses.
+  const subject = stripPointPrefix(title, point)
+  if (stageOnlyTitle(subject) || looksLikeClosingTitle(subject)) {
+    throw new Error(
+      `board: the queue card for point ${point} is titled "${title}", which names a STAGE rather ` +
+        'than a subject — the promoted card would say nothing about the point, or claim to be the ' +
+        `closing card. Give it a subject first: node scripts/board-queue.mjs set ${point} --title "<Betreff>"`,
+    )
+  }
   const now =
-    `<details class="now">\n  <summary><span class="t">${point} — ${title}</span>` +
+    `<details class="now">\n  <summary>${numberChip(point)}<span class="t">${escapeCardTitle(stripPointPrefix(title, point))}</span>` +
     `<span class="right"><span class="meta">${times ?? stamp}</span></span></summary>\n` +
     `  <div class="body">\n${renderCardBody(status, { stamp })}\n  </div>\n</details>\n`
   // Both state cards go with it (points 470/544): the moment a point is current
@@ -230,13 +396,35 @@ function sectionBounds(html, key) {
   return { from, end: end < from ? html.length : end }
 }
 
-/** The current-work card for `point`, or null. */
+/**
+ * A current-work card's summary head for `point`, in BOTH shapes: the numbered
+ * chip it carries since point 655, and the leading title number of a card
+ * written before that. One source for every matcher, so the writer and the
+ * finders cannot drift apart — the drift that made `CLOSING_WORK_TITLE`
+ * unreplaceable in the first place.
+ */
+const NOW_HEAD = (point) =>
+  `<details class="now"[^>]*>\\s*<summary>\\s*(?:<span class="num">\\s*${point}\\s*</span>|<span class="t">\\s*${point}\\s*${DASH})`
+
+/** The current-work card for `point`, or null. Searched in its own section. */
 export function nowCard(html, point) {
-  const re = new RegExp(
-    `<details class="now">\\s*<summary><span class="t">${point} —[\\s\\S]*?</details>\\s*`,
-  )
-  const m = String(html ?? '').match(re)
+  const re = new RegExp(`${NOW_HEAD(point)}[\\s\\S]*?</details>\\s*`)
+  const m = nowSectionSlice(html).text.match(re)
   return m ? m[0] : null
+}
+
+/**
+ * The current-work SECTION as `{ from, end, text }` — the whole document when
+ * the section cannot be found, which is what a fragment gives a caller.
+ */
+function nowSectionSlice(html) {
+  const text = String(html ?? '')
+  try {
+    const { from, end } = sectionBounds(text, 'now')
+    return { from, end, text: text.slice(from, end) }
+  } catch {
+    return { from: 0, end: text.length, text }
+  }
 }
 
 /** "~2,5 h · Feature" → 2.5; anything without an hour figure → null. */
@@ -268,7 +456,7 @@ function spanHours(times) {
   return ((to - from + 1440) % 1440) / 60
 }
 
-const titleOf = (card) => (card.match(/<span class="t">([^<]*)<\/span>/) ?? [])[1] ?? ''
+const titleOf = (card) => (card.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? ''
 const metaOf = (card) => (card.match(/<span class="meta">([^<]*)<\/span>/) ?? [])[1] ?? ''
 /** The card's last status text, stamp span stripped — what a move carries over. */
 const statusOf = (card) => {
@@ -321,7 +509,7 @@ export function toQueue(html, point, { text, estimate } = {}) {
   if (!body) throw new Error('board: refusing to queue a card with an empty body')
   const hours = spanHours(metaOf(card))
   const meta = estimate ?? (hours == null ? QUEUE_STUB_META : hoursLabel(hours))
-  const title = titleOf(card).replace(new RegExp(`^${point}\\s*—\\s*`), '')
+  const title = stripPointPrefix(titleOf(card), point)
   const entry =
     `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
     `<span class="right"><span class="meta">${meta}</span></span>` +
@@ -342,7 +530,7 @@ export function toDone(html, point, { text, end = berlinStamp() } = {}) {
   const body = text?.trim() || statusOf(card)
   if (!body) throw new Error('board: refusing to archive a card with an empty body')
   const start = (metaOf(card).match(/^\s*(\d{1,2}:\d{2})/) ?? [])[1] ?? end
-  const title = titleOf(card).replace(new RegExp(`^${point}\\s*—\\s*`), '')
+  const title = stripPointPrefix(titleOf(card), point)
   const entry =
     `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
     `<span class="right"><span class="meta">${start} · ${end}</span></span></summary>\n` +
@@ -376,24 +564,138 @@ export function hasCurrentWork(html) {
 export const NO_CURRENT_WORK_TITLE = 'Gerade keine laufende Arbeit'
 
 /**
- * The title of the card a session stands behind while it still owes the CLOSING
- * DUTIES of a point it has already merged and ticked (point 544).
+ * The STAGE word the closing card ends on (point 655, user 11.08.2026). Its
+ * title is composed per point now — "Das Trommelbett ist eine 1,9-Sekunden-
+ * Schleife: Abschlussarbeiten": the subject FIRST, the stage last.
  *
- * WHY A THIRD KIND. The board could say two things — "idle" or "a numbered
- * point" — and a session finishing its closing duties is NEITHER. The point-470
- * deny then fires on every state-changing call, and neither remedy it names
- * reaches the state: `now <N>` needs an open point that already has a queue
- * card, and `none` rewrites only the REASON, never the title. Measured
- * 07.08.2026: a finished retrospective refresh could not be committed, and
- * filing the point about it was itself blocked. The deny is right and its bias
- * stays — what was missing is a third thing a session can truthfully say.
+ * WHY THE TITLE IS NO LONGER A CONSTANT. It was `CLOSING_WORK_TITLE`, one fixed
+ * sentence for every point, so the card named only the STAGE the session was in:
+ * "Abschlussarbeiten zum gerade beendeten Punkt". On the phone that is the whole
+ * screen — no number, no subject — and the reader has to go and look up what
+ * just ended. Because the matcher can then no longer key on the literal text, it
+ * keys on the `data-state` marker below.
  */
+export const CLOSING_STAGE = 'Abschlussarbeiten'
+
+/** The pre-655 closing title, still recognised so an older board stays readable. */
 export const CLOSING_WORK_TITLE = 'Abschlussarbeiten zum gerade beendeten Punkt'
 
+/** A subject with a `: Abschlussarbeiten` tail removed — composing twice must not stack. */
+const stripClosingStage = (text) =>
+  String(text ?? '')
+    .replace(new RegExp(`\\s*:\\s*${CLOSING_STAGE}\\s*$`), '')
+    .trim()
+
 /**
- * The unnumbered STATE cards of the current-work section. They own no point
- * number by design, so every rule written for a numbered card — the topic
- * guard's foreign-point complaint above all — has to know them by name.
+ * Is this title the shape the CLOSING card composes — "<Betreff>: <Stage>"?
+ *
+ * It lives HERE, beside the composer, because both the strip below and the
+ * publish gate ask it and neither may answer it differently. Only the closing
+ * stage counts, not every stage word (four-eyes review, 12.08.2026): "Karten:
+ * Vorbereitung" is an ordinary title with a real subject.
+ */
+export function looksLikeClosingTitle(title) {
+  return new RegExp(`[:—–]\\s*${CLOSING_STAGE}\\s*$`, 'i').test(String(title ?? '').trim())
+}
+
+/** "<Betreff>: Abschlussarbeiten" — what `board.mjs closing <N>` composes. */
+export function closingCardTitle(subject) {
+  const text = stripClosingStage(subject)
+  if (!text) throw new Error('board: a closing card needs the point SUBJECT for its title')
+  return `${text}: ${CLOSING_STAGE}`
+}
+
+/**
+ * THE STAGE WORDS a card title may not consist of (point 655, user 11.08.2026,
+ * both languages). A stage says WHERE in the work the session stands, never what
+ * the work IS — "Abschlussarbeiten" was the whole title of a card, and the user
+ * read it on his phone without learning which point had ended or what it had
+ * been about.
+ */
+export const STAGE_WORDS = [
+  'Abschlussarbeiten',
+  'Nacharbeit',
+  'Nacharbeiten',
+  'Vorbereitung',
+  'Vorbereitungen',
+  'Aufräumen',
+  'Aufraeumen',
+  'Aufräumarbeiten',
+  'closing work',
+  'closing duties',
+  'closing',
+  'rework',
+  'preparation',
+  'cleanup',
+  'clean-up',
+  'tidying',
+]
+
+/**
+ * The words that name no subject: articles, prepositions and the words that
+ * only point BACK at the point itself ("zum gerade beendeten Punkt"). They are
+ * what separates the card the user complained about from a legitimate title that
+ * happens to open on a stage word.
+ */
+const FILLER_WORDS = new Set([
+  'zum', 'zur', 'zu', 'am', 'an', 'im', 'in', 'auf', 'für', 'fur', 'des', 'der', 'die', 'das', 'den', 'dem',
+  'ein', 'eine', 'einen', 'einem', 'eines', 'und', 'noch', 'nur', 'gerade', 'eben', 'soeben', 'letzten',
+  'letzte', 'aktuellen', 'aktuelle', 'beendeten', 'beendete', 'abgeschlossenen', 'fertigen', 'meines',
+  'meiner', 'diesem', 'diesen', 'dieses', 'punkt', 'punkts', 'punktes', 'point', 'points', 'the', 'this',
+  'that', 'of', 'for', 'to', 'on', 'at', 'just', 'now', 'current', 'finished', 'closed', 'my', 'work',
+  'works', 'duties', 'a', 'an', 'and',
+])
+
+/**
+ * Does this title say only what STAGE the work is in (point 655)?
+ *
+ * THE RULE, and why it is not simply "begins with a stage word" (four-eyes
+ * review, GPT-5.6 Sol, 12.08.2026): the title is stripped of its number prefix,
+ * of every stage word and of the FILLER above — and if NOTHING is left, it named
+ * no subject. "Abschlussarbeiten zum gerade beendeten Punkt" leaves nothing and
+ * is refused; "Vorbereitung der Karten", "Cleanup parser for Windows" and
+ * "<Betreff>: Abschlussarbeiten" all leave a subject and pass. A refusal here
+ * costs a retitle, so it must fire only where the card really says nothing.
+ */
+export function stageOnlyTitle(title) {
+  let text = String(title ?? '')
+    .replace(/^\s*\d+\s*[—–-]\s*/, '')
+    .trim()
+  if (!text) return true
+  for (const w of STAGE_WORDS) text = text.replace(new RegExp(`\\b${w}\\b`, 'gi'), ' ')
+  const rest = text
+    .toLowerCase()
+    .split(/[^a-zäöüß0-9-]+/i)
+    .filter((t) => t && !FILLER_WORDS.has(t))
+  return rest.length === 0
+}
+
+/**
+ * THE MARKER THE STATE CARDS ARE FOUND BY (point 655). A state card is REPLACED,
+ * never appended, so whatever writes one has to find the one standing — and
+ * while the closing card's title was a constant, the pattern could be built from
+ * that title. A per-point title makes that impossible, so the KIND is written
+ * into the markup and every matcher keys on it. The legacy titles stay
+ * recognised beside it: a board written before this point must still be read,
+ * and its state card must still be replaceable.
+ */
+const STATE_ATTR = (kind) => ` data-state="${kind}"`
+
+/** Any run of markup that stays INSIDE one card — never past its closing tag. */
+const WITHIN_CARD = '(?:(?!</details>)[\\s\\S])*?'
+
+/** The two state kinds: the unnumbered handover card, and the closing card. */
+export const STATE_KINDS = ['idle', 'closing']
+
+/** The pre-655 title of each state card — the fallback every matcher carries. */
+const LEGACY_STATE_TITLE = { idle: NO_CURRENT_WORK_TITLE, closing: CLOSING_WORK_TITLE }
+
+/**
+ * The UNNUMBERED state-card titles. The handover card owns no point number by
+ * design, so every rule written for a numbered card — the topic guard's
+ * foreign-point complaint above all — has to know it by name. The closing card
+ * carries a number since point 655; its legacy title stays listed so a board
+ * written earlier is still exempted.
  */
 export const STATE_CARD_TITLES = [NO_CURRENT_WORK_TITLE, CLOSING_WORK_TITLE]
 
@@ -403,15 +705,39 @@ export function isStateCardTitle(title) {
 }
 
 /**
- * A state card's markup, matched globally. Built from the title so the card and
- * the pattern that finds it can never drift apart. A fresh regex per call —
- * a shared global one carries `lastIndex` between callers.
+ * A state card's markup, matched globally: by its marker, or — for a card
+ * written before point 655 — by its literal title. A fresh regex per call; a
+ * shared global one carries `lastIndex` between callers.
  */
-const stateCardPattern = (title) =>
-  new RegExp(`<details class="now">\\s*<summary><span class="t">${title}</span>[\\s\\S]*?</details>\\s*`, 'g')
+const stateCardPattern = (kind) =>
+  new RegExp(
+    `<details class="now"[^>]*data-state="${kind}"[^>]*>[\\s\\S]*?</details>\\s*` +
+      `|<details class="now"[^>]*>${WITHIN_CARD}<span class="t">${LEGACY_STATE_TITLE[kind]}</span>[\\s\\S]*?</details>\\s*`,
+    'g',
+  )
 
-const noWorkCardPattern = () => stateCardPattern(NO_CURRENT_WORK_TITLE)
-const closingCardPattern = () => stateCardPattern(CLOSING_WORK_TITLE)
+/**
+ * Is this card REALLY the state its marker claims (four-eyes review,
+ * 12.08.2026)? A marker is hand-writable and a state card is REPLACED, so a
+ * marker alone must never authorise a deletion: the idle card is unnumbered and
+ * carries its constant title, the closing card carries a composed closing title.
+ * Anything else keeps standing and the publish gate names it.
+ */
+function isTrulyStateCard(card, kind) {
+  const summary = (String(card).match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+  const title = ((summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? '').trim()
+  const numbered = summaryPoint(summary).chip != null
+  if (kind === 'idle') return title === NO_CURRENT_WORK_TITLE && !numbered
+  // THE LEGACY TITLE ONLY COUNTS ON AN UNNUMBERED CARD (four-eyes review,
+  // 12.08.2026). That card never had a number; a NUMBERED card wearing the old
+  // sentence is a point card whose title is merely wrong, and removing it would
+  // delete real work without passing the one path that reports what it removes.
+  if (title === CLOSING_WORK_TITLE) return !numbered
+  return looksLikeClosingTitle(title)
+}
+
+const noWorkCardPattern = () => stateCardPattern('idle')
+const closingCardPattern = () => stateCardPattern('closing')
 
 /** Every idle card standing in the document — normally none or one. */
 export function noCurrentWorkCards(html) {
@@ -423,36 +749,78 @@ export function closingWorkCards(html) {
   return String(html ?? '').match(closingCardPattern()) ?? []
 }
 
-/** The document without any idle card. The state is REPLACED, never appended. */
+/**
+ * The document without any idle card. The state is REPLACED, never appended —
+ * but only where the card really IS the handover card: a numbered running card
+ * that somehow wears the idle marker is running work, and deleting it would cost
+ * exactly what the marker was introduced to protect.
+ */
 export function stripNoCurrentWork(html) {
-  return String(html ?? '').replace(noWorkCardPattern(), '')
-}
-
-/** The document without any closing card. Same rule: a state replaces. */
-export function stripClosingWork(html) {
-  return String(html ?? '').replace(closingCardPattern(), '')
+  return withinNowSection(html, (scope) =>
+    scope.replace(noWorkCardPattern(), (card) => (isTrulyStateCard(card, 'idle') ? '' : card)),
+  )
 }
 
 /**
- * The document without ANY unnumbered state card. The three kinds are mutually
- * exclusive (`board-structure-core` refuses a board carrying two), so whatever
- * writes one kind clears the others in the same edit.
+ * Apply an edit to the current-work SECTION alone — never to the whole document
+ * (four-eyes review, 12.08.2026). A state card that has drifted out of the
+ * section is a `now-card-outside` violation the gate reports; deleting it from
+ * the archive or the queue on the next state write would take that evidence away
+ * silently, and the one path allowed to remove a card is the one that says so.
+ * A fragment without the section is judged as it stands, like the claims are.
+ */
+function withinNowSection(html, edit) {
+  const text = String(html ?? '')
+  try {
+    const { from, end } = sectionBounds(text, 'now')
+    return text.slice(0, from) + edit(text.slice(from, end)) + text.slice(end)
+  } catch {
+    return edit(text)
+  }
+}
+
+/**
+ * The document without any closing card. Same rule: a state replaces.
+ *
+ * A MARKER ALONE IS NOT THE STATE (four-eyes review, 12.08.2026). A card that
+ * wears `data-state="closing"` over an ordinary subject title is not closing
+ * work, and removing it would silently delete RUNNING work — the marker is
+ * hand-writable, so it must not be able to authorise a deletion on its own. Such
+ * a card is left standing and the publish gate refuses it by name; it carries a
+ * number, so `queue <N>`, `done <N>` and `title <N>` all reach it.
+ */
+export function stripClosingWork(html) {
+  return withinNowSection(html, (scope) =>
+    scope.replace(closingCardPattern(), (card) => (isTrulyStateCard(card, 'closing') ? '' : card)),
+  )
+}
+
+/**
+ * The document without ANY state card. The three kinds are mutually exclusive
+ * (`board-structure-core` refuses a board carrying two), so whatever writes one
+ * kind clears the others in the same edit.
+ *
+ * AN UNNUMBERED CARD IS A STATE CARD, whatever it says (four-eyes review,
+ * 12.08.2026). Since point 655 a current-work card either names its point in the
+ * chip or IS the handover card, so a card with neither chip nor legacy title
+ * number can only be a state card — one written by hand, or by a version of this
+ * module that had no marker yet. Without this clause nothing could remove such a
+ * card: the state patterns miss it and every point command needs a number, so
+ * the publish gate would refuse the board and the only repair left would be the
+ * hand edit this whole module exists to make unnecessary.
  */
 export function stripStateCards(html) {
   return stripClosingWork(stripNoCurrentWork(html))
 }
 
-/** Test a pattern against the current-work SECTION alone, not the whole board. */
-function testInNowSection(html, pattern) {
-  const text = String(html ?? '')
-  let scope = text
-  try {
-    const { from, end } = sectionBounds(text, 'now')
-    scope = text.slice(from, end)
-  } catch {
-    /* no section — judge the fragment as it stands */
-  }
-  return pattern.test(scope)
+/**
+ * The points of the NUMBERED current-work cards, the state cards excluded. The
+ * closing card carries a number since point 655, and counting it here would make
+ * the boundary's own handover card unwritable ("651 still stands as current
+ * work") right after that very card said the point was finished.
+ */
+function standingPointCards(html) {
+  return [...parseNowCardPoints(stripStateCards(String(html ?? '')))]
 }
 
 /**
@@ -466,16 +834,38 @@ function testInNowSection(html, pattern) {
  *
  * THE CLOSING CARD IS NOT THIS CLAIM (point 544). It says the opposite — work is
  * still owed on the point that just ended — so the deny must not fire under it.
- * That falls out of the title match; the tests pin it so no future widening of
- * this predicate can quietly take the third card with it.
+ * That falls out of the marker; the tests pin it so no future widening of this
+ * predicate can quietly take the other card with it.
  */
 export function claimsNoCurrentWork(html) {
-  return testInNowSection(html, noWorkCardPattern())
+  return sectionStateCards(html, 'idle').length > 0
 }
 
 /** Does the current-work section say that only closing duties are left? */
 export function claimsClosingWork(html) {
-  return testInNowSection(html, closingCardPattern())
+  return sectionStateCards(html, 'closing').length > 0
+}
+
+/**
+ * The cards in the current-work section that REALLY are the given state — the
+ * marker checked against the card itself (four-eyes review, 12.08.2026).
+ *
+ * A numbered card wearing the idle marker is running work, not a claim to stop.
+ * Trusting the marker there fired the point-470 deny on a card the strip
+ * deliberately refuses to remove, and the deny's remedies (`now`, `closing`)
+ * cannot reach it while the ones that can (`title`, `queue`) are themselves the
+ * state-changing calls it blocks — a trap with no way out.
+ */
+function sectionStateCards(html, kind) {
+  const text = String(html ?? '')
+  let scope = text
+  try {
+    const { from, end } = sectionBounds(text, 'now')
+    scope = text.slice(from, end)
+  } catch {
+    /* no section — judge the fragment as it stands */
+  }
+  return (scope.match(stateCardPattern(kind)) ?? []).filter((card) => isTrulyStateCard(card, kind))
 }
 
 /**
@@ -491,6 +881,10 @@ export function claimsClosingWork(html) {
  * session hand-edited the file instead — and a hand-edit APPENDS. Two idle cards
  * are now unreachable through this path, whatever calls it and however often.
  *
+ * IT IS THE ONE UNNUMBERED CARD (point 655), so it owes the reader in prose what
+ * the numbered cards give him in a chip: the reason must NAME the point the
+ * successor picks up. The publish gate refuses a handover card that names none.
+ *
  * AND IT MUST BE TRUE WHEN IT IS WRITTEN. A numbered card standing in the
  * section is work the board itself says is running, so the claim would
  * contradict the document it is written into — exactly the pair the user read
@@ -498,41 +892,113 @@ export function claimsClosingWork(html) {
  * both sanctioned ways out named.
  */
 export function toNoCurrentWork(html, reason, { stamp = berlinStamp() } = {}) {
-  return writeStateCard(html, NO_CURRENT_WORK_TITLE, reason, {
+  return writeStateCard(html, {
+    kind: 'idle',
+    title: NO_CURRENT_WORK_TITLE,
+    text: reason,
     stamp,
     emptyReason: 'board: --none needs a reason — the reader must learn WHY nothing is running',
     claim: 'that nothing is running',
+    // THE WRITER REFUSES WHAT ITS OWN GATE WOULD REFUSE (four-eyes review,
+    // 12.08.2026). `none "Sitzungsgrenze."` used to write a card the publish gate
+    // then rejected — a sanctioned command producing an unpublishable board is
+    // the worst of both, because the refusal arrives a step after the mistake.
+    precondition: (text) =>
+      namesFollowOnWork(text)
+        ? null
+        : 'board: the handover card is the one card without a number, so its reason must NAME the ' +
+          'point the batch picks up next ("… der Nachfolger nimmt Punkt 656"). The publish gate ' +
+          'refuses a handover card that names none.',
   })
 }
 
 /**
  * The current-work card for a session that has MERGED AND TICKED its point and
  * still owes its closing duties — the four-eyes record on the tick commit, the
- * retrospective's new problem class (point 544). Unnumbered like the idle card,
- * so it adds no point-per-section conflict; the reason says which duties are
- * still owed.
+ * retrospective's new problem class (point 544). It CARRIES ITS POINT since
+ * point 655: the number in the chip, the point's subject in the title, the stage
+ * last, and a body that says what the point was about before what is left of it.
  *
  * IT IS A STATE, like the idle card, and the two are mutually exclusive: writing
  * this one clears any idle card standing, and the boundary's `none` clears this
- * one. Refused while a NUMBERED card stands, for the same reason the idle card
- * is: the board would contradict itself in one screen.
+ * one. Refused while a NUMBERED point card stands, for the same reason the idle
+ * card is: the board would contradict itself in one screen.
  *
  * IT IS NOT A CLAIM TO STOP. That is the whole point of it — `board-first-guard`
  * denies under the idle card and lets the work through under this one.
  */
-export function toClosingWork(html, reason, { stamp = berlinStamp() } = {}) {
-  return writeStateCard(html, CLOSING_WORK_TITLE, reason, {
+export function toClosingWork(html, point, { subject, reason, stamp = berlinStamp() } = {}) {
+  if (!/^\d+$/.test(String(point ?? ''))) {
+    throw new Error(
+      `board: closing takes the POINT it closes, got "${point}" — node scripts/board.mjs closing <N> "<Grund>"`,
+    )
+  }
+  // The REASON is judged before the composition: the subject line this card
+  // prepends would otherwise make an empty reason look like a full body.
+  const duties = String(reason ?? '').trim()
+  if (!duties) {
+    throw new Error('board: closing needs a reason — the reader must learn WHICH duties are still owed')
+  }
+  const name = String(subject ?? '').trim() || pointSubject(html, point) || ''
+  if (name && stageOnlyTitle(name)) {
+    throw new Error(
+      `board: "${name}" is a STAGE, not a subject — the card would read "${name}: ${CLOSING_STAGE}" and ` +
+        'say nothing about the point. Give the point\'s own subject: node scripts/board.mjs closing ' +
+        `${point} --title "<Betreff des Punktes>" "<Grund>".`,
+    )
+  }
+  if (!name) {
+    throw new Error(
+      `board: no German subject for point ${point} stands anywhere on the board, so the card would ` +
+        `say only "${CLOSING_STAGE}" — the very thing point 655 ended. Give it one: ` +
+        `node scripts/board.mjs closing ${point} --title "<Betreff des Punktes>" "<Grund>".`,
+    )
+  }
+  const subject_ = stripClosingStage(name)
+  return writeStateCard(html, {
+    kind: 'closing',
+    point,
+    title: closingCardTitle(subject_),
+    // THE BODY SAYS WHAT THE POINT IS ABOUT BEFORE IT SAYS WHAT STAGE IT IS IN
+    // (user 11.08.2026). The subject leads, the owed duties follow as their own
+    // paragraph — composed here, so no caller can leave the subject out.
+    text: `${subject_} — dieser Punkt ist zusammengeführt und abgehakt; die ${CLOSING_STAGE} stehen noch aus.\n\n${duties}`,
     stamp,
     emptyReason: 'board: closing needs a reason — the reader must learn WHICH duties are still owed',
     claim: 'that only closing duties are left',
   })
 }
 
-/** Write one unnumbered state card, replacing whichever one stands. */
-function writeStateCard(html, title, reason, { stamp, emptyReason, claim }) {
+/**
+ * Does this text name a FOLLOW-ON point? It lives beside the writer that owes it,
+ * and the publish gate imports it, so the two cannot ask it differently.
+ *
+ * KNOWN LIMIT: it asks that A point is named, not that it is the RIGHT one —
+ * nothing here can know which point just ended. It catches the card that names
+ * none at all, which is the reported defect.
+ */
+export function namesFollowOnWork(text) {
+  return /\b(?:punkt|point)\s*(\d{1,6})\b/i.test(String(text ?? ''))
+}
+
+/**
+ * The German subject a point is known by on this board: from its numbered chip
+ * (a queue, Erledigt or current-work card) or from a title still written in the
+ * pre-655 "651 — …" shape. Null when the point stands nowhere.
+ */
+export function pointSubject(html, point) {
+  const doc = String(html ?? '')
+  const chip = doc.match(new RegExp(`<span class="num">${point}</span><span class="t">${TITLE_TEXT}</span>`))
+  const legacy = chip ? null : doc.match(new RegExp(`<span class="t">${point}\\s*${DASH}\\s*${TITLE_TEXT}</span>`))
+  const text = stripClosingStage((chip ?? legacy ?? [])[1])
+  return text || null
+}
+
+/** Write one state card, replacing whichever one stands. */
+function writeStateCard(html, { kind, point = null, title, text: reason, stamp, emptyReason, claim, precondition }) {
   const text = String(reason ?? '').trim()
   if (!text) throw new Error(emptyReason)
-  const standing = [...parseNowCardPoints(html)]
+  const standing = standingPointCards(html)
   if (standing.length) {
     throw new Error(
       `board: refusing to claim ${claim} while ${standing.join(', ')} still stands as current ` +
@@ -540,8 +1006,13 @@ function writeStateCard(html, title, reason, { stamp, emptyReason, claim }) {
         `(done ${standing[0]} --none "<reason>") or send it back (queue ${standing[0]}).`,
     )
   }
+  // Judged AFTER the contradiction above, which is the more fundamental refusal:
+  // a card that may not be written at all owes no advice about its wording.
+  const objection = precondition ? precondition(text) : null
+  if (objection) throw new Error(objection)
   const card =
-    `<details class="now">\n  <summary><span class="t">${title}</span>` +
+    `<details class="now"${STATE_ATTR(kind)}>\n  <summary>${point == null ? '' : numberChip(point)}` +
+    `<span class="t">${escapeCardTitle(title)}</span>` +
     `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
     `  <div class="body">\n${renderCardBody(text, { stamp })}\n  </div>\n</details>\n`
   return insertAsFirstNowCard(stripStateCards(html), card)
@@ -608,6 +1079,30 @@ export function parseDoneArgs(rest) {
 }
 
 /**
+ * Split `closing`'s argv into the point it closes, an optional `--title
+ * "<Betreff>"` and the reason. Pure, so the flag handling is pinned by tests —
+ * and the point is a POSITIONAL argument now (point 655), because the card must
+ * name it and a caller that has to remember to write it into the text will one
+ * day not.
+ */
+export function parseClosingArgs(rest) {
+  const args = (Array.isArray(rest) ? rest : []).map((a) => String(a))
+  const [point, ...tail] = args
+  const out = { point: point ?? '', subject: null, words: [] }
+  for (let i = 0; i < tail.length; i += 1) {
+    if (tail[i] !== '--title') {
+      out.words.push(tail[i])
+      continue
+    }
+    if (out.subject != null) throw new Error('board: --title given twice')
+    out.subject = String(tail[i + 1] ?? '').trim()
+    if (!out.subject) throw new Error('board: --title needs the point SUBJECT as its value')
+    i += 1
+  }
+  return out
+}
+
+/**
  * Put a question to the user as a "Von dir zu klären" card, at the TOP of the
  * section (point 421). Until now the board could only DROP such a card, so the
  * one thing the rule demands — that every decision asked of the user stands
@@ -661,12 +1156,17 @@ export function setCardStatus(html, point, text, stamp = berlinStamp()) {
   if (typeof html !== 'string' || !html) throw new Error('board: empty document')
   if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
   if (!text || !String(text).trim()) throw new Error('board: refusing to write an empty status')
-  const re = new RegExp(
-    `(<summary><span class="t">${point} —[\\s\\S]*?<div class="body">)[\\s\\S]*?(</div>\\s*</details>)`,
-  )
-  if (!re.test(html)) throw new Error(`board: no current-work card for point ${point} — add the card first`)
+  // BOUNDED TO ITS OWN CARD (four-eyes review, 12.08.2026). The run to the body
+  // used to be free, so a card that had lost its body sent the rewrite into the
+  // NEXT card's body — a status for one point silently overwriting another
+  // point's text, with markup that still looked plausible afterwards. A card
+  // without a body is now simply not found, and the refusal says so.
+  const re = new RegExp(`(${NOW_HEAD(point)}${WITHIN_CARD}<div class="body">)${WITHIN_CARD}(</div>\\s*</details>)`)
+  const { from, end, text: section } = nowSectionSlice(html)
+  if (!re.test(section)) throw new Error(`board: no current-work card for point ${point} — add the card first`)
   const body = renderCardBody(text, { stamp })
-  return html.replace(re, `$1\n${body}\n  $2`)
+  const rewritten = section.replace(re, (_m, head, tail) => `${head}\n${body}\n  ${tail}`)
+  return html.slice(0, from) + rewritten + html.slice(end)
 }
 
 /**
@@ -684,12 +1184,75 @@ export function setCardTitle(html, point, title) {
   if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
   const text = String(title ?? '').trim()
   if (!text) throw new Error('board: refusing to write an empty title')
-  // The now-card carries its number INSIDE the title span ("439 — …"), the queue
-  // card in a span of its own; each is rewritten in the shape its section fixes.
-  const nowRe = new RegExp(`(<summary><span class="t">)${point} —[^<]*(</span>)`)
-  if (nowRe.test(html)) return html.replace(nowRe, `$1${point} — ${text}$2`)
-  const queueRe = new RegExp(`(<summary><span class="num">${point}</span><span class="t">)[^<]*(</span>)`)
-  if (queueRe.test(html)) return html.replace(queueRe, `$1${text}$2`)
+  // A SANCTIONED WRITER MAY NOT PRODUCE WHAT THE PUBLISH GATE REFUSES (four-eyes
+  // review, 12.08.2026): a title that says only which STAGE the work is in is
+  // exactly the card point 655 ended, and writing one here would leave the board
+  // unpublishable one command later.
+  if (stageOnlyTitle(text)) {
+    throw new Error(
+      `board: "${text}" names a STAGE and no subject — a card title says what the point IS. ` +
+        `For the closing card use node scripts/board.mjs closing ${point} "<Grund>", which composes ` +
+        `"<Betreff>: ${CLOSING_STAGE}" itself.`,
+    )
+  }
+  // Both sections carry the number in a chip of its own since point 655, so a
+  // retitle only ever rewrites the SUBJECT — and a now-card still written in the
+  // old shape ("439 — …") is lifted into the chip shape on the way.
+  // ON A CLOSING CARD THE TITLE KEEPS ITS SHAPE. The marker and the composed
+  // title are one statement; retitling only the subject would leave a card the
+  // gate reads as a false closing marker.
+  const now = nowSectionSlice(html)
+  const closingMarked = new RegExp(
+    `<details class="now"[^>]*data-state="closing"[^>]*>\\s*<summary>[\\s\\S]*?<span class="num">\\s*${point}\\s*</span>`,
+  ).test(now.text)
+  // A CLOSING SHAPE IS THE CLOSING STATE (four-eyes review, 12.08.2026). Writing
+  // that title onto an ordinary card would produce the unmarked closing card the
+  // gate refuses — and the command that writes the state properly is one line
+  // away, so it is named rather than approximated.
+  if (!closingMarked && looksLikeClosingTitle(text)) {
+    throw new Error(
+      `board: "${text}" is the CLOSING card's shape, and this card is not the closing card. ` +
+        `Write that state with node scripts/board.mjs closing ${point} "<Grund>", which composes the ` +
+        'title and sets the marker together.',
+    )
+  }
+  const bare = escapeCardTitle(closingMarked ? closingCardTitle(stripPointPrefix(text, point)) : stripPointPrefix(text, point))
+  const chipRe = new RegExp(
+    `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*<span class="t">)` +
+      `(?:(?!</span>)[\\s\\S])*(</span>)`,
+  )
+  if (chipRe.test(now.text)) {
+    const rewritten = now.text.replace(chipRe, (_m, head, tail) => `${head}${bare}${tail}`)
+    return html.slice(0, now.from) + rewritten + html.slice(now.end)
+  }
+  const legacyRe = new RegExp(
+    `(<details class="now"[^>]*>\\s*<summary>\\s*)<span class="t">\\s*${point}\\s*${DASH}(?:(?!</span>)[\\s\\S])*(</span>)`,
+  )
+  if (legacyRe.test(now.text)) {
+    const rewritten = now.text.replace(
+      legacyRe,
+      (_m, head, tail) => `${head}${numberChip(point)}<span class="t">${bare}${tail}`,
+    )
+    return html.slice(0, now.from) + rewritten + html.slice(now.end)
+  }
+  // SCOPED TO THE QUEUE (four-eyes review, 12.08.2026): the archived cards carry
+  // the very same markup, so an unscoped fallback retitled FINISHED work for a
+  // point that had no card left in either live section — silently, since the
+  // command reports success either way. The Erledigt section is history; a
+  // retitle there is a hand edit's business, not this command's.
+  const queueRe = new RegExp(
+    `(<summary><span class="num">${point}</span><span class="t">)(?:(?!</span>)[\\s\\S])*(</span>)`,
+  )
+  try {
+    const { from, end } = sectionBounds(html, 'queue')
+    const section = html.slice(from, end)
+    if (queueRe.test(section)) {
+      const rewritten = section.replace(queueRe, (_m, head, tail) => `${head}${escapeCardTitle(text)}${tail}`)
+      return html.slice(0, from) + rewritten + html.slice(end)
+    }
+  } catch {
+    /* no queue section — the refusal below is the honest answer */
+  }
   throw new Error(`board: no current-work or queue card for point ${point}`)
 }
 

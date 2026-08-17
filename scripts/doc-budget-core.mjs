@@ -53,8 +53,15 @@ export const DOC_BUDGETS = [
     // unchanged: a genuinely new rule raises the budget by its measured size
     // with the reason written here, a longer telling of something already in the
     // file does not.
-    maxLines: 773,
-    maxWords: 6531,
+    // RAISED 773/6531 → 781/6617 by point 675, the sanctioned new-rule raise:
+    // the §6 boundary paragraph carries three genuinely new rules (the
+    // two-phase sealed boundary, the landed-not-drained condition with
+    // adoption, the context watermark), written as tight as they compress —
+    // measured +5 lines / +66 words on this guard's own counter, after
+    // tightening the §7.2 BATCH-family line to pay one line back. The same
+    // small margin as before rides on top (0.4 % lines, 0.3 % words).
+    maxLines: 781,
+    maxWords: 6617,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {

@@ -190,7 +190,7 @@ describe('village speech (design.md §13.4)', () => {
       labelSeconds: 2.6,
       speechPitchHz: 140,
       speechPitchInterval: 1.68,
-      speechVolume: 1.5,
+      speechVolume: 2,
       labelHeadroom: 0.25,
     })
     // A five-syllable atom stays well under two seconds, so a seven-atom
@@ -226,11 +226,11 @@ describe('village speech (design.md §13.4)', () => {
     // The syllables must be audible with NOTHING else configured — the whole
     // communication PoC is learned from them.
     expect(balance.communication.speechVolume).toBeGreaterThan(0)
-    // Point 605: it inherited 0.5 from the ambient bus, and at 0.5 it sat UNDER
-    // the village drums — the reported "too quiet". The relation that justifies
-    // the value is measured on the live buses in src/systems/ambience.test.ts;
-    // this pins the number, so a future edit has to say what it is doing.
-    expect(balance.communication.speechVolume).toBe(1.5)
+    // The deployed 1.5 remained too quiet even after its earlier drum-relative
+    // calibration. Point 673 raises the default above that failed value and
+    // measures it against the remaining shipped mix in ambience.test.ts.
+    expect(balance.communication.speechVolume).toBeGreaterThan(1.5)
+    expect(balance.communication.speechVolume).toBe(2)
     // It is the ONE level allowed above the drums it must carry through: louder
     // than "everything else", quieter than the footsteps right at the ear.
     expect(balance.communication.speechVolume).toBeGreaterThan(balance.ambientVolume)

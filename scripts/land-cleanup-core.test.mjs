@@ -11,6 +11,7 @@ import {
   AGENT_WORKTREE_DIR,
   DISPOSITION,
   GIT_WORKTREE_ADMIN_DIR,
+  branchDeletionBlocker,
   formatCleanupNotes,
   isAgentWorktree,
   isLinkedWorktreeOf,
@@ -98,6 +99,71 @@ describe('ownership must be PROVEN', () => {
     expect(sel.remove).toEqual([])
     expect(sel.branch.delete).toBe(false)
     expect(formatCleanupNotes(sel).join('\n')).toContain(tree.path)
+  })
+
+  it('the MAIN checkout DETACHED keeps both branches — never removed is not "proves nothing"', () => {
+    // Sixth review, finding 2: the main-checkout test returned `foreign` before the
+    // detached handling could see it, so a main tree detached during the cleanup
+    // (mid-rebase, mid-bisect) blocked neither deletion.
+    const detachedMain = { path: ROOT, branch: '' }
+    const v = judgeCleanupTarget({ ...base, worktree: detachedMain, evidence: deadFor('main') })
+    expect(v.disposition).toBe(DISPOSITION.unproven)
+    expect(v.reason).toMatch(/MAIN checkout with a detached HEAD/)
+
+    const sel = selectCleanupTargets({ ...base, worktrees: [detachedMain], evidence: { [ROOT]: deadFor('main') } })
+    expect(sel.remove).toEqual([]) // and it is STILL never removed
+    expect(sel.reported.map((r) => r.path)).toEqual([ROOT])
+    expect(sel.branch.delete).toBe(false)
+    expect(formatCleanupNotes(sel).join('\n')).toContain(ROOT)
+  })
+
+  it('the MAIN checkout on a branch stays foreign — git itself refuses to delete under it', () => {
+    const v = judgeCleanupTarget({ ...base, worktree: { path: ROOT, branch: 'main' }, evidence: deadFor('main') })
+    expect(v.disposition).toBe(DISPOSITION.foreign)
+    expect(v.reason).toBe('the MAIN checkout')
+  })
+
+  it('a detached main checkout blocks even beside a removable tree of the landed point', () => {
+    const own = wt('608a', 'feat/608-x')
+    const sel = selectCleanupTargets({
+      ...base,
+      worktrees: [{ path: ROOT, branch: '' }, own],
+      evidence: { [ROOT]: deadFor('main'), [own.path]: deadFor('608a') },
+    })
+    expect(sel.remove).toEqual([own.path])
+    expect(sel.branch.delete).toBe(false)
+    expect(sel.branch.reason).toContain(ROOT)
+  })
+
+  it('a DETACHED checkout outside the agent directory is REPORTED too — and keeps BOTH branches', () => {
+    // Whole-branch review, finding 5: this was classified `foreign`, so it fell out
+    // of `reported`, its empty branch matched nothing in the fallback comparison,
+    // and a live manual worktree rebasing the landed branch permitted both branch
+    // deletions — the incident's own shape, one level up.
+    const manual = { path: `${ROOT}/local/somebody-else`, branch: '' }
+    const v = judgeCleanupTarget({ ...base, worktree: manual, evidence: deadFor('x') })
+    expect(v.disposition).toBe(DISPOSITION.unproven)
+    expect(v.reason).toMatch(/detached/)
+    const sel = selectCleanupTargets({ ...base, worktrees: [manual], evidence: { [manual.path]: deadFor('x') } })
+    expect(sel.remove).toEqual([])
+    expect(sel.reported.map((r) => r.path)).toEqual([manual.path])
+    expect(sel.branch.delete).toBe(false)
+    expect(formatCleanupNotes(sel).join('\n')).toContain(manual.path)
+  })
+
+  it('a detached tree standing BESIDE the landed point\'s own dead one still keeps the branch', () => {
+    // The removal is not blocked by it — only the branch is. Debris costs one
+    // command; a branch deleted under a rebase costs the rebase.
+    const own = wt('608a', 'feat/608-x')
+    const manual = { path: `${ROOT}/local/rebasing`, branch: '' }
+    const sel = selectCleanupTargets({
+      ...base,
+      worktrees: [{ path: ROOT, branch: 'main' }, own, manual],
+      evidence: { [own.path]: deadFor('608a'), [manual.path]: deadFor('z') },
+    })
+    expect(sel.remove).toEqual([own.path])
+    expect(sel.branch.delete).toBe(false)
+    expect(sel.branch.reason).toContain(manual.path)
   })
 
   it('a checkout on the landed branch outside the agent directory is REPORTED, not removed', () => {
@@ -339,6 +405,45 @@ describe('the re-proof at the moment of deletion (review finding 2)', () => {
       gitBirth: 880,
       notWrittenAfter: NOW,
     })
+  })
+})
+
+// THE BRANCH DELETION IS DECIDED ON A STATE READ NOW, NEVER ON THE PLAN — and on
+// BOTH sides of the local deletion, because `branch -d` and `push --delete` are two
+// commands (whole-branch review, finding 6).
+describe('branchDeletionBlocker — the blocker at the moment of deletion', () => {
+  const free = { branch: { delete: true, reason: '' } }
+
+  it('lets the deletion run when nothing at all stands in the way', () => {
+    expect(branchDeletionBlocker({ selection: free })).toBe('')
+  })
+
+  it('carries the reason of a selection taken NOW, not the plan\'s', () => {
+    const now = { branch: { delete: false, reason: '/repo/local/rebasing was kept (detached)' } }
+    expect(branchDeletionBlocker({ selection: now })).toContain('rebasing')
+  })
+
+  it('blocks when a removal was refused or failed at the last moment', () => {
+    expect(branchDeletionBlocker({ selection: free, refused: 1 })).toMatch(/refused at the last moment/)
+    expect(branchDeletionBlocker({ selection: free, failed: 1 })).toMatch(/could not be removed/)
+  })
+
+  it('blocks the REMOTE deletion once the local branch is back', () => {
+    // A live tree that recreates the branch between the two commands would keep
+    // its local branch and lose its remote — the same loss by the other half.
+    expect(branchDeletionBlocker({ selection: free, recreated: true })).toMatch(/exists again/)
+    expect(branchDeletionBlocker({ selection: free, recreated: false })).toBe('')
+  })
+
+  it('blocks when the worktrees could not be listed at all — no answer is not permission', () => {
+    for (const selection of [null, undefined, {}, { branch: null }, 'nonsense']) {
+      expect(branchDeletionBlocker({ selection }), String(selection)).toMatch(/could not be listed/)
+    }
+    expect(branchDeletionBlocker()).toMatch(/could not be listed/)
+  })
+
+  it('never returns an EMPTY reason for a selection that refuses the deletion', () => {
+    expect(branchDeletionBlocker({ selection: { branch: { delete: false, reason: '' } } })).toMatch(/may still be standing/)
   })
 })
 

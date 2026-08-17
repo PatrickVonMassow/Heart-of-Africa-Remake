@@ -176,9 +176,33 @@ export function matchesExpectation({ expected, entry, actual = null, dirty, ownL
   if (!has) return { ok: false, reason: `expected ${branch}, but it is on a detached HEAD` }
   if (has !== branch) return { ok: false, reason: `expected ${branch}, but it is on ${has}` }
 
-  const lock = String(entry.locked ?? '').trim()
-  const own = String(ownLock ?? '').trim()
-  if (lock && lock !== own) return { ok: false, reason: `it is git-locked: ${lock}` }
+  // THE EXCLUSION MUST STILL BE IN PLACE — AN EMPTY LOCK IS A REFUSAL, NOT A PASS
+  // (fifth review, finding 2). This used to reject only a NON-EMPTY foreign lock,
+  // so the one state where the caller holds NOTHING slipped through as "unlocked,
+  // fine": a concurrent stale-lock recovery clears our lock and pauses before
+  // retaking it, and the deletion then proceeds with no exclusion at all. git
+  // offers no way to HOLD exclusion across that gap — `worktree unlock` names no
+  // lock, so a third party can always clear ours — but the deletion path closes
+  // regardless: where `ownLock` says we took a lock, exactly that reason must be
+  // in place, and its absence refuses as loudly as a stranger's.
+  const lock = String(entry.locked ?? '')
+  const own = String(ownLock ?? '')
+  if (own) {
+    if (!lock) {
+      return {
+        ok: false,
+        reason:
+          'the lock this cleanup took is GONE — something cleared it, so the exclusion this verification runs under no longer holds',
+      }
+    }
+    if (lock !== own) return { ok: false, reason: `it is git-locked: ${lock}` }
+  } else if (lock.trim()) {
+    // Printed VERBATIM, like the branch above it: the padding is part of what is
+    // in git's file, and a reader comparing this line against the file must see
+    // the same bytes. Only the DECISION trims, so a lock of pure whitespace still
+    // reads as "no lock".
+    return { ok: false, reason: `it is git-locked: ${lock}` }
+  }
 
   const got = actual && typeof actual === 'object' ? actual : {}
   const mismatch = (name, wanted, found) => {
@@ -301,10 +325,27 @@ const CLEANUP_LOCK_SIGNATURE = new RegExp(`^${CLEANUP_LOCK_BODY} \\(pid (\\d+) s
 export const formatCleanupLock = ({ pid, startedAt } = {}) =>
   `${CLEANUP_LOCK_BODY} (pid ${Number(pid) || 0} start ${Number(startedAt) || 0})`
 
-/** `{ ours, pid, startedAt }` for a lock reason — `ours: false` for anything this
- *  command did not write, which is never recovered. PURE. */
+/**
+ * `{ ours, pid, startedAt }` for a lock reason — `ours: false` for anything this
+ * command did not write, which is never recovered. PURE.
+ *
+ * THE REASON IS MATCHED VERBATIM (fifth review, finding 1). This used to TRIM
+ * before matching, which WIDENED the anchored signature the formatter writes: a
+ * foreign lock padded with whitespace — `" worktree-cleanup verifying and deleting
+ * (pid 999999 start 1) "` — then read as OURS, and a foreign lock that parses as
+ * ours becomes BREAKABLE the moment its pid is absent. That is the one rule the
+ * asymmetry above never bends, so the reader now matches exactly what the writer
+ * emits and normalises nothing.
+ *
+ * THE PADDING IS REAL, measured 11.08.2026 (git 2.39.5): `git worktree lock
+ * --reason` stores the reason VERBATIM in `<admin gitdir>/locked` (the file is the
+ * reason plus one newline), while `git worktree list --porcelain` TRIMS it before
+ * printing. Git's own trim is unavoidable, which is exactly why the callers of this
+ * parser read the lock FILE rather than the porcelain — see `readLockReason` in
+ * `worktree-cleanup.mjs`.
+ */
 export function parseCleanupLock(reason) {
-  const text = String(reason ?? '').trim()
+  const text = String(reason ?? '')
   const m = CLEANUP_LOCK_SIGNATURE.exec(text)
   if (m) return { ours: true, pid: Number(m[1]), startedAt: Number(m[2]) }
   return { ours: text === CLEANUP_LOCK_LEGACY, pid: 0, startedAt: 0 }
@@ -320,17 +361,36 @@ export function parseCleanupLock(reason) {
  * PROVABLY gone: the process no longer exists, or a process with that pid exists
  * whose start time is not the recorded one, which means the pid was recycled and
  * the original holder is dead. Everything else keeps the lock.
+ *
+ * A LOCK OF OURS THAT RECORDS NO START TIME IS RECOVERABLE BY A NARROWER RULE
+ * (fifth review, finding 4). `cleanupLockReason` writes `start 0` whenever the
+ * process-start probe cannot answer, and refusing every zero-start lock made a
+ * crash while holding one WEDGE that worktree for good — the very failure the run
+ * identity was added to end, reintroduced through its own fallback. So a
+ * zero-start lock OF OURS is recoverable on the one piece of evidence that still
+ * carries: the pid is PROVABLY ABSENT. It is never recovered while a process with
+ * that pid exists, because without a start time a recycled pid cannot be told from
+ * the original holder — that half stays wedged, visibly, and a human clears it.
+ * A lock naming no pid at all (the legacy spelling) stays by-hand as before.
  */
 export function staleLockVerdict({ reason, probe = null, tolerance = 5000 } = {}) {
-  const text = String(reason ?? '').trim()
-  if (!text) return { recoverable: false, why: 'there is no lock reason to judge' }
+  const text = String(reason ?? '')
+  if (!text.trim()) return { recoverable: false, why: 'there is no lock reason to judge' }
   const lock = parseCleanupLock(text)
   if (!lock.ours) return { recoverable: false, why: `the lock is not this command's: ${text}` }
-  if (!lock.pid || !lock.startedAt) {
+  if (!lock.pid) {
     return { recoverable: false, why: `this command's lock names no run (${text}) — remove it by hand once you are sure` }
   }
   if (!probe || typeof probe.exists !== 'boolean') {
     return { recoverable: false, why: `the holder of ${text} could not be judged` }
+  }
+  if (!lock.startedAt) {
+    return probe.exists === false
+      ? { recoverable: true, why: `its holder (pid ${lock.pid}) is gone — the lock recorded no start time, so an absent pid is the only thing that clears it` }
+      : {
+          recoverable: false,
+          why: `pid ${lock.pid} exists and this lock recorded no start time, so a recycled pid cannot be told from its holder — clear it by hand once you are sure`,
+        }
   }
   if (probe.exists === false) return { recoverable: true, why: `its holder (pid ${lock.pid}) is gone` }
   if (typeof probe.startedAt !== 'number') {
@@ -340,6 +400,66 @@ export function staleLockVerdict({ reason, probe = null, tolerance = 5000 } = {}
     return { recoverable: true, why: `pid ${lock.pid} was recycled by another process — the holder is gone` }
   }
   return { recoverable: false, why: `its holder (pid ${lock.pid}) is still running` }
+}
+
+/**
+ * MAY THE LOCK IN PLACE BE RELEASED? PURE (fifth review, finding 3).
+ *
+ * THE RELEASE IS STILL NOT ONE ACT, AND GIT HAS NO PRIMITIVE THAT WOULD MAKE IT
+ * ONE: `git worktree unlock` names no lock, it clears whatever is there, and
+ * there is no compare-and-unlock anywhere in git or in POSIX. So the release is
+ * NARROWED instead — this verdict is taken from the reason read out of git's own
+ * lock file and the unlink follows it immediately, two syscalls in one process
+ * rather than two git subprocesses (see `releaseCleanupLock` in
+ * `worktree-cleanup.mjs` for the measured shape and the residual).
+ *
+ * Inputs:
+ *   held  the reason in place, VERBATIM — '' for no lock, null when it could not
+ *         be read
+ *   ours  the reason this command wrote, '' when it took none
+ *
+ * Returns { release, note }. A note is a sentence to PRINT: a lock nobody
+ * released is a wedge somebody has to see.
+ */
+export function judgeLockRelease({ held, ours } = {}) {
+  const mine = String(ours ?? '')
+  if (!mine) return { release: false, note: '' } // we took no lock, so we release none
+  if (held === null || held === undefined) {
+    return { release: false, note: 'the lock could not be re-read, so it was LEFT IN PLACE' }
+  }
+  const there = String(held)
+  if (!there) return { release: false, note: '' } // it went with the tree, or somebody cleared it
+  if (there !== mine) return { release: false, note: `the lock in place is not ours (${there}) — LEFT ALONE` }
+  return { release: true, note: '' }
+}
+
+/**
+ * IS THE LOCK IN PLACE STILL OURS? PURE (seventh review, finding 4).
+ *
+ * THE CHECK THAT GUARDS A DESTRUCTIVE ACT IS READ AT THE MOMENT OF THAT ACT. The
+ * verification reads the lock once and then runs `readIdentity` and a `git status`
+ * before anything is deleted — so validating the deletion against THAT read is
+ * validating a cached fact. The review's interleaving: another cleanup's release
+ * strips our lock in the meantime, and because nothing looks again, the removal
+ * proceeds with no exclusion at all. That is the destroyed-work class, not a lost
+ * lock, and it is what this verdict exists to make impossible.
+ *
+ * `held` is the reason git's lock file carries VERBATIM — '' for no lock, null when
+ * it could not be read. `ours` is what we wrote, '' when we took no lock.
+ *
+ * Returns { ok, reason }. Every uncertain answer is `ok: false`, because the act it
+ * guards cannot be undone.
+ */
+export function judgeLockHeld({ held, ours } = {}) {
+  const mine = String(ours ?? '')
+  if (!mine) return { ok: true, reason: 'no lock was taken, so none can have been lost' }
+  if (held === null || held === undefined) {
+    return { ok: false, reason: "the lock this cleanup holds could not be read from git's own lock file" }
+  }
+  const there = String(held)
+  if (!there) return { ok: false, reason: 'the lock this cleanup took is GONE — something cleared it' }
+  if (there !== mine) return { ok: false, reason: `the lock in place is not ours (${there})` }
+  return { ok: true, reason: 'the lock this cleanup took is still in place' }
 }
 
 /**

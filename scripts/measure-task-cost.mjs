@@ -19,7 +19,20 @@ import { createInterface } from 'node:readline'
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { listTranscripts, transcriptDir } from './measure-context-cost.mjs'
-import { COST_WEIGHTS, PHASES, PHASE_NOTES, assignTasks, attribute, dominantTaskPerFile, foldResponseLines, mergeSpans, taskSpread } from './measure-task-cost-core.mjs'
+import {
+  COST_WEIGHTS,
+  PHASES,
+  PHASE_NOTES,
+  VERIFICATION_KINDS,
+  VERIFICATION_KIND_NOTES,
+  assignTasks,
+  attribute,
+  dominantTaskPerFile,
+  foldResponseLines,
+  mergeSpans,
+  taskSpread,
+  verificationBreakdown,
+} from './measure-task-cost-core.mjs'
 
 /**
  * Every assistant turn with usage, carrying the evidence the classifier needs: the tool
@@ -135,6 +148,10 @@ if (isMain) {
   // from their neighbours in the same session. The gap between the two is the error bar.
   const result = attribute({ turns })
   const strict = attribute({ turns, carry: false })
+  // The verification phase split again into the half a read-only model could take and
+  // the halves bound to this machine or to a pair of eyes (point 654).
+  const verification = verificationBreakdown({ turns })
+  const verificationStrict = verificationBreakdown({ turns, carry: false })
   const rawMerges = readMerges({ since: gitSince })
   const merges = mergeSpans(rawMerges)
   const spread = {
@@ -163,7 +180,13 @@ if (isMain) {
   }
 
   if (asJson) {
-    console.log(JSON.stringify({ transcriptDir: dir, transcripts: files, turnsRead: turns.length, span, minWeighted, ...result, strict, spread, overhead, merges }, null, 2))
+    console.log(
+      JSON.stringify(
+        { transcriptDir: dir, transcripts: files, turnsRead: turns.length, span, minWeighted, ...result, strict, verification, verificationStrict, spread, overhead, merges },
+        null,
+        2,
+      ),
+    )
   } else {
     const pct = (v) => (v == null ? 'n/a' : `${(v * 100).toFixed(1)} %`)
     const k = (v) => `${(v / 1000).toFixed(0)}k`
@@ -197,6 +220,25 @@ if (isMain) {
     const compW = Object.fromEntries(Object.entries(comp).map(([key, v]) => [key, v * (COST_WEIGHTS[key] ?? 1)]))
     const compWTotal = Object.values(compW).reduce((a, b) => a + b, 0)
     console.log(`BILLED COUNTERS over all phases (${k(compTotal)} raw): ` + Object.entries(comp).map(([key, v]) => `${key} ${k(v)} (${pct(v / compTotal)} raw, ${pct(compW[key] / compWTotal)} weighted)`).join(' · '))
+    console.log('')
+    // WHICH HALF OF THE VERIFICATION PHASE COULD LEAVE THIS MACHINE (point 654). The
+    // phase table above says verification is the biggest single share; this says how
+    // much of it is pure text, which is the only part a read-only model can take.
+    console.log(`VERIFICATION SPLIT — the ${k(verification.weighted)} weighted of the verification phase, by half`)
+    for (const kind of VERIFICATION_KINDS) {
+      const b = verification.kinds[kind]
+      const s = verificationStrict.kinds[kind]
+      console.log(
+        `  ${kind.padEnd(10)} ${k(b.weighted).padStart(9)} ${pct(verification.weighted ? b.weighted / verification.weighted : null).padStart(8)} ` +
+          `${String(b.hours).padStart(8)} h  strict ${k(s.weighted).padStart(8)}   ${VERIFICATION_KIND_NOTES[kind]}`,
+      )
+    }
+    console.log(`  ROUTABLE (text) ${pct(verification.routableShare)} of verification = ${pct(total ? verification.kinds.text.weighted / total : null)} of everything.`)
+    for (const scope of ['top-level', 'subagent']) {
+      const s = verification.byScope[scope]
+      const sum = VERIFICATION_KINDS.reduce((a, kind) => a + s[kind].weighted, 0)
+      console.log(`  ${scope.padEnd(10)} ${k(sum).padStart(9)}  ` + VERIFICATION_KINDS.map((kind) => `${kind.slice(0, 5)} ${pct(sum ? s[kind].weighted / sum : null)}`).join('  '))
+    }
     console.log('')
     console.log('SCOPE SPLIT (weighted)')
     for (const scope of ['top-level', 'subagent']) {

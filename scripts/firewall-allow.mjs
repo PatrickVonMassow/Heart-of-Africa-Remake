@@ -72,6 +72,33 @@ export const DEFAULT_TOPUP = [
   // The ORT-WASM runtime the TTS worker loads (the other host ttsCache.mjs owns).
   { host: 'cdn.jsdelivr.net', net24: true },
   { host: 'registry.npmjs.org', net24: false },
+  // THE REVIEWER'S HOSTS (added 11.08.2026, after a container restart cut them off).
+  // `chatgpt.com` carries the Codex endpoint every Sol review speaks to, and Sol is
+  // the project's cross-vendor reviewer — without it `review-sol.mjs` hands every
+  // review to one of our OWN models and the four-eyes rule quietly loses the
+  // decorrelation it exists for. These hosts sit behind Cloudflare and their
+  // addresses ROTATE, so a boot-time snapshot goes stale exactly the way
+  // storage.googleapis.com did: `.devcontainer/init-firewall.sh` already lists them,
+  // yet after the 22:04 restart the resolved addresses were no longer in the set and
+  // the review came back as "allowance exhausted" while the account had 96 % left.
+  // NOT as /24, though that was the first attempt (GPT-5.6 Sol, 11.08.2026): a /24
+  // around a Cloudflare anycast address is 256 addresses SHARED with unrelated
+  // proxied hostnames, so it grants far more than the reviewer's endpoint — and it
+  // still misses a rotation into a different block, which is the very thing it was
+  // meant to cover. It buys reach nowhere and gives away reach everywhere. So exact
+  // addresses, HERE rather than in the boot script, which runs once.
+  //
+  // WHAT THIS DOES NOT DO, stated because two earlier wordings overclaimed it: the
+  // re-application does not COVER rotation, it REPAIRS it — and not "within one tick"
+  // either, but at the next tick that actually gets to run this and succeeds. A
+  // rotated host stays unreachable until then, so a review can still fail; what the
+  // mechanism buys is that it heals by itself instead of standing until someone
+  // notices. And nothing is ever removed, so yesterday's addresses accumulate for the
+  // life of the container; that is a slow widening of the allowlist, and if it ever
+  // matters the answer is an expiry on the entries, not a wider mask.
+  { host: 'chatgpt.com', net24: false },
+  { host: 'auth.openai.com', net24: false },
+  { host: 'api.openai.com', net24: false },
 ]
 
 /** Per-command ceiling. An `ipset add` is instant; anything slower is stuck. */

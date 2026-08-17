@@ -162,11 +162,67 @@ Verifiable:
 gifts; `src/ui/Dialogs.test.tsx` prices village goods in gifts, not
 money.
 
-## 7. Language/direction system.
+## 7. Language and communication.
 
-Verifiable: `src/state/store.hints.test.ts` covers all five
+THE §13.1–13.3 LAYER (elder, glossary, hints) — verifiable:
+`src/state/store.hints.test.ts` covers all five
 regions, the retroactive deciphering (either order) and the gift lore;
 `src/i18n/i18n.test.ts` the in-world words in the language files.
+
+THE VILLAGE SPEECH (§13.4, docs/communication-poc-spec.md, work-order points
+477–488 and their successors 579/580/582/588/589). Pure Vitest throughout —
+nothing in the mechanic needs a browser, and the one thing that does (the note
+landing over the figure the scene drew) is the polish suite below:
+
+- `src/communication/lexicon.test.ts` — the eleven concepts and the spec's table
+  syllable for syllable; every pair at least two syllables apart, so a misheard
+  beat can only produce a non-word, never a second concept; the four mirrored
+  opposite pairs; and the journal sort order as a total order.
+- `src/communication/speaking.test.ts` — the syllable timing at the calibratable
+  pace, the constant pause BETWEEN a phrase's atoms and nowhere else, the
+  distance curve, and that "audible" and "recorded as heard" are one condition.
+- `src/communication/heard.test.ts` — the first-heard day and settlement kept
+  against later hearings, one entry per utterance, the free-text reading the game
+  never checks, the lexicon sort order, and the save round trip including a
+  snapshot that predates the system.
+- `src/communication/spokenGesture.test.ts` — the point-580 rule: a figure
+  gestures only where it can be heard, across the whole distance range, following
+  the debug-menu radius while the game runs, and the arms stop when the player
+  walks out of earshot.
+- `src/communication/speechLabel.test.ts` and
+  `src/communication/speechTarget.test.ts` — the note
+  over the head carries the player's own reading or `???`, one per atom in
+  spoken order, rides on the SPEAKER'S OWN height (point 582), never accumulates;
+  and the click goes to the NEAREST speaker, a tie held rather than flickering,
+  with no invitation while a dialog stands open (point 588).
+- `src/scenes/place/childSituations.test.ts` — the children's six concepts, each
+  in more than one situation, the staged contrasts (a COME from a child standing
+  still, a THERE nobody moves after), one situation at a time, and the scheduler
+  putting every one of them in front of the player within a visit.
+- `src/scenes/place/adultErrands.test.ts` — the five concepts the children do NOT
+  teach, each in at least two distinct situations and mixed with a known one;
+  RIVER unable to collapse into "fetch water"; UPSTREAM/DOWNSTREAM staged as a
+  mirrored pair; and a BIG_ROCK errand with no upstream walk (point 482).
+- `src/scenes/place/speechChannel.test.ts` — the scene speaks over a named
+  figure, holds the click target, and never accumulates standing text.
+- `src/systems/ambience.test.ts` (`playSpeech`) — the syllables reach the audio
+  clock on the speech bus, under the single §21 ambience volume (point 577).
+- `src/state/store.communication.test.ts` — hearing recorded on the in-game day
+  with the settlement the player stands in, a note only on what was heard, the
+  label reading that same note, and the save round trip.
+- `src/ui/SpeechGuess.test.tsx` and `src/ui/SpeechLabelCard.test.tsx` — the guess
+  dialog opens for exactly the utterance spoken, writes the store field, gives a
+  phrase one field per word, saves on Enter and leaves the note untouched on
+  Escape, in both languages and never interpreting the note; the invitation
+  highlights the nearest speaker alone.
+- `src/ui/JournalPanel.test.tsx` — the journal's observation section is the same
+  note the label shows, and names the village of the first hearing (point 579).
+
+In the browser, `scripts/verify/polish.mjs` proves what the picture owes: section
+`speech-hypothesis` speaks over a figure the scene really drew and measures the
+note against that figure's own head (`146-speech-hypothesis-label`), and section
+`speech-guess` the click invitation and the opened dialog
+(`148-speech-guess-invitation`, `149-speech-guess-dialog`).
 
 THE CHIEF'S MESSAGE ON THE DRUMS (§13.4, docs/communication-poc-spec.md,
 point 486). Asked for at the audience — in his village alone, and only once a
@@ -1493,13 +1549,15 @@ Verifiable, by suite:
   else (asserted over the completeness table AND on the rendered menu),
   and the speech row's label reads as a volume in the wording family of
   its neighbours in both languages while still naming the village
-  speech. The DEFAULT (`balance.communication.speechVolume` 1.5, pinned
-  in `src/config/balance.test.ts`) is calibrated on the audio graph:
-  `src/systems/ambience.test.ts` measures, off the live nodes at the
-  default balance, a syllable spoken beside the player against a
-  village drum beat — 2.04× at the master's input — and that the
-  loudest realistic moment (two close speakers, the drum bed, a
-  footstep) reaches 0.62 of full scale, so nothing clips. The one
+  speech. After the ambient drum bed shipped silent, the DEFAULT
+  (`balance.communication.speechVolume` 2, pinned above the failed 1.5
+  value in `src/config/balance.test.ts`) is calibrated on the deployed
+  audio graph: `src/systems/ambience.test.ts` measures, off the live
+  nodes at the default balance, a syllable peak of 0.612 against a
+  conservative 0.2275 remaining village ambience floor — 2.69×, or
+  8.59 dB, clear. The dormant debug drum mix remains measured too, and
+  its loudest realistic moment (two close speakers, the drum bed, a
+  footstep) reaches 0.76 of full scale, so nothing clips. The one
   factor the node graph does not carry, a syllable's ~2× synthesis
   gain, is measured on the rendered chain in
   `src/systems/ambience.speech.test.ts`.
@@ -1831,4 +1889,3 @@ etc., pt. 20 / point 276): the level drives the post chain — SSAO on only
 at high, TRAA + bloom off only on low — combined with the internal flags
 without ever clobbering them; `settings.mjs` gates the F9 cycle and the
 effective flips.
-

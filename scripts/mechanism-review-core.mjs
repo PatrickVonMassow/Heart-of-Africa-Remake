@@ -17,6 +17,11 @@
 // scripts/mechanism-review-guard.mjs (fail-open) and the record CLI
 // scripts/mechanism-review.mjs. Pinned by mechanism-review-core.test.mjs.
 
+// The ONE import: what a co-author trailer naming a MODEL looks like. It is the
+// author allowlist's own answer (scripts/model-guard-core.mjs, which imports
+// nothing), so "who authored this" cannot drift from "who may author at all".
+import { modelNamesIn } from './model-guard-core.mjs'
+
 /** The verdicts a review may end in, weakest refusal last. */
 export const VERDICTS = Object.freeze(['merge', 'merge-with-fixes', 'do-not-merge'])
 
@@ -139,7 +144,12 @@ export function parseModel(name) {
     .toLowerCase()
   return {
     raw,
-    family: (cleaned.match(/[a-z]+/) ?? [''])[0],
+    // ONE FAMILY PER MODEL, WHICHEVER HALF OF THE NAME IS WRITTEN (point 667).
+    // Sol's designation carries its vendor's word in FRONT of it — "GPT-5.6
+    // Sol" — so reading the first word as the family made it a different model
+    // from the bare "Sol". Harmless while Sol only reviewed; now that it also
+    // AUTHORS, that difference is how a self-review would pass the ledger.
+    family: /\bsol\b/.test(cleaned) ? 'sol' : (cleaned.match(/[a-z]+/) ?? [''])[0],
     version: (cleaned.match(/\d+(?:\.\d+)?/) ?? [''])[0],
   }
 }
@@ -400,23 +410,33 @@ export function validateMergedBy({
   return { ok: errors.length === 0, errors }
 }
 
-/** The first Claude co-author out of a `Co-Authored-By` trailer field. */
+/** The first MODEL co-author out of a `Co-Authored-By` trailer field. */
 export function modelFromTrailers(field) {
   return modelsFromTrailers(field)[0] ?? ''
 }
 
 /**
- * EVERY Claude co-author of a commit, not just the first.
+ * EVERY model co-author of a commit, not just the first.
  *
  * The single-author read is right for "who wrote this" — the gate compares one
  * author against one reviewer — but wrong for the merge: a commit naming two
  * models has two list authors, and taking only the first would let the second
  * merge its own list (four-eyes review of point 634).
+ *
+ * IT ASKS THE AUTHOR ALLOWLIST WHAT A MODEL TRAILER LOOKS LIKE (point 667), and
+ * no longer "does it say Claude". Since Sol authors too, a Claude-only reading
+ * would report a Sol-authored commit as having no author at all — and every
+ * self-review refusal downstream is built on knowing who wrote it. Human
+ * co-authors still name no model and are still dropped.
  */
 export function modelsFromTrailers(field) {
   const out = []
   for (const part of String(field ?? '').split(/[;,\n]/)) {
-    if (/\bclaude\b/i.test(part) && part.trim()) out.push(part.trim())
+    // ASKED OF THE PARSED NAME, not the raw line (second cross-vendor round of
+    // point 667): the raw line carries the ADDRESS, so a human co-author writing
+    // from `build@sol.example` was returned as a model author — and would then
+    // block a legitimate review as a self-review.
+    if (part.trim() && modelNamesIn(part).length) out.push(part.trim())
   }
   return out
 }

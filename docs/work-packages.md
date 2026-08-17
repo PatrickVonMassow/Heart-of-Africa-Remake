@@ -79,7 +79,7 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 
 | Name | Id | What it is | Points |
 |---|---|---|---|
-| **Dorfleben** | A | Village life | 350, 351, 356, 357, 359, 360, 394, 578 |
+| **Dorfleben** | A | Village life | 648, 350, 351, 356, 357, 359, 360, 394, 578 (648 first — the user is blocked on it) |
 | **Wetter & Wasser** | B | Weather, ground and water surface | 314, 320, 321, 323, 348, 353, 354, 358, 384, 385 |
 | **Siedlungsgeometrie** | C | Settlement geometry | 299, 349, 352, 380, 415, 428, 581, 583, 604 |
 | **Sonne & Himmel** | D | Sun and sky | 343, 344, 345, 346 |
@@ -87,7 +87,7 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 | **Tierverhalten** | F | Animal behaviour | 265, 269, 312, 362, 363, 364, 414, 565, 575 |
 | **Kadaver & Geier** | G | Carrion, vultures, staging | 319, 322, 326, 327, 328, 336, 453 |
 | **Chat & Tafel** | H | Chat and board | 440, 451, 465, 467, 473, 539 — the rest landed 30.07.2026 (308, 410, 411, 416, 421, 423, 424, 430, 435, 436, 441, 439, 452, 472, 470) |
-| **Session- & Repo-Hygiene** | I | Session, pool and repo hygiene | 401, 434, 461, 462, 463, 471, 553, 554, 556, 629, 646 (646 is the doctor-side twin of 629 — the same deletion reached by a different route; 553 is 373's measured successor lever; 556 is the lease half of the same singleton family) — the rest landed 30.07.2026 (329, 396, 399, 409, 426, 427, 429, 431, 433, 458) and 08.08.2026 (373) |
+| **Session- & Repo-Hygiene** | I | Session, pool and repo hygiene | 401, 434, 461, 462, 463, 471, 553, 554, 556, 629, 646, 649 (646 is the doctor-side twin of 629 — the same deletion reached by a different route; 649 holds the holes the fifth review found in 629's own lock protocol; 553 is 373's measured successor lever; 556 is the lease half of the same singleton family) — the rest landed 30.07.2026 (329, 396, 399, 409, 426, 427, 429, 431, 433, 458) and 08.08.2026 (373) |
 | **Modell & Wächter** | J | Model and guard chain | 309, 355, 397, 425, 437, 438, 457, 468, 534, 535, 536, 537, 538, 540, 560, 561, 613, 630, 631, 632, 634, 638, 639, 640 (534–538 are the audit findings of point 297 — worked BEFORE the rest of the bundle, because they decide what the four-eyes gate and the review schedule see at all) |
 | **Testinfrastruktur** | K | Test and verification infrastructure | 295, 330, 387, 418, 455, 456, 460, 464, 466, 532, 549, 557, 563, 564, 566, 567, 568, 569, 570, 571, 572, 573, 574, 641, 642, 647 (564/566/567 all came out of the point-342 verification: what a red is believed to mean, what a repair costs, and what a killed session leaves running) |
 | **Dokumentation** | L | Docs and knowledge transfer | 303, 333, 422, 555, 645 — the rest landed 30.07.2026 (459) |
