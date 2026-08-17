@@ -1309,7 +1309,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 18.08.2026, 00:04 · Quellen-Fingerprint: `23f569c1523b…`
+Zuletzt aktualisiert: Dienstag, 18.08.2026, 00:12 · Quellen-Fingerprint: `cc7a9bbd8faf…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1343,7 +1343,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | REVISED 17.08.2026: hard/complex/error-prone work stays with Opus 5 — Fable is only the ESCALATION, taking over Opus work that Sol still rejects after a re-work | 3 | mittel | — (Regel/Memory) | ◐ Regel |
-| What survives of the 25.07. rule: Fable is NOT the default lane because its volume is the scarcest — but difficulty IS a reason for it, and review is cross-vendor, not Fable-by-default | 3 | mittel | — (Regel/Memory) | ◐ Regel |
+| Fable is NOT the default lane because its volume is the scarcest; since 17.08.2026 difficulty is NOT a reason for it either (hard cases stay with Opus 5), and review is cross-vendor, not Fable-by-default | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1400,10 +1400,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 83 Feedback-/Projekt-Memories · 49 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 55 Prozess-/Meta-TASKS-Punkte (davon 21 offen).
+Erfasste Quellen: 83 Feedback-/Projekt-Memories · 49 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 56 Prozess-/Meta-TASKS-Punkte (davon 22 offen).
 
-<!-- RETRO-FINGERPRINT: 23f569c1523b279fc8483d1dee37471771419fbed5d32b55673ca6082a92959f -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-17T22:04:26.610Z -->
+<!-- RETRO-FINGERPRINT: cc7a9bbd8faf582ad141ca15ab7dd8737f66ec7ff6e7fadcebf466d50c864ba5 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-17T22:12:09.731Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
