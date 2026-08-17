@@ -103,14 +103,17 @@ export function gatherStampedFiles() {
  */
 export function memoryStampedFiles() {
   const out = {}
-  for (const dir of memoryDirs()) {
-    if (!existsSync(dir)) continue
+  // ONE KEY PER PHYSICAL COPY (round 3, P1): both directories used the same
+  // `memory/<name>` key, so the second copy overwrote the first and a stray
+  // stamp living only in the overwritten one was invisible.
+  memoryDirs().forEach((dir, i) => {
+    if (!existsSync(dir)) return
     for (const name of readdirSync(dir)) {
       if (!name.endsWith('.md')) continue
       const text = readFileSync(resolve(dir, name), 'utf8')
-      if (/rule:[a-z0-9-]+@[0-9a-f]{8}/.test(text)) out[`memory/${name}`] = text
+      if (/rule:[a-z0-9-]+@[0-9a-f]{8}/.test(text)) out[i === 0 ? `memory/${name}` : `memory#${i + 1}/${name}`] = text
     }
-  }
+  })
   return out
 }
 

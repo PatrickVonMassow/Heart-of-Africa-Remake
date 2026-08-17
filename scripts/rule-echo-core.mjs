@@ -40,6 +40,11 @@ import { createHash } from 'node:crypto'
  * restates the rule — the stamp says "somebody read this file against that
  * version of the rule", which is exactly the check being made.
  *
+ * THE WORK ORDER IS NOT AN ECHO. TASKS.md quotes the policy inside point specs
+ * (678, 693 as of 17.08.2026), and those quotes are corrected by working the
+ * points, not by re-stamping a file that changes every day. They are carried as
+ * findings instead — a spec is a description of work, not a statement of a rule.
+ *
  * `optional: true` marks a path outside the repository (the memory directory).
  * It is skipped only when the whole TREE is absent, so a machine keeping no
  * memories is never blocked while a DELETED entry still is.
@@ -50,6 +55,7 @@ export const RULE_REGISTRY = Object.freeze([
     title: 'which model authors, reviews and serves',
     source: Object.freeze({ file: 'CLAUDE.md', startsWith: '- **Model policy' }),
     echoes: Object.freeze([
+      Object.freeze({ file: 'docs/maximum-qa.md' }),
       Object.freeze({ file: 'docs/sol-routing.md' }),
       Object.freeze({ file: 'scripts/author-routing-core.mjs' }),
       Object.freeze({ file: 'scripts/author-sol-core.mjs' }),
@@ -71,19 +77,16 @@ export const STAMP_PATTERN = /rule:([a-z0-9-]+)@([0-9a-f]{8})/g
 /**
  * The fingerprint of a rule's source text.
  *
- * It normalises line endings and strips whitespace at the very END of the block,
- * and NOTHING else. Two earlier versions tried to be clever — collapsing all
- * whitespace, then collapsing runs inside a line — and the cross-vendor review
- * caught both: in Markdown, leading indentation is list nesting and two trailing
- * spaces are a hard break, so every collapse hid a real edit while the comment
- * claimed otherwise (rounds 1 and 2, P2). The cost of being literal is that a
- * pure re-wrap fires the guard, and that is the cheap direction: re-stamping is
- * one command, a missed change is the drift this exists to prevent.
+ * It normalises line endings and NOTHING else. Three versions tried to be
+ * clever — collapsing all whitespace, then runs inside a line, then the block's
+ * trailing whitespace — and the cross-vendor review caught each: in Markdown,
+ * indentation is list nesting and two trailing spaces are a hard break, right up
+ * to the paragraph's last line (rounds 1–3, P2). The cost of being literal is
+ * that a pure re-wrap fires the guard, and that is the cheap direction:
+ * re-stamping is one command, a missed change is the drift this prevents.
  */
 export function fingerprint(text) {
-  const normalized = String(text ?? '')
-    .replace(/\r\n?/g, '\n')
-    .replace(/\s+$/, '')
+  const normalized = String(text ?? '').replace(/\r\n?/g, '\n')
   return createHash('sha256').update(normalized).digest('hex').slice(0, 8)
 }
 
@@ -211,9 +214,13 @@ export function unregisteredStamps(registry = RULE_REGISTRY, stamped = {}) {
   }
   const out = []
   for (const [file, text] of Object.entries(stamped ?? {})) {
+    // A SECOND PHYSICAL COPY IS THE SAME REGISTERED ENTRY (round 3): the caller
+    // keys the duplicate memory directory as `memory#2/<name>` so neither copy
+    // overwrites the other, and the registry knows it under `memory/<name>`.
+    const registryKey = file.replace(/^memory#\d+\//, 'memory/')
     for (const { id } of stampsIn(text ?? '')) {
       if (!known.has(id)) out.push({ file, id, why: 'no such rule' })
-      else if (!known.get(id).has(file)) out.push({ file, id, why: 'not in this rule’s echo list' })
+      else if (!known.get(id).has(registryKey)) out.push({ file, id, why: 'not in this rule’s echo list' })
     }
   }
   return out
@@ -250,13 +257,28 @@ export function filesToRead(registry = RULE_REGISTRY) {
  * still matches. The stamp itself does not count: it is the one string every
  * file on the list is guaranteed to contain.
  */
-export function quoteIsInFile(text = '', quote = '', { minLength = 24 } = {}) {
+export function quoteIsInFile(text = '', quote = '', { minLength = 24, id = '', window = 1500 } = {}) {
   const flat = (s) => String(s ?? '').replace(/\s+/g, ' ').trim()
   const needle = flat(quote)
   if (needle.length < minLength) return { ok: false, reason: `the quote must be at least ${minLength} characters` }
-  if (/^rule:[a-z0-9-]+@[0-9a-f]{8}$/.test(needle)) return { ok: false, reason: 'the stamp itself is not a quote from the text' }
-  if (!flat(text).includes(needle)) return { ok: false, reason: 'that phrase does not occur in the file' }
-  return { ok: true, reason: '' }
+  // ANY stamp, however it is wrapped (round 3, P0): rejecting only the bare form
+  // let `// rule:x@abcdef01` through, so the guard's own output could clear the
+  // very file it was complaining about.
+  if (/rule:[a-z0-9-]+@[0-9a-f]{8}/.test(needle)) return { ok: false, reason: 'a stamp is not a quote from the text' }
+  const haystack = flat(text)
+  const at = haystack.indexOf(needle)
+  if (at < 0) return { ok: false, reason: 'that phrase does not occur in the file' }
+  if (!id) return { ok: true, reason: '' }
+  // AND IT MUST BELONG TO THIS RULE'S PASSAGE (round 3, P1): a file may restate
+  // two rules, and a phrase from one says nothing about the other. "Near the
+  // stamp" is the available proxy for "in the passage" — the stamp is written
+  // where the file states the rule.
+  const marks = [...haystack.matchAll(new RegExp(`rule:${String(id).replace(/[^a-z0-9-]/gi, '')}@[0-9a-f]{8}`, 'g'))]
+  if (!marks.length) return { ok: true, reason: '' }
+  const near = marks.some((m) => Math.abs(m.index - at) <= window)
+  return near
+    ? { ok: true, reason: '' }
+    : { ok: false, reason: `that phrase is not near this file's rule:${id} stamp — quote the passage that states THIS rule` }
 }
 
 /**

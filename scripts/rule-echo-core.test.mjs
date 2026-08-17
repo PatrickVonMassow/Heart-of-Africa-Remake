@@ -54,9 +54,14 @@ describe('sourceTextOf', () => {
 })
 
 describe('fingerprint', () => {
-  it('normalises line endings and the block’s trailing whitespace, nothing else', () => {
+  it('normalises line endings and nothing else at all', () => {
     expect(fingerprint('a b\r\nc')).toBe(fingerprint('a b\nc'))
-    expect(fingerprint('a b\n\n  ')).toBe(fingerprint('a b'))
+  })
+
+  it('keeps trailing whitespace on the LAST line too (round 3, P2)', () => {
+    // Two spaces at the end of the paragraph's final line are a Markdown hard
+    // break; stripping the block's tail hashed that away.
+    expect(fingerprint('a b\nc  ')).not.toBe(fingerprint('a b\nc'))
   })
 
   it('keeps every whitespace that carries MEANING in Markdown (review rounds 1+2, P2)', () => {
@@ -189,6 +194,7 @@ describe('the registry itself', () => {
     const rule = RULE_REGISTRY.find((r) => r.id === 'model-policy')
     expect(rule.source).toEqual({ file: 'CLAUDE.md', startsWith: '- **Model policy' })
     expect(rule.echoes.map((e) => e.file)).toEqual([
+      'docs/maximum-qa.md',
       'docs/sol-routing.md',
       'scripts/author-routing-core.mjs',
       'scripts/author-sol-core.mjs',
@@ -260,11 +266,30 @@ describe('quoteIsInFile', () => {
     expect(quoteIsInFile('a short file', 'a short').ok).toBe(false)
   })
 
-  it('refuses the stamp itself, which every listed file is guaranteed to carry', () => {
-    expect(quoteIsInFile('x rule:model-policy@abcdef01 y', 'rule:model-policy@abcdef01')).toMatchObject({
+  it('refuses a stamp however it is wrapped (round 3, P0)', () => {
+    const text = 'x // rule:model-policy@abcdef01 y'
+    expect(quoteIsInFile(text, 'rule:model-policy@abcdef01').ok).toBe(false)
+    // The wrapped forms are what the guard's own output shows, so they were the
+    // real hole: a comment marker made the stamp pass as a quote.
+    expect(quoteIsInFile(text, '// rule:model-policy@abcdef01')).toMatchObject({
       ok: false,
-      reason: 'the stamp itself is not a quote from the text',
+      reason: 'a stamp is not a quote from the text',
     })
+    expect(quoteIsInFile('a <!-- rule:x@abcdef01 --> b', '<!-- rule:x@abcdef01 -->').ok).toBe(false)
+  })
+
+  it('demands the quote sit near THIS rule’s stamp when an id is given (round 3, P1)', () => {
+    const text =
+      'passage about rule one, which is long enough to quote. rule:one@aaaaaaaa\n' +
+      `${'filler '.repeat(400)}\n` +
+      'passage about rule two, which is also long enough. rule:two@bbbbbbbb'
+    expect(quoteIsInFile(text, 'passage about rule one, which is long enough to quote', { id: 'one' }).ok).toBe(true)
+    expect(quoteIsInFile(text, 'passage about rule one, which is long enough to quote', { id: 'two' })).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('not near'),
+    })
+    // Without an id the file-wide check stands, which is the single-rule case.
+    expect(quoteIsInFile(text, 'passage about rule one, which is long enough to quote').ok).toBe(true)
   })
 
   it('never throws on nothing', () => {
@@ -283,6 +308,14 @@ describe('unregisteredStamps', () => {
   it('names a stamp for a rule that does not exist at all', () => {
     expect(unregisteredStamps([RULE], { 'a.mjs': 'rule:gone@aaaaaaaa' })).toEqual([
       { file: 'a.mjs', id: 'gone', why: 'no such rule' },
+    ])
+  })
+
+  it('reads a duplicated memory copy as the SAME registered entry (round 3)', () => {
+    const rule = { ...RULE, echoes: [{ file: 'memory/c.md', optional: true }] }
+    expect(unregisteredStamps([rule], { 'memory#2/c.md': 'rule:demo@aaaaaaaa' })).toEqual([])
+    expect(unregisteredStamps([rule], { 'memory#2/other.md': 'rule:demo@aaaaaaaa' })).toEqual([
+      { file: 'memory#2/other.md', id: 'demo', why: 'not in this rule\u2019s echo list' },
     ])
   })
 

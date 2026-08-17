@@ -106,7 +106,7 @@ function stampOne(rule, file, quote) {
   const fulls = fullPathsOf(file)
   if (!fulls.length) return { ok: false, message: `rule-echo: ${file} does not exist here.` }
   const texts = fulls.map((p) => readFileSync(p, 'utf8'))
-  const q = texts.map((text) => quoteIsInFile(text, quote)).find((r) => !r.ok) ?? { ok: true, reason: '' }
+  const q = texts.map((text) => quoteIsInFile(text, quote, { id: rule.id })).find((r) => !r.ok) ?? { ok: true, reason: '' }
   if (!q.ok) {
     return {
       ok: false,
