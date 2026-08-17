@@ -36,6 +36,13 @@ describe('over the mark, a STARTING call is denied — naming the mark', () => {
     // npm option VALUES must never be read as the subcommand (Sol finding 4a).
     ['npm test behind a value-taking option', { toolName: 'Bash', command: 'npm --prefix . test' }],
     ['npm test behind a value-less flag', { toolName: 'Bash', command: 'npm --silent test' }],
+    // …and the subcommand is determined fail-CLOSED, not through an option
+    // allowlist: an option the old list did not name read its value as the
+    // subcommand and ALLOWED the suite behind it (Sol round 3, finding 4a).
+    ['npm test behind an unlisted value-taking option', { toolName: 'Bash', command: 'npm --fetch-retries 3 test' }],
+    ['npm with no recognisable subcommand', { toolName: 'Bash', command: 'npm --fetch-retries 3' }],
+    ['npm test shadowed by a value that is itself a subcommand', { toolName: 'Bash', command: 'npm --loglevel ls test' }],
+    ['npm run test with a flag standing between', { toolName: 'Bash', command: 'npm run --script-shell bash test' }],
     // A DIRECT suite call is the browser work itself — judged on the
     // scripts/verify/ path prefix, no suite list enumerated (Sol finding 4b).
     ['a direct suite call', { toolName: 'Bash', command: 'node scripts/verify/world.mjs' }],
@@ -98,6 +105,9 @@ describe('over the mark, FINISHING calls and reads stay allowed', () => {
     ['the boundary itself', { toolName: 'Bash', command: 'node scripts/batch-boundary.mjs --prepare --context' }],
     ['awaiting a running verify', { toolName: 'Bash', command: 'node scripts/verify/run-wait.mjs --await' }],
     ['a build behind a value-taking npm option', { toolName: 'Bash', command: 'npm --prefix . run build' }],
+    ['a build behind an option value no list names', { toolName: 'Bash', command: 'npm --loglevel warn run build' }],
+    ['the fast gate behind a leading option', { toolName: 'Bash', command: 'npm --silent run test:unit' }],
+    ['a lint with an npm flag', { toolName: 'Bash', command: 'npm run lint --workspaces' }],
     ['a source edit finishing the step', { toolName: 'Edit', filePath: 'src/world/world.ts' }],
     ['a scripts edit finishing the step', { toolName: 'Edit', filePath: 'scripts/board-core.mjs' }],
     ['the board file', { toolName: 'Edit', filePath: '.batch-dashboard.html' }],

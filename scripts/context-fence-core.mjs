@@ -105,54 +105,71 @@ function startsVerifyPath(p) {
   return !VERIFY_FINISHERS.has(norm.slice(norm.lastIndexOf('/') + 1))
 }
 
-/** npm options that CONSUME the next word as their value. Without consuming
- *  it, `npm --prefix . test` would read `.` as the subcommand and classify as
- *  not-starting (Sol review of 534c2ba, finding 4a). The `--opt=value` form
- *  carries its value inside the flag word and needs no entry here. */
-const NPM_VALUE_OPTIONS = new Set([
-  '--prefix',
-  '-C',
-  '--workspace',
-  '-w',
-  '--registry',
-  '--loglevel',
-  '--userconfig',
-  '--script-shell',
-  '--cache',
-  '--globalconfig',
-  '--omit',
-  '--include',
+/**
+ * npm's own subcommands (the npm v10 command roster plus its documented
+ * aliases). This set INVERTS the option allowlist it replaced, deliberately
+ * (Sol review of e837260, finding 4a): npm's OPTION table is open-ended —
+ * every config key is a flag and most take a value — so enumerating
+ * value-taking options failed OPEN: one missing entry (`--fetch-retries`)
+ * read its value as the subcommand and ALLOWED `npm --fetch-retries 3 test`
+ * to start a suite. A missing entry HERE fails CLOSED instead: a subcommand
+ * this set cannot name reads as undeterminable, and undeterminable is treated
+ * as STARTING. That asymmetry is the fence's whole point — a false deny costs
+ * one refusal that names the boundary command; a false allow costs the
+ * mechanism the session was supposed to end at.
+ */
+const NPM_SUBCOMMANDS = new Set([
+  'access', 'add', 'adduser', 'audit', 'author', 'bugs', 'cache', 'ci', 'cit', 'clean-install',
+  'clean-install-test', 'completion', 'config', 'create', 'ddp', 'dedupe', 'deprecate', 'diff',
+  'dist-tag', 'docs', 'doctor', 'edit', 'exec', 'explain', 'explore', 'find-dupes', 'fund', 'get',
+  'help', 'help-search', 'home', 'i', 'ic', 'in', 'info', 'init', 'innit', 'ins', 'inst', 'insta',
+  'instal', 'install', 'install-ci-test', 'install-clean', 'install-test', 'isnt', 'isnta', 'isntal',
+  'isntall', 'issues', 'it', 'la', 'link', 'list', 'll', 'ln', 'login', 'logout', 'ls', 'org',
+  'outdated', 'owner', 'pack', 'ping', 'pkg', 'prefix', 'profile', 'prune', 'publish', 'query', 'r',
+  'rb', 'rebuild', 'remove', 'repo', 'restart', 'rm', 'root', 'rum', 'run', 'run-script', 's', 'sbom',
+  'se', 'search', 'set', 'show', 'shrinkwrap', 'sit', 'star', 'stars', 'start', 'stop', 't', 'team',
+  'test', 'token', 'tst', 'un', 'uninstall', 'unlink', 'unpublish', 'unstar', 'up', 'update',
+  'upgrade', 'urn', 'v', 'version', 'view', 'whoami', 'why', 'x',
 ])
 
-/** npm's positional words, with every option AND its value stripped, so an
- *  option value can never be mistaken for the subcommand. */
-function npmPositionals(argTexts) {
-  const pos = []
-  for (let i = 0; i < argTexts.length; i += 1) {
-    const t = argTexts[i]
-    if (!t) continue
-    if (t.startsWith('-')) {
-      if (!t.includes('=') && NPM_VALUE_OPTIONS.has(t)) i += 1 // skip the value too
-      continue
-    }
-    pos.push(t)
-  }
-  return pos
+/** The subcommands that ARE a suite start, and the run-scripts that are. */
+const NPM_SUITE_SUBCOMMANDS = new Set(['test', 't', 'tst'])
+const NPM_SUITE_SCRIPTS = new Set(['test', 'test:small', 'test:large'])
+
+/** npm's argv words that are not flags. A flag's detached VALUE stays in this
+ *  list on purpose — which flags consume one is exactly what cannot be known
+ *  without npm's open-ended option table. */
+function npmWordsOf(argTexts) {
+  return argTexts.map((t) => String(t ?? '')).filter((t) => t && !t.startsWith('-'))
 }
 
-/** `npm test` / `npm t` / `npm run test[:small|:large]` start the browser
- *  regression; `npm run test:unit` (and build/lint) finish the step in
- *  flight. Judged on npm's SUBCOMMAND, never on the string. */
+/**
+ * Does this npm call start the browser regression? Judged on npm's
+ * SUBCOMMAND where that is UNAMBIGUOUS, and fail-CLOSED where it is not:
+ *   - The subcommand is the first positional that IS a known npm subcommand;
+ *     the words before it may be options' detached values (`npm --loglevel
+ *     warn run build`), which absolve nothing and are skipped.
+ *   - `test`/`t`/`tst`, and `run`/`run-script` of test/test:small/test:large,
+ *     START. `npm run test:unit`/`build`/`lint` and the rest finish or read.
+ *   - Positionals but NO recognisable subcommand — an option value may BE the
+ *     subcommand we failed to see (`npm --fetch-retries 3`) — read STARTING.
+ *   - A suite token among the OTHER positionals also reads STARTING: the
+ *     recognised word may itself have been an option's value standing in
+ *     front of the real subcommand (`npm --loglevel ls test`).
+ * The false denies this buys (`npm ls test` past the mark) each cost one
+ * refusal naming the boundary command; the escapes it closes cost the fence.
+ */
 function npmStartsSuite(head, argTexts) {
   if (head !== 'npm') return false
-  const pos = npmPositionals(argTexts)
-  const sub = (pos[0] ?? '').toLowerCase()
-  if (sub === 'test' || sub === 't' || sub === 'tst') return true
-  if (sub === 'run' || sub === 'run-script') {
-    const script = (pos[1] ?? '').toLowerCase()
-    return script === 'test' || script === 'test:small' || script === 'test:large'
-  }
-  return false
+  const pos = npmWordsOf(argTexts)
+  const at = pos.findIndex((p) => NPM_SUBCOMMANDS.has(p.toLowerCase()))
+  if (at === -1) return pos.length > 0 // undeterminable subcommand → starting
+  const sub = pos[at].toLowerCase()
+  if (NPM_SUITE_SUBCOMMANDS.has(sub)) return true
+  if ((sub === 'run' || sub === 'run-script') && NPM_SUITE_SCRIPTS.has((pos[at + 1] ?? '').toLowerCase())) return true
+  return pos.some(
+    (p, i) => i !== at && (NPM_SUITE_SUBCOMMANDS.has(p.toLowerCase()) || NPM_SUITE_SCRIPTS.has(p.toLowerCase())),
+  )
 }
 
 const basenameOf = (p) => {
