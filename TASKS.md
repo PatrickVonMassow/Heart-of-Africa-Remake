@@ -77,7 +77,7 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 700. THE CONTEXT WATERMARK REMINDS AND DOES NOT BIND — A SESSION RAN TO 2.9x IT (measured
+- [ ] 700. The context watermark reminds and does not bind — a session ran to 2.9x it (measured
   17.08.2026, and raised by the user the same day: »Diese Sitzung ist inzwischen sehr gewachsen.
   Musst du den Kontext so weit anwachsen lassen? … Nicht nur mir zustimmen und es machen, sondern
   dafür sorgen, dass es in Zukunft auch eingehalten wird.«). MEASURED on this session: the Stop
@@ -182,7 +182,7 @@ put it is the mistake this line exists to stop.
   the user has asked for the cause twice.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 662. THE CONTEXT BOUNDARY MUST ALSO FIRE WITHOUT A TICK (user 12.08.2026: "Außerdem ist
+- [ ] 662. The context boundary must also fire without a tick (user 12.08.2026: "Außerdem ist
   der Kontext dieser Session wieder ziemlich groß geworden. Hättest du in der Zwischenzeit
   nicht mal an eine andere übergeben können? So bekommen wir das sonst nie in den Griff.").
   THE GAP: the boundary duty (batch-boundary + batch-progress-guard) is keyed to a TICKED
@@ -204,7 +204,7 @@ put it is the mistake this line exists to stop.
   door it walks through.
   Bundle: unbundled (infrastructure).
 
-- [ ] 553. AN EXPLICIT CONTEXT BUDGET PER POINT, AND A WRITTEN HANDOFF WHEN IT IS SPENT
+- [ ] 553. An explicit context budget per point, and a written handoff when it is spent
   (08.08.2026, chosen BY MEASUREMENT as point 373 requires — the closing measurement is
   recorded in `docs/batch-autonomy.md`, "The closing measurement under the built levers").
   THE STATE THE MEASUREMENT LEAVES: under the boundary and the bounded verify digest the
@@ -290,7 +290,7 @@ put it is the mistake this line exists to stop.
   APPENDED to the work order and taken by the next session. The ceiling is measured, not
   guessed: it is derived from the same recorded spend this point already reads.
 
-- [ ] 596. THE TAIL IS VISIBLE WHILE IT RUNS (point 572's measure 6). A point's running
+- [ ] 596. The tail is visible while it runs (point 572's measure 6). A point's running
   cost is measurable DURING the point, not only after it: a hook reports when a branch
   passes three times the median (≈ 17 M weighted), and that report is a DECISION point —
   re-cut, re-staff, or continue deliberately — never an automatic abort. In the same
@@ -329,7 +329,7 @@ put it is the mistake this line exists to stop.
   but contains NOTHING of it — measured by reading the whole net diff. It must be built, here or
   on its own branch; the shared branch lands 595 and 598 alone.
 
-- [ ] 597. LARGE TOOL OUTPUT NEVER ENTERS THE CONTEXT WHOLE (point 572's measure 7). The
+- [ ] 597. Large tool output never enters the context whole (point 572's measure 7). The
   bounded-output discipline `scripts/verify/run-logged.mjs` already applies to verify runs
   extends to the other big producers: `git diff` (`--stat` first), `grep` (`-c` or a head
   bound), file reads (`offset`/`limit` instead of a whole file), `npm ls`, `gh run view`.
@@ -353,7 +353,7 @@ put it is the mistake this line exists to stop.
   but contains NOTHING of it — measured by reading the whole net diff. It must be built, here or
   on its own branch; the shared branch lands 595 and 598 alone.
 
-- [ ] 686. THE TAUGHT LANGUAGE IS FIVE CONCEPTS, AND THE CHIEF'S MESSAGE IS FOUR OF THEM (user
+- [ ] 686. The taught language is five concepts, and the chief's message is four of them (user
   13.08.2026, playing the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
   switch "Speech: show concepts instead of syllables" on and could learn nothing:
@@ -462,7 +462,7 @@ put it is the mistake this line exists to stop.
   Refs: src/communication/lexicon.ts, src/communication/drumMessage.ts, src/scenes/place/childSituations.ts, src/scenes/place/adultErrands.ts, docs/communication-poc-spec.md, design.md 13.4
   Bundle: Dorfleben.
 
-- [ ] 687. THE VILLAGE CHILDREN PLAY ONE GAME AT THE BANK, AND IT TEACHES FOUR WORDS (user
+- [ ] 687. The village children play one game at the bank, and it teaches four words (user
   13.08.2026, playing the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
   switch "Speech: show concepts instead of syllables" on and could learn nothing:
@@ -611,7 +611,7 @@ put it is the mistake this line exists to stop.
   Refs: src/scenes/place/tagGame.ts, src/scenes/place/childSituations.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts, src/scenes/place/layout.ts, src/config/balance.ts
   Bundle: Dorfleben.
 
-- [ ] 688. THE ADULTS TEACH WATER AND DIGGING BY DOING THEIR OWN WORK (user 13.08.2026, playing
+- [ ] 688. The adults teach water and digging by doing their own work (user 13.08.2026, playing
   the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
   switch "Speech: show concepts instead of syllables" on and could learn nothing:
@@ -688,7 +688,7 @@ put it is the mistake this line exists to stop.
   Refs: src/scenes/place/adultErrands.ts, src/scenes/place/PlaceLife.tsx (TaskWalker, HEAD_CARRY_POSE), src/scenes/place/layout.ts (teachingStone, digSites), src/scenes/place/riverBank.ts
   Bundle: Dorfleben.
 
-- [ ] 689. THE CHIEF SPEAKS FROM THE FIRST MINUTE, AND PAYS IN A DIRECTION AND A MOULD (user
+- [ ] 689. The chief speaks from the first minute, and pays in a direction and a mould (user
   13.08.2026, playing the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
   switch "Speech: show concepts instead of syllables" on and could learn nothing:
@@ -773,7 +773,7 @@ put it is the mistake this line exists to stop.
   Refs: src/communication/chiefReply.ts, src/state/store.ts (rockArtefact), src/ui/Dialogs.tsx, src/world/data/landmarks.ts (bandiagara), docs/205-world-accuracy-findings.md A18
   Bundle: Dorfleben.
 
-- [ ] 690. THE CLASSIC GAME OF TAG MOVES TO THE PORT CITIES, AND IS SILENT THERE (user
+- [ ] 690. The classic game of tag moves to the port cities, and is silent there (user
   13.08.2026, playing the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
   switch "Speech: show concepts instead of syllables" on and could learn nothing:
@@ -827,7 +827,7 @@ put it is the mistake this line exists to stop.
   Refs: src/scenes/place/tagGame.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts
   Bundle: Dorfleben.
 
-- [ ] 691. A GUESS IS ENTERED WITH SPACE, AND THE NEARER THING WINS (user 13.08.2026, playing
+- [ ] 691. A guess is entered with space, and the nearer thing wins (user 13.08.2026, playing
   the deployed communication slice).
   The user played the deployed communication slice on 13.08.2026 with the debug
   switch "Speech: show concepts instead of syllables" on and could learn nothing:
@@ -882,7 +882,7 @@ put it is the mistake this line exists to stop.
   Refs: src/scenes/place/SpeechLabels.tsx, src/communication/speechTarget.ts, src/ui/Dialogs.tsx, src/i18n/de.ts, src/i18n/en.ts
   Bundle: Dorfleben.
 
-- [ ] 692. EVERY DOCUMENT DESCRIBES THE REBUILT COMMUNICATION MECHANIC, NOT THE OLD ONE (user
+- [ ] 692. Every document describes the rebuilt communication mechanic, not the old one (user
   13.08.2026, playing the deployed communication slice).
   The rebuild changes what the mechanic IS, and the documents are what the next
   session, the next agent and the closing run read as the target state. A sweep on
@@ -1094,7 +1094,7 @@ put it is the mistake this line exists to stop.
   Refs: docs/communication-poc-spec.md, design.md 13.4, CLAUDE.md 7.1 criteria 6 and 7, docs/acceptance-criteria-detail.md 6 and 7, docs/acceptance-evidence.md 7
   Bundle: Dorfleben.
 
-- [ ] 659. THE WHOLE COMMUNICATION CHAIN, PLAYED THROUGH AND JUDGED BY WHAT REACHES THE
+- [ ] 659. The whole communication chain, played through and judged by what reaches the
   PLAYER — A SIX-EYES ALL-ROUND REVIEW.
   ON HOLD (user 13.08.2026, 22:25: »Stoppe 659 erstmal — der macht erstmal keinen Sinn, wenn wir
   jetzt die Mechanik umbauen.«). This point must NOT be started while the communication rebuild
@@ -1178,7 +1178,7 @@ put it is the mistake this line exists to stop.
   keeps hitting the bugs.
   Bundle: Verständigung.
 
-- [ ] 581. THE SETTLEMENT BOUNDARY IS TOO FAINT, AND ITS SLIDER IS ALREADY AT THE CEILING
+- [ ] 581. The settlement boundary is too faint, and its slider is already at the ceiling
   (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
   Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
   state: `placeEdgeBand` stands at the shipped defaults, `widthM: 3`, `wanderM: 0.9`,
@@ -1203,7 +1203,7 @@ put it is the mistake this line exists to stop.
   Criticality: medium — the boundary is what tells the player where the settlement ends
   and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
 
-- [ ] 660. ONE SESSION, TWO IDENTITIES: THE FENCE LOCKS OUT THE SESSION THAT IS WORKING
+- [ ] 660. One session, two identities: the fence locks out the session that is working
   (measured 12.08.2026, 18:02-18:20). The launcher spawned session 6cd11926 at 17:57 (fence
   281), which took the batch and worked. At 18:02 the identity 986df9ff claimed the same batch
   (fence 282) — the SAME process id 1020, i.e. the same OS process under the session id it was
@@ -1226,7 +1226,7 @@ put it is the mistake this line exists to stop.
   can rescue.
   Bundle: unbundled (infrastructure).
 
-- [ ] 663. THE DEPLOY DIES ON A FROZEN TAG'S FLAKY DOWNLOAD (measured 12.08.2026, twice on
+- [ ] 663. The deploy dies on a frozen tag's flaky download (measured 12.08.2026, twice on
   run 31636330165). The GH-Pages deploy rebuilds EVERY version tag on every `main` push, and
   the frozen v0.2 tree's `onnxruntime-node` postinstall downloads a GPU tarball from GitHub
   releases at install time — that download ECONNRESET twice, so a pure network flake in a
@@ -1243,7 +1243,7 @@ put it is the mistake this line exists to stop.
   Criticality: medium — it stalls every landing behind a dice roll on a runner's network.
   Bundle: unbundled (infrastructure).
 
-- [ ] 664. THE ESTIMATE ON THE BOARD EXPIRES UNSEEN, AND EVERY CARD SAYS "STAND" TWICE (user
+- [ ] 664. The estimate on the board expires unseen, and every card says "stand" twice (user
   13.08.2026: "Wieso ist die Endzeitschätzung der Karten wieder so veraltet? Ich denke, dagegen
   gibt es einen Mechanismus. Außerdem steht inzwischen immer 2x Stand drin - z. B. Stand 04:48
   Stand 04:49"). Two defects in the board, both MEASURED on the published page at 07:42 on
@@ -1286,7 +1286,7 @@ put it is the mistake this line exists to stop.
   card body whose first paragraph still opens with a second `Stand HH:MM`, so the strip cannot
   quietly stop working.
 
-- [ ] 665. EVERY BOARD CARD NAMES ITS PROBLEM BEFORE ITS STATUS — AND A MECHANISM ENFORCES IT
+- [ ] 665. Every board card names its problem before its status — and a mechanism enforces it
   (user 12.08.2026, 23:21–23:24, asking about the 641 now-card).
   
   MEASURED 12.08.2026 23:24 on the published board: the 641 now-card body reads, in full,
@@ -1329,7 +1329,7 @@ put it is the mistake this line exists to stop.
   retrofitted (after one-topic-per-card), so the class needs a structural gate, not
   another reminder.
 
-- [ ] 669. A WORKING AUTHOR'S PUSHES RUN CI OVER, AND THE SUPERVISOR PAYS FOR IT (measured
+- [ ] 669. A working author's pushes run ci over, and the supervisor pays for it (measured
   13.08.2026 on BOTH author lanes). `scripts/author-sol.mjs` pushes the working branch every ~2
   minutes so a dying run loses nothing. Every push starts a CI run, and the workflow's
   `concurrency: ci-${{ github.ref }}` with `cancel-in-progress: true` kills the previous one:
@@ -1365,7 +1365,7 @@ put it is the mistake this line exists to stop.
   ends, which is how the batch stalls.
 
 
-- [ ] 697. THE SETTLEMENT GOAT'S PLANTED FOOT SLIDES WITH THE BODY (measured 14.08.2026, on a
+- [ ] 697. The settlement goat's planted foot slides with the body (measured 14.08.2026, on a
   quiet machine — every leftover vite server, suite and automation browser killed first, load
   average 1.0).
   The polish suite's check "settlement walker (goat): the planted foot holds its ground spot
@@ -1388,7 +1388,7 @@ put it is the mistake this line exists to stop.
   stands, every polish run on `main` carries a red that masks the next real one.
   Bundle: Dorfleben.
 
-- [ ] 633. THE RELEASE'S CLOSING RUN — TWO REGRESSIONS WITH THE CLEANUP BETWEEN THEM (user
+- [ ] 633. The release's closing run — two regressions with the cleanup between them (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
   zu sein"). 174 carried the whole release in one card estimated at ~1 h, which was true
   when it meant "tag and publish" and is false now that the closing run hangs off it.
@@ -1461,7 +1461,7 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
-- [ ] 336. THE WHOLE CROCODILE STAGING FAMILY IS FRAGILE — REBUILD IT, NOT ONE CASE
+- [ ] 336. The whole crocodile staging family is fragile — rebuild it, not one case
   AT A TIME (escalated 25.07.2026 after four consecutive runs each failed a DIFFERENT
   crocodile check). History: the lunge case was found resting on an unpinned
   assumption (its red turned out to be machine load, proven by a quiet-machine
@@ -1488,7 +1488,7 @@ put it is the mistake this line exists to stop.
   200's flake work, and point 294's auto-classification would have labelled all four
   reds "staging, not product" without a manual repeat each time.
 
-- [ ] 595. THE VERIFICATION LADDER (point 572's measure 5). While a render point is still
+- [ ] 595. The verification ladder (point 572's measure 5). While a render point is still
   being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
   full proof — both backends where they can differ, LARGE where the change warrants it —
   runs exactly ONCE, on the EXACT MERGE CANDIDATE — `main` merged into the branch, the tree
@@ -1546,7 +1546,7 @@ put it is the mistake this line exists to stop.
   (`health`, WebGPU) has been run on the merged state. The branch carries 596 and 597 in its
   NAME only; see their entries.
 
-- [ ] 598. THE BRIEF ORIENTS IN THE CODE, NOT ONLY IN THE SPEC (point 572's measure 8).
+- [ ] 598. The brief orients in the code, not only in the spec (point 572's measure 8).
   The delegation brief carries a GENERATED orientation: the paths the specification itself
   names, and a per-directory line of responsibility derived from the tree and its file
   headers. It is marked as a HINT, never as an instruction ("the specification names these
@@ -1574,7 +1574,7 @@ put it is the mistake this line exists to stop.
   (`health`, WebGPU) has been run on the merged state. The branch carries 596 and 597 in its
   NAME only; see their entries.
 
-- [ ] 453. WHAT IS THE LION EATING? (user bug report 30.07.2026,
+- [ ] 453. What is the lion eating? (user bug report 30.07.2026,
   `local/WasFrisstDerLoewe.zip`, seed 1608676381, east region at the river, WebGPU/high:
   "Er scheint zu fressen und die Geier kreisen, aber ich sehe keine Beute"; bundle Kadaver &
   Geier). In the frame the lion stands head-down in its feeding pose, vulture shadows circle
@@ -1590,7 +1590,7 @@ put it is the mistake this line exists to stop.
   and a remnant that keeps vultures on station is itself renderable; plus a browser frame from
   that seed showing predator and prey together, on both backends.
 
-- [ ] 658. THE EGRESS ALLOWANCE MUST SURVIVE A CONTAINER RESTART AND THE HOURS AFTER IT (user
+- [ ] 658. The egress allowance must survive a container restart and the hours after it (user
   12.08.2026: "Das ist auch schon zum zweiten Mal passiert. Sorge dafür, dass das den
   Container-Neustart überlebt. Deine bisherige Maßnahme scheint also nicht wirksam gewesen zu
   sein."). MEASURED, and confirmed independently by GPT-5.6 Sol at effort high (diagnose,
@@ -1650,7 +1650,7 @@ put it is the mistake this line exists to stop.
   did so twice unnoticed.
   Bundle: unbundled (infrastructure).
 
-- [ ] 642. EVERY CHECK THAT CAN BE LOAD-PROOF IS MADE LOAD-PROOF, AND THE REST SAYS SO (user
+- [ ] 642. Every check that can be load-proof is made load-proof, and the rest says so (user
   11.08.2026: "Was ist mit dem Problem, dass nicht alle Tests Last-resistent sind? … Das muss
   nicht mehr vor der 0.3 passieren, aber möglichst bald danach"). The rebuild that replaced
   wall-clock waits with waiting on the app's own state was applied CASE BY CASE, never swept:
@@ -1684,7 +1684,7 @@ put it is the mistake this line exists to stop.
   Criticality: HIGH — a suite that can fail from load makes every red arguable, which is the
   door point 640 closes from the other side.
 
-- [ ] 630. A SHELL WRITE INTO `.claude/` RAISES A PROMPT IN THE USER'S VS CODE WINDOW
+- [ ] 630. A shell write into `.claude/` raises a prompt in the user's vs code window
   (measured twice 11.08.2026 — once by a delegated agent, once by a direct probe; user
   requirement the same day: "Es dürfen niemals Rückfragen hier in VS Code kommen"). THE
   RULE, as measured: a write by SHELL REDIRECTION into `.claude/` raises the harness
@@ -1734,7 +1734,7 @@ put it is the mistake this line exists to stop.
   Criticality: high — the user has forbidden prompts in that window outright, and a prompt
   in an unattended session is a stall nobody is there to clear. Bundle: Modell & Wächter.
 
-- [ ] 632. A LESSON COUNTS AS SERVED THE MOMENT ITS ENFORCER IS NAMED — NOT WHEN IT STANDS
+- [ ] 632. A lesson counts as served the moment its enforcer is named — not when it stands
   (user 11.08.2026: "Lehren sind schön und gut, aber es muss sichergestellt werden, dass sie
   auch eingehalten werden." MEASURED against the directory `docs/analysis_de/lesson-mechanisms.md`,
   107 lessons: 53 class 1 (an existing enforcer widened), 30 class 2 (a new enforcer), 24
@@ -1769,7 +1769,7 @@ put it is the mistake this line exists to stop.
   Criticality: high — it decides whether our whole apparatus of lessons takes effect or
   merely records.
 
-- [ ] 614. EXECUTE THE FOUR-EYES WORK-ORDER CLEANUP (10.08.2026; the verdict of a
+- [ ] 614. Execute the four-eyes work-order cleanup (10.08.2026; the verdict of a
   BLIND-PARALLEL analysis by two models on the 148 open points — CLAUDE.md §6, divergent
   stage). Both runs were merged by MEANING; where only one model found an item it is
   MARKED as such and kept. This point EXECUTES the verdict on `TASKS.md` and
@@ -1845,7 +1845,7 @@ put it is the mistake this line exists to stop.
   Criticality: medium — it removes verification rounds that would otherwise be paid
   several times for one defect, and it stops five blocks from reading as unstarted work.
 
-- [ ] 639. THE ASSURANCE REGIME FOR THE RELEASE MACHINERY (user 11.08.2026: "Das Ganze ist
+- [ ] 639. The assurance regime for the release machinery (user 11.08.2026: "Das Ganze ist
   ein kritischer neuer Mechanismus … Überlege, ob du die drei verfügbaren Modelle hier noch
   intensiver zur gegenseitigen Absicherung einsetzen kannst … Der Umbau hat daher maximale
   Kritikalität und muss entsprechend gründlich verifiziert werden, bevor er scharfgeschaltet
@@ -1904,7 +1904,7 @@ put it is the mistake this line exists to stop.
   is clean for all four points.
   Criticality: MAXIMUM — it is the assurance the other four are trusted on.
 
-- [ ] 635. THE QUEUE IS CUT INTO RELEASES, AND THE CUT IS DATA (user 11.08.2026, sketching
+- [ ] 635. The queue is cut into releases, and the cut is data (user 11.08.2026, sketching
   the board: "Unterteilung der Warteschlange in Releases … für jedes Release eines und
   unten ein Abschnitt Backlog"). Today the scope of a release is PROSE inside point 174 —
   nothing can check whether a point belongs to v0.3, and nothing tells the batch where one
@@ -1946,7 +1946,7 @@ put it is the mistake this line exists to stop.
   Criticality: HIGH — every later release step reads this cut. Verified under the regime of
   point 639.
 
-- [ ] 636. A FINISHED BLOCK CLOSES AND TAGS ITSELF (user 11.08.2026: "Du sollst diese
+- [ ] 636. A finished block closes and tags itself (user 11.08.2026: "Du sollst diese
   Release-Blöcke von oben nach unten abarbeiten. Am Ende jedes Blocks soll automatisch der
   übliche Release-Abschluss passieren … Das Taggen auf die Release-Version kannst du
   selbständig immer direkt machen und es unter …/VERSION/ veröffentlichen"). This is the
@@ -1982,7 +1982,7 @@ put it is the mistake this line exists to stop.
   Criticality: MAXIMUM — it acts unattended and its mistakes are permanent. Verified under
   the regime of point 639.
 
-- [ ] 638. A TICKET I OPEN MYSELF GETS ITS URGENCY DECIDED, NOT ITS DEFAULT (user
+- [ ] 638. A ticket i open myself gets its urgency decided, not its default (user
   11.08.2026: "Wenn du selbständig neue Tickets anlegst, bewerte deren Dringlichkeit …
   Wenn du unsicher bist, lege mir eine Karte unter 'Von dir zu klären' an. Das muss
   zuverlässig verankert sein"). Append-and-defer puts every new point LAST — the right
@@ -2007,7 +2007,7 @@ put it is the mistake this line exists to stop.
   Criticality: HIGH — it decides what is worked next, silently and every day. Verified under
   the regime of point 639.
 
-- [ ] 637. THE BOARD BECOMES A PLACE TO DECIDE, NOT ONLY TO READ (user 11.08.2026: "Drag &
+- [ ] 637. The board becomes a place to decide, not only to read (user 11.08.2026: "Drag &
   Drop von Punkten in der Warteschlange … So kann ich selbstständig solche Änderungen
   vornehmen, ohne immer über dich gehen zu müssen").
   FINAL STATE:
@@ -2040,7 +2040,7 @@ put it is the mistake this line exists to stop.
   Criticality: HIGH — it writes into the work order from a public page. Verified under the
   regime of point 639.
 
-- [ ] 456. THE TEST THAT IS ONLY GREEN IN THE SIDE TREE (retrospective §3.68, 30.07.2026;
+- [ ] 456. The test that is only green in the side tree (retrospective §3.68, 30.07.2026;
   bundle Testinfrastruktur). Two blockers of one day shared a cause: a test passed because a
   git-ignored file is ABSENT in the agent's worktree while it exists in the main tree — it
   measured its environment, not the behaviour, and would have gone red on the merge. Add a
@@ -2064,7 +2064,7 @@ put it is the mistake this line exists to stop.
   actually lands. VERIFIABLE additionally: a fixture worktree whose `node_modules` holds only
   cache directories is reported as NOT bootstrapped and is linked.
 
-- [ ] 558. A VERIFY RUN TAKEN IN A WORKTREE IS DESTROYED WITH THE WORKTREE (measured
+- [ ] 558. A verify run taken in a worktree is destroyed with the worktree (measured
   08.08.2026 at the merge of point 549; bundle Testinfrastruktur). The render-verify
   ledger lives at `.claude/render-verify-state.json`, and `scripts/repo-paths.mjs`
   resolves `REPO_ROOT` from the SCRIPT's own location — so a suite run inside a git
@@ -2096,7 +2096,7 @@ put it is the mistake this line exists to stop.
   delegated render point silently, which pushes the session toward re-running or
   deferring what was already proven.
 
-- [ ] 574. A BARE VERIFY SCRIPT PHOTOGRAPHS WHATEVER SERVER HOLDS PORT 5173 (found
+- [ ] 574. A bare verify script photographs whatever server holds port 5173 (found
   09.08.2026 during the point-264 picture check; it had already invalidated one accepted
   picture acceptance before anyone noticed).
   `scripts/verify/enrichments.mjs` — and every suite that reads it — falls back to
@@ -2141,7 +2141,7 @@ put it is the mistake this line exists to stop.
   Criticality: high — it does not break the game, but it silently voids the picture
   proof, which is the one check this project cannot replace with a test.
 
-- [ ] 567. A KILLED SESSION LEAVES ITS VERIFY RUN BEHIND, AND NOTHING STOPS IT
+- [ ] 567. A killed session leaves its verify run behind, and nothing stops it
   (measured 09.08.2026, 00:12–00:14, on the resumption after the point-342 session died;
   bundle Testinfrastruktur). The dead session's `run-all polish enrichments` (pid 1641328)
   was still running nine minutes later, together with its Vite dev server and its headless
@@ -2178,7 +2178,7 @@ put it is the mistake this line exists to stop.
   machine, and PROCEED-MARKED under the override, with the pids named in every case.
   Criticality: medium, frequency HIGH (every killed session can leave one behind).
 
-- [ ] 599. MEASURE WHAT THE CACHE AND THE CALENDAR HIDE (point 572's measure 9). Two
+- [ ] 599. Measure what the cache and the calendar hide (point 572's measure 9). Two
   measurements the throughput analysis needed and did not have, delivered together because
   both are pure readings of data we already keep.
   (a) CACHE-PREFIX HYGIENE: plot `cache_creation` against `cache_read` per response over a
@@ -2222,7 +2222,7 @@ put it is the mistake this line exists to stop.
   Criticality: low — pure measurement; it changes no behaviour, and it is the precondition
   for judging the remaining structural levers.
 
-- [ ] 512. THE BUILD ORDER IS PAID AGAIN BY EVERY SUBAGENT (user decision
+- [ ] 512. The build order is paid again by every subagent (user decision
   05.08.2026 on the card "Bauanleitung für Subagenten aufteilen?"). Measured:
   `CLAUDE.md` is 61.6 KB — §1–5 8.0 KB, §6 13.6 KB, §7 37.5 KB (of which §7.2 is
   7.4 KB), §9 2.0 KB — and every delegated agent receives all of it, though a
@@ -2250,7 +2250,7 @@ put it is the mistake this line exists to stop.
   the old file is findable in exactly one of the two halves (a test sweeps the
   section headings for coverage and for duplication).
 
-- [ ] 511. THE MEMORY INDEX STILL CARRIES WHAT THIRTY GUARDS NOW ENFORCE
+- [ ] 511. The memory index still carries what thirty guards now enforce
   (measured 05.08.2026 on the user's question about context cost). The numbers
   first, so the effort goes where the cost is: the memory INDEX is 13.2 KB / 86
   lines (~3.3k tokens) per session and the 74 entry files load only on recall,
@@ -2270,7 +2270,7 @@ put it is the mistake this line exists to stop.
   VERIFIABLE: the index names no entry whose whole content is an armed guard's
   rule; the audit doc lists each retired entry beside the guard that replaced it.
 
-- [ ] 471. THE WORK ORDER STARVES THE POOL IT IS SUPPOSED TO FEED (user 30.07.2026, drawn
+- [ ] 471. The work order starves the pool it is supposed to feed (user 30.07.2026, drawn
   from the branch-per-point ruling: "Dann sollte die aktuelle Abarbeitungsreihenfolge dahingend
   optimiert werden, dass sie den potenziellen Vorteil der Bündel optimal nutzt"; bundle
   Session- & Repo-Hygiene). With one branch per point settled, a bundle's remaining value is
@@ -2343,7 +2343,7 @@ Build order, chosen so no two parallel agents own the same file:
   wave 4  481 (children teach) · 483 (adults teach)
   wave 5  486 (drums) · 487 (digging)
 
-- [ ] 552. THE CI GUARD REPLAYS A FROZEN REASON AND SENDS THE READER AT A GREEN RUN
+- [ ] 552. The ci guard replays a frozen reason and sends the reader at a green run
   (measured 07.08.2026, cost two turns of false search; bundle Testinfrastruktur).
   `ci-status-guard` caches its verdict per sha in `.claude/ci-status-guard-state.json`
   and re-asks GitHub every `RECHECK_MS`. The VERDICT is re-derived correctly — a sha
@@ -2395,7 +2395,7 @@ Build order, chosen so no two parallel agents own the same file:
   a check is one the next reader starts arguing with instead of obeying, and one that
   cannot be satisfied at all is one the next session looks for a way around.
 
-- [ ] 460. A RED VERIFICATION MUST BE DIAGNOSABLE WITHOUT RE-RUNNING IT (30.07.2026; bundle
+- [ ] 460. A red verification must be diagnosable without re-running it (30.07.2026; bundle
   K). `runSuite` in `scripts/verify/run-all.mjs` captures each suite's complete output, prints
   only the verdict line plus, on a failure, the `FAIL`/`ERR:` lines and a hardcoded 12-line
   tail — and then DISCARDS the rest. So the context is already bounded; what is missing is the
@@ -2420,7 +2420,7 @@ Build order, chosen so no two parallel agents own the same file:
   PRIORITY: behind 458 and 459 — it is a wall-clock and diagnosis saving, not the context
   saving it was drafted for.
 
-- [ ] 504. EVERY BATCH OWNER IS DISPOSSESSED AT HALF AN HOUR OF AGE
+- [ ] 504. Every batch owner is dispossessed at half an hour of age
   (measured 04.08.2026, 18:50Z and root-caused at 19:00Z). The autostart launcher
   logged "owner provably dead (pid-reused) — taking over" and spawned a second
   session while the owner it judged dead was ALIVE and mid-work: it was running a
@@ -2484,7 +2484,7 @@ Build order, chosen so no two parallel agents own the same file:
   batch owner older than an hour is still read as alive by
   `node scripts/batch-doctor.mjs` on this host.
 
-- [ ] 515. THE PARALLEL-SESSION DETECTOR COUNTS A PLACEHOLDER OWNER AS A SECOND
+- [ ] 515. The parallel-session detector counts a placeholder owner as a second
   SESSION (measured 05.08.2026). The batch PAUSED ITSELF at 13:06 because the
   alert "PARALLEL batch sessions" had gone five times unanswered. The alert was
   FALSE. `.claude/batch-lock.json` carried the placeholder `x` as its `sessionId`
@@ -2547,7 +2547,7 @@ Build order, chosen so no two parallel agents own the same file:
   the lock's recorded owner byte-identical while a real id still restamps; and the
   doctor reports the pid-mine/id-foreign lock as torn and repairs it.
 
-- [ ] 517. THE LEASE-EXPIRY TAKEOVER IGNORES AN HONOURED CLAIM (measured
+- [ ] 517. The lease-expiry takeover ignores an honoured claim (measured
   05.08.2026). The launcher tick took the batch from session 91c1ac42 after 67
   minutes without a lease renewal (LEASE EXPIRED) and spawned a FRESH headless
   successor, although a claim from the user's own window d68e8df9 had stood since
@@ -2599,7 +2599,7 @@ Build order, chosen so no two parallel agents own the same file:
   evidence has gone quiet → spawn), and the boundary path's existing tests stay green
   unchanged.
 
-- [ ] 463. TWO LIVENESS READINGS THE FORCED HANDOVER PROVED WRONG (30.07.2026, both
+- [ ] 463. Two liveness readings the forced handover proved wrong (30.07.2026, both
   observed while taking the batch back by force; bundle Session- & Repo-Hygiene).
   PART A — A KILLED OWNER READS AS ALIVE FOR FIVE MINUTES. `assessOwner`
   (`scripts/batch-singleton.mjs`) returns `fresh-heartbeat` for any heartbeat younger than
@@ -2622,7 +2622,7 @@ Build order, chosen so no two parallel agents own the same file:
   dead, a fresh heartbeat without a pid still assessed alive, and the guard's stand-down for
   a non-owner; the sweep is evidenced by the commit message naming every guard checked.
 
-- [ ] 554. THE CHAT WATCHER LEAKS ORPHANS THE SUPERVISION CANNOT SEE (measured
+- [ ] 554. The chat watcher leaks orphans the supervision cannot see (measured
   08.08.2026 on a quiet machine, while point 309's regression ran). `pgrep -f
   chat-watcher.mjs` returns TEN live processes — the oldest running since 04.08.,
   three days — while `.claude/chat-watcher.json` names exactly one (pid 2861724).
@@ -2665,7 +2665,7 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: raised to HIGH — no longer a latent risk but a fault the user sees,
   and it reaches him directly rather than through the build.
 
-- [ ] 455. A RED THAT LOAD DID NOT EXPLAIN (30.07.2026, measured: `batch-doctor --gate` called
+- [ ] 455. A red that load did not explain (30.07.2026, measured: `batch-doctor --gate` called
   a real unit-test failure INCONCLUSIVE because of "1 live agent worktree", and that worktree
   had last been written the previous evening; bundle Testinfrastruktur). The load excuse is
   right in principle (retrospective §3.22/§3.48) and was wrong here: it downgraded a genuine
@@ -2690,7 +2690,7 @@ Build order, chosen so no two parallel agents own the same file:
   `claude -p "<prompt naming scripts/verify/run-all.mjs>"` argv is NOT load, a real
   `node scripts/verify/run-all.mjs polish` argv IS, and the session's own pid never counts.
 
-- [ ] 602. WHAT ELSE DID WE BUILD AND NEVER USE? (user 09.08.2026, on learning that the
+- [ ] 602. What else did we build and never use? (user 09.08.2026, on learning that the
   section runner of point 566 has never been used once: "Dass du 566 nicht eingesetzt
   hast, ist aber fatal und legt eine grundsätzliche Lücke auf. Lege einen weiteren Punkt
   an, um zu prüfen, ob es noch weitere Mechanismen gibt, die du gebaut hast, um Dinge zu
@@ -2743,7 +2743,7 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: HIGH — every unused mechanism was paid for twice: once when it was built,
   and again in every hour it would have saved and did not.
 
-- [ ] 603. THE GROUND'S MICRO-DETAIL SITS JUST UNDER ITS OWN BAR, AND NOBODY OWNS IT
+- [ ] 603. The ground's micro-detail sits just under its own bar, and nobody owns it
   (measured 10.08.2026 during the acceptance of the play-session packages; the triage point
   of 04.08.2026 named this failure and closed without giving it an owner). The `settings`
   check `first-person ground shows micro-detail (edge energy)` reads a Laplacian mean of
@@ -2768,7 +2768,7 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: medium — no crash and nothing the player reports, but an unowned red inside
   the everyday gate is a hole in the one signal every other point is judged by.
 
-- [ ] 528. THE DEPLOY THAT NEVER REACHES A RUNNER LEAVES THE SITE STALE, AND POINT
+- [ ] 528. The deploy that never reaches a runner leaves the site stale, and point
   526 IS UNPROVEN ON THE LIVE PATH (measured 06.08.2026, immediately after 526
   merged). Point 526's VERIFIABLE demands, besides its Vitest layer, ONE REAL
   DEPLOY RUN proving a commit still reaches the live site. That proof could not be
@@ -2815,7 +2815,7 @@ Build order, chosen so no two parallel agents own the same file:
   `main`) and on the two residuals of item 4, plus the one real deploy run of
   item 1 with its run id recorded.
 
-- [ ] 507. A LOST WEBGPU DEVICE ENDS THE RUN QUIETLY AND THE PICTURE BLACK
+- [ ] 507. A lost webgpu device ends the run quietly and the picture black
   (measured 05.08.2026, both quiet runs of `invariants` on the software WebGPU
   lane). The suite ends `2 pass, 0 fail` with 9 and 2 console errors —
   `AbortError: Failed to execute 'mapAsync' on 'GPUBuffer': A valid external
@@ -2846,7 +2846,7 @@ Build order, chosen so no two parallel agents own the same file:
   rather than a truncated pass; and `VERIFY_GL=webgpu npm test -- invariants`
   either completes on this host or names the device loss as its verdict.
 
-- [ ] 519. THE JOURNAL'S HANDWRITING EXISTS ONLY ON THE AUTHOR'S OWN MACHINE
+- [ ] 519. The journal's handwriting exists only on the author's own machine
   (measured 05.08.2026 while verifying point 394 in this Linux container). The
   journal's handwritten look (§16/§16.3, acceptance criterion 29) is asked for by
   NAME alone: `font-family: 'Segoe Script', 'Bradley Hand', 'Comic Sans MS',
@@ -2875,7 +2875,7 @@ Build order, chosen so no two parallel agents own the same file:
   so a silent fallback fails loudly instead of quietly producing plain text.
   Screenshot 81 refreshed on the bundled face.
 
-- [ ] 551. THE TRANSIENT STATUS HINT IS DRAWN ON TOP OF THE REGION NAME (seen
+- [ ] 551. The transient status hint is drawn on top of the region name (seen
   07.08.2026 in the verification frames `121-harmattan-pall-january.png` and
   `122-atlas-snow-february.png`, WebGL 2, and reproducible in every frame the
   enrichments suite writes while the canoe hint stands). The centred hint "The canoe is
@@ -2900,7 +2900,7 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: medium — nothing breaks, but it is the first thing in the picture a reader
   sees as sloppy, and it is in every screenshot the suites write.
 
-- [ ] 464. A RED UNIT LAYER REACHED `main` THROUGH THE PRE-PUSH GATE (user 30.07.2026:
+- [ ] 464. A red unit layer reached `main` through the pre-push gate (user 30.07.2026:
   "Sorge dafür, dass das sicher nicht mehr passiert."; bundle Testinfrastruktur). CI run 30555562185 on
   `main`, commit `4d580957`, failed at step `npm run test:unit` — the guide-brevity audit,
   because that commit pushed `docs/analysis_de/vibe-coding-anleitung.md` over its budget. The
@@ -2933,7 +2933,7 @@ Build order, chosen so no two parallel agents own the same file:
   refused for a different one, refused when absent, refused on an internal error), and a live
   push attempt on a deliberately red tree is refused.
 
-- [ ] 457. A RECORDED "DO NOT MERGE" MUST NOT SATISFY THE GATE (retrospective §3.67,
+- [ ] 457. A recorded "do not merge" must not satisfy the gate (retrospective §3.67,
   30.07.2026 — three cases in one morning, one of which would have turned `main` red; bundle
   Modell & Wächter). `scripts/mechanism-review-guard.mjs` asks WHETHER the other model's review
   is recorded, not WHAT it says: an agent started its review in the background, finished before
@@ -2962,7 +2962,7 @@ Build order, chosen so no two parallel agents own the same file:
   commit passes even when its record timestamp precedes the refusal's; two records on the
   SAME commit still block; the brief's text is pinned by its existing test.
 
-- [ ] 510. THE RENDER-VERIFY CORE COUNTS A RUN THAT NEVER CONFIRMED ITS BACKEND
+- [ ] 510. The render-verify core counts a run that never confirmed its backend
   (four-eyes review of point 505's gate change, 05.08.2026 — the reviewer cleared
   that change and left these three beside it).
   FINAL STATE:
@@ -2983,7 +2983,7 @@ Build order, chosen so no two parallel agents own the same file:
   the options default survives `null`; `scripts/closing-guard-core.mjs` carries the
   core-level step and `--status` lists it.
 
-- [ ] 518. THE SHUTTER JUDGES ITS AIM BEFORE THE WAIT AND NEVER RE-JUDGES (found
+- [ ] 518. The shutter judges its aim before the wait and never re-judges (found
   05.08.2026 while closing point 489). `captureFrame` checks that the frame's
   declared subject is in the picture, and only THEN waits up to 120 s for the scene
   to finish drawing. Nothing re-judges the aim afterwards. Where the camera drifts
@@ -3097,7 +3097,7 @@ Build order, chosen so no two parallel agents own the same file:
   full-page element frame serves the stand-still wait while a clipped or
   locator-bound one does not), and live the two Aswan frames stay green.
 
-- [ ] 565. A DRINKING WILDEBEEST CALF STANDS BURIED IN THE GROUND
+- [ ] 565. A drinking wildebeest calf stands buried in the ground
   (caught 08.08.2026, 19:xx, by the in-game anchoring tripwire on the `enrichments`
   WebGL 2 lane). The dev-mode assert fired: `animal-buried — wildebeest bodyY=1.09
   ground=1.82 y=1.82 young=false bathe=false drink=true dodge=false hop=false
@@ -3127,7 +3127,7 @@ Build order, chosen so no two parallel agents own the same file:
   the herds use, at both ages, and asserts the offset never falls below the ground
   sample; `enrichments` runs on both backends without the `animal-buried` assert firing.
 
-- [ ] 522. THE BURNING GRASS DOES NOT BURN (observed 05.08.2026 while closing point
+- [ ] 522. The burning grass does not burn (observed 05.08.2026 while closing point
   323). `verification/131-burning-grass.png` is the frame that proves the §19.9
   bush fire, and no fire is visible in it to the eye — the frame passes its checks
   and shows dry grass. Either the dressing does not draw at the moment the shutter
@@ -3145,7 +3145,7 @@ Build order, chosen so no two parallel agents own the same file:
   and its check fails when the fire is switched off in the debug menu — proving the
   check reads the picture rather than the intent.
 
-- [ ] 523. THE PANORAMA LEAVE-CAPTURE COMES OUT EMPTY, AND TWO CHECKS ON `main`
+- [ ] 523. The panorama leave-capture comes out empty, and two checks on `main`
   HAVE BEEN RED FOR IT (measured 05.08.2026 while closing point 480, on BOTH
   backends, and classified PRE-EXISTING on `main` by
   `node scripts/verify/baseline-classify.mjs polish --ref origin/main`). The two
@@ -3167,7 +3167,7 @@ Build order, chosen so no two parallel agents own the same file:
   empty capture can never again read as a threshold miss; plus a pure test that the
   check FAILS on an all-transparent capture instead of reporting a band verdict.
 
-- [ ] 500. THE LEAVE CAPTURE BAKES A TERRAINLESS BAND ON A SLOW HOST
+- [ ] 500. The leave capture bakes a terrainless band on a slow host
   (measured 04.08.2026 during the point-499 triage, 3 of 3 runs). The `polish`
   check on the maasai-village leave capture reads the bottom quarter of the
   panorama backdrop as opaque 0.000 — the captured band carries no terrain at
@@ -3188,7 +3188,7 @@ Build order, chosen so no two parallel agents own the same file:
   the container host, and the same run on the WebGPU (software) lane; the
   captured band is inspected as a PICTURE once, not only as a number.
 
-- [ ] 501. THE COMPASS PROBE PILLAR NEVER REACHES THE PANORAMA BAND
+- [ ] 501. The compass probe pillar never reaches the panorama band
   (measured 04.08.2026 during the point-499 triage, 3 of 3 runs). The `polish`
   orientation check reads west 0 px / east 0 px for its DEV probe pillar, while
   the water fractions of the SAME capture became non-zero once the scene was
@@ -3208,7 +3208,7 @@ Build order, chosen so no two parallel agents own the same file:
   when the panorama orientation is deliberately inverted — a check that cannot
   fail proves nothing.
 
-- [ ] 321. GRASS FIRE READS WRONG ON EVERY COUNT (user 25.07.2026 with screenshot:
+- [ ] 321. Grass fire reads wrong on every count (user 25.07.2026 with screenshot:
   the burning-grass event shows a column of flat orange blocks — no recognizable
   FIRE FRONT, "strange waves" that make no sense, and the burn SCARS do not read as
   burnt ground). Rebuild the §14/§19 grass-fire depiction: (a) a readable FRONT — a
@@ -3224,7 +3224,7 @@ Build order, chosen so no two parallel agents own the same file:
   brighter/warmer than the trailing scar and the scar clearly DARKER than unburnt
   savanna; screenshot 131 refreshed and judged on BOTH backends.
 
-- [ ] 319. CROCODILE KILL AFTERMATH: PREY DISSOLVES WITHOUT SINK OR VISIBLE SCAVENGER
+- [ ] 319. Crocodile kill aftermath: prey dissolves without sink or visible scavenger
   (user 25.07.2026: a crocodile seized an animal, the crocodile disappeared at some
   point, and the prey then kept slowly dissolving — possibly "eaten" with no vulture
   visible). Per §19.16 a crocodile KILL must SINK — the river keeps the body, no
@@ -3244,7 +3244,7 @@ Build order, chosen so no two parallel agents own the same file:
   add a dev-assert for "shrinking carcass has no feeder" so every session detects
   it); both backends.
 
-- [ ] 326. A PARENT DIES WITH NO VISIBLE CAUSE AFTER A CROCODILE KILL (user
+- [ ] 326. A parent dies with no visible cause after a crocodile kill (user
   25.07.2026: crocodile took a calf, crocodile gone, the parent stood at the death
   spot and simply fell over dead — reading as suicide). Every §19.8 death must have
   a VISIBLE cause on screen (a predator that reaches it, a trample, a drowning, a
@@ -3257,7 +3257,7 @@ Build order, chosen so no two parallel agents own the same file:
   cause field; the assert fires on a synthetic causeless death; a staged
   croc-kill-then-vigil ends in one of the two legitimate outcomes; both backends.
 
-- [ ] 314. DRIFTING PALE PATCHES ON WATER (user 25.07.2026, screenshot: bird's-eye at
+- [ ] 314. Drifting pale patches on water (user 25.07.2026, screenshot: bird's-eye at
   a river mouth near the ocean — two elongated pale/greenish patches ON the water
   surface near the shore, which MOVE/CHANGE as the traveller walks; "immer noch
   gelegentlich", i.e. the class was seen before). DIAGNOSE BY THE PICTURE first
@@ -3274,7 +3274,7 @@ Build order, chosen so no two parallel agents own the same file:
   BOTH backends), plus the screenshot pair before/after; pure test for whichever
   sampling rule was wrong.
 
-- [ ] 575. THE ANIMALS CARRY NO PELT PATTERN AND NO FACE (found 09.08.2026 by the
+- [ ] 575. The animals carry no pelt pattern and no face (found 09.08.2026 by the
   point-264 control frame, which photographed two zebras at the player's own zoom).
   `ZEBRA_SPEC` paints the body `#d8d4cc` and the head `#9a958c`, flat and untextured —
   a zebra with NO STRIPES. At the reachable bird's-eye zoom (0.125–0.5, default 0.5) the
@@ -3297,7 +3297,7 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: medium — it is the visual identity of every animal in the bird's-eye view,
   and acceptance criterion 11 (no schematic look) speaks to exactly this.
 
-- [ ] 533. WHAT BRINGS THE CONTAINER BACK AFTER A HOST REBOOT (found 07.08.2026 while
+- [ ] 533. What brings the container back after a host reboot (found 07.08.2026 while
   merging point 447; bundle Urlaubsfestigkeit). Point 447 hardened the WINDOWS boot path —
   `HoA-Batch-Autostart` with an at-logon trigger, plus `HoA-Batch-Watchdog` watching it —
   and its measurements date from 30.07.2026, when the batch still ran on that host. Since
@@ -3322,7 +3322,7 @@ Build order, chosen so no two parallel agents own the same file:
   and one real reboot, recorded as evidence — the container path cannot be proven from
   inside the container, and point 449's drill is where it is exercised afterwards.
 
-- [ ] 448. ONE COMMAND THAT SAYS "READY FOR A FORTNIGHT ALONE" (30.07.2026; bundle
+- [ ] 448. One command that says "ready for a fortnight alone" (30.07.2026; bundle
   Urlaubsfestigkeit). Before an absence, nothing today reports whether the chain is intact —
   and the failures that hurt most are the silent ones. `scripts/vacation-ready.mjs` answers it
   in one read-only run, each line PASS/WARN/FAIL with the remedy: both scheduled tasks present,
@@ -3337,7 +3337,7 @@ Build order, chosen so no two parallel agents own the same file:
   overall exit code — 0 only when nothing is FAIL) with every probe injected; one live run
   against the real machine as the acceptance evidence.
 
-- [ ] 449. THE CHAOS DRILL — KILLS AT RANDOM MOMENTS (user 30.07.2026: "Beachte, dass ein
+- [ ] 449. The chaos drill — kills at random moments (user 30.07.2026: "Beachte, dass ein
   Ausfall eines Elements zu jedem beliebigen Zeitpunkt passieren kann - auch mitten in einer
   kritischen Aktion von dir"; bundle Urlaubsfestigkeit). Everything in this bundle is a claim
   until an outage has been survived under observation, and the lesson of 30.07.2026 is exactly
@@ -3353,7 +3353,7 @@ Build order, chosen so no two parallel agents own the same file:
   Vitest for its pure parts (the kill-moment plan, the verdict assembly). A drill that cannot
   produce a verdict FAILS rather than passing quietly.
 
-- [ ] 200. VERIFY-SCRIPT ROBUSTNESS pass — fix the 26 wall-clock/radius
+- [ ] 200. Verify-script robustness pass — fix the 26 wall-clock/radius
   findings in the test scripts (Pillar-2 group E; exact list in the 184 log:
   20 in enrichments, plus polish 270, settings 183/277, flow 242, voice 56,
   touch 75). Two patterns, both established: (1) render-loop behaviours polled
@@ -3510,7 +3510,7 @@ Build order, chosen so no two parallel agents own the same file:
   which is a player-visible regression of the §19.9 dressing and belongs in its own point
   rather than here. Take that reading before touching the check.
 
-- [ ] 309. SERVING-MODEL DEGRADATION: REPAIR + TRIPWIRE (user 25.07.2026). REPAIR: the
+- [ ] 309. Serving-model degradation: repair + tripwire (user 25.07.2026). REPAIR: the
   late-evening session of 24.07 ran silently on Haiku 4.5 (proven by the Co-Authored-By
   commit trailers) and merged three deliveries that missed their specs; main is RESTORED
   to the last pre-degradation state fd85464 on every touched path — the placebo
@@ -3550,7 +3550,7 @@ Build order, chosen so no two parallel agents own the same file:
   not a product defect. So take this proof either after 506 lands, or with that one red
   recorded as the charge it is — never as a clean both-backend LARGE.
 
-- [ ] 312. ANIMALS ARE WATER-SHY, NOT WATER-BARRED (user 25.07.2026, revising the
+- [ ] 312. Animals are water-shy, not water-barred (user 25.07.2026, revising the
   point-192 rule; former point 324 is folded in here). The rule was read far too
   strictly: "animals must not stand around in water" — so that a canoe passage stays
   clear — hardened into "water is off limits to them". What the player sees is a
@@ -3606,7 +3606,7 @@ Build order, chosen so no two parallel agents own the same file:
   drama resolves; and across a driven pass no animal is found standing in a channel, so
   the canoe lane stays clear.
 
-- [ ] 333. WHY THE DOCS DRIFT — AND A MECHANISM AGAINST IT (root-cause analysis
+- [ ] 333. Why the docs drift — and a mechanism against it (root-cause analysis
   25.07.2026, user question "where does all this drift come from — were there
   problems before the degraded session too?"). ANSWER: yes, and it has nothing to do
   with that session. Measured on the four features merged after v0.2: 262 touched
@@ -3676,7 +3676,7 @@ Build order, chosen so no two parallel agents own the same file:
   cited `panoramaVicinityRadius` never existed in any commit, it came from a spec
   draft; a doc's symbol citations must be checked against the code that shipped.
 
-- [ ] 347. THE STARTING QUALITY LEVEL FROM THE URL (user 25.07.2026; design.md §21.1
+- [ ] 347. The starting quality level from the url (user 25.07.2026; design.md §21.1
   states the target). `?quality=low|medium|high` on any deployment URL — the GH-Pages
   root, `/poc/`, a `/vX.Y/` folder — opens the session at that level, so a link handed
   to someone whose hardware is known already fits it. Case-insensitive; an unknown,
@@ -3711,7 +3711,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS: design.md §21.1 already states it; name the parameter in the README's play
   links if that file lists them, so the shareable form is discoverable.
 
-- [ ] 422. THE BEGINNER GUIDE IS FULL, AND TODAY'S LESSON HAS NOWHERE TO GO
+- [ ] 422. The beginner guide is full, and today's lesson has nowhere to go
   (29.07.2026, found while doing the guide review the currency guard demands).
   `docs/analysis_de/vibe-coding-anleitung.md` sits at EXACTLY its budget — measured
   13.08.2026, 415 lines of 415 and 3677 words of 3677 (`scripts/guide-brevity-core.mjs`).
@@ -3742,7 +3742,7 @@ Build order, chosen so no two parallel agents own the same file:
   NOTE: the guide currency was attested on 29.07. against the sources of that day; the
   review found this gap and could not close it, which is what this point exists for.
 
-- [ ] 438. THE PROJECT HOOKS CANNOT FIRE OUTSIDE THE REPO ROOT (29.07.2026, measured in a
+- [ ] 438. The project hooks cannot fire outside the repo root (29.07.2026, measured in a
   `/doctor` run and reviewed by the second model; bundle Modell & Wächter). All 31 project hooks in
   `.claude/settings.json` are wired RELATIVELY (`node scripts/x.mjs`), so a session whose cwd
   is not the repo root loses the WHOLE guard chain to a non-blocking `Cannot find module` —
@@ -3790,7 +3790,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS in the same commit: `docs/batch-autonomy.md` where the guard chain is described, and
   CLAUDE.md §7.2 only if the families it names change.
 
-- [ ] 451. THE REPLY THAT SENT ITS OWN FLAG (user 30.07.2026: "Was ist mit dem Chat los?" —
+- [ ] 451. The reply that sent its own flag (user 30.07.2026: "Was ist mit dem Chat los?" —
   two agent messages on the board read literally `--text-stdin`; bundle Chat & Tafel).
   `scripts/board.mjs` accepts `--text-stdin` for German prose; `scripts/chat-reply.mjs` does
   NOT — it joins `process.argv.slice(2)` into the message, so the flag itself was published as
@@ -3803,7 +3803,7 @@ Build order, chosen so no two parallel agents own the same file:
   BEGINS with a dash is still sendable (via stdin), so the guard cannot swallow legitimate
   prose.
 
-- [ ] 465. A NOW-CARD OUTLIVES THE SESSION THAT WROTE IT (user 30.07.2026, from the board
+- [ ] 465. A now-card outlives the session that wrote it (user 30.07.2026, from the board
   screenshot: "'Gerade keine laufende Arbeit' ist auch nicht wirklich wahr … beim nächsten
   Mal wird es wieder so eine geben, oder?"; bundle Chat & Tafel). After the forced handover the
   stopped session's card "Gerade keine laufende Arbeit" (17:09) still stood in "Woran ich
@@ -3829,7 +3829,7 @@ Build order, chosen so no two parallel agents own the same file:
   start stamp is rejected, one with `start · ~end` passes) and the gate's refusal; a live
   handover leaves no stale card behind.
 
-- [ ] 466. THE DOC VERIFICATION CHECKS A SENTENCE THE README NO LONGER HAS (30.07.2026,
+- [ ] 466. The doc verification checks a sentence the readme no longer has (30.07.2026,
   found by the agent that shrank the always-loaded instruction file; reproduced on unmodified
   `main`, so it is PRE-EXISTING and was not caused by that work; bundle Testinfrastruktur).
   `scripts/verify/docs.mjs` fails two checks — "README states an acceptance-criteria count"
@@ -3849,7 +3849,7 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: `docs.mjs` green on `main`; the pure layer covers the pointer check against a
   present, a missing and a misspelled detail section.
 
-- [ ] 531. THE SPEC DOCUMENTS STILL DESCRIBE THE OLD BIRD'S-EYE COLLISION (found
+- [ ] 531. The spec documents still describe the old bird's-eye collision (found
   06.08.2026 while closing point 299, escalated by the building agent rather than
   guessed around). Point 299 added a settlement footprint to the bird's-eye
   collision and made a debug jump to an enterable place ENTER it, but two spec
@@ -3874,7 +3874,7 @@ Build order, chosen so no two parallel agents own the same file:
   with both passages present; `scripts/verify/docs.mjs` green; a grep for "trees and
   animals" finds no bird's-eye collision passage that omits the settlement.
 
-- [ ] 532. THE COLLISION SUITE COUNTS A DIFFERENT NUMBER OF CHECKS EVERY RUN
+- [ ] 532. The collision suite counts a different number of checks every run
   (found 07.08.2026 while merging point 349). Three runs of `collision` against the
   SAME tree (`main` 72fe646a) reported 19, 24 and 25 checks: the 24-check run failed
   `PoC village: the teaching stone is in the layout — null` on both its try and its
@@ -3907,7 +3907,7 @@ Build order, chosen so no two parallel agents own the same file:
   WebGPU — reporting the SAME check count, and a deliberately removed check turning
   the run red instead of shrinking it.
 
-- [ ] 534. ONE PROJECT-SLUG RESOLVER, AND A FINDING RECORDED FROM A WORKTREE SURVIVES
+- [ ] 534. One project-slug resolver, and a finding recorded from a worktree survives
   (guard/memory audit 07.08.2026, findings 1/3/6 — `docs/guard-memory-audit.md`).
   MEASURED: `findings-paths.projectSlug` maps the repo path to the memory directory with a
   bare `replace(/[^A-Za-z0-9]/g,'-')` while `retro-sources.defaultMemoryDir` strips the
@@ -3937,7 +3937,7 @@ Build order, chosen so no two parallel agents own the same file:
   real index. Live: a finding recorded from a worktree is read by `--drain` in the main tree.
   Criticality: high (the carrier is the only thing that outlives a finding session).
 
-- [ ] 535. ONE DEFINITION OF WHAT COUNTS AS A MECHANISM, AND IT REACHES THE HOOKS
+- [ ] 535. One definition of what counts as a mechanism, and it reaches the hooks
   (guard/memory audit 07.08.2026, findings 2/5). CLAUDE.md §7.2 states that
   `mechanism-review-guard` "lets no new or changed guard, gate or HOOK end a turn without
   the OTHER model's recorded review". `isMechanismPath` matches `-guard`/`-gate` and
@@ -3969,7 +3969,7 @@ Build order, chosen so no two parallel agents own the same file:
   count matches `guard-inventory`'s enforcer count on the real tree.
   Criticality: high (it decides what the four-eyes gate sees at all).
 
-- [ ] 536. THE TWO WIRED ENFORCERS NO SELECTOR REACHES GET CONVENTIONAL NAMES
+- [ ] 536. The two wired enforcers no selector reaches get conventional names
   (guard/memory audit 07.08.2026, finding 4). `dashboard-sync.mjs` (Stop) and
   `worktree-reminder.mjs` (PreToolUse/Agent) enforce real rules with pure cores, but their
   names end in none of `-guard`/`-gate`/`-hook`. So `guard-health` never asks whether they are
@@ -3984,7 +3984,7 @@ Build order, chosen so no two parallel agents own the same file:
   lists both, and the corpus count rises by two — with the attestation re-recorded in the same
   commit as in point 535. Criticality: medium.
 
-- [ ] 537. THE UNTESTED-GUARD RATCHET IS RATCHETED, AND THE REAL DEBT NAMED
+- [ ] 537. The untested-guard ratchet is ratcheted, and the real debt named
   (guard/memory audit 07.08.2026, finding 8). `KNOWN_UNTESTED` records seven enforcers as
   lacking a tested core and states the list "can only shrink — remove a name the moment its
   core gains a test". Judged by the module's OWN `tested` rule, four now pass:
@@ -3997,7 +3997,7 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: pure Vitest — a tested core still listed in `KNOWN_UNTESTED` FAILS; the three
   remaining names pass; the list cannot grow without a written reason. Criticality: medium.
 
-- [ ] 538. TWO MEMORIES THAT DESCRIBE MECHANISMS THAT ARE GONE
+- [ ] 538. Two memories that describe mechanisms that are gone
   (guard/memory audit 07.08.2026, findings 7/10). `chat-timestamp` — 7.7 KB, the project's
   third-largest memory, loaded every session — states that `dashboard-reminder-hook.mjs` emits
   the timestamp obligation as its first and last line, "(Zeilen 66 und 131)". Point 440 took
@@ -4017,7 +4017,7 @@ Build order, chosen so no two parallel agents own the same file:
   names a mechanism the tree does not have; check each claim against the code that owns it.
   Criticality: low, frequency HIGH (both texts load every session).
 
-- [ ] 607. THE EVIDENCE FOR CRITERION 20 NAMES A CONTROL COUNT THAT IS TWO DOZEN SHORT
+- [ ] 607. The evidence for criterion 20 names a control count that is two dozen short
   (found while delivering point 605). `docs/acceptance-evidence.md` §20 states that the
   completeness test pins "132 controls"; the debug menu now carries 158. The number was
   right when it was written and has not been maintained since, which makes the evidence
@@ -4034,7 +4034,7 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: low — a documentation defect, but in the file the closing run reads as
   proof.
 
-- [ ] 609. THE PROOF GUARD IS BUILT, TAUGHT AND WIRED TO NOTHING (found 10.08.2026 by the
+- [ ] 609. The proof guard is built, taught and wired to nothing (found 10.08.2026 by the
   second model while clearing point 594). `scripts/point-proof-guard.mjs` refuses the tick of
   a point whose `PROOF:` line has not run at the current HEAD — the mechanism exists, has a
   register, a `--status` and a CLI, and point 594 just taught it to recognise the landing
@@ -4059,7 +4059,7 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: medium — nothing the player sees, but it is a gate everyone believed was
   closed, and the belief is what made it worth nothing.
 
-- [ ] 611. THE FENCE TEST TOLERATES WHAT IT CLAIMS TO FORBID (four-eyes finding on point
+- [ ] 611. The fence test tolerates what it claims to forbid (four-eyes finding on point
   604, 10.08.2026). `src/scenes/place/layout.test.ts:664` asserts that no dwelling grows
   through a fence with `toBeGreaterThan(-0.5)`, while the worst real case — the tuareg
   camp's tent through its own windbreak — measures -0.463 m: 3.7 cm of headroom, no comment
@@ -4078,7 +4078,7 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: low — nothing traps the player today, but the assertion is the one thing
   standing between a future crossing and the picture.
 
-- [ ] 467. THE VERSIONED BOARD REFRESHER REACHES NO READER (30.07.2026, found by the agent
+- [ ] 467. The versioned board refresher reaches no reader (30.07.2026, found by the agent
   that fixed the refresh stealing the chat's focus; bundle Chat & Tafel). Two halves of one
   hole. (a) `scripts/board-refresher-core.mjs` exports `refresherScript()` /
   `REFRESHER_SOURCE`, but NO production script imports them — neither `scripts/board.mjs` nor
@@ -4101,7 +4101,7 @@ Build order, chosen so no two parallel agents own the same file:
   absent script, and one covering the event dispatch. Plus one published board reviewed by
   eye — a swap must still re-inject the chat.
 
-- [ ] 468. THE SAME BLIND PARSE SITS IN TWO MORE READERS OF THE WORK ORDER (30.07.2026,
+- [ ] 468. The same blind parse sits in two more readers of the work order (30.07.2026,
   named by the agent that fixed the board's title parse; bundle Modell & Wächter). The defect
   shape of point 439 — a `$`-anchored line pattern applied to `split('\n')` output, which
   matches NOTHING when the file arrives with CRLF because `.` does not match `\r` and `$` does
@@ -4124,7 +4124,7 @@ Build order, chosen so no two parallel agents own the same file:
   fixture written with `\n` passes before the fix and proves nothing), plus one asserting the
   empty-parse report fires for a non-empty source.
 
-- [ ] 491. QUEUE PROSE WRITTEN ONLY INTO THE HTML IS LOST ON THE NEXT REBUILD
+- [ ] 491. Queue prose written only into the html is lost on the next rebuild
   (measured 04.08.2026, and it cost the German text of thirteen cards). The
   Warteschlange is a PROJECTION: `scripts/board-queue.mjs` renders it from
   `.claude/board-queue.json`. But `node scripts/board.mjs queue <N> "<text>"`
@@ -4150,7 +4150,7 @@ Build order, chosen so no two parallel agents own the same file:
   rebuild; a rebuild that would blank an existing card's prose is refused or
   restores it; the report names the cards it emptied.
 
-- [ ] 495. A VERSIONED GIT HOOK WITHOUT ITS EXECUTABLE BIT IS SILENTLY INERT
+- [ ] 495. A versioned git hook without its executable bit is silently inert
   (found 04.08.2026). `scripts/git-hooks/pre-push` was committed 100644. Git for
   Windows runs a hook whichever mode it carries, so the gate worked on the old
   host and fell silent the moment the working copy moved to Linux — the only
@@ -4184,7 +4184,7 @@ Build order, chosen so no two parallel agents own the same file:
   `node scripts/guard-health-guard.mjs --status` names a hook whose bit was
   removed.
 
-- [ ] 497. THE GERMAN-LANGUAGE RULE HAS NO MECHANISM AT ALL, AND THE AUDIT
+- [ ] 497. The german-language rule has no mechanism at all, and the audit
   PASSED IT ANYWAY (user 04.08.2026: "Warum schreibst du die ganze Zeit auf
   Englisch? Klappt der Mechanismus nicht? Falls ja, klappen vielleicht auch
   andere Mechanismen nicht."). Answers to the user are German (memory
@@ -4228,7 +4228,7 @@ Build order, chosen so no two parallel agents own the same file:
   every enforcer wired with the new one counted, and no row in
   `docs/rule-corpus-audit.md` is left with an empty measured-by cell.
 
-- [ ] 498. WHAT THE SOFTWARE SECOND LANE COSTS THE FULL REGRESSION, MEASURED
+- [ ] 498. What the software second lane costs the full regression, measured
   (user 04.08.2026, asking against the open decision "Zweite Bahn läuft in
   Software — reicht das?"). Point 493 restored both lanes and measured ONE
   suite: `flow` runs 58 s on the hardware WebGL lane and 3 min 41 s on the
@@ -4266,7 +4266,7 @@ Build order, chosen so no two parallel agents own the same file:
   and no figure in that section is an extrapolation — every one is a wall-clock
   reading of a run that happened.
 
-- [ ] 506. THE SOFTWARE LANE REDDENS AT CHECKS IT CANNOT DRAW FAST ENOUGH TO
+- [ ] 506. The software lane reddens at checks it cannot draw fast enough to
   ANSWER (measured 05.08.2026, 01:50–03:40, on a machine with no second verify
   run — the quiet repeat point 499 asked for). Four checks fail on the software
   WebGPU lane and pass, measured, on the hardware WebGL 2 lane, and every one of
@@ -4326,7 +4326,7 @@ Build order, chosen so no two parallel agents own the same file:
   a Vitest case pins the pure skip decision (needed vs measured throughput) in
   both directions, including that a hardware lane never skips.
 
-- [ ] 508. EACH NOW-CARD IS JUDGED BY ITS OWN NUMBER (measured 05.08.2026, bundle
+- [ ] 508. Each now-card is judged by its own number (measured 05.08.2026, bundle
   Chat & Tafel). `parseNowCard` in `scripts/queue-order-guard-core.mjs` cuts the
   WHOLE "Woran ich gerade arbeite" section out as ONE text and files it under the
   FIRST card's number. Several now-cards at once are explicitly allowed (one per
@@ -4347,7 +4347,7 @@ Build order, chosen so no two parallel agents own the same file:
   finding must name the second card's point, and a single-now-card board must behave
   exactly as it does today.
 
-- [ ] 514. THE COMPATIBILITY LANE HAS TWO REDS THE WEBGL LANE DOES NOT (measured
+- [ ] 514. The compatibility lane has two reds the webgl lane does not (measured
   05.08.2026 on `main`, both lanes run minutes apart on the same machine, right
   after the lane moved onto the card in point 505). `enrichments` on the WebGPU
   compatibility lane died twice for different reasons — run 1 after 157 green
@@ -4404,7 +4404,7 @@ Build order, chosen so no two parallel agents own the same file:
   difference that makes it structurally impossible there. Plus: a probe built on
   `bootGame` renders the scene, not a black canvas.
 
-- [ ] 520. THE BOARD DEMANDS A TIME IT GIVES NO WAY TO WRITE (found 05.08.2026
+- [ ] 520. The board demands a time it gives no way to write (found 05.08.2026
   while closing point 394). `dashboard-guard` refuses the turn end when a
   current-work card's estimate is less than 15 minutes away (`now-eta-soon`) and
   instructs "give each a realistic new `~HH:MM`" — but `scripts/board.mjs` has no
@@ -4426,7 +4426,7 @@ Build order, chosen so no two parallel agents own the same file:
   written with LF endings whatever it held before), plus a case that the
   `now-eta-soon` remedy text names the new command.
 
-- [ ] 521. THE ENRICHMENT SUITE AIMS BY STOPWATCH AND ABORTS BEFORE ITS OWN
+- [ ] 521. The enrichment suite aims by stopwatch and aborts before its own
   EVIDENCE (found 05.08.2026 while closing point 323). `scripts/verify/
   enrichments.mjs` jumps the traveller with `debugJumpTo` — which sets the
   POSITION instantly while the travel camera SPRINGS toward it — and then waits a
@@ -4470,7 +4470,7 @@ Build order, chosen so no two parallel agents own the same file:
   `docs/picture-check-levers.md`, which is a result, not a failure. Nothing diff-based is
   enabled by this point itself.
 
-- [ ] 529. A STOP HOOK IN THE USER SCOPE NOW ENFORCES WHAT A PROJECT GUARD
+- [ ] 529. A stop hook in the user scope now enforces what a project guard
   ALREADY HARD-BLOCKS (measured 06.08.2026 while taking the turn-cost inventory).
   `~/.claude/hooks/check-reply-timestamp.cjs` is registered as a Stop hook in the
   user scope and checks the chat timestamp — the same rule
@@ -4486,7 +4486,7 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: a reply written without the stamp is still refused (timestamp-guard
   blocks it) after the removal, and the Stop chain's process count drops by one.
 
-- [ ] 542. THREE BUILT GUARDS ARE STILL ASLEEP, AND THE ARMING NEEDS AN ATTENDED
+- [ ] 542. Three built guards are still asleep, and the arming needs an attended
   SESSION (07.08.2026). `path-scope-guard`, `bundle-first-guard` and
   `point-proof-guard` are built, tested and recorded in `INTENTIONALLY_DORMANT`
   (`scripts/guard-health-core.mjs`). None of them enforces anything, because arming
@@ -4512,7 +4512,7 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: medium — the guards themselves are reviewed and tested; what is at
   stake is that a wrongly placed hook line disables a chain silently.
 
-- [ ] 548. THE PANORAMA BAND'S TWO REVIEW OBSERVATIONS (second model, 07.08.2026; it
+- [ ] 548. The panorama band's two review observations (second model, 07.08.2026; it
   judged BOTH as non-blocking and asked for them as their own point rather than as
   argument). (a) THE ONCE-PER-SESSION CAPTURE TARGETS DO NOT SURVIVE A RENDERER
   RECREATION. `src/scenes/travel/panoramaCapture.ts` holds `targets` module-global, and
@@ -4542,7 +4542,7 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: low — neither is reachable or harmful today; both are the kind of thing
   that stays invisible until the day it is not.
 
-- [ ] 559. THE TIME-TRACKING MANDATE IS ABOLISHED, ITS USEFUL HALF KEPT (user decision
+- [ ] 559. The time-tracking mandate is abolished, its useful half kept (user decision
   08.08.2026, answering the board card "Zeiterfassung in der Arbeitsordnung: abschaffen
   oder wiederbeleben?"; bundle Arbeitsordnung). The rule mandated 14.07.2026 prescribes
   four point states — `[ ]` untouched, `[*]` in progress, `[~]` implemented but
@@ -4581,7 +4581,7 @@ Build order, chosen so no two parallel agents own the same file:
   nobody follows it teaches that the rule corpus may be ignored, and that cost is
   charged to every other rule.
 
-- [ ] 560. THE ONLY ACTIVE CHANNEL FOR A RED BRANCH RUN IS NOT CONFIGURED (measured
+- [ ] 560. The only active channel for a red branch run is not configured (measured
   08.08.2026 during the live proof of point 513; bundle Modell & Wächter). The CI
   workflow has always carried an ntfy alert step for a failed run, and that step has
   never fired: the probe run reported `NTFY_TOPIC secret not set — skipping the failure
@@ -4605,7 +4605,7 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: medium — it is the difference between a silent failure and a noticed one,
   and it only became live with 513.
 
-- [ ] 561. THE SILENCED BRANCH GATE HAS THREE BLIND SPOTS (four-eyes review of point 513
+- [ ] 561. The silenced branch gate has three blind spots (four-eyes review of point 513
   by Fable 5, 08.08.2026; bundle Modell & Wächter). Point 513 deliberately makes a red
   `feat/**` run conclude `success` so it stops mailing the owner. The consequence was
   measured, not guessed: the GitHub jobs API reports the failed step's conclusion as
@@ -4645,7 +4645,7 @@ Build order, chosen so no two parallel agents own the same file:
   `protectedRef`. Pure Vitest for each.
   Criticality: medium — (a) is the one that can let a real regression reach `main`.
 
-- [ ] 563. THE TAG FRAME'S NEW READABILITY JUDGE HAS THREE SOFT SPOTS (four-eyes
+- [ ] 563. The tag frame's new readability judge has three soft spots (four-eyes
   review of point 524 by the second model, 08.08.2026, verdict merge; bundle
   Testinfrastruktur). `scripts/verify/tagFrameReading.mjs` decides whether the
   village-tag evidence frame readably shows both children, and it was accepted as
@@ -4678,7 +4678,7 @@ Build order, chosen so no two parallel agents own the same file:
   the diagnostic picks the best of a series of failing readings, not the last (3).
   No browser run is needed for any of the three.
 
-- [ ] 564. "CANDIDATE REAL FAILURE" IS ASSERTED WITH CONFIDENCE THE RUN DID NOT EARN
+- [ ] 564. "Candidate real failure" is asserted with confidence the run did not earn
   (measured 08.08.2026, 18:22Z). The retry classifier calls a check that fails in BOTH
   runs a "CANDIDATE REAL FAILURE" and names the diff words it touches — here `polish`
   "settlement walker (goat): the planted foot holds its ground spot (point 300)", twice,
@@ -4710,7 +4710,7 @@ Build order, chosen so no two parallel agents own the same file:
   loaded one; a rate-marked check is named as rate-sensitive in the verdict; and the
   diff-word list is absent from an UNDECIDED verdict.
 
-- [ ] 568. THE POLISH WATER-SAMENESS CHECK ROTATES ITS VERDICT (measured 09.08.2026 by
+- [ ] 568. The polish water-sameness check rotates its verdict (measured 09.08.2026 by
   the agent delivering point 557, on WebGL 2, with the world seed pinned to 42 at the
   launcher; bundle Testinfrastruktur). Step 13.8 of `polish` — "the water beyond the
   plate's rim is the SAME water as the water at the bank (≤ 12/255)" — went RED on the
@@ -4734,7 +4734,7 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: medium — it does not itself hide a product defect, but it may BE one, and
   it erodes the trust in a red that point 549 was built to restore.
 
-- [ ] 570. THE CHILDREN-PHOTOGRAPHABLE CHECK REDS ON THE PINNED WORLD (measured
+- [ ] 570. The children-photographable check reds on the pinned world (measured
   09.08.2026 on `main` at 3e33ff83, WebGL 2, immediately after point 557 pinned the world
   seed at the launcher; bundle Testinfrastruktur). `polish`'s check "the game is
   photographable: both children read whole, apart and at least 67 px tall, unoccluded,
@@ -4767,7 +4767,7 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: medium — it may be a real regression against a closed criterion, and until
   it is owned it blocks every render-set change from ever recording a covering run.
 
-- [ ] 265. ELDERLY (GERIATRIC) ANIMAL VARIANTS — an OLD version of each suitable
+- [ ] 265. Elderly (GERIATRIC) ANIMAL VARIANTS — an OLD version of each suitable
   species, visibly aged AND behaviourally distinct, plus natural death of old age
   (user 23.07.2026). PRIORITY/POSITION: queued BEFORE point 203 (do this content
   feature before the 203 visual bug-finder). RESEARCH FIRST (a standalone Fable pass,
@@ -4829,7 +4829,7 @@ Build order, chosen so no two parallel agents own the same file:
   files) can start in parallel, the scene wiring waits for the wildlife cluster to be
   free. Implementation-ready.
 
-- [ ] 269. BIRDS FLEE BY FLYING + REGION-APPROPRIATE AERIAL PREDATORS (research-gated)
+- [ ] 269. Birds flee by flying + region-appropriate aerial predators (research-gated)
   (user 23.07.2026). Two linked additions, BOTH gated on a Fable research pass first.
   (A) FLIGHT-CAPABLE BIRDS ESCAPE BY FLYING: every bird species that can fly gets a
   GROUND (perched/sitting/feeding) state and an IN-AIR (flying) state; when it flees a
@@ -4879,7 +4879,7 @@ Build order, chosen so no two parallel agents own the same file:
   now; the BUILD waits for the cluster to be free and does NOT run concurrently with
   another Wildlife.tsx point. Implementation-ready once the research lands.
 
-- [ ] 310. LOW-PRESET PERFORMANCE PASS FOR TWO OPPOSITE DEVICES (user 25.07.2026,
+- [ ] 310. Low-preset performance pass for two opposite devices (user 25.07.2026,
   recalibrated 06.08.2026). LOW must run WELL on a weak Windows desktop AND on the
   Galaxy S25 — one preset, two opposite bottlenecks, which is the whole difficulty
   of this point.
@@ -4955,7 +4955,7 @@ Build order, chosen so no two parallel agents own the same file:
   RELATIVE drop must confirm the projection rather than contradict it — without a
   visual regression the user rejects.
 
-- [ ] 315. THE SPHINX IS REBUILT FROM SCRATCH, FAR MORE ELABORATE (user 28.07.2026,
+- [ ] 315. The sphinx is rebuilt from scratch, far more elaborate (user 28.07.2026,
   superseding every earlier display report about it — the flicker, the shape and the
   half-buried read are all answered by the new model, not by patching the old one). The
   user's verdict on the deployed build: "die Darstellung der Sphinx gefällt mir allgemein
@@ -5012,7 +5012,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS in the same commit: `docs/acceptance-evidence.md` §15/§25 gain the chain, and
   `docs/graphics-detail-levels.md` the new per-level entries.
 
-- [ ] 391. THE GIZA MONUMENTS STAND AT A MONUMENTAL SCALE IN THE FIRST-PERSON VIEW (user
+- [ ] 391. The giza monuments stand at a monumental scale in the first-person view (user
   28.07.2026). Standing on the plateau, the pyramids and the Sphinx must read as GIANTS —
   markedly larger than today, so that a person at their foot is a speck against them. The
   stated reason is a planned later feature and belongs in the record: the user intends a
@@ -5066,7 +5066,7 @@ Build order, chosen so no two parallel agents own the same file:
   in `scripts/doc-budget-core.mjs`, or by shortening elsewhere — the guard decides, not a
   round number.
 
-- [ ] 320. SPRINGS AS REAL 3D BUBBLING WATER (user 25.07.2026: the springs still
+- [ ] 320. Springs as real 3d bubbling water (user 25.07.2026: the springs still
   read as a mere symbol — animated now, but flat; they should LOOK like a spring
   with water bubbling three-dimensionally). Rework the §11.3 spring depiction at
   travel scale into a small 3D water feature. ANCHOR (25.07, main session): the
@@ -5087,7 +5087,7 @@ Build order, chosen so no two parallel agents own the same file:
   ray/heights check); screenshot pair added to the §7.2 evidence set; the picture
   judged on BOTH backends per the render rule.
 
-- [ ] 322. STAGED-EVENT FAILURES ARE EASY TO MISS (user 25.07.2026: staging "calf
+- [ ] 322. Staged-event failures are easy to miss (user 25.07.2026: staging "calf
   mired at waterfall" appeared to do nothing; the user later suspected an unseen
   error message). Make every debug stage/trigger outcome UNMISSABLE: a persistent,
   clearly styled result banner — success names what was staged and where, failure
@@ -5100,7 +5100,7 @@ Build order, chosen so no two parallel agents own the same file:
   both languages, no silent path); settings.mjs live-checks the banner on an unmet
   precondition and a successful stage; both languages.
 
-- [ ] 327. TWO NEARBY CARCASSES MUST SHARE ONE VULTURE FLOCK (user 25.07.2026: a
+- [ ] 327. Two nearby carcasses must share one vulture flock (user 25.07.2026: a
   second flock spawns and the two overlap). Give the §19.6 flock a claim over a
   carcass CLUSTER: a new carcass within a calibratable radius of a flock's current
   target joins that flock's queue instead of drawing a second flock, and the flock
@@ -5110,7 +5110,7 @@ Build order, chosen so no two parallel agents own the same file:
   check with two staged carcasses close together — exactly one flock, both eaten,
   no overlap; both backends.
 
-- [ ] 328. VULTURES DO NOT VISIBLY LAND (user 25.07.2026: "they seem to fly one
+- [ ] 328. Vultures do not visibly land (user 25.07.2026: "they seem to fly one
   moment and stand the next — is there a landing at all?"). Add a real landing
   approach to the §19.6 flock AND the lone ground scavenger: a descending glide
   along the approach heading with slowing forward speed, a flare with raised wings
@@ -5123,7 +5123,7 @@ Build order, chosen so no two parallel agents own the same file:
   single-frame snap) while the point-128 "stands on its own ground" clearance still
   holds; screenshot of the flare; both backends.
 
-- [ ] 343. THE SUN STANDS WHERE IT REALLY STOOD — ELEVATION FROM DATE AND LATITUDE
+- [ ] 343. The sun stands where it really stood — elevation from date and latitude
   (user 25.07.2026; design.md §2.7 states the target). Today `SUN_DIR` is a hard
   constant in BOTH scenes — `[0.5, 0.62, 0.38]` in `src/scenes/travel/TravelScene.tsx`
   and `[0.52, 0.68, 0.34]` in `src/scenes/place/PlaceScene.tsx`, an elevation of ~45°
@@ -5194,7 +5194,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS: design.md §2.7 already states it; CLAUDE.md §7.1 point 14 gains the built
   behaviour when this lands.
 
-- [ ] 344. EYE ADAPTATION AND SUN GLARE, HIGHEST QUALITY LEVEL (user 25.07.2026;
+- [ ] 344. Eye adaptation and sun glare, highest quality level (user 25.07.2026;
   design.md §2.7 states the target). BUILDS ON POINT 343 — before the sun is low there
   is nothing to be dazzled by, and with a 50° vertical field of view the first-person
   camera sees roughly -25°..+25°, so the 16:00 sun (6.7°..37°) sits IN FRAME whenever
@@ -5235,7 +5235,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS: design.md §2.7 already states it; CLAUDE.md §7.1 point 14 gains the built
   behaviour when this lands.
 
-- [ ] 345. SUN SHAFTS THROUGH WHAT STANDS IN THE WAY, HIGHEST QUALITY LEVEL (user
+- [ ] 345. Sun shafts through what stands in the way, highest quality level (user
   25.07.2026). With the low afternoon sun of point 343, a palm crown, a roof edge, the
   Djinguereber minaret or the Giza pyramids finally have something to cast shafts
   through. Wire the upstream `three/addons/tsl/display/GodraysNode.js`
@@ -5261,7 +5261,7 @@ Build order, chosen so no two parallel agents own the same file:
   stepped down — judged on the image, not on the flag; no console errors; the F8
   before/after numbers are recorded.
 
-- [ ] 346. HORIZON MAPS BAKED FROM THE DEM — SELF-SHADOWING AND SKY OCCLUSION AT
+- [ ] 346. Horizon maps baked from the dem — self-shadowing and sky occlusion at
   PLANETARY RANGE (user 25.07.2026; design.md §2.7 states the target). A new offline
   step beside `scripts/build-geodata.mjs` measures, per DEM texel, the HORIZON ANGLE —
   how high the land rises around that point — and the terrain shader reads it. Two
@@ -5323,7 +5323,7 @@ Build order, chosen so no two parallel agents own the same file:
   the quality level stepped to low — the effect is judged on the image, never on the
   flag; no console errors; the build step is reproducible from a clean checkout.
 
-- [ ] 348. THE VILLAGE FIRE IN THE RAIN (user 25.07.2026, screenshot: the Zulu village
+- [ ] 348. The village fire in the rain (user 25.07.2026, screenshot: the Zulu village
   under visible rain, the §19.10 fire burning uncovered in the open with the
   inhabitants standing around it as if the weather were not happening). Point 142
   already made the fire answer to a place's own COLD, harmattan and karif; RAIN is the
@@ -5377,7 +5377,7 @@ Build order, chosen so no two parallel agents own the same file:
   than an uncovered burning fire, and the same village in dry weather is unchanged from
   today.
 
-- [ ] 350. THE KNEELING VILLAGER IS A SQUASHED VILLAGER (user 25.07.2026, deployed
+- [ ] 350. The kneeling villager is a squashed villager (user 25.07.2026, deployed
   build: a figure in the Zulu village alternates between normal and visibly FLATTENED).
   ROOT CAUSE, already located: `Figure` in `src/scenes/place/PlaceLife.tsx` fakes
   kneeling with a NON-UNIFORM vertical squash — `scale={[scale, scale * (kneel ? 0.75 :
@@ -5403,7 +5403,7 @@ Build order, chosen so no two parallel agents own the same file:
   rendered height by more than the transition's per-frame step — the pop is what the
   check is for.
 
-- [ ] 353. SHELTERED GROUND STAYS LESS WET (user 25.07.2026). In the rain the whole
+- [ ] 353. Sheltered ground stays less wet (user 25.07.2026). In the rain the whole
   settlement floor darkens uniformly, so the earth under a roof overhang or a tree crown
   soaks exactly like the open yard. Make wetness SPATIAL — and less, not none: ground
   under cover reads drier than the open ground around it, but never bone dry, because
@@ -5440,7 +5440,7 @@ Build order, chosen so no two parallel agents own the same file:
   in the open yard, while in dry weather the two crops match — judged on the image, not
   on the uniform.
 
-- [ ] 354. RAIN FALLS FROM A BRIGHT BLUE SKY IN THE SETTLEMENT (user 25.07.2026,
+- [ ] 354. Rain falls from a bright blue sky in the settlement (user 25.07.2026,
   deployed build: the Zulu village on 03.01.1890 — high summer rains — with clear rain
   streaks against an almost cloudless blue dome). Under rain the sky must read heavy.
   THE MECHANISM EXISTS AND IS WIRED, which is what makes this worth a careful look
@@ -5475,7 +5475,7 @@ Build order, chosen so no two parallel agents own the same file:
   than in its dry month, and the difference is large enough that a person would call it
   overcast; the existing dry-month picture is unchanged.
 
-- [ ] 356. THE INHABITANTS NOTICE THE TRAVELLER (user 25.07.2026). Today they do not:
+- [ ] 356. The inhabitants notice the traveller (user 25.07.2026). Today they do not:
   in `src/scenes/place/PlaceLife.tsx` the player appears ONLY as a collision radius, so
   a settlement is a diorama that happens to be occupied. Being SEEN is the strongest
   signal that a place is inhabited, and for a European walking into an African village
@@ -5498,7 +5498,7 @@ Build order, chosen so no two parallel agents own the same file:
   measurably toward the player and returns afterwards, while the errands continue.
   DOCS: design.md §19.10 gains the glance beside the existing village vignettes.
 
-- [ ] 357. THE VILLAGE SOUNDS INHABITED (user 25.07.2026). Checked: the settlement
+- [ ] 357. The village sounds inhabited (user 25.07.2026). Checked: the settlement
   soundscape in `src/systems/ambience.ts` runs exactly ONE layer for a village —
   `setTarget('drums', 0.5)`. No voices, no pestle, no goats, no fire. Sound carries
   "inhabited" further than any visual, and its absence is not noticed until it is there.
@@ -5521,7 +5521,7 @@ Build order, chosen so no two parallel agents own the same file:
   the master is muted; no console errors.
   DOCS: design.md §19.10/§20 name the village layers.
 
-- [ ] 358. SMOKE OVER THE FIRE, DUST UNDER THE FEET (user 25.07.2026). A thin smoke
+- [ ] 358. Smoke over the fire, dust under the feet (user 25.07.2026). A thin smoke
   column drifting from the §19.10 fire reads as "someone lives here" from further away
   than any figure does, and dust kicked up where a walker crosses dry ground makes the
   ground feel walked on rather than walked over.
@@ -5542,7 +5542,7 @@ Build order, chosen so no two parallel agents own the same file:
   inhabitant raises visible dust and in rain it does not.
   DOCS: design.md §19.10.
 
-- [ ] 359. THE CATTLE PEOPLES' KRAAL IS EMPTY (user 25.07.2026, from the Zulu village
+- [ ] 359. The cattle peoples' kraal is empty (user 25.07.2026, from the Zulu village
   screenshot: the enclosure stands there with nothing in it — `PlaceLife.tsx` puts GOATS
   in a pen, cattle do not exist). For a Zulu umuzi the cattle enclosure is not scenery
   but the centre of the homestead, and an empty one is a conspicuous absence.
@@ -5568,7 +5568,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS in the same commit: design.md §19.10 and the implementation section of
   `docs/peoples-1890.md` (the standing rule that research and game table never drift).
 
-- [ ] 360. THE INHABITANTS TAKE NOTICE OF EACH OTHER (user 25.07.2026). Every villager
+- [ ] 360. The inhabitants take notice of each other (user 25.07.2026). Every villager
   runs its errand alone: they pass within a metre of one another and nothing happens.
   A place where nobody acknowledges anybody reads as a set of independent machines
   sharing a courtyard.
@@ -5600,7 +5600,7 @@ Build order, chosen so no two parallel agents own the same file:
   targets are still reached afterwards; no walker is left standing past its window.
   DOCS: design.md §19.10 beside the existing village vignettes.
 
-- [ ] 362. THE CROSSING TURNED BACK — the crocodile takes a calf mid-channel
+- [ ] 362. The crossing turned back — the crocodile takes a calf mid-channel
   (user 26.07.2026; design.md §19.8 states the target). Two systems exist and have
   never met: the purposeful water crossing (`crossingTarget`/`shouldStartCrossing`
   in `src/scenes/travel/wildlifeBehavior.ts`, point 192) and the crocodile ambush
@@ -5641,7 +5641,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS: design.md §19.8 + §21.2 already state it; add the balance value's comment
   and the acceptance-evidence line under §12.
 
-- [ ] 363. THE STRAGGLER — a lame calf the herd leaves behind (user 26.07.2026;
+- [ ] 363. The straggler — a lame calf the herd leaves behind (user 26.07.2026;
   design.md §19.8 states the target). Every §19 drama is fast: a charge, a seizure,
   a plunge. This one is slow, and nothing is scripted to kill — it is the only
   scene in the game whose tension is WAITING.
@@ -5674,7 +5674,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
   acceptance-evidence line under §12.
 
-- [ ] 364. THE FLOOD SWELLS THE DRAMA CURRENT — and can take a calf at the crest
+- [ ] 364. The flood swells the drama current — and can take a calf at the crest
   (user 26.07.2026; design.md §19.8 states the target). This point fixes a real
   inconsistency first and adds a drama second; both land together.
   THE BUG. `seasonFlowFactor(CURRENT_WEATHER.wetness, dryFlowFactor, wetFlowFactor)`
@@ -5716,7 +5716,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
   acceptance-evidence line under §12.
 
-- [ ] 379. ABU SIMBEL BECOMES A WALKABLE SITE (user 27.07.2026; a FEATURE, and the user's
+- [ ] 379. Abu simbel becomes a walkable site (user 27.07.2026; a FEATURE, and the user's
   own instruction is that the open DEFECTS come first — it waits behind them). The world carries
   eight built cultural landmarks (Meroë, Giza, Great Zimbabwe, Lalibela, Kilwa, Aksum,
   Gondar, Bandiagara) and four natural ones; the rock temples of Abu Simbel are absent,
@@ -5766,7 +5766,7 @@ Build order, chosen so no two parallel agents own the same file:
   is a genuine addition and pays its measured words), CLAUDE.md §7.1 pt 25 where the
   eight are enumerated, and the evidence section.
 
-- [ ] 380. THE SURROUNDINGS SHOW THE NEIGHBOUR THAT IS REALLY THERE (user 27.07.2026,
+- [ ] 380. The surroundings show the neighbour that is really there (user 27.07.2026,
   reported from the deployed build). Standing at the Giza monument site the traveller
   does NOT see Cairo on the horizon, while standing in Cairo he does see the pyramids —
   and in 1890 the two are barely fifteen kilometres apart, in flat desert, in plain
@@ -5799,7 +5799,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS in the same commit: `design.md` §2.5 (what the panorama shows is design content)
   and CLAUDE.md §7.1 pt 31 with its evidence section.
 
-- [ ] 384. RAIN THAT TOUCHES THE WORLD — WET GROUND, IMPACTS, LIT DROPS (user 27.07.2026,
+- [ ] 384. Rain that touches the world — wet ground, impacts, lit drops (user 27.07.2026,
   after looking at the settlement rain on the deployed build: "the rain is simply painted
   over the picture — it has no effect on the optics at all"). Measured against the code,
   that reading is nearly right: `src/scenes/place/PlaceRain.tsx` draws 700 instanced
@@ -5841,7 +5841,7 @@ Build order, chosen so no two parallel agents own the same file:
   content), `docs/graphics-detail-levels.md`, and CLAUDE.md §7.1 pt 12 with its evidence
   section.
 
-- [ ] 385. RAIN WITH DEPTH AND WEATHER — LAYERS, STREAK SHAPE, DIMMED SUN (user
+- [ ] 385. Rain with depth and weather — layers, streak shape, dimmed sun (user
   27.07.2026; the second half of the rain work, deliberately LAST in the queue, after
   point 379). Point 384 makes the rain touch the world; this makes the rain itself read
   as weather rather than as particles.
@@ -5869,7 +5869,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS in the same commit: design.md §19.13, `docs/graphics-detail-levels.md`, CLAUDE.md
   §7.1 pt 12 and its evidence section.
 
-- [ ] 414. THE BIRD'S-EYE ANIMALS GET THE WALK THE SETTLEMENT ONES HAVE (29.07.2026,
+- [ ] 414. The bird's-eye animals get the walk the settlement ones have (29.07.2026,
   user asked after seeing the settlement gait: "could this walk be carried over to the
   bird's-eye view?"). Yes — and the hard part is already built and tested. `src/render/
   fauna.ts` carries the whole derivation as pure functions: `footReach`, `strideLength`,
@@ -5921,7 +5921,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS in the same commit: design.md §19 where the wildlife is described, and
   `docs/graphics-detail-levels.md`.
 
-- [ ] 415. THE TUAREG TENT READS AS A HEAP OF SAND (29.07.2026, user in the Tuareg
+- [ ] 415. The tuareg tent reads as a heap of sand (29.07.2026, user in the Tuareg
   village, North: "what are these cones supposed to be? Sand piles? They look more like
   mini tents"). They ARE tents — `Tent` in `PlaceScene.tsx` is a single
   `coneGeometry(r·1.25, h)` in the cloth material, a 0.45-unit pole and a small dark
@@ -5954,7 +5954,7 @@ Build order, chosen so no two parallel agents own the same file:
   the dwelling row for the Tuareg, per the standing rule that the implementation
   sections move with the rendering.
 
-- [ ] 428. THE WALKABLE GROUND MEETS THE PANORAMA AT A VISIBLE STEP (29.07.2026, found by
+- [ ] 428. The walkable ground meets the panorama at a visible step (29.07.2026, found by
   the picture check of the vertical look, on BOTH backends). Standing at the settlement's
   walkable edge and looking DOWN over it — a view the game only gained with the vertical
   look — the walkable disc and the backdrop relief behind it read as TWO surfaces, not one
@@ -5988,7 +5988,7 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS in the same commit: the evidence section `docs/acceptance-evidence.md` §31 records
   the pitched-view check beside the existing eye-level one.
 
-- [ ] 591. DOES THE PROJECT STILL OBEY ITS OWN RULES? A FULL ADHERENCE AUDIT (user
+- [ ] 591. Does the project still obey its own rules? a full adherence audit (user
   09.08.2026: "Wir scheinen so einige unserer eigenen Projektregeln zu verletzen. Lege
   auch einen Task an, der ein Review des ganzen Projekts macht, um zu prüfen, ob es noch
   mehr in der Richtung gibt"). THIS IS A DIFFERENT AXIS FROM POINT 307. That audit
@@ -6060,7 +6060,7 @@ later decisions wait on its readings, and the ladder (595) now precedes the land
 (594) — verification is 47 % of the spend against bookkeeping's 26 %, and a rule is cheaper
 to land than a mechanism that needs a review.
 
-- [ ] 303. CODE REVIEW OF ALL CHANGES SINCE v0.1 — validate every test is still VALID (user
+- [ ] 303. Code review of all changes since v0.1 — validate every test is still valid (user
   24.07.2026). QUEUE POSITION: the NEXT task after 224. Stale tests keep surfacing only as
   incidental findings (today alone: a strict type-check, heavy fuzz timeouts, and checks that
   ASSUMED pre-276 defaults — SSAO on, campfire shadows off — so they measured the wrong
@@ -6077,7 +6077,7 @@ to land than a mechanism that needs a review.
   `scripts/verify/*.mjs`. VERIFIABLE: a written report per reviewed area with a verdict
   (valid / stale→fixed), each stale test fixed with its correction. No player-visible text.
 
-- [ ] 285. HUNT ACCUMULATION BUGS AND MEMORY LEAKS — A REPEATABLE FABLE ANALYSIS
+- [ ] 285. Hunt accumulation bugs and memory leaks — a repeatable fable analysis
   (user 24.07.2026, learning from point 278: a fixed anchor drew ever more animals
   because streamed wildlife re-seeded on every return without releasing the
   re-homed originals — an UNBOUNDED growth that a normal test never caught because
@@ -6116,7 +6116,7 @@ to land than a mechanism that needs a review.
   workflows-token-budget rule) — scope Prong A inline first, then run Prong B's
   harness. Implementation-ready.
 
-- [ ] 330. FULL POST-DEGRADATION ASSURANCE PASS — nothing new starts until this is
+- [ ] 330. Full post-degradation assurance pass — nothing new starts until this is
   100 % green (user 25.07.2026, after three separate leftovers were found by chance:
   the board's broken umlauts, the board's inconsistency, and a whole night's work
   sitting unpushed on a feature branch). The user's verdict on the cleanup so far:
@@ -6189,7 +6189,7 @@ to land than a mechanism that needs a review.
   pre-satisfy the tag gate (it is keyed to a different commit; `--status` reports
   0/11 at HEAD). That review's own findings are queued as point 331.
 
-- [ ] 205. A WORLD & FUNCTIONALITY PLAUSIBILITY AUDIT — a THIRD audit kind beyond
+- [ ] 205. A world & functionality plausibility audit — a third audit kind beyond
   code bugs (Pillar 2) and visual/behaviour bugs (203): does the world and its
   functionality make SENSE and COHERE, not just work? (user request 20.07.2026:
   there may be systems that work but are pointless, useless, or run counter to
@@ -6245,7 +6245,7 @@ to land than a mechanism that needs a review.
   model-diverse pass is welcome (a Fable lens on "does this cohere") within the
   point-200 token limits.
 
-- [ ] 203. EXTEND 184 — a SYSTEMATIC visual + liveness bug-finder (user request
+- [ ] 203. Extend 184 — a systematic visual + liveness bug-finder (user request
   20.07.2026: "Bugs wie die … sollten leicht für dich zu finden sein … Kannst
   du 184 dahingehend erweitern, dass es selbst viel mehr Bugs in der Richtung
   findet?"). ROOT CAUSE of the miss: the invariant harness checks POSITIONS
@@ -6453,7 +6453,7 @@ to land than a mechanism that needs a review.
   the tripwire armed; build+lint+vitest+audit clean. (B)-(N) and the visual
   sweep (C) remain open above.
 
-- [ ] 207. ADDITIONAL FINDING METHODS that complement the existing audits (Pillar
+- [ ] 207. Additional finding methods that complement the existing audits (Pillar
   2 code, 203 visual/behaviour, 205 plausibility) and together lift coverage
   sharply (user request 20.07.2026). The existing net is designed-scenario
   invariants + an inspected visual sweep + static review; these orthogonal METHODS
@@ -6497,7 +6497,7 @@ to land than a mechanism that needs a review.
   BUILD ORDER: (i) then (ii) first (highest leverage), the rest layer in over the
   finder. These join 203/204/205 as the pre-tag quality framework.
 
-- [ ] 184. PRE-TAG HARDENING — a MUCH stronger, systematic quality pass to reach a
+- [ ] 184. Pre-tag hardening — a much stronger, systematic quality pass to reach a
   high-confidence bug-free state before the final closing run and the v0.2 tag.
   User decision 19.07.2026, after a cluster of elementary-functionality bugs kept
   surfacing in play (178 vultures pop in; 179 a lion tunnels through parent + calf;
@@ -6780,7 +6780,7 @@ to land than a mechanism that needs a review.
   1973, 2375, 3027, 4071, 4102, 4182, 4544, 4611, 4756, 5335; polish 270;
   settings 183, 277; flow 242; voice 56; touch 75) → 200.
 
-- [ ] 224. CONFIRM THE v0.2 CHECKPOINT IS SERVED (re-cut 10.08.2026 from the
+- [ ] 224. Confirm the v0.2 checkpoint is served (re-cut 10.08.2026 from the
   four-eyes work-order analysis; the original demanded work that is already done).
   The checkpoint itself SHIPPED: `git tag` carries `v0.2` at `bafd9b25` (24.07.2026),
   the `poc` tag has since moved on, and the Pages workflow enumerates every `v*` tag
@@ -6794,7 +6794,7 @@ to land than a mechanism that needs a review.
   evidence.
   Criticality: low — bookkeeping on a delivery that already happened.
 
-- [ ] 615. THE NOT-RUN GATE IS DISARMED BY A COMMENT, AND THE BOOTSTRAP SKIPS ITS OWN
+- [ ] 615. The not-run gate is disarmed by a comment, and the bootstrap skips its own
   LOCKFILE CHECK (four-eyes review of the landed point 573 by the second model,
   10.08.2026, verdict merge-with-fixes; both defects live-verified by the reviewer, not
   argued). Point 573 closed the false green where a spawn that never ran was read as
@@ -6830,7 +6830,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — both halves restore a signal the fast layer is believed to give
   and does not, which is the same failure class point 573 was opened for.
 
-- [ ] 616. THE IDLE MODES POINT 612 DOES NOT REACH (blind-parallel enumeration by both
+- [ ] 616. The idle modes point 612 does not reach (blind-parallel enumeration by both
   models, 10.08.2026 — CLAUDE.md §6 divergent stage; merged by meaning, and every item
   below is evidenced in `.claude/batch-launcher.log` or in the code it names). Point 612
   binds OWNERSHIP to work. Three further channels can hold the batch still while nothing
@@ -6866,7 +6866,7 @@ to land than a mechanism that needs a review.
   Criticality: high for unattended operation — each of the three has already cost more
   standing-still time than the failure 612 repairs.
 
-- [ ] 617. AN OWNER THAT WORKS ONCE AND THEN IDLES STILL HOLDS THE BATCH FOR AN HOUR
+- [ ] 617. An owner that works once and then idles still holds the batch for an hour
   (four-eyes finding on point 612, 10.08.2026, recorded with its merge verdict). Point 612
   binds ownership to work, but its idle window only reaches a session that has completed
   NO call since taking the lock (`workedSinceClaim === false`). That restriction is right
@@ -6889,7 +6889,7 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the batch's ownership arithmetic, and getting it wrong either
   strands the queue or produces two live owners.
 
-- [ ] 618. A MODIFIED KEY STILL DOES TWO THINGS AT ONCE OUTSIDE THE CALENDAR ROW
+- [ ] 618. A modified key still does two things at once outside the calendar row
   (four-eyes finding on point 601, 10.08.2026, recorded with its merge verdict). Point 601
   closed this defect class for the calendar keys: a chord the game hands back to the browser
   must not ALSO run the game's own handler, or one press does two things and the game's half
@@ -6915,7 +6915,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — it takes no session down the way Ctrl+W did, but every instance is
   a silent state change the player did not ask for and cannot see the cause of.
 
-- [ ] 619. THE DRESSING PAIR NO LONGER GESTURES, AND design.md SAYS SO (user decision
+- [ ] 619. The dressing pair no longer gestures, and design.md says so (user decision
   10.08.2026, answering the card the point-580 fix raised). The village's conversing pair
   is pure dressing that never utters anything, and since gestures were tied to speech
   behind the earshot gate it only stands, turns and shifts its weight. `design.md` §19.10
@@ -6931,7 +6931,7 @@ to land than a mechanism that needs a review.
   Criticality: low — it is a documentation correction, but an uncorrected line is a
   standing invitation to "restore" a behaviour that was deliberately removed.
 
-- [ ] 620. A FRAME PASSES ITS CHECKS WHILE SHOWING NOTHING AT ALL (measured 10.08.2026
+- [ ] 620. A frame passes its checks while showing nothing at all (measured 10.08.2026
   while landing point 588; bundle Testinfrastruktur). `VERIFY_GL=webgl node
   scripts/verify/run-all.mjs polish --section=speech-guess` passes all 11 checks and writes
   `148-speech-guess-invitation.png` / `149-speech-guess-dialog.png` showing the note and the
@@ -6960,7 +6960,7 @@ to land than a mechanism that needs a review.
   view is invisible on the WebGL 2 lane for as long as this stands, which is the exact harm
   the picture check exists to prevent.
 
-- [ ] 621. A CEILING RAISE IS NO LONGER A QUESTION FOR THE USER (user decision
+- [ ] 621. A ceiling raise is no longer a question for the user (user decision
   10.08.2026, via the board chat: "Frage mich in Zukunft allgemein nicht mehr bzgl.
   Anhebungen"; bundle Chat & Tafel). The measured doc ceilings in
   `scripts/doc-budget-core.mjs` currently have two ways out, and the second one —
@@ -6987,7 +6987,7 @@ to land than a mechanism that needs a review.
   `node scripts/doc-budget-core.mjs` and `scripts/verify/docs.mjs` green.
   Criticality: low — a process rule, no player-visible behaviour.
 
-- [ ] 622. A VERIFY RUN THAT RAN NOTHING REPORTS GREEN, AND AN UNKNOWN FLAG RUNS
+- [ ] 622. A verify run that ran nothing reports green, and an unknown flag runs
   EVERYTHING (found 10.08.2026 while verifying point 592; bundle Prüfkosten).
   Two shapes of the same hole in `scripts/verify/tiers.mjs`' `parseArgs`, both
   reproduced today: `node scripts/verify/run-logged.mjs --help` sorted `--help`
@@ -7016,7 +7016,7 @@ to land than a mechanism that needs a review.
   so a mistake there silences the whole gate; the other model's mechanism review
   applies.
 
-- [ ] 623. AN ANSWERED CARD OUTLIVES ITS ANSWER (user 10.08.2026, in the attended
+- [ ] 623. An answered card outlives its answer (user 10.08.2026, in the attended
   window: "Das ist schon ein paar mal passiert, dass eine Karte nicht gelöscht wurde,
   die ich beantwortet habe. Etabliere einen Mechanismus dagegen."; bundle Chat & Tafel).
   Measured the same evening: the card "design.md: 102 Wörter mehr, oder 102 anderswo
@@ -7087,7 +7087,7 @@ to land than a mechanism that needs a review.
   model's recorded review, and its failure mode is the user acting on a question that
   was settled hours ago.
 
-- [ ] 625. THE SAME DEFECT WAS BUILT TWICE, IN PARALLEL (measured 11.08.2026, 00:12).
+- [ ] 625. The same defect was built twice, in parallel (measured 11.08.2026, 00:12).
   Point 590 ("THE BOARD'S QUEUE ORDER IS A SECOND COPY OF THE WORK ORDER, AND IT KEEPS
   DRIFTING", from the user's report of 09.08.) and point 608 ("THE BOARD'S ORDER IS
   HAND-KEPT AND DRIFTS FROM THE WORK ORDER", a finding of 10.08.) name ONE defect and
@@ -7121,7 +7121,7 @@ to land than a mechanism that needs a review.
   Criticality: MEDIUM — no player-visible behaviour, but it wastes whole agent runs and
   produces branches that cannot both land.
 
-- [ ] 626. THE BOULDER'S PROOF PROVES THE WRONG THING (four-eyes review by GPT-5.6 Sol of
+- [ ] 626. The boulder's proof proves the wrong thing (four-eyes review by GPT-5.6 Sol of
   the landed point 585, 11.08.2026; two findings re-verified against the tree before
   filing). 585 stood the landmark erratic on the ground and was landed on a green picture
   — but its evidence does not hold what it claims, and a second defect class it fixed is
@@ -7149,7 +7149,7 @@ to land than a mechanism that needs a review.
   Criticality: HIGH — this is the landmark the communication goal is dug up at, and the
   check that was supposed to protect it does not.
 
-- [ ] 627. THE VICTORIA FALLS FRAME PHOTOGRAPHS SOMEWHERE ELSE (measured 11.08.2026 on
+- [ ] 627. The victoria falls frame photographs somewhere else (measured 11.08.2026 on
   `main` at 3f639f0d, after the point-585 landing; bundle Testinfrastruktur). `world`
   reds on ONE of its seven landmark frames: `15-worldmodel-victoria-falls — its subject is
   not in the rendered picture: off the left and bottom edge of the frame`. It survived the
@@ -7173,7 +7173,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — it blocks no player, but an unaccounted red on `main` blinds the
   render gate for every later change.
 
-- [ ] 643. A RED IS RELEASED BY THE WRONG PROOF: THE SUITE PASSED, NOT THE CHECK (found by
+- [ ] 643. A red is released by the wrong proof: the suite passed, not the check (found by
   GPT-5.6 Sol while reviewing point 640, and left standing there as a named boundary rather
   than smuggled into that point's scope). Point 640 settled how a red is CLOSED — cause,
   charge, or its own point. What it does not settle is how a red is RELEASED once recorded.
@@ -7197,7 +7197,7 @@ to land than a mechanism that needs a review.
   lets a red be signed off by evidence that never touched it, which is the same defect
   class point 640 closed from the other side. Bundle: Testinfrastruktur.
 
-- [ ] 646. THE REPO DOCTOR IS THE SECOND DOOR INTO THE SAME DISASTER (found 11.08.2026 by the
+- [ ] 646. The repo doctor is the second door into the same disaster (found 11.08.2026 by the
   agent delivering point 629, and left to its own point rather than smuggled into that
   scope). Point 629 closes the LANDING's path to deleting a live agent's worktree.
   `scripts/batch-doctor.mjs`'s `remove-orphan-worktrees` reaches the same directories under
@@ -7246,7 +7246,7 @@ to land than a mechanism that needs a review.
   Criticality: high — same failure class as point 629 and the same cost: it destroys work
   that is already done, and it fires while the pool is busiest. Bundle: Session- & Repo-Hygiene.
 
-- [ ] 647. A FULL-SUITE RED ON THE 629 BRANCH WHOSE TEST NOBODY CAN NAME (11.08.2026, 18:03,
+- [ ] 647. A full-suite red on the 629 branch whose test nobody can name (11.08.2026, 18:03,
   on `feat/629-cleanup-spares-live-worktrees`). One test in a full `npm run test:unit` run
   failed; the run's output was truncated before the name was read, and no vitest report
   artifact is kept in the repository, so the test cannot be recovered from the run. It is
@@ -7274,7 +7274,7 @@ to land than a mechanism that needs a review.
   between it and a landing; what makes it worth a point is that it could not be ANSWERED,
   which is the condition points 455, 640 and 643 all exist to end. Bundle: Testinfrastruktur.
 
-- [ ] 650. A REVIEW'S COVERAGE IS READ ALONG WITH ITS VERDICT (retrospective §3.110,
+- [ ] 650. A review's coverage is read along with its verdict (retrospective §3.110,
   11.08.2026). `scripts/review-sol.mjs` builds the reviewer's material from the whole
   commit range and stops at a cap; past it, files are dropped and the reviewer says so IN
   PROSE ("TRUNCATED/omitted"). Point 629 was reviewed five times and every single round
@@ -7312,7 +7312,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — it does not break the product, but it decides how much a review is
   worth, and every HIGH point is signed off on one. Bundle: Modell & Wächter.
 
-- [ ] 652. THE SESSION MAY NOT ASSERT A STATE IT DID NOT MEASURE, AND IS HANDED THE FACTS IT
+- [ ] 652. The session may not assert a state it did not measure, and is handed the facts it
   OTHERWISE GUESSES (user 11.08.2026, after five wrong assertions in one attended session:
   "your playing costs this machine nothing" — the container is WSL2 on the user's own host and
   shares CPU and GPU; `/poc/` offered as a test target — a frozen tag; "the machine is quiet" —
@@ -7386,7 +7386,7 @@ to land than a mechanism that needs a review.
   `scripts/mechanism-review.mjs --record` before it may end a turn, and the wiring in
   `.claude/settings.json` needs an attended session.
 
-- [ ] 653. EVERY ACCEPTANCE CRITERION'S DETAIL SECTION IS BOUND TO THE CODE IT DESCRIBES (user
+- [ ] 653. Every acceptance criterion's detail section is bound to the code it describes (user
   11.08.2026: "Ja, natürlich teste ich von der Kommunikationsmechanik nur den aktuellen Stand.
   Den habe ich ja selbst spezifiziert und dich bauen lassen und für den bauen wir bald die 0.3.
   Bevor die gebaut wird, will ich ihn testen."). MEASURED: `docs/acceptance-criteria-detail.md` §7 still describes the OLD
@@ -7426,7 +7426,7 @@ to land than a mechanism that needs a review.
   passes. It would have caught this case, because `src/communication/` is young and the section
   is old.
 
-- [ ] 668. THE LANDING GATE PROVES THE CHARGES ONLY WHILE THE POINT IS STILL OPEN (measured
+- [ ] 668. The landing gate proves the charges only while the point is still open (measured
   13.08.2026 at the 657 landing). `land-point.mjs` runs its fast gate BEFORE the tick, so the
   charges rule of `scripts/render-verify-core.test.mjs` ("charges only points the work order
   still holds OPEN") is proven on a state where the landing point is still open — and turns red
@@ -7440,7 +7440,7 @@ to land than a mechanism that needs a review.
   Criticality: low — the defect is loud and self-explaining at the push; this removes the manual
   after-the-fact repair, nothing else.
 
-- [ ] 670. A FILTERED GATE CHAIN DESTROYS THE EVIDENCE ITS OWN SUSPECT RECORD DEMANDS (measured
+- [ ] 670. A filtered gate chain destroys the evidence its own suspect record demands (measured
   13.08.2026 while verifying point 651). The gates were run as one chain whose suite call ended
   in `| grep -E "PASS|FAIL" | tail -2`. The suite went RED on its first attempt and green on the
   retry, so the harness recorded the run SUSPECT — correctly, per point 640, which then demands
@@ -7460,7 +7460,7 @@ to land than a mechanism that needs a review.
   cause and closing it by a green, which is exactly what point 640 forbids.
 
 
-- [ ] 676. AN AUTHORING LANE MUST SURVIVE THE SESSION THAT SPAWNED IT (specified 13.08.2026 by
+- [ ] 676. An authoring lane must survive the session that spawned it (specified 13.08.2026 by
   the blind-parallel four-eyes stage of CLAUDE.md §6; the counted union, the final proposal and
   the rejected alternatives are `docs/handover-architecture.md`). TWO RULES OF THIS HOUSE
   CONTRADICT EACH OTHER TODAY: the pool runs up to three authoring lanes, and the session hands
@@ -7509,7 +7509,7 @@ to land than a mechanism that needs a review.
   here loses work rather than merely slowing it.
 
 
-- [ ] 677. A GUARD RUN BY HAND HANGS FOREVER ON ITS OWN STDIN (measured 13.08.2026, 19:20). The
+- [ ] 677. A guard run by hand hangs forever on its own stdin (measured 13.08.2026, 19:20). The
   house rule says to ASK THE GUARDS BEFORE THE ACTION (CLAUDE.md §7.2), and a session that does
   so directly — `node scripts/tasks-spec-guard.mjs` — never comes back: the wrapper reads the
   hook payload with `readFileSync(0, 'utf8')`, which BLOCKS while stdin is an open terminal or an
@@ -7533,7 +7533,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — nothing is corrupted, but it burns a session's turn and leaves stuck
   processes behind, and it fires exactly on the session that follows the rule.
 
-- [ ] 678. A LANE IS ROUTED TO WHEN IT HAS NOTHING LEFT, AND WHAT DIES THERE IS RESCUED BY HAND
+- [ ] 678. A lane is routed to when it has nothing left, and what dies there is rescued by hand
   (measured 13.08.2026, 20:0x, on point 675). The routing sends difficult, complex or error-prone
   work to Fable 5 from the start (`scripts/author-routing-core.mjs`), and it does so without ever
   asking whether that lane still has volume. Today the Fable author built five commits of the
@@ -7571,7 +7571,7 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the only failure mode on record that can destroy finished work outright,
   and it fired today.
 
-- [ ] 680. THE BUG REPORT CARRIES THE SETTLEMENT'S LIFE, NOT ONLY THE WILDLIFE (measured
+- [ ] 680. The bug report carries the settlement's life, not only the wildlife (measured
   13.08.2026 on the user's report "Kind hängt wieder fest", `local/KindHaengtWieder/`). The
   archive holds a picture, the game state, the balance and UI values — and a WILDLIFE section
   reading "0 animals, 0 carcasses, 0 flocks", because the report was taken inside a village.
@@ -7608,7 +7608,7 @@ to land than a mechanism that needs a review.
   user sends is undiagnosable without it, and point 666 is waiting on exactly that.
   Bundle: Dorfleben.
 
-- [ ] 681. THE TEACHING STONE STANDS ON THE BANK UPSTREAM, AND THE GROUND WORK LEAVES THE VILLAGE MIDDLE (user 13.08.2026, playing the deployed state)
+- [ ] 681. The teaching stone stands on the bank upstream, and the ground work leaves the village middle (user 13.08.2026, playing the deployed state)
   User decision 13.08.2026, from playing the deployed state with the debug switch
   "Speech: show concepts instead of syllables" on: the errands taught him nothing.
   A boulder on the village square that everybody walks to for no reason, and people
@@ -7680,7 +7680,7 @@ to land than a mechanism that needs a review.
   Nutzer, 13.08.2026 20:46: »Der Lehrstein soll flussaufwärts wandern. Ein großer Felsbrocken mitten im Dorf macht keinen Sinn - ebensowenig, wie dort zugraben.«
   Nutzer, 13.08.2026 20:41 (die Beobachtung dahinter): »dann sagt er GO_THERE BIG_ROCK und zeigt in die Dorfmitte, wo der große Felsen liegt (warum auch immer) … sie bleiben am Felsbrocken stehen und machen nichts«
 
-- [ ] 682. THE CHILDREN'S GAME IS A GAME OF TAG AGAIN, AND THE TEACHING RIDES ON IT (user 13.08.2026: »Beim Kinderspiel kann ich auch nichts lernen. Ich erkenne da kein Fangspiel.«)
+- [ ] 682. The children's game is a game of tag again, and the teaching rides on it (user 13.08.2026: »Beim Kinderspiel kann ich auch nichts lernen. Ich erkenne da kein Fangspiel.«)
   User, 13.08.2026, from playing the deployed state: "Beim Kinderspiel kann ich auch
   nichts lernen. Ich erkenne da kein Fangspiel." The children read as running about
   at random and calling out instructions that do not serve the game; the tag game
@@ -7750,7 +7750,7 @@ to land than a mechanism that needs a review.
   QUOTED:
   Nutzer, 13.08.2026 20:51: »Beim Kinderspiel kann ich auch nichts lernen. Ich erkenne da kein Fangspiel. Für mich laufen die Kinder mehr oder weniger zufällig hin und her (wenn sie mal nicht festhängen) und werfen mit Anweisungen um sich, die dem Spiel nicht dienlich sind. Ursprünglich war es mal ein Fangspiel, bei dem einer die anderen fangen muss und der Gefangene dadurch zum Fänger wird. Durch die ganzen neuen Situationen, die zur Erklärung der Kommunikationskonzepte COME, THERE, FOLLOW, usw. hinzugekommen sind, ist das Kinderspiel völlig verwässert. Das Herumschicken wirkt wie zum Selbstzweck eingeführt und macht das Fangspiel nicht mehr erkennbar.«
 
-- [ ] 683. THE SEAL LETS THE WORK ORDER THROUGH, BECAUSE IT CLASSIFIES BY TARGET (Sol's
+- [ ] 683. The seal lets the work order through, because it classifies by target (Sol's
   closing review of point 675, 13.08.2026, the one finding left standing by decision). After
   `batch-boundary.mjs --commit` the marker is sealed and every further repository mutation is
   denied — except the closing set, which is a list of TARGETS rather than of operations, and
@@ -7786,7 +7786,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — the seal holds against every other mutation, so this is the last gap
   in it rather than an open door.
 
-- [ ] 684. A WHOLE-BRANCH CROSS-REVIEW FALLS INTO THE MATERIAL LIMIT AND JUDGES A CROPPED
+- [ ] 684. A whole-branch cross-review falls into the material limit and judges a cropped
   PICTURE (measured 13.08.2026 over TWELVE review rounds on point 675). Every whole-branch
   round hit the ~200k-character material limit of `scripts/review-sol.mjs`, and Sol said so in
   every verdict ("patch truncated, full file bodies omitted"). Not one round could read the
@@ -7808,7 +7808,7 @@ to land than a mechanism that needs a review.
   Criticality: high — it decides what our four-eyes principle actually covers, and it has been
   overstating that coverage on every large branch.
 
-- [ ] 685. THE BOARD'S TAB ICON STANDS ON A TRANSPARENT GROUND, NOT ON A BEIGE PLATE (user
+- [ ] 685. The board's tab icon stands on a transparent ground, not on a beige plate (user
   13.08.2026, 23:00, on the deployed icon: »Das Afrika-Symbol für den Browser-Tab finde ich gut.
   Eine kleine Änderung: Der Hintergrund sollte nicht beige sondern transparent sein.«). The
   silhouette is right, but its beige plate reads as a card wedged between the other tabs, whose
@@ -7826,7 +7826,7 @@ to land than a mechanism that needs a review.
   PICTURE — the icon rasterised and looked at against a light and a dark tab strip.
   Criticality: low — it is a one-element correction to the icon point 679 delivered.
 
-- [ ] 693. THE AUTHOR ROUTING RECOMMENDS A LANE WHOSE POOL IS EMPTY (measured 14.08.2026,
+- [ ] 693. The author routing recommends a lane whose pool is empty (measured 14.08.2026,
   01:33–01:40, at the start of an autonomous batch session). `scripts/author-routing-core.mjs`
   routed point 666 to Fable 5 — "tagged HIGH criticality, a hard case by definition" — and the
   delegated Fable agent died on its FIRST API call with "You've reached your Fable 5 limit". The
@@ -7860,7 +7860,7 @@ to land than a mechanism that needs a review.
   Criticality: medium — it wastes a delegation per hard case whenever a pool runs dry, which is
   exactly when the batch can least afford one.
 
-- [ ] 694. THE CHILDREN'S ACCEPTED WEBGL 2 COMPOSITION NEEDS A HOME THAT SURVIVES A TICK
+- [ ] 694. The children's accepted webgl 2 composition needs a home that survives a tick
   (found 14.08.2026 by the cross-vendor review of point 666 — Claude Opus 5 on the Sol-authored
   branch — and verified against the mechanism itself, not argued). Point 666 answered the
   player-visible standstill with a behaviour fix and settled its REMAINING WebGL 2 red by its
@@ -7927,7 +7927,7 @@ to land than a mechanism that needs a review.
   children red closes by a NAMED cause instead of by a retry (point 640).
   Bundle: Dorfleben.
 
-- [ ] 695. THE RENDER GATE IS BLOCKED BY REDS NOBODY CAN READ (measured 14.08.2026, 04:20, on
+- [ ] 695. The render gate is blocked by reds nobody can read (measured 14.08.2026, 04:20, on
   main at b4c0bc36, while closing point 666). `render-verify-guard` counts ELEVEN recorded runs
   in its window that failed with nothing to explain them, and they belong to no work this session
   did: `settings` on WebGPU (13.08.2026, 15:24 and 23:19-23:22, 18-19 reds each), `collision` on
@@ -7952,7 +7952,7 @@ to land than a mechanism that needs a review.
   blocks or waves reds through with a deferral, which is how a real regression slips past.
   Bundle: Werkzeug.
 
-- [ ] 696. A HANDED-OVER SESSION KEPT WRITING, AND THE SUCCESSOR WAS TOLD IT WAS DEAD (measured
+- [ ] 696. A handed-over session kept writing, and the successor was told it was dead (measured
   14.08.2026, 07:00-07:05, while resuming point 687). The SessionStart hook told the incoming
   session "the previous owner was provably dead" and handed it the batch lock at 06:56. The
   predecessor (pid 2380442, 1 h 25 min old) was alive and went on working: it committed into the
@@ -7986,7 +7986,7 @@ to land than a mechanism that needs a review.
   invisible in git.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 698. THE CHILDREN CROSS THE TRAVELLER'S LINE TOO RARELY FOR THE PICTURE THE BANK ROUND
+- [ ] 698. The children cross the traveller's line too rarely for the picture the bank round
   PROMISES (measured 17.08.2026 on `feat/687-roam-bound-fixes`; the user decided the same day to
   land the round as it stands and calibrate the density here). The round's acceptance is that the
   children play PAST the traveller, and the check that claimed it counted a crossing over the
@@ -8019,7 +8019,7 @@ to land than a mechanism that needs a review.
   currently has to wait minutes for.
   Bundle: Dorfleben.
 
-- [ ] 699. AN ACTOR LABEL IS DRAWN THROUGH THE LANDMARK LABEL BEHIND IT (seen 17.08.2026 in the
+- [ ] 699. An actor label is drawn through the landmark label behind it (seen 17.08.2026 in the
   hold-Ctrl evidence frame `verification/147-ctrl-actor-labels.png`, on WebGL 2 and WebGPU
   alike, while judging the picture of the Ctrl layer's declutter). The declutter that point 628
   delivered keeps ACTOR labels apart from one another, and the picture proves it does. It does
