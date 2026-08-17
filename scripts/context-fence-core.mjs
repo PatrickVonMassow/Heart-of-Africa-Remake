@@ -410,14 +410,23 @@ function segmentStart(seg, resolvePath) {
   if (segmentInvokesPathWhere(seg, startsVerifyPath, { resolvePath })) {
     return { what: `starting a verify script directly (\`${seg.raw}\`)`, authoring: false }
   }
-  // A segment that CREATES a link into scripts/verify counts as starting a
-  // verify run itself (Sol round 6, finding B — the one cheap catch): `ln -s
-  // scripts/verify late-link` exists only to run the fenced work through a
-  // name the resolver cannot see yet (the link is unborn when it runs). This
-  // closes that literal construction; the CLASS of constructed escapes stays
-  // outside the fence's claim — see resolveThroughAncestors.
-  if (head === 'ln' && args.some((a) => !a.text.startsWith('-') && VERIFY_TREE.test(posixNormalizePath(a.text)))) {
-    return { what: `constructing a link into the verify tree (\`${seg.raw}\`)`, authoring: false }
+  // A segment that CREATES a symlink into scripts/verify counts as starting
+  // a verify run itself (Sol round 6, finding B; narrowed by round 7,
+  // finding 5 — the one cheap catch stays exactly one construction wide):
+  // `ln -s scripts/verify late-link` exists only to run the fenced work
+  // through a name the resolver cannot see yet (the link is unborn when it
+  // runs). So the catch takes `-s` AND judges the LINK TARGET (the source
+  // operand) — a HARD link out of the tree (`ln scripts/verify/world.mjs
+  // /tmp/world.mjs`) is the copy-shaped escape already pinned as the
+  // intended limit, and an `ln -s` pointing elsewhere is ordinary file work.
+  // This closes the literal construction; the CLASS of constructed escapes
+  // stays outside the fence's claim — see resolveThroughAncestors.
+  if (head === 'ln' && args.some((a) => /^-[A-Za-z]*s/.test(a.text) || a.text === '--symbolic')) {
+    const { targetDir, operands } = destinationSplit(args)
+    const linkTargets = targetDir !== null || operands.length < 2 ? operands : operands.slice(0, -1)
+    if (linkTargets.some((t) => VERIFY_TREE.test(posixNormalizePath(t)))) {
+      return { what: `constructing a link into the verify tree (\`${seg.raw}\`)`, authoring: false }
+    }
   }
   // Authoring by REDIRECTION — `echo "- [ ] 999. x" >> TASKS.md` writes the
   // work order without the Edit tool. Judged on the parsed redirect TARGET,

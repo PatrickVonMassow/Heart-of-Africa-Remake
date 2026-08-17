@@ -262,6 +262,9 @@ describe('over the mark, FINISHING calls and reads stay allowed', () => {
     ['the board', { toolName: 'Bash', command: 'node scripts/board.mjs none --text-stdin' }],
     ['the board publish', { toolName: 'Bash', command: 'node scripts/board-publish.mjs' }],
     ['the boundary itself', { toolName: 'Bash', command: 'node scripts/batch-boundary.mjs --prepare --context' }],
+    ['the boundary commit', { toolName: 'Bash', command: 'node scripts/batch-boundary.mjs --commit --context' }],
+    ['the guard preflight — a remedy command', { toolName: 'Bash', command: 'node scripts/guard-preflight.mjs --for answer --session abc' }],
+    ['the focus confirm — a remedy command', { toolName: 'Bash', command: 'node scripts/board.mjs focus confirm' }],
     ['awaiting a running verify', { toolName: 'Bash', command: 'node scripts/verify/run-wait.mjs --await' }],
     // The verify-path rule judges what is INVOKED, on the NORMALISED path
     // (Sol round 3, finding 4b): a finishing script reached through the
@@ -446,6 +449,18 @@ describe("the fence's claim is BOUNDED — a constructed escape is outside it (r
   it('denies the bare link construction on its own, dot-spellings included', () => {
     expect(decide({ toolName: 'Bash', command: 'ln -s scripts/verify late-link' }).block).toBe(true)
     expect(decide({ toolName: 'Bash', command: 'ln -s ./scripts/./verify late-link' }).block).toBe(true)
+    // The -t destination form of the same construction — the operands are all
+    // link targets there.
+    expect(decide({ toolName: 'Bash', command: 'ln -s -t /tmp scripts/verify' }).block).toBe(true)
+  })
+
+  it('the catch is ONE construction wide (Sol round 7, finding 5): a symlink whose TARGET is the verify tree', () => {
+    // A HARD link out of the tree is the copy-shaped escape pinned as the
+    // intended limit below — allowed, like the cp it is equivalent to.
+    expect(decide({ toolName: 'Bash', command: 'ln scripts/verify/world.mjs /tmp/world.mjs' }).block).toBe(false)
+    // An ln -s pointing ELSEWHERE is ordinary file work: only the link
+    // TARGET is judged, never the link name or destination directory.
+    expect(decide({ toolName: 'Bash', command: 'ln -s /tmp/notes.md scripts/verify-notes.md' }).block).toBe(false)
   })
 
   it('INTENDED LIMIT, not an oversight: the copy-based constructed escape PASSES — the class has no lexical closure and the fence is not a sandbox', () => {
