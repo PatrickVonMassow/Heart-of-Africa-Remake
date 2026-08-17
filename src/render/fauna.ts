@@ -223,7 +223,11 @@ export interface FootPlantPose {
  * Maximum reach of a planted leg as a multiple of its built length. Ten per
  * cent gives the simple straight-leg rig enough compliance for curved travel
  * and collision jitter; beyond that the limb reads as elastic, so the contact
- * must release and be captured again on the next stance frame.
+ * must release and be captured again on the next stance frame. The radial
+ * allowance is NOT the size of that hand-over: at the release the lost contact
+ * sits legLength·√(MAX²−1) — almost half a leg on level ground — from the
+ * fresh procedural endpoint, so the step to the new spot must never be drawn,
+ * or measured, as one planted foot moving (point 697).
  */
 export const FOOT_PLANT_MAX_STRETCH = 1.1
 
@@ -236,7 +240,15 @@ export const FOOT_PLANT_MAX_STRETCH = 1.1
  * drags the foot. A stance instead remembers its touchdown in WORLD space and
  * re-aims the straight leg from the moving hip to that point. The first stance
  * frame captures the procedural gait's current foot, avoiding a touchdown pop;
- * swing frames release it and return the ordinary gait direction.
+ * swing frames release it and return the ordinary gait direction — as unit
+ * direction and stretch 1, so the caller draws EVERY frame from the returned
+ * pose and needs no second, procedural drawing path.
+ *
+ * An over-extended stance releases too (point 697): that frame still returns
+ * the drawable pose — the leg held at the reach limit toward the lost contact,
+ * continuous with the frame before — while `contact: null` tells the caller
+ * the plant ended, so the next stance frame captures afresh and the flag
+ * feeding the no-skate measurement reports the hand-over as unplanted.
  *
  * The result contains no Three.js object and no mutation, so the full contact
  * invariant can be exercised in Vitest independently of the render loop.
@@ -285,6 +297,10 @@ export function footPlantPose(
   const direction: [number, number, number] = [vx / reach, vy / reach, vz / reach]
   const stretch = Math.min(reach / legLength, FOOT_PLANT_MAX_STRETCH)
   if (reach > legLength * FOOT_PLANT_MAX_STRETCH) {
+    // Release frame: keep the leg drawn at the leash — aimed at the lost
+    // contact, clamped to the reach limit — so the pose stays continuous with
+    // the previous frame. Snapping to the procedural pose here would move the
+    // drawn foot ~legLength·√(MAX²−1) in one frame, inside a gait stance.
     return { contact: null, direction, stretch }
   }
   return {

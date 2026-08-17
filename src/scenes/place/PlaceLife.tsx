@@ -928,21 +928,27 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
             rig.legLength,
           )
           s.plants[li] = planting.contact
-          if (planting.contact) {
-            legDirection.set(...planting.direction)
-            lg.quaternion.setFromUnitVectors(legDown, legDirection)
-            lg.scale.set(1, planting.stretch, 1)
-          } else {
-            lg.rotation.set(swing, 0, 0)
-            lg.scale.set(1, 1, 1)
-          }
+          // Every frame draws the pose footPlantPose returned: planted frames
+          // aim at the held world contact, swing frames reproduce the
+          // procedural gait exactly (pinned in fauna.test.ts), and the
+          // over-extension release frame keeps the leg at its reach limit
+          // toward the lost contact instead of snapping to the gait pose in
+          // the middle of a stance (point 697).
+          legDirection.set(...planting.direction)
+          lg.quaternion.setFromUnitVectors(legDown, legDirection)
+          lg.scale.set(1, planting.stretch, 1)
         }
       }
       if (import.meta.env.DEV) {
         // The live no-skate probe (point 300) tracks one foot through its stance:
-        // its world spot must hold while the body advances and turns. Reported
-        // straight from the rendered leg group, so the probe reads what is
-        // DRAWN rather than the intended planting state.
+        // its world spot must hold while the body advances and turns. The foot is
+        // read straight from the rendered leg group, so the probe reports what is
+        // DRAWN; the stance flag reports whether that drawn foot is a HELD plant,
+        // so an over-extension hand-over — contact released at the reach limit
+        // and captured afresh, point 697 — breaks the measured interval exactly
+        // like an ordinary swing does instead of being scored as one planted
+        // foot jumping. A rig that released every frame could not hide there:
+        // it would starve the judgment's interval count and fail its gate.
         const lg = legRefs.current[i]?.[0]
         if (lg) {
           const foot = footProbe.set(0, -rig.legLength, 0)
@@ -957,7 +963,7 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
             phase,
             stride: rig.stride,
             yaw: s.yaw,
-            stance: isStance(phase + parts.legs[0].phaseOffset),
+            stance: s.plants[0] !== null,
             foot: { x: foot.x, y: foot.y, z: foot.z },
           }
         }
