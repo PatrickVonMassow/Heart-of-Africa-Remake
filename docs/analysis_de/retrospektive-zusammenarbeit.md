@@ -1309,7 +1309,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 17.08.2026, 23:14 · Quellen-Fingerprint: `9f6ca283d0ab…`
+Zuletzt aktualisiert: Dienstag, 18.08.2026, 00:04 · Quellen-Fingerprint: `23f569c1523b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1342,8 +1342,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 2 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Fable 5 authors work judged difficult/complex/error-prone from the start, and takes over Opus work once Sol still finds problems after a re-work; Fable is NOT the default (smaller volume) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| What survives of the 25.07. rule: Fable is NOT the default lane because its volume is the scarcest — but difficulty IS a reason for it, and review is cross-vendor, not Fable-by-default | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| REVISED 17.08.2026: hard/complex/error-prone work stays with Opus 5 — Fable is only the ESCALATION, taking over Opus work that Sol still rejects after a re-work | 3 | mittel | — (Regel/Memory) | ◐ Regel |
+| What survives of the 25.07. rule: Fable is NOT the default lane because its volume is the scarcest — but difficulty IS a reason for it, and review is cross-vendor, not Fable-by-default | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1354,7 +1354,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | hoa PERMANENT process — delegate as much implementation as possible to worktree-isolated subagents; keep only picture-verify + merge at the main session; run a pool of parallel agents on non-overlapping files | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | The \"Maximum QA\" QA process and the \"new demo\" trigger (append it + closing + increment tag + publish) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | State only what was just measured, with its reading time; never assert machine/repo state from a plausible model | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Before building, triage difficulty × criticality; HIGH/critical work gets a second, different model — in which FORM (blind-parallel vs. review) is normative in CLAUDE.md §6, not here | 2 | mittel | criticality-review-guard.mjs, model-guard.mjs | ✔ Mechanismus |
+| Before building, triage difficulty × criticality; HIGH/critical work gets a second, different model — in which FORM (blind-parallel vs. review) is normative in CLAUDE.md §6, not here | 3 | mittel | criticality-review-guard.mjs, model-guard.mjs | ✔ Mechanismus |
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | The batch-owning session is a headless successor the launcher spawned — the user cannot see, reach or close it; never ask them to | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1373,7 +1373,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Priority tiers for picking the next point — token-reduction work first, then the communication mechanic, then everything else; open branches before a fresh point | 2 | mittel | lock-release-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | A declared \"intended residual\" is where real defects hide — legitimate only when the information to close it is genuinely not at hand | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 3 | mittel | model-guard.mjs | ✔ Mechanismus |
+| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 4 | hoch | model-guard.mjs | ✔ Mechanismus |
 | ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1400,10 +1400,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 83 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 55 Prozess-/Meta-TASKS-Punkte (davon 21 offen).
+Erfasste Quellen: 83 Feedback-/Projekt-Memories · 49 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 55 Prozess-/Meta-TASKS-Punkte (davon 21 offen).
 
-<!-- RETRO-FINGERPRINT: 9f6ca283d0abf1bf5d50634aa58f65d9fa072155c2cb9252899331c042756b33 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-17T21:14:36.772Z -->
+<!-- RETRO-FINGERPRINT: 23f569c1523b279fc8483d1dee37471771419fbed5d32b55673ca6082a92959f -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-17T22:04:26.610Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
