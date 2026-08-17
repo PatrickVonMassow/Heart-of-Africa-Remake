@@ -93,6 +93,10 @@ describe('context-fence-guard (spawned)', () => {
     expect(denial(callGuard('Bash', { command: 'npm test' }))).toContain('WATERMARK')
   })
 
+  it('denies a Task spawn like an Agent spawn — the arming matcher must carry both', () => {
+    expect(denial(callGuard('Task', { prompt: 'build point 701' }))).toContain('WATERMARK')
+  })
+
   it('lets every finishing call and read through past the mark', () => {
     for (const [tool, input] of [
       ['Bash', { command: 'git commit -m "finish"' }],

@@ -58,7 +58,7 @@ export const INTENTIONALLY_DORMANT = {
     '(`node scripts/bundle-first-guard.mjs --status`), THEN wire it and REMOVE THIS ENTRY IN THE SAME COMMIT.',
   'context-fence-guard.mjs':
     'Built 17.08.2026 by a worktree agent (point 700), which may not touch .claude/settings.json — the ' +
-    'PreToolUse line ("Edit|Write|NotebookEdit|Agent|Bash|PowerShell" → node scripts/context-fence-guard.mjs) ' +
+    'PreToolUse line ("Edit|Write|NotebookEdit|Agent|Task|Bash|PowerShell" → node scripts/context-fence-guard.mjs) ' +
     'is a protected-path edit and needs an attended session. Its core and its spawned wrapper are fully ' +
     'tested, so it is correct the moment it is armed. REMOVE THIS ENTRY IN THE SAME COMMIT THAT ADDS THE ' +
     'HOOK LINE.',

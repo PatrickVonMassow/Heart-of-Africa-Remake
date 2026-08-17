@@ -3,9 +3,12 @@
 // core (context-fence-core.mjs).
 //
 // REGISTRATION (.claude/settings.json is a protected path — the main session
-// wires it): one entry under `PreToolUse`, beside board-first-guard's:
+// wires it): one entry under `PreToolUse`, beside board-first-guard's. The
+// matcher carries `Task` because AGENT_TOOLS classifies it as a spawn — the
+// two must agree, or the fence never sees the very call it denies (Sol review
+// of d0aebb6, finding 4):
 //
-//   { "matcher": "Edit|Write|NotebookEdit|Agent|Bash|PowerShell",
+//   { "matcher": "Edit|Write|NotebookEdit|Agent|Task|Bash|PowerShell",
 //     "hooks": [{ "type": "command", "command": "node scripts/context-fence-guard.mjs" }] }
 //
 // Modes:
