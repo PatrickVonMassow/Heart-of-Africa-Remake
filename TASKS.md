@@ -8218,3 +8218,39 @@ to land than a mechanism that needs a review.
   Criticality: medium — it is the per-point overhead of every session, and each hand-driven chain is
   a place a step gets forgotten.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 709. A unit test passes or fails by how deeply the test runner happens to be nested
+  (measured 17.08.2026, three reproductions in a row, after the same suite had been green
+  twenty minutes earlier on the identical commit). `scripts/container-ask-guard-core.test.mjs`
+  → "a real guard under matching ancestry cannot restamp its asserted test id or raise an
+  alert" spawns a helper, has the helper spawn the real guard, and asserts
+  `matchedAncestorPid: true` — that the guard resolved the HELPER as the session process.
+  The guard resolves it with `findClaudeAncestor` (`scripts/batch-singleton.mjs`), which walks
+  at most TEN ancestors looking for a process whose `comm` matches `claude` and otherwise falls
+  back to the parent. So the assertion holds only where no `claude` process sits within ten
+  hops: in CI, where none exists at all, and in a deeply nested local run. Run the same suite
+  DIRECTLY from a session — `npx vitest run` — and the walk reaches the live `claude` process
+  (measured: two hops from a plain node), the guard resolves THAT pid, and the test fails.
+  Run it through `land-point.mjs`, four processes deeper, and it passes. The consequence is the
+  worst kind: the pre-push gate blocked a push whose commits touched neither the test nor its
+  subject, while CI was green on the same tree, and nothing in the red named the real reason.
+  FINAL STATE:
+  - The test states the ancestry it needs instead of inheriting it: the helper is spawned so
+    that the guard's walk cannot reach the session — by naming the ancestor explicitly through
+    the injection the singleton already supports (`opts.ancestor` / `findAncestorFn`), which is
+    what every other test of this file uses. The test then asserts the guard's BEHAVIOUR, not
+    the shell it happened to run in.
+  - Any remaining case that genuinely needs a real walk asserts the walk's OUTCOME against what
+    the environment actually offers, and SKIPS with a named reason where it cannot be
+    established — never a silent pass and never an environment-dependent fail.
+  - A sweep of the unit layer for the same shape: every test that spawns a real process and
+    asserts something about ancestry, cwd depth or the parent chain is either injected or
+    stated. The sweep's result is written down, including the tests it cleared.
+  VERIFIABLE: Vitest — the repaired case green both when run directly (`npx vitest run
+  scripts/container-ask-guard-core.test.mjs` from the session shell) and through the fast gate,
+  proven by running it both ways in the same commit; plus a case that pins the ten-hop budget
+  itself, so a later change to `findClaudeAncestor` cannot silently move it.
+  Criticality: medium — it is a gate that blocks correct work and passes incorrect work
+  depending on who started it, and the red it produces names nothing that would lead anyone to
+  the cause.
+  Bundle: Session- & Repo-Hygiene.
