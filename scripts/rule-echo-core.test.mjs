@@ -428,6 +428,14 @@ describe('passageOf', () => {
     expect(passageOf(text, 'one')).toBe('rule:one@aaaaaaaa ルール適用')
   })
 
+  it('lets TWO lone stamps share a block and still mark the paragraph (round 12)', () => {
+    // A file may echo more than one rule; when both stamps stand alone in one
+    // block, neither may count as the other's content.
+    const text = ['lead-in line', '', '<!-- rule:one@aaaaaaaa rule:two@bbbbbbbb -->', '', 'right after'].join('\n')
+    expect(passageOf(text, 'one')).toContain('right after')
+    expect(passageOf(text, 'two')).toContain('lead-in line')
+  })
+
   it('treats punctuation of any script as no content (round 11)', () => {
     // A lone stamp wrapped in comment syntax, an em dash, a full-width stop:
     // none of it states a rule, so the paragraph beside it is still the passage.

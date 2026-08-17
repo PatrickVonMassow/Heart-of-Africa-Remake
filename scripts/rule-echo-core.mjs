@@ -333,8 +333,11 @@ export function passageOf(text = '', id = '') {
   // called a dash, a full-width stop or a bracket "content" — so a lone stamp
   // wrapped in comment syntax lost the paragraph it marks. What counts is a
   // letter or a digit, in any script.
+  // EVERY stamp comes out, not just this rule's (round 12): a block holding two
+  // lone stamps had the OTHER one supplying the letters, so it counted as
+  // content and both rules lost the paragraph beside them.
   const stripped = own
-    .map((line) => line.replace(new RegExp(mark.source, 'g'), ''))
+    .map((line) => line.replace(new RegExp(STAMP_PATTERN.source, 'g'), ''))
     .join(' ')
     .replace(/[^\p{L}\p{N}]+/gu, '')
   if (stripped.length > 0) return own.join('\n')
