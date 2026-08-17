@@ -121,11 +121,46 @@ put it is the mistake this line exists to stop.
      `src/scenes/place/adultErrands.ts` that speak them, the glossary/journal/i18n
      strings naming them in BOTH languages, and their tests. What replaces them is
      built in the two points that follow this one (children's bank game, adults'
-     water and digging), so this point may be landed together with them rather
-     than leaving the village mute in between — the batch decides, but a merge of
-     this point alone must still build, lint and play without errors.
+     water and digging), and THE BATCH HAS DECIDED, ON A MEASUREMENT, THAT THIS
+     POINT LANDS WITH THE CHILDREN'S GAME AND NOT BEFORE (14.08.2026): emptying
+     the child situations takes the children's steering with it, and the shipped
+     bambara village then shuffles 0.42 % of its judged time against the 0.25 %
+     gate — the user's own "Kind zittert auf der Stelle herum", which `main` is
+     green on today. The branch stays open until the game is back rather than
+     deploying that regression; the code on it builds, lints and plays without
+     errors, which is what a merge of it alone was required to prove.
   5. `docs/communication-poc-spec.md` and design.md §13.4 are rewritten to the five
      words and the new teaching places in the same commit.
+  7. THE LEFTOVERS THE CROSS-VENDOR REVIEW FOUND ARE CLOSED (Opus 5 on
+     `main..44f37c6a`, 14.08.2026, verdict merge-with-fixes; the lexicon core itself
+     it verified correct and genuinely pinned — recomputed distances, the mirror and
+     the sixteen-strike message all hold). None of these is optional:
+     - THE PLAYER-VISIBLE ONES FIRST, in BOTH languages: the drum journal entry
+       still says "Seven words, each of five beats" / "Sieben Wörter zu je fünf
+       Schlägen" (`en.ts:1057`/`de.ts:1069`), the drum panel hint still says "Seven
+       words, one after another" (`en.ts:279`/`de.ts:281`), and two further entries
+       (`en.ts:1059`/`de.ts:1071`, `en.ts:1061`/`de.ts:1073`) describe an errand and
+       children's speech that no longer exist. Item 4 named the i18n strings and no
+       i18n file was touched.
+     - `scripts/verify/settings.mjs` and `scripts/verify/polish.mjs` still hard-code
+       FIVE-syllable literals. The heard store is string-keyed, so those suites still
+       pass — which is the defect: the browser gate proves the audio path for a shape
+       the game can no longer produce and covers the shipped four-syllable utterance
+       nowhere.
+     - The point-589 speech-silence alarms are DEAD: `watchProducer`'s only remaining
+       caller is the tag round, `adultErrands.ts` carries an unstepped watch, and yet
+       `balance.ts` documents both alarms and the debug menu still ships both sliders
+       in both languages. Either the alarms are re-armed for the rounds that do speak,
+       or the controls and their documentation go with them — no dead slider.
+     - `docs/acceptance-evidence.md` still describes the eleven-word state while §7's
+       criterion detail was corrected; the two contradict each other and must move
+       together.
+     - `RIVER` is four identical low strikes. Six of the eight even-parity sequences
+       carry BOTH tones and only five words are needed, so the "at least one syllable
+       of each tone" rule is restored and `RIVER` takes a mixed-tone sequence: the
+       least hearable word in the inventory is not the one the whole message opens on.
+     - The persisted-readings break of item 6 is STATED IN A COMMIT, not only in the
+       spec document.
 
   Test: the Vitest layer pins the five concepts, the two-syllable minimum distance
   over the whole inventory, the mirror of the direction pair, and the message's
@@ -229,6 +264,54 @@ put it is the mistake this line exists to stop.
      villager — one extra radius, calibratable — so they visibly swerve rather than
      brush past him.
   8. Every utterance is one atom, read from the same lexicon as everything else.
+  9. THE THREE CHILD-MOTION PINS THE VOCABULARY POINT LOOSENED ARE RESTORED AND
+     RE-MEASURED (measured 14.08.2026 on `feat/686-five-word-lexicon`). Emptying
+     the child situations took the children's steering with it, and
+     `src/scenes/place/tagShuffle.test.ts` measured the cost: bambara-village at
+     seed 2972259115 shuffles 0.42 % of its judged time over 60 s against the
+     0.25 % gate, the progress watch fires twice over 90 s where once was enough,
+     and the constructed pen stops producing the symptom at 0.65 m (6.7 % shuffled,
+     82.3 % of the trace still judged — the gate passing a wedged child). The
+     interim run is 120 s, the exact rescue pin is `toBeGreaterThan(0)` and the
+     pen is 0.6 m; each site names the number it held. This point puts the 60 s,
+     the exact `toBe(1)` and the 0.65 m yard back, and states the re-measurement
+     in the same commit. A pin that cannot be restored is a finding, not a value
+     to re-tune.
+ 10. THE CROSS-VENDOR REVIEW'S FINDINGS ARE ANSWERED (GPT-5.6 Sol at effort high on
+     `44f37c6a..9598673d`, 14.08.2026, verdict DO-NOT-MERGE). Each is fixed or
+     refuted with evidence, and the ones that are fixed are pinned by a test that
+     would fail without the fix:
+     - THE CYCLE CAN NEVER END. `endRun` promotes only children already `out`, and
+       the sole cycle exit is "no free runner left", so a sequence of runs in which
+       nobody is tagged repeats run/regroup forever. The roaming phase then never
+       returns — and with it neither the boulder that teaches `ROCK` off the game nor
+       the opening `RIVER` call. The round needs a guaranteed elimination or an
+       explicit cycle backstop, and a test that drives a no-tag run to termination.
+     - THE CATCHER'S TAP CAN FALL AFTER SOMEBODY ARRIVES. The tap and the direction
+       announcement are QUEUED and drained one per `utteranceGapSeconds`, so the tap
+       is emitted at least one gap into the run — which is exactly the "made it"
+       reading item 4 forbids. Every utterance that item 5 fixes to a moment of the
+       round is emitted AT that moment or not at all.
+     - THE OFF-GAME `ROCK` GUARD IS SILENTLY ABANDONED when the roaming goal runs
+       long (`namedBoulder` is set true without anyone speaking), `BankStage.boulder`
+       is nullable, and no code makes the child climb. The guard either fires every
+       roaming phase or the settlement has no bank round; a cycle without the boulder
+       utterance is a failing test, not an accepted case.
+     - THE BODY SEPARATION MOVES CROUCHED CHILDREN. `separateGroup` and
+       `absorbSeparation` run unconditionally after the round's own step, so a tagged
+       child can be pushed while it is meant to hold its posture, and can be pushed
+       inside the traveller's berth because the round's obstacle check has already
+       finished. The pure test asserts immobility on a path the game does not take —
+       the integration path is what must be pinned.
+     - THREE ASSERTIONS PIN NOTHING and are replaced by ones that bite:
+       `expect(free).toBeGreaterThanOrEqual(0)` is tautological, `expect(pace)
+       .toBeGreaterThanOrEqual(Math.min(paceBefore, pace))` is always true, and
+       `expect(nearest).toBeGreaterThan(berth * 0.9)` permits ten percent penetration
+       of the very radius it guards and never compares against the ordinary villager's.
+     - The re-pen construction of item 9 was NOT judged (it fell outside the reviewed
+       range), so the re-review covers it: the guard was loosened from demanding a
+       clear r+1.6 m yard to only refusing to leave a sibling in the wall band, and
+       that must be shown to be a correction rather than a weakening.
 
   Test: Vitest over a replayed cycle — the phases alternate; the caller becomes the
   first catcher; the direction alternates with the side swap; `ROCK` occurs once
@@ -1027,6 +1110,29 @@ put it is the mistake this line exists to stop.
   Criticality: medium — it does not corrupt work, but it blocks the supervising session's turn
   ends, which is how the batch stalls.
 
+
+- [ ] 697. THE SETTLEMENT GOAT'S PLANTED FOOT SLIDES WITH THE BODY (measured 14.08.2026, on a
+  quiet machine — every leftover vite server, suite and automation browser killed first, load
+  average 1.0).
+  The polish suite's check "settlement walker (goat): the planted foot holds its ground spot
+  while the body walks over it (point 300)" [--section=panorama-wildlife] is RED on `main`
+  itself, not only on a feature branch. It was found while classifying point 687's reds:
+  `node scripts/verify/baseline-classify.mjs polish` against the merge-base ec021bee3da1 ranks
+  it PRE-EXISTING, and BOTH baseline runs failed exactly this one check (155 checks each,
+  1 failing each). Measured on the baseline: 29 stance intervals, worst foot/body travel 2.304,
+  turn up to 3.094 rad. On the branch the same check is red with 20-22 stance intervals, worst
+  travel 0.824-0.896 and turn up to 2.231 rad — better, but still over the bar. The player sees
+  the goat's planted foot skate along the ground instead of holding its spot while the body
+  walks over it.
+  FINAL STATE: the planted foot HOLDS its ground spot for the whole stance interval — the body
+  and the turn move over it, the contact point does not — so the check passes on `main` at the
+  values it demands, and the goat reads as walking rather than gliding.
+  VERIFIABLE: `node scripts/verify/run-all.mjs polish --section=panorama-wildlife` green on a
+  quiet machine, plus a Vitest case over the pure stride/foot-planting logic that pins the
+  contact point against body travel and turn, so the regression cannot come back unseen.
+  Criticality: medium — it is a visible motion defect on the deployed branch, and while it
+  stands, every polish run on `main` carries a red that masks the next real one.
+  Bundle: Dorfleben.
 
 - [ ] 633. THE RELEASE'S CLOSING RUN — TWO REGRESSIONS WITH THE CLEANUP BETWEEN THEM (user
   11.08.2026, splitting point 174: "Dafür scheint mir die Schätzung von 1 h viel zu wenig
@@ -7728,3 +7834,38 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the release branch's picture gate: while it stands, every turn either
   blocks or waves reds through with a deferral, which is how a real regression slips past.
   Bundle: Werkzeug.
+
+- [ ] 696. A HANDED-OVER SESSION KEPT WRITING, AND THE SUCCESSOR WAS TOLD IT WAS DEAD (measured
+  14.08.2026, 07:00-07:05, while resuming point 687). The SessionStart hook told the incoming
+  session "the previous owner was provably dead" and handed it the batch lock at 06:56. The
+  predecessor (pid 2380442, 1 h 25 min old) was alive and went on working: it committed into the
+  SAME worktree at 06:59:30 and 07:04:22, after the lock had changed hands. It had already taken
+  its point boundary and transferred its in-flight declaration — so it handed over AND kept
+  going, and neither its own Stop guards nor the PreToolUse fence stopped its commit or its push.
+  The cost was measurable within minutes: a delegated Sol run started by the new owner saw
+  foreign commits appear in its own worktree mid-run, read the point as already implemented and
+  authored nothing. Two writers in one worktree is the exact failure the hard singleton exists to
+  prevent. Resolved by hand with `kill -TERM`; `batch-doctor --gate` then reported consistent.
+  FINAL STATE: two holes are closed, and each is closed where it is, not by a reminder.
+  (a) THE LIVENESS VERDICT. Whatever `provably dead` is computed from judged a process that was
+  running and committing as dead. The probe is corrected so that a live pid that is still
+  producing commits is NEVER judged dead, and the failure direction is stated: a wrong "alive"
+  costs a delayed spawn, a wrong "dead" costs two writers — so the probe errs toward alive.
+  (`verify-owner-really-dead` in the memory records the OPPOSITE drift on the same probe, a live
+  owner declared pid-reused after ~30 min; both directions come out of one mechanism and are
+  fixed together.)
+  (b) THE FENCE. A session that does not hold the lock must not be able to commit or push in a
+  repository worktree. The fence already refuses it merge, push of main, the tick, the board
+  publish and `dashboard-state.json`; a branch commit and a branch push are added to what it
+  refuses, so a session that has handed over cannot write even if it is still running.
+  Additionally the handover ENDS the session it hands from: after `--commit`, a predecessor that
+  is still alive is stopped rather than trusted to stop itself.
+  VERIFIABLE: Vitest cases over the pure liveness core proving a running, recently-committing pid
+  is judged alive and that the tie-break falls toward alive; a case over the fence proving a
+  commit and a push are refused for a session without the lock; and a case proving the boundary
+  commit leaves no live predecessor behind.
+  Criticality: high — this is the singleton itself. While it holds wrong, every resumed session
+  can silently share a worktree with its predecessor, and the damage (a lost delegated run) is
+  invisible in git.
+  Bundle: Session- & Repo-Hygiene.
+
