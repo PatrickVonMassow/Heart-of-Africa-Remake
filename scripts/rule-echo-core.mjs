@@ -321,6 +321,17 @@ export function passageOf(text = '', id = '') {
   })
   const at = blocks.findIndex((b) => b.some((line) => mark.test(line)))
   if (at < 0) return ''
+  const own = blocks[at]
+  // A LONE STAMP LINE MARKS ITS NEIGHBOURS; A STAMP INSIDE TEXT MARKS THAT TEXT.
+  // The first version always took the neighbours, and the review kept finding
+  // the same class of bypass through them (rounds 8 and 9). So the neighbours
+  // are reached only when the stamp's own block says nothing else — the shape a
+  // Markdown file uses, `<!-- rule:x@… -->` on a line above the paragraph.
+  const stripped = own
+    .map((line) => line.replace(new RegExp(mark.source, 'g'), '').replace(/[^A-Za-z0-9]+/g, ' ').trim())
+    .join(' ')
+    .trim()
+  if (stripped.length >= 24) return own.join('\n')
   return blocks
     .slice(Math.max(0, at - 1), at + 2)
     .map((b) => b.join('\n'))

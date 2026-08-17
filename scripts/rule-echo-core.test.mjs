@@ -408,6 +408,14 @@ describe('rulesForFile', () => {
 
 
 describe('passageOf', () => {
+  it('is the stamp’s OWN block when that block carries text of its own (round 9)', () => {
+    const text = ['before', '', 'rule:one@aaaaaaaa the policy sentence itself, long enough', '', 'after'].join('\n')
+    const passage = passageOf(text, 'one')
+    expect(passage).toContain('the policy sentence itself')
+    expect(passage).not.toContain('before')
+    expect(passage).not.toContain('after')
+  })
+
   it('is the stamp’s block plus its neighbours, not the whole file', () => {
     const text = ['far away paragraph', '', 'lead-in line', '<!-- rule:one@aaaaaaaa -->', '', 'right after', '', 'much later'].join('\n')
     const passage = passageOf(text, 'one')
@@ -472,5 +480,12 @@ describe('the real placement of a stamp (review round 8)', () => {
     expect(
       quoteIsInFile(hookText, 'auto-resume the TASKS.md batch', { id: 'model-policy' }).ok,
     ).toBe(false)
+  })
+
+  it('refuses the CODE beside the stamp, the last bypass class (round 9)', () => {
+    // The stamp used to share its block with the surrounding code, so
+    // `const header = openPointsHeadline` cleared it. The policy text now stands
+    // in a block of its own, opened by the stamp.
+    expect(quoteIsInFile(hookText, 'const header = openPointsHeadline', { id: 'model-policy' }).ok).toBe(false)
   })
 })

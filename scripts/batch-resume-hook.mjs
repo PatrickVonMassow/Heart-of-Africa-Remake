@@ -234,6 +234,7 @@ try {
     // forbidden commit.
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
+
       // rule:model-policy@8b2f41d7
       'MODEL POLICY (25.07.-17.08.2026, CLAUDE.md par.6): AUTHORING HAS THREE LANES. ' +
       'GPT-5.6 Sol authors the MECHANICAL and MID-DIFFICULTY points via ' +

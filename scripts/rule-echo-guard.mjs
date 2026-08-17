@@ -70,6 +70,9 @@ export function gatherStampedFiles() {
       encoding: 'utf8',
       timeout: 10000,
       stdio: ['ignore', 'pipe', 'ignore'],
+      // The Stop chain runs at every turn end (point 401): without this, each
+      // run opens a console window on Windows and steals the focus.
+      windowsHide: true,
     })
       .split('\n')
       .filter(Boolean)
