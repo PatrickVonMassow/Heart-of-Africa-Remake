@@ -1641,6 +1641,32 @@ describe('the walk drops a corner it cannot reach, but not into a wall', () => {
     }
     expect(aims).toContainEqual(CORNER)
   })
+
+  it('survives a planner that knows no way at all, once a corner stands refused', () => {
+    const c = childAt(0, 0)
+    const CORNER = { x: 6, z: 2 }
+    // `BankWorld.route` is declared to answer null where no way round is known,
+    // and the refusal check read that answer's length without asking whether it
+    // was one. The branch tip did not compile because of it. The crash is not
+    // reachable from a fresh child — `c.refused !== null` short-circuits ahead of
+    // it — so the refusal has to stand FIRST, which is exactly the state the
+    // stall branch leaves behind: a child that has just given a corner up and is
+    // still standing on the spot it gave it up from.
+    const world = worldWith([CORNER, { x: 0, z: 6 }, GOAL], (_ax, _az, bx, bz) => bx === 0 && bz === 6)
+    stallAt(c, world)
+    expect(c.refused).not.toBeNull()
+    // Now the planner loses the way entirely, with the child still on that spot.
+    const lost = { ...world, route: () => null } as unknown as BankWorld
+    const dt = 1 / 60
+    const aims: Array<{ x: number; z: number }> = []
+    for (let t = 0; t < 5; t += dt) {
+      const aim = wayTo(c, GOAL, dt, lost)
+      aims.push({ x: aim.x, z: aim.z })
+    }
+    // It keeps walking at its goal instead of throwing, and no corner is banned
+    // on the strength of a route that was never handed back.
+    expect(aims.every((a) => a.x === GOAL.x && a.z === GOAL.z)).toBe(true)
+  })
 })
 
 /** The measure as point 648 left it, kept for exactly one purpose: to show on a

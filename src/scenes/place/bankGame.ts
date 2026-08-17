@@ -1073,9 +1073,12 @@ export function wayTo(
     // ever. Such a plan is discarded and the child keeps walking at its goal;
     // the refusal lapses once the child has genuinely left the spot, so a
     // corner that was only briefly stood on is not banned for good.
+    // A planner that knows no way back returns null; there is then no corner to
+    // ban, and the child keeps walking at its goal on the open-line path below.
     const banned =
       c.refused !== null &&
       dist(c, { x: c.refused.fromX, z: c.refused.fromZ }) < REFUSAL_LEAVE_DISTANCE &&
+      fresh !== null &&
       fresh.length > 0 &&
       dist(fresh[0], c.refused) <= WAYPOINT_RADIUS
     if (!banned) {
