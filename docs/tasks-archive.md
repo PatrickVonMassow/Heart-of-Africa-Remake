@@ -18416,3 +18416,57 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   depending on who started it, and the red it produces names nothing that would lead anyone to
   the cause.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 711. A GitHub-side deploy transient stays red, because the one retry is granted only for
+  a cleared queue stall (user 17.08.2026, 18:14: »Die Pipeline für main ist gerade mehrfach
+  fehlgeschlagen.«). The reds were GitHub-side, not ours — but one half IS ours: the retry built
+  in reaction to the 06.08.2026 queue stall is wired to that one cause and lets every other
+  transient through to red. The deploy workflow has exactly one retry step, gated on
+  `steps.unblock.outputs.retry`, and `shouldRetryDeploy` in
+  `scripts/pages-deploy-unblock-core.mjs` sets that flag ONLY when the unblock step actually
+  cancelled a stuck Pages deployment. Both of the day's red deploys failed with nothing stuck,
+  so the retry was SKIPPED on commits whose CI was green: run 32040260819 (16:53) took HTTP 503
+  from the Pages deployment API in `actions/deploy-pages@v4`, and run 32044141828 (18:02) took
+  HTTP 429 three times while DOWNLOADING that action — the latter inside `Set up job`, before
+  any step of the job existed. RATE, so the size is not guessed: over the last 100 deploy runs
+  on `main` (13.–17.08.2026) 91 green, 2 failed (both above), 7 `cancelled` by the `pages`
+  concurrency group, which is ordinary supersession and not a failure. WHAT IT COSTS:
+  `ci-status-guard` reads every workflow's newest run on a head and any red makes the head red,
+  so a GitHub-side transient blocks the turn end until a human re-runs the job by hand — and
+  until then the Pages site, the only thing the user ever judges a render change against, serves
+  the older `main`. The asymmetry is the argument: a retry not taken costs a red run, a blocked
+  turn end and a stale site; a retry taken needlessly costs at most one bounded extra attempt
+  whose outcome the verdict already prints.
+  FINAL STATE:
+  - `shouldRetryDeploy` grants the one retry on ANY failure of the deploy step, not only on a
+    cleared stall. What stays distinct is the REASON, not the verdict: `cleared <n> stuck Pages
+    deployment(s) (<shas>) — deploying again` when something was cancelled, and a second reason
+    for the case where nothing was, naming it as a possible GitHub-side transient and saying a
+    repeat is safe here. The safety is structural and already recorded in the file's header: the
+    `deploy` job talks to the Pages API only, and `needs: build` means the build succeeded before
+    it starts, so a retry driven from here can never re-run and never mask a build failure. This
+    point extends exactly that argument to the case the current condition excludes.
+  - The cost of retrying a DETERMINISTIC deploy failure — an oversized or missing artifact, the
+    case the current comment names as the reason to stay narrow — is bounded and stays visible:
+    the retry step's `timeout: 300000` bounds it, `timeout-minutes: 25` bounds the job, and the
+    `Verdict` step already prints `first attempt: <outcome>, retry: <outcome>`, so a run that
+    failed twice names both attempts instead of blurring them.
+  - The header comment of `shouldRetryDeploy` states the new rule and why the old one was too
+    narrow, naming both runs above.
+  - The `Set up job` 429 is RECORDED AS A RESIDUAL in the deploy workflow's comment and not
+    fixed: an action download that fails before the job's steps exist is out of reach of every
+    step in that file, and only a job-level re-run helps. No code changes for it.
+  CONSTRAINTS: the build/deploy job split stays as it is — it is what makes the retry safe, so
+  never move a build step into the `deploy` job and never let the retry re-run `build`. The retry
+  stays ONE; "once" is structural (a single retry step in the workflow) and this point changes
+  only whether it runs, never how often. `shouldRetryDeploy` stays pure and Vitest-covered; the
+  decision does not move into the YAML. `cancelled` runs are the concurrency group superseding an
+  older run and nothing here treats them as failures.
+  VERIFIABLE: `scripts/pages-deploy-unblock-core.test.mjs` covers the full truth table — deploy
+  failed and nothing cleared → `retry: true` with the transient reason (the case that changes);
+  deploy failed and a stall cleared → `retry: true` with the cleared reason, shas named
+  (unchanged); deploy succeeded → `retry: false` (unchanged). The reason strings are asserted,
+  not just the flag, because the report is what a human reads off a red run.
+  Criticality: medium — no game code, but a red deploy blocks every turn end and leaves the
+  deployed site behind `main`, which is what the user judges render work against.
+  Bundle: Session- & Repo-Hygiene.
