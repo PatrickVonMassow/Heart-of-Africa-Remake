@@ -12,6 +12,11 @@
 // turn end: any OPEN point whose text carries retrospective change-history
 // framing blocks the Stop until the point is rewritten clean.
 //
+// The second invariant is title casing: a point added or edited after the
+// wrapper's local baseline may not shout in full uppercase. Historic titles are
+// grandfathered so adoption cannot be blocked by the corpus it was built to
+// repair; touching the point makes its title answer to the rule.
+//
 // Marker calibration: whole-PHRASE markers only, each specific to retrospective
 // spec-history framing ("originally planned", "instead of the earlier", "war
 // ursprünglich"). Deliberately NO broad single words ("instead", "changed",

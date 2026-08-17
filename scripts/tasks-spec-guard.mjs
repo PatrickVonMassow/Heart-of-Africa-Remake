@@ -4,8 +4,9 @@
 // target, never patched with an iterative "first X, then Y" trail (point 258 kept
 // the superseded "buttons" plan beside the new dropdown design). The decision
 // logic lives in tasks-spec-guard-core.mjs (pure, Vitest-covered); this wrapper
-// only reads TASKS.md and is fail-OPEN: any internal error → allow, so a guard
-// bug never traps the session.
+// reads current and baseline TASKS.md, advances a per-branch local baseline
+// after a clean decision, and is fail-OPEN: any internal error → allow, so a
+// guard bug never traps the session.
 import { execSync } from 'node:child_process'
 import { dirname } from 'node:path'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'

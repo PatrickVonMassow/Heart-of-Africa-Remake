@@ -130,6 +130,11 @@ describe('title casing', () => {
     expect(isShoutingTitle('LOUD ONE')).toBe(false)
   })
 
+  it('uses fewer than five percent, not five percent or fewer, as the boundary', () => {
+    expect(isShoutingTitle('AAAAAAAAAAAAAAAAAAAb')).toBe(false) // 1 of 20 lowercase: exactly 5%
+    expect(isShoutingTitle('AAAAAAAAAAAAAAAAAAAAb')).toBe(true) // 1 of 21 lowercase: below 5%
+  })
+
   it('ignores a pre-baseline offender until that point is edited', () => {
     const old = point(700, 'HISTORIC SHOUTING TITLE')
     expect(titleCaseOffenders(old, old)).toEqual([])
