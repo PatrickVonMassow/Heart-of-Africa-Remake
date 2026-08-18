@@ -138,6 +138,45 @@ describe('per-contribution review baseline', () => {
     expect(result.outstanding.some((c) => c.file === 'b')).toBe(true)
   })
 
+  it('lets a later refusal overturn an earlier clearance of the same contribution', () => {
+    const row = (verdict, at) => ({
+      sha: sha('b'),
+      model: 'Opus 5',
+      verdict,
+      at,
+      containedShas: [sha('b')],
+      pass: { files: ['b'], commits: [sha('b')] },
+    })
+    const result = outstandingContributions({
+      commits,
+      recordUsable: usable,
+      records: [row('merge', 100), row('do-not-merge', 200)],
+    })
+    // The gate blocks on the newest verdict, so the plan must still owe this
+    // file — counting the older clearance would hide it from every later plan.
+    expect(result.outstanding.some((c) => c.file === 'b')).toBe(true)
+    expect(result.covered.some((c) => c.file === 'b')).toBe(false)
+    expect(result.refusals).toHaveLength(1)
+  })
+
+  it('lets a later clearance settle a contribution an earlier round refused', () => {
+    const row = (verdict, at) => ({
+      sha: sha('b'),
+      model: 'Opus 5',
+      verdict,
+      at,
+      containedShas: [sha('b')],
+      pass: { files: ['b'], commits: [sha('b')] },
+    })
+    const result = outstandingContributions({
+      commits,
+      recordUsable: usable,
+      records: [row('do-not-merge', 100), row('merge', 200)],
+    })
+    expect(result.covered.some((c) => c.file === 'b')).toBe(true)
+    expect(result.refusals).toHaveLength(0)
+  })
+
   it('rebuilds the next plan with only still-owed files', () => {
     const debt = outstandingContributions({ commits, records: [], recordUsable: usable })
     const rebuilt = commitsForContributions(debt.outstanding.filter((c) => c.file === 'shared'))

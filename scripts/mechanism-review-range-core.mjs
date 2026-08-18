@@ -175,8 +175,11 @@ const contained = (record, sha) => {
  */
 export function outstandingContributions({ commits = [], records = [], recordUsable = () => true } = {}) {
   const contributions = contributionsIn(commits)
-  const covered = new Set()
-  const refusals = []
+  // THE LATEST READING OF A CONTRIBUTION RULES IT, and only it. A pair read
+  // twice — cleared once, refused later — is still refused: the gate blocks on
+  // the newest verdict, so a plan that counted the older clearance would hide
+  // the very file the gate is blocking on and leave the block unresolvable.
+  const latest = new Map()
   for (const record of records ?? []) {
     const files = Array.isArray(record?.pass?.files) ? record.pass.files.map(String) : []
     const commitsRead = Array.isArray(record?.pass?.commits) ? record.pass.commits.map(String) : []
@@ -187,9 +190,18 @@ export function outstandingContributions({ commits = [], records = [], recordUsa
       if (!contained(record, contribution.sha)) continue
       if (contribution.authors.some((author) => sameModel(record.model, author))) continue
       const key = keyFor(contribution.sha, contribution.file)
-      if (String(record.verdict) === 'do-not-merge') refusals.push({ contribution, record })
-      else covered.add(key)
+      const at = Number(record.at ?? 0)
+      const prev = latest.get(key)
+      // `>=` keeps the LAST row of a tie: the ledger is append-only, so the
+      // later line is the later reading even where the clock did not move.
+      if (!prev || at >= prev.at) latest.set(key, { record, at, contribution })
     }
+  }
+  const covered = new Set()
+  const refusals = []
+  for (const [key, read] of latest) {
+    if (String(read.record.verdict) === 'do-not-merge') refusals.push({ contribution: read.contribution, record: read.record })
+    else covered.add(key)
   }
   return {
     outstanding: contributions.filter((c) => !covered.has(keyFor(c.sha, c.file))),
