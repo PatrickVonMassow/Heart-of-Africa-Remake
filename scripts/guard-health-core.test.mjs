@@ -74,6 +74,22 @@ describe('isEnforcerWired — the fact, not the record of an intention', () => {
     ).toBe(true)
   })
 
+  it('requires the script to be Node\'s executed entry point and the hook to be a command', () => {
+    for (const command of [
+      'echo scripts/a-guard.mjs',
+      'git diff -- scripts/a-guard.mjs',
+      'node --check scripts/a-guard.mjs',
+      'node -c scripts/a-guard.mjs',
+      'node -e "console.log(1)" scripts/a-guard.mjs',
+    ]) {
+      expect(isEnforcerWired(settings(command), 'a-guard.mjs'), command).toBe(false)
+    }
+    const wrongType = JSON.stringify({
+      hooks: { Stop: [{ matcher: '', hooks: [{ type: 'prompt', command: 'node scripts/a-guard.mjs' }] }] },
+    })
+    expect(isEnforcerWired(wrongType, 'a-guard.mjs')).toBe(false)
+  })
+
   it('demands the EVENT and every tool the caller names in the matcher', () => {
     const wired = settings('node scripts/a-guard.mjs', { event: 'PreToolUse', matcher: 'Agent|Task|Bash' })
     expect(isEnforcerWired(wired, 'a-guard.mjs', { event: 'PreToolUse', tools: ['Agent', 'Bash'] })).toBe(true)
@@ -81,6 +97,19 @@ describe('isEnforcerWired — the fact, not the record of an intention', () => {
     expect(isEnforcerWired(wired, 'a-guard.mjs', { event: 'Stop' })).toBe(false)
     // …and a matcher short of one demanded tool leaves that tool unguarded.
     expect(isEnforcerWired(wired, 'a-guard.mjs', { event: 'PreToolUse', tools: ['Agent', 'PowerShell'] })).toBe(false)
+  })
+
+  it('combines tool coverage across hook entries that execute the same guard', () => {
+    const split = JSON.stringify({
+      hooks: {
+        PreToolUse: [
+          { matcher: 'Agent', hooks: [{ type: 'command', command: 'node scripts/a-guard.mjs' }] },
+          { matcher: 'Bash', hooks: [{ type: 'command', command: 'node scripts/a-guard.mjs' }] },
+        ],
+      },
+    })
+    expect(isEnforcerWired(split, 'a-guard.mjs', { event: 'PreToolUse', tools: ['Agent', 'Bash'] })).toBe(true)
+    expect(isEnforcerWired(split, 'a-guard.mjs', { event: 'PreToolUse', tools: ['Agent', 'PowerShell'] })).toBe(false)
   })
 
   // THE MATCHER IS ALTERNATIVES, NOT CHARACTERS (fourth review, finding 15):

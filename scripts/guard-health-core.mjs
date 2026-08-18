@@ -96,16 +96,18 @@ export function isEnforcerWired(settingsText, name, { event = null, tools = [] }
   if (!hooks || typeof hooks !== 'object' || Array.isArray(hooks)) return false
   const events = event ? [event] : Object.keys(hooks)
   const needed = (Array.isArray(tools) ? tools : [tools]).map((t) => String(t)).filter(Boolean)
+  const covered = new Set()
   for (const ev of events) {
     for (const entry of Array.isArray(hooks[ev]) ? hooks[ev] : []) {
       const names = (Array.isArray(entry?.hooks) ? entry.hooks : []).some((h) =>
-        executedScriptRefs(h?.command).some((ref) => ref.split(/[/\\]/).pop() === wanted),
+        h?.type === 'command' && executedScriptRefs(h?.command).some((ref) => ref.split(/[/\\]/).pop() === wanted),
       )
       if (!names) continue
-      if (needed.every((t) => matcherCoversTool(entry?.matcher, t))) return true
+      if (needed.length === 0) return true
+      for (const tool of needed) if (matcherCoversTool(entry?.matcher, tool)) covered.add(tool)
     }
   }
-  return false
+  return needed.length > 0 && needed.every((tool) => covered.has(tool))
 }
 
 /**
@@ -114,16 +116,38 @@ export function isEnforcerWired(settingsText, name, { event = null, tools = [] }
  * scripts/commission-guard.mjs` reported the commission guard ARMED, the exact
  * failure the structural parse was installed to end). The rule: a command is
  * read segment by segment (`&&`, `||`, `;`, `|`, `&`, newline), and the FIRST
- * script path in a segment is the one being run — everything after it is that
- * script's arguments. A preloaded module (`node -r scripts/x.mjs scripts/y.mjs`)
- * misreads toward a FALSE DORMANT, which is the visible direction this module
- * prefers to the invisible false ARMED.
+ * script's arguments. A segment only counts when its command is Node and the
+ * path is Node's entry script. Thus `echo scripts/x.mjs`, `git diff --
+ * scripts/x.mjs`, and `node --check scripts/x.mjs` execute no guard.
  */
 export function executedScriptRefs(command) {
   const out = []
   for (const seg of String(command ?? '').split(/\n|&&|\|\||[;|&]/)) {
-    const first = seg.match(SCRIPT_REF_RE)
-    if (first && first[0]) out.push(first[0])
+    const tokens = seg.match(/"(?:\\.|[^"])*"|'[^']*'|\S+/g) ?? []
+    const unquote = (token) => String(token ?? '').replace(/^(['"])(.*)\1$/, '$2')
+    const program = unquote(tokens.shift())
+    if (!/(?:^|[/\\])node(?:\.exe)?$/i.test(program)) continue
+    let entry = ''
+    for (let i = 0; i < tokens.length; i += 1) {
+      const token = unquote(tokens[i])
+      if (token === '--check' || token === '-c' || token === '--eval' || token === '-e' || token === '--print' || token === '-p') {
+        entry = ''
+        break
+      }
+      if (token === '--require' || token === '-r' || token === '--import') {
+        i += 1
+        continue
+      }
+      if (token === '--') {
+        entry = unquote(tokens[i + 1])
+        break
+      }
+      if (token.startsWith('-')) continue
+      entry = token
+      break
+    }
+    const ref = entry.match(SCRIPT_REF_RE)?.[0]
+    if (ref) out.push(ref)
   }
   return out
 }
