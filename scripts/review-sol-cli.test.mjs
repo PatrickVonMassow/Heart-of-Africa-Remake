@@ -80,6 +80,7 @@ let mainSha = ''
 let headSha = ''
 let fableSha = ''
 let solSha = ''
+let solHeadSha = ''
 let orphanSha = ''
 let bulkSha = ''
 let oddSha = ''
@@ -291,6 +292,11 @@ beforeAll(() => {
   git('add', '-A')
   git('commit', '--no-verify', '-q', '-m', 'Write something as Sol\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
   solSha = git('rev-parse', 'HEAD')
+  // …with a SECOND commit above it, so a `--since` can narrow the Sol range.
+  writeFileSync(join(repo, 'sol2.txt'), 'a second commit in the OpenAI authoring lane\n')
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', 'Extend the Sol work\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
+  solHeadSha = git('rev-parse', 'HEAD')
 
   // A branch whose material CANNOT fit one round (point 714): two files of 120k
   // characters, so the range needs more than the 200k budget however it is cut.
@@ -644,6 +650,42 @@ describe('a path git writes in quotes', () => {
     expect(sent).toContain('the odd-named file, revised in this range')
     expect(sent).toContain('=== FILE (current content):')
     expect(sent).not.toContain('OMITTED ENTIRELY')
+  })
+})
+
+// ESCALATION ROUND: both early routes hard-coded `partial: null`, so a fitting
+// range with an explicit narrowed `--since` printed a whole-SHA record template
+// although only the narrowed range was measured — bypassing the coverage
+// refusal the normal route makes.
+describe('a narrowed --since on the early routes', () => {
+  it('prints NO record template at claude-only while --since narrows the range', () => {
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'], { SOL_SHARE_FILE: shareFile })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toMatch(/NO RECORD COMMAND IS PRINTED/)
+    expect(r.stdout).toMatch(/clears every commit it contains/)
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
+    rmSync(shareFile, { force: true })
+  })
+
+  it('prints NO record template for a narrowed Sol-authored range either', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', solHeadSha, '--since', `${solHeadSha}~1`, '--brief', 'judge it'])
+    expect(r.status).toBe(3)
+    expect(r.stdout).toMatch(/NO RECORD COMMAND IS PRINTED/)
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(calls()).toEqual([])
+  })
+
+  it('still hands over the full template when no --since narrows the early route', () => {
+    // The refusal is about the narrowing, not about the hand-over itself.
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', solHeadSha, '--brief', 'judge it'])
+    expect(r.status).toBe(3)
+    expect(recordCommandIn(r.stdout)).toContain('--verdict <merge|')
   })
 })
 

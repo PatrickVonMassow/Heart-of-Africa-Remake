@@ -667,7 +667,12 @@ export function formatReviewReport({
       `review-sol: ${said}`,
       '',
       `  NO RECORD COMMAND IS PRINTED. A record at ${String(sha).slice(0, 7)} clears every commit it contains,`,
-      `  back to ${short(partial.coverageBase)}, and this review only saw back to ${short(partial.reviewedBase)}.`,
+      // A hand-over never SAW anything, but the refusal is the same: only the
+      // narrowed range was measured, and a template for the whole sha would
+      // claim the rest (escalation round — both early routes printed one).
+      decision.fellBack
+        ? `  back to ${short(partial.coverageBase)}, and only the range back to ${short(partial.reviewedBase)} was measured here.`
+        : `  back to ${short(partial.coverageBase)}, and this review only saw back to ${short(partial.reviewedBase)}.`,
       '  Re-run without --since to review the whole range, then record that.',
       // TWO REASONS ARE NOT ONE (cross-vendor review, second round): a narrowed
       // range whose round ALSO overflowed used to report only the narrowing, and

@@ -562,8 +562,19 @@ if (isMainModule(import.meta.url)) {
     const share = currentSetting()
     // A fallback nobody is told about is a setting nobody chose (cross-vendor review).
     if (share.problem) console.error(settingProblemLine(share, 'review-sol'))
+    // THE COVERAGE QUESTION IS ASKED ON EVERY PATH THAT PRINTS A TEMPLATE
+    // (escalation round): the early routes hard-coded `partial: null`, so an
+    // explicit narrowed `--since` on a fitting range printed a whole-SHA record
+    // template although only the narrowed range was measured — bypassing the
+    // refusal the normal route makes. The same three lines answer it everywhere.
+    const sinceFlag = flag('--since')
+    const partialFor = (base) => {
+      const coverageBase = sinceFlag ? git(['merge-base', 'main', full], { required: false }) : base
+      return coverageDecision({ reviewedBase: base, coverageBase })
+    }
+
     if (routeFor('review', share.setting) !== 'sol') {
-      const base = mergeBase(flag('--since') || 'main', full, { explicit: Boolean(flag('--since')) })
+      const base = mergeBase(sinceFlag || 'main', full, { explicit: Boolean(sinceFlag) })
       const decision = decideReview({
         outcome: { ok: false, kind: OUTCOME.SWITCHED_OFF, cause: causeTextFor(OUTCOME.SWITCHED_OFF) },
         parsed: { ok: false },
@@ -582,7 +593,7 @@ if (isMainModule(import.meta.url)) {
           sha: full,
           mode,
           point,
-          partial: null,
+          partial: partialFor(base),
           shortfall: planShortfall(handOverPlan),
           plan: handOverPlan,
         }),
@@ -594,7 +605,6 @@ if (isMainModule(import.meta.url)) {
     // call is paid for (point 667). Sol AUTHORS now, and a review it may not
     // give is not worth an allowance: a Sol-authored range goes straight to the
     // Claude reviewer that also runs the suites, judges the picture and lands.
-    const sinceFlag = flag('--since')
     const base = mergeBase(sinceFlag || 'main', full, { explicit: Boolean(sinceFlag) })
     const rangeAuthors = authorsIn(full, base)
     if (solAuthored(rangeAuthors)) {
@@ -612,7 +622,7 @@ if (isMainModule(import.meta.url)) {
           sha: full,
           mode,
           point,
-          partial: null,
+          partial: partialFor(base),
           shortfall: planShortfall(swapPlan),
           plan: swapPlan,
         }),
@@ -641,8 +651,7 @@ if (isMainModule(import.meta.url)) {
     // sha with no merge base against `main` used to leave this empty, which
     // switched the check OFF and printed a record for a range nobody bounded.
     // The decision itself is pure and tested (coverageDecision).
-    const coverageBase = sinceFlag ? git(['merge-base', 'main', full], { required: false }) : base
-    const partial = coverageDecision({ reviewedBase: base, coverageBase })
+    const partial = partialFor(base)
 
     // THE THRESHOLD IS NAMED BEFORE THE ROUND IS SPENT (point 714). A caller who
     // learns of the overflow from the verdict has already paid for a review that
