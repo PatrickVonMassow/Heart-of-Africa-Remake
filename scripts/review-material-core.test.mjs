@@ -6,6 +6,7 @@ import {
   formatPassManifest,
   formatShortfall,
   isBinaryPatchSection,
+  joinPatchSections,
   MANIFEST_END,
   manifestAllowance,
   MATERIAL_BUDGET_CHARS,
@@ -737,6 +738,80 @@ describe('the manifest a pass carries — the material states its own shape', ()
     expect(bare.fit).toBe(true)
     const out = assembleMaterial({ stat: 's', patch: 'p', files: [], budget: 120, manifest: 'M'.repeat(60) })
     expect(out.fit).toBe(false)
+  })
+})
+
+// THE POINT'S ACCEPTANCE CONDITION, ASKED END TO END: a range too large must be
+// reviewable COMPLETELY in passes, not merely refused loudly. A refusal alone
+// leaves the range blocked, which is the state this point was opened to end.
+describe('a range too large travels COMPLETE in passes', () => {
+  const bigSection = (path, lines) =>
+    [
+      `diff --git a/${path} b/${path}`,
+      'index 1..2 100644',
+      `--- a/${path}`,
+      `+++ b/${path}`,
+      '@@ -1 +1 @@',
+      ...Array.from({ length: lines }, (_, i) => `+line ${i} of ${path}`),
+    ].join('\n')
+
+  it('sizes a pass patch as the string the assembly SENDS — separators included', () => {
+    // THE DEFECT (measured on the real 109-commit range this point was written
+    // for, ae8539d2~1..main): the plan SUMMED its sections' lengths while the
+    // assembly JOINED them with newlines. Where a pass's patch exceeds the
+    // standing half-share, `patchRoom` IS that measured length — so the patch
+    // arrived (n-1) characters over its own room and came back truncated. A
+    // truncated patch can vouch for no section, so every declared patch-only
+    // file in the pass turned into an unbacked OMISSION and the record was
+    // refused. Pass 1 of 10 overran by SIX characters and lost its three
+    // largest files that way; nine passes cleared, one could not, and the union
+    // never covered the range.
+    const paths = ['a.mjs', 'b.mjs', 'c.mjs', 'd.mjs', 'e.mjs', 'f.mjs']
+    const patch = paths.map((p) => bigSection(p, 330)).join('\n')
+    const files = paths.map((p) => file(p, 500))
+    const budget = 20_000
+    const plan = planPasses({ stat: ' a | 2 +-', patch, files, budget })
+    expect(plan.fits).toBe(false)
+    expect(plan.passes.length).toBeGreaterThan(1)
+    expect(plan.uncoverable).toEqual([])
+
+    const sections = new Map(splitPatchByFile(patch).map((s) => [s.path, s.text]))
+    const covered = new Set()
+    for (const pass of plan.passes) {
+      const sent = joinPatchSections(pass.files, sections)
+      // The room the plan hands the assembly is the room the real string needs.
+      // Pre-fix this was `sent.length - 1`, and the assertions below all failed.
+      expect(pass.patchRoom).toBeGreaterThanOrEqual(sent.length)
+      const out = assembleMaterial({
+        stat: ' a | 2 +-',
+        patch: sent,
+        files: files.filter((f) => pass.files.includes(f.path)),
+        budget,
+        patchRoom: pass.patchRoom,
+        patchOnly: pass.patchOnly,
+        manifest: formatPassManifest(plan, pass),
+      })
+      expect(out.patchTruncated).toBe(false)
+      expect(out.truncated).toEqual([])
+      expect(out.omitted).toEqual([])
+      expect(out.fit).toBe(true)
+      // A pass that fits is a pass a record may be offered for.
+      expect(materialShortfall({ assembly: out, sent: out.text })).toBeNull()
+      for (const p of pass.files) covered.add(p)
+    }
+    // …and the passes' UNION is the range: complete review, not a loud refusal.
+    expect([...covered].sort()).toEqual([...paths].sort())
+  })
+
+  it('joins the sections the one way both sides must measure', () => {
+    const sections = new Map([
+      ['a.mjs', 'AAA'],
+      ['b.mjs', 'BBB'],
+    ])
+    expect(joinPatchSections(['a.mjs', 'b.mjs'], sections)).toBe('AAA\nBBB')
+    // A path with no section contributes nothing — and no stray separator.
+    expect(joinPatchSections(['a.mjs', 'gone.mjs', 'b.mjs'], sections)).toBe('AAA\nBBB')
+    expect(joinPatchSections([], sections)).toBe('')
   })
 })
 

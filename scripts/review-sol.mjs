@@ -81,6 +81,7 @@ import {
   formatPassManifest,
   formatShortfall,
   isBinaryPatchSection,
+  joinPatchSections,
   materialShortfall,
   MATERIAL_BUDGET_CHARS,
   passByIndex,
@@ -243,7 +244,9 @@ function assemblePass(range, pass, plan = null) {
   const files = pass.files
   return assembleMaterial({
     stat: range.stat,
-    patch: files.map((p) => sections.get(p)).filter(Boolean).join('\n'),
+    // THE SAME HELPER THE PLAN MEASURED WITH, so the string sized and the
+    // string sent cannot drift apart again (see joinPatchSections).
+    patch: joinPatchSections(files, sections),
     files: range.files.filter((f) => files.includes(f.path)),
     budget: MATERIAL_BUDGET_CHARS,
     patchRoom: pass.patchRoom,

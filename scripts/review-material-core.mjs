@@ -651,6 +651,29 @@ export function splitPatchByFile(patch) {
 }
 
 /**
+ * The patch text of ONE pass: its files' sections, joined the one way the
+ * assembly joins them.
+ *
+ * Exported because the PLAN and the ASSEMBLY must measure the SAME string, and
+ * they did not. The plan SUMMED the section lengths; the assembly JOINED them
+ * with newlines. For a pass whose patch exceeds the standing half-share —
+ * exactly where `patchRoom` becomes the measured length itself — the assembled
+ * patch was then (n-1) characters over its own room and came back
+ * `patchTruncated`. That is not a cosmetic overrun: a truncated patch can vouch
+ * for no section's completeness, so every declared patch-only file in the pass
+ * became an UNBACKED OMISSION and the record was refused.
+ *
+ * MEASURED on the 109-commit range this point was written for (ae8539d2~1..main,
+ * 48 files): pass 1 of 10 overran by SIX characters, and lost its three biggest
+ * bookkeeping files that way. Nine passes offered a record, one could not, and
+ * the union therefore never covered the range — the deadlock this point exists
+ * to clear, surviving inside the mechanism built to clear it.
+ */
+export function joinPatchSections(paths = [], sections = new Map()) {
+  return (paths ?? []).map((p) => sections.get(p)).filter(Boolean).join('\n')
+}
+
+/**
  * Cut a range that does not fit into PASSES over the FILE SET.
  *
  * Each pass is a set of files whose patch sections and content together fit one
@@ -762,8 +785,11 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
       size: p.size,
       // The patch of a pass is MANDATORY material, so it gets whatever room it
       // needs rather than the standing half-share — the packing above already
-      // proved the whole pass fits.
-      patchRoom: Math.max(Math.floor(cap * PATCH_SHARE), p.patchChars),
+      // proved the whole pass fits. Measured as the EXACT string the assembly
+      // will send (joinPatchSections), never as the sum of its parts: the
+      // newlines between the sections are characters too, and a room that
+      // forgot them truncated the patch it had just sized.
+      patchRoom: Math.max(Math.floor(cap * PATCH_SHARE), joinPatchSections(p.files, sections).length),
     })),
     uncoverable,
   }
