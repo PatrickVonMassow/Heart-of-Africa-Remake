@@ -5,6 +5,7 @@ import {
   formatShortfall,
   MATERIAL_BUDGET_CHARS,
   materialShortfall,
+  parseDiffHeader,
   parsePassFiles,
   parsePassSpec,
   passByIndex,
@@ -12,6 +13,7 @@ import {
   planPasses,
   sentMaterialMatches,
   splitPatchByFile,
+  unquoteGitPath,
   worstVerdict,
 } from './review-material-core.mjs'
 
@@ -199,6 +201,45 @@ describe('the patch, split per file', () => {
   it('finds nothing in an empty patch', () => {
     expect(splitPatchByFile('')).toEqual([])
     expect(splitPatchByFile(null)).toEqual([])
+  })
+
+  // A PATH GIT QUOTED IS STILL A PATH (cross-vendor review, second round): read
+  // literally it matched no section and resolved in no `git show`, so the file
+  // travelled in no pass and nothing said it was missing.
+  it('reads a QUOTED header as the path git meant', () => {
+    const quoted = 'scripts/we\tird.mjs'
+    const sections = splitPatchByFile(
+      [`diff --git "a/scripts/we\\tird.mjs" "b/scripts/we\\tird.mjs"`, '--- a/x', '+++ b/x', '+one'].join('\n'),
+    )
+    expect(sections.map((s) => s.path)).toEqual([quoted])
+  })
+
+  it('decodes the escapes git writes, bytes and all', () => {
+    expect(unquoteGitPath('"a/x\\ty"')).toBe('a/x\ty')
+    expect(unquoteGitPath('"a/say \\"so\\""')).toBe('a/say "so"')
+    expect(unquoteGitPath('"a/back\\\\slash"')).toBe('a/back\\slash')
+    // Octal escapes are BYTES: two of them are one UTF-8 character.
+    expect(unquoteGitPath('"docs/\\303\\244.md"')).toBe('docs/ä.md')
+    // Anything git did not quote comes back untouched.
+    expect(unquoteGitPath('scripts/plain.mjs')).toBe('scripts/plain.mjs')
+    expect(unquoteGitPath('')).toBe('')
+  })
+
+  it('picks the split whose two halves match where a path itself holds " b/"', () => {
+    const header = parseDiffHeader('diff --git a/dir b/file.mjs b/dir b/file.mjs')
+    expect(header).toEqual({ a: 'dir b/file.mjs', b: 'dir b/file.mjs' })
+  })
+
+  it('is not fooled into calling an ordinary line a header', () => {
+    expect(parseDiffHeader('index 1..2 100644')).toBeNull()
+    expect(parseDiffHeader('diff --git nothing-like-a-path')).toBeNull()
+    expect(parseDiffHeader('diff --git "a/never closes')).toBeNull()
+    expect(parseDiffHeader(null)).toBeNull()
+  })
+
+  it('names a RENAME by where it landed, quoted or not', () => {
+    expect(parseDiffHeader('diff --git a/old.mjs b/new.mjs')).toEqual({ a: 'old.mjs', b: 'new.mjs' })
+    expect(parseDiffHeader('diff --git "a/o\\tld.mjs" "b/n\\tew.mjs"')).toEqual({ a: 'o\tld.mjs', b: 'n\tew.mjs' })
   })
 })
 

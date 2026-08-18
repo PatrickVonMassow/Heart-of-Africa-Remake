@@ -248,6 +248,100 @@ export function materialShortfall({ assembly = null, sent = undefined } = {}) {
 }
 
 /**
+ * One path as GIT WROTE IT — unquoted where git quoted it.
+ *
+ * git prints a path with a tab, a newline, a quote, a backslash or a high byte
+ * in it as a C-style quoted string (`"a/x\ty"`), in the diff header and in
+ * `--name-only` alike. A reader that takes the quoted form literally is holding a
+ * path no `git show` will resolve and no section parser will match — which is a
+ * file dropped from every pass with nothing said about it (cross-vendor review,
+ * second round). The octal escapes are BYTES, so they are decoded as such and the
+ * result read back as UTF-8; anything unquoted is returned untouched.
+ */
+export function unquoteGitPath(value) {
+  const raw = String(value ?? '')
+  if (!(raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2)) return raw
+  const body = raw.slice(1, -1)
+  const simple = { a: 7, b: 8, f: 12, n: 10, r: 13, t: 9, v: 11, '\\': 92, '"': 34 }
+  const bytes = []
+  for (let i = 0; i < body.length; i++) {
+    if (body[i] !== '\\') {
+      bytes.push(...Buffer.from(body[i], 'utf8'))
+      continue
+    }
+    const next = body[++i]
+    if (next === undefined) break
+    if (next in simple) {
+      bytes.push(simple[next])
+      continue
+    }
+    const octal = /^[0-7]{1,3}/.exec(body.slice(i))
+    if (octal) {
+      i += octal[0].length - 1
+      bytes.push(Number.parseInt(octal[0], 8))
+      continue
+    }
+    bytes.push(...Buffer.from(next, 'utf8'))
+  }
+  return Buffer.from(bytes).toString('utf8')
+}
+
+/** One C-quoted token starting at `from`, or null if it never closes. */
+function readQuoted(text, from) {
+  for (let i = from + 1; i < text.length; i++) {
+    if (text[i] === '\\') {
+      i++
+      continue
+    }
+    if (text[i] === '"') return { value: unquoteGitPath(text.slice(from, i + 1)), end: i + 1 }
+  }
+  return null
+}
+
+/** Drop the `a/`/`b/` prefixes git writes in front of both sides. */
+const dropPrefix = (path, side) => (path.startsWith(`${side}/`) ? path.slice(2) : path)
+
+/**
+ * The two paths one `diff --git` header names, or null for any other line.
+ *
+ * The bare form is genuinely ambiguous — a path may itself contain ` b/` — so
+ * where several splits are possible the one whose two halves are EQUAL wins, and
+ * the last one otherwise, which is what the plain regex used to do.
+ */
+export function parseDiffHeader(line) {
+  const m = /^diff --git (.*)$/.exec(String(line ?? ''))
+  if (!m) return null
+  const rest = m[1]
+  let a = null
+  let tail = rest
+  if (rest.startsWith('"')) {
+    const read = readQuoted(rest, 0)
+    if (!read) return null
+    a = dropPrefix(read.value, 'a')
+    tail = rest.slice(read.end).replace(/^ /, '')
+  }
+  if (a !== null) {
+    const b = tail.startsWith('"') ? readQuoted(tail, 0) : { value: tail }
+    if (!b) return null
+    return { a, b: dropPrefix(b.value, 'b') }
+  }
+  // A bare a-side with a quoted b-side (git quotes both, but a hand-made patch
+  // need not) — then the ordinary all-bare form.
+  const quotedB = rest.indexOf(' "')
+  if (quotedB >= 0 && rest.startsWith('a/')) {
+    const b = readQuoted(rest, quotedB + 1)
+    if (b) return { a: rest.slice(2, quotedB), b: dropPrefix(b.value, 'b') }
+  }
+  if (!rest.startsWith('a/')) return null
+  const splits = []
+  for (let i = rest.indexOf(' b/'); i >= 0; i = rest.indexOf(' b/', i + 1)) splits.push(i)
+  if (!splits.length) return null
+  const equal = splits.find((i) => rest.slice(2, i) === rest.slice(i + 3))
+  const at = equal === undefined ? splits[splits.length - 1] : equal
+  return { a: rest.slice(2, at), b: rest.slice(at + 3) }
+}
+
+/**
  * The patch, split into one section per file.
  *
  * Pure, and the reason no extra git call is needed to cost a file: a per-file
@@ -259,10 +353,10 @@ export function splitPatchByFile(patch) {
   const out = []
   let current = null
   for (const line of lines) {
-    const m = /^diff --git a\/(.+) b\/(.+)$/.exec(line)
-    if (m) {
+    const header = parseDiffHeader(line)
+    if (header) {
       if (current) out.push(current)
-      current = { path: m[2], lines: [line] }
+      current = { path: header.b, lines: [line] }
       continue
     }
     if (current) current.lines.push(line)

@@ -39,6 +39,7 @@ import {
   modelFromTrailers,
   modelsFromTrailers,
 } from './mechanism-review-core.mjs'
+import { unquoteGitPath } from './review-material-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 
@@ -167,7 +168,11 @@ function mechanismCommits(base, head, files) {
     if (!sha) continue
     const touched = lines
       .slice(1)
-      .map((l) => l.trim())
+      // git QUOTES a path with a tab, a quote or a high byte in it, and the
+      // quoted form matches neither a mechanism path nor a pass record's file
+      // list — the change would be invisible to this gate and to the coverage
+      // check alike (cross-vendor review, second round).
+      .map((l) => unquoteGitPath(l.trim()))
       .filter(Boolean)
     const mech = mechanismPathsIn(touched, { scriptFiles: files })
     if (!mech.length) continue

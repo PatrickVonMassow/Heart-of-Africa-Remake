@@ -25,6 +25,7 @@ import {
   assembleMaterial,
   formatShortfall,
   MATERIAL_BUDGET_CHARS,
+  parseDiffHeader,
   PATCH_SHARE,
 } from './review-material-core.mjs'
 
@@ -474,9 +475,12 @@ export function newFilePathsIn(patch) {
   for (let i = 0; i < lines.length; i++) {
     if (!/^new file mode /.test(lines[i])) continue
     for (let j = i; j >= 0 && j > i - 6; j--) {
-      const m = /^diff --git a\/(.+) b\/(.+)$/.exec(lines[j])
-      if (m) {
-        paths.add(m[2])
+      // The SAME header parser the pass split uses, so a path git QUOTED is read
+      // as one path by both — two readers of one line that disagree are how a
+      // file falls out of the material with nothing said (cross-vendor round).
+      const header = parseDiffHeader(lines[j])
+      if (header) {
+        paths.add(header.b)
         break
       }
     }

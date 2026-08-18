@@ -82,6 +82,9 @@ let fableSha = ''
 let solSha = ''
 let orphanSha = ''
 let bulkSha = ''
+let oddSha = ''
+/** A name git prints QUOTED, because it is not plain ASCII. */
+const ODD_NAME = 'ümlaut.txt'
 /** An EMPTY git template: a host `init.templateDir` must not seed the fixture. */
 let emptyTemplate = ''
 
@@ -259,6 +262,12 @@ beforeAll(() => {
   // path is refused unless git PROVES it ignored, and that proof is a property
   // of the checkout the file lives in.
   writeFileSync(join(repo, '.gitignore'), '/local/\nnode_modules\n')
+  // A path GIT QUOTES lives in the fixture world from the start (cross-vendor
+  // review, second round): its non-ASCII name is written `"\303\274mlaut.txt"`
+  // in `--name-only` and in the diff header alike, and read literally it
+  // resolved in no `git show` and matched no patch section — the file travelled
+  // in no pass and nothing said so.
+  writeFileSync(join(repo, ODD_NAME), 'the original odd-named file\n')
   mainSha = commit('world.txt', 'the fixture world\n', 'Lay down the fixture world', 'Opus 5')
 
   git('checkout', '-q', '-b', 'feat')
@@ -283,6 +292,11 @@ beforeAll(() => {
   git('add', '-A')
   git('commit', '--no-verify', '-q', '-m', 'Add two files no single round can hold\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
   bulkSha = git('rev-parse', 'HEAD')
+
+  // …and a branch that CHANGES that quoted-name file, so the range carries it as
+  // a modification and its current content must travel with the patch.
+  git('checkout', '-q', '-b', 'odd-name', 'main')
+  oddSha = commit(ODD_NAME, 'the odd-named file, revised in this range\n', 'Revise the odd-named file', 'Opus 5')
 
   // A history sharing no ancestor with the rest: the third form of "not a proper
   // ancestor", which merge-base answers with nothing at all.
@@ -587,6 +601,22 @@ describe('a range SOL authored', () => {
     expect(calls()).toEqual([])
     // And no verdict is invented: the record command still carries the placeholder.
     expect(r.stdout).toMatch(/--verdict <merge\|/)
+  })
+})
+
+// POINT 714, second cross-vendor round: a file whose name git QUOTES must reach
+// the reviewer like any other, or it is a file the record clears unread.
+describe('a path git writes in quotes', () => {
+  it('sends its content, not an unresolvable quoted name', () => {
+    provenId()
+    const r = run(['--sha', oddSha, '--brief', 'judge the odd name'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    // The CONTENT is the proof the path resolved: `git show <sha>:<path>` only
+    // answers for the real path, and the quoted form is not one.
+    expect(sent).toContain('the odd-named file, revised in this range')
+    expect(sent).toContain('=== FILE (current content):')
+    expect(sent).not.toContain('OMITTED ENTIRELY')
   })
 })
 

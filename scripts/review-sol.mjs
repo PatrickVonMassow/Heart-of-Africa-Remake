@@ -152,7 +152,12 @@ function gatherRange(sha, base) {
   // A range DIFF (rather than per-commit patches) is what carries a merge
   // commit's conflict resolution, which `git log --patch` omits.
   const range = `${base}..${sha}`
-  const paths = git(['diff', '--name-only', range]).split('\n').map((p) => p.trim()).filter(Boolean)
+  // NUL-SEPARATED, because the newline-separated form is QUOTED: a path with a
+  // tab, a quote or a high byte in it arrives as `"scripts/x\ty.mjs"`, which no
+  // `git show` resolves — the file then reached neither the content list nor a
+  // pass, and nothing said so (cross-vendor review, second round). `-z` hands
+  // over the raw bytes and the paths need no unpicking at all.
+  const paths = git(['diff', '--name-only', '-z', range]).split('\0').map((p) => p.trim()).filter(Boolean)
   const patch = git(['diff', range])
   // A file the patch ADDS whole is already there in full; sending its content
   // again only spends the budget the other files need — but only while the patch
