@@ -1713,12 +1713,18 @@ export function branchSlotRefusal(decision = {}, { limit = 10 } = {}) {
     return `  · ${b?.ref} — ${age}, ${behind}`
   })
   if (open.length > limit) lines.push(`  · …and ${open.length - limit} more`)
+  // THE REMEDY MUST ACTUALLY LIFT THE REFUSAL (fourth review, finding 7): with
+  // three occupied slots and a call opening two branches, landing ONE leaves
+  // the same call refused — so the refusal says how many must go, not "one".
+  const excess = Math.max(1, (Number.isFinite(decision?.count) ? decision.count : open.length) + adding - cap)
+  const howMany = excess > 1 ? `${excess} of them must go` : 'one of them must go'
   return (
     `A SLOT IS NOT FREE UNTIL ITS BRANCH IS GONE: ${open.length} open feat/* branch(es) against a pool cap of ` +
     `${cap}${n ? `, so opening point${named.length > 1 ? 's' : ''} ${n} would add ${
       adding > 1 ? `${adding} more` : 'another'
     }` : ''}. Oldest first:\n${lines.join('\n')}\n` +
-    `TWO WAYS OUT, both explicit: LAND one (${BRANCH_LAND_CMD}), or PARK it with a reason (${BRANCH_PARK_CMD}), ` +
+    `TWO WAYS OUT, both explicit, and ${howMany} before this call fits: LAND one (${BRANCH_LAND_CMD}), or PARK ` +
+    `it with a reason (${BRANCH_PARK_CMD}), ` +
     'which records the decision and drops the branch out of the count until it moves again. Built work that never ' +
     'lands delivers nothing and costs more to merge every day it ages against a moving main.'
   )

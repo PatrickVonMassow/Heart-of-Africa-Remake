@@ -2811,6 +2811,60 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
     expect(branchSlotRefusal(d)).toContain('opening points 705 and 697 would add 2 more')
   })
 
+  // THE DECISIVE CAPACITY CASE (fourth review, finding 8): TWO occupied slots
+  // plus TWO newly opened points. An implementation that ignores the second
+  // commissioning computes 2+1 and allows; the real state the call would leave
+  // is 4 branches under a cap of 3.
+  it('refuses TWO points opened into ONE free slot — judged on the state the call would LEAVE', () => {
+    const two = NINE_BRANCHES.slice(0, 2)
+    const d = branchSlotDecision({ branches: two, points: [705, 697], now: AUG17 })
+    expect(d.count).toBe(2)
+    expect(d.adding).toBe(2)
+    expect(d.allowed).toBe(false)
+    // ONE of the two points alone fits the free slot.
+    expect(branchSlotDecision({ branches: two, points: [705], now: AUG17 }).allowed).toBe(true)
+    // Here landing ONE suffices (2+2−3), and the refusal says exactly that…
+    expect(branchSlotRefusal(d)).toContain('one of them must go')
+    // …while at THREE occupied plus two opened, landing one leaves the call
+    // refused, and the refusal must demand TWO (finding 7).
+    const worse = branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), points: [705, 697], now: AUG17 })
+    expect(worse.allowed).toBe(false)
+    expect(branchSlotRefusal(worse)).toContain('2 of them must go')
+  })
+
+  // THE REMEDY, FOLLOWED, LIFTS THE REFUSAL (fourth review, findings 7 and 12):
+  // asserting two substrings proved nothing about the remedy being complete or
+  // effective, so each named way out is taken here and the decision re-asked.
+  it('following the refusal\'s remedy — LAND or PARK — flips the decision to allowed', () => {
+    const three = [{ ...NINE_BRANCHES[0], tip: 'a1b2c3d4' }, ...NINE_BRANCHES.slice(1, 3)]
+    const refused = branchSlotDecision({ branches: three, point: 705, now: AUG17 })
+    expect(refused.allowed).toBe(false)
+    const text = branchSlotRefusal(refused)
+    // The refusal names the concrete branch to act on (oldest first) and the
+    // complete park command shape, reason slot included.
+    expect(text).toContain('one of them must go')
+    expect(text.indexOf('feat/336-croc-staging')).toBeGreaterThan(-1)
+    expect(text).toContain('--reason "<why>"')
+    // (a) LAND the oldest: its branch gone, the same call fits.
+    expect(branchSlotDecision({ branches: three.slice(1), point: 705, now: AUG17 }).allowed).toBe(true)
+    // (b) PARK it exactly as the printed command records it — non-empty reason,
+    // tip baseline — and the same call fits too.
+    const rec = recordParkedBranch(parseCommissionRecord(''), 'feat/336-croc-staging', 'superseded by 703', {
+      at: '2026-08-17T19:00:00.000Z',
+      tip: 'a1b2c3d4',
+    })
+    expect(branchSlotDecision({ branches: three, parked: rec.parked, point: 705, now: AUG17 })).toMatchObject({
+      allowed: true,
+      count: 2,
+    })
+    // An EMPTY reason records no park at all, so the refusal stands.
+    const silent = recordParkedBranch(parseCommissionRecord(''), 'feat/336-croc-staging', '   ', {
+      at: '2026-08-17T19:00:00.000Z',
+      tip: 'a1b2c3d4',
+    })
+    expect(branchSlotDecision({ branches: three, parked: silent.parked, point: 705, now: AUG17 }).allowed).toBe(false)
+  })
+
   // A NAMED REF NARROWS THE EXEMPTION TO ITSELF (Sol, review of 3078d166). 687
   // stood on TWO branches on 17.08.2026; the point-wide exemption excused both
   // of them for a call that was cutting a THIRD.
