@@ -1741,6 +1741,18 @@ export function branchSlotRefusal(decision = {}, { limit = 10 } = {}) {
   // the same call refused — so the refusal says how many must go, not "one".
   const excess = Math.max(1, (Number.isFinite(decision?.count) ? decision.count : open.length) + adding - cap)
   const howMany = excess > 1 ? `${excess} of them must go` : 'one of them must go'
+  // When the CALL alone exceeds the cap there is no standing branch to land or
+  // park. Printing the ordinary remedy in that state tells the operator to act
+  // on an empty list. The only possible correction is a smaller commissioning.
+  if (open.length === 0) {
+    return (
+      `THE CALL ITSELF EXCEEDS THE POOL CAP: no feat/* branches currently occupy a slot, but opening point${
+        named.length > 1 ? 's' : ''
+      } ${n ?? '?'} would add ${adding} branch${adding === 1 ? '' : 'es'} against a cap of ${cap}. ` +
+      `COMMISSION FEWER TARGETS: split this call so it opens at most ${cap} branch${cap === 1 ? '' : 'es'} at once. ` +
+      'There is no existing branch to LAND or PARK.'
+    )
+  }
   return (
     `A SLOT IS NOT FREE UNTIL ITS BRANCH IS GONE: ${open.length} open feat/* branch(es) against a pool cap of ` +
     `${cap}${n ? `, so opening point${named.length > 1 ? 's' : ''} ${n} would add ${

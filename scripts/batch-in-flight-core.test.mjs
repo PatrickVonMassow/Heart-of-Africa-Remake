@@ -2858,6 +2858,17 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
     expect(branchSlotRefusal(worse)).toContain('2 of them must go')
   })
 
+  it('tells an oversized empty-pool call to commission fewer targets', () => {
+    const d = branchSlotDecision({ branches: [], points: [712, 713, 714, 715], cap: 3, now: AUG17 })
+    expect(d).toMatchObject({ count: 0, adding: 4, allowed: false })
+    const text = branchSlotRefusal(d)
+    expect(text).toContain('THE CALL ITSELF EXCEEDS THE POOL CAP')
+    expect(text).toContain('COMMISSION FEWER TARGETS')
+    expect(text).toContain('at most 3 branches')
+    expect(text).toContain('no existing branch to LAND or PARK')
+    expect(text).not.toContain('one of them must go')
+  })
+
   it('refuses a mixed call that continues one occupied point and opens another at the cap', () => {
     const three = NINE_BRANCHES.slice(0, 3)
     const d = branchSlotDecision({ branches: three, points: [336, 705], now: AUG17 })
