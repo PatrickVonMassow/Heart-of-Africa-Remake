@@ -272,9 +272,13 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
     .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
     .replace(/^[ \t]*>+[ \t]?/gm, '')
     .replace(/`+/g, '')
+  // The boundary is ANY non-word position, as a complement rather than an
+  // enumerated class (closing round: a quote-adjacent pair survived the
+  // whitespace list, and every list invites the next shape). A marker run
+  // inside a word — foo_.mjs, ma*terial — never opens or closes.
   for (let i = 0; i < 4; i++) {
     const next = clean.replace(
-      /(^|[\s([{*_])([*_]+)(?=[^\s*_])([^*_]+?)(?<=[^\s*_])\2(?=[\s)\]}.,;:!?*_]|$)/g,
+      /(^|[^\w*_])([*_]+)(?=[^\s*_])([^*_]+?)(?<=[^\s*_])\2(?=[^\w*_]|[*_]|$)/g,
       '$1$3',
     )
     if (next === clean) break
