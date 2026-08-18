@@ -1765,16 +1765,32 @@ export function branchSlotRefusal(decision = {}, { limit = 10 } = {}) {
   // the same call refused — so the refusal says how many must go, not "one".
   const excess = Math.max(1, (Number.isFinite(decision?.count) ? decision.count : open.length) + adding - cap)
   const howMany = excess > 1 ? `${excess} of them must go` : 'one of them must go'
-  // When the CALL alone exceeds the cap there is no standing branch to land or
-  // park. Printing the ordinary remedy in that state tells the operator to act
-  // on an empty list. The only possible correction is a smaller commissioning.
-  if (open.length === 0) {
+  // When removing EVERY standing branch still would not make the call fit, the
+  // ordinary LAND/PARK remedy is impossible to complete: it asks more branches
+  // to go than the list contains. The remaining excess has to come out of the
+  // call itself. With an empty pool that is the whole remedy; with a mixed state
+  // BOTH actions are required, and saying either one alone would send the
+  // operator around the same refusal loop.
+  if (excess > open.length && open.length === 0) {
     return (
       `THE CALL ITSELF EXCEEDS THE POOL CAP: no feat/* branches currently occupy a slot, but opening point${
         named.length > 1 ? 's' : ''
       } ${n ?? '?'} would add ${adding} branch${adding === 1 ? '' : 'es'} against a cap of ${cap}. ` +
       `COMMISSION FEWER TARGETS: split this call so it opens at most ${cap} branch${cap === 1 ? '' : 'es'} at once. ` +
       'There is no existing branch to LAND or PARK.'
+    )
+  }
+  if (excess > open.length) {
+    const targetsToDrop = excess - open.length
+    return (
+      `A SLOT IS NOT FREE UNTIL ITS BRANCH IS GONE: ${open.length} open feat/* branch(es) against a pool cap of ` +
+      `${cap}${n ? `, so opening point${named.length > 1 ? 's' : ''} ${n} would add ${
+        adding > 1 ? `${adding} more` : 'another'
+      }` : ''}. Oldest first:\n${lines.join('\n')}\n` +
+      `BOTH CHANGES ARE REQUIRED BEFORE THIS CALL FITS: LAND or PARK all ${open.length} standing branch${
+        open.length === 1 ? '' : 'es'
+      } named above (${BRANCH_LAND_CMD}, or ${BRANCH_PARK_CMD} with a reason), AND COMMISSION ${targetsToDrop} FEWER ` +
+      `branch-opening target${targetsToDrop === 1 ? '' : 's'} from this call. Neither action alone frees enough slots.`
     )
   }
   return (

@@ -2904,6 +2904,36 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
     expect(text).not.toContain('one of them must go')
   })
 
+  it('names both required remedies when landing every standing branch is not enough', () => {
+    const one = [{ ...NINE_BRANCHES[0], tip: 'a1b2c3d4' }]
+    const points = [701, 702, 703, 704]
+    const refused = branchSlotDecision({ branches: one, points, cap: 3, now: AUG17 })
+    expect(refused).toMatchObject({ count: 1, adding: 4, allowed: false })
+
+    const text = branchSlotRefusal(refused)
+    expect(text).toContain('feat/336-croc-staging')
+    expect(text).toContain('LAND or PARK all 1 standing branch')
+    expect(text).toContain('COMMISSION 1 FEWER branch-opening target')
+    expect(text).toContain('Neither action alone frees enough slots')
+
+    // Follow the complete remedy: remove the one named branch and one target.
+    // Either printed way of removing the standing branch must then allow the
+    // remaining three-target call under a cap of three.
+    const smallerCall = points.slice(0, 3)
+    expect(branchSlotDecision({ branches: [], points: smallerCall, cap: 3, now: AUG17 }).allowed).toBe(true)
+    const rec = recordParkedBranch(parseCommissionRecord(''), 'feat/336-croc-staging', 'superseded by 701', {
+      at: '2026-08-17T19:00:00.000Z',
+      tip: 'a1b2c3d4',
+    })
+    expect(
+      branchSlotDecision({ branches: one, parked: rec.parked, points: smallerCall, cap: 3, now: AUG17 }).allowed,
+    ).toBe(true)
+
+    // Prove why BOTH clauses are present: either half by itself remains refused.
+    expect(branchSlotDecision({ branches: [], points, cap: 3, now: AUG17 }).allowed).toBe(false)
+    expect(branchSlotDecision({ branches: one, points: smallerCall, cap: 3, now: AUG17 }).allowed).toBe(false)
+  })
+
   it('refuses a mixed call that continues one occupied point and opens another at the cap', () => {
     const three = NINE_BRANCHES.slice(0, 3)
     const d = branchSlotDecision({ branches: three, points: [336, 705], now: AUG17 })
