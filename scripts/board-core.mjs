@@ -598,6 +598,20 @@ function renderDoneEntry({ point, title, start, end, body }) {
   )
 }
 
+/**
+ * A card with its START field replaced, whatever shape the old one had.
+ *
+ * The field is everything between `class="meta">` and the range separator (or
+ * the closing tag when the card carries a single stamp), so a damaged start is
+ * REPLACED rather than partially overwritten (review rounds 3 and 5).
+ */
+export function withStart(card, start) {
+  return String(card ?? '').replace(/(class="meta">)([^<]*)/, (whole, lead, content) => {
+    const at = content.indexOf('·')
+    return at < 0 ? `${lead}${start}` : `${lead}${start} ${content.slice(at)}`
+  })
+}
+
 /** Remove every Erledigt card for `point`, INSIDE the section alone. */
 function dropDoneCards(html, point) {
   const source = String(html ?? '')
@@ -661,7 +675,7 @@ export function doneStart(card) {
   // a bare digit boundary still read `12:34:56` and `12:34x` as `12:34`, so a
   // damaged card could decide the merged start. What may follow is the range
   // separator or the closing tag, nothing else.
-  const m = String(card ?? '').match(/class="meta">\s*(\d{1,2}):(\d{2})(?=\s*(?:·|<|$))/)
+  const m = String(card ?? '').match(/class="meta">\s*(\d{1,2}):(\d{2})(?=\s*(?:·|<\/span>))/)
   if (!m) return ''
   const [, h, min] = m
   if (Number(h) > 23 || Number(min) > 59) return ''
@@ -717,10 +731,10 @@ export function mergeDoneDuplicates(html) {
     seen.add(e.point)
     if (counts.get(e.point) > 1) {
       const start = earliestStart(doneCards(source, e.point))
-      // The WHOLE numeric run is replaced, not a well-formed prefix of it
-      // (third review round): a damaged newest stamp like `12:345` had its first
-      // four characters swapped and left the stray digit behind — `21:175`.
-      out += start ? e.text.replace(/(class="meta">\s*)[\d:]+/, `$1${start}`) : e.text
+      // The whole START FIELD is replaced, not the digits in it (review rounds 3
+      // and 5): a damaged newest stamp is not always numeric — `oops · 01:10`
+      // survived untouched and `12x:34` became `21:17x:34`.
+      out += start ? withStart(e.text, start) : e.text
     } else {
       out += e.text
     }

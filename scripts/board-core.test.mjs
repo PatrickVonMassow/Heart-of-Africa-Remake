@@ -1193,11 +1193,15 @@ describe('mergeDoneDuplicates — a board that already carries them', () => {
     expect(queueSection).toContain('class="num">700')
   })
 
-  it('folds a DAMAGED newest stamp whole instead of leaving a stray digit', () => {
-    const html = fullBoard({ done: card(700, 'Neu', '12:345 · 01:10') + card(700, 'Alt', '21:17 · 00:44') })
-    const out = mergeDoneDuplicates(html).html
-    expect(out).toContain('<span class="meta">21:17 · 01:10</span>')
-    expect(out).not.toContain('21:175')
+  it('folds a DAMAGED newest stamp whole, numeric or not (rounds 3 and 5)', () => {
+    for (const damaged of ['12:345', 'oops', '12x:34', '']) {
+      const html = fullBoard({ done: card(700, 'Neu', `${damaged} · 01:10`) + card(700, 'Alt', '21:17 · 00:44') })
+      const out = mergeDoneDuplicates(html).html
+      expect(out, damaged).toContain('<span class="meta">21:17 · 01:10</span>')
+      expect(out, damaged).not.toContain('21:175')
+      expect(out, damaged).not.toContain('21:17x')
+      expect(out, damaged).not.toContain('oops')
+    }
   })
 
   it('leaves the section’s own markup untouched around and BETWEEN the cards', () => {
@@ -1244,6 +1248,10 @@ describe('doneStart / earliestStart', () => {
     expect(doneStart(meta('12:345 · 00:44'))).toBe('')
     expect(doneStart(meta('12:34:56 · 00:44'))).toBe('')
     expect(doneStart(meta('12:34x · 00:44'))).toBe('')
+    // Only the separator or the CLOSING TAG may follow (fifth round): `<b>` and
+    // an unterminated field used to pass.
+    expect(doneStart('class="meta">12:34')).toBe('')
+    expect(doneStart('class="meta">12:34<b>')).toBe('')
     // …while both real shapes still answer.
     expect(doneStart(meta('12:34 · 00:44'))).toBe('12:34')
     expect(doneStart(meta('12:34'))).toBe('12:34')
