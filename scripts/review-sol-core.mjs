@@ -672,10 +672,34 @@ export function formatReviewReport({
   mode = 'review',
   point = '',
   partial = null,
-  shortfall = null,
+  shortfall,
   plan = null,
   pass = null,
 } = {}) {
+  // THE REPORT RESTS ON decision.ready, NEVER ON A PARAMETER'S DEFAULT (fourth
+  // cross-vendor round, pass 3). decideReview answers ready:false for a round
+  // whose delivery accounting it was never shown — and this function then
+  // printed the record command anyway, because its own `shortfall` parameter
+  // defaulted to null, which is the accounting's word for "provably complete".
+  // That is the fail-open this point exists to close, surviving in the one
+  // function that decides what the caller is told to run. An absent accounting
+  // is now the same refusal the accounting itself makes of an unknown fit; the
+  // deliberate fallback templates (whose placeholders the recorder refuses
+  // anyway) keep their shape, so only the successful-run path is gated here.
+  const gap =
+    shortfall !== null && shortfall !== undefined
+      ? shortfall
+      : !decision.fellBack && decision.ready !== true
+        ? {
+            reason: 'unverified',
+            detail: 'the caller never asked the material accounting whether this round carried its range',
+            truncated: [],
+            omitted: [],
+            budget: MATERIAL_BUDGET_CHARS,
+            size: 0,
+            rawSize: 0,
+          }
+        : null
   // A RECORD IS NEVER PRINTED FOR LESS THAN IT CLEARS (fourth cross-vendor
   // round). Both gates treat a record as covering every commit it CONTAINS, so a
   // narrowed range — `--since <sha>~1` on a branch with older commits — would
@@ -700,7 +724,7 @@ export function formatReviewReport({
       // range whose round ALSO overflowed used to report only the narrowing, and
       // the files nobody read went unnamed — while the point demands each one be
       // named in the refusal, whatever else is wrong with the round.
-      ...(shortfall ? ['', '  And it did not carry even that much:', formatShortfall(shortfall, { sha, plan })] : []),
+      ...(gap ? ['', '  And it did not carry even that much:', formatShortfall(gap, { sha, plan })] : []),
     ].join('\n')
   }
   // A RECORD IS NEVER PRINTED FOR MATERIAL THE ROUND DID NOT CARRY (point 714).
@@ -709,7 +733,7 @@ export function formatReviewReport({
   // produced a clean-looking record command covering files nobody read. The
   // verdict is still reported, because the reviewer's findings are worth having;
   // the ready-to-run command is not.
-  if (shortfall) {
+  if (gap) {
     // THE HAND-OVER STILL HAS TO NAME ITS READER. A short-fall on a path that
     // never ran Sol at all — the share switch, or a range Sol authored — is
     // still a review somebody must do, and a refusal that dropped the reviewer's
@@ -723,7 +747,7 @@ export function formatReviewReport({
       : decision.kind === OUTCOME.SELF_REVIEW
         ? `ROLE SWAP — ${SOL_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.\n${handOver}`
         : `${SOL_MODEL_NAME} did not review it: ${decision.cause}.\n${handOver}`
-    return [`review-sol: ${said}`, '', formatShortfall(shortfall, { sha, plan })].join('\n')
+    return [`review-sol: ${said}`, '', formatShortfall(gap, { sha, plan })].join('\n')
   }
   const cmd = formatRecordCommand({
     sha,

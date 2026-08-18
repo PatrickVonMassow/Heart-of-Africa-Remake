@@ -404,6 +404,41 @@ describe('the record the command prints', () => {
     expect(report).toContain('merge')
   })
 
+  it('never prints a record command while the decision is not READY, whatever the defaults', () => {
+    // Round 4, pass 3: decideReview correctly answers ready:false for a round
+    // whose delivery accounting it was never shown — and the report printed the
+    // record command anyway, because its own shortfall parameter defaulted to
+    // null, the accounting's word for "provably complete". The report now rests
+    // on the decision, so a caller that never asked the accounting gets the
+    // unverified refusal, not a command.
+    const decision = decideReview({
+      outcome: classifyOutcome({ exitCode: 0, stdout: solSays() }),
+      parsed: parseVerdict(solSays()),
+      // no shortfall handed over at all — the accounting was never consulted
+    })
+    expect(decision.fellBack).toBe(false)
+    expect(decision.ready).toBe(false)
+    const report = formatReviewReport({ decision, sha: 'a'.repeat(40) })
+    expect(report).not.toContain('mechanism-review.mjs --record')
+    expect(report).toContain('NO RECORD COMMAND IS PRINTED')
+    expect(report).toContain('never asked the material accounting')
+  })
+
+  it('refuses the same way when ready is false although a null shortfall reached the report', () => {
+    // The two inputs contradicting each other must resolve toward the refusal:
+    // ready is the decision's word, and null alone must not outvote it.
+    const decision = {
+      model: SOL_MODEL_NAME,
+      fellBack: false,
+      ready: false,
+      verdict: 'merge',
+      evidence: 'read the diff end to end',
+    }
+    const report = formatReviewReport({ decision, sha: 'b'.repeat(40), shortfall: null })
+    expect(report).not.toContain('--record')
+    expect(report).toContain('NO RECORD COMMAND IS PRINTED')
+  })
+
   it('is NOT printed at all when the round did not carry the material (point 714)', () => {
     const report = formatReviewReport({
       decision: decideReview(okRun()),
