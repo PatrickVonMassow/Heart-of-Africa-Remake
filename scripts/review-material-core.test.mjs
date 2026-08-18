@@ -85,6 +85,51 @@ describe('the assembly says what it could not hold', () => {
     expect(out.text).not.toContain('x'.repeat(200))
   })
 
+  // …but the NOTE it travels as costs room, and pushing it with none left put
+  // the round over its ceiling while the loss list stayed empty (cross-vendor
+  // review, second round).
+  it('does not spend room it has not got on the patch-only notes', () => {
+    const out = assembleMaterial({
+      stat: 's',
+      patch: 'p',
+      files: [file('a.md', 9), file('b.md', 9), file('c.md', 9), file('d.md', 9)],
+      budget: 400,
+      patchOnly: ['a.md', 'b.md', 'c.md', 'd.md'],
+    })
+    // The notes stop where the room does, and what is left over is an OMISSION —
+    // which is a loss, so the round is not complete and no record may rest on it.
+    expect(out.patchOnly.length).toBeLessThan(4)
+    expect(out.omitted.length).toBeGreaterThan(0)
+    expect(out.fit).toBe(false)
+  })
+
+  it('keeps every round it CALLS complete inside its budget', () => {
+    // The invariant the flags alone did not carry: a declared coverage may cost
+    // room, so "nothing was cut" must never outvote the measured size.
+    for (const budget of [600, 1200, 5000, 20_000]) {
+      const out = assembleMaterial({
+        stat: 's'.repeat(300),
+        patch: patchFor(['a.md', 'b.md', 'c.md']),
+        files: [file('a.md', 200), file('b.md', 400), file('c.md', 900)],
+        budget,
+        patchOnly: ['c.md'],
+      })
+      if (out.fit) expect(out.size, `budget ${budget}`).toBeLessThanOrEqual(budget)
+    }
+  })
+
+  it('never calls a round complete whose text is over the ceiling', () => {
+    // The frames the assembly writes belong to no file's reservation, so the
+    // measured text — not the empty loss list — is what answers "did it fit".
+    const out = assembleMaterial({ stat: '', patch: '', files: [], budget: 5 })
+    expect(out.size).toBeGreaterThan(5)
+    expect(out.truncated).toEqual([])
+    expect(out.omitted).toEqual([])
+    expect(out.fit).toBe(false)
+    const said = formatShortfall(materialShortfall({ assembly: out, sent: out.text }), { sha: 'abc1234' })
+    expect(said).toContain('over the ceiling')
+  })
+
   it('is fine with a commit that only deleted files', () => {
     const out = assembleMaterial({ stat: 's', patch: 'p', files: [], budget: 10_000 })
     expect(out.fit).toBe(true)

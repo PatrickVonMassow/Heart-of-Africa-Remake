@@ -128,9 +128,19 @@ export function assembleMaterial({
     // the material says which. It costs the round only its one header line.
     if (skipContent.has(path)) {
       const header = patchOnlyHeader(path)
+      // THE NOTE COSTS ROOM TOO. Pushed with no room left it put the round over
+      // its budget while the accounting still called it complete — several
+      // declared patch-only files were enough to do it (cross-vendor review,
+      // second round). With nothing left the file is an ordinary OMISSION: the
+      // round is spent, and saying so is what stops the record.
+      if (left <= header.length + 1) {
+        out.push(omittedHeader(path), '')
+        account.omitted.push(path)
+        continue
+      }
       out.push(header, '')
       account.patchOnly.push(path)
-      left = Math.max(0, left - header.length - 1)
+      left -= header.length + 1
       continue
     }
     const header = fileHeader(path)
@@ -153,12 +163,17 @@ export function assembleMaterial({
     size: text.length,
     rawSize,
     budget: cap,
-    // THE ONE QUESTION, ANSWERED FROM THE ACCOUNTING AND NOTHING ELSE.
+    // THE ONE QUESTION, ANSWERED FROM THE ACCOUNTING — AND FROM THE RESULT. The
+    // flags alone said "nothing was cut", which is not the same claim as "it
+    // fitted": the frames the assembly writes are outside every per-file
+    // reservation, so a round could end over its ceiling with an empty ledger of
+    // losses (cross-vendor review, second round). The measured text decides.
     fit:
       !account.statTruncated &&
       !account.patchTruncated &&
       account.truncated.length === 0 &&
-      account.omitted.length === 0,
+      account.omitted.length === 0 &&
+      text.length <= cap,
   }
 }
 
@@ -399,6 +414,14 @@ export function formatShortfall(shortfall, { sha = '', plan = null } = {}) {
   lines.push(
     `  The material budget is ${shortfall.budget} characters and the complete material is ${shortfall.rawSize}.`,
   )
+  // A ROUND CAN BE OVER ITS CEILING WITH NOTHING ON THE LOSS LIST: the frames
+  // around the parts are charged to no file, so the size is named in its own
+  // right rather than left to be inferred from an empty list.
+  if (Number(shortfall.size) > Number(shortfall.budget)) {
+    lines.push(
+      `  · the assembled round is ${shortfall.size} characters — ${shortfall.size - shortfall.budget} over the ceiling`,
+    )
+  }
   if (shortfall.statTruncated) lines.push('  · the DIFFSTAT was cut')
   if (shortfall.patchTruncated) lines.push('  · the PATCH was cut — the reviewer saw part of the diff')
   for (const path of shortfall.truncated) lines.push(`  · TRUNCATED: ${path}`)
