@@ -441,37 +441,6 @@ put it is the mistake this line exists to stop.
   Criticality: medium — it is the tool that exists to save turns, and it costs them where it is blind.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 708. Only the landing is one command; the beginning and the turn's end are hand-driven chains
-  (analysed 17.08.2026 against the code). The project knows the pattern: `land-point.mjs` drives 15
-  steps — merge, gate, tick, archive, push, board, cleanup — as ONE command, and CLAUDE.md calls it
-  out as "The landing is ONE command". What was bundled is the RARE, dangerous end. What runs MANY
-  times per point stayed unbundled, and four gaps were measured:
-  (1) THE SESSION BOUNDARY prints a card it could set itself — `batch-boundary.mjs` composes the text
-  via `boundaryCardText`, imports `PUBLISH_CMD` and has `execFileSync`, but neither puts the card up
-  nor publishes; that cost three refused `--commit` runs in one day (card missing, card naming no
-  point, card byte-identical inside the same minute) plus a correction for card brevity.
-  (2) FILING A POINT is about ten calls with no helper at all: append to TASKS.md, `tasks-spec-guard`,
-  `tasks-archive-guard`, `doc-budget-guard`, commit, push, `board-queue set` for title, body and
-  estimate, render the queue, publish the board, `queue-rank --ranked`. No script in the tree appends
-  a point, and `queue-order-guard` blocks the turn end when the ranking step is missing — so the chain
-  is MANDATORY and still unbundled. It ran three times in one day.
-  (3) HANDING A POINT OUT is three calls with no helper: `git worktree add -b feat/<n>-<slug>`,
-  `worktree-bootstrap.mjs`, `author-sol.mjs --point` — and `author-sol` explicitly demands an existing
-  worktree and branch. There are 15 bundled steps for the END and none for the BEGINNING.
-  (4) THE TURN'S END has no command at all: `focus set`, `board-publish`, `dashboard-guard --synced`,
-  `board.mjs attest`, `guard-preflight`. `attest` bundles three of them, but neither the publish nor
-  the focus, and `batch-progress-guard` alone names seven different commands across its remedies.
-  FINAL STATE: one command per sequence, built like `land-point.mjs` — fixed order, one verdict per
-  step, STOPS at the first red, leaves no half state and bypasses no guard. Built in this order, by
-  how often each runs: (2) file a point, (4) end the turn, (1) take the boundary, (3) hand a point out.
-  Each carries a `--dry` that prints the plan without touching anything, as the landing does.
-  VERIFIABLE: Vitest over each sequence's pure plan — the step list, the stop-at-first-red behaviour
-  and the `--dry` output; plus one driven run per command against a fixture repository, ending in the
-  state the hand-driven chain produced.
-  Criticality: medium — it is the per-point overhead of every session, and each hand-driven chain is
-  a place a step gets forgotten.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 705. The board is republished once per guard correction, instead of once at the end
   (measured 17.08.2026). One session published the whole board about a dozen times in fifty
   minutes, and that is not carelessness but the design. `scripts/board.mjs` couples the card
@@ -499,8 +468,6 @@ put it is the mistake this line exists to stop.
   - A ceiling on publishes per turn that ABORTS LOUDLY when it is reached, naming what was
     published and what was refused. A rate that silently keeps writing is how the quota was spent
     without anyone noticing.
-  - The batch pause written for this throttling (`.claude/batch-paused`, 17.08.2026) is lifted as
-    part of this point, once the transport answers 200 again.
   VERIFIABLE: Vitest over the staged controller — several edits accumulate with no publish, the
   closing step publishes once, the ceiling aborts on the publish past the limit and names both
   sides; plus a driven run of the sequence that produced this finding (a card edit that five
@@ -509,117 +476,41 @@ put it is the mistake this line exists to stop.
   failure is invisible to the session that causes it.
   Bundle: Chat & Tafel.
 
-- [ ] 706. The queue commands lose the card text one way and re-write a blocked one the other
-  (measured 17.08.2026 against the code and the stored state, while filing points). `parseSetArgs`
-  in `scripts/board-queue-core.mjs` treats `--title`/`--estimate` as a MODE switch and pushes every
-  following argument into THAT bucket (`buckets[field].push(a)`). So `set 702 --estimate "~2 h"
-  "<prose>"` files the prose under `estimate`, where `setQueueEntry` discards it while normalising —
-  what remains stored is `~2 h`, and the card text was never there. The command reported `estimate
-  for point 702 stored` and said nothing about the swallowed argument. The cost is not only the lost
-  text: it forces three calls per card (title, body, estimate) instead of the ONE the usage line
-  offers, and with the edit-publish coupling each of those was another publish.
-  FINAL STATE:
-  - An argument the parser does not use as what the caller plainly meant is REFUSED LOUDLY instead
-    of dropped: text after `--estimate` that does not read as a duration aborts and names the right
-    order. The same holds for `--title` followed by more than a title.
-  - The success line names EVERY field it set, so a missing one is visible in the output.
-  - `queue <N>` on a point that IS the standing now-card does not silently empty the now section.
-    Measured 17.08.2026: refreshing the stale queue text of the point in active work moved the card
-    OUT of "Woran ich gerade arbeite" and reported `700 returned to the queue`, leaving that section
-    blank — the exact state point 713 exists to prevent — and the next `now <N>` then failed with
-    `no queue card for point 700`, because the round trip had consumed the queue card the command
-    reads from. Either the queue text of a point in active work is editable WITHOUT unseating its
-    now-card, or the attempt is refused and names `status <N>` as the way to restate it; a command
-    that moves a card between sections says which section it left.
-  - The REBUILD does not write a card the card guard then blocks. Measured 17.08.2026: a queue
-    rebuild regenerates every card body from the work-order spec, and a spec that names another
-    point therefore lands in the card verbatim — `dashboard-card-topic-guard` blocked the turn end
-    on a cross-point sentence the rebuild had just written, and the hand-fix in the board file
-    survives only until the next rebuild. The generator strips or rewrites the cross-point passage
-    the way the guard demands, so a rebuilt board is publishable without a hand pass.
-  VERIFIABLE: Vitest over `parseSetArgs` with exactly this call — the mixed form refused with the
-  correct order named, the well-formed three-field call accepted, and the success line listing each
-  field it wrote; plus a case that renders a spec naming another point and asserts the generated
-  card body passes the card-topic rule; plus a case that edits the queue text of the point holding
-  the now-card and asserts the now section still holds it afterwards.
-  Criticality: low — one command's argument handling, but it silently discards the user-visible
-  text of a board card.
-  Bundle: Chat & Tafel.
-
-- [ ] 710. The remaining forty-five sequences of the multi-step analysis are worked into the
-  order, bundle-first (the blind-parallel stage of 17.08.2026, run on the user's instruction).
-  The union in `docs/multistep-analysis-17-08/multistep-union.json` holds 57 accounted entries
-  (rescued from git-ignored `local/` on 18.08.2026, point 723's U16); its six priority findings
-  already resolve to points 700, 701, 705, 707 and 708, but 45 entries named only by Sol's list
-  stand nowhere in the work order, each with its own defect line.
-  FINAL STATE:
-  - Every union entry is either MAPPED to a standing point (named in the mapping), FILED into an
-    existing bundle per bundle-first (a new point only where no bundle fits), or REJECTED with a
-    one-line reason. The mapping is committed under `docs/` so it survives the checkout.
-  - The analysis artefacts (lists A and B and the union) move with it into the repository, since
-    they are now the evidence a committed mapping cites.
-  - Priority follows the user's instruction of 17.08.2026: process cleanup, redundant consumption
-    and session sizes first; nothing is filed as a feature point.
-  VERIFIABLE: the committed mapping accounts for all 57 ids — a Vitest case over the mapping file
-  checks the id set against the union and fails on an unaccounted entry.
-  Criticality: low — it is bookkeeping over an existing analysis, but losing it silently would
-  discard a paid-for four-eyes stage.
+- [ ] 708. Only the landing is one command; the beginning and the turn's end are hand-driven chains
+  (analysed 17.08.2026 against the code). The project knows the pattern: `land-point.mjs` drives 15
+  steps — merge, gate, tick, archive, push, board, cleanup — as ONE command, and CLAUDE.md calls it
+  out as "The landing is ONE command". What was bundled is the RARE, dangerous end. What runs MANY
+  times per point stayed unbundled, and four gaps were measured:
+  (1) THE SESSION BOUNDARY prints a card it could set itself — `batch-boundary.mjs` composes the text
+  via `boundaryCardText`, imports `PUBLISH_CMD` and has `execFileSync`, but neither puts the card up
+  nor publishes; that cost three refused `--commit` runs in one day (card missing, card naming no
+  point, card byte-identical inside the same minute) plus a correction for card brevity.
+  (2) FILING A POINT is about ten calls with no helper at all: append to TASKS.md, `tasks-spec-guard`,
+  `tasks-archive-guard`, `doc-budget-guard`, commit, push, `board-queue set` for title, body and
+  estimate, render the queue, publish the board, `queue-rank --ranked`. No script in the tree appends
+  a point, and `queue-order-guard` blocks the turn end when the ranking step is missing — so the chain
+  is MANDATORY and still unbundled. It ran three times in one day.
+  (3) HANDING A POINT OUT is three calls with no helper: `git worktree add -b feat/<n>-<slug>`,
+  `worktree-bootstrap.mjs`, `author-sol.mjs --point` — and `author-sol` explicitly demands an existing
+  worktree and branch. There are 15 bundled steps for the END and none for the BEGINNING.
+  (4) THE TURN'S END has no command at all: `focus set`, `board-publish`, `dashboard-guard --synced`,
+  `board.mjs attest`, `guard-preflight`. `attest` bundles three of them, but neither the publish nor
+  the focus, and `batch-progress-guard` alone names seven different commands across its remedies.
+  FINAL STATE: one command per sequence, built like `land-point.mjs` — fixed order, one verdict per
+  step, STOPS at the first red, leaves no half state and bypasses no guard. Built in this order, by
+  how often each runs: (2) file a point, (4) end the turn, (1) take the boundary, (3) hand a point out.
+  Each carries a `--dry` that prints the plan without touching anything, as the landing does.
+  BUILD NOTES (18.08.2026, point 723's counted union U6/U7): the end-turn command ADOPTS point
+  705's staged board mode — one combined guard pass and exactly ONE checked publish — and never
+  re-implements them; 705 lands first, dependency-ordered. And the file-a-point command must not
+  paper over point 706's silent argument loss: it issues the three well-formed board-queue calls,
+  or lands 706's parser refusal first if that proves trivial.
+  VERIFIABLE: Vitest over each sequence's pure plan — the step list, the stop-at-first-red behaviour
+  and the `--dry` output; plus one driven run per command against a fixture repository, ending in the
+  state the hand-driven chain produced.
+  Criticality: medium — it is the per-point overhead of every session, and each hand-driven chain is
+  a place a step gets forgotten.
   Bundle: Session- & Repo-Hygiene.
-
-- [ ] 715. The staged rewiring of the hook paths is finished, and the check accepts the defaulted
-  anchor (measured 18.08.2026 against `scripts/guard-health-core.mjs` and `.claude/settings.json`).
-  39 of the 41 hook entries stand as `node scripts/<x>.mjs` — cwd-relative — so a session whose
-  working directory is not the repository root gets a non-blocking `Cannot find module` and the hook
-  is silently dead while its rule still counts as covered.
-  WHAT THIS IS NOT, recorded because I first filed it as one: this is NOT a check that certifies what
-  it condemns. `RELATIVE_WIRING_ROLLOUT` in `guard-health-core.mjs` records every one of those 39 as
-  the deliberate, staged rollout of point 438 — `.claude/settings.json` is a protected path, so each
-  line is rewired by an ATTENDED session, the pilot (`lock-heartbeat-hook`) first and verified from a
-  cwd outside the repo root, and a name leaves the list in the SAME commit that anchors its line. A
-  newly wired hook that is neither anchored nor recorded is reported at once, which is exactly what
-  happened to `rule-echo-guard`. So `guard-health`'s OK is honest, and what remains is not a blind
-  check but an UNFINISHED rollout plus one gap in what the check recognises. I had confirmed Sol's
-  count of 39 and inferred its conclusion without reading the rollout record — the count was right
-  and the reading was wrong.
-  FINAL STATE:
-  - The rollout is CARRIED TO ITS END: every hook line is anchored and `RELATIVE_WIRING_ROLLOUT` is
-    empty, each removal in the same commit as its anchoring, in the attended sessions the record
-    itself prescribes. Until then the list stays the honest statement of what is left.
-  - The DEFAULTED anchor form is recognised as anchored — `${CLAUDE_PROJECT_DIR:-.}/scripts/x.mjs`,
-    which is the anchored path when the variable is set and degrades to the relative one when it is
-    not, never worse than the bare form (whose unset expansion `/scripts/x.mjs` resolves nowhere from
-    any cwd). DONE 18.08.2026 in `refAnchoring`, with the malformed-default case pinned as relative.
-  VERIFIABLE: Vitest — a settings file with one unrecorded relative entry among anchored ones is
-  reported; a name left in the rollout after its line was anchored is reported as a stale record; the
-  defaulted form counts as anchored and a malformed default does not; and `RELATIVE_WIRING_ROLLOUT`
-  being empty leaves the audit clean.
-  NOTE ON EXECUTION: `.claude/settings.json` is a protected path whose edits prompt, so the remaining
-  rewiring needs attended sessions and cannot be delegated to a headless batch run.
-  Criticality: medium — the rollout is recorded and progressing, so nothing is silently uncovered;
-  what is left is finishing it, not repairing a blind check.
-  Bundle: unbundled (guard hygiene).
-
-- [ ] 662. The context boundary must also fire without a tick (user 12.08.2026: "Außerdem ist
-  der Kontext dieser Session wieder ziemlich groß geworden. Hättest du in der Zwischenzeit
-  nicht mal an eine andere übergeben können? So bekommen wir das sonst nie in den Griff.").
-  THE GAP: the boundary duty (batch-boundary + batch-progress-guard) is keyed to a TICKED
-  point. A point that lands in HALVES — 657's first half merged without a tick — or a day of
-  review rounds on one branch never produces a tick, so one session carried the batch for ~14
-  hours and >150k context while every rule held. The 656 landing WAS a tickable boundary and
-  the session pulled the next point in anyway; nothing blocked that.
-  FINAL STATE: the boundary becomes reachable and OWED at safe moments even without a tick:
-  (1) after any MERGE to main (ticked or not) with no delegated agent in flight, the
-  batch-progress-guard demands the boundary exactly as it does after a tick — a merge is a
-  clean handover point by definition; (2) a session that has held the batch longer than a
-  measured ceiling (calibrate from the cost data: hours or landed merges, not tokens the
-  scripts cannot read) must take the next safe handover instead of choosing to continue; the
-  guard blocks "continue the next queue item" once the ceiling is passed. Attended sessions
-  ask for /clear at the same moments. VERIFIABLE: Vitest over the guard core — a merge without
-  tick and no agent in flight demands the boundary; under the ceiling it does not; the ceiling
-  case refuses the continue-path and allows the boundary path.
-  Criticality: high — 91 % of the project's spend sits above 150k context, and this is the
-  door it walks through.
-  Bundle: unbundled (infrastructure).
 
 - [ ] 553. An explicit context budget per point, and a written handoff when it is spent
   (08.08.2026, chosen BY MEASUREMENT as point 373 requires — the closing measurement is
@@ -690,6 +581,22 @@ put it is the mistake this line exists to stop.
   73k. This is the one measure on the list that can silently lower work quality — what an
   agent has learned and not written down is lost at the cut — which is why it is piloted
   and measured rather than adopted.
+  FOLDED IN FROM POINT 662 (18.08.2026, point 723's counted union U11 — the boundary without a
+  tick; user 12.08.2026: "Außerdem ist der Kontext dieser Session wieder ziemlich groß geworden.
+  Hättest du in der Zwischenzeit nicht mal an eine andere übergeben können? So bekommen wir das
+  sonst nie in den Griff."). The boundary duty was keyed to a TICKED point, so a point landing in
+  halves or a day of review rounds on one branch never produced a tick — one session carried the
+  batch ~14 hours and >150k context while every rule held, and the 656 landing WAS a tickable
+  boundary the session ignored. The merged final state keeps both of 662's demands under THIS
+  point's measured budget: (1) after any MERGE to main (ticked or not) with no delegated agent in
+  flight, `batch-progress-guard` demands the boundary exactly as it does after a tick — a merge
+  is a clean handover point by definition; (2) the held-too-long ceiling IS the measured context
+  ceiling this point already defines — 662's "hours or landed merges, not tokens the scripts
+  cannot read" premise went stale when point 700's fence made the context measurable — and past
+  it the guard refuses "continue the next queue item" while allowing the boundary path. Attended
+  sessions ask for /clear at the same moments. VERIFIABLE (beside the cases above): a merge
+  without a tick and no agent in flight demands the boundary; under the ceiling it does not; the
+  ceiling case refuses the continue-path and allows the boundary path.
   Criticality: high — this is the batch's dominant running cost, and a lever that reports
   a saving it did not make is worse than none: it retires the question. The measurement is
   therefore part of the delivery, not a follow-up.
@@ -769,6 +676,68 @@ put it is the mistake this line exists to stop.
   NOT ON ITS BRANCH 17.08.2026: `feat/595-598-verification-ladder-brief` is named for this point
   but contains NOTHING of it — measured by reading the whole net diff. It must be built, here or
   on its own branch; the shared branch lands 595 and 598 alone.
+
+- [ ] 706. The queue commands lose the card text one way and re-write a blocked one the other
+  (measured 17.08.2026 against the code and the stored state, while filing points). `parseSetArgs`
+  in `scripts/board-queue-core.mjs` treats `--title`/`--estimate` as a MODE switch and pushes every
+  following argument into THAT bucket (`buckets[field].push(a)`). So `set 702 --estimate "~2 h"
+  "<prose>"` files the prose under `estimate`, where `setQueueEntry` discards it while normalising —
+  what remains stored is `~2 h`, and the card text was never there. The command reported `estimate
+  for point 702 stored` and said nothing about the swallowed argument. The cost is not only the lost
+  text: it forces three calls per card (title, body, estimate) instead of the ONE the usage line
+  offers, and with the edit-publish coupling each of those was another publish.
+  FINAL STATE:
+  - An argument the parser does not use as what the caller plainly meant is REFUSED LOUDLY instead
+    of dropped: text after `--estimate` that does not read as a duration aborts and names the right
+    order. The same holds for `--title` followed by more than a title.
+  - The success line names EVERY field it set, so a missing one is visible in the output.
+  - `queue <N>` on a point that IS the standing now-card does not silently empty the now section.
+    Measured 17.08.2026: refreshing the stale queue text of the point in active work moved the card
+    OUT of "Woran ich gerade arbeite" and reported `700 returned to the queue`, leaving that section
+    blank — the exact state point 713 exists to prevent — and the next `now <N>` then failed with
+    `no queue card for point 700`, because the round trip had consumed the queue card the command
+    reads from. Either the queue text of a point in active work is editable WITHOUT unseating its
+    now-card, or the attempt is refused and names `status <N>` as the way to restate it; a command
+    that moves a card between sections says which section it left.
+  - The REBUILD does not write a card the card guard then blocks. Measured 17.08.2026: a queue
+    rebuild regenerates every card body from the work-order spec, and a spec that names another
+    point therefore lands in the card verbatim — `dashboard-card-topic-guard` blocked the turn end
+    on a cross-point sentence the rebuild had just written, and the hand-fix in the board file
+    survives only until the next rebuild. The generator strips or rewrites the cross-point passage
+    the way the guard demands, so a rebuilt board is publishable without a hand pass.
+  VERIFIABLE: Vitest over `parseSetArgs` with exactly this call — the mixed form refused with the
+  correct order named, the well-formed three-field call accepted, and the success line listing each
+  field it wrote; plus a case that renders a spec naming another point and asserts the generated
+  card body passes the card-topic rule; plus a case that edits the queue text of the point holding
+  the now-card and asserts the now section still holds it afterwards.
+  PLACEMENT AND SUBSUMPTION (18.08.2026, point 723's counted union U8/U17): moved behind the
+  token-reduction levers on the user's 17.08 word (token reduction outranks low bookkeeping), and
+  point 713 lands first — its derived now-section re-creates the card `queue <N>` unseats, so the
+  third bullet shrinks to a regression test once 713 is in; the parser and rebuild-card halves
+  stay this point's own work.
+  Criticality: low — one command's argument handling, but it silently discards the user-visible
+  text of a board card.
+  Bundle: Chat & Tafel.
+
+- [ ] 710. The remaining forty-five sequences of the multi-step analysis are worked into the
+  order, bundle-first (the blind-parallel stage of 17.08.2026, run on the user's instruction).
+  The union in `docs/multistep-analysis-17-08/multistep-union.json` holds 57 accounted entries
+  (rescued from git-ignored `local/` on 18.08.2026, point 723's U16); its six priority findings
+  already resolve to points 700, 701, 705, 707 and 708, but 45 entries named only by Sol's list
+  stand nowhere in the work order, each with its own defect line.
+  FINAL STATE:
+  - Every union entry is either MAPPED to a standing point (named in the mapping), FILED into an
+    existing bundle per bundle-first (a new point only where no bundle fits), or REJECTED with a
+    one-line reason. The mapping is committed under `docs/` so it survives the checkout.
+  - The analysis artefacts (lists A and B and the union) move with it into the repository, since
+    they are now the evidence a committed mapping cites.
+  - Priority follows the user's instruction of 17.08.2026: process cleanup, redundant consumption
+    and session sizes first; nothing is filed as a feature point.
+  VERIFIABLE: the committed mapping accounts for all 57 ids — a Vitest case over the mapping file
+  checks the id set against the union and fails on an unaccounted entry.
+  Criticality: low — it is bookkeeping over an existing analysis, but losing it silently would
+  discard a paid-for four-eyes stage.
+  Bundle: Session- & Repo-Hygiene.
 
 - [ ] 697. The settlement goat's planted foot slides with the body (measured 14.08.2026, on a
   quiet machine — every leftover vite server, suite and automation browser killed first, load
@@ -961,6 +930,43 @@ put it is the mistake this line exists to stop.
   their real outcome (no masking). RELATED: this is the concrete first slice of point
   200's flake work, and point 294's auto-classification would have labelled all four
   reds "staging, not product" without a manual repeat each time.
+
+- [ ] 715. The staged rewiring of the hook paths is finished, and the check accepts the defaulted
+  anchor (measured 18.08.2026 against `scripts/guard-health-core.mjs` and `.claude/settings.json`).
+  39 of the 41 hook entries stand as `node scripts/<x>.mjs` — cwd-relative — so a session whose
+  working directory is not the repository root gets a non-blocking `Cannot find module` and the hook
+  is silently dead while its rule still counts as covered.
+  WHAT THIS IS NOT, recorded because I first filed it as one: this is NOT a check that certifies what
+  it condemns. `RELATIVE_WIRING_ROLLOUT` in `guard-health-core.mjs` records every one of those 39 as
+  the deliberate, staged rollout of point 438 — `.claude/settings.json` is a protected path, so each
+  line is rewired by an ATTENDED session, the pilot (`lock-heartbeat-hook`) first and verified from a
+  cwd outside the repo root, and a name leaves the list in the SAME commit that anchors its line. A
+  newly wired hook that is neither anchored nor recorded is reported at once, which is exactly what
+  happened to `rule-echo-guard`. So `guard-health`'s OK is honest, and what remains is not a blind
+  check but an UNFINISHED rollout plus one gap in what the check recognises. I had confirmed Sol's
+  count of 39 and inferred its conclusion without reading the rollout record — the count was right
+  and the reading was wrong.
+  FINAL STATE:
+  - The rollout is CARRIED TO ITS END: every hook line is anchored and `RELATIVE_WIRING_ROLLOUT` is
+    empty, each removal in the same commit as its anchoring, in the attended sessions the record
+    itself prescribes. Until then the list stays the honest statement of what is left.
+  - The DEFAULTED anchor form is recognised as anchored — `${CLAUDE_PROJECT_DIR:-.}/scripts/x.mjs`,
+    which is the anchored path when the variable is set and degrades to the relative one when it is
+    not, never worse than the bare form (whose unset expansion `/scripts/x.mjs` resolves nowhere from
+    any cwd). DONE 18.08.2026 in `refAnchoring`, with the malformed-default case pinned as relative.
+  VERIFIABLE: Vitest — a settings file with one unrecorded relative entry among anchored ones is
+  reported; a name left in the rollout after its line was anchored is reported as a stale record; the
+  defaulted form counts as anchored and a malformed default does not; and `RELATIVE_WIRING_ROLLOUT`
+  being empty leaves the audit clean.
+  NOTE ON EXECUTION: `.claude/settings.json` is a protected path whose edits prompt, so the remaining
+  rewiring needs attended sessions and cannot be delegated to a headless batch run.
+  ATTENDED-GATED (18.08.2026, point 723's counted union U10, a declared refinement of the user's
+  18.08 ranking): placed behind the user's block — attended-only by this spec's own execution
+  note, it must not jam the headless picker's front slots; a headless session skips it, an
+  attended session takes it from here.
+  Criticality: medium — the rollout is recorded and progressing, so nothing is silently uncovered;
+  what is left is finishing it, not repairing a blind check.
+  Bundle: unbundled (guard hygiene).
 
 - [ ] 686. The taught language is five concepts, and the chief's message is four of them (user
   13.08.2026, playing the deployed communication slice).

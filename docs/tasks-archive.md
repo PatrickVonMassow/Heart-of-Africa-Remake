@@ -18649,3 +18649,35 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — it is the enforcement of the four-eyes principle itself, and its current
   failure mode is a gate that blocks every turn end while being impossible to satisfy.
   Bundle: unbundled (review tooling).
+
+- [x] 662. The context boundary must also fire without a tick — MERGED INTO POINT 553
+  (18.08.2026, point 723's counted union U11). Both points defined the context-triggered
+  handover through batch-progress-guard, and one final-state spec had to reconcile their
+  competing ceiling definitions, so 553 now owns the merged final state in its "FOLDED IN
+  FROM POINT 662" paragraph: the un-ticked-merge boundary (after any merge to main with no
+  delegated agent in flight the guard demands the boundary exactly as after a tick), the
+  held-too-long ceiling recalibrated onto 553's measured context ceiling — 662's "tokens
+  the scripts cannot read" premise went stale when point 700's fence made the context
+  measurable — the attended /clear duty and 662's Vitest cases. Nothing is lost by the
+  merge. The spec as it stood when absorbed:
+  (was:) - [ ] 662. The context boundary must also fire without a tick (user 12.08.2026: "Außerdem ist
+    der Kontext dieser Session wieder ziemlich groß geworden. Hättest du in der Zwischenzeit
+    nicht mal an eine andere übergeben können? So bekommen wir das sonst nie in den Griff.").
+    THE GAP: the boundary duty (batch-boundary + batch-progress-guard) is keyed to a TICKED
+    point. A point that lands in HALVES — 657's first half merged without a tick — or a day of
+    review rounds on one branch never produces a tick, so one session carried the batch for ~14
+    hours and >150k context while every rule held. The 656 landing WAS a tickable boundary and
+    the session pulled the next point in anyway; nothing blocked that.
+    FINAL STATE: the boundary becomes reachable and OWED at safe moments even without a tick:
+    (1) after any MERGE to main (ticked or not) with no delegated agent in flight, the
+    batch-progress-guard demands the boundary exactly as it does after a tick — a merge is a
+    clean handover point by definition; (2) a session that has held the batch longer than a
+    measured ceiling (calibrate from the cost data: hours or landed merges, not tokens the
+    scripts cannot read) must take the next safe handover instead of choosing to continue; the
+    guard blocks "continue the next queue item" once the ceiling is passed. Attended sessions
+    ask for /clear at the same moments. VERIFIABLE: Vitest over the guard core — a merge without
+    tick and no agent in flight demands the boundary; under the ceiling it does not; the ceiling
+    case refuses the continue-path and allows the boundary path.
+    Criticality: high — 91 % of the project's spend sits above 150k context, and this is the
+    door it walks through.
+    Bundle: unbundled (infrastructure).
