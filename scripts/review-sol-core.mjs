@@ -445,9 +445,11 @@ export function parseVerdict(text, { receipt = '' } = {}) {
   }
   // A line still in its angle brackets is the PLACEHOLDER echoed back, not an
   // observation. RULED on the STRIPPED capture (decoration must not change a
-  // decision — `**<placeholder>**` walks a raw `/^</` test), while the quoted
+  // decision — `**<placeholder>**` walks a raw `/^</` test), AND on the
+  // net-only spelling (landing round): an UNPAIRED marker survives the pair
+  // strip, so `EVIDENCE: _<one line…>` shielded the anchored test. The quoted
   // evidence above stays raw.
-  if (evidenceClean.length < 10 || /^</.test(evidenceClean)) {
+  if (evidenceClean.length < 10 || /^</.test(evidenceClean) || /^</.test(charStripped(evidenceClean).trim())) {
     return { ok: false, verdict: '', evidence: '', error: 'no usable EVIDENCE line' }
   }
   return { ok: true, verdict, evidence: evidence || evidenceClean, error: '' }

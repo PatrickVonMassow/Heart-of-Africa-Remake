@@ -303,6 +303,13 @@ describe('the markdown strip reads shapes, not characters (round-7 pass 1)', () 
     const noFile = parseAnswer({ kind: 'audit', text: 'sweep\n\nA1 | ``` | the loader drops the flag field' })
     expect(noFile.ok).toBe(true)
     expect(noFile.answer.entries[0].file).toBe('(unspecified)')
+    // …and the NO-FINDINGS explanation obeys the same rule (landing round):
+    // an unpaired marker survives the pair strip, so `NO FINDINGS: _` read as
+    // an explained clean audit while naming nothing checked.
+    const bare = parseAnswer({ kind: 'audit', text: 'sweep\n\nNO FINDINGS: _' })
+    expect(bare.ok).toBe(false)
+    const explained = parseAnswer({ kind: 'audit', text: 'sweep\n\nNO FINDINGS: checked the loader end to end' })
+    expect(explained.ok).toBe(true)
   })
 
   it('does not admit a genuine review that merely SPEAKS the net’s vocabulary, raw or stripped', () => {

@@ -32,7 +32,7 @@
 
 import { ALLOWED_TRAILERS, classifyTrailer, modelNamesIn } from './model-guard-core.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
-import { rawFieldValue, stripDecoration, SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
+import { charStripped, rawFieldValue, stripDecoration, SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 
 export { SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
 
@@ -354,7 +354,12 @@ export function parseAuthoringAnswer(text) {
   // ALL THREE fields, OPEN included (final-round pass 1): the check covered
   // only DONE and GATES, so `OPEN: **<what you left undone>**` parsed clean and
   // judgeAuthoring reported a clean run over an unanswered required field.
-  if (/^</.test(doneClean) || /^</.test(gatesClean) || /^</.test(openClean)) {
+  // RULED ON THE NET-ONLY SPELLING TOO (landing round): an UNPAIRED marker
+  // survives the pair strip, so `OPEN: _<what you left undone>` shielded the
+  // placeholder from the anchored test. Character deletion can only ever
+  // widen this refusal, never clear one.
+  const placeholder = (v) => /^</.test(v) || /^</.test(charStripped(v).trim())
+  if (placeholder(doneClean) || placeholder(gatesClean) || placeholder(openClean)) {
     return { ok: false, error: 'the closing lines are the placeholders echoed back' }
   }
   return {

@@ -28,7 +28,7 @@
 // Side-effect free — the git work, the state file and the block belong to
 // scripts/criticality-review-guard.mjs (fail-open). Pinned by
 // criticality-review-guard-core.test.mjs.
-import { ledgerAtUsable, MODES, VERDICTS, sameModel } from './mechanism-review-core.mjs'
+import { ledgerAtUsable, MODE_REQUIRED_SINCE, MODES, VERDICTS, sameModel } from './mechanism-review-core.mjs'
 
 /** The ONE verdict that lets a high-criticality point be declared finished. */
 export const CLEARING_VERDICT = 'merge'
@@ -168,15 +168,34 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
     // NaN timestamp loses every comparison, so a hand-made row without one
     // could out-stand a later, finite-dated refusal (round-3 pass 1, applied
     // to the same ledger this gate reads).
-    const wellFormed = reachable.filter(
-      (r) =>
-        VERDICTS.includes(String(r.verdict)) &&
-        String(r.model ?? '').trim() &&
-        // Typed AND in the millisecond domain (rounds 4/5, pass 1): Number(null)
-        // is 0, and a seconds-scale or `at: 1` row loses every "later than"
-        // comparison, letting an earlier merge read a later refusal as answered.
-        ledgerAtUsable(r?.at),
-    )
+    // The MODE is held to the recorder's standard from the day it began
+    // demanding one (landing-round pass 1, mirroring the mechanism gate): a
+    // modern row naming no usable mode can only have arrived by hand.
+    const modeUsable = (r) => {
+      const m = String(r?.mode ?? '').trim()
+      if (m) return MODES.includes(m)
+      const at = Number(r?.at)
+      return Number.isFinite(at) && at > 0 && at < MODE_REQUIRED_SINCE
+    }
+    const rowWellFormed = (r) =>
+      VERDICTS.includes(String(r.verdict)) &&
+      // PRIMITIVE STRINGS, not coercions (landing-round pass 2): `model: {}`
+      // coerces to '[object Object]' and walked the emptiness test.
+      typeof r.model === 'string' &&
+      r.model.trim() &&
+      // The AUTHORSHIP KEY is required as a string (landing-round pass 1):
+      // the recorder always writes it, reading the commit's own trailers — a
+      // row without it can only have arrived by hand. It may be EMPTY, and
+      // that residual is named: a commit without a model trailer (a merge,
+      // the user's own edit) records authoredBy '' legitimately, and the
+      // gate cannot tell that apart from a hand-edit that typed ''.
+      typeof r.authoredBy === 'string' &&
+      // Typed AND in the millisecond domain (rounds 4/5, pass 1): Number(null)
+      // is 0, and a seconds-scale or `at: 1` row loses every "later than"
+      // comparison, letting an earlier merge read a later refusal as answered.
+      ledgerAtUsable(r?.at) &&
+      modeUsable(r)
+    const wellFormed = reachable.filter(rowWellFormed)
     // A MALFORMED REFUSAL POISONS, IT DOES NOT VANISH (final-round pass 1):
     // silently dropping a reachable refusal whose timestamp fails the domain
     // let a valid OLDER merge stand alone and clear the point — the exact
@@ -187,12 +206,14 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
     // criterion poisons, not only the timestamp (landing-round pass 1): a
     // refusal with a valid `at` but a missing `model` fell out of wellFormed
     // AND out of this net, and vanished the same way.
-    const malformedRefusals = reachable.filter(
-      (r) =>
-        VERDICTS.includes(String(r.verdict)) &&
-        String(r.verdict) !== CLEARING_VERDICT &&
-        !(String(r.model ?? '').trim() && ledgerAtUsable(r?.at)),
-    )
+    // …and the refusal is recognised NORMALISED (landing-round pass 2): a
+    // hand-edited `"do-not-merge "` fails the strict verdict test above AND
+    // an exact-match poison net, and vanished between the two.
+    const refusalShaped = (r) => {
+      const v = typeof r?.verdict === 'string' ? r.verdict.trim().toLowerCase() : ''
+      return VERDICTS.includes(v) && v !== CLEARING_VERDICT
+    }
+    const malformedRefusals = reachable.filter((r) => refusalShaped(r) && !rowWellFormed(r))
     if (malformedRefusals.length) {
       findings.push({ kind: 'malformed-record', tick, records: malformedRefusals })
       continue

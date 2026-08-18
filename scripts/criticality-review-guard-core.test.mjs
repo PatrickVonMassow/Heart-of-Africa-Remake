@@ -33,6 +33,10 @@ const record = (over = {}) => ({
   authoredBy: OPUS,
   verdict: CLEARING_VERDICT,
   evidence: 'read the core and ran the gate against a synthetic tick',
+  // The recorder demands a mode since MODE_REQUIRED_SINCE, and this gate now
+  // holds rows of that era to it (landing round) — the helper writes what the
+  // recorder writes.
+  mode: 'review',
   at: 1_787_000_000_000,
   reachable: true,
   descendsFrom: [],
@@ -202,6 +206,33 @@ describe('evaluateCriticalityReview', () => {
     expect(v.block).toBe(true)
     expect(v.findings[0].kind).toBe('malformed-record')
     expect(formatCriticalityReviewVerdict(v)).toContain('cannot be ORDERED')
+  })
+
+  it('a clearing row without authorship or a usable mode cannot clear (landing round)', () => {
+    // A hand-written merge with no authoredBy KEY (the recorder always writes
+    // one) or a mode the recorder refuses entered wellFormed and cleared a
+    // HIGH point without establishing a different-model review.
+    for (const over of [{ authoredBy: undefined }, { authoredBy: 42 }, { mode: 'bogus' }, { model: {} }]) {
+      const row = { ...record({ verdict: 'merge' }), ...over }
+      if (over.authoredBy === undefined) delete row.authoredBy
+      const v = evaluateCriticalityReview({ baseline: 'b', head: 'h', ticks: [tick()], records: [row] })
+      expect(v.block, JSON.stringify(over)).toBe(true)
+      expect(v.findings[0].kind).toBe('no-review')
+    }
+  })
+
+  it('a whitespace-decorated refusal verdict poisons — it cannot vanish unnormalised (landing round)', () => {
+    const v = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [
+        record({ verdict: 'merge', at: 1_787_000_002_000 }),
+        record({ verdict: 'do-not-merge ', at: 1_787_000_001_000 }),
+      ],
+    })
+    expect(v.block).toBe(true)
+    expect(v.findings[0].kind).toBe('malformed-record')
   })
 
   it('a missing-model REFUSAL poisons the same way — no criterion lets it vanish (landing round)', () => {

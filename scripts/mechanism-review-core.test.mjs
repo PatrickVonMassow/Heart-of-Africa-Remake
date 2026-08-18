@@ -1601,6 +1601,54 @@ describe('the mode is required to WRITE a record, never to READ one', () => {
     }
   })
 
+  it('a coerced non-string field never reads as a named reviewer or evidence (landing round)', () => {
+    // `model: {}` coerces to '[object Object]' and walked the emptiness test;
+    // `evidence: {}` walked the length test the same way. Neither may clear.
+    for (const over of [{ model: {} }, { evidence: {} }, { evidence: ['long enough as an array'] }]) {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+        records: [
+          {
+            sha: 'c'.repeat(40),
+            model: 'GPT-5.6 Sol',
+            authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+            evidence: 'checked the guard change against its spec end to end',
+            mode: 'review',
+            verdict: 'merge',
+            at: MERGE_ACCOUNTING_SINCE + 5000,
+            ...over,
+          },
+        ],
+      })
+      expect(v.block, JSON.stringify(over)).toBe(true)
+    }
+  })
+
+  it('a whitespace-decorated refusal verdict poisons rather than vanishing (landing round)', () => {
+    const base = {
+      sha: 'c'.repeat(40),
+      model: 'GPT-5.6 Sol',
+      authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+      evidence: 'checked the guard change against its spec end to end',
+      mode: 'review',
+    }
+    for (const verdict of ['do-not-merge ', ' do-not-merge', 'Do-Not-Merge']) {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+        records: [
+          { ...base, verdict: 'merge', at: MERGE_ACCOUNTING_SINCE + 5000 },
+          { ...base, verdict, at: MERGE_ACCOUNTING_SINCE + 9000 },
+        ],
+      })
+      expect(v.block, JSON.stringify(verdict)).toBe(true)
+      expect(v.findings[0].kind).toBe('malformed-record')
+    }
+  })
+
   it('an unsound REFUSAL cannot vanish behind an older complete composition (landing round)', () => {
     // The suppression path pass 2 named: a newer hand-edited do-not-merge pass
     // row with a valid timestamp but a mode the recorder refuses fell out of

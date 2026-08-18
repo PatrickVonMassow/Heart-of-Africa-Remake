@@ -216,6 +216,9 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
   it('refuses an evidence line that says nothing, including the placeholder itself', () => {
     expect(parseVerdict('VERDICT: merge\nEVIDENCE: fine')).toMatchObject({ ok: false })
     expect(parseVerdict('VERDICT: merge\nEVIDENCE: <one line naming what you checked>')).toMatchObject({ ok: false })
+    // An UNPAIRED marker survives the pair strip and shielded the anchored
+    // placeholder test (landing round): ruled on the net-only spelling too.
+    expect(parseVerdict('VERDICT: merge\nEVIDENCE: _<one line naming what you checked>')).toMatchObject({ ok: false })
   })
 
   it('refuses a reviewer that says it could not see the change, whatever verdict it gave', () => {

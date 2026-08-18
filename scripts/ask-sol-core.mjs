@@ -256,7 +256,12 @@ function parseEntries(lines, prefix, { allowEmpty = false } = {}) {
   // was checked. DETECTING a contradiction only demands the claim: an answer that lists a
   // finding and then writes the marker at all is saying two things, explanation or not.
   const claimsNone = /(^|\n)\s*[-*]?\s*NO FINDINGS\b/i.test(clean)
-  const statesNone = /(^|\n)\s*[-*]?\s*NO FINDINGS\s*:\s*\S/i.test(clean)
+  // The EXPLANATION rules on the net-only spelling, like entry presence above
+  // (landing round): the pair strip leaves an unpaired marker standing, so
+  // `NO FINDINGS: _` read as an explained clean audit while naming nothing
+  // checked. Deletion cannot fabricate emptiness.
+  const explained = /(^|\n)\s*[-*]?\s*NO FINDINGS\s*:\s*(\S[^\n]*)/i.exec(clean)
+  const statesNone = Boolean(explained && charStripped(explained[2]).trim())
   if (!entries.length) {
     if (allowEmpty && statesNone) return { ok: true, answer: { entries: [] }, summary: 'no findings' }
     return { ok: false, error: `no entry in the form \`${prefix}1 | <file> | <one line>\`` }

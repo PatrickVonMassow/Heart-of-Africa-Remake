@@ -1035,7 +1035,10 @@ export function evaluateMechanismReview({
     // MODE_REQUIRED_SINCE): a row of that era naming no usable mode can only
     // have arrived by hand.
     const evidenceUsable = (r) => {
-      const ev = String(r?.evidence ?? '').trim()
+      // A PRIMITIVE STRING, not a coercion (landing-round pass 2): an object
+      // coerces to '[object Object]', which walks the length test.
+      if (typeof r?.evidence !== 'string') return false
+      const ev = r.evidence.trim()
       return ev.length >= 10 && !/^<.*>$/.test(ev) && !blindReviewerAdmission(ev)
     }
     // Value, not only presence (round-2 pass 1): the recorder and this gate
@@ -1051,7 +1054,10 @@ export function evaluateMechanismReview({
     }
     const rowWellFormed = (r) =>
       VERDICTS.includes(String(r.verdict)) &&
-      String(r.model ?? '').trim() &&
+      // A PRIMITIVE STRING, not a coercion (landing-round pass 2): `model:
+      // {}` coerces to '[object Object]' and read as a named reviewer.
+      typeof r.model === 'string' &&
+      r.model.trim() &&
       // A NON-NUMERIC TIMESTAMP DEFEATS THE ORDERING (round-3 pass 1,
       // tightened twice: Number(null) is 0, and a positive-but-seconds-scale
       // value still loses every comparison against real rows — round-5
@@ -1072,9 +1078,12 @@ export function evaluateMechanismReview({
     // complete merge composition cleared past it. The recorder never writes
     // such a row; it can only have arrived by hand, and a hand-edited ledger
     // earns a refusal, never a clearance — it refuses until fixed or removed.
-    const malformedRefusals = covering.filter(
-      (r) => String(r?.verdict) === BLOCKING_VERDICT && !rowWellFormed(r),
-    )
+    // …recognised NORMALISED (landing-round pass 2): `"do-not-merge "` fails
+    // the strict verdict test AND an exact-match poison net, and vanished
+    // between the two.
+    const refusalShaped = (r) =>
+      typeof r?.verdict === 'string' && r.verdict.trim().toLowerCase() === BLOCKING_VERDICT
+    const malformedRefusals = covering.filter((r) => refusalShaped(r) && !rowWellFormed(r))
     if (malformedRefusals.length) {
       findings.push({ kind: 'malformed-record', commit, records: malformedRefusals })
       continue

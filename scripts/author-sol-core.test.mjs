@@ -234,6 +234,11 @@ describe('parseAuthoringAnswer', () => {
     expect(
       parseAuthoringAnswer('DONE: built\nGATES: test:unit, build and lint all green\nOPEN: **<what you left undone>**').ok,
     ).toBe(false)
+    // An UNPAIRED marker survives the pair strip and shielded the anchored
+    // test (landing round): the ruling reads the net-only spelling too.
+    expect(
+      parseAuthoringAnswer('DONE: built\nGATES: test:unit, build and lint all green\nOPEN: _<what you left undone>').ok,
+    ).toBe(false)
   })
 
   it('quotes DONE/GATES/OPEN from the raw lines byte-for-byte', () => {
