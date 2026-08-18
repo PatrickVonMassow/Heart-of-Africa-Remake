@@ -1163,20 +1163,36 @@ describe('mergeDoneDuplicates — a board that already carries them', () => {
 
   it('keeps the newest card at its POSITION even when the duplicates are identical', () => {
     // Byte-identical cards made a whole-document replace delete the FIRST
-    // occurrence — the survivor — and leave the older one in its place
-    // (cross-vendor review 18.08.2026).
+    // occurrence — the survivor — and leave the older one in its place. A card
+    // BETWEEN the two is what makes the difference visible (second review round:
+    // with adjacent duplicates the broken version passed the assertion too).
     const same = card(700, 'Gleich', '10:00 · 11:00')
-    const html = fullBoard({ done: card(701, 'Neuer', '12:00 · 12:30') + same + same })
+    const between = card(702, 'Dazwischen', '11:30 · 11:45')
+    const html = fullBoard({ done: card(701, 'Neuster', '12:00 · 12:30') + same + between + same })
     const out = mergeDoneDuplicates(html)
     expect(doneCards(out.html, 700)).toHaveLength(1)
     expect(out.html.indexOf('class="num">701')).toBeLessThan(out.html.indexOf('class="num">700'))
+    // The survivor is the NEWER one, so it stands BEFORE the card between them.
+    expect(out.html.indexOf('class="num">700')).toBeLessThan(out.html.indexOf('class="num">702'))
   })
 
   it('never deletes a card from ANOTHER section that happens to be identical', () => {
     const same = card(700, 'Gleich', '10:00 · 11:00')
     const html = fullBoard({ queue: same, done: same + same })
     const out = mergeDoneDuplicates(html)
-    expect(out.html.match(/class="num">700/g)).toHaveLength(2) // one queue, one archive
+    // Scoped, not counted over the whole document (second review round): the old
+    // implementation deleted the QUEUE copy and left both archive copies, which
+    // a total of two chips could not tell apart.
+    expect(doneCards(out.html, 700)).toHaveLength(1)
+    expect(queueCard(out.html, 700)).not.toBeNull()
+  })
+
+  it('leaves the section’s own markup untouched around the cards', () => {
+    const html = fullBoard({ done: card(700, 'Neu', '01:04 · 01:10') + card(700, 'Alt', '21:17 · 00:44') })
+    const out = mergeDoneDuplicates(html).html
+    expect(out).toContain('<summary><h2>Erledigt</h2></summary>')
+    expect(out.match(/<details class="sect">/g)).toHaveLength(html.match(/<details class="sect">/g).length)
+    expect(out.endsWith(html.slice(html.lastIndexOf('</main>')))).toBe(true)
   })
 
   it('skips a damaged stamp instead of falling back to the newest card', () => {
@@ -1199,6 +1215,8 @@ describe('doneStart / earliestStart', () => {
     expect(doneStart(meta('21:17 · 00:44'))).toBe('21:17')
     expect(doneStart(meta('99:99 · 00:44'))).toBe('')
     expect(doneStart(meta('12:75 · 00:44'))).toBe('')
+    // Trailing digits are damage, not a time: `12:345` used to read as `12:34`.
+    expect(doneStart(meta('12:345 · 00:44'))).toBe('')
     expect(doneStart('no meta at all')).toBe('')
     expect(doneStart()).toBe('')
   })

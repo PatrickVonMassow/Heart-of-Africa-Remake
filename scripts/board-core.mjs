@@ -657,7 +657,9 @@ export function doneCard(html, point) {
  * began — it must simply not answer.
  */
 export function doneStart(card) {
-  const m = String(card ?? '').match(/class="meta">\s*(\d{1,2}):(\d{2})/)
+  // The minutes must END there (second review round): without the boundary,
+  // `12:345` matched as `12:34` and a damaged card decided the merged start.
+  const m = String(card ?? '').match(/class="meta">\s*(\d{1,2}):(\d{2})(?!\d)/)
   if (!m) return ''
   const [, h, min] = m
   if (Number(h) > 23 || Number(min) > 59) return ''
