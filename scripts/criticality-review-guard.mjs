@@ -42,6 +42,7 @@ import {
   evaluateCriticalityReview,
   formatCriticalityReviewVerdict,
   highTicks,
+  strictAncestorProbe,
 } from './criticality-review-guard-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
@@ -197,19 +198,13 @@ function ancestryProbe(head, shas) {
     /* an ancient git without the flag — treat as shallow and keep asking git */
   }
   if (shallow) return gitIsStrictAncestor
-  let index = null
   try {
-    index = ancestorIndex(git(`rev-list --topo-order --parents "${head}"`), shas)
+    // The graph answers only about the shas it was BUILT for; everything else is
+    // asked of git, so this is a speed-up of the common case and never a change
+    // of verdict (`strictAncestorProbe` holds that line).
+    return strictAncestorProbe(ancestorIndex(git(`rev-list --topo-order --parents "${head}"`), shas), gitIsStrictAncestor)
   } catch {
     return gitIsStrictAncestor
-  }
-  return (a, b) => {
-    if (!a || !b || a === b) return false
-    const ancestors = index.ancestorsOf(b)
-    // The graph answers only for a WANTED sha; anything else is asked of git, so
-    // this is a speed-up of the common case and never a change of verdict.
-    if (!ancestors || !index.reachable.has(String(a))) return gitIsStrictAncestor(a, b)
-    return ancestors.has(String(a))
   }
 }
 

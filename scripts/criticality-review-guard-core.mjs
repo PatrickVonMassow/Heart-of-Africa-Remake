@@ -153,9 +153,11 @@ export function highTicks({ baseTasks = '', baseArchive = '', headTasks = '', he
  * accumulates for each commit which of the WANTED shas are its ancestors. The
  * input is the raw rev-list text, so this stays pure and testable without a repo.
  *
- * Returns { reachable, ancestorsOf }:
+ * Returns { reachable, wanted, ancestorsOf }:
  *   reachable    Set of every sha in the graph — reachable from head, head itself
  *                included.
+ *   wanted       the set the answer is ABOUT, so a caller can tell "not an
+ *                ancestor" from "never asked about" (see `strictAncestorProbe`).
  *   ancestorsOf  (sha) => Set of the WANTED shas that are its STRICT ancestors,
  *                or null when the graph does not hold that commit at all. Null is
  *                "cannot say", never "no": the caller falls back to asking git,
@@ -184,7 +186,28 @@ export function ancestorIndex(revListParents = '', wanted = []) {
     }
     anc.set(sha, set)
   }
-  return { reachable, ancestorsOf: (sha) => anc.get(String(sha)) ?? null }
+  return { reachable, wanted: want, ancestorsOf: (sha) => anc.get(String(sha)) ?? null }
+}
+
+/**
+ * The strict-ancestor question, answered from an index where the index can and by
+ * `fallback` where it cannot.
+ *
+ * THE CONDITION IS WANTEDNESS, NOT REACHABILITY (found by the cross-vendor review
+ * of the change above, 18.08.2026). The index holds only the wanted shas, so for a
+ * commit that IS in the graph but was never asked about, the set is silently empty
+ * and "not in it" would read as "not an ancestor" — a false NO, which on this gate
+ * clears what should block. Every call site today passes exactly the ledger shas as
+ * wanted, so nothing was mis-answered; the contract was wrong all the same, and a
+ * contract is what the next caller reads.
+ */
+export function strictAncestorProbe(index, fallback) {
+  return (a, b) => {
+    if (!a || !b || a === b) return false
+    const ancestors = index?.ancestorsOf?.(b)
+    if (!ancestors || !index.wanted?.has(String(a))) return fallback(a, b)
+    return ancestors.has(String(a))
+  }
 }
 
 /**

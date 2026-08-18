@@ -14,6 +14,7 @@ import {
   highTicks,
   newlyTicked,
   parsePointBlocks,
+  strictAncestorProbe,
   tickedNumbers,
 } from './criticality-review-guard-core.mjs'
 
@@ -457,5 +458,52 @@ describe('ancestorIndex', () => {
   it('survives an empty listing and an empty wanted set', () => {
     expect(ancestorIndex('', [A]).ancestorsOf(A)).toBe(null)
     expect([...ancestorIndex(line, []).ancestorsOf(D)]).toEqual([])
+  })
+})
+
+describe('strictAncestorProbe', () => {
+  const A = 'a'.repeat(40)
+  const B = 'b'.repeat(40)
+  const C = 'c'.repeat(40)
+  const M = 'm'.repeat(40)
+  const line = [`${C} ${B}`, `${B} ${A}`, `${A}`].join('\n')
+
+  const spying = () => {
+    const asked = []
+    return [(a, b) => (asked.push([a, b]), true), asked]
+  }
+
+  it('answers from the index for a wanted sha, without asking git', () => {
+    const [fallback, asked] = spying()
+    const probe = strictAncestorProbe(ancestorIndex(line, [A, B]), fallback)
+    expect(probe(A, C)).toBe(true)
+    // The other direction, both shas wanted: a plain NO, still without asking git.
+    expect(probe(B, A)).toBe(false)
+    expect(asked).toEqual([])
+  })
+
+  it('FALLS BACK for a sha the index was not built for — the review finding of 18.08.2026', () => {
+    // B is in the graph and IS an ancestor of C, but the index was built for A
+    // alone, so its set cannot hold B. Reading that emptiness as "no" would be a
+    // false NO on a gate whose false NO CLEARS what must block.
+    const [fallback, asked] = spying()
+    const probe = strictAncestorProbe(ancestorIndex(line, [A]), fallback)
+    expect(probe(B, C)).toBe(true)
+    expect(asked).toEqual([[B, C]])
+  })
+
+  it('falls back for a commit outside the graph, where the index says nothing', () => {
+    const [fallback, asked] = spying()
+    expect(strictAncestorProbe(ancestorIndex(line, [A]), fallback)(A, M)).toBe(true)
+    expect(asked).toEqual([[A, M]])
+  })
+
+  it('never asks anyone about an empty or self-referential pair', () => {
+    const [fallback, asked] = spying()
+    const probe = strictAncestorProbe(ancestorIndex(line, [A]), fallback)
+    expect(probe(A, A)).toBe(false)
+    expect(probe('', C)).toBe(false)
+    expect(probe(A, '')).toBe(false)
+    expect(asked).toEqual([])
   })
 })
