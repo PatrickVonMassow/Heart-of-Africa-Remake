@@ -47,6 +47,7 @@ import {
   outstandingContributions,
   parseRangeLog as parseWholeRangeLog,
   planAuthorshipGroups,
+  summarizeReviewDebt,
 } from './mechanism-review-range-core.mjs'
 import { quotePassFile, unquoteGitPath } from './review-material-core.mjs'
 import { guardOutcome, reviewGapRange } from './mechanism-review-guard-gap-core.mjs'
@@ -539,13 +540,21 @@ if (isMainModule(import.meta.url)) {
     const outcome = guardOutcome({ blocked: verdict.block, gap })
 
     if (status) {
-      let measuredChars = null
+      let statusPlan = null
       if (gathered.rangeBase && gathered.head && (gathered.debt?.outstanding ?? []).length) {
         try {
-          const { measureReviewMaterial } = await import('./mechanism-review-guard-gap.mjs')
-          measuredChars = measureReviewMaterial({ baseline: gathered.rangeBase, head: gathered.head }).measuredChars
+          // Use the SAME authorship-then-size planner that prints the runnable
+          // review-sol commands. Counting authorship groups alone understates
+          // the debt whenever one group needs several budget-sized rounds —
+          // the live range was three passes while --status claimed one.
+          const { buildAuthorshipPassPlan } = await import('./review-sol.mjs')
+          statusPlan = buildAuthorshipPassPlan({
+            sha: gathered.head,
+            base: gathered.rangeBase,
+            commits: commitsForContributions(gathered.debt.outstanding),
+          })
         } catch {
-          /* the status names an unavailable measurement instead of inventing zero */
+          /* the status names an unavailable plan instead of inventing a count */
         }
       }
       console.log(`HEAD:      ${gathered.head.slice(0, 7)} (branch ${gathered.branch})`)
@@ -561,13 +570,17 @@ if (isMainModule(import.meta.url)) {
             `${c.coveringRecordShas.length} covering review(s)`,
         )
       }
-      console.log(`outstanding review passes: ${gathered.authorshipPlan?.groups?.length ?? 0}`)
+      const debtStatus = summarizeReviewDebt({ outstanding: gathered.debt?.outstanding, sizedPlan: statusPlan })
+      console.log(`outstanding review passes: ${debtStatus.passCount ?? '<plan unavailable>'}`)
+      const outstandingMaterial = debtStatus.materialChars === null
+        ? '<measurement unavailable>'
+        : `${debtStatus.materialChars} characters`
       console.log(
-        `outstanding material: ${measuredChars === null ? '<measurement unavailable>' : `${measuredChars} characters`}`,
+        `outstanding material: ${outstandingMaterial}`,
       )
-      for (const group of gathered.authorshipPlan?.groups ?? []) {
+      for (const group of debtStatus.groups.length ? debtStatus.groups : gathered.authorshipPlan?.groups ?? []) {
         console.log(
-          `  ${group.kind === 'commit' ? `commit ${group.commits[0].slice(0, 7)}` : `${group.vendor} files`} → ` +
+          `  ${(group.authorshipKind ?? group.kind) === 'commit' ? `commit ${group.commits[0].slice(0, 7)}` : `${group.vendor ?? 'authored'} files`} → ` +
             `${group.reviewer || 'NO ELIGIBLE REVIEWER'}: ${group.files.map((f) => quotePassFile(f)).join(', ')}`,
         )
       }

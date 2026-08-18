@@ -4,6 +4,7 @@ import {
   eligibleReviewer,
   outstandingContributions,
   planAuthorshipGroups,
+  summarizeReviewDebt,
   vendorOf,
 } from './mechanism-review-range-core.mjs'
 import { evaluateMechanismReview } from './mechanism-review-core.mjs'
@@ -180,5 +181,24 @@ describe('per-contribution review baseline', () => {
       pendingCommits: [{ ...commits[0], coveringRecordShas: [head] }],
     })
     expect(verdict.block).toBe(false)
+  })
+})
+
+describe('visible review debt', () => {
+  it('reports the sized pass count and material, not the smaller authorship-group count', () => {
+    const passes = [{ index: 1 }, { index: 2 }, { index: 3 }]
+    expect(summarizeReviewDebt({
+      outstanding: [{ file: 'a' }],
+      sizedPlan: { passes, rawSize: 462_972 },
+    })).toEqual({ passCount: 3, materialChars: 462_972, groups: passes })
+  })
+
+  it('distinguishes cleared debt from an unavailable measurement', () => {
+    expect(summarizeReviewDebt({ outstanding: [] })).toEqual({ passCount: 0, materialChars: 0, groups: [] })
+    expect(summarizeReviewDebt({ outstanding: [{ file: 'a' }] })).toEqual({
+      passCount: null,
+      materialChars: null,
+      groups: [],
+    })
   })
 })

@@ -202,3 +202,17 @@ export function commitsForContributions(contributions = []) {
   }
   return [...bySha.values()]
 }
+
+/** The typed facts printed by --status; an unavailable size plan is never zero. */
+export function summarizeReviewDebt({ outstanding = [], sizedPlan = null } = {}) {
+  const owed = Array.isArray(outstanding) ? outstanding.length : 0
+  if (!owed) return { passCount: 0, materialChars: 0, groups: [] }
+  if (!sizedPlan || !Array.isArray(sizedPlan.passes) || !Number.isFinite(Number(sizedPlan.rawSize))) {
+    return { passCount: null, materialChars: null, groups: [] }
+  }
+  return {
+    passCount: sizedPlan.passes.length,
+    materialChars: Number(sizedPlan.rawSize),
+    groups: sizedPlan.passes,
+  }
+}

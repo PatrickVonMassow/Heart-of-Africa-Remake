@@ -379,6 +379,7 @@ export function buildAuthorshipPassPlan({ sha, base, commits = gatherAuthorshipC
         files: childFiles,
         commits: childCommits,
         authors: group.authors,
+        vendor: group.vendor,
         reviewer: group.reviewer,
         authorshipKind: group.kind,
         rangeBase,
