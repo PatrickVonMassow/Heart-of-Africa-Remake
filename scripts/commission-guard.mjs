@@ -241,6 +241,24 @@ export function commissionVerdict(inputs, { now = Date.now() } = {}) {
   }
 }
 
+/**
+ * A PARKED BRANCH IS UNPARKED WHEN WORK IS ASSIGNED, not at its first commit
+ * (fourth review, finding 6): between the assignment and the commit the branch
+ * would otherwise hold no slot while an agent already works it, and at a full
+ * pool that is occupancy past the cap. Called by the hook the moment an
+ * allowed call reopens one; returns the refs it cleared. A TORN record is left
+ * alone — rewriting what nobody could read would erase every other entry.
+ */
+export function unparkReopened(slots, { read = readCommissionRecord, write = writeCommissionRecord } = {}) {
+  const reopens = Array.isArray(slots?.reopens) ? slots.reopens : []
+  if (reopens.length === 0) return []
+  let record = read()
+  if (record?.torn === true) return []
+  for (const ref of reopens) record = clearParkedBranch(record, ref)
+  write(record)
+  return reopens
+}
+
 // ---- CLI ------------------------------------------------------------------
 
 const flag = (argv, name) => {
@@ -384,6 +402,13 @@ if (isMainModule(import.meta.url)) {
     })
     if (!g.applicable) process.exit(0)
     const verdict = commissionVerdict(g.inputs)
+    if (!verdict.block && !verdict.unread && verdict.slots?.reopens?.length) {
+      for (const ref of unparkReopened(verdict.slots)) {
+        console.error(
+          `commission-guard: unparked ${ref} — work was assigned back onto it, so it occupies its slot again.`,
+        )
+      }
+    }
     if (verdict.block) {
       process.stdout.write(
         JSON.stringify({

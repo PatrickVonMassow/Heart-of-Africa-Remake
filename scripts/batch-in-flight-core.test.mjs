@@ -2705,6 +2705,64 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
     })
   })
 
+  // WORK ASSIGNED BACK ONTO A PARKED BRANCH REOCCUPIES ITS SLOT AT THE
+  // ASSIGNMENT (fourth review, findings 6 and 11). Counting parked branches
+  // into the in-flight set read that assignment as `nothing-opened`, so at a
+  // full pool the call passed and occupancy exceeded the cap the moment the
+  // branch moved.
+  describe('recommissioning a PARKED branch opens a slot again', () => {
+    const at = '2026-08-17T18:00:00.000Z'
+    const parked = { 'feat/336-croc-staging': { reason: 'superseded', at, tip: 'a1b2c3d4' } }
+    const parked336 = { ...NINE_BRANCHES[0], tip: 'a1b2c3d4' }
+
+    it('REFUSES at a full pool — the reassignment is an opening, not nothing', () => {
+      // 336 parked, three LIVE branches: the pool is full.
+      const branches = [parked336, ...NINE_BRANCHES.slice(1, 4)]
+      const d = branchSlotDecision({
+        branches,
+        parked,
+        points: [336],
+        refs: ['feat/336-croc-staging'],
+        now: AUG17,
+      })
+      expect(d.count).toBe(3)
+      expect(d.adding).toBe(1)
+      expect(d.allowed).toBe(false)
+    })
+
+    it('ALLOWS with room, counts the branch again, and NAMES the park to clear', () => {
+      const branches = [parked336, ...NINE_BRANCHES.slice(1, 3)]
+      const d = branchSlotDecision({
+        branches,
+        parked,
+        points: [336],
+        refs: ['feat/336-croc-staging'],
+        now: AUG17,
+      })
+      expect(d).toMatchObject({ allowed: true, count: 2, adding: 1 })
+      expect(d.reopens).toEqual(['feat/336-croc-staging'])
+    })
+
+    it('reads a POINT-only assignment (a spawn) onto a parked branch the same way', () => {
+      const branches = [parked336, ...NINE_BRANCHES.slice(1, 4)]
+      const d = branchSlotDecision({ branches, parked, points: [336], now: AUG17 })
+      expect(d.adding).toBe(1)
+      expect(d.allowed).toBe(false)
+      expect(d.reopens).toEqual(['feat/336-croc-staging'])
+    })
+
+    it('a point with a LIVE branch beside its parked one is still being finished', () => {
+      const parked687 = { 'feat/687-roam-bound-fixes': { reason: 'superseded', at, tip: 'ffee0011' } }
+      const branches = [
+        NINE_BRANCHES[2], // feat/687-bank-game, live
+        { ...NINE_BRANCHES[3], tip: 'ffee0011' }, // feat/687-roam-bound-fixes, parked
+        NINE_BRANCHES[1],
+      ]
+      const d = branchSlotDecision({ branches, parked: parked687, points: [687], now: AUG17 })
+      expect(d).toMatchObject({ allowed: true, adding: 0, reopens: [] })
+    })
+  })
+
   it('keeps a parked branch parked when its tip date cannot be read', () => {
     const parked = { 'feat/336-croc-staging': { reason: 'superseded', at: '2026-08-17T18:00:00.000Z' } }
     const blind = [{ ref: 'feat/336-croc-staging', tipAt: null, behind: null }, ...NINE_BRANCHES.slice(1, 3)]

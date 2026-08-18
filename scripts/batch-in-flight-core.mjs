@@ -1616,7 +1616,10 @@ function movedSincePark(park, item) {
 /**
  * MAY A FURTHER POINT BE OPENED, GIVEN THE BRANCHES THAT STAND? PURE.
  *
- * Returns { allowed, why, open, parkedOut, count, slotsFree, cap }. `readable`
+ * Returns { allowed, why, open, parkedOut, count, slotsFree, cap, adding,
+ * reopens }. `reopens` names the PARKED branches this call assigns work back
+ * onto — each one reoccupies its slot at the assignment, and the wrapper clears
+ * its park the moment the call is allowed (finding 6). `readable`
  * false is the fail-open case the wrapper passes when git could not be
  * questioned: a branch list nobody could read is not evidence of debris.
  *
@@ -1649,12 +1652,37 @@ export function branchSlotDecision({
   // A ref the call names that no branch answers to is one new branch. A target
   // point the call names NO ref for is one new branch unless a branch for it
   // already stands — that is the spawn shape, where the name cannot be known.
+  //
+  // A PARKED BRANCH THE CALL ASSIGNS WORK TO REOCCUPIES ITS SLOT NOW (fourth
+  // review, finding 6). Counting parked branches into the in-flight set read
+  // that assignment as `nothing-opened`, so at a full pool the call passed and
+  // occupancy exceeded the cap the moment the branch moved — the unpark must
+  // happen when work is ASSIGNED, not at the first commit. So the in-flight set
+  // holds only the branches that OCCUPY a slot, a reassigned park counts toward
+  // `adding`, and `reopens` names the parks the wrapper must clear on allow.
   const standing = (Array.isArray(branches) ? branches : []).map((b) => normRef(b?.ref)).filter(Boolean)
-  const inFlight = new Set(standing.map(pointOfBranch).filter((n) => n !== null))
+  const parkedRefs = slots.parkedOut.map((b) => b.ref)
+  const parkedPoints = new Set(slots.parkedOut.map((b) => b.point).filter((n) => n !== null))
+  const live = standing.filter((s) => !parkedRefs.includes(s))
+  const inFlight = new Set(live.map(pointOfBranch).filter((n) => n !== null))
   const newRefs = named.filter((r) => !standing.some((s) => branchAnswersTo(r, s, { loose: looseRefs })))
+  const reopenedRefs = named.filter((r) => parkedRefs.some((p) => branchAnswersTo(r, p, { loose: looseRefs })))
   const unnamed = targets.filter((p) => !named.some((r) => pointOfBranch(r) === p))
-  const adding = newRefs.length + unnamed.filter((p) => !inFlight.has(p)).length
-  const out = { ...slots, point: targets[0] ?? null, points: targets, refs: named, adding }
+  const opening = unnamed.filter((p) => !inFlight.has(p))
+  const reopenedPoints = opening.filter((p) => parkedPoints.has(p))
+  const adding = newRefs.length + reopenedRefs.length + opening.length
+  const reopens = [
+    ...new Set(
+      slots.parkedOut
+        .filter(
+          (b) =>
+            reopenedRefs.some((r) => branchAnswersTo(r, b.ref, { loose: looseRefs })) ||
+            (b.point !== null && reopenedPoints.includes(b.point)),
+        )
+        .map((b) => b.ref),
+    ),
+  ]
+  const out = { ...slots, point: targets[0] ?? null, points: targets, refs: named, adding, reopens }
   if (readable !== true) return { ...out, allowed: true, why: 'branches-unreadable' }
   // A call that opens NO new branch is finishing, whatever the pool holds —
   // pushing to a branch that stands must never be refused for the slot it is in.

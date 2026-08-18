@@ -14,6 +14,7 @@ import {
   gatherCommissionInputs,
   commissionVerdict,
   parkBranch,
+  unparkReopened,
   wiringReport,
 } from './commission-guard.mjs'
 import { POOL_CAP } from './batch-in-flight-core.mjs'
@@ -109,6 +110,47 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
     const v = commissionVerdict(gather(700, { branches: NINE.slice(0, 3), record }).inputs, { now: AUG17 })
     expect(v.block).toBe(false)
     expect(v.slots.count).toBe(2)
+  })
+
+  // THE UNPARK HAPPENS WHEN WORK IS ASSIGNED, not at the first commit (fourth
+  // review, findings 6/11): between assignment and commit the branch would hold
+  // no slot while an agent already works it.
+  it('a call assigning work back onto a parked branch reopens it, and the wrapper clears the park', () => {
+    const record = {
+      overrides: {},
+      parked: { 'feat/336-croc-staging': { reason: 'superseded', at: '2026-08-17T19:00:00.000Z', tip: 'a1b2c3d4' } },
+      torn: false,
+    }
+    const branches = [{ ...NINE[0], tip: 'a1b2c3d4' }, ...NINE.slice(1, 4)]
+    // AT A FULL POOL the reassignment is refused — it is an opening.
+    const full = commissionVerdict(
+      gather(336, { branches, record, refs: ['feat/336-croc-staging'] }).inputs,
+      { now: AUG17 },
+    )
+    expect(full.block).toBe(true)
+    expect(full.reason).toContain('A SLOT IS NOT FREE')
+    // WITH ROOM it passes, names the park, and unparkReopened clears exactly it.
+    const roomy = commissionVerdict(
+      gather(336, { branches: branches.slice(0, 3), record, refs: ['feat/336-croc-staging'] }).inputs,
+      { now: AUG17 },
+    )
+    expect(roomy.block).toBe(false)
+    expect(roomy.slots.reopens).toEqual(['feat/336-croc-staging'])
+    let written = null
+    expect(unparkReopened(roomy.slots, { read: () => record, write: (r) => (written = r) })).toEqual([
+      'feat/336-croc-staging',
+    ])
+    expect(written.parked).toEqual({})
+    // A TORN record is never rewritten — clearing into it would erase the rest.
+    written = null
+    expect(unparkReopened(roomy.slots, { read: () => ({ ...record, torn: true }), write: (r) => (written = r) })).toEqual(
+      [],
+    )
+    expect(written).toBeNull()
+    // …and nothing to reopen writes nothing.
+    expect(unparkReopened({ reopens: [] }, { read: () => record, write: () => { throw new Error('no write') } })).toEqual(
+      [],
+    )
   })
 
   it('treats the point whose branch already stands as work being FINISHED', () => {
