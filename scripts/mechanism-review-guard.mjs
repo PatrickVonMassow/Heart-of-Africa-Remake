@@ -48,13 +48,25 @@ const PAUSE = repoPath('.claude/batch-paused')
  *  while the ledger that must travel — the reviews — is the tracked one. */
 export const BASELINE_PATH = repoPath('.claude/mechanism-review-baseline.json')
 
-/** Record/field separators for the one `git log` this guard runs. Plain ASCII:
+/** Record/field sentinels for the one `git log` this guard runs. Plain ASCII:
  *  a raw control byte or a `%`-pair in the command line is a Windows shell
- *  hazard, and this hook runs on Windows. */
+ *  hazard, and this hook runs on Windows. REC marks the START of a header LINE
+ *  and is matched by the full header shape below — never split on, because the
+ *  sentinel is a legal path substring (`scripts/git-hooks/x__C__y`), and a
+ *  split cut such a commit's record in half (cross-vendor review, third
+ *  round). */
 const REC = '__C__'
 const FLD = '__F__'
 
+/** A header line, whole: sentinel, 40-hex sha, epoch, subject, trailers. */
+const HEADER_RE = new RegExp(`^${REC}([0-9a-f]{40})${FLD}(\\d+)${FLD}(.*)$`)
+
 const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+
+/** The same call UNTRIMMED — for output whose last line is a PATH: trimming the
+ *  whole log would strip a real trailing space off that path along with the
+ *  final newline (cross-vendor review, third round). */
+const gitRaw = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })
 
 /**
  * True when `sha` names no reachable commit — the ONE condition under which an
@@ -155,39 +167,72 @@ function scriptFiles() {
  *  bite on the record the trapped session would write. `cc` shows only what the
  *  merge changed against ALL its parents: nothing for a clean merge, the
  *  resolution delta for an evil one. */
+/**
+ * The pure half of mechanismCommits: the raw `git log --name-only` output,
+ * parsed into the commits that touch a mechanism path. EXPORTED for the test —
+ * the parsing IS the gate's view of the tree, and two of its old habits each
+ * blinded it to a legal path (cross-vendor review, second and third rounds):
+ *
+ *  - a path is read BYTE-EXACT, never trimmed. git does not quote a plain
+ *    leading or trailing space, so `scripts/git-hooks/check ` printed as-is and
+ *    the trim turned it into a DIFFERENT path — one a pass record could then
+ *    name in the trimmed spelling and satisfy the union without anyone reading
+ *    the changed file. Only a trailing `\r` is stripped: a path really ending
+ *    in `\r` is git-quoted, so a bare one is line-ending noise.
+ *  - a header is a LINE matching the full header shape, never a `split(REC)`:
+ *    the sentinel is a legal path substring, and the split cut such a commit's
+ *    record in half. RESIDUAL, accepted: a committed path whose whole line
+ *    mimics the header shape (sentinel + 40-hex sha + epoch + fields) would
+ *    still be read as one — that shape names itself as adversarial, and git
+ *    quotes any path that could smuggle a newline to fake a line of its own.
+ *
+ * git QUOTES a path with a tab, a quote or a high byte in it, and the quoted
+ * form matches neither a mechanism path nor a pass record's file list — so
+ * every path line goes through unquoteGitPath.
+ */
+export function parseMechanismLog(out, files) {
+  const commits = []
+  let current = null
+  const finish = () => {
+    if (!current) return
+    const mech = mechanismPathsIn(current.touched, { scriptFiles: files })
+    if (mech.length) {
+      const { touched: _touched, ...commit } = current
+      commits.push({ ...commit, files: mech })
+    }
+    current = null
+  }
+  for (const raw of String(out ?? '').split('\n')) {
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
+    const header = HEADER_RE.exec(line)
+    if (header) {
+      finish()
+      const [subject = '', trailers = ''] = header[3].split(FLD)
+      current = {
+        sha: header[1],
+        at: Number(header[2]) * 1000 || 0,
+        subject: subject.trim(),
+        authorModel: modelFromTrailers(trailers),
+        // EVERY co-author, not only the first: a commit naming two models has
+        // two list authors, and neither may merge the union (point 634).
+        authorModels: modelsFromTrailers(trailers),
+        touched: [],
+      }
+      continue
+    }
+    if (!current || !line) continue
+    current.touched.push(unquoteGitPath(line))
+  }
+  finish()
+  return commits
+}
+
 function mechanismCommits(base, head, files) {
-  const out = git(
+  const out = gitRaw(
     `log --format="${REC}%H${FLD}%ct${FLD}%s${FLD}%(trailers:key=Co-Authored-By,valueonly,separator=;)" ` +
       `--name-only --diff-merges=cc --reverse "${base}..${head}"`,
   )
-  const commits = []
-  for (const chunk of out.split(REC)) {
-    if (!chunk.trim()) continue
-    const lines = chunk.split('\n')
-    const [sha, ct, subject, trailers] = lines[0].split(FLD)
-    if (!sha) continue
-    const touched = lines
-      .slice(1)
-      // git QUOTES a path with a tab, a quote or a high byte in it, and the
-      // quoted form matches neither a mechanism path nor a pass record's file
-      // list — the change would be invisible to this gate and to the coverage
-      // check alike (cross-vendor review, second round).
-      .map((l) => unquoteGitPath(l.trim()))
-      .filter(Boolean)
-    const mech = mechanismPathsIn(touched, { scriptFiles: files })
-    if (!mech.length) continue
-    commits.push({
-      sha: sha.trim(),
-      at: Number(ct) * 1000 || 0,
-      subject: (subject ?? '').trim(),
-      authorModel: modelFromTrailers(trailers),
-      // EVERY co-author, not only the first: a commit naming two models has two
-      // list authors, and neither may merge the union (point 634).
-      authorModels: modelsFromTrailers(trailers),
-      files: mech,
-    })
-  }
-  return commits
+  return parseMechanismLog(out, files)
 }
 
 /**

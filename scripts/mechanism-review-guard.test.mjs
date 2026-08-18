@@ -6,7 +6,7 @@
 // fell back to HEAD on Windows and grandfathered the branch's own work — the
 // gate reported "GATE CLEAR" on four unreviewed mechanism commits.
 import { describe, it, expect } from 'vitest'
-import { attachCoverage, baselineFor, bootstrapBase } from './mechanism-review-guard.mjs'
+import { attachCoverage, baselineFor, bootstrapBase, parseMechanismLog } from './mechanism-review-guard.mjs'
 
 describe('baselineFor', () => {
   const state = { baselines: { main: 'aaa', 'feat/x': 'bbb' } }
@@ -49,6 +49,74 @@ describe('bootstrapBase', () => {
     // The grandfathering the point asks for: a checkout with no main to fork
     // from owes nothing for its history.
     expect(bootstrapBase('headsha', () => '')).toBe('headsha')
+  })
+})
+
+// THE LOG PARSE IS THE GATE'S VIEW OF THE TREE, and two of its old habits each
+// blinded it to a legal path (cross-vendor review, second and third rounds):
+// trimming a line turned `…/check ` into `…/check`, so a pass record naming the
+// trimmed spelling satisfied the union without naming the changed file; and
+// splitting the whole log on the `__C__` sentinel cut a commit in half wherever
+// a path carried that legal substring.
+describe('parseMechanismLog', () => {
+  const SHA = 'a'.repeat(40)
+  const SHB = 'b'.repeat(40)
+  const header = (sha, trailers = 'Claude Opus 5 <noreply@anthropic.com>') =>
+    `__C__${sha}__F__1723000000__F__A subject__F__${trailers}`
+  const files = ['x-guard.mjs']
+
+  it('keeps a path with a trailing space BYTE-EXACT, never its trimmed spelling', () => {
+    const out = [header(SHA), '', 'scripts/git-hooks/check ', ''].join('\n')
+    const commits = parseMechanismLog(out, files)
+    expect(commits).toHaveLength(1)
+    expect(commits[0].files).toEqual(['scripts/git-hooks/check '])
+    expect(commits[0].files).not.toContain('scripts/git-hooks/check')
+    expect(commits[0]).toMatchObject({
+      sha: SHA,
+      subject: 'A subject',
+      authorModel: 'Claude Opus 5 <noreply@anthropic.com>',
+    })
+  })
+
+  it('keeps a leading space too, and strips only a trailing carriage return', () => {
+    const out = [header(SHA), '', 'scripts/git-hooks/ lead\r', ''].join('\n')
+    expect(parseMechanismLog(out, files)[0].files).toEqual(['scripts/git-hooks/ lead'])
+  })
+
+  it('does not cut a commit in half on a path containing the record sentinel', () => {
+    const out = [header(SHA), '', 'scripts/git-hooks/x__C__y', 'scripts/x-guard.mjs', ''].join('\n')
+    const commits = parseMechanismLog(out, files)
+    expect(commits).toHaveLength(1)
+    expect(commits[0].files).toEqual(['scripts/git-hooks/x__C__y', 'scripts/x-guard.mjs'])
+  })
+
+  it('unquotes the path git QUOTED, exactly as the pass records spell it', () => {
+    const out = [header(SHA), '', '"scripts/git-hooks/we\\tird"', ''].join('\n')
+    expect(parseMechanismLog(out, files)[0].files).toEqual(['scripts/git-hooks/we\tird'])
+  })
+
+  it('separates commits by the full header shape and skips the non-mechanism ones', () => {
+    const out = [
+      header(SHA),
+      '',
+      'src/App.tsx',
+      header(SHB, 'Claude Fable 5 <noreply@anthropic.com>;GPT-5.6 Sol <noreply@openai.com>'),
+      '',
+      'scripts/x-guard.mjs',
+      '',
+    ].join('\n')
+    const commits = parseMechanismLog(out, files)
+    expect(commits).toHaveLength(1)
+    expect(commits[0].sha).toBe(SHB)
+    expect(commits[0].authorModels).toEqual([
+      'Claude Fable 5 <noreply@anthropic.com>',
+      'GPT-5.6 Sol <noreply@openai.com>',
+    ])
+  })
+
+  it('parses nothing from an empty or fileless log', () => {
+    expect(parseMechanismLog('', files)).toEqual([])
+    expect(parseMechanismLog(`${header(SHA)}\n`, files)).toEqual([])
   })
 })
 
