@@ -31,6 +31,7 @@ import { isMainModule } from './is-main.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { readVdzkAnswers, writeVdzkAnswers } from './vdzk-answer.mjs'
 import { repoPath } from './repo-paths.mjs'
+import { LAUNCHER_RESUME_PROMPT_MARKER } from './batch-autostart-core.mjs'
 
 const DASHBOARD =
   process.env.DECISION_CARD_DASHBOARD || repoPath('.batch-dashboard.html')
@@ -69,7 +70,8 @@ export const writeDecisionCardState = (state) => {
 }
 
 /** The last real user prompt in Claude's JSONL transcript. Tool-result entries
- * also carry type `user`; they have no transcript UUID to review and are skipped. */
+ * and the OS launcher's synthetic `-p` prompt also carry type `user`; neither is
+ * a decision-bearing message from the user, so both are skipped. */
 export function extractLastUserMessage(jsonl) {
   if (typeof jsonl !== 'string' || !jsonl.trim()) return null
   let last = null
@@ -92,7 +94,12 @@ export function extractLastUserMessage(jsonl) {
         .join('\n')
     }
     const id = entry.uuid || entry.message?.id
-    if (typeof id === 'string' && id.trim() && text.trim()) last = { id, text }
+    if (
+      typeof id === 'string' &&
+      id.trim() &&
+      text.trim() &&
+      !text.startsWith(LAUNCHER_RESUME_PROMPT_MARKER)
+    ) last = { id, text }
   }
   return last
 }

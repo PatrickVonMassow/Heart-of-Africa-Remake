@@ -6,6 +6,8 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { ANSWER_DEADLINE_MS } from './decision-card-guard-core.mjs'
 import { extractLastUserMessage } from './decision-card-guard.mjs'
 import { boardHtml } from './dashboard-guard-fixtures.mjs'
+import { RESUME_PROMPT, chatPromptSuffix } from './batch-autostart-core.mjs'
+import { buildResponderPrompt } from './chat-watcher-core.mjs'
 
 const dir = mkdtempSync(join(tmpdir(), 'vdzk-answer-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -58,6 +60,24 @@ describe('the transcript user-message boundary', () => {
     ].join('\n')
     expect(extractLastUserMessage(transcript)).toEqual({ id: 'last', text: 'Letzte Nachricht.' })
     expect(extractLastUserMessage('broken\n')).toBeNull()
+  })
+
+  it('rejects the OS launcher prompt, including a chat suffix', () => {
+    const launcherEntry = (text) => JSON.stringify({
+      type: 'user',
+      uuid: 'launcher',
+      message: { content: [{ type: 'text', text }] },
+    })
+    expect(extractLastUserMessage(launcherEntry(RESUME_PROMPT))).toBeNull()
+    expect(extractLastUserMessage(launcherEntry(RESUME_PROMPT + chatPromptSuffix([
+      { ts: 1, text: 'Kartenschrift bleibt.' },
+    ])))).toBeNull()
+  })
+
+  it('keeps arming on the chat watcher responder prompt', () => {
+    const prompt = buildResponderPrompt([{ id: 'chat-1', ts: 1, text: 'Kartenschrift bleibt.' }])
+    const transcript = JSON.stringify({ type: 'user', uuid: 'watcher', message: { content: prompt } })
+    expect(extractLastUserMessage(transcript)).toEqual({ id: 'watcher', text: prompt })
   })
 })
 

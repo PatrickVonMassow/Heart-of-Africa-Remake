@@ -102,8 +102,20 @@ export function callDisciplineTopics() {
   ]
 }
 
+/**
+ * Machine-readable identity of the OS launcher's synthetic user entry.
+ *
+ * Claude's transcript records the `-p` prompt as an ordinary `type: "user"`
+ * message. Guards that owe duties only to words the user actually wrote must
+ * therefore be able to distinguish this prompt without guessing from its
+ * subject matter. Keep the marker as the literal first bytes handed to the CLI;
+ * chat-watcher responders use their own prompt head and do not match it.
+ */
+export const LAUNCHER_RESUME_PROMPT_MARKER =
+  'Autonome Batch-Wiederaufnahme (vom OS-Scheduler gestartet, weil keine Claude-Session aktiv war). '
+
 export const RESUME_PROMPT =
-  'Autonome Batch-Wiederaufnahme (vom OS-Scheduler gestartet, weil keine Claude-Session aktiv war). ' +
+  LAUNCHER_RESUME_PROMPT_MARKER +
   'Setze den "Heart of Africa"-Batch fort. Orientiere dich am Board (scripts/focus.mjs show plus die ' +
   'Warteschlange in .batch-dashboard.html) — die frueher hier genannte Handoff-Memory ist retiriert und ' +
   'existiert nicht mehr. ' +
