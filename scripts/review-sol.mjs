@@ -78,6 +78,7 @@ import {
 import {
   assembleMaterial,
   formatBudgetNotice,
+  formatPassManifest,
   formatShortfall,
   materialShortfall,
   MATERIAL_BUDGET_CHARS,
@@ -207,7 +208,7 @@ function gatherRange(sha, base) {
  * surrounding file, which is the only way a bookkeeping file measured in
  * megabytes is reviewable at all (see planPasses).
  */
-function assemblePass(range, pass) {
+function assemblePass(range, pass, plan = null) {
   const sections = new Map(splitPatchByFile(range.patch).map((s) => [s.path, s.text]))
   const files = pass.files
   return assembleMaterial({
@@ -217,6 +218,12 @@ function assemblePass(range, pass) {
     budget: MATERIAL_BUDGET_CHARS,
     patchRoom: pass.patchRoom,
     patchOnly: pass.patchOnly,
+    // THE PASS STATES ITS OWN SHAPE INSIDE THE MATERIAL (structural finding,
+    // fourth cross-vendor round): which pass of how many, which files it
+    // carries at which delivery level, and which files are absent BY DESIGN
+    // with the pass covering each — absence by design and absence by
+    // truncation mean opposite things about the verdict the reviewer may give.
+    manifest: plan && !plan.fits ? formatPassManifest(plan, pass) : '',
   })
 }
 
@@ -730,7 +737,7 @@ if (isMainModule(import.meta.url)) {
         console.error(`review-sol: --pass ${passFlag}: this range splits into ${plan.passes.length} pass(es).`)
         process.exit(2)
       }
-      assembly = assemblePass(range, pass)
+      assembly = assemblePass(range, pass, plan)
     }
     // THE ASSEMBLY IS THE AUTHORITY, THE PLAN ONLY ADVISORY. Where the two
     // disagree the round is not spent: a review whose record will be refused
@@ -743,7 +750,7 @@ if (isMainModule(import.meta.url)) {
       `  material: ${assembly.size} characters of diff and file content ` +
         `(${base.slice(0, 7)}..${full.slice(0, 7)}${pass ? `, pass ${pass.index}/${pass.total}` : ''})`,
     )
-    const run = runCodex({ prompt: buildReviewPrompt({ sha: full, brief, mode }), input: assembly.text, timeoutMs })
+    const run = runCodex({ prompt: buildReviewPrompt({ sha: full, brief, mode, pass }), input: assembly.text, timeoutMs })
     const outcome = classifyOutcome(run)
     const parsed = outcome.ok ? parseVerdict(run.finalMessage) : { ok: false }
     // DID THIS ROUND CARRY WHAT IT CLAIMS TO HAVE JUDGED? Asked of the accounting

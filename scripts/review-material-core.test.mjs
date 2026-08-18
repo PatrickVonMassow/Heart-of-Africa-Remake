@@ -3,7 +3,10 @@ import {
   assembleMaterial,
   formatBudgetNotice,
   formatPassFiles,
+  formatPassManifest,
   formatShortfall,
+  MANIFEST_END,
+  manifestAllowance,
   MATERIAL_BUDGET_CHARS,
   materialShortfall,
   parseDiffHeader,
@@ -442,10 +445,13 @@ describe('the passes a range too large is cut into', () => {
   it('produces a plan whose passes the ASSEMBLY then confirms as fitting', () => {
     // The plan is advisory and the assembly is authority — so the two must agree
     // on a plan the planner itself calls complete, or every pass would refuse.
+    // Each pass carries its MANIFEST, exactly as the command assembles it: the
+    // plan reserved that room, and the confirmation must spend it.
     const paths = ['a.mjs', 'b.mjs', 'c.mjs', 'd.mjs', 'e.mjs']
     const files = paths.map((p, i) => file(p, 2000 + i * 700))
     const patch = patchFor(paths)
     const plan = planPasses({ stat: ' x | 1 +', patch, files, budget: 12_000 })
+    expect(plan.fits).toBe(false)
     const sections = new Map(splitPatchByFile(patch).map((s) => [s.path, s.text]))
     for (const pass of plan.passes) {
       const out = assembleMaterial({
@@ -455,9 +461,107 @@ describe('the passes a range too large is cut into', () => {
         budget: 12_000,
         patchRoom: pass.patchRoom,
         patchOnly: pass.patchOnly,
+        manifest: formatPassManifest(plan, pass),
       })
       expect(out.fit).toBe(true)
     }
+  })
+})
+
+// THE STRUCTURAL FINDING OF THE FOURTH CROSS-VENDOR ROUND: three of four passes
+// were refused a conclusion because the whole-range diffstat named files the
+// pass deliberately did not carry, and nothing in the material said so. The
+// material of a pass must state its own shape INSIDE the material.
+describe('the manifest a pass carries — the material states its own shape', () => {
+  const splitPlan = () => {
+    const paths = ['a.mjs', 'b.mjs', 'c.mjs', 'd.mjs']
+    return {
+      paths,
+      plan: planPasses({
+        stat: 's',
+        patch: patchFor(paths),
+        files: paths.map((p) => file(p, 3000)),
+        budget: 10_000,
+      }),
+    }
+  }
+
+  it('names which pass this is, what it carries, and what is absent BY DESIGN with its pass', () => {
+    const { plan } = splitPlan()
+    expect(plan.passes.length).toBeGreaterThan(1)
+    const first = plan.passes[0]
+    const text = formatPassManifest(plan, first)
+    expect(text).toContain(`=== REVIEW PASS 1/${plan.passes.length} `)
+    for (const path of first.files) expect(text).toContain(`· ${path} — complete`)
+    expect(text).toContain('ABSENT BY DESIGN')
+    for (const other of plan.passes.slice(1)) {
+      for (const path of other.files) {
+        expect(text).toContain(`· ${path} → pass ${other.index}/${plan.passes.length}`)
+      }
+    }
+    // The two kinds of absence are stated as OPPOSITE things.
+    expect(text).toContain('NOT truncated')
+    expect(text).toContain(MANIFEST_END)
+  })
+
+  it('marks a DIFF-ONLY file as a delivery level, distinct from an absence', () => {
+    const plan = planPasses({
+      stat: 's',
+      patch: patchFor(['archive.md', 'guard.mjs', 'other.mjs']),
+      files: [file('archive.md', 400_000), file('guard.mjs', 6000), file('other.mjs', 6000)],
+      budget: 10_000,
+    })
+    const holder = plan.passes.find((p) => p.patchOnly.includes('archive.md'))
+    const text = formatPassManifest(plan, holder)
+    expect(text).toContain('· archive.md — DIFF ONLY, by design')
+    expect(text).not.toContain('· archive.md — complete')
+  })
+
+  it('names the files beyond the reach of any pass, so nobody assumes they were read', () => {
+    const huge = ['diff --git a/x.md b/x.md', `+${'y'.repeat(30_000)}`].join('\n')
+    const plan = planPasses({
+      stat: 's',
+      patch: `${huge}\n${patchFor(['a.mjs'])}`,
+      files: [file('x.md', 10), file('a.mjs', 10)],
+      budget: 5000,
+    })
+    expect(plan.uncoverable.map((u) => u.path)).toEqual(['x.md'])
+    const text = formatPassManifest(plan, plan.passes[0])
+    expect(text).toContain('BEYOND THE REACH OF ANY PASS')
+    expect(text).toContain('· x.md')
+  })
+
+  it('never outgrows the room the plan reserved for it', () => {
+    // The allowance is computable before the passes exist; the real manifest
+    // must stay inside it for every pass, or the assembly refuses a pass the
+    // plan called complete — one paid round later.
+    const paths = Array.from({ length: 40 }, (_, i) => `scripts/some-quite-long-directory/name-${i}.mjs`)
+    const plan = planPasses({
+      stat: 's'.repeat(300),
+      patch: patchFor(paths),
+      files: paths.map((p) => file(p, 4000)),
+      budget: 12_000,
+    })
+    expect(plan.passes.length).toBeGreaterThan(2)
+    const allowance = manifestAllowance(paths)
+    for (const pass of plan.passes) {
+      expect(formatPassManifest(plan, pass).length).toBeLessThanOrEqual(allowance)
+    }
+  })
+
+  it('travels at the TOP of the material and inside its measured size', () => {
+    const manifest = 'M'.repeat(60)
+    const out = assembleMaterial({ stat: 's', patch: 'p', files: [], budget: 10_000, manifest })
+    expect(out.text.startsWith(manifest)).toBe(true)
+    const bare = assembleMaterial({ stat: 's', patch: 'p', files: [], budget: 10_000 })
+    expect(out.size).toBe(bare.size + manifest.length + 1)
+  })
+
+  it('counts against the ceiling — a manifest nobody reserved room for fails the fit', () => {
+    const bare = assembleMaterial({ stat: 's', patch: 'p', files: [], budget: 60 })
+    expect(bare.fit).toBe(true)
+    const out = assembleMaterial({ stat: 's', patch: 'p', files: [], budget: 60, manifest: 'M'.repeat(60) })
+    expect(out.fit).toBe(false)
   })
 })
 

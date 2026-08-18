@@ -724,6 +724,19 @@ describe('the codex command line is the rule, not a preference of the caller', (
     expect(divergent).toMatch(/cannot be counted/)
     expect(buildReviewPrompt({ sha: 'abc', brief: 'x' })).not.toMatch(/ONE ENTRY PER LINE/)
   })
+
+  it('tells a PASS reviewer the manifest governs absence, and a whole-range one nothing of it', () => {
+    // The structural finding of the fourth cross-vendor round: every pass
+    // verdict degraded into a coverage refusal because nothing told the
+    // reviewer which absences were design. The prompt now says it, and the
+    // material's own manifest says it again where the files are listed.
+    const prompt = buildReviewPrompt({ sha: 'abc', brief: 'x', pass: { index: 2, total: 3 } })
+    expect(prompt).toContain('THIS IS PASS 2 OF 3')
+    expect(prompt).toMatch(/OPENS WITH A\nMANIFEST/)
+    expect(prompt).toMatch(/absent is NOT truncated/)
+    expect(prompt).toMatch(/covers exactly the files this pass carries/)
+    expect(buildReviewPrompt({ sha: 'abc', brief: 'x' })).not.toContain('THIS IS PASS')
+  })
 })
 
 // POINT 667: the REVERSED direction. Sol authors too now, and the failure this

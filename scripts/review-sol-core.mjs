@@ -232,7 +232,7 @@ export function codexArgs({
  * transcribed into the ledger verbatim — a verdict word this project's recorder
  * accepts, and one honest line of what was actually checked.
  */
-export function buildReviewPrompt({ sha = '', brief = '', mode = 'review' } = {}) {
+export function buildReviewPrompt({ sha = '', brief = '', mode = 'review', pass = null } = {}) {
   const divergent = String(mode) === 'blind-parallel'
   return [
     'You are the SECOND pair of eyes on a change in this repository, working under the',
@@ -248,6 +248,21 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review' } = {}
     'cannot create user namespaces, so a shell command of yours would fail before it',
     'ran — judge the attached material, and if a part of it is marked TRUNCATED, say so',
     'in your evidence rather than guessing past the cut.',
+    // A PASS REVIEWER IS TOLD THE MATERIAL'S SHAPE UP FRONT (structural finding,
+    // fourth cross-vendor round): without this, every pass verdict degraded into
+    // a coverage refusal over files another pass carries by design.
+    ...(pass
+      ? [
+          '',
+          `THIS IS PASS ${Number(pass.index)} OF ${Number(pass.total)} of a review split over the range's`,
+          'FILE SET, because the whole range does not fit one round. The material OPENS WITH A',
+          'MANIFEST naming which files THIS pass carries (and at which delivery level) and which',
+          'are ABSENT BY DESIGN, each covered by another pass. A file the manifest declares',
+          'absent is NOT truncated: do not refuse a verdict over its absence. Your verdict',
+          'covers exactly the files this pass carries, and the range is cleared only once',
+          'every pass is recorded.',
+        ]
+      : []),
     '',
     `WHAT TO JUDGE: ${brief}`,
     '',

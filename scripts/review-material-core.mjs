@@ -64,6 +64,81 @@ const FILE_FRAME_CHARS = 320
 const fileHeader = (path) => `=== FILE (current content): ${path} ===`
 const omittedHeader = (path) => `=== FILE OMITTED ENTIRELY (material budget spent): ${path} ===`
 
+/** The last line of a pass manifest, so the reviewer sees where the shape ends. */
+export const MANIFEST_END = '=== END OF PASS MANIFEST — the DIFFSTAT and PATCH follow ==='
+
+/**
+ * THE MATERIAL OF A PASS STATES ITS OWN SHAPE, INSIDE THE MATERIAL (fourth
+ * cross-vendor round, the structural finding). Three of four passes were
+ * refused a conclusion for the same reason, in the reviewer's own words: the
+ * whole-range diffstat named 14 changed files, the attachment carried 2–3, and
+ * nothing was marked TRUNCATED — so the reviewer, correctly, declined to
+ * conclude about the absent files. That was the pass mechanism's fault, not
+ * the reviewer's: it shipped the range's diffstat beside one pass's file
+ * bodies with nothing saying "this is pass k of n, these files are absent by
+ * design, covered by passes x and y". Absent-by-design and
+ * absent-by-truncation mean OPPOSITE things about the verdict a reviewer may
+ * give, so the two must be visibly different things in the material itself —
+ * until they are, no pass verdict means what the ledger records it as meaning.
+ *
+ * The manifest therefore names, for THIS pass: which pass of how many, every
+ * file it carries WITH its delivery level (complete, or diff-only by design),
+ * every file of the range that is absent by design with the pass covering it,
+ * and the files beyond the reach of any pass. It is written by the same module
+ * that plans the passes, so the two cannot drift apart.
+ */
+export function formatPassManifest(plan, pass) {
+  const total = Number(pass?.total ?? 0)
+  const index = Number(pass?.index ?? 0)
+  const patchOnly = new Set(pass?.patchOnly ?? [])
+  const carried = pass?.files ?? []
+  const lines = [
+    `=== REVIEW PASS ${index}/${total} — THE SHAPE OF THIS MATERIAL ===`,
+    `This range is too large for one review round, so it is reviewed in ${total} passes over its`,
+    'FILE SET, whose union covers the range. This material is ONE of those passes. The DIFFSTAT',
+    'below describes the WHOLE range for context: it names files this pass deliberately omits.',
+    `THIS PASS CARRIES ${carried.length} file(s), each at the delivery level stated:`,
+  ]
+  for (const path of carried) {
+    lines.push(
+      patchOnly.has(path)
+        ? `  · ${path} — DIFF ONLY, by design (content larger than a round; its PATCH is complete)`
+        : `  · ${path} — complete: its diff in the PATCH, its current content below`,
+    )
+  }
+  const absent = (plan?.passes ?? []).filter((p) => p.index !== index)
+  if (absent.some((p) => (p.files ?? []).length)) {
+    lines.push('ABSENT BY DESIGN — every other changed file, covered by the pass named beside it:')
+    for (const other of absent) {
+      for (const path of other.files ?? []) lines.push(`  · ${path} → pass ${other.index}/${total}`)
+    }
+  }
+  if ((plan?.uncoverable ?? []).length) {
+    lines.push('BEYOND THE REACH OF ANY PASS — no round can hold these; NO pass covers them:')
+    for (const u of plan.uncoverable) lines.push(`  · ${u.path}`)
+  }
+  lines.push(
+    'A file declared ABSENT BY DESIGN here is NOT truncated — the two mean opposite things:',
+    'a designed absence is covered by another pass and bars no verdict, while anything marked',
+    'TRUNCATED or OMITTED further down is a DEFECT of this round and must not be concluded',
+    'about. Your verdict covers exactly the files this pass carries.',
+    MANIFEST_END,
+  )
+  return lines.join('\n')
+}
+
+/**
+ * The room the plan keeps free per pass for the manifest the assembly will
+ * write: a deliberate over-estimate, computable BEFORE the passes exist — the
+ * manifest's size is dominated by the range's path list, which every pass
+ * names exactly once (carried, absent-by-design, or beyond reach). Pinned
+ * against the real formatPassManifest output by the unit layer, so a manifest
+ * that outgrows its allowance fails a test rather than a paid review round.
+ */
+export function manifestAllowance(paths = []) {
+  return 1000 + (paths ?? []).reduce((sum, p) => sum + String(p).length + 96, 0)
+}
+
 /**
  * The marker for a file whose CONTENT is larger than a whole round but whose DIFF
  * is complete in the patch above it. It is not an omission and not a cut: the
@@ -98,6 +173,7 @@ export function assembleMaterial({
   budget = MATERIAL_BUDGET_CHARS,
   patchRoom = null,
   patchOnly = [],
+  manifest = '',
 } = {}) {
   const cap = Math.max(0, Number(budget) || 0)
   // NEVER TRIMMED (fourth cross-vendor round): a trim is a silent edit to the
@@ -114,7 +190,14 @@ export function assembleMaterial({
     : Math.floor(cap * PATCH_SHARE)
   const skipContent = new Set((patchOnly ?? []).map((p) => String(p)))
 
-  const out = ['=== DIFFSTAT ===', cut(statText, statRoom), '', '=== PATCH ===', cut(patchText, room), '']
+  // THE MANIFEST TRAVELS FIRST AND IS NEVER CUT: it is the text that tells the
+  // reviewer which absences are design and which would be defects, so cutting
+  // it would recreate the very confusion it exists to end. Its cost is real —
+  // it stands inside the measured text, so a manifest the plan did not reserve
+  // room for fails `fit` below rather than slipping past the ceiling.
+  const manifestText = String(manifest ?? '')
+  const out = manifestText ? [manifestText, ''] : []
+  out.push('=== DIFFSTAT ===', cut(statText, statRoom), '', '=== PATCH ===', cut(patchText, room), '')
   const account = {
     statTruncated: statText.length > statRoom,
     patchTruncated: patchText.length > room,
@@ -487,7 +570,7 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
   const statRoom = Math.floor(cap * STAT_SHARE)
   const statTruncated = statText.length > statRoom
   const statCost = Math.min(statText.length, statRoom)
-  const room = Math.max(0, cap - statCost - PASS_RESERVE)
+  const baseRoom = Math.max(0, cap - statCost - PASS_RESERVE)
 
   // Every path the range touched: the ones with content, plus the ones the patch
   // knows about and the content list does not (a deleted file has no content).
@@ -501,30 +584,45 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
   for (const [path, text] of sections) {
     if (!seen.has(path)) entries.push({ path, content: '', patchText: text })
   }
-
-  const passes = []
-  const uncoverable = []
   let rawSize = statText.length
-  let current = null
-  for (const entry of entries) {
-    const frame = FILE_FRAME_CHARS + fileHeader(entry.path).length
-    const patchLen = entry.patchText.length
-    rawSize += patchLen + entry.content.length
-    if (frame + patchLen > room) {
-      uncoverable.push({ path: entry.path, patchChars: patchLen, contentChars: entry.content.length })
-      continue
+  for (const entry of entries) rawSize += entry.patchText.length + entry.content.length
+
+  const pack = (room) => {
+    const passes = []
+    const uncoverable = []
+    let current = null
+    for (const entry of entries) {
+      const frame = FILE_FRAME_CHARS + fileHeader(entry.path).length
+      const patchLen = entry.patchText.length
+      if (frame + patchLen > room) {
+        uncoverable.push({ path: entry.path, patchChars: patchLen, contentChars: entry.content.length })
+        continue
+      }
+      const whole = frame + patchLen + entry.content.length
+      const patchOnly = whole > room
+      const cost = patchOnly ? frame + patchLen : whole
+      if (!current || current.size + cost > room) {
+        current = { files: [], patchOnly: [], patchChars: 0, size: 0 }
+        passes.push(current)
+      }
+      current.files.push(entry.path)
+      if (patchOnly) current.patchOnly.push(entry.path)
+      current.patchChars += patchLen
+      current.size += cost
     }
-    const whole = frame + patchLen + entry.content.length
-    const patchOnly = whole > room
-    const cost = patchOnly ? frame + patchLen : whole
-    if (!current || current.size + cost > room) {
-      current = { files: [], patchOnly: [], patchChars: 0, size: 0 }
-      passes.push(current)
-    }
-    current.files.push(entry.path)
-    if (patchOnly) current.patchOnly.push(entry.path)
-    current.patchChars += patchLen
-    current.size += cost
+    return { passes, uncoverable }
+  }
+
+  // PACKED TWICE WHERE IT SPLITS (structural finding, fourth cross-vendor
+  // round): a single fitting round carries no manifest, so the first packing
+  // uses the whole room — and only a range that genuinely splits is re-packed
+  // with the manifest's reservation taken off, because every pass of a split
+  // must then carry its own shape declaration inside the budget.
+  let room = baseRoom
+  let { passes, uncoverable } = pack(room)
+  if (passes.length > 1 || uncoverable.length > 0) {
+    room = Math.max(0, baseRoom - manifestAllowance(entries.map((e) => e.path)))
+    ;({ passes, uncoverable } = pack(room))
   }
 
   const total = passes.length
