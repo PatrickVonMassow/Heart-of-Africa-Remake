@@ -385,22 +385,43 @@ describe('visible review debt', () => {
 describe('the reading selector on its own', () => {
   // Exported and callable directly, so it normalizes rather than trusting the
   // caller: a numeric string is not a time, and an absent stamp is the oldest.
-  const reading = (verdict, at, index) => ({ record: { verdict }, at, index })
+  // The LINE is the position in the list, so a reading carries no line of its own.
+  const reading = (verdict, at) => ({ record: { verdict }, at })
 
   it('never coerces a numeric string into a time', () => {
-    expect(newestReading([reading('merge', '900', 0), reading('do-not-merge', 5, 1)]).record.verdict)
+    expect(newestReading([reading('merge', '900'), reading('do-not-merge', 5)]).record.verdict)
       .toBe('do-not-merge')
   })
 
-  it('sorts an unusable clock before every clocked reading, whatever its line', () => {
+  it('never lets an unclocked clearance overtake a clocked reading', () => {
     for (const at of [Number.NaN, Number.POSITIVE_INFINITY, null, undefined, '5']) {
-      expect(newestReading([reading('do-not-merge', 5, 0), reading('merge', at, 1)]).record.verdict)
+      expect(newestReading([reading('do-not-merge', 5), reading('merge', at)]).record.verdict)
         .toBe('do-not-merge')
     }
   })
 
-  it('falls back to the ledger line only where neither reading carries a clock', () => {
-    expect(newestReading([reading('do-not-merge', null, 0), reading('merge', null, 1)]).record.verdict)
+  it('does not let an unclocked clearance settle an unclocked refusal — only a clocked one does', () => {
+    // Neither row can be placed in time, and clearing is the dangerous
+    // direction, so the refusal stands. It is not a freeze: a properly stamped
+    // clearance settles it, whichever line it lands on.
+    expect(newestReading([reading('do-not-merge', null), reading('merge', null)]).record.verdict)
+      .toBe('do-not-merge')
+    expect(newestReading([reading('do-not-merge', null), reading('merge', 5)]).record.verdict).toBe('merge')
+    expect(newestReading([reading('merge', 5), reading('do-not-merge', null)]).record.verdict)
+      .toBe('do-not-merge')
+  })
+
+  it('lets the last line rule where no reading carries a clock at all', () => {
+    expect(newestReading([reading('merge', null), reading('merge-with-fixes', null)]).record.verdict)
+      .toBe('merge-with-fixes')
+  })
+
+  it('keeps a refusal appended after the newest clocked reading', () => {
+    // The line is the only evidence an unclocked row carries, and it proves
+    // this much: the refusal came after the clearance.
+    expect(newestReading([reading('merge', 500), reading('do-not-merge', undefined)]).record.verdict)
+      .toBe('do-not-merge')
+    expect(newestReading([reading('do-not-merge', undefined), reading('merge', 500)]).record.verdict)
       .toBe('merge')
   })
 

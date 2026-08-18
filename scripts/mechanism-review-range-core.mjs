@@ -191,54 +191,51 @@ const contained = (record, sha) => {
 /**
  * The reading that rules one contribution, out of every reading of it.
  *
- * ONE KEY, SO THE ORDER IS TOTAL: `(clock, ledger line)`, compared
- * lexicographically, the later line breaking a tie because the ledger is
- * append-only.  A clock is a finite NUMBER or nothing — a numeric STRING is
- * data of the wrong type and is never coerced into a time — and a reading
- * without one sorts BEFORE every clocked reading, as the oldest.
+ * A SELECTION, NOT A PAIRWISE COMPARATOR. Ranking rows against each other was
+ * the bug twice over: comparing clock against clock and line against line
+ * pairwise is not an order at all (a refusal at 300, an unclocked clearance and
+ * a clearance at 100 cleared what the clock calls refused), and folding both
+ * signals into one key lost a refusal appended after a clocked clearance.
  *
- * That single key is what makes the rule safe in both directions. An unclocked
- * or older clearance can never bury the refusal recorded after it, and an
- * unclocked refusal is still settled by any clocked clearance, so no row can
- * freeze a contribution as permanently owed — an unsatisfiable gate is the
- * failure this point exists to remove.  Comparing clock against clock and
- * position against position PAIRWISE, as this once did, is not an order at all:
- * with a refusal at 300, an unclocked clearance, and a clearance at 100, the
- * scan walked from the refusal to the newest row and cleared what the clock
- * says is refused.
+ * The rule, in the order it decides:
+ *  1. A clock is a finite NUMBER or nothing. A numeric string is data of the
+ *     wrong type and is never coerced into a time.
+ *  2. Among the readings that carry a clock, the newest rules — the later
+ *     LEDGER LINE breaking a tie, the ledger being append-only.
+ *  3. An unclocked reading cannot be placed in that order, so it never CLEARS.
+ *     But a refusal appended AFTER that newest clocked reading is exactly what
+ *     the line still proves, so it rules and the contribution stays owed.
+ *     Appended BEFORE it, the refusal is superseded — nothing can freeze a
+ *     contribution as permanently owed, an unsatisfiable gate being the failure
+ *     this point exists to remove.
+ *  4. With no clocked reading at all, the last line rules, so a lone record
+ *     nobody stamped still settles its own contribution.
  *
- * RESIDUAL: between two readings that BOTH lack a clock, only the ledger line
- * remains, and a ledger merged across branches carries no chronology in that
- * line. Two clockless readings of one contribution disagreeing is the only case
- * that can resolve arbitrarily; every row this repository writes is clocked.
+ * The LINE is the position in the list the caller passes, which is ledger order
+ * — no row carries a line of its own that could be missing or malformed.
  */
 export function newestReading(readings = []) {
   if (!readings.length) return null
-  let best = readings[0]
-  for (const [index, row] of readings.entries()) {
-    if (index === 0) continue
-    if (!earlier(row, best)) best = row
+  let newest = null
+  let newestLine = -1
+  for (const [line, row] of readings.entries()) {
+    if (clockOf(row) === null) continue
+    if (!newest || clockOf(row) >= clockOf(newest)) {
+      newest = row
+      newestLine = line
+    }
   }
-  return best
+  for (const [line, row] of readings.entries()) {
+    if (line <= newestLine || clockOf(row) !== null) continue
+    if (String(row?.record?.verdict) === 'do-not-merge') return row
+  }
+  return newest ?? readings[readings.length - 1]
 }
 
 /** The strict clock of a reading: a finite number, or null for "no time". The
  *  selector normalizes rather than trusting its caller, so a direct caller gets
  *  the documented rule and not JavaScript's coercing comparison. */
 const clockOf = (row) => (typeof row?.at === 'number' && Number.isFinite(row.at) ? row.at : null)
-
-/** Is `row` earlier than `than` under `(clock, line)`? An absent clock is the
- *  oldest, and an absent line keeps the array's own order. */
-const earlier = (row, than) => {
-  const a = clockOf(row)
-  const b = clockOf(than)
-  if (a !== b) {
-    if (a === null) return true
-    if (b === null) return false
-    return a < b
-  }
-  return Number(row?.index ?? 0) < Number(than?.index ?? 0)
-}
 
 /**
  * Remove only contribution pairs actually read by a valid authorship-scoped
@@ -252,7 +249,7 @@ export function outstandingContributions({ commits = [], records = [], recordUsa
   // the newest verdict, so a plan that counted the older clearance would hide
   // the very file the gate is blocking on and leave the block unresolvable.
   const latest = new Map()
-  for (const [position, record] of (records ?? []).entries()) {
+  for (const record of records ?? []) {
     const files = Array.isArray(record?.pass?.files) ? record.pass.files.map(String) : []
     const commitsRead = Array.isArray(record?.pass?.commits) ? record.pass.commits.map(String) : []
     if (!files.length || !commitsRead.length) continue
@@ -269,9 +266,9 @@ export function outstandingContributions({ commits = [], records = [], recordUsa
       // permanent winner and hid every later reading behind it.
       const at = typeof record.at === 'number' && Number.isFinite(record.at) ? record.at : null
       if (!latest.has(key)) latest.set(key, [])
-      // The ledger POSITION travels with the reading: it is the ordering that
-      // survives when the clock does not.
-      latest.get(key).push({ record, at, contribution, index: position })
+      // Pushed in ledger order: the position in this list IS the line, so no
+      // reading carries a line of its own that could go missing.
+      latest.get(key).push({ record, at, contribution })
     }
   }
   const covered = new Set()
