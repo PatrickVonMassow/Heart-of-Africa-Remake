@@ -55,7 +55,7 @@ import {
   recordCommissionOverride,
   recordParkedBranch,
 } from './batch-in-flight-core.mjs'
-import { openFeatBranches, readCommissionRecord, writeCommissionRecord } from './batch-in-flight.mjs'
+import { branchTip, openFeatBranches, readCommissionRecord, writeCommissionRecord } from './batch-in-flight.mjs'
 
 const PAUSE = repoPath('.claude', 'batch-paused')
 
@@ -230,8 +230,16 @@ function parkBranch(argv) {
     console.error('usage: node scripts/commission-guard.mjs --park <branch> --reason "<why>"')
     return 1
   }
-  writeCommissionRecord(recordParkedBranch(readCommissionRecord(), ref, reason, { at: new Date().toISOString() }))
-  console.log(`parked ${ref} out of the slot count. It returns to the count the moment it receives another commit.`)
+  // THE TIP IS THE BASELINE the park expires against; the timestamp beside it is
+  // only the fallback for a record written before this existed.
+  const tip = branchTip(ref)
+  writeCommissionRecord(
+    recordParkedBranch(readCommissionRecord(), ref, reason, { at: new Date().toISOString(), tip }),
+  )
+  console.log(
+    `parked ${ref} out of the slot count${tip ? ` at ${tip.slice(0, 8)}` : ' (git could not name its tip — the park' +
+      ' falls back to the clock)'}. It returns to the count the moment it receives another commit.`,
+  )
   return 0
 }
 

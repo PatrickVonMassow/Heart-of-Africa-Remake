@@ -155,7 +155,7 @@ export function openFeatBranches({ cwd = REPO_ROOT, base = 'main', behind = fals
         'for-each-ref',
         '--no-merged',
         base,
-        '--format=%(refname:short)\t%(committerdate:unix)',
+        '--format=%(refname:short)\t%(committerdate:unix)\t%(objectname)',
         'refs/heads/feat',
         'refs/remotes/origin/feat',
       ],
@@ -166,16 +166,37 @@ export function openFeatBranches({ cwd = REPO_ROOT, base = 'main', behind = fals
   }
   const branches = []
   for (const line of out.split(/\r?\n/)) {
-    const [ref, stamp] = line.split('\t')
+    const [ref, stamp, tip] = line.split('\t')
     if (!ref || !ref.trim()) continue
     const secs = Number(stamp)
     branches.push({
       ref: ref.trim(),
       tipAt: Number.isFinite(secs) && secs > 0 ? secs * 1000 : null,
+      // The TIP is what a park is measured against — the committer date is only
+      // the fallback, and it is a second coarse and forgeable by a rebase.
+      tip: String(tip ?? '').trim(),
       behind: behind ? commitsBehind(ref.trim(), { cwd, base }) : null,
     })
   }
   return { readable: true, branches }
+}
+
+/** The commit a branch points at right now, or '' where git cannot say. It is
+ *  the baseline a park is recorded with. */
+export function branchTip(ref, { cwd = REPO_ROOT } = {}) {
+  const name = String(ref ?? '').trim()
+  if (!name || /[\s~^:?*[\]\\]/.test(name)) return ''
+  try {
+    return execFileSync('git', ['rev-parse', '--verify', '--quiet', `${name}^{commit}`], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  } catch {
+    return ''
+  }
 }
 
 /** Where the commissioning record lives, resolved once. */

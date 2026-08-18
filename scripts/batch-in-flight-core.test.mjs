@@ -64,6 +64,7 @@ import {
   branchSlotDecision,
   branchSlotRefusal,
   commissionTarget,
+  normaliseTip,
 } from './batch-in-flight-core.mjs'
 import {
   assessOwner,
@@ -2640,6 +2641,58 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
     // A commit after the park makes it live work again.
     const moved = [{ ...NINE_BRANCHES[0], tipAt: Date.parse('2026-08-17T18:30:00.000Z') }, ...NINE_BRANCHES.slice(1, 3)]
     expect(branchSlotDecision({ branches: moved, parked, point: 697, now: AUG17 }).count).toBe(3)
+  })
+
+  // THE PARK EXPIRES AGAINST THE TIP, not against a clock (Sol, review of
+  // 91d88f9a). Git's committer date is whole seconds and a rebase can preserve
+  // it, so a timestamp comparison called real movement "still parked".
+  describe('a park is measured against the branch TIP', () => {
+    const at = '2026-08-17T18:00:00.000Z'
+    const parkedAt = (tip) => ({ 'feat/336-croc-staging': { reason: 'superseded', at, tip } })
+    const withTip = (tip, extra = {}) => [
+      { ...NINE_BRANCHES[0], tip, ...extra },
+      ...NINE_BRANCHES.slice(1, 3),
+    ]
+
+    it('stays parked while the tip is the one it was parked at', () => {
+      expect(branchSlotDecision({ branches: withTip('a1b2c3d4'), parked: parkedAt('a1b2c3d4'), now: AUG17 }).count).toBe(
+        2,
+      )
+    })
+
+    it('returns to the count on a NEW tip, whatever the committer date says', () => {
+      // The killing case: a commit in the same second as the park, and one whose
+      // committer date was preserved from BEFORE it. Both moved; both count.
+      const sameSecond = withTip('99ffee00', { tipAt: Date.parse(at) })
+      expect(branchSlotDecision({ branches: sameSecond, parked: parkedAt('a1b2c3d4'), now: AUG17 }).count).toBe(3)
+      const backdated = withTip('99ffee00', { tipAt: Date.parse('2026-08-01T10:00:00.000Z') })
+      expect(branchSlotDecision({ branches: backdated, parked: parkedAt('a1b2c3d4'), now: AUG17 }).count).toBe(3)
+    })
+
+    it('stays parked while the tip cannot be read — an unreadable tip proves no movement', () => {
+      expect(branchSlotDecision({ branches: withTip(''), parked: parkedAt('a1b2c3d4'), now: AUG17 }).count).toBe(2)
+    })
+
+    it('does NOT honour a park with no baseline at all, and says which one', () => {
+      const noBaseline = { 'feat/336-croc-staging': { reason: 'superseded', at: 'not a date' } }
+      const d = branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), parked: noBaseline, point: 697, now: AUG17 })
+      expect(d.count).toBe(3)
+      expect(d.invalidParks.map((b) => b.ref)).toEqual(['feat/336-croc-staging'])
+      expect(commissionRecordReport(parseCommissionRecord(JSON.stringify({ parked: noBaseline })))).toContain(
+        'NO BASELINE',
+      )
+    })
+
+    it('reads a tip only where it is one, and keeps it through the record', () => {
+      expect(normaliseTip('A1B2C3D4')).toBe('a1b2c3d4')
+      for (const bad of ['', 'zzzz', 'abc', null, 42, 'a'.repeat(65)]) expect(normaliseTip(bad)).toBe('')
+      const rec = recordParkedBranch(parseCommissionRecord(''), 'feat/1-a', 'why', { at, tip: 'A1B2C3D4E5' })
+      expect(parseCommissionRecord(JSON.stringify(rec)).parked['feat/1-a'].tip).toBe('a1b2c3d4e5')
+      expect(commissionRecordReport(rec)).toContain('parked at a1b2c3d4')
+      // A hand-edited nonsense tip is dropped, and the clock carries the park.
+      const hand = parseCommissionRecord(JSON.stringify({ parked: { 'feat/1-a': { reason: 'why', at, tip: 'nope' } } }))
+      expect(hand.parked['feat/1-a'].tip).toBe('')
+    })
   })
 
   it('keeps a parked branch parked when its tip date cannot be read', () => {

@@ -1227,7 +1227,9 @@ export function parseCommissionRecord(text) {
   }
   for (const [key, value] of Object.entries(src(parsed.parked))) {
     const ref = normRef(key)
-    const e = entry(value)
+    // A park also carries the branch TIP it was taken at — a commit sha or
+    // nothing. Anything else is a hand-edit nobody can compare against.
+    const e = { ...entry(value), tip: normaliseTip(value?.tip) }
     if (ref && e.reason) out.parked[ref] = e
   }
   return out
@@ -1251,14 +1253,30 @@ export function recordCommissionOverride(record, point, reason, { at = '' } = {}
   return { ...base, overrides: { ...base.overrides, [n]: { reason: text, at: String(at ?? '') } } }
 }
 
-/** Park a branch out of the slot count, with its reason and the moment it was
- *  taken — the stamp is what lets a parked branch come BACK when it moves. */
-export function recordParkedBranch(record, ref, reason, { at = '' } = {}) {
+/** A commit sha as the record keeps it, or '' for anything that is not one. */
+export function normaliseTip(tip) {
+  const text = String(tip ?? '').trim()
+  return /^[0-9a-f]{7,64}$/i.test(text) ? text.toLowerCase() : ''
+}
+
+/**
+ * Park a branch out of the slot count, with its reason, the moment it was taken
+ * and THE TIP IT STOOD AT — the tip is what lets a parked branch come back the
+ * moment it moves, and it is the only baseline that cannot be fooled.
+ *
+ * The timestamp alone could be, in three ways Sol named in the review of
+ * 91d88f9a: git reports a committer date in whole SECONDS while the park is
+ * stamped in milliseconds, so a commit made later in the same second reads as
+ * older; a rebase or a `--date` preserves a committer date the branch has long
+ * moved past; and an unparsable stamp made the branch parked forever. A sha
+ * comparison has none of those failure modes.
+ */
+export function recordParkedBranch(record, ref, reason, { at = '', tip = '' } = {}) {
   const base = record && typeof record === 'object' ? record : { overrides: {}, parked: {} }
   const name = normRef(ref)
   const text = sanitiseReason(reason)
   if (!name || !text) return base
-  return { ...base, parked: { ...base.parked, [name]: { reason: text, at: String(at ?? '') } } }
+  return { ...base, parked: { ...base.parked, [name]: { reason: text, at: String(at ?? ''), tip: normaliseTip(tip) } } }
 }
 
 /** Take a branch back into the count deliberately. */
@@ -1281,7 +1299,16 @@ export function commissionRecordReport(record) {
   lines.push(overrides.length ? 'Recorded queue overrides:' : 'Recorded queue overrides: none.')
   for (const [n, e] of overrides) lines.push(`  · point ${n} — ${e.reason}${e.at ? ` (${e.at})` : ''}`)
   lines.push(parked.length ? 'Parked branches (out of the slot count):' : 'Parked branches: none.')
-  for (const [ref, e] of parked) lines.push(`  · ${ref} — ${e.reason}${e.at ? ` (${e.at})` : ''}`)
+  for (const [ref, e] of parked) {
+    // A park with no baseline can never expire, so it is not honoured — and the
+    // reader is told here rather than left wondering why the branch still counts.
+    const baseline = e.tip
+      ? ` — parked at ${String(e.tip).slice(0, 8)}`
+      : Number.isFinite(Date.parse(String(e.at ?? '')))
+        ? ''
+        : ' — NO BASELINE, so it does NOT count as parked; park it again'
+    lines.push(`  · ${ref} — ${e.reason}${e.at ? ` (${e.at})` : ''}${baseline}`)
+  }
   return lines.join('\n')
 }
 
@@ -1293,11 +1320,20 @@ export function commissionRecordReport(record) {
  * branch are ONE branch; two branches for one point are TWO (687 had exactly
  * that on 17.08.2026, and both were real work standing open).
  *
- * A PARKED BRANCH THAT MOVES IS LIVE AGAIN. The park records the moment it was
- * taken, so a commit landing on a parked branch afterwards puts it straight back
- * into the count — otherwise parking would be a permanent exemption bought once,
- * which is the silent-override failure this point exists to end. A branch whose
- * tip date cannot be read stays parked: an unreadable date proves no movement.
+ * A PARKED BRANCH THAT MOVES IS LIVE AGAIN. The park records the TIP the branch
+ * stood at, so a commit landing on it afterwards puts it straight back into the
+ * count — otherwise parking would be a permanent exemption bought once, which is
+ * the silent-override failure this point exists to end. A branch whose tip
+ * cannot be read stays parked: an unreadable tip proves no movement.
+ *
+ * A park with NO baseline at all — no tip, and no timestamp that parses — is not
+ * honoured: it could never expire, and a park that can never expire is the
+ * permanent exemption again, bought by a typo. It is reported in `invalidParks`
+ * so the reader is told rather than left wondering why the branch still counts.
+ * The timestamp remains the FALLBACK baseline for parks written before the tip
+ * was recorded, and it is read a whole second coarse, because git's committer
+ * date is: only a tip in a strictly later second counts as movement, so a park
+ * is never undone by the rounding of the very commit it was taken on.
  *
  * `exclude` is the point (or the POINTS — one shell call can open two) being
  * commissioned. Their own branches are not slots the commissioning would consume
@@ -1306,29 +1342,34 @@ export function commissionRecordReport(record) {
 export function openBranchSlots({ branches = [], parked = {}, exclude = null, cap = POOL_CAP, now = Date.now() } = {}) {
   const parkedAt = new Map()
   for (const [ref, e] of Object.entries(parked && typeof parked === 'object' ? parked : {})) {
-    parkedAt.set(normRef(ref), { reason: e?.reason ?? '', at: Date.parse(String(e?.at ?? '')) })
+    parkedAt.set(normRef(ref), {
+      reason: e?.reason ?? '',
+      at: Date.parse(String(e?.at ?? '')),
+      tip: normaliseTip(e?.tip),
+    })
   }
   const skip = new Set(
     (Array.isArray(exclude) ? exclude : [exclude]).map(Number).filter((n) => Number.isInteger(n) && n > 0),
   )
   const seen = new Map()
   const parkedOut = []
+  const invalidParks = []
   for (const b of Array.isArray(branches) ? branches : []) {
     const ref = normRef(b?.ref)
     if (!ref || seen.has(ref)) continue
     const tipAt = Number.isFinite(b?.tipAt) ? b.tipAt : null
+    const tip = normaliseTip(b?.tip)
     const item = {
       ref,
       point: pointOfBranch(ref),
       tipAt,
+      tip,
       ageMs: tipAt === null || !Number.isFinite(now) ? null : Math.max(0, now - tipAt),
       behind: Number.isFinite(b?.behind) ? b.behind : null,
     }
     const park = parkedAt.get(ref)
-    // Moved since it was parked → back in the count. An unparsable park stamp is
-    // read as "parked forever ago", so a moving branch still returns.
-    const movedSincePark = park && tipAt !== null && Number.isFinite(park.at) && tipAt > park.at
-    if (park && !movedSincePark) {
+    if (park && !parkHolds(park)) invalidParks.push({ ...item, reason: park.reason })
+    else if (park && !movedSincePark(park, item)) {
       parkedOut.push({ ...item, reason: park.reason })
       seen.set(ref, true)
       continue
@@ -1344,7 +1385,29 @@ export function openBranchSlots({ branches = [], parked = {}, exclude = null, ca
     // Oldest first: the branch that has been standing longest is the one to land.
     .sort((a, b) => (a.tipAt ?? Infinity) - (b.tipAt ?? Infinity) || a.ref.localeCompare(b.ref))
   const limit = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : POOL_CAP
-  return { open, parkedOut, count: open.length, slotsFree: Math.max(0, limit - open.length), cap: limit }
+  return {
+    open,
+    parkedOut,
+    invalidParks,
+    count: open.length,
+    slotsFree: Math.max(0, limit - open.length),
+    cap: limit,
+  }
+}
+
+/** Does this park have a baseline movement can be measured against at all? */
+function parkHolds(park) {
+  return Boolean(park?.tip) || Number.isFinite(park?.at)
+}
+
+/** Has the branch moved since it was parked? The TIP decides where one was
+ *  recorded; the timestamp is the coarse fallback for a park written without. */
+function movedSincePark(park, item) {
+  if (park?.tip) return Boolean(item.tip) && item.tip !== park.tip
+  if (!Number.isFinite(park?.at) || item.tipAt === null) return false
+  // Git's committer date is whole seconds, the park stamp is milliseconds: only a
+  // tip in a strictly LATER second is evidence of a commit after the park.
+  return item.tipAt >= Math.floor(park.at / 1000) * 1000 + 1000
 }
 
 /**
