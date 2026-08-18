@@ -2639,9 +2639,19 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
 
   it('lists them OLDEST FIRST with age and behind-count, and names LAND and PARK', () => {
     const text = branchSlotRefusal(branchSlotDecision({ branches: NINE_BRANCHES, point: 697, now: AUG17 }))
-    expect(text).toContain('feat/336-croc-staging — 13 d, 1679 commits behind main')
-    expect(text.indexOf('feat/336-croc-staging')).toBeLessThan(text.indexOf('feat/686-five-word-lexicon'))
-    expect(text.indexOf('feat/686-five-word-lexicon')).toBeLessThan(text.indexOf('feat/711-queue-rank'))
+    expect(text.split('\n').filter((line) => line.startsWith('  · '))).toEqual([
+      '  · feat/336-croc-staging — 13 d, 1679 commits behind main',
+      '  · feat/686-five-word-lexicon — 4 d, 81 commits behind main',
+      '  · feat/687-bank-game — 3 d, 81 commits behind main',
+      // Deliberately reversed in the fixture: input puts the 9-hour branch
+      // first, so preserving input order fails this assertion.
+      '  · feat/581-settlement-boundary-contrast — 10 h, 14 commits behind main',
+      '  · feat/687-roam-bound-fixes — 9 h, 12 commits behind main',
+      '  · feat/595-598-verification-ladder-brief — 8 h, 9 commits behind main',
+      '  · feat/703-board-write-report — 4 h, 5 commits behind main',
+      '  · feat/700-context-fence — 2 h, 2 commits behind main',
+      '  · feat/711-queue-rank — 1 h, 1 commit behind main',
+    ])
     expect(text).toContain('land-point.mjs')
     expect(text).toContain('--park')
     expect(text).toContain('697')
