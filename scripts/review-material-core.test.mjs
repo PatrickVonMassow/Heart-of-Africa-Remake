@@ -111,15 +111,56 @@ describe('the assembly says what it could not hold', () => {
   it('does not spend room it has not got on the patch-only notes', () => {
     const out = assembleMaterial({
       stat: 's',
-      patch: 'p',
+      patch: patchFor(['a.md', 'b.md', 'c.md', 'd.md']),
       files: [file('a.md', 9), file('b.md', 9), file('c.md', 9), file('d.md', 9)],
-      budget: 400,
+      budget: 650,
+      patchRoom: 400,
       patchOnly: ['a.md', 'b.md', 'c.md', 'd.md'],
     })
     // The notes stop where the room does, and what is left over is an OMISSION —
     // which is a loss, so the round is not complete and no record may rest on it.
     expect(out.patchOnly.length).toBeLessThan(4)
+    expect(out.patchOnly.length).toBeGreaterThan(0)
     expect(out.omitted.length).toBeGreaterThan(0)
+    expect(out.fit).toBe(false)
+  })
+
+  // ROUND 4, PASS 2, FINDING 1 — the point's headline defect one level down:
+  // `patchOnly` was a caller-supplied claim the accounting never checked, so a
+  // declaration the patch did not back withheld content, kept `fit` true, and
+  // offered a record over file content the reviewer never received.
+  it('does not honour a patch-only declaration the PATCH does not back', () => {
+    const out = assembleMaterial({
+      stat: 's',
+      patch: patchFor(['other.mjs']),
+      files: [file('archive.md', 90_000)],
+      budget: 10_000,
+      patchOnly: ['archive.md'],
+    })
+    expect(out.fit).toBe(false)
+    expect(out.patchOnly).toEqual([])
+    expect(out.omitted).toEqual(['archive.md'])
+    expect(out.text).toContain('declared patch-only, but the PATCH above does not carry its complete diff')
+    const said = formatShortfall(materialShortfall({ assembly: out, sent: out.text }), { sha: 'abc1234' })
+    expect(said).toContain('OMITTED ENTIRELY: archive.md')
+    expect(said).not.toContain('mechanism-review.mjs --record')
+  })
+
+  it('honours NO patch-only declaration once the patch itself was cut', () => {
+    // With the patch's tail cut, no section can be vouched complete — even one
+    // that happens to stand before the cut is refused, deliberately: the
+    // conservative reading only ever refuses a record, never grants one.
+    const patch = `${patchFor(['archive.md'])}\ndiff --git a/big.mjs b/big.mjs\n+${'z'.repeat(5000)}`
+    const out = assembleMaterial({
+      stat: 's',
+      patch,
+      files: [file('archive.md', 90_000)],
+      budget: 4000,
+      patchOnly: ['archive.md'],
+    })
+    expect(out.patchTruncated).toBe(true)
+    expect(out.patchOnly).toEqual([])
+    expect(out.omitted).toEqual(['archive.md'])
     expect(out.fit).toBe(false)
   })
 

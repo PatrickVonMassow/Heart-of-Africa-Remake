@@ -148,6 +148,10 @@ export function manifestAllowance(paths = []) {
 const patchOnlyHeader = (path) =>
   `=== FILE CONTENT NOT SENT — it is larger than one whole review round; its COMPLETE diff is in the PATCH above: ${path} ===`
 
+/** The header of a patch-only declaration the patch does not back — an omission. */
+const unbackedHeader = (path) =>
+  `=== FILE OMITTED ENTIRELY (declared patch-only, but the PATCH above does not carry its complete diff): ${path} ===`
+
 /** Cut `text` to `room`, saying so in the material where the cut falls. */
 const cut = (text, room) =>
   text.length > room
@@ -208,6 +212,14 @@ export function assembleMaterial({
   }
   let rawSize = statText.length + patchText.length
 
+  // The patch's own sections, read once and only where a declaration must be
+  // checked against them.
+  let sectionsSeen = null
+  const patchSections = () => {
+    if (!sectionsSeen) sectionsSeen = new Set(splitPatchByFile(patchText).map((s) => s.path))
+    return sectionsSeen
+  }
+
   let left = Math.max(0, cap - out.join('\n').length)
   for (const file of files ?? []) {
     const path = String(file?.path ?? '?')
@@ -216,6 +228,20 @@ export function assembleMaterial({
     // DECLARED, NOT DROPPED: the content is out by decision, the diff is in, and
     // the material says which. It costs the round only its one header line.
     if (skipContent.has(path)) {
+      // THE DECLARATION IS VERIFIED, NOT TRUSTED (fourth cross-vendor round,
+      // pass 2, finding 1): the header below claims the file's COMPLETE diff
+      // stands in the PATCH above, and the accounting used to take the
+      // caller's word for it — content withheld, fit true, record offered over
+      // file content the reviewer never received. The claim is checked against
+      // the patch actually assembled: a path with no section in it, or a patch
+      // whose tail was cut (after which no section can be vouched complete),
+      // makes the file an ordinary OMISSION, named as such — and the round is
+      // then not complete, so no record is offered over it.
+      if (account.patchTruncated || !patchSections().has(path)) {
+        out.push(unbackedHeader(path), '')
+        account.omitted.push(path)
+        continue
+      }
       const header = patchOnlyHeader(path)
       // THE NOTE COSTS ROOM TOO. Pushed with no room left it put the round over
       // its budget while the accounting still called it complete — several
