@@ -147,7 +147,11 @@ export function formatPassManifest(plan, pass) {
  * that outgrows its allowance fails a test rather than a paid review round.
  */
 export function manifestAllowance(paths = []) {
-  return 1000 + (paths ?? []).reduce((sum, p) => sum + String(p).length + 96, 0)
+  // The manifest prints every path QUOTED (quotePassFile), where one control
+  // byte expands to four characters — so the reservation is computed over the
+  // quoted spelling, or a control-heavy legal path outgrows its own allowance
+  // and turns a planned pass into an over-budget refusal (round-2 pass 3).
+  return 1000 + (paths ?? []).reduce((sum, p) => sum + quotePassFile(String(p)).length + 96, 0)
 }
 
 /**
@@ -701,10 +705,20 @@ export function splitPatchByFile(patch) {
   // The path is read WITH the section's own lines in view: an ambiguous rename
   // header is decided by its `rename from`/`rename to` lines, never by a guess
   // over the one line (cross-vendor review, third round).
-  return sections.map((s) => ({
-    path: parseDiffHeader(s.header, s.lines.slice(1)).b,
-    text: s.lines.join('\n'),
-  }))
+  //
+  // A RENAME SECTION COVERS BOTH ITS SPELLINGS (round-2 pass 3): keeping only
+  // the destination made the SOURCE path unreachable by any pass — while the
+  // guard's range listing runs --no-renames and therefore expects both the
+  // deleted source and the added destination, so pass records could never
+  // cover the source and the composition deadlocked. The one section IS the
+  // delivery of both paths, so it is emitted under each.
+  return sections.flatMap((s) => {
+    const header = parseDiffHeader(s.header, s.lines.slice(1))
+    const text = s.lines.join('\n')
+    const out = [{ path: header.b, text }]
+    if (header.a && header.a !== header.b) out.push({ path: header.a, text })
+    return out
+  })
 }
 
 /**
@@ -727,7 +741,17 @@ export function splitPatchByFile(patch) {
  * to clear, surviving inside the mechanism built to clear it.
  */
 export function joinPatchSections(paths = [], sections = new Map()) {
-  return (paths ?? []).map((p) => sections.get(p)).filter(Boolean).join('\n')
+  // DEDUPED BY SECTION (round-2 pass 3): a rename's one section sits under
+  // both its spellings, and a pass naming both must carry it once, not twice.
+  const seen = new Set()
+  const out = []
+  for (const p of paths ?? []) {
+    const text = sections.get(p)
+    if (text === undefined || text === null || seen.has(text)) continue
+    seen.add(text)
+    out.push(text)
+  }
+  return out.join('\n')
 }
 
 /**
@@ -792,7 +816,17 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
     for (const entry of entries) {
       const frame = FILE_FRAME_CHARS + fileHeader(entry.path).length
       const patchLen = entry.patchText.length
-      if (frame + patchLen > room) {
+      // A PASS MAY ONLY PROMISE WHAT THE ASSEMBLY WOULD DELIVER (round-2 pass
+      // 3): a carried path with no patch section is an omission the assembly
+      // refuses, and a binary declaration whose section carries no change (the
+      // bare 'Binary files … differ' marker, or no section at all) is refused
+      // the same way — so a plan that packed either certified material the
+      // round could never send, and the plan-only hand-off paths offered a
+      // record over an undelivered change. Both are named beyond reach.
+      const undeliverable = entry.binary
+        ? patchLen === 0 || !binarySectionDeliversChange(entry.patchText)
+        : patchLen === 0
+      if (undeliverable || frame + patchLen > room) {
         uncoverable.push({ path: entry.path, patchChars: patchLen, contentChars: entry.content.length })
         continue
       }
@@ -871,7 +905,7 @@ export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/rev
     const declared = plan.passes?.[0]?.patchOnly ?? []
     return declared.length
       ? `${head}\n  It fits in one round, with ${declared.length} file(s) travelling as their diff alone` +
-          ` (content larger than a round): ${declared.join(', ')}.`
+          ` (content larger than a round): ${declared.map((p) => quotePassFile(p)).join(', ')}.`
       : `${head}\n  It fits in one round.`
   }
   if (plan.statTruncated) {
@@ -887,11 +921,14 @@ export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/rev
     '  (splitting by COMMIT does not help: every commit ships the current content of the files it',
     '  touches, so the same files overflow one commit at a time and cost a round each).',
   ]
+  // Structural path lists spell every name through quotePassFile (round-2
+  // pass 3): a legal path holding a newline or comma could otherwise forge a
+  // line or make the printed pass membership ambiguous.
   for (const pass of plan.passes) {
     lines.push(
       `    pass ${pass.index}/${pass.total}  ${pass.files.length} file(s), ~${pass.size} characters` +
-        (pass.patchOnly.length ? `  [diff only: ${pass.patchOnly.join(', ')}]` : ''),
-      `      ${pass.files.join(', ')}`,
+        (pass.patchOnly.length ? `  [diff only: ${pass.patchOnly.map((p) => quotePassFile(p)).join(', ')}]` : ''),
+      `      ${pass.files.map((p) => quotePassFile(p)).join(', ')}`,
       `      ${command} --sha ${at || '<sha>'} --brief "<what to judge>" --pass ${pass.index}`,
     )
   }
@@ -965,7 +1002,9 @@ function lostLines(shortfall) {
 /** The passes the caller is sent to instead, from the plan or from the shortfall. */
 function passLines(shortfall, plan) {
   const passes = plan && !plan.fits ? plan.passes : (shortfall.passes ?? [])
-  const lines = passes.map((pass) => `    --pass ${pass.index}   ${(pass.files ?? []).join(', ')}`)
+  const lines = passes.map(
+    (pass) => `    --pass ${pass.index}   ${(pass.files ?? []).map((p) => quotePassFile(p)).join(', ')}`,
+  )
   const beyond = plan && !plan.fits ? plan.uncoverable : (shortfall.uncoverable ?? [])
   if (beyond?.length) {
     lines.push(

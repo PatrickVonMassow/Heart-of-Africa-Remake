@@ -51,6 +51,7 @@ import {
   validateRecord,
   VERDICTS,
 } from './mechanism-review-core.mjs'
+import { quotePassFile } from './review-material-core.mjs'
 
 // Re-exported so the flag surface has ONE definition (the pure parser's) and one
 // import path for its callers.
@@ -348,7 +349,9 @@ if (isMainModule(import.meta.url)) {
             `\n      ${r.evidence ?? ''}${r.framing ? `\n      framing: ${r.framing}` : ''}` +
             `${r.mergedBy ? `\n      union merged by: ${r.mergedBy}${r.mergeFallback ? ` (two-model fallback: ${r.mergeFallback})` : ''}` : ''}` +
             `${r.accounting ? `\n      accounting: ${r.accounting}` : ''}` +
-            `${r.pass ? `\n      pass ${r.pass.index}/${r.pass.total} over: ${(r.pass.files ?? []).join(', ')}` : ''}`,
+            // Quoted like every structural path list (round-2 pass 3): a path
+            // holding a newline or comma must not forge a line here either.
+            `${r.pass ? `\n      pass ${r.pass.index}/${r.pass.total} over: ${(r.pass.files ?? []).map((p) => quotePassFile(p)).join(', ')}` : ''}`,
         )
       }
       process.exit(0)

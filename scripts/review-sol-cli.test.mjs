@@ -501,6 +501,17 @@ describe('a child that never read its material', () => {
     expect(r.stdout).toContain('no parseable verdict')
     expect(r.stdout).toContain('RECEIPT')
     expect(r.stdout).toContain('The review is NOT done')
+    // ROUND-2 PASS 4: the stub deliberately answers `VERDICT: merge`, so a
+    // regression that printed a RUNNABLE record command beside the refusal
+    // would have passed every line above. What may travel is the hand-over
+    // TEMPLATE, whose angle-bracket placeholders the recorder refuses — never
+    // the unread child's own verdict as a completed command.
+    const out = `${r.stdout}${r.stderr}`
+    expect(out).not.toContain('--verdict merge ')
+    expect(out).not.toMatch(/--verdict merge$/m)
+    if (out.includes('mechanism-review.mjs --record')) {
+      expect(out).toContain('--verdict <')
+    }
   })
 })
 
@@ -894,6 +905,35 @@ describe('a range too large for one round', () => {
     expect(r.stdout).toContain('bulk-a.txt')
     expect(r.stdout).not.toContain('mechanism-review.mjs --record')
     expect(calls()).toEqual([])
+    rmSync(shareFile, { force: true })
+  })
+
+  it('hands over ONE PASS of a range too large when --pass names it (round-2 pass 5)', () => {
+    // The flag was parsed only after the hand-off exits, so a pass-scoped
+    // hand-off was unreachable: --pass was silently ignored and the report
+    // covered the whole range.
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '1'], {
+      SOL_SHARE_FILE: shareFile,
+    })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toMatch(/claude-only/)
+    expect(r.stdout).toContain('--pass 1/2')
+    expect(r.stdout).toContain('--pass-files')
+    expect(calls()).toEqual([])
+    rmSync(shareFile, { force: true })
+  })
+
+  it('refuses a pass number the hand-off range does not have, exactly like the paid path', () => {
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '9'], {
+      SOL_SHARE_FILE: shareFile,
+    })
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('splits into 2 pass(es)')
     rmSync(shareFile, { force: true })
   })
 

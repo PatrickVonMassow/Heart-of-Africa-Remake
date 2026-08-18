@@ -133,7 +133,22 @@ function git(args, { required = true, raw = false } = {}) {
   })
   const errText = (res.stderr ?? Buffer.alloc(0)).toString('utf8')
   if (res.status !== 0 || res.error) {
-    if (!required) return null
+    // AN OPTIONAL READ IS ONLY OPTIONAL ABOUT ABSENCE (round-2 pass 5): null
+    // means "the commit does not carry that path", and answering it for a
+    // spawn error, corruption or an overflowed buffer silently treated an
+    // unreadable blob as deleted. Anything that is not git saying "absent"
+    // fails loud, required or not.
+    const absent =
+      !res.error &&
+      res.status !== null &&
+      (/does not exist|exists on disk, but not in|bad object|invalid object name|bad revision|unknown revision/i.test(
+        errText,
+      ) ||
+        // --quiet reads (rev-parse --verify --quiet, merge-base) say "absent"
+        // as a bare non-zero exit with NOTHING on stderr. A crash, a signal or
+        // an overflowed buffer never answers that way (res.error/res.signal).
+        errText.trim() === '')
+    if (!required && absent) return null
     throw new Error(`git ${args.join(' ')} failed: ${(errText || res.error?.message || '').trim()}`)
   }
   const out = res.stdout ?? Buffer.alloc(0)
@@ -158,7 +173,19 @@ function git(args, { required = true, raw = false } = {}) {
       throw e
     }
   }
-  return out.toString('utf8').trim()
+  // The trimmed path decodes STRICTLY too (round-2 pass 5): authorship
+  // trailers read through this branch, and a lossy U+FFFD copy of a trailer
+  // could obscure the very model the self-review routing turns on.
+  try {
+    return utf8Strict.decode(out).trim()
+  } catch {
+    const e = new Error(
+      `git ${args.join(' ')} returned bytes that are not valid UTF-8 — ` +
+        'this pipeline cannot carry them byte-exact, and a lossy decode must never be recorded as complete',
+    )
+    e.undecodable = true
+    throw e
+  }
 }
 
 /**
@@ -693,6 +720,25 @@ if (isMainModule(import.meta.url)) {
       return coverageDecision({ reviewedBase: base, coverageBase })
     }
 
+    // PARSED BEFORE THE FIRST EXIT (round-2 pass 5): both hand-off routes
+    // leave below, and reading --pass after them made a pass-scoped hand-off
+    // impossible — `--pass k` was silently ignored, the report covered the
+    // whole range, and an oversized range could never hand on one of its
+    // passes. One selection serves every route.
+    const passFlag = flag('--pass')
+    const passFor = (plan) => {
+      if (!passFlag) return { pass: null }
+      if (!plan) return { error: `--pass ${passFlag}: the range could not be measured, so no pass can be selected.` }
+      if (plan.fits) {
+        return {
+          error: `--pass ${passFlag} names a pass of a split this range does not need — it fits in one round.`,
+        }
+      }
+      const pass = passByIndex(plan, passFlag)
+      if (!pass) return { error: `--pass ${passFlag}: this range splits into ${plan.passes.length} pass(es).` }
+      return { pass }
+    }
+
     if (routeFor('review', share.setting) !== 'sol') {
       const base = mergeBase(sinceFlag || 'main', full, { explicit: Boolean(sinceFlag) })
       const decision = decideReview({
@@ -707,6 +753,11 @@ if (isMainModule(import.meta.url)) {
       // assumption this point removes. The measurement costs git, not an
       // allowance.
       const handOverPlan = measureRange(full, base)
+      const handOverPass = passFor(handOverPlan)
+      if (handOverPass.error) {
+        console.error(`review-sol: ${handOverPass.error}`)
+        process.exit(2)
+      }
       console.log(
         formatReviewReport({
           decision,
@@ -714,8 +765,13 @@ if (isMainModule(import.meta.url)) {
           mode,
           point,
           partial: partialFor(base),
-          shortfall: planShortfall(handOverPlan),
+          // A SELECTED PASS is measured by the plan to fit one round, so its
+          // hand-over template prints pass-scoped — exactly as a fitting range
+          // prints its whole-range template; the whole-range shortfall would
+          // suppress the very record the pass split exists to make possible.
+          shortfall: handOverPass.pass ? null : planShortfall(handOverPlan),
           plan: handOverPlan,
+          pass: handOverPass.pass,
         }),
       )
       process.exit(3)
@@ -736,6 +792,11 @@ if (isMainModule(import.meta.url)) {
       // Same measurement, same reason: the role swap hands the WHOLE range on,
       // and a range no single round can hold must be handed on as its passes.
       const swapPlan = measureRange(full, base)
+      const swapPass = passFor(swapPlan)
+      if (swapPass.error) {
+        console.error(`review-sol: ${swapPass.error}`)
+        process.exit(2)
+      }
       console.log(
         formatReviewReport({
           decision,
@@ -743,8 +804,9 @@ if (isMainModule(import.meta.url)) {
           mode,
           point,
           partial: partialFor(base),
-          shortfall: planShortfall(swapPlan),
+          shortfall: swapPass.pass ? null : planShortfall(swapPlan),
           plan: swapPlan,
+          pass: swapPass.pass,
         }),
       )
       process.exit(3)
@@ -781,7 +843,8 @@ if (isMainModule(import.meta.url)) {
     const plan = planPasses({ ...range, budget: MATERIAL_BUDGET_CHARS })
     console.error(formatBudgetNotice(plan, { sha: full }))
 
-    const passFlag = flag('--pass')
+    // The flag itself was parsed above, before the hand-off exits (round-2
+    // pass 5); this is the same selection the hand-offs make.
     let pass = null
     let assembly
     if (plan.fits) {

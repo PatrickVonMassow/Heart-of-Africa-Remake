@@ -420,10 +420,22 @@ describe('a binary file is declared, never dropped or mangled', () => {
     expect(out.omitted).toEqual(['img.png'])
   })
 
-  it('is its own delivery level in a pass manifest', () => {
+  it('is its own delivery level in a pass manifest — when its bytes actually travel', () => {
+    // ROUND-2 PASS 4: this fixture used the bare `Binary files … differ`
+    // section the surrounding tests prove carries no bytes, and still expected
+    // a pass to hold the file — codifying a planner/assembler contradiction.
+    // The manifest line is earned only by a section that DELIVERS the change.
+    const gitBinSection = [
+      'diff --git a/img.png b/img.png',
+      'new file mode 100644',
+      'index 0000000..1111111',
+      'GIT binary patch',
+      'literal 5',
+      'Mcmb=d0001',
+    ].join('\n')
     const plan = planPasses({
       stat: 's',
-      patch: `${binSection}\n${patchFor(['a.mjs', 'b.mjs'])}`,
+      patch: `${gitBinSection}\n${patchFor(['a.mjs', 'b.mjs'])}`,
       files: [{ path: 'img.png', binary: true }, file('a.mjs', 6000), file('b.mjs', 6000)],
       budget: 10_000,
     })
@@ -432,6 +444,30 @@ describe('a binary file is declared, never dropped or mangled', () => {
     expect(holder).toBeTruthy()
     const text = formatPassManifest(plan, holder)
     expect(text).toContain('· img.png — BINARY, declared')
+  })
+
+  it('a bare binary marker is BEYOND REACH for the plan too — no pass may promise it', () => {
+    // The assembly refuses the bare marker as an undelivered change, so a plan
+    // that packed it certified material the round could never send.
+    const plan = planPasses({
+      stat: 's',
+      patch: `${binSection}\n${patchFor(['a.mjs', 'b.mjs'])}`,
+      files: [{ path: 'img.png', binary: true }, file('a.mjs', 6000), file('b.mjs', 6000)],
+      budget: 10_000,
+    })
+    expect(plan.passes.some((p) => p.files.includes('img.png'))).toBe(false)
+    expect(plan.uncoverable.map((u) => u.path)).toContain('img.png')
+  })
+
+  it('a carried text path with NO patch section is beyond reach, not packed (round-2 pass 3)', () => {
+    const plan = planPasses({
+      stat: 's',
+      patch: patchFor(['a.mjs']),
+      files: [file('a.mjs', 100), file('ghost.mjs', 100)],
+      budget: 20_000,
+    })
+    expect(plan.passes.some((p) => p.files.includes('ghost.mjs'))).toBe(false)
+    expect(plan.uncoverable.map((u) => u.path)).toContain('ghost.mjs')
   })
 })
 
@@ -620,8 +656,26 @@ describe('the patch, split per file', () => {
       patchFor(['plain.mjs']),
     ].join('\n')
     const sections = splitPatchByFile(patch)
-    expect(sections.map((s) => s.path)).toEqual(['new b/dest.txt', 'plain.mjs'])
+    // The destination first, then the SOURCE spelling of the same section
+    // (round-2 pass 3): the guard's rename-split range listing expects both,
+    // and a section that names only its destination leaves the source path
+    // coverable by no pass.
+    expect(sections.map((s) => s.path)).toEqual(['new b/dest.txt', 'old.txt', 'plain.mjs'])
     expect(sections[0].text).toContain('rename to new b/dest.txt')
+    expect(sections[0].text).toBe(sections[1].text)
+  })
+
+  it('carries a rename section ONCE in a pass that names both its spellings', () => {
+    const sections = new Map(
+      splitPatchByFile(
+        ['diff --git a/old.txt b/dest.txt', 'rename from old.txt', 'rename to dest.txt', '@@ -1 +1 @@', '+x'].join(
+          '\n',
+        ),
+      ).map((s) => [s.path, s.text]),
+    )
+    const joined = joinPatchSections(['old.txt', 'dest.txt'], sections)
+    expect(joined).toContain('rename to dest.txt')
+    expect(joined.match(/rename to dest\.txt/g)).toHaveLength(1)
   })
 })
 

@@ -148,19 +148,18 @@ describe('parseMechanismLog', () => {
 // gate's view of the tree config-independent and rename-proof, so they are
 // pinned as the COMMANDS the wrapper actually builds.
 describe('the path-carrying git commands', () => {
-  it('forces quoted paths in the log — a user’s core.quotePath=false must not corrupt a byte', () => {
-    expect(mechanismLogCommand('base', 'head')).toContain('-c core.quotepath=on ')
+  // PINNED WHOLE, not by substring (round-2 pass 3): a `.toContain` still
+  // passes with the option after `--`, after the revision, or overridden by a
+  // later flag — none of which is the config-proof, rename-split command the
+  // guard depends on. The exact string is the claim.
+  it('builds the log command config-proof and rename-split, exactly', () => {
+    expect(mechanismLogCommand('base', 'head')).toBe(
+      '-c core.quotepath=on log --format="__C__%H__F__%ct" --name-only --no-renames --diff-merges=cc --reverse "base..head"',
+    )
   })
 
-  it('disables rename detection in the log — renaming a guard away must list its old path', () => {
-    expect(mechanismLogCommand('base', 'head')).toContain('--no-renames')
-  })
-
-  it('lists a record’s range files raw (-z) and rename-split', () => {
-    const cmd = rangeFilesCommand('base', 'sha')
-    expect(cmd).toContain('-z')
-    expect(cmd).toContain('--no-renames')
-    expect(cmd).toContain('"base..sha"')
+  it('builds the range listing raw (-z) and rename-split, exactly', () => {
+    expect(rangeFilesCommand('base', 'sha')).toBe('diff --name-only -z --no-renames "base..sha"')
   })
 })
 
