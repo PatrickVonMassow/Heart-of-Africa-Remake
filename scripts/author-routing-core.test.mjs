@@ -84,7 +84,7 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(lane('Claude judges the picture. The picture shows a black horizon on WebGL.')).toBe('opus')
   })
 
-  it('moves work that came back from Sol with findings to Fable, above every other signal', () => {
+  it('moves work whose re-work the review still finds problems in to Fable, above every other signal', () => {
     expect(lane('A screenshot point.', { reworked: true })).toBe('fable')
     expect(lane('Something mechanical.', { reworked: true })).toBe('fable')
     expect(authorLaneFor({ body: 'x', reworked: true }).why[0]).toMatch(/after a re-work/)

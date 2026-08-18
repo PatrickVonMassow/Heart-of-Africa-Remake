@@ -173,8 +173,9 @@ reported as having authored nothing.
 ## What is never routed, at any setting
 
 - A point whose verification is the work, unless its spec marks it hard — since
-  18.08.2026 a hard or critical point is Sol's whatever else it says (the
-  routing function decides, and `--anyway` is the deliberate override).
+  18.08.2026 a hard or critical point is Sol's whatever else it says. No SETTING
+  routes it; the routing function decides, and a point's own `Author lane:` tag
+  or `--anyway` is the deliberate override.
 - REVIEWING what Sol itself authored — no model reviews its own work, so
   `review-sol.mjs` refuses such a range before it spends a call on it.
 - Driving the browser suites and **judging the picture**.

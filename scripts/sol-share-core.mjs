@@ -139,7 +139,7 @@ export const SETTING_NOTES = Object.freeze({
 
 /** WHAT IS NEVER ROUTED, whatever the setting says. Printed, so nobody has to ask. */
 export const NEVER_ROUTED = Object.freeze([
-  'a point whose VERIFICATION is the work, unless the spec marks it hard (scripts/author-routing-core.mjs decides)',
+  'a point whose VERIFICATION is the work, unless its spec marks it hard or names a lane (scripts/author-routing-core.mjs decides)',
   'REVIEWING what Sol itself authored — no model reviews its own work',
   'driving the browser suites and JUDGING the picture',
   'the landing (scripts/land-point.mjs) and the main session bookkeeping',

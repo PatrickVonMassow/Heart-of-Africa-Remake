@@ -242,8 +242,9 @@ try {
       'HARD and CRITICAL ones go STRAIGHT to it — difficult, complex, error-prone or tagged ' +
       'HIGH criticality is a reason FOR Sol, not against it; OPUS 5 authors what is left, a ' +
       'point whose VERIFICATION is the work and that nothing marks hard; FABLE 5 is the ' +
-      'ESCALATION and takes over once a re-work still comes back with problems, and only ' +
-      'then (its weekly pool is the scarcest). scripts/author-routing-core.mjs makes the cut, and ' +
+      'ESCALATION the CUT reaches only once a re-work still comes back with problems, though ' +
+      'a point\'s own `Author lane:` tag may name any lane (its weekly pool is the scarcest). ' +
+      'scripts/author-routing-core.mjs makes the cut, and ' +
       'scripts/sol-share.mjs --status says what the switch routes right now. REVIEW is ' +
       'CROSS-VENDOR: Sol reads Anthropic-authored work (scripts/review-sol.mjs), Claude ' +
       'reads Sol-authored work, and no model reviews its own. ' +
