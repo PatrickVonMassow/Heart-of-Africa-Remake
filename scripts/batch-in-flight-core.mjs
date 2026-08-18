@@ -1129,11 +1129,25 @@ export function pointOfBranch(ref) {
  *  slugless branch would open work unseen. */
 const featPointsIn = (text) => [...String(text).matchAll(/feat\/(\d+)/gi)].map((m) => Number(m[1]))
 
-/** The three spellings that CUT a branch, each capturing the name it creates.
- *  The name is read off the flag rather than off the whole command, so
+/** EVERY spelling that CUTS a branch, each capturing the name it creates. The
+ *  name is read off the FLAG rather than off the whole command, so
  *  `git checkout -b feat/712-x origin/feat/705-y` opens 712 and not the branch
- *  it started FROM. `git branch -D …` is excluded by the `(?!-)`. */
-const CUT_PATTERNS = [/\bcheckout\b.*?\s-b\s+(\S+)/i, /\bswitch\b.*?\s-[cC]\s+(\S+)/, /\bgit\s+branch\s+(?!-)(\S+)/i]
+ *  it started FROM. `git branch -D …` is excluded by the `(?!-)`.
+ *
+ *  THE LONG FORMS ARE HERE BECAUSE THE SHORT ONES ALONE WERE A BYPASS (Sol,
+ *  review of 3078d166): `git switch --create feat/697-x` cut a branch the guard
+ *  answered `none` to, and the guard then exited before either refusal. A
+ *  spelling git accepts is a spelling this rule must read. */
+const CUT_PATTERNS = [
+  // checkout -b / -B <name>
+  /\bcheckout\b.*?\s-[bB](?:\s+|=)(\S+)/,
+  // switch -c / -C / --create / --force-create <name>
+  /\bswitch\b.*?\s(?:-[cC]|--create|--force-create)(?:\s+|=)(\S+)/,
+  // git branch <name> — the plain create; -d/-D/-r/-a and friends fall out here
+  /\bgit\s+branch\s+(?!-)(\S+)/i,
+  // git branch -c/-C/--copy | -m/-M/--move [<old>] <new> — the NEW name is LAST
+  /\bgit\s+branch\s+(?:-[cCmM]|--copy|--move)\s+(?:\S+\s+)?(\S+)/,
+]
 
 /** ONE shell segment, judged on its own. Returns { points, how }. */
 function segmentTarget(seg) {
@@ -1146,9 +1160,9 @@ function segmentTarget(seg) {
     if (authored.length) return { points: authored, how: 'author' }
   }
   if (/\bworktree\s+add\b/.test(seg)) {
-    // `-b` names the branch a new tree cuts; without it the tree is created ON a
-    // branch that is named plainly, and creating the tree is still the act.
-    const m = /\bworktree\s+add\b.*?\s-b\s+(\S+)/.exec(seg)
+    // `-b`/`-B` names the branch a new tree cuts; without it the tree is created
+    // ON a branch that is named plainly, and creating the tree is still the act.
+    const m = /\bworktree\s+add\b.*?\s-[bB](?:\s+|=)(\S+)/.exec(seg)
     const created = uniq(m ? [pointOfBranch(m[1])] : featPointsIn(seg))
     return created.length ? { points: created, how: 'worktree' } : none
   }

@@ -2984,6 +2984,30 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
     })
   })
 
+  // ADDED after Sol's review of 3078d166: the short flags alone were a bypass.
+  // `git switch --create feat/697-x` cuts a branch git is perfectly happy with,
+  // and the guard answered `none` and exited before either refusal fired. Every
+  // spelling git accepts must be a spelling this rule reads.
+  it('recognises the LONG and FORCE spellings too — a bypass is a bypass', () => {
+    const points = (command) => commissionTarget({ toolName: 'Bash', command }).points
+    expect(points('git switch --create feat/697-x')).toEqual([697])
+    expect(points('git switch --force-create feat/697-x')).toEqual([697])
+    expect(points('git switch -C feat/697-x')).toEqual([697])
+    expect(points('git checkout -B feat/697-x main')).toEqual([697])
+    expect(points('git worktree add -B feat/697-x .claude/worktrees/agent-y')).toEqual([697])
+    // `git branch -c/-m <old> <new>` CREATES <new>, and the new name is the last.
+    expect(points('git branch -c feat/705-a feat/697-x')).toEqual([697])
+    expect(points('git branch --copy feat/705-a feat/697-x')).toEqual([697])
+    expect(points('git branch -M feat/697-x')).toEqual([697])
+    // …while the DESTRUCTIVE and read-only forms still open nothing.
+    expect(points('git branch -D feat/697-x')).toEqual([])
+    expect(points('git branch -d feat/697-x')).toEqual([])
+    expect(points('git branch --list feat/697-x')).toEqual([])
+    expect(points('git push -u origin feat/697-x')).toEqual([])
+    expect(points('git checkout feat/697-x')).toEqual([])
+    expect(points('git switch feat/697-x')).toEqual([])
+  })
+
   it('recognises a worktree being created on one', () => {
     expect(
       commissionTarget({ toolName: 'Bash', command: 'git worktree add -b feat/697-goat .claude/worktrees/agent-y' }),
