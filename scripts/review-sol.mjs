@@ -87,6 +87,7 @@ import {
   passByIndex,
   planPasses,
   planShortfall,
+  patchSectionMap,
   splitPatchByFile,
   undecodablePaths,
 } from './review-material-core.mjs'
@@ -316,7 +317,7 @@ function gatherRange(sha, base) {
  * megabytes is reviewable at all (see planPasses).
  */
 function assemblePass(range, pass, plan = null) {
-  const sections = new Map(splitPatchByFile(range.patch).map((s) => [s.path, s.text]))
+  const sections = patchSectionMap(range.patch)
   const files = pass.files
   return assembleMaterial({
     stat: range.stat,

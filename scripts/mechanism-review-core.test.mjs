@@ -886,6 +886,61 @@ describe('evaluateMechanismReview', () => {
       expect(v.block).toBe(true)
     })
 
+    it('an older COMPLETE composition cannot mask a newer INCOMPLETE split (final round)', () => {
+      // The suppression path: the newer split at another covering sha — its
+      // recorded pass even saying do-not-merge — was silently outranked by an
+      // older complete set whose worst verdict was merge.
+      const oldSha = 'c'.repeat(40)
+      const newSha = 'd'.repeat(40)
+      const oldPass = (index) =>
+        record({
+          sha: oldSha,
+          pass: { index, total: 2, files: index === 1 ? [MECH, 'scripts/f1.mjs'] : ['scripts/f2.mjs'] },
+          at: MERGE_ACCOUNTING_SINCE + 1000 + index,
+          rangeFiles: [MECH, 'scripts/f1.mjs', 'scripts/f2.mjs'],
+        })
+      const newIncomplete = record({
+        sha: newSha,
+        verdict: 'do-not-merge',
+        pass: { index: 1, total: 3, files: [MECH] },
+        at: MERGE_ACCOUNTING_SINCE + 9000,
+        rangeFiles: [MECH, 'scripts/f1.mjs', 'scripts/f2.mjs'],
+      })
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: [oldSha, newSha] })],
+        records: [oldPass(1), oldPass(2), newIncomplete],
+      })
+      expect(v.block).toBe(true)
+      expect(v.findings[0].kind).toBe('incomplete-passes')
+    })
+
+    it('a LATER complete review still supersedes an EARLIER incomplete split', () => {
+      const oldSha = 'c'.repeat(40)
+      const newSha = 'd'.repeat(40)
+      const earlierIncomplete = record({
+        sha: oldSha,
+        pass: { index: 1, total: 3, files: [MECH] },
+        at: MERGE_ACCOUNTING_SINCE + 1000,
+        rangeFiles: [MECH],
+      })
+      const laterComplete = (index) =>
+        record({
+          sha: newSha,
+          pass: { index, total: 2, files: index === 1 ? [MECH, 'scripts/f1.mjs'] : ['scripts/f2.mjs'] },
+          at: MERGE_ACCOUNTING_SINCE + 9000 + index,
+          rangeFiles: [MECH, 'scripts/f1.mjs', 'scripts/f2.mjs'],
+        })
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: [oldSha, newSha] })],
+        records: [earlierIncomplete, laterComplete(1), laterComplete(2)],
+      })
+      expect(v.block).toBe(false)
+    })
+
     it('an UNPARSABLE pass claim poisons the shortcut too (round-6 pass 2)', () => {
       // `pass: { total: 2, index: "x" }` was no pass row to the old shape test
       // — it neither composed nor poisoned, and the sound pass-less sibling

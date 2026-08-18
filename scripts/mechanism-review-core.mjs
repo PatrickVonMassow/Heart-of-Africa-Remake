@@ -1154,21 +1154,33 @@ export function evaluateMechanismReview({
       })),
     ]
 
+    // AN INCOMPLETE SPLIT IS MASKED ONLY BY A STRICTLY LATER VALID REVIEW
+    // (final-round pass 2): reporting incomplete compositions only when no
+    // complete one existed let an OLDER complete set — even one whose worst
+    // verdict was merge — suppress a NEWER incomplete split, including one
+    // whose recorded passes already said do-not-merge. A newer incomplete
+    // split is a standing demand; only a review recorded AFTER its newest
+    // pass supersedes it, which is the same later-answers-earlier rule every
+    // verdict here obeys.
+    const newestAt = (g) => Math.max(...g.records.map((r) => Number(r.at ?? 0)))
+    const standingIncomplete = incomplete.filter(
+      (g) => !valid.some((v) => Number(v.at ?? 0) > newestAt(g)),
+    )
+    if (standingIncomplete.length) {
+      // The widest gap is the one reported: a missing pass and a file no pass
+      // named are the same failure — material the composition does not hold.
+      const gap = (g) => (g.missing?.length ?? 0) + (g.uncovered?.length ?? 0)
+      const worst = standingIncomplete.reduce((a, b) => (gap(b) >= gap(a) ? b : a))
+      findings.push({
+        kind: 'incomplete-passes',
+        commit,
+        records: worst.records,
+        passes: worst,
+        besideSplit,
+      })
+      continue
+    }
     if (!valid.length) {
-      if (incomplete.length) {
-        // The widest gap is the one reported: a missing pass and a file no pass
-        // named are the same failure — material the composition does not hold.
-        const gap = (g) => (g.missing?.length ?? 0) + (g.uncovered?.length ?? 0)
-        const worst = incomplete.reduce((a, b) => (gap(b) >= gap(a) ? b : a))
-        findings.push({
-          kind: 'incomplete-passes',
-          commit,
-          records: worst.records,
-          passes: worst,
-          besideSplit,
-        })
-        continue
-      }
       findings.push({
         kind: selfReviews.length ? 'self-review' : 'no-review',
         commit,

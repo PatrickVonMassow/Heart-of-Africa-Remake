@@ -359,7 +359,7 @@ export function assembleMaterial({
   // checked against them.
   let sectionsSeen = null
   const patchSections = () => {
-    if (!sectionsSeen) sectionsSeen = new Map(splitPatchByFile(patchText).map((s) => [s.path, s.text]))
+    if (!sectionsSeen) sectionsSeen = patchSectionMap(patchText)
     return sectionsSeen
   }
 
@@ -775,14 +775,37 @@ export function splitPatchByFile(patch) {
   // guard's range listing runs --no-renames and therefore expects both the
   // deleted source and the added destination, so pass records could never
   // cover the source and the composition deadlocked. The one section IS the
-  // delivery of both paths, so it is emitted under each.
+  // delivery of both paths, so it is emitted under each — but ONLY for a
+  // RENAME (final-round pass 5): a COPY leaves its source in place, possibly
+  // with its own modification section, and aliasing the copy overwrote that
+  // real section in the callers' maps — a suppressed diff reported as
+  // complete coverage. The alias is FLAGGED so patchSectionMap can refuse to
+  // let it displace a real section either way.
   return sections.flatMap((s) => {
     const header = parseDiffHeader(s.header, s.lines.slice(1))
     const text = s.lines.join('\n')
     const out = [{ path: header.b, text }]
-    if (header.a && header.a !== header.b) out.push({ path: header.a, text })
+    const renames = s.lines.slice(1).some((l) => /^rename from /.test(l))
+    if (renames && header.a && header.a !== header.b) out.push({ path: header.a, text, alias: true })
     return out
   })
+}
+
+/** The per-path section map every consumer must build: a flagged ALIAS never
+ *  displaces a real section, whatever order the patch put them in
+ *  (final-round pass 5 — a copy section clobbered its source's modification). */
+export function patchSectionMap(patch) {
+  const map = new Map()
+  const aliasAt = new Set()
+  for (const s of splitPatchByFile(patch)) {
+    const present = map.has(s.path)
+    if (present && !aliasAt.has(s.path)) continue // a real section stands, whatever comes later
+    if (present && s.alias) continue // one alias does not replace another
+    map.set(s.path, s.text)
+    if (s.alias) aliasAt.add(s.path)
+    else aliasAt.delete(s.path)
+  }
+  return map
 }
 
 /**
@@ -838,7 +861,7 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
   // Untrimmed, exactly as assembleMaterial reads it: the plan and the assembly
   // must measure the SAME bytes, or the plan clears what the assembly refuses.
   const statText = String(stat)
-  const sections = new Map(splitPatchByFile(patch).map((s) => [s.path, s.text]))
+  const sections = patchSectionMap(patch)
   // A DIFFSTAT OVER ITS SHARE FAILS THE PLAN, exactly as it fails the assembly
   // (fourth cross-vendor round): Math.min silently assumed the cut, so a range
   // whose stat overflowed could plan as one fitting pass while assembleMaterial
@@ -1238,11 +1261,21 @@ export function parsePassSpec(value) {
   if (total < 2) {
     errors.push('--pass <k>/<n>: n must be at least 2 — one pass over the whole range is an ordinary record')
   }
-  if (index < 1 || index > total) {
+  // BOUNDED, so no ledger row can spin the gate (final-round pass 5): the
+  // composition walks 1..total, and a hand-written huge total would hang the
+  // guard — past safe-integer precision the walk never even advances. The cap
+  // is far above any real split (the largest on record is 10).
+  if (!Number.isSafeInteger(total) || total > MAX_PASS_TOTAL) {
+    errors.push(`--pass <k>/<n>: n must be a whole number of at most ${MAX_PASS_TOTAL}`)
+  }
+  if (!Number.isSafeInteger(index) || index < 1 || index > total) {
     errors.push(`--pass ${raw}: the pass number must lie between 1 and ${total}`)
   }
   return errors.length ? { ok: false, errors } : { ok: true, index, total, errors: [] }
 }
+
+/** The most passes one range may split into — see parsePassSpec. */
+export const MAX_PASS_TOTAL = 256
 
 /**
  * ONE representation for a git path on the `--pass-files` command line, chosen
@@ -1381,7 +1414,12 @@ export function passComposition(records = [], { expect = null } = {}) {
   for (const record of records ?? []) {
     const total = Number(record?.pass?.total)
     const index = Number(record?.pass?.index)
-    if (!Number.isInteger(total) || total < 2 || !Number.isInteger(index)) continue
+    // Bounded like parsePassSpec (final-round pass 5): the completeness walk
+    // below runs 1..total, and an unbounded hand-written total would hang it —
+    // past safe-integer precision `i++` stops advancing at all. A row outside
+    // the bound composes nothing; at the gate its bare `pass` field still
+    // poisons the pass-less shortcut.
+    if (!Number.isInteger(total) || total < 2 || total > MAX_PASS_TOTAL || !Number.isInteger(index)) continue
     const key = `${String(record.sha ?? '')}|${total}`
     if (!groups.has(key)) groups.set(key, { sha: String(record.sha ?? ''), total, byIndex: new Map(), records: [] })
     const group = groups.get(key)

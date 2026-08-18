@@ -19,6 +19,7 @@ import {
   parsePassSpec,
   passByIndex,
   passComposition,
+  patchSectionMap,
   planPasses,
   planShortfall,
   sentMaterialMatches,
@@ -717,6 +718,72 @@ describe('the patch, split per file', () => {
     expect(sections.map((s) => s.path)).toEqual(['new b/dest.txt', 'old.txt', 'plain.mjs'])
     expect(sections[0].text).toContain('rename to new b/dest.txt')
     expect(sections[0].text).toBe(sections[1].text)
+  })
+
+  it('aliases a RENAME source only — a COPY leaves its source section untouched (final round)', () => {
+    // The suppression path: aliasing the copy overwrote the source's real
+    // modification section in the callers' maps, and joinPatchSections then
+    // omitted a real diff while the accounting reported complete coverage.
+    const patch = [
+      'diff --git a/src.txt b/src.txt',
+      'index 1..2 100644',
+      '--- a/src.txt',
+      '+++ b/src.txt',
+      '@@ -1 +1 @@',
+      '+the real modification of the source',
+      'diff --git a/src.txt b/dest.txt',
+      'similarity index 95%',
+      'copy from src.txt',
+      'copy to dest.txt',
+      '--- a/src.txt',
+      '+++ b/dest.txt',
+      '@@ -1 +1 @@',
+      '+the copied variant',
+    ].join('\n')
+    const sections = splitPatchByFile(patch)
+    // No alias entry for the copy's source: only renames cover both spellings.
+    expect(sections.filter((s) => s.path === 'src.txt')).toHaveLength(1)
+    const map = patchSectionMap(patch)
+    expect(map.get('src.txt')).toContain('the real modification of the source')
+    expect(map.get('dest.txt')).toContain('the copied variant')
+  })
+
+  it('never lets a rename ALIAS displace a real section, whatever the patch order', () => {
+    const alias = { path: 'x.txt', text: 'ALIAS', alias: true }
+    // patchSectionMap is exercised through a crafted patch: a rename whose
+    // source ALSO has a real section later in the patch.
+    const patch = [
+      'diff --git a/old.txt b/new.txt',
+      'rename from old.txt',
+      'rename to new.txt',
+      '@@ -1 +1 @@',
+      '+moved',
+      'diff --git a/old.txt b/old.txt',
+      'index 1..2 100644',
+      '--- a/old.txt',
+      '+++ b/old.txt',
+      '@@ -1 +1 @@',
+      '+the real section',
+    ].join('\n')
+    const map = patchSectionMap(patch)
+    expect(map.get('old.txt')).toContain('the real section')
+    expect(map.get('new.txt')).toContain('+moved')
+    expect(alias.alias).toBe(true)
+  })
+
+  it('bounds a composition total, so a hand-written ledger row cannot spin the walk (final round)', () => {
+    const groups = passComposition(
+      [
+        {
+          sha: 'c'.repeat(40),
+          at: 1,
+          pass: { index: 1, total: 1e15, files: ['a.mjs'] },
+        },
+      ],
+      { expect: ['a.mjs'] },
+    )
+    // The unbounded walk would never return; the bounded one composes nothing.
+    expect(groups).toEqual([])
   })
 
   it('carries a rename section ONCE in a pass that names both its spellings', () => {
