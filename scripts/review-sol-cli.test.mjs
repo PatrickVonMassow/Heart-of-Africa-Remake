@@ -432,6 +432,27 @@ describe('the file bodies travel byte-exact', () => {
   })
 })
 
+describe('a binary file in the range', () => {
+  it('travels DECLARED in the material rather than vanishing or arriving as mojibake', () => {
+    // Fourth cross-vendor round, pass 4, finding 7: an added binary was
+    // skipped as "covered by the patch" while the ordinary diff carries only
+    // "Binary files differ" — the blob never travelled, nothing was recorded.
+    provenId()
+    git('checkout', '-q', '-b', 'binary-work', 'main')
+    writeFileSync(join(repo, 'blob.bin'), Buffer.from([0, 1, 2, 3, 250, 251, 0, 90]))
+    git('add', '-A')
+    git('commit', '--no-verify', '-q', '-m', 'Add a binary blob\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+    const sha = git('rev-parse', 'HEAD')
+    const r = run(['--sha', sha, '--brief', 'judge the blob'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain('FILE IS BINARY')
+    expect(sent).toContain('blob.bin')
+    // The declaration is not a loss: the record command is still offered.
+    expect(r.stdout).toContain('mechanism-review.mjs --record')
+  })
+})
+
 describe('a review that does not run', () => {
   it('names the cause, hands the review on, and exits 3 — never 0', () => {
     provenId()

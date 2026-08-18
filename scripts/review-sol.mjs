@@ -80,6 +80,7 @@ import {
   formatBudgetNotice,
   formatPassManifest,
   formatShortfall,
+  isBinaryPatchSection,
   materialShortfall,
   MATERIAL_BUDGET_CHARS,
   passByIndex,
@@ -183,12 +184,28 @@ function gatherRange(sha, base) {
   // off a rename destination's last line together with the final newline — a
   // silently different path, with the accounting none the wiser.
   const patch = git(['diff', range], { raw: true })
+  // A BINARY FILE'S BYTES CANNOT TRAVEL AS REVIEW TEXT (fourth cross-vendor
+  // round, pass 4, finding 7). An ADDED binary was skipped as "covered by the
+  // patch" while the ordinary diff carries only `Binary files … differ` — the
+  // blob never travelled and nothing recorded the loss; a MODIFIED one came
+  // back through the utf8 read as mojibake recorded complete. Binary paths are
+  // read off the patch's own sections and travel DECLARED (assembleMaterial
+  // writes the marker the reviewer sees and the accounting carries).
+  const binaryPaths = new Set(
+    splitPatchByFile(patch)
+      .filter((s) => isBinaryPatchSection(s.text))
+      .map((s) => s.path),
+  )
   // A file the patch ADDS whole is already there in full; sending its content
   // again only spends the budget the other files need — but only while the patch
   // itself fits, or the file would fall out of both halves.
   const added = addedFilesAreCoveredByPatch(patch.length) ? newFilePathsIn(patch) : new Set()
   const files = []
   for (const path of [...new Set(paths)]) {
+    if (binaryPaths.has(path)) {
+      files.push({ path, binary: true })
+      continue
+    }
     if (added.has(path)) continue
     // RAW, like the patch and the paths (fourth cross-vendor round, pass 4):
     // the default read trims, which strips a body's leading/trailing
@@ -198,7 +215,15 @@ function gatherRange(sha, base) {
     const text = git(['show', `${sha}:${path}`], { required: false, raw: true })
     // Null = the commit does not carry that path (it was deleted); the patch
     // above still shows what happened to it.
-    if (text !== null) files.push({ path, text })
+    if (text === null) continue
+    // A binary whose SECTION carries no marker — a pure rename diffs nothing —
+    // still cannot travel as text. NUL in the blob is git's own binary
+    // heuristic, and shipping the utf8 read would record mojibake as complete.
+    if (text.includes('\0')) {
+      files.push({ path, binary: true })
+      continue
+    }
+    files.push({ path, text })
   }
   // THE RAW PARTS, NOT THE FORMATTED MATERIAL (point 714). The budget decision,
   // the pass plan and the accounting all need the parts separately; assembling

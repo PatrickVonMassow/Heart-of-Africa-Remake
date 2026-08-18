@@ -5,6 +5,7 @@ import {
   formatPassFiles,
   formatPassManifest,
   formatShortfall,
+  isBinaryPatchSection,
   MANIFEST_END,
   manifestAllowance,
   MATERIAL_BUDGET_CHARS,
@@ -201,6 +202,65 @@ describe('the assembly says what it could not hold', () => {
     const out = assembleMaterial({ stat: 's', patch: 'p', files: [file('a', 10)], budget: 0 })
     expect(typeof out.text).toBe('string')
     expect(out.fit).toBe(false)
+  })
+})
+
+// ROUND 4, PASS 4, FINDING 7: an added binary was skipped as "covered by the
+// patch" while the ordinary diff carries only `Binary files … differ` — the
+// blob never travelled and nothing recorded the loss.
+describe('a binary file is declared, never dropped or mangled', () => {
+  const binSection = [
+    'diff --git a/img.png b/img.png',
+    'new file mode 100644',
+    'index 0000000..1111111',
+    'Binary files /dev/null and b/img.png differ',
+  ].join('\n')
+
+  it('recognises the two shapes of a binary patch section, and no content line', () => {
+    expect(isBinaryPatchSection(binSection)).toBe(true)
+    expect(isBinaryPatchSection('diff --git a/x b/x\nGIT binary patch\nliteral 5')).toBe(true)
+    expect(isBinaryPatchSection(patchFor(['a.mjs']))).toBe(false)
+    // A CONTENT line carrying the words is prefixed and proves nothing.
+    expect(isBinaryPatchSection('diff --git a/x b/x\n+Binary files a and b differ')).toBe(false)
+  })
+
+  it('declares it in the material and the accounting, and the round stays complete', () => {
+    const out = assembleMaterial({
+      stat: 's',
+      patch: binSection,
+      files: [{ path: 'img.png', binary: true }],
+      budget: 10_000,
+    })
+    expect(out.fit).toBe(true)
+    expect(out.binary).toEqual(['img.png'])
+    expect(out.sent).toEqual([])
+    expect(out.text).toContain('=== FILE IS BINARY — its bytes cannot travel as review text; judge its change from the PATCH above: img.png ===')
+  })
+
+  it('refuses the declaration when the patch does not back it, exactly like patch-only', () => {
+    const out = assembleMaterial({
+      stat: 's',
+      patch: patchFor(['other.mjs']),
+      files: [{ path: 'img.png', binary: true }],
+      budget: 10_000,
+    })
+    expect(out.fit).toBe(false)
+    expect(out.binary).toEqual([])
+    expect(out.omitted).toEqual(['img.png'])
+  })
+
+  it('is its own delivery level in a pass manifest', () => {
+    const plan = planPasses({
+      stat: 's',
+      patch: `${binSection}\n${patchFor(['a.mjs', 'b.mjs'])}`,
+      files: [{ path: 'img.png', binary: true }, file('a.mjs', 6000), file('b.mjs', 6000)],
+      budget: 10_000,
+    })
+    expect(plan.fits).toBe(false)
+    const holder = plan.passes.find((p) => p.binary.includes('img.png'))
+    expect(holder).toBeTruthy()
+    const text = formatPassManifest(plan, holder)
+    expect(text).toContain('· img.png — BINARY, declared')
   })
 })
 

@@ -91,6 +91,7 @@ export function formatPassManifest(plan, pass) {
   const total = Number(pass?.total ?? 0)
   const index = Number(pass?.index ?? 0)
   const patchOnly = new Set(pass?.patchOnly ?? [])
+  const binary = new Set(pass?.binary ?? [])
   const carried = pass?.files ?? []
   const lines = [
     `=== REVIEW PASS ${index}/${total} — THE SHAPE OF THIS MATERIAL ===`,
@@ -101,9 +102,11 @@ export function formatPassManifest(plan, pass) {
   ]
   for (const path of carried) {
     lines.push(
-      patchOnly.has(path)
-        ? `  · ${path} — DIFF ONLY, by design (content larger than a round; its PATCH is complete)`
-        : `  · ${path} — complete: its diff in the PATCH, its current content below`,
+      binary.has(path)
+        ? `  · ${path} — BINARY, declared: its bytes cannot travel as text; the PATCH marks the change`
+        : patchOnly.has(path)
+          ? `  · ${path} — DIFF ONLY, by design (content larger than a round; its PATCH is complete)`
+          : `  · ${path} — complete: its diff in the PATCH, its current content below`,
     )
   }
   const absent = (plan?.passes ?? []).filter((p) => p.index !== index)
@@ -151,6 +154,24 @@ const patchOnlyHeader = (path) =>
 /** The header of a patch-only declaration the patch does not back — an omission. */
 const unbackedHeader = (path) =>
   `=== FILE OMITTED ENTIRELY (declared patch-only, but the PATCH above does not carry its complete diff): ${path} ===`
+
+/** The declared marker of a file whose bytes cannot travel as review text. */
+const binaryHeader = (path) =>
+  `=== FILE IS BINARY — its bytes cannot travel as review text; judge its change from the PATCH above: ${path} ===`
+
+/**
+ * Is this per-file patch section a BINARY change? git writes `Binary files …
+ * differ` (ordinary diff) or `GIT binary patch` (--binary) as bare lines only
+ * in binary sections; content lines always carry a +/-/space prefix, so the
+ * bare form cannot be forged by reviewed text.
+ */
+export function isBinaryPatchSection(text) {
+  for (const line of String(text ?? '').split('\n')) {
+    if (line === 'GIT binary patch') return true
+    if (/^Binary files .* differ$/.test(line)) return true
+  }
+  return false
+}
 
 /** Cut `text` to `room`, saying so in the material where the cut falls. */
 const cut = (text, room) =>
@@ -208,6 +229,7 @@ export function assembleMaterial({
     truncated: [],
     omitted: [],
     patchOnly: [],
+    binary: [],
     sent: [],
   }
   let rawSize = statText.length + patchText.length
@@ -225,6 +247,27 @@ export function assembleMaterial({
     const path = String(file?.path ?? '?')
     const text = String(file?.text ?? '')
     rawSize += text.length
+    // A BINARY FILE IS DECLARED, NEVER DROPPED OR MANGLED (fourth cross-vendor
+    // round, pass 4, finding 7): an added binary used to be skipped as "the
+    // patch carries it" while the ordinary diff holds only `Binary files …
+    // differ` — the blob travelled nowhere and nothing recorded the loss — and
+    // a modified one came back through the utf8 read as mojibake recorded
+    // complete. The material now names it binary, in a header the reviewer
+    // sees; the declaration is verified against the patch exactly like the
+    // patch-only one, and refuses to an omission where nothing backs it.
+    if (file?.binary) {
+      const backed = !account.patchTruncated && patchSections().has(path)
+      const header = binaryHeader(path)
+      if (!backed || left <= header.length + 1) {
+        out.push(omittedHeader(path), '')
+        account.omitted.push(path)
+        continue
+      }
+      out.push(header, '')
+      account.binary.push(path)
+      left -= header.length + 1
+      continue
+    }
     // DECLARED, NOT DROPPED: the content is out by decision, the diff is in, and
     // the material says which. It costs the round only its one header line.
     if (skipContent.has(path)) {
@@ -605,7 +648,14 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
   for (const file of files ?? []) {
     const path = String(file?.path ?? '?')
     seen.add(path)
-    entries.push({ path, content: String(file?.text ?? ''), patchText: sections.get(path) ?? '' })
+    entries.push({
+      path,
+      content: String(file?.text ?? ''),
+      patchText: sections.get(path) ?? '',
+      // A binary file travels as its declared marker (assembleMaterial), so it
+      // costs a pass its header and patch section, never content.
+      binary: Boolean(file?.binary),
+    })
   }
   for (const [path, text] of sections) {
     if (!seen.has(path)) entries.push({ path, content: '', patchText: text })
@@ -625,14 +675,15 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
         continue
       }
       const whole = frame + patchLen + entry.content.length
-      const patchOnly = whole > room
-      const cost = patchOnly ? frame + patchLen : whole
+      const patchOnly = !entry.binary && whole > room
+      const cost = patchOnly || entry.binary ? frame + patchLen : whole
       if (!current || current.size + cost > room) {
-        current = { files: [], patchOnly: [], patchChars: 0, size: 0 }
+        current = { files: [], patchOnly: [], binary: [], patchChars: 0, size: 0 }
         passes.push(current)
       }
       current.files.push(entry.path)
       if (patchOnly) current.patchOnly.push(entry.path)
+      if (entry.binary) current.binary.push(entry.path)
       current.patchChars += patchLen
       current.size += cost
     }
@@ -665,6 +716,7 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
       total,
       files: p.files,
       patchOnly: p.patchOnly,
+      binary: p.binary,
       size: p.size,
       // The patch of a pass is MANDATORY material, so it gets whatever room it
       // needs rather than the standing half-share — the packing above already
