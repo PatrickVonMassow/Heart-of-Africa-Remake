@@ -596,17 +596,49 @@ describe('evaluateMechanismReview', () => {
     expect(formatMechanismReviewVerdict(v)).toMatch(/the fast path skips the tested files/)
   })
 
-  it('lets a later review supersede an earlier refusal', () => {
+  it('lets a later review supersede an earlier refusal ONLY by descent (second landing round)', () => {
+    // The clearing record descends from the refused one — the guard measured
+    // it (containedShas is attachCoverage's rev-list of the record's sha).
     const v = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',
       pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40), 'd'.repeat(40)] })],
       records: [
         record({ verdict: 'do-not-merge', at: 1_787_000_001_000 }),
-        record({ sha: 'd'.repeat(40), verdict: 'merge-with-fixes', at: 1_787_000_005_000 }),
+        record({
+          sha: 'd'.repeat(40),
+          verdict: 'merge-with-fixes',
+          at: 1_787_000_005_000,
+          containedShas: new Set(['d'.repeat(40), 'c'.repeat(40)]),
+        }),
       ],
     })
     expect(v.block).toBe(false)
+  })
+
+  it('a later clearing that does NOT descend from the refusal answers nothing (second landing round)', () => {
+    // Timestamp-only supersession let a merge review of an ancestor — or of
+    // an unrelated sibling — clear a do-not-merge on newer work: a verdict on
+    // work that does not contain the fix. Three shapes, all demanding more:
+    // a measured non-descent, a missing ancestry fact, and the same sha.
+    for (const clearing of [
+      { sha: 'd'.repeat(40), containedShas: new Set(['d'.repeat(40)]) },
+      { sha: 'd'.repeat(40) },
+      { sha: 'c'.repeat(40), containedShas: new Set(['c'.repeat(40)]) },
+    ]) {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40), 'd'.repeat(40)] })],
+        records: [
+          record({ verdict: 'do-not-merge', at: 1_787_000_001_000 }),
+          record({ verdict: 'merge', at: 1_787_000_005_000, ...clearing }),
+        ],
+      })
+      expect(v.block, JSON.stringify(clearing.sha)).toBe(true)
+      expect(v.findings[0].kind).toBe('do-not-merge')
+      expect(formatMechanismReviewVerdict(v)).toContain('DESCENDS')
+    }
   })
 
   it('ignores a half-written ledger line instead of clearing on it', () => {

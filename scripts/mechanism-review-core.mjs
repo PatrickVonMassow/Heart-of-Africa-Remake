@@ -1221,8 +1221,29 @@ export function evaluateMechanismReview({
     }
     // Latest valid review wins: a later "merge" is allowed to supersede an
     // earlier refusal, which is what happens when the fixes are made.
-    const latest = valid.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
-    if (latest.verdict === BLOCKING_VERDICT) {
+    // A REFUSAL IS ANSWERED ONLY BY DESCENT (second landing round, pass 2;
+    // user decision 18.08.2026). Timestamp-only supersession let a later
+    // merge review of an ANCESTOR — or of the same commit — clear a
+    // do-not-merge recorded on newer work: a verdict on work that does not
+    // CONTAIN the fix cleared the demand for it. The criticality gate has
+    // demanded descent all along; the pair now agrees. The ancestry fact is
+    // MEASURED by the impure guard (attachCoverage's rev-list per record,
+    // `containedShas`) and handed in as data; a clearing record whose fact is
+    // missing answers nothing — no ancestry fact, no clearance — and a
+    // same-sha re-record fixes nothing, exactly as at the sibling gate.
+    const clearing = valid.filter((r) => String(r.verdict) !== BLOCKING_VERDICT)
+    const refusals = valid.filter((r) => String(r.verdict) === BLOCKING_VERDICT)
+    const answers = (c, u) => {
+      if (String(c.sha) === String(u.sha)) return false
+      const fact = c.containedShas
+      const set = fact instanceof Set ? fact : Array.isArray(fact) ? new Set(fact.map(String)) : null
+      return set ? set.has(String(u.sha)) : false
+    }
+    const open = refusals.filter(
+      (u) => !clearing.some((c) => Number(c.at ?? 0) > Number(u.at ?? 0) && answers(c, u)),
+    )
+    if (open.length) {
+      const latest = open.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
       findings.push({ kind: 'do-not-merge', commit, records: [latest] })
     }
   }
@@ -1248,7 +1269,9 @@ export function formatMechanismReviewVerdict(verdict) {
         `  ✗ ${short(c.sha)} ${c.subject ?? ''}`,
         `      ${files}`,
         `      ${String(r.model).trim()} reviewed this and said DO-NOT-MERGE: ${r.evidence ?? ''}`,
-        '      Fix what the review found, then record the re-review — the verdict is not advisory.',
+        '      Fix what the review found, then record the re-review at a commit that DESCENDS',
+        `      from ${short(r.sha)} — the verdict is not advisory, and a verdict on work that does`,
+        '      not contain the fix answers nothing.',
       )
       continue
     }
