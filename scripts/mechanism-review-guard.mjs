@@ -243,10 +243,30 @@ function commitFacts(sha) {
   }
 }
 
+/**
+ * The two path-carrying git commands, built pure so the unit layer can pin
+ * their flags (round-1 pass 2, both findings):
+ *  - `-c core.quotepath=on` makes the LOG's path spelling CONFIG-INDEPENDENT:
+ *    with a user's `core.quotePath=false`, a legal non-UTF-8 file name arrived
+ *    as raw bytes and the UTF-8 decode collapsed distinct paths into one
+ *    replacement-character spelling. Quoted-on, every such byte travels as a
+ *    pure-ASCII octal escape and unquoteGitPath decodes it; what remains
+ *    undecodable surfaces as U+FFFD, which the pass records can never name
+ *    (parsePassFiles refuses it), so a conflated path can only ever DENY a
+ *    clearance. (The -z range listing below never quotes, by design.)
+ *  - `--no-renames` closes the rename-out blindness: with rename detection on,
+ *    `--name-only` reports only the DESTINATION, so renaming a guard to an
+ *    ordinary path hid the mechanism's removal from the gate. Split into
+ *    delete + add, BOTH spellings are listed and the old guard path still
+ *    demands its review.
+ */
+export const mechanismLogCommand = (base, head) =>
+  `-c core.quotepath=on log --format="${REC}%H${FLD}%ct" --name-only --no-renames --diff-merges=cc --reverse "${base}..${head}"`
+
+export const rangeFilesCommand = (base, sha) => `diff --name-only -z --no-renames "${base}..${sha}"`
+
 function mechanismCommits(base, head, files) {
-  const out = gitRaw(
-    `log --format="${REC}%H${FLD}%ct" --name-only --diff-merges=cc --reverse "${base}..${head}"`,
-  )
+  const out = gitRaw(mechanismLogCommand(base, head))
   return parseMechanismLog(out, files).map((commit) => {
     const facts = commitFacts(commit.sha)
     return {
@@ -347,7 +367,7 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
     // nobody read. `-z` hands the paths over raw, exactly as gatherRange and
     // the pass records spell them.
     rangeFiles: (sha) =>
-      gitRaw(`diff --name-only -z "${effective}..${sha}"`).split('\0').filter(Boolean),
+      gitRaw(rangeFilesCommand(effective, sha)).split('\0').filter(Boolean),
   })
 
   return {

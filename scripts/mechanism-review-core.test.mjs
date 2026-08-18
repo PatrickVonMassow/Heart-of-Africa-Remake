@@ -111,6 +111,30 @@ describe('isMechanismPath', () => {
     expect(isMechanismPath('scripts\\model-guard.mjs', opts)).toBe(true)
   })
 
+  // ROUND-1 PASS 1: normalizing every backslash to `/` mutated legal POSIX
+  // path bytes — `scripts/foo\bar-guard.mjs` became a two-segment path no rule
+  // matched, so a guard NAMED with a backslash evaded the gate entirely.
+  it('classifies a guard whose name carries a backslash, judged on its raw bytes', () => {
+    expect(isMechanismPath('scripts/foo\\bar-guard.mjs', opts)).toBe(true)
+  })
+
+  it('classifies a guard whose name carries other exotic bytes — the class is any-but-slash', () => {
+    expect(isMechanismPath('scripts/we ird-guard.mjs', opts)).toBe(true)
+    expect(isMechanismPath('scripts/we�ird-gate.mjs', opts)).toBe(true)
+  })
+
+  it('still leaves an ordinary backslash-named script alone', () => {
+    expect(isMechanismPath('scripts/foo\\bar.mjs', opts)).toBe(false)
+  })
+
+  it('hands back the caller’s own byte spelling, never a normalized double', () => {
+    // The accounting downstream compares path SPELLINGS byte-exactly.
+    expect(mechanismPathsIn(['scripts/foo\\bar-guard.mjs', 'scripts/x-guard.mjs'], opts)).toEqual([
+      'scripts/foo\\bar-guard.mjs',
+      'scripts/x-guard.mjs',
+    ])
+  })
+
   it('filters a commit file list down to the mechanism paths', () => {
     expect(
       mechanismPathsIn(['src/ui/Hud.tsx', 'scripts/pre-push-gate.mjs', 'README.md'], opts),

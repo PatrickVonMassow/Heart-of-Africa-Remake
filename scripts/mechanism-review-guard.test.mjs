@@ -6,7 +6,14 @@
 // fell back to HEAD on Windows and grandfathered the branch's own work — the
 // gate reported "GATE CLEAR" on four unreviewed mechanism commits.
 import { describe, it, expect } from 'vitest'
-import { attachCoverage, baselineFor, bootstrapBase, parseMechanismLog } from './mechanism-review-guard.mjs'
+import {
+  attachCoverage,
+  baselineFor,
+  bootstrapBase,
+  mechanismLogCommand,
+  parseMechanismLog,
+  rangeFilesCommand,
+} from './mechanism-review-guard.mjs'
 
 describe('baselineFor', () => {
   const state = { baselines: { main: 'aaa', 'feat/x': 'bbb' } }
@@ -134,6 +141,26 @@ describe('parseMechanismLog', () => {
   it('parses nothing from an empty or fileless log', () => {
     expect(parseMechanismLog('', files)).toEqual([])
     expect(parseMechanismLog(`${header(SHA)}\n`, files)).toEqual([])
+  })
+})
+
+// ROUND-1 PASS 2, both path-transport findings: the flags are what make the
+// gate's view of the tree config-independent and rename-proof, so they are
+// pinned as the COMMANDS the wrapper actually builds.
+describe('the path-carrying git commands', () => {
+  it('forces quoted paths in the log — a user’s core.quotePath=false must not corrupt a byte', () => {
+    expect(mechanismLogCommand('base', 'head')).toContain('-c core.quotepath=on ')
+  })
+
+  it('disables rename detection in the log — renaming a guard away must list its old path', () => {
+    expect(mechanismLogCommand('base', 'head')).toContain('--no-renames')
+  })
+
+  it('lists a record’s range files raw (-z) and rename-split', () => {
+    const cmd = rangeFilesCommand('base', 'sha')
+    expect(cmd).toContain('-z')
+    expect(cmd).toContain('--no-renames')
+    expect(cmd).toContain('"base..sha"')
   })
 })
 

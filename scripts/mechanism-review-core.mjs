@@ -114,10 +114,25 @@ export const NAMED_MECHANISM_FILES = Object.freeze([
  * the "beside one" rule; without it only the -guard/-gate names match.
  */
 export function isMechanismPath(path, { scriptFiles = [] } = {}) {
-  const p = String(path ?? '').replace(/\\/g, '/')
+  const raw = String(path ?? '')
+  // The RAW spelling is judged FIRST, byte-exact (round-1 pass 1): a backslash
+  // is a legal byte inside a POSIX file name, and normalizing it away turned
+  // `scripts/foo\bar-guard.mjs` into a different path that then evaded the
+  // gate. The Windows-separator spelling is judged BESIDE it, never instead —
+  // the normalized reading may only ADD demand.
+  const windows = raw.replace(/\\/g, '/')
+  return classifiesAsMechanism(raw, scriptFiles) || (windows !== raw && classifiesAsMechanism(windows, scriptFiles))
+}
+
+function classifiesAsMechanism(p, scriptFiles) {
   if (NAMED_MECHANISM_FILES.includes(p)) return true
   if (p.startsWith('scripts/git-hooks/') && p.length > 'scripts/git-hooks/'.length) return true
-  const m = /^scripts\/([A-Za-z0-9._-]+)\.mjs$/.exec(p)
+  // ANY single segment under scripts/, whatever bytes its name carries (round-1
+  // pass 1): the old `[A-Za-z0-9._-]` class let a guard whose name held one
+  // exotic byte fall outside the rule entirely — a `-guard.mjs` with a
+  // backslash in its stem was no mechanism to this gate. Widening classifies
+  // MORE names, never fewer, so the change can only add demand.
+  const m = /^scripts\/([^/]+)\.mjs$/.exec(p)
   if (!m) return false
   const name = m[1]
   if (/-(guard|gate)\b/.test(name)) return true
