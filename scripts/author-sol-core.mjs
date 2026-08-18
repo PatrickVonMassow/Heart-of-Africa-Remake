@@ -32,7 +32,7 @@
 
 import { ALLOWED_TRAILERS, classifyTrailer, modelNamesIn } from './model-guard-core.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
-import { SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
+import { charStripped, rawFieldValue, stripDecoration, SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 
 export { SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
 
@@ -327,17 +327,55 @@ export function gatesProblem(gates) {
   return GREEN.test(whole) ? '' : 'it never says the gates PASSED — an absent complaint is not a green run'
 }
 
-/** The closing lines of an authoring answer, read off the END of the message. */
+/** The closing lines of an authoring answer, read off the END of the message.
+ *  MATCHED on the stripped line, QUOTED from the raw one (the one rule): the
+ *  character strip rewrites content — `src/__init__.py` loses its underscores
+ *  — and these three fields are read and reported by the caller. The strip
+ *  removes no newline, so lines pair one to one. */
 export function parseAuthoringAnswer(text) {
-  const clean = String(text ?? '').replace(/[*`_#>]/g, '')
-  const tail = clean.split('\n').map((l) => l.trim()).filter(Boolean).slice(-3)
-  const field = (line, name) => (new RegExp(`^[-*]?\\s*${name}\\s*:\\s*(.+)$`, 'i').exec(line ?? '')?.[1] ?? '').trim()
-  const done = field(tail[0], 'DONE')
-  const gates = field(tail[1], 'GATES')
-  const open = field(tail[2], 'OPEN')
-  if (!done || !gates || !open) return { ok: false, error: 'the message does not end in the DONE/GATES/OPEN lines' }
-  if (/^</.test(done) || /^</.test(gates)) return { ok: false, error: 'the closing lines are the placeholders echoed back' }
-  return { ok: true, done, gates, open, error: '' }
+  // stripDecoration, not character deletion (final-round pass 1): deleting
+  // characters let a fabricated `D_ONE:` label match `DONE:`.
+  const pairs = String(text ?? '')
+    .split('\n')
+    .map((line) => ({ raw: line, clean: stripDecoration(line).trim() }))
+    .filter((p) => p.clean)
+  const tail = pairs.slice(-3)
+  // EVERY RULING — presence and placeholder — reads the STRIPPED captures
+  // (decoration must not change a decision: `**<what you built>**` walked the
+  // raw `/^</` test); the returned values are QUOTED from the raw lines.
+  const cleanField = (pair, name) =>
+    (new RegExp(`^[-*]?\\s*${name}\\s*:\\s*(.+)$`, 'i').exec(pair?.clean ?? '')?.[1] ?? '').trim()
+  const doneClean = cleanField(tail[0], 'DONE')
+  const gatesClean = cleanField(tail[1], 'GATES')
+  const openClean = cleanField(tail[2], 'OPEN')
+  if (!doneClean || !gatesClean || !openClean) {
+    return { ok: false, error: 'the message does not end in the DONE/GATES/OPEN lines' }
+  }
+  // A MARKER-ONLY FIELD IS AN EMPTY FIELD (fourth landing round, pass 1):
+  // the pair strip leaves an unmatched `_` standing, so `DONE: _` and
+  // `OPEN: _` read as answered fields. Presence rules on the net-only
+  // spelling, which deletion cannot fabricate.
+  if (!charStripped(doneClean).trim() || !charStripped(gatesClean).trim() || !charStripped(openClean).trim()) {
+    return { ok: false, error: 'a closing line holds only marker characters — the field was not answered' }
+  }
+  // ALL THREE fields, OPEN included (final-round pass 1): the check covered
+  // only DONE and GATES, so `OPEN: **<what you left undone>**` parsed clean and
+  // judgeAuthoring reported a clean run over an unanswered required field.
+  // RULED ON THE NET-ONLY SPELLING TOO (landing round): an UNPAIRED marker
+  // survives the pair strip, so `OPEN: _<what you left undone>` shielded the
+  // placeholder from the anchored test. Character deletion can only ever
+  // widen this refusal, never clear one.
+  const placeholder = (v) => /^</.test(v) || /^</.test(charStripped(v).trim())
+  if (placeholder(doneClean) || placeholder(gatesClean) || placeholder(openClean)) {
+    return { ok: false, error: 'the closing lines are the placeholders echoed back' }
+  }
+  return {
+    ok: true,
+    done: rawFieldValue(tail[0].raw) || doneClean,
+    gates: rawFieldValue(tail[1].raw) || gatesClean,
+    open: rawFieldValue(tail[2].raw) || openClean,
+    error: '',
+  }
 }
 
 /**

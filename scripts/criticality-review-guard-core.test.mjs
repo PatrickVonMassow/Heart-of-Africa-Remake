@@ -33,7 +33,11 @@ const record = (over = {}) => ({
   authoredBy: OPUS,
   verdict: CLEARING_VERDICT,
   evidence: 'read the core and ran the gate against a synthetic tick',
-  at: 1000,
+  // The recorder demands a mode since MODE_REQUIRED_SINCE, and this gate now
+  // holds rows of that era to it (landing round) — the helper writes what the
+  // recorder writes.
+  mode: 'review',
+  at: 1_787_000_000_000,
   reachable: true,
   descendsFrom: [],
   ...over,
@@ -171,6 +175,133 @@ describe('evaluateCriticalityReview', () => {
     expect(evaluateCriticalityReview({ baseline: 'b', ticks: [], records: [] }).block).toBe(false)
   })
 
+  it('treats a record OUTSIDE the millisecond timestamp domain as no review at all (round-6 pass 1)', () => {
+    // Removing ledgerAtUsable from the filter must redden this: at:null, at:1
+    // and a seconds-scale epoch each lose every later-than comparison, so a
+    // refusal dated that way could read as answered by an earlier merge.
+    for (const at of [null, undefined, 'unknown', 1, 1_787_027_296, 4_102_444_800_001]) {
+      const v = evaluateCriticalityReview({
+        baseline: 'b',
+        head: 'h',
+        ticks: [tick()],
+        records: [{ ...record({ verdict: 'merge' }), at }],
+      })
+      expect(v.block, `at=${String(at)}`).toBe(true)
+      expect(v.findings[0].kind).toBe('no-review')
+    }
+  })
+
+  it('a malformed-timestamp REFUSAL poisons the point — a valid merge cannot clear past it (final round)', () => {
+    // The suppression path: the bad-at do-not-merge vanished from wellFormed,
+    // the valid merge stood alone, and the high point cleared.
+    const v = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [
+        record({ verdict: 'merge', at: 1_787_000_002_000 }),
+        { ...record({ verdict: 'do-not-merge' }), at: 1 },
+      ],
+    })
+    expect(v.block).toBe(true)
+    expect(v.findings[0].kind).toBe('malformed-record')
+    expect(formatCriticalityReviewVerdict(v)).toContain('cannot be ORDERED')
+  })
+
+  it('a clearing row without authorship or a usable mode cannot clear (landing round)', () => {
+    // A hand-written merge with no authoredBy KEY (the recorder always writes
+    // one) or a mode the recorder refuses entered wellFormed and cleared a
+    // HIGH point without establishing a different-model review.
+    for (const over of [{ authoredBy: undefined }, { authoredBy: 42 }, { mode: 'bogus' }, { model: {} }]) {
+      const row = { ...record({ verdict: 'merge' }), ...over }
+      if (over.authoredBy === undefined) delete row.authoredBy
+      const v = evaluateCriticalityReview({ baseline: 'b', head: 'h', ticks: [tick()], records: [row] })
+      expect(v.block, JSON.stringify(over)).toBe(true)
+      expect(v.findings[0].kind).toBe('no-review')
+    }
+  })
+
+  it('a single PASS row never clears a whole point — only a complete composition does (third landing round)', () => {
+    // The live, pre-existing hole: a record carrying `pass` covers the files
+    // that pass read and no more, yet it entered `clean` like a whole-range
+    // review — one merge pass row cleared a HIGH point whose other passes
+    // were never recorded.
+    const passRow = (index, verdict, at) =>
+      record({ verdict, at, pass: { index, total: 2, files: [`f${index}.mjs`] } })
+    const lone = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [passRow(1, 'merge', 1_787_000_001_000)],
+    })
+    expect(lone.block).toBe(true)
+    expect(lone.findings[0].kind).toBe('unresolved')
+    // The COMPLETE split, every pass merge, clears…
+    const complete = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [passRow(1, 'merge', 1_787_000_001_000), passRow(2, 'merge', 1_787_000_002_000)],
+    })
+    expect(complete.block).toBe(false)
+    // …while a split whose WORST pass refuses does not — and the refusal
+    // keeps its own standing.
+    const refused = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [passRow(1, 'merge', 1_787_000_001_000), passRow(2, 'do-not-merge', 1_787_000_002_000)],
+    })
+    expect(refused.block).toBe(true)
+  })
+
+  it('a carried row clears only with the wrapper’s verification stamp (delta rounds)', () => {
+    const carriedMerge = record({ verdict: 'merge', carried: { from: 'f'.repeat(40) } })
+    const unstamped = evaluateCriticalityReview({ baseline: 'b', head: 'h', ticks: [tick()], records: [carriedMerge] })
+    expect(unstamped.block).toBe(true)
+    const stamped = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [{ ...carriedMerge, carriedVerified: true }],
+    })
+    expect(stamped.block).toBe(false)
+  })
+
+  it('a whitespace-decorated refusal verdict poisons — it cannot vanish unnormalised (landing round)', () => {
+    const v = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [
+        record({ verdict: 'merge', at: 1_787_000_002_000 }),
+        record({ verdict: 'do-not-merge ', at: 1_787_000_001_000 }),
+      ],
+    })
+    expect(v.block).toBe(true)
+    expect(v.findings[0].kind).toBe('malformed-record')
+  })
+
+  it('a missing-model REFUSAL poisons the same way — no criterion lets it vanish (landing round)', () => {
+    // The residual of the timestamp fix: a do-not-merge with a valid `at` but
+    // no model fell out of wellFormed AND out of the poison net, and the older
+    // valid merge cleared the point past it.
+    for (const model of ['', '   ', null, undefined]) {
+      const v = evaluateCriticalityReview({
+        baseline: 'b',
+        head: 'h',
+        ticks: [tick()],
+        records: [
+          record({ verdict: 'merge', at: 1_787_000_002_000 }),
+          record({ verdict: 'do-not-merge', model, at: 1_787_000_001_000 }),
+        ],
+      })
+      expect(v.block, `model=${String(model)}`).toBe(true)
+      expect(v.findings[0].kind).toBe('malformed-record')
+      expect(formatCriticalityReviewVerdict(v)).toContain('missing model')
+    }
+  })
+
   it('BLOCKS on a self-review — a green ledger is worse than an empty one', () => {
     const v = evaluateCriticalityReview({
       baseline: 'b',
@@ -217,15 +348,15 @@ describe('evaluateCriticalityReview', () => {
   })
 
   it('ALLOWS once a later merge on a DESCENDANT commit answers the refusal', () => {
-    const refused = record({ sha: 'a'.repeat(40), verdict: 'do-not-merge', at: 1000 })
-    const answered = record({ sha: 'b'.repeat(40), verdict: 'merge', at: 2000, descendsFrom: ['a'.repeat(40)] })
+    const refused = record({ sha: 'a'.repeat(40), verdict: 'do-not-merge', at: 1_787_000_001_000 })
+    const answered = record({ sha: 'b'.repeat(40), verdict: 'merge', at: 1_787_000_002_000, descendsFrom: ['a'.repeat(40)] })
     const v = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [refused, answered] })
     expect(v.block).toBe(false)
   })
 
   it('BLOCKS when the later merge judges the SAME commit — nothing was fixed between them', () => {
-    const refused = record({ sha: 'a'.repeat(40), verdict: 'do-not-merge', at: 1000 })
-    const rerun = record({ sha: 'a'.repeat(40), verdict: 'merge', at: 2000, descendsFrom: [] })
+    const refused = record({ sha: 'a'.repeat(40), verdict: 'do-not-merge', at: 1_787_000_001_000 })
+    const rerun = record({ sha: 'a'.repeat(40), verdict: 'merge', at: 1_787_000_002_000, descendsFrom: [] })
     const v = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [refused, rerun] })
     expect(v.block).toBe(true)
     expect(v.findings[0].kind).toBe('unanswered')
@@ -233,8 +364,8 @@ describe('evaluateCriticalityReview', () => {
   })
 
   it('BLOCKS when the answering merge is older in time than the refusal it claims to answer', () => {
-    const refused = record({ sha: 'b'.repeat(40), verdict: 'do-not-merge', at: 3000 })
-    const stale = record({ sha: 'a'.repeat(40), verdict: 'merge', at: 1000 })
+    const refused = record({ sha: 'b'.repeat(40), verdict: 'do-not-merge', at: 1_787_000_003_000 })
+    const stale = record({ sha: 'a'.repeat(40), verdict: 'merge', at: 1_787_000_001_000 })
     // `stale` sits BELOW the refusal in history, so it cannot descend from it.
     const v = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [refused, stale] })
     expect(v.block).toBe(true)

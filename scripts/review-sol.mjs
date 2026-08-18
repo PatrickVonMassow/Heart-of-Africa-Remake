@@ -61,7 +61,6 @@ import {
   decideReview,
   OUTCOME,
   FALLBACK_CHAIN,
-  formatReviewMaterial,
   formatReviewReport,
   isUnknownModelRefusal,
   modelsInTrailerField,
@@ -76,6 +75,26 @@ import {
   SOL_MODEL_NAME,
   SOL_REASONING_EFFORT,
 } from './review-sol-core.mjs'
+import {
+  assembleMaterial,
+  formatBudgetNotice,
+  formatPassFiles,
+  formatPassManifest,
+  formatShortfall,
+  isBinaryPatchSection,
+  joinPatchSections,
+  materialShortfall,
+  MATERIAL_BUDGET_CHARS,
+  MAX_PASS_TOTAL,
+  passByIndex,
+  planPasses,
+  planShortfall,
+  patchSectionMap,
+  quotePassFile,
+  splitPatchByFile,
+  undecodablePaths,
+} from './review-material-core.mjs'
+import { readRecords } from './mechanism-review.mjs'
 
 /** Where codex keeps the ChatGPT login, and where we park a copy of it. */
 export const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), '.codex')
@@ -108,18 +127,73 @@ export const SAVED_AUTH_FILE = join(STATE_DIR, 'codex-auth.json')
  * 10.08.2026). The optional reads are the per-file ones, where "not in this
  * commit" is an ordinary answer.
  */
-function git(args, { required = true } = {}) {
+/** Decodes strictly or throws — the lossy default writes U+FFFD and moves on. */
+const utf8Strict = new TextDecoder('utf-8', { fatal: true })
+
+function git(args, { required = true, raw = false } = {}) {
   const res = spawnSync('git', args, {
     cwd: REPO_ROOT,
-    encoding: 'utf8',
     windowsHide: true,
     maxBuffer: 128 * 1024 * 1024,
   })
+  const errText = (res.stderr ?? Buffer.alloc(0)).toString('utf8')
   if (res.status !== 0 || res.error) {
-    if (!required) return null
-    throw new Error(`git ${args.join(' ')} failed: ${(res.stderr || res.error?.message || '').trim()}`)
+    // AN OPTIONAL READ IS ONLY OPTIONAL ABOUT ABSENCE (round-2 pass 5,
+    // narrowed by round-3 pass 7): null means "git itself answered absent",
+    // and the answer that counts as absent depends on the QUESTION. A blob
+    // read (`show sha:path`) is absent only when git names the PATH as not in
+    // that tree — `bad object` there can mean corruption, and skipping the
+    // blob would treat an unreadable change as deleted. The quiet queries
+    // (rev-parse --verify --quiet, merge-base) answer absence as a bare
+    // non-zero exit with nothing on stderr. A crash, a signal or an overflowed
+    // buffer never matches either shape (res.error/res.signal), and everything
+    // else fails loud, required or not.
+    const blobRead = args[0] === 'show'
+    const absent =
+      !res.error &&
+      res.status !== null &&
+      (blobRead
+        ? /does not exist|exists on disk, but not in/i.test(errText)
+        : /does not exist|exists on disk, but not in|bad revision|unknown revision/i.test(errText) ||
+          errText.trim() === '')
+    if (!required && absent) return null
+    throw new Error(`git ${args.join(' ')} failed: ${(errText || res.error?.message || '').trim()}`)
   }
-  return (res.stdout ?? '').trim()
+  const out = res.stdout ?? Buffer.alloc(0)
+  // `raw` skips the trim for output that IS paths: a legal path may begin or
+  // end in whitespace, and trimming the stream eats it off the first and last
+  // one (cross-vendor review, third round). It also decodes STRICTLY (round-1
+  // pass 5): the lenient default turned invalid UTF-8 into replacement
+  // characters, the NUL-only binary check then read the ALTERED text as
+  // complete, and a pass could record byte-inexact material as wholly
+  // delivered. Bytes this string pipeline cannot carry are refused by name —
+  // the caller decides whether that refuses the round (patch, stat, paths) or
+  // degrades the one file to a declared binary (blob reads).
+  if (raw) {
+    try {
+      return utf8Strict.decode(out)
+    } catch {
+      const e = new Error(
+        `git ${args.join(' ')} returned bytes that are not valid UTF-8 — ` +
+          'this pipeline cannot carry them byte-exact, and a lossy decode must never be recorded as complete',
+      )
+      e.undecodable = true
+      throw e
+    }
+  }
+  // The trimmed path decodes STRICTLY too (round-2 pass 5): authorship
+  // trailers read through this branch, and a lossy U+FFFD copy of a trailer
+  // could obscure the very model the self-review routing turns on.
+  try {
+    return utf8Strict.decode(out).trim()
+  } catch {
+    const e = new Error(
+      `git ${args.join(' ')} returned bytes that are not valid UTF-8 — ` +
+        'this pipeline cannot carry them byte-exact, and a lossy decode must never be recorded as complete',
+    )
+    e.undecodable = true
+    throw e
+  }
 }
 
 /**
@@ -135,7 +209,7 @@ function git(args, { required = true } = {}) {
  * symlink yields its own target text (a few harmless bytes, and visible as such)
  * and nothing outside the commit can travel at all.
  */
-function gatherMaterial(sha, base) {
+function gatherRange(sha, base) {
   // THE WHOLE RANGE, NOT THE LAST COMMIT (10.08.2026). One record covers every
   // commit it CONTAINS — that is how both gates read the ledger — so a review of
   // a branch head that only saw the head's own diff would clear commits nobody
@@ -143,21 +217,168 @@ function gatherMaterial(sha, base) {
   // A range DIFF (rather than per-commit patches) is what carries a merge
   // commit's conflict resolution, which `git log --patch` omits.
   const range = `${base}..${sha}`
-  const paths = git(['diff', '--name-only', range]).split('\n').map((p) => p.trim()).filter(Boolean)
-  const patch = git(['diff', range])
+  // NUL-SEPARATED, because the newline-separated form is QUOTED: a path with a
+  // tab, a quote or a high byte in it arrives as `"scripts/x\ty.mjs"`, which no
+  // `git show` resolves — the file then reached neither the content list nor a
+  // pass, and nothing said so (cross-vendor review, second round). `-z` hands
+  // over the raw bytes, and they are kept RAW: trimming a path with edge
+  // whitespace makes a different path, one `git show` misses — the real file
+  // then travelled in no pass while nothing named the loss (third round).
+  const paths = git(['diff', '--name-only', '-z', range], { raw: true }).split('\0').filter(Boolean)
+  // A PATH NODE'S STRINGS CANNOT CARRY IS REFUSED, NOT COLLAPSED (fourth
+  // cross-vendor round; named residual — see unquoteGitPath). Bytes that are
+  // not valid UTF-8 decode to U+FFFD here, distinct real paths can then fall
+  // together, `git show` misses the real file, and the coverage accounting
+  // would clear a file nobody could even name. Refusing loses the round; the
+  // alternative loses the record's meaning.
+  const unspeakable = undecodablePaths(paths)
+  if (unspeakable.length) {
+    throw new Error(
+      `a changed path in ${range} is not valid UTF-8 and cannot travel through this pipeline byte-exact: ` +
+        `${unspeakable.join(', ')} — no record can be offered for this range; rename the file or review it by another means`,
+    )
+  }
+  // The patch travels RAW too (fourth round): trimming it ate a trailing space
+  // off a rename destination's last line together with the final newline — a
+  // silently different path, with the accounting none the wiser.
+  // `--binary` because a declared binary file's CHANGE must actually travel
+  // (round-1 passes 3/4): the ordinary diff writes only `Binary files …
+  // differ`, which delivers no byte — arbitrary binary content was then
+  // cleared unread. The base85 `GIT binary patch` is pure ASCII, so it rides
+  // the text pipeline losslessly, and assembleMaterial refuses the binary
+  // declaration where that section is missing. `--no-textconv` because a
+  // configured textconv driver replaces file bytes with a transformed
+  // representation while avoiding the binary marker — the real blob then
+  // reaches no pass while the accounting reports complete delivery (round-1
+  // second run, pass 5).
+  // `--no-ext-diff` beside it (round-4 pass 7): a configured diff.external or
+  // per-path external driver REPLACES git's own patch generation, so a helper
+  // emitting plausible `diff --git` sections could deliver transformed or
+  // incomplete content the section accounting accepts as the real patch.
+  const patch = git(['diff', '--binary', '--no-textconv', '--no-ext-diff', range], { raw: true })
+  // A BINARY FILE'S BYTES CANNOT TRAVEL AS REVIEW TEXT (fourth cross-vendor
+  // round, pass 4, finding 7). An ADDED binary was skipped as "covered by the
+  // patch" while the ordinary diff carries only `Binary files … differ` — the
+  // blob never travelled and nothing recorded the loss; a MODIFIED one came
+  // back through the utf8 read as mojibake recorded complete. Binary paths are
+  // read off the patch's own sections and travel DECLARED (assembleMaterial
+  // writes the marker the reviewer sees and the accounting carries).
+  const binaryPaths = new Set(
+    splitPatchByFile(patch)
+      .filter((s) => isBinaryPatchSection(s.text))
+      .map((s) => s.path),
+  )
+  // A MODIFIED GITLINK IS ITS PATCH (final-round pass 8): a submodule entry
+  // points at a COMMIT object, so `git show sha:path` answers `bad object` —
+  // which reads as corruption and fails the round — or, with the submodule
+  // present, would ship commit output as file content. The pointer change IS
+  // the whole change, and the patch carries it; the path travels with no
+  // content of its own. CLASSIFIED BY MODE EVIDENCE ALONE (landing-round
+  // pass 8): a `+Subproject commit <hex>` line is hunk CONTENT, and a normal
+  // text file adding that literal line was classified a gitlink — its real
+  // content silently omitted while the accounting read complete. Only git's
+  // own section headers prove the 160000 entry: the mode lines, or the index
+  // line's trailing mode. Hunk lines carry a +/-/space prefix, so a header
+  // anchored at line start cannot be forged from file content.
+  const gitlinkPaths = new Set(
+    splitPatchByFile(patch)
+      .filter((s) =>
+        /^(?:(?:old|new|deleted file|new file) mode 160000|index [0-9a-f]+\.\.[0-9a-f]+ 160000)$/m.test(s.text),
+      )
+      .map((s) => s.path),
+  )
   // A file the patch ADDS whole is already there in full; sending its content
   // again only spends the budget the other files need — but only while the patch
   // itself fits, or the file would fall out of both halves.
   const added = addedFilesAreCoveredByPatch(patch.length) ? newFilePathsIn(patch) : new Set()
   const files = []
   for (const path of [...new Set(paths)]) {
+    if (binaryPaths.has(path)) {
+      files.push({ path, binary: true })
+      continue
+    }
+    if (gitlinkPaths.has(path)) {
+      files.push({ path, text: '' })
+      continue
+    }
     if (added.has(path)) continue
-    const text = git(['show', `${sha}:${path}`], { required: false })
+    // RAW, like the patch and the paths (fourth cross-vendor round, pass 4):
+    // the default read trims, which strips a body's leading/trailing
+    // whitespace and its final newline — and the assembly then recorded that
+    // ALTERED string as complete, so byte-inexact delivery passed the
+    // accounting. What the commit holds is what travels. A blob whose bytes
+    // are not valid UTF-8 cannot travel as text AT ALL (round-1 pass 5): it
+    // degrades to a declared binary, exactly like the NUL case below, never
+    // to a replacement-character copy recorded as complete.
+    let text
+    try {
+      text = git(['show', `${sha}:${path}`], { required: false, raw: true })
+    } catch (e) {
+      if (!e?.undecodable) throw e
+      files.push({ path, binary: true })
+      continue
+    }
     // Null = the commit does not carry that path (it was deleted); the patch
     // above still shows what happened to it.
-    if (text !== null) files.push({ path, text })
+    if (text === null) continue
+    // A binary whose SECTION carries no marker — a pure rename diffs nothing —
+    // still cannot travel as text. NUL in the blob is git's own binary
+    // heuristic, and shipping the utf8 read would record mojibake as complete.
+    if (text.includes('\0')) {
+      files.push({ path, binary: true })
+      continue
+    }
+    files.push({ path, text })
   }
-  return formatReviewMaterial({ stat: git(['diff', '--stat', range]), patch, files })
+  // THE RAW PARTS, NOT THE FORMATTED MATERIAL (point 714). The budget decision,
+  // the pass plan and the accounting all need the parts separately; assembling
+  // here would leave the caller with a string and no way to tell what it lost.
+  return { stat: git(['diff', '--stat', range], { raw: true }), patch, files }
+}
+
+/**
+ * The material for ONE pass — the pass's own files, their patch sections, and the
+ * whole range's diffstat so the reviewer still sees the shape of what it is a
+ * part of. `patchOnly` files travel as their complete diff without the
+ * surrounding file, which is the only way a bookkeeping file measured in
+ * megabytes is reviewable at all (see planPasses).
+ */
+function assemblePass(range, pass, plan = null) {
+  const sections = patchSectionMap(range.patch)
+  const files = pass.files
+  return assembleMaterial({
+    stat: range.stat,
+    // THE SAME HELPER THE PLAN MEASURED WITH, so the string sized and the
+    // string sent cannot drift apart again (see joinPatchSections).
+    patch: joinPatchSections(files, sections),
+    files: range.files.filter((f) => files.includes(f.path)),
+    budget: MATERIAL_BUDGET_CHARS,
+    patchRoom: pass.patchRoom,
+    patchOnly: pass.patchOnly,
+    // THE PASS STATES ITS OWN SHAPE INSIDE THE MATERIAL (structural finding,
+    // fourth cross-vendor round): which pass of how many, which files it
+    // carries at which delivery level, and which files are absent BY DESIGN
+    // with the pass covering each — absence by design and absence by
+    // truncation mean opposite things about the verdict the reviewer may give.
+    manifest: plan && !plan.fits ? formatPassManifest(plan, pass) : '',
+  })
+}
+
+/**
+ * The pass plan for a range, or null when it could not be measured.
+ *
+ * For the paths that spend NO round and still print a record command for the
+ * whole range — the share switch at `claude-only`, and a range Sol authored. A
+ * measurement that fails is reported as a measurement that failed: `null` yields
+ * the `unplanned` refusal, never a silent "it fits".
+ */
+function measureRange(sha, base) {
+  try {
+    return planPasses({ ...gatherRange(sha, base), budget: MATERIAL_BUDGET_CHARS })
+  } catch (e) {
+    console.error(`review-sol: the range could not be measured against the budget: ${(e && e.message) || e}`)
+    return null
+  }
 }
 
 /**
@@ -248,6 +469,7 @@ export function runCodex({ prompt, input = '', modelId = SOL_MODEL_ID, timeoutMs
   } catch {
     /* a leftover temp file is not worth an exit code */
   }
+  const timedOut = res.signal === 'SIGTERM' || String(res.error?.code ?? '') === 'ETIMEDOUT'
   return {
     spawnError: res.error ?? null,
     exitCode: res.status ?? 1,
@@ -255,8 +477,33 @@ export function runCodex({ prompt, input = '', modelId = SOL_MODEL_ID, timeoutMs
     stderr: res.stderr ?? '',
     // `timeout` kills with SIGTERM AND sets an ETIMEDOUT error; either half on
     // its own would otherwise read as an ordinary error exit.
-    timedOut: res.signal === 'SIGTERM' || String(res.error?.code ?? '') === 'ETIMEDOUT',
+    timedOut,
     finalMessage: last || res.stdout || '',
+    // WHAT ACTUALLY WENT OUT (point 714). This is the exact argument the spawn
+    // received, so comparing against it pins the CALL SITE — a caller that
+    // rebuilt, trimmed or swapped the variable fails the sent-differs check.
+    // It is NOT a witness of the transport: nothing codex prints echoes its
+    // stdin back. What the process layer DOES report travels beside it
+    // (escalation round): a child that closes stdin while more material is
+    // still being written surfaces as an EPIPE spawn error even at exit 0
+    // (measured 18.08.2026), which lands in transportError below and refuses.
+    // NAMED RESIDUAL, erring to a wrong GRANT and not closable from here: a
+    // material SMALLER than the kernel pipe buffer (~64 KiB) is accepted by
+    // the OS in one write, so a child that exits 0 without ever reading it
+    // raises nothing — no spawn error, no signal — and a parseable verdict
+    // over unread material would pass this layer. spawnSync exposes no
+    // read-side evidence that could close it; the admission check in
+    // parseVerdict (a reviewer saying it could not see) is the only, partial,
+    // mitigation. What the process layer DOES report is still honoured …
+    sentInput: input,
+    // … and where the spawn layer reported an error, or the run was killed on
+    // its budget mid-stream, whether the material arrived is UNKNOWN — the
+    // caller hands this to materialShortfall, and unknown refuses the record.
+    transportError: res.error
+      ? `the spawn layer reported ${String(res.error.code ?? res.error.message ?? 'an error')} before the run completed`
+      : timedOut
+        ? 'the run was killed on its time budget, mid-stream'
+        : '',
   }
 }
 
@@ -438,12 +685,21 @@ function restoreLogin() {
 export const usage = () =>
   [
     'usage: node scripts/review-sol.mjs --sha <sha> --brief "<what to judge>" \\',
-    '           [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>]',
+    '           [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>] \\',
+    '           [--pass <k>]',
     '       node scripts/review-sol.mjs --probe            (is -m honoured?)',
     '       node scripts/review-sol.mjs --save-login | --restore-login',
     '',
     'The material is the whole range <since>..<sha> (--since defaults to main), because',
     'one record covers every commit it contains.',
+    `A round carries at most ${MATERIAL_BUDGET_CHARS} characters. A range beyond that is REFUSED`,
+    'and split into PASSES over the FILE SET — --pass <k> reviews one of them, and the',
+    'record it prints covers that pass alone. Splitting by COMMIT does not help: every',
+    'commit ships the current content of the files it touches.',
+    '--carry-from <sha> (planning only, with neither --pass nor a fitting range): sorts the',
+    'pass plan into passes whose files are byte-identical at that earlier reviewed head —',
+    'their reading CARRIES via mechanism-review.mjs --carried-from, re-verified by the',
+    'recorder and the gates — and passes needing fresh eyes.',
     `Reviews run on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT} (CLAUDE.md §6). When it`,
     `cannot be reached the review is HANDED OVER to the first model of ${FALLBACK_CHAIN.join(' → ')}`,
     'that authored no part of the reviewed range — the recorded review always names the',
@@ -492,14 +748,88 @@ if (isMainModule(import.meta.url)) {
     const share = currentSetting()
     // A fallback nobody is told about is a setting nobody chose (cross-vendor review).
     if (share.problem) console.error(settingProblemLine(share, 'review-sol'))
+    // THE COVERAGE QUESTION IS ASKED ON EVERY PATH THAT PRINTS A TEMPLATE
+    // (escalation round): the early routes hard-coded `partial: null`, so an
+    // explicit narrowed `--since` on a fitting range printed a whole-SHA record
+    // template although only the narrowed range was measured — bypassing the
+    // refusal the normal route makes. The same three lines answer it everywhere.
+    const sinceFlag = flag('--since')
+    const partialFor = (base) => {
+      const coverageBase = sinceFlag ? git(['merge-base', 'main', full], { required: false }) : base
+      return coverageDecision({ reviewedBase: base, coverageBase })
+    }
+
+    // PARSED BEFORE THE FIRST EXIT (round-2 pass 5): both hand-off routes
+    // leave below, and reading --pass after them made a pass-scoped hand-off
+    // impossible — `--pass k` was silently ignored, the report covered the
+    // whole range, and an oversized range could never hand on one of its
+    // passes. One selection serves every route.
+    const passFlag = flag('--pass')
+    const passFor = (plan) => {
+      if (!passFlag) return { pass: null }
+      if (!plan) return { error: `--pass ${passFlag}: the range could not be measured, so no pass can be selected.` }
+      if (plan.fits) {
+        return {
+          error: `--pass ${passFlag} names a pass of a split this range does not need — it fits in one round.`,
+        }
+      }
+      if (plan.passes.length < 2) {
+        return {
+          error:
+            `--pass ${passFlag}: this range packs into one coverable pass beside files beyond ` +
+            'reach, and a split of one cannot be recorded — narrow the range or split the change.',
+        }
+      }
+      // A split past the recorder's ceiling can never be recorded either
+      // (landing-round pass 5): every pass of it would be a paid round whose
+      // record parsePassSpec refuses.
+      if (plan.passes.length > MAX_PASS_TOTAL) {
+        return {
+          error:
+            `--pass ${passFlag}: this range splits into ${plan.passes.length} passes — more than the ` +
+            `${MAX_PASS_TOTAL} a record can hold. Narrow the range or split the change.`,
+        }
+      }
+      const pass = passByIndex(plan, passFlag)
+      if (!pass) return { error: `--pass ${passFlag}: this range splits into ${plan.passes.length} pass(es).` }
+      return { pass }
+    }
+
     if (routeFor('review', share.setting) !== 'sol') {
-      const base = mergeBase(flag('--since') || 'main', full, { explicit: Boolean(flag('--since')) })
+      const base = mergeBase(sinceFlag || 'main', full, { explicit: Boolean(sinceFlag) })
       const decision = decideReview({
         outcome: { ok: false, kind: OUTCOME.SWITCHED_OFF, cause: causeTextFor(OUTCOME.SWITCHED_OFF) },
         parsed: { ok: false },
         authorModel: authorsIn(full, base),
       })
-      console.log(formatReviewReport({ decision, sha: full, mode, point, partial: null }))
+      // THE FIT IS MEASURED ON THIS PATH TOO (cross-vendor review, second
+      // round). No round is spent here, but the record command printed for the
+      // hand-over covers the WHOLE range — and printing that template while
+      // nobody has measured whether the range is reviewable in one round is the
+      // assumption this point removes. The measurement costs git, not an
+      // allowance.
+      const handOverPlan = measureRange(full, base)
+      const handOverPass = passFor(handOverPlan)
+      if (handOverPass.error) {
+        console.error(`review-sol: ${handOverPass.error}`)
+        process.exit(2)
+      }
+      console.log(
+        formatReviewReport({
+          decision,
+          sha: full,
+          mode,
+          point,
+          partial: partialFor(base),
+          // A SELECTED PASS is measured by the plan to fit one round, so its
+          // hand-over template prints pass-scoped — exactly as a fitting range
+          // prints its whole-range template; the whole-range shortfall would
+          // suppress the very record the pass split exists to make possible.
+          shortfall: handOverPass.pass ? null : planShortfall(handOverPlan),
+          plan: handOverPlan,
+          pass: handOverPass.pass,
+        }),
+      )
       process.exit(3)
     }
 
@@ -507,7 +837,6 @@ if (isMainModule(import.meta.url)) {
     // call is paid for (point 667). Sol AUTHORS now, and a review it may not
     // give is not worth an allowance: a Sol-authored range goes straight to the
     // Claude reviewer that also runs the suites, judges the picture and lands.
-    const sinceFlag = flag('--since')
     const base = mergeBase(sinceFlag || 'main', full, { explicit: Boolean(sinceFlag) })
     const rangeAuthors = authorsIn(full, base)
     if (solAuthored(rangeAuthors)) {
@@ -516,7 +845,26 @@ if (isMainModule(import.meta.url)) {
         parsed: { ok: false },
         authorModel: rangeAuthors,
       })
-      console.log(formatReviewReport({ decision, sha: full, mode, point, partial: null }))
+      // Same measurement, same reason: the role swap hands the WHOLE range on,
+      // and a range no single round can hold must be handed on as its passes.
+      const swapPlan = measureRange(full, base)
+      const swapPass = passFor(swapPlan)
+      if (swapPass.error) {
+        console.error(`review-sol: ${swapPass.error}`)
+        process.exit(2)
+      }
+      console.log(
+        formatReviewReport({
+          decision,
+          sha: full,
+          mode,
+          point,
+          partial: partialFor(base),
+          shortfall: swapPass.pass ? null : planShortfall(swapPlan),
+          plan: swapPlan,
+          pass: swapPass.pass,
+        }),
+      )
       process.exit(3)
     }
 
@@ -541,20 +889,171 @@ if (isMainModule(import.meta.url)) {
     // sha with no merge base against `main` used to leave this empty, which
     // switched the check OFF and printed a record for a range nobody bounded.
     // The decision itself is pure and tested (coverageDecision).
-    const coverageBase = sinceFlag ? git(['merge-base', 'main', full], { required: false }) : base
-    const partial = coverageDecision({ reviewedBase: base, coverageBase })
-    const material = gatherMaterial(full, base)
+    const partial = partialFor(base)
+
+    // THE THRESHOLD IS NAMED BEFORE THE ROUND IS SPENT (point 714). A caller who
+    // learns of the overflow from the verdict has already paid for a review that
+    // covers less than it looks like it does; a caller who learns of it here can
+    // split the review instead.
+    const range = gatherRange(full, base)
+    const plan = planPasses({ ...range, budget: MATERIAL_BUDGET_CHARS })
+    console.error(formatBudgetNotice(plan, { sha: full }))
+
+    // The flag itself was parsed above, before the hand-off exits (round-2
+    // pass 5); this is the same selection the hand-offs make.
+    let pass = null
+    let assembly
+    if (plan.fits) {
+      if (flag('--carry-from')) {
+        console.error(
+          'review-sol: --carry-from does nothing here — this range fits in one round, which must be read whole.',
+        )
+      }
+      if (passFlag) {
+        console.error(
+          `review-sol: --pass ${passFlag} names a pass of a split this range does not need — it fits in one round.`,
+        )
+        process.exit(2)
+      }
+      // The single pass the plan produced, so the patch gets the room the plan
+      // costed it: the standing half-share would cut a diff-heavy range the plan
+      // called complete, and the round would be paid for before anyone noticed.
+      assembly = plan.passes.length === 1
+        ? assemblePass(range, plan.passes[0])
+        : assembleMaterial({ ...range, budget: MATERIAL_BUDGET_CHARS })
+    } else {
+      // A ROUND OVER MATERIAL THAT CANNOT FIT IS A ROUND SPENT ON A RECORD THAT
+      // WILL BE REFUSED. The plan above says how to split it, so the run stops
+      // here rather than paying for a verdict nothing may rest on.
+      if (!passFlag) {
+        // An over-cap split can never be recorded: refuse BEFORE any carry
+        // analysis prints unrecordable commands (fourth landing round).
+        if (plan.passes.length > MAX_PASS_TOTAL) {
+          console.error(
+            `review-sol: this range splits into ${plan.passes.length} passes — more than the ` +
+              `${MAX_PASS_TOTAL} a record can hold. Narrow the range or split the change.`,
+          )
+          process.exit(2)
+        }
+        // DELTA-SCOPED ROUNDS (user decision 18.08.2026): with --carry-from
+        // <previous round's head>, a pass whose files are ALL byte-identical
+        // there and were ALL read by one recorded pass at that head needs no
+        // fresh round — its reading carries, and the recorder re-verifies
+        // every claim this planning makes (blob identity, the source row)
+        // before writing, as do the gates on every read. Anything less than
+        // fully unchanged+covered is reviewed fresh; the analysis only sorts
+        // the passes, it clears nothing itself.
+        const carryFlag = flag('--carry-from')
+        if (carryFlag) {
+          if (!/^[0-9a-f]{7,40}$/i.test(carryFlag)) {
+            console.error(`review-sol: --carry-from: "${carryFlag}" is not a commit sha (7–40 hex characters)`)
+            process.exit(2)
+          }
+          const carrySha = git(['rev-parse', `${carryFlag}^{commit}`], { required: false })
+          if (!carrySha) {
+            console.error(`review-sol: --carry-from ${carryFlag}: no such commit in this repository`)
+            process.exit(2)
+          }
+          const changed = new Set(
+            git(['diff', '--name-only', '-z', `${carrySha}..${full}`], { raw: true })
+              .split('\0')
+              .filter(Boolean),
+          )
+          const sourceRows = readRecords().filter(
+            (r) => r.sha === carrySha && r.pass && Array.isArray(r.pass.files) && r.carried === undefined,
+          )
+          // INJECTIVE (JSON, never a join) — advisory only, and the recorder
+          // re-verifies every claim, but a colliding key here recommends a
+          // carry the recorder then refuses (fourth landing round).
+          const setOf = (files) => JSON.stringify([...files].map(String).sort())
+          const sourceSets = new Set(sourceRows.map((r) => setOf(r.pass.files)))
+          console.error(`review-sol: carry analysis against ${carrySha.slice(0, 7)}:`)
+          for (const p of plan.passes) {
+            const dirty = p.files.filter((f) => changed.has(f))
+            const covered = sourceSets.has(setOf(p.files))
+            if (!dirty.length && covered) {
+              console.error(
+                `  pass ${p.index}/${p.total} — unchanged and read there; CARRY it:\n` +
+                  `    node scripts/mechanism-review.mjs --record ${full} --carried-from ${carrySha} ` +
+                  `--pass ${p.index}/${p.total} --pass-files "${formatPassFiles(p.files)}"${point ? ` --point ${point}` : ''}`,
+              )
+            } else {
+              const why = dirty.length
+                ? `${dirty.length} file(s) changed: ${dirty.map((f) => quotePassFile(f)).join(', ')}`
+                : 'no recorded pass there covers exactly this file set'
+              console.error(`  pass ${p.index}/${p.total} — review it fresh (${why}): --pass ${p.index}`)
+            }
+          }
+        }
+        console.error(
+          'review-sol: REFUSING to spend a round on a range that cannot fit one — run the passes above.',
+        )
+        process.exit(4)
+      }
+      if (flag('--carry-from')) {
+        console.error(
+          'review-sol: --carry-from is a planning aid and does not combine with --pass — this call pays a fresh review of the named pass.',
+        )
+      }
+      // A split of one cannot be recorded (round-3 pass 4): the recorder
+      // refuses totals below 2, so spending a round on `--pass 1` of such a
+      // plan buys a verdict nothing can carry.
+      if (plan.passes.length < 2) {
+        console.error(
+          `review-sol: --pass ${passFlag}: this range packs into one coverable pass beside files ` +
+            'beyond reach, and a split of one cannot be recorded — narrow the range or split the change.',
+        )
+        process.exit(2)
+      }
+      // Nor a split past the recorder's ceiling (landing-round pass 5): every
+      // round spent on such a pass buys a record parsePassSpec refuses.
+      if (plan.passes.length > MAX_PASS_TOTAL) {
+        console.error(
+          `review-sol: --pass ${passFlag}: this range splits into ${plan.passes.length} passes — more ` +
+            `than the ${MAX_PASS_TOTAL} a record can hold. Narrow the range or split the change.`,
+        )
+        process.exit(2)
+      }
+      pass = passByIndex(plan, passFlag)
+      if (!pass) {
+        console.error(`review-sol: --pass ${passFlag}: this range splits into ${plan.passes.length} pass(es).`)
+        process.exit(2)
+      }
+      assembly = assemblePass(range, pass, plan)
+    }
+    // THE ASSEMBLY IS THE AUTHORITY, THE PLAN ONLY ADVISORY. Where the two
+    // disagree the round is not spent: a review whose record will be refused
+    // afterwards costs an allowance and answers nothing.
+    if (!assembly.fit) {
+      console.error(formatShortfall(materialShortfall({ assembly, sent: assembly.text }), { sha: full, plan }))
+      process.exit(4)
+    }
     console.error(
-      `  material: ${material.length} characters of diff and file content ` +
-        `(${base.slice(0, 7)}..${full.slice(0, 7)})`,
+      `  material: ${assembly.size} characters of diff and file content ` +
+        `(${base.slice(0, 7)}..${full.slice(0, 7)}${pass ? `, pass ${pass.index}/${pass.total}` : ''})`,
     )
-    const run = runCodex({ prompt: buildReviewPrompt({ sha: full, brief, mode }), input: material, timeoutMs })
+    const run = runCodex({
+      prompt: buildReviewPrompt({ sha: full, brief, mode, pass, receipt: assembly.receipt }),
+      input: assembly.text,
+      timeoutMs,
+    })
     const outcome = classifyOutcome(run)
-    const parsed = outcome.ok ? parseVerdict(run.finalMessage) : { ok: false }
+    // The RECEIPT is demanded back (finding 8): the token stands only on the
+    // material's last line, so an answer that cannot repeat it is a run whose
+    // material is not proven read — no verdict, and therefore no record.
+    const parsed = outcome.ok ? parseVerdict(run.finalMessage, { receipt: assembly.receipt }) : { ok: false }
+    // DID THIS ROUND CARRY WHAT IT CLAIMS TO HAVE JUDGED? Asked of the accounting
+    // and of the string that actually went to codex — never of the material's own
+    // text, which a reviewed source file can carry the truncation marker in — and
+    // of the process layer's own report: a hand-off that died mid-transmit is an
+    // UNKNOWN coverage, and unknown refuses. Asked BEFORE the decision, because
+    // `ready` rests on this answer (escalation round): a clean exit with a
+    // parseable verdict is not delivery evidence.
+    const shortfall = materialShortfall({ assembly, sent: run.sentInput, transportError: run.transportError })
     // WHO AUTHORED IT decides who may review it if Sol is unavailable: Fable
     // cannot review its own commit (see fallbackReviewerFor), and the record
     // covers the whole range, so every author in it counts.
-    const decision = decideReview({ outcome, parsed, authorModel: rangeAuthors })
+    const decision = decideReview({ outcome, parsed, authorModel: rangeAuthors, shortfall })
     // THE FINDINGS ARE THE POINT, not the verdict word: a `do-not-merge` whose
     // reasons were never printed cannot be acted on, and the evidence line the
     // ledger carries is one sentence by design. So the reviewer's whole answer
@@ -563,11 +1062,12 @@ if (isMainModule(import.meta.url)) {
     if (said) {
       console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end of review ---\n`)
     }
-    console.log(formatReviewReport({ decision, sha: full, mode, point, partial }))
+    console.log(formatReviewReport({ decision, sha: full, mode, point, partial, shortfall, plan, pass }))
     // A fallback is not an error of THIS command — it did its job by refusing to
     // invent a review — but it must not read as a finished one either, so the
-    // exit code distinguishes them for any script that chains on it.
-    process.exit(decision.fellBack ? 3 : 0)
+    // exit code distinguishes them for any script that chains on it. A short-fall
+    // is the same shape of answer: a verdict was given, no record may rest on it.
+    process.exit(decision.fellBack || shortfall ? 3 : 0)
   } catch (e) {
     console.error(`review-sol failed: ${(e && e.message) || e}`)
     process.exit(1)

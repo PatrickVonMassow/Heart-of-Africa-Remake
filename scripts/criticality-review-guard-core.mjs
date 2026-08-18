@@ -28,7 +28,7 @@
 // Side-effect free — the git work, the state file and the block belong to
 // scripts/criticality-review-guard.mjs (fail-open). Pinned by
 // criticality-review-guard-core.test.mjs.
-import { MODES, VERDICTS, sameModel } from './mechanism-review-core.mjs'
+import { ledgerAtUsable, MODE_REQUIRED_SINCE, MODES, VERDICTS, sameModel } from './mechanism-review-core.mjs'
 
 /** The ONE verdict that lets a high-criticality point be declared finished. */
 export const CLEARING_VERDICT = 'merge'
@@ -163,10 +163,65 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
   for (const tick of ticks ?? []) {
     const all = (records ?? []).filter((r) => Number(r?.point) === Number(tick?.number))
     const reachable = all.filter((r) => r.reachable !== false)
-    // A record is only a review if it says who reviewed and how it ended.
-    const wellFormed = reachable.filter(
-      (r) => VERDICTS.includes(String(r.verdict)) && String(r.model ?? '').trim(),
-    )
+    // A record is only a review if it says who reviewed and how it ended —
+    // and WHEN: the answered-refusal ordering below compares Number(at), and a
+    // NaN timestamp loses every comparison, so a hand-made row without one
+    // could out-stand a later, finite-dated refusal (round-3 pass 1, applied
+    // to the same ledger this gate reads).
+    // The MODE is held to the recorder's standard from the day it began
+    // demanding one (landing-round pass 1, mirroring the mechanism gate): a
+    // modern row naming no usable mode can only have arrived by hand.
+    const modeUsable = (r) => {
+      const m = String(r?.mode ?? '').trim()
+      if (m) return MODES.includes(m)
+      const at = Number(r?.at)
+      return Number.isFinite(at) && at > 0 && at < MODE_REQUIRED_SINCE
+    }
+    const rowWellFormed = (r) =>
+      VERDICTS.includes(String(r.verdict)) &&
+      // PRIMITIVE STRINGS, not coercions (landing-round pass 2): `model: {}`
+      // coerces to '[object Object]' and walked the emptiness test.
+      typeof r.model === 'string' &&
+      r.model.trim() &&
+      // The AUTHORSHIP KEY is required as a string (landing-round pass 1):
+      // the recorder always writes it, reading the commit's own trailers — a
+      // row without it can only have arrived by hand. It may be EMPTY, and
+      // that residual is named: a commit without a model trailer (a merge,
+      // the user's own edit) records authoredBy '' legitimately, and the
+      // gate cannot tell that apart from a hand-edit that typed ''.
+      typeof r.authoredBy === 'string' &&
+      // Typed AND in the millisecond domain (rounds 4/5, pass 1): Number(null)
+      // is 0, and a seconds-scale or `at: 1` row loses every "later than"
+      // comparison, letting an earlier merge read a later refusal as answered.
+      ledgerAtUsable(r?.at) &&
+      modeUsable(r) &&
+      // A CARRIED ROW STANDS ONLY VERIFIED here too (delta rounds,
+      // 18.08.2026): the wrapper re-measures the blob identity and stamps it;
+      // unstamped, the row is no reading of its sha's content.
+      (r.carried === undefined || r.carriedVerified === true)
+    const wellFormed = reachable.filter(rowWellFormed)
+    // A MALFORMED REFUSAL POISONS, IT DOES NOT VANISH (final-round pass 1):
+    // silently dropping a reachable refusal whose timestamp fails the domain
+    // let a valid OLDER merge stand alone and clear the point — the exact
+    // suppression the answered-refusal ordering exists to prevent. The
+    // recorder never writes such a row, so it can only have arrived by hand,
+    // and a hand-edited ledger earns a refusal, never a clearance; the way
+    // out is fixing or removing the row, on the record. EVERY well-formedness
+    // criterion poisons, not only the timestamp (landing-round pass 1): a
+    // refusal with a valid `at` but a missing `model` fell out of wellFormed
+    // AND out of this net, and vanished the same way.
+    // …and the refusal is recognised NORMALISED (landing-round pass 2): a
+    // hand-edited `"do-not-merge "` fails the strict verdict test above AND
+    // an exact-match poison net, and vanished between the two.
+    const refusalShaped = (r) => {
+      const v = typeof r?.verdict === 'string' ? r.verdict.trim().toLowerCase() : ''
+      return VERDICTS.includes(v) && v !== CLEARING_VERDICT
+    }
+    const malformedRefusals = reachable.filter((r) => refusalShaped(r) && !rowWellFormed(r))
+    if (malformedRefusals.length) {
+      findings.push({ kind: 'malformed-record', tick, records: malformedRefusals })
+      continue
+    }
     // A self-review in the ledger is worse than none: the gate would read green.
     // Refused at the record command too, but re-checked here — the ledger is a
     // file anyone can hand-edit.
@@ -180,10 +235,59 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
       continue
     }
 
-    const clean = valid.filter((r) => String(r.verdict) === CLEARING_VERDICT)
+    // A PASS ROW ALONE CLEARS NOTHING (third landing round, pass 2 — a live,
+    // pre-existing unearned-clearance path): a record carrying `pass` covers
+    // the files that pass read and no more, yet it entered `clean` like a
+    // whole-range review, so ONE merge pass row could clear a HIGH point
+    // whose other passes were never recorded. A pass-split review clears
+    // only as a COMPLETE COMPOSITION — every index 1..total present at one
+    // sha among the valid rows — speaking with the WORST of its passes,
+    // exactly as at the mechanism gate. A pass REFUSAL keeps its individual
+    // standing in `unresolved` (fail-closed in both directions).
+    const passShape = (r) => {
+      const total = Number(r?.pass?.total)
+      const index = Number(r?.pass?.index)
+      return (
+        Number.isInteger(total) && total >= 2 && total <= 256 && Number.isInteger(index) && index >= 1 && index <= total
+      )
+    }
+    const compositions = []
+    {
+      const groups = new Map()
+      for (const r of valid) {
+        if (!passShape(r)) continue
+        const key = `${String(r.sha)}|${Number(r.pass.total)}`
+        if (!groups.has(key)) groups.set(key, new Map())
+        const byIndex = groups.get(key)
+        const i = Number(r.pass.index)
+        const prior = byIndex.get(i)
+        if (!prior || Number(r.at ?? 0) >= Number(prior.at ?? 0)) byIndex.set(i, r)
+      }
+      for (const [key, byIndex] of groups) {
+        const total = Number(key.split('|').at(-1))
+        let complete = true
+        for (let i = 1; i <= total; i++) if (!byIndex.has(i)) complete = false
+        if (!complete) continue
+        const rows = [...byIndex.values()]
+        const worstRank = ['merge', 'merge-with-fixes', 'do-not-merge']
+        const worst = rows.reduce(
+          (w, r) => (worstRank.indexOf(String(r.verdict)) > worstRank.indexOf(w) ? String(r.verdict) : w),
+          'merge',
+        )
+        const latest = rows.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+        compositions.push({ ...latest, verdict: worst, at: Math.max(...rows.map((r) => Number(r.at ?? 0))) })
+      }
+    }
+    const clean = [
+      ...valid.filter((r) => r.pass === undefined && String(r.verdict) === CLEARING_VERDICT),
+      ...compositions.filter((g) => String(g.verdict) === CLEARING_VERDICT),
+    ]
     const unresolved = valid.filter((r) => String(r.verdict) !== CLEARING_VERDICT)
     if (!clean.length) {
-      const latest = unresolved.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+      // Merge pass rows of an INCOMPLETE split leave `unresolved` empty while
+      // nothing may clear — the finding then names those rows instead.
+      const pool = unresolved.length ? unresolved : valid
+      const latest = pool.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
       findings.push({ kind: 'unresolved', tick, records: [latest] })
       continue
     }
@@ -219,6 +323,14 @@ export function formatCriticalityReviewVerdict(verdict) {
     const r = f.records?.[0] ?? {}
     if (f.kind === 'no-review') {
       lines.push(head, '      no review recorded for this point')
+    } else if (f.kind === 'malformed-record') {
+      lines.push(
+        head,
+        `      a recorded ${r.verdict} on ${short(r.sha)} is malformed — a timestamp outside the ` +
+          "ledger's millisecond domain (it then cannot be ORDERED against the reviews around it)",
+        '      or a missing model. The recorder never writes such a row, so it can only have',
+        '      arrived by hand. It refuses rather than vanishes: fix or remove the row, on the record.',
+      )
     } else if (f.kind === 'not-in-history') {
       lines.push(
         head,

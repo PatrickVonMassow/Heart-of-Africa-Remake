@@ -721,6 +721,92 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
     }
   })
 
+  it('uses the feature merge-base for the gap ruling after main advances', () => {
+    // The stored fallback baseline follows main, but this feature branch forked
+    // earlier. Main-only bulk must not enter the gap measurement: pending
+    // detection and pass coverage both describe fork..feature, so measuring
+    // main-tip..feature would manufacture an uncoverable deletion and waive a
+    // small, reviewable guard change.
+    write(LEDGER, '')
+    const trunk = branch()
+    const fork = head()
+    const baselineBefore = existsSync(resolve(repo, BASELINE))
+      ? readFileSync(resolve(repo, BASELINE), 'utf8')
+      : null
+    if (trunk !== 'main') expect(git('branch', '-f', 'main', trunk).status).toBe(0)
+
+    expect(git('checkout', '-q', '-b', 'feat/main-advanced-gap-range').status).toBe(0)
+    write('scripts/demo-gap-range-guard.mjs', '// small and reviewable\n')
+    commit(`add a reviewable range guard\n\n${AUTHOR}`)
+
+    expect(git('checkout', '-q', 'main').status).toBe(0)
+    write('main-only-bulk.txt', 'main-only material\n'.repeat(20_000))
+    commit(`advance main with unrelated bulk\n\n${AUTHOR}`)
+    const advancedMain = head()
+    expect(git('checkout', '-q', 'feat/main-advanced-gap-range').status).toBe(0)
+    write(BASELINE, JSON.stringify({ baselines: { main: advancedMain } }))
+
+    try {
+      const hook = runHook('mechanism-review-guard.mjs')
+      expect(hook.status, hook.stderr).toBe(0)
+      expect(
+        hook.decision?.decision,
+        `stdout was ${JSON.stringify(hook.stdout)}; stderr was ${hook.stderr}`,
+      ).toBe('block')
+      expect(hook.decision.reason).toContain('scripts/demo-gap-range-guard.mjs')
+      expect(hook.stderr).not.toContain('REVIEW GAP')
+      expect(git('merge-base', advancedMain, head()).stdout.trim()).toBe(fork)
+    } finally {
+      // Keep this isolated fixture's main-only bulk out of the serial cases
+      // below; all of these refs belong to the temporary test repository.
+      if (baselineBefore === null) rmSync(resolve(repo, BASELINE), { force: true })
+      else write(BASELINE, baselineBefore)
+      expect(git('branch', '-f', 'main', fork).status).toBe(0)
+      expect(git('checkout', '-q', trunk).status).toBe(0)
+    }
+  })
+
+  it('does not hide branch bulk from the gap ruling when advanced main has identical content', () => {
+    // The reverse divergence: the feature range really is uncoverable, while
+    // main later acquires the same bulk independently. A raw main-tip..feature
+    // tree diff erases that file and would keep demanding an impossible review;
+    // the common merge-base range must still report the measured gap.
+    write(LEDGER, '')
+    const trunk = branch()
+    const fork = head()
+    const baselineBefore = existsSync(resolve(repo, BASELINE))
+      ? readFileSync(resolve(repo, BASELINE), 'utf8')
+      : null
+    if (trunk !== 'main') expect(git('branch', '-f', 'main', trunk).status).toBe(0)
+    const bulk = 'shared but independently committed material\n'.repeat(12_000)
+
+    expect(git('checkout', '-q', '-b', 'feat/branch-bulk-gap-range').status).toBe(0)
+    write('scripts/demo-branch-bulk-guard.mjs', '// guard beside branch bulk\n')
+    write('shared-bulk.txt', bulk)
+    commit(`add a guard beside branch bulk\n\n${AUTHOR}`)
+
+    expect(git('checkout', '-q', 'main').status).toBe(0)
+    write('shared-bulk.txt', bulk)
+    commit(`advance main with matching bulk\n\n${AUTHOR}`)
+    const advancedMain = head()
+    expect(git('checkout', '-q', 'feat/branch-bulk-gap-range').status).toBe(0)
+    write(BASELINE, JSON.stringify({ baselines: { main: advancedMain } }))
+
+    try {
+      const hook = runHook('mechanism-review-guard.mjs')
+      expect(hook.status, hook.stderr).toBe(0)
+      expect(hook.stdout.trim()).toBe('')
+      expect(hook.stderr).toContain('REVIEW GAP')
+      expect(hook.stderr).toContain('shared-bulk.txt')
+      expect(git('merge-base', advancedMain, head()).stdout.trim()).toBe(fork)
+    } finally {
+      if (baselineBefore === null) rmSync(resolve(repo, BASELINE), { force: true })
+      else write(BASELINE, baselineBefore)
+      expect(git('branch', '-f', 'main', fork).status).toBe(0)
+      expect(git('checkout', '-q', trunk).status).toBe(0)
+    }
+  })
+
   it('does NOT advance the baseline while it is blocking', () => {
     // A gate that pins its baseline on a blocked turn clears itself on the next
     // one — the block would be a single-turn nuisance instead of a gate.
