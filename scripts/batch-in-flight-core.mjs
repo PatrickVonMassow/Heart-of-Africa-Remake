@@ -1573,7 +1573,10 @@ export function openBranchSlots({
     const park = parkedAt.get(ref)
     if (park && !parkHolds(park)) invalidParks.push({ ...item, reason: park.reason })
     else if (park && !movedSincePark(park, item)) {
-      parkedOut.push({ ...item, reason: park.reason })
+      // A park whose CURRENT tip could not be read stays parked (see
+      // `movedSincePark`), but it is MARKED, so the reporting side can say the
+      // baseline could not be checked instead of passing it off as verified.
+      parkedOut.push({ ...item, reason: park.reason, ...(park.tip && !item.tip ? { tipUnverified: true } : {}) })
       seen.set(ref, true)
       continue
     }
@@ -1604,7 +1607,20 @@ function parkHolds(park) {
 }
 
 /** Has the branch moved since it was parked? The TIP decides where one was
- *  recorded; the timestamp is the coarse fallback for a park written without. */
+ *  recorded; the timestamp is the coarse fallback for a park written without.
+ *
+ *  AN UNREADABLE CURRENT TIP READS AS UNMOVED — DELIBERATELY (fourth review,
+ *  finding 5, kept on the spec's fail-open rule). The strict reading would put
+ *  the branch back into the count exactly when git could not be asked, i.e. it
+ *  would REFUSE commissioning on the guard's own failure — the fail-closed
+ *  direction every leg here avoids. The cost is bounded: the branch stays
+ *  parked, which is the state a human explicitly recorded, and the blindness
+ *  is not silent — `openBranchSlots` marks the entry `tipUnverified` and the
+ *  status report names it. The timestamp fallback below still honours tipless
+ *  parks (written before the tip was recorded; `--park` always records one
+ *  now) and cannot see a rebase or a backdated commit — recorded residual,
+ *  same fail-open reasoning, visible in the record report as the missing
+ *  "parked at <sha>" baseline. */
 function movedSincePark(park, item) {
   if (park?.tip) return Boolean(item.tip) && item.tip !== park.tip
   if (!Number.isFinite(park?.at) || item.tipAt === null) return false

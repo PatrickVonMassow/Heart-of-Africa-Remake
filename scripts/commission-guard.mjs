@@ -242,6 +242,27 @@ export function commissionVerdict(inputs, { now = Date.now() } = {}) {
 }
 
 /**
+ * THE FAIL-OPEN PASS IS NEVER SILENT (fourth review, finding 1 — kept fail-open
+ * on the spec's rule, made VISIBLE here). An allow over an unreadable branch
+ * census or record is an allow WITHOUT judgment: it can commission past the cap
+ * and past a recorded park, and until now nothing told the caller. The hook
+ * prints this to stderr on such an allow, and `--status` prints it beside the
+ * verdict, so the state the guard could not see is named where the pass happens.
+ */
+export function unreadNotice(unread) {
+  if (!unread) return ''
+  const what =
+    unread === 'record-unreadable'
+      ? 'the commission record (overrides and parks) is TORN and could not be read'
+      : 'the open-branch census could not be read from git'
+  return (
+    `commission-guard: ALLOWING WITHOUT JUDGMENT — ${what}, so neither the queue-front nor the branch-slot ` +
+    `refusal could be decided (fail-open by design: a guard fault must never trap the session). This pass can ` +
+    `exceed the pool cap. Check the state it could not see: ${COMMISSION_STATUS_CMD}`
+  )
+}
+
+/**
  * A PARKED BRANCH IS UNPARKED WHEN WORK IS ASSIGNED, not at its first commit
  * (fourth review, finding 6): between the assignment and the commit the branch
  * would otherwise hold no slot while an agent already works it, and at a full
@@ -292,7 +313,19 @@ function printStatus(argv) {
     const behind = Number.isFinite(b.behind) ? `${b.behind} behind main` : 'behind-count unknown'
     console.log(`  · ${b.ref} — ${describeBranchAge(b.ageMs)}, ${behind}`)
   }
+  // A park held on a baseline nobody could re-check is a blindness worth
+  // naming (finding 5): the branch STAYS parked, and the reader is told why
+  // that verdict is unverified rather than shown a clean count.
+  for (const b of verdict.slots.parkedOut ?? []) {
+    if (b.tipUnverified) {
+      console.log(
+        `  · ${b.ref} — PARKED, but its CURRENT tip could not be read, so movement since the park is ` +
+          'UNVERIFIED (fail-open: it stays out of the count).',
+      )
+    }
+  }
   console.log(commissionRecordReport(inputs.record))
+  if (verdict.unread) console.log(unreadNotice(verdict.unread))
   if (point) {
     console.log(`\nverdict for opening point ${point}: ${verdict.block ? 'DENY' : 'allow'} (queue: ${
       verdict.queue.why
@@ -402,6 +435,9 @@ if (isMainModule(import.meta.url)) {
     })
     if (!g.applicable) process.exit(0)
     const verdict = commissionVerdict(g.inputs)
+    // The fail-open pass says so OUT LOUD (finding 1): stderr, because a
+    // PreToolUse allow must not fabricate a permission decision just to speak.
+    if (verdict.unread) console.error(unreadNotice(verdict.unread))
     if (!verdict.block && !verdict.unread && verdict.slots?.reopens?.length) {
       for (const ref of unparkReopened(verdict.slots)) {
         console.error(

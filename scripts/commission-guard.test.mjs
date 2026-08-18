@@ -15,6 +15,7 @@ import {
   commissionVerdict,
   parkBranch,
   unparkReopened,
+  unreadNotice,
   wiringReport,
 } from './commission-guard.mjs'
 import { POOL_CAP } from './batch-in-flight-core.mjs'
@@ -310,6 +311,29 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
     const v = commissionVerdict(g.inputs, { now: AUG17 })
     expect(v.slots.why).toBe('branches-unreadable')
     expect(v.block).toBe(false)
+  })
+
+  // THE FAIL-OPEN PASS IS NEVER SILENT (fourth review, finding 1): the leg
+  // stays fail-open by the spec's own rule, but an allow over an unreadable
+  // census is an allow WITHOUT judgment and can commission past the cap — so
+  // the caller is TOLD, in a notice that names what could not be read.
+  it('names the unreadable state out loud instead of passing silently', () => {
+    const branches = unreadNotice('branches-unreadable')
+    expect(branches).toContain('ALLOWING WITHOUT JUDGMENT')
+    expect(branches).toContain('open-branch census')
+    expect(branches).toContain('fail-open')
+    expect(branches).toContain('--status')
+    const record = unreadNotice('record-unreadable')
+    expect(record).toContain('ALLOWING WITHOUT JUDGMENT')
+    expect(record).toContain('commission record')
+    // A clean verdict produces NO notice — the loud pass is for the blind one.
+    expect(unreadNotice('')).toBe('')
+    expect(unreadNotice(undefined)).toBe('')
+    // …and the verdict carries exactly the key the notice is built from.
+    const v = commissionVerdict(gather(700, { branchProbe: () => ({ readable: false, branches: [] }) }).inputs, {
+      now: AUG17,
+    })
+    expect(unreadNotice(v.unread)).toContain('open-branch census')
   })
 
   // …AND ON THE QUEUE HALF TOO (Sol, review of 3078d166). The branch half failed

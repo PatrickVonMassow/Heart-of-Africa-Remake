@@ -2680,7 +2680,15 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
     })
 
     it('stays parked while the tip cannot be read — an unreadable tip proves no movement', () => {
-      expect(branchSlotDecision({ branches: withTip(''), parked: parkedAt('a1b2c3d4'), now: AUG17 }).count).toBe(2)
+      const d = branchSlotDecision({ branches: withTip(''), parked: parkedAt('a1b2c3d4'), now: AUG17 })
+      expect(d.count).toBe(2)
+      // …but NOT silently (fourth review, finding 5): the entry is marked, so
+      // the status can say the baseline could not be re-checked.
+      expect(d.parkedOut).toHaveLength(1)
+      expect(d.parkedOut[0]).toMatchObject({ ref: 'feat/336-croc-staging', tipUnverified: true })
+      // A park whose tip WAS read carries no such mark.
+      const clean = branchSlotDecision({ branches: withTip('a1b2c3d4'), parked: parkedAt('a1b2c3d4'), now: AUG17 })
+      expect(clean.parkedOut[0].tipUnverified).toBeUndefined()
     })
 
     it('does NOT honour a park with no baseline at all, and says which one', () => {
