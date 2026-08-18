@@ -184,10 +184,27 @@ export function formatAskMaterial({ sections = [], budget = MATERIAL_BUDGET_CHAR
 }
 
 /** The two closing lines of a DIAGNOSE answer, read off the END of the message. */
-function parseDiagnose(clean) {
-  const tail = clean.split('\n').map((l) => l.trim()).filter(Boolean).slice(-2)
-  const cause = (/^[-*]?\s*CAUSE\s*:\s*(.+)$/i.exec(tail[0] ?? '')?.[1] ?? '').trim()
-  const evidence = (/^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1] ?? '')?.[1] ?? '').trim()
+/** The VALUE of a labelled raw line: everything after its first colon — the
+ *  label always carries one, and decoration adds none before it. A label
+ *  written `**CAUSE:**` closes its decoration right after the colon; that one
+ *  trailing marker run is dropped only when whitespace follows it, so a value
+ *  that genuinely BEGINS with a marker (`_private …` has none after) stays. */
+const rawValueAfterColon = (rawLine) => {
+  const at = String(rawLine ?? '').indexOf(':')
+  if (at < 0) return ''
+  return String(rawLine)
+    .slice(at + 1)
+    .replace(/^\s*(?:[*_`]+(?=\s))?/, '')
+    .trim()
+}
+
+function parseDiagnose(lines) {
+  const tail = lines.map((l) => ({ clean: l.clean.trim(), raw: l.raw })).filter((l) => l.clean).slice(-2)
+  const causeLabel = /^[-*]?\s*CAUSE\s*:\s*(.+)$/i.exec(tail[0]?.clean ?? '')?.[1] ?? ''
+  const evidenceLabel = /^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1]?.clean ?? '')?.[1] ?? ''
+  // Recognised on the stripped line, QUOTED from the raw one (see parseAnswer).
+  const cause = causeLabel ? rawValueAfterColon(tail[0].raw) : ''
+  const evidence = evidenceLabel ? rawValueAfterColon(tail[1].raw) : ''
   if (!cause || !evidence) return { ok: false, error: 'the message does not end in the CAUSE/EVIDENCE pair' }
   if (/^</.test(cause) || /^</.test(evidence) || evidence.length < 10) {
     return { ok: false, error: 'the CAUSE/EVIDENCE lines are the placeholders echoed back' }
@@ -208,20 +225,29 @@ function parseDiagnose(clean) {
  * refusing it would report a clean audit as "Sol did not answer" after the allowance was
  * already spent. It must SAY so in the prescribed line — silence is still no answer.
  */
-function parseEntries(clean, prefix, { allowEmpty = false } = {}) {
+function parseEntries(lines, prefix, { allowEmpty = false } = {}) {
   const re = new RegExp(`^[-*]?\\s*(${prefix}\\d+)\\s*\\|\\s*([^|]*)\\|\\s*(.*)$`, 'i')
   const entries = []
   const seen = new Set()
-  for (const line of clean.split('\n')) {
-    const m = re.exec(line.trim())
+  const clean = lines.map((l) => l.clean).join('\n')
+  for (const { clean: cleanLine, raw } of lines) {
+    const m = re.exec(cleanLine.trim())
     if (!m) continue
     const id = m[1].toUpperCase()
-    const text = m[3].trim()
+    // The id is recognised on the stripped line; the FILE and FINDING are cut
+    // from the raw line between/after its pipes, so a path the strip would
+    // rewrite (`src/__init__.py`) travels byte-exact (see parseAnswer). A raw
+    // line whose pipes the strip somehow invented falls back to the stripped
+    // fields — visible, never silent loss.
+    const firstPipe = raw.indexOf('|')
+    const secondPipe = firstPipe < 0 ? -1 : raw.indexOf('|', firstPipe + 1)
+    const file = secondPipe < 0 ? m[2].trim() : raw.slice(firstPipe + 1, secondPipe).trim()
+    const text = secondPipe < 0 ? m[3].trim() : raw.slice(secondPipe + 1).trim()
     if (!text) return { ok: false, error: `entry ${id} carries no finding at all` }
     if (seen.has(id)) return { ok: false, error: `the id ${id} is used twice — the merge accounts by id, so one of them would vanish` }
     seen.add(id)
     // A finding that names no file is still a finding; it is marked, never dropped.
-    entries.push({ id, file: m[2].trim() || '(unspecified)', text })
+    entries.push({ id, file: file || '(unspecified)', text })
   }
   // TWO READINGS OF THE SAME MARKER, deliberately different (last round). ACCEPTING an
   // empty audit demands the explanation — a bare "NO FINDINGS:" says nothing about what
@@ -301,6 +327,20 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
   if (blindReviewerAdmission(text) || blindReviewerAdmission(clean)) {
     return { ok: false, kind: k, answer: null, summary: '', error: 'the model says it could not see the material' }
   }
+  // THE STRIPPED COPY MATCHES, THE RAW TEXT IS QUOTED (final convergence,
+  // second half of the dual-scan principle): every strip rule preserves the
+  // LINE COUNT (nothing removes a newline), so lines pair by index — a label
+  // or entry id is recognised on the stripped line, robust against
+  // decoration, and the field VALUE is cut from the raw line, so content the
+  // strip would rewrite (`src/__init__.py`) reaches the caller byte-exact.
+  // Should the pairing ever break, extraction falls back to the stripped
+  // lines alone — a wrong-but-visible spelling, never a crash.
+  const rawLines = String(text ?? '').split('\n')
+  const cleanLines = clean.split('\n')
+  const lines =
+    rawLines.length === cleanLines.length
+      ? cleanLines.map((c, i) => ({ clean: c, raw: rawLines[i] }))
+      : cleanLines.map((c) => ({ clean: c, raw: c }))
   if (k === 'explain') {
     const prose = clean.trim()
     if (prose.length < 40) return { ok: false, kind: k, answer: null, summary: '', error: 'the answer is too thin to be an explanation' }
@@ -308,7 +348,7 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
   }
   // A sweep may honestly find nothing; a DIVERGENT enumeration that lists nothing is no
   // half of a blind-parallel stage, so only the audit may come back empty.
-  const parsed = k === 'diagnose' ? parseDiagnose(clean) : parseEntries(clean, entryPrefix(k), { allowEmpty: k === 'audit' })
+  const parsed = k === 'diagnose' ? parseDiagnose(lines) : parseEntries(lines, entryPrefix(k), { allowEmpty: k === 'audit' })
   return parsed.ok
     ? { ok: true, kind: k, answer: parsed.answer, summary: parsed.summary, error: '' }
     : { ok: false, kind: k, answer: null, summary: '', error: parsed.error }

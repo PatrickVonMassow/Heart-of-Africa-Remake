@@ -222,6 +222,40 @@ describe('the markdown strip reads shapes, not characters (round-7 pass 1)', () 
     }
   })
 
+  it('quotes fields from the RAW text — src/__init__.py reaches the caller byte-exact', () => {
+    // The finding that closed the loop: the stripped copy rewrote matched
+    // word-edge pairs, so diagnose evidence cited src/init.py for a file
+    // named src/__init__.py. Matching runs on the stripped line; the VALUE
+    // is cut from the raw one.
+    const parsed = parseAnswer({
+      kind: 'diagnose',
+      text: 'reasoning\n\nCAUSE: the module initialiser writes early\nEVIDENCE: src/__init__.py:3 writes the frame outside the shutter',
+    })
+    expect(parsed.ok).toBe(true)
+    expect(parsed.answer.evidence).toContain('src/__init__.py:3')
+  })
+
+  it('still recognises a DECORATED label — the stripped line matches, the raw line is quoted', () => {
+    const parsed = parseAnswer({
+      kind: 'diagnose',
+      text: 'reasoning\n\n**CAUSE:** the fixture writes early\n**EVIDENCE:** src/__init__.py:9 exports the checked symbol',
+    })
+    expect(parsed.ok).toBe(true)
+    expect(parsed.answer.cause).toBe('the fixture writes early')
+    expect(parsed.answer.evidence).toContain('src/__init__.py:9')
+  })
+
+  it('carries a list entry’s file and finding byte-for-byte from the raw line', () => {
+    const parsed = parseAnswer({
+      kind: 'audit',
+      text: 'sweep done\n\nA1 | src/__init__.py | the __slots__ list drops the flag field entirely',
+    })
+    expect(parsed.ok).toBe(true)
+    expect(parsed.answer.entries).toEqual([
+      { id: 'A1', file: 'src/__init__.py', text: 'the __slots__ list drops the flag field entirely' },
+    ])
+  })
+
   it('does not admit a genuine review that merely SPEAKS the net’s vocabulary, raw or stripped', () => {
     const parsed = parseAnswer({
       kind: 'explain',
