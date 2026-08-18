@@ -176,7 +176,8 @@ const RESUME_BODY =
   'DELEGATION (user decision 22.07.2026): delegate implementation AND infra/guard/doc/' +
   'dashboard work to parallel WORKTREE-ISOLATED subagents on NON-OVERLAPPING files — under ' +
   'the model policy stated above, so the points go to GPT-5.6 Sol — the hard and critical ' +
-  'ones included — while a point whose verification is the work stays with Opus 5 ' +
+  'ones included — while a point whose verification is the work stays with Opus 5 unless ' +
+  'its spec marks it hard ' +
   '(each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
   'session keeps only the picture-verification on both backends, the serial merge -> ' +
   'fast-gate -> tick -> deploy -> cleanup, and the board publish. Every defect the user ' +
