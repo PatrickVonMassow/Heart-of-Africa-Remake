@@ -288,10 +288,25 @@ export function summarizeReviewDebt({ outstanding = [], sizedPlan = null } = {})
   // the UNSPLIT assembly of every group — measured 18.08.2026 it stood at 466106
   // beside a one-round plan whose pass carried 116875, and a figure four times
   // the budget beside "1 pass" reads as a count that cannot be true.
-  const passMaterial = sizedPlan.passes.reduce((sum, pass) => sum + Number(pass?.rawSize ?? pass?.size ?? 0), 0)
+  // A PART-MEASURED PLAN REPORTS NOTHING. Summing what some passes carry and
+  // treating an unmeasured one as zero understates the debt by exactly the
+  // passes nobody sized, and understating it is how this gate came to be
+  // ignored. Only two answers are honest: what every pass carries, or — where
+  // none was measured — the plan's unsplit assembly, which at least names its
+  // own frame.
+  const sizes = sizedPlan.passes.map((pass) => {
+    const size = Number(pass?.rawSize ?? pass?.size)
+    return Number.isFinite(size) ? size : null
+  })
+  const measured = sizes.filter((size) => size !== null)
+  const materialChars = !measured.length
+    ? Number(sizedPlan.rawSize)
+    : measured.length < sizes.length
+      ? null
+      : measured.reduce((sum, size) => sum + size, 0)
   return {
     passCount: sizedPlan.passes.length,
-    materialChars: passMaterial > 0 ? passMaterial : Number(sizedPlan.rawSize),
+    materialChars,
     groups: sizedPlan.passes,
   }
 }

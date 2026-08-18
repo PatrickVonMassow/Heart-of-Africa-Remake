@@ -339,6 +339,16 @@ describe('visible review debt', () => {
     })).toEqual({ passCount: 1, materialChars: 116_875, groups: passes })
   })
 
+  it('names a part-measured plan unavailable rather than reporting the passes it could size', () => {
+    // Treating an unsized pass as zero understates the debt by exactly the
+    // passes nobody measured — a smaller number that still reads as a fact.
+    const passes = [{ index: 1, rawSize: 100 }, { index: 2 }]
+    expect(summarizeReviewDebt({
+      outstanding: [{ file: 'a' }],
+      sizedPlan: { passes, rawSize: 1000 },
+    })).toEqual({ passCount: 2, materialChars: null, groups: passes })
+  })
+
   it('distinguishes cleared debt from an unavailable measurement', () => {
     expect(summarizeReviewDebt({ outstanding: [] })).toEqual({ passCount: 0, materialChars: 0, groups: [] })
     expect(summarizeReviewDebt({ outstanding: [{ file: 'a' }] })).toEqual({
