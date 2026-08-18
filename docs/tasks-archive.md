@@ -18608,3 +18608,44 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — it does not produce a wrong answer, it produces an unearned CLEARANCE, and
   the four-eyes rule the whole model policy rests on is only worth what its records cover.
   Bundle: unbundled (review tooling).
+
+- [x] 721. The mechanism gate's unreviewed range outgrew every reviewer, so the four-eyes
+  rule it enforces cannot be satisfied at all (measured 18.08.2026, 15:5x). The gate demands a
+  second model's recorded review for the range `762de1ce..HEAD`. What that range now is:
+  5 870 199 characters of material against a 200 000-character round, split into TWENTY passes
+  over the file set, of which ONE is on record. And the split is only half the problem: asked to
+  review it, `review-sol.mjs` answers "GPT-5.6 Sol AUTHORED part of this range — no model
+  reviews its own work", while Anthropic models authored other parts of the same range. There is
+  therefore no eligible reviewer for the range AS A WHOLE, and the per-pass route needs twenty
+  rounds that nobody schedules. Meanwhile every new guard commit joins the same range, so the
+  debt grows with the work and the gate blocks turn ends for a rule it makes impossible to obey.
+  This is not point 717 (the review-material sharpenings) and not point 714 (which closed the
+  silent-coverage hole): it is the RANGE, which no mechanism cuts back.
+  FINAL STATE:
+  1. THE RANGE IS CUT BY AUTHORSHIP, NOT ONLY BY SIZE. The pass plan groups files by WHO
+     authored their changes in the range, so each pass has an eligible reviewer by construction,
+     and a pass names it. A file set with contributions from both vendors is reported as such
+     and split at the commit level rather than assigned to an author of its own content.
+  2. THE BASELINE ADVANCES ON WHAT WAS ACTUALLY READ. A recorded pass moves the gate's baseline
+     for the files it covered, so a cleared file stops being re-demanded by every later range.
+     What has never been read stays owed, by name.
+  3. THE DEBT IS VISIBLE BEFORE IT IS BLOCKING. `node scripts/mechanism-review-guard.mjs
+     --status` states the outstanding pass count and the material size, and the batch reports
+     it like any other backlog — a gate that first speaks at a turn end has already cost the
+     turn.
+  4. THE CRITICALITY GATE HANGS ON THE SAME CAUSE and is cleared with it. Point 700's HIGH tick
+     carries a `do-not-merge` whose own evidence says why: three successive passes were refused
+     on TRUNCATED material rather than on a defect, and the recorder refused to manufacture a
+     clearance by re-asking with a friendlier framing. So the re-review of 700 that this gate
+     wants is only possible once the range is reviewable at all — it is the first record the
+     rebuilt plan must produce, and until then BOTH gates block every turn end for one cause.
+  5. THE EXISTING BACKLOG IS WORKED OFF, not waived: the twenty passes of the current range are
+     run under rule 1 and recorded, or the range is explicitly re-baselined with a written
+     justification naming every file that re-baselining leaves unread.
+  VERIFIABLE: the pass plan for the current range assigns every pass a reviewer that authored
+  none of its files, or names the pass it cannot; a recorded pass removes its files from the
+  next plan; `--status` prints the outstanding count; and `npm run test:unit` covers the
+  authorship cut and the per-file baseline in the pure core.
+  Criticality: high — it is the enforcement of the four-eyes principle itself, and its current
+  failure mode is a gate that blocks every turn end while being impossible to satisfy.
+  Bundle: unbundled (review tooling).
