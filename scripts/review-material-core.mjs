@@ -465,6 +465,12 @@ export function materialShortfall({ assembly = null, sent = undefined, transport
     return {
       reason: 'unverified',
       detail: `the hand-off did not complete: ${err}`,
+      // The accounting's evidence of a cut travels into EVERY refusal shape
+      // (round-1 pass 3): these branches dropped the two flags, so the loss
+      // report could not name that the DIFFSTAT or the PATCH was cut even
+      // though the assembly knew.
+      statTruncated: Boolean(assembly?.statTruncated),
+      patchTruncated: Boolean(assembly?.patchTruncated),
       truncated: assembly?.truncated ?? [],
       omitted: assembly?.omitted ?? [],
       budget: assembly?.budget ?? MATERIAL_BUDGET_CHARS,
@@ -477,6 +483,8 @@ export function materialShortfall({ assembly = null, sent = undefined, transport
     return {
       reason: 'unverified',
       detail: seen.note,
+      statTruncated: Boolean(assembly?.statTruncated),
+      patchTruncated: Boolean(assembly?.patchTruncated),
       truncated: assembly?.truncated ?? [],
       omitted: assembly?.omitted ?? [],
       budget: assembly?.budget ?? MATERIAL_BUDGET_CHARS,
@@ -488,6 +496,8 @@ export function materialShortfall({ assembly = null, sent = undefined, transport
     return {
       reason: 'sent-differs',
       detail: seen.note,
+      statTruncated: Boolean(assembly.statTruncated),
+      patchTruncated: Boolean(assembly.patchTruncated),
       truncated: assembly.truncated,
       omitted: assembly.omitted,
       budget: assembly.budget,

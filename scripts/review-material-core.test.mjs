@@ -454,6 +454,25 @@ describe('what was assembled against what was sent', () => {
     expect(materialShortfall({ assembly, sent: assembly.text, transportError: '' })).toBeNull()
     expect(materialShortfall({ assembly, sent: assembly.text, transportError: '  ' })).toBeNull()
   })
+
+  // ROUND-1 PASS 3: the transport-error, unknown-sent and sent-differs
+  // branches dropped statTruncated/patchTruncated, so the loss report could
+  // not name that the DIFFSTAT or the PATCH was cut even though the assembly
+  // knew. Every refusal shape now carries the evidence it has.
+  it('names a cut diffstat and patch in EVERY refusal shape, not only over-budget', () => {
+    const cutAssembly = { ...assembly, statTruncated: true, patchTruncated: true }
+    for (const short of [
+      materialShortfall({ assembly: cutAssembly, sent: cutAssembly.text, transportError: 'killed mid-stream' }),
+      materialShortfall({ assembly: cutAssembly }),
+      materialShortfall({ assembly: cutAssembly, sent: 'a different string' }),
+    ]) {
+      expect(short?.statTruncated).toBe(true)
+      expect(short?.patchTruncated).toBe(true)
+      const said = formatShortfall(short, { sha: 'abc1234' })
+      expect(said).toContain('the DIFFSTAT was cut')
+      expect(said).toContain('the PATCH was cut')
+    }
+  })
 })
 
 describe('the patch, split per file', () => {
