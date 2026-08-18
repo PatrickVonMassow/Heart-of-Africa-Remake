@@ -573,11 +573,17 @@ export function resolveCommit(sha, { run = git } = {}) {
     .map((line) => line.trim())
     .filter(Boolean)
   const commits = candidates.filter((candidate) => {
+    // AN UNREADABLE CANDIDATE IS NOT A NON-COMMIT. Swallowing the error dropped
+    // it from the list, so a prefix naming one readable commit beside one
+    // unreadable object resolved as unambiguous — ambiguity failing OPEN, which
+    // is the one direction this check exists to prevent.
+    let type
     try {
-      return run(['cat-file', '-t', candidate]) === 'commit'
-    } catch {
-      return false
+      type = run(['cat-file', '-t', candidate])
+    } catch (e) {
+      throw new Error(`--record <sha>: "${ref}" names an object this repository cannot read (${candidate.slice(0, 12)}): ${(e && e.message) || e}`)
     }
+    return type === 'commit'
   })
   if (!commits.length) {
     throw new Error(`--record <sha>: "${ref}" names no commit in this repository`)

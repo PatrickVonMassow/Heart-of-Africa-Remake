@@ -872,19 +872,29 @@ describe('the mode at the command line', () => {
 })
 
 describe('a boundary resolves against the object database, not against refs', () => {
-  const OBJECT = 'a'.repeat(40)
+  // Real `--disambiguate` only ever lists objects that CARRY the queried prefix,
+  // so the fixtures do too: a fake free to answer with an unrelated sha would
+  // pin a contract git does not have.
+  const PREFIX = 'aaaaaaa'
+  const OBJECT = `${PREFIX}${'0'.repeat(33)}`
+  const SIBLING = `${PREFIX}${'1'.repeat(33)}`
+  // What a hex-named REF would have resolved to: unrelated to the prefix, which
+  // is exactly the damage — a different commit recorded than the one named.
   const SHADOW = 'b'.repeat(40)
-  // A branch or tag may legally be named in hex, and `git rev-parse` answers the
-  // REF first — so a ref named like a sha prefix would have recorded a different
-  // commit than the boundary named, and the coverage reader would then clear
-  // contributions nobody read.
-  const runner = ({ objects = [OBJECT], types = {}, calls = [] } = {}) => {
+
+  const runner = ({ objects = [OBJECT], types = {}, unreadable = [], calls = [] } = {}) => {
     const fake = (args) => {
       calls.push(args.join(' '))
-      if (args[0] === 'rev-parse' && String(args[1]).startsWith('--disambiguate=')) return objects.join('\n')
-      if (args[0] === 'cat-file') return types[args[2]] ?? 'commit'
+      if (args[0] === 'rev-parse' && String(args[1]).startsWith('--disambiguate=')) {
+        const prefix = String(args[1]).slice('--disambiguate='.length)
+        return objects.filter((object) => object.startsWith(prefix)).join('\n')
+      }
+      if (args[0] === 'cat-file') {
+        if (unreadable.includes(args[2])) throw new Error(`fatal: git cat-file: could not get object info`)
+        return types[args[2]] ?? 'commit'
+      }
       if (args[0] === 'rev-parse') return SHADOW
-      if (args[0] === 'show') return args[1] === '-s' && String(args[2]).includes('%s') ? 'subject' : 'GPT-5.6 Sol <noreply@openai.com>'
+      if (args[0] === 'show') return String(args[2]).includes('%s') ? 'subject' : 'GPT-5.6 Sol <noreply@openai.com>'
       return ''
     }
     fake.calls = calls
@@ -893,23 +903,38 @@ describe('a boundary resolves against the object database, not against refs', ()
 
   it('takes the object a prefix names, not the commit a hex-named ref points at', () => {
     const run = runner()
-    expect(resolveCommit('aaaaaaa', { run }).sha).toBe(OBJECT)
+    expect(resolveCommit(PREFIX, { run }).sha).toBe(OBJECT)
+    expect(run.calls.some((call) => call.includes('^{commit}'))).toBe(false)
+  })
+
+  it('resolves a full 40-character sha through the object database too', () => {
+    const run = runner()
+    // A ref may legally be named in 40 hex characters as well, so the long form
+    // must not fall back to ref resolution either.
+    expect(resolveCommit(OBJECT, { run }).sha).toBe(OBJECT)
     expect(run.calls.some((call) => call.includes('^{commit}'))).toBe(false)
   })
 
   it('refuses an ambiguous prefix instead of picking one', () => {
-    const run = runner({ objects: [OBJECT, SHADOW] })
-    expect(() => resolveCommit('aaaaaaa', { run })).toThrow(/ambiguous/)
+    const run = runner({ objects: [OBJECT, SIBLING] })
+    expect(() => resolveCommit(PREFIX, { run })).toThrow(/ambiguous/)
   })
 
   it('refuses a prefix that names no commit', () => {
-    expect(() => resolveCommit('aaaaaaa', { run: runner({ objects: [] }) })).toThrow(/names no commit/)
+    expect(() => resolveCommit(PREFIX, { run: runner({ objects: [] }) })).toThrow(/names no commit/)
     const blob = runner({ types: { [OBJECT]: 'blob' } })
-    expect(() => resolveCommit('aaaaaaa', { run: blob })).toThrow(/names no commit/)
+    expect(() => resolveCommit(PREFIX, { run: blob })).toThrow(/names no commit/)
   })
 
   it('passes over a non-commit object sharing the prefix', () => {
-    const run = runner({ objects: [SHADOW, OBJECT], types: { [SHADOW]: 'tree' } })
-    expect(resolveCommit('aaaaaaa', { run }).sha).toBe(OBJECT)
+    const run = runner({ objects: [SIBLING, OBJECT], types: { [SIBLING]: 'tree' } })
+    expect(resolveCommit(PREFIX, { run }).sha).toBe(OBJECT)
+  })
+
+  it('refuses when a candidate cannot be typed, rather than resolving around it', () => {
+    // An unreadable object could itself be a commit; dropping it would let
+    // ambiguity fail open, which is the one direction this check must not fail.
+    const run = runner({ objects: [OBJECT, SIBLING], unreadable: [SIBLING] })
+    expect(() => resolveCommit(PREFIX, { run })).toThrow(/cannot read/)
   })
 })
