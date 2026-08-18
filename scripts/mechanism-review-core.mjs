@@ -524,6 +524,11 @@ export const FLAG_SPEC = Object.freeze({
   // the file set, and each pass records what it actually read (point 714).
   '--pass': true,
   '--pass-files': true,
+  // Authorship-cut passes also name the commits whose contributions they read.
+  // A mixed-vendor path may occur in two passes, one per authoring commit; the
+  // commit list makes those two readings distinct and lets the gate advance the
+  // baseline for exactly the contribution that was seen.
+  '--pass-commits': true,
   // A pass of an EARLIER round carries forward to a new head where every file
   // it read is byte-identical there (delta-scoped rounds, user decision
   // 18.08.2026): the recorder verifies the blob identity and the source
@@ -553,6 +558,7 @@ const VALUE_KEY = Object.freeze({
   '--list-b': 'listBPath',
   '--pass': 'pass',
   '--pass-files': 'passFiles',
+  '--pass-commits': 'passCommits',
   '--carried-from': 'carriedFrom',
 })
 
@@ -854,7 +860,7 @@ export function validateMode({ mode, framing } = {}) {
  *
  * Returns { ok, errors, pass } with `pass` the parsed record field, or null.
  */
-export function validatePass({ pass, passFiles } = {}) {
+export function validatePass({ pass, passFiles, passCommits } = {}) {
   const spec = String(pass ?? '').trim()
   // The list is parsed RAW (fourth cross-vendor round): trimming it here strips
   // the FIRST token's leading and the LAST token's trailing whitespace before
@@ -863,7 +869,9 @@ export function validatePass({ pass, passFiles } = {}) {
   // the trimmed view; the bytes go to the parser untouched, which fails loud.
   const listed = String(passFiles ?? '')
   const hasList = listed.trim() !== ''
-  if (!spec && !hasList) return { ok: true, errors: [], pass: null }
+  const commitList = String(passCommits ?? '').trim()
+  const hasCommits = commitList !== ''
+  if (!spec && !hasList && !hasCommits) return { ok: true, errors: [], pass: null }
   const errors = []
   if (!spec) {
     errors.push('--pass-files without --pass <k>/<n>: a file list belongs to a pass, and this record names none')
@@ -873,6 +881,9 @@ export function validatePass({ pass, passFiles } = {}) {
       '--pass <k>/<n> without --pass-files: a pass verdict covers the files it actually read, and a ' +
         'record that does not name them claims a coverage nobody can check',
     )
+  }
+  if (!spec && hasCommits) {
+    errors.push('--pass-commits without --pass <k>/<n>: commit scope belongs to a pass, and this record names none')
   }
   const parsed = spec ? parsePassSpec(spec) : { ok: false, errors: [] }
   errors.push(...parsed.errors)
@@ -885,9 +896,22 @@ export function validatePass({ pass, passFiles } = {}) {
   if (hasList && list.ok && !list.files.length) {
     errors.push('--pass-files "<a,b,c>": the paths this pass reviewed, comma-separated')
   }
+  const commits = commitList ? commitList.split(',') : []
+  if (hasCommits && commits.some((sha) => !/^[0-9a-f]{7,40}$/i.test(sha))) {
+    errors.push('--pass-commits "<sha,sha>": every contribution boundary must be a 7–40 character commit sha')
+  }
+  if (hasCommits && uniqStrings(commits).length !== commits.length) {
+    errors.push('--pass-commits: each commit is named once; duplicate boundaries do not add coverage')
+  }
   if (errors.length) return { ok: false, errors, pass: null }
-  return { ok: true, errors: [], pass: { index: parsed.index, total: parsed.total, files: list.files } }
+  return {
+    ok: true,
+    errors: [],
+    pass: { index: parsed.index, total: parsed.total, files: list.files, ...(hasCommits ? { commits } : {}) },
+  }
 }
+
+const uniqStrings = (values) => [...new Set((values ?? []).map(String))]
 
 /**
  * Is this a well-formed review record, and may it be WRITTEN?
@@ -910,10 +934,11 @@ export function validateRecord({
   authors,
   pass,
   passFiles,
+  passCommits,
 } = {}) {
   const errors = []
   errors.push(...validateMode({ mode, framing }).errors)
-  errors.push(...validatePass({ pass, passFiles }).errors)
+  errors.push(...validatePass({ pass, passFiles, passCommits }).errors)
   errors.push(...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors }).errors)
   if (!/^[0-9a-f]{7,40}$/i.test(String(sha ?? '').trim())) {
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
@@ -992,6 +1017,20 @@ export function mergeProblem(record = {}, commit = {}) {
   return check.ok ? '' : 'self-merge'
 }
 
+/** Ledger-era validity shared by the gate and the per-file debt planner. */
+export function reviewRecordWellFormed(record = {}) {
+  if (!VERDICTS.includes(String(record.verdict))) return false
+  if (typeof record.model !== 'string' || !record.model.trim()) return false
+  if (!ledgerAtUsable(record.at)) return false
+  if (typeof record.evidence !== 'string') return false
+  const evidence = record.evidence.trim()
+  if (evidence.length < 10 || /^<.*>$/.test(evidence) || blindReviewerAdmission(evidence)) return false
+  const mode = String(record.mode ?? '').trim()
+  const at = Number(record.at)
+  if (mode ? !MODES.includes(mode) : !(Number.isFinite(at) && at > 0 && at < MODE_REQUIRED_SINCE)) return false
+  return record.carried === undefined || record.carriedVerified === true
+}
+
 /**
  * The gate itself.
  *
@@ -1028,7 +1067,8 @@ export function evaluateMechanismReview({
   }
   const findings = []
 
-  for (const commit of pendingCommits ?? []) {
+  for (const pendingCommit of pendingCommits ?? []) {
+    let commit = pendingCommit
     const covering = [...new Set(commit?.coveringRecordShas ?? [])].flatMap((s) => bySha.get(String(s)) ?? [])
     // A record is only a review if it says who reviewed, how it ended AND what
     // was actually checked; a half-written line must not clear the gate. THE
@@ -1041,44 +1081,7 @@ export function evaluateMechanismReview({
     // standard from the day the recorder began demanding it (see
     // MODE_REQUIRED_SINCE): a row of that era naming no usable mode can only
     // have arrived by hand.
-    const evidenceUsable = (r) => {
-      // A PRIMITIVE STRING, not a coercion (landing-round pass 2): an object
-      // coerces to '[object Object]', which walks the length test.
-      if (typeof r?.evidence !== 'string') return false
-      const ev = r.evidence.trim()
-      return ev.length >= 10 && !/^<.*>$/.test(ev) && !blindReviewerAdmission(ev)
-    }
-    // Value, not only presence (round-2 pass 1): the recorder and this gate
-    // version together in one tree, so a mode this file does not know cannot
-    // have come from its recorder — "presence, not value" let a hand-edited
-    // `mode: "bogus"` row clear a gate whose own CLI would have refused it. A
-    // legitimately newer mode arrives WITH the MODES entry that names it.
-    const modeUsable = (r) => {
-      const m = String(r?.mode ?? '').trim()
-      if (m) return MODES.includes(m)
-      const at = Number(r?.at)
-      return Number.isFinite(at) && at > 0 && at < MODE_REQUIRED_SINCE
-    }
-    const rowWellFormed = (r) =>
-      VERDICTS.includes(String(r.verdict)) &&
-      // A PRIMITIVE STRING, not a coercion (landing-round pass 2): `model:
-      // {}` coerces to '[object Object]' and read as a named reviewer.
-      typeof r.model === 'string' &&
-      r.model.trim() &&
-      // A NON-NUMERIC TIMESTAMP DEFEATS THE ORDERING (round-3 pass 1,
-      // tightened twice: Number(null) is 0, and a positive-but-seconds-scale
-      // value still loses every comparison against real rows — round-5
-      // pass 1). The recorder writes `at` as a millisecond epoch, and only
-      // that DOMAIN may stand.
-      ledgerAtUsable(r?.at) &&
-      evidenceUsable(r) &&
-      modeUsable(r) &&
-      // A CARRIED ROW STANDS ONLY VERIFIED (delta rounds, 18.08.2026): the
-      // guard re-measures the blob identity the recorder claimed
-      // (verifyCarried) and stamps it; a carried row without the stamp — a
-      // hand-edit, or blobs that no longer match — is not a reading of this
-      // sha's content, and composes nothing.
-      (r.carried === undefined || r.carriedVerified === true)
+    const rowWellFormed = reviewRecordWellFormed
     const wellFormed = covering.filter(rowWellFormed)
     // A MALFORMED REFUSAL POISONS, IT DOES NOT VANISH (final-round pass 1,
     // applied to both gates): a covering do-not-merge whose timestamp fails
@@ -1111,6 +1114,36 @@ export function evaluateMechanismReview({
     const selfReviews = wellFormed.filter((r) => sameModel(r.model, commit?.authorModel) || mergeProblem(r, commit))
     const sound = wellFormed.filter((r) => !sameModel(r.model, commit?.authorModel) && !mergeProblem(r, commit))
 
+    // AUTHORSHIP-SCOPED PASSES ADVANCE PER CONTRIBUTION. Unlike the legacy
+    // size-only split below, these rows name the commits whose changes were in
+    // the material. Each file can therefore clear as soon as its own
+    // contribution was read; missing siblings stay owed by name instead of
+    // pulling the cleared file back into every later whole-range demand.
+    const scopedShape = (r) => Array.isArray(r?.pass?.commits) && Array.isArray(r?.pass?.files)
+    const scoped = sound.filter((r) => scopedShape(r) && r.pass.commits.map(String).includes(String(commit.sha)))
+    const remainingFiles = []
+    let scopedRefusal = null
+    for (const file of commit.files ?? []) {
+      const rows = scoped.filter((r) => r.pass.files.map(String).includes(String(file)))
+      if (!rows.length) {
+        remainingFiles.push(file)
+        continue
+      }
+      const latest = rows.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+      if (String(latest.verdict) === BLOCKING_VERDICT) {
+        scopedRefusal = !scopedRefusal || Number(latest.at) >= Number(scopedRefusal.at) ? latest : scopedRefusal
+        remainingFiles.push(file)
+      }
+    }
+    if (scopedRefusal) {
+      findings.push({ kind: 'do-not-merge', commit: { ...commit, files: remainingFiles }, records: [scopedRefusal] })
+      continue
+    }
+    if (!remainingFiles.length) continue
+    commit = { ...commit, files: remainingFiles }
+    const legacyCovering = covering.filter((r) => !scopedShape(r))
+    const legacySound = sound.filter((r) => !scopedShape(r))
+
     // A PASS CLEARS NOTHING ON ITS OWN (point 714). The material of a large range
     // is cut through the file set and reviewed one pass at a time, so a single
     // pass record covers the files it named and no more; only a COMPLETE
@@ -1141,8 +1174,8 @@ export function evaluateMechanismReview({
     // exactly when nothing could say which files the range really changed. An
     // empty expected set is passComposition's own unknown-coverage refusal, so
     // the composition then blocks instead of clearing narrower.
-    const compositions = [...new Set(sound.map((r) => String(r?.sha ?? '')))].flatMap((sha) => {
-      const rows = sound.filter((r) => String(r?.sha ?? '') === sha)
+    const compositions = [...new Set(legacySound.map((r) => String(r?.sha ?? '')))].flatMap((sha) => {
+      const rows = legacySound.filter((r) => String(r?.sha ?? '') === sha)
       const measured = rows.some((r) => Array.isArray(r?.rangeFiles))
       const range = [...new Set(rows.flatMap((r) => (Array.isArray(r?.rangeFiles) ? r.rangeFiles : [])))]
       return passComposition(rows, {
@@ -1184,10 +1217,10 @@ export function evaluateMechanismReview({
     // way out stays honest and is always open: complete the recorded passes.
     // Only records that COMPOSE must be sound; the evidence of the split need
     // not be.
-    const split = covering.some(passRow)
-    const besideSplit = split ? sound.filter((r) => !r?.pass) : []
+    const split = legacyCovering.some(passRow)
+    const besideSplit = split ? legacySound.filter((r) => !r?.pass) : []
     const valid = [
-      ...(split ? [] : sound.filter((r) => !r?.pass)),
+      ...(split ? [] : legacySound.filter((r) => !r?.pass)),
       ...complete.map((g) => ({
         ...g.records.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a)),
         // The composition speaks with the WORST of its passes: one pass saying

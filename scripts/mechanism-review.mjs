@@ -154,6 +154,7 @@ export function buildRecord({
   listBPath = '',
   pass = '',
   passFiles = '',
+  passCommits = '',
   carriedFrom = '',
   now = Date.now(),
   resolve = resolveCommit,
@@ -178,6 +179,7 @@ export function buildRecord({
         accounting,
         pass,
         passFiles,
+        passCommits,
       }).errors,
     }
   }
@@ -200,6 +202,7 @@ export function buildRecord({
       accounting,
       pass,
       passFiles,
+      passCommits,
     }).errors.filter((e) => !/--record\b/.test(e))
     return {
       ok: false,
@@ -209,6 +212,14 @@ export function buildRecord({
   // A CARRY IS ITS OWN FLOW (delta rounds, 18.08.2026): everything but the
   // sha, the pass scope and the point comes verified from the source reading.
   if (String(carriedFrom ?? '').trim()) {
+    if (String(passCommits ?? '').trim()) {
+      return {
+        ok: false,
+        errors: [
+          '--pass-commits cannot be carried: contribution boundaries are tied to the authorship plan that was actually reviewed',
+        ],
+      }
+    }
     return buildCarriedRecord({
       sha: ref,
       carriedFrom,
@@ -262,6 +273,7 @@ export function buildRecord({
     accounting: receipt,
     pass,
     passFiles,
+    passCommits,
   })
   const errors = [...check.errors]
   // Optional, but never sloppy: a mistyped point number would record a review
@@ -272,7 +284,30 @@ export function buildRecord({
     errors.push('--point <N>: the work-order point this review settles, as a plain number')
   }
   if (errors.length) return { ok: false, errors }
-  const passField = validatePass({ pass, passFiles }).pass
+  let passField = validatePass({ pass, passFiles, passCommits }).pass
+  // A CONTRIBUTION BOUNDARY IS STORED WHOLE. The flag accepts a 7–40 character
+  // sha, but the gate matches a record's commits against the range's FULL shas
+  // by exact string — an abbreviated boundary therefore covered NOTHING while
+  // the record looked complete, the silent shape point 714 exists to refuse. So
+  // the boundary is resolved here, and a sha this repository cannot resolve is
+  // a refusal rather than a row nobody can act on.
+  if (passField?.commits) {
+    const resolved = []
+    for (const boundary of passField.commits) {
+      try {
+        resolved.push(resolve(boundary).sha)
+      } catch (e) {
+        return { ok: false, errors: [`--pass-commits ${boundary}: ${(e && e.message) || e}`] }
+      }
+    }
+    if (new Set(resolved).size !== resolved.length) {
+      return {
+        ok: false,
+        errors: ['--pass-commits: two boundaries resolve to the same commit; each contribution is named once'],
+      }
+    }
+    passField = { ...passField, commits: resolved }
+  }
   return {
     ok: true,
     record: {
@@ -519,7 +554,7 @@ export function verifyCarried(records, allRecords = null) {
  *  containing that separator shifted the trailers out of their field — the
  *  authoring model then read wrong, and the self-review refusal missed. With
  *  one format per call there is no separator to forge. */
-export function resolveCommit(sha) {
+export function resolveCommit(sha, { run = git } = {}) {
   // VALIDATED BEFORE GIT SEES IT (landing-round pass 4): the record command is
   // only ever printed with a hex sha, so anything else is refused by shape —
   // with the one message that names what this command wants.
@@ -527,9 +562,40 @@ export function resolveCommit(sha) {
   if (!/^[0-9a-f]{7,40}$/i.test(ref)) {
     throw new Error(`--record <sha>: "${ref}" is not a commit sha (7–40 hex characters)`)
   }
-  const full = git(['rev-parse', `${ref}^{commit}`])
-  const subject = git(['show', '-s', '--format=%s', full])
-  const trailers = git(['show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', full])
+  // RESOLVED AGAINST THE OBJECT DATABASE, NOT AGAINST REFS. `git rev-parse`
+  // answers a REF first, and a branch or tag may legally be named in hex — so
+  // a ref named like a sha prefix would silently record a DIFFERENT commit than
+  // the boundary given, and the coverage reader would then clear contributions
+  // nobody read. `--disambiguate` never consults refs: it lists the objects
+  // whose id carries the prefix, and anything but exactly one commit is refused.
+  const candidates = run(['rev-parse', `--disambiguate=${ref.toLowerCase()}`])
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const commits = candidates.filter((candidate) => {
+    // AN UNREADABLE CANDIDATE IS NOT A NON-COMMIT. Swallowing the error dropped
+    // it from the list, so a prefix naming one readable commit beside one
+    // unreadable object resolved as unambiguous — ambiguity failing OPEN, which
+    // is the one direction this check exists to prevent.
+    let type
+    try {
+      type = run(['cat-file', '-t', candidate])
+    } catch (e) {
+      throw new Error(`--record <sha>: "${ref}" names an object this repository cannot read (${candidate.slice(0, 12)}): ${(e && e.message) || e}`)
+    }
+    return type === 'commit'
+  })
+  if (!commits.length) {
+    throw new Error(`--record <sha>: "${ref}" names no commit in this repository`)
+  }
+  if (commits.length > 1) {
+    throw new Error(
+      `--record <sha>: "${ref}" is ambiguous — it names ${commits.length} commits (${commits.map((c) => c.slice(0, 12)).join(', ')})`,
+    )
+  }
+  const full = commits[0]
+  const subject = run(['show', '-s', '--format=%s', full])
+  const trailers = run(['show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', full])
   return {
     sha: full,
     subject,
@@ -566,6 +632,8 @@ export const usage = () =>
   `       its own covers the files it names and nothing else. review-sol.mjs prints them.\n` +
   `       A path holding a comma, a quote or edge whitespace is written C-QUOTED, exactly\n` +
   `       as git prints it; nothing is ever trimmed into a different path.\n` +
+  `       An authorship-cut pass adds --pass-commits "<sha,sha>" so a mixed-vendor\n` +
+  `       file is credited only at the commit boundaries this reviewer actually read.\n` +
   `--carried-from <sha> carries an EARLIER round's pass to this head where every file it\n` +
   `       read is byte-identical there: the recorder verifies the blob identity and the\n` +
   `       source reading, and COPIES its verdict/model/evidence — do not pass them. The\n` +
@@ -626,8 +694,9 @@ if (isMainModule(import.meta.url)) {
           index >= 1 &&
           index <= total &&
           Array.isArray(p?.files)
+        const commits = Array.isArray(p?.commits) ? p.commits.map((sha) => oneLine(sha)).join(', ') : ''
         return shaped
-          ? `\n      pass ${index}/${total} over: ${files}`
+          ? `\n      pass ${index}/${total} over: ${files}${commits ? `\n      contribution commits: ${commits}` : ''}`
           : `\n      pass (MALFORMED claim ${oneLine(JSON.stringify({ index: p?.index, total: p?.total, files: Array.isArray(p?.files) ? undefined : p?.files })).slice(0, 100)}) over: ${files}`
       }
       for (const r of records) {

@@ -24,10 +24,6 @@
       "at": "2026-08-11T21:10:45.801Z",
       "why": "Last is right for the mechanism; the ONE stale section it names (criterion 7) is corrected inside point 174, which gates the release anyway."
     },
-    "662": {
-      "at": "2026-08-12T20:10:55.614Z",
-      "why": "Prozessluecke mit hoher Kostenwirkung, aber hinter der Verstaendigungs-Kette; vor 633 einsortiert bei den Infrastruktur-Nachbarn"
-    },
     "663": {
       "at": "2026-08-12T20:20:48.210Z",
       "why": "Infrastruktur-Aergernis mit Retry als Sofort-Handgriff; hinter den Release-Punkten bei den Infrastruktur-Nachbarn"
@@ -143,10 +139,14 @@
     "718": {
       "at": "2026-08-18T13:41:46.018Z",
       "why": "The lane ruling it records is already in force since 714 landed; what remains is the tag plus its unit case, which nothing blocks."
+    },
+    "722": {
+      "at": "2026-08-18T16:54:33.891Z",
+      "why": "Nobody is blocked on the historical reading — the gates stand clear after the rule-5 re-baseline, the debt is tracked in the point itself, and the user's queue work (723, the game points) comes first"
     }
   },
   "settled": {
-    "at": "2026-08-18T13:41:46.018Z",
+    "at": "2026-08-18T17:37:22.335Z",
     "points": [
       174,
       184,
@@ -309,7 +309,6 @@
       658,
       659,
       660,
-      662,
       663,
       664,
       665,
@@ -354,7 +353,8 @@
       717,
       718,
       719,
-      720
+      720,
+      722
     ]
   }
 }

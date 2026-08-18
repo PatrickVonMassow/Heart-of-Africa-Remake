@@ -13,7 +13,7 @@ import { spawnSync } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { appendRecord, buildRecord, KNOWN_FLAGS, readRecords, usage } from './mechanism-review.mjs'
+import { appendRecord, buildRecord, KNOWN_FLAGS, readRecords, resolveCommit, usage } from './mechanism-review.mjs'
 import { MODES, VERDICTS } from './mechanism-review-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'mechanism-review.mjs')
@@ -27,7 +27,10 @@ const run = (...args) =>
 
 describe('the flag surface', () => {
   it('knows every flag its usage documents', () => {
-    const flags = ['--record', '--model', '--verdict', '--evidence', '--point', '--mode', '--framing', '--list']
+    const flags = [
+      '--record', '--model', '--verdict', '--evidence', '--point', '--mode', '--framing',
+      '--pass', '--pass-files', '--pass-commits', '--list',
+    ]
     for (const flag of flags) {
       expect(KNOWN_FLAGS.has(flag), `${flag} must be accepted`).toBe(true)
     }
@@ -158,7 +161,11 @@ describe('the mode round-trips into the ledger', () => {
       verdict: 'merge',
       evidence: 'read the core against the spec and ran the pure cases',
       now: 1_700_000_000_000,
-      resolve: () => stub(),
+      // The stub ANSWERS THE REF IT WAS ASKED (not a fixed sha): the recorder
+      // resolves every contribution boundary through the same resolver, and a
+      // stub blind to its argument would hide a boundary resolved to the wrong
+      // commit.
+      resolve: (ref) => stub({ sha: String(ref) }),
       ...over,
     })
 
@@ -193,6 +200,78 @@ describe('the mode round-trips into the ledger', () => {
         expect(back[0].verdict).toBe('merge')
       })
     }
+  })
+
+  it('round-trips an authorship pass contribution scope', () => {
+    const a = 'a'.repeat(40)
+    const b = 'b'.repeat(40)
+    const built = build({
+      mode: 'review',
+      pass: '1/2',
+      passFiles: 'scripts/shared-guard.mjs',
+      passCommits: `${a},${b}`,
+    })
+    expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
+    expect(built.record.pass).toEqual({
+      index: 1,
+      total: 2,
+      files: ['scripts/shared-guard.mjs'],
+      commits: [a, b],
+    })
+  })
+
+  it('stores a contribution boundary WHOLE, so the gate can match it at all', () => {
+    const full = 'a'.repeat(40)
+    const built = build({
+      mode: 'review',
+      pass: '1/2',
+      passFiles: 'scripts/shared-guard.mjs',
+      // The flag accepts an abbreviation; the gate compares against full shas.
+      passCommits: full.slice(0, 8),
+      resolve: (ref) => ({ ...stub(), sha: String(ref).length === 40 ? String(ref) : full }),
+    })
+    expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
+    expect(built.record.pass.commits).toEqual([full])
+  })
+
+  it('refuses a contribution boundary this repository cannot resolve', () => {
+    const built = build({
+      mode: 'review',
+      pass: '1/2',
+      passFiles: 'scripts/shared-guard.mjs',
+      passCommits: 'deadbeef',
+      resolve: (ref) => {
+        if (String(ref) === 'deadbeef') throw new Error('no such commit')
+        return stub({ sha: String(ref) })
+      },
+    })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join('\n')).toContain('--pass-commits deadbeef')
+  })
+
+  it('refuses two boundaries that name the same commit once resolved', () => {
+    const full = 'a'.repeat(40)
+    const built = build({
+      mode: 'review',
+      pass: '1/2',
+      passFiles: 'scripts/shared-guard.mjs',
+      passCommits: `${full.slice(0, 8)},${full}`,
+      resolve: (ref) => ({ ...stub(), sha: String(ref).length === 40 ? String(ref) : full }),
+    })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join('\n')).toContain('resolve to the same commit')
+  })
+
+  it('refuses to carry an authorship scope into a different plan', () => {
+    const built = build({
+      mode: '',
+      carriedFrom: 'a'.repeat(40),
+      pass: '1/2',
+      passFiles: 'scripts/shared-guard.mjs',
+      passCommits: 'b'.repeat(40),
+    })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join('\n')).toContain('cannot be carried')
   })
 
   it('carries the same-model fallback framing through with a blind-parallel mode', () => {
@@ -789,5 +868,73 @@ describe('the mode at the command line', () => {
     expect(text).toContain('--mode')
     expect(text).toContain('--framing')
     for (const mode of MODES) expect(text).toContain(mode)
+  })
+})
+
+describe('a boundary resolves against the object database, not against refs', () => {
+  // Real `--disambiguate` only ever lists objects that CARRY the queried prefix,
+  // so the fixtures do too: a fake free to answer with an unrelated sha would
+  // pin a contract git does not have.
+  const PREFIX = 'aaaaaaa'
+  const OBJECT = `${PREFIX}${'0'.repeat(33)}`
+  const SIBLING = `${PREFIX}${'1'.repeat(33)}`
+  // What a hex-named REF would have resolved to: unrelated to the prefix, which
+  // is exactly the damage — a different commit recorded than the one named.
+  const SHADOW = 'b'.repeat(40)
+
+  const runner = ({ objects = [OBJECT], types = {}, unreadable = [], calls = [] } = {}) => {
+    const fake = (args) => {
+      calls.push(args.join(' '))
+      if (args[0] === 'rev-parse' && String(args[1]).startsWith('--disambiguate=')) {
+        const prefix = String(args[1]).slice('--disambiguate='.length)
+        return objects.filter((object) => object.startsWith(prefix)).join('\n')
+      }
+      if (args[0] === 'cat-file') {
+        if (unreadable.includes(args[2])) throw new Error(`fatal: git cat-file: could not get object info`)
+        return types[args[2]] ?? 'commit'
+      }
+      if (args[0] === 'rev-parse') return SHADOW
+      if (args[0] === 'show') return String(args[2]).includes('%s') ? 'subject' : 'GPT-5.6 Sol <noreply@openai.com>'
+      return ''
+    }
+    fake.calls = calls
+    return fake
+  }
+
+  it('takes the object a prefix names, not the commit a hex-named ref points at', () => {
+    const run = runner()
+    expect(resolveCommit(PREFIX, { run }).sha).toBe(OBJECT)
+    expect(run.calls.some((call) => call.includes('^{commit}'))).toBe(false)
+  })
+
+  it('resolves a full 40-character sha through the object database too', () => {
+    const run = runner()
+    // A ref may legally be named in 40 hex characters as well, so the long form
+    // must not fall back to ref resolution either.
+    expect(resolveCommit(OBJECT, { run }).sha).toBe(OBJECT)
+    expect(run.calls.some((call) => call.includes('^{commit}'))).toBe(false)
+  })
+
+  it('refuses an ambiguous prefix instead of picking one', () => {
+    const run = runner({ objects: [OBJECT, SIBLING] })
+    expect(() => resolveCommit(PREFIX, { run })).toThrow(/ambiguous/)
+  })
+
+  it('refuses a prefix that names no commit', () => {
+    expect(() => resolveCommit(PREFIX, { run: runner({ objects: [] }) })).toThrow(/names no commit/)
+    const blob = runner({ types: { [OBJECT]: 'blob' } })
+    expect(() => resolveCommit(PREFIX, { run: blob })).toThrow(/names no commit/)
+  })
+
+  it('passes over a non-commit object sharing the prefix', () => {
+    const run = runner({ objects: [SIBLING, OBJECT], types: { [SIBLING]: 'tree' } })
+    expect(resolveCommit(PREFIX, { run }).sha).toBe(OBJECT)
+  })
+
+  it('refuses when a candidate cannot be typed, rather than resolving around it', () => {
+    // An unreadable object could itself be a commit; dropping it would let
+    // ambiguity fail open, which is the one direction this check must not fail.
+    const run = runner({ objects: [OBJECT, SIBLING], unreadable: [SIBLING] })
+    expect(() => resolveCommit(PREFIX, { run })).toThrow(/cannot read/)
   })
 })

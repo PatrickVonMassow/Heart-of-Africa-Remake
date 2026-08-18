@@ -55,6 +55,7 @@ const SCRIPT_FILES = [
   // is the only honest way to claim that command is complete.
   'mechanism-review.mjs',
   'mechanism-review-core.mjs',
+  'mechanism-review-range-core.mjs',
   // …which counts a blind-parallel union itself (point 634), so its accounting
   // core travels with it, and asks the AUTHOR allowlist what a model trailer
   // looks like (point 667), so that one does too.
@@ -1048,5 +1049,18 @@ describe('a range too large for one round', () => {
     const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'])
     expect(r.status, r.stderr).toBe(0)
     expect(r.stderr).toContain('It fits in one round.')
+  })
+
+  it('retires carry planning because recorded contribution coverage now persists directly', () => {
+    provenId()
+    const r = run([
+      '--sha', bulkSha,
+      '--brief', 'judge the remaining contributions',
+      '--carry-from', headSha,
+    ])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('--carry-from is obsolete')
+    expect(r.stderr).toContain('commit/file contributions')
+    expect(calls()).toEqual([])
   })
 })

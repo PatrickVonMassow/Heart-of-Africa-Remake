@@ -18608,3 +18608,104 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — it does not produce a wrong answer, it produces an unearned CLEARANCE, and
   the four-eyes rule the whole model policy rests on is only worth what its records cover.
   Bundle: unbundled (review tooling).
+
+- [x] 721. The mechanism gate's unreviewed range outgrew every reviewer, so the four-eyes
+  rule it enforces cannot be satisfied at all (measured 18.08.2026, 15:5x). The gate demands a
+  second model's recorded review for the range `762de1ce..HEAD`. What that range now is:
+  5 870 199 characters of material against a 200 000-character round, split into TWENTY passes
+  over the file set, of which ONE is on record. And the split is only half the problem: asked to
+  review it, `review-sol.mjs` answers "GPT-5.6 Sol AUTHORED part of this range — no model
+  reviews its own work", while Anthropic models authored other parts of the same range. There is
+  therefore no eligible reviewer for the range AS A WHOLE, and the per-pass route needs twenty
+  rounds that nobody schedules. Meanwhile every new guard commit joins the same range, so the
+  debt grows with the work and the gate blocks turn ends for a rule it makes impossible to obey.
+  This is not point 717 (the review-material sharpenings) and not point 714 (which closed the
+  silent-coverage hole): it is the RANGE, which no mechanism cuts back.
+  FINAL STATE:
+  1. THE RANGE IS CUT BY AUTHORSHIP, NOT ONLY BY SIZE. The pass plan groups files by WHO
+     authored their changes in the range, so each pass has an eligible reviewer by construction,
+     and a pass names it. A file set with contributions from both vendors is reported as such
+     and split at the commit level rather than assigned to an author of its own content.
+  2. THE BASELINE ADVANCES ON WHAT WAS ACTUALLY READ. A recorded pass moves the gate's baseline
+     for the files it covered, so a cleared file stops being re-demanded by every later range.
+     What has never been read stays owed, by name.
+  3. THE DEBT IS VISIBLE BEFORE IT IS BLOCKING. `node scripts/mechanism-review-guard.mjs
+     --status` states the outstanding pass count and the material size, and the batch reports
+     it like any other backlog — a gate that first speaks at a turn end has already cost the
+     turn.
+  4. THE CRITICALITY GATE HANGS ON THE SAME CAUSE and is cleared with it. Point 700's HIGH tick
+     carries a `do-not-merge` whose own evidence says why: three successive passes were refused
+     on TRUNCATED material rather than on a defect, and the recorder refused to manufacture a
+     clearance by re-asking with a friendlier framing. So the re-review of 700 that this gate
+     wants is only possible once the range is reviewable at all — it is the first record the
+     rebuilt plan must produce, and until then BOTH gates block every turn end for one cause.
+  5. THE EXISTING BACKLOG IS WORKED OFF, not waived: the twenty passes of the current range are
+     run under rule 1 and recorded, or the range is explicitly re-baselined with a written
+     justification naming every file that re-baselining leaves unread.
+  VERIFIABLE: the pass plan for the current range assigns every pass a reviewer that authored
+  none of its files, or names the pass it cannot; a recorded pass removes its files from the
+  next plan; `--status` prints the outstanding count; and `npm run test:unit` covers the
+  authorship cut and the per-file baseline in the pure core.
+  Criticality: high — it is the enforcement of the four-eyes principle itself, and its current
+  failure mode is a gate that blocks every turn end while being impossible to satisfy.
+  Bundle: unbundled (review tooling).
+
+- [x] 662. The context boundary must also fire without a tick — MERGED INTO POINT 553
+  (18.08.2026, point 723's counted union U11). Both points defined the context-triggered
+  handover through batch-progress-guard, and one final-state spec had to reconcile their
+  competing ceiling definitions, so 553 now owns the merged final state in its "FOLDED IN
+  FROM POINT 662" paragraph: the un-ticked-merge boundary (after any merge to main with no
+  delegated agent in flight the guard demands the boundary exactly as after a tick), the
+  held-too-long ceiling recalibrated onto 553's measured context ceiling — 662's "tokens
+  the scripts cannot read" premise went stale when point 700's fence made the context
+  measurable — the attended /clear duty and 662's Vitest cases. Nothing is lost by the
+  merge. The spec as it stood when absorbed:
+  (was:) - [ ] 662. The context boundary must also fire without a tick (user 12.08.2026: "Außerdem ist
+    der Kontext dieser Session wieder ziemlich groß geworden. Hättest du in der Zwischenzeit
+    nicht mal an eine andere übergeben können? So bekommen wir das sonst nie in den Griff.").
+    THE GAP: the boundary duty (batch-boundary + batch-progress-guard) is keyed to a TICKED
+    point. A point that lands in HALVES — 657's first half merged without a tick — or a day of
+    review rounds on one branch never produces a tick, so one session carried the batch for ~14
+    hours and >150k context while every rule held. The 656 landing WAS a tickable boundary and
+    the session pulled the next point in anyway; nothing blocked that.
+    FINAL STATE: the boundary becomes reachable and OWED at safe moments even without a tick:
+    (1) after any MERGE to main (ticked or not) with no delegated agent in flight, the
+    batch-progress-guard demands the boundary exactly as it does after a tick — a merge is a
+    clean handover point by definition; (2) a session that has held the batch longer than a
+    measured ceiling (calibrate from the cost data: hours or landed merges, not tokens the
+    scripts cannot read) must take the next safe handover instead of choosing to continue; the
+    guard blocks "continue the next queue item" once the ceiling is passed. Attended sessions
+    ask for /clear at the same moments. VERIFIABLE: Vitest over the guard core — a merge without
+    tick and no agent in flight demands the boundary; under the ceiling it does not; the ceiling
+    case refuses the continue-path and allows the boundary path.
+    Criticality: high — 91 % of the project's spend sits above 150k context, and this is the
+    door it walks through.
+    Bundle: unbundled (infrastructure).
+
+- [x] 723. The queue's head is re-judged before it is worked (user 18.08.2026, 16:51): whether the
+  points up to and including 597 stand in a sensible order, whether some belong MERGED into one
+  point or bundle, and whether any is in substance already done by work that landed since it was
+  filed. The analysis is a DIVERGENT stage, so it runs as four eyes per CLAUDE.md §6: both models
+  produce their judgment blind-parallel from the same inputs (the specs of the queue-head points,
+  the archive, and the current code), the merge is counted and goes to a model that wrote neither
+  list where one exists. FINAL STATE: every point up to 597 either keeps its place with the
+  analysis's one-line reason, is moved (block moved in TASKS.md, verbatim), is merged into a named
+  sibling (specs unified final-state-only, the absorbed number retired to the archive with a
+  pointer), or is ticked as already-done with the evidence the tick demands; the adjustments are
+  applied in the same stretch of work, not filed as further points. The user's same-day ranking
+  (697, 703, 595/598, 581, 336 directly after 597 — branches with started work falling behind
+  main) is an INPUT the analysis respects: it may propose refinements but not silently undo it.
+  VERIFIABLE: the blind-parallel records exist (two lists, a counted merge), the queue order after
+  the change matches the analysis's outcome, and every merged or ticked point names its evidence.
+  Criticality: medium — work-order bookkeeping, but it steers every session after it.
+  Author lane: Sol.
+  Bundle: unbundled (work order).
+  DELIVERED 18.08.2026: the blind-parallel records and the counted union stand in
+  `docs/blind-723/` (half A GPT-5.6 Sol 15 entries, half B Claude Opus 5 18 entries,
+  union by Fable 5 — 17 entries, 31 merged / 0 only A / 2 only B, accounting verified by
+  `blind-merge.mjs`; ledger record on 2e93f776). Applied in the same stretch: head order
+  623, 712, 713, 701, 707, 705, 708, 553, 596, 597, 706, 710, then the user's 18.08 block
+  697, 703, 595/598, 581, 336, then attended-gated 715; 662 merged into 553 (archive
+  pointer above); build notes on 705/706/708; the perishable blind-713 and multistep
+  evidence rescued into `docs/` (U16). No point was tickable as already-done — both halves
+  and the union judged all 14 substantive and undelivered.
