@@ -269,10 +269,18 @@ function gatherRange(sha, base) {
   // which reads as corruption and fails the round — or, with the submodule
   // present, would ship commit output as file content. The pointer change IS
   // the whole change, and the patch carries it; the path travels with no
-  // content of its own.
+  // content of its own. CLASSIFIED BY MODE EVIDENCE ALONE (landing-round
+  // pass 8): a `+Subproject commit <hex>` line is hunk CONTENT, and a normal
+  // text file adding that literal line was classified a gitlink — its real
+  // content silently omitted while the accounting read complete. Only git's
+  // own section headers prove the 160000 entry: the mode lines, or the index
+  // line's trailing mode. Hunk lines carry a +/-/space prefix, so a header
+  // anchored at line start cannot be forged from file content.
   const gitlinkPaths = new Set(
     splitPatchByFile(patch)
-      .filter((s) => /^(?:[+-]Subproject commit [0-9a-f]{4,40}|(?:old|new|deleted file|new file) mode 160000)$/m.test(s.text))
+      .filter((s) =>
+        /^(?:(?:old|new|deleted file|new file) mode 160000|index [0-9a-f]+\.\.[0-9a-f]+ 160000)$/m.test(s.text),
+      )
       .map((s) => s.path),
   )
   // A file the patch ADDS whole is already there in full; sending its content

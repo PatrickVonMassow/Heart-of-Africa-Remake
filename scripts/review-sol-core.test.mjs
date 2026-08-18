@@ -182,6 +182,26 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
     )
   })
 
+  it('never fabricates a label from a mid-word backtick (landing-round pass 7)', () => {
+    // Deleting backtick runs outright merged word fragments: VERD`ICT: read
+    // as VERDICT: and a fabricated pair was accepted as the terminal fields.
+    expect(parseVerdict('VERD`ICT: merge\nEVID`ENCE: read the whole diff and the tests').ok).toBe(false)
+    const receipted = 'looked.\n\nREC`EIPT: abcd1234abcd1234\nVERDICT: merge\nEVIDENCE: read the whole diff and the tests'
+    expect(parseVerdict(receipted, { receipt: 'abcd1234abcd1234' }).ok).toBe(false)
+    // …while PAIRED backtick decoration around a label still unwraps.
+    expect(parseVerdict('`VERDICT:` merge\n`EVIDENCE:` read the whole diff and the tests')).toMatchObject({
+      ok: true,
+      verdict: 'merge',
+    })
+  })
+
+  it('drops a bare code-fence line rather than letting it displace the terminal pair', () => {
+    expect(parseVerdict('VERDICT: merge\nEVIDENCE: read the whole diff and the tests\n```')).toMatchObject({
+      ok: true,
+      verdict: 'merge',
+    })
+  })
+
   it('takes the LAST pair, so a quoted instruction cannot shadow the answer', () => {
     const text = `End with:\nVERDICT: <merge|do-not-merge>\n\n…\n\n${solSays('merge', 'checked every branch of the classifier')}`
     expect(parseVerdict(text)).toMatchObject({ ok: true, verdict: 'merge' })

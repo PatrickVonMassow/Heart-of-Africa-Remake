@@ -333,12 +333,21 @@ export function stripDecoration(text) {
   let clean = String(text ?? '')
     .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
     .replace(/^[ \t]*>+[ \t]?/gm, '')
-    .replace(/`+/g, '')
+    // A FENCE LINE IS LINE-START DECORATION like a heading: a line holding
+    // only a backtick run (with an optional language tag) frames content and
+    // is no content itself — left standing it would displace the terminal
+    // label lines the parsers read off the message end.
+    .replace(/^[ \t]*`{3,}[\w-]*[ \t]*$/gm, '')
+  // BACKTICKS AS MATCHED PAIRS TOO (landing-round pass 7): deleting every
+  // backtick run outright merged word fragments exactly like the emphasis
+  // case this function exists to avoid — `` VERD`ICT: `` became `VERDICT:`
+  // and a fabricated label was accepted as the required terminal field. A
+  // backtick run unwraps only against an equal closing run at a word edge; a
+  // marker inside a word is content and stays.
   for (let i = 0; i < 4; i++) {
-    const next = clean.replace(
-      /(^|[^\w*_])([*_]+)(?=[^\s*_])([^*_]+?)(?<=[^\s*_])\2(?=[^\w*_]|[*_]|$)/g,
-      '$1$3',
-    )
+    const next = clean
+      .replace(/(^|[^\w`])(`+)(?=[^\s`])([^`]+?)(?<=[^\s`])\2(?=[^\w`]|`|$)/g, '$1$3')
+      .replace(/(^|[^\w*_])([*_]+)(?=[^\s*_])([^*_]+?)(?<=[^\s*_])\2(?=[^\w*_]|[*_]|$)/g, '$1$3')
     if (next === clean) break
     clean = next
   }

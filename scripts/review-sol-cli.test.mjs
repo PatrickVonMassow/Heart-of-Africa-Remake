@@ -796,6 +796,21 @@ describe('a modified gitlink', () => {
     expect(sent).toContain(`+Subproject commit ${'f'.repeat(40)}`)
     expect(sent).not.toContain('OMITTED ENTIRELY')
   })
+
+  it('keeps a TEXT file text although its hunk holds the pointer line (landing-round pass 8)', () => {
+    // The classifier read the `+Subproject commit <hex>` HUNK line as gitlink
+    // evidence, so a normal text file merely containing that literal line was
+    // assigned no content of its own — silently omitted while the accounting
+    // read complete. Only git's own mode headers prove a 160000 entry.
+    provenId()
+    git('checkout', '-q', '-b', 'fake-gitlink', 'main')
+    const body = `prose about submodules\nSubproject commit ${'a'.repeat(40)}\nmore prose\n`
+    const sha = commit('world.txt', body, 'Mention a subproject pointer in prose', 'Opus 5')
+    const r = run(['--sha', sha, '--brief', 'judge the prose'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain(`=== FILE (current content): world.txt ===\n${body}`)
+  })
 })
 
 // ESCALATION ROUND: both early routes hard-coded `partial: null`, so a fitting
@@ -883,6 +898,14 @@ describe('a range too large for one round', () => {
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
     expect(sent.length).toBeLessThanOrEqual(200_000)
     expect(sent).toContain('=== PATCH ===')
+    // THE ARITHMETIC, measured against a doubting review (landing-round pass
+    // 7): a 120k added file exceeds the standing patch HALF-share, so the plan
+    // widens this pass's patchRoom to the exact joined section — the pass's
+    // patch is mandatory material — and delivers the file PATCH-ONLY. Its
+    // whole body still travels, as the added lines of its own diff; nothing is
+    // truncated, and the completed two-pass record is earned, not fabricated.
+    expect(sent).toContain('a'.repeat(120_000))
+    expect(sent).not.toContain('[TRUNCATED:')
     // THE RECORDER ACCEPTS IT, run rather than pattern-matched: a pass command
     // the recorder refuses is a command that clears nothing.
     const recorded = spawnSync(process.execPath, splitCommand(printed).slice(1), {
