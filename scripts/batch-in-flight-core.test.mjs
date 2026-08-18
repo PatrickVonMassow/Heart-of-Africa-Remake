@@ -2972,8 +2972,34 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
         .points,
     ).toEqual([711, 697])
     // A spawn prompt that spells out two branches names two branches to be worked.
-    expect(commissionTarget({ toolName: 'Agent', prompt: 'branch feat/697-a; do not touch feat/705-b' }).points).toEqual(
-      [697, 705],
+    expect(
+      commissionTarget({ toolName: 'Agent', prompt: 'work branch feat/697-a and also branch feat/705-b' }).points,
+    ).toEqual([697, 705])
+  })
+
+  // A BRANCH NAMED ONLY TO FORBID IT IS NOT A COMMISSIONING (fourth review,
+  // finding 9): pinning "do not touch feat/705-b" as opening 705 refused
+  // legitimate work over a branch the prompt put explicitly OUT of scope.
+  it('does not commission a mention its own clause NEGATES', () => {
+    const t = commissionTarget({ toolName: 'Agent', prompt: 'branch feat/697-a; do not touch feat/705-b' })
+    expect(t.points).toEqual([697])
+    expect(t.refs).toEqual(['feat/697-a'])
+    expect(commissionTarget({ toolName: 'Agent', prompt: 'point 697; never start point 705' }).points).toEqual([697])
+    expect(
+      commissionTarget({ toolName: 'Agent', prompt: 'Punkt 697 umsetzen; nicht auch noch Punkt 705 beginnen' }).points,
+    ).toEqual([697])
+    // A POST-positioned negation ("Punkt 705 nicht beginnen") is deliberately
+    // NOT excused — the window looks backward only, so the miss errs toward a
+    // visible, overridable refusal instead of an invisible bypass.
+    expect(
+      commissionTarget({ toolName: 'Agent', prompt: 'Punkt 697 umsetzen; Punkt 705 nicht beginnen' }).points,
+    ).toEqual([697, 705])
+    // The window is the mention's own clause: a negation in an EARLIER sentence
+    // does not excuse a later mention, and a trailing "do not skip the tests"
+    // does not excuse the point before it.
+    expect(commissionTarget({ toolName: 'Agent', prompt: 'Do not guess. Work point 705' }).points).toEqual([705])
+    expect(commissionTarget({ toolName: 'Agent', prompt: 'work point 705 and do not skip the tests' }).points).toEqual(
+      [705],
     )
   })
 
@@ -2987,8 +3013,15 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
     ).toEqual([697])
   })
 
-  it('leaves PROSE ambiguous — a cross-reference is not a second commissioning', () => {
-    expect(commissionTarget({ toolName: 'Agent', prompt: 'point 697 depends on point 705' }).point).toBeNull()
+  // EVERY point a prose spawn names is judged (fourth review, finding 4): the
+  // single-number rule made "implement point 712 and point 713" a call that
+  // commissioned both and was judged on NEITHER. A cross-reference now gets
+  // judged too — a visible, overridable refusal, against a silent bypass.
+  it('judges EVERY affirmed "point N" a prose spawn names — two points are two commissionings', () => {
+    expect(commissionTarget({ toolName: 'Agent', prompt: 'implement point 712 and point 713' }).points).toEqual([
+      712, 713,
+    ])
+    expect(commissionTarget({ toolName: 'Agent', prompt: 'point 697 depends on point 705' }).points).toEqual([697, 705])
   })
 
   it('prefers the BRANCH over prose when both appear — the branch is the binding name', () => {
