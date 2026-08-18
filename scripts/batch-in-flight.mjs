@@ -62,6 +62,9 @@ import {
   declaredAgentCount,
   openPointSpecs,
   waitEtaRefusal,
+  openBranchSlots,
+  parseCommissionRecord,
+  COMMISSION_RECORD_PATH,
   IN_FLIGHT_MAX_AGE_MS,
   POOL_CAP,
   RESPAWN_GRACE_MS,
@@ -124,6 +127,90 @@ export function refTipAt(ref, { cwd = REPO_ROOT } = {}) {
     }).trim()
     const secs = Number(out)
     return Number.isFinite(secs) && secs > 0 ? secs * 1000 : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * WHICH `feat/*` BRANCHES STAND OPEN (point 712)? `{ readable, branches }`, each
+ * branch `{ ref, tipAt, behind }`.
+ *
+ * "Open" is "not contained in `main`" — a merged branch is debris that
+ * `branch-hygiene-guard` sweeps, not a slot somebody is holding. Local and
+ * remote spellings are both asked for and folded into one by the pure core, so a
+ * branch pushed but not checked out here still counts.
+ *
+ * The behind-count costs one `rev-list` per branch and is only asked for where
+ * the refusal will print it; the Stop-hook path needs the COUNT alone. Any git
+ * failure answers `readable: false` — a branch list nobody could read is not
+ * evidence of anything, and the decision fails open on it.
+ */
+export function openFeatBranches({ cwd = REPO_ROOT, base = 'main', behind = false } = {}) {
+  let out = ''
+  try {
+    out = execFileSync(
+      'git',
+      [
+        'for-each-ref',
+        '--no-merged',
+        base,
+        '--format=%(refname:short)\t%(committerdate:unix)',
+        'refs/heads/feat',
+        'refs/remotes/origin/feat',
+      ],
+      { windowsHide: true, cwd, encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] },
+    )
+  } catch {
+    return { readable: false, branches: [] }
+  }
+  const branches = []
+  for (const line of out.split(/\r?\n/)) {
+    const [ref, stamp] = line.split('\t')
+    if (!ref || !ref.trim()) continue
+    const secs = Number(stamp)
+    branches.push({
+      ref: ref.trim(),
+      tipAt: Number.isFinite(secs) && secs > 0 ? secs * 1000 : null,
+      behind: behind ? commitsBehind(ref.trim(), { cwd, base }) : null,
+    })
+  }
+  return { readable: true, branches }
+}
+
+/** Where the commissioning record lives, resolved once. */
+export const COMMISSION_RECORD_FILE = resolve(REPO_ROOT, COMMISSION_RECORD_PATH)
+
+/** The recorded overrides and parks. A missing file is an EMPTY record, not a
+ *  torn one — nothing recorded yet is the ordinary state. */
+export function readCommissionRecord(path = COMMISSION_RECORD_FILE) {
+  try {
+    return parseCommissionRecord(readFileSync(path, 'utf8'))
+  } catch {
+    return parseCommissionRecord('')
+  }
+}
+
+/** Store it back. Atomic, like every other state file this batch keeps. */
+export function writeCommissionRecord(record, path = COMMISSION_RECORD_FILE) {
+  writeJsonAtomic(path, { overrides: record?.overrides ?? {}, parked: record?.parked ?? {} })
+}
+
+/** How many commits `base` holds that this branch does not — the cost of not
+ *  landing it. Null where git cannot say. */
+export function commitsBehind(ref, { cwd = REPO_ROOT, base = 'main' } = {}) {
+  const name = String(ref ?? '').trim()
+  if (!name || /[\s~^:?*[\]\\]/.test(name)) return null
+  try {
+    const out = execFileSync('git', ['rev-list', '--count', `${name}..${base}`], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    const n = Number(out)
+    return Number.isFinite(n) && n >= 0 ? n : null
   } catch {
     return null
   }
@@ -426,6 +513,14 @@ export function gatherSlots(declaration, { cwd = REPO_ROOT, tasksPath = TASKS_PA
     if (running.length === 0) return { needsReason: false, slotsFree: 0, agents: 0, candidates: [], why: 'overlap-unknown' }
     return slotReasonDecision({
       agents: declaredAgentCount(evidence),
+      // What OCCUPIES a slot is the open branch (point 712). The demand and the
+      // commissioning refusal must read the same occupancy, or they trap the
+      // session between them: nine branches open and one agent running would
+      // otherwise demand a fourth point that the refusal denies.
+      openBranches: openBranchSlots({
+        branches: openFeatBranches({ cwd }).branches,
+        parked: readCommissionRecord().parked,
+      }).count,
       openPoints: openPointSpecs(readTasksOpen(tasksPath)),
       runningFiles: running,
       reason: declaration?.slotsFree ?? '',
