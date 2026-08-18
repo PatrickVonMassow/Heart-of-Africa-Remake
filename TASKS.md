@@ -472,10 +472,22 @@ put it is the mistake this line exists to stop.
     and `docs/analysis_de/retrospektive-zusammenarbeit.md` (231k). The worst single commit reaches
     2.05M. A caller who reacts to a truncation by reviewing commit by commit therefore gets the
     same truncation one commit at a time, and pays a round per commit for it.
+  - EVERY FILE'S DELIVERY MODE IS NAMED IN THE MATERIAL, and there are three: carried whole,
+    PATCH-ONLY (its diff without its surrounding content), and absent — the last split again into
+    absent-by-design, covered by a named other pass, and absent-by-truncation. They license
+    different verdicts, so a reviewer that cannot tell them apart cannot say what its verdict
+    covers. The accounting counts a patch-only file as its patch alone; a record must never cover
+    content that was not sent. A bookkeeping path carrying no reviewable mechanism is delivered
+    patch-only by default: measured 18.08.2026 on `main@92af94cc`, the jammed range
+    `ae8539d2~1..657fc453` weighs 168355 characters of patch against 3014107 of touched-path
+    content, of which the four files above carry 2571262 — 85 % — leaving 442845 across the other
+    23. Shipping those four patch-only is what turns this range from unreviewable into three or
+    four passes.
   VERIFIABLE: Vitest over the pure assembly — material under the budget yields a record command,
   material over it yields the refusal naming the dropped files, and a two-pass composition yields a
   record naming both passes; plus a case pinning that a truncation notice inside the material alone
-  never satisfies the check.
+  never satisfies the check, and one pinning that a patch-only file is accounted as its patch and
+  never counted as content delivered.
   Criticality: high — it does not produce a wrong answer, it produces an unearned CLEARANCE, and
   the four-eyes rule the whole model policy rests on is only worth what its records cover.
   Bundle: unbundled (review tooling).
