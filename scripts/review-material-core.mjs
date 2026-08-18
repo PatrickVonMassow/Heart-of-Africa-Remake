@@ -1025,7 +1025,20 @@ export function parsePassSpec(value) {
  * it — the same convention unquoteGitPath already decodes — and everything else
  * travels byte-exact, never trimmed.
  */
-const needsQuoting = (path) => /^[\s]|[\s]$|[,"\\\u0000-\u001f\u007f]/.test(path)
+const needsQuoting = (path) => {
+  const p = String(path)
+  if (/^\s|\s$/.test(p)) return true
+  // Tested by CODE POINT rather than by a regex character class: naming the
+  // control range in a class makes the file either BINARY to grep (a literal
+  // NUL) or a no-control-regex lint finding (an escaped one). This says the
+  // same thing in plain ASCII — the list separator, the quote, the escape,
+  // and anything git itself would escape.
+  for (const ch of p) {
+    const code = ch.codePointAt(0)
+    if (ch === ',' || ch === '"' || ch === '\\' || code < 0x20 || code === 0x7f) return true
+  }
+  return false
+}
 
 /** One path, C-quoted the way git would print it. */
 export function quotePassFile(path) {
