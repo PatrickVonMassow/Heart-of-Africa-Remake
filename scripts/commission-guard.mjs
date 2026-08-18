@@ -54,7 +54,6 @@ import {
   describeBranchAge,
   normaliseBranchRef,
   openBranchSlots,
-  pointOfBranch,
   recordCommissionOverride,
   recordParkedBranch,
 } from './batch-in-flight-core.mjs'

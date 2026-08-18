@@ -1712,7 +1712,6 @@ export function branchSlotDecision({
   // holds only the branches that OCCUPY a slot, a reassigned park counts toward
   // `adding`, and `reopens` names the parks the wrapper must clear on allow.
   const standing = [...new Set((Array.isArray(branches) ? branches : []).map((b) => normRef(b?.ref)).filter(Boolean))]
-  const parkedRefs = slots.parkedOut.map((b) => b.ref)
   const live = slots.open.map((b) => b.ref)
   const inFlight = new Set(live.map(pointOfBranch).filter((n) => n !== null))
   const newRefs = named.filter((r) => !standing.some((s) => branchAnswersTo(r, s, { loose: looseRefs })))
