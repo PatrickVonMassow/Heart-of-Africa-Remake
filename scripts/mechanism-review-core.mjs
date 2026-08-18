@@ -782,13 +782,19 @@ export function validateMode({ mode, framing } = {}) {
  */
 export function validatePass({ pass, passFiles } = {}) {
   const spec = String(pass ?? '').trim()
-  const listed = String(passFiles ?? '').trim()
-  if (!spec && !listed) return { ok: true, errors: [], pass: null }
+  // The list is parsed RAW (fourth cross-vendor round): trimming it here strips
+  // the FIRST token's leading and the LAST token's trailing whitespace before
+  // the parser can refuse them, so ` scripts/a.mjs` silently became a coverage
+  // claim about `scripts/a.mjs` — a different path. Only PRESENCE is judged on
+  // the trimmed view; the bytes go to the parser untouched, which fails loud.
+  const listed = String(passFiles ?? '')
+  const hasList = listed.trim() !== ''
+  if (!spec && !hasList) return { ok: true, errors: [], pass: null }
   const errors = []
   if (!spec) {
     errors.push('--pass-files without --pass <k>/<n>: a file list belongs to a pass, and this record names none')
   }
-  if (spec && !listed) {
+  if (spec && !hasList) {
     errors.push(
       '--pass <k>/<n> without --pass-files: a pass verdict covers the files it actually read, and a ' +
         'record that does not name them claims a coverage nobody can check',
@@ -802,7 +808,7 @@ export function validatePass({ pass, passFiles } = {}) {
   // nobody named (cross-vendor review, third round).
   const list = parsePassFiles(listed)
   errors.push(...list.errors)
-  if (listed && list.ok && !list.files.length) {
+  if (hasList && list.ok && !list.files.length) {
     errors.push('--pass-files "<a,b,c>": the paths this pass reviewed, comma-separated')
   }
   if (errors.length) return { ok: false, errors, pass: null }

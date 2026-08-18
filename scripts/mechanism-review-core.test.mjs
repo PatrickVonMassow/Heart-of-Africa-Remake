@@ -936,6 +936,21 @@ describe('validatePass', () => {
     expect(v.errors.join('\n')).toContain('C-quoted')
   })
 
+  it('REFUSES leading whitespace on the FIRST token — the outer trim used to eat it', () => {
+    // ` scripts/a.mjs` is a legal path distinct from `scripts/a.mjs`; trimming
+    // the whole list before parsing let the first token cover the wrong file
+    // (cross-vendor review, fourth round).
+    const v = validatePass({ pass: '1/2', passFiles: ' scripts/a.mjs,scripts/b.mjs' })
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toContain('whitespace')
+  })
+
+  it('REFUSES trailing whitespace on the LAST token for the same reason', () => {
+    const v = validatePass({ pass: '1/2', passFiles: 'scripts/a.mjs,scripts/b.mjs ' })
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toContain('whitespace')
+  })
+
   it('reads a C-QUOTED path byte-exact — comma, quote and edge space included', () => {
     const v = validatePass({ pass: '1/2', passFiles: '"scripts/git-hooks/check ",plain.mjs,"a,b.mjs"' })
     expect(v.ok).toBe(true)
