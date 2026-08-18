@@ -3031,11 +3031,20 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
     expect(points('git switch --force-create feat/697-x')).toEqual([697])
     expect(points('git switch -C feat/697-x')).toEqual([697])
     expect(points('git checkout -B feat/697-x main')).toEqual([697])
+    // The ORPHAN forms cut a branch with an empty history — still a branch
+    // (fourth review, finding 10: the sweep had omitted them).
+    expect(points('git checkout --orphan feat/697-x')).toEqual([697])
+    expect(points('git switch --orphan feat/697-x')).toEqual([697])
     expect(points('git worktree add -B feat/697-x .claude/worktrees/agent-y')).toEqual([697])
     // `git branch -c/-m <old> <new>` CREATES <new>, and the new name is the last.
     expect(points('git branch -c feat/705-a feat/697-x')).toEqual([697])
     expect(points('git branch --copy feat/705-a feat/697-x')).toEqual([697])
     expect(points('git branch -M feat/697-x')).toEqual([697])
+    // `-t`/`--track` CREATE with tracking set up; `--recurse-submodules` is a
+    // boolean that must not eat the branch name (fourth review, finding 3).
+    expect(points('git branch -t feat/697-x main')).toEqual([697])
+    expect(points('git branch --track feat/697-x main')).toEqual([697])
+    expect(points('git branch --recurse-submodules feat/697-x main')).toEqual([697])
     // …while the DESTRUCTIVE and read-only forms still open nothing.
     expect(points('git branch -D feat/697-x')).toEqual([])
     expect(points('git branch -d feat/697-x')).toEqual([])
@@ -3043,6 +3052,20 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
     expect(points('git push -u origin feat/697-x')).toEqual([])
     expect(points('git checkout feat/697-x')).toEqual([])
     expect(points('git switch feat/697-x')).toEqual([])
+  })
+
+  // A NAME IN QUOTES IS THE SAME NAME (fourth review, finding 2): the `(\S+)`
+  // capture kept the shell quoting, `normRef` did not strip it, and the call
+  // walked past both refusals as "no target".
+  it('reads a QUOTED branch name in every creating spelling', () => {
+    const target = (command) => commissionTarget({ toolName: 'Bash', command })
+    expect(target("git switch -c 'feat/712-work'")).toMatchObject({ points: [712], refs: ['feat/712-work'] })
+    expect(target('git checkout -b "feat/712-work" main')).toMatchObject({ points: [712], refs: ['feat/712-work'] })
+    expect(target("git branch 'feat/712-work'")).toMatchObject({ points: [712], refs: ['feat/712-work'] })
+    expect(target('git worktree add -b "feat/712-work" .claude/worktrees/agent-z')).toMatchObject({
+      points: [712],
+      refs: ['feat/712-work'],
+    })
   })
 
   it('recognises a worktree being created on one', () => {

@@ -1124,6 +1124,12 @@ export function pointOfBranch(ref) {
   return Number.isInteger(n) && n > 0 ? n : null
 }
 
+/** Shell quoting stripped off a captured branch name: `git switch -c
+ *  'feat/712-work'` reaches the `(\S+)` capture WITH its quotes, and a name the
+ *  normaliser cannot read walks past both refusals (fourth review, finding 2).
+ *  Git itself forbids quotes in a refname, so nothing legitimate is lost. */
+const unquote = (name) => String(name ?? '').replace(/^['"]+/, '').replace(/['"]+$/, '')
+
 /** Every `feat/<N>` a text names, in order. `feat/712`, `feat/712-slug` and
  *  `feat/712/x` are one branch name each — the separator is NOT required, or a
  *  slugless branch would open work unseen. */
@@ -1181,16 +1187,22 @@ const GIT_GLOBAL =
 
 const GIT_BRANCH_RE = new RegExp(String.raw`\bgit(?:\s+${GIT_GLOBAL})*\s+branch\b(.*)$`, 'i')
 
-/** `git branch` modes that LIST, DELETE or RECONFIGURE — none of them creates. */
+/** `git branch` modes that LIST, DELETE or RECONFIGURE — none of them creates.
+ *  `-t` is NOT here: `git branch -t feat/712-x main` sets tracking while
+ *  CREATING, so reading it as not-creating was a bypass (fourth review,
+ *  finding 3; its long form `--track` was already read as a plain flag). */
 const BRANCH_NOT_CREATING =
-  /^(?:-[dDlarvtuh]|--delete|--list|--all|--remotes|--verbose|--contains|--no-contains|--merged|--no-merged|--points-at|--sort|--format|--column|--no-column|--show-current|--edit-description|--set-upstream|--set-upstream-to|--unset-upstream|--help|--color|--no-color|--abbrev|--no-abbrev|--ignore-case|--omit-empty)(?:=|$)/
+  /^(?:-[dDlarvuh]|--delete|--list|--all|--remotes|--verbose|--contains|--no-contains|--merged|--no-merged|--points-at|--sort|--format|--column|--no-column|--show-current|--edit-description|--set-upstream|--set-upstream-to|--unset-upstream|--help|--color|--no-color|--abbrev|--no-abbrev|--ignore-case|--omit-empty)(?:=|$)/
 
 /** …and the ones that CREATE by copying or renaming, where the new name is LAST. */
 const BRANCH_COPY_OR_MOVE = /^(?:-[cCmM]|--copy|--move)$/
 
-/** Flags of `git branch` whose VALUE is the next token, so it is not a name. */
+/** Flags of `git branch` whose VALUE is the next token, so it is not a name.
+ *  `--recurse-submodules` is BOOLEAN (its mode travels only via `=`), so listing
+ *  it here consumed the branch-name token and the creation went unread (fourth
+ *  review, finding 3). */
 const BRANCH_VALUE_FLAGS = new Set(['--contains', '--no-contains', '--merged', '--no-merged', '--points-at', '--sort',
-  '--format', '--set-upstream-to', '-u', '--abbrev', '--color', '--recurse-submodules'])
+  '--format', '--set-upstream-to', '-u', '--abbrev', '--color'])
 
 /**
  * The branch a `git branch …` segment CREATES, or [] where it creates none.
@@ -1215,7 +1227,7 @@ function gitBranchCreates(seg) {
       if (BRANCH_VALUE_FLAGS.has(t)) i += 1
       continue
     }
-    names.push(t)
+    names.push(unquote(t))
   }
   if (!names.length) return []
   return [copyOrMove ? names[names.length - 1] : names[0]]
@@ -1240,11 +1252,11 @@ function segmentTarget(seg) {
     // <path>` derives the branch from the path, so the token after it may be
     // either — the plain `feat/<N>` scan below is the honest reading there.
     const m = /\bworktree\s+add\b.*?\s-[bB](?:\s+|=)(\S+)/.exec(seg)
-    const created = uniq(m ? [pointOfBranch(m[1])] : featPointsIn(seg))
+    const created = uniq(m ? [pointOfBranch(unquote(m[1]))] : featPointsIn(seg))
     if (!created.length) return none
-    return { points: created, refs: m ? [normRef(m[1])] : [], how: 'worktree' }
+    return { points: created, refs: m ? [normRef(unquote(m[1]))] : [], how: 'worktree' }
   }
-  const names = [...CUT_PATTERNS.map((re) => re.exec(seg)).map((m) => (m ? m[1] : '')), ...gitBranchCreates(seg)]
+  const names = [...CUT_PATTERNS.map((re) => re.exec(seg)).map((m) => (m ? unquote(m[1]) : '')), ...gitBranchCreates(seg)]
     .map((r) => normRef(r))
     .filter((r) => pointOfBranch(r) !== null)
   const cut = uniq(names.map(pointOfBranch))
