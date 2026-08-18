@@ -480,6 +480,19 @@ put it is the mistake this line exists to stop.
     is spent, so a caller can split the review instead of discovering the gap in the verdict.
   - Fail-open: a tool that cannot tell whether it fit says so and refuses the record, rather than
     assuming it did.
+  - AN IMPOSSIBLE REVIEW MUST NOT TRAP THE SESSION, which is the state this point is being built
+    from. Every guard in this chain is fail-OPEN by rule (CLAUDE.md §7.2) — a guard bug may not trap
+    a session — yet `mechanism-review-guard` currently blocks every turn end on `main` for a range
+    whose review CANNOT be assembled, so no honest action clears it and the only exits left are
+    fabricating a clearance or pausing the batch. MEASURED 18.08.2026 at `main@19d9ed3f`: the
+    blocked range cuts into 64 contiguous single-commit slices, and 52 of them exceed the budget
+    ALONE, each dominated by content rather than patch (the worst reaches 2.06M on two files);
+    reviewing the work on its own feature branch does not help either, because the branch's repeated
+    merges from `main` pull the same bookkeeping paths into its touched-path set (3.50M over 30
+    files for `ae8539d2~1..66d36016^2`). So while a range's material cannot be assembled at all, the
+    guard REPORTS that gap — naming the range, the measured size and the budget — and lets the turn
+    end, rather than demanding a review no caller can produce. It resumes blocking the moment the
+    material fits again, which is what the patch-only delivery above restores.
   - SPLITTING BY COMMIT DOES NOT HELP, which is why the passes above are cuts through the FILE SET
     and not through the history (measured 18.08.2026 over the 35 commits the guard currently holds
     open, `ae8539d2~1..657fc453`). `gatherMaterial` ships the CURRENT CONTENT of every touched
