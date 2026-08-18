@@ -120,6 +120,37 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
     expect(v.reason).toContain('A SLOT IS NOT FREE')
   })
 
+  // A SECOND BRANCH FOR A POINT IN FLIGHT IS AN OPENING (Sol, review of
+  // 3078d166). The point-wide exemption meant `git branch feat/687-b` past a
+  // standing `feat/687-a` was excused by its own point and cut a fourth branch
+  // through a full pool — the exact debris this rule counts. 687 really did have
+  // two branches on 17.08.2026, so this is not a hypothetical shape.
+  it('refuses a SECOND branch for a point already in flight, and still allows the first back', () => {
+    const cut = (refs) => commissionVerdict(gather(687, { branches: NINE, refs }).inputs, { now: AUG17 })
+    // Cutting a branch that does NOT stand yet takes a slot, in-flight or not.
+    const fresh = cut(['feat/687-b'])
+    expect(fresh.block).toBe(true)
+    expect(fresh.reason).toContain('A SLOT IS NOT FREE')
+    // …and the point's OTHER branches are not excused away either: all nine count.
+    expect(fresh.slots.count).toBe(NINE.length)
+    // Re-cutting or pushing the branch that already stands is finishing.
+    expect(cut(['feat/687-bank-game']).block).toBe(false)
+    // The remote spelling of that same branch is the same branch.
+    expect(cut(['origin/feat/687-bank-game']).block).toBe(false)
+    // A call naming NO ref at all — a spawn, a prose target — keeps the
+    // point-wide exemption, because the branch cannot be identified.
+    expect(cut([]).block).toBe(false)
+  })
+
+  it('refuses a two-branch call the moment ONE of the branches is new', () => {
+    const v = commissionVerdict(
+      gather(687, { branches: NINE, points: [687, 700], refs: ['feat/687-bank-game', 'feat/700-second'] }).inputs,
+      { now: AUG17 },
+    )
+    expect(v.block).toBe(true)
+    expect(v.reason).toContain('A SLOT IS NOT FREE')
+  })
+
   it('derives the in-flight set from the branches, so the front skips them', () => {
     const g = gather(708, { branches: [{ ref: 'feat/700-a', tipAt: AUG17 }, { ref: 'origin/feat/701-b', tipAt: AUG17 }] })
     expect(g.inputs.inFlight).toEqual([700, 701])

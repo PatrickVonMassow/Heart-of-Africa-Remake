@@ -52,6 +52,7 @@ import {
   commissionRecordReport,
   commissionTarget,
   describeBranchAge,
+  normaliseBranchRef,
   pointOfBranch,
   recordCommissionOverride,
   recordParkedBranch,
@@ -97,6 +98,9 @@ export function gatherCommissionInputs({
   // EVERY point the call opens, not only the first: one shell call can cut two
   // branches, and judging one of them is judging none.
   points = null,
+  // The branch names the call CREATES, where a flag names them: a second branch
+  // for a point already in flight is an OPENING, not a finishing.
+  refs = null,
   cwd = REPO_ROOT,
   behind = true,
   // The probes are injectable so the stand-downs are provable in the pure
@@ -127,6 +131,7 @@ export function gatherCommissionInputs({
     inputs: {
       point: targets[0] ?? null,
       points: targets,
+      refs: (Array.isArray(refs) ? refs : refs ? [refs] : []).map(normaliseBranchRef).filter(Boolean),
       open: openPointsOf(tasks),
       gates: parseUserGates(tasks),
       // THE OPEN BRANCH IS THE IN-FLIGHT SIGNAL now that it is what holds a
@@ -171,10 +176,12 @@ export function commissionVerdict(inputs, { now = Date.now() } = {}) {
     }),
   }))
   for (const v of verdicts) v.block = !v.queue.allowed
+  const refs = Array.isArray(inputs.refs) ? inputs.refs : []
   const slots = branchSlotDecision({
     branches: inputs.branches,
     parked: inputs.record?.parked ?? {},
     points: targets,
+    refs,
     cap: POOL_CAP,
     readable: inputs.readable,
     now,
@@ -185,8 +192,17 @@ export function commissionVerdict(inputs, { now = Date.now() } = {}) {
   // same way, and pushing to it must never be refused for the pool it already
   // sits in. Cutting a NEW branch outside the work order does take a slot — so
   // a call is spared only when EVERY point it opens is already in flight.
+  //
+  // AND ONLY WHEN EVERY BRANCH IT CUTS ALREADY STANDS (Sol, review of 3078d166).
+  // The point alone answered "687 is in flight" to `git branch feat/687-b` while
+  // `feat/687-a` was the branch that made it so — a second branch for one point,
+  // cut past a full pool, which is precisely the debris this rule counts.
   const inFlight = Array.isArray(inputs.inFlight) ? inputs.inFlight : []
-  const finishing = targets.length > 0 && targets.every((p) => inFlight.includes(Number(p)))
+  const standing = new Set((Array.isArray(inputs.branches) ? inputs.branches : []).map((b) => normaliseBranchRef(b?.ref)))
+  const finishing =
+    targets.length > 0 &&
+    targets.every((p) => inFlight.includes(Number(p))) &&
+    refs.every((r) => standing.has(normaliseBranchRef(r)))
   const parts = []
   if (!finishing && !slots.allowed) parts.push(branchSlotRefusal(slots))
   for (const v of verdicts) if (v.block) parts.push(commissionRefusal(v.queue))
@@ -320,6 +336,7 @@ if (isMainModule(import.meta.url)) {
     const g = gatherCommissionInputs({
       sessionId: payload.session_id || '',
       points: target.points,
+      refs: target.refs,
       cwd: payload.cwd || REPO_ROOT,
     })
     if (!g.applicable) process.exit(0)
