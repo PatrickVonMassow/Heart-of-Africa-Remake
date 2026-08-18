@@ -146,7 +146,7 @@ export function refTipAt(ref, { cwd = REPO_ROOT } = {}) {
  * failure answers `readable: false` — a branch list nobody could read is not
  * evidence of anything, and the decision fails open on it.
  */
-export function openFeatBranches({ cwd = REPO_ROOT, base = 'main', behind = false } = {}) {
+export function openFeatBranches({ cwd = REPO_ROOT, base = 'main', behind = false, behindProbe = commitsBehind } = {}) {
   let out = ''
   try {
     out = execFileSync(
@@ -169,13 +169,18 @@ export function openFeatBranches({ cwd = REPO_ROOT, base = 'main', behind = fals
     const [ref, stamp, tip] = line.split('\t')
     if (!ref || !ref.trim()) continue
     const secs = Number(stamp)
+    const behindCount = behind ? behindProbe(ref.trim(), { cwd, base }) : null
+    // A requested behind-count is part of the census contract, not optional
+    // decoration. If one rev-list fails, returning `readable: true` would permit
+    // a refusal whose required branch detail cannot be printed.
+    if (behind && !Number.isFinite(behindCount)) return { readable: false, branches: [] }
     branches.push({
       ref: ref.trim(),
       tipAt: Number.isFinite(secs) && secs > 0 ? secs * 1000 : null,
       // The TIP is what a park is measured against — the committer date is only
       // the fallback, and it is a second coarse and forgeable by a rebase.
       tip: String(tip ?? '').trim(),
-      behind: behind ? commitsBehind(ref.trim(), { cwd, base }) : null,
+      behind: behindCount,
     })
   }
   return { readable: true, branches }

@@ -84,6 +84,7 @@ import {
   processCommandOf,
   runRecordFor,
   gatherInFlight,
+  openFeatBranches,
   maxAgeMs,
   readDeclaration,
   resolveRefName,
@@ -2604,6 +2605,29 @@ describe('pointOfBranch / describeBranchAge — reading a branch name and an age
 })
 
 describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agents', () => {
+  it('marks the entire census unreadable when one requested behind-count fails', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-open-branches-'))
+    const git = (...args) =>
+      execFileSync('git', args, { cwd: dir, stdio: 'ignore', env: { ...process.env, LC_ALL: 'C' } })
+    try {
+      git('init', '-b', 'main')
+      git('config', 'user.email', 'test@example.invalid')
+      git('config', 'user.name', 'Test')
+      writeFileSync(join(dir, 'base.txt'), 'base')
+      git('add', 'base.txt')
+      git('commit', '-m', 'base')
+      git('switch', '-c', 'feat/712-test')
+      writeFileSync(join(dir, 'work.txt'), 'work')
+      git('add', 'work.txt')
+      git('commit', '-m', 'work')
+      git('switch', 'main')
+      const result = openFeatBranches({ cwd: dir, behind: true, behindProbe: () => null })
+      expect(result).toEqual({ readable: false, branches: [] })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('REFUSES a further point while the nine of 17.08.2026 stand open', () => {
     const d = branchSlotDecision({ branches: NINE_BRANCHES, point: 697, now: AUG17 })
     expect(d.allowed).toBe(false)
