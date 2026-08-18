@@ -1000,7 +1000,15 @@ export function evaluateMechanismReview({
     // supersede at a head whose range was never measured as oversized.
     const passRow = (r) =>
       Number.isInteger(Number(r?.pass?.total)) && Number(r?.pass?.total) >= 2 && Number.isInteger(Number(r?.pass?.index))
-    const splitShas = new Set(sound.filter(passRow).map((r) => String(r.sha ?? '')))
+    // THE SPLIT IS READ OFF EVERY RECORD AT THE SHA, sound or not (fourth
+    // cross-vendor round): a pass row excluded as a self-review or a broken
+    // merge still WITNESSES that the offering tool measured this range as too
+    // large for one round — the measurement stands whether or not that row's
+    // verdict may count. Deriving it from `sound` alone let a pass-less record
+    // by a different model stand beside an unsound split and clear the range
+    // whole. Only records that COMPOSE must be sound; the evidence of the
+    // split need not be, and erring wide here only ever refuses.
+    const splitShas = new Set(covering.filter(passRow).map((r) => String(r.sha ?? '')))
     const besideSplit = sound.filter((r) => !r?.pass && splitShas.has(String(r.sha ?? '')))
     const valid = [
       ...sound.filter((r) => !r?.pass && !splitShas.has(String(r.sha ?? ''))),

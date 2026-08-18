@@ -663,6 +663,20 @@ describe('evaluateMechanismReview', () => {
       expect(v.findings[0].kind).toBe('self-review')
     })
 
+    it('does not let a pass-less record stand beside a split whose pass rows are UNSOUND', () => {
+      // A pass row excluded as a self-review composes nothing, but it still
+      // WITNESSES the measurement that this range needed a split — reading the
+      // split off `sound` alone let a pass-less record by a different model
+      // clear the whole range beside it (cross-vendor review, fourth round).
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [pass(1, 2, { model: 'Claude Opus 5' }), record({ at: MERGE_ACCOUNTING_SINCE + 9000 })],
+      })
+      expect(v.block).toBe(true)
+    })
+
     // THE HOLE THE FIRST CROSS-VENDOR ROUND FOUND: the count of passes was the
     // whole check, so any two records marked 1/2 and 2/2 cleared the commit —
     // whatever files they named, and even when they both named the same one.
