@@ -243,6 +243,57 @@ describe('the patch, split per file', () => {
     expect(parseDiffHeader('diff --git a/old.mjs b/new.mjs')).toEqual({ a: 'old.mjs', b: 'new.mjs' })
     expect(parseDiffHeader('diff --git "a/o\\tld.mjs" "b/n\\tew.mjs"')).toEqual({ a: 'o\tld.mjs', b: 'n\tew.mjs' })
   })
+
+  // AN AMBIGUOUS RENAME IS DECIDED BY ITS OWN LINES (cross-vendor review, third
+  // round): `a/old.txt b/new b/dest.txt` reads as a rename to `dest.txt` or to
+  // `new b/dest.txt` with equal right, and the wrong guess dropped the real
+  // destination's patch association while a fictitious path entered the plan.
+  it('reads an ambiguous rename destination from the rename from/to lines', () => {
+    const lookahead = ['similarity index 90%', 'rename from old.txt', 'rename to new b/dest.txt']
+    expect(parseDiffHeader('diff --git a/old.txt b/new b/dest.txt', lookahead)).toEqual({
+      a: 'old.txt',
+      b: 'new b/dest.txt',
+    })
+    // …and the mirror image, where the SOURCE carries the ` b/`.
+    expect(
+      parseDiffHeader('diff --git a/old b/x.txt b/y.txt', ['rename from old b/x.txt', 'rename to y.txt']),
+    ).toEqual({ a: 'old b/x.txt', b: 'y.txt' })
+    // Copies name their paths the same way.
+    expect(
+      parseDiffHeader('diff --git a/old.txt b/new b/dest.txt', ['copy from old.txt', 'copy to new b/dest.txt']),
+    ).toEqual({ a: 'old.txt', b: 'new b/dest.txt' })
+    // A QUOTED from/to line is decoded like every other git path.
+    expect(
+      parseDiffHeader('diff --git a/old.txt b/x b/y', ['rename from old.txt', 'rename to "x b/\\ty"']),
+    ).toEqual({ a: 'old.txt', b: 'x b/\ty' })
+  })
+
+  it('stops reading rename lines at the first hunk or the next file', () => {
+    // A `rename to` inside ADDED CONTENT sits below a hunk header and must not
+    // rewrite the header above it.
+    const lookahead = ['index 1..2 100644', '@@ -1 +1 @@', '+rename to smuggled.txt']
+    expect(parseDiffHeader('diff --git a/old.txt b/new b/dest.txt', lookahead)).toEqual({
+      a: 'old.txt b/new',
+      b: 'dest.txt',
+    })
+  })
+
+  it('gives an ambiguous rename SECTION the destination its own lines name', () => {
+    const patch = [
+      'diff --git a/old.txt b/new b/dest.txt',
+      'similarity index 95%',
+      'rename from old.txt',
+      'rename to new b/dest.txt',
+      '--- a/old.txt',
+      '+++ b/new b/dest.txt',
+      '@@ -1 +1 @@',
+      '+changed',
+      patchFor(['plain.mjs']),
+    ].join('\n')
+    const sections = splitPatchByFile(patch)
+    expect(sections.map((s) => s.path)).toEqual(['new b/dest.txt', 'plain.mjs'])
+    expect(sections[0].text).toContain('rename to new b/dest.txt')
+  })
 })
 
 describe('the passes a range too large is cut into', () => {

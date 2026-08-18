@@ -302,13 +302,42 @@ function readQuoted(text, from) {
 const dropPrefix = (path, side) => (path.startsWith(`${side}/`) ? path.slice(2) : path)
 
 /**
+ * The `rename from`/`rename to` (or `copy from`/`copy to`) pair out of a
+ * section's extended header lines, or null. These lines carry each path WHOLE —
+ * one per line, quoted only where git quotes — so they are the one unambiguous
+ * spelling of a rename the `diff --git` line cannot always give. The scan stops
+ * where the extended headers do: at the first hunk or the next file.
+ */
+function renamePathsIn(lines) {
+  let from = null
+  let to = null
+  for (const raw of lines ?? []) {
+    const line = String(raw)
+    if (line.startsWith('diff --git ') || line.startsWith('@@')) break
+    const m = /^(?:rename|copy) (from|to) (.*)$/.exec(line)
+    if (!m) continue
+    if (m[1] === 'from') from = unquoteGitPath(m[2])
+    else to = unquoteGitPath(m[2])
+    if (from !== null && to !== null) return { from, to }
+  }
+  return null
+}
+
+/**
  * The two paths one `diff --git` header names, or null for any other line.
  *
- * The bare form is genuinely ambiguous — a path may itself contain ` b/` — so
- * where several splits are possible the one whose two halves are EQUAL wins, and
- * the last one otherwise, which is what the plain regex used to do.
+ * The bare form is genuinely ambiguous — a path may itself contain ` b/` — and
+ * the header line ALONE cannot always decide: `diff --git a/old.txt b/new
+ * b/dest.txt` reads as a rename to `dest.txt` or to `new b/dest.txt` with equal
+ * right (cross-vendor review, third round — the wrong reading dropped the real
+ * destination's patch association and put a fictitious path in the plan). So
+ * `lookahead` — the section's own following lines — is consulted first: a
+ * rename or copy names both paths whole in its extended headers, and that
+ * spelling outranks any guess. Without it, the split whose two halves are EQUAL
+ * wins (a modification, the common case), and the last split otherwise, which
+ * is what the plain regex used to do.
  */
-export function parseDiffHeader(line) {
+export function parseDiffHeader(line, lookahead = []) {
   const m = /^diff --git (.*)$/.exec(String(line ?? ''))
   if (!m) return null
   const rest = m[1]
@@ -336,6 +365,8 @@ export function parseDiffHeader(line) {
   const splits = []
   for (let i = rest.indexOf(' b/'); i >= 0; i = rest.indexOf(' b/', i + 1)) splits.push(i)
   if (!splits.length) return null
+  const named = renamePathsIn(lookahead)
+  if (named) return { a: named.from, b: named.to }
   const equal = splits.find((i) => rest.slice(2, i) === rest.slice(i + 3))
   const at = equal === undefined ? splits[splits.length - 1] : equal
   return { a: rest.slice(2, at), b: rest.slice(at + 3) }
@@ -350,19 +381,24 @@ export function parseDiffHeader(line) {
  */
 export function splitPatchByFile(patch) {
   const lines = String(patch ?? '').split('\n')
-  const out = []
+  const sections = []
   let current = null
   for (const line of lines) {
-    const header = parseDiffHeader(line)
-    if (header) {
-      if (current) out.push(current)
-      current = { path: header.b, lines: [line] }
+    if (parseDiffHeader(line)) {
+      if (current) sections.push(current)
+      current = { header: line, lines: [line] }
       continue
     }
     if (current) current.lines.push(line)
   }
-  if (current) out.push(current)
-  return out.map((s) => ({ path: s.path, text: s.lines.join('\n') }))
+  if (current) sections.push(current)
+  // The path is read WITH the section's own lines in view: an ambiguous rename
+  // header is decided by its `rename from`/`rename to` lines, never by a guess
+  // over the one line (cross-vendor review, third round).
+  return sections.map((s) => ({
+    path: parseDiffHeader(s.header, s.lines.slice(1)).b,
+    text: s.lines.join('\n'),
+  }))
 }
 
 /**
