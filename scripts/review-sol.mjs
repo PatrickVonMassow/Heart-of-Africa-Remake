@@ -77,7 +77,6 @@ import {
 } from './review-sol-core.mjs'
 import {
   assembleMaterial,
-  formatBudgetNotice,
   formatPassFiles,
   formatPassManifest,
   formatShortfall,
@@ -88,13 +87,13 @@ import {
   MAX_PASS_TOTAL,
   passByIndex,
   planPasses,
-  planShortfall,
   patchSectionMap,
   quotePassFile,
   splitPatchByFile,
   undecodablePaths,
+  unquoteGitPath,
 } from './review-material-core.mjs'
-import { readRecords } from './mechanism-review.mjs'
+import { mechanismLogCommand, parseRangeLog, planAuthorshipGroups } from './mechanism-review-range-core.mjs'
 
 /** Where codex keeps the ChatGPT login, and where we park a copy of it. */
 export const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), '.codex')
@@ -209,7 +208,7 @@ function git(args, { required = true, raw = false } = {}) {
  * symlink yields its own target text (a few harmless bytes, and visible as such)
  * and nothing outside the commit can travel at all.
  */
-function gatherRange(sha, base) {
+function gatherRange(sha, base, onlyPaths = null) {
   // THE WHOLE RANGE, NOT THE LAST COMMIT (10.08.2026). One record covers every
   // commit it CONTAINS — that is how both gates read the ledger — so a review of
   // a branch head that only saw the head's own diff would clear commits nobody
@@ -224,7 +223,8 @@ function gatherRange(sha, base) {
   // over the raw bytes, and they are kept RAW: trimming a path with edge
   // whitespace makes a different path, one `git show` misses — the real file
   // then travelled in no pass while nothing named the loss (third round).
-  const paths = git(['diff', '--name-only', '-z', range], { raw: true }).split('\0').filter(Boolean)
+  const pathspec = Array.isArray(onlyPaths) && onlyPaths.length ? ['--', ...onlyPaths] : []
+  const paths = git(['diff', '--name-only', '-z', range, ...pathspec], { raw: true }).split('\0').filter(Boolean)
   // A PATH NODE'S STRINGS CANNOT CARRY IS REFUSED, NOT COLLAPSED (fourth
   // cross-vendor round; named residual — see unquoteGitPath). Bytes that are
   // not valid UTF-8 decode to U+FFFD here, distinct real paths can then fall
@@ -255,7 +255,7 @@ function gatherRange(sha, base) {
   // per-path external driver REPLACES git's own patch generation, so a helper
   // emitting plausible `diff --git` sections could deliver transformed or
   // incomplete content the section accounting accepts as the real patch.
-  const patch = git(['diff', '--binary', '--no-textconv', '--no-ext-diff', range], { raw: true })
+  const patch = git(['diff', '--binary', '--no-textconv', '--no-ext-diff', range, ...pathspec], { raw: true })
   // A BINARY FILE'S BYTES CANNOT TRAVEL AS REVIEW TEXT (fourth cross-vendor
   // round, pass 4, finding 7). An ADDED binary was skipped as "covered by the
   // patch" while the ordinary diff carries only `Binary files … differ` — the
@@ -333,7 +333,90 @@ function gatherRange(sha, base) {
   // THE RAW PARTS, NOT THE FORMATTED MATERIAL (point 714). The budget decision,
   // the pass plan and the accounting all need the parts separately; assembling
   // here would leave the caller with a string and no way to tell what it lost.
-  return { stat: git(['diff', '--stat', range], { raw: true }), patch, files }
+  return { stat: git(['diff', '--stat', range, ...pathspec], { raw: true }), patch, files }
+}
+
+/** Commit/file authorship facts for a range, in the same path semantics as the guard. */
+export function gatherAuthorshipCommits(sha, base) {
+  const raw = git(mechanismLogCommand(base, sha), { raw: true })
+  return parseRangeLog(raw, { decodePath: unquoteGitPath }).map((commit) => {
+    const field = git([
+      'show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', commit.sha,
+    ])
+    return { ...commit, authorModels: modelsInTrailerField(field), authorModel: modelsInTrailerField(field)[0] ?? '' }
+  })
+}
+
+/**
+ * Size every authorship group with the standing material planner, then flatten
+ * the result into one recordable pass sequence at the requested head.
+ */
+export function buildAuthorshipPassPlan({ sha, base, commits = gatherAuthorshipCommits(sha, base) } = {}) {
+  const authorship = planAuthorshipGroups({ commits })
+  const passes = []
+  const uncoverable = []
+  let rawSize = 0
+  for (const group of authorship.groups) {
+    let rangeHead = sha
+    let rangeBase = base
+    if (group.kind === 'commit') {
+      rangeHead = group.commits[0]
+      rangeBase = git(['rev-parse', `${rangeHead}^`])
+    }
+    const range = gatherRange(rangeHead, rangeBase, group.files)
+    const sized = planPasses({ ...range, budget: MATERIAL_BUDGET_CHARS })
+    rawSize += Number(sized.rawSize ?? 0)
+    uncoverable.push(...(sized.uncoverable ?? []).map((item) => ({ ...item, reviewer: group.reviewer })))
+    for (const child of sized.passes ?? []) {
+      const childFiles = child.files ?? []
+      const childCommits = group.commits.filter((commitSha) => {
+        const source = commits.find((commit) => String(commit.sha) === String(commitSha))
+        return (source?.files ?? []).some((file) => childFiles.includes(file))
+      })
+      passes.push({
+        ...child,
+        files: childFiles,
+        commits: childCommits,
+        authors: group.authors,
+        reviewer: group.reviewer,
+        authorshipKind: group.kind,
+        rangeBase,
+        rangeHead,
+        sourceRange: range,
+      })
+    }
+  }
+  const total = passes.length
+  const numbered = passes.map((pass, index) => ({ ...pass, index: index + 1, total }))
+  return {
+    fits: total === 1 && uncoverable.length === 0,
+    passes: numbered,
+    uncoverable,
+    rawSize,
+    mixedFiles: authorship.mixedFiles,
+    unreviewable: authorship.unreviewable,
+  }
+}
+
+export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
+  const lines = [
+    `review-sol: ${plan.rawSize} characters of outstanding material in ${plan.passes.length} authorship/size pass(es):`,
+  ]
+  if (plan.mixedFiles?.length) {
+    lines.push(`  mixed-vendor files (split at commit boundaries): ${plan.mixedFiles.map(quotePassFile).join(', ')}`)
+  }
+  for (const pass of plan.passes ?? []) {
+    lines.push(
+      `  pass ${pass.index}/${pass.total} → ${pass.reviewer || 'NO ELIGIBLE REVIEWER'}; ` +
+        `${pass.size} characters; commits ${pass.commits.map((commit) => commit.slice(0, 7)).join(', ')}; ` +
+        `files ${pass.files.map(quotePassFile).join(', ')}`,
+      `    node scripts/review-sol.mjs --sha ${sha} --brief "<what to judge>" --pass ${pass.index}`,
+    )
+  }
+  for (const group of plan.unreviewable ?? []) {
+    lines.push(`  CANNOT ASSIGN: ${group.files.map(quotePassFile).join(', ')} — every candidate authored this group`)
+  }
+  return lines.join('\n')
 }
 
 /**
@@ -372,15 +455,6 @@ function assemblePass(range, pass, plan = null) {
  * measurement that fails is reported as a measurement that failed: `null` yields
  * the `unplanned` refusal, never a silent "it fits".
  */
-function measureRange(sha, base) {
-  try {
-    return planPasses({ ...gatherRange(sha, base), budget: MATERIAL_BUDGET_CHARS })
-  } catch (e) {
-    console.error(`review-sol: the range could not be measured against the budget: ${(e && e.message) || e}`)
-    return null
-  }
-}
-
 /**
  * The commit the review's range starts at: where `ref` and `sha` diverged.
  *
@@ -795,12 +869,40 @@ if (isMainModule(import.meta.url)) {
       return { pass }
     }
 
+    const base = mergeBase(sinceFlag || 'main', full, { explicit: Boolean(sinceFlag) })
+    const plan = buildAuthorshipPassPlan({ sha: full, base })
+    console.error(formatAuthorshipPlan(plan, { sha: full }))
+    if (plan.unreviewable.length) {
+      console.error('review-sol: at least one pass has no eligible non-author reviewer; no round can clear it.')
+      process.exit(4)
+    }
+    if (plan.passes.length > MAX_PASS_TOTAL) {
+      console.error(
+        `review-sol: this range needs ${plan.passes.length} passes — more than the ${MAX_PASS_TOTAL} a record can hold.`,
+      )
+      process.exit(2)
+    }
+    if (!plan.passes.length || plan.uncoverable.length) {
+      console.error('review-sol: the authorship plan cannot cover every changed file; no record is offered.')
+      process.exit(4)
+    }
+    if (!plan.fits && !passFlag) {
+      console.error('review-sol: REFUSING to spend a round on the whole range — run one of the authored passes above.')
+      process.exit(4)
+    }
+    const selected = plan.fits ? plan.passes[0] : passFor(plan).pass
+    if (!selected) {
+      console.error(`review-sol: --pass ${passFlag} does not name one of this plan's ${plan.passes.length} passes.`)
+      process.exit(2)
+    }
+    const pass = plan.fits ? null : selected
+    const rangeAuthors = selected.authors
+
     if (routeFor('review', share.setting) !== 'sol') {
-      const base = mergeBase(sinceFlag || 'main', full, { explicit: Boolean(sinceFlag) })
       const decision = decideReview({
         outcome: { ok: false, kind: OUTCOME.SWITCHED_OFF, cause: causeTextFor(OUTCOME.SWITCHED_OFF) },
         parsed: { ok: false },
-        authorModel: authorsIn(full, base),
+        authorModel: rangeAuthors,
       })
       // THE FIT IS MEASURED ON THIS PATH TOO (cross-vendor review, second
       // round). No round is spent here, but the record command printed for the
@@ -808,26 +910,20 @@ if (isMainModule(import.meta.url)) {
       // nobody has measured whether the range is reviewable in one round is the
       // assumption this point removes. The measurement costs git, not an
       // allowance.
-      const handOverPlan = measureRange(full, base)
-      const handOverPass = passFor(handOverPlan)
-      if (handOverPass.error) {
-        console.error(`review-sol: ${handOverPass.error}`)
-        process.exit(2)
-      }
       console.log(
         formatReviewReport({
           decision,
           sha: full,
           mode,
           point,
-          partial: partialFor(base),
+          partial: pass ? null : partialFor(base),
           // A SELECTED PASS is measured by the plan to fit one round, so its
           // hand-over template prints pass-scoped — exactly as a fitting range
           // prints its whole-range template; the whole-range shortfall would
           // suppress the very record the pass split exists to make possible.
-          shortfall: handOverPass.pass ? null : planShortfall(handOverPlan),
-          plan: handOverPlan,
-          pass: handOverPass.pass,
+          shortfall: null,
+          plan,
+          pass,
         }),
       )
       process.exit(3)
@@ -837,8 +933,6 @@ if (isMainModule(import.meta.url)) {
     // call is paid for (point 667). Sol AUTHORS now, and a review it may not
     // give is not worth an allowance: a Sol-authored range goes straight to the
     // Claude reviewer that also runs the suites, judges the picture and lands.
-    const base = mergeBase(sinceFlag || 'main', full, { explicit: Boolean(sinceFlag) })
-    const rangeAuthors = authorsIn(full, base)
     if (solAuthored(rangeAuthors)) {
       const decision = decideReview({
         outcome: { ok: false, kind: OUTCOME.SELF_REVIEW, cause: causeTextFor(OUTCOME.SELF_REVIEW) },
@@ -847,22 +941,16 @@ if (isMainModule(import.meta.url)) {
       })
       // Same measurement, same reason: the role swap hands the WHOLE range on,
       // and a range no single round can hold must be handed on as its passes.
-      const swapPlan = measureRange(full, base)
-      const swapPass = passFor(swapPlan)
-      if (swapPass.error) {
-        console.error(`review-sol: ${swapPass.error}`)
-        process.exit(2)
-      }
       console.log(
         formatReviewReport({
           decision,
           sha: full,
           mode,
           point,
-          partial: partialFor(base),
-          shortfall: swapPass.pass ? null : planShortfall(swapPlan),
-          plan: swapPlan,
-          pass: swapPass.pass,
+          partial: pass ? null : partialFor(base),
+          shortfall: null,
+          plan,
+          pass,
         }),
       )
       process.exit(3)
@@ -889,138 +977,9 @@ if (isMainModule(import.meta.url)) {
     // sha with no merge base against `main` used to leave this empty, which
     // switched the check OFF and printed a record for a range nobody bounded.
     // The decision itself is pure and tested (coverageDecision).
-    const partial = partialFor(base)
-
-    // THE THRESHOLD IS NAMED BEFORE THE ROUND IS SPENT (point 714). A caller who
-    // learns of the overflow from the verdict has already paid for a review that
-    // covers less than it looks like it does; a caller who learns of it here can
-    // split the review instead.
-    const range = gatherRange(full, base)
-    const plan = planPasses({ ...range, budget: MATERIAL_BUDGET_CHARS })
-    console.error(formatBudgetNotice(plan, { sha: full }))
-
-    // The flag itself was parsed above, before the hand-off exits (round-2
-    // pass 5); this is the same selection the hand-offs make.
-    let pass = null
-    let assembly
-    if (plan.fits) {
-      if (flag('--carry-from')) {
-        console.error(
-          'review-sol: --carry-from does nothing here — this range fits in one round, which must be read whole.',
-        )
-      }
-      if (passFlag) {
-        console.error(
-          `review-sol: --pass ${passFlag} names a pass of a split this range does not need — it fits in one round.`,
-        )
-        process.exit(2)
-      }
-      // The single pass the plan produced, so the patch gets the room the plan
-      // costed it: the standing half-share would cut a diff-heavy range the plan
-      // called complete, and the round would be paid for before anyone noticed.
-      assembly = plan.passes.length === 1
-        ? assemblePass(range, plan.passes[0])
-        : assembleMaterial({ ...range, budget: MATERIAL_BUDGET_CHARS })
-    } else {
-      // A ROUND OVER MATERIAL THAT CANNOT FIT IS A ROUND SPENT ON A RECORD THAT
-      // WILL BE REFUSED. The plan above says how to split it, so the run stops
-      // here rather than paying for a verdict nothing may rest on.
-      if (!passFlag) {
-        // An over-cap split can never be recorded: refuse BEFORE any carry
-        // analysis prints unrecordable commands (fourth landing round).
-        if (plan.passes.length > MAX_PASS_TOTAL) {
-          console.error(
-            `review-sol: this range splits into ${plan.passes.length} passes — more than the ` +
-              `${MAX_PASS_TOTAL} a record can hold. Narrow the range or split the change.`,
-          )
-          process.exit(2)
-        }
-        // DELTA-SCOPED ROUNDS (user decision 18.08.2026): with --carry-from
-        // <previous round's head>, a pass whose files are ALL byte-identical
-        // there and were ALL read by one recorded pass at that head needs no
-        // fresh round — its reading carries, and the recorder re-verifies
-        // every claim this planning makes (blob identity, the source row)
-        // before writing, as do the gates on every read. Anything less than
-        // fully unchanged+covered is reviewed fresh; the analysis only sorts
-        // the passes, it clears nothing itself.
-        const carryFlag = flag('--carry-from')
-        if (carryFlag) {
-          if (!/^[0-9a-f]{7,40}$/i.test(carryFlag)) {
-            console.error(`review-sol: --carry-from: "${carryFlag}" is not a commit sha (7–40 hex characters)`)
-            process.exit(2)
-          }
-          const carrySha = git(['rev-parse', `${carryFlag}^{commit}`], { required: false })
-          if (!carrySha) {
-            console.error(`review-sol: --carry-from ${carryFlag}: no such commit in this repository`)
-            process.exit(2)
-          }
-          const changed = new Set(
-            git(['diff', '--name-only', '-z', `${carrySha}..${full}`], { raw: true })
-              .split('\0')
-              .filter(Boolean),
-          )
-          const sourceRows = readRecords().filter(
-            (r) => r.sha === carrySha && r.pass && Array.isArray(r.pass.files) && r.carried === undefined,
-          )
-          // INJECTIVE (JSON, never a join) — advisory only, and the recorder
-          // re-verifies every claim, but a colliding key here recommends a
-          // carry the recorder then refuses (fourth landing round).
-          const setOf = (files) => JSON.stringify([...files].map(String).sort())
-          const sourceSets = new Set(sourceRows.map((r) => setOf(r.pass.files)))
-          console.error(`review-sol: carry analysis against ${carrySha.slice(0, 7)}:`)
-          for (const p of plan.passes) {
-            const dirty = p.files.filter((f) => changed.has(f))
-            const covered = sourceSets.has(setOf(p.files))
-            if (!dirty.length && covered) {
-              console.error(
-                `  pass ${p.index}/${p.total} — unchanged and read there; CARRY it:\n` +
-                  `    node scripts/mechanism-review.mjs --record ${full} --carried-from ${carrySha} ` +
-                  `--pass ${p.index}/${p.total} --pass-files "${formatPassFiles(p.files)}"${point ? ` --point ${point}` : ''}`,
-              )
-            } else {
-              const why = dirty.length
-                ? `${dirty.length} file(s) changed: ${dirty.map((f) => quotePassFile(f)).join(', ')}`
-                : 'no recorded pass there covers exactly this file set'
-              console.error(`  pass ${p.index}/${p.total} — review it fresh (${why}): --pass ${p.index}`)
-            }
-          }
-        }
-        console.error(
-          'review-sol: REFUSING to spend a round on a range that cannot fit one — run the passes above.',
-        )
-        process.exit(4)
-      }
-      if (flag('--carry-from')) {
-        console.error(
-          'review-sol: --carry-from is a planning aid and does not combine with --pass — this call pays a fresh review of the named pass.',
-        )
-      }
-      // A split of one cannot be recorded (round-3 pass 4): the recorder
-      // refuses totals below 2, so spending a round on `--pass 1` of such a
-      // plan buys a verdict nothing can carry.
-      if (plan.passes.length < 2) {
-        console.error(
-          `review-sol: --pass ${passFlag}: this range packs into one coverable pass beside files ` +
-            'beyond reach, and a split of one cannot be recorded — narrow the range or split the change.',
-        )
-        process.exit(2)
-      }
-      // Nor a split past the recorder's ceiling (landing-round pass 5): every
-      // round spent on such a pass buys a record parsePassSpec refuses.
-      if (plan.passes.length > MAX_PASS_TOTAL) {
-        console.error(
-          `review-sol: --pass ${passFlag}: this range splits into ${plan.passes.length} passes — more ` +
-            `than the ${MAX_PASS_TOTAL} a record can hold. Narrow the range or split the change.`,
-        )
-        process.exit(2)
-      }
-      pass = passByIndex(plan, passFlag)
-      if (!pass) {
-        console.error(`review-sol: --pass ${passFlag}: this range splits into ${plan.passes.length} pass(es).`)
-        process.exit(2)
-      }
-      assembly = assemblePass(range, pass, plan)
-    }
+    const partial = pass ? null : partialFor(base)
+    const range = selected.sourceRange
+    const assembly = assemblePass(range, selected, plan)
     // THE ASSEMBLY IS THE AUTHORITY, THE PLAN ONLY ADVISORY. Where the two
     // disagree the round is not spent: a review whose record will be refused
     // afterwards costs an allowance and answers nothing.

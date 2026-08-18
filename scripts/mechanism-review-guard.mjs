@@ -43,7 +43,9 @@ import {
 } from './mechanism-review-core.mjs'
 import {
   commitsForContributions,
+  mechanismLogCommand,
   outstandingContributions,
+  parseRangeLog as parseWholeRangeLog,
   planAuthorshipGroups,
 } from './mechanism-review-range-core.mjs'
 import { quotePassFile, unquoteGitPath } from './review-material-core.mjs'
@@ -70,8 +72,6 @@ export const BASELINE_PATH = repoPath('.claude/mechanism-review-baseline.json')
 // RAW separator byte can only ever come from the --format string itself — the
 // boundary is unforgeable by file name. Spelled via fromCharCode so this
 // source file stays free of raw control bytes.
-const REC = String.fromCharCode(0x1e)
-const FLD = String.fromCharCode(0x1f)
 
 /** A header line, whole: sentinel, 40-hex sha, epoch — and NOTHING FREE-TEXT
  *  (escalation round, pass 2). The header used to carry the subject and the
@@ -81,7 +81,6 @@ const FLD = String.fromCharCode(0x1f)
  *  refusal could not bite. Machine-shaped fields cannot contain the separator;
  *  the free-text facts travel per commit through their own single-format git
  *  calls (see commitFacts), where there is no separator to forge. */
-const HEADER_RE = new RegExp(`^${REC}([0-9a-f]{40})${FLD}(\\d+)$`)
 
 const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
@@ -223,27 +222,7 @@ function scriptFiles() {
  * every path line goes through unquoteGitPath.
  */
 export function parseRangeLog(out) {
-  const commits = []
-  let current = null
-  const finish = () => {
-    if (!current) return
-    const { touched: _touched, ...commit } = current
-    commits.push({ ...commit, files: current.touched })
-    current = null
-  }
-  for (const raw of String(out ?? '').split('\n')) {
-    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
-    const header = HEADER_RE.exec(line)
-    if (header) {
-      finish()
-      current = { sha: header[1], at: Number(header[2]) * 1000 || 0, touched: [] }
-      continue
-    }
-    if (!current || !line) continue
-    current.touched.push(unquoteGitPath(line))
-  }
-  finish()
-  return commits
+  return parseWholeRangeLog(out, { decodePath: unquoteGitPath })
 }
 
 export function parseMechanismLog(out, files) {
@@ -284,21 +263,7 @@ function commitFacts(sha) {
  *    delete + add, BOTH spellings are listed and the old guard path still
  *    demands its review.
  */
-export const mechanismLogCommand = (base, head) => [
-  // %x1e/%x1f are expanded by GIT, so the arguments stay ASCII and the
-  // separators reach the output as raw control bytes no quoted path can carry
-  // (round-4 pass 3). AS AN ARGS ARRAY, never a shell line (round-5 pass 3):
-  // cmd.exe expands %-spans as environment variables before git runs.
-  '-c',
-  'core.quotepath=on',
-  'log',
-  '--format=%x1e%H%x1f%ct',
-  '--name-only',
-  '--no-renames',
-  '--diff-merges=cc',
-  '--reverse',
-  `${base}..${head}`,
-]
+export { mechanismLogCommand }
 
 export const rangeFilesCommand = (base, sha) => [
   'diff',

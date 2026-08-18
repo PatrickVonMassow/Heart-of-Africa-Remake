@@ -788,6 +788,9 @@ export function formatRecordCommand({
   // what the recorder stores is byte-identical to what this pass read.
   if (pass) {
     parts.push(`--pass ${pass.index}/${pass.total}`, `--pass-files ${q(formatPassFiles(pass.files ?? []))}`)
+    if (Array.isArray(pass.commits) && pass.commits.length) {
+      parts.push(`--pass-commits ${q(pass.commits.join(','))}`)
+    }
   }
   return parts.join(' ')
 }

@@ -11,6 +11,43 @@ export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', 'Fabl
 const uniq = (xs) => [...new Set((xs ?? []).map(String).filter(Boolean))]
 const keyFor = (sha, file) => `${String(sha)}\0${String(file)}`
 
+const RANGE_RECORD = String.fromCharCode(0x1e)
+const RANGE_FIELD = String.fromCharCode(0x1f)
+const RANGE_HEADER = new RegExp(`^${RANGE_RECORD}([0-9a-f]{40})${RANGE_FIELD}(\\d+)$`)
+
+export const mechanismLogCommand = (base, head) => [
+  '-c',
+  'core.quotepath=on',
+  'log',
+  '--format=%x1e%H%x1f%ct',
+  '--name-only',
+  '--no-renames',
+  '--diff-merges=cc',
+  '--reverse',
+  `${base}..${head}`,
+]
+
+export function parseRangeLog(out, { decodePath = (path) => path } = {}) {
+  const commits = []
+  let current = null
+  const finish = () => {
+    if (current) commits.push(current)
+    current = null
+  }
+  for (const raw of String(out ?? '').split('\n')) {
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
+    const header = RANGE_HEADER.exec(line)
+    if (header) {
+      finish()
+      current = { sha: header[1], at: Number(header[2]) * 1000 || 0, files: [] }
+    } else if (current && line) {
+      current.files.push(decodePath(line))
+    }
+  }
+  finish()
+  return commits
+}
+
 export function vendorOf(model) {
   const value = String(model ?? '').toLowerCase()
   if (/\bsol\b|\bgpt[- ]?5(?:\.|\b)/.test(value) || /openai\.com/.test(value)) return 'openai'
