@@ -20,7 +20,7 @@
 // Side-effect free: the process spawn, the temp files and the printing belong to
 // scripts/review-sol.mjs. Pinned by review-sol-core.test.mjs.
 
-import { BLIND_REVIEWER, modelFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
+import { BLIND_REVIEWER, blindReviewerAdmission, modelFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
 import {
   assembleMaterial,
   formatShortfall,
@@ -31,7 +31,7 @@ import {
 
 // Re-exported: the runner and the recorder refuse the same sentence, from one
 // definition (mechanism-review-core.mjs).
-export { BLIND_REVIEWER }
+export { BLIND_REVIEWER, blindReviewerAdmission }
 
 // The material budget and its split live with the accounting that spends them
 // (review-material-core.mjs); re-exported here because this is where every
@@ -297,8 +297,12 @@ export function parseVerdict(text) {
   // first run of this command answered `do-not-merge` because none of its
   // commands reached the repository). Such an answer carries a valid verdict
   // word and would otherwise be recorded as a review. The check errs towards the
-  // fallback, which costs a second reviewer, never a false green.
-  if (BLIND_REVIEWER.test(evidence)) {
+  // fallback, which costs a second reviewer, never a false green — but it is the
+  // two-tier JUDGMENT, not the raw net: an evidence line that opens with what
+  // was checked and then describes the reviewed code in the net's vocabulary is
+  // a review, and routing its verdict to a fallback would discard it (measured
+  // 18.08.2026, point 714 pass 2 — see blindReviewerAdmission).
+  if (blindReviewerAdmission(evidence)) {
     return { ok: false, verdict: '', evidence: '', error: 'the reviewer says it could not see the change' }
   }
   // A line still in its angle brackets is the PLACEHOLDER echoed back, not an

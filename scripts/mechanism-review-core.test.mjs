@@ -234,6 +234,34 @@ describe('validateRecord', () => {
     expect(validateRecord({ ...good, evidence: 'the guard could not see a renamed file; fixed in the diff' }).ok).toBe(true)
   })
 
+  // THE NET MUST NOT EAT A REVIEW (measured 18.08.2026, point 714 pass 2): a
+  // review OF this review tooling describes the tooling's failure modes in the
+  // net's own vocabulary, and the verdict it carried was routed to a fallback
+  // as "could not see the change". The evidence lines below are the shape of
+  // that answer — they open with what was checked, then name defects.
+  it('accepts an evidence line whose FINDINGS use the net’s vocabulary', () => {
+    for (const evidence of [
+      'Checked the full supplied core and CLI-test material; found renames whose destination ends with no patch association while a fictitious file enters the plan',
+      'Checked parseDiffHeader and parsePassFiles; found paths whose material was not supplied to any pass and nothing said so',
+      'Reviewed the guard end to end; a file the range touched can end up where the diff could not be read by the union check',
+    ]) {
+      expect(validateRecord({ ...good, evidence }).ok, evidence).toBe(true)
+    }
+  })
+
+  it('still refuses the same vocabulary where nothing affirms a reading', () => {
+    expect(validateRecord({ ...good, evidence: 'no patch arrived with the request, so this judges nothing' }).ok).toBe(false)
+    expect(validateRecord({ ...good, evidence: 'without access to the material there was nothing to judge here' }).ok).toBe(false)
+  })
+
+  it('refuses a FIRST-PERSON admission even beside an affirmed reading', () => {
+    // "I could not read…" speaks about the run, not about the code; a finding
+    // does not say "I".
+    expect(
+      validateRecord({ ...good, evidence: 'Checked the prompt wiring, but I could not read the diff itself' }).ok,
+    ).toBe(false)
+  })
+
   it('refuses an evidence line still in its angle brackets, however long', () => {
     // The commands that print a record command for a review still to be done
     // leave `<…>` standing; the length rule alone would wave a long one through.

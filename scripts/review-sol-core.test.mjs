@@ -197,6 +197,35 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
     ).toMatchObject({ ok: true })
   })
 
+  it('does NOT route a real verdict to the fallback because its FINDINGS use the net’s words', () => {
+    // Measured 18.08.2026 (point 714, pass 2): Sol reviewed the review tooling
+    // itself, its findings named a file that ends up "with no patch"
+    // association, and the clean do-not-merge below it was reported as "the
+    // reviewer says it could not see the change" — a FALSE fallback, which is
+    // the mirror image of the bug the net exists for. This message is that
+    // answer's shape: a findings body, then the two closing lines.
+    const answer = [
+      'Findings:',
+      '1. review-material-core.mjs — parseDiffHeader misparses valid unquoted renames whose',
+      '   destination contains " b/": the real destination then loses its patch association',
+      '   while a fictitious dest.txt with no patch enters the plan.',
+      '2. review-material-core.mjs — parsePassFiles collapses paths, so a file the range',
+      '   touched can look covered although its content was not supplied to any pass.',
+      'VERDICT: do-not-merge',
+      'EVIDENCE: Checked the full supplied core and CLI-test material; found an unquoted-rename misassociation that leaves a file with no patch, and non-round-trippable pass-file paths',
+    ].join('\n')
+    expect(parseVerdict(answer)).toMatchObject({ ok: true, verdict: 'do-not-merge' })
+  })
+
+  it('still refuses the genuine admission, first person or bare', () => {
+    expect(
+      parseVerdict('VERDICT: do-not-merge\nEVIDENCE: Checked what I was given, but I could not read the diff itself'),
+    ).toMatchObject({ ok: false })
+    expect(
+      parseVerdict('VERDICT: do-not-merge\nEVIDENCE: no patch arrived on stdin, so nothing here judges the change'),
+    ).toMatchObject({ ok: false })
+  })
+
   it('requires the pair to be the LAST two lines, not two matches from anywhere', () => {
     const spliced = 'VERDICT: merge\n\nSome later paragraph.\n\nEVIDENCE: read the whole diff and the tests'
     expect(parseVerdict(spliced)).toMatchObject({ ok: false })

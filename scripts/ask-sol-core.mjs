@@ -18,7 +18,7 @@
 // Side-effect free: the process spawn, the material gathering and the printing belong to
 // scripts/ask-sol.mjs. Pinned by ask-sol-core.test.mjs.
 
-import { BLIND_REVIEWER, MATERIAL_BUDGET_CHARS, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
+import { blindReviewerAdmission, MATERIAL_BUDGET_CHARS, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 
 export { MATERIAL_BUDGET_CHARS, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
 
@@ -255,7 +255,11 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
   if (!k) throw new Error(`ask-sol: not a kind: ${kind}`)
   const clean = String(text ?? '').replace(/[*`_#>]/g, '')
   if (!clean.trim()) return { ok: false, kind: k, answer: null, summary: '', error: 'the run produced no answer at all' }
-  if (BLIND_REVIEWER.test(clean)) {
+  // The two-tier judgment, not the raw net: an audit or diagnose answer about
+  // THIS project's tooling describes failure modes in the net's own vocabulary,
+  // and a whole message swallowed for one such phrase is work discarded
+  // (measured 18.08.2026, point 714 pass 2, on the review path).
+  if (blindReviewerAdmission(clean)) {
     return { ok: false, kind: k, answer: null, summary: '', error: 'the model says it could not see the material' }
   }
   if (k === 'explain') {

@@ -634,12 +634,35 @@ export function formatArgErrors(errors = []) {
  * more phrasing. What keeps the gate honest is the runner falling back on any
  * unusable answer at all; this only stops the ones that would otherwise read as
  * a verdict.
+ *
+ * TWO TIERS, because the net caught a real review (measured 18.08.2026, point
+ * 714 pass 2): a review OF this review tooling describes the tooling's own
+ * failure modes in the net's own vocabulary — a finding about a file that ends
+ * up "with no patch" association is a defect report, not an admission — and the
+ * verdict it carried was routed to a fallback as "could not see the change".
+ * A FALSE fallback is the mirror image of the bug the net exists for: it
+ * discards a verdict somebody gave. So:
+ *   FIRST PERSON  ("I could not read…", "none of my commands…") is always an
+ *                 admission — a finding speaks about the code, not about "me".
+ *   SUBJECT-ONLY  ("the diff could not be read", "no material") counts only
+ *                 while the answer nowhere AFFIRMS a reading: a line that opens
+ *                 with what was checked is reporting findings, and a phrase of
+ *                 the net inside it describes the code under review.
+ * blindReviewerAdmission() is the one entry point; both refusers ask it.
  */
-export const BLIND_REVIEWER = new RegExp(
+const BLIND_FIRST_PERSON = new RegExp(
   [
     // "I could not read/see/access …", "we were unable to inspect …"
     /\b(?:i|we)\s+(?:could\s+not|couldn't|can(?:no|')t|(?:was|were)\s+(?:unable|not\s+able)\s+to|did\s+not\s+(?:get|receive|have))\b[^.\n]{0,80}\b(?:read|see|inspect|access|reach|open|review|view|retrieve|fetch|verify|validate|confirm|check|examine|evaluate|assess)\b/
       .source,
+    // "none of my commands reached …"
+    /\bnone\s+of\s+(?:my|our)\s+commands\b/.source,
+  ].join('|'),
+  'i',
+)
+
+const BLIND_SUBJECT = new RegExp(
+  [
     // "…because the repository was unavailable" — the reason half of the same
     // admission, whatever verb the first half used (fifth cross-vendor round).
     /\b(?:repository|repo|diff|patch|material|files?|change|workspace|content)\s+(?:was|were|is|are)\s+(?:unavailable|unreachable|inaccessible|not\s+(?:available|reachable|accessible))\b/
@@ -647,10 +670,8 @@ export const BLIND_REVIEWER = new RegExp(
     // "no access to the diff", "without access to the files", "had no material"
     /\b(?:no|without|lacking|denied)\s+access\b/.source,
     /\bno\s+(?:material|patch|diff)\b/.source,
-    // "none of my commands reached …", "repository access failed"
-    /\bnone\s+of\s+my\s+commands\b/.source,
     /\b(?:repository|repo|file|material|workspace)\s+access\s+(?:failed|denied|was\s+denied)\b/.source,
-    // "the diff could not be read", "the patch was not supplied/provided"
+    // "could not read the diff", "the patch was not supplied/provided"
     /\b(?:could\s+not|unable\s+to)\s+(?:read|inspect|access|retrieve)\s+(?:the\s+)?(?:diff|patch|files?|repository|material|change)\b/
       .source,
     // …and the same sentence in the passive, which the active form above does
@@ -662,6 +683,31 @@ export const BLIND_REVIEWER = new RegExp(
   ].join('|'),
   'i',
 )
+
+/**
+ * The prompt fixes the evidence shape as "what you actually checked and what
+ * you found", so a genuine review opens with a reading verb. Multiline: for the
+ * callers that test a whole message, any line that opens so affirms a reading.
+ */
+const AFFIRMED_READING = /^\W*(?:checked|reviewed|read|inspected|examined|verified|compared|traced|audited|analysed|analyzed|assessed|judged|covered)\b/im
+
+/** The union, kept for callers that want the raw net rather than the judgment. */
+export const BLIND_REVIEWER = new RegExp(`${BLIND_FIRST_PERSON.source}|${BLIND_SUBJECT.source}`, 'i')
+
+/**
+ * Does this text ADMIT the reviewer never saw the change? The two-tier judgment
+ * described at the net above. RESIDUAL, accepted and named: an answer that
+ * opens with a reading verb and then reports its own missing material in the
+ * subject-only voice ("Checked nothing; the material was not supplied") passes —
+ * the net is a safety net, and the material accounting (materialShortfall), not
+ * this text scan, is what decides whether a record may rest on a round.
+ */
+export function blindReviewerAdmission(text) {
+  const t = String(text ?? '')
+  if (BLIND_FIRST_PERSON.test(t)) return true
+  if (AFFIRMED_READING.test(t)) return false
+  return BLIND_SUBJECT.test(t)
+}
 
 /** Shortest form a message should print a sha in. */
 const short = (sha) => String(sha ?? '').slice(0, 7)
@@ -795,7 +841,7 @@ export function validateRecord({
   const ev = String(evidence ?? '').trim()
   if (ev.length < 10) {
     errors.push('--evidence "<one line>": what was actually checked — one honest line, not a word')
-  } else if (BLIND_REVIEWER.test(ev)) {
+  } else if (blindReviewerAdmission(ev)) {
     // AN EVIDENCE LINE THAT ADMITS THE REVIEWER NEVER SAW THE CHANGE IS REFUSED
     // (point 624, second cross-vendor round). The first real cross-vendor run
     // answered `do-not-merge` because none of its commands reached the
