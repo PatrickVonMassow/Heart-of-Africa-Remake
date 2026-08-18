@@ -450,6 +450,8 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
       }),
     ).toBe(0)
     expect(written.parked['feat/336-croc-staging']).toMatchObject({ reason: 'superseded', tip: 'abc1234def' })
+    expect(said.join('\n')).toContain('moment work is assigned back to it')
+    expect(said.join('\n')).toContain('tip movement also invalidates the park')
   })
 
   // A GUARD NOBODY RUNS REFUSES NOTHING, and the first cut of this one was

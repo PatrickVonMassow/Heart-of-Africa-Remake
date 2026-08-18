@@ -418,8 +418,8 @@ export function parkBranch(
   }
   write(recordParkedBranch(read(), ref, reason, { at: at ?? new Date().toISOString(), tip }))
   out.log(
-    `parked ${ref} out of the slot count at ${tip.slice(0, 8)}. It returns to the count the moment it receives ` +
-      'another commit.',
+    `parked ${ref} out of the slot count at ${tip.slice(0, 8)}. It returns to the count the moment work is ` +
+      'assigned back to it; any tip movement also invalidates the park.',
   )
   return 0
 }
