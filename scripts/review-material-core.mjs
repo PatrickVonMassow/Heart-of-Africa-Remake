@@ -662,7 +662,15 @@ export function passByIndex(plan, index) {
 export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/review-sol.mjs' } = {}) {
   const at = String(sha).slice(0, 7)
   const head = `review-sol: the material budget is ${plan.budget} characters per round; this range assembles ${plan.rawSize}.`
-  if (plan.fits) return `${head}\n  It fits in one round.`
+  if (plan.fits) {
+    // A round that fits only at a DECLARED delivery level says so: the caller
+    // deciding whether this review suffices must know which content stays out.
+    const declared = plan.passes?.[0]?.patchOnly ?? []
+    return declared.length
+      ? `${head}\n  It fits in one round, with ${declared.length} file(s) travelling as their diff alone` +
+          ` (content larger than a round): ${declared.join(', ')}.`
+      : `${head}\n  It fits in one round.`
+  }
   if (plan.statTruncated) {
     return [
       head,

@@ -554,7 +554,29 @@ describe('the manifest a pass carries — the material states its own shape', ()
     const out = assembleMaterial({ stat: 's', patch: 'p', files: [], budget: 10_000, manifest })
     expect(out.text.startsWith(manifest)).toBe(true)
     const bare = assembleMaterial({ stat: 's', patch: 'p', files: [], budget: 10_000 })
-    expect(out.size).toBe(bare.size + manifest.length + 1)
+    expect(out.size).toBe(bare.size + manifest.length + 2)
+  })
+
+  it('collapses near-round-sized files into ONE declared diff-only round rather than a manifest-less split', () => {
+    // Every pass of a split must carry its manifest, so the packing room of a
+    // split is smaller than a single round's — and a file that no longer fits
+    // it complete travels DIFF ONLY, declared. Here that collapses the range
+    // back into one round: a whole-range record at stated delivery levels,
+    // instead of two passes whose shape nothing stated.
+    const plan = planPasses({
+      stat: 's',
+      patch: patchFor(['a.mjs', 'b.mjs']),
+      files: [file('a.mjs', 8000), file('b.mjs', 8000)],
+      budget: 10_000,
+    })
+    expect(plan.fits).toBe(true)
+    expect(plan.passes).toHaveLength(1)
+    expect(plan.passes[0].patchOnly).toEqual(['a.mjs', 'b.mjs'])
+    // …and the caller is TOLD the delivery level of that one round.
+    const notice = formatBudgetNotice(plan, { sha: 'abcdef1' })
+    expect(notice).toContain('It fits in one round')
+    expect(notice).toContain('diff alone')
+    expect(notice).toContain('a.mjs')
   })
 
   it('counts against the ceiling — a manifest nobody reserved room for fails the fit', () => {
@@ -647,8 +669,8 @@ describe('the refusal a PLAN alone produces', () => {
   const oversized = () =>
     planPasses({
       stat: 's',
-      patch: patchFor(['a.mjs', 'b.mjs']),
-      files: [file('a.mjs', 8000), file('b.mjs', 8000)],
+      patch: patchFor(['a.mjs', 'b.mjs', 'c.mjs']),
+      files: [file('a.mjs', 5000), file('b.mjs', 5000), file('c.mjs', 5000)],
       budget: 10_000,
     })
 
