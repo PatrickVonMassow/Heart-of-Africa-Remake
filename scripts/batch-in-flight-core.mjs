@@ -1103,6 +1103,57 @@ export function pointOfBranch(ref) {
   return Number.isInteger(n) && n > 0 ? n : null
 }
 
+/**
+ * WHICH POINT IS THIS TOOL CALL OPENING WORK ON? PURE.
+ *
+ * Returns { point, how }: `how` names the act that was recognised — `agent` for
+ * a spawn, `branch` for a `feat/<N>-…` being CUT, `worktree` for a tree created
+ * on one, `author` for an authoring run commissioned on a point — and `none`
+ * where the call opens nothing this rule knows about.
+ *
+ * AMBIGUITY ANSWERS NULL, deliberately. A prompt that names two point numbers
+ * cannot say which one is being opened, and a guard that guesses would refuse
+ * the wrong work; the whole mechanism is worth nothing if it fires on a call it
+ * misread. Switching to an existing branch, pushing one, landing one — none of
+ * them CREATES anything, and none is recognised here.
+ *
+ * A READ-ONLY RUN OPENS NOTHING either: `author-sol.mjs --routing` answers which
+ * lane owns a point and `--dry-run` prints the prompt it would send. Refusing
+ * those would deny the very question a session asks BEFORE it commissions.
+ */
+export function commissionTarget({ toolName = '', command = '', prompt = '', description = '' } = {}) {
+  const none = { point: null, how: 'none' }
+  const only = (nums) => {
+    const set = [...new Set(nums.filter((n) => Number.isInteger(n) && n > 0))]
+    return set.length === 1 ? set[0] : null
+  }
+  // `feat/712`, `feat/712-slug` and `feat/712/x` are one branch name each — the
+  // separator is NOT required, or a slugless branch would open work unseen.
+  const featPoints = (text) => [...String(text).matchAll(/feat\/(\d+)/gi)].map((m) => Number(m[1]))
+  const tool = String(toolName ?? '')
+  if (tool === 'Agent' || tool === 'Task') {
+    const text = `${prompt ?? ''}\n${description ?? ''}`
+    const byBranch = only(featPoints(text))
+    if (byBranch) return { point: byBranch, how: 'agent' }
+    const named = only([...text.matchAll(/\b(?:point|punkt)\s+(\d+)\b/gi)].map((m) => Number(m[1])))
+    return named ? { point: named, how: 'agent' } : none
+  }
+  const cmd = String(command ?? '')
+  if (!cmd.trim()) return none
+  // An authoring run IS the commissioning of a point, whichever vendor runs it —
+  // unless it is one of the read-only legs, which produce no work at all.
+  const authored = /--routing\b|--dry-run\b/.test(cmd)
+    ? null
+    : only([...cmd.matchAll(/author-sol\.mjs[^|;&]*--point\s+(\d+)/gi)].map((m) => Number(m[1])))
+  if (authored) return { point: authored, how: 'author' }
+  const created = only(featPoints(cmd))
+  if (!created) return none
+  if (/\bworktree\s+add\b/.test(cmd)) return { point: created, how: 'worktree' }
+  const cuts =
+    /\bcheckout\s+[^|;&]*?-b\b/.test(cmd) || /\bswitch\s+[^|;&]*?-[cC]\b/.test(cmd) || /\bgit\s+branch\s+(?!-)/.test(cmd)
+  return cuts ? { point: created, how: 'branch' } : none
+}
+
 /** An age a human reads at a glance: days past a day, hours past an hour. */
 export function describeBranchAge(ms) {
   if (!Number.isFinite(ms) || ms < 0) return 'age unknown'
@@ -1294,7 +1345,9 @@ export function branchSlotRefusal(decision = {}, { limit = 10 } = {}) {
   const n = decision?.point
   const lines = open.slice(0, limit).map((b) => {
     const age = describeBranchAge(Number.isFinite(b?.ageMs) ? b.ageMs : NaN)
-    const behind = Number.isFinite(b?.behind) ? `${b.behind} commits behind main` : 'behind-count unknown'
+    const behind = Number.isFinite(b?.behind)
+      ? `${b.behind} commit${b.behind === 1 ? '' : 's'} behind main`
+      : 'behind-count unknown'
     return `  · ${b?.ref} — ${age}, ${behind}`
   })
   if (open.length > limit) lines.push(`  · …and ${open.length - limit} more`)

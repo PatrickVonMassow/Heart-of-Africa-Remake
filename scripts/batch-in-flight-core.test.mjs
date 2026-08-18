@@ -63,6 +63,7 @@ import {
   openBranchSlots,
   branchSlotDecision,
   branchSlotRefusal,
+  commissionTarget,
 } from './batch-in-flight-core.mjs'
 import {
   assessOwner,
@@ -2785,5 +2786,115 @@ describe('slotReasonDecision — the target half counts the same occupancy as th
     expect(
       slotReasonDecision({ agents: 1, openBranches: -4, openPoints: independent, runningFiles: running }).slotsFree,
     ).toBe(POOL_CAP - 1)
+  })
+})
+
+// ---- WHICH POINT IS A TOOL CALL OPENING? (point 712) ----------------------
+//
+// The refusal is worth exactly what this recognition is worth: a call it misreads
+// refuses the wrong work, and a call it misses is the silent failure of
+// 17.08.2026 all over again. Both directions are written from the failure side.
+describe('commissionTarget — the act of opening a point, recognised', () => {
+  it('reads the point out of the branch an agent prompt names', () => {
+    expect(
+      commissionTarget({
+        toolName: 'Agent',
+        prompt: 'Work in /workspace/hoa/.claude/worktrees/agent-x, branch feat/697-goat-foot is checked out.',
+      }),
+    ).toEqual({ point: 697, how: 'agent' })
+  })
+
+  it('reads a point NAMED in prose when no branch is spelled out, in either language', () => {
+    expect(commissionTarget({ toolName: 'Task', prompt: 'Deliver work-order point 697.' })).toEqual({
+      point: 697,
+      how: 'agent',
+    })
+    expect(commissionTarget({ toolName: 'Agent', description: 'Punkt 705 umsetzen' })).toEqual({
+      point: 705,
+      how: 'agent',
+    })
+  })
+
+  it('answers NULL where a prompt names two points — a guess would refuse the wrong work', () => {
+    expect(
+      commissionTarget({ toolName: 'Agent', prompt: 'branch feat/697-a; do not touch feat/705-b' }).point,
+    ).toBeNull()
+    expect(commissionTarget({ toolName: 'Agent', prompt: 'point 697 depends on point 705' }).point).toBeNull()
+  })
+
+  it('prefers the BRANCH over prose when both appear — the branch is the binding name', () => {
+    expect(
+      commissionTarget({ toolName: 'Agent', prompt: 'branch feat/711-x, which point 400 first asked for' }),
+    ).toEqual({ point: 711, how: 'agent' })
+  })
+
+  it('recognises a branch being CUT, in every spelling, slug or none', () => {
+    expect(commissionTarget({ toolName: 'Bash', command: 'git checkout -b feat/697-goat main' })).toEqual({
+      point: 697,
+      how: 'branch',
+    })
+    expect(commissionTarget({ toolName: 'Bash', command: 'git switch -c feat/697' })).toEqual({
+      point: 697,
+      how: 'branch',
+    })
+    expect(commissionTarget({ toolName: 'Bash', command: 'git branch feat/697-goat main' })).toEqual({
+      point: 697,
+      how: 'branch',
+    })
+  })
+
+  it('recognises a worktree being created on one', () => {
+    expect(
+      commissionTarget({ toolName: 'Bash', command: 'git worktree add -b feat/697-goat .claude/worktrees/agent-y' }),
+    ).toEqual({ point: 697, how: 'worktree' })
+  })
+
+  it('recognises an authoring run as the commissioning it is', () => {
+    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-sol.mjs --point 697' })).toEqual({
+      point: 697,
+      how: 'author',
+    })
+  })
+
+  it('opens NOTHING on the read-only authoring legs — routing and dry-run', () => {
+    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-sol.mjs --routing --point 697' })).toEqual(
+      { point: null, how: 'none' },
+    )
+    expect(
+      commissionTarget({ toolName: 'Bash', command: 'node scripts/author-sol.mjs --point 697 --dry-run' }).point,
+    ).toBeNull()
+  })
+
+  it('opens NOTHING when the call only touches a branch that already exists', () => {
+    for (const command of [
+      'git checkout feat/697-goat',
+      'git push -u origin feat/697-goat',
+      'git switch feat/697-goat',
+      'git branch -D feat/697-goat',
+      'git merge --no-ff feat/697-goat',
+      'node scripts/land-point.mjs 697 --model opus-5',
+      'node scripts/point-brief.mjs 697',
+    ]) {
+      expect(commissionTarget({ toolName: 'Bash', command }).point, command).toBeNull()
+    }
+  })
+
+  it('judges a COMMAND wherever it arrives — which tools it SEES is the matcher\'s job, not this rule\'s', () => {
+    expect(commissionTarget({ toolName: 'PowerShell', command: 'git checkout -b feat/697-x' })).toEqual({
+      point: 697,
+      how: 'branch',
+    })
+  })
+
+  it('opens nothing on a call that carries no command and no prompt', () => {
+    expect(commissionTarget({ toolName: 'Bash', command: '   ' })).toEqual({ point: null, how: 'none' })
+    expect(commissionTarget({ toolName: 'Read', filePath: 'TASKS.md' })).toEqual({ point: null, how: 'none' })
+    expect(commissionTarget()).toEqual({ point: null, how: 'none' })
+  })
+
+  it('never throws on hostile input', () => {
+    expect(() => commissionTarget({ toolName: null, command: null, prompt: null, description: null })).not.toThrow()
+    expect(commissionTarget({ toolName: 'Bash', command: 'git checkout -b feat/0-nope' }).point).toBeNull()
+    expect(commissionTarget({ toolName: 'Agent', prompt: 'feat/'.repeat(500) }).point).toBeNull()
   })
 })
