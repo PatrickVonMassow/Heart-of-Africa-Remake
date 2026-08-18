@@ -118,7 +118,7 @@ export const SAVED_AUTH_FILE = join(STATE_DIR, 'codex-auth.json')
  * 10.08.2026). The optional reads are the per-file ones, where "not in this
  * commit" is an ordinary answer.
  */
-function git(args, { required = true } = {}) {
+function git(args, { required = true, raw = false } = {}) {
   const res = spawnSync('git', args, {
     cwd: REPO_ROOT,
     encoding: 'utf8',
@@ -129,7 +129,10 @@ function git(args, { required = true } = {}) {
     if (!required) return null
     throw new Error(`git ${args.join(' ')} failed: ${(res.stderr || res.error?.message || '').trim()}`)
   }
-  return (res.stdout ?? '').trim()
+  // `raw` skips the trim for output that IS paths: a legal path may begin or
+  // end in whitespace, and trimming the stream eats it off the first and last
+  // one (cross-vendor review, third round).
+  return raw ? (res.stdout ?? '') : (res.stdout ?? '').trim()
 }
 
 /**
@@ -157,8 +160,10 @@ function gatherRange(sha, base) {
   // tab, a quote or a high byte in it arrives as `"scripts/x\ty.mjs"`, which no
   // `git show` resolves — the file then reached neither the content list nor a
   // pass, and nothing said so (cross-vendor review, second round). `-z` hands
-  // over the raw bytes and the paths need no unpicking at all.
-  const paths = git(['diff', '--name-only', '-z', range]).split('\0').map((p) => p.trim()).filter(Boolean)
+  // over the raw bytes, and they are kept RAW: trimming a path with edge
+  // whitespace makes a different path, one `git show` misses — the real file
+  // then travelled in no pass while nothing named the loss (third round).
+  const paths = git(['diff', '--name-only', '-z', range], { raw: true }).split('\0').filter(Boolean)
   const patch = git(['diff', range])
   // A file the patch ADDS whole is already there in full; sending its content
   // again only spends the budget the other files need — but only while the patch

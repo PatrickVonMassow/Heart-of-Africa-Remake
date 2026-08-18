@@ -84,8 +84,12 @@ let orphanSha = ''
 let bulkSha = ''
 let oddSha = ''
 let bulkSolSha = ''
+let edgeSha = ''
 /** A name git prints QUOTED, because it is not plain ASCII. */
 const ODD_NAME = 'ümlaut.txt'
+/** A name git does NOT quote and a trim would corrupt (POSIX only — Windows
+ *  cannot create it, so its case skips there). */
+const EDGE_NAME = 'edge-space.txt '
 /** An EMPTY git template: a host `init.templateDir` must not seed the fixture. */
 let emptyTemplate = ''
 
@@ -269,6 +273,9 @@ beforeAll(() => {
   // resolved in no `git show` and matched no patch section — the file travelled
   // in no pass and nothing said so.
   writeFileSync(join(repo, ODD_NAME), 'the original odd-named file\n')
+  // The trailing-space file exists from the start, so the edge branch MODIFIES
+  // it and its current content must travel beside the patch.
+  if (process.platform !== 'win32') writeFileSync(join(repo, EDGE_NAME), 'the original edge-space file\n')
   mainSha = commit('world.txt', 'the fixture world\n', 'Lay down the fixture world', 'Opus 5')
 
   git('checkout', '-q', '-b', 'feat')
@@ -298,6 +305,14 @@ beforeAll(() => {
   // a modification and its current content must travel with the patch.
   git('checkout', '-q', '-b', 'odd-name', 'main')
   oddSha = commit(ODD_NAME, 'the odd-named file, revised in this range\n', 'Revise the odd-named file', 'Opus 5')
+
+  // …and a branch touching a path with a TRAILING SPACE, which git prints
+  // UNQUOTED — the spelling a trim corrupts into a different path (point 714,
+  // third round). Windows cannot create such a file, so the branch is POSIX-only.
+  if (process.platform !== 'win32') {
+    git('checkout', '-q', '-b', 'edge-name', 'main')
+    edgeSha = commit(EDGE_NAME, 'content behind the trailing space\n', 'Touch the edge-space file', 'Opus 5')
+  }
 
   // …and the same bulk, authored by SOL: the role swap hands the whole range to
   // a Claude reviewer, and a range no round can hold must be handed on as passes
@@ -628,6 +643,22 @@ describe('a path git writes in quotes', () => {
     // answers for the real path, and the quoted form is not one.
     expect(sent).toContain('the odd-named file, revised in this range')
     expect(sent).toContain('=== FILE (current content):')
+    expect(sent).not.toContain('OMITTED ENTIRELY')
+  })
+})
+
+// POINT 714, third round: a path with a trailing space is printed UNQUOTED by
+// git, and a trim anywhere on the way turns it into a different path — the real
+// file then reaches no pass and no content list, with nothing said.
+describe('a path with a trailing space', () => {
+  it.skipIf(process.platform === 'win32')('travels byte-exact, content and all', () => {
+    provenId()
+    const r = run(['--sha', edgeSha, '--brief', 'judge the edge name'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain('content behind the trailing space')
+    // The header carries the UNTRIMMED spelling — the space sits before the ===.
+    expect(sent).toContain(`=== FILE (current content): ${EDGE_NAME} ===`)
     expect(sent).not.toContain('OMITTED ENTIRELY')
   })
 })
