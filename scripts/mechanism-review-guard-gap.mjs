@@ -219,8 +219,15 @@ export async function assessReviewGap({
           fits: plan.fits === true,
           // Covered means every pass of the plan fits AND nothing is beyond the
           // reach of any pass AND the diffstat is inside its share — the same
-          // three claims planPasses itself makes for an assemblable split.
-          covers: !plan.statTruncated && (plan.uncoverable ?? []).length === 0 && plan.passes.length >= 1,
+          // three claims planPasses itself makes for an assemblable split. AND
+          // the split is RECORDABLE (landing-round pass 5): a plan of more
+          // passes than MAX_PASS_TOTAL can never be recorded, so it covers
+          // nothing — demanding it would re-arm the trap.
+          covers:
+            !plan.statTruncated &&
+            (plan.uncoverable ?? []).length === 0 &&
+            plan.passes.length >= 1 &&
+            plan.passes.length <= (Number(tool.MAX_PASS_TOTAL) || 256),
           uncoverable: (plan.uncoverable ?? []).map((u) => u.path),
           budget: tool.MATERIAL_BUDGET_CHARS,
         }

@@ -84,6 +84,7 @@ import {
   joinPatchSections,
   materialShortfall,
   MATERIAL_BUDGET_CHARS,
+  MAX_PASS_TOTAL,
   passByIndex,
   planPasses,
   planShortfall,
@@ -772,6 +773,16 @@ if (isMainModule(import.meta.url)) {
             'reach, and a split of one cannot be recorded — narrow the range or split the change.',
         }
       }
+      // A split past the recorder's ceiling can never be recorded either
+      // (landing-round pass 5): every pass of it would be a paid round whose
+      // record parsePassSpec refuses.
+      if (plan.passes.length > MAX_PASS_TOTAL) {
+        return {
+          error:
+            `--pass ${passFlag}: this range splits into ${plan.passes.length} passes — more than the ` +
+            `${MAX_PASS_TOTAL} a record can hold. Narrow the range or split the change.`,
+        }
+      }
       const pass = passByIndex(plan, passFlag)
       if (!pass) return { error: `--pass ${passFlag}: this range splits into ${plan.passes.length} pass(es).` }
       return { pass }
@@ -915,6 +926,15 @@ if (isMainModule(import.meta.url)) {
         console.error(
           `review-sol: --pass ${passFlag}: this range packs into one coverable pass beside files ` +
             'beyond reach, and a split of one cannot be recorded — narrow the range or split the change.',
+        )
+        process.exit(2)
+      }
+      // Nor a split past the recorder's ceiling (landing-round pass 5): every
+      // round spent on such a pass buys a record parsePassSpec refuses.
+      if (plan.passes.length > MAX_PASS_TOTAL) {
+        console.error(
+          `review-sol: --pass ${passFlag}: this range splits into ${plan.passes.length} passes — more ` +
+            `than the ${MAX_PASS_TOTAL} a record can hold. Narrow the range or split the change.`,
         )
         process.exit(2)
       }

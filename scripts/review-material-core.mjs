@@ -251,10 +251,23 @@ function decodeBase85Line(line) {
  *  literal recorded as delivered bytes. Delivered means: every payload line
  *  decodes, the concatenation INFLATES, and the inflated length IS the
  *  declared one. */
+/** The most a binary literal may inflate to before validation refuses it
+ *  (landing-round pass 5): inflateSync without an output bound hands an
+ *  attacker-controlled stream the process's memory — a highly compressible
+ *  literal can declare and deliver gigabytes from a few fitting lines. Above
+ *  this bound the declaration refuses, which routes the file to the honest
+ *  uncoverable/omission path ("review it by another means"); a repository
+ *  binary this size has no business inside review material anyway. */
+export const MAX_INFLATED_BINARY_BYTES = 64 * 1024 * 1024
+
 function literalStreamDelivers(lines, at) {
   const m = /^literal (\d+)$/.exec(lines[at + 1] ?? '')
   if (!m) return false
   const declared = Number(m[1])
+  // Refused BEFORE the inflate, off the declaration alone: maxOutputLength
+  // below caps what the stream may produce, and this caps what a declaration
+  // may demand — either way nothing inflates past the bound.
+  if (!Number.isSafeInteger(declared) || declared > MAX_INFLATED_BINARY_BYTES) return false
   const chunks = []
   for (let i = at + 2; i < lines.length && lines[i] !== ''; i++) {
     const decoded = decodeBase85Line(lines[i])
@@ -263,7 +276,9 @@ function literalStreamDelivers(lines, at) {
   }
   if (!chunks.length) return false
   try {
-    return inflateSync(Buffer.concat(chunks)).length === declared
+    // A stream inflating past its own declaration throws here and refuses —
+    // the strict output bound the unbounded call was missing.
+    return inflateSync(Buffer.concat(chunks), { maxOutputLength: Math.max(1, declared) }).length === declared
   } catch {
     return false
   }
@@ -930,10 +945,15 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
       // round could never send, and the plan-only hand-off paths offered a
       // record over an undelivered change. Both are named beyond reach. This
       // ruling reads the SECTION's own length, never the alias-deduped cost.
-      const undeliverable = entry.binary
-        ? sectionLen === 0 || !binarySectionDeliversChange(entry.patchText)
-        : sectionLen === 0
-      if (undeliverable || frame + sectionLen > room) {
+      // SIZE IS JUDGED FIRST (landing-round pass 5): the binary-delivery check
+      // inflates the section's stream, and running it on a section the pass
+      // could never hold spent unbounded memory proving a point the length
+      // alone already settles.
+      const oversized = frame + sectionLen > room
+      const undeliverable =
+        oversized ||
+        (entry.binary ? sectionLen === 0 || !binarySectionDeliversChange(entry.patchText) : sectionLen === 0)
+      if (undeliverable) {
         uncoverable.push({ path: entry.path, patchChars: sectionLen, contentChars: entry.content.length })
         continue
       }
@@ -1046,7 +1066,19 @@ export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/rev
   // coverable pass beside files beyond reach would advertise `--pass 1` of a
   // total the recorder refuses (a pass record needs a total of at least 2 — a
   // pass of one IS a whole range). No runnable command is printed for it.
-  const recordable = plan.passes.length >= 2
+  // NEITHER CAN A SPLIT PAST THE RECORDER'S CEILING (landing-round pass 5):
+  // parsePassSpec refuses any total above MAX_PASS_TOTAL, so advertising the
+  // commands of a wider plan sends the caller into rounds whose records are
+  // all refused — paid reviews that can never clear anything.
+  const recordable = plan.passes.length >= 2 && plan.passes.length <= MAX_PASS_TOTAL
+  if (plan.passes.length > MAX_PASS_TOTAL) {
+    lines.push(
+      `  This range splits into ${plan.passes.length} passes — more than the ${MAX_PASS_TOTAL} a`,
+      '  record can hold, so no pass of it could ever be recorded. No round is worth spending:',
+      '  narrow the range, or split the change itself.',
+    )
+    return lines.join('\n')
+  }
   for (const pass of plan.passes) {
     lines.push(
       `    pass ${pass.index}/${pass.total}  ${pass.files.length} file(s), ~${pass.size} characters` +
@@ -1137,17 +1169,24 @@ function passLines(shortfall, plan) {
   // A SPLIT OF ONE CANNOT BE RECORDED here either (round-5 pass 4): the same
   // rule formatBudgetNotice applies — the recorder refuses totals below 2, so
   // pointing the caller at `--pass 1` of a one-pass plan sends them to a
-  // command whose record is refused.
-  const recordable = passes.length >= 2
+  // command whose record is refused. A split past MAX_PASS_TOTAL is refused
+  // the same way (landing-round pass 5): the recorder holds no such total.
+  const recordable = passes.length >= 2 && passes.length <= MAX_PASS_TOTAL
   const lines = recordable
     ? passes.map(
         (pass) => `    --pass ${pass.index}   ${(pass.files ?? []).map((p) => quotePassFile(p)).join(', ')}`,
       )
-    : [
-        '  This range packs into ONE coverable pass beside what is beyond reach, and a split of',
-        '  one cannot be recorded as passes. No record can cover this range: narrow the range,',
-        '  or split the change itself.',
-      ]
+    : passes.length > MAX_PASS_TOTAL
+      ? [
+          `  This range splits into ${passes.length} passes — more than the ${MAX_PASS_TOTAL} a record`,
+          '  can hold, so no pass of it could ever be recorded. Narrow the range, or split the',
+          '  change itself.',
+        ]
+      : [
+          '  This range packs into ONE coverable pass beside what is beyond reach, and a split of',
+          '  one cannot be recorded as passes. No record can cover this range: narrow the range,',
+          '  or split the change itself.',
+        ]
   const beyond = plan && !plan.fits ? plan.uncoverable : (shortfall.uncoverable ?? [])
   if (beyond?.length) {
     lines.push(

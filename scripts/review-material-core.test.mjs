@@ -14,6 +14,7 @@ import {
   manifestAllowance,
   MATERIAL_BUDGET_CHARS,
   materialShortfall,
+  MAX_PASS_TOTAL,
   parseDiffHeader,
   parsePassFiles,
   parsePassSpec,
@@ -467,6 +468,24 @@ describe('a binary file is declared, never dropped or mangled', () => {
     expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\ndelta 5')).toBe(false)
     expect(
       binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\ndelta 6\nNcmWHKh>T)n0ssa+0cHRI'),
+    ).toBe(false)
+  })
+
+  it('refuses a declaration past the inflation bound WITHOUT inflating it (landing-round pass 5)', () => {
+    // inflateSync without an output bound hands an attacker-controlled stream
+    // the process's memory: a highly compressible literal can declare and
+    // deliver gigabytes from a few fitting lines. The declaration is refused
+    // off its size alone, and the inflate itself runs under maxOutputLength.
+    const bomb = [
+      'diff --git a/x.bin b/x.bin',
+      'GIT binary patch',
+      `literal ${64 * 1024 * 1024 + 1}`,
+      'NcmWHKh>T)n0ssa+0cHRI',
+    ].join('\n')
+    expect(binarySectionDeliversChange(bomb)).toBe(false)
+    // A non-integer or absurd declaration refuses the same way.
+    expect(
+      binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 99999999999999999999\nNcmWHKh>T)n0ssa+0cHRI'),
     ).toBe(false)
   })
 
@@ -1204,6 +1223,35 @@ describe('what the caller is told before the round is spent', () => {
     const huge = ['diff --git a/x.md b/x.md', `+${'y'.repeat(30_000)}`].join('\n')
     const plan = planPasses({ stat: 's', patch: huge, files: [file('x.md', 10)], budget: 5000 })
     expect(formatBudgetNotice(plan, { sha: 'aaaaaaa' })).toContain('BEYOND REACH')
+  })
+
+  it('refuses a plan wider than the recorder holds, advertising NO pass command (landing-round pass 5)', () => {
+    // parsePassSpec refuses any total above MAX_PASS_TOTAL, so a plan of more
+    // passes advertised runnable commands whose records were all refused —
+    // rounds consumed on a review that could never be recorded.
+    const wide = {
+      budget: 200_000,
+      rawSize: 10_000_000,
+      fits: false,
+      statTruncated: false,
+      passes: Array.from({ length: MAX_PASS_TOTAL + 1 }, (_, i) => ({
+        index: i + 1,
+        total: MAX_PASS_TOTAL + 1,
+        files: [`f${i}.txt`],
+        patchOnly: [],
+        binary: [],
+        size: 100,
+      })),
+      uncoverable: [],
+    }
+    const notice = formatBudgetNotice(wide, { sha: 'abcdef1234567' })
+    expect(notice).toContain(`more than the ${MAX_PASS_TOTAL}`)
+    expect(notice).toContain('narrow the range')
+    expect(notice).not.toContain('--pass 1')
+    // …and the plan-only refusal path says the same instead of listing passes.
+    const refusal = formatShortfall(planShortfall(wide), { sha: 'abcdef1234567', plan: wide })
+    expect(refusal).toContain(`more than the ${MAX_PASS_TOTAL}`)
+    expect(refusal).not.toContain('--pass 1')
   })
 })
 
