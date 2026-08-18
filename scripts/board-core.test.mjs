@@ -1206,14 +1206,14 @@ describe('mergeDoneDuplicates — a board that already carries them', () => {
     // are what a rebuild would silently drop.
     const html = fullBoard({
       done:
-        '<p class="archivelink">Ältere Einträge im Archiv</p>\n' +
+        '<p class="archive-link">Ältere im <a href="https://example.invalid/archiv">Archiv</a>.</p>\n' +
         card(700, 'Neu', '01:04 · 01:10') +
         '<!-- Notiz zwischen zwei Karten -->\n' +
         card(700, 'Alt', '21:17 · 00:44'),
     })
     const out = mergeDoneDuplicates(html).html
     expect(out).toContain('<summary><h2>Erledigt</h2></summary>')
-    expect(out).toContain('<p class="archivelink">Ältere Einträge im Archiv</p>')
+    expect(out).toContain('<p class="archive-link">Ältere im <a href="https://example.invalid/archiv">Archiv</a>.</p>')
     expect(out).toContain('<!-- Notiz zwischen zwei Karten -->')
     expect(out.match(/<details class="sect">/g)).toHaveLength(html.match(/<details class="sect">/g).length)
     expect(out.endsWith(html.slice(html.lastIndexOf('</main>')))).toBe(true)
@@ -1239,8 +1239,14 @@ describe('doneStart / earliestStart', () => {
     expect(doneStart(meta('21:17 · 00:44'))).toBe('21:17')
     expect(doneStart(meta('99:99 · 00:44'))).toBe('')
     expect(doneStart(meta('12:75 · 00:44'))).toBe('')
-    // Trailing digits are damage, not a time: `12:345` used to read as `12:34`.
+    // Anything but the separator or the closing tag after HH:MM is damage:
+    // `12:345`, `12:34:56` and `12:34x` all used to read as a time.
     expect(doneStart(meta('12:345 · 00:44'))).toBe('')
+    expect(doneStart(meta('12:34:56 · 00:44'))).toBe('')
+    expect(doneStart(meta('12:34x · 00:44'))).toBe('')
+    // …while both real shapes still answer.
+    expect(doneStart(meta('12:34 · 00:44'))).toBe('12:34')
+    expect(doneStart(meta('12:34'))).toBe('12:34')
     expect(doneStart('no meta at all')).toBe('')
     expect(doneStart()).toBe('')
   })

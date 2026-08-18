@@ -657,9 +657,11 @@ export function doneCard(html, point) {
  * began — it must simply not answer.
  */
 export function doneStart(card) {
-  // The minutes must END there (second review round): without the boundary,
-  // `12:345` matched as `12:34` and a damaged card decided the merged start.
-  const m = String(card ?? '').match(/class="meta">\s*(\d{1,2}):(\d{2})(?!\d)/)
+  // The stamp must END where the markup says it does (review rounds 2 and 4):
+  // a bare digit boundary still read `12:34:56` and `12:34x` as `12:34`, so a
+  // damaged card could decide the merged start. What may follow is the range
+  // separator or the closing tag, nothing else.
+  const m = String(card ?? '').match(/class="meta">\s*(\d{1,2}):(\d{2})(?=\s*(?:·|<|$))/)
   if (!m) return ''
   const [, h, min] = m
   if (Number(h) > 23 || Number(min) > 59) return ''
