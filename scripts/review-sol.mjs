@@ -85,6 +85,7 @@ import {
   planPasses,
   planShortfall,
   splitPatchByFile,
+  undecodablePaths,
 } from './review-material-core.mjs'
 
 /** Where codex keeps the ChatGPT login, and where we park a copy of it. */
@@ -164,6 +165,19 @@ function gatherRange(sha, base) {
   // whitespace makes a different path, one `git show` misses — the real file
   // then travelled in no pass while nothing named the loss (third round).
   const paths = git(['diff', '--name-only', '-z', range], { raw: true }).split('\0').filter(Boolean)
+  // A PATH NODE'S STRINGS CANNOT CARRY IS REFUSED, NOT COLLAPSED (fourth
+  // cross-vendor round; named residual — see unquoteGitPath). Bytes that are
+  // not valid UTF-8 decode to U+FFFD here, distinct real paths can then fall
+  // together, `git show` misses the real file, and the coverage accounting
+  // would clear a file nobody could even name. Refusing loses the round; the
+  // alternative loses the record's meaning.
+  const unspeakable = undecodablePaths(paths)
+  if (unspeakable.length) {
+    throw new Error(
+      `a changed path in ${range} is not valid UTF-8 and cannot travel through this pipeline byte-exact: ` +
+        `${unspeakable.join(', ')} — no record can be offered for this range; rename the file or review it by another means`,
+    )
+  }
   // The patch travels RAW too (fourth round): trimming it ate a trailing space
   // off a rename destination's last line together with the final newline — a
   // silently different path, with the accounting none the wiser.

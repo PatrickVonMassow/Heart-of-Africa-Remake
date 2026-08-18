@@ -200,10 +200,13 @@ export function sentMaterialMatches(assembly = null, sent = undefined) {
     return { known: false, matches: false, note: 'the caller did not say what it sent' }
   }
   if (sent === assembly.text) return { known: true, matches: true, note: '' }
+  // Sizes in BYTES: two different strings can hold the same number of UTF-16
+  // code units, and a note that printed equal "characters" for unequal texts
+  // read as a contradiction (cross-vendor review, fourth round).
   return {
     known: true,
     matches: false,
-    note: `what was sent is ${sent.length} characters, what was assembled is ${assembly.text.length}`,
+    note: `what was sent is ${Buffer.byteLength(sent, 'utf8')} bytes, what was assembled is ${Buffer.byteLength(assembly.text, 'utf8')}`,
   }
 }
 
@@ -288,9 +291,16 @@ export function unquoteGitPath(value) {
   const body = raw.slice(1, -1)
   const simple = { a: 7, b: 8, f: 12, n: 10, r: 13, t: 9, v: 11, '\\': 92, '"': 34 }
   const bytes = []
+  // WHOLE CODE POINTS, never UTF-16 units (fourth cross-vendor round): `body[i]`
+  // on an astral character is a lone surrogate, which Buffer encodes as U+FFFD —
+  // a quoted `"😀,x"` parsed back as mojibake, and two distinct legal paths
+  // could then collapse into one spelling in the coverage accounting.
+  const wholeChar = (at) => String.fromCodePoint(body.codePointAt(at))
   for (let i = 0; i < body.length; i++) {
     if (body[i] !== '\\') {
-      bytes.push(...Buffer.from(body[i], 'utf8'))
+      const ch = wholeChar(i)
+      i += ch.length - 1
+      bytes.push(...Buffer.from(ch, 'utf8'))
       continue
     }
     const next = body[++i]
@@ -305,9 +315,30 @@ export function unquoteGitPath(value) {
       bytes.push(Number.parseInt(octal[0], 8))
       continue
     }
-    bytes.push(...Buffer.from(next, 'utf8'))
+    const ch = wholeChar(i)
+    i += ch.length - 1
+    bytes.push(...Buffer.from(ch, 'utf8'))
   }
+  // NAMED RESIDUAL: a path whose BYTES are not valid UTF-8 (git octal-escapes
+  // them) cannot live in a JS string — this decode turns each bad byte into
+  // U+FFFD, and DISTINCT such paths can collapse into one spelling. Closing
+  // that end-to-end would mean carrying Buffers through the whole material
+  // pipeline (git → files → Map keys → git show), which this string-based
+  // pipeline cannot do. So every consumer REFUSES a path that decodes with
+  // U+FFFD in it (undecodablePaths below; gatherRange and parsePassFiles ask) —
+  // erring to refusing a record, never to granting one. The cost knowingly
+  // paid: a file genuinely NAMED with U+FFFD is refused alongside, because the
+  // two are indistinguishable after the decode.
   return Buffer.from(bytes).toString('utf8')
+}
+
+/**
+ * The paths of a set that this pipeline CANNOT name faithfully — see the
+ * residual note in unquoteGitPath. A caller that finds any must refuse the
+ * round or the record rather than account coverage under a collapsed spelling.
+ */
+export function undecodablePaths(paths = []) {
+  return (paths ?? []).map((p) => String(p ?? '')).filter((p) => p.includes('�'))
 }
 
 /** One C-quoted token starting at `from`, or null if it never closes. */
@@ -778,6 +809,15 @@ export function parsePassFiles(value) {
       continue
     }
     files.push(token)
+  }
+  // A path that decodes with U+FFFD is one this pipeline cannot tell apart
+  // from its neighbours (see unquoteGitPath): recording coverage under it
+  // could clear a different real file, so it is refused by name.
+  for (const path of undecodablePaths(files)) {
+    errors.push(
+      `--pass-files: "${path}" contains U+FFFD, so it cannot name one file faithfully — a path whose ` +
+        'bytes are not valid UTF-8 cannot be carried here; review that file by another means',
+    )
   }
   return { ok: errors.length === 0, files, errors }
 }

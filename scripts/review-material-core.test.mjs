@@ -15,6 +15,7 @@ import {
   planShortfall,
   sentMaterialMatches,
   splitPatchByFile,
+  undecodablePaths,
   unquoteGitPath,
   worstVerdict,
 } from './review-material-core.mjs'
@@ -591,6 +592,30 @@ describe('the pass flag', () => {
     const odd = ['scripts/a,b.mjs', 'scripts/say "so".mjs', 'scripts/git-hooks/check ', ' lead', 'scripts/x__C__y.mjs', 'plain.mjs']
     const written = formatPassFiles(odd)
     expect(parsePassFiles(written)).toEqual({ ok: true, files: odd, errors: [] })
+  })
+
+  it('round-trips a MULTI-BYTE character inside a quoted path, not as mojibake', () => {
+    // `"😀,x"` used to parse back as replacement characters: the unquoter
+    // walked UTF-16 code units, so each half of the surrogate pair went to
+    // Buffer alone — and distinct legal paths could collapse into one spelling
+    // in the coverage accounting (cross-vendor review, fourth round).
+    const odd = ['😀,x', 'scripts/ä,ö.mjs']
+    expect(parsePassFiles(formatPassFiles(odd))).toEqual({ ok: true, files: odd, errors: [] })
+    expect(unquoteGitPath('"a/\\303\\244.mjs"')).toBe('a/ä.mjs')
+  })
+
+  it('REFUSES a path carrying U+FFFD — the spelling that cannot name one file', () => {
+    // Bytes that are not valid UTF-8 decode to U+FFFD, and two DIFFERENT such
+    // paths become the same string; a record under that spelling could clear a
+    // file nobody read. The named residual errs to refusing: a file genuinely
+    // named with U+FFFD is refused alongside, indistinguishably.
+    expect(undecodablePaths(['ok.mjs', 'bad�name'])).toEqual(['bad�name'])
+    const out = parsePassFiles('ok.mjs,bad�name')
+    expect(out.ok).toBe(false)
+    expect(out.errors.join('\n')).toContain('U+FFFD')
+    // …and the quoted spelling of invalid bytes decodes to the same refusal.
+    const viaOctal = parsePassFiles('"bad\\377name"')
+    expect(viaOctal.ok).toBe(false)
   })
 
   it('round-trips control characters as git octal escapes', () => {
