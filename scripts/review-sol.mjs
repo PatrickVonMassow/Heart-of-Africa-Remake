@@ -87,6 +87,7 @@ import {
   MAX_PASS_TOTAL,
   passByIndex,
   planPasses,
+  planShortfall,
   patchSectionMap,
   quotePassFile,
   splitPatchByFile,
@@ -393,6 +394,8 @@ export function buildAuthorshipPassPlan({ sha, base, commits = gatherAuthorshipC
     passes: numbered,
     uncoverable,
     rawSize,
+    budget: MATERIAL_BUDGET_CHARS,
+    statTruncated: false,
     mixedFiles: authorship.mixedFiles,
     unreviewable: authorship.unreviewable,
   }
@@ -400,8 +403,16 @@ export function buildAuthorshipPassPlan({ sha, base, commits = gatherAuthorshipC
 
 export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
   const lines = [
-    `review-sol: ${plan.rawSize} characters of outstanding material in ${plan.passes.length} authorship/size pass(es):`,
+    `review-sol: the material budget is ${plan.budget} characters per round; ` +
+      `this range has ${plan.rawSize} characters of outstanding material.`,
   ]
+  if (plan.fits) lines.push('  It fits in one round.')
+  else {
+    lines.push(
+      `  IT DOES NOT FIT, so ${String(sha).slice(0, 7) || 'this range'} is reviewed in ` +
+        `${plan.passes.length} PASSES over the FILE SET, cut by authorship before size:`,
+    )
+  }
   if (plan.mixedFiles?.length) {
     lines.push(`  mixed-vendor files (split at commit boundaries): ${plan.mixedFiles.map(quotePassFile).join(', ')}`)
   }
@@ -886,17 +897,16 @@ if (isMainModule(import.meta.url)) {
       console.error('review-sol: the authorship plan cannot cover every changed file; no record is offered.')
       process.exit(4)
     }
-    if (!plan.fits && !passFlag) {
-      console.error('review-sol: REFUSING to spend a round on the whole range — run one of the authored passes above.')
-      process.exit(4)
-    }
-    const selected = plan.fits ? plan.passes[0] : passFor(plan).pass
-    if (!selected) {
-      console.error(`review-sol: --pass ${passFlag} does not name one of this plan's ${plan.passes.length} passes.`)
+    const selection = passFor(plan)
+    if (selection.error) {
+      console.error(`review-sol: ${selection.error}`)
       process.exit(2)
     }
+    const selected = plan.fits ? plan.passes[0] : selection.pass
     const pass = plan.fits ? null : selected
-    const rangeAuthors = selected.authors
+    const rangeAuthors = selected
+      ? selected.authors
+      : [...new Set(plan.passes.flatMap((candidate) => candidate.authors ?? []))]
 
     if (routeFor('review', share.setting) !== 'sol') {
       const decision = decideReview({
@@ -916,12 +926,12 @@ if (isMainModule(import.meta.url)) {
           sha: full,
           mode,
           point,
-          partial: pass ? null : partialFor(base),
+          partial: pass || !plan.fits ? null : partialFor(base),
           // A SELECTED PASS is measured by the plan to fit one round, so its
           // hand-over template prints pass-scoped — exactly as a fitting range
           // prints its whole-range template; the whole-range shortfall would
           // suppress the very record the pass split exists to make possible.
-          shortfall: null,
+          shortfall: pass ? null : planShortfall(plan),
           plan,
           pass,
         }),
@@ -947,13 +957,18 @@ if (isMainModule(import.meta.url)) {
           sha: full,
           mode,
           point,
-          partial: pass ? null : partialFor(base),
-          shortfall: null,
+          partial: pass || !plan.fits ? null : partialFor(base),
+          shortfall: pass ? null : planShortfall(plan),
           plan,
           pass,
         }),
       )
       process.exit(3)
+    }
+
+    if (!selected) {
+      console.error('review-sol: REFUSING to spend a round on the whole range — run one of the authored passes above.')
+      process.exit(4)
     }
 
     console.error(
