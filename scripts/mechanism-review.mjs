@@ -554,7 +554,7 @@ export function verifyCarried(records, allRecords = null) {
  *  containing that separator shifted the trailers out of their field — the
  *  authoring model then read wrong, and the self-review refusal missed. With
  *  one format per call there is no separator to forge. */
-export function resolveCommit(sha) {
+export function resolveCommit(sha, { run = git } = {}) {
   // VALIDATED BEFORE GIT SEES IT (landing-round pass 4): the record command is
   // only ever printed with a hex sha, so anything else is refused by shape —
   // with the one message that names what this command wants.
@@ -562,9 +562,34 @@ export function resolveCommit(sha) {
   if (!/^[0-9a-f]{7,40}$/i.test(ref)) {
     throw new Error(`--record <sha>: "${ref}" is not a commit sha (7–40 hex characters)`)
   }
-  const full = git(['rev-parse', `${ref}^{commit}`])
-  const subject = git(['show', '-s', '--format=%s', full])
-  const trailers = git(['show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', full])
+  // RESOLVED AGAINST THE OBJECT DATABASE, NOT AGAINST REFS. `git rev-parse`
+  // answers a REF first, and a branch or tag may legally be named in hex — so
+  // a ref named like a sha prefix would silently record a DIFFERENT commit than
+  // the boundary given, and the coverage reader would then clear contributions
+  // nobody read. `--disambiguate` never consults refs: it lists the objects
+  // whose id carries the prefix, and anything but exactly one commit is refused.
+  const candidates = run(['rev-parse', `--disambiguate=${ref.toLowerCase()}`])
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const commits = candidates.filter((candidate) => {
+    try {
+      return run(['cat-file', '-t', candidate]) === 'commit'
+    } catch {
+      return false
+    }
+  })
+  if (!commits.length) {
+    throw new Error(`--record <sha>: "${ref}" names no commit in this repository`)
+  }
+  if (commits.length > 1) {
+    throw new Error(
+      `--record <sha>: "${ref}" is ambiguous — it names ${commits.length} commits (${commits.map((c) => c.slice(0, 12)).join(', ')})`,
+    )
+  }
+  const full = commits[0]
+  const subject = run(['show', '-s', '--format=%s', full])
+  const trailers = run(['show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', full])
   return {
     sha: full,
     subject,

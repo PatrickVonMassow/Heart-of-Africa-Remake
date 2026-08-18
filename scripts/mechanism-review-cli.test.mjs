@@ -13,7 +13,7 @@ import { spawnSync } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { appendRecord, buildRecord, KNOWN_FLAGS, readRecords, usage } from './mechanism-review.mjs'
+import { appendRecord, buildRecord, KNOWN_FLAGS, readRecords, resolveCommit, usage } from './mechanism-review.mjs'
 import { MODES, VERDICTS } from './mechanism-review-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'mechanism-review.mjs')
@@ -868,5 +868,48 @@ describe('the mode at the command line', () => {
     expect(text).toContain('--mode')
     expect(text).toContain('--framing')
     for (const mode of MODES) expect(text).toContain(mode)
+  })
+})
+
+describe('a boundary resolves against the object database, not against refs', () => {
+  const OBJECT = 'a'.repeat(40)
+  const SHADOW = 'b'.repeat(40)
+  // A branch or tag may legally be named in hex, and `git rev-parse` answers the
+  // REF first — so a ref named like a sha prefix would have recorded a different
+  // commit than the boundary named, and the coverage reader would then clear
+  // contributions nobody read.
+  const runner = ({ objects = [OBJECT], types = {}, calls = [] } = {}) => {
+    const fake = (args) => {
+      calls.push(args.join(' '))
+      if (args[0] === 'rev-parse' && String(args[1]).startsWith('--disambiguate=')) return objects.join('\n')
+      if (args[0] === 'cat-file') return types[args[2]] ?? 'commit'
+      if (args[0] === 'rev-parse') return SHADOW
+      if (args[0] === 'show') return args[1] === '-s' && String(args[2]).includes('%s') ? 'subject' : 'GPT-5.6 Sol <noreply@openai.com>'
+      return ''
+    }
+    fake.calls = calls
+    return fake
+  }
+
+  it('takes the object a prefix names, not the commit a hex-named ref points at', () => {
+    const run = runner()
+    expect(resolveCommit('aaaaaaa', { run }).sha).toBe(OBJECT)
+    expect(run.calls.some((call) => call.includes('^{commit}'))).toBe(false)
+  })
+
+  it('refuses an ambiguous prefix instead of picking one', () => {
+    const run = runner({ objects: [OBJECT, SHADOW] })
+    expect(() => resolveCommit('aaaaaaa', { run })).toThrow(/ambiguous/)
+  })
+
+  it('refuses a prefix that names no commit', () => {
+    expect(() => resolveCommit('aaaaaaa', { run: runner({ objects: [] }) })).toThrow(/names no commit/)
+    const blob = runner({ types: { [OBJECT]: 'blob' } })
+    expect(() => resolveCommit('aaaaaaa', { run: blob })).toThrow(/names no commit/)
+  })
+
+  it('passes over a non-commit object sharing the prefix', () => {
+    const run = runner({ objects: [SHADOW, OBJECT], types: { [SHADOW]: 'tree' } })
+    expect(resolveCommit('aaaaaaa', { run }).sha).toBe(OBJECT)
   })
 })
