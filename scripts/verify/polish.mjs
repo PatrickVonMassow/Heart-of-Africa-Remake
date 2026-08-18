@@ -433,18 +433,24 @@ if (section('panorama-wildlife')) {
   // the page makes the sample window the frame it actually is, and lets the
   // judgment demand an UNBROKEN stance across the whole interval, so a wrap is
   // not filtered out — it cannot occur. The judgment itself is the pure,
-  // Vitest-covered `judgeStanceSlip` (scripts/verify/stanceSlip.mjs), which also
-  // removes the turning body's rigid leg swing through the interval's MEAN
-  // heading rather than the heading at its start (measured: a 0.4 rad turn cost
-  // 0.200 of spurious slip the old way and 0.006 this way).
+  // Vitest-covered `judgeStanceSlip` (scripts/verify/stanceSlip.mjs). The
+  // renderer now keeps a stance contact in world space even as its body turns,
+  // so the judgment reads that world travel directly; compensating for a rigid
+  // body's yaw would manufacture movement for a contact whose coordinates did
+  // not change.
   //
-  // THE SPREAD, RECORDED (point 549, the way point 387 recorded its five). Four
-  // consecutive WebGL 2 runs on this host after the fix reported worst foot/body
-  // travel 0.049, 0.047, 0.049 and 0.059 against the unchanged bar of 0.25 — a
-  // spread of 0.012 where the eight runs before it spanned 0.278–1.549 and
-  // straddled the bar. The interval count came out 37, 43, 43 and 42, so the
-  // verdict rests on a comparable population each time rather than on whatever
-  // the host managed to draw.
+  // MEASURED SPREAD (19.08.2026, this section run six consecutive times on the
+  // branch state, three passes per backend, against the 0.25 bar and the
+  // eight-interval enough-gate). Settlement walker (goat), the lane that was
+  // red: WebGL 2 — 35/36/36 intervals, worst foot/body travel 0.000 in every
+  // pass, body turn up to 0.299/0.247/0.292 rad; WebGPU — 13/15/18 intervals,
+  // worst 0.000 in every pass, turn up to 0.433/0.815/0.595 rad. Panorama
+  // silhouette over the same runs: WebGL 2 48/50/49 intervals, worst
+  // 0.025/0.026/0.026; WebGPU 49/50/47 intervals, worst 0.023/0.023/0.025. The
+  // interval population therefore clears the gate on both backends with room
+  // (13 is the thinnest run), the goat's contact does not move at all while the
+  // body turns up to 0.8 rad over it, and the silhouette's tenth-of-the-bar
+  // residue is the only travel any pass measured.
   {
     /** Record the tracked walkers frame by frame, inside the page: one round trip
      *  for the whole series, so no sample window can be stretched by the host.

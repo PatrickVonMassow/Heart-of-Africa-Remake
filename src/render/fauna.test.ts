@@ -5,6 +5,7 @@
 // per-animal spawn scale shrinks them.
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three/webgpu'
+import { judgeStanceSlip } from '../../scripts/verify/stanceSlip.mjs'
 import {
   buildAntelope,
   buildAntelopeCalf,
@@ -25,6 +26,8 @@ import {
   footBodyOffset,
   footForwardOffset,
   footHeight,
+  footPlantPose,
+  FOOT_PLANT_MAX_STRETCH,
   gaitBodyLift,
   gaitCadence,
   gaitFootFraction,
@@ -750,6 +753,251 @@ describe('animal gait (design.md §19, points 228/255/300 — planted feet, no s
       // The body genuinely advanced meanwhile — this is not a stalled animal.
       expect(stanceDistance).toBeGreaterThan(0.05 * rig.legLength)
       expect(moved).toBeLessThan(1e-9)
+    }
+  })
+
+  it('holds one world contact through body travel and turn for the whole stance', () => {
+    const leg = buildGoatParts().legs[0]
+    const radius = 1.2
+    const stanceTravel = GOAT.stride * GAIT_DUTY * 0.98
+    let contact = null as ReturnType<typeof footPlantPose>['contact']
+    let firstBody = { x: 0, z: 0, yaw: 0 }
+    let lastBody = firstBody
+
+    for (let k = 0; k <= 80; k++) {
+      const distance = (k / 80) * stanceTravel
+      const arc = distance / radius
+      const phase = -Math.PI / 2 + 0.01 + gaitPhase(distance, GOAT.cadence)
+      expect(isStance(phase + leg.phaseOffset)).toBe(true)
+      const body = {
+        x: radius * (1 - Math.cos(arc)),
+        y: gaitBodyLift(phase, GOAT.legLength),
+        z: radius * Math.sin(arc),
+        yaw: arc,
+      }
+      if (k === 0) firstBody = body
+      lastBody = body
+      const pose = footPlantPose(contact, true, body, leg.hip, legSwingAngle(phase, leg.phaseOffset), GOAT.legLength)
+      contact = pose.contact
+
+      // Rebuild the rendered endpoint from the pure pose. It must land on the
+      // same world point despite both the hip translation and the yaw change.
+      const reach = GOAT.legLength * pose.stretch
+      const localX = leg.hip[0] + pose.direction[0] * reach
+      const localY = leg.hip[1] + pose.direction[1] * reach
+      const localZ = leg.hip[2] + pose.direction[2] * reach
+      const cy = Math.cos(body.yaw)
+      const sy = Math.sin(body.yaw)
+      const foot = {
+        x: body.x + localX * cy + localZ * sy,
+        y: body.y + localY,
+        z: body.z - localX * sy + localZ * cy,
+      }
+      expect(foot.x).toBeCloseTo(contact!.x, 12)
+      expect(foot.y).toBeCloseTo(contact!.y, 12)
+      expect(foot.z).toBeCloseTo(contact!.z, 12)
+    }
+
+    expect(Math.hypot(lastBody.x - firstBody.x, lastBody.z - firstBody.z)).toBeGreaterThan(GOAT.legLength * 0.5)
+    expect(lastBody.yaw - firstBody.yaw).toBeGreaterThan(0.25)
+    expect(footPlantPose(contact, false, lastBody, leg.hip, 0, GOAT.legLength).contact).toBeNull()
+  })
+
+  it('releases a planted foot before an in-place turn can stretch its leg', () => {
+    const leg = buildGoatParts().legs[0]
+    const body = { x: 0, y: 0, z: 0, yaw: 0 }
+    const planted = footPlantPose(null, true, body, leg.hip, 0, GOAT.legLength)
+    let pose = planted
+    let released = false
+
+    for (let k = 1; k <= 80; k++) {
+      pose = footPlantPose(planted.contact, true, { ...body, yaw: (k / 80) * Math.PI }, leg.hip, 0, GOAT.legLength)
+      expect(pose.stretch).toBeLessThanOrEqual(FOOT_PLANT_MAX_STRETCH)
+      if (!pose.contact) released = true
+    }
+
+    expect(released).toBe(true)
+    expect(pose.contact).toBeNull()
+    expect(pose.stretch).toBe(FOOT_PLANT_MAX_STRETCH)
+    // The caller stores the null release; the next stance frame captures the
+    // ordinary gait endpoint at the body's new heading instead of stretching.
+    const replanted = footPlantPose(pose.contact, true, { ...body, yaw: Math.PI }, leg.hip, 0, GOAT.legLength)
+    expect(replanted.contact).not.toBeNull()
+    expect(replanted.stretch).toBeCloseTo(1, 12)
+  })
+
+  // World position of the foot the caller draws from a pose: the leg group is
+  // aimed along `direction` and scaled by `stretch`, so its endpoint sits at
+  // hip + direction·(stretch·legLength), carried through the body's yaw and
+  // position — the same reconstruction the curved-stance case above uses.
+  const drawnFoot = (
+    pose: { direction: [number, number, number]; stretch: number },
+    body: { x: number; y: number; z: number; yaw: number },
+    hip: readonly [number, number, number],
+    legLength: number,
+  ) => {
+    const reach = legLength * pose.stretch
+    const lx = hip[0] + pose.direction[0] * reach
+    const ly = hip[1] + pose.direction[1] * reach
+    const lz = hip[2] + pose.direction[2] * reach
+    const cy = Math.cos(body.yaw)
+    const sy = Math.sin(body.yaw)
+    return { x: body.x + lx * cy + lz * sy, y: body.y + ly, z: body.z - lx * sy + lz * cy }
+  }
+
+  it('swing frames return the procedural gait pose, so the caller draws every frame from the plant pose (point 697)', () => {
+    // This is what licenses PlaceLife drawing every frame from the returned
+    // pose with no second, procedural branch: on a swing frame the pose IS the
+    // procedural gait — the old `rotation.set(swing, 0, 0)` at scale 1.
+    const leg = buildGoatParts().legs[0]
+    const body = { x: 0.4, y: 0.02, z: -1.3, yaw: 0.7 }
+    for (const s of [-0.5, -0.25, 0, 0.3, 0.5]) {
+      const pose = footPlantPose(null, false, body, leg.hip, s, GOAT.legLength)
+      expect(pose.contact).toBeNull()
+      expect(pose.stretch).toBe(1)
+      expect(pose.direction[0]).toBe(0)
+      expect(pose.direction[1]).toBeCloseTo(-Math.cos(s), 12)
+      expect(pose.direction[2]).toBeCloseTo(-Math.sin(s), 12)
+    }
+  })
+
+  it('the release frame is drawn at the reach limit toward the lost contact — never snapped to the gait pose (point 697)', () => {
+    // A planted stance whose body is shoved sideways past the reach limit. The
+    // defect this pins: the caller branched on `contact` and fell back to the
+    // procedural pose on the release frame, teleporting the drawn foot almost
+    // half a leg in one frame, in the middle of a stance.
+    const leg = buildGoatParts().legs[0]
+    const L = GOAT.legLength
+    const step = 0.01 * L
+    let body = { x: 0, y: 0, z: 0, yaw: 0 }
+    let pose = footPlantPose(null, true, body, leg.hip, 0, L)
+    expect(pose.contact).not.toBeNull()
+    let contact = pose.contact
+    let prevDrawn = drawnFoot(pose, body, leg.hip, L)
+    let releasedAt = -1
+    for (let k = 1; k <= 80 && releasedAt < 0; k++) {
+      body = { ...body, x: k * step }
+      pose = footPlantPose(contact, true, body, leg.hip, 0, L)
+      const drawn = drawnFoot(pose, body, leg.hip, L)
+      if (contact && !pose.contact) {
+        releasedAt = k
+        // The release frame stays clamped at the leash: the drawn foot moves at
+        // most about one body step. The radial 10 % allowance is NOT the size of
+        // the positional jump — the procedural pose the old caller drew here sits
+        // √(MAX²−1)·legLength (~0.46·L) away, and that was the mid-stance snap.
+        expect(pose.stretch).toBe(FOOT_PLANT_MAX_STRETCH)
+        expect(Math.hypot(drawn.x - prevDrawn.x, drawn.y - prevDrawn.y, drawn.z - prevDrawn.z)).toBeLessThan(1.5 * step)
+        const nominal = drawnFoot({ direction: [0, -1, 0], stretch: 1 }, body, leg.hip, L)
+        const oldJump = Math.hypot(nominal.x - prevDrawn.x, nominal.y - prevDrawn.y, nominal.z - prevDrawn.z)
+        expect(oldJump).toBeGreaterThan(0.4 * L)
+      }
+      prevDrawn = drawn
+      contact = pose.contact
+    }
+    expect(releasedAt).toBeGreaterThan(0)
+    // The frame after the release captures afresh at the gait endpoint — the
+    // foot steps to its new spot across an unplanted frame — and then holds it.
+    body = { ...body, x: body.x + step }
+    const fresh = footPlantPose(null, true, body, leg.hip, 0, L)
+    expect(fresh.contact).not.toBeNull()
+    expect(fresh.stretch).toBeCloseTo(1, 12)
+    const freshDrawn = drawnFoot(fresh, body, leg.hip, L)
+    expect(freshDrawn.x).toBeCloseTo(fresh.contact!.x, 12)
+    expect(freshDrawn.y).toBeCloseTo(fresh.contact!.y, 12)
+    expect(freshDrawn.z).toBeCloseTo(fresh.contact!.z, 12)
+    const held = footPlantPose(fresh.contact, true, { ...body, x: body.x + step }, leg.hip, 0, L)
+    expect(held.contact).toEqual(fresh.contact)
+  })
+
+  it('a release is a hand-over the slip judgment never scores as a planted-foot jump (point 697)', () => {
+    // The renderer's exact per-frame pipeline for one leg, over a wander with a
+    // hard bend every few strides — the sharp pivots that over-extend a planted
+    // stance on the goats' real paths. The same walk is recorded twice:
+    //  - `fixed`: what the fix draws and reports — release frame clamped at the
+    //    leash, stance flag = the held plant, so the hand-over breaks the run
+    //    exactly like an ordinary swing does;
+    //  - `defect`: what the old caller drew and reported — procedural pose on
+    //    the release frame, stance flag = the gait phase — so the snap lands
+    //    INSIDE a scored stance interval and blows the 0.25 bar the polish
+    //    suite holds. Neither the judgment nor the bar moves here.
+    const leg = buildGoatParts().legs[0]
+    const L = GOAT.legLength
+    const step = 0.02 * GOAT.stride
+    let heading = 0
+    let x = 0
+    let z = 0
+    let yaw = 0
+    let dist = 0
+    let contact: ReturnType<typeof footPlantPose>['contact'] = null
+    let releases = 0
+    const fixed: Array<Record<string, unknown>> = []
+    const defect: Array<Record<string, unknown>> = []
+    for (let k = 0; k < 900; k++) {
+      if (k > 0 && k % 45 === 0) heading += (k % 90 === 0 ? 1 : -1) * 1.9
+      const dx = step * Math.sin(heading)
+      const dz = step * Math.cos(heading)
+      x += dx
+      z += dz
+      yaw = faceVelocity(dx, dz, yaw)
+      dist += step
+      const phase = gaitPhase(dist, GOAT.cadence)
+      const inStance = isStance(phase + leg.phaseOffset)
+      const swing = legSwingAngle(phase, leg.phaseOffset)
+      const body = { x, y: gaitBodyLift(phase, L), z, yaw }
+      const pose = footPlantPose(contact, inStance, body, leg.hip, swing, L)
+      const released = inStance && contact !== null && pose.contact === null
+      if (released) releases++
+      contact = pose.contact
+      const foot = drawnFoot(pose, body, leg.hip, L)
+      const base = { x, z, yaw, stride: GOAT.stride }
+      fixed.push({ g: { ...base, stance: pose.contact !== null, foot } })
+      defect.push({
+        g: {
+          ...base,
+          stance: inStance,
+          foot: released
+            ? drawnFoot({ direction: [0, -Math.cos(swing), -Math.sin(swing)], stretch: 1 }, body, leg.hip, L)
+            : foot,
+        },
+      })
+    }
+    // The scenario really exercises the release path — otherwise it pins nothing.
+    expect(releases).toBeGreaterThanOrEqual(2)
+    const scoredDefect = judgeStanceSlip(defect)
+    const scoredFixed = judgeStanceSlip(fixed)
+    // The defect: the old drawing and reporting score the snap against the bar.
+    expect(scoredDefect.enough).toBe(true)
+    expect(scoredDefect.worst).toBeGreaterThanOrEqual(0.25)
+    // The fix: the same walk with the same releases still yields a full
+    // measurement (the hand-over cannot starve the check), and nothing scores —
+    // within a held plant the drawn foot does not move AT ALL, so the worst
+    // figure is numerically zero, far under the 0.25 bar (measured: defect
+    // 13.602, fixed 0.000 over 130 intervals on this deterministic walk).
+    expect(scoredFixed.enough).toBe(true)
+    expect(scoredFixed.worst).toBeLessThan(1e-6)
+  })
+
+  it('keeps an ordinary straight walking stance planted at its built leg length', () => {
+    const leg = buildGoatParts().legs.find((candidate) => candidate.phaseOffset === 0)!
+    const touchdownPhase = -Math.PI / 2
+    const stanceTravel = GOAT.stride * GAIT_DUTY
+    let contact = null as ReturnType<typeof footPlantPose>['contact']
+
+    for (let k = 0; k <= 80; k++) {
+      const distance = (k / 80) * stanceTravel
+      const phase = touchdownPhase + gaitPhase(distance, GOAT.cadence)
+      const pose = footPlantPose(
+        contact,
+        true,
+        { x: 0, y: gaitBodyLift(phase, GOAT.legLength), z: distance, yaw: 0 },
+        leg.hip,
+        legSwingAngle(phase, leg.phaseOffset),
+        GOAT.legLength,
+      )
+      contact = pose.contact
+
+      expect(contact).not.toBeNull()
+      expect(pose.stretch).toBeCloseTo(1, 12)
     }
   })
 

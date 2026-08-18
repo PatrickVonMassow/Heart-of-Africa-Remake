@@ -194,6 +194,122 @@ export function footForwardOffset(
   return -legLength * Math.sin(legSwingAngle(phase, phaseOffset, amp))
 }
 
+/** A foot's fixed contact point in world space during one stance. */
+export interface FootPlant {
+  x: number
+  y: number
+  z: number
+}
+
+/** The world pose of the body that carries a planted leg. */
+export interface FootPlantBodyPose {
+  x: number
+  y: number
+  z: number
+  yaw: number
+}
+
+/** The local direction and reach that draw a straight leg onto its target. */
+export interface FootPlantPose {
+  /** The held world contact, or null while the foot is in swing. */
+  contact: FootPlant | null
+  /** Unit direction from the hip to the foot, in the body's local frame. */
+  direction: [number, number, number]
+  /** Leg length multiplier needed to reach the target. */
+  stretch: number
+}
+
+/**
+ * Maximum reach of a planted leg as a multiple of its built length. Ten per
+ * cent gives the simple straight-leg rig enough compliance for curved travel
+ * and collision jitter; beyond that the limb reads as elastic, so the contact
+ * must release and be captured again on the next stance frame. The radial
+ * allowance is NOT the size of that hand-over: at the release the lost contact
+ * sits legLength·√(MAX²−1) — almost half a leg on level ground — from the
+ * fresh procedural endpoint, so the step to the new spot must never be drawn,
+ * or measured, as one planted foot moving (point 697).
+ */
+export const FOOT_PLANT_MAX_STRETCH = 1.1
+
+/**
+ * Hold a stance foot at one world point while its body translates and turns.
+ *
+ * Matching stride distance to a fore/aft leg sweep cancels translation only
+ * while the body follows its current forward axis. Settlement goats also turn
+ * and are collision-resolved sideways, so that one-axis cancellation still
+ * drags the foot. A stance instead remembers its touchdown in WORLD space and
+ * re-aims the straight leg from the moving hip to that point. The first stance
+ * frame captures the procedural gait's current foot, avoiding a touchdown pop;
+ * swing frames release it and return the ordinary gait direction — as unit
+ * direction and stretch 1, so the caller draws EVERY frame from the returned
+ * pose and needs no second, procedural drawing path.
+ *
+ * An over-extended stance releases too (point 697): that frame still returns
+ * the drawable pose — the leg held at the reach limit toward the lost contact,
+ * continuous with the frame before — while `contact: null` tells the caller
+ * the plant ended, so the next stance frame captures afresh and the flag
+ * feeding the no-skate measurement reports the hand-over as unplanted.
+ *
+ * The result contains no Three.js object and no mutation, so the full contact
+ * invariant can be exercised in Vitest independently of the render loop.
+ */
+export function footPlantPose(
+  previous: FootPlant | null,
+  stance: boolean,
+  body: FootPlantBodyPose,
+  hip: readonly [number, number, number],
+  swingAngle: number,
+  legLength: number,
+): FootPlantPose {
+  if (!(legLength > 0)) return { contact: null, direction: [0, -1, 0], stretch: 1 }
+
+  // The procedural leg endpoint in the body's frame. Rotation about local X
+  // carries a down-pointing leg toward -Z for a positive swing angle.
+  const nominalX = hip[0]
+  const nominalY = hip[1] - legLength * Math.cos(swingAngle)
+  const nominalZ = hip[2] - legLength * Math.sin(swingAngle)
+  if (!stance) {
+    return {
+      contact: null,
+      direction: [0, -Math.cos(swingAngle), -Math.sin(swingAngle)],
+      stretch: 1,
+    }
+  }
+
+  const cy = Math.cos(body.yaw)
+  const sy = Math.sin(body.yaw)
+  const contact =
+    previous ??
+    {
+      x: body.x + nominalX * cy + nominalZ * sy,
+      y: body.y + nominalY,
+      z: body.z - nominalX * sy + nominalZ * cy,
+    }
+
+  // World target back into the body's yawed frame, then relative to the hip.
+  const dx = contact.x - body.x
+  const dz = contact.z - body.z
+  const vx = dx * cy - dz * sy - hip[0]
+  const vy = contact.y - body.y - hip[1]
+  const vz = dx * sy + dz * cy - hip[2]
+  const reach = Math.hypot(vx, vy, vz)
+  if (!(reach > 0)) return { contact, direction: [0, -1, 0], stretch: 0 }
+  const direction: [number, number, number] = [vx / reach, vy / reach, vz / reach]
+  const stretch = Math.min(reach / legLength, FOOT_PLANT_MAX_STRETCH)
+  if (reach > legLength * FOOT_PLANT_MAX_STRETCH) {
+    // Release frame: keep the leg drawn at the leash — aimed at the lost
+    // contact, clamped to the reach limit — so the pose stays continuous with
+    // the previous frame. Snapping to the procedural pose here would move the
+    // drawn foot ~legLength·√(MAX²−1) in one frame, inside a gait stance.
+    return { contact: null, direction, stretch }
+  }
+  return {
+    contact,
+    direction,
+    stretch,
+  }
+}
+
 /**
  * Vertical body offset (≤ 0) that puts the STANCE foot on the ground (point
  * 300). A rigid leg swung by θ reaches only legLength·cos θ down, so a body held
