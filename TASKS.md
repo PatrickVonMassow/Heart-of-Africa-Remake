@@ -118,6 +118,21 @@ put it is the mistake this line exists to stop.
     LAND it, or PARK it explicitly. A parked branch is recorded with a reason and drops out of the
     count — `feat/336-croc-staging` at 13 days and 1679 commits behind is exactly that case, and
     today it is indistinguishable from live work.
+  - A SLOT IS ALSO NOT FREE WHILE ITS WORKTREE STILL HAS AN OCCUPANT. The commissioning check asks
+    the queue and the branch, never whether the target tree is already being worked, and on
+    18.08.2026 that let a session spawn a SECOND agent into a worktree whose agent had OUTLIVED its
+    dead parent session and was four commits along. The second agent recognised the peer itself and
+    stood down before its first write, so nothing was lost — but by its own judgment, not by any
+    mechanism. A declaration naming a DEAD author is no evidence the WORK is dead: the process
+    outlives its parent. Opening work on an existing worktree is therefore refused while that tree's
+    HEAD or its working files have moved since the brief was cut, and the refusal names the commits
+    and the times it measured.
+  - EVERY REFUSAL NAMES THE REMEDY THAT ACTUALLY LIFTS IT, and no other. The user-gated refusal must
+    not print the override command: an override recorded for a gated point is deliberately not
+    honoured, so following that printed remedy records a reason the decision then ignores and the
+    guard denies again — the block-loop class that cost ~30 turns on 24.07.2026. The slot refusal
+    names land-or-park, the queue refusal names the recorded override, and the gated refusal names
+    the user's word (its AWAITING-USER line).
   - BOTH REFUSALS STAND DOWN where every guard here does: a session that does not own the batch lock
     (`heldByOtherLiveOwner`) and a paused batch (`.claude/batch-paused`), so they never fire on a
     subagent or a paused run. Fail-open on their own error, like the rest of the chain.
@@ -137,13 +152,84 @@ put it is the mistake this line exists to stop.
   refused and the refusal names 700/701/707; a front candidate is accepted; a gated or in-flight
   point is skipped when the front three are chosen; an override with a recorded reason is accepted
   and the reason is reported back; nine open branches refuse a new point while two do not; a parked
-  branch does not count; a non-owner session and a paused batch are waved through unchanged.
+  branch does not count; a non-owner session and a paused batch are waved through unchanged. Plus:
+  a worktree whose HEAD or working files postdate the brief refuses a second occupant and names what
+  it measured, while a quiet one is accepted; and each refusal's text carries its own remedy, the
+  gated one naming the user's word rather than the override.
   Both files are guard-side decision cores, so the other model's recorded review is required before
   the merge (`mechanism-review-guard`).
   Criticality: HIGH for the batch's usefulness — it is the mechanism that makes the user's stated
   priority actually govern what gets built, and the one that stops built work from rotting unlanded.
   No player-visible behaviour.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 714. A review record silently covers files no reviewer ever saw, once a range outgrows the
+  material budget (measured 17.08.2026 on point 700, round 6). `scripts/review-sol.mjs` assembles
+  the WHOLE range `main..<sha>` as review material and tells the reviewer that a record at the head
+  clears every commit it contains, back to the branch point. At 201567 characters the material was
+  TRUNCATED: the patch ended in `[TRUNCATED: 40207 characters not shown]` and 19 touched files were
+  marked `OMITTED ENTIRELY` — among them `scripts/context-fence-guard.mjs`, its tests, both shim
+  files and the boundary/transfer wiring. Sol reported this itself and refused the whole-range
+  verdict on that ground: the guard's top-level fail-open handling, the reachability of the remedy
+  commands, the signal propagation and the merge itself were not reviewable at all. NOTHING TOLD
+  THE CALLER. The truncation notice is written INTO the material, so it reaches the caller only if
+  the model chooses to mention it — a model that did not would have produced a clean-looking
+  `--record` line covering files nobody read, and the ledger would carry it as a cleared range.
+  That is the worst shape a review record can take, and it gets worse with size: the point big
+  enough to need the review most is the one whose record covers least of it.
+  FINAL STATE:
+  - The tool KNOWS when its material did not fit — it compares what it assembled against what it
+    sent — and on a short-fall it REFUSES to print the record command for the whole range, naming
+    every file that was truncated or omitted. A record is offered only for what was actually read.
+  - A range too large is reviewed in PASSES whose union covers it, each pass a set of files that
+    fits, and the record names the passes it rests on. `mechanism-review.mjs` accepts that
+    composition rather than forcing one verdict over material no single call could hold.
+  - The size at which this begins is MEASURED and named in the tool's own output before the round
+    is spent, so a caller can split the review instead of discovering the gap in the verdict.
+  - Fail-open: a tool that cannot tell whether it fit says so and refuses the record, rather than
+    assuming it did.
+  - AN IMPOSSIBLE REVIEW MUST NOT TRAP THE SESSION, which is the state this point is being built
+    from. Every guard in this chain is fail-OPEN by rule (CLAUDE.md §7.2) — a guard bug may not trap
+    a session — yet `mechanism-review-guard` currently blocks every turn end on `main` for a range
+    whose review CANNOT be assembled, so no honest action clears it and the only exits left are
+    fabricating a clearance or pausing the batch. MEASURED 18.08.2026 at `main@19d9ed3f`: the
+    blocked range cuts into 64 contiguous single-commit slices, and 52 of them exceed the budget
+    ALONE, each dominated by content rather than patch (the worst reaches 2.06M on two files);
+    reviewing the work on its own feature branch does not help either, because the branch's repeated
+    merges from `main` pull the same bookkeeping paths into its touched-path set (3.50M over 30
+    files for `ae8539d2~1..66d36016^2`). So while a range's material cannot be assembled at all, the
+    guard REPORTS that gap — naming the range, the measured size and the budget — and lets the turn
+    end, rather than demanding a review no caller can produce. It resumes blocking the moment the
+    material fits again, which is what the patch-only delivery above restores.
+  - SPLITTING BY COMMIT DOES NOT HELP, which is why the passes above are cuts through the FILE SET
+    and not through the history (measured 18.08.2026 over the 35 commits the guard currently holds
+    open, `ae8539d2~1..657fc453`). `gatherMaterial` ships the CURRENT CONTENT of every touched
+    path beside the patch, so a commit's material is dominated by the largest file it happens to
+    touch: 34 of those 41 commits exceed 150k characters on their own, and 31 of them do so ONLY
+    because of four bookkeeping files that carry no reviewable mechanism at all —
+    `docs/tasks-archive.md` (1.39M), `TASKS.md` (662k), `.claude/mechanism-reviews.jsonl` (256k)
+    and `docs/analysis_de/retrospektive-zusammenarbeit.md` (231k). The worst single commit reaches
+    2.05M. A caller who reacts to a truncation by reviewing commit by commit therefore gets the
+    same truncation one commit at a time, and pays a round per commit for it.
+  - EVERY FILE'S DELIVERY MODE IS NAMED IN THE MATERIAL, and there are three: carried whole,
+    PATCH-ONLY (its diff without its surrounding content), and absent — the last split again into
+    absent-by-design, covered by a named other pass, and absent-by-truncation. They license
+    different verdicts, so a reviewer that cannot tell them apart cannot say what its verdict
+    covers. The accounting counts a patch-only file as its patch alone; a record must never cover
+    content that was not sent. A bookkeeping path carrying no reviewable mechanism is delivered
+    patch-only by default: measured 18.08.2026 on `main@92af94cc`, the jammed range
+    `ae8539d2~1..657fc453` weighs 168355 characters of patch against 3014107 of touched-path
+    content, of which the four files above carry 2571262 — 85 % — leaving 442845 across the other
+    23. Shipping those four patch-only is what turns this range from unreviewable into three or
+    four passes.
+  VERIFIABLE: Vitest over the pure assembly — material under the budget yields a record command,
+  material over it yields the refusal naming the dropped files, and a two-pass composition yields a
+  record naming both passes; plus a case pinning that a truncation notice inside the material alone
+  never satisfies the check, and one pinning that a patch-only file is accounted as its patch and
+  never counted as content delivered.
+  Criticality: high — it does not produce a wrong answer, it produces an unearned CLEARANCE, and
+  the four-eyes rule the whole model policy rests on is only worth what its records cover.
+  Bundle: unbundled (review tooling).
 
 - [ ] 713. The board's now-section answers to nothing, so it stood empty while three strands were
   in flight (user 17.08.2026, reading the live board: »Die Sektion Woran ich gerade arbeite ist
@@ -436,61 +522,6 @@ put it is the mistake this line exists to stop.
   Criticality: low — it is bookkeeping over an existing analysis, but losing it silently would
   discard a paid-for four-eyes stage.
   Bundle: Session- & Repo-Hygiene.
-
-- [ ] 714. A review record silently covers files no reviewer ever saw, once a range outgrows the
-  material budget (measured 17.08.2026 on point 700, round 6). `scripts/review-sol.mjs` assembles
-  the WHOLE range `main..<sha>` as review material and tells the reviewer that a record at the head
-  clears every commit it contains, back to the branch point. At 201567 characters the material was
-  TRUNCATED: the patch ended in `[TRUNCATED: 40207 characters not shown]` and 19 touched files were
-  marked `OMITTED ENTIRELY` — among them `scripts/context-fence-guard.mjs`, its tests, both shim
-  files and the boundary/transfer wiring. Sol reported this itself and refused the whole-range
-  verdict on that ground: the guard's top-level fail-open handling, the reachability of the remedy
-  commands, the signal propagation and the merge itself were not reviewable at all. NOTHING TOLD
-  THE CALLER. The truncation notice is written INTO the material, so it reaches the caller only if
-  the model chooses to mention it — a model that did not would have produced a clean-looking
-  `--record` line covering files nobody read, and the ledger would carry it as a cleared range.
-  That is the worst shape a review record can take, and it gets worse with size: the point big
-  enough to need the review most is the one whose record covers least of it.
-  FINAL STATE:
-  - The tool KNOWS when its material did not fit — it compares what it assembled against what it
-    sent — and on a short-fall it REFUSES to print the record command for the whole range, naming
-    every file that was truncated or omitted. A record is offered only for what was actually read.
-  - A range too large is reviewed in PASSES whose union covers it, each pass a set of files that
-    fits, and the record names the passes it rests on. `mechanism-review.mjs` accepts that
-    composition rather than forcing one verdict over material no single call could hold.
-  - The size at which this begins is MEASURED and named in the tool's own output before the round
-    is spent, so a caller can split the review instead of discovering the gap in the verdict.
-  - Fail-open: a tool that cannot tell whether it fit says so and refuses the record, rather than
-    assuming it did.
-  - SPLITTING BY COMMIT DOES NOT HELP, which is why the passes above are cuts through the FILE SET
-    and not through the history (measured 18.08.2026 over the 35 commits the guard currently holds
-    open, `ae8539d2~1..657fc453`). `gatherMaterial` ships the CURRENT CONTENT of every touched
-    path beside the patch, so a commit's material is dominated by the largest file it happens to
-    touch: 34 of those 41 commits exceed 150k characters on their own, and 31 of them do so ONLY
-    because of four bookkeeping files that carry no reviewable mechanism at all —
-    `docs/tasks-archive.md` (1.39M), `TASKS.md` (662k), `.claude/mechanism-reviews.jsonl` (256k)
-    and `docs/analysis_de/retrospektive-zusammenarbeit.md` (231k). The worst single commit reaches
-    2.05M. A caller who reacts to a truncation by reviewing commit by commit therefore gets the
-    same truncation one commit at a time, and pays a round per commit for it.
-  - EVERY FILE'S DELIVERY MODE IS NAMED IN THE MATERIAL, and there are three: carried whole,
-    PATCH-ONLY (its diff without its surrounding content), and absent — the last split again into
-    absent-by-design, covered by a named other pass, and absent-by-truncation. They license
-    different verdicts, so a reviewer that cannot tell them apart cannot say what its verdict
-    covers. The accounting counts a patch-only file as its patch alone; a record must never cover
-    content that was not sent. A bookkeeping path carrying no reviewable mechanism is delivered
-    patch-only by default: measured 18.08.2026 on `main@92af94cc`, the jammed range
-    `ae8539d2~1..657fc453` weighs 168355 characters of patch against 3014107 of touched-path
-    content, of which the four files above carry 2571262 — 85 % — leaving 442845 across the other
-    23. Shipping those four patch-only is what turns this range from unreviewable into three or
-    four passes.
-  VERIFIABLE: Vitest over the pure assembly — material under the budget yields a record command,
-  material over it yields the refusal naming the dropped files, and a two-pass composition yields a
-  record naming both passes; plus a case pinning that a truncation notice inside the material alone
-  never satisfies the check, and one pinning that a patch-only file is accounted as its patch and
-  never counted as content delivered.
-  Criticality: high — it does not produce a wrong answer, it produces an unearned CLEARANCE, and
-  the four-eyes rule the whole model policy rests on is only worth what its records cover.
-  Bundle: unbundled (review tooling).
 
 - [ ] 715. The staged rewiring of the hook paths is finished, and the check accepts the defaulted
   anchor (measured 18.08.2026 against `scripts/guard-health-core.mjs` and `.claude/settings.json`).
