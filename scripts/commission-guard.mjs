@@ -203,6 +203,26 @@ export function commissionVerdict(inputs, { now = Date.now() } = {}) {
     targets.length > 0 &&
     targets.every((p) => inFlight.includes(Number(p))) &&
     refs.every((r) => standing.has(normaliseBranchRef(r)))
+  // A FACT NOBODY COULD READ REFUSES NOTHING (Sol, review of 3078d166). Both
+  // halves already failed open on their own inputs, but the QUEUE half was fed
+  // git's answer too: an unreadable branch list left the in-flight set EMPTY, so
+  // a point actually in flight read as behind the front and was refused for a
+  // git fault. The same for a torn record, which is where an override lives —
+  // losing it turns a recorded exemption back into a refusal. Both are named, so
+  // `--status` says which fact was missing rather than reporting a clean allow.
+  const unread =
+    inputs?.readable !== true ? 'branches-unreadable' : inputs?.record?.torn === true ? 'record-unreadable' : ''
+  if (unread) {
+    const open = (q) => ({ ...(q ?? {}), allowed: true, why: unread })
+    return {
+      block: false,
+      reason: '',
+      queue: open(verdicts[0]?.queue),
+      slots: { ...slots, allowed: true, why: unread },
+      verdicts: verdicts.map((v) => ({ ...v, block: false, queue: open(v.queue) })),
+      unread,
+    }
+  }
   const parts = []
   if (!finishing && !slots.allowed) parts.push(branchSlotRefusal(slots))
   for (const v of verdicts) if (v.block) parts.push(commissionRefusal(v.queue))
@@ -212,6 +232,7 @@ export function commissionVerdict(inputs, { now = Date.now() } = {}) {
     queue: verdicts[0]?.queue ?? commissionDecision({ point: null, open: inputs.open, gates: inputs.gates }),
     slots,
     verdicts,
+    unread: '',
   }
 }
 
@@ -271,22 +292,38 @@ function recordOverride(argv) {
   return 0
 }
 
-function parkBranch(argv) {
+/** Exported for the unit layer: the probes are injectable so the refusal to park
+ *  a branch without a baseline is provable without a repository. */
+export function parkBranch(
+  argv,
+  { tipProbe = branchTip, read = readCommissionRecord, write = writeCommissionRecord, out = console, at = null } = {},
+) {
   const ref = flag(argv, '--park')
   const reason = flag(argv, '--reason') ?? ''
   if (!ref || !String(reason).trim()) {
-    console.error('usage: node scripts/commission-guard.mjs --park <branch> --reason "<why>"')
+    out.error('usage: node scripts/commission-guard.mjs --park <branch> --reason "<why>"')
     return 1
   }
-  // THE TIP IS THE BASELINE the park expires against; the timestamp beside it is
-  // only the fallback for a record written before this existed.
-  const tip = branchTip(ref)
-  writeCommissionRecord(
-    recordParkedBranch(readCommissionRecord(), ref, reason, { at: new Date().toISOString(), tip }),
-  )
-  console.log(
-    `parked ${ref} out of the slot count${tip ? ` at ${tip.slice(0, 8)}` : ' (git could not name its tip — the park' +
-      ' falls back to the clock)'}. It returns to the count the moment it receives another commit.`,
+  // THE TIP IS THE BASELINE the park expires against, and WITHOUT ONE THE PARK IS
+  // REFUSED (Sol, review of 3078d166). The clock fallback carries the very defects
+  // the tip was introduced to remove — git's committer date is a whole second
+  // coarse, and a rebase or a `--date` preserves one the branch has long moved
+  // past — so a park taken on it could outlive the work it excused. The fallback
+  // stays only for records written BEFORE the tip was recorded; a park taken from
+  // here always has a sha. An unresolvable name is usually a typo anyway.
+  const tip = tipProbe(ref)
+  if (!tip) {
+    out.error(
+      `refusing to park ${ref}: git cannot name its tip, and the tip is the baseline a park expires against. ` +
+        'Without it the park could never be undone by a commit landing on the branch. Check the branch name ' +
+        '(`git branch --list "feat/*"`), fetch it if it is only on the remote, and park it again.',
+    )
+    return 1
+  }
+  write(recordParkedBranch(read(), ref, reason, { at: at ?? new Date().toISOString(), tip }))
+  out.log(
+    `parked ${ref} out of the slot count at ${tip.slice(0, 8)}. It returns to the count the moment it receives ` +
+      'another commit.',
   )
   return 0
 }

@@ -6,10 +6,18 @@
 // batch-in-flight-core.test.mjs; what is under test here is the wiring: which
 // facts reach which decision, and when the guard says nothing at all.
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
-import { COMMISSION_HOOK_LINE, gatherCommissionInputs, commissionVerdict, wiringReport } from './commission-guard.mjs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import {
+  COMMISSION_HOOK_LINE,
+  gatherCommissionInputs,
+  commissionVerdict,
+  parkBranch,
+  wiringReport,
+} from './commission-guard.mjs'
 import { POOL_CAP } from './batch-in-flight-core.mjs'
+import { readCommissionRecord } from './batch-in-flight.mjs'
 
 const AUG17 = Date.parse('2026-08-17T19:41:00.000Z')
 const days = (n) => n * 86400000
@@ -260,6 +268,69 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
     const v = commissionVerdict(g.inputs, { now: AUG17 })
     expect(v.slots.why).toBe('branches-unreadable')
     expect(v.block).toBe(false)
+  })
+
+  // …AND ON THE QUEUE HALF TOO (Sol, review of 3078d166). The branch half failed
+  // open on its own input while the QUEUE half was fed the same git answer: an
+  // unreadable list left the in-flight set empty, so a point already being worked
+  // read as behind the front and was refused for a git fault, not for a queue jump.
+  it('FAILS OPEN on the QUEUE half as well when git could not be questioned', () => {
+    const v = commissionVerdict(gather(697, { branchProbe: () => ({ readable: false, branches: [] }) }).inputs, {
+      now: AUG17,
+    })
+    expect(v.block).toBe(false)
+    expect(v.unread).toBe('branches-unreadable')
+    expect(v.queue.why).toBe('branches-unreadable')
+    expect(v.reason).toBe('')
+  })
+
+  // The override lives in the record and nowhere else, so a record nobody can
+  // read turns a recorded exemption back into a refusal.
+  it('FAILS OPEN on a TORN record, where the overrides live', () => {
+    const v = commissionVerdict(gather(697, { branches: NINE, record: { overrides: {}, parked: {}, torn: true } })
+      .inputs, { now: AUG17 })
+    expect(v.block).toBe(false)
+    expect(v.unread).toBe('record-unreadable')
+  })
+
+  it('an UNREADABLE record file is torn, not empty — a missing one is empty', () => {
+    // A directory in the file's place is the readable stand-in for EACCES here:
+    // it EXISTS and cannot be read, which is exactly the state that was silently
+    // reported as "nothing recorded yet".
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-commission-record-'))
+    try {
+      expect(readCommissionRecord(dir).torn).toBe(true)
+      expect(readCommissionRecord(join(dir, 'absent.json'))).toMatchObject({ torn: false, overrides: {} })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  // A PARK WITHOUT A BASELINE COULD NEVER EXPIRE (Sol, review of 3078d166): the
+  // clock fallback carries the very second-coarse and rebase defects the tip was
+  // introduced to remove, so a park taken on it could outlive the work it excused.
+  it('REFUSES to park a branch whose tip git cannot name, and says why', () => {
+    const said = []
+    const out = { log: (m) => said.push(m), error: (m) => said.push(m) }
+    let written = null
+    const args = ['--park', 'feat/336-croc-staging', '--reason', 'superseded']
+    expect(
+      parkBranch(args, { tipProbe: () => '', write: (r) => (written = r), read: () => ({ overrides: {}, parked: {} }), out }),
+    ).toBe(1)
+    expect(written).toBeNull()
+    expect(said.join('\n')).toContain('git cannot name its tip')
+    // …and a tip that IS readable parks, with the sha as the baseline.
+    said.length = 0
+    expect(
+      parkBranch(args, {
+        tipProbe: () => 'abc1234def',
+        write: (r) => (written = r),
+        read: () => ({ overrides: {}, parked: {} }),
+        out,
+        at: '2026-08-17T19:00:00.000Z',
+      }),
+    ).toBe(0)
+    expect(written.parked['feat/336-croc-staging']).toMatchObject({ reason: 'superseded', tip: 'abc1234def' })
   })
 
   // A GUARD NOBODY RUNS REFUSES NOTHING, and the first cut of this one was

@@ -203,12 +203,18 @@ export function branchTip(ref, { cwd = REPO_ROOT } = {}) {
 export const COMMISSION_RECORD_FILE = resolve(REPO_ROOT, COMMISSION_RECORD_PATH)
 
 /** The recorded overrides and parks. A missing file is an EMPTY record, not a
- *  torn one — nothing recorded yet is the ordinary state. */
+ *  torn one — nothing recorded yet is the ordinary state.
+ *
+ *  A file that EXISTS and cannot be read is torn, though, and saying otherwise
+ *  is how a recorded override silently stops excusing its point (Sol, review of
+ *  3078d166): the two states looked identical, so a permissions fault or a
+ *  half-written file produced a refusal instead of the fail-open the rest of the
+ *  chain takes. `torn` is what the guard fails open on. */
 export function readCommissionRecord(path = COMMISSION_RECORD_FILE) {
   try {
     return parseCommissionRecord(readFileSync(path, 'utf8'))
-  } catch {
-    return parseCommissionRecord('')
+  } catch (e) {
+    return e && e.code === 'ENOENT' ? parseCommissionRecord('') : { overrides: {}, parked: {}, torn: true }
   }
 }
 
