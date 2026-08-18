@@ -8762,6 +8762,13 @@ to land than a mechanism that needs a review.
     direction: an empty `authoredBy` cannot be told apart from a hand-typed empty one, and the
     hairline band between the under-estimated rendered floor and the real rendered size keeps
     blocking where it could in principle waive.
+  - THE REVIEW LOOP CONVERGES ONLY ON A CLEAN PASS (measured on point 721, 18.08.2026): every fix
+    commit ADDS a pass to the range plan, so working off a review debt GREW it from 13 to 21 passes
+    while eight passes ran — every finding real, three blockers, so the reviewer was right, but a
+    commit whose whole content ANSWERS a recorded pass still opens a new contribution instead of
+    joining the pass that demanded it. Decide and build the cheaper shape: an answer commit joins
+    its demanding pass's contribution (reviewed in the confirming re-round anyway), or the cost is
+    accepted and stated here as intended.
   VERIFIABLE: Vitest for the first two — a binary or a submodule pointer yields an absent-by-design
   entry naming the reason, never silence and never a decode path, and the deleted machinery has no
   caller left; and the material suite holds the pass-warning and ledger-pointer rulings. Each tail
@@ -8785,4 +8792,35 @@ to land than a mechanism that needs a review.
   for it; 714 is ticked with its round count stated and every surviving finding traceable to 717 or
   to a numbered point.
   Criticality: medium — a work-order ruling; no player-visible behaviour.
+  Bundle: unbundled (review tooling).
+
+- [ ] 722. The mechanism gate's HISTORICAL backlog on main is worked off with the rebuilt planner
+  (measured 18.08.2026 after point 721 landed: 34 outstanding passes, ~3.4M characters for the
+  range 762de1c..main). Point 721 made the debt workable — every pass now has an eligible reviewer
+  by construction and a recorded pass advances the per-contribution baseline — but the reading
+  itself is multi-session work nobody has run, and the moment 721's planner covered the range, the
+  point-714 gap clause stopped degrading the block: the gate hard-blocked every turn end again for
+  a debt no single session can clear. To keep the batch able to END its sessions, the gate's LOCAL
+  baseline on main was advanced to the then-HEAD on 18.08.2026 under point 721's rule 5
+  ("or the range is explicitly re-baselined with a written justification naming every file that
+  re-baselining leaves unread") — the justification and the full unread-file list live in
+  `.claude/mechanism-review-baseline.json` beside the baseline it moved, and THIS point is that
+  justification's tracked half. FINAL STATE:
+  - Every file the re-baseline left unread is read in authorship-cut passes against the range
+    762de1c..b8baae0 and recorded (`node scripts/review-sol.mjs --sha b8baae0 --since 762de1c` plans
+    them; the reviewer per pass is the planner's, cross-vendor by construction), or is explicitly
+    retired here with a reason (a doc file whose content is not a mechanism — CLAUDE.md, TASKS.md,
+    docs/tasks-archive.md and the analysis docs are candidates — may be retired as non-mechanism
+    material once the material assembly can exclude it, see point 717's tail).
+  - The pass records land in the tracked ledger like any others, so the per-contribution baseline
+    carries the progress and a later range never re-demands what a pass cleared.
+  - Point 700's clean re-review is the FIRST record this work produces where it is still owed when
+    this point starts (721's rule 4 named it; if a session already cleared it, that is recorded and
+    this item is done).
+  VERIFIABLE: `node scripts/mechanism-review-guard.mjs --status` on main reports zero outstanding
+  passes for 762de1c..b8baae0 contributions, or names only contributions this point's spec retired
+  with their reasons; the criticality gate holds no open finding for point 700.
+  Criticality: high — it is the four-eyes principle's actual coverage of five weeks of guard work;
+  the re-baseline that unblocked the batch is honest only while this reading is owed and scheduled.
+  Author lane: Sol.
   Bundle: unbundled (review tooling).
