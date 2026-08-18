@@ -1296,10 +1296,14 @@ describe('the flag surface itself', () => {
   })
 
   it('knows the pass flags, and lands their values where the record reads them', () => {
-    const p = parseArgs(['--record', 'abc1234', '--pass', '1/3', '--pass-files', 'a.mjs,b.mjs'])
+    const p = parseArgs([
+      '--record', 'abc1234', '--pass', '1/3', '--pass-files', 'a.mjs,b.mjs',
+      '--pass-commits', 'aaaaaaa,bbbbbbb',
+    ])
     expect(p.ok).toBe(true)
     expect(p.values.pass).toBe('1/3')
     expect(p.values.passFiles).toBe('a.mjs,b.mjs')
+    expect(p.values.passCommits).toBe('aaaaaaa,bbbbbbb')
   })
 })
 
@@ -1344,6 +1348,20 @@ describe('validatePass', () => {
     const v = validatePass({ pass: '2/4', passFiles: 'scripts/a.mjs,scripts/b.mjs' })
     expect(v.ok).toBe(true)
     expect(v.pass).toEqual({ index: 2, total: 4, files: ['scripts/a.mjs', 'scripts/b.mjs'] })
+  })
+
+  it('records the commit boundaries of an authorship-cut pass', () => {
+    const a = 'a'.repeat(40)
+    const b = 'b'.repeat(40)
+    const v = validatePass({ pass: '2/4', passFiles: 'shared.mjs', passCommits: `${a},${b}` })
+    expect(v.ok).toBe(true)
+    expect(v.pass).toEqual({ index: 2, total: 4, files: ['shared.mjs'], commits: [a, b] })
+  })
+
+  it('refuses malformed, duplicate or pass-less contribution boundaries', () => {
+    expect(validatePass({ pass: '1/2', passFiles: 'a', passCommits: 'HEAD' }).ok).toBe(false)
+    expect(validatePass({ pass: '1/2', passFiles: 'a', passCommits: 'aaaaaaa,aaaaaaa' }).ok).toBe(false)
+    expect(validatePass({ passCommits: 'aaaaaaa' }).ok).toBe(false)
   })
 
   it('is silent on an ordinary record, which names no pass at all', () => {

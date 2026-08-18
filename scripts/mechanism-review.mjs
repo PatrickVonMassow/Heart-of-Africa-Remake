@@ -154,6 +154,7 @@ export function buildRecord({
   listBPath = '',
   pass = '',
   passFiles = '',
+  passCommits = '',
   carriedFrom = '',
   now = Date.now(),
   resolve = resolveCommit,
@@ -178,6 +179,7 @@ export function buildRecord({
         accounting,
         pass,
         passFiles,
+        passCommits,
       }).errors,
     }
   }
@@ -200,6 +202,7 @@ export function buildRecord({
       accounting,
       pass,
       passFiles,
+      passCommits,
     }).errors.filter((e) => !/--record\b/.test(e))
     return {
       ok: false,
@@ -209,6 +212,14 @@ export function buildRecord({
   // A CARRY IS ITS OWN FLOW (delta rounds, 18.08.2026): everything but the
   // sha, the pass scope and the point comes verified from the source reading.
   if (String(carriedFrom ?? '').trim()) {
+    if (String(passCommits ?? '').trim()) {
+      return {
+        ok: false,
+        errors: [
+          '--pass-commits cannot be carried: contribution boundaries are tied to the authorship plan that was actually reviewed',
+        ],
+      }
+    }
     return buildCarriedRecord({
       sha: ref,
       carriedFrom,
@@ -262,6 +273,7 @@ export function buildRecord({
     accounting: receipt,
     pass,
     passFiles,
+    passCommits,
   })
   const errors = [...check.errors]
   // Optional, but never sloppy: a mistyped point number would record a review
@@ -272,7 +284,7 @@ export function buildRecord({
     errors.push('--point <N>: the work-order point this review settles, as a plain number')
   }
   if (errors.length) return { ok: false, errors }
-  const passField = validatePass({ pass, passFiles }).pass
+  const passField = validatePass({ pass, passFiles, passCommits }).pass
   return {
     ok: true,
     record: {
@@ -566,6 +578,8 @@ export const usage = () =>
   `       its own covers the files it names and nothing else. review-sol.mjs prints them.\n` +
   `       A path holding a comma, a quote or edge whitespace is written C-QUOTED, exactly\n` +
   `       as git prints it; nothing is ever trimmed into a different path.\n` +
+  `       An authorship-cut pass adds --pass-commits "<sha,sha>" so a mixed-vendor\n` +
+  `       file is credited only at the commit boundaries this reviewer actually read.\n` +
   `--carried-from <sha> carries an EARLIER round's pass to this head where every file it\n` +
   `       read is byte-identical there: the recorder verifies the blob identity and the\n` +
   `       source reading, and COPIES its verdict/model/evidence — do not pass them. The\n` +
@@ -626,8 +640,9 @@ if (isMainModule(import.meta.url)) {
           index >= 1 &&
           index <= total &&
           Array.isArray(p?.files)
+        const commits = Array.isArray(p?.commits) ? p.commits.map((sha) => oneLine(sha)).join(', ') : ''
         return shaped
-          ? `\n      pass ${index}/${total} over: ${files}`
+          ? `\n      pass ${index}/${total} over: ${files}${commits ? `\n      contribution commits: ${commits}` : ''}`
           : `\n      pass (MALFORMED claim ${oneLine(JSON.stringify({ index: p?.index, total: p?.total, files: Array.isArray(p?.files) ? undefined : p?.files })).slice(0, 100)}) over: ${files}`
       }
       for (const r of records) {

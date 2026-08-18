@@ -27,7 +27,10 @@ const run = (...args) =>
 
 describe('the flag surface', () => {
   it('knows every flag its usage documents', () => {
-    const flags = ['--record', '--model', '--verdict', '--evidence', '--point', '--mode', '--framing', '--list']
+    const flags = [
+      '--record', '--model', '--verdict', '--evidence', '--point', '--mode', '--framing',
+      '--pass', '--pass-files', '--pass-commits', '--list',
+    ]
     for (const flag of flags) {
       expect(KNOWN_FLAGS.has(flag), `${flag} must be accepted`).toBe(true)
     }
@@ -193,6 +196,36 @@ describe('the mode round-trips into the ledger', () => {
         expect(back[0].verdict).toBe('merge')
       })
     }
+  })
+
+  it('round-trips an authorship pass contribution scope', () => {
+    const a = 'a'.repeat(40)
+    const b = 'b'.repeat(40)
+    const built = build({
+      mode: 'review',
+      pass: '1/2',
+      passFiles: 'scripts/shared-guard.mjs',
+      passCommits: `${a},${b}`,
+    })
+    expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
+    expect(built.record.pass).toEqual({
+      index: 1,
+      total: 2,
+      files: ['scripts/shared-guard.mjs'],
+      commits: [a, b],
+    })
+  })
+
+  it('refuses to carry an authorship scope into a different plan', () => {
+    const built = build({
+      mode: '',
+      carriedFrom: 'a'.repeat(40),
+      pass: '1/2',
+      passFiles: 'scripts/shared-guard.mjs',
+      passCommits: 'b'.repeat(40),
+    })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join('\n')).toContain('cannot be carried')
   })
 
   it('carries the same-model fallback framing through with a blind-parallel mode', () => {

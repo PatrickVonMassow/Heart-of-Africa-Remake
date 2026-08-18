@@ -524,6 +524,11 @@ export const FLAG_SPEC = Object.freeze({
   // the file set, and each pass records what it actually read (point 714).
   '--pass': true,
   '--pass-files': true,
+  // Authorship-cut passes also name the commits whose contributions they read.
+  // A mixed-vendor path may occur in two passes, one per authoring commit; the
+  // commit list makes those two readings distinct and lets the gate advance the
+  // baseline for exactly the contribution that was seen.
+  '--pass-commits': true,
   // A pass of an EARLIER round carries forward to a new head where every file
   // it read is byte-identical there (delta-scoped rounds, user decision
   // 18.08.2026): the recorder verifies the blob identity and the source
@@ -553,6 +558,7 @@ const VALUE_KEY = Object.freeze({
   '--list-b': 'listBPath',
   '--pass': 'pass',
   '--pass-files': 'passFiles',
+  '--pass-commits': 'passCommits',
   '--carried-from': 'carriedFrom',
 })
 
@@ -854,7 +860,7 @@ export function validateMode({ mode, framing } = {}) {
  *
  * Returns { ok, errors, pass } with `pass` the parsed record field, or null.
  */
-export function validatePass({ pass, passFiles } = {}) {
+export function validatePass({ pass, passFiles, passCommits } = {}) {
   const spec = String(pass ?? '').trim()
   // The list is parsed RAW (fourth cross-vendor round): trimming it here strips
   // the FIRST token's leading and the LAST token's trailing whitespace before
@@ -863,7 +869,9 @@ export function validatePass({ pass, passFiles } = {}) {
   // the trimmed view; the bytes go to the parser untouched, which fails loud.
   const listed = String(passFiles ?? '')
   const hasList = listed.trim() !== ''
-  if (!spec && !hasList) return { ok: true, errors: [], pass: null }
+  const commitList = String(passCommits ?? '').trim()
+  const hasCommits = commitList !== ''
+  if (!spec && !hasList && !hasCommits) return { ok: true, errors: [], pass: null }
   const errors = []
   if (!spec) {
     errors.push('--pass-files without --pass <k>/<n>: a file list belongs to a pass, and this record names none')
@@ -873,6 +881,9 @@ export function validatePass({ pass, passFiles } = {}) {
       '--pass <k>/<n> without --pass-files: a pass verdict covers the files it actually read, and a ' +
         'record that does not name them claims a coverage nobody can check',
     )
+  }
+  if (!spec && hasCommits) {
+    errors.push('--pass-commits without --pass <k>/<n>: commit scope belongs to a pass, and this record names none')
   }
   const parsed = spec ? parsePassSpec(spec) : { ok: false, errors: [] }
   errors.push(...parsed.errors)
@@ -885,9 +896,22 @@ export function validatePass({ pass, passFiles } = {}) {
   if (hasList && list.ok && !list.files.length) {
     errors.push('--pass-files "<a,b,c>": the paths this pass reviewed, comma-separated')
   }
+  const commits = commitList ? commitList.split(',') : []
+  if (hasCommits && commits.some((sha) => !/^[0-9a-f]{7,40}$/i.test(sha))) {
+    errors.push('--pass-commits "<sha,sha>": every contribution boundary must be a 7–40 character commit sha')
+  }
+  if (hasCommits && uniqStrings(commits).length !== commits.length) {
+    errors.push('--pass-commits: each commit is named once; duplicate boundaries do not add coverage')
+  }
   if (errors.length) return { ok: false, errors, pass: null }
-  return { ok: true, errors: [], pass: { index: parsed.index, total: parsed.total, files: list.files } }
+  return {
+    ok: true,
+    errors: [],
+    pass: { index: parsed.index, total: parsed.total, files: list.files, ...(hasCommits ? { commits } : {}) },
+  }
 }
+
+const uniqStrings = (values) => [...new Set((values ?? []).map(String))]
 
 /**
  * Is this a well-formed review record, and may it be WRITTEN?
@@ -910,10 +934,11 @@ export function validateRecord({
   authors,
   pass,
   passFiles,
+  passCommits,
 } = {}) {
   const errors = []
   errors.push(...validateMode({ mode, framing }).errors)
-  errors.push(...validatePass({ pass, passFiles }).errors)
+  errors.push(...validatePass({ pass, passFiles, passCommits }).errors)
   errors.push(...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors }).errors)
   if (!/^[0-9a-f]{7,40}$/i.test(String(sha ?? '').trim())) {
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
