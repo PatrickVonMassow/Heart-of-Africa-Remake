@@ -94,7 +94,16 @@ put it is the mistake this line exists to stop.
      not END while an open VDZK card stands undecided AGAINST that message. The channel
      does not matter and needs no integration: a typed prompt and a chat message the
      watcher spawned a responder for both arrive as the last USER entry of the
-     transcript the Stop hook already reads. Per card
+     transcript the Stop hook already reads. ONLY THOSE TWO ARM THE REVIEW, and the
+     rule is a POSITIVE recognition of what the user actually sent — never a growing
+     exclusion list of machine-written texts. The transcript carries several entries
+     of type `user` that no human wrote: tool results, the OS launcher's injected
+     resume prompt, and the Stop/UserPromptSubmit hooks' feedback. Measured
+     18.08.2026, both from the same session: excluding the launcher prompt by its
+     marker simply promoted the next machine text ("Stop hook feedback: GitHub CI is
+     RED …") to being the message every open card must be discharged against. A duty
+     armed by a text the user never sent can only ever be rubber-stamped, which is
+     what item 4 forbids. Per card
      the session either REMOVES it (`node scripts/board.mjs vdzk-remove "<fragment>"`)
      or records that this message did not answer it (`node scripts/board.mjs vdzk-keep
      "<fragment>" [...]`, several fragments in one call, written to the guard state and
