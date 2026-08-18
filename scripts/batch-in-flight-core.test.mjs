@@ -2932,7 +2932,10 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
         toolName: 'Agent',
         prompt: 'Work in /workspace/hoa/.claude/worktrees/agent-x, branch feat/697-goat-foot is checked out.',
       }),
-    ).toEqual({ point: 697, points: [697], refs: [], how: 'agent' })
+      // THE PROSE'S OWN BRANCH NAME IS CARRIED (Sol, review of dd7fd78c): without
+      // it a spawn naming a SECOND branch for a point in flight kept the
+      // point-wide exemption, which is the escape the shell path had just lost.
+    ).toEqual({ point: 697, points: [697], refs: ['feat/697-goat-foot'], refsLoose: true, how: 'agent' })
   })
 
   it('reads a point NAMED in prose when no branch is spelled out, in either language', () => {
@@ -2940,12 +2943,14 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
       point: 697,
       points: [697],
       refs: [],
+      refsLoose: true,
       how: 'agent',
     })
     expect(commissionTarget({ toolName: 'Agent', description: 'Punkt 705 umsetzen' })).toEqual({
       point: 705,
       points: [705],
       refs: [],
+      refsLoose: true,
       how: 'agent',
     })
   })
@@ -2957,7 +2962,7 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
   it('judges EVERY point one call opens — two branches in one line are two commissionings', () => {
     expect(
       commissionTarget({ toolName: 'Bash', command: 'git checkout -b feat/697-a && git branch feat/705-b' }),
-    ).toEqual({ point: 697, points: [697, 705], refs: ['feat/697-a', 'feat/705-b'], how: 'branch' })
+    ).toEqual({ point: 697, points: [697, 705], refs: ['feat/697-a', 'feat/705-b'], refsLoose: false, how: 'branch' })
     // …in every separator a shell offers, and with a worktree beside a cut.
     expect(
       commissionTarget({ toolName: 'Bash', command: 'git branch feat/705-b; git switch -c feat/697-a' }).points,
@@ -2989,7 +2994,7 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
   it('prefers the BRANCH over prose when both appear — the branch is the binding name', () => {
     expect(
       commissionTarget({ toolName: 'Agent', prompt: 'branch feat/711-x, which point 400 first asked for' }),
-    ).toEqual({ point: 711, points: [711], refs: [], how: 'agent' })
+    ).toEqual({ point: 711, points: [711], refs: ['feat/711-x'], refsLoose: true, how: 'agent' })
   })
 
   it('recognises a branch being CUT, in every spelling, slug or none', () => {
@@ -2997,18 +3002,21 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
       point: 697,
       points: [697],
       refs: ['feat/697-goat'],
+      refsLoose: false,
       how: 'branch',
     })
     expect(commissionTarget({ toolName: 'Bash', command: 'git switch -c feat/697' })).toEqual({
       point: 697,
       points: [697],
       refs: ['feat/697'],
+      refsLoose: false,
       how: 'branch',
     })
     expect(commissionTarget({ toolName: 'Bash', command: 'git branch feat/697-goat main' })).toEqual({
       point: 697,
       points: [697],
       refs: ['feat/697-goat'],
+      refsLoose: false,
       how: 'branch',
     })
   })
@@ -3040,7 +3048,7 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
   it('recognises a worktree being created on one', () => {
     expect(
       commissionTarget({ toolName: 'Bash', command: 'git worktree add -b feat/697-goat .claude/worktrees/agent-y' }),
-    ).toEqual({ point: 697, points: [697], refs: ['feat/697-goat'], how: 'worktree' })
+    ).toEqual({ point: 697, points: [697], refs: ['feat/697-goat'], refsLoose: false, how: 'worktree' })
     // A tree created ON an existing branch is the same act, named plainly.
     expect(
       commissionTarget({ toolName: 'Bash', command: 'git worktree add .claude/worktrees/agent-y feat/697-goat' }).points,
@@ -3052,13 +3060,14 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
       point: 697,
       points: [697],
       refs: [],
+      refsLoose: false,
       how: 'author',
     })
   })
 
   it('opens NOTHING on the read-only authoring legs — routing and dry-run', () => {
     expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-sol.mjs --routing --point 697' })).toEqual(
-      { point: null, points: [], refs: [], how: 'none' },
+      { point: null, points: [], refs: [], refsLoose: false, how: 'none' },
     )
     expect(
       commissionTarget({ toolName: 'Bash', command: 'node scripts/author-sol.mjs --point 697 --dry-run' }).point,
@@ -3092,6 +3101,7 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
       point: 697,
       points: [697],
       refs: ['feat/697-x'],
+      refsLoose: false,
       how: 'branch',
     })
   })
@@ -3101,15 +3111,17 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
       point: null,
       points: [],
       refs: [],
+      refsLoose: false,
       how: 'none',
     })
     expect(commissionTarget({ toolName: 'Read', filePath: 'TASKS.md' })).toEqual({
       point: null,
       points: [],
       refs: [],
+      refsLoose: false,
       how: 'none',
     })
-    expect(commissionTarget()).toEqual({ point: null, points: [], refs: [], how: 'none' })
+    expect(commissionTarget()).toEqual({ point: null, points: [], refs: [], refsLoose: false, how: 'none' })
   })
 
   it('never throws on hostile input', () => {

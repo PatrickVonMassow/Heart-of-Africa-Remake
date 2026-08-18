@@ -67,20 +67,46 @@ export const INTENTIONALLY_DORMANT = {
 }
 
 /**
- * IS THIS ENFORCER WIRED AT ALL? PURE, over the settings text.
+ * IS THIS ENFORCER WIRED, AND ON THE EVENT AND TOOLS IT NEEDS? PURE, over the
+ * settings TEXT.
  *
  * The blunt question the map above answers from MEMORY, asked of the FACT
- * instead: a guard is wired when some hook command names its script. It is
- * deliberately coarse — the anchoring audit judges hook commands row by row, and
- * this one only wants to know whether the file is referenced at all, which is
- * what a guard's own `--status` must be able to say about itself. A guard that
- * reports itself armed while it is dormant is the failure this module exists
- * for, and it is worse coming from the guard's own mouth.
+ * instead, and asked of the STRUCTURE rather than of the characters: the first
+ * cut scanned the whole file for the basename, so a malformed settings file, a
+ * name inside another guard's arguments, or the guard wired on the WRONG event
+ * all read as armed (Sol, review of dd7fd78c). A guard that reports itself armed
+ * while it refuses nothing is the failure this module exists for, and it is
+ * worse coming from the guard's own mouth — so anything that does not parse, or
+ * parses without the entry, is NOT wired.
+ *
+ * `event` narrows to one hook event (`PreToolUse`, `Stop`, …); `tools` demands
+ * that the entry's matcher name every one of them, because a hook that never
+ * sees the call that opens work refuses nothing either.
  */
-export function isEnforcerWired(settingsText, name) {
+export function isEnforcerWired(settingsText, name, { event = null, tools = [] } = {}) {
   const wanted = String(name ?? '').trim()
   if (!wanted) return false
-  return scriptRefsInCommand(settingsText).some((ref) => ref.split(/[/\\]/).pop() === wanted)
+  let parsed
+  try {
+    parsed = JSON.parse(String(settingsText ?? ''))
+  } catch {
+    return false
+  }
+  const hooks = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed.hooks : null
+  if (!hooks || typeof hooks !== 'object' || Array.isArray(hooks)) return false
+  const events = event ? [event] : Object.keys(hooks)
+  const needed = (Array.isArray(tools) ? tools : [tools]).map((t) => String(t)).filter(Boolean)
+  for (const ev of events) {
+    for (const entry of Array.isArray(hooks[ev]) ? hooks[ev] : []) {
+      const names = (Array.isArray(entry?.hooks) ? entry.hooks : []).some((h) =>
+        scriptRefsInCommand(h?.command).some((ref) => ref.split(/[/\\]/).pop() === wanted),
+      )
+      if (!names) continue
+      const matcher = String(entry?.matcher ?? '')
+      if (needed.every((t) => matcher.includes(t))) return true
+    }
+  }
+  return false
 }
 
 /**

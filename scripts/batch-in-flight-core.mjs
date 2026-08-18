@@ -1129,6 +1129,30 @@ export function pointOfBranch(ref) {
  *  slugless branch would open work unseen. */
 const featPointsIn = (text) => [...String(text).matchAll(/feat\/(\d+)/gi)].map((m) => Number(m[1]))
 
+/** …and the whole branch NAME each of them spells, for the refs a prose target
+ *  carries. Trailing punctuation is not part of a branch name. */
+const featRefsIn = (text) =>
+  [...String(text).matchAll(/\bfeat\/\d+[A-Za-z0-9._\-/]*/gi)].map((m) => m[0].replace(/[.\-/]+$/, ''))
+
+/**
+ * DOES THIS STANDING BRANCH ANSWER TO THE NAME A CALL GAVE? PURE.
+ *
+ * A name from a cut FLAG is exact: `git branch feat/687` past a standing
+ * `feat/687-bank-game` creates a second branch, and calling that a match is the
+ * bypass itself. A name from PROSE is a description, and a prompt saying
+ * "point 687, branch feat/687" means the branch that exists — so there, and only
+ * there, a name the standing branch EXTENDS at a segment boundary counts.
+ * `feat/687-b` still does not answer for `feat/687-bank-game`: the boundary is a
+ * separator, not any character.
+ */
+export function branchAnswersTo(named, standing, { loose = false } = {}) {
+  const a = normRef(named)
+  const b = normRef(standing)
+  if (!a || !b) return false
+  if (a === b) return true
+  return loose === true && (b.startsWith(`${a}-`) || b.startsWith(`${a}/`))
+}
+
 /** EVERY spelling that CUTS a branch, each capturing the name it creates. The
  *  name is read off the FLAG rather than off the whole command, so
  *  `git checkout -b feat/712-x origin/feat/705-y` opens 712 and not the branch
@@ -1143,11 +1167,59 @@ const CUT_PATTERNS = [
   /\bcheckout\b.*?\s-[bB](?:\s+|=)(\S+)/,
   // switch -c / -C / --create / --force-create <name>
   /\bswitch\b.*?\s(?:-[cC]|--create|--force-create)(?:\s+|=)(\S+)/,
-  // git branch <name> — the plain create; -d/-D/-r/-a and friends fall out here
-  /\bgit\s+branch\s+(?!-)(\S+)/i,
-  // git branch -c/-C/--copy | -m/-M/--move [<old>] <new> — the NEW name is LAST
-  /\bgit\s+branch\s+(?:-[cCmM]|--copy|--move)\s+(?:\S+\s+)?(\S+)/,
+  // checkout/switch --orphan <name> — an empty history is still a new branch
+  /\b(?:checkout|switch)\b.*?\s--orphan(?:\s+|=)(\S+)/,
 ]
+
+/** Git's GLOBAL options, which may stand between `git` and its subcommand.
+ *  `git -C . branch feat/697-x` cuts a branch, and an expression anchored on
+ *  `git\s+branch` read none of it (Sol, review of dd7fd78c). */
+const GIT_GLOBAL =
+  String.raw`(?:-[cC]\s+\S+|--git-dir(?:=\S+|\s+\S+)|--work-tree(?:=\S+|\s+\S+)|--namespace(?:=\S+|\s+\S+)` +
+  String.raw`|--exec-path(?:=\S+)?|--config-env\s+\S+|--no-pager|--paginate|-p|-P|--bare|--literal-pathspecs` +
+  String.raw`|--no-replace-objects|--no-optional-locks|--noglob-pathspecs|--glob-pathspecs|--icase-pathspecs)`
+
+const GIT_BRANCH_RE = new RegExp(String.raw`\bgit(?:\s+${GIT_GLOBAL})*\s+branch\b(.*)$`, 'i')
+
+/** `git branch` modes that LIST, DELETE or RECONFIGURE — none of them creates. */
+const BRANCH_NOT_CREATING =
+  /^(?:-[dDlarvtuh]|--delete|--list|--all|--remotes|--verbose|--contains|--no-contains|--merged|--no-merged|--points-at|--sort|--format|--column|--no-column|--show-current|--edit-description|--set-upstream|--set-upstream-to|--unset-upstream|--help|--color|--no-color|--abbrev|--no-abbrev|--ignore-case|--omit-empty)(?:=|$)/
+
+/** …and the ones that CREATE by copying or renaming, where the new name is LAST. */
+const BRANCH_COPY_OR_MOVE = /^(?:-[cCmM]|--copy|--move)$/
+
+/** Flags of `git branch` whose VALUE is the next token, so it is not a name. */
+const BRANCH_VALUE_FLAGS = new Set(['--contains', '--no-contains', '--merged', '--no-merged', '--points-at', '--sort',
+  '--format', '--set-upstream-to', '-u', '--abbrev', '--color', '--recurse-submodules'])
+
+/**
+ * The branch a `git branch …` segment CREATES, or [] where it creates none.
+ * READ AS TOKENS, not as one expression: `git branch --track feat/697-x main`
+ * creates a branch behind a flag no `(?!-)` could see past, and enumerating the
+ * flags that may PRECEDE a name is how a spelling escapes. So the option tokens
+ * are skipped and the first plain name is taken — the last one for a copy or a
+ * rename, whose earlier name is the SOURCE.
+ */
+function gitBranchCreates(seg) {
+  const m = GIT_BRANCH_RE.exec(seg)
+  if (!m) return []
+  const names = []
+  let copyOrMove = false
+  const tokens = m[1].trim().split(/\s+/).filter(Boolean)
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i]
+    if (t === '--') continue
+    if (t.startsWith('-')) {
+      if (BRANCH_NOT_CREATING.test(t)) return []
+      if (BRANCH_COPY_OR_MOVE.test(t)) copyOrMove = true
+      if (BRANCH_VALUE_FLAGS.has(t)) i += 1
+      continue
+    }
+    names.push(t)
+  }
+  if (!names.length) return []
+  return [copyOrMove ? names[names.length - 1] : names[0]]
+}
 
 /** ONE shell segment, judged on its own. Returns { points, refs, how }, where
  *  `refs` are the branch names the segment CREATES — read off a cut flag, so
@@ -1164,13 +1236,16 @@ function segmentTarget(seg) {
   if (/\bworktree\s+add\b/.test(seg)) {
     // `-b`/`-B` names the branch a new tree cuts; without it the tree is created
     // ON a branch that is named plainly, and creating the tree is still the act.
+    // `--orphan` is deliberately NOT read for a name: `git worktree add --orphan
+    // <path>` derives the branch from the path, so the token after it may be
+    // either — the plain `feat/<N>` scan below is the honest reading there.
     const m = /\bworktree\s+add\b.*?\s-[bB](?:\s+|=)(\S+)/.exec(seg)
     const created = uniq(m ? [pointOfBranch(m[1])] : featPointsIn(seg))
     if (!created.length) return none
     return { points: created, refs: m ? [normRef(m[1])] : [], how: 'worktree' }
   }
-  const names = CUT_PATTERNS.map((re) => re.exec(seg))
-    .map((m) => (m ? normRef(m[1]) : ''))
+  const names = [...CUT_PATTERNS.map((re) => re.exec(seg)).map((m) => (m ? m[1] : '')), ...gitBranchCreates(seg)]
+    .map((r) => normRef(r))
     .filter((r) => pointOfBranch(r) !== null)
   const cut = uniq(names.map(pointOfBranch))
   return cut.length ? { points: cut, refs: [...new Set(names)], how: 'branch' } : none
@@ -1212,14 +1287,22 @@ function segmentTarget(seg) {
  * those would deny the very question a session asks BEFORE it commissions.
  */
 export function commissionTarget({ toolName = '', command = '', prompt = '', description = '' } = {}) {
-  const none = { point: null, points: [], refs: [], how: 'none' }
+  const none = { point: null, points: [], refs: [], refsLoose: false, how: 'none' }
   const uniq = (nums) => [...new Set(nums.filter((n) => Number.isInteger(n) && n > 0))]
-  const found = (points, how, refs = []) => (points.length ? { point: points[0], points, refs, how } : none)
+  // `refsLoose` says whether the names were CREATED by a flag (exact) or merely
+  // SPOKEN in a prompt (a description, which the standing branch may extend).
+  const found = (points, how, refs = []) =>
+    points.length ? { point: points[0], points, refs, refsLoose: how === 'agent', how } : none
   const tool = String(toolName ?? '')
   if (tool === 'Agent' || tool === 'Task') {
     const text = `${prompt ?? ''}\n${description ?? ''}`
     const byBranch = uniq(featPointsIn(text))
-    if (byBranch.length) return found(byBranch, 'agent')
+    // THE PROSE NAMES ITS BRANCHES TOO (Sol, review of dd7fd78c). Dropping them
+    // left the spawn path on the point-wide exemption, so "point 687 on branch
+    // feat/687-b" walked past a standing feat/687-a at a full pool — the very
+    // escape the ref narrowing had just closed on the shell path. They are
+    // matched LOOSELY, because prose describes rather than creates.
+    if (byBranch.length) return found(byBranch, 'agent', [...new Set(featRefsIn(text).map(normRef).filter(Boolean))])
     const named = uniq([...text.matchAll(/\b(?:point|punkt)\s+(\d+)\b/gi)].map((m) => Number(m[1])))
     return named.length === 1 ? found(named, 'agent') : none
   }
@@ -1402,6 +1485,7 @@ export function openBranchSlots({
   parked = {},
   exclude = null,
   excludeRefs = null,
+  looseRefs = false,
   cap = POOL_CAP,
   now = Date.now(),
 } = {}) {
@@ -1413,11 +1497,11 @@ export function openBranchSlots({
       tip: normaliseTip(e?.tip),
     })
   }
-  const skipRefs = new Set(
-    (Array.isArray(excludeRefs) ? excludeRefs : excludeRefs ? [excludeRefs] : []).map(normRef).filter(Boolean),
-  )
+  const skipRefs = (Array.isArray(excludeRefs) ? excludeRefs : excludeRefs ? [excludeRefs] : [])
+    .map(normRef)
+    .filter(Boolean)
   // A point whose OWN ref the call named is exempt for that ref alone.
-  const namedPoints = new Set([...skipRefs].map(pointOfBranch).filter((n) => n !== null))
+  const namedPoints = new Set(skipRefs.map(pointOfBranch).filter((n) => n !== null))
   const skip = new Set(
     (Array.isArray(exclude) ? exclude : [exclude])
       .map(Number)
@@ -1446,7 +1530,7 @@ export function openBranchSlots({
       seen.set(ref, true)
       continue
     }
-    if (skipRefs.has(ref) || (item.point !== null && skip.has(item.point))) {
+    if (skipRefs.some((r) => branchAnswersTo(r, ref, { loose: looseRefs })) || (item.point !== null && skip.has(item.point))) {
       seen.set(ref, true)
       continue
     }
@@ -1500,6 +1584,7 @@ export function branchSlotDecision({
   point = null,
   points = null,
   refs = null,
+  looseRefs = false,
   cap = POOL_CAP,
   readable = true,
   now = Date.now(),
@@ -1507,10 +1592,27 @@ export function branchSlotDecision({
   const targets = (Array.isArray(points) && points.length ? points : [point])
     .map(Number)
     .filter((n) => Number.isInteger(n) && n > 0)
-  const slots = openBranchSlots({ branches, parked, exclude: targets, excludeRefs: refs, cap, now })
-  const out = { ...slots, point: targets[0] ?? null, points: targets }
+  const named = (Array.isArray(refs) ? refs : refs ? [refs] : []).map(normRef).filter(Boolean)
+  const slots = openBranchSlots({ branches, parked, exclude: targets, excludeRefs: named, looseRefs, cap, now })
+  // HOW MANY BRANCHES WOULD THIS CALL ADD? The count alone answered "two of
+  // three taken" to a line cutting TWO more, and left four standing under a cap
+  // of three (Sol, review of dd7fd78c). A refusal has to be about the state the
+  // call would LEAVE, not the state it starts from.
+  //
+  // A ref the call names that no branch answers to is one new branch. A target
+  // point the call names NO ref for is one new branch unless a branch for it
+  // already stands — that is the spawn shape, where the name cannot be known.
+  const standing = (Array.isArray(branches) ? branches : []).map((b) => normRef(b?.ref)).filter(Boolean)
+  const inFlight = new Set(standing.map(pointOfBranch).filter((n) => n !== null))
+  const newRefs = named.filter((r) => !standing.some((s) => branchAnswersTo(r, s, { loose: looseRefs })))
+  const unnamed = targets.filter((p) => !named.some((r) => pointOfBranch(r) === p))
+  const adding = newRefs.length + unnamed.filter((p) => !inFlight.has(p)).length
+  const out = { ...slots, point: targets[0] ?? null, points: targets, refs: named, adding }
   if (readable !== true) return { ...out, allowed: true, why: 'branches-unreadable' }
-  if (slots.count < slots.cap) return { ...out, allowed: true, why: 'slots-free' }
+  // A call that opens NO new branch is finishing, whatever the pool holds —
+  // pushing to a branch that stands must never be refused for the slot it is in.
+  if (adding === 0) return { ...out, allowed: true, why: 'nothing-opened' }
+  if (slots.count + adding <= slots.cap) return { ...out, allowed: true, why: 'slots-free' }
   return { ...out, allowed: false, why: 'branches-open' }
 }
 
@@ -1527,6 +1629,7 @@ export function branchSlotRefusal(decision = {}, { limit = 10 } = {}) {
   // One call can open two points, and the refusal names both — a message that
   // named one of them would read as if the other had been allowed.
   const n = named.length > 1 ? `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}` : (named[0] ?? null)
+  const adding = Number.isFinite(decision?.adding) && decision.adding > 0 ? decision.adding : named.length || 1
   const lines = open.slice(0, limit).map((b) => {
     const age = describeBranchAge(Number.isFinite(b?.ageMs) ? b.ageMs : NaN)
     const behind = Number.isFinite(b?.behind)
@@ -1538,7 +1641,7 @@ export function branchSlotRefusal(decision = {}, { limit = 10 } = {}) {
   return (
     `A SLOT IS NOT FREE UNTIL ITS BRANCH IS GONE: ${open.length} open feat/* branch(es) against a pool cap of ` +
     `${cap}${n ? `, so opening point${named.length > 1 ? 's' : ''} ${n} would add ${
-      named.length > 1 ? `${named.length} more` : 'another'
+      adding > 1 ? `${adding} more` : 'another'
     }` : ''}. Oldest first:\n${lines.join('\n')}\n` +
     `TWO WAYS OUT, both explicit: LAND one (${BRANCH_LAND_CMD}), or PARK it with a reason (${BRANCH_PARK_CMD}), ` +
     'which records the decision and drops the branch out of the count until it moves again. Built work that never ' +

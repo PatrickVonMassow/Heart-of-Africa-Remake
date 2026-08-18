@@ -14,8 +14,8 @@
 // matcher carries the spawn tools and the shell, because a point is opened by
 // spawning its agent, by cutting its branch or by creating its worktree:
 //
-//   { "matcher": "Agent|Task|Bash|PowerShell",
-//     "hooks": [{ "type": "command", "command": "node scripts/commission-guard.mjs" }] }
+//   { "matcher": "Agent|Task|Bash|PowerShell", "hooks": [{ "type": "command",
+//     "command": "node \\"$CLAUDE_PROJECT_DIR/scripts/commission-guard.mjs\\"" }] }
 //
 // WHO IT BINDS: the batch owner. A session that does not hold the lock, a
 // worktree-isolated agent (which cuts its OWN branch by design) and a paused
@@ -62,10 +62,18 @@ import { branchTip, openFeatBranches, readCommissionRecord, writeCommissionRecor
 const PAUSE = repoPath('.claude', 'batch-paused')
 const SETTINGS = repoPath('.claude', 'settings.json')
 
-/** The PreToolUse line that arms this guard, named wherever its state is reported. */
+/** The tools whose calls can OPEN a point. A hook that does not see them refuses
+ *  nothing, so the wiring check demands every one of them in the matcher. */
+export const COMMISSION_TOOLS = ['Agent', 'Task', 'Bash', 'PowerShell']
+
+/** The PreToolUse line that arms this guard, named wherever its state is
+ *  reported — ANCHORED on $CLAUDE_PROJECT_DIR, exactly as the real entry is. The
+ *  remedy printed the bare relative form, which resolves against the cwd, i.e.
+ *  against luck (Sol, review of dd7fd78c): a reader following it from anywhere
+ *  but the repo root installs a hook that cannot find the guard. */
 export const COMMISSION_HOOK_LINE =
   '{ "matcher": "Agent|Task|Bash|PowerShell", "hooks": [{ "type": "command", ' +
-  '"command": "node scripts/commission-guard.mjs" }] }'
+  '"command": "node \\"$CLAUDE_PROJECT_DIR/scripts/commission-guard.mjs\\"" }] }'
 
 /**
  * WHAT THIS GUARD IS WORTH RIGHT NOW, from the settings text. PURE.
@@ -73,16 +81,20 @@ export const COMMISSION_HOOK_LINE =
  * A guard that reports a verdict while nothing runs it reads as enforcement and
  * is none — the failure `guard-health-core.mjs` exists for, and worse from the
  * guard's own mouth. So `--status` says which it is, out of the FACT rather than
- * out of a record of an intention.
+ * out of a record of an intention: the settings are PARSED, the entry must sit
+ * under PreToolUse, and its matcher must name every tool that can open a point.
+ * Anything less is reported DORMANT, never armed.
  */
 export function wiringReport(settingsText) {
   if (settingsText === null || settingsText === undefined) {
     return 'WIRING: UNKNOWN — .claude/settings.json could not be read from here, so whether this guard fires is unproven.'
   }
-  return isEnforcerWired(settingsText, 'commission-guard.mjs')
-    ? 'WIRING: ARMED — a PreToolUse hook runs this guard, so a commissioning against the queue is really refused.'
-    : 'WIRING: DORMANT — no hook in .claude/settings.json names this guard, so it REFUSES NOTHING; only the ' +
-        `commands below still work. Arm it with one PreToolUse entry: ${COMMISSION_HOOK_LINE}`
+  return isEnforcerWired(settingsText, 'commission-guard.mjs', { event: 'PreToolUse', tools: COMMISSION_TOOLS })
+    ? 'WIRING: ARMED — a PreToolUse hook runs this guard on every tool that can open a point, so a commissioning ' +
+        'against the queue is really refused.'
+    : 'WIRING: DORMANT — no PreToolUse entry in .claude/settings.json runs this guard on all of ' +
+        `${COMMISSION_TOOLS.join('/')}, so it REFUSES NOTHING; only the commands below still work. Arm it with ` +
+        `one PreToolUse entry: ${COMMISSION_HOOK_LINE}`
 }
 
 /**
@@ -101,6 +113,8 @@ export function gatherCommissionInputs({
   // The branch names the call CREATES, where a flag names them: a second branch
   // for a point already in flight is an OPENING, not a finishing.
   refs = null,
+  // …and whether those names were CREATED by a flag or merely SPOKEN in a prompt.
+  refsLoose = false,
   cwd = REPO_ROOT,
   behind = true,
   // The probes are injectable so the stand-downs are provable in the pure
@@ -132,6 +146,7 @@ export function gatherCommissionInputs({
       point: targets[0] ?? null,
       points: targets,
       refs: (Array.isArray(refs) ? refs : refs ? [refs] : []).map(normaliseBranchRef).filter(Boolean),
+      refsLoose: refsLoose === true,
       open: openPointsOf(tasks),
       gates: parseUserGates(tasks),
       // THE OPEN BRANCH IS THE IN-FLIGHT SIGNAL now that it is what holds a
@@ -176,33 +191,23 @@ export function commissionVerdict(inputs, { now = Date.now() } = {}) {
     }),
   }))
   for (const v of verdicts) v.block = !v.queue.allowed
-  const refs = Array.isArray(inputs.refs) ? inputs.refs : []
+  // WHAT THE CALL WOULD LEAVE STANDING is the pure core's question, not this
+  // file's. `branchSlotDecision` counts the branches the call ADDS — a named ref
+  // no standing branch answers to, or a target point it names no ref for and has
+  // no branch — and answers `nothing-opened` where it adds none, which is what
+  // "this point is being FINISHED, not started" means in branches. The judgment
+  // lived here as a `finishing` flag and knew only the current count, so a line
+  // cutting TWO branches into one free slot passed (Sol, review of dd7fd78c).
   const slots = branchSlotDecision({
     branches: inputs.branches,
     parked: inputs.record?.parked ?? {},
     points: targets,
-    refs,
+    refs: Array.isArray(inputs.refs) ? inputs.refs : [],
+    looseRefs: inputs.refsLoose === true,
     cap: POOL_CAP,
     readable: inputs.readable,
     now,
   })
-  // A point whose branch already stands is being FINISHED, not opened, and the
-  // SLOT rule does not apply to it. The test is the BRANCH, not the queue
-  // verdict: a branch outside the work order (a cross-cutting fix) is judged the
-  // same way, and pushing to it must never be refused for the pool it already
-  // sits in. Cutting a NEW branch outside the work order does take a slot — so
-  // a call is spared only when EVERY point it opens is already in flight.
-  //
-  // AND ONLY WHEN EVERY BRANCH IT CUTS ALREADY STANDS (Sol, review of 3078d166).
-  // The point alone answered "687 is in flight" to `git branch feat/687-b` while
-  // `feat/687-a` was the branch that made it so — a second branch for one point,
-  // cut past a full pool, which is precisely the debris this rule counts.
-  const inFlight = Array.isArray(inputs.inFlight) ? inputs.inFlight : []
-  const standing = new Set((Array.isArray(inputs.branches) ? inputs.branches : []).map((b) => normaliseBranchRef(b?.ref)))
-  const finishing =
-    targets.length > 0 &&
-    targets.every((p) => inFlight.includes(Number(p))) &&
-    refs.every((r) => standing.has(normaliseBranchRef(r)))
   // A FACT NOBODY COULD READ REFUSES NOTHING (Sol, review of 3078d166). Both
   // halves already failed open on their own inputs, but the QUEUE half was fed
   // git's answer too: an unreadable branch list left the in-flight set EMPTY, so
@@ -224,7 +229,7 @@ export function commissionVerdict(inputs, { now = Date.now() } = {}) {
     }
   }
   const parts = []
-  if (!finishing && !slots.allowed) parts.push(branchSlotRefusal(slots))
+  if (!slots.allowed) parts.push(branchSlotRefusal(slots))
   for (const v of verdicts) if (v.block) parts.push(commissionRefusal(v.queue))
   return {
     block: parts.length > 0,
@@ -374,6 +379,7 @@ if (isMainModule(import.meta.url)) {
       sessionId: payload.session_id || '',
       points: target.points,
       refs: target.refs,
+      refsLoose: target.refsLoose,
       cwd: payload.cwd || REPO_ROOT,
     })
     if (!g.applicable) process.exit(0)
