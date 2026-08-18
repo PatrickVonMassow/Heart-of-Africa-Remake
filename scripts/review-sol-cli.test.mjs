@@ -401,6 +401,11 @@ describe('a review that runs', () => {
     expect(received).toContain('=== DIFFSTAT ===')
     expect(received).toContain('=== PATCH ===')
     expect(received).toContain('diff --git')
+    // …WHOLE: the size the command claims for the round is the size the child
+    // process actually read off its stdin — a real transport check, not the
+    // call site's own echo (escalation round).
+    const claimed = Number(/material: (\d+) characters/.exec(r.stderr)?.[1])
+    expect(received.length).toBe(claimed)
     // …and it is the whole BRANCH, both commits above main, not just the head.
     expect(received).toContain('the fixture world, revised')
     expect(received).toContain('a file the patch carries whole')

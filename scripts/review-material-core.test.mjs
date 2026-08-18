@@ -190,6 +190,28 @@ describe('what was assembled against what was sent', () => {
     expect(materialShortfall({})?.reason).toBe('unverified')
     expect(materialShortfall({ assembly: {}, sent: 'x' })?.reason).toBe('unverified')
   })
+
+  // THE ECHO PINS THE CALL SITE, NOT THE TRANSPORT (escalation round): the
+  // string the caller hands the spawn is the string it compares against, so an
+  // identical pair proves only that no variable was swapped. Where the process
+  // layer reported an error mid-hand-off, whether the material arrived is
+  // UNKNOWN — and unknown refuses, even though the echo still matches.
+  it('refuses a round whose hand-off the process layer reported broken', () => {
+    const short = materialShortfall({
+      assembly,
+      sent: assembly.text,
+      transportError: 'the run was killed on its time budget, mid-stream',
+    })
+    expect(short?.reason).toBe('unverified')
+    expect(short?.detail).toContain('did not complete')
+    expect(short?.detail).toContain('time budget')
+    expect(formatShortfall(short, { sha: 'abc1234' })).toContain('NO RECORD COMMAND IS PRINTED')
+  })
+
+  it('does not read an empty transport report as a problem', () => {
+    expect(materialShortfall({ assembly, sent: assembly.text, transportError: '' })).toBeNull()
+    expect(materialShortfall({ assembly, sent: assembly.text, transportError: '  ' })).toBeNull()
+  })
 })
 
 describe('the patch, split per file', () => {

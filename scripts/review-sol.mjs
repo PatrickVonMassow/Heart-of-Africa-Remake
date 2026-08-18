@@ -308,6 +308,7 @@ export function runCodex({ prompt, input = '', modelId = SOL_MODEL_ID, timeoutMs
   } catch {
     /* a leftover temp file is not worth an exit code */
   }
+  const timedOut = res.signal === 'SIGTERM' || String(res.error?.code ?? '') === 'ETIMEDOUT'
   return {
     spawnError: res.error ?? null,
     exitCode: res.status ?? 1,
@@ -315,13 +316,23 @@ export function runCodex({ prompt, input = '', modelId = SOL_MODEL_ID, timeoutMs
     stderr: res.stderr ?? '',
     // `timeout` kills with SIGTERM AND sets an ETIMEDOUT error; either half on
     // its own would otherwise read as an ordinary error exit.
-    timedOut: res.signal === 'SIGTERM' || String(res.error?.code ?? '') === 'ETIMEDOUT',
+    timedOut,
     finalMessage: last || res.stdout || '',
-    // WHAT ACTUALLY WENT OUT (point 714). The caller compares this against what
-    // it assembled: an assembly can be perfect and the hand-off still lose it,
-    // and a coverage claim resting on "presumably the same string" is the kind
-    // of assumption this whole point exists to remove.
+    // WHAT ACTUALLY WENT OUT (point 714). This is the exact argument the spawn
+    // received, so comparing against it pins the CALL SITE — a caller that
+    // rebuilt, trimmed or swapped the variable fails the sent-differs check.
+    // It is NOT a witness of the transport: nothing codex prints echoes its
+    // stdin back, so a kernel-level truncation is invisible from here. What
+    // the process layer DOES report travels beside it (escalation round) …
     sentInput: input,
+    // … and where the spawn layer reported an error, or the run was killed on
+    // its budget mid-stream, whether the material arrived is UNKNOWN — the
+    // caller hands this to materialShortfall, and unknown refuses the record.
+    transportError: res.error
+      ? `the spawn layer reported ${String(res.error.code ?? res.error.message ?? 'an error')} before the run completed`
+      : timedOut
+        ? 'the run was killed on its time budget, mid-stream'
+        : '',
   }
 }
 
@@ -722,8 +733,10 @@ if (isMainModule(import.meta.url)) {
     }
     // DID THIS ROUND CARRY WHAT IT CLAIMS TO HAVE JUDGED? Asked of the accounting
     // and of the string that actually went to codex — never of the material's own
-    // text, which a reviewed source file can carry the truncation marker in.
-    const shortfall = materialShortfall({ assembly, sent: run.sentInput })
+    // text, which a reviewed source file can carry the truncation marker in — and
+    // of the process layer's own report: a hand-off that died mid-transmit is an
+    // UNKNOWN coverage, and unknown refuses.
+    const shortfall = materialShortfall({ assembly, sent: run.sentInput, transportError: run.transportError })
     console.log(formatReviewReport({ decision, sha: full, mode, point, partial, shortfall, plan, pass }))
     // A fallback is not an error of THIS command — it did its job by refusing to
     // invent a review — but it must not read as a finished one either, so the

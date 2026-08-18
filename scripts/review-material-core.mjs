@@ -209,7 +209,25 @@ export function sentMaterialMatches(assembly = null, sent = undefined) {
  * not to have fitted. The only answer that clears it is a complete assembly whose
  * text is provably the text that went out.
  */
-export function materialShortfall({ assembly = null, sent = undefined } = {}) {
+export function materialShortfall({ assembly = null, sent = undefined, transportError = '' } = {}) {
+  // THE PROCESS LAYER'S OWN REPORT OUTRANKS THE ECHO (escalation round): the
+  // string a caller hands the spawn is the same string it compares against, so
+  // that comparison pins the CALL SITE — a rebuilt or swapped variable — and
+  // can never witness the transport itself. Where the spawn layer reported an
+  // error or the run was killed mid-stream, whether the material arrived is
+  // UNKNOWN, and unknown refuses.
+  const err = String(transportError ?? '').trim()
+  if (err) {
+    return {
+      reason: 'unverified',
+      detail: `the hand-off did not complete: ${err}`,
+      truncated: assembly?.truncated ?? [],
+      omitted: assembly?.omitted ?? [],
+      budget: assembly?.budget ?? MATERIAL_BUDGET_CHARS,
+      size: assembly?.size ?? 0,
+      rawSize: assembly?.rawSize ?? 0,
+    }
+  }
   const seen = sentMaterialMatches(assembly, sent)
   if (!seen.known) {
     return {
