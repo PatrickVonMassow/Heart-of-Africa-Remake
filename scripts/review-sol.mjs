@@ -78,6 +78,7 @@ import {
 import {
   assembleMaterial,
   formatBudgetNotice,
+  formatShortfall,
   materialShortfall,
   MATERIAL_BUDGET_CHARS,
   passByIndex,
@@ -603,7 +604,12 @@ if (isMainModule(import.meta.url)) {
         )
         process.exit(2)
       }
-      assembly = assembleMaterial({ ...range, budget: MATERIAL_BUDGET_CHARS })
+      // The single pass the plan produced, so the patch gets the room the plan
+      // costed it: the standing half-share would cut a diff-heavy range the plan
+      // called complete, and the round would be paid for before anyone noticed.
+      assembly = plan.passes.length === 1
+        ? assemblePass(range, plan.passes[0])
+        : assembleMaterial({ ...range, budget: MATERIAL_BUDGET_CHARS })
     } else {
       // A ROUND OVER MATERIAL THAT CANNOT FIT IS A ROUND SPENT ON A RECORD THAT
       // WILL BE REFUSED. The plan above says how to split it, so the run stops
@@ -620,6 +626,13 @@ if (isMainModule(import.meta.url)) {
         process.exit(2)
       }
       assembly = assemblePass(range, pass)
+    }
+    // THE ASSEMBLY IS THE AUTHORITY, THE PLAN ONLY ADVISORY. Where the two
+    // disagree the round is not spent: a review whose record will be refused
+    // afterwards costs an allowance and answers nothing.
+    if (!assembly.fit) {
+      console.error(formatShortfall(materialShortfall({ assembly, sent: assembly.text }), { sha: full, plan }))
+      process.exit(4)
     }
     console.error(
       `  material: ${assembly.size} characters of diff and file content ` +
