@@ -18681,3 +18681,31 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
     Criticality: high — 91 % of the project's spend sits above 150k context, and this is the
     door it walks through.
     Bundle: unbundled (infrastructure).
+
+- [x] 723. The queue's head is re-judged before it is worked (user 18.08.2026, 16:51): whether the
+  points up to and including 597 stand in a sensible order, whether some belong MERGED into one
+  point or bundle, and whether any is in substance already done by work that landed since it was
+  filed. The analysis is a DIVERGENT stage, so it runs as four eyes per CLAUDE.md §6: both models
+  produce their judgment blind-parallel from the same inputs (the specs of the queue-head points,
+  the archive, and the current code), the merge is counted and goes to a model that wrote neither
+  list where one exists. FINAL STATE: every point up to 597 either keeps its place with the
+  analysis's one-line reason, is moved (block moved in TASKS.md, verbatim), is merged into a named
+  sibling (specs unified final-state-only, the absorbed number retired to the archive with a
+  pointer), or is ticked as already-done with the evidence the tick demands; the adjustments are
+  applied in the same stretch of work, not filed as further points. The user's same-day ranking
+  (697, 703, 595/598, 581, 336 directly after 597 — branches with started work falling behind
+  main) is an INPUT the analysis respects: it may propose refinements but not silently undo it.
+  VERIFIABLE: the blind-parallel records exist (two lists, a counted merge), the queue order after
+  the change matches the analysis's outcome, and every merged or ticked point names its evidence.
+  Criticality: medium — work-order bookkeeping, but it steers every session after it.
+  Author lane: Sol.
+  Bundle: unbundled (work order).
+  DELIVERED 18.08.2026: the blind-parallel records and the counted union stand in
+  `docs/blind-723/` (half A GPT-5.6 Sol 15 entries, half B Claude Opus 5 18 entries,
+  union by Fable 5 — 17 entries, 31 merged / 0 only A / 2 only B, accounting verified by
+  `blind-merge.mjs`; ledger record on 2e93f776). Applied in the same stretch: head order
+  623, 712, 713, 701, 707, 705, 708, 553, 596, 597, 706, 710, then the user's 18.08 block
+  697, 703, 595/598, 581, 336, then attended-gated 715; 662 merged into 553 (archive
+  pointer above); build notes on 705/706/708; the perishable blind-713 and multistep
+  evidence rescued into `docs/` (U16). No point was tickable as already-done — both halves
+  and the union judged all 14 substantive and undelivered.
