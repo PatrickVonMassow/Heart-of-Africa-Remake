@@ -19,6 +19,8 @@
 // can contain that marker verbatim (this one does), and a check that scans for it
 // answers about the wrong thing in both directions.
 //
+import { createHash } from 'node:crypto'
+
 // SPLITTING BY COMMIT DOES NOT HELP, which is why planPasses cuts through the
 // FILE SET (measured 18.08.2026 over 41 commits): the material ships the CURRENT
 // CONTENT of every touched path beside the patch, so a commit's material is
@@ -314,10 +316,21 @@ export function assembleMaterial({
     left -= header.length + Math.min(text.length, fileRoom) + 80
   }
 
-  const text = out.join('\n')
+  // THE RECEIPT CLOSES THE UNREAD-STDIN RESIDUAL (fourth cross-vendor round,
+  // pass 4, finding 8). `sentInput` proves the hand-off to the spawn, never
+  // the read: a child can exit 0 with a parseable verdict without ever reading
+  // an input smaller than the pipe buffer, and no process-layer evidence can
+  // witness the read. So the material's LAST line carries a token derived from
+  // the material itself, the prompt demands it back — and the prompt never
+  // contains it — which makes a returned token evidence that the child read
+  // the material through to its END. parseVerdict enforces the echo.
+  const body = out.join('\n')
+  const receipt = createHash('sha256').update(body, 'utf8').digest('hex').slice(0, 16)
+  const text = `${body}\n=== END OF MATERIAL — RECEIPT ${receipt} ===`
   return {
     ...account,
     text,
+    receipt,
     size: text.length,
     rawSize,
     budget: cap,

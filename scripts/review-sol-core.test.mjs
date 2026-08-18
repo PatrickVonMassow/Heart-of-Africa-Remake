@@ -229,6 +229,24 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
     ).toMatchObject({ ok: false })
   })
 
+  // FINDING 8 (fourth cross-vendor round, pass 4): `sentInput` proves only the
+  // hand-off to the spawn — a child can exit 0 with a parseable verdict without
+  // ever reading its stdin. The token stands only on the material's LAST line,
+  // never in the prompt, so echoing it back is evidence of the read.
+  it('demands the material RECEIPT back where one was issued', () => {
+    const good = `looked closely.\n\nRECEIPT: abcd1234abcd1234\nVERDICT: merge\nEVIDENCE: read the whole diff and its tests`
+    expect(parseVerdict(good, { receipt: 'abcd1234abcd1234' })).toMatchObject({ ok: true, verdict: 'merge' })
+    const missing = parseVerdict(solSays(), { receipt: 'abcd1234abcd1234' })
+    expect(missing.ok).toBe(false)
+    expect(missing.error).toContain('no RECEIPT')
+    const wrong = parseVerdict(good, { receipt: 'ffff0000ffff0000' })
+    expect(wrong.ok).toBe(false)
+    expect(wrong.error).toContain('does not match')
+    // …and a message shaped for a receipt but asked without one still parses
+    // as before: the last two lines are the pair.
+    expect(parseVerdict(solSays())).toMatchObject({ ok: true, verdict: 'merge' })
+  })
+
   it('requires the pair to be the LAST two lines, not two matches from anywhere', () => {
     const spliced = 'VERDICT: merge\n\nSome later paragraph.\n\nEVIDENCE: read the whole diff and the tests'
     expect(parseVerdict(spliced)).toMatchObject({ ok: false })
@@ -758,6 +776,17 @@ describe('the codex command line is the rule, not a preference of the caller', (
     expect(divergent).toMatch(/B<n> \| <file> \| <the defect in/)
     expect(divergent).toMatch(/cannot be counted/)
     expect(buildReviewPrompt({ sha: 'abc', brief: 'x' })).not.toMatch(/ONE ENTRY PER LINE/)
+  })
+
+  it('demands the RECEIPT in the answer shape without ever containing the token', () => {
+    const token = 'abcd1234abcd1234'
+    const prompt = buildReviewPrompt({ sha: 'abc', brief: 'x', receipt: token })
+    expect(prompt).toContain('EXACTLY these three lines')
+    expect(prompt).toContain('RECEIPT: <the hex token')
+    // The whole worth of the receipt: the prompt NEVER carries it, so only a
+    // child that read the material to its end can echo it.
+    expect(prompt).not.toContain(token)
+    expect(buildReviewPrompt({ sha: 'abc', brief: 'x' })).toContain('EXACTLY these two lines')
   })
 
   it('tells a PASS reviewer the manifest governs absence, and a whole-range one nothing of it', () => {

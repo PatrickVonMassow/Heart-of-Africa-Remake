@@ -203,6 +203,22 @@ describe('the assembly says what it could not hold', () => {
     expect(typeof out.text).toBe('string')
     expect(out.fit).toBe(false)
   })
+
+  // FINDING 8 (fourth cross-vendor round, pass 4): the last line of every
+  // round carries a token derived from the material itself, and the prompt
+  // demands it back — a child that never read its stdin cannot produce it.
+  it('ends every round in a RECEIPT derived from the material itself', () => {
+    const out = assembleMaterial({ stat: 's', patch: 'p', files: [file('a.md', 10)], budget: 10_000 })
+    expect(out.receipt).toMatch(/^[0-9a-f]{16}$/)
+    expect(out.text.endsWith(`=== END OF MATERIAL — RECEIPT ${out.receipt} ===`)).toBe(true)
+    // Deterministic over the same material, different over different material.
+    const again = assembleMaterial({ stat: 's', patch: 'p', files: [file('a.md', 10)], budget: 10_000 })
+    expect(again.receipt).toBe(out.receipt)
+    const other = assembleMaterial({ stat: 's', patch: 'q', files: [file('a.md', 10)], budget: 10_000 })
+    expect(other.receipt).not.toBe(out.receipt)
+    // The receipt line stands INSIDE the measured size, so fit stays honest.
+    expect(out.size).toBe(out.text.length)
+  })
 })
 
 // ROUND 4, PASS 4, FINDING 7: an added binary was skipped as "covered by the

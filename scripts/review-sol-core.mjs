@@ -232,8 +232,9 @@ export function codexArgs({
  * transcribed into the ledger verbatim — a verdict word this project's recorder
  * accepts, and one honest line of what was actually checked.
  */
-export function buildReviewPrompt({ sha = '', brief = '', mode = 'review', pass = null } = {}) {
+export function buildReviewPrompt({ sha = '', brief = '', mode = 'review', pass = null, receipt = '' } = {}) {
   const divergent = String(mode) === 'blind-parallel'
+  const withReceipt = Boolean(String(receipt ?? '').trim())
   return [
     'You are the SECOND pair of eyes on a change in this repository, working under the',
     'four-eyes rule of CLAUDE.md §6. You were chosen because you are a DIFFERENT model',
@@ -277,7 +278,15 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review', pass 
         'spec, are its tests real tests, what breaks that nobody tested?',
     '',
     'Report ONLY findings you can point at a line for. End your final message with',
-    'EXACTLY these two lines and nothing after them:',
+    // THE TOKEN IS NEVER IN THE PROMPT (finding 8): it stands only on the
+    // material's last line, so echoing it back is evidence the material was
+    // read through to its end — a child that saw only this prompt cannot know it.
+    ...(withReceipt
+      ? [
+          'EXACTLY these three lines and nothing after them:',
+          'RECEIPT: <the hex token from the material\'s LAST line, "=== END OF MATERIAL — RECEIPT … ===">',
+        ]
+      : ['EXACTLY these two lines and nothing after them:']),
     `VERDICT: <${VERDICTS.join('|')}>`,
     'EVIDENCE: <one line naming what you actually checked and what you found>',
   ].join('\n')
@@ -291,14 +300,34 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review', pass 
  * evidence line too thin to mean anything, is NOT a verdict. Such a run has not
  * been reviewed, and the caller falls back rather than record a guess.
  */
-export function parseVerdict(text) {
+export function parseVerdict(text, { receipt = '' } = {}) {
   const raw = String(text ?? '')
   const clean = raw.replace(/[*`_#>]/g, '')
   // THE PAIR MUST BE THE END OF THE MESSAGE (four-eyes finding, 10.08.2026). The
   // prompt asks for exactly two closing lines; taking the last match of each
   // INDEPENDENTLY would happily pair a verdict with an evidence line from some
   // earlier paragraph, so the two final non-empty lines are what is read.
-  const tail = clean.split('\n').map((l) => l.trim()).filter(Boolean).slice(-2)
+  const expected = String(receipt ?? '').trim()
+  const lines = clean.split('\n').map((l) => l.trim()).filter(Boolean)
+  const tail = lines.slice(expected ? -3 : -2)
+  // THE RECEIPT IS DEMANDED WHERE ONE WAS ISSUED (fourth cross-vendor round,
+  // pass 4, finding 8): the token stands only on the material's last line,
+  // never in the prompt, so an answer that cannot repeat it is an answer from
+  // a run whose material is not proven read — and that is not a verdict.
+  if (expected) {
+    const got = (/^[-*]?\s*RECEIPT\s*:\s*([0-9a-f]+)\s*$/i.exec(tail[0] ?? '')?.[1] ?? '').toLowerCase()
+    if (got !== expected.toLowerCase()) {
+      return {
+        ok: false,
+        verdict: '',
+        evidence: '',
+        error: got
+          ? 'the RECEIPT line does not match the material\'s token — what was judged is not proven to be what was sent'
+          : 'the answer carries no RECEIPT line — nothing proves the material was read to its end',
+      }
+    }
+    tail.shift()
+  }
   const verdict = (/^[-*]?\s*VERDICT\s*:\s*(.+)$/i.exec(tail[0] ?? '')?.[1] ?? '').trim().toLowerCase()
   const evidence = (/^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1] ?? '')?.[1] ?? '').trim()
   if (!VERDICTS.includes(verdict)) {

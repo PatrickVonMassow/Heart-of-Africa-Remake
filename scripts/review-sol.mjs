@@ -780,9 +780,16 @@ if (isMainModule(import.meta.url)) {
       `  material: ${assembly.size} characters of diff and file content ` +
         `(${base.slice(0, 7)}..${full.slice(0, 7)}${pass ? `, pass ${pass.index}/${pass.total}` : ''})`,
     )
-    const run = runCodex({ prompt: buildReviewPrompt({ sha: full, brief, mode, pass }), input: assembly.text, timeoutMs })
+    const run = runCodex({
+      prompt: buildReviewPrompt({ sha: full, brief, mode, pass, receipt: assembly.receipt }),
+      input: assembly.text,
+      timeoutMs,
+    })
     const outcome = classifyOutcome(run)
-    const parsed = outcome.ok ? parseVerdict(run.finalMessage) : { ok: false }
+    // The RECEIPT is demanded back (finding 8): the token stands only on the
+    // material's last line, so an answer that cannot repeat it is a run whose
+    // material is not proven read — no verdict, and therefore no record.
+    const parsed = outcome.ok ? parseVerdict(run.finalMessage, { receipt: assembly.receipt }) : { ok: false }
     // DID THIS ROUND CARRY WHAT IT CLAIMS TO HAVE JUDGED? Asked of the accounting
     // and of the string that actually went to codex — never of the material's own
     // text, which a reviewed source file can carry the truncation marker in — and

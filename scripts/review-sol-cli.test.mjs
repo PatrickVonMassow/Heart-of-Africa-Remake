@@ -121,7 +121,12 @@ if (process.env.STUB_MODE === 'fail') {
   process.stderr.write('stream error: You are not logged in. Run \`codex login\`.\\n')
   process.exit(1)
 }
-const answer = process.env.STUB_ANSWER || 'VERDICT: merge\\nEVIDENCE: read the whole range and both test files'
+// A compliant reviewer reads the material to its end and echoes the RECEIPT
+// token from its last line (finding 8). STUB_MODE=no-receipt plays the child
+// that answered without ever reading its stdin.
+const token = /=== END OF MATERIAL — RECEIPT ([0-9a-f]+) ===/.exec(stdin)
+const receipt = process.env.STUB_MODE === 'no-receipt' || !token ? '' : 'RECEIPT: ' + token[1] + '\\n'
+const answer = receipt + (process.env.STUB_ANSWER || 'VERDICT: merge\\nEVIDENCE: read the whole range and both test files')
 if (out) writeFileSync(out, answer)
 process.stdout.write(answer)
 process.exit(0)
@@ -450,6 +455,22 @@ describe('a binary file in the range', () => {
     expect(sent).toContain('blob.bin')
     // The declaration is not a loss: the record command is still offered.
     expect(r.stdout).toContain('mechanism-review.mjs --record')
+  })
+})
+
+describe('a child that never read its material', () => {
+  it('yields no verdict and no completed record — the receipt closes the unread-stdin hole', () => {
+    // Finding 8: a child can exit 0 with a parseable verdict without ever
+    // reading an input smaller than the pipe buffer, and the process layer
+    // cannot witness the read. The RECEIPT token stands only on the material's
+    // last line, so this stub — which answers without it — is exactly that
+    // child, and its answer must not become a record.
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge the change'], { STUB_MODE: 'no-receipt' })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('no parseable verdict')
+    expect(r.stdout).toContain('RECEIPT')
+    expect(r.stdout).toContain('The review is NOT done')
   })
 })
 
