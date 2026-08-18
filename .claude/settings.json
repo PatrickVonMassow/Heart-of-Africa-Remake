@@ -83,6 +83,10 @@
           },
           {
             "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/rule-echo-guard.mjs\""
+          },
+          {
+            "type": "command",
             "command": "node scripts/dashboard-conciseness-guard.mjs"
           },
           {
@@ -156,6 +160,15 @@
           {
             "type": "command",
             "command": "node scripts/worktree-reminder.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent|Task|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/commission-guard.mjs\""
           }
         ]
       },

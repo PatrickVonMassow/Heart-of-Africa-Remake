@@ -26,7 +26,7 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(authorLaneFor()).toMatchObject({ lane: 'sol', model: 'GPT-5.6 Sol' })
   })
 
-  it('keeps the hard cases with Fable, in CLAUDE.md §6’s own words', () => {
+  it('sends the hard cases straight to Sol, in CLAUDE.md §6’s own words (user 18.08.2026)', () => {
     for (const body of [
       'This is difficult: the lock is taken twice.',
       'A complex rebuild of the launcher.',
@@ -36,13 +36,21 @@ describe('authorLaneFor — which lane authors a point', () => {
       'A deadlock between the hook and the gate.',
       'A migration of every recorded review row.',
     ]) {
-      expect(lane(body), body).toBe('fable')
+      expect(lane(body), body).toBe('sol')
     }
     expect(authorLaneFor({ body: 'A complex rebuild.' }).why[0]).toMatch(/hard case \(complex\)/)
+    // Neither of the two lanes this used to take: not Fable from the start (its
+    // weekly pool is the scarcest, 17.08.) and no longer held back for Opus.
+    expect(authorLaneFor({ body: 'A complex rebuild.' }).why[0]).toMatch(/straight to Sol/)
+    // AND IT OUTRANKS THE VERIFICATION LANE (user 18.08.2026, asked explicitly):
+    // a hard picture point is authored by Sol too — the main session judges the
+    // picture whoever wrote the code, so only the authoring moves.
+    expect(lane('A complex screenshot problem on both backends.')).toBe('sol')
   })
 
   it('treats a HIGH-criticality tag as a hard case by definition', () => {
-    expect(lane('Anything at all.', { criticality: 'high' })).toBe('fable')
+    expect(lane('Anything at all.', { criticality: 'high' })).toBe('sol')
+    expect(lane('The screenshot must hold.', { criticality: 'high' })).toBe('sol')
     // …and med/low/none leave the decision to the text.
     expect(lane('Anything at all.', { criticality: 'med' })).toBe('sol')
     expect(lane('Anything at all.', { criticality: 'low' })).toBe('sol')
@@ -76,7 +84,7 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(lane('Claude judges the picture. The picture shows a black horizon on WebGL.')).toBe('opus')
   })
 
-  it('moves work that came back from Sol with findings to Fable, above every other signal', () => {
+  it('moves work whose re-work the review still finds problems in to Fable, above every other signal', () => {
     expect(lane('A screenshot point.', { reworked: true })).toBe('fable')
     expect(lane('Something mechanical.', { reworked: true })).toBe('fable')
     expect(authorLaneFor({ body: 'x', reworked: true }).why[0]).toMatch(/after a re-work/)
@@ -145,10 +153,13 @@ describe('authorLaneFor — which lane authors a point', () => {
   })
 
   it('names the subjects its own comments promise (cross-vendor P1)', () => {
-    // The list claimed locks and state migration and held only the noun.
-    expect(lane('The batch lock is taken twice.')).toBe('fable')
-    expect(lane('Migrating every recorded review row.')).toBe('fable')
-    // …and "visually inspect" is how half the render points are written.
+    // The list claimed locks and state migration and held only the noun. They
+    // are hard subjects, so since 18.08.2026 they answer `sol` — the marker
+    // still fires, only the lane it feeds changed.
+    expect(lane('The batch lock is taken twice.')).toBe('sol')
+    expect(lane('Migrating every recorded review row.')).toBe('sol')
+    // …and "visually inspect" is how half the render points are written, which
+    // is the verification lane and stays with the main session.
     expect(lane('Visually inspect the horizon banding.')).toBe('opus')
   })
 
@@ -157,9 +168,9 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(d.signals).toMatchObject({ criticality: 'med', reworked: false })
     expect(d.signals.hard).toEqual(['complex'])
     expect(d.signals.verification).toEqual(['screenshot'])
-    // Hard beats verification: the hard-case lane authors it, and the main
-    // session judges the picture for every point regardless.
-    expect(d.lane).toBe('fable')
+    // The two signals now answer DIFFERENTLY, and the order decides: hard wins,
+    // so this point is Sol's while the verification signal is still reported.
+    expect(d.lane).toBe('sol')
   })
 
   it('answers for every lane and cannot be handed something it throws on', () => {

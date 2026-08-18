@@ -57,6 +57,10 @@ import {
   setCardStatus,
   setCardTitle,
   toDone,
+  doneCards,
+  doneStart,
+  earliestStart,
+  mergeDoneDuplicates,
   toNow,
   toQueue,
 } from './board-core.mjs'
@@ -267,8 +271,8 @@ describe('toQueue — the move that had to be done by hand', () => {
     expect(out).toContain('<span class="meta">~4 h</span>')
   })
 
-  it('throws when the point is not in current work', () => {
-    expect(() => toQueue(board(), 999)).toThrow(/no current-work card/)
+  it('throws only when the point is NOWHERE on the board — the typo case', () => {
+    expect(() => toQueue(board(), 999)).toThrow(/nowhere on the board/)
   })
 
   // A point promoted straight from a STUB queue card has a start time and no
@@ -301,6 +305,22 @@ describe('toDone — current work into the archive', () => {
     const at = out.indexOf('class="num">365')
     expect(at).toBeGreaterThan(out.indexOf('<h2>Erledigt'))
     expect(at).toBeLessThan(out.indexOf('class="num">364'))
+  })
+
+  it('folds a SECOND archiving into the card that is already there (user 18.08.2026)', () => {
+    // Point 700 stood in Erledigt four times: it came back into current work at
+    // every session boundary, and each archiving appended another card.
+    const first = toDone(board(), 365, { text: 'Erste Runde.', end: '11:00' })
+    const reopened = fullBoard({
+      now: nowEntry(365, 'Der Preis eines Punktes', '12:00 · ~13:00'),
+      done: doneCards(first, 365)[0],
+    })
+    const again = toDone(reopened, 365, { text: 'Zweite Runde.', end: '13:30' })
+    expect(doneCards(again, 365)).toHaveLength(1)
+    // The EARLIEST start survives and the newest end and text win.
+    expect(again).toContain('<span class="meta">10:07 · 13:30</span>')
+    expect(again).toContain('<p>Zweite Runde.</p>')
+    expect(again).not.toContain('<p>Erste Runde.</p>')
   })
 
   it('refuses an empty archive body rather than filing a blank card', () => {
@@ -485,6 +505,110 @@ describe('removeVdzk — an answered question disappears', () => {
   it('never reaches into another section for its match', () => {
     const withQueueCard = fullBoard({ vdzk: vdzkEntry('Eine Frage'), queue: queueEntry(372, 'Ein Befehl', '~2 h') })
     expect(() => removeVdzk(withQueueCard, 'Ein Befehl')).toThrow(/no open question/)
+  })
+})
+
+// ═══ Point 700 — THE HANDOVER STATE IS LEGITIMATE, and the audit knows it ═══
+// Measured 17.08.2026, twice, on the live board: while the unnumbered handover
+// card stood where a numbered now-card had been, the unit layer went red
+// (`dup-in-section`) — and because the pre-push gate runs this layer, the
+// refusal landed on the session's LAST bookkeeping, the most expensive moment
+// there is; one commit was dropped rather than fought for. THE DECISION PINNED
+// HERE: the unnumbered gap card is the SANCTIONED state of a board whose
+// session is ending (points 439/470/655 built it deliberately) — the audit
+// passes it, the live-board sweep SKIPS it (no now-point to move), and the
+// sanctioned moves into that state cannot mint a duplicate. A numbered card is
+// NOT owed during a handover.
+describe('point 700 — the handover state cannot block the handover', () => {
+  const running = () =>
+    `<details class="now">\n  <summary><span class="num">700</span><span class="t">Die Kontextmarke</span>` +
+    `<span class="right"><span class="meta">18:04 · ~23:04</span></span></summary>\n` +
+    `  <div class="body">\n    <p><span class="stamp">Stand 16:20</span> läuft</p>\n  </div>\n</details>\n`
+  const audit = (doc) => auditDashboard(doc, { open: [], done: [] }).map((v) => v.code)
+
+  it('a POINT handover (done --none) leaves a board the audit passes, the gap card standing', () => {
+    const before = fullBoard({ now: running(), queue: queueEntry(701, 'Nächster Punkt', '~2 h') })
+    const after = closeCard(before, 700, {
+      text: 'Fertig; übergeben.',
+      end: '19:00',
+      none: 'Der Punkt ist abgeschlossen; der Nachfolger nimmt Punkt 701.',
+    })
+    // `archive-link-missing` is the fixture's, not the move's: the synthetic
+    // Erledigt section has no archive link for its first-ever card to sit under.
+    const added = audit(after).filter((c) => !audit(before).includes(c) && c !== 'archive-link-missing')
+    expect(added).toEqual([])
+    expect(claimsNoCurrentWork(after)).toBe(true)
+  })
+
+  it('a CONTEXT handover (queue back, then the gap card) duplicates nothing', () => {
+    const before = fullBoard({ now: running(), queue: queueEntry(701, 'Nächster Punkt', '~2 h') })
+    const returned = toQueue(before, 700)
+    const after = toNoCurrentWork(returned, 'Wasserstandsmarke erreicht; der Nachfolger nimmt Punkt 700 wieder auf.', {
+      stamp: '19:01',
+    })
+    expect(audit(after)).not.toContain('dup-in-section')
+    expect([...parseQueuePoints(after)]).toEqual([700, 701])
+  })
+
+  it('the gap card contributes NO now-point, so the live sweep skips instead of moving a card that is not there', () => {
+    const after = toNoCurrentWork(fullBoard({ queue: queueEntry(701, 'Nächster Punkt', '~2 h') }),
+      'Übergabe; der Nachfolger nimmt Punkt 701.', { stamp: '19:01' })
+    expect([...parseNowCardPoints(after)]).toEqual([])
+  })
+
+  it('toQueue HONOURS text and estimate on the standing card — an update is never swallowed (Sol finding 5)', () => {
+    const drifted = fullBoard({
+      now: running(),
+      queue: queueEntry(700, 'Die Kontextmarke', '~5 h') + queueEntry(701, 'Nächster Punkt', '~2 h'),
+    })
+    const updated = toQueue(drifted, 700, { text: 'Zurückgestellt: Übergabe an den Nachfolger.', estimate: '~3 h' })
+    expect([...parseQueuePoints(updated)]).toEqual([700, 701])
+    // Judged on the 700 CARD, not the document — the 701 fixture card shares
+    // the stub body, which must survive untouched.
+    const card700 = queueCard(updated, 700)
+    expect(card700).toContain('Zurückgestellt: Übergabe an den Nachfolger.')
+    expect(card700).toContain('~3 h')
+    expect(card700).not.toContain('~5 h')
+    expect(card700).not.toContain('Warum das ansteht.')
+    expect(queueCard(updated, 701)).toContain('Warum das ansteht.')
+    // A partial update keeps the standing card's OTHER half.
+    const textOnly = queueCard(toQueue(drifted, 700, { text: 'Nur neuer Text.' }), 700)
+    expect(textOnly).toContain('Nur neuer Text.')
+    expect(textOnly).toContain('~5 h')
+    // …and the SECOND identical call is a NO-OP SUCCESS (Sol review of
+    // 534c2ba, finding 5): the desired end state already holds, and the last
+    // bookkeeping of a session must never be blocked by the session ending.
+    const once = toQueue(drifted, 700)
+    expect(toQueue(once, 700)).toBe(once)
+    // A repeat WITH an update still lands on the standing card.
+    const repeatUpdated = queueCard(toQueue(once, 700, { text: 'Doch noch ein Nachtrag.' }), 700)
+    expect(repeatUpdated).toContain('Doch noch ein Nachtrag.')
+    // Only a point NOWHERE on the board — no now-card, no queue card — throws.
+    expect(() => toQueue(once, 999)).toThrow(/nowhere on the board/)
+  })
+
+  it('toQueue is IDEMPOTENT against board drift — a standing queue card is kept, never doubled', () => {
+    // The measured red: the queue already lists the point while its now-card
+    // stands; a second card is the dup-in-section that blocked the handover.
+    const drifted = fullBoard({
+      now: running(),
+      queue: queueEntry(700, 'Die Kontextmarke', '~5 h') + queueEntry(701, 'Nächster Punkt', '~2 h'),
+    })
+    const after = toQueue(drifted, 700)
+    expect(audit(after)).not.toContain('dup-in-section')
+    expect([...parseNowCardPoints(after)]).toEqual([])
+    expect([...parseQueuePoints(after)]).toEqual([700, 701])
+    // …and an Erledigt card of the same bare shape does NOT masquerade as the
+    // standing queue entry: with no queue card, the move still inserts one.
+    const redelivered = fullBoard({
+      now: running(),
+      queue: queueEntry(701, 'Nächster Punkt', '~2 h'),
+      done:
+        `<details>\n  <summary><span class="num">700</span><span class="t">Die Kontextmarke</span>` +
+        `<span class="right"><span class="meta">10:00 · 11:00</span></span></summary>\n` +
+        `  <div class="body">\n    <p>Frühere Lieferung.</p>\n  </div>\n</details>\n`,
+    })
+    expect([...parseQueuePoints(toQueue(redelivered, 700))]).toEqual([700, 701])
   })
 })
 
@@ -1015,5 +1139,144 @@ describe('the closing card — a state that is NOT a claim to stop', () => {
     for (const other of ['544 — Die dritte Kartenart', '', null, undefined, 42]) {
       expect(isStateCardTitle(other)).toBe(false)
     }
+  })
+})
+
+
+describe('mergeDoneDuplicates — a board that already carries them', () => {
+  const card = (point, title, meta) =>
+    `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
+    `<span class="right"><span class="meta">${meta}</span></span></summary>\n` +
+    `  <div class="body">\n    <p>${title}</p>\n  </div>\n</details>\n`
+
+  it('folds four cards for one point into one, newest text, earliest start', () => {
+    // The real shape of point 700 on 18.08.2026, newest first — and note that
+    // 21:17 is the EARLIEST although its clock face is the largest: the archive
+    // is ordered, the stamps carry no date.
+    const html = fullBoard({
+      done:
+        card(700, 'Vierte', '01:04 · 01:10') +
+        card(700, 'Dritte', '01:00 · 01:02') +
+        card(700, 'Zweite', '00:45 · 00:58') +
+        card(700, 'Erste', '21:17 · 00:44'),
+    })
+    const out = mergeDoneDuplicates(html)
+    expect(out.merged).toEqual(['700'])
+    expect(doneCards(out.html, 700)).toHaveLength(1)
+    expect(out.html).toContain('<span class="meta">21:17 · 01:10</span>')
+    expect(out.html).toContain('<p>Vierte</p>')
+    expect(out.html).not.toContain('<p>Zweite</p>')
+  })
+
+  it('leaves a board with one card per point exactly as it is', () => {
+    const html = fullBoard({ done: card(700, 'Eins', '10:00 · 11:00') + card(701, 'Zwei', '11:00 · 12:00') })
+    const out = mergeDoneDuplicates(html)
+    expect(out.merged).toEqual([])
+    expect(out.html).toBe(html)
+  })
+
+  it('keeps the newest card at its POSITION even when the duplicates are identical', () => {
+    // Byte-identical cards made a whole-document replace delete the FIRST
+    // occurrence — the survivor — and leave the older one in its place. A card
+    // BETWEEN the two is what makes the difference visible (second review round:
+    // with adjacent duplicates the broken version passed the assertion too).
+    const same = card(700, 'Gleich', '10:00 · 11:00')
+    const between = card(702, 'Dazwischen', '11:30 · 11:45')
+    const html = fullBoard({ done: card(701, 'Neuster', '12:00 · 12:30') + same + between + same })
+    const out = mergeDoneDuplicates(html)
+    expect(doneCards(out.html, 700)).toHaveLength(1)
+    expect(out.html.indexOf('class="num">701')).toBeLessThan(out.html.indexOf('class="num">700'))
+    // The survivor is the NEWER one, so it stands BEFORE the card between them.
+    expect(out.html.indexOf('class="num">700')).toBeLessThan(out.html.indexOf('class="num">702'))
+  })
+
+  it('never deletes a card from ANOTHER section that happens to be identical', () => {
+    const same = card(700, 'Gleich', '10:00 · 11:00')
+    const html = fullBoard({ queue: same, done: same + same })
+    const out = mergeDoneDuplicates(html)
+    // Scoped, not counted over the whole document (second review round): the old
+    // implementation deleted the QUEUE copy and left both archive copies, which
+    // a total of two chips could not tell apart.
+    expect(doneCards(out.html, 700)).toHaveLength(1)
+    // SCOPED to the queue section (third review round): a document-wide lookup
+    // could return the surviving ARCHIVE card and call the queue card intact.
+    const queueSection = out.html.slice(
+      out.html.indexOf('<h2>Warteschlange</h2>'),
+      out.html.indexOf('<h2>Erledigt</h2>'),
+    )
+    expect(queueSection).toContain('class="num">700')
+  })
+
+  it('folds a DAMAGED newest stamp whole, numeric or not (rounds 3 and 5)', () => {
+    for (const damaged of ['12:345', 'oops', '12x:34', '']) {
+      const html = fullBoard({ done: card(700, 'Neu', `${damaged} · 01:10`) + card(700, 'Alt', '21:17 · 00:44') })
+      const out = mergeDoneDuplicates(html).html
+      expect(out, damaged).toContain('<span class="meta">21:17 · 01:10</span>')
+      expect(out, damaged).not.toContain('21:175')
+      expect(out, damaged).not.toContain('21:17x')
+      expect(out, damaged).not.toContain('oops')
+    }
+  })
+
+  it('leaves the section’s own markup untouched around and BETWEEN the cards', () => {
+    // Section-local sentinels (third review round): a heading that exists
+    // somewhere proves nothing — the archive link and a note between two cards
+    // are what a rebuild would silently drop.
+    const html = fullBoard({
+      done:
+        '<p class="archive-link">Ältere im <a href="https://example.invalid/archiv">Archiv</a>.</p>\n' +
+        card(700, 'Neu', '01:04 · 01:10') +
+        '<!-- Notiz zwischen zwei Karten -->\n' +
+        card(700, 'Alt', '21:17 · 00:44'),
+    })
+    const out = mergeDoneDuplicates(html).html
+    expect(out).toContain('<summary><h2>Erledigt</h2></summary>')
+    expect(out).toContain('<p class="archive-link">Ältere im <a href="https://example.invalid/archiv">Archiv</a>.</p>')
+    expect(out).toContain('<!-- Notiz zwischen zwei Karten -->')
+    expect(out.match(/<details class="sect">/g)).toHaveLength(html.match(/<details class="sect">/g).length)
+    expect(out.endsWith(html.slice(html.lastIndexOf('</main>')))).toBe(true)
+  })
+
+  it('skips a damaged stamp instead of falling back to the newest card', () => {
+    const html = fullBoard({
+      done: card(700, 'Neu', '01:04 · 01:10') + card(700, 'Kaputt', '99:99 · 00:58') + card(700, 'Alt', '21:17 · 00:44'),
+    })
+    expect(mergeDoneDuplicates(html).html).toContain('<span class="meta">21:17 · 01:10</span>')
+  })
+
+  it('never throws on a board without an Erledigt section', () => {
+    expect(mergeDoneDuplicates('<main></main>')).toEqual({ html: '<main></main>', merged: [] })
+    expect(mergeDoneDuplicates()).toEqual({ html: '', merged: [] })
+  })
+})
+
+describe('doneStart / earliestStart', () => {
+  const meta = (m) => `<summary><span class="right"><span class="meta">${m}</span></span></summary>`
+
+  it('reads a real time of day and refuses an impossible one', () => {
+    expect(doneStart(meta('21:17 · 00:44'))).toBe('21:17')
+    expect(doneStart(meta('99:99 · 00:44'))).toBe('')
+    expect(doneStart(meta('12:75 · 00:44'))).toBe('')
+    // Anything but the separator or the closing tag after HH:MM is damage:
+    // `12:345`, `12:34:56` and `12:34x` all used to read as a time.
+    expect(doneStart(meta('12:345 · 00:44'))).toBe('')
+    expect(doneStart(meta('12:34:56 · 00:44'))).toBe('')
+    expect(doneStart(meta('12:34x · 00:44'))).toBe('')
+    // Only the separator or the CLOSING TAG may follow (fifth round): `<b>` and
+    // an unterminated field used to pass.
+    expect(doneStart('class="meta">12:34')).toBe('')
+    expect(doneStart('class="meta">12:34<b>')).toBe('')
+    // …while both real shapes still answer.
+    expect(doneStart(meta('12:34 · 00:44'))).toBe('12:34')
+    expect(doneStart(meta('12:34'))).toBe('12:34')
+    expect(doneStart('no meta at all')).toBe('')
+    expect(doneStart()).toBe('')
+  })
+
+  it('takes the OLDEST usable start, scanning past a damaged one', () => {
+    expect(earliestStart([meta('01:04 · 01:10'), meta('00:45 · 00:58'), meta('21:17 · 00:44')])).toBe('21:17')
+    expect(earliestStart([meta('01:04 · 01:10'), meta('99:99 · 00:44')])).toBe('01:04')
+    expect(earliestStart([])).toBe('')
+    expect(earliestStart()).toBe('')
   })
 })

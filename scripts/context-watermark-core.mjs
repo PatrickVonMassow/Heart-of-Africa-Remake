@@ -71,6 +71,38 @@ export function parseContextTokens(text) {
  *   'unreadable' — NO real reading. `alert` is true: this must surface loudly
  *                  (a watermark that silently never fires is defeat 3 intact).
  */
+/**
+ * THE STATED MARGIN (point 700): how far past the mark a boundary may honestly
+ * land — the mark fires mid-step and finishing that step costs context. A
+ * boundary taken FURTHER past it than this says so in the session's closing
+ * report, so the distance between the mark and the real handover stays a
+ * number somebody reads rather than a claim. Calibratable like the mark.
+ */
+export const CONTEXT_MARGIN_TOKENS = 25_000
+
+/**
+ * THE DISTANCE NOTE a boundary commit prints (point 700). PURE, pinned by
+ * tests. Null when the recorded reading sits within the margin; a sentence
+ * demanding the closing report name it when it does not — and when NO reading
+ * rode on the boundary at all, since an unmeasured distance must not read as a
+ * small one.
+ */
+export function contextDistanceNote({ tokens, watermark, margin = CONTEXT_MARGIN_TOKENS } = {}) {
+  if (typeof tokens !== 'number' || !(tokens > 0)) {
+    return (
+      'NO CONTEXT READING RODE ON THIS BOUNDARY — the distance to the watermark cannot be judged. ' +
+      'Say so in the closing report.'
+    )
+  }
+  const mark = typeof watermark === 'number' && watermark > 0 ? watermark : CONTEXT_WATERMARK_TOKENS
+  const over = tokens - mark
+  if (over <= margin) return null
+  return (
+    `THIS BOUNDARY WAS TAKEN ${over} TOKENS PAST THE ${mark} WATERMARK (measured ${tokens}, stated margin ` +
+    `${margin}) — say so in the closing report, naming what kept the session working past the mark.`
+  )
+}
+
 export function watermarkDecision({ reading, watermark = CONTEXT_WATERMARK_TOKENS } = {}) {
   const mark = Number.isFinite(watermark) && watermark > 0 ? watermark : CONTEXT_WATERMARK_TOKENS
   if (!reading || typeof reading.tokens !== 'number' || !(reading.tokens > 0)) {

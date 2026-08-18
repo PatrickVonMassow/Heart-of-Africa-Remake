@@ -302,7 +302,7 @@ export const STOPWORDS = Object.freeze(
     // and a card both speak of "Punkte", "Fragen" and "Entscheidungen", and a
     // question connected to a card by one of those is connected by nothing. The
     // weekday and the word "Stand" come out of the mandated timestamp header.
-    'punkt', 'punkte', 'frage', 'fragen', 'antwort', 'entscheidung', 'entscheidungen', 'stand',
+    'board', 'punkt', 'punkte', 'frage', 'fragen', 'antwort', 'entscheidung', 'entscheidungen', 'stand',
     'montag', 'dienstag', 'mittwoch', 'donnerstag', 'freitag', 'samstag', 'sonntag',
   ]),
 )
@@ -315,6 +315,16 @@ export const MIN_WORD_LENGTH = 4
  *  compound ("Kartenschrift") identifies a topic, a short word does not. Below it
  *  TWO shared words are required (four-eyes review 30.07.2026, finding 2). */
 export const STRONG_WORD_LENGTH = 8
+
+/** A shared term this long is distinctive enough to make an answered-card hit
+ *  plausible. Unlike the outgoing-question matcher, one such term is enough:
+ *  this match only raises the cost of `vdzk-keep`; it never removes a card. */
+export const DISTINCTIVE_WORD_LENGTH = 5
+
+/** A carried answer must reach the board even when the owner is inside a long
+ *  declared wait. The launcher ticks every fifteen minutes, so one interval is
+ *  the shortest deadline it can honour without inventing another scheduler. */
+export const ANSWER_DEADLINE_MS = 15 * 60 * 1000
 
 /** The letters a German word is made of — the guard's OWN word boundary, because
  *  JavaScript's `\b` treats "ä" as a boundary and would split "wähle" in two. */
@@ -371,12 +381,54 @@ export function addressesUser(sentence) {
  * before the general one ("entscheide").
  */
 export function firingPhrase(sentence) {
+  const retrospective = isRetrospective(sentence)
+  const arrangement = describesStandingArrangement(sentence)
   for (const entry of DECISION_PHRASES) {
     if (!containsPhrase(sentence, entry.phrase)) continue
-    if (entry.address === 'self' || isQuestion(sentence) || addressesUser(sentence)) return entry
-    if (entry.verbFirst && (startsWithPhrase(sentence, entry.phrase) || containsPhrase(sentence, 'bitte'))) return entry
+    if (isQuestion(sentence)) return entry
+    const imperative =
+      IMPERATIVE_PHRASES.has(entry.phrase) ||
+      (entry.verbFirst && (startsWithPhrase(sentence, entry.phrase) || containsPhrase(sentence, 'bitte')))
+    if (imperative) return entry
+    // A look back and a statement of an existing responsibility can address the
+    // user just as directly as a request. With no `?` and no imperative they are
+    // affirmative statements, not doubtful cases to send through the loud path.
+    if (retrospective || arrangement) continue
+    if (entry.address === 'self' || addressesUser(sentence)) return entry
   }
   return null
+}
+
+/** The `self` entries whose wording is itself imperative. The other self
+ * entries merely contain a second-person form and can therefore look backward
+ * ("deine Entscheidung von heute") without asking anything. */
+export const IMPERATIVE_PHRASES = Object.freeze(
+  new Set(['bitte entscheide', 'bitte wähle', 'bitte waehle', 'sag mir', 'sage mir', 'sag bescheid', 'gib mir bescheid']),
+)
+
+export const BACKWARD_MARKERS = Object.freeze([
+  'von heute', 'von gestern', 'vorhin', 'damals', 'bereits', 'schon',
+])
+
+/** A sentence explicitly looking backward or carrying an unambiguous German
+ * past construction. This is deliberately narrower than a general tense parser:
+ * a false retrospective would silence the costly direction of the guard. */
+export function isRetrospective(sentence) {
+  const s = normalize(sentence)
+  if (BACKWARD_MARKERS.some((marker) => containsPhrase(s, marker))) return true
+  if (/\b(?:war|waren|warst|wart|hatte|hatten|hattest|hattet|wurde|wurden|wurdest|wurdet|gab|ging|kam|kamen|blieb|blieben|lag|lagen|entschied|wählte|waehlte)\b/.test(s)) return true
+  return /\b(?:habe|hast|hat|haben|habt|bin|bist|ist|sind|seid)\b[^.!?]*\b(?:ge[a-zäöüß]+(?:t|en)|gewesen|worden)\b/.test(s)
+}
+
+/** Statements that name the standing decision-maker rather than requesting a
+ * new decision. The colon form ("Deine Entscheidung: …") intentionally does
+ * not match and remains loud. */
+export function describesStandingArrangement(sentence) {
+  const s = normalize(sentence)
+  return (
+    /\b(?:bleibt|ist)\b[^.!?]*\bdeine (?:entscheidung|wahl)\b/.test(s) ||
+    /\b(?:bleibt|liegt|ist)\b[^.!?]*\bbei dir\b/.test(s)
+  )
 }
 
 /** Topic words of a text, lowercased: letters only, stopwords and numbers out. */
@@ -392,6 +444,16 @@ export function contentWords(text) {
     out.add(raw)
   }
   return out
+}
+
+/** Distinctive topic terms shared by one card and the user's message. A hit is
+ * not an answer detector; it only means silently keeping that card would be too
+ * cheap, so the caller must write why the message did not settle it. */
+export function sharedDistinctiveTerms(message, title) {
+  const messageWords = contentWords(message)
+  return [...contentWords(title)]
+    .filter((word) => word.length >= DISTINCTIVE_WORD_LENGTH && messageWords.has(word))
+    .sort((a, b) => b.length - a.length || a.localeCompare(b))
 }
 
 /**
@@ -520,4 +582,124 @@ export function evaluate({ replyText = null, vdzkTitles = null, cardAddedThisTur
       'Then rewrite the sentence without the question — this guard errs toward blocking on purpose, ' +
       'because a missed decision costs the user hours and a false block costs one turn.',
   }
+}
+
+const pass = () => ({ block: false, reason: null })
+const quoted = (value) => JSON.stringify(String(value ?? ''))
+
+/** The last real user message as the review rule consumes it. Both fields are
+ * required: the UUID re-arms every card on the next message, while the text is
+ * what makes a suspected answer loud. */
+export function validUserMessage(message) {
+  return Boolean(
+    message &&
+    typeof message.id === 'string' && message.id.trim() &&
+    typeof message.text === 'string' && message.text.trim(),
+  )
+}
+
+/** Which turn-start cards still need an explicit remove/keep decision for this
+ * user message. A card absent now was removed; a title absent at turn start was
+ * added after the message and is not due until the next one. */
+export function pendingCardReviews({
+  userMessage = null,
+  cardsAtMessage = null,
+  currentTitles = null,
+  review = null,
+  carriedAnswers = [],
+  nonOwner = false,
+  stateReadable = true,
+} = {}) {
+  if (!stateReadable || !validUserMessage(userMessage)) return []
+  if (!Array.isArray(cardsAtMessage) || !Array.isArray(currentTitles)) return []
+  const current = new Set(currentTitles)
+  const kept = review?.messageId === userMessage.id && review.kept && typeof review.kept === 'object'
+    ? review.kept
+    : {}
+  const carried = new Set(
+    (Array.isArray(carriedAnswers) ? carriedAnswers : [])
+      .filter((entry) => entry?.sourceMessageId === userMessage.id && typeof entry.cardTitle === 'string')
+      .map((entry) => entry.cardTitle),
+  )
+  const pending = []
+  for (const title of cardsAtMessage) {
+    if (typeof title !== 'string' || !current.has(title)) continue
+    const terms = sharedDistinctiveTerms(userMessage.text, title)
+    const record = kept[title]
+    const keptWithRequiredReason = Boolean(
+      record && (terms.length === 0 || (typeof record.why === 'string' && record.why.trim())),
+    )
+    if (keptWithRequiredReason || (nonOwner && carried.has(title))) continue
+    pending.push({ title, terms })
+  }
+  return pending
+}
+
+/** Verdict for the review due at every user message. The reason gives one exact
+ * command per card; a distinctive term adds the deliberate `--why` cost, while
+ * an unrelated card remains a cheap explicit keep. */
+export function evaluateCardReviews(input = {}) {
+  const pending = pendingCardReviews(input)
+  if (!pending.length) return pass()
+  const nonOwner = input.nonOwner === true
+  const lines = pending.map(({ title, terms }) => {
+    const fragment = quoted(title)
+    const keep = `node scripts/board.mjs vdzk-keep ${fragment}${terms.length ? ' --why "<warum diese Nachricht die Karte nicht beantwortet>"' : ''}`
+    if (!nonOwner) {
+      return `- ${quoted(title)}: node scripts/board.mjs vdzk-remove ${fragment}\n  or: ${keep}`
+    }
+    const carry = `node scripts/vdzk-answer.mjs ${fragment} --answer "<was der Nutzer entschieden hat>"`
+    return terms.length
+      ? `- ${quoted(title)} (shared: ${terms.join(', ')}): ${carry}\n  or, if it was not answered: ${keep}`
+      : `- ${quoted(title)}: ${keep}`
+  })
+  return {
+    block: true,
+    reason:
+      `Answered-card review: user message ${quoted(input.userMessage?.id)} has ${pending.length} open ` +
+      `card(s) not yet reviewed. Resolve EACH card with its exact command:\n${lines.join('\n')}`,
+  }
+}
+
+/** Carrier entries whose named card vanished are complete by definition. */
+export function reconcileCarriedAnswers(entries, currentTitles) {
+  if (!Array.isArray(entries) || !Array.isArray(currentTitles)) return { active: [], cleared: [] }
+  const current = new Set(currentTitles)
+  const active = []
+  const cleared = []
+  for (const entry of entries) {
+    if (!entry || typeof entry.cardTitle !== 'string') continue
+    ;(current.has(entry.cardTitle) ? active : cleared).push(entry)
+  }
+  return { active, cleared }
+}
+
+/** The owner must apply every live carried answer before its turn can end. */
+export function evaluateCarriedAnswers({ entries = null, currentTitles = null, owner = false, stateReadable = true } = {}) {
+  if (!stateReadable || !owner || !Array.isArray(entries) || !Array.isArray(currentTitles)) return pass()
+  const { active } = reconcileCarriedAnswers(entries, currentTitles)
+  if (!active.length) return pass()
+  const lines = active.map((entry) => {
+    const fragment = quoted(entry.cardTitle)
+    return (
+      `- ${quoted(entry.cardTitle)} — answer: ${quoted(entry.answer)}\n` +
+      `  node scripts/board.mjs vdzk-remove ${fragment}\n` +
+      `  node scripts/vdzk-answer.mjs --applied ${fragment}`
+    )
+  })
+  return {
+    block: true,
+    reason: `Carried VDZK answer(s) are waiting for the board owner. Apply each one:\n${lines.join('\n')}`,
+  }
+}
+
+/** One constant computes every stored deadline and every launcher comparison. */
+export const answerDeadline = (recordedAt) => Number(recordedAt) + ANSWER_DEADLINE_MS
+
+export function dueCarriedAnswers(entries, now = Date.now()) {
+  if (!Array.isArray(entries) || !Number.isFinite(Number(now))) return []
+  return entries.filter((entry) => {
+    const deadline = Number(entry?.deadlineAt)
+    return Number.isFinite(deadline) && deadline <= Number(now)
+  })
 }

@@ -23,8 +23,11 @@ import { seedDecisionCardBaseline } from './decision-card-guard.mjs'
 // the user-scope hook and timestamp-guard, not through this one.
 let standDown = false
 let sid = ''
+let transcriptPath = ''
 try {
-  sid = JSON.parse(fs.readFileSync(0, 'utf8')).session_id || ''
+  const payload = JSON.parse(fs.readFileSync(0, 'utf8'))
+  sid = payload.session_id || ''
+  transcriptPath = payload.transcript_path || ''
 } catch {
   /* no/!JSON stdin */
 }
@@ -75,16 +78,13 @@ try {
 // still reporting that the board says nothing. Best effort: a failure leaves the
 // guard exactly as it was.
 //
-// ONLY THE OWNER SEEDS IT. The baseline file is SHARED and keyed by session, so
-// a non-owner's prompt would stamp its own id over the owner's — whose Stop then
-// reads a mismatch, treats the baseline as absent and swallows the very card the
-// turn added, which is the defect this seeding exists to fix.
-if (!standDown) {
-  try {
-    seedDecisionCardBaseline(sid)
-  } catch {
-    // best effort — the reminder text below is the payload
-  }
+// The snapshot is now keyed BY SESSION. That keeps the owner's turn-start board
+// intact while also giving a non-owner the user-message UUID needed to carry an
+// answer instead of touching the board.
+try {
+  seedDecisionCardBaseline(sid, { transcriptPath })
+} catch {
+  // best effort — the reminder text below is the payload
 }
 
 // The chat-timestamp rule is NOT stated here (point 440). It used to be stated

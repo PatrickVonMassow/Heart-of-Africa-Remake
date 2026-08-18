@@ -3,7 +3,9 @@
 // forbidden outcomes are firing on an ASSUMPTION and silently never firing.
 import { describe, it, expect } from 'vitest'
 import {
+  CONTEXT_MARGIN_TOKENS,
   CONTEXT_WATERMARK_TOKENS,
+  contextDistanceNote,
   parseContextTokens,
   watermarkDecision,
 } from './context-watermark-core.mjs'
@@ -100,5 +102,26 @@ describe('watermarkDecision — past, below, or LOUDLY unreadable', () => {
   it('a real reading carries its tokens through to the verdict', () => {
     const d = watermarkDecision({ reading: { tokens: 151_000 } })
     expect(d).toEqual({ state: 'past', tokens: 151_000, watermark: 150_000, alert: false })
+  })
+})
+
+describe('contextDistanceNote — the distance between mark and handover is a number, not a claim (point 700)', () => {
+  it('stays silent within the stated margin, below the mark included', () => {
+    expect(contextDistanceNote({ tokens: 120_000, watermark: 150_000 })).toBeNull()
+    expect(contextDistanceNote({ tokens: 150_000 + CONTEXT_MARGIN_TOKENS, watermark: 150_000 })).toBeNull()
+  })
+
+  it('demands the closing report name a boundary taken further past the mark than the margin', () => {
+    const note = contextDistanceNote({ tokens: 434_440, watermark: 150_000 })
+    expect(note).toContain('284440')
+    expect(note).toContain('closing report')
+  })
+
+  it('an UNMEASURED boundary is named too — no reading must never read as a small distance', () => {
+    expect(contextDistanceNote({ tokens: null, watermark: 150_000 })).toContain('NO CONTEXT READING')
+  })
+
+  it('a broken watermark falls back to the named default', () => {
+    expect(contextDistanceNote({ tokens: 500_000, watermark: 0 })).toContain('150000')
   })
 })

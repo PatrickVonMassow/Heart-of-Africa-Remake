@@ -1,0 +1,14 @@
+A1 | TASKS.md | DEFECT: at 19:59 the now-section was empty and at 20:07 held only point 700, while batch-in-flight declared 700, 697 and 711 in flight, all pushed and none merged; the section is the only part of the board with no source but a hand, and no existing guard checks its completeness.
+A2 | scripts/board-core.mjs | FINAL STATE: the SET of now-cards is derived from the in-flight declaration (its branch/worktree evidence and the open feat/<N> branches) while the card text stays authored — the same split the Warteschlange already uses.
+A3 | scripts/board-core.mjs | FINAL STATE: the render CREATES a stub card for an in-flight point that has none and REMOVES a card whose point is no longer in flight.
+A4 | scripts/board-core.mjs | FINAL STATE: an existing card's authored prose survives the render; a render that would blank written text refuses or restores it (point 491's lesson applied in advance).
+A5 | scripts/board-core.mjs | FINAL STATE: a created card is a visible STUB that says it needs its text, so an unwritten card is never silently empty.
+A6 | scripts/dashboard-integrity-guard-core.mjs | FINAL STATE: while anything is in flight, an empty now-section BLOCKS the turn end, naming the missing point numbers.
+A7 | scripts/board-core.mjs | FINAL STATE: when genuinely nothing is in flight the section says so in one card, so a reader can tell "nothing is running" from "nobody wrote it" — today the two look identical.
+A8 | scripts/board-core.mjs | FINAL STATE: point 700's undecided clause is answered — the unnumbered handover card is legitimate BESIDE the numbered cards, never instead of them, which also settles the dup-in-section red.
+A9 | scripts/dashboard-integrity-guard.mjs | FINAL STATE: the check stands down for heldByOtherLiveOwner and .claude/batch-paused and fails OPEN on its own error; the decision logic is pure and the wrapper thin I/O.
+A10 | scripts/dashboard-integrity-guard-core.test.mjs | VERIFIABLE: a declaration naming 700/697/711 against a section holding only 700 is reported incomplete and names 697 and 711; an empty section with those three in flight blocks.
+A11 | scripts/board-core.test.mjs | VERIFIABLE: a render creates the two missing stubs without touching 700's prose; a render that would blank existing prose refuses; a card for a point no longer in flight is removed.
+A12 | scripts/board-core.test.mjs | VERIFIABLE: the unnumbered handover card beside a numbered one passes and alone does not; an empty section with nothing in flight is accepted only with the explicit "nothing running" card; a non-owner session and a paused batch are waved through.
+A13 | TASKS.md | Criticality: MEDIUM-HIGH — this section is what the user reads to know whether anything is happening at all, and it told him the opposite of the truth.
+A14 | TASKS.md | Bundle: Chat & Tafel; the other model's recorded review is required before the merge because a guard core and the board render change.

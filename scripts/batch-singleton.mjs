@@ -754,14 +754,20 @@ export function processStartTime(pid) {
  *  chain (hook = node, spawned by a shell, spawned by claude). Returns
  *  { pid, startedAt } or null. Called at ACQUISITION only (one PowerShell
  *  round-trip), never on the per-tool-call heartbeat path. */
-export function findClaudeAncestor() {
-  if (process.platform !== 'win32') {
+export const CLAUDE_ANCESTOR_HOPS = 10
+
+export function findClaudeAncestor(opts = {}) {
+  const platform = opts.platform ?? process.platform
+  const parentPid = opts.parentPid ?? process.ppid
+  if (platform !== 'win32') {
+    const readProcFile = opts.readProcFileFn ?? readFileSync
+    const startTime = opts.processStartTimeFn ?? processStartTime
     try {
-      let pid = process.ppid
-      for (let i = 0; i < 10 && pid > 1; i++) {
-        const comm = readFileSync(`/proc/${pid}/comm`, 'utf8').trim()
-        if (/claude/i.test(comm)) return { pid, startedAt: processStartTime(pid) }
-        const stat = readFileSync(`/proc/${pid}/stat`, 'utf8')
+      let pid = parentPid
+      for (let i = 0; i < CLAUDE_ANCESTOR_HOPS && pid > 1; i++) {
+        const comm = readProcFile(`/proc/${pid}/comm`, 'utf8').trim()
+        if (/claude/i.test(comm)) return { pid, startedAt: startTime(pid) }
+        const stat = readProcFile(`/proc/${pid}/stat`, 'utf8')
         pid = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[1])
       }
     } catch {
@@ -771,8 +777,8 @@ export function findClaudeAncestor() {
   }
   try {
     const script =
-      `$id=${Number(process.ppid)};` +
-      `for($i=0;$i -lt 10 -and $id -gt 0;$i++){` +
+      `$id=${Number(parentPid)};` +
+      `for($i=0;$i -lt ${CLAUDE_ANCESTOR_HOPS} -and $id -gt 0;$i++){` +
       `$p=Get-CimInstance Win32_Process -Filter "ProcessId=$id" -ErrorAction SilentlyContinue;` +
       `if(-not $p){break};` +
       `if($p.Name -match 'claude'){Write-Output ("$($p.ProcessId)|$($p.CreationDate.ToFileTimeUtc())");break};` +

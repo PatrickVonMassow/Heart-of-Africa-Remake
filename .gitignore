@@ -112,12 +112,27 @@ scripts/.tile-cache
 .claude/batch-lock.json.reaping
 .claude/timestamp-guard-state.json
 .claude/decision-card-guard-state.json
+.claude/decision-card-guard-state.json.tmp-*
+.claude/vdzk-answers.json
+.claude/vdzk-answers.json.tmp-*
+# The board read-modify-write mutex and its private fencing state. Like the board
+# itself these identify processes on this machine, not repository content.
+.claude/board-edit-lock.json
+.claude/board-edit-lock.json.tmp-*
+.claude/board-edit-lock.json.reaping
+.claude/board-edit-lock.json.fence
+.claude/board-edit-lock.json.fence.tmp-*
 .claude/batch-boundary.json
 .claude/batch-boundary.json.tmp-*
 .claude/batch-boundary-prepared.json
 .claude/batch-boundary-prepared.json.tmp-*
 .claude/batch-in-flight.json
 .claude/batch-in-flight.json.tmp-*
+# The commissioning record (point 712): the overrides taken against the queue's
+# front and the branches parked out of the slot count. It describes THIS
+# checkout's batch, not the repository's content.
+.claude/commission-record.json
+.claude/commission-record.json.tmp-*
 .claude/batch-claim.json
 .claude/batch-claim.json.tmp-*
 # Per-branch baseline of the mechanism four-eyes gate — local bookkeeping. The
@@ -127,6 +142,9 @@ scripts/.tile-cache
 # Same shape for the CRITICALITY gate (point 298), which shares that ledger and
 # keeps its own per-branch baseline.
 .claude/criticality-review-baseline.json
+# Per-branch baseline for title casing in the open work order. Historical title
+# drift is grandfathered; a point added or edited after this local marker is not.
+.claude/tasks-spec-guard-baseline.json
 # The pre-push gate's memory of the last green unit run (test-file count). Per
 # CHECKOUT on purpose: each worktree has its own dependency tree, and a baseline
 # shared across them would compare two different worlds.

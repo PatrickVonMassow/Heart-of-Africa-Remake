@@ -570,6 +570,12 @@ describe('buildBrief', () => {
     expect(brief).toMatch(/ESCALATE/)
   })
 
+  it('carries the work-order title-casing rule into every delegation brief', () => {
+    const { brief } = buildBrief({ ...args, number: 401 })
+    expect(brief).toMatch(/Point titles use sentence case rather than full uppercase/)
+    expect(brief).toMatch(/acronyms and individual\s+emphasised words may stay capitalised/)
+  })
+
   it('FAILS LOUDLY on an unknown point number', () => {
     expect(() => buildBrief({ ...args, number: 999 })).toThrow(BriefError)
     expect(() => buildBrief({ ...args, number: 999 })).toThrow(/no work-order point 999/)
