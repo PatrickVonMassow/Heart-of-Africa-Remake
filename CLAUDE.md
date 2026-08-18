@@ -316,8 +316,8 @@ coverage map live in `scripts/verify/README.md`.
   error-prone or tagged HIGH criticality is a reason FOR Sol, not against it.
   **Opus 5** authors what is left: a point whose
   VERIFICATION is the work and that nothing marks hard.
-  **FABLE 5 IS THE ESCALATION**: work MOVES there once the review still finds
-  problems after a re-work, and only then — its weekly pool is the scarcest. The cut is
+  **FABLE 5 IS THE ESCALATION**: the cut sends work there only once the review still
+  finds problems after a re-work; its weekly pool is the scarcest. The cut is
   made by `scripts/author-routing-core.mjs`. REVIEWERS:
   the OTHER vendor, never an author of the range —
   Sol at effort HIGH on Claude's work; where SOL authored, CLAUDE reviews, runs the

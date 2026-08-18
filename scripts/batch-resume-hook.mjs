@@ -236,7 +236,7 @@ try {
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
 
-      // rule:model-policy@d7e58641
+      // rule:model-policy@05eaa324
       'MODEL POLICY (25.07.-18.08.2026, CLAUDE.md par.6): AUTHORING HAS THREE LANES. ' +
       'GPT-5.6 Sol authors the points via scripts/author-sol.mjs, and since 18.08.2026 the ' +
       'HARD and CRITICAL ones go STRAIGHT to it — difficult, complex, error-prone or tagged ' +

@@ -40,7 +40,7 @@ export const BG_WAIT_CEILING_OVERRIDE_ENV = 'HOA_BG_WAIT_CEILING_MS'
 /** 0 = wait indefinitely (the runtime's own documented value). */
 export const BG_WAIT_CEILING_DEFAULT = '0'
 
-/** Model policy (CLAUDE.md §6, 25.07./18.08.2026). rule:model-policy@d7e58641
+/** Model policy (CLAUDE.md §6, 25.07./18.08.2026). rule:model-policy@05eaa324
  *  The fallback CHAIN is
  *  Opus 5 → Fable 5 → Opus 4.8, so the SESSION this launcher spawns is Opus 5.
  *  That is the spawn, not the whole policy: the hard and critical points are

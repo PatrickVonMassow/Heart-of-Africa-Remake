@@ -111,15 +111,16 @@ node scripts/author-sol.mjs --point 651 --dry-run  # the prompt and the argv, no
 node scripts/author-sol.mjs --point 651 --findings f.md   # the second leg: answer the review
 ```
 
-<!-- rule:model-policy@d7e58641 -->
+<!-- rule:model-policy@05eaa324 -->
 **The cut is a function, not a taste.** `scripts/author-routing-core.mjs` reads
 the point's own text: the hard cases (difficult, complex, error-prone, or tagged
 HIGH criticality) go **straight to Sol** (user 18.08.2026 — they used to be held
 back for Opus 5, and before that routed to Fable), and so does everything
 mechanical and mid-difficulty. What stays with the main session is a point whose
 VERIFICATION is the work and that nothing marks hard — the picture is judged
-here whoever authored the code, so a hard picture point is Sol's too. Fable is
-reached by ONE route only: `--reworked`. Measured over the whole open queue on
+here whoever authored the code, so a hard picture point is Sol's too. The CUT
+reaches Fable by ONE route only, `--reworked`; a lane tag or an explicit
+override is the operator's own decision, below. Measured over the whole open queue on
 18.08.2026, before and after the change: **203 points → 120 Sol / 0 Fable / 83
 main session**, against 65 / 0 / 138 the day before. A point may
 override the function with `Author lane: sol|fable|opus` **on a line of its

@@ -1,4 +1,4 @@
-// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@d7e58641
+// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@05eaa324
 //
 // The user pays two vendors, and authoring is the largest single item of the
 // spend, so it is split across both rather than sitting on one. It does NOT all
@@ -21,7 +21,8 @@
 //          18.08. ruling outranks this lane, not the other way round.
 //   fable  Fable 5 takes ONE case (user 17.08.2026): work whose re-work the
 //          review still finds problems in. Its weekly pool is the scarcest of
-//          the three, so nothing else is routed there.
+//          the three, so the CUT sends nothing else there — a point's own lane
+//          tag and the caller's override still can, and both are deliberate.
 //
 // WHY A FUNCTION RATHER THAN A JUDGMENT CALL: the point says the cut is named,
 // not guessed. A dispatcher's taste is not reviewable and drifts with whoever
