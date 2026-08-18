@@ -8621,21 +8621,29 @@ to land than a mechanism that needs a review.
   Criticality: medium — a work-order ruling; no player-visible behaviour.
   Bundle: unbundled (review tooling).
 
-- [ ] 722. The mechanism gate's HISTORICAL backlog on main is worked off with the rebuilt planner
-  (measured 18.08.2026 after point 721 landed: 34 outstanding passes, ~3.4M characters for the
-  range 762de1c..main). Point 721 made the debt workable — every pass now has an eligible reviewer
-  by construction and a recorded pass advances the per-contribution baseline — but the reading
-  itself is multi-session work nobody has run, and the moment 721's planner covered the range, the
-  point-714 gap clause stopped degrading the block: the gate hard-blocked every turn end again for
-  a debt no single session can clear. To keep the batch able to END its sessions, the gate's LOCAL
-  baseline on main was advanced to the then-HEAD on 18.08.2026 under point 721's rule 5
-  ("or the range is explicitly re-baselined with a written justification naming every file that
-  re-baselining leaves unread") — the justification and the full unread-file list live in
-  `.claude/mechanism-review-baseline.json` beside the baseline it moved, and THIS point is that
-  justification's tracked half. FINAL STATE:
-  - Every file the re-baseline left unread is read in authorship-cut passes against the range
-    762de1c..b8baae0 and recorded (`node scripts/review-sol.mjs --sha b8baae0 --since 762de1c` plans
-    them; the reviewer per pass is the planner's, cross-vendor by construction), or is explicitly
+- [ ] 722. The mechanism gate's HISTORICAL backlog on main is worked off with the rebuilt planner.
+  Point 721 made the debt workable — every pass has an eligible reviewer by construction and a
+  recorded pass advances the per-contribution baseline — but the reading itself is multi-session
+  work nobody has run, and once 721's planner covered a range the point-714 gap clause stopped
+  degrading the block: the gate hard-blocks every turn end for a debt no single session can clear.
+  TWO ranges are therefore owed, each unblocked at the time by 721's rule 5 ("or the range is
+  explicitly re-baselined with a written justification naming every file that re-baselining leaves
+  unread"), each justification and full unread-file list living in
+  `.claude/mechanism-review-baseline.json` beside the baseline it moved, and THIS point is both
+  justifications' tracked half:
+  - `762de1c..b8baae0` — five weeks of guard work; measured 18.08.2026 after 721 landed: 34
+    outstanding passes, ~3.4M characters.
+  - `53feef3..ee195c7` — point 712's own 46 commits; measured 18.08.2026, 22:55: 65 outstanding
+    passes, ~9.8M characters over 16 files (40 to Sol, 25 to Opus 5) out of a 222k-character diff.
+    That 44x multiplication is the material assembly re-reading a file's WHOLE content at every
+    commit boundary that touched it, so seven mechanism files became 9.8M; point 717's tail is the
+    fix, and until it lands any guard range past a handful of commits re-creates this debt. 712's
+    substance had six cross-vendor rounds and its fixes are in the tree — what the ledger lacks is
+    Sol's clearing read of the FIXED content at the boundaries its round-5/6 refusals named.
+  FINAL STATE:
+  - Every file the two re-baselines left unread is read in authorship-cut passes against its own
+    range and recorded (`node scripts/review-sol.mjs --sha <head> --since <base>` plans them; the
+    reviewer per pass is the planner's, cross-vendor by construction), or is explicitly
     retired here with a reason (a doc file whose content is not a mechanism — CLAUDE.md, TASKS.md,
     docs/tasks-archive.md and the analysis docs are candidates — may be retired as non-mechanism
     material once the material assembly can exclude it, see point 717's tail).
@@ -8645,9 +8653,9 @@ to land than a mechanism that needs a review.
     this point starts (721's rule 4 named it; if a session already cleared it, that is recorded and
     this item is done).
   VERIFIABLE: `node scripts/mechanism-review-guard.mjs --status` on main reports zero outstanding
-  passes for 762de1c..b8baae0 contributions, or names only contributions this point's spec retired
-  with their reasons; the criticality gate holds no open finding for point 700.
+  passes for the contributions of BOTH ranges, or names only contributions this point's spec
+  retired with their reasons; the criticality gate holds no open finding for point 700.
   Criticality: high — it is the four-eyes principle's actual coverage of five weeks of guard work;
-  the re-baseline that unblocked the batch is honest only while this reading is owed and scheduled.
+  a re-baseline that unblocked the batch is honest only while this reading is owed and scheduled.
   Author lane: Sol.
   Bundle: unbundled (review tooling).
