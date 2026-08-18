@@ -105,6 +105,17 @@ if (argv[0] === '--version') {
 }
 const out = argv[argv.indexOf('-o') + 1]
 const model = argv[argv.indexOf('-m') + 1]
+if (process.env.STUB_MODE === 'no-receipt') {
+  // The child this mode plays EXITS WITHOUT EVER READING ITS STDIN (finding 8;
+  // round-1 pass 4): the earlier stub read everything first and only withheld
+  // the token, which tested a different child — one that DID read. Answering
+  // before the first read is what makes the receipt impossible to echo for the
+  // honest reason.
+  const answer = process.env.STUB_ANSWER || 'VERDICT: merge\\nEVIDENCE: read the whole range and both test files'
+  if (out) writeFileSync(out, answer)
+  process.stdout.write(answer)
+  process.exit(0)
+}
 // What arrived on stdin is recorded: the material travels that way, and an
 // assertion on the caller's own log message would stay green without it.
 let stdin = ''
