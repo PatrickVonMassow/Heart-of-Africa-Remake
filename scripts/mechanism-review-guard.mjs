@@ -26,7 +26,7 @@
 // CLI:
 //   node scripts/mechanism-review-guard.mjs --status
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { execSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
 import { dirname } from 'node:path'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
@@ -78,10 +78,16 @@ const HEADER_RE = new RegExp(`^${REC}([0-9a-f]{40})${FLD}(\\d+)$`)
 
 const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
-/** The same call UNTRIMMED — for output whose last line is a PATH: trimming the
- *  whole log would strip a real trailing space off that path along with the
- *  final newline (cross-vendor review, third round). */
-const gitRaw = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })
+/** The NO-SHELL lane for the two path-carrying commands (round-5 pass 3): on
+ *  Windows, execSync routes through cmd.exe, which expands `%x1e%`-shaped
+ *  spans as environment variables BEFORE git sees the format string — the
+ *  headers then never appear and an empty parse would clear the gate. An args
+ *  array through execFileSync reaches git verbatim on every platform. The
+ *  output is UNTRIMMED — its last line can be a PATH, and trimming the log
+ *  would strip a real trailing space off it (cross-vendor review, third
+ *  round). */
+const gitRawFile = (args) =>
+  execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })
 
 /**
  * True when `sha` names no reachable commit — the ONE condition under which an
@@ -268,16 +274,32 @@ function commitFacts(sha) {
  *    delete + add, BOTH spellings are listed and the old guard path still
  *    demands its review.
  */
-export const mechanismLogCommand = (base, head) =>
-  // %x1e/%x1f are expanded by GIT, so the command line itself stays ASCII and
-  // the separators reach the output as raw control bytes no quoted path can
-  // carry (round-4 pass 3).
-  `-c core.quotepath=on log --format="%x1e%H%x1f%ct" --name-only --no-renames --diff-merges=cc --reverse "${base}..${head}"`
+export const mechanismLogCommand = (base, head) => [
+  // %x1e/%x1f are expanded by GIT, so the arguments stay ASCII and the
+  // separators reach the output as raw control bytes no quoted path can carry
+  // (round-4 pass 3). AS AN ARGS ARRAY, never a shell line (round-5 pass 3):
+  // cmd.exe expands %-spans as environment variables before git runs.
+  '-c',
+  'core.quotepath=on',
+  'log',
+  '--format=%x1e%H%x1f%ct',
+  '--name-only',
+  '--no-renames',
+  '--diff-merges=cc',
+  '--reverse',
+  `${base}..${head}`,
+]
 
-export const rangeFilesCommand = (base, sha) => `diff --name-only -z --no-renames "${base}..${sha}"`
+export const rangeFilesCommand = (base, sha) => [
+  'diff',
+  '--name-only',
+  '-z',
+  '--no-renames',
+  `${base}..${sha}`,
+]
 
 function mechanismCommits(base, head, files) {
-  const out = gitRaw(mechanismLogCommand(base, head))
+  const out = gitRawFile(mechanismLogCommand(base, head))
   return parseMechanismLog(out, files).map((commit) => {
     const facts = commitFacts(commit.sha)
     return {
@@ -381,7 +403,7 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
     // a DIFFERENT file set on a branch whose baseline is no ancestor —
     // main-only changes leak in, identical branch changes vanish — so the
     // completeness demand and the detection would talk about different ranges.
-    rangeFiles: (sha) => gitRaw(rangeFilesCommand(base, sha)).split('\0').filter(Boolean),
+    rangeFiles: (sha) => gitRawFile(rangeFilesCommand(base, sha)).split('\0').filter(Boolean),
   })
 
   return {

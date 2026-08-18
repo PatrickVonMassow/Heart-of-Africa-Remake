@@ -180,14 +180,31 @@ describe('the path-carrying git commands', () => {
   // passes with the option after `--`, after the revision, or overridden by a
   // later flag — none of which is the config-proof, rename-split command the
   // guard depends on. The exact string is the claim.
-  it('builds the log command config-proof and rename-split, exactly', () => {
-    expect(mechanismLogCommand('base', 'head')).toBe(
-      '-c core.quotepath=on log --format="%x1e%H%x1f%ct" --name-only --no-renames --diff-merges=cc --reverse "base..head"',
-    )
+  it('builds the log command config-proof and rename-split, exactly — as an args ARRAY', () => {
+    // An array, never a shell line (round-5 pass 3): cmd.exe expands
+    // %x1e%-shaped spans as environment variables before git runs, and the
+    // gate would then parse an output with no headers at all — and clear.
+    expect(mechanismLogCommand('base', 'head')).toEqual([
+      '-c',
+      'core.quotepath=on',
+      'log',
+      '--format=%x1e%H%x1f%ct',
+      '--name-only',
+      '--no-renames',
+      '--diff-merges=cc',
+      '--reverse',
+      'base..head',
+    ])
   })
 
-  it('builds the range listing raw (-z) and rename-split, exactly', () => {
-    expect(rangeFilesCommand('base', 'sha')).toBe('diff --name-only -z --no-renames "base..sha"')
+  it('builds the range listing raw (-z) and rename-split, exactly — as an args ARRAY', () => {
+    expect(rangeFilesCommand('base', 'sha')).toEqual([
+      'diff',
+      '--name-only',
+      '-z',
+      '--no-renames',
+      'base..sha',
+    ])
   })
 })
 

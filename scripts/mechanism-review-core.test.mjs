@@ -79,6 +79,17 @@ describe('isMechanismPath', () => {
     expect(isMechanismPath('scripts/render-verify-state.mjs', opts)).toBe(false)
   })
 
+  it('strips at most one .test then one -core — repeated suffixes are no decoration (round-5 pass 2)', () => {
+    // The repository writes `x-core.mjs` and `x-core.test.mjs` beside
+    // `x-guard.mjs` — never `x-core-core.mjs`. An unbounded strip classified
+    // that alien name off a guard it does not belong to.
+    const files = ['render-verify-guard.mjs']
+    expect(isMechanismPath('scripts/render-verify-core.mjs', { scriptFiles: files })).toBe(true)
+    expect(isMechanismPath('scripts/render-verify-core.test.mjs', { scriptFiles: files })).toBe(true)
+    expect(isMechanismPath('scripts/render-verify-core-core.mjs', { scriptFiles: files })).toBe(false)
+    expect(isMechanismPath('scripts/render-verify.test-core.mjs', { scriptFiles: files })).toBe(false)
+  })
+
   it('catches the two files that disarm the chain without matching any name rule', () => {
     // The Stop-chain registration and the spawned-hook proof: deleting one line
     // of the first silently kills any guard, and gutting the second removes the
@@ -338,7 +349,7 @@ describe('evaluateMechanismReview', () => {
   const commit = (over = {}) => ({
     sha: 'c'.repeat(40),
     subject: 'Give the pre-push gate its fast path',
-    at: 1000,
+    at: 1_787_000_000_000,
     authorModel: 'Claude Opus 5',
     files: ['scripts/pre-push-gate-core.mjs'],
     coveringRecordShas: [],
@@ -591,8 +602,8 @@ describe('evaluateMechanismReview', () => {
       head: 'h',
       pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40), 'd'.repeat(40)] })],
       records: [
-        record({ verdict: 'do-not-merge', at: 1000 }),
-        record({ sha: 'd'.repeat(40), verdict: 'merge-with-fixes', at: 5000 }),
+        record({ verdict: 'do-not-merge', at: 1_787_000_001_000 }),
+        record({ sha: 'd'.repeat(40), verdict: 'merge-with-fixes', at: 1_787_000_005_000 }),
       ],
     })
     expect(v.block).toBe(false)
@@ -1435,7 +1446,7 @@ describe('the mode is required to WRITE a record, never to READ one', () => {
     model: 'Fable 5',
     verdict: 'merge',
     evidence: 'a verdict recorded before --mode existed',
-    at: 1,
+    at: 1_710_000_000_000,
     ...over,
   })
   const commit = (over = {}) => ({
@@ -1465,6 +1476,29 @@ describe('the mode is required to WRITE a record, never to READ one', () => {
       records: [legacy({ mode: 'review' })],
     })
     expect(v.block).toBe(false)
+  })
+
+  it('a wrong-SCALE timestamp cannot stand either — the ledger domain is milliseconds (round-5 pass 1)', () => {
+    // `at: 1`, or a seconds-scale epoch, is positive and finite — and loses
+    // every "later than" comparison, so a refusal dated that way could be read
+    // as answered by an earlier merge on a descendant.
+    const base = {
+      sha: 'c'.repeat(40),
+      model: 'GPT-5.6 Sol',
+      authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+      evidence: 'checked the guard change against its spec end to end',
+      mode: 'review',
+      verdict: 'merge',
+    }
+    for (const at of [1, 1_787_027_296, 4_102_444_800_001]) {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+        records: [{ ...base, at }],
+      })
+      expect(v.block, `at=${at}`).toBe(true)
+    }
   })
 
   it('a non-finite timestamp cannot out-stand a later do-not-merge (round-3 pass 1)', () => {

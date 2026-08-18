@@ -319,13 +319,16 @@ describe('a binary file is declared, never dropped or mangled', () => {
   })
 
   it('declares it and stays complete where the GIT binary patch carries the bytes', () => {
+    // Real `git diff --binary` payload lines (round-5 pass 5: a hand-made line
+    // whose length letter contradicts its data length is one real git never
+    // writes, and blessing it blessed arbitrary text).
     const gitBinSection = [
       'diff --git a/img.png b/img.png',
       'new file mode 100644',
       'index 0000000..1111111',
       'GIT binary patch',
-      'literal 8',
-      'Pc$~sf00001',
+      'literal 6',
+      'NcmWHKh>T)n0ssa+0cHRI',
     ].join('\n')
     const out = assembleMaterial({
       stat: 's',
@@ -437,15 +440,27 @@ describe('a binary file is declared, never dropped or mangled', () => {
   it('a GIT binary patch with NO payload delivers nothing (round-3 pass 5)', () => {
     // The header alone — or a length line with no base85 data line after it —
     // carries no bytes, and blessing it as delivered would let an empty
-    // binary patch clear real content. The delta form is held to the same
-    // payload demand as the literal form.
+    // binary patch clear real content.
     expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch')).toBe(false)
     expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5')).toBe(false)
     expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5\n')).toBe(false)
+  })
+
+  it('a DELTA binary patch never delivers — its base blob is deliberately not sent (round-5 pass 4)', () => {
+    // A delta stream reconstructs the bytes FROM THE ORIGINAL, and binary
+    // contents never travel in review material — a reviewer holding a valid
+    // delta still holds nothing readable.
     expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\ndelta 5')).toBe(false)
     expect(
       binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\ndelta 6\nNcmWHKh>T)n0ssa+0cHRI'),
-    ).toBe(true)
+    ).toBe(false)
+  })
+
+  it('a payload line whose length letter contradicts its data is no payload (round-5 pass 5)', () => {
+    // M declares 13 decoded bytes, which demands 20 data characters — 9 is a
+    // line real git never writes, and 'any nonempty text' blessed it.
+    expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5\nMcmb=d0001')).toBe(false)
+    expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5\n#not base85')).toBe(false)
   })
 
   it('refuses the declaration when the patch does not back it, exactly like patch-only', () => {

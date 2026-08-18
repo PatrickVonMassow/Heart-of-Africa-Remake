@@ -136,14 +136,30 @@ function classifiesAsMechanism(p, scriptFiles) {
   if (!m) return false
   const name = m[1]
   if (/-(guard|gate)\b/.test(name)) return true
-  // "beside one": strip the trailing -core / .test decorations and ask whether a
-  // guard or gate of that stem exists in the same directory.
+  // "beside one": strip the decorations the repository actually writes — at
+  // most one `.test`, then at most one `-core`, in that order (round-5 pass 2:
+  // an unbounded loop also stripped `foo-core-core`, a name no tool here
+  // produces, and classified it off a guard it does not belong to).
   let stem = name
-  for (let i = 0; i < 4 && /(-core|\.test)$/.test(stem); i++) stem = stem.replace(/(-core|\.test)$/, '')
+  if (stem.endsWith('.test')) stem = stem.slice(0, -'.test'.length)
+  if (stem.endsWith('-core')) stem = stem.slice(0, -'-core'.length)
   if (!stem) return false
   const files = Array.isArray(scriptFiles) ? scriptFiles : []
   return files.includes(`${stem}-guard.mjs`) || files.includes(`${stem}-gate.mjs`)
 }
+
+/** The millisecond-epoch domain a ledger `at` must live in (round-5 pass 1):
+ *  a positive number alone still let `at: 1` — or a seconds-scale epoch —
+ *  stand, and any such value loses every "later than" comparison against real
+ *  rows, so a refusal dated that way could be read as answered by an earlier
+ *  merge. Bounds: the project predates none of its rows (2026), so anything
+ *  before Nov 2023 in ms is wrong-scale or forged; anything past 2100 is a
+ *  forgery that would out-stand every future row. Shared with the criticality
+ *  gate, which reads the same ledger. */
+export const LEDGER_AT_MIN_MS = 1_700_000_000_000
+export const LEDGER_AT_MAX_MS = 4_102_444_800_000
+export const ledgerAtUsable = (at) =>
+  typeof at === 'number' && Number.isFinite(at) && at >= LEDGER_AT_MIN_MS && at <= LEDGER_AT_MAX_MS
 
 /** The mechanism paths out of a commit's file list. */
 export function mechanismPathsIn(paths, opts) {
@@ -1033,12 +1049,11 @@ export function evaluateMechanismReview({
         VERDICTS.includes(String(r.verdict)) &&
         String(r.model ?? '').trim() &&
         // A NON-NUMERIC TIMESTAMP DEFEATS THE ORDERING (round-3 pass 1,
-        // tightened by round-4: Number(null) and Number('') are 0, so the
-        // coercing test accepted rows with no timestamp at all): the recorder
-        // writes `at` as a positive number, and only that shape may stand.
-        typeof r?.at === 'number' &&
-        Number.isFinite(r.at) &&
-        r.at > 0 &&
+        // tightened twice: Number(null) is 0, and a positive-but-seconds-scale
+        // value still loses every comparison against real rows — round-5
+        // pass 1). The recorder writes `at` as a millisecond epoch, and only
+        // that DOMAIN may stand.
+        ledgerAtUsable(r?.at) &&
         evidenceUsable(r) &&
         modeUsable(r),
     )

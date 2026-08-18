@@ -203,16 +203,34 @@ export function binarySectionDeliversChange(text) {
   const lines = String(text ?? '').split('\n')
   const at = lines.indexOf('GIT binary patch')
   if (at >= 0) {
-    // THE BYTES MUST ACTUALLY BE THERE (round-3 pass 5): the header alone, or
-    // a `literal N` with no base85 data line after it, delivers nothing — and
-    // a fixture blessing that shape as delivered would let an empty binary
-    // patch clear real bytes. Delivered means: a literal/delta length line AND
-    // at least one non-empty payload line following it.
+    // THE BYTES MUST ACTUALLY BE THERE (round-3 pass 5, tightened twice):
+    //  - only the LITERAL form delivers (round-5 pass 4): a delta stream needs
+    //    the ORIGINAL blob to reconstruct the bytes, and binary contents are
+    //    deliberately never sent — a reviewer holding a delta holds nothing;
+    //  - the first payload line must be a WELL-FORMED git base85 line (round-5
+    //    pass 5): its leading letter encodes 1..52 decoded bytes, and the data
+    //    must be exactly the ceil(bytes/4)*5 characters that length demands —
+    //    "any non-empty text" blessed payloads real git would never write.
     const length = lines[at + 1] ?? ''
-    const payload = lines[at + 2] ?? ''
-    return /^(?:literal|delta) \d+$/.test(length) && payload.trim() !== ''
+    return /^literal \d+$/.test(length) && isBase85PayloadLine(lines[at + 2] ?? '')
   }
   return !lines.some((line) => /^Binary files .* differ$/.test(line))
+}
+
+/** One line of git's base85 binary-patch payload, validated against its own
+ *  declared length (see base85.c: length letter A..Z = 1..26, a..z = 27..52,
+ *  then 5 encoded characters per 4 decoded bytes). */
+function isBase85PayloadLine(line) {
+  const s = String(line ?? '')
+  if (!s) return false
+  const c = s.charCodeAt(0)
+  let bytes = 0
+  if (c >= 65 && c <= 90) bytes = c - 64
+  else if (c >= 97 && c <= 122) bytes = c - 70
+  else return false
+  const data = s.slice(1)
+  if (data.length !== Math.ceil(bytes / 4) * 5) return false
+  return /^[0-9A-Za-z!#$%&()*+;<=>?@^_`{|}~-]+$/.test(data)
 }
 
 /**
@@ -1057,9 +1075,20 @@ function lostLines(shortfall) {
 /** The passes the caller is sent to instead, from the plan or from the shortfall. */
 function passLines(shortfall, plan) {
   const passes = plan && !plan.fits ? plan.passes : (shortfall.passes ?? [])
-  const lines = passes.map(
-    (pass) => `    --pass ${pass.index}   ${(pass.files ?? []).map((p) => quotePassFile(p)).join(', ')}`,
-  )
+  // A SPLIT OF ONE CANNOT BE RECORDED here either (round-5 pass 4): the same
+  // rule formatBudgetNotice applies — the recorder refuses totals below 2, so
+  // pointing the caller at `--pass 1` of a one-pass plan sends them to a
+  // command whose record is refused.
+  const recordable = passes.length >= 2
+  const lines = recordable
+    ? passes.map(
+        (pass) => `    --pass ${pass.index}   ${(pass.files ?? []).map((p) => quotePassFile(p)).join(', ')}`,
+      )
+    : [
+        '  This range packs into ONE coverable pass beside what is beyond reach, and a split of',
+        '  one cannot be recorded as passes. No record can cover this range: narrow the range,',
+        '  or split the change itself.',
+      ]
   const beyond = plan && !plan.fits ? plan.uncoverable : (shortfall.uncoverable ?? [])
   if (beyond?.length) {
     lines.push(
@@ -1124,18 +1153,31 @@ export function formatShortfall(shortfall, { sha = '', plan = null } = {}) {
       )
       return lines.join('\n')
     }
+    const splitCount = (plan && !plan.fits ? plan.passes : (shortfall.passes ?? [])).length
     lines.push(
-      `  A record here would clear every commit in the range. Review it in the ${(shortfall.passes ?? []).length}`,
-      '  PASSES over the file set instead — each pass records what it actually read:',
+      ...(splitCount >= 2
+        ? [
+            `  A record here would clear every commit in the range. Review it in the ${splitCount}`,
+            '  PASSES over the file set instead — each pass records what it actually read:',
+          ]
+        : ['  A record here would clear every commit in the range — and no recordable split exists:']),
       ...passLines(shortfall, plan),
     )
     return lines.join('\n')
   }
+  const splitCount = (plan && !plan.fits ? plan.passes : (shortfall.passes ?? [])).length
   lines.push(
     `  The material budget is ${shortfall.budget} characters and the complete material is ${shortfall.rawSize}.`,
     ...lostLines(shortfall),
-    '  A record here would clear every commit in the range, including these files. Review the',
-    '  range in PASSES over the file set instead — each pass records what it actually read:',
+    ...(splitCount >= 2
+      ? [
+          '  A record here would clear every commit in the range, including these files. Review the',
+          '  range in PASSES over the file set instead — each pass records what it actually read:',
+        ]
+      : [
+          '  A record here would clear every commit in the range, including these files — and no',
+          '  recordable split exists:',
+        ]),
     ...passLines(shortfall, plan),
   )
   return lines.join('\n')

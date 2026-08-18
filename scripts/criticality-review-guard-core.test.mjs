@@ -33,7 +33,7 @@ const record = (over = {}) => ({
   authoredBy: OPUS,
   verdict: CLEARING_VERDICT,
   evidence: 'read the core and ran the gate against a synthetic tick',
-  at: 1000,
+  at: 1_787_000_000_000,
   reachable: true,
   descendsFrom: [],
   ...over,
@@ -217,15 +217,15 @@ describe('evaluateCriticalityReview', () => {
   })
 
   it('ALLOWS once a later merge on a DESCENDANT commit answers the refusal', () => {
-    const refused = record({ sha: 'a'.repeat(40), verdict: 'do-not-merge', at: 1000 })
-    const answered = record({ sha: 'b'.repeat(40), verdict: 'merge', at: 2000, descendsFrom: ['a'.repeat(40)] })
+    const refused = record({ sha: 'a'.repeat(40), verdict: 'do-not-merge', at: 1_787_000_001_000 })
+    const answered = record({ sha: 'b'.repeat(40), verdict: 'merge', at: 1_787_000_002_000, descendsFrom: ['a'.repeat(40)] })
     const v = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [refused, answered] })
     expect(v.block).toBe(false)
   })
 
   it('BLOCKS when the later merge judges the SAME commit — nothing was fixed between them', () => {
-    const refused = record({ sha: 'a'.repeat(40), verdict: 'do-not-merge', at: 1000 })
-    const rerun = record({ sha: 'a'.repeat(40), verdict: 'merge', at: 2000, descendsFrom: [] })
+    const refused = record({ sha: 'a'.repeat(40), verdict: 'do-not-merge', at: 1_787_000_001_000 })
+    const rerun = record({ sha: 'a'.repeat(40), verdict: 'merge', at: 1_787_000_002_000, descendsFrom: [] })
     const v = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [refused, rerun] })
     expect(v.block).toBe(true)
     expect(v.findings[0].kind).toBe('unanswered')
@@ -233,8 +233,8 @@ describe('evaluateCriticalityReview', () => {
   })
 
   it('BLOCKS when the answering merge is older in time than the refusal it claims to answer', () => {
-    const refused = record({ sha: 'b'.repeat(40), verdict: 'do-not-merge', at: 3000 })
-    const stale = record({ sha: 'a'.repeat(40), verdict: 'merge', at: 1000 })
+    const refused = record({ sha: 'b'.repeat(40), verdict: 'do-not-merge', at: 1_787_000_003_000 })
+    const stale = record({ sha: 'a'.repeat(40), verdict: 'merge', at: 1_787_000_001_000 })
     // `stale` sits BELOW the refusal in history, so it cannot descend from it.
     const v = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [refused, stale] })
     expect(v.block).toBe(true)

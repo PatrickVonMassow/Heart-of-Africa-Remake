@@ -926,6 +926,11 @@ describe('a range too large for one round', () => {
     // toContain. Pass 1 of this fixture holds exactly the first bulk file.
     const passFiles = /--pass-files "([^"]*)"/.exec(r.stdout)?.[1]
     expect(passFiles).toBe('bulk-a.txt')
+    // The hand-off template carries the not-cleared warning and the ledger
+    // pointer too (round-5 pass 6) — a fallback pass template without it read
+    // like a cleared range.
+    expect(r.stdout).toContain('NOT cleared until every pass 1..2 is recorded')
+    expect(r.stdout).toContain('mechanism-review.mjs --list')
     expect(calls()).toEqual([])
     rmSync(shareFile, { force: true })
   })

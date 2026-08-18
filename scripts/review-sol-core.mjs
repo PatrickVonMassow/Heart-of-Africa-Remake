@@ -787,6 +787,19 @@ export function formatReviewReport({
     point,
     pass,
   })
+  // EVERY pass template carries the not-cleared warning — the fallback and
+  // role-swap templates included (round-5 pass 6) — and the way to the
+  // remainder consults the LEDGER, not the pass number (round-4 pass 6):
+  // passes run in any order, so "next: k+1" recommended recorded passes and
+  // fell silent on unrecorded ones. This formatter is pure and cannot read
+  // the ledger, so it points at the listing that can.
+  const passWarning = pass
+    ? [
+        '',
+        `  The range is NOT cleared until every pass 1..${pass.total} is recorded — ` +
+          'node scripts/mechanism-review.mjs --list shows which already are.',
+      ]
+    : []
   if (!decision.fellBack) {
     const scope = pass
       ? ` (PASS ${pass.index}/${pass.total} — ${(pass.files ?? []).length} file(s) of a range too large for one round)`
@@ -797,19 +810,7 @@ export function formatReviewReport({
       '',
       'Record it (the model named is the one that actually ran):',
       `  ${cmd}`,
-      // EVERY pass carries the not-cleared warning (round-3 pass 6), and the
-      // way to the remainder consults the LEDGER, not the pass number (round-4
-      // pass 6): passes run in any order, so "next: k+1" recommended recorded
-      // passes and fell silent on unrecorded ones whenever the highest number
-      // ran first. This formatter is pure and cannot read the ledger, so it
-      // points at the listing that can.
-      ...(pass
-        ? [
-            '',
-            `  The range is NOT cleared until every pass 1..${pass.total} is recorded — ` +
-              'node scripts/mechanism-review.mjs --list shows which already are.',
-          ]
-        : []),
+      ...passWarning,
     ].join('\n')
   }
   // The prose names the model the DECISION picked, not the usual one: where
@@ -834,6 +835,7 @@ export function formatReviewReport({
       '  Record what IT says — never a verdict this command invented:',
       '',
       `     ${cmd}`,
+      ...passWarning,
     ].join('\n')
   }
   if (!who) {
@@ -870,5 +872,6 @@ export function formatReviewReport({
     `  1. give ${who} the commit and the brief above,`,
     `  2. then record its verdict — never this command's:`,
     `     ${cmd}`,
+    ...passWarning,
   ].join('\n')
 }

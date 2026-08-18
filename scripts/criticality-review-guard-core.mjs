@@ -28,7 +28,7 @@
 // Side-effect free — the git work, the state file and the block belong to
 // scripts/criticality-review-guard.mjs (fail-open). Pinned by
 // criticality-review-guard-core.test.mjs.
-import { MODES, VERDICTS, sameModel } from './mechanism-review-core.mjs'
+import { ledgerAtUsable, MODES, VERDICTS, sameModel } from './mechanism-review-core.mjs'
 
 /** The ONE verdict that lets a high-criticality point be declared finished. */
 export const CLEARING_VERDICT = 'merge'
@@ -172,11 +172,10 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
       (r) =>
         VERDICTS.includes(String(r.verdict)) &&
         String(r.model ?? '').trim() &&
-        // Typed, not coerced (round-4 pass 1): Number(null) is 0, which is
-        // finite, so a row with no timestamp at all passed the coercing test.
-        typeof r?.at === 'number' &&
-        Number.isFinite(r.at) &&
-        r.at > 0,
+        // Typed AND in the millisecond domain (rounds 4/5, pass 1): Number(null)
+        // is 0, and a seconds-scale or `at: 1` row loses every "later than"
+        // comparison, letting an earlier merge read a later refusal as answered.
+        ledgerAtUsable(r?.at),
     )
     // A self-review in the ledger is worse than none: the gate would read green.
     // Refused at the record command too, but re-checked here — the ledger is a
