@@ -378,19 +378,32 @@ if (isMainModule(import.meta.url)) {
       // EVERY FREE-TEXT FIELD RENDERS AS ONE LINE (landing-round pass 4):
       // readRecords validates only the sha, and a hand-edited row with a
       // newline in any field forged arbitrary listing lines — the shape a
-      // reader greps and trusts. Control characters flatten to one space.
-      const oneLine = (v) => String(v ?? '').replace(/\s+/g, ' ')
-      // …and the pass CLAIM is validated before it is rendered: Number() turns
-      // any decorated or multi-line index into NaN, and a claim that is not a
-      // plausible k-of-n is printed as the malformed hand-edit it is.
+      // reader greps and trusts. Whitespace runs flatten to one space, and
+      // TERMINAL CONTROLS (ESC and the other C0/C1 bytes, which \s does not
+      // cover) are dropped outright — a hand-edited field must not drive the
+      // reader's terminal either.
+      const oneLine = (v) =>
+        String(v ?? '')
+          .replace(/\s+/g, ' ')
+          // eslint-disable-next-line no-control-regex
+          .replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
+      // …and the pass CLAIM is validated whole before it is rendered: Number()
+      // turns any decorated or multi-line index into NaN, a files value that
+      // is no array is part of the malformed claim, and a claim that is not a
+      // plausible k-of-n over a file list is printed as the hand-edit it is.
       const passLine = (p) => {
         const index = Number(p?.index)
         const total = Number(p?.total)
         const files = (Array.isArray(p?.files) ? p.files : []).map((q) => quotePassFile(q)).join(', ')
-        const shaped = Number.isSafeInteger(index) && Number.isSafeInteger(total) && index >= 1 && index <= total
+        const shaped =
+          Number.isSafeInteger(index) &&
+          Number.isSafeInteger(total) &&
+          index >= 1 &&
+          index <= total &&
+          Array.isArray(p?.files)
         return shaped
           ? `\n      pass ${index}/${total} over: ${files}`
-          : `\n      pass (MALFORMED claim ${oneLine(JSON.stringify({ index: p?.index, total: p?.total })).slice(0, 80)}) over: ${files}`
+          : `\n      pass (MALFORMED claim ${oneLine(JSON.stringify({ index: p?.index, total: p?.total, files: Array.isArray(p?.files) ? undefined : p?.files })).slice(0, 100)}) over: ${files}`
       }
       for (const r of records) {
         console.log(

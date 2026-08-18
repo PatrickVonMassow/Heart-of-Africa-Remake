@@ -1251,9 +1251,12 @@ export function formatShortfall(shortfall, { sha = '', plan = null } = {}) {
       )
       return lines.join('\n')
     }
+    // The SAME recordability predicate as passLines (landing-round pass 5): a
+    // plan past MAX_PASS_TOTAL was introduced as reviewable passes on the
+    // line above the refusal that says none can be recorded.
     const splitCount = (plan && !plan.fits ? plan.passes : (shortfall.passes ?? [])).length
     lines.push(
-      ...(splitCount >= 2
+      ...(splitCount >= 2 && splitCount <= MAX_PASS_TOTAL
         ? [
             `  A record here would clear every commit in the range. Review it in the ${splitCount}`,
             '  PASSES over the file set instead — each pass records what it actually read:',
@@ -1267,7 +1270,7 @@ export function formatShortfall(shortfall, { sha = '', plan = null } = {}) {
   lines.push(
     `  The material budget is ${shortfall.budget} characters and the complete material is ${shortfall.rawSize}.`,
     ...lostLines(shortfall),
-    ...(splitCount >= 2
+    ...(splitCount >= 2 && splitCount <= MAX_PASS_TOTAL
       ? [
           '  A record here would clear every commit in the range, including these files. Review the',
           '  range in PASSES over the file set instead — each pass records what it actually read:',
@@ -1457,8 +1460,21 @@ export function passComposition(records = [], { expect = null } = {}) {
     // below runs 1..total, and an unbounded hand-written total would hang it —
     // past safe-integer precision `i++` stops advancing at all. A row outside
     // the bound composes nothing; at the gate its bare `pass` field still
-    // poisons the pass-less shortcut.
-    if (!Number.isInteger(total) || total < 2 || total > MAX_PASS_TOTAL || !Number.isInteger(index)) continue
+    // poisons the pass-less shortcut. THE INDEX IS BOUNDED TO ITS TOTAL TOO
+    // (landing-round pass 5): a hand-written `3/2` row entered the group, its
+    // FILES joined the coverage union, and a composition could read complete
+    // over a file no valid pass ever named — the recorder refuses such a row,
+    // so it contributes nothing here either.
+    if (
+      !Number.isInteger(total) ||
+      total < 2 ||
+      total > MAX_PASS_TOTAL ||
+      !Number.isInteger(index) ||
+      index < 1 ||
+      index > total
+    ) {
+      continue
+    }
     const key = `${String(record.sha ?? '')}|${total}`
     if (!groups.has(key)) groups.set(key, { sha: String(record.sha ?? ''), total, byIndex: new Map(), records: [] })
     const group = groups.get(key)

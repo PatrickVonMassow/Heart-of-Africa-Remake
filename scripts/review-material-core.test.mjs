@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { deflateSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import {
   assembleMaterial,
@@ -14,6 +15,7 @@ import {
   manifestAllowance,
   MATERIAL_BUDGET_CHARS,
   materialShortfall,
+  MAX_INFLATED_BINARY_BYTES,
   MAX_PASS_TOTAL,
   parseDiffHeader,
   parsePassFiles,
@@ -471,18 +473,45 @@ describe('a binary file is declared, never dropped or mangled', () => {
     ).toBe(false)
   })
 
-  it('refuses a declaration past the inflation bound WITHOUT inflating it (landing-round pass 5)', () => {
-    // inflateSync without an output bound hands an attacker-controlled stream
-    // the process's memory: a highly compressible literal can declare and
-    // deliver gigabytes from a few fitting lines. The declaration is refused
-    // off its size alone, and the inflate itself runs under maxOutputLength.
-    const bomb = [
-      'diff --git a/x.bin b/x.bin',
-      'GIT binary patch',
-      `literal ${64 * 1024 * 1024 + 1}`,
-      'NcmWHKh>T)n0ssa+0cHRI',
-    ].join('\n')
-    expect(binarySectionDeliversChange(bomb)).toBe(false)
+  // git's own base85 (base85.c), so the boundary cases below are REAL streams
+  // a bound regression would genuinely mis-handle — not fixtures that fail for
+  // an unrelated reason (landing-round pass 6).
+  const B85 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~'
+  const b85Lines = (buf) => {
+    const lines = []
+    for (let off = 0; off < buf.length; off += 52) {
+      const chunk = buf.subarray(off, Math.min(off + 52, buf.length))
+      const len = chunk.length
+      let line = String.fromCharCode(len <= 26 ? 64 + len : 70 + len)
+      for (let g = 0; g < len; g += 4) {
+        let acc = 0
+        for (let k = 0; k < 4; k++) acc = acc * 256 + (chunk[g + k] ?? 0)
+        const five = []
+        for (let k = 0; k < 5; k++) {
+          five.unshift(B85[acc % 85])
+          acc = Math.floor(acc / 85)
+        }
+        line += five.join('')
+      }
+      lines.push(line)
+    }
+    return lines
+  }
+  const literalSection = (bytes, declared = bytes.length) =>
+    ['diff --git a/x.bin b/x.bin', 'GIT binary patch', `literal ${declared}`, ...b85Lines(deflateSync(bytes))].join(
+      '\n',
+    )
+
+  it('bounds the inflation at the declaration and at the hard cap (landing-round passes 5 and 6)', () => {
+    // A REAL compressible stream: 1 MiB of zeros deflates to ~1 KiB. Declared
+    // truthfully it delivers; declared past the hard cap it is refused off the
+    // declaration alone, before anything inflates.
+    const meg = Buffer.alloc(1024 * 1024)
+    expect(binarySectionDeliversChange(literalSection(meg))).toBe(true)
+    expect(binarySectionDeliversChange(literalSection(meg, MAX_INFLATED_BINARY_BYTES + 1))).toBe(false)
+    // A stream that would inflate PAST its own declaration is stopped by the
+    // output bound (the declared length is the most validation may produce).
+    expect(binarySectionDeliversChange(literalSection(meg, 16))).toBe(false)
     // A non-integer or absurd declaration refuses the same way.
     expect(
       binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 99999999999999999999\nNcmWHKh>T)n0ssa+0cHRI'),
@@ -725,6 +754,14 @@ describe('the patch, split per file', () => {
     // rewrite the header above it.
     const lookahead = ['index 1..2 100644', '@@ -1 +1 @@', '+rename to smuggled.txt']
     expect(parseDiffHeader('diff --git a/old.txt b/new b/dest.txt', lookahead)).toEqual({
+      a: 'old.txt b/new',
+      b: 'dest.txt',
+    })
+    // …and at the NEXT FILE too (landing-round pass 6): rename metadata of a
+    // FOLLOWING section — a hunkless metadata-only diff right below — must not
+    // leak upward into this header either.
+    const nextFile = ['index 1..2 100644', 'diff --git a/other.txt b/other2.txt', 'rename from other.txt', 'rename to smuggled.txt']
+    expect(parseDiffHeader('diff --git a/old.txt b/new b/dest.txt', nextFile)).toEqual({
       a: 'old.txt b/new',
       b: 'dest.txt',
     })
@@ -1377,6 +1414,24 @@ describe('the pass flag', () => {
     expect(parsePassSpec('0/3').ok).toBe(false)
   })
 
+  it('accepts exactly MAX_PASS_TOTAL and refuses one more (landing-round pass 6)', () => {
+    // The boundary itself, on both surfaces an off-by-one would slip through.
+    expect(parsePassSpec(`1/${MAX_PASS_TOTAL}`)).toMatchObject({ ok: true, total: MAX_PASS_TOTAL })
+    expect(parsePassSpec(`1/${MAX_PASS_TOTAL + 1}`).ok).toBe(false)
+    const rec = (index, total) => ({
+      sha: 'c'.repeat(40),
+      at: 1_787_000_000_000 + index,
+      pass: { index, total, files: ['a.mjs'] },
+    })
+    const atMax = passComposition(
+      Array.from({ length: MAX_PASS_TOTAL }, (_, i) => rec(i + 1, MAX_PASS_TOTAL)),
+      { expect: ['a.mjs'] },
+    )
+    expect(atMax).toHaveLength(1)
+    expect(atMax[0].complete).toBe(true)
+    expect(passComposition([rec(1, MAX_PASS_TOTAL + 1)], { expect: ['a.mjs'] })).toHaveLength(0)
+  })
+
   it('refuses anything that is not k/n', () => {
     for (const bad of ['', 'two of three', '2', '2/', 'a/b', null]) expect(parsePassSpec(bad).ok).toBe(false)
   })
@@ -1447,6 +1502,24 @@ describe('the pass flag', () => {
 })
 
 describe('the composition a set of pass records rests on', () => {
+  it('an out-of-range index contributes NO coverage (landing-round pass 5)', () => {
+    // A hand-written `3/2` row entered the group and its FILES joined the
+    // coverage union: passes 1/2 and 2/2 could omit an expected file while
+    // the invalid row named it, and the composition read complete over a
+    // file no valid pass ever covered.
+    const rec = (index, files) => ({
+      sha: 'c'.repeat(40),
+      at: 1_787_000_000_000 + index,
+      pass: { index, total: 2, files },
+    })
+    const groups = passComposition([rec(1, ['a.mjs']), rec(2, ['a.mjs']), rec(3, ['b.mjs'])], {
+      expect: ['a.mjs', 'b.mjs'],
+    })
+    expect(groups).toHaveLength(1)
+    expect(groups[0].complete).toBe(false)
+    expect(groups[0].uncovered).toEqual(['b.mjs'])
+  })
+
   const rec = (index, total, extra = {}) => ({
     sha: 'abc1234',
     verdict: 'merge',

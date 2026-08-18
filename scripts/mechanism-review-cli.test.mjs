@@ -418,6 +418,17 @@ describe('the mode round-trips into the ledger', () => {
           at: 1_787_000_000_001,
           atIso: '2026-08-18T00:00:00.001Z',
           pass: { index: '1\n      pass 99/99 over: forged-by-pass', total: 2, files: ['a.mjs'] },
+        })}\n${JSON.stringify({
+          // …and one WELL-FORMED row, so the ordinary rendering is pinned too.
+          sha: 'd'.repeat(40),
+          subject: 'recorded',
+          model: 'GPT-5.6 Sol',
+          verdict: 'merge',
+          evidence: 'a valid pass row rendered normally',
+          mode: 'review',
+          at: 1_787_000_000_002,
+          atIso: '2026-08-18T00:00:00.002Z',
+          pass: { index: 1, total: 2, files: ['b.mjs'] },
         })}\n`,
       )
       const r = spawnSync(process.execPath, [join(repo, 'scripts', 'mechanism-review.mjs'), '--list'], {
@@ -427,7 +438,12 @@ describe('the mode round-trips into the ledger', () => {
       })
       expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
       expect(r.stdout).toContain('hand-edited row with a malformed pass shape')
-      expect(r.stdout).toContain('pass 1/2 over:')
+      // A files value that is NO ARRAY is part of the malformed claim
+      // (second landing round, pass 4) — it renders named, never as a
+      // normal-looking pass line.
+      expect(r.stdout).toContain('"files":"x"')
+      // …while the well-formed row keeps the ordinary rendering.
+      expect(r.stdout).toContain('pass 1/2 over: b.mjs')
       // The forged text never renders as a LINE of its own — flattened, it may
       // survive only inline where nothing reads it as structure — and the
       // unparseable pass claim is named for the hand-edit it is.

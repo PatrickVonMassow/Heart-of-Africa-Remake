@@ -904,7 +904,21 @@ describe('a range too large for one round', () => {
     // patch is mandatory material — and delivers the file PATCH-ONLY. Its
     // whole body still travels, as the added lines of its own diff; nothing is
     // truncated, and the completed two-pass record is earned, not fabricated.
-    expect(sent).toContain('a'.repeat(120_000))
+    // THE RECORDED SCOPE IS BOUND TO THE TRANSPORTED BYTES (second landing
+    // round, pass 7): the file the record command names is the file whose
+    // body and diff section actually travelled — not merely "one of the two".
+    const scoped = /--pass-files "bulk-([ab])\.txt"/.exec(printed)?.[1]
+    expect(['a', 'b']).toContain(scoped)
+    const other = scoped === 'a' ? 'b' : 'a'
+    expect(sent).toContain(scoped.repeat(120_000))
+    expect(sent).not.toContain(other.repeat(120_000))
+    expect(sent).toContain(`diff --git a/bulk-${scoped}.txt b/bulk-${scoped}.txt`)
+    // …at the PATCH-ONLY delivery level the manifest declares: the body rides
+    // inside the PATCH section, and the content slot says so.
+    expect(sent).toContain(`its COMPLETE diff is in the PATCH above: bulk-${scoped}.txt ===`)
+    const patchAt = sent.indexOf('=== PATCH ===')
+    expect(patchAt).toBeGreaterThan(-1)
+    expect(sent.indexOf(scoped.repeat(120_000))).toBeGreaterThan(patchAt)
     expect(sent).not.toContain('[TRUNCATED:')
     // THE RECORDER ACCEPTS IT, run rather than pattern-matched: a pass command
     // the recorder refuses is a command that clears nothing.
