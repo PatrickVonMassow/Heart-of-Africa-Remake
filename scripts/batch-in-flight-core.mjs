@@ -1135,32 +1135,32 @@ const unquote = (name) => String(name ?? '').replace(/^['"]+/, '').replace(/['"]
  *  slugless branch would open work unseen. */
 const featPointsIn = (text) => [...String(text).matchAll(/feat\/(\d+)/gi)].map((m) => Number(m[1]))
 
-/** Negation words a prose clause can hang a mention on, in both languages. */
+/** Negation words that make a prose sentence unsafe to interpret as an
+ * assignment, in both languages. */
 const NEGATION_RE =
   /\b(?:not|never|don'?t|doesn'?t|won'?t|avoid|except|without|excluding|nicht|niemals|kein(?:e[nmrs]?)?|ohne|außer|ausser)\b/i
 
 /**
- * IS THIS PROSE MENTION NEGATED? A prompt saying "do not touch feat/705-b"
- * names a branch as explicitly OUT of scope, and pinning it as a commissioning
- * refuses legitimate work over it (fourth review, finding 9). The window is the
- * mention's own clause, BACKWARD only — from the last sentence boundary to the
- * mention. Backward only is deliberate: a forward window would let "implement
- * point 712 and do not skip the tests" excuse the very point it opens, and a
- * missed post-positioned negation ("feat/705-b nicht anfassen") errs toward a
- * VISIBLE, overridable refusal rather than an invisible bypass.
+ * THE SENTENCE A PROSE MENTION LIVES IN. This is no longer used to decide that a
+ * point IS or IS NOT commissioned: five rounds demonstrated that free-prose
+ * scope cannot be made reliable by widening or narrowing a regex window. It is
+ * only an ambiguity detector. An uncertain call is reported visibly and binds
+ * neither refusal.
  */
-function negatedMention(text, index) {
+function mentionSentence(text, index) {
   const s = String(text)
   let start = -1
   for (const boundary of ['.', ';', ':', '!', '?', '\n']) {
     const i = s.lastIndexOf(boundary, index - 1)
     if (i > start) start = i
   }
-  return NEGATION_RE.test(s.slice(start + 1, index))
+  let end = s.length
+  for (const boundary of ['.', ';', ':', '!', '?', '\n']) {
+    const i = s.indexOf(boundary, index)
+    if (i >= 0 && i < end) end = i
+  }
+  return s.slice(start + 1, end)
 }
-
-/** The matches of `re` in `text` whose mention is NOT negated away. */
-const affirmedMatches = (text, re) => [...String(text).matchAll(re)].filter((m) => !negatedMention(text, m.index))
 
 /**
  * DOES THIS STANDING BRANCH ANSWER TO THE NAME A CALL GAVE? PURE.
@@ -1309,15 +1309,13 @@ function segmentTarget(seg) {
  * `;`, `|`, newline), each judged on the branch its own flag names, so a push or
  * a checkout standing beside a cut contributes nothing.
  *
- * PROSE IS JUDGED WHOLE, MINUS ITS NEGATIONS (fourth review, findings 4 and 9).
- * A spawn prompt that names several `feat/<N>` branches or several points names
- * several pieces of work, and EVERY one of them is judged — the earlier
- * single-number rule made "implement point 712 and point 713" a call that
- * commissioned both and was judged on neither. The price is that a bare
- * cross-reference ("point 697 depends on point 705") is judged too; that errs
- * toward a visible, overridable refusal, where the old rule erred toward a
- * silent bypass. A mention whose own clause negates it ("do not touch
- * feat/705-b") is OUT of scope, not a commissioning — see `negatedMention`.
+ * PROSE IS CONSERVATIVE AND DECLARED. One point named without a negation in its
+ * sentence is an unambiguous agent assignment. Two distinct points, or a point
+ * whose sentence also contains a negation, are NOT guessed into either a
+ * commissioning or an exclusion: the return value carries `ambiguous`, and the
+ * hook says what it saw while binding neither refusal. Thus "697 depends on
+ * 705", "implement 712 and 713", and "do not touch feat/705 but implement
+ * feat/712" can no longer silently commission both or silently bypass both.
  * Switching to an existing branch, pushing one, landing one — none of them
  * CREATES anything, and none is recognised here.
  *
@@ -1335,7 +1333,38 @@ export function commissionTarget({ toolName = '', command = '', prompt = '', des
   const tool = String(toolName ?? '')
   if (tool === 'Agent' || tool === 'Task') {
     const text = `${prompt ?? ''}\n${description ?? ''}`
-    const byBranch = uniq(affirmedMatches(text, /feat\/(\d+)/gi).map((m) => Number(m[1])))
+    const branchMatches = [...text.matchAll(/\bfeat\/(\d+)[A-Za-z0-9._\-/]*/gi)]
+    const pointMatches = [...text.matchAll(/\b(?:point|punkt)\s+(\d+)\b/gi)]
+    const mentioned = uniq([
+      ...branchMatches.map((m) => Number(m[1])),
+      ...pointMatches.map((m) => Number(m[1])),
+    ])
+    const mentionedRefs = [
+      ...new Set(
+        branchMatches
+          .map((m) => normRef(m[0].replace(/[.\-/]+$/, '')))
+          .filter(Boolean),
+      ),
+    ]
+    const negatedSentence = [...branchMatches, ...pointMatches].some((m) =>
+      NEGATION_RE.test(mentionSentence(text, m.index)),
+    )
+    if (mentioned.length > 1 || negatedSentence) {
+      return {
+        ...none,
+        refsLoose: true,
+        how: 'ambiguous-prose',
+        ambiguous: {
+          points: mentioned,
+          refs: mentionedRefs,
+          reasons: [
+            ...(mentioned.length > 1 ? ['multiple point mentions'] : []),
+            ...(negatedSentence ? ['negation shares a sentence with a point mention'] : []),
+          ],
+        },
+      }
+    }
+    const byBranch = uniq(branchMatches.map((m) => Number(m[1])))
     // THE PROSE NAMES ITS BRANCHES TOO (Sol, review of dd7fd78c). Dropping them
     // left the spawn path on the point-wide exemption, so "point 687 on branch
     // feat/687-b" walked past a standing feat/687-a at a full pool — the very
@@ -1343,15 +1372,9 @@ export function commissionTarget({ toolName = '', command = '', prompt = '', des
     // matched LOOSELY, because prose describes rather than creates — and a
     // branch a clause names only to FORBID is no branch to be worked.
     if (byBranch.length) {
-      const refs = affirmedMatches(text, /\bfeat\/\d+[A-Za-z0-9._\-/]*/gi)
-        .map((m) => normRef(m[0].replace(/[.\-/]+$/, '')))
-        .filter(Boolean)
-      return found(byBranch, 'agent', [...new Set(refs)])
+      return found(byBranch, 'agent', mentionedRefs)
     }
-    // EVERY affirmed "point N" is judged (finding 4): the single-number rule let
-    // a two-point prompt commission both while being judged on neither.
-    const named = uniq(affirmedMatches(text, /\b(?:point|punkt)\s+(\d+)\b/gi).map((m) => Number(m[1])))
-    return named.length ? found(named, 'agent') : none
+    return mentioned.length ? found(mentioned, 'agent') : none
   }
   const cmd = String(command ?? '')
   if (!cmd.trim()) return none

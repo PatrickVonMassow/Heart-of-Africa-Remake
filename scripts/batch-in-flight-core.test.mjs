@@ -3115,7 +3115,7 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
   // `git checkout -b feat/697-a && git branch feat/705-b` as "no target", which
   // made ONE shell call a complete bypass of both refusals — the test pinned the
   // hole rather than the rule. A command is not ambiguous about what it creates.
-  it('judges EVERY point one call opens — two branches in one line are two commissionings', () => {
+  it('judges every point a command opens, while declaring multi-point prose ambiguous', () => {
     expect(
       commissionTarget({ toolName: 'Bash', command: 'git checkout -b feat/697-a && git branch feat/705-b' }),
     ).toEqual({ point: 697, points: [697, 705], refs: ['feat/697-a', 'feat/705-b'], refsLoose: false, how: 'branch' })
@@ -3127,35 +3127,28 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
       commissionTarget({ toolName: 'Bash', command: 'git worktree add -b feat/711-x t\ngit checkout -b feat/697-a' })
         .points,
     ).toEqual([711, 697])
-    // A spawn prompt that spells out two branches names two branches to be worked.
-    expect(
-      commissionTarget({ toolName: 'Agent', prompt: 'work branch feat/697-a and also branch feat/705-b' }).points,
-    ).toEqual([697, 705])
+    // A spawn prompt is free prose, so two branch names are reported rather
+    // than guessed into two assignments.
+    const prose = commissionTarget({
+      toolName: 'Agent',
+      prompt: 'work branch feat/697-a and also branch feat/705-b',
+    })
+    expect(prose).toMatchObject({ point: null, points: [], how: 'ambiguous-prose' })
+    expect(prose.ambiguous).toMatchObject({ points: [697, 705], refs: ['feat/697-a', 'feat/705-b'] })
   })
 
-  // A BRANCH NAMED ONLY TO FORBID IT IS NOT A COMMISSIONING (fourth review,
-  // finding 9): pinning "do not touch feat/705-b" as opening 705 refused
-  // legitimate work over a branch the prompt put explicitly OUT of scope.
-  it('does not commission a mention its own clause NEGATES', () => {
+  it('declares mixed negation ambiguous instead of guessing points in or out', () => {
     const t = commissionTarget({ toolName: 'Agent', prompt: 'branch feat/697-a; do not touch feat/705-b' })
-    expect(t.points).toEqual([697])
-    expect(t.refs).toEqual(['feat/697-a'])
-    expect(commissionTarget({ toolName: 'Agent', prompt: 'point 697; never start point 705' }).points).toEqual([697])
-    expect(
-      commissionTarget({ toolName: 'Agent', prompt: 'Punkt 697 umsetzen; nicht auch noch Punkt 705 beginnen' }).points,
-    ).toEqual([697])
-    // A POST-positioned negation ("Punkt 705 nicht beginnen") is deliberately
-    // NOT excused — the window looks backward only, so the miss errs toward a
-    // visible, overridable refusal instead of an invisible bypass.
-    expect(
-      commissionTarget({ toolName: 'Agent', prompt: 'Punkt 697 umsetzen; Punkt 705 nicht beginnen' }).points,
-    ).toEqual([697, 705])
-    // The window is the mention's own clause: a negation in an EARLIER sentence
-    // does not excuse a later mention, and a trailing "do not skip the tests"
-    // does not excuse the point before it.
+    expect(t).toMatchObject({ point: null, points: [], how: 'ambiguous-prose' })
+    expect(t.ambiguous).toMatchObject({ points: [697, 705], refs: ['feat/697-a', 'feat/705-b'] })
+    expect(t.ambiguous.reasons).toContain('multiple point mentions')
+    const post = commissionTarget({ toolName: 'Agent', prompt: 'Punkt 705 nicht beginnen' })
+    expect(post).toMatchObject({ point: null, points: [], how: 'ambiguous-prose' })
+    expect(post.ambiguous.points).toEqual([705])
+    // A negation in another sentence is not attached to the assignment.
     expect(commissionTarget({ toolName: 'Agent', prompt: 'Do not guess. Work point 705' }).points).toEqual([705])
-    expect(commissionTarget({ toolName: 'Agent', prompt: 'work point 705 and do not skip the tests' }).points).toEqual(
-      [705],
+    expect(commissionTarget({ toolName: 'Agent', prompt: 'work point 705 and do not skip the tests' }).how).toBe(
+      'ambiguous-prose',
     )
   })
 
@@ -3169,21 +3162,19 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
     ).toEqual([697])
   })
 
-  // EVERY point a prose spawn names is judged (fourth review, finding 4): the
-  // single-number rule made "implement point 712 and point 713" a call that
-  // commissioned both and was judged on NEITHER. A cross-reference now gets
-  // judged too — a visible, overridable refusal, against a silent bypass.
-  it('judges EVERY affirmed "point N" a prose spawn names — two points are two commissionings', () => {
-    expect(commissionTarget({ toolName: 'Agent', prompt: 'implement point 712 and point 713' }).points).toEqual([
-      712, 713,
-    ])
-    expect(commissionTarget({ toolName: 'Agent', prompt: 'point 697 depends on point 705' }).points).toEqual([697, 705])
+  it('declares multi-point and dependency prose ambiguous, naming what it saw', () => {
+    const two = commissionTarget({ toolName: 'Agent', prompt: 'implement point 712 and point 713' })
+    expect(two).toMatchObject({ point: null, points: [], how: 'ambiguous-prose' })
+    expect(two.ambiguous.points).toEqual([712, 713])
+    const dependency = commissionTarget({ toolName: 'Agent', prompt: 'point 697 depends on point 705' })
+    expect(dependency).toMatchObject({ point: null, points: [], how: 'ambiguous-prose' })
+    expect(dependency.ambiguous.points).toEqual([697, 705])
   })
 
-  it('prefers the BRANCH over prose when both appear — the branch is the binding name', () => {
-    expect(
-      commissionTarget({ toolName: 'Agent', prompt: 'branch feat/711-x, which point 400 first asked for' }),
-    ).toEqual({ point: 711, points: [711], refs: ['feat/711-x'], refsLoose: true, how: 'agent' })
+  it('does not let a branch mention hide a second prose point', () => {
+    const t = commissionTarget({ toolName: 'Agent', prompt: 'branch feat/711-x, which point 400 first asked for' })
+    expect(t).toMatchObject({ point: null, points: [], how: 'ambiguous-prose' })
+    expect(t.ambiguous).toMatchObject({ points: [711, 400], refs: ['feat/711-x'] })
   })
 
   it('recognises a branch being CUT, in every spelling, slug or none', () => {

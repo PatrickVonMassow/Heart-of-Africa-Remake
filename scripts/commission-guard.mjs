@@ -262,6 +262,23 @@ export function unreadNotice(unread) {
   )
 }
 
+/** A free-prose call the classifier cannot bind is allowed, but never silently.
+ * The notice names every signal it found so the caller can restate one explicit
+ * assignment or use the decidable branch/worktree form. */
+export function ambiguityNotice(ambiguous) {
+  if (!ambiguous || typeof ambiguous !== 'object') return ''
+  const points = Array.isArray(ambiguous.points) ? ambiguous.points.filter((n) => Number.isInteger(n) && n > 0) : []
+  const refs = Array.isArray(ambiguous.refs) ? ambiguous.refs.filter(Boolean) : []
+  const reasons = Array.isArray(ambiguous.reasons) ? ambiguous.reasons.filter(Boolean) : []
+  return (
+    `commission-guard: ALLOWING WITHOUT A PROSE DECISION — the call is ambiguous (${reasons.join('; ') ||
+      'scope could not be determined'}). Saw point(s): ${points.join(', ') || 'none'}; branch name(s): ${
+      refs.join(', ') || 'none'
+    }. Restate exactly one point to assign, or create its feat/<N> branch/worktree explicitly; no queue or slot ` +
+    'refusal was inferred from this prose.'
+  )
+}
+
 /**
  * A PARKED BRANCH IS UNPARKED WHEN WORK IS ASSIGNED, not at its first commit
  * (fourth review, finding 6): between the assignment and the commit the branch
@@ -421,6 +438,10 @@ if (isMainModule(import.meta.url)) {
       prompt: input.prompt,
       description: input.description,
     })
+    if (target.ambiguous) {
+      console.error(ambiguityNotice(target.ambiguous))
+      process.exit(0)
+    }
     if (!target.point) process.exit(0) // opens nothing this rule knows about
     // THE SESSION'S cwd, not the script's: the hook is wired anchored so it
     // fires from any working directory (point 438), which means the script's own

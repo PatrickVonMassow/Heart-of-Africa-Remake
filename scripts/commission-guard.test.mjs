@@ -7,10 +7,12 @@
 // facts reach which decision, and when the guard says nothing at all.
 import { describe, it, expect } from 'vitest'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
   COMMISSION_HOOK_LINE,
+  ambiguityNotice,
   gatherCommissionInputs,
   commissionVerdict,
   parkBranch,
@@ -54,6 +56,22 @@ const gather = (point, { branches = [], record, ...rest } = {}) =>
 
 
 describe('the wrapper — both refusals, and the stand-downs', () => {
+  it('reports ambiguous prose through the real hook path and binds no refusal', () => {
+    const payload = JSON.stringify({
+      tool_name: 'Agent',
+      tool_input: { prompt: 'Do not touch feat/705-a, but implement feat/712-b' },
+    })
+    const run = spawnSync(process.execPath, [resolve(import.meta.dirname, 'commission-guard.mjs')], {
+      input: payload,
+      encoding: 'utf8',
+    })
+    expect(run.status).toBe(0)
+    expect(run.stdout).toBe('')
+    expect(run.stderr).toContain('ALLOWING WITHOUT A PROSE DECISION')
+    expect(run.stderr).toContain('705, 712')
+    expect(run.stderr).toContain('feat/705-a, feat/712-b')
+    expect(ambiguityNotice(null)).toBe('')
+  })
   it('refuses the real 17.08.2026 pick on BOTH counts and names each', () => {
     const g = gather(697, { branches: NINE })
     expect(g.applicable).toBe(true)
