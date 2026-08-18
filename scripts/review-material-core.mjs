@@ -157,6 +157,10 @@ const patchOnlyHeader = (path) =>
 const unbackedHeader = (path) =>
   `=== FILE OMITTED ENTIRELY (declared patch-only, but the PATCH above does not carry its complete diff): ${path} ===`
 
+/** The header of a carried file whose diff the PATCH does not hold — an omission. */
+const difflessHeader = (path) =>
+  `=== FILE OMITTED ENTIRELY (its diff is not in the PATCH above, so the change itself was never delivered): ${path} ===`
+
 /** The declared marker of a file whose bytes cannot travel as review text. */
 const binaryHeader = (path) =>
   `=== FILE IS BINARY — its bytes cannot travel as review text; judge its change from the PATCH above: ${path} ===`
@@ -330,6 +334,20 @@ export function assembleMaterial({
       out.push(header, '')
       account.patchOnly.push(path)
       left -= header.length + HEADER_PAIR_COST
+      continue
+    }
+    // A CARRIED FILE'S DIFF MUST HAVE TRAVELLED TOO (sixth cross-vendor round,
+    // pass 3): the "complete" delivery level claims the file's diff in the
+    // PATCH and its content below, and only the second half used to be checked
+    // — a caller handing content beside a patch with no section for the path
+    // got the file marked `sent` and the round `fit: true`, a record offered
+    // over a diff nobody received. A complete patch without a section for the
+    // path proves the diff never travelled, so the file is an OMISSION, named
+    // as such. (A CUT patch already refuses the round via `patchTruncated`,
+    // whose refusal names the cut itself.)
+    if (!account.patchTruncated && !patchSections().has(path)) {
+      out.push(difflessHeader(path), '')
+      account.omitted.push(path)
       continue
     }
     const header = fileHeader(path)
@@ -1133,10 +1151,17 @@ export function parsePassFiles(value) {
  * anything (cross-vendor review of this point, first round): counting passes
  * alone, two records that both name the SAME file — or arbitrary files, or the
  * files of a plan whose UNCOVERABLE entry no pass ever held — read as `1/2` and
- * `2/2` and cleared a range nobody read. A caller with nothing to compare
- * against passes none and gets the count alone, which is what it asked for.
+ * `2/2` and cleared a range nobody read.
+ *
+ * UNKNOWN COVERAGE REFUSES (sixth cross-vendor round, pass 3): a caller with
+ * nothing to compare against used to get the count alone, so two records with
+ * empty or arbitrary file lists cleared a `2/2` composition over a range whose
+ * real file set nobody had established. A composition is now complete ONLY
+ * against a known, non-empty expected set; without one, every group carries
+ * `coverageUnknown: true` and `complete: false` — the fail-open direction the
+ * point demands, because a range with review passes always changed files.
  */
-export function passComposition(records = [], { expect = [] } = {}) {
+export function passComposition(records = [], { expect = null } = {}) {
   const groups = new Map()
   for (const record of records ?? []) {
     const total = Number(record?.pass?.total)
@@ -1154,7 +1179,10 @@ export function passComposition(records = [], { expect = [] } = {}) {
   // BYTE-EXACT, NEVER TRIMMED (cross-vendor review, third round): `x` and ` x`
   // are two legal paths, and trimming the expected set collapsed them into one
   // entry — a union could then look complete without covering both.
-  const wanted = [...new Set((expect ?? []).map((p) => String(p ?? '')).filter(Boolean))]
+  const wanted = [...new Set((Array.isArray(expect) ? expect : []).map((p) => String(p ?? '')).filter(Boolean))]
+  // Known coverage is a NON-EMPTY expected set: a range under review always
+  // changed files, so an empty one is a caller that could not say — unknown.
+  const expectKnown = wanted.length > 0
   return [...groups.values()].map((group) => {
     const missing = []
     for (let i = 1; i <= group.total; i++) if (!group.byIndex.has(i)) missing.push(i)
@@ -1170,7 +1198,8 @@ export function passComposition(records = [], { expect = [] } = {}) {
       have: group.byIndex.size,
       missing,
       uncovered,
-      complete: missing.length === 0 && uncovered.length === 0,
+      coverageUnknown: !expectKnown,
+      complete: expectKnown && missing.length === 0 && uncovered.length === 0,
       records: held,
       files,
     }

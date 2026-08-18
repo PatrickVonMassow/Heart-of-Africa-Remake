@@ -627,13 +627,21 @@ describe('the recorder accepts the reviewer the rule now prefers (point 624)', (
 })
 
 describe('the material the reviewer is handed', () => {
+  // The patch must CARRY each file's section: a carried file whose diff is not
+  // in the patch is refused as an omission (round-1 pass-3 finding, 18.08.2026).
+  const sectionFor = (p) => [`diff --git a/${p} b/${p}`, `--- a/${p}`, `+++ b/${p}`, '+x'].join('\n')
   const material = (files, budget) =>
-    formatReviewMaterial({ stat: ' a | 2 +-', patch: 'diff --git a/a b/a', files, budget })
+    formatReviewMaterial({
+      stat: ' a | 2 +-',
+      patch: files.length ? files.map((f) => sectionFor(f.path)).join('\n') : 'diff --git a/a b/a',
+      files,
+      budget,
+    })
 
   it('carries the diffstat, the patch and each file with its path', () => {
     const out = material([{ path: 'scripts/a.mjs', text: 'export const a = 1' }])
     expect(out).toContain('=== DIFFSTAT ===')
-    expect(out).toContain('diff --git a/a b/a')
+    expect(out).toContain('diff --git a/scripts/a.mjs b/scripts/a.mjs')
     expect(out).toContain('=== FILE (current content): scripts/a.mjs ===')
     expect(out).toContain('export const a = 1')
   })

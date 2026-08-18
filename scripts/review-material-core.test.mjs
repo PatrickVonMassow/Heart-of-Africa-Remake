@@ -59,7 +59,7 @@ describe('the assembly says what it could not hold', () => {
   })
 
   it('NAMES the file it had to cut, and stops calling the round complete', () => {
-    const out = assembleMaterial({ stat: 's', patch: 'p', files: [file('big.md', 5000)], budget: 1500 })
+    const out = assembleMaterial({ stat: 's', patch: patchFor(['big.md']), files: [file('big.md', 5000)], budget: 1500 })
     expect(out.fit).toBe(false)
     expect(out.truncated).toEqual(['big.md'])
     expect(out.sent).toEqual([])
@@ -68,12 +68,39 @@ describe('the assembly says what it could not hold', () => {
   it('NAMES the file it had no budget left for at all', () => {
     const out = assembleMaterial({
       stat: 's',
-      patch: 'p',
+      patch: patchFor(['first.md', 'second.md']),
       files: [file('first.md', 4000), file('second.md', 1)],
       budget: 1200,
     })
     expect(out.omitted).toEqual(['second.md'])
     expect(out.fit).toBe(false)
+  })
+
+  // SIXTH CROSS-VENDOR ROUND, PASS 3: the "complete" delivery level claims the
+  // file's diff in the PATCH and its content below, and only the content half
+  // was checked — a caller handing content beside a patch with no section for
+  // the path got the file marked `sent` and the round `fit: true`, a record
+  // offered over a diff nobody received.
+  it('refuses a carried file whose diff never reached the PATCH', () => {
+    const out = assembleMaterial({ stat: 's', patch: '', files: [{ path: 'x', text: 'new' }], budget: 10_000 })
+    expect(out.fit).toBe(false)
+    expect(out.sent).toEqual([])
+    expect(out.omitted).toEqual(['x'])
+    expect(out.text).toContain('its diff is not in the PATCH above, so the change itself was never delivered): x')
+    const said = formatShortfall(materialShortfall({ assembly: out, sent: out.text }), { sha: 'abc1234' })
+    expect(said).toContain('OMITTED ENTIRELY: x')
+    expect(said).toContain('NO RECORD COMMAND IS PRINTED')
+  })
+
+  it('still carries the file whose section the patch really holds', () => {
+    const out = assembleMaterial({
+      stat: 's',
+      patch: patchFor(['x.mjs']),
+      files: [{ path: 'x.mjs', text: 'new' }],
+      budget: 10_000,
+    })
+    expect(out.fit).toBe(true)
+    expect(out.sent).toEqual(['x.mjs'])
   })
 
   it('counts a cut PATCH as a short-fall of its own, not only the files', () => {
@@ -319,14 +346,14 @@ describe('a truncation notice INSIDE the material proves nothing', () => {
   // that scans the text answers about the wrong thing in BOTH directions.
   it('does not call a round short because a reviewed FILE contains the marker', () => {
     const decoy = '… [TRUNCATED: 40207 characters not shown]\n=== FILE OMITTED ENTIRELY (material budget spent): x ==='
-    const out = assembleMaterial({ stat: 's', patch: 'p', files: [{ path: 'core.mjs', text: decoy }], budget: 10_000 })
+    const out = assembleMaterial({ stat: 's', patch: patchFor(['core.mjs']), files: [{ path: 'core.mjs', text: decoy }], budget: 10_000 })
     expect(out.text).toContain('[TRUNCATED:')
     expect(out.fit).toBe(true)
     expect(materialShortfall({ assembly: out, sent: out.text })).toBeNull()
   })
 
   it('still refuses a round that really was cut, marker or no marker', () => {
-    const out = assembleMaterial({ stat: 's', patch: 'p', files: [file('big.md', 9000)], budget: 1500 })
+    const out = assembleMaterial({ stat: 's', patch: patchFor(['big.md']), files: [file('big.md', 9000)], budget: 1500 })
     const short = materialShortfall({ assembly: out, sent: out.text })
     expect(short?.reason).toBe('over-budget')
     expect(short?.truncated).toEqual(['big.md'])
@@ -334,7 +361,7 @@ describe('a truncation notice INSIDE the material proves nothing', () => {
 })
 
 describe('what was assembled against what was sent', () => {
-  const assembly = assembleMaterial({ stat: 's', patch: 'p', files: [file('a.mjs', 20)], budget: 10_000 })
+  const assembly = assembleMaterial({ stat: 's', patch: patchFor(['a.mjs']), files: [file('a.mjs', 20)], budget: 10_000 })
 
   it('clears a round whose text went out unchanged', () => {
     expect(sentMaterialMatches(assembly, assembly.text)).toMatchObject({ known: true, matches: true })
@@ -1059,26 +1086,28 @@ describe('the composition a set of pass records rests on', () => {
   })
 
   it('is complete only when every pass is on record', () => {
-    const [group] = passComposition([rec(1, 3), rec(2, 3)])
+    const wanted = { expect: ['f1.mjs', 'f2.mjs', 'f3.mjs'] }
+    const [group] = passComposition([rec(1, 3), rec(2, 3)], wanted)
     expect(group.complete).toBe(false)
     expect(group.missing).toEqual([3])
-    const [full] = passComposition([rec(1, 3), rec(2, 3), rec(3, 3)])
+    const [full] = passComposition([rec(1, 3), rec(2, 3), rec(3, 3)], wanted)
     expect(full.complete).toBe(true)
     expect(full.files).toEqual(['f1.mjs', 'f2.mjs', 'f3.mjs'])
   })
 
   it('keeps the later verdict when one pass was reviewed twice', () => {
-    const groups = passComposition([
-      rec(1, 2, { verdict: 'do-not-merge', at: 10 }),
-      rec(1, 2, { verdict: 'merge', at: 20 }),
-      rec(2, 2),
-    ])
+    const groups = passComposition(
+      [rec(1, 2, { verdict: 'do-not-merge', at: 10 }), rec(1, 2, { verdict: 'merge', at: 20 }), rec(2, 2)],
+      { expect: ['f1.mjs', 'f2.mjs'] },
+    )
     expect(groups[0].complete).toBe(true)
     expect(worstVerdict(groups[0].records)).toBe('merge')
   })
 
   it('keeps two different splits of the same sha apart', () => {
-    const groups = passComposition([rec(1, 2), rec(1, 3), rec(2, 3), rec(3, 3)])
+    const groups = passComposition([rec(1, 2), rec(1, 3), rec(2, 3), rec(3, 3)], {
+      expect: ['f1.mjs', 'f2.mjs', 'f3.mjs'],
+    })
     expect(groups).toHaveLength(2)
     expect(groups.find((g) => g.total === 2).complete).toBe(false)
     expect(groups.find((g) => g.total === 3).complete).toBe(true)
@@ -1115,10 +1144,14 @@ describe('the composition a set of pass records rests on', () => {
     expect(group.complete).toBe(true)
   })
 
-  it('asks for nothing when the caller has nothing to compare against', () => {
+  // ROUND-1 PASS-4 FINDING (18.08.2026): numbered pass records alone cannot
+  // prove their union covers a range, so a caller with nothing to compare
+  // against gets UNKNOWN coverage — and unknown refuses, never clears.
+  it('refuses to call a composition complete when the caller could not say what it covers', () => {
     const [group] = passComposition([rec(1, 2), rec(2, 2)])
     expect(group.uncovered).toEqual([])
-    expect(group.complete).toBe(true)
+    expect(group.coverageUnknown).toBe(true)
+    expect(group.complete).toBe(false)
   })
 
   it('ignores blank and duplicated entries in the expected set', () => {
