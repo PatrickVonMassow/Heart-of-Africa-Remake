@@ -781,15 +781,18 @@ describe('the patch, split per file', () => {
   })
 
   it('never lets a rename ALIAS displace a real section, whatever the patch order', () => {
-    const alias = { path: 'x.txt', text: 'ALIAS', alias: true }
-    // patchSectionMap is exercised through a crafted patch: a rename whose
-    // source ALSO has a real section later in the patch.
-    const patch = [
+    // BOTH orders (landing-round pass 6): the fixture exercised only
+    // rename-first, and its standalone alias object never reached the code
+    // under test — a regression where a LATER alias overwrites an EARLIER
+    // real section would still have passed.
+    const renameSection = [
       'diff --git a/old.txt b/new.txt',
       'rename from old.txt',
       'rename to new.txt',
       '@@ -1 +1 @@',
       '+moved',
+    ].join('\n')
+    const realSection = [
       'diff --git a/old.txt b/old.txt',
       'index 1..2 100644',
       '--- a/old.txt',
@@ -797,10 +800,11 @@ describe('the patch, split per file', () => {
       '@@ -1 +1 @@',
       '+the real section',
     ].join('\n')
-    const map = patchSectionMap(patch)
-    expect(map.get('old.txt')).toContain('the real section')
-    expect(map.get('new.txt')).toContain('+moved')
-    expect(alias.alias).toBe(true)
+    for (const patch of [`${renameSection}\n${realSection}`, `${realSection}\n${renameSection}`]) {
+      const map = patchSectionMap(patch)
+      expect(map.get('old.txt'), patch.slice(0, 30)).toContain('the real section')
+      expect(map.get('new.txt'), patch.slice(0, 30)).toContain('+moved')
+    }
   })
 
   it('never mixes pass records across SHAS, identical totals included (final-round pass 6)', () => {
