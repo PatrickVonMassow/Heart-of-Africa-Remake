@@ -1655,11 +1655,21 @@ export function branchSlotDecision({
   readable = true,
   now = Date.now(),
 } = {}) {
-  const targets = (Array.isArray(points) && points.length ? points : [point])
-    .map(Number)
-    .filter((n) => Number.isInteger(n) && n > 0)
-  const named = (Array.isArray(refs) ? refs : refs ? [refs] : []).map(normRef).filter(Boolean)
-  const slots = openBranchSlots({ branches, parked, exclude: targets, excludeRefs: named, looseRefs, cap, now })
+  const targets = [
+    ...new Set(
+      (Array.isArray(points) && points.length ? points : [point])
+        .map(Number)
+        .filter((n) => Number.isInteger(n) && n > 0),
+    ),
+  ]
+  const named = [
+    ...new Set((Array.isArray(refs) ? refs : refs ? [refs] : []).map(normRef).filter(Boolean)),
+  ]
+  // Keep the CURRENT occupancy intact. Earlier cuts excluded every target here
+  // and tried to add it back below. That loses a live target in a mixed call:
+  // three occupied branches minus the continued target plus one new target read
+  // as 2 + 1, although the call really leaves four branches standing.
+  const slots = openBranchSlots({ branches, parked, cap, now })
   // HOW MANY BRANCHES WOULD THIS CALL ADD? The count alone answered "two of
   // three taken" to a line cutting TWO more, and left four standing under a cap
   // of three (Sol, review of dd7fd78c). A refusal has to be about the state the
@@ -1676,28 +1686,25 @@ export function branchSlotDecision({
   // happen when work is ASSIGNED, not at the first commit. So the in-flight set
   // holds only the branches that OCCUPY a slot, a reassigned park counts toward
   // `adding`, and `reopens` names the parks the wrapper must clear on allow.
-  const standing = (Array.isArray(branches) ? branches : []).map((b) => normRef(b?.ref)).filter(Boolean)
+  const standing = [...new Set((Array.isArray(branches) ? branches : []).map((b) => normRef(b?.ref)).filter(Boolean))]
   const parkedRefs = slots.parkedOut.map((b) => b.ref)
-  const parkedPoints = new Set(slots.parkedOut.map((b) => b.point).filter((n) => n !== null))
-  const live = standing.filter((s) => !parkedRefs.includes(s))
+  const live = slots.open.map((b) => b.ref)
   const inFlight = new Set(live.map(pointOfBranch).filter((n) => n !== null))
   const newRefs = named.filter((r) => !standing.some((s) => branchAnswersTo(r, s, { loose: looseRefs })))
-  const reopenedRefs = named.filter((r) => parkedRefs.some((p) => branchAnswersTo(r, p, { loose: looseRefs })))
   const unnamed = targets.filter((p) => !named.some((r) => pointOfBranch(r) === p))
-  const opening = unnamed.filter((p) => !inFlight.has(p))
-  const reopenedPoints = opening.filter((p) => parkedPoints.has(p))
-  const adding = newRefs.length + reopenedRefs.length + opening.length
-  const reopens = [
-    ...new Set(
-      slots.parkedOut
-        .filter(
-          (b) =>
-            reopenedRefs.some((r) => branchAnswersTo(r, b.ref, { loose: looseRefs })) ||
-            (b.point !== null && reopenedPoints.includes(b.point)),
-        )
-        .map((b) => b.ref),
-    ),
-  ]
+  const reopens = slots.parkedOut
+    .filter(
+      (b) =>
+        named.some((r) => branchAnswersTo(r, b.ref, { loose: looseRefs })) ||
+        // A point-wide assignment cannot distinguish between parked branches.
+        // If no live branch carries that point, every park the wrapper clears
+        // becomes occupied and therefore every one must be projected here.
+        (b.point !== null && unnamed.includes(b.point) && !inFlight.has(b.point)),
+    )
+    .map((b) => b.ref)
+  const reopeningPoints = new Set(reopens.map(pointOfBranch).filter((n) => n !== null))
+  const opening = unnamed.filter((p) => !inFlight.has(p) && !reopeningPoints.has(p))
+  const adding = newRefs.length + reopens.length + opening.length
   const out = { ...slots, point: targets[0] ?? null, points: targets, refs: named, adding, reopens }
   if (readable !== true) return { ...out, allowed: true, why: 'branches-unreadable' }
   // A call that opens NO new branch is finishing, whatever the pool holds —

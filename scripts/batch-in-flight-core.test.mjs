@@ -2759,6 +2759,21 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
       expect(d.reopens).toEqual(['feat/336-croc-staging'])
     })
 
+    it('projects every parked branch a point-wide assignment reoccupies', () => {
+      const twoParks = {
+        ...parked,
+        'feat/336-second': { reason: 'alternate', at, tip: 'bb22cc33' },
+      }
+      const branches = [
+        parked336,
+        { ...parked336, ref: 'feat/336-second', tip: 'bb22cc33' },
+        ...NINE_BRANCHES.slice(1, 3),
+      ]
+      const d = branchSlotDecision({ branches, parked: twoParks, points: [336], now: AUG17 })
+      expect(d).toMatchObject({ count: 2, adding: 2, allowed: false })
+      expect(d.reopens).toEqual(['feat/336-croc-staging', 'feat/336-second'])
+    })
+
     it('a point with a LIVE branch beside its parked one is still being finished', () => {
       const parked687 = { 'feat/687-roam-bound-fixes': { reason: 'superseded', at, tip: 'ffee0011' } }
       const branches = [
@@ -2796,7 +2811,8 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
     const three = NINE_BRANCHES.slice(0, 3)
     expect(branchSlotDecision({ branches: three, point: 336, now: AUG17 })).toMatchObject({
       allowed: true,
-      count: 2,
+      count: 3,
+      adding: 0,
     })
   })
 
@@ -2807,12 +2823,14 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
     })
   })
 
-  it('excludes the branches of EVERY point one call opens, and names them all', () => {
+  it('keeps existing target branches in occupancy while naming every target', () => {
     const three = NINE_BRANCHES.slice(0, 3) // 336, 686, 687
-    // A call finishing two of the three standing branches consumes one slot, not three.
+    // Continuing two existing points adds nothing, but all three live branches
+    // still occupy their slots.
     expect(branchSlotDecision({ branches: three, points: [336, 686], now: AUG17 })).toMatchObject({
       allowed: true,
-      count: 1,
+      count: 3,
+      adding: 0,
     })
     const d = branchSlotDecision({ branches: three, points: [705, 697], now: AUG17 })
     expect(d.allowed).toBe(false)
@@ -2838,6 +2856,12 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
     const worse = branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), points: [705, 697], now: AUG17 })
     expect(worse.allowed).toBe(false)
     expect(branchSlotRefusal(worse)).toContain('2 of them must go')
+  })
+
+  it('refuses a mixed call that continues one occupied point and opens another at the cap', () => {
+    const three = NINE_BRANCHES.slice(0, 3)
+    const d = branchSlotDecision({ branches: three, points: [336, 705], now: AUG17 })
+    expect(d).toMatchObject({ count: 3, adding: 1, allowed: false, why: 'branches-open' })
   })
 
   // THE REMEDY, FOLLOWED, LIFTS THE REFUSAL (fourth review, findings 7 and 12):
@@ -2881,7 +2905,7 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
     // Naming the branch that already stands: it is the one being finished.
     expect(
       branchSlotDecision({ branches: three, points: [687], refs: ['feat/687-bank-game'], cap: 3, now: AUG17 }),
-    ).toMatchObject({ allowed: true, count: 2 })
+    ).toMatchObject({ allowed: true, count: 3, adding: 0 })
     // Naming a branch that does NOT stand: all three keep their slots.
     expect(
       branchSlotDecision({ branches: three, points: [687], refs: ['feat/687-second'], cap: 3, now: AUG17 }),
@@ -2889,12 +2913,13 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
     // Naming NOTHING keeps the point-wide exemption — the branch is unidentifiable.
     expect(branchSlotDecision({ branches: three, points: [687], cap: 3, now: AUG17 })).toMatchObject({
       allowed: true,
-      count: 2,
+      count: 3,
+      adding: 0,
     })
     // A ref for one point does not narrow ANOTHER point's exemption.
     expect(
       branchSlotDecision({ branches: three, points: [687, 686], refs: ['feat/687-second'], cap: 3, now: AUG17 }),
-    ).toMatchObject({ count: 2 })
+    ).toMatchObject({ count: 3 })
   })
 
   it('never throws on hostile input, and refuses nothing it cannot see', () => {
