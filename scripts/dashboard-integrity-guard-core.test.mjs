@@ -336,8 +336,30 @@ describe('duplicateDonePoints — one point, one Erledigt card (user 18.08.2026)
     expect(duplicateDonePoints(html)).toEqual([])
   })
 
+  it('stops at the NEXT section, so a queue placed after Erledigt is not counted', () => {
+    const html =
+      `<main>\n<details class="sect">\n<summary><h2>Erledigt</h2></summary>\n${done(700, '01:04 · 01:10')}</details>\n` +
+      `<details class="sect">\n<summary><h2>Warteschlange</h2></summary>\n${done(700, '~2 h')}</details>\n</main>`
+    expect(duplicateDonePoints(html)).toEqual([])
+  })
+
   it('never throws on a board without the section, or on nothing', () => {
     expect(duplicateDonePoints('<main></main>')).toEqual([])
     expect(duplicateDonePoints()).toEqual([])
+  })
+
+  it('BLOCKS through evaluate() even when the batch is complete or the board is bare', () => {
+    // Both early returns used to run first, so exactly the boards that consist of
+    // duplicated archive cards were waved through (cross-vendor review 18.08.).
+    const html = board(done(700, '01:04 · 01:10') + done(700, '21:17 · 00:44'))
+    const allTicked = '- [x] 700. Done.\n'
+    expect(evaluate({ dashboardHtml: html, tasksMd: allTicked }).block).toBe(true)
+    expect(evaluate({ dashboardHtml: html, tasksMd: allTicked }).reason).toMatch(/ERLEDIGT MORE THAN ONCE/)
+    // …and with an open point but no queue/now card at all.
+    const open = '- [ ] 701. Offen.\n'
+    expect(evaluate({ dashboardHtml: html, tasksMd: open }).block).toBe(true)
+    // A clean archive still passes both paths.
+    const clean = board(done(700, '01:04 · 01:10'))
+    expect(evaluate({ dashboardHtml: clean, tasksMd: allTicked }).block).toBe(false)
   })
 })

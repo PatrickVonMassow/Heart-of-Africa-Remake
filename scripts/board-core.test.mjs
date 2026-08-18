@@ -58,6 +58,8 @@ import {
   setCardTitle,
   toDone,
   doneCards,
+  doneStart,
+  earliestStart,
   mergeDoneDuplicates,
   toNow,
   toQueue,
@@ -1159,8 +1161,52 @@ describe('mergeDoneDuplicates — a board that already carries them', () => {
     expect(out.html).toBe(html)
   })
 
+  it('keeps the newest card at its POSITION even when the duplicates are identical', () => {
+    // Byte-identical cards made a whole-document replace delete the FIRST
+    // occurrence — the survivor — and leave the older one in its place
+    // (cross-vendor review 18.08.2026).
+    const same = card(700, 'Gleich', '10:00 · 11:00')
+    const html = fullBoard({ done: card(701, 'Neuer', '12:00 · 12:30') + same + same })
+    const out = mergeDoneDuplicates(html)
+    expect(doneCards(out.html, 700)).toHaveLength(1)
+    expect(out.html.indexOf('class="num">701')).toBeLessThan(out.html.indexOf('class="num">700'))
+  })
+
+  it('never deletes a card from ANOTHER section that happens to be identical', () => {
+    const same = card(700, 'Gleich', '10:00 · 11:00')
+    const html = fullBoard({ queue: same, done: same + same })
+    const out = mergeDoneDuplicates(html)
+    expect(out.html.match(/class="num">700/g)).toHaveLength(2) // one queue, one archive
+  })
+
+  it('skips a damaged stamp instead of falling back to the newest card', () => {
+    const html = fullBoard({
+      done: card(700, 'Neu', '01:04 · 01:10') + card(700, 'Kaputt', '99:99 · 00:58') + card(700, 'Alt', '21:17 · 00:44'),
+    })
+    expect(mergeDoneDuplicates(html).html).toContain('<span class="meta">21:17 · 01:10</span>')
+  })
+
   it('never throws on a board without an Erledigt section', () => {
     expect(mergeDoneDuplicates('<main></main>')).toEqual({ html: '<main></main>', merged: [] })
     expect(mergeDoneDuplicates()).toEqual({ html: '', merged: [] })
+  })
+})
+
+describe('doneStart / earliestStart', () => {
+  const meta = (m) => `<summary><span class="right"><span class="meta">${m}</span></span></summary>`
+
+  it('reads a real time of day and refuses an impossible one', () => {
+    expect(doneStart(meta('21:17 · 00:44'))).toBe('21:17')
+    expect(doneStart(meta('99:99 · 00:44'))).toBe('')
+    expect(doneStart(meta('12:75 · 00:44'))).toBe('')
+    expect(doneStart('no meta at all')).toBe('')
+    expect(doneStart()).toBe('')
+  })
+
+  it('takes the OLDEST usable start, scanning past a damaged one', () => {
+    expect(earliestStart([meta('01:04 · 01:10'), meta('00:45 · 00:58'), meta('21:17 · 00:44')])).toBe('21:17')
+    expect(earliestStart([meta('01:04 · 01:10'), meta('99:99 · 00:44')])).toBe('01:04')
+    expect(earliestStart([])).toBe('')
+    expect(earliestStart()).toBe('')
   })
 })

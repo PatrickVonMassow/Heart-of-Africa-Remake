@@ -582,9 +582,9 @@ export function toDone(html, point, { text, end = berlinStamp() } = {}) {
   // date, so `21:17` from last night is EARLIER than `00:45` this morning while
   // arithmetic says the opposite (measured on point 700's four cards).
   const existing = doneCards(out, point)
-  const earliest = existing.length ? doneStart(existing[existing.length - 1]) || start : start
+  const earliest = earliestStart(existing) || start
   const entry = renderDoneEntry({ point, title, start: earliest, end, body })
-  const cleaned = existing.reduce((acc, card) => acc.replace(card, ''), out)
+  const cleaned = dropDoneCards(out, point)
   const { from } = sectionBounds(cleaned, 'done')
   return `${cleaned.slice(0, from)}\n${entry}${cleaned.slice(from).replace(/^\n/, '')}`
 }
@@ -598,24 +598,49 @@ function renderDoneEntry({ point, title, start, end, body }) {
   )
 }
 
-/** The Erledigt section's text, or '' when the board has no such section. */
-function doneSectionText(html) {
-  try {
-    const { from, end } = sectionBounds(String(html ?? ''), 'done')
-    return String(html).slice(from, end)
-  } catch {
-    return ''
+/** Remove every Erledigt card for `point`, INSIDE the section alone. */
+function dropDoneCards(html, point) {
+  const source = String(html ?? '')
+  const b = doneBounds(source)
+  if (!b) return source
+  const entries = doneEntries(source).filter((e) => e.point === String(point))
+  if (!entries.length) return source
+  const section = source.slice(b.from, b.end)
+  let out = ''
+  let cursor = 0
+  for (const e of entries) {
+    out += section.slice(cursor, e.at)
+    cursor = e.at + e.text.length
   }
+  out += section.slice(cursor)
+  return `${source.slice(0, b.from)}${out}${source.slice(b.end)}`
+}
+
+/** Where the Erledigt section's cards sit, or null when there is no section. */
+function doneBounds(html) {
+  try {
+    return sectionBounds(String(html ?? ''), 'done')
+  } catch {
+    return null
+  }
+}
+
+/** An Erledigt card, matched inside the section alone. */
+const DONE_CARD_RE = /<details>\s*<summary><span class="num">\s*(\d+)\s*<\/span>[\s\S]*?<\/details>\n?/g
+
+/** Every Erledigt card as `{ point, text, at }`, in document order (newest first). */
+export function doneEntries(html) {
+  const b = doneBounds(html)
+  if (!b) return []
+  const section = String(html).slice(b.from, b.end)
+  return [...section.matchAll(DONE_CARD_RE)].map((m) => ({ point: m[1], text: m[0], at: m.index }))
 }
 
 /** Every Erledigt card for `point`, newest first — normally none or one. */
 export function doneCards(html, point) {
-  const section = doneSectionText(html)
-  const re = new RegExp(
-    `<details>\\s*<summary><span class="num">\\s*${point}\\s*</span>[\\s\\S]*?</details>\\n?`,
-    'g',
-  )
-  return section.match(re) ?? []
+  return doneEntries(html)
+    .filter((e) => e.point === String(point))
+    .map((e) => e.text)
 }
 
 /** The FIRST Erledigt card for `point`, or null. */
@@ -623,41 +648,78 @@ export function doneCard(html, point) {
   return doneCards(html, point)[0] ?? null
 }
 
-/** The start stamp an Erledigt card carries (`hh:mm · hh:mm`), or ''. */
+/**
+ * The start stamp an Erledigt card carries, or '' when it carries none that is
+ * a real time of day.
+ *
+ * `99:99` used to pass and then win the comparison it took part in
+ * (cross-vendor review 18.08.2026): a damaged card must not decide when the work
+ * began — it must simply not answer.
+ */
 export function doneStart(card) {
-  return (String(card ?? '').match(/class="meta">\s*(\d{1,2}:\d{2})/) ?? [])[1] ?? ''
+  const m = String(card ?? '').match(/class="meta">\s*(\d{1,2}):(\d{2})/)
+  if (!m) return ''
+  const [, h, min] = m
+  if (Number(h) > 23 || Number(min) > 59) return ''
+  return `${h}:${min}`
+}
+
+/**
+ * The start of the OLDEST card that carries a usable one.
+ *
+ * By ORDER, not by comparing clock faces: the archive is newest-first and the
+ * stamps carry no date, so last night's `21:17` precedes this morning's `00:45`
+ * while arithmetic says the opposite. Scanning on past a malformed card matters
+ * for the same reason — one damaged stamp must not throw the answer back to the
+ * newest card (same review).
+ */
+export function earliestStart(cards = []) {
+  for (let i = cards.length - 1; i >= 0; i--) {
+    const s = doneStart(cards[i])
+    if (s) return s
+  }
+  return ''
 }
 
 /**
  * Fold every duplicate Erledigt card into one, for a board that already carries
  * them (point 700 stood there four times before `toDone` learned to merge).
  *
- * The NEWEST card wins the text and the end stamp, the earliest start survives,
- * and the merged card stays where the newest one stood — the archive is ordered
- * by when a point finished, and the newest finish is the true one.
+ * The NEWEST card keeps its POSITION and its text — the archive is ordered by
+ * when a point finished — and takes the earliest start it can find. The section
+ * is rebuilt from its own cards rather than string-replaced: two byte-identical
+ * duplicates made `replace` delete the FIRST occurrence, which is the survivor,
+ * and an identical card in another section could be deleted instead (same
+ * review).
  */
 export function mergeDoneDuplicates(html) {
-  const section = doneSectionText(html)
-  if (!section) return { html: String(html ?? ''), merged: [] }
-  const points = [...section.matchAll(/<details>\s*<summary><span class="num">\s*(\d+)\s*<\/span>/g)].map(
-    (m) => m[1],
-  )
-  const duplicated = [...new Set(points.filter((p, i) => points.indexOf(p) !== i))]
-  let out = String(html ?? '')
-  for (const point of duplicated) {
-    const cards = doneCards(out, point)
-    if (cards.length < 2) continue
-    const [newest] = cards
-    const older = cards.slice(1)
-    const start = doneStart(cards[cards.length - 1]) || doneStart(newest)
-    const merged = newest.replace(
-      /(class="meta">\s*)(\d{1,2}:\d{2})/,
-      (_, lead) => `${lead}${start}`,
-    )
-    out = out.replace(newest, merged)
-    for (const card of older) out = out.replace(card, '')
+  const source = String(html ?? '')
+  const b = doneBounds(source)
+  if (!b) return { html: source, merged: [] }
+  const entries = doneEntries(source)
+  const counts = new Map()
+  for (const e of entries) counts.set(e.point, (counts.get(e.point) ?? 0) + 1)
+  const merged = [...counts.entries()].filter(([, n]) => n > 1).map(([point]) => point)
+  if (!merged.length) return { html: source, merged: [] }
+
+  const section = source.slice(b.from, b.end)
+  let out = ''
+  let cursor = 0
+  const seen = new Set()
+  for (const e of entries) {
+    out += section.slice(cursor, e.at)
+    cursor = e.at + e.text.length
+    if (seen.has(e.point)) continue // an older duplicate: dropped
+    seen.add(e.point)
+    if (counts.get(e.point) > 1) {
+      const start = earliestStart(doneCards(source, e.point))
+      out += start ? e.text.replace(/(class="meta">\s*)\d{1,2}:\d{2}/, `$1${start}`) : e.text
+    } else {
+      out += e.text
+    }
   }
-  return { html: out, merged: duplicated }
+  out += section.slice(cursor)
+  return { html: `${source.slice(0, b.from)}${out}${source.slice(b.end)}`, merged }
 }
 
 // ═══ Point 416 — closing a point must not leave the board blank ═══
