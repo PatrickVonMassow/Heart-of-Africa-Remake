@@ -36,7 +36,7 @@
 // fails LOUD — it is a command, not a hook.
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { accountUnion, formatAccounting, parseListText, summaryLine, validateInputs } from './blind-merge-core.mjs'
@@ -47,9 +47,11 @@ import {
   modelsFromTrailers,
   MODES,
   parseArgs,
+  validatePass,
   validateRecord,
   VERDICTS,
 } from './mechanism-review-core.mjs'
+import { quotePassFile } from './review-material-core.mjs'
 
 // Re-exported so the flag surface has ONE definition (the pure parser's) and one
 // import path for its callers.
@@ -58,12 +60,11 @@ export { KNOWN_FLAGS }
 /** The tracked ledger of recorded mechanism reviews (JSON Lines). */
 export const RECORDS_PATH = repoPath('.claude/mechanism-reviews.jsonl')
 
-// Field separator for the one `git show` below. Plain ASCII on purpose: a
-// `%X%` pair in a cmd.exe command line is an environment-variable expansion
-// waiting to happen, and this runs on Windows (four-eyes review, 27.07.2026).
-const FLD = '__F__'
-
-const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+// AN ARGUMENT VECTOR, NEVER A SHELL LINE (landing-round pass 4): the sha this
+// command interpolated reached a shell before any validation ran, so a value
+// like `HEAD"; <command>; echo "` executed. execFileSync hands git its
+// arguments directly — there is no shell to inject into.
+const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
 /** Every recorded review. A malformed line is skipped, never fatal — the ledger
  *  outlives the code that writes it, and one bad line must not blind the gate. */
@@ -151,6 +152,10 @@ export function buildRecord({
   unionPath = '',
   listAPath = '',
   listBPath = '',
+  pass = '',
+  passFiles = '',
+  passCommits = '',
+  carriedFrom = '',
   now = Date.now(),
   resolve = resolveCommit,
   countUnion = countUnionFiles,
@@ -172,8 +177,63 @@ export function buildRecord({
         mergedBy,
         mergeFallback,
         accounting,
+        pass,
+        passFiles,
+        passCommits,
       }).errors,
     }
+  }
+  // THE SHA IS VALIDATED BY SHAPE BEFORE ANYTHING RESOLVES IT (landing-round
+  // pass 4): the record command is only ever printed with a hex sha, so
+  // anything else — HEAD, a branch name, a shell fragment — is refused here
+  // with the usage, and never reaches git in any form. The remaining flags
+  // are still checked so the refusal names everything at once.
+  const ref = String(sha).trim()
+  if (!/^[0-9a-f]{7,40}$/i.test(ref)) {
+    const rest = validateRecord({
+      sha: '',
+      model,
+      verdict,
+      evidence,
+      mode,
+      framing,
+      mergedBy,
+      mergeFallback,
+      accounting,
+      pass,
+      passFiles,
+      passCommits,
+    }).errors.filter((e) => !/--record\b/.test(e))
+    return {
+      ok: false,
+      errors: [`--record <sha>: "${ref}" is not a commit sha (7–40 hex characters)`, ...rest],
+    }
+  }
+  // A CARRY IS ITS OWN FLOW (delta rounds, 18.08.2026): everything but the
+  // sha, the pass scope and the point comes verified from the source reading.
+  if (String(carriedFrom ?? '').trim()) {
+    if (String(passCommits ?? '').trim()) {
+      return {
+        ok: false,
+        errors: [
+          '--pass-commits cannot be carried: contribution boundaries are tied to the authorship plan that was actually reviewed',
+        ],
+      }
+    }
+    return buildCarriedRecord({
+      sha: ref,
+      carriedFrom,
+      pass,
+      passFiles,
+      point,
+      model,
+      verdict,
+      evidence,
+      mode,
+      framing,
+      now,
+      resolve,
+    })
   }
   // THE RECEIPT IS COUNTED HERE WHERE IT CAN BE (four-eyes review, third round):
   // a typed `--accounting` line is a claim, and the recorder can turn it into a
@@ -211,6 +271,9 @@ export function buildRecord({
     mergedBy,
     mergeFallback,
     accounting: receipt,
+    pass,
+    passFiles,
+    passCommits,
   })
   const errors = [...check.errors]
   // Optional, but never sloppy: a mistyped point number would record a review
@@ -221,6 +284,30 @@ export function buildRecord({
     errors.push('--point <N>: the work-order point this review settles, as a plain number')
   }
   if (errors.length) return { ok: false, errors }
+  let passField = validatePass({ pass, passFiles, passCommits }).pass
+  // A CONTRIBUTION BOUNDARY IS STORED WHOLE. The flag accepts a 7–40 character
+  // sha, but the gate matches a record's commits against the range's FULL shas
+  // by exact string — an abbreviated boundary therefore covered NOTHING while
+  // the record looked complete, the silent shape point 714 exists to refuse. So
+  // the boundary is resolved here, and a sha this repository cannot resolve is
+  // a refusal rather than a row nobody can act on.
+  if (passField?.commits) {
+    const resolved = []
+    for (const boundary of passField.commits) {
+      try {
+        resolved.push(resolve(boundary).sha)
+      } catch (e) {
+        return { ok: false, errors: [`--pass-commits ${boundary}: ${(e && e.message) || e}`] }
+      }
+    }
+    if (new Set(resolved).size !== resolved.length) {
+      return {
+        ok: false,
+        errors: ['--pass-commits: two boundaries resolve to the same commit; each contribution is named once'],
+      }
+    }
+    passField = { ...passField, commits: resolved }
+  }
   return {
     ok: true,
     record: {
@@ -246,6 +333,11 @@ export function buildRecord({
       // — and WHERE it came from: `computed` was measured from the files here,
       // `stated` was typed by whoever ran the merge.
       ...(String(receipt).trim() ? { accounting: String(receipt).trim(), accountingSource: source } : {}),
+      // WHICH PASS OF WHICH SPLIT, AND OVER WHICH FILES (point 714). A range no
+      // single round can hold is reviewed in passes over the file set; the gate
+      // clears it only once every pass of the same total is on record, so this
+      // field is what turns several partial verdicts into one coverage.
+      ...(passField ? { pass: passField } : {}),
       ...(wanted ? { point: Number(wanted) } : {}),
       at: now,
       atIso: new Date(now).toISOString(),
@@ -253,16 +345,260 @@ export function buildRecord({
   }
 }
 
-/** Resolve a (possibly short) sha to the commit, its subject and its author model. */
-export function resolveCommit(sha) {
-  const full = git(`rev-parse "${String(sha).trim()}^{commit}"`)
-  const line = git(
-    `show -s --format="%H${FLD}%s${FLD}%(trailers:key=Co-Authored-By,valueonly,separator=;)" ${full}`,
+/**
+ * Build a CARRIED pass record (delta-scoped rounds, user decision 18.08.2026):
+ * a pass of an earlier round carries to a new head where every file it read is
+ * byte-identical there. The recorder VERIFIES rather than believes — the
+ * source sha must be an ancestor of the head, every pass file's blob must be
+ * identical at both, and the ledger must hold the source reading itself, whose
+ * verdict/model/evidence/mode are COPIED (a carry is provenance, never a fresh
+ * judgment; that is why --model/--verdict/--evidence/--mode are refused
+ * beside it). The gates re-verify the blob identity on every read
+ * (verifyCarried), so a hand-edited carried row clears nothing.
+ */
+export function buildCarriedRecord({
+  sha = '',
+  carriedFrom = '',
+  pass = '',
+  passFiles = '',
+  point = '',
+  model = '',
+  verdict = '',
+  evidence = '',
+  mode = '',
+  framing = '',
+  now = Date.now(),
+  resolve = resolveCommit,
+  records = null,
+} = {}) {
+  const errors = []
+  if ([model, verdict, evidence, mode, framing].some((v) => String(v ?? '').trim())) {
+    errors.push('--carried-from copies model, verdict, evidence and mode from the source pass — do not pass them')
+  }
+  const from = String(carriedFrom).trim()
+  if (!/^[0-9a-f]{7,40}$/i.test(from)) {
+    errors.push(`--carried-from: "${from}" is not a commit sha (7–40 hex characters)`)
+  }
+  const passCheck = validatePass({ pass, passFiles })
+  if (!passCheck.pass) {
+    errors.push('--carried-from needs --pass <k>/<n> and --pass-files — a carry is always one pass of a split')
+  }
+  const wanted = String(point ?? '').trim()
+  if (wanted && !/^\d+$/.test(wanted)) {
+    errors.push('--point <N>: the work-order point this review settles, as a plain number')
+  }
+  if (errors.length) return { ok: false, errors }
+  const commit = resolve(sha)
+  const source = resolve(from)
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', source.sha, commit.sha], {
+      windowsHide: true,
+      cwd: REPO_ROOT,
+      stdio: 'ignore',
+    })
+  } catch {
+    errors.push(`--carried-from: ${source.sha.slice(0, 7)} is not an ancestor of ${commit.sha.slice(0, 7)} — a carry only moves a reading FORWARD along this history`)
+  }
+  if (source.sha === commit.sha) {
+    errors.push('--carried-from names the recorded sha itself — record the original pass, not a carry')
+  }
+  for (const file of passCheck.pass?.files ?? []) {
+    let a = null
+    let b = null
+    try {
+      a = git(['rev-parse', `${source.sha}:${file}`])
+    } catch {
+      errors.push(`--carried-from: ${file} does not exist at ${source.sha.slice(0, 7)} — nothing there to carry`)
+      continue
+    }
+    try {
+      b = git(['rev-parse', `${commit.sha}:${file}`])
+    } catch {
+      errors.push(`--carried-from: ${file} does not exist at ${commit.sha.slice(0, 7)} — deleted content cannot be covered by a carry`)
+      continue
+    }
+    if (a !== b) {
+      errors.push(
+        `--carried-from: ${file} CHANGED between ${source.sha.slice(0, 7)} and ${commit.sha.slice(0, 7)} — a carry may only rest on identical blobs; review it fresh`,
+      )
+    }
+  }
+  const all = records ?? readRecords()
+  // The same INJECTIVE set key as verifyCarried.
+  const wantedSet = JSON.stringify([...(passCheck.pass?.files ?? [])].map(String).sort())
+  const sources = all.filter(
+    (r) =>
+      r.sha === source.sha &&
+      r.pass &&
+      Array.isArray(r.pass.files) &&
+      JSON.stringify([...r.pass.files].map(String).sort()) === wantedSet &&
+      VERDICTS.includes(String(r.verdict)) &&
+      // The source must be the ORIGINAL reading: blob identity is transitive,
+      // so where the source is itself carried, carry from ITS original.
+      r.carried === undefined,
   )
-  const [resolved, subject, trailers] = line.split(FLD)
+  if (!sources.length) {
+    errors.push(
+      `--carried-from: no recorded pass at ${source.sha.slice(0, 7)} covers exactly these files — a carry may only rest on a reading that happened (and where that reading is itself a carry, carry from its original)`,
+    )
+  }
+  if (errors.length) return { ok: false, errors }
+  const src = sources.reduce((x, y) => (Number(y.at ?? 0) >= Number(x.at ?? 0) ? y : x))
+  const copiedEvidence = `CARRIED from ${source.sha.slice(0, 7)} (blobs verified identical): ${String(src.evidence ?? '').trim()}`
+  const check = validateRecord({
+    sha: commit.sha,
+    model: src.model,
+    verdict: src.verdict,
+    evidence: copiedEvidence,
+    authoredBy: commit.authoredBy,
+    authors: commit.authors,
+    mode: src.mode,
+    pass,
+    passFiles,
+  })
+  if (check.errors.length) return { ok: false, errors: check.errors }
   return {
-    sha: resolved || full,
-    subject: subject ?? '',
+    ok: true,
+    record: {
+      sha: commit.sha,
+      subject: commit.subject,
+      authoredBy: commit.authoredBy,
+      model: String(src.model).trim(),
+      verdict: String(src.verdict).trim(),
+      evidence: copiedEvidence,
+      mode: String(src.mode).trim(),
+      pass: passCheck.pass,
+      carried: { from: source.sha },
+      ...(wanted ? { point: Number(wanted) } : {}),
+      at: now,
+      atIso: new Date(now).toISOString(),
+    },
+  }
+}
+
+/**
+ * Re-measure every carried row's WHOLE claim and STAMP it (the gates' half of
+ * the carry contract): for each record with `carried.from`,
+ *   - every pass file's blob must be identical between the source and the
+ *     recorded sha,
+ *   - the source must be a strict ancestor of the recorded sha,
+ *   - and the SOURCE READING itself must stand in the ledger — an original
+ *     (non-carried) pass row at the source sha over the exact file set whose
+ *     model, verdict and mode the carried row COPIED, and whose evidence the
+ *     carried evidence quotes. Blob identity alone let a hand-edited carried
+ *     row INVENT its verdict and still stamp true (third landing round,
+ *     pass 5) — the copied fields are part of the claim, so they are part of
+ *     the proof.
+ * Anything that cannot be verified — a malformed sha, a missing file, a git
+ * failure, no matching source row — stamps false, and the cores refuse the
+ * row. Mutates and returns `records`.
+ */
+export function verifyCarried(records, allRecords = null) {
+  let ledger = null
+  for (const r of records ?? []) {
+    if (!r || typeof r !== 'object' || r.carried === undefined) continue
+    r.carriedVerified = (() => {
+      try {
+        const from = String(r.carried?.from ?? '')
+        if (!/^[0-9a-f]{7,40}$/i.test(from)) return false
+        if (!/^[0-9a-f]{7,40}$/i.test(String(r.sha ?? ''))) return false
+        if (from === r.sha) return false
+        try {
+          execFileSync('git', ['merge-base', '--is-ancestor', from, r.sha], {
+            windowsHide: true,
+            cwd: REPO_ROOT,
+            stdio: 'ignore',
+          })
+        } catch {
+          return false
+        }
+        const files = Array.isArray(r.pass?.files) ? r.pass.files : null
+        if (!files || !files.length) return false
+        for (const file of files) {
+          if (typeof file !== 'string' || !file) return false
+          const a = git(['rev-parse', `${from}:${file}`])
+          const b = git(['rev-parse', `${r.sha}:${file}`])
+          if (!a || a !== b) return false
+        }
+        if (!ledger) ledger = allRecords ?? readRecords()
+        // An INJECTIVE set key (JSON, never a join): a legal path may contain any
+        // separator a join could pick, and a collision would let one file set
+        // impersonate another.
+        const wantedSet = JSON.stringify([...files].map(String).sort())
+        const source = ledger.find(
+          (s) =>
+            s !== r &&
+            s.carried === undefined &&
+            String(s.sha) === from &&
+            Array.isArray(s.pass?.files) &&
+            JSON.stringify([...s.pass.files].map(String).sort()) === wantedSet &&
+            String(s.model) === String(r.model) &&
+            String(s.verdict) === String(r.verdict) &&
+            String(s.mode) === String(r.mode) &&
+            String(r.evidence ?? '').endsWith(String(s.evidence ?? '').trim()) &&
+            /^CARRIED from [0-9a-f]{7} \(blobs verified identical\): /.test(String(r.evidence ?? '')),
+        )
+        return Boolean(source)
+      } catch {
+        return false
+      }
+    })()
+  }
+  return records
+}
+
+/** Resolve a (possibly short) sha to the commit, its subject and its author model.
+ *
+ *  Each free-text fact through its OWN single-format `git show` (escalation
+ *  round, pass 2): a combined format needs a separator, and a legal SUBJECT
+ *  containing that separator shifted the trailers out of their field — the
+ *  authoring model then read wrong, and the self-review refusal missed. With
+ *  one format per call there is no separator to forge. */
+export function resolveCommit(sha, { run = git } = {}) {
+  // VALIDATED BEFORE GIT SEES IT (landing-round pass 4): the record command is
+  // only ever printed with a hex sha, so anything else is refused by shape —
+  // with the one message that names what this command wants.
+  const ref = String(sha).trim()
+  if (!/^[0-9a-f]{7,40}$/i.test(ref)) {
+    throw new Error(`--record <sha>: "${ref}" is not a commit sha (7–40 hex characters)`)
+  }
+  // RESOLVED AGAINST THE OBJECT DATABASE, NOT AGAINST REFS. `git rev-parse`
+  // answers a REF first, and a branch or tag may legally be named in hex — so
+  // a ref named like a sha prefix would silently record a DIFFERENT commit than
+  // the boundary given, and the coverage reader would then clear contributions
+  // nobody read. `--disambiguate` never consults refs: it lists the objects
+  // whose id carries the prefix, and anything but exactly one commit is refused.
+  const candidates = run(['rev-parse', `--disambiguate=${ref.toLowerCase()}`])
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const commits = candidates.filter((candidate) => {
+    // AN UNREADABLE CANDIDATE IS NOT A NON-COMMIT. Swallowing the error dropped
+    // it from the list, so a prefix naming one readable commit beside one
+    // unreadable object resolved as unambiguous — ambiguity failing OPEN, which
+    // is the one direction this check exists to prevent.
+    let type
+    try {
+      type = run(['cat-file', '-t', candidate])
+    } catch (e) {
+      throw new Error(`--record <sha>: "${ref}" names an object this repository cannot read (${candidate.slice(0, 12)}): ${(e && e.message) || e}`)
+    }
+    return type === 'commit'
+  })
+  if (!commits.length) {
+    throw new Error(`--record <sha>: "${ref}" names no commit in this repository`)
+  }
+  if (commits.length > 1) {
+    throw new Error(
+      `--record <sha>: "${ref}" is ambiguous — it names ${commits.length} commits (${commits.map((c) => c.slice(0, 12)).join(', ')})`,
+    )
+  }
+  const full = commits[0]
+  const subject = run(['show', '-s', '--format=%s', full])
+  const trailers = run(['show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', full])
+  return {
+    sha: full,
+    subject,
     authoredBy: modelFromTrailers(trailers),
     authors: modelsFromTrailers(trailers),
   }
@@ -290,6 +626,18 @@ export const usage = () =>
   `       --union <U.json> --list-a <A> --list-b <B>   (preferred; --accounting then\n` +
   `       needs no value). Or run node scripts/blind-merge.mjs first and pass the line\n` +
   `       it prints as --accounting "<summary>".\n` +
+  `--pass <k>/<n> --pass-files "<a,b,c>" records ONE pass of a range whose material no\n` +
+  `       single review round can hold. The passes cut through the FILE SET, and the gate\n` +
+  `       clears the range only once EVERY pass of the same total is recorded — a pass on\n` +
+  `       its own covers the files it names and nothing else. review-sol.mjs prints them.\n` +
+  `       A path holding a comma, a quote or edge whitespace is written C-QUOTED, exactly\n` +
+  `       as git prints it; nothing is ever trimmed into a different path.\n` +
+  `       An authorship-cut pass adds --pass-commits "<sha,sha>" so a mixed-vendor\n` +
+  `       file is credited only at the commit boundaries this reviewer actually read.\n` +
+  `--carried-from <sha> carries an EARLIER round's pass to this head where every file it\n` +
+  `       read is byte-identical there: the recorder verifies the blob identity and the\n` +
+  `       source reading, and COPIES its verdict/model/evidence — do not pass them. The\n` +
+  `       gates re-verify the blobs on every read; a changed file refuses the carry.\n` +
   `\nWHO REVIEWS (CLAUDE.md §6): the OTHER vendor, never an author of the range.\n` +
   `       Claude authored it → GPT-5.6 Sol at reasoning effort high, and when Sol is\n` +
   `       unavailable the first of Fable 5 / Opus 5 / Opus 4.8 that wrote no part of it.\n` +
@@ -320,16 +668,53 @@ if (isMainModule(import.meta.url)) {
       if (!records.length) {
         console.log('no mechanism reviews recorded yet')
       }
+      // EVERY FREE-TEXT FIELD RENDERS AS ONE LINE (landing-round pass 4):
+      // readRecords validates only the sha, and a hand-edited row with a
+      // newline in any field forged arbitrary listing lines — the shape a
+      // reader greps and trusts. Whitespace runs flatten to one space, and
+      // TERMINAL CONTROLS (ESC and the other C0/C1 bytes, which \s does not
+      // cover) are dropped outright — a hand-edited field must not drive the
+      // reader's terminal either.
+      const oneLine = (v) =>
+        String(v ?? '')
+          .replace(/\s+/g, ' ')
+          // eslint-disable-next-line no-control-regex
+          .replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
+      // …and the pass CLAIM is validated whole before it is rendered: Number()
+      // turns any decorated or multi-line index into NaN, a files value that
+      // is no array is part of the malformed claim, and a claim that is not a
+      // plausible k-of-n over a file list is printed as the hand-edit it is.
+      const passLine = (p) => {
+        const index = Number(p?.index)
+        const total = Number(p?.total)
+        const files = (Array.isArray(p?.files) ? p.files : []).map((q) => quotePassFile(q)).join(', ')
+        const shaped =
+          Number.isSafeInteger(index) &&
+          Number.isSafeInteger(total) &&
+          index >= 1 &&
+          index <= total &&
+          Array.isArray(p?.files)
+        const commits = Array.isArray(p?.commits) ? p.commits.map((sha) => oneLine(sha)).join(', ') : ''
+        return shaped
+          ? `\n      pass ${index}/${total} over: ${files}${commits ? `\n      contribution commits: ${commits}` : ''}`
+          : `\n      pass (MALFORMED claim ${oneLine(JSON.stringify({ index: p?.index, total: p?.total, files: Array.isArray(p?.files) ? undefined : p?.files })).slice(0, 100)}) over: ${files}`
+      }
       for (const r of records) {
         console.log(
-          `${String(r.sha).slice(0, 7)}  ${String(r.verdict).padEnd(16)} by ${String(r.model).padEnd(12)} ` +
-            `(authored by ${r.authoredBy || 'unknown'})${r.point ? `  point ${r.point}` : ''}  ` +
+          `${String(r.sha).slice(0, 7)}  ${oneLine(r.verdict).padEnd(16)} by ${oneLine(r.model).padEnd(12)} ` +
+            `(authored by ${oneLine(r.authoredBy) || 'unknown'})${r.point ? `  point ${oneLine(r.point)}` : ''}  ` +
             // A row from before --mode existed has none; it reads as unrecorded,
             // never as one of the two modes.
-            `[${r.mode || 'mode not recorded'}]  ${r.atIso ?? ''}` +
-            `\n      ${r.evidence ?? ''}${r.framing ? `\n      framing: ${r.framing}` : ''}` +
-            `${r.mergedBy ? `\n      union merged by: ${r.mergedBy}${r.mergeFallback ? ` (two-model fallback: ${r.mergeFallback})` : ''}` : ''}` +
-            `${r.accounting ? `\n      accounting: ${r.accounting}` : ''}`,
+            `[${oneLine(r.mode) || 'mode not recorded'}]  ${oneLine(r.atIso ?? '')}` +
+            `\n      ${oneLine(r.evidence ?? '')}${r.framing ? `\n      framing: ${oneLine(r.framing)}` : ''}` +
+            `${r.mergedBy ? `\n      union merged by: ${oneLine(r.mergedBy)}${r.mergeFallback ? ` (two-model fallback: ${oneLine(r.mergeFallback)})` : ''}` : ''}` +
+            `${r.accounting ? `\n      accounting: ${oneLine(r.accounting)}` : ''}` +
+            // Quoted like every structural path list (round-2 pass 3): a path
+            // holding a newline or comma must not forge a line here either.
+            // And GUARDED (final-round pass 4): readRecords validates only the
+            // sha, so a hand-edited `pass.files` that is no array crashed the
+            // whole listing.
+            `${r.pass ? passLine(r.pass) : ''}`,
         )
       }
       process.exit(0)

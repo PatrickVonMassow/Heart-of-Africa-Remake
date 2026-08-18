@@ -1,0 +1,174 @@
+{
+  "mergedBy": "Fable 5",
+  "entries": [
+    {
+      "id": "U1",
+      "from": [
+        "A1",
+        "B1"
+      ],
+      "point": "623",
+      "verdict": "KEEP: First place stands — a repeated user-visible stale-decision bug in a HIGH-criticality guard, asked twice (10.08 and the 18.08 re-ask, the freshest user word), verified undelivered (no scripts/vdzk-answer.mjs, no message-keyed review/retrospect rule in decision-card-guard-core.mjs); requested fixes rank before QA tickets, and no listed landing delivers its answer carrier, deadline and retrospective recognition together.",
+      "defect": "KEEP: First place stands — a repeated user-visible stale-decision bug in a HIGH-criticality guard, asked twice (10.08 and the 18.08 re-ask, the freshest user word), verified undelivered (no scripts/vdzk-answer.mjs, no message-keyed review/retrospect rule in decision-card-guard-core.mjs); requested fixes rank before QA tickets, and no listed landing delivers its answer carrier, deadline and retrospective recognition together."
+    },
+    {
+      "id": "U2",
+      "from": [
+        "A2",
+        "B2"
+      ],
+      "point": "712",
+      "verdict": "KEEP: Second place, directly behind 623 — B's move-to-front is rejected because 712 lands immediately after the first landing anyway, so its pick-refusal and branch-counted slots govern every subsequent pick at the cost of exactly one pick; verified unbuilt (batch-in-flight-core.mjs still computes slotsFree = limit - running, agents not branches), and 590/608 delivered ordering, not picker or slot enforcement. B's self-enforcement rationale is why it must not slip below second.",
+      "defect": "KEEP: Second place, directly behind 623 — B's move-to-front is rejected because 712 lands immediately after the first landing anyway, so its pick-refusal and branch-counted slots govern every subsequent pick at the cost of exactly one pick; verified unbuilt (batch-in-flight-core.mjs still computes slotsFree = limit - running, agents not branches), and 590/608 delivered ordering, not picker or slot enforcement. B's self-enforcement rationale is why it must not slip below second."
+    },
+    {
+      "id": "U3",
+      "from": [
+        "A3",
+        "B3"
+      ],
+      "point": "713",
+      "verdict": "KEEP: Position 3 — a concrete user-visible dashboard falsehood ahead of broad measurement work; the derived queue from 590/608 does not derive or validate the now-section, and the defect is verified live (board-core.mjs:369 still reads the FIRST now-card for focus, the measured 17.08 failure). HARD PREREQUISITE before building: the owed COUNTED blind merge of local/blind-713/ (0 identical vs 56 candidate pairs, third-model merger).",
+      "defect": "KEEP: Position 3 — a concrete user-visible dashboard falsehood ahead of broad measurement work; the derived queue from 590/608 does not derive or validate the now-section, and the defect is verified live (board-core.mjs:369 still reads the FIRST now-card for focus, the measured 17.08 failure). HARD PREREQUISITE before building: the owed COUNTED blind merge of local/blind-713/ (0 identical vs 56 candidate pairs, third-model merger)."
+    },
+    {
+      "id": "U4",
+      "from": [
+        "A4",
+        "B4"
+      ],
+      "point": "701",
+      "verdict": "KEEP: Position 4, right before the unbuilt levers it must judge — 553's (and absorbed 662's) ceilings are explicitly calibrated from the cost data, so the place is load-bearing; no listed commit supplies the repeatable per-point ledger. Partial substrate exists (measure-task-cost.mjs prints the phase split and --tasks) but the per-point ledger command and the per-lever firing/effectiveness reading do not.",
+      "defect": "KEEP: Position 4, right before the unbuilt levers it must judge — 553's (and absorbed 662's) ceilings are explicitly calibrated from the cost data, so the place is load-bearing; no listed commit supplies the repeatable per-point ledger. Partial substrate exists (measure-task-cost.mjs prints the phase split and --tasks) but the per-point ledger command and the per-lever firing/effectiveness reading do not."
+    },
+    {
+      "id": "U5",
+      "from": [
+        "A5",
+        "B5"
+      ],
+      "point": "707",
+      "verdict": "KEEP: Position 5, correctly after 712 (it only CARRIES 712's refusals into the report) — the four-guard preflight gap and missing stand-down are active known bugs, verified undelivered (guide-brevity-guard.mjs still checks only .claude/batch-paused with no heldByOtherLiveOwner; guard-preflight-core.mjs still emits not-judged for the four guards); landed 711 may reduce one deploy-transient case but does not deliver the point in substance.",
+      "defect": "KEEP: Position 5, correctly after 712 (it only CARRIES 712's refusals into the report) — the four-guard preflight gap and missing stand-down are active known bugs, verified undelivered (guide-brevity-guard.mjs still checks only .claude/batch-paused with no heldByOtherLiveOwner; guard-preflight-core.mjs still emits not-judged for the four guards); landed 711 may reduce one deploy-transient case but does not deliver the point in substance."
+    },
+    {
+      "id": "U6",
+      "from": [
+        "A7",
+        "B7"
+      ],
+      "point": "705",
+      "verdict": "MOVE: Before 708, as its own point — A's merge into 708 is rejected: the staged edit-publish is a board.mjs primitive that three of 708's four commands (file a point, end the turn, take the boundary) will call, so it is dependency-ordered shared work, not one work with the orchestration point. A's transaction concern is kept as a binding build note on 708: the end-turn command adopts 705's staged mode, one combined guard pass and exactly ONE checked publish, never re-implements them. At build time strike the moot 'lift .claude/batch-paused' sub-item (marker verified gone, pause already lifted).",
+      "defect": "MOVE: Before 708, as its own point — A's merge into 708 is rejected: the staged edit-publish is a board.mjs primitive that three of 708's four commands (file a point, end the turn, take the boundary) will call, so it is dependency-ordered shared work, not one work with the orchestration point. A's transaction concern is kept as a binding build note on 708: the end-turn command adopts 705's staged mode, one combined guard pass and exactly ONE checked publish, never re-implements them. At build time strike the moot 'lift .claude/batch-paused' sub-item (marker verified gone, pause already lifted)."
+    },
+    {
+      "id": "U7",
+      "from": [
+        "A6",
+        "B6"
+      ],
+      "point": "708",
+      "verdict": "KEEP: Directly after 705 and ahead of the low board-bookkeeping points — A's move behind 706 is rejected on the user's 17.08 word (708 is per-point token overhead of every session, genuine token reduction; 706 is low bookkeeping); its internal build order (file-a-point first) is already frequency-justified in the spec. A's dependency concern is carried: the file-a-point command must not paper over 706's silent argument loss — it issues the three well-formed board-queue calls, or lands 706's parser refusal first if that proves trivial.",
+      "defect": "KEEP: Directly after 705 and ahead of the low board-bookkeeping points — A's move behind 706 is rejected on the user's 17.08 word (708 is per-point token overhead of every session, genuine token reduction; 706 is low bookkeeping); its internal build order (file-a-point first) is already frequency-justified in the spec. A's dependency concern is carried: the file-a-point command must not paper over 706's silent argument loss — it issues the three well-formed board-queue calls, or lands 706's parser refusal first if that proves trivial."
+    },
+    {
+      "id": "U8",
+      "from": [
+        "A8",
+        "B8"
+      ],
+      "point": "706",
+      "verdict": "MOVE: Behind the token-reduction levers (after 597, before 710, still ahead of the user's 18.08 block) — the parser defect is verified still present (parseSetArgs in board-queue-core.mjs still buckets prose after --estimate with no duration check; the flag refusal covers only ---prefixed values) and it stays a concrete data-loss fix, but it is LOW and the user's 17.08 word ranks token reduction above bookkeeping. Per the 713 subsumption (U17), land 713 first and shrink 706's third bullet to a regression test; the parser and rebuild-card halves stay 706's own work, and 708 depends on its corrected primitives only in the sense noted in U7.",
+      "defect": "MOVE: Behind the token-reduction levers (after 597, before 710, still ahead of the user's 18.08 block) — the parser defect is verified still present (parseSetArgs in board-queue-core.mjs still buckets prose after --estimate with no duration check; the flag refusal covers only ---prefixed values) and it stays a concrete data-loss fix, but it is LOW and the user's 17.08 word ranks token reduction above bookkeeping. Per the 713 subsumption (U17), land 713 first and shrink 706's third bullet to a regression test; the parser and rebuild-card halves stay 706's own work, and 708 depends on its corrected primitives only in the sense noted in U7."
+    },
+    {
+      "id": "U9",
+      "from": [
+        "A9",
+        "B9"
+      ],
+      "point": "710",
+      "verdict": "KEEP: Last of the head, low bookkeeping, still ahead of the user-ranked branch block and no longer behind the attended-only rollout (715 moved out) — its bounded accounting preserves 57 paid-for findings. The perishable half is urgent INDEPENDENT of rank: local/multistep-analysis-17-08/ (multistep-A/B, union.json, verified present) is git-ignored and one checkout event from gone; commit the raw artifacts now as evidence (U16), ahead of the mapping work.",
+      "defect": "KEEP: Last of the head, low bookkeeping, still ahead of the user-ranked branch block and no longer behind the attended-only rollout (715 moved out) — its bounded accounting preserves 57 paid-for findings. The perishable half is urgent INDEPENDENT of rank: local/multistep-analysis-17-08/ (multistep-A/B, union.json, verified present) is git-ignored and one checkout event from gone; commit the raw artifacts now as evidence (U16), ahead of the mapping work."
+    },
+    {
+      "id": "U10",
+      "from": [
+        "A10",
+        "B10"
+      ],
+      "point": "715",
+      "verdict": "MOVE: Behind the user's 18.08 block, marked attended-gated — declared refinement of the ranking: the remaining work is ATTENDED-ONLY by its own spec (.claude/settings.json is protected; verified 36 scripts still in RELATIVE_WIRING_ROLLOUT, settings still 39 relative vs 2 anchored lines), so at position 10 it would jam 712's front-three picker for every headless session. A's substance stands: the defaulted-anchor recognition is only partially delivered and finishing the recorded 39-entry rollout remains substantive work — this is a placement change, not a DONE.",
+      "defect": "MOVE: Behind the user's 18.08 block, marked attended-gated — declared refinement of the ranking: the remaining work is ATTENDED-ONLY by its own spec (.claude/settings.json is protected; verified 36 scripts still in RELATIVE_WIRING_ROLLOUT, settings still 39 relative vs 2 anchored lines), so at position 10 it would jam 712's front-three picker for every headless session. A's substance stands: the defaulted-anchor recognition is only partially delivered and finishing the recorded 39-entry rollout remains substantive work — this is a placement change, not a DONE."
+    },
+    {
+      "id": "U11",
+      "from": [
+        "A11",
+        "B11",
+        "B18"
+      ],
+      "point": "662",
+      "verdict": "MERGE: Into point 553, retaining the merge-without-tick trigger as an owed boundary — both define context-triggered handover through batch-progress-guard, and one final-state spec must reconcile the competing ceiling definitions; the reconciliation is settled by B's verified facts: 662's 'tokens the scripts cannot read' premise is stale (point 700's fence BINDS at the 150k measured watermark, covering the >150k-carried-14h path), so the merged ceiling is recalibrated on the now-readable context measure, while the un-ticked-merge boundary demand is untouched (batch-progress-guard.mjs still says 'Merge and tick it first') and stays in the merged spec. B18 is subsumed by the merge: one point means one coordinated guard change and one cross-model mechanism review by construction.",
+      "defect": "MERGE: Into point 553, retaining the merge-without-tick trigger as an owed boundary — both define context-triggered handover through batch-progress-guard, and one final-state spec must reconcile the competing ceiling definitions; the reconciliation is settled by B's verified facts: 662's 'tokens the scripts cannot read' premise is stale (point 700's fence BINDS at the 150k measured watermark, covering the >150k-carried-14h path), so the merged ceiling is recalibrated on the now-readable context measure, while the un-ticked-merge boundary demand is untouched (batch-progress-guard.mjs still says 'Merge and tick it first') and stays in the merged spec. B18 is subsumed by the merge: one point means one coordinated guard change and one cross-model mechanism review by construction."
+    },
+    {
+      "id": "U12",
+      "from": [
+        "A12",
+        "B12"
+      ],
+      "point": "553",
+      "verdict": "KEEP: With 662 absorbed, the single owner of measured context budgets, written mid-point handoffs, delegated-agent enforcement, the merge-without-tick boundary and the post-landing effectiveness measurement, placed before 596/597 which ride the same measurement machinery; HIGH and verified unbuilt (no scripts/point-handoff.mjs).",
+      "defect": "KEEP: With 662 absorbed, the single owner of measured context budgets, written mid-point handoffs, delegated-agent enforcement, the merge-without-tick boundary and the post-landing effectiveness measurement, placed before 596/597 which ride the same measurement machinery; HIGH and verified unbuilt (no scripts/point-handoff.mjs)."
+    },
+    {
+      "id": "U13",
+      "from": [
+        "A13",
+        "B13"
+      ],
+      "point": "596",
+      "verdict": "KEEP: Correctly after 553 (same measurement machinery and medians) and before the bounded-output point — tail and silent-run visibility is wholly unbuilt, per the spec's own 17.08 branch reading (the 595/598 branch contains none of it); the silence-window third trigger (the six-and-a-half-hour bleed) is the part with proven cost and must not slip out in a re-cut.",
+      "defect": "KEEP: Correctly after 553 (same measurement machinery and medians) and before the bounded-output point — tail and silent-run visibility is wholly unbuilt, per the spec's own 17.08 branch reading (the 595/598 branch contains none of it); the silence-window third trigger (the six-and-a-half-hour bleed) is the part with proven cost and must not slip out in a re-cut."
+    },
+    {
+      "id": "U14",
+      "from": [
+        "A14",
+        "B14"
+      ],
+      "point": "597",
+      "verdict": "KEEP: Last token-reduction item of the head, fitting its LOW criticality, explicitly absent from the shared 595/598 branch — and only the unconditional bounded-output half is workable now: the standing-load/cache-prefix half is CONDITIONAL on point 599 (not in this head), so the point lands its unconditional half without waiting.",
+      "defect": "KEEP: Last token-reduction item of the head, fitting its LOW criticality, explicitly absent from the shared 595/598 branch — and only the unconditional bounded-output half is workable now: the standing-load/cache-prefix half is CONDITIONAL on point 599 (not in this head), so the point lands its unconditional half without waiting."
+    },
+    {
+      "id": "U15",
+      "from": [
+        "A15",
+        "B15"
+      ],
+      "point": "order",
+      "verdict": "MOVE: Final head order 623, 712, 713, 701, 707, 705, 708, 553 (662 merged in), 596, 597, 706, 710, then the user's binding 18.08 block 697, 703, 595/598, 581, 336 directly after the head's last point, then attended-gated 715 — B15's declared refinement (token-reduction levers 553/596/597 ahead of low bookkeeping 706/710, on the user's 17.08 word that only token reduction outranks landing branches) is adopted; A15's 662-into-553 merge is adopted; A15's 705-into-708 merge is rejected per U6 (705 stays its own point, ordered before 708); nothing the user pulled forward moves, and nothing is pulled past the block except 715, declared in U10.",
+      "defect": "MOVE: Final head order 623, 712, 713, 701, 707, 705, 708, 553 (662 merged in), 596, 597, 706, 710, then the user's binding 18.08 block 697, 703, 595/598, 581, 336 directly after the head's last point, then attended-gated 715 — B15's declared refinement (token-reduction levers 553/596/597 ahead of low bookkeeping 706/710, on the user's 17.08 word that only token reduction outranks landing branches) is adopted; A15's 662-into-553 merge is adopted; A15's 705-into-708 merge is rejected per U6 (705 stays its own point, ordered before 708); nothing the user pulled forward moves, and nothing is pulled past the block except 715, declared in U10."
+    },
+    {
+      "id": "U16",
+      "from": [
+        "B16"
+      ],
+      "point": "order",
+      "verdict": "KEEP: Cross-point evidence rescue — commit the git-ignored blind/analysis artifacts (local/blind-713/ for 713, local/multistep-analysis-17-08/ for 710) in one small evidence commit immediately, decoupled from when either point is worked; both points cite them and a checkout loss would discard two paid-for four-eyes stages.",
+      "defect": "KEEP: Cross-point evidence rescue — commit the git-ignored blind/analysis artifacts (local/blind-713/ for 713, local/multistep-analysis-17-08/ for 710) in one small evidence commit immediately, decoupled from when either point is worked; both points cite them and a checkout loss would discard two paid-for four-eyes stages."
+    },
+    {
+      "id": "U17",
+      "from": [
+        "B17"
+      ],
+      "point": "order",
+      "verdict": "KEEP: Partial subsumption, not a merge — 713's derived now-section substantially covers 706's third bullet (queue <N> unseating the now-card: a derived render re-creates the card), so land 713 first and shrink 706's third bullet to a regression test; 706's parser and rebuild-card halves stay its own work.",
+      "defect": "KEEP: Partial subsumption, not a merge — 713's derived now-section substantially covers 706's third bullet (queue <N> unseating the now-card: a derived render re-creates the card), so land 713 first and shrink 706's third bullet to a regression test; 706's parser and rebuild-card halves stay its own work."
+    }
+  ]
+}

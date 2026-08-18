@@ -218,6 +218,43 @@ describe('parseAuthoringAnswer', () => {
     expect(parseAuthoringAnswer('').ok).toBe(false)
     expect(parseAuthoringAnswer('DONE: <what you built>\nGATES: <the result>\nOPEN: none').ok).toBe(false)
   })
+
+  it('rules the placeholder on the STRIPPED capture — decoration cannot smuggle it', () => {
+    expect(
+      parseAuthoringAnswer('DONE: **<what you built>**\nGATES: test:unit green\nOPEN: none').ok,
+    ).toBe(false)
+  })
+
+  it('refuses an OPEN placeholder too — a clean-looking run with an unanswered field (landing round)', () => {
+    // The check covered only DONE and GATES: real DONE, green GATES and
+    // `OPEN: **<what you left undone>**` parsed clean.
+    expect(
+      parseAuthoringAnswer('DONE: built\nGATES: test:unit, build and lint all green\nOPEN: <what you left undone>').ok,
+    ).toBe(false)
+    expect(
+      parseAuthoringAnswer('DONE: built\nGATES: test:unit, build and lint all green\nOPEN: **<what you left undone>**').ok,
+    ).toBe(false)
+    // An UNPAIRED marker survives the pair strip and shielded the anchored
+    // test (landing round): the ruling reads the net-only spelling too.
+    expect(
+      parseAuthoringAnswer('DONE: built\nGATES: test:unit, build and lint all green\nOPEN: _<what you left undone>').ok,
+    ).toBe(false)
+    // A MARKER-ONLY field is an unanswered field (fourth landing round).
+    expect(parseAuthoringAnswer('DONE: _\nGATES: test:unit, build and lint all green\nOPEN: _').ok).toBe(false)
+  })
+
+  it('quotes DONE/GATES/OPEN from the raw lines byte-for-byte', () => {
+    // A token the stripper would mangle must reach the caller unrewritten.
+    const parsed = parseAuthoringAnswer(
+      'prose\n\nDONE: ported src/__init__.py and its __slots__ handling\nGATES: test:unit, build and lint all green\nOPEN: the __all__ export list is still owed',
+    )
+    expect(parsed).toMatchObject({
+      ok: true,
+      done: 'ported src/__init__.py and its __slots__ handling',
+      gates: 'test:unit, build and lint all green',
+      open: 'the __all__ export list is still owed',
+    })
+  })
 })
 
 describe('judgeAuthoring — what GIT says, not what the run claimed', () => {

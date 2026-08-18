@@ -1,4 +1,4 @@
-// WHICH AUTHORING LANE A POINT GOES TO (point 667).
+// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@05eaa324
 //
 // The user pays two vendors, and authoring is the largest single item of the
 // spend, so it is split across both rather than sitting on one. It does NOT all
@@ -9,13 +9,20 @@
 // (cross-vendor audit 17.08.2026 — the header used to argue from one day's
 // quota reading, which then outlived it).
 //
-//   sol    GPT-5.6 Sol authors the MECHANICAL and MID-DIFFICULTY points, and
-//          Claude then reviews, runs the suites, judges the picture and lands.
-//   fable  Fable 5 keeps the HARD cases — difficult, complex, error-prone — and
-//          the work that has already come back from Sol with findings.
+//   sol    GPT-5.6 Sol authors the points, and Claude then reviews, runs the
+//          suites, judges the picture and lands. Since 18.08.2026 that includes
+//          the HARD and CRITICAL ones — difficult, complex, error-prone or
+//          tagged HIGH criticality goes STRAIGHT here, where it used to be held
+//          back for Opus.
 //   opus   Opus 5 keeps what only the main lane can honestly finish: a point
 //          whose VERIFICATION is the work (a picture judged on both backends is
-//          the main session's job, so authoring it elsewhere buys nothing).
+//          the main session's job, so authoring it elsewhere buys nothing) —
+//          and only while nothing marks that point hard, because the user's
+//          18.08. ruling outranks this lane, not the other way round.
+//   fable  Fable 5 takes ONE case (user 17.08.2026): work whose re-work the
+//          review still finds problems in. Its weekly pool is the scarcest of
+//          the three, so the CUT sends nothing else there — a point's own lane
+//          tag and the caller's override still can, and both are deliberate.
 //
 // WHY A FUNCTION RATHER THAN A JUDGMENT CALL: the point says the cut is named,
 // not guessed. A dispatcher's taste is not reviewable and drifts with whoever
@@ -41,11 +48,14 @@ export const LANE_MODEL = Object.freeze({
  * The words CLAUDE.md §6 itself uses for the hard cases, plus the classic
  * error-prone subjects, which a spec names when it is one.
  *
- * Deliberately SHORT. Every word here diverts work away from the lane this point
- * exists to fill, so a term that merely sounds weighty ("careful", "important")
- * is not on the list: it would empty the Sol lane one plausible adjective at a
- * time. What IS here is either the policy's own wording or a subject where a
- * wrong answer is silent — a race, a lock, a migration of state that exists.
+ * Deliberately SHORT, and it stayed short when the lane it feeds REVERSED (user
+ * 18.08.2026). A hit no longer holds work back for Opus; it now OVERRIDES the
+ * verification lane below, which is the one thing that still costs something to
+ * get wrong. So a term that merely sounds weighty ("careful", "important") is
+ * still not on the list: it would pull picture points out of the main session
+ * one plausible adjective at a time. What IS here is either the policy's own
+ * wording or a subject where a wrong answer is silent — a race, a lock, a
+ * migration of state that exists.
  */
 export const HARD_MARKERS = Object.freeze([
   /\bdifficult\b/i,
@@ -65,14 +75,19 @@ export const HARD_MARKERS = Object.freeze([
  * …and the markers of a point whose VERIFICATION IS THE WORK.
  *
  * Not a difficulty judgment: these name work whose ANSWER is a rendered picture
- * or a browser run, and CLAUDE.md §6 keeps both with the main session whoever
- * authored the code. Handing such a point to another lane splits it in two and
- * saves nothing — the expensive half stays here either way.
+ * or a browser run. The main session judges that picture whoever authored the
+ * code, so for an ORDINARY such point authoring it elsewhere splits it in two
+ * and saves little — which is why this lane exists at all.
+ *
+ * IT IS THE LAST WORD ONLY WHERE NOTHING MARKS THE POINT HARD (user
+ * 18.08.2026). A hard or HIGH-criticality picture point is Sol's: the branch
+ * above returns before this one, and the test file pins that order. What is left
+ * here is the ordinary picture point.
  *
  * THEY ERR TOWARDS MATCHING, deliberately (cross-vendor review of point 667,
  * P1): a mechanical rename that merely mentions WebGPU is routed here and costs
- * the Sol lane one point, while a real picture point routed to Sol costs a
- * rebuild. The point's own `Author lane:` tag is the cheap way back.
+ * the Sol lane one point. The point's own `Author lane:` tag is the cheap way
+ * back.
  */
 export const VERIFICATION_MARKERS = Object.freeze([
   /\bscreenshots?\b/i,
@@ -181,7 +196,7 @@ function hits(markers, text) {
  * Inputs — all optional, because a caller rarely has all of them:
  *   body         the point's text out of the work order
  *   criticality  its tag, as `criticalityOf` reads it ('low' | 'med' | 'high')
- *   reworked     has Sol already found problems in a re-work of this point?
+ *   reworked     did the review still find problems in a re-work of this point?
  *                (CLAUDE.md §6: such work MOVES to Fable)
  *   override     a lane the caller insists on, beating even the tag
  *
@@ -200,16 +215,25 @@ export function authorLaneFor({ body = '', criticality = null, reworked = false,
   if (LANES.includes(String(override).toLowerCase())) {
     return decide(String(override).toLowerCase(), `the caller asked for the ${override} lane explicitly`)
   }
-  // A RE-WORK THAT SOL STILL FINDS PROBLEMS IN OUTRANKS EVERY OTHER SIGNAL
+  // A RE-WORK THE REVIEW STILL FINDS PROBLEMS IN OUTRANKS EVERY OTHER SIGNAL
   // (CLAUDE.md §6). Whatever the text looks like — and whatever lane it was
   // TAGGED for — the evidence says the lane it was on could not finish it. It
   // stood BELOW the tag until the cross-vendor review of point 667 (P1) read the
   // order against the sentence claiming it, and `Author lane: sol` plus a failed
   // re-work therefore stayed with Sol.
-  if (reworked) return decide('fable', 'Sol still found problems after a re-work — §6 moves such work to Fable')
+  if (reworked) return decide('fable', 'the review still found problems after a re-work — §6 moves such work to Fable')
   if (tag) return decide(tag, `the point itself carries \`Author lane: ${tag}\``)
-  if (criticality === 'high') return decide('fable', 'the point is tagged HIGH criticality — a hard case by definition')
-  if (hard.length) return decide('fable', `the spec names it a hard case (${hard.join(', ')})`)
+  // A HARD OR CRITICAL POINT GOES STRAIGHT TO SOL (user 18.08.2026). It used to
+  // be held back for Opus — and before that routed to Fable — and it now takes
+  // the direct route, ABOVE the verification lane: the user was asked which of
+  // the two wins and answered that these go to Sol as well. The picture is still
+  // judged here whoever authored it, so only the AUTHORING moves.
+  if (criticality === 'high') {
+    return decide('sol', 'the point is tagged HIGH criticality — hard and critical work goes straight to Sol')
+  }
+  if (hard.length) {
+    return decide('sol', `the spec names it a hard case (${hard.join(', ')}) — hard cases go straight to Sol`)
+  }
   if (verification.length) {
     return decide('opus', `its VERIFICATION is the work (${verification.join(', ')}) — the main session judges that anyway`)
   }

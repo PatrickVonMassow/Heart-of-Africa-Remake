@@ -12,9 +12,9 @@
 // shift load to OpenAI EARLIER — first the work that needs no write access at all:
 // diagnoses, audits, enumerations, explanations.
 //
-// AND SINCE POINT 667, AUTHORING TOO. At `prefer-sol` the `author` kind goes to Sol for
-// the mechanical and mid-difficulty points, which is the largest single item of the
-// spend; the role swap it needs is built — Sol stands in the author allowlist, the
+// AND SINCE POINT 667, AUTHORING TOO. At `prefer-sol` the `author` kind goes to Sol —
+// since 18.08.2026 for the hard and critical points as well, which is the largest single
+// item of the spend; the role swap it needs is built — Sol stands in the author allowlist, the
 // `commit-msg` hook takes its trailer, and Claude reviews, runs the suites, judges the
 // picture and lands. What no setting routes is in NEVER_ROUTED below.
 //
@@ -123,8 +123,9 @@ export const usage = () =>
     ...SETTINGS.map((s) => `  ${s.padEnd(12)} ${SETTING_NOTES[s]}`),
     '',
     'The board shows a non-default setting while it is on, and the delegation brief tells',
-    'every agent which kinds to hand over. At prefer-sol Sol also AUTHORS the mechanical',
-    'and mid-difficulty points; Claude reviews them. What no setting routes is listed under',
+    'every agent which kinds to hand over. At prefer-sol Sol also AUTHORS every point the',
+    'routing cut does not keep here, the hard and critical ones included; Claude reviews them.',
+    'What no setting routes is listed under',
     '"NEVER routed" by --status.',
   ].join('\n')
 

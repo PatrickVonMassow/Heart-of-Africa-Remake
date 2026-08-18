@@ -47,10 +47,15 @@ import { FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, SOL_MODEL_NAME } from 
 const SCRIPT_FILES = [
   'review-sol.mjs',
   'review-sol-core.mjs',
+  // The material budget, its accounting and the pass plan (point 714): the
+  // command refuses a record whose round did not carry the range, and the suite
+  // exercises that refusal against the real command.
+  'review-material-core.mjs',
   // The recorder too: the suite RUNS the record command the report prints, which
   // is the only honest way to claim that command is complete.
   'mechanism-review.mjs',
   'mechanism-review-core.mjs',
+  'mechanism-review-range-core.mjs',
   // …which counts a blind-parallel union itself (point 634), so its accounting
   // core travels with it, and asks the AUTHOR allowlist what a model trailer
   // looks like (point 667), so that one does too.
@@ -76,7 +81,18 @@ let mainSha = ''
 let headSha = ''
 let fableSha = ''
 let solSha = ''
+let solHeadSha = ''
 let orphanSha = ''
+let bulkSha = ''
+let oddSha = ''
+let gitlinkSha = ''
+let bulkSolSha = ''
+let edgeSha = ''
+/** A name git prints QUOTED, because it is not plain ASCII. */
+const ODD_NAME = 'ümlaut.txt'
+/** A name git does NOT quote and a trim would corrupt (POSIX only — Windows
+ *  cannot create it, so its case skips there). */
+const EDGE_NAME = 'edge-space.txt '
 /** An EMPTY git template: a host `init.templateDir` must not seed the fixture. */
 let emptyTemplate = ''
 
@@ -91,6 +107,17 @@ if (argv[0] === '--version') {
 }
 const out = argv[argv.indexOf('-o') + 1]
 const model = argv[argv.indexOf('-m') + 1]
+if (process.env.STUB_MODE === 'no-receipt') {
+  // The child this mode plays EXITS WITHOUT EVER READING ITS STDIN (finding 8;
+  // round-1 pass 4): the earlier stub read everything first and only withheld
+  // the token, which tested a different child — one that DID read. Answering
+  // before the first read is what makes the receipt impossible to echo for the
+  // honest reason.
+  const answer = process.env.STUB_ANSWER || 'VERDICT: merge\\nEVIDENCE: read the whole range and both test files'
+  if (out) writeFileSync(out, answer)
+  process.stdout.write(answer)
+  process.exit(0)
+}
 // What arrived on stdin is recorded: the material travels that way, and an
 // assertion on the caller's own log message would stay green without it.
 let stdin = ''
@@ -107,7 +134,12 @@ if (process.env.STUB_MODE === 'fail') {
   process.stderr.write('stream error: You are not logged in. Run \`codex login\`.\\n')
   process.exit(1)
 }
-const answer = process.env.STUB_ANSWER || 'VERDICT: merge\\nEVIDENCE: read the whole range and both test files'
+// A compliant reviewer reads the material to its end and echoes the RECEIPT
+// token from its last line (finding 8). STUB_MODE=no-receipt plays the child
+// that answered without ever reading its stdin.
+const token = /=== END OF MATERIAL — RECEIPT ([0-9a-f]+) ===/.exec(stdin)
+const receipt = process.env.STUB_MODE === 'no-receipt' || !token ? '' : 'RECEIPT: ' + token[1] + '\\n'
+const answer = receipt + (process.env.STUB_ANSWER || 'VERDICT: merge\\nEVIDENCE: read the whole range and both test files')
 if (out) writeFileSync(out, answer)
 process.stdout.write(answer)
 process.exit(0)
@@ -254,6 +286,15 @@ beforeAll(() => {
   // path is refused unless git PROVES it ignored, and that proof is a property
   // of the checkout the file lives in.
   writeFileSync(join(repo, '.gitignore'), '/local/\nnode_modules\n')
+  // A path GIT QUOTES lives in the fixture world from the start (cross-vendor
+  // review, second round): its non-ASCII name is written `"\303\274mlaut.txt"`
+  // in `--name-only` and in the diff header alike, and read literally it
+  // resolved in no `git show` and matched no patch section — the file travelled
+  // in no pass and nothing said so.
+  writeFileSync(join(repo, ODD_NAME), 'the original odd-named file\n')
+  // The trailing-space file exists from the start, so the edge branch MODIFIES
+  // it and its current content must travel beside the patch.
+  if (process.platform !== 'win32') writeFileSync(join(repo, EDGE_NAME), 'the original edge-space file\n')
   mainSha = commit('world.txt', 'the fixture world\n', 'Lay down the fixture world', 'Opus 5')
 
   git('checkout', '-q', '-b', 'feat')
@@ -269,6 +310,53 @@ beforeAll(() => {
   git('add', '-A')
   git('commit', '--no-verify', '-q', '-m', 'Write something as Sol\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
   solSha = git('rev-parse', 'HEAD')
+  // …with a SECOND commit above it, so a `--since` can narrow the Sol range.
+  writeFileSync(join(repo, 'sol2.txt'), 'a second commit in the OpenAI authoring lane\n')
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', 'Extend the Sol work\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
+  solHeadSha = git('rev-parse', 'HEAD')
+
+  // A branch whose material CANNOT fit one round (point 714): two files of 120k
+  // characters, so the range needs more than the 200k budget however it is cut.
+  git('checkout', '-q', '-b', 'bulk', 'main')
+  writeFileSync(join(repo, 'bulk-a.txt'), `${'a'.repeat(120_000)}\n`)
+  writeFileSync(join(repo, 'bulk-b.txt'), `${'b'.repeat(120_000)}\n`)
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', 'Add two files no single round can hold\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+  bulkSha = git('rev-parse', 'HEAD')
+
+  // …and a branch that CHANGES that quoted-name file, so the range carries it as
+  // a modification and its current content must travel with the patch.
+  git('checkout', '-q', '-b', 'odd-name', 'main')
+  oddSha = commit(ODD_NAME, 'the odd-named file, revised in this range\n', 'Revise the odd-named file', 'Opus 5')
+
+  // …and a branch adding a GITLINK (a submodule pointer, mode 160000): its
+  // blob cannot be shown — the entry names a COMMIT object — so the pointer
+  // change must travel as its patch (final-round pass 8). cacheinfo writes
+  // the entry without any submodule machinery.
+  git('checkout', '-q', '-b', 'gitlink', 'main')
+  git('update-index', '--add', '--cacheinfo', `160000,${'f'.repeat(40)},vendor-sub`)
+  git('commit', '--no-verify', '-q', '-m', 'Pin the vendored subproject\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+  gitlinkSha = git('rev-parse', 'HEAD')
+
+  // …and a branch touching a path with a TRAILING SPACE, which git prints
+  // UNQUOTED — the spelling a trim corrupts into a different path (point 714,
+  // third round). Windows cannot create such a file, so the branch is POSIX-only.
+  if (process.platform !== 'win32') {
+    git('checkout', '-q', '-b', 'edge-name', 'main')
+    edgeSha = commit(EDGE_NAME, 'content behind the trailing space\n', 'Touch the edge-space file', 'Opus 5')
+  }
+
+  // …and the same bulk, authored by SOL: the role swap hands the whole range to
+  // a Claude reviewer, and a range no round can hold must be handed on as passes
+  // rather than as a whole-range record template (cross-vendor review, second
+  // round).
+  git('checkout', '-q', '-b', 'bulk-sol', 'main')
+  writeFileSync(join(repo, 'bulk-c.txt'), `${'c'.repeat(120_000)}\n`)
+  writeFileSync(join(repo, 'bulk-d.txt'), `${'d'.repeat(120_000)}\n`)
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', 'Add two more files no round can hold\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
+  bulkSolSha = git('rev-parse', 'HEAD')
 
   // A history sharing no ancestor with the rest: the third form of "not a proper
   // ancestor", which merge-base answers with nothing at all.
@@ -340,10 +428,101 @@ describe('a review that runs', () => {
     expect(received).toContain('=== DIFFSTAT ===')
     expect(received).toContain('=== PATCH ===')
     expect(received).toContain('diff --git')
+    // …WHOLE: the size the command claims for the round is the size the child
+    // process actually read off its stdin — a real transport check, not the
+    // call site's own echo (escalation round).
+    const claimed = Number(/material: (\d+) characters/.exec(r.stderr)?.[1])
+    expect(received.length).toBe(claimed)
     // …and it is the whole BRANCH, both commits above main, not just the head.
     expect(received).toContain('the fixture world, revised')
     expect(received).toContain('a file the patch carries whole')
     expect(r.stderr).toMatch(/material: \d+ characters/)
+  })
+})
+
+describe('the file bodies travel byte-exact', () => {
+  it('keeps a body’s leading and trailing blank lines, which a trim would eat', () => {
+    // Fourth cross-vendor round, pass 4: gatherRange read bodies through the
+    // trimming git() default, so every file lost its edge whitespace and final
+    // newline — and the assembly recorded the ALTERED string as complete, so
+    // byte-inexact delivery passed the accounting. Asserted on what the child
+    // process actually received, not on any log line.
+    provenId()
+    git('checkout', '-q', '-b', 'padded-work', 'main')
+    // A MODIFIED file, so its body travels as current content — an added one
+    // rides inside the patch and would not exercise the body read.
+    const sha = commit('world.txt', '\n\n  body with edges  \n\n', 'Pad a file with blank edges', 'Opus 5')
+    const r = run(['--sha', sha, '--brief', 'judge the padding'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain('=== FILE (current content): world.txt ===\n\n\n  body with edges  \n\n')
+  })
+})
+
+describe('a binary file in the range', () => {
+  it('travels DECLARED in the material rather than vanishing or arriving as mojibake', () => {
+    // Fourth cross-vendor round, pass 4, finding 7: an added binary was
+    // skipped as "covered by the patch" while the ordinary diff carries only
+    // "Binary files differ" — the blob never travelled, nothing was recorded.
+    provenId()
+    git('checkout', '-q', '-b', 'binary-work', 'main')
+    writeFileSync(join(repo, 'blob.bin'), Buffer.from([0, 1, 2, 3, 250, 251, 0, 90]))
+    git('add', '-A')
+    git('commit', '--no-verify', '-q', '-m', 'Add a binary blob\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+    const sha = git('rev-parse', 'HEAD')
+    const r = run(['--sha', sha, '--brief', 'judge the blob'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain('FILE IS BINARY')
+    expect(sent).toContain('blob.bin')
+    // The declaration is not a loss: the record command is still offered.
+    expect(r.stdout).toContain('mechanism-review.mjs --record')
+  })
+
+  // ROUND-1 PASS 5: invalid UTF-8 without a NUL slipped past the binary check
+  // as replacement characters, and the ALTERED text was recorded as complete
+  // delivery. The strict decode refuses such bytes by name instead.
+  it('refuses a range whose diff bytes are not valid UTF-8, rather than recording mojibake', () => {
+    provenId()
+    git('checkout', '-q', '-b', 'latin1-work', 'main')
+    // 0xFF is not valid UTF-8 anywhere, and there is no NUL — git diffs this
+    // as TEXT, which is exactly the hole: the lenient decode wrote U+FFFD and
+    // called the material complete.
+    writeFileSync(join(repo, 'legacy.txt'), Buffer.from([0x61, 0xff, 0x62, 0x0a]))
+    git('add', '-A')
+    git('commit', '--no-verify', '-q', '-m', 'Add a latin1 body\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+    const sha = git('rev-parse', 'HEAD')
+    const r = run(['--sha', sha, '--brief', 'judge the legacy bytes'])
+    expect(r.status).not.toBe(0)
+    expect(`${r.stdout}${r.stderr}`).toContain('not valid UTF-8')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+  })
+})
+
+describe('a child that never read its material', () => {
+  it('yields no verdict and no completed record — the receipt closes the unread-stdin hole', () => {
+    // Finding 8: a child can exit 0 with a parseable verdict without ever
+    // reading an input smaller than the pipe buffer, and the process layer
+    // cannot witness the read. The RECEIPT token stands only on the material's
+    // last line, so this stub — which answers without it — is exactly that
+    // child, and its answer must not become a record.
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge the change'], { STUB_MODE: 'no-receipt' })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toContain('no parseable verdict')
+    expect(r.stdout).toContain('RECEIPT')
+    expect(r.stdout).toContain('The review is NOT done')
+    // ROUND-2 PASS 4: the stub deliberately answers `VERDICT: merge`, so a
+    // regression that printed a RUNNABLE record command beside the refusal
+    // would have passed every line above. What may travel is the hand-over
+    // TEMPLATE, whose angle-bracket placeholders the recorder refuses — never
+    // the unread child's own verdict as a completed command.
+    const out = `${r.stdout}${r.stderr}`
+    expect(out).not.toContain('--verdict merge ')
+    expect(out).not.toMatch(/--verdict merge$/m)
+    if (out.includes('mechanism-review.mjs --record')) {
+      expect(out).toContain('--verdict <')
+    }
   })
 })
 
@@ -356,9 +535,11 @@ describe('a review that does not run', () => {
     expect(r.stdout).toMatch(/login/i)
     expect(r.stdout).toContain(FALLBACK_MODEL_NAME)
     expect(r.stdout).toContain('The review is NOT done')
-    // The printed record cannot be run as it stands: the verdict is a placeholder.
-    expect(r.stdout).toMatch(/--verdict <merge\|merge-with-fixes\|do-not-merge>/)
-    expect(r.stdout).not.toContain('--model "GPT-5.6 Sol"')
+    // A FAILED DELIVERY OFFERS NO RECORD IN ANY SHAPE (escalation round): the
+    // run errored, so nothing of the range was read, and even a placeholder
+    // template at the whole sha is an offer no completed hand-off backs.
+    expect(r.stdout).toContain('NO RECORD COMMAND IS PRINTED')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
   })
 
   it('treats an answer that admits it saw nothing as no review at all', () => {
@@ -393,8 +574,10 @@ describe('a review that does not run', () => {
     provenId()
     const r = run(['--sha', fableSha, '--brief', 'judge it'], { STUB_MODE: 'fail' })
     expect(r.status).toBe(3)
+    // The hand-over names its reviewer in PROSE — after a failed delivery no
+    // record command is printed at all, not even a placeholder template.
     expect(r.stdout).toContain(SECOND_FALLBACK_MODEL_NAME)
-    expect(r.stdout).toContain(`--model "${SECOND_FALLBACK_MODEL_NAME}"`)
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
     expect(r.stdout).not.toMatch(/Hand it to Fable/)
   })
 })
@@ -573,5 +756,311 @@ describe('a range SOL authored', () => {
     expect(calls()).toEqual([])
     // And no verdict is invented: the record command still carries the placeholder.
     expect(r.stdout).toMatch(/--verdict <merge\|/)
+  })
+})
+
+// POINT 714, second cross-vendor round: a file whose name git QUOTES must reach
+// the reviewer like any other, or it is a file the record clears unread.
+describe('a path git writes in quotes', () => {
+  it('sends its content, not an unresolvable quoted name', () => {
+    provenId()
+    const r = run(['--sha', oddSha, '--brief', 'judge the odd name'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    // The CONTENT is the proof the path resolved — asserted CONTIGUOUSLY under
+    // ITS OWN header (final-round pass 7): the bare toContain was satisfied by
+    // the PATCH carrying the line, so the odd name's body could resolve empty
+    // while this stayed green. The header must NAME the odd file and the body
+    // must follow it before the next structural marker.
+    // The material spells the DECODED name (git's quoted octal form resolves
+    // to the real path, and needsQuoting has nothing to escape in it).
+    const header = `=== FILE (current content): ${ODD_NAME} ===`
+    expect(sent).toContain(header)
+    const body = sent.slice(sent.indexOf(header) + header.length)
+    const nextMarker = body.indexOf('=== ')
+    expect(body.slice(0, nextMarker < 0 ? undefined : nextMarker)).toContain(
+      'the odd-named file, revised in this range',
+    )
+    expect(sent).not.toContain('OMITTED ENTIRELY')
+  })
+})
+
+// FINAL-ROUND PASS 8: a submodule entry points at a COMMIT object, so its blob
+// cannot travel — the pointer change is the patch, and the round must complete
+// rather than fail on `bad object`.
+describe('a modified gitlink', () => {
+  it('travels as its patch, and the round completes', () => {
+    provenId()
+    const r = run(['--sha', gitlinkSha, '--brief', 'judge the submodule pin'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain(`+Subproject commit ${'f'.repeat(40)}`)
+    expect(sent).not.toContain('OMITTED ENTIRELY')
+  })
+
+  it('keeps a TEXT file text although its hunk holds the pointer line (landing-round pass 8)', () => {
+    // The classifier read the `+Subproject commit <hex>` HUNK line as gitlink
+    // evidence, so a normal text file merely containing that literal line was
+    // assigned no content of its own — silently omitted while the accounting
+    // read complete. Only git's own mode headers prove a 160000 entry.
+    provenId()
+    git('checkout', '-q', '-b', 'fake-gitlink', 'main')
+    const body = `prose about submodules\nSubproject commit ${'a'.repeat(40)}\nmore prose\n`
+    const sha = commit('world.txt', body, 'Mention a subproject pointer in prose', 'Opus 5')
+    const r = run(['--sha', sha, '--brief', 'judge the prose'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain(`=== FILE (current content): world.txt ===\n${body}`)
+  })
+})
+
+// ESCALATION ROUND: both early routes hard-coded `partial: null`, so a fitting
+// range with an explicit narrowed `--since` printed a whole-SHA record template
+// although only the narrowed range was measured — bypassing the coverage
+// refusal the normal route makes.
+describe('a narrowed --since on the early routes', () => {
+  it('prints NO record template at claude-only while --since narrows the range', () => {
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'], { SOL_SHARE_FILE: shareFile })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toMatch(/NO RECORD COMMAND IS PRINTED/)
+    expect(r.stdout).toMatch(/clears every commit it contains/)
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
+    rmSync(shareFile, { force: true })
+  })
+
+  it('prints NO record template for a narrowed Sol-authored range either', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', solHeadSha, '--since', `${solHeadSha}~1`, '--brief', 'judge it'])
+    expect(r.status).toBe(3)
+    expect(r.stdout).toMatch(/NO RECORD COMMAND IS PRINTED/)
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(calls()).toEqual([])
+  })
+
+  it('still hands over the full template when no --since narrows the early route', () => {
+    // The refusal is about the narrowing, not about the hand-over itself.
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', solHeadSha, '--brief', 'judge it'])
+    expect(r.status).toBe(3)
+    expect(recordCommandIn(r.stdout)).toContain('--verdict <merge|')
+  })
+})
+
+// POINT 714, third round: a path with a trailing space is printed UNQUOTED by
+// git, and a trim anywhere on the way turns it into a different path — the real
+// file then reaches no pass and no content list, with nothing said.
+describe('a path with a trailing space', () => {
+  it.skipIf(process.platform === 'win32')('travels byte-exact, content and all', () => {
+    provenId()
+    const r = run(['--sha', edgeSha, '--brief', 'judge the edge name'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    // CONTIGUOUS, header and body as one string (fourth landing round,
+    // carried pass 8): asserted separately, the body's presence in the PATCH
+    // kept this green even if the current-content lookup failed.
+    expect(sent).toContain(`=== FILE (current content): "${EDGE_NAME}" ===\ncontent behind the trailing space\n`)
+    expect(sent).not.toContain('OMITTED ENTIRELY')
+  })
+})
+
+// POINT 714: a range whose material cannot fit one round must be recognised
+// BEFORE the round is spent, and no record may be offered for what was not read.
+describe('a range too large for one round', () => {
+  it('names the threshold, refuses to spend the round, and prints the pass plan', () => {
+    provenId()
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'])
+    expect(r.status, r.stderr).toBe(4)
+    expect(r.stderr).toContain('material budget is 200000 characters')
+    expect(r.stderr).toContain('PASSES over the FILE SET')
+    expect(r.stderr).toContain('bulk-a.txt')
+    expect(r.stderr).toContain('bulk-b.txt')
+    expect(r.stderr).toContain('--pass 1')
+    // THE ROUND IS NOT SPENT: the whole cost of the old behaviour was a paid
+    // review whose record covered files nobody read.
+    expect(calls()).toEqual([])
+    // And nothing that looks like a record reaches the caller.
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+  })
+
+  it('reviews ONE pass on demand and offers a record for that pass alone', () => {
+    provenId()
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '1'])
+    expect(r.status, r.stderr).toBe(0)
+    const printed = recordCommandIn(r.stdout)
+    expect(printed).toMatch(/--pass 1\/2/)
+    expect(printed).toMatch(/--pass-files "bulk-[ab]\.txt"/)
+    expect(r.stdout).toContain('NOT cleared until every pass 1..2 is recorded')
+    // What actually went to the reviewer stayed inside the budget.
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent.length).toBeLessThanOrEqual(200_000)
+    expect(sent).toContain('=== PATCH ===')
+    // THE ARITHMETIC, measured against a doubting review (landing-round pass
+    // 7): a 120k added file exceeds the standing patch HALF-share, so the plan
+    // widens this pass's patchRoom to the exact joined section — the pass's
+    // patch is mandatory material — and delivers the file PATCH-ONLY. Its
+    // whole body still travels, as the added lines of its own diff; nothing is
+    // truncated, and the completed two-pass record is earned, not fabricated.
+    // THE RECORDED SCOPE IS BOUND TO THE TRANSPORTED BYTES (second landing
+    // round, pass 7): the file the record command names is the file whose
+    // body and diff section actually travelled — not merely "one of the two".
+    const scoped = /--pass-files "bulk-([ab])\.txt"/.exec(printed)?.[1]
+    expect(['a', 'b']).toContain(scoped)
+    const other = scoped === 'a' ? 'b' : 'a'
+    expect(sent).toContain(scoped.repeat(120_000))
+    expect(sent).not.toContain(other.repeat(120_000))
+    expect(sent).toContain(`diff --git a/bulk-${scoped}.txt b/bulk-${scoped}.txt`)
+    // …at the PATCH-ONLY delivery level the manifest declares: the body rides
+    // inside the PATCH section, and the content slot says so.
+    expect(sent).toContain(`its COMPLETE diff is in the PATCH above: bulk-${scoped}.txt ===`)
+    const patchAt = sent.indexOf('=== PATCH ===')
+    expect(patchAt).toBeGreaterThan(-1)
+    expect(sent.indexOf(scoped.repeat(120_000))).toBeGreaterThan(patchAt)
+    expect(sent).not.toContain('[TRUNCATED:')
+    // THE RECORDER ACCEPTS IT, run rather than pattern-matched: a pass command
+    // the recorder refuses is a command that clears nothing.
+    const recorded = spawnSync(process.execPath, splitCommand(printed).slice(1), {
+      cwd: repo,
+      encoding: 'utf8',
+      windowsHide: true,
+      env: hermeticEnv(),
+    })
+    expect(recorded.status, recorded.stderr).toBe(0)
+    const ledger = readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')
+    expect(JSON.parse(ledger.at(-1))).toMatchObject({
+      sha: bulkSha,
+      pass: { index: 1, total: 2, files: [expect.stringMatching(/^bulk-[ab]\.txt$/)] },
+    })
+  })
+
+  it('reviews the OTHER pass, and the two together name both files', () => {
+    provenId()
+    const one = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '1'])
+    const two = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '2'])
+    expect(two.status, two.stderr).toBe(0)
+    const files = [one.stdout, two.stdout]
+      .map((out) => /--pass-files "([^"]*)"/.exec(recordCommandIn(out))?.[1] ?? '')
+      .join(',')
+      .split(',')
+    expect([...files].sort()).toEqual(['bulk-a.txt', 'bulk-b.txt'])
+  })
+
+  // THE HAND-OVER PATHS SPEND NO ROUND AND STILL OFFER A RECORD (cross-vendor
+  // review, second round): both printed a whole-range template while nobody had
+  // measured whether the range is reviewable in one round at all.
+  it('offers no whole-range record when SOL authored a range too large, and names the passes', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', bulkSolSha, '--brief', 'judge the bulk Sol range'])
+    expect(r.status, r.stderr).toBe(3)
+    expect(r.stdout).toMatch(/ROLE SWAP/)
+    // The reviewer is still named — a refusal that drops it leaves nobody owning
+    // the review.
+    expect(r.stdout).toContain('Opus 5')
+    expect(r.stdout).toContain('does not fit ONE review round')
+    expect(r.stdout).toContain('--pass 1')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(calls()).toEqual([])
+  })
+
+  it('offers no whole-range record at claude-only either, while the range does not fit', () => {
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'], { SOL_SHARE_FILE: shareFile })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toMatch(/claude-only/)
+    expect(r.stdout).toContain('does not fit ONE review round')
+    expect(r.stdout).toContain('bulk-a.txt')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(calls()).toEqual([])
+    rmSync(shareFile, { force: true })
+  })
+
+  it('hands over ONE PASS of a range too large when --pass names it (round-2 pass 5)', () => {
+    // The flag was parsed only after the hand-off exits, so a pass-scoped
+    // hand-off was unreachable: --pass was silently ignored and the report
+    // covered the whole range.
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '1'], {
+      SOL_SHARE_FILE: shareFile,
+    })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toMatch(/claude-only/)
+    expect(r.stdout).toContain('--pass 1/2')
+    // The scope is PARSED, not merely present (round-3 pass 6): a hand-off
+    // whose record command covered both bulk files would satisfy a bare
+    // toContain. Pass 1 of this fixture holds exactly the first bulk file.
+    const passFiles = /--pass-files "([^"]*)"/.exec(r.stdout)?.[1]
+    expect(passFiles).toBe('bulk-a.txt')
+    // The hand-off template carries the not-cleared warning and the ledger
+    // pointer too (round-5 pass 6) — a fallback pass template without it read
+    // like a cleared range.
+    expect(r.stdout).toContain('NOT cleared until every pass 1..2 is recorded')
+    expect(r.stdout).toContain('mechanism-review.mjs --list')
+    expect(calls()).toEqual([])
+    rmSync(shareFile, { force: true })
+  })
+
+  it('refuses a pass number the hand-off range does not have, exactly like the paid path', () => {
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '9'], {
+      SOL_SHARE_FILE: shareFile,
+    })
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('splits into 2 pass(es)')
+    rmSync(shareFile, { force: true })
+  })
+
+  it('still hands over a record command where the range DOES fit', () => {
+    // The refusal is about the material, not about the hand-over: a small range
+    // must keep its ready-to-run template.
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'], { SOL_SHARE_FILE: shareFile })
+    expect(r.status).toBe(3)
+    expect(recordCommandIn(r.stdout)).toContain('--verdict <merge|')
+    rmSync(shareFile, { force: true })
+  })
+
+  it('refuses a pass number this range does not have', () => {
+    provenId()
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '9'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('splits into 2 pass(es)')
+    expect(calls()).toEqual([])
+  })
+
+  it('refuses --pass on a range that fits, rather than recording a split nobody needs', () => {
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range', '--pass', '1'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('fits in one round')
+    expect(calls()).toEqual([])
+  })
+
+  it('says a range that fits does so, before the round', () => {
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).toContain('It fits in one round.')
+  })
+
+  it('retires carry planning because recorded contribution coverage now persists directly', () => {
+    provenId()
+    const r = run([
+      '--sha', bulkSha,
+      '--brief', 'judge the remaining contributions',
+      '--carry-from', headSha,
+    ])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('--carry-from is obsolete')
+    expect(r.stderr).toContain('commit/file contributions')
+    expect(calls()).toEqual([])
   })
 })
