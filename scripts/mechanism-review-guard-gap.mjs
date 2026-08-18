@@ -50,6 +50,17 @@ const MAX_BUFFER = 512 * 1024 * 1024
 // on the ranges big enough to need it most. The error is tagged, never
 // swallowed: everything that is not the overflow still rethrows.
 export const OVERSIZE_FLOOR_CHARS = Math.floor(MAX_BUFFER / 4)
+export { MAX_BUFFER }
+
+/** ENOBUFS ALONE PROVES NOTHING (landing-round pass 4): execFileSync raises it
+ *  when EITHER stream overflows, so a flood of stderr — or error prose that
+ *  merely contains the word — must not read as proof about the material. The
+ *  proof is the CAPTURED STDOUT itself sitting at the buffer limit. Its
+ *  length is read as delivered (characters for a string, bytes for a Buffer);
+ *  multibyte content can under-report against the byte limit, which fails
+ *  toward BLOCKING, never toward a waiver. */
+const provesStdoutOverflow = (e) =>
+  e?.code === 'ENOBUFS' && (e?.stdout?.length ?? 0) >= MAX_BUFFER
 
 // A blob whose size is beyond any pass's content room is never READ whole for
 // a measurement — a stand-in string of the same planning consequence is fed to
@@ -66,9 +77,9 @@ const git = (args) => {
       maxBuffer: MAX_BUFFER,
     })
   } catch (e) {
-    if (e?.code === 'ENOBUFS' || /ENOBUFS/.test(String(e?.message ?? ''))) {
+    if (provesStdoutOverflow(e)) {
       const oversize = new Error(
-        `git ${args[0]} output exceeded the ${MAX_BUFFER}-byte measurement buffer — at least ${OVERSIZE_FLOOR_CHARS} characters`,
+        `git ${args[0]} stdout exceeded the ${MAX_BUFFER}-byte measurement buffer — at least ${OVERSIZE_FLOOR_CHARS} characters`,
       )
       oversize.oversize = true
       throw oversize
@@ -100,9 +111,11 @@ export function measureReviewMaterial({ baseline, head, run = git }) {
     paths = run(['diff', '--name-only', '-z', range]).split('\0').filter(Boolean)
   } catch (e) {
     // Recognised on the ERROR ITSELF, not only on the internal helper's tag,
-    // so an injected runner (the unit layer) and the real one rule alike.
-    const oversize = e?.oversize || e?.code === 'ENOBUFS' || /ENOBUFS/.test(String(e?.message ?? ''))
-    if (oversize) {
+    // so an injected runner (the unit layer) and the real one rule alike —
+    // and ONLY where the captured stdout proves the overflow (landing-round
+    // pass 4): a stderr flood or error prose containing the word blocks as an
+    // ordinary measurement failure.
+    if (e?.oversize === true || provesStdoutOverflow(e)) {
       return { measuredChars: OVERSIZE_FLOOR_CHARS, oversizeProven: true, stat: '', patch: '', files: [] }
     }
     throw e

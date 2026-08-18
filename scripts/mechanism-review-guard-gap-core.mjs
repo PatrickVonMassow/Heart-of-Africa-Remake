@@ -43,16 +43,19 @@ export const REVIEW_GAP_MAX_PASS_TOTAL = 256
  *  from assembleMaterial (the section frames and the receipt line, then one
  *  header and its separators per carried file). The no-splitter ruling reads
  *  the rendered floor through these; where the tool exists its own fit ruling
- *  outranks this estimate. The per-file constant is the header's fixed text
- *  plus its two separators, deliberately a couple of characters ABOVE the real
- *  cost: at the margin an over-estimate reports a gap the assembly would just
- *  have fitted (fail-open by a hair), while an under-estimate re-arms the
- *  permanent trap this file exists to end. */
-export const REVIEW_GAP_FIXED_DELIVERY_CHARS = 96
-export const REVIEW_GAP_PER_FILE_DELIVERY_CHARS = 40
+ *  outranks this estimate. BOTH constants sit deliberately BELOW the real
+ *  cost, because this estimate feeds a WAIVER (landing-round pass 3): a gap
+ *  it rules must be PROVEN, so the estimate may only ever under-count — an
+ *  over-count would waive the gate on a range that actually fits. The
+ *  residual is named and points the safe way: the few characters of real
+ *  overhead above the floor keep a hairline-marginal range BLOCKING, never
+ *  waived. The pin in the tests is one-sided accordingly (estimate <= real). */
+export const REVIEW_GAP_FIXED_DELIVERY_CHARS = 80
+export const REVIEW_GAP_PER_FILE_DELIVERY_CHARS = 30
 
-/** The rendered floor of a no-splitter round: the raw parts plus what delivery
- *  adds. Pure, so the wrapper and the tests read the same arithmetic. */
+/** The rendered FLOOR of a no-splitter round: the raw parts plus what delivery
+ *  provably at least adds. Pure, so the wrapper and the tests read the same
+ *  arithmetic. */
 export function estimateRenderedChars({ measuredChars = 0, filePaths = [] } = {}) {
   const parts = Number(measuredChars) || 0
   let overhead = REVIEW_GAP_FIXED_DELIVERY_CHARS
@@ -108,7 +111,11 @@ export function decideReviewGap({
   // no plan can exist and the gap is proven without one; a floor below that
   // ceiling proves nothing either way, and an unproven claim keeps blocking.
   if (oversizeProven) {
-    if (size > cap * REVIEW_GAP_MAX_PASS_TOTAL) {
+    // AT the ceiling exactly the material still cannot travel (landing-round
+    // pass 3): every recordable pass spends part of its budget on its own
+    // manifest and receipt, so the deliverable payload of any split is
+    // STRICTLY below budget × passes — `>=` is the proven boundary.
+    if (size >= cap * REVIEW_GAP_MAX_PASS_TOTAL) {
       return { gap: true, reason: 'beyond-any-split', measuredChars: size, floor: true, budget: cap }
     }
     return {
@@ -135,14 +142,18 @@ export function decideReviewGap({
     }
   }
   // WITHOUT THE TOOL, THE RENDERED FLOOR DECIDES, not the raw sum (landing-
-  // round pass 3): delivery adds frames, headers and the receipt, so raw
-  // material just under the budget could exceed it once rendered — and the
-  // guard then demanded a review the assembly refuses. The wrapper hands the
-  // estimate in (estimateRenderedChars); a caller without one falls back to
-  // the raw sum, which is the old, narrower reading.
+  // round pass 3, both directions): delivery adds frames, headers and the
+  // receipt, so raw material just under the budget could exceed it once
+  // rendered — and the guard then demanded a review the assembly refuses.
+  // The wrapper hands the floor in (estimateRenderedChars, a proven
+  // UNDER-count — a waiver may only rest on a proven size); a caller without
+  // one falls back to the raw sum, which is the old, narrower reading.
   const rendered = Number.isFinite(Number(renderedChars)) && renderedChars !== null ? Number(renderedChars) : size
   if (Math.max(size, rendered) <= cap) return { gap: false, reason: 'fits', measuredChars: size, budget: cap }
-  return { gap: true, reason: 'no-splitter', measuredChars: size, budget: cap }
+  // The quantity that ruled is REPORTED beside the raw sum (landing-round
+  // pass 3): a report saying "measured 199990 against 200000" while ruling a
+  // gap would hide the number that proved it.
+  return { gap: true, reason: 'no-splitter', measuredChars: size, renderedChars: rendered, budget: cap }
 }
 
 /**
@@ -165,6 +176,12 @@ export function formatReviewGap({ baseline = '', head = '', decision = {}, stand
       `${decision.floor ? ' (a proven floor — the reading overflowed the measurement buffer)' : ''}.`,
   ]
   if (decision.reason === 'no-splitter') {
+    if (Number(decision.renderedChars) > Number(decision.measuredChars)) {
+      lines.push(
+        `  Rendered for delivery it is at least ${decision.renderedChars} characters — the frames,`,
+        '  headers and receipt are part of what a round must hold, and that floor is what ruled.',
+      )
+    }
     lines.push('  This tree carries no pass-splitting tool, so no round can hold the range at all.')
   }
   if (decision.reason === 'beyond-any-split') {

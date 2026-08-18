@@ -74,14 +74,19 @@ describe('decideReviewGap', () => {
     }
   })
 
-  it('a PROVEN oversize floor past the widest split rules the gap without a plan (landing round)', () => {
-    const d = decideReviewGap({
-      measuredChars: REVIEW_GAP_BUDGET_CHARS * REVIEW_GAP_MAX_PASS_TOTAL + 1,
-      oversizeProven: true,
-    })
-    expect(d.gap).toBe(true)
-    expect(d.reason).toBe('beyond-any-split')
-    expect(d.floor).toBe(true)
+  it('a PROVEN oversize floor at or past the widest split rules the gap without a plan (landing round)', () => {
+    // AT the ceiling exactly: every pass spends budget on its own manifest
+    // and receipt, so no split's payload ever reaches budget × passes — the
+    // boundary itself is already proven uncoverable.
+    for (const at of [0, 1]) {
+      const d = decideReviewGap({
+        measuredChars: REVIEW_GAP_BUDGET_CHARS * REVIEW_GAP_MAX_PASS_TOTAL + at,
+        oversizeProven: true,
+      })
+      expect(d.gap, `+${at}`).toBe(true)
+      expect(d.reason).toBe('beyond-any-split')
+      expect(d.floor).toBe(true)
+    }
   })
 
   it('a proven floor BELOW the widest split proves nothing — it keeps blocking', () => {
@@ -98,6 +103,11 @@ describe('decideReviewGap', () => {
     const over = decideReviewGap({ measuredChars: raw, renderedChars: REVIEW_GAP_BUDGET_CHARS + 1 })
     expect(over.gap).toBe(true)
     expect(over.reason).toBe('no-splitter')
+    // …and the quantity that ruled is carried and reported beside the raw sum.
+    expect(over.renderedChars).toBe(REVIEW_GAP_BUDGET_CHARS + 1)
+    expect(formatReviewGap({ baseline: 'a', head: 'b', decision: over })).toContain(
+      `at least ${REVIEW_GAP_BUDGET_CHARS + 1} characters`,
+    )
     const fits = decideReviewGap({ measuredChars: raw, renderedChars: REVIEW_GAP_BUDGET_CHARS })
     expect(fits.gap).toBe(false)
     expect(fits.reason).toBe('fits')
@@ -366,11 +376,15 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     // ENOBUFS on the patch used to throw into the measurement catch and rule
     // 'unmeasured' — blocking forever exactly where the material is provably
     // unassemblable. The overflow proves a floor far beyond any recordable
-    // split, and the gap is ruled without a plan.
-    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    // split, and the gap is ruled without a plan — but ONLY where the
+    // CAPTURED STDOUT itself proves the overflow (landing-round pass 4).
+    const { assessReviewGap, MAX_BUFFER } = await import('./mechanism-review-guard-gap.mjs')
     const overflowing = (args) => {
       if (args[0] === 'diff' && !args.includes('--stat') && !args.includes('--name-only')) {
-        throw Object.assign(new Error('spawnSync git ENOBUFS'), { code: 'ENOBUFS' })
+        throw Object.assign(new Error('spawnSync git ENOBUFS'), {
+          code: 'ENOBUFS',
+          stdout: { length: MAX_BUFFER },
+        })
       }
       return bigRun(args)
     }
@@ -384,6 +398,26 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     expect(d.reason).toBe('beyond-any-split')
     expect(d.floor).toBe(true)
     expect(d.report).toContain('proven floor')
+  })
+
+  it('ENOBUFS without a full captured stdout proves nothing — a stderr flood blocks (landing-round pass 4)', async () => {
+    // execFileSync raises ENOBUFS when EITHER stream overflows; only stdout
+    // at the buffer limit says anything about the material's size.
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const stderrFlood = (args) => {
+      if (args[0] === 'diff' && !args.includes('--stat') && !args.includes('--name-only')) {
+        throw Object.assign(new Error('spawnSync git ENOBUFS'), { code: 'ENOBUFS', stdout: 'tiny' })
+      }
+      return bigRun(args)
+    }
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: stderrFlood,
+      loadTool: () => Promise.reject(absent),
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('unmeasured')
   })
 
   it('asks a blob its size first and never reads a huge one whole (landing-round pass 3)', async () => {
@@ -511,9 +545,11 @@ describe('the budget mirror', () => {
     expect(REVIEW_GAP_MAX_PASS_TOTAL).toBe(material.MAX_PASS_TOTAL)
   })
 
-  it.skipIf(!material)('the rendered estimate never UNDER-counts what the assembly writes', () => {
-    // The no-splitter ruling reads the rendered floor through this estimate;
-    // an under-count re-arms the trap at the margin, so the pin is one-sided.
+  it.skipIf(!material)('the rendered estimate never OVER-counts what the assembly writes', () => {
+    // The estimate feeds a WAIVER, so it must be a proven FLOOR (landing-round
+    // pass 3): an over-count would waive the gate on a range that actually
+    // fits. The pin is one-sided the safe way — the few real characters above
+    // the floor keep a hairline-marginal range blocking, never waived.
     // Every file carries a section, as in a real measurement: the paths come
     // off the same diff the patch was read from.
     const section = (p) =>
@@ -527,6 +563,8 @@ describe('the budget mirror', () => {
     const assembled = material.assembleMaterial({ stat, patch, files })
     const raw = stat.length + patch.length + files.reduce((n, f) => n + f.text.length, 0)
     const estimate = estimateRenderedChars({ measuredChars: raw, filePaths: files.map((f) => f.path) })
-    expect(estimate).toBeGreaterThanOrEqual(assembled.size)
+    expect(estimate).toBeLessThanOrEqual(assembled.size)
+    // …while still counting real overhead above the raw parts.
+    expect(estimate).toBeGreaterThan(raw)
   })
 })
