@@ -18,11 +18,10 @@ import {
 const material = await import('./review-material-core.mjs').catch(() => null)
 
 describe('reviewGapRange — one range for detection, coverage and gap ruling', () => {
-  it('uses the computed merge-base in either divergence direction, never the stored baseline', () => {
+  it('uses the computed merge-base as the assessment baseline', () => {
     const head = 'h'.repeat(40)
-    for (const base of ['a'.repeat(40), 'z'.repeat(40)]) {
-      expect(reviewGapRange({ blocked: true, base, head })).toEqual({ baseline: base, head })
-    }
+    const base = 'a'.repeat(40)
+    expect(reviewGapRange({ blocked: true, base, head })).toEqual({ baseline: base, head })
   })
 
   it('leaves the block standing when the common range cannot be established', () => {

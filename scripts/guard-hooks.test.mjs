@@ -730,6 +730,9 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
     write(LEDGER, '')
     const trunk = branch()
     const fork = head()
+    const baselineBefore = existsSync(resolve(repo, BASELINE))
+      ? readFileSync(resolve(repo, BASELINE), 'utf8')
+      : null
     if (trunk !== 'main') expect(git('branch', '-f', 'main', trunk).status).toBe(0)
 
     expect(git('checkout', '-q', '-b', 'feat/main-advanced-gap-range').status).toBe(0)
@@ -756,6 +759,49 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
     } finally {
       // Keep this isolated fixture's main-only bulk out of the serial cases
       // below; all of these refs belong to the temporary test repository.
+      if (baselineBefore === null) rmSync(resolve(repo, BASELINE), { force: true })
+      else write(BASELINE, baselineBefore)
+      expect(git('branch', '-f', 'main', fork).status).toBe(0)
+      expect(git('checkout', '-q', trunk).status).toBe(0)
+    }
+  })
+
+  it('does not hide branch bulk from the gap ruling when advanced main has identical content', () => {
+    // The reverse divergence: the feature range really is uncoverable, while
+    // main later acquires the same bulk independently. A raw main-tip..feature
+    // tree diff erases that file and would keep demanding an impossible review;
+    // the common merge-base range must still report the measured gap.
+    write(LEDGER, '')
+    const trunk = branch()
+    const fork = head()
+    const baselineBefore = existsSync(resolve(repo, BASELINE))
+      ? readFileSync(resolve(repo, BASELINE), 'utf8')
+      : null
+    if (trunk !== 'main') expect(git('branch', '-f', 'main', trunk).status).toBe(0)
+    const bulk = 'shared but independently committed material\n'.repeat(12_000)
+
+    expect(git('checkout', '-q', '-b', 'feat/branch-bulk-gap-range').status).toBe(0)
+    write('scripts/demo-branch-bulk-guard.mjs', '// guard beside branch bulk\n')
+    write('shared-bulk.txt', bulk)
+    commit(`add a guard beside branch bulk\n\n${AUTHOR}`)
+
+    expect(git('checkout', '-q', 'main').status).toBe(0)
+    write('shared-bulk.txt', bulk)
+    commit(`advance main with matching bulk\n\n${AUTHOR}`)
+    const advancedMain = head()
+    expect(git('checkout', '-q', 'feat/branch-bulk-gap-range').status).toBe(0)
+    write(BASELINE, JSON.stringify({ baselines: { main: advancedMain } }))
+
+    try {
+      const hook = runHook('mechanism-review-guard.mjs')
+      expect(hook.status, hook.stderr).toBe(0)
+      expect(hook.stdout.trim()).toBe('')
+      expect(hook.stderr).toContain('REVIEW GAP')
+      expect(hook.stderr).toContain('shared-bulk.txt')
+      expect(git('merge-base', advancedMain, head()).stdout.trim()).toBe(fork)
+    } finally {
+      if (baselineBefore === null) rmSync(resolve(repo, BASELINE), { force: true })
+      else write(BASELINE, baselineBefore)
       expect(git('branch', '-f', 'main', fork).status).toBe(0)
       expect(git('checkout', '-q', trunk).status).toBe(0)
     }
