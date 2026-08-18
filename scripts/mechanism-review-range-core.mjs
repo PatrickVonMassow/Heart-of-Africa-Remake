@@ -191,28 +191,53 @@ const contained = (record, sha) => {
 /**
  * The reading that rules one contribution, out of every reading of it.
  *
- * TWO ORDERINGS, AND THE WEAKER ONE IS ALWAYS AVAILABLE. Where both readings
- * carry a readable clock the clock decides, the later LEDGER LINE breaking a
- * tie.  Where either clock is unplaceable — absent, `NaN`, infinite, or a
- * string, which is data of the wrong type and is never coerced into a time —
- * the LINE decides alone: the ledger is append-only, so the row appended later
- * is the later reading.  That keeps the rule total and RESOLVABLE, which a
- * fail-safe "an unplaceable refusal wins" would not: one broken row would then
- * freeze its contribution as owed for good, with no reading able to settle it,
- * and an unsatisfiable gate is the very failure this point exists to remove.
+ * ONE KEY, SO THE ORDER IS TOTAL: `(clock, ledger line)`, compared
+ * lexicographically, the later line breaking a tie because the ledger is
+ * append-only.  A clock is a finite NUMBER or nothing — a numeric STRING is
+ * data of the wrong type and is never coerced into a time — and a reading
+ * without one sorts BEFORE every clocked reading, as the oldest.
+ *
+ * That single key is what makes the rule safe in both directions. An unclocked
+ * or older clearance can never bury the refusal recorded after it, and an
+ * unclocked refusal is still settled by any clocked clearance, so no row can
+ * freeze a contribution as permanently owed — an unsatisfiable gate is the
+ * failure this point exists to remove.  Comparing clock against clock and
+ * position against position PAIRWISE, as this once did, is not an order at all:
+ * with a refusal at 300, an unclocked clearance, and a clearance at 100, the
+ * scan walked from the refusal to the newest row and cleared what the clock
+ * says is refused.
+ *
+ * RESIDUAL: between two readings that BOTH lack a clock, only the ledger line
+ * remains, and a ledger merged across branches carries no chronology in that
+ * line. Two clockless readings of one contribution disagreeing is the only case
+ * that can resolve arbitrarily; every row this repository writes is clocked.
  */
 export function newestReading(readings = []) {
   if (!readings.length) return null
   let best = readings[0]
-  for (const row of readings) best = laterReading(best, row)
+  for (const [index, row] of readings.entries()) {
+    if (index === 0) continue
+    if (!earlier(row, best)) best = row
+  }
   return best
 }
 
-/** Of two readings of one contribution, the later. `b` wins a tie, so a scan in
- *  ledger order ends on the last row of an otherwise equal set. */
-const laterReading = (a, b) => {
-  if (a.at !== null && b.at !== null) return b.at >= a.at ? b : a
-  return b.index >= a.index ? b : a
+/** The strict clock of a reading: a finite number, or null for "no time". The
+ *  selector normalizes rather than trusting its caller, so a direct caller gets
+ *  the documented rule and not JavaScript's coercing comparison. */
+const clockOf = (row) => (typeof row?.at === 'number' && Number.isFinite(row.at) ? row.at : null)
+
+/** Is `row` earlier than `than` under `(clock, line)`? An absent clock is the
+ *  oldest, and an absent line keeps the array's own order. */
+const earlier = (row, than) => {
+  const a = clockOf(row)
+  const b = clockOf(than)
+  if (a !== b) {
+    if (a === null) return true
+    if (b === null) return false
+    return a < b
+  }
+  return Number(row?.index ?? 0) < Number(than?.index ?? 0)
 }
 
 /**

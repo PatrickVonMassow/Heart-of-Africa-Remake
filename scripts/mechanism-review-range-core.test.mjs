@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   commitsForContributions,
+  newestReading,
   eligibleReviewer,
   outstandingContributions,
   planAuthorshipGroups,
@@ -236,8 +237,10 @@ describe('per-contribution review baseline', () => {
   for (const [name, at] of [
     ['NaN', Number.NaN],
     ['an infinite stamp', Number.POSITIVE_INFINITY],
+    ['a negative infinite stamp', Number.NEGATIVE_INFINITY],
     ['a string', 'yesterday'],
     ['a numeric string', '300'],
+    ['an explicit null', null],
     ['no stamp at all', undefined],
   ]) {
     it(`does not let a clearance carrying ${name} bury the refusal appended after it`, () => {
@@ -255,6 +258,26 @@ describe('per-contribution review baseline', () => {
       expect(result.refusals).toHaveLength(0)
     })
   }
+
+  it('does not let an unclocked row between them bury the refusal the clock calls newest', () => {
+    // The pairwise comparison this replaced was no order at all: the unclocked
+    // middle row beat the refusal on ledger position, the last clearance beat
+    // that row the same way, and the scan cleared what the clock says is
+    // refused. The same three rows in any arrangement must owe.
+    const rows = [row('do-not-merge', 300), row('merge', undefined), row('merge', 100)]
+    for (const records of [rows, [rows[2], rows[1], rows[0]], [rows[1], rows[0], rows[2]]]) {
+      const result = owed(records)
+      expect(result.outstanding.some((c) => c.file === 'b')).toBe(true)
+      expect(result.refusals).toHaveLength(1)
+    }
+  })
+
+  it('reads a ledger a branch merge reordered by the clock, not by the line', () => {
+    // Concurrent branches append independently and a merge may place an older
+    // clearance after a newer refusal; both carry clocks, so the clock rules.
+    const result = owed([row('do-not-merge', 900), row('merge', 100)])
+    expect(result.outstanding.some((c) => c.file === 'b')).toBe(true)
+  })
 
   it('still lets a lone record with no clock rule its contribution', () => {
     const result = owed([row('merge', undefined)])
@@ -356,5 +379,32 @@ describe('visible review debt', () => {
       materialChars: null,
       groups: [],
     })
+  })
+})
+
+describe('the reading selector on its own', () => {
+  // Exported and callable directly, so it normalizes rather than trusting the
+  // caller: a numeric string is not a time, and an absent stamp is the oldest.
+  const reading = (verdict, at, index) => ({ record: { verdict }, at, index })
+
+  it('never coerces a numeric string into a time', () => {
+    expect(newestReading([reading('merge', '900', 0), reading('do-not-merge', 5, 1)]).record.verdict)
+      .toBe('do-not-merge')
+  })
+
+  it('sorts an unusable clock before every clocked reading, whatever its line', () => {
+    for (const at of [Number.NaN, Number.POSITIVE_INFINITY, null, undefined, '5']) {
+      expect(newestReading([reading('do-not-merge', 5, 0), reading('merge', at, 1)]).record.verdict)
+        .toBe('do-not-merge')
+    }
+  })
+
+  it('falls back to the ledger line only where neither reading carries a clock', () => {
+    expect(newestReading([reading('do-not-merge', null, 0), reading('merge', null, 1)]).record.verdict)
+      .toBe('merge')
+  })
+
+  it('answers nothing for no readings', () => {
+    expect(newestReading([])).toBe(null)
   })
 })
