@@ -48,6 +48,7 @@ import {
   frontCandidates,
   commissionDecision,
   commissionRefusal,
+  COMMISSION_OVERRIDE_CMD,
 } from './board-queue-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
 import { POOL_CAP } from './batch-in-flight-core.mjs'
@@ -1002,6 +1003,24 @@ describe('commissionDecision — the real 17.08.2026 pick is refused', () => {
     const gated = commissionDecision({ point: 701, open: QUEUE_17_08, gates })
     expect(gated).toMatchObject({ allowed: false, why: 'user-gated' })
     expect(commissionRefusal(gated)).toContain('WAITING ON THE USER')
+  })
+
+  // THE GATED REFUSAL NAMES THE REMEDY THAT ACTUALLY LIFTS IT, AND NO OTHER
+  // (fourth review, finding 13). Printing the override command here sent the
+  // reader into a recorded-then-ignored loop: the decision asks the gate BEFORE
+  // the override, so following that remedy records a reason that changes
+  // nothing and the guard denies again.
+  it('the GATED refusal never prints the override command, and names the user\'s word instead', () => {
+    const gates = { gated: new Set([701]), answered: new Set(), since: new Map() }
+    const text = commissionRefusal(commissionDecision({ point: 701, open: QUEUE_17_08, gates }))
+    expect(text).not.toContain('--override')
+    expect(text).not.toContain(COMMISSION_OVERRIDE_CMD)
+    expect(text).toContain('AWAITING-USER')
+    expect(text).toContain("user's answer")
+    expect(text).toContain('NOT honoured')
+    // …while the ORDINARY queue refusal keeps the override as its recorded escape.
+    const behind = commissionRefusal(commissionDecision({ point: 697, open: QUEUE_17_08 }))
+    expect(behind).toContain(COMMISSION_OVERRIDE_CMD)
   })
 
   it('skips an IN-FLIGHT point when the front three are chosen', () => {

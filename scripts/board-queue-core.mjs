@@ -911,6 +911,15 @@ export function commissionDecision({
  * The refusal's wording. PURE, so it is pinned by a test rather than left to a
  * script: the point requires it to NAME the candidates it expected and the
  * refused point's own position, and to say how an override is taken.
+ *
+ * EVERY REFUSAL NAMES THE REMEDY THAT ACTUALLY LIFTS IT, AND NO OTHER (spec,
+ * fourth review finding 13). The GATED refusal therefore never prints the
+ * override command: an override recorded for a gated point is deliberately not
+ * honoured (`commissionDecision` asks the gate first), so a reader who followed
+ * that printed remedy would record a reason the decision then ignores and be
+ * denied again — the block-loop class that cost ~30 turns on 24.07.2026. What
+ * lifts a gate is the USER'S WORD, closing the point's AWAITING-USER line in
+ * the work order, and that is what the refusal says.
  */
 export function commissionRefusal(decision = {}) {
   const n = decision?.point ?? '?'
@@ -921,15 +930,18 @@ export function commissionRefusal(decision = {}) {
     decision?.position != null
       ? `the work order ranks it ${decision.position} of ${total} open points`
       : 'the work order does not rank it'
+  if (decision?.why === 'user-gated') {
+    return (
+      `POINT ${n} IS WAITING ON THE USER (its AWAITING-USER line in the work order), so no work may be opened ` +
+      `on it: ${front}. The ONLY thing that lifts this is the user's answer — his word closes the point's ` +
+      'AWAITING-USER line, and the point becomes workable in the same moment. A recorded override is ' +
+      'deliberately NOT honoured for a gated point, so do not record one: work a front candidate, or ask the ' +
+      'user (the board carries the decision card).'
+    )
+  }
   const remedy =
     `Work one of those instead, or RECORD why ${n} goes first: ${COMMISSION_OVERRIDE_CMD}. ` +
     `The reason is stored with the point and printed by \`${COMMISSION_STATUS_CMD}\`, so an override stays ` +
     'visible afterwards — overriding is allowed, taking it silently is not.'
-  if (decision?.why === 'user-gated') {
-    return (
-      `POINT ${n} IS WAITING ON THE USER (AWAITING-USER in the work order), so no work may be opened on it: ` +
-      `${front}. ${remedy}`
-    )
-  }
   return `COMMISSIONING POINT ${n} ANSWERS TO NOTHING: ${where}, while ${front}. ${remedy}`
 }
