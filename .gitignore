@@ -128,6 +128,11 @@ scripts/.tile-cache
 .claude/batch-boundary-prepared.json.tmp-*
 .claude/batch-in-flight.json
 .claude/batch-in-flight.json.tmp-*
+# The commissioning record (point 712): the overrides taken against the queue's
+# front and the branches parked out of the slot count. It describes THIS
+# checkout's batch, not the repository's content.
+.claude/commission-record.json
+.claude/commission-record.json.tmp-*
 .claude/batch-claim.json
 .claude/batch-claim.json.tmp-*
 # Per-branch baseline of the mechanism four-eyes gate — local bookkeeping. The

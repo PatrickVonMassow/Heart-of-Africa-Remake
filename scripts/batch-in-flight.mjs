@@ -62,6 +62,9 @@ import {
   declaredAgentCount,
   openPointSpecs,
   waitEtaRefusal,
+  openBranchSlots,
+  parseCommissionRecord,
+  COMMISSION_RECORD_PATH,
   IN_FLIGHT_MAX_AGE_MS,
   POOL_CAP,
   RESPAWN_GRACE_MS,
@@ -124,6 +127,122 @@ export function refTipAt(ref, { cwd = REPO_ROOT } = {}) {
     }).trim()
     const secs = Number(out)
     return Number.isFinite(secs) && secs > 0 ? secs * 1000 : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * WHICH `feat/*` BRANCHES STAND OPEN (point 712)? `{ readable, branches }`, each
+ * branch `{ ref, tipAt, behind }`.
+ *
+ * "Open" is "not contained in `main`" — a merged branch is debris that
+ * `branch-hygiene-guard` sweeps, not a slot somebody is holding. Local and
+ * remote spellings are both asked for and folded into one by the pure core, so a
+ * branch pushed but not checked out here still counts.
+ *
+ * The behind-count costs one `rev-list` per branch and is only asked for where
+ * the refusal will print it; the Stop-hook path needs the COUNT alone. Any git
+ * failure answers `readable: false` — a branch list nobody could read is not
+ * evidence of anything, and the decision fails open on it.
+ */
+export function openFeatBranches({ cwd = REPO_ROOT, base = 'main', behind = false, behindProbe = commitsBehind } = {}) {
+  let out = ''
+  try {
+    out = execFileSync(
+      'git',
+      [
+        'for-each-ref',
+        '--no-merged',
+        base,
+        '--format=%(refname:short)\t%(committerdate:unix)\t%(objectname)',
+        'refs/heads/feat',
+        'refs/remotes/origin/feat',
+      ],
+      { windowsHide: true, cwd, encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] },
+    )
+  } catch {
+    return { readable: false, branches: [] }
+  }
+  const branches = []
+  for (const line of out.split(/\r?\n/)) {
+    const [ref, stamp, tip] = line.split('\t')
+    if (!ref || !ref.trim()) continue
+    const secs = Number(stamp)
+    const behindCount = behind ? behindProbe(ref.trim(), { cwd, base }) : null
+    // A requested behind-count is part of the census contract, not optional
+    // decoration. If one rev-list fails, returning `readable: true` would permit
+    // a refusal whose required branch detail cannot be printed.
+    if (behind && !Number.isFinite(behindCount)) return { readable: false, branches: [] }
+    branches.push({
+      ref: ref.trim(),
+      tipAt: Number.isFinite(secs) && secs > 0 ? secs * 1000 : null,
+      // The TIP is what a park is measured against — the committer date is only
+      // the fallback, and it is a second coarse and forgeable by a rebase.
+      tip: String(tip ?? '').trim(),
+      behind: behindCount,
+    })
+  }
+  return { readable: true, branches }
+}
+
+/** The commit a branch points at right now, or '' where git cannot say. It is
+ *  the baseline a park is recorded with. */
+export function branchTip(ref, { cwd = REPO_ROOT } = {}) {
+  const name = String(ref ?? '').trim()
+  if (!name || /[\s~^:?*[\]\\]/.test(name)) return ''
+  try {
+    return execFileSync('git', ['rev-parse', '--verify', '--quiet', `${name}^{commit}`], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  } catch {
+    return ''
+  }
+}
+
+/** Where the commissioning record lives, resolved once. */
+export const COMMISSION_RECORD_FILE = resolve(REPO_ROOT, COMMISSION_RECORD_PATH)
+
+/** The recorded overrides and parks. A missing file is an EMPTY record, not a
+ *  torn one — nothing recorded yet is the ordinary state.
+ *
+ *  A file that EXISTS and cannot be read is torn, though, and saying otherwise
+ *  is how a recorded override silently stops excusing its point (Sol, review of
+ *  3078d166): the two states looked identical, so a permissions fault or a
+ *  half-written file produced a refusal instead of the fail-open the rest of the
+ *  chain takes. `torn` is what the guard fails open on. */
+export function readCommissionRecord(path = COMMISSION_RECORD_FILE) {
+  try {
+    return parseCommissionRecord(readFileSync(path, 'utf8'))
+  } catch (e) {
+    return e && e.code === 'ENOENT' ? parseCommissionRecord('') : { overrides: {}, parked: {}, torn: true }
+  }
+}
+
+/** Store it back. Atomic, like every other state file this batch keeps. */
+export function writeCommissionRecord(record, path = COMMISSION_RECORD_FILE) {
+  writeJsonAtomic(path, { overrides: record?.overrides ?? {}, parked: record?.parked ?? {} })
+}
+
+/** How many commits `base` holds that this branch does not — the cost of not
+ *  landing it. Null where git cannot say. */
+export function commitsBehind(ref, { cwd = REPO_ROOT, base = 'main' } = {}) {
+  const name = String(ref ?? '').trim()
+  if (!name || /[\s~^:?*[\]\\]/.test(name)) return null
+  try {
+    const out = execFileSync('git', ['rev-list', '--count', `${name}..${base}`], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    const n = Number(out)
+    return Number.isFinite(n) && n >= 0 ? n : null
   } catch {
     return null
   }
@@ -417,15 +536,39 @@ export function runningBranchFiles(evidence = [], { cwd = REPO_ROOT } = {}) {
  * pure (`slotReasonDecision`); this gathers the four facts. Anything unreadable ends
  * as "no demand" — the lower bound on the pool is worth a nudge, never a wedge.
  */
-export function gatherSlots(declaration, { cwd = REPO_ROOT, tasksPath = TASKS_PATH } = {}) {
+export function gatherSlots(
+  declaration,
+  { cwd = REPO_ROOT, tasksPath = TASKS_PATH, recordProbe = readCommissionRecord } = {},
+) {
   try {
+    const record = recordProbe()
+    // The parks are occupancy input. A torn record is not an empty set of
+    // parks; carry the unreadable state into the same pure decision that carries
+    // an unreadable branch census, so the status report and refusal path agree.
+    if (record?.torn === true) return slotReasonDecision({ recordReadable: false })
     const evidence = Array.isArray(declaration?.evidence) ? declaration.evidence : []
     const running = runningBranchFiles(evidence, { cwd })
     // No readable running-file set means the overlap question cannot be answered, and
     // an unanswerable question is not a reason to demand anything.
     if (running.length === 0) return { needsReason: false, slotsFree: 0, agents: 0, candidates: [], why: 'overlap-unknown' }
+    // What OCCUPIES a slot is the open branch (point 712). The demand and the
+    // commissioning refusal must read the same occupancy, or they trap the
+    // session between them: nine branches open and one agent running would
+    // otherwise demand a fourth point that the refusal denies.
+    //
+    // AND THE UNREADABLE CASE IS CARRIED, not dropped. Throwing `readable` away
+    // fed an EMPTY branch list into the decision, so a git that could not be
+    // questioned looked exactly like a repository with no open branch and could
+    // demand work for slots nobody had counted (Sol, review of 91d88f9a).
+    const branchProbe = openFeatBranches({ cwd })
     return slotReasonDecision({
       agents: declaredAgentCount(evidence),
+      openBranches: openBranchSlots({
+        branches: branchProbe.branches,
+        parked: record.parked,
+      }).count,
+      branchesReadable: branchProbe.readable,
+      recordReadable: record?.torn !== true,
       openPoints: openPointSpecs(readTasksOpen(tasksPath)),
       runningFiles: running,
       reason: declaration?.slotsFree ?? '',

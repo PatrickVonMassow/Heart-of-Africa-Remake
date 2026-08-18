@@ -47,7 +47,7 @@
 // costs one command, a wrong allow cost five and a half hours.
 import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
 import { CLOSING_STEPS, missingSteps } from './closing-guard-core.mjs'
-import { parseGateLine } from './user-gate-core.mjs'
+import { parseGateLine, sanitiseReason } from './user-gate-core.mjs'
 import { SECTION_TITLES, sliceSections, parseCards, etaStatus } from './dashboard-guard-core.mjs'
 import { NOW_CARD_CMD, REPUBLISH } from './board-remedy.mjs'
 
@@ -1004,6 +1004,9 @@ export function closingFreezeActive({ marker = false, closingState = null, head 
  */
 export function slotReasonDecision({
   agents = 0,
+  openBranches = 0,
+  branchesReadable = true,
+  recordReadable = true,
   openPoints = [],
   runningFiles = [],
   reason = '',
@@ -1011,16 +1014,45 @@ export function slotReasonDecision({
   closingFreeze = false,
   cap = POOL_CAP,
 } = {}) {
-  const running = Number.isFinite(agents) && agents > 0 ? Math.floor(agents) : 0
+  // WHAT OCCUPIES A SLOT IS THE OPEN BRANCH (point 712), and this half counts it
+  // the same way the refusal does — otherwise the two rules trap the session
+  // between them: nine branches open and one agent running would have this
+  // demand a fourth point while `commission-guard` refuses every one of them.
+  //
+  // A RUNNING AGENT WITHOUT A BRANCH STILL FILLS ITS SLOT, and that is a
+  // SEPARATE, NAMED state rather than a second occupancy rule. The two must not
+  // be folded into one number: `max(agents, branches)` reported two agents and
+  // no branch as ONE free slot when three branch slots stand empty, and that is
+  // the agent count occupying a branch slot again (Sol, reviews of 91d88f9a and
+  // 3078d166). So `slotsFree` counts BRANCHES and nothing else, `agents` reports
+  // the agents actually declared, and the concurrent-agent cap of CLAUDE.md §6
+  // — which still binds a spawn — suppresses the demand under its OWN name:
+  // asking for a fourth point while three agents run would ask for a breach of
+  // it, so that state answers `agents-at-cap` and the report says which is full.
+  const declared = Number.isFinite(agents) && agents > 0 ? Math.floor(agents) : 0
+  const branches = Number.isFinite(openBranches) && openBranches > 0 ? Math.floor(openBranches) : 0
   const limit = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : POOL_CAP
-  const slotsFree = Math.max(0, limit - running)
+  const slotsFree = Math.max(0, limit - branches)
   const candidates = independentOpenPoints({ points: openPoints, runningFiles })
-  const no = (why) => ({ needsReason: false, slotsFree, agents: running, candidates, why })
+  const no = (why) => ({
+    needsReason: false,
+    slotsFree,
+    agents: declared,
+    openBranches: branches,
+    candidates,
+    why,
+  })
   // A paused batch and a closing freeze are states in which commissioning MORE work
   // would be wrong — the freeze exists so the closing tests the final state.
   if (paused === true) return no('paused')
   if (closingFreeze === true) return no('closing-freeze')
-  if (slotsFree === 0) return no('at-cap')
+  // OCCUPANCY NOBODY COULD READ IS NOT IDLENESS. Where git could not be
+  // questioned the branch count is 0 for want of an answer, not because no
+  // branch stands, and demanding work on that is the fail-CLOSED direction.
+  if (branchesReadable !== true) return no('branches-unreadable')
+  if (recordReadable !== true) return no('record-unreadable')
+  if (branches >= limit) return no('at-cap')
+  if (declared >= limit) return no('agents-at-cap')
   if (candidates.length === 0) {
     // WHY the queue offered nothing matters (point 450). "Everything left waits
     // on the user" is a different state from "everything left touches the
@@ -1031,7 +1063,7 @@ export function slotReasonDecision({
     return no(gatedOnly ? 'queue-user-gated' : 'queue-overlaps')
   }
   if (String(reason ?? '').trim()) return no('reason-given')
-  return { needsReason: true, slotsFree, agents: running, candidates, why: 'idle-slots' }
+  return { ...no('idle-slots'), needsReason: true }
 }
 
 /**
@@ -1045,7 +1077,8 @@ export function slotsRemedy({ slots = {}, cap = POOL_CAP } = {}) {
     .filter((p) => p != null)
     .join(', ')
   return (
-    `THE AGENT POOL IS BELOW ITS CAP AND NOTHING SAYS WHY: ${slots.agents ?? 0} agent(s) running, ` +
+    `THE AGENT POOL IS BELOW ITS CAP AND NOTHING SAYS WHY: ${slots.openBranches ?? 0} open feat/* branch(es) and ` +
+    `${slots.agents ?? 0} agent(s) running, ` +
     `${slots.slotsFree ?? 0} of ${cap} slots FREE, and the queue holds independent open point(s) that touch none of ` +
     `the running branch's files (${names || 'see the work order'}). The declared wait is fine; the idle slots are ` +
     'not accounted for. TWO honest answers: (a) COMMISSION another point into a free slot — a worktree-isolated ' +
@@ -1053,6 +1086,722 @@ export function slotsRemedy({ slots = {}, cap = POOL_CAP } = {}) {
     'makes the queue\'s next points unsuitable right now: `node scripts/batch-in-flight.mjs --waiting-on "<what>" ' +
     '<evidence> --slots-free "<why>"` (file overlap with the running branch, a closing freeze, a user pause are ' +
     'all valid reasons). A paused batch, a recorded closing freeze and a full pool need no reason at all.'
+  )
+}
+
+// ---- A SLOT IS NOT FREE UNTIL ITS BRANCH IS GONE (point 712) ---------------
+//
+// The cap above counts CONCURRENT AGENTS, so an agent that finishes returns its
+// slot and leaves its branch standing. Branches then accumulate unbounded: nine
+// stood open on 17.08.2026, the two OLDEST of them the communication mechanic
+// this release exists for — `feat/336-croc-staging` 13 days old and 1679 commits
+// behind `main`, indistinguishable from live work. Built work that never lands
+// delivers nothing and costs more to merge every day it ages.
+//
+// So what OCCUPIES a slot is the open branch, not the running agent, and the
+// only way to give one back is to LAND it or to PARK it on the record.
+
+/** The refusals' recorded state: the overrides taken per point and the branches
+ *  parked out of the count. Git-ignored, like the other `.claude/` state files —
+ *  it describes THIS checkout's batch, not the repository's content. */
+export const COMMISSION_RECORD_PATH = '.claude/commission-record.json'
+
+/** How a branch is taken out of the count — named by the refusal itself. */
+export const BRANCH_PARK_CMD = 'node scripts/commission-guard.mjs --park <branch> --reason "<why>"'
+
+/** …and the other way out, which is the one that should normally be taken. */
+export const BRANCH_LAND_CMD = 'node scripts/land-point.mjs <N> --model <m>'
+
+/** `refs/heads/x`, `heads/x`, `origin/x` and `x` all name one branch — the
+ *  spelling rule the evidence checks already use, exported so the branch-slot
+ *  judgment and its record cannot drift into a second one. */
+export const normaliseBranchRef = normRef
+
+/** The point a `feat/<N>-…` branch belongs to, or null. The branch NAME is the
+ *  only thing tying an open branch to a work-order point, which is exactly why
+ *  the workflow prescribes that name. */
+export function pointOfBranch(ref) {
+  const m = /^feat\/(\d+)(?:[-/]|$)/.exec(normRef(ref))
+  const n = m ? Number(m[1]) : NaN
+  return Number.isInteger(n) && n > 0 ? n : null
+}
+
+/** Shell quoting stripped off a captured branch name: `git switch -c
+ *  'feat/712-work'` reaches the `(\S+)` capture WITH its quotes, and a name the
+ *  normaliser cannot read walks past both refusals (fourth review, finding 2).
+ *  Git itself forbids quotes in a refname, so nothing legitimate is lost. */
+const unquote = (name) => String(name ?? '').replace(/^['"]+/, '').replace(/['"]+$/, '')
+
+/** Every `feat/<N>` a text names, in order. `feat/712`, `feat/712-slug` and
+ *  `feat/712/x` are one branch name each — the separator is NOT required, or a
+ *  slugless branch would open work unseen. */
+const featPointsIn = (text) => [...String(text).matchAll(/feat\/(\d+)/gi)].map((m) => Number(m[1]))
+
+/** Negation words that make a prose sentence unsafe to interpret as an
+ * assignment, in both languages. */
+const NEGATION_RE =
+  /\b(?:not|never|don'?t|doesn'?t|won'?t|avoid|except|without|excluding|nicht|niemals|kein(?:e[nmrs]?)?|ohne|außer|ausser)\b/i
+
+/**
+ * THE SENTENCE A PROSE MENTION LIVES IN. This is no longer used to decide that a
+ * point IS or IS NOT commissioned: five rounds demonstrated that free-prose
+ * scope cannot be made reliable by widening or narrowing a regex window. It is
+ * only an ambiguity detector. An uncertain call is reported visibly and binds
+ * neither refusal.
+ */
+function mentionSentence(text, index) {
+  const s = String(text)
+  let start = -1
+  for (const boundary of ['.', ';', ':', '!', '?', '\n']) {
+    const i = s.lastIndexOf(boundary, index - 1)
+    if (i > start) start = i
+  }
+  let end = s.length
+  for (const boundary of ['.', ';', ':', '!', '?', '\n']) {
+    const i = s.indexOf(boundary, index)
+    if (i >= 0 && i < end) end = i
+  }
+  return s.slice(start + 1, end)
+}
+
+/**
+ * DOES THIS STANDING BRANCH ANSWER TO THE NAME A CALL GAVE? PURE.
+ *
+ * A name from a cut FLAG is exact: `git branch feat/687` past a standing
+ * `feat/687-bank-game` creates a second branch, and calling that a match is the
+ * bypass itself. A name from PROSE is a description, and a prompt saying
+ * "point 687, branch feat/687" means the branch that exists — so there, and only
+ * there, a name the standing branch EXTENDS at a segment boundary counts.
+ * `feat/687-b` still does not answer for `feat/687-bank-game`: the boundary is a
+ * separator, not any character.
+ */
+export function branchAnswersTo(named, standing, { loose = false } = {}) {
+  const a = normRef(named)
+  const b = normRef(standing)
+  if (!a || !b) return false
+  if (a === b) return true
+  return loose === true && (b.startsWith(`${a}-`) || b.startsWith(`${a}/`))
+}
+
+/** EVERY spelling that CUTS a branch, each capturing the name it creates. The
+ *  name is read off the FLAG rather than off the whole command, so
+ *  `git checkout -b feat/712-x origin/feat/705-y` opens 712 and not the branch
+ *  it started FROM. `git branch -D …` is excluded by the `(?!-)`.
+ *
+ *  THE LONG FORMS ARE HERE BECAUSE THE SHORT ONES ALONE WERE A BYPASS (Sol,
+ *  review of 3078d166): `git switch --create feat/697-x` cut a branch the guard
+ *  answered `none` to, and the guard then exited before either refusal. A
+ *  spelling git accepts is a spelling this rule must read. */
+const CUT_PATTERNS = [
+  // checkout -b / -B <name>
+  /\bcheckout\b.*?\s-[bB](?:\s+|=)(\S+)/,
+  // switch -c / -C / --create / --force-create <name>
+  /\bswitch\b.*?\s(?:-[cC]|--create|--force-create)(?:\s+|=)(\S+)/,
+  // checkout/switch --orphan <name> — an empty history is still a new branch
+  /\b(?:checkout|switch)\b.*?\s--orphan(?:\s+|=)(\S+)/,
+]
+
+/** Git's GLOBAL options, which may stand between `git` and its subcommand.
+ *  `git -C . branch feat/697-x` cuts a branch, and an expression anchored on
+ *  `git\s+branch` read none of it (Sol, review of dd7fd78c). */
+const GIT_GLOBAL =
+  String.raw`(?:-[cC]\s+\S+|--git-dir(?:=\S+|\s+\S+)|--work-tree(?:=\S+|\s+\S+)|--namespace(?:=\S+|\s+\S+)` +
+  String.raw`|--exec-path(?:=\S+)?|--config-env\s+\S+|--no-pager|--paginate|-p|-P|--bare|--literal-pathspecs` +
+  String.raw`|--no-replace-objects|--no-optional-locks|--noglob-pathspecs|--glob-pathspecs|--icase-pathspecs)`
+
+const GIT_BRANCH_RE = new RegExp(String.raw`\bgit(?:\s+${GIT_GLOBAL})*\s+branch\b(.*)$`, 'i')
+
+/** `git branch` modes that LIST, DELETE or RECONFIGURE — none of them creates.
+ *  `-t` is NOT here: `git branch -t feat/712-x main` sets tracking while
+ *  CREATING, so reading it as not-creating was a bypass (fourth review,
+ *  finding 3; its long form `--track` was already read as a plain flag). */
+const BRANCH_NOT_CREATING =
+  /^(?:-[dDlarvuh]|--delete|--list|--all|--remotes|--verbose|--contains|--no-contains|--merged|--no-merged|--points-at|--sort|--format|--column|--no-column|--show-current|--edit-description|--set-upstream|--set-upstream-to|--unset-upstream|--help|--color|--no-color|--abbrev|--no-abbrev|--ignore-case|--omit-empty)(?:=|$)/
+
+/** …and the ones that CREATE by copying or renaming, where the new name is LAST. */
+const BRANCH_COPY_OR_MOVE = /^(?:-[cCmM]|--copy|--move)$/
+
+/** Flags of `git branch` whose VALUE is the next token, so it is not a name.
+ *  `--recurse-submodules` is BOOLEAN (its mode travels only via `=`), so listing
+ *  it here consumed the branch-name token and the creation went unread (fourth
+ *  review, finding 3). */
+const BRANCH_VALUE_FLAGS = new Set(['--contains', '--no-contains', '--merged', '--no-merged', '--points-at', '--sort',
+  '--format', '--set-upstream-to', '-u', '--abbrev', '--color'])
+
+/**
+ * The branch a `git branch …` segment CREATES, or [] where it creates none.
+ * READ AS TOKENS, not as one expression: `git branch --track feat/697-x main`
+ * creates a branch behind a flag no `(?!-)` could see past, and enumerating the
+ * flags that may PRECEDE a name is how a spelling escapes. So the option tokens
+ * are skipped and the first plain name is taken — the last one for a copy or a
+ * rename, whose earlier name is the SOURCE.
+ */
+function gitBranchCreates(seg) {
+  const m = GIT_BRANCH_RE.exec(seg)
+  if (!m) return []
+  const names = []
+  let copyOrMove = false
+  const tokens = m[1].trim().split(/\s+/).filter(Boolean)
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i]
+    if (t === '--') continue
+    if (t.startsWith('-')) {
+      if (BRANCH_NOT_CREATING.test(t)) return []
+      if (BRANCH_COPY_OR_MOVE.test(t)) copyOrMove = true
+      if (BRANCH_VALUE_FLAGS.has(t)) i += 1
+      continue
+    }
+    names.push(unquote(t))
+  }
+  if (!names.length) return []
+  return [copyOrMove ? names[names.length - 1] : names[0]]
+}
+
+/** ONE shell segment, judged on its own. Returns { points, refs, how }, where
+ *  `refs` are the branch names the segment CREATES — read off a cut flag, so
+ *  each one is a name git would bring into being, never a name merely mentioned. */
+function segmentTarget(seg) {
+  const none = { points: [], refs: [], how: 'none' }
+  const uniq = (nums) => [...new Set(nums.filter((n) => Number.isInteger(n) && n > 0))]
+  // An authoring run IS the commissioning of a point, whichever vendor runs it —
+  // unless it is one of the read-only legs, which produce no work at all.
+  if (!/--routing\b|--dry-run\b/.test(seg)) {
+    const authored = uniq([...seg.matchAll(/author-sol\.mjs.*?--point\s+(\d+)/gi)].map((m) => Number(m[1])))
+    if (authored.length) return { points: authored, refs: [], how: 'author' }
+  }
+  if (/\bworktree\s+add\b/.test(seg)) {
+    // `-b`/`-B` names the branch a new tree cuts; without it the tree is created
+    // ON a branch that is named plainly, and creating the tree is still the act.
+    // `--orphan` is deliberately NOT read for a name: `git worktree add --orphan
+    // <path>` derives the branch from the path, so the token after it may be
+    // either — the plain `feat/<N>` scan below is the honest reading there.
+    const m = /\bworktree\s+add\b.*?\s-[bB](?:\s+|=)(\S+)/.exec(seg)
+    const created = uniq(m ? [pointOfBranch(unquote(m[1]))] : featPointsIn(seg))
+    if (!created.length) return none
+    return { points: created, refs: m ? [normRef(unquote(m[1]))] : [], how: 'worktree' }
+  }
+  const names = [...CUT_PATTERNS.map((re) => re.exec(seg)).map((m) => (m ? unquote(m[1]) : '')), ...gitBranchCreates(seg)]
+    .map((r) => normRef(r))
+    .filter((r) => pointOfBranch(r) !== null)
+  const cut = uniq(names.map(pointOfBranch))
+  return cut.length ? { points: cut, refs: [...new Set(names)], how: 'branch' } : none
+}
+
+/**
+ * WHICH POINTS IS THIS TOOL CALL OPENING WORK ON? PURE.
+ *
+ * Returns { points, point, refs, how }: `points` is EVERY point the call opens,
+ * `point` the first of them (the single-target shorthand the CLI and the report
+ * use), `refs` the branch names the call CREATES where a cut flag names them, and
+ * `how` names the act recognised for it — `agent` for a spawn, `branch` for a
+ * `feat/<N>-…` being CUT, `worktree` for a tree created on one, `author` for an
+ * authoring run — with `none` where the call opens nothing this rule knows about.
+ *
+ * `refs` is what separates FINISHING from opening a SECOND branch for one point
+ * (Sol, review of 3078d166): the point alone said "687 is already in flight", so
+ * `git branch feat/687-b` past a standing `feat/687-a` walked through a full
+ * pool. A ref is collected only where a FLAG creates it, never from prose — a
+ * spawn prompt naming `feat/697-goat` is identifying the branch it works on.
+ *
+ * A CALL THAT OPENS TWO POINTS OPENS BOTH, and every one of them is judged. The
+ * first cut of this rule answered NULL to any second number, which made
+ * `git checkout -b feat/697-a && git branch feat/705-b` — one shell call — a
+ * complete bypass of both refusals (Sol, review of 91d88f9a). A COMMAND is not
+ * ambiguous about what it creates: it is read SEGMENT BY SEGMENT (`&&`, `||`,
+ * `;`, `|`, newline), each judged on the branch its own flag names, so a push or
+ * a checkout standing beside a cut contributes nothing.
+ *
+ * PROSE IS CONSERVATIVE AND DECLARED. One point named without a negation in its
+ * sentence is an unambiguous agent assignment. Two distinct points, or a point
+ * whose sentence also contains a negation, are NOT guessed into either a
+ * commissioning or an exclusion: the return value carries `ambiguous`, and the
+ * hook says what it saw while binding neither refusal. Thus "697 depends on
+ * 705", "implement 712 and 713", and "do not touch feat/705 but implement
+ * feat/712" can no longer silently commission both or silently bypass both.
+ * Switching to an existing branch, pushing one, landing one — none of them
+ * CREATES anything, and none is recognised here.
+ *
+ * A READ-ONLY RUN OPENS NOTHING either: `author-sol.mjs --routing` answers which
+ * lane owns a point and `--dry-run` prints the prompt it would send. Refusing
+ * those would deny the very question a session asks BEFORE it commissions.
+ */
+export function commissionTarget({ toolName = '', command = '', prompt = '', description = '' } = {}) {
+  const none = { point: null, points: [], refs: [], refsLoose: false, how: 'none' }
+  const uniq = (nums) => [...new Set(nums.filter((n) => Number.isInteger(n) && n > 0))]
+  // `refsLoose` says whether the names were CREATED by a flag (exact) or merely
+  // SPOKEN in a prompt (a description, which the standing branch may extend).
+  const found = (points, how, refs = []) =>
+    points.length ? { point: points[0], points, refs, refsLoose: how === 'agent', how } : none
+  const tool = String(toolName ?? '')
+  if (tool === 'Agent' || tool === 'Task') {
+    const text = `${prompt ?? ''}\n${description ?? ''}`
+    const branchMatches = [...text.matchAll(/\bfeat\/(\d+)[A-Za-z0-9._\-/]*/gi)]
+    const pointMatches = [...text.matchAll(/\b(?:point|punkt)\s+(\d+)\b/gi)]
+    const mentioned = uniq([
+      ...branchMatches.map((m) => Number(m[1])),
+      ...pointMatches.map((m) => Number(m[1])),
+    ])
+    const mentionedRefs = [
+      ...new Set(
+        branchMatches
+          .map((m) => normRef(m[0].replace(/[.\-/]+$/, '')))
+          .filter(Boolean),
+      ),
+    ]
+    const negatedSentence = [...branchMatches, ...pointMatches].some((m) =>
+      NEGATION_RE.test(mentionSentence(text, m.index)),
+    )
+    if (mentioned.length > 1 || negatedSentence) {
+      return {
+        ...none,
+        refsLoose: true,
+        how: 'ambiguous-prose',
+        ambiguous: {
+          points: mentioned,
+          refs: mentionedRefs,
+          reasons: [
+            ...(mentioned.length > 1 ? ['multiple point mentions'] : []),
+            ...(negatedSentence ? ['negation shares a sentence with a point mention'] : []),
+          ],
+        },
+      }
+    }
+    const byBranch = uniq(branchMatches.map((m) => Number(m[1])))
+    // THE PROSE NAMES ITS BRANCHES TOO (Sol, review of dd7fd78c). Dropping them
+    // left the spawn path on the point-wide exemption, so "point 687 on branch
+    // feat/687-b" walked past a standing feat/687-a at a full pool — the very
+    // escape the ref narrowing had just closed on the shell path. They are
+    // matched LOOSELY, because prose describes rather than creates — and a
+    // branch a clause names only to FORBID is no branch to be worked.
+    if (byBranch.length) {
+      return found(byBranch, 'agent', mentionedRefs)
+    }
+    return mentioned.length ? found(mentioned, 'agent') : none
+  }
+  const cmd = String(command ?? '')
+  if (!cmd.trim()) return none
+  const points = []
+  const refs = []
+  let how = 'none'
+  for (const raw of cmd.split(/\n|&&|\|\||[;|&]/)) {
+    const seg = raw.trim()
+    if (!seg) continue
+    const t = segmentTarget(seg)
+    for (const n of t.points) {
+      if (points.includes(n)) continue
+      points.push(n)
+      if (how === 'none') how = t.how
+    }
+    for (const r of t.refs) if (r && !refs.includes(r)) refs.push(r)
+  }
+  return found(points, how, refs)
+}
+
+/** An age a human reads at a glance: days past a day, hours past an hour. */
+export function describeBranchAge(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return 'age unknown'
+  const min = Math.round(ms / 60000)
+  if (min < 60) return `${min} min`
+  const h = Math.round(ms / 3600000)
+  return h < 24 ? `${h} h` : `${Math.round(ms / 86400000)} d`
+}
+
+/**
+ * The record, from the file's text. PURE, and hostile-tolerant: it is
+ * hand-editable, and a torn one must degrade to "nothing recorded" rather than
+ * throw inside a hook. `torn` is carried so the CLI can SAY so — a silently
+ * empty record would look exactly like a clean one.
+ */
+export function parseCommissionRecord(text) {
+  const empty = { overrides: {}, parked: {}, torn: false }
+  if (text === null || text === undefined || String(text).trim() === '') return empty
+  let parsed
+  try {
+    parsed = JSON.parse(String(text))
+  } catch {
+    return { ...empty, torn: true }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { ...empty, torn: true }
+  const out = { overrides: {}, parked: {}, torn: false }
+  const entry = (v) => ({ reason: sanitiseReason(v?.reason), at: typeof v?.at === 'string' ? v.at : '' })
+  const src = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {})
+  for (const [key, value] of Object.entries(src(parsed.overrides))) {
+    const n = Number(key)
+    const e = entry(value)
+    if (Number.isInteger(n) && n > 0 && e.reason) out.overrides[n] = e
+  }
+  for (const [key, value] of Object.entries(src(parsed.parked))) {
+    const ref = normRef(key)
+    // A park also carries the branch TIP it was taken at — a commit sha or
+    // nothing. Anything else is a hand-edit nobody can compare against.
+    const e = { ...entry(value), tip: normaliseTip(value?.tip) }
+    if (ref && e.reason) out.parked[ref] = e
+  }
+  return out
+}
+
+/** The override recorded for a point, or '' — the string `commissionDecision`
+ *  takes. The record is the ONE place a reason is kept; the queue core never
+ *  reads a file. */
+export function commissionOverrideFor(record, point) {
+  const n = Number(point)
+  return (Number.isInteger(n) ? record?.overrides?.[n]?.reason : '') || ''
+}
+
+/** Record an override for a point. Returns a NEW record; an empty reason changes
+ *  nothing, because silence is the one thing this mechanism forbids. */
+export function recordCommissionOverride(record, point, reason, { at = '' } = {}) {
+  const base = record && typeof record === 'object' ? record : { overrides: {}, parked: {} }
+  const n = Number(point)
+  const text = sanitiseReason(reason)
+  if (!Number.isInteger(n) || n <= 0 || !text) return base
+  return { ...base, overrides: { ...base.overrides, [n]: { reason: text, at: String(at ?? '') } } }
+}
+
+/** A commit sha as the record keeps it, or '' for anything that is not one. */
+export function normaliseTip(tip) {
+  const text = String(tip ?? '').trim()
+  return /^[0-9a-f]{7,64}$/i.test(text) ? text.toLowerCase() : ''
+}
+
+/**
+ * Park a branch out of the slot count, with its reason, the moment it was taken
+ * and THE TIP IT STOOD AT — the tip is what lets a parked branch come back the
+ * moment it moves, and it is the only baseline that cannot be fooled.
+ *
+ * The timestamp alone could be, in three ways Sol named in the review of
+ * 91d88f9a: git reports a committer date in whole SECONDS while the park is
+ * stamped in milliseconds, so a commit made later in the same second reads as
+ * older; a rebase or a `--date` preserves a committer date the branch has long
+ * moved past; and an unparsable stamp made the branch parked forever. A sha
+ * comparison has none of those failure modes.
+ */
+export function recordParkedBranch(record, ref, reason, { at = '', tip = '' } = {}) {
+  const base = record && typeof record === 'object' ? record : { overrides: {}, parked: {} }
+  const name = normRef(ref)
+  const text = sanitiseReason(reason)
+  if (!name || !text) return base
+  return { ...base, parked: { ...base.parked, [name]: { reason: text, at: String(at ?? ''), tip: normaliseTip(tip) } } }
+}
+
+/** Take a branch back into the count deliberately. */
+export function clearParkedBranch(record, ref) {
+  const base = record && typeof record === 'object' ? record : { overrides: {}, parked: {} }
+  const name = normRef(ref)
+  if (!name || !base.parked?.[name]) return base
+  const parked = { ...base.parked }
+  delete parked[name]
+  return { ...base, parked }
+}
+
+/** What the reporting command prints, so an override is visible AFTERWARDS and
+ *  not only in the moment it is taken. PURE — the wording is pinned by a test. */
+export function commissionRecordReport(record) {
+  const lines = []
+  if (record?.torn) lines.push(`${COMMISSION_RECORD_PATH} does not parse — nothing recorded can be read from it.`)
+  const overrides = Object.entries(record?.overrides ?? {}).sort((a, b) => Number(a[0]) - Number(b[0]))
+  const parked = Object.entries(record?.parked ?? {}).sort((a, b) => a[0].localeCompare(b[0]))
+  lines.push(overrides.length ? 'Recorded queue overrides:' : 'Recorded queue overrides: none.')
+  for (const [n, e] of overrides) lines.push(`  · point ${n} — ${e.reason}${e.at ? ` (${e.at})` : ''}`)
+  lines.push(parked.length ? 'Parked branches (out of the slot count):' : 'Parked branches: none.')
+  for (const [ref, e] of parked) {
+    // A park with no baseline can never expire, so it is not honoured — and the
+    // reader is told here rather than left wondering why the branch still counts.
+    const baseline = e.tip
+      ? ` — parked at ${String(e.tip).slice(0, 8)}`
+      : Number.isFinite(Date.parse(String(e.at ?? '')))
+        ? ''
+        : ' — NO BASELINE, so it does NOT count as parked; park it again'
+    lines.push(`  · ${ref} — ${e.reason}${e.at ? ` (${e.at})` : ''}${baseline}`)
+  }
+  return lines.join('\n')
+}
+
+/**
+ * WHICH OPEN BRANCHES OCCUPY A SLOT? PURE.
+ *
+ * `branches` is [{ ref, tipAt, behind }] — every `feat/*` branch not contained in
+ * `main`, as the wrapper reads them from git. Local and remote spellings of one
+ * branch are ONE branch; two branches for one point are TWO (687 had exactly
+ * that on 17.08.2026, and both were real work standing open).
+ *
+ * A PARKED BRANCH THAT MOVES IS LIVE AGAIN. The park records the TIP the branch
+ * stood at, so a commit landing on it afterwards puts it straight back into the
+ * count — otherwise parking would be a permanent exemption bought once, which is
+ * the silent-override failure this point exists to end. A branch whose tip
+ * cannot be read stays parked: an unreadable tip proves no movement.
+ *
+ * A park with NO baseline at all — no tip, and no timestamp that parses — is not
+ * honoured: it could never expire, and a park that can never expire is the
+ * permanent exemption again, bought by a typo. It is reported in `invalidParks`
+ * so the reader is told rather than left wondering why the branch still counts.
+ * The timestamp remains the FALLBACK baseline for parks written before the tip
+ * was recorded, and it is read a whole second coarse, because git's committer
+ * date is: only a tip in a strictly later second counts as movement, so a park
+ * is never undone by the rounding of the very commit it was taken on.
+ *
+ * `exclude` is the point (or the POINTS — one shell call can open two) being
+ * commissioned. Their own branches are not slots the commissioning would consume
+ * — re-cutting or pushing an existing branch is finishing, not opening.
+ *
+ * `excludeRefs` NARROWS that to the branch actually named, where the call names
+ * one. A point-wide exemption let a SECOND branch for a point in flight walk
+ * through a full pool (Sol, review of 3078d166): with `feat/687-a` standing,
+ * `git branch feat/687-b` was excused by its own point. So where the call names
+ * the ref it creates, only THAT ref is exempt, and the point's other branches go
+ * on holding their slots; where no ref is named — a spawn, a prose target — the
+ * point-wide exemption stands, because the branch cannot be identified.
+ */
+export function openBranchSlots({
+  branches = [],
+  parked = {},
+  exclude = null,
+  excludeRefs = null,
+  looseRefs = false,
+  cap = POOL_CAP,
+  now = Date.now(),
+} = {}) {
+  const parkedAt = new Map()
+  for (const [ref, e] of Object.entries(parked && typeof parked === 'object' ? parked : {})) {
+    parkedAt.set(normRef(ref), {
+      reason: e?.reason ?? '',
+      at: Date.parse(String(e?.at ?? '')),
+      tip: normaliseTip(e?.tip),
+    })
+  }
+  const skipRefs = (Array.isArray(excludeRefs) ? excludeRefs : excludeRefs ? [excludeRefs] : [])
+    .map(normRef)
+    .filter(Boolean)
+  // A point whose OWN ref the call named is exempt for that ref alone.
+  const namedPoints = new Set(skipRefs.map(pointOfBranch).filter((n) => n !== null))
+  const skip = new Set(
+    (Array.isArray(exclude) ? exclude : [exclude])
+      .map(Number)
+      .filter((n) => Number.isInteger(n) && n > 0 && !namedPoints.has(n)),
+  )
+  const seen = new Map()
+  const parkedOut = []
+  const invalidParks = []
+  for (const b of Array.isArray(branches) ? branches : []) {
+    const ref = normRef(b?.ref)
+    if (!ref || seen.has(ref)) continue
+    const tipAt = Number.isFinite(b?.tipAt) ? b.tipAt : null
+    const tip = normaliseTip(b?.tip)
+    const item = {
+      ref,
+      point: pointOfBranch(ref),
+      tipAt,
+      tip,
+      ageMs: tipAt === null || !Number.isFinite(now) ? null : Math.max(0, now - tipAt),
+      behind: Number.isFinite(b?.behind) ? b.behind : null,
+    }
+    const park = parkedAt.get(ref)
+    if (park && !parkHolds(park)) invalidParks.push({ ...item, reason: park.reason })
+    else if (park && !movedSincePark(park, item)) {
+      // A park whose CURRENT tip could not be read stays parked (see
+      // `movedSincePark`), but it is MARKED, so the reporting side can say the
+      // baseline could not be checked instead of passing it off as verified.
+      parkedOut.push({ ...item, reason: park.reason, ...(park.tip && !item.tip ? { tipUnverified: true } : {}) })
+      seen.set(ref, true)
+      continue
+    }
+    if (skipRefs.some((r) => branchAnswersTo(r, ref, { loose: looseRefs })) || (item.point !== null && skip.has(item.point))) {
+      seen.set(ref, true)
+      continue
+    }
+    seen.set(ref, item)
+  }
+  const open = [...seen.values()]
+    .filter((v) => v !== true)
+    // Oldest first: the branch that has been standing longest is the one to land.
+    .sort((a, b) => (a.tipAt ?? Infinity) - (b.tipAt ?? Infinity) || a.ref.localeCompare(b.ref))
+  const limit = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : POOL_CAP
+  return {
+    open,
+    parkedOut,
+    invalidParks,
+    count: open.length,
+    slotsFree: Math.max(0, limit - open.length),
+    cap: limit,
+  }
+}
+
+/** Does this park have a baseline movement can be measured against at all? */
+function parkHolds(park) {
+  return Boolean(park?.tip) || Number.isFinite(park?.at)
+}
+
+/** Has the branch moved since it was parked? The TIP decides where one was
+ *  recorded; the timestamp is the coarse fallback for a park written without.
+ *
+ *  AN UNREADABLE CURRENT TIP READS AS UNMOVED — DELIBERATELY (fourth review,
+ *  finding 5, kept on the spec's fail-open rule). The strict reading would put
+ *  the branch back into the count exactly when git could not be asked, i.e. it
+ *  would REFUSE commissioning on the guard's own failure — the fail-closed
+ *  direction every leg here avoids. The cost is bounded: the branch stays
+ *  parked, which is the state a human explicitly recorded, and the blindness
+ *  is not silent — `openBranchSlots` marks the entry `tipUnverified` and the
+ *  status report names it. The timestamp fallback below still honours tipless
+ *  parks (written before the tip was recorded; `--park` always records one
+ *  now) and cannot see a rebase or a backdated commit — recorded residual,
+ *  same fail-open reasoning, visible in the record report as the missing
+ *  "parked at <sha>" baseline. */
+function movedSincePark(park, item) {
+  if (park?.tip) return Boolean(item.tip) && item.tip !== park.tip
+  if (!Number.isFinite(park?.at) || item.tipAt === null) return false
+  // Git's committer date is whole seconds, the park stamp is milliseconds: only a
+  // tip in a strictly LATER second is evidence of a commit after the park.
+  return item.tipAt >= Math.floor(park.at / 1000) * 1000 + 1000
+}
+
+/**
+ * MAY A FURTHER POINT BE OPENED, GIVEN THE BRANCHES THAT STAND? PURE.
+ *
+ * Returns { allowed, why, open, parkedOut, count, slotsFree, cap, adding,
+ * reopens }. `reopens` names the PARKED branches this call assigns work back
+ * onto — each one reoccupies its slot at the assignment, and the wrapper clears
+ * its park the moment the call is allowed (finding 6). `readable`
+ * false is the fail-open case the wrapper passes when git could not be
+ * questioned: a branch list nobody could read is not evidence of debris.
+ *
+ * There is deliberately NO reason-override here. The first refusal's escape is a
+ * recorded reason because the queue's order can legitimately be departed from;
+ * this one's escapes are LAND and PARK, both of which change the real state
+ * rather than excusing it, and parking is recorded exactly as an override is.
+ */
+export function branchSlotDecision({
+  branches = [],
+  parked = {},
+  point = null,
+  points = null,
+  refs = null,
+  looseRefs = false,
+  cap = POOL_CAP,
+  readable = true,
+  now = Date.now(),
+} = {}) {
+  const targets = [
+    ...new Set(
+      (Array.isArray(points) && points.length ? points : [point])
+        .map(Number)
+        .filter((n) => Number.isInteger(n) && n > 0),
+    ),
+  ]
+  const named = [
+    ...new Set((Array.isArray(refs) ? refs : refs ? [refs] : []).map(normRef).filter(Boolean)),
+  ]
+  // Keep the CURRENT occupancy intact. Earlier cuts excluded every target here
+  // and tried to add it back below. That loses a live target in a mixed call:
+  // three occupied branches minus the continued target plus one new target read
+  // as 2 + 1, although the call really leaves four branches standing.
+  const slots = openBranchSlots({ branches, parked, cap, now })
+  // HOW MANY BRANCHES WOULD THIS CALL ADD? The count alone answered "two of
+  // three taken" to a line cutting TWO more, and left four standing under a cap
+  // of three (Sol, review of dd7fd78c). A refusal has to be about the state the
+  // call would LEAVE, not the state it starts from.
+  //
+  // A ref the call names that no branch answers to is one new branch. A target
+  // point the call names NO ref for is one new branch unless a branch for it
+  // already stands — that is the spawn shape, where the name cannot be known.
+  //
+  // A PARKED BRANCH THE CALL ASSIGNS WORK TO REOCCUPIES ITS SLOT NOW (fourth
+  // review, finding 6). Counting parked branches into the in-flight set read
+  // that assignment as `nothing-opened`, so at a full pool the call passed and
+  // occupancy exceeded the cap the moment the branch moved — the unpark must
+  // happen when work is ASSIGNED, not at the first commit. So the in-flight set
+  // holds only the branches that OCCUPY a slot, a reassigned park counts toward
+  // `adding`, and `reopens` names the parks the wrapper must clear on allow.
+  const standing = [...new Set((Array.isArray(branches) ? branches : []).map((b) => normRef(b?.ref)).filter(Boolean))]
+  const live = slots.open.map((b) => b.ref)
+  const inFlight = new Set(live.map(pointOfBranch).filter((n) => n !== null))
+  const newRefs = named.filter((r) => !standing.some((s) => branchAnswersTo(r, s, { loose: looseRefs })))
+  const unnamed = targets.filter((p) => !named.some((r) => pointOfBranch(r) === p))
+  const reopens = slots.parkedOut
+    .filter(
+      (b) =>
+        named.some((r) => branchAnswersTo(r, b.ref, { loose: looseRefs })) ||
+        // A point-wide assignment cannot distinguish between parked branches.
+        // If no live branch carries that point, every park the wrapper clears
+        // becomes occupied and therefore every one must be projected here.
+        (b.point !== null && unnamed.includes(b.point) && !inFlight.has(b.point)),
+    )
+    .map((b) => b.ref)
+  const reopeningPoints = new Set(reopens.map(pointOfBranch).filter((n) => n !== null))
+  const opening = unnamed.filter((p) => !inFlight.has(p) && !reopeningPoints.has(p))
+  const adding = newRefs.length + reopens.length + opening.length
+  const out = { ...slots, point: targets[0] ?? null, points: targets, refs: named, adding, reopens }
+  if (readable !== true) return { ...out, allowed: true, why: 'branches-unreadable' }
+  // A call that opens NO new branch is finishing, whatever the pool holds —
+  // pushing to a branch that stands must never be refused for the slot it is in.
+  if (adding === 0) return { ...out, allowed: true, why: 'nothing-opened' }
+  if (slots.count + adding <= slots.cap) return { ...out, allowed: true, why: 'slots-free' }
+  return { ...out, allowed: false, why: 'branches-open' }
+}
+
+/**
+ * The branch refusal's wording. PURE: the point requires it to list the open
+ * branches OLDEST FIRST with each one's age and behind-count, and to name the
+ * two ways out.
+ */
+export function branchSlotRefusal(decision = {}, { limit = 10 } = {}) {
+  const open = Array.isArray(decision?.open) ? decision.open : []
+  const cap = decision?.cap ?? POOL_CAP
+  const targets = Array.isArray(decision?.points) && decision.points.length ? decision.points : [decision?.point]
+  const named = targets.filter((p) => Number.isInteger(Number(p)) && Number(p) > 0)
+  // One call can open two points, and the refusal names both — a message that
+  // named one of them would read as if the other had been allowed.
+  const n = named.length > 1 ? `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}` : (named[0] ?? null)
+  const adding = Number.isFinite(decision?.adding) && decision.adding > 0 ? decision.adding : named.length || 1
+  const lines = open.slice(0, limit).map((b) => {
+    const age = describeBranchAge(Number.isFinite(b?.ageMs) ? b.ageMs : NaN)
+    const behind = Number.isFinite(b?.behind)
+      ? `${b.behind} commit${b.behind === 1 ? '' : 's'} behind main`
+      : 'behind-count unknown'
+    return `  · ${b?.ref} — ${age}, ${behind}`
+  })
+  if (open.length > limit) lines.push(`  · …and ${open.length - limit} more`)
+  // THE REMEDY MUST ACTUALLY LIFT THE REFUSAL (fourth review, finding 7): with
+  // three occupied slots and a call opening two branches, landing ONE leaves
+  // the same call refused — so the refusal says how many must go, not "one".
+  const excess = Math.max(1, (Number.isFinite(decision?.count) ? decision.count : open.length) + adding - cap)
+  const howMany = excess > 1 ? `${excess} of them must go` : 'one of them must go'
+  // When removing EVERY standing branch still would not make the call fit, the
+  // ordinary LAND/PARK remedy is impossible to complete: it asks more branches
+  // to go than the list contains. The remaining excess has to come out of the
+  // call itself. With an empty pool that is the whole remedy; with a mixed state
+  // BOTH actions are required, and saying either one alone would send the
+  // operator around the same refusal loop.
+  if (excess > open.length && open.length === 0) {
+    return (
+      `THE CALL ITSELF EXCEEDS THE POOL CAP: no feat/* branches currently occupy a slot, but opening point${
+        named.length > 1 ? 's' : ''
+      } ${n ?? '?'} would add ${adding} branch${adding === 1 ? '' : 'es'} against a cap of ${cap}. ` +
+      `COMMISSION FEWER TARGETS: split this call so it opens at most ${cap} branch${cap === 1 ? '' : 'es'} at once. ` +
+      'There is no existing branch to LAND or PARK.'
+    )
+  }
+  if (excess > open.length) {
+    const targetsToDrop = excess - open.length
+    return (
+      `A SLOT IS NOT FREE UNTIL ITS BRANCH IS GONE: ${open.length} open feat/* branch(es) against a pool cap of ` +
+      `${cap}${n ? `, so opening point${named.length > 1 ? 's' : ''} ${n} would add ${
+        adding > 1 ? `${adding} more` : 'another'
+      }` : ''}. Oldest first:\n${lines.join('\n')}\n` +
+      `BOTH CHANGES ARE REQUIRED BEFORE THIS CALL FITS: LAND or PARK all ${open.length} standing branch${
+        open.length === 1 ? '' : 'es'
+      } named above (${BRANCH_LAND_CMD}, or ${BRANCH_PARK_CMD} with a reason), AND COMMISSION ${targetsToDrop} FEWER ` +
+      `branch-opening target${targetsToDrop === 1 ? '' : 's'} from this call. Neither action alone frees enough slots.`
+    )
+  }
+  return (
+    `A SLOT IS NOT FREE UNTIL ITS BRANCH IS GONE: ${open.length} open feat/* branch(es) against a pool cap of ` +
+    `${cap}${n ? `, so opening point${named.length > 1 ? 's' : ''} ${n} would add ${
+      adding > 1 ? `${adding} more` : 'another'
+    }` : ''}. Oldest first:\n${lines.join('\n')}\n` +
+    `TWO WAYS OUT, both explicit, and ${howMany} before this call fits: LAND one (${BRANCH_LAND_CMD}), or PARK ` +
+    `it with a reason (${BRANCH_PARK_CMD}), ` +
+    'which records the decision and drops the branch out of the count until it moves again. Built work that never ' +
+    'lands delivers nothing and costs more to merge every day it ages against a moving main.'
   )
 }
 
