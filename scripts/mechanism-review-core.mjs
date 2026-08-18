@@ -688,8 +688,14 @@ const BLIND_SUBJECT = new RegExp(
  * The prompt fixes the evidence shape as "what you actually checked and what
  * you found", so a genuine review opens with a reading verb. Multiline: for the
  * callers that test a whole message, any line that opens so affirms a reading.
+ *
+ * A VACUOUS object un-affirms it (escalation round, pass 1): "Checked nothing;
+ * the material was not supplied" opens with the verb and affirms no reading at
+ * all — shielded, it walked the subject-only admission past the net. The verb
+ * followed by nothing/none/"no <thing>"/neither is therefore not an affirmation.
  */
-const AFFIRMED_READING = /^\W*(?:checked|reviewed|read|inspected|examined|verified|compared|traced|audited|analysed|analyzed|assessed|judged|covered)\b/im
+const AFFIRMED_READING =
+  /^\W*(?:checked|reviewed|read|inspected|examined|verified|compared|traced|audited|analysed|analyzed|assessed|judged|covered)\b(?!\s*[:,;–—-]*\s*(?:nothing\b|none\b|neither\b|no\s))/im
 
 /** The union, kept for callers that want the raw net rather than the judgment. */
 export const BLIND_REVIEWER = new RegExp(`${BLIND_FIRST_PERSON.source}|${BLIND_SUBJECT.source}`, 'i')
