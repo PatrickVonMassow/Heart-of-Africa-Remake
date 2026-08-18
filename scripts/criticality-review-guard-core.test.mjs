@@ -221,6 +221,40 @@ describe('evaluateCriticalityReview', () => {
     }
   })
 
+  it('a single PASS row never clears a whole point — only a complete composition does (third landing round)', () => {
+    // The live, pre-existing hole: a record carrying `pass` covers the files
+    // that pass read and no more, yet it entered `clean` like a whole-range
+    // review — one merge pass row cleared a HIGH point whose other passes
+    // were never recorded.
+    const passRow = (index, verdict, at) =>
+      record({ verdict, at, pass: { index, total: 2, files: [`f${index}.mjs`] } })
+    const lone = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [passRow(1, 'merge', 1_787_000_001_000)],
+    })
+    expect(lone.block).toBe(true)
+    expect(lone.findings[0].kind).toBe('unresolved')
+    // The COMPLETE split, every pass merge, clears…
+    const complete = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [passRow(1, 'merge', 1_787_000_001_000), passRow(2, 'merge', 1_787_000_002_000)],
+    })
+    expect(complete.block).toBe(false)
+    // …while a split whose WORST pass refuses does not — and the refusal
+    // keeps its own standing.
+    const refused = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [passRow(1, 'merge', 1_787_000_001_000), passRow(2, 'do-not-merge', 1_787_000_002_000)],
+    })
+    expect(refused.block).toBe(true)
+  })
+
   it('a carried row clears only with the wrapper’s verification stamp (delta rounds)', () => {
     const carriedMerge = record({ verdict: 'merge', carried: { from: 'f'.repeat(40) } })
     const unstamped = evaluateCriticalityReview({ baseline: 'b', head: 'h', ticks: [tick()], records: [carriedMerge] })

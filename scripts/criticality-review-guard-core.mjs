@@ -235,10 +235,59 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
       continue
     }
 
-    const clean = valid.filter((r) => String(r.verdict) === CLEARING_VERDICT)
+    // A PASS ROW ALONE CLEARS NOTHING (third landing round, pass 2 — a live,
+    // pre-existing unearned-clearance path): a record carrying `pass` covers
+    // the files that pass read and no more, yet it entered `clean` like a
+    // whole-range review, so ONE merge pass row could clear a HIGH point
+    // whose other passes were never recorded. A pass-split review clears
+    // only as a COMPLETE COMPOSITION — every index 1..total present at one
+    // sha among the valid rows — speaking with the WORST of its passes,
+    // exactly as at the mechanism gate. A pass REFUSAL keeps its individual
+    // standing in `unresolved` (fail-closed in both directions).
+    const passShape = (r) => {
+      const total = Number(r?.pass?.total)
+      const index = Number(r?.pass?.index)
+      return (
+        Number.isInteger(total) && total >= 2 && total <= 256 && Number.isInteger(index) && index >= 1 && index <= total
+      )
+    }
+    const compositions = []
+    {
+      const groups = new Map()
+      for (const r of valid) {
+        if (!passShape(r)) continue
+        const key = `${String(r.sha)}|${Number(r.pass.total)}`
+        if (!groups.has(key)) groups.set(key, new Map())
+        const byIndex = groups.get(key)
+        const i = Number(r.pass.index)
+        const prior = byIndex.get(i)
+        if (!prior || Number(r.at ?? 0) >= Number(prior.at ?? 0)) byIndex.set(i, r)
+      }
+      for (const [key, byIndex] of groups) {
+        const total = Number(key.split('|').at(-1))
+        let complete = true
+        for (let i = 1; i <= total; i++) if (!byIndex.has(i)) complete = false
+        if (!complete) continue
+        const rows = [...byIndex.values()]
+        const worstRank = ['merge', 'merge-with-fixes', 'do-not-merge']
+        const worst = rows.reduce(
+          (w, r) => (worstRank.indexOf(String(r.verdict)) > worstRank.indexOf(w) ? String(r.verdict) : w),
+          'merge',
+        )
+        const latest = rows.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+        compositions.push({ ...latest, verdict: worst, at: Math.max(...rows.map((r) => Number(r.at ?? 0))) })
+      }
+    }
+    const clean = [
+      ...valid.filter((r) => r.pass === undefined && String(r.verdict) === CLEARING_VERDICT),
+      ...compositions.filter((g) => String(g.verdict) === CLEARING_VERDICT),
+    ]
     const unresolved = valid.filter((r) => String(r.verdict) !== CLEARING_VERDICT)
     if (!clean.length) {
-      const latest = unresolved.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+      // Merge pass rows of an INCOMPLETE split leave `unresolved` empty while
+      // nothing may clear — the finding then names those rows instead.
+      const pool = unresolved.length ? unresolved : valid
+      const latest = pool.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
       findings.push({ kind: 'unresolved', tick, records: [latest] })
       continue
     }

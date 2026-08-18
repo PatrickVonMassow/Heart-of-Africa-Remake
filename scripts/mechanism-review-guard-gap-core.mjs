@@ -109,15 +109,29 @@ export function decideReviewGap({
   // receipt — so material just over the budget once rendered read as fitting
   // here. Where the tool measured, its answer is the answer; the bare size
   // rules only in a tree without the tool.
-  if (planner && planner.available) {
+  if (planner && planner.available === true) {
     if (planner.fits === true) return { gap: false, reason: 'fits', measuredChars: size, budget: cap }
-    if (planner.covers) return { gap: false, reason: 'splits', measuredChars: size, budget: cap }
+    if (planner.covers === true) return { gap: false, reason: 'splits', measuredChars: size, budget: cap }
+    // THE GAP DEMANDS AN EXPLICIT RULING, never the absence of one (third
+    // landing round, pass 4): `{ available: true }` alone used to fall
+    // through here and SUSPEND a blocking verdict as split-cannot-cover —
+    // a waiver on planner data that ruled nothing. Only a planner that
+    // answered both questions with booleans and named its uncoverable set
+    // may rule the gap; anything malformed blocks as unmeasured.
+    if (planner.fits === false && planner.covers === false && Array.isArray(planner.uncoverable)) {
+      return {
+        gap: true,
+        reason: 'split-cannot-cover',
+        measuredChars: size,
+        budget: cap,
+        uncoverable: planner.uncoverable.map((p) => String(p)),
+      }
+    }
     return {
-      gap: true,
-      reason: 'split-cannot-cover',
-      measuredChars: size,
+      gap: false,
+      reason: 'unmeasured',
+      detail: 'the pass-splitting ruling is malformed — it answered neither fits nor covers as a boolean with a named uncoverable set',
       budget: cap,
-      uncoverable: [...(planner.uncoverable ?? [])].map((p) => String(p)),
     }
   }
   // NO PLANNER AND NO NAMED FAILURE is a caller not following the protocol:

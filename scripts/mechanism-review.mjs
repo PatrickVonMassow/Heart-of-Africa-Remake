@@ -389,13 +389,14 @@ export function buildCarriedRecord({
     }
   }
   const all = records ?? readRecords()
-  const wantedSet = [...(passCheck.pass?.files ?? [])].sort().join('\n')
+  // The same INJECTIVE set key as verifyCarried.
+  const wantedSet = JSON.stringify([...(passCheck.pass?.files ?? [])].map(String).sort())
   const sources = all.filter(
     (r) =>
       r.sha === source.sha &&
       r.pass &&
       Array.isArray(r.pass.files) &&
-      [...r.pass.files].sort().join('\n') === wantedSet &&
+      JSON.stringify([...r.pass.files].map(String).sort()) === wantedSet &&
       VERDICTS.includes(String(r.verdict)) &&
       // The source must be the ORIGINAL reading: blob identity is transitive,
       // so where the source is itself carried, carry from ITS original.
@@ -441,13 +442,24 @@ export function buildCarriedRecord({
 }
 
 /**
- * Re-measure every carried row's claim and STAMP it (the gates' half of the
- * carry contract): for each record with `carried.from`, every pass file's blob
- * must be identical between the source and the recorded sha. Anything that
- * cannot be verified — a malformed sha, a missing file, a git failure — stamps
- * false, and the cores refuse the row. Mutates and returns `records`.
+ * Re-measure every carried row's WHOLE claim and STAMP it (the gates' half of
+ * the carry contract): for each record with `carried.from`,
+ *   - every pass file's blob must be identical between the source and the
+ *     recorded sha,
+ *   - the source must be a strict ancestor of the recorded sha,
+ *   - and the SOURCE READING itself must stand in the ledger — an original
+ *     (non-carried) pass row at the source sha over the exact file set whose
+ *     model, verdict and mode the carried row COPIED, and whose evidence the
+ *     carried evidence quotes. Blob identity alone let a hand-edited carried
+ *     row INVENT its verdict and still stamp true (third landing round,
+ *     pass 5) — the copied fields are part of the claim, so they are part of
+ *     the proof.
+ * Anything that cannot be verified — a malformed sha, a missing file, a git
+ * failure, no matching source row — stamps false, and the cores refuse the
+ * row. Mutates and returns `records`.
  */
-export function verifyCarried(records) {
+export function verifyCarried(records, allRecords = null) {
+  let ledger = null
   for (const r of records ?? []) {
     if (!r || typeof r !== 'object' || r.carried === undefined) continue
     r.carriedVerified = (() => {
@@ -455,6 +467,16 @@ export function verifyCarried(records) {
         const from = String(r.carried?.from ?? '')
         if (!/^[0-9a-f]{7,40}$/i.test(from)) return false
         if (!/^[0-9a-f]{7,40}$/i.test(String(r.sha ?? ''))) return false
+        if (from === r.sha) return false
+        try {
+          execFileSync('git', ['merge-base', '--is-ancestor', from, r.sha], {
+            windowsHide: true,
+            cwd: REPO_ROOT,
+            stdio: 'ignore',
+          })
+        } catch {
+          return false
+        }
         const files = Array.isArray(r.pass?.files) ? r.pass.files : null
         if (!files || !files.length) return false
         for (const file of files) {
@@ -463,7 +485,25 @@ export function verifyCarried(records) {
           const b = git(['rev-parse', `${r.sha}:${file}`])
           if (!a || a !== b) return false
         }
-        return true
+        if (!ledger) ledger = allRecords ?? readRecords()
+        // An INJECTIVE set key (JSON, never a join): a legal path may contain any
+        // separator a join could pick, and a collision would let one file set
+        // impersonate another.
+        const wantedSet = JSON.stringify([...files].map(String).sort())
+        const source = ledger.find(
+          (s) =>
+            s !== r &&
+            s.carried === undefined &&
+            String(s.sha) === from &&
+            Array.isArray(s.pass?.files) &&
+            JSON.stringify([...s.pass.files].map(String).sort()) === wantedSet &&
+            String(s.model) === String(r.model) &&
+            String(s.verdict) === String(r.verdict) &&
+            String(s.mode) === String(r.mode) &&
+            String(r.evidence ?? '').endsWith(String(s.evidence ?? '').trim()) &&
+            /^CARRIED from [0-9a-f]{7} \(blobs verified identical\): /.test(String(r.evidence ?? '')),
+        )
+        return Boolean(source)
       } catch {
         return false
       }

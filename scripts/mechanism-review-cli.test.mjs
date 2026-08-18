@@ -474,22 +474,54 @@ describe('the mode round-trips into the ledger', () => {
       .stdout.trim()
       .split('\n')
       .find((f) => f && !changedSet.includes(f))
+    // The SOURCE READING the carried rows quote (third landing round, pass
+    // 5): blob identity alone let a hand-edited carried row INVENT its
+    // verdict — the stamp now also demands the original pass row whose
+    // fields the carry copied.
+    const source = {
+      sha: parent,
+      model: 'GPT-5.6 Sol',
+      verdict: 'merge-with-fixes',
+      evidence: 'read the pass whole and found one soft spot',
+      mode: 'review',
+      pass: { index: 1, total: 2, files: [unchangedFile] },
+      at: 1_787_000_000_000,
+    }
+    const carriedRow = (over = {}) => ({
+      sha: head,
+      model: source.model,
+      verdict: source.verdict,
+      evidence: `CARRIED from ${parent.slice(0, 7)} (blobs verified identical): ${source.evidence}`,
+      mode: source.mode,
+      carried: { from: parent },
+      pass: { index: 1, total: 2, files: [unchangedFile] },
+      ...over,
+    })
     const rows = [
-      { sha: head, carried: { from: parent }, pass: { index: 1, total: 2, files: [unchangedFile] } },
-      { sha: head, carried: { from: parent }, pass: { index: 1, total: 2, files: [changedFile] } },
-      { sha: head, carried: { from: 'not-a-sha' }, pass: { index: 1, total: 2, files: [unchangedFile] } },
-      { sha: head, carried: { from: parent }, pass: { index: 1, total: 2, files: [] } },
-      { sha: head, carried: { from: parent }, pass: { index: 1, total: 2, files: 'x' } },
+      carriedRow(),
+      carriedRow({ pass: { index: 1, total: 2, files: [changedFile] } }),
+      carriedRow({ carried: { from: 'not-a-sha' } }),
+      carriedRow({ pass: { index: 1, total: 2, files: [] } }),
+      carriedRow({ pass: { index: 1, total: 2, files: 'x' } }),
       { sha: head, verdict: 'merge' },
+      // An INVENTED verdict, blobs identical: must not stamp.
+      carriedRow({ verdict: 'merge' }),
+      // A fabricated evidence line, blobs identical: must not stamp.
+      carriedRow({ evidence: 'CARRIED from abcdef0 (blobs verified identical): something nobody wrote' }),
+      // No source row in the ledger at all: must not stamp.
+      carriedRow({ model: 'Fable 5' }),
     ]
-    verifyCarried(rows)
-    expect(rows[0].carriedVerified, `${unchangedFile} unchanged HEAD~1..HEAD`).toBe(true)
+    verifyCarried(rows, [source])
+    expect(rows[0].carriedVerified, `${unchangedFile} unchanged + source matches`).toBe(true)
     expect(rows[1].carriedVerified, `${changedFile} changed`).toBe(false)
     expect(rows[2].carriedVerified).toBe(false)
     expect(rows[3].carriedVerified).toBe(false)
     expect(rows[4].carriedVerified).toBe(false)
     // A row without a carry is left unstamped — it owes no verification.
     expect('carriedVerified' in rows[5]).toBe(false)
+    expect(rows[6].carriedVerified, 'invented verdict').toBe(false)
+    expect(rows[7].carriedVerified, 'fabricated evidence').toBe(false)
+    expect(rows[8].carriedVerified, 'no matching source').toBe(false)
   })
 
   it('refuses a non-hex --record sha by SHAPE, before git or any shell sees it (landing-round pass 4)', () => {

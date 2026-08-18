@@ -52,7 +52,7 @@ describe('decideReviewGap', () => {
   it('rules a GAP where even the split cannot carry the range, naming the files', () => {
     const d = decideReviewGap({
       measuredChars: REVIEW_GAP_BUDGET_CHARS * 3,
-      planner: { available: true, covers: false, uncoverable: ['docs/huge.md'] },
+      planner: { available: true, fits: false, covers: false, uncoverable: ['docs/huge.md'] },
     })
     expect(d.gap).toBe(true)
     expect(d.reason).toBe('split-cannot-cover')
@@ -71,6 +71,22 @@ describe('decideReviewGap', () => {
     ]) {
       const d = decideReviewGap(broken)
       expect(d.gap, JSON.stringify(broken)).toBe(false)
+      expect(d.reason).toBe('unmeasured')
+    }
+  })
+
+  it('a MALFORMED planner ruling blocks as unmeasured — never a waiver (third landing round)', () => {
+    // `{ available: true }` used to fall through to split-cannot-cover and
+    // SUSPEND a blocking verdict on planner data that ruled nothing.
+    for (const planner of [
+      { available: true },
+      { available: true, fits: 'no', covers: 'no', uncoverable: [] },
+      { available: true, fits: false, covers: false },
+      { available: true, fits: false, covers: false, uncoverable: 'docs/huge.md' },
+      { available: 1, fits: false, covers: false, uncoverable: [] },
+    ]) {
+      const d = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS * 3, planner })
+      expect(d.gap, JSON.stringify(planner)).toBe(false)
       expect(d.reason).toBe('unmeasured')
     }
   })
@@ -111,7 +127,7 @@ describe('formatReviewGap', () => {
   it('names the range, the measured size and the budget — the spec’s own three', () => {
     const decision = decideReviewGap({
       measuredChars: 3_014_107,
-      planner: { available: true, covers: false, uncoverable: ['docs/huge.md'] },
+      planner: { available: true, fits: false, covers: false, uncoverable: ['docs/huge.md'] },
     })
     const text = formatReviewGap({ baseline: base, head, decision })
     expect(text).toContain(`${base.slice(0, 12)}..${head.slice(0, 12)}`)
@@ -129,7 +145,7 @@ describe('formatReviewGap', () => {
   it('lists what even a split cannot carry', () => {
     const decision = decideReviewGap({
       measuredChars: REVIEW_GAP_BUDGET_CHARS * 5,
-      planner: { available: true, covers: false, uncoverable: ['docs/tasks-archive.md'] },
+      planner: { available: true, fits: false, covers: false, uncoverable: ['docs/tasks-archive.md'] },
     })
     const text = formatReviewGap({ baseline: base, head, decision })
     expect(text).toContain('docs/tasks-archive.md')
@@ -157,7 +173,7 @@ describe('guardOutcome — the junction where a do-not-merge could be waved thro
   it('a block on a range that measures over budget and uncoverable degrades to the report', () => {
     const gap = decideReviewGap({
       measuredChars: REVIEW_GAP_BUDGET_CHARS * 3,
-      planner: { available: true, covers: false, uncoverable: ['docs/huge.md'] },
+      planner: { available: true, fits: false, covers: false, uncoverable: ['docs/huge.md'] },
     })
     expect(guardOutcome({ blocked: true, gap }).action).toBe('report-gap')
   })
@@ -165,7 +181,7 @@ describe('guardOutcome — the junction where a do-not-merge could be waved thro
   it('the same range, once it fits again, blocks again — the gap suspends, never clears', () => {
     const over = decideReviewGap({
       measuredChars: REVIEW_GAP_BUDGET_CHARS * 3,
-      planner: { available: true, covers: false, uncoverable: ['docs/huge.md'] },
+      planner: { available: true, fits: false, covers: false, uncoverable: ['docs/huge.md'] },
     })
     const fits = decideReviewGap({
       measuredChars: REVIEW_GAP_BUDGET_CHARS - 1,
@@ -499,7 +515,7 @@ describe('formatCriticalityGap', () => {
   it('names each point, its record range and the resume rule', () => {
     const decision = decideReviewGap({
       measuredChars: 3_000_000,
-      planner: { available: true, covers: false, uncoverable: ['docs/huge.md'] },
+      planner: { available: true, fits: false, covers: false, uncoverable: ['docs/huge.md'] },
     })
     const text = formatCriticalityGap([{ point: 700, sha: 'e'.repeat(40), decision }])
     expect(text).toContain('point 700')
