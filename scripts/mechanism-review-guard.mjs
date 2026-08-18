@@ -58,8 +58,15 @@ export const BASELINE_PATH = repoPath('.claude/mechanism-review-baseline.json')
 const REC = '__C__'
 const FLD = '__F__'
 
-/** A header line, whole: sentinel, 40-hex sha, epoch, subject, trailers. */
-const HEADER_RE = new RegExp(`^${REC}([0-9a-f]{40})${FLD}(\\d+)${FLD}(.*)$`)
+/** A header line, whole: sentinel, 40-hex sha, epoch — and NOTHING FREE-TEXT
+ *  (escalation round, pass 2). The header used to carry the subject and the
+ *  trailers behind two more separators, and a legal SUBJECT containing the
+ *  separator shifted the real trailer field out of the destructuring — the
+ *  authoring model then read as empty or attacker-chosen, and the self-review
+ *  refusal could not bite. Machine-shaped fields cannot contain the separator;
+ *  the free-text facts travel per commit through their own single-format git
+ *  calls (see commitFacts), where there is no separator to forge. */
+const HEADER_RE = new RegExp(`^${REC}([0-9a-f]{40})${FLD}(\\d+)$`)
 
 const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
@@ -182,9 +189,13 @@ function scriptFiles() {
  *  - a header is a LINE matching the full header shape, never a `split(REC)`:
  *    the sentinel is a legal path substring, and the split cut such a commit's
  *    record in half. RESIDUAL, accepted: a committed path whose whole line
- *    mimics the header shape (sentinel + 40-hex sha + epoch + fields) would
- *    still be read as one — that shape names itself as adversarial, and git
- *    quotes any path that could smuggle a newline to fake a line of its own.
+ *    mimics the header shape (sentinel + 40-hex sha + epoch) would still be
+ *    read as one — that shape names itself as adversarial, and git quotes any
+ *    path that could smuggle a newline to fake a line of its own.
+ *
+ * The header carries NO free-text field — the subject and the trailers travel
+ * per commit through commitFacts (escalation round, pass 2) — so this parser
+ * returns { sha, at, files } and the wrapper adds who wrote it.
  *
  * git QUOTES a path with a tab, a quote or a high byte in it, and the quoted
  * form matches neither a mechanism path nor a pass record's file list — so
@@ -207,17 +218,7 @@ export function parseMechanismLog(out, files) {
     const header = HEADER_RE.exec(line)
     if (header) {
       finish()
-      const [subject = '', trailers = ''] = header[3].split(FLD)
-      current = {
-        sha: header[1],
-        at: Number(header[2]) * 1000 || 0,
-        subject: subject.trim(),
-        authorModel: modelFromTrailers(trailers),
-        // EVERY co-author, not only the first: a commit naming two models has
-        // two list authors, and neither may merge the union (point 634).
-        authorModels: modelsFromTrailers(trailers),
-        touched: [],
-      }
+      current = { sha: header[1], at: Number(header[2]) * 1000 || 0, touched: [] }
       continue
     }
     if (!current || !line) continue
@@ -227,12 +228,36 @@ export function parseMechanismLog(out, files) {
   return commits
 }
 
+/**
+ * The free-text facts of ONE commit — its subject and its co-author trailers —
+ * each through its own single-format `git show`, so no separator exists for a
+ * crafted subject to forge (escalation round, pass 2: the combined format's
+ * separator inside a legal subject shifted the trailers out of their field,
+ * and the self-review refusal read an empty author). Two calls per PENDING
+ * MECHANISM commit only — the common turn has none.
+ */
+function commitFacts(sha) {
+  return {
+    subject: git(`show -s --format=%s "${sha}"`),
+    trailers: git(`show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${sha}"`),
+  }
+}
+
 function mechanismCommits(base, head, files) {
   const out = gitRaw(
-    `log --format="${REC}%H${FLD}%ct${FLD}%s${FLD}%(trailers:key=Co-Authored-By,valueonly,separator=;)" ` +
-      `--name-only --diff-merges=cc --reverse "${base}..${head}"`,
+    `log --format="${REC}%H${FLD}%ct" --name-only --diff-merges=cc --reverse "${base}..${head}"`,
   )
-  return parseMechanismLog(out, files)
+  return parseMechanismLog(out, files).map((commit) => {
+    const facts = commitFacts(commit.sha)
+    return {
+      ...commit,
+      subject: facts.subject,
+      authorModel: modelFromTrailers(facts.trailers),
+      // EVERY co-author, not only the first: a commit naming two models has
+      // two list authors, and neither may merge the union (point 634).
+      authorModels: modelsFromTrailers(facts.trailers),
+    }
+  })
 }
 
 /**

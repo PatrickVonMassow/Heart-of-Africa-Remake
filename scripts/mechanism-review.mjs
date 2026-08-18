@@ -59,11 +59,6 @@ export { KNOWN_FLAGS }
 /** The tracked ledger of recorded mechanism reviews (JSON Lines). */
 export const RECORDS_PATH = repoPath('.claude/mechanism-reviews.jsonl')
 
-// Field separator for the one `git show` below. Plain ASCII on purpose: a
-// `%X%` pair in a cmd.exe command line is an environment-variable expansion
-// waiting to happen, and this runs on Windows (four-eyes review, 27.07.2026).
-const FLD = '__F__'
-
 const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
 /** Every recorded review. A malformed line is skipped, never fatal — the ledger
@@ -266,16 +261,20 @@ export function buildRecord({
   }
 }
 
-/** Resolve a (possibly short) sha to the commit, its subject and its author model. */
+/** Resolve a (possibly short) sha to the commit, its subject and its author model.
+ *
+ *  Each free-text fact through its OWN single-format `git show` (escalation
+ *  round, pass 2): a combined format needs a separator, and a legal SUBJECT
+ *  containing that separator shifted the trailers out of their field — the
+ *  authoring model then read wrong, and the self-review refusal missed. With
+ *  one format per call there is no separator to forge. */
 export function resolveCommit(sha) {
   const full = git(`rev-parse "${String(sha).trim()}^{commit}"`)
-  const line = git(
-    `show -s --format="%H${FLD}%s${FLD}%(trailers:key=Co-Authored-By,valueonly,separator=;)" ${full}`,
-  )
-  const [resolved, subject, trailers] = line.split(FLD)
+  const subject = git(`show -s --format=%s "${full}"`)
+  const trailers = git(`show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${full}"`)
   return {
-    sha: resolved || full,
-    subject: subject ?? '',
+    sha: full,
+    subject,
     authoredBy: modelFromTrailers(trailers),
     authors: modelsFromTrailers(trailers),
   }
