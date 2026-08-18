@@ -83,6 +83,7 @@ import {
   MATERIAL_BUDGET_CHARS,
   passByIndex,
   planPasses,
+  planShortfall,
   splitPatchByFile,
 } from './review-material-core.mjs'
 
@@ -195,6 +196,23 @@ function assemblePass(range, pass) {
     patchRoom: pass.patchRoom,
     patchOnly: pass.patchOnly,
   })
+}
+
+/**
+ * The pass plan for a range, or null when it could not be measured.
+ *
+ * For the paths that spend NO round and still print a record command for the
+ * whole range — the share switch at `claude-only`, and a range Sol authored. A
+ * measurement that fails is reported as a measurement that failed: `null` yields
+ * the `unplanned` refusal, never a silent "it fits".
+ */
+function measureRange(sha, base) {
+  try {
+    return planPasses({ ...gatherRange(sha, base), budget: MATERIAL_BUDGET_CHARS })
+  } catch (e) {
+    console.error(`review-sol: the range could not be measured against the budget: ${(e && e.message) || e}`)
+    return null
+  }
 }
 
 /**
@@ -546,7 +564,24 @@ if (isMainModule(import.meta.url)) {
         parsed: { ok: false },
         authorModel: authorsIn(full, base),
       })
-      console.log(formatReviewReport({ decision, sha: full, mode, point, partial: null }))
+      // THE FIT IS MEASURED ON THIS PATH TOO (cross-vendor review, second
+      // round). No round is spent here, but the record command printed for the
+      // hand-over covers the WHOLE range — and printing that template while
+      // nobody has measured whether the range is reviewable in one round is the
+      // assumption this point removes. The measurement costs git, not an
+      // allowance.
+      const handOverPlan = measureRange(full, base)
+      console.log(
+        formatReviewReport({
+          decision,
+          sha: full,
+          mode,
+          point,
+          partial: null,
+          shortfall: planShortfall(handOverPlan),
+          plan: handOverPlan,
+        }),
+      )
       process.exit(3)
     }
 
@@ -563,7 +598,20 @@ if (isMainModule(import.meta.url)) {
         parsed: { ok: false },
         authorModel: rangeAuthors,
       })
-      console.log(formatReviewReport({ decision, sha: full, mode, point, partial: null }))
+      // Same measurement, same reason: the role swap hands the WHOLE range on,
+      // and a range no single round can hold must be handed on as its passes.
+      const swapPlan = measureRange(full, base)
+      console.log(
+        formatReviewReport({
+          decision,
+          sha: full,
+          mode,
+          point,
+          partial: null,
+          shortfall: planShortfall(swapPlan),
+          plan: swapPlan,
+        }),
+      )
       process.exit(3)
     }
 

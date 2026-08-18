@@ -366,6 +366,52 @@ describe('the record the command prints', () => {
     expect(report).toContain('merge')
   })
 
+  // TWO REASONS ARE NOT ONE (cross-vendor review, second round): the narrowed
+  // range returned before the short-fall, so a round that ALSO overflowed named
+  // none of the files nobody read.
+  it('names the lost files even when the range was narrowed as well', () => {
+    const report = formatReviewReport({
+      decision: decideReview(okRun()),
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      partial: { reviewedBase: 'b'.repeat(40), coverageBase: 'c'.repeat(40) },
+      shortfall: {
+        reason: 'over-budget',
+        truncated: ['scripts/lost.mjs'],
+        omitted: [],
+        budget: 200_000,
+        size: 200_000,
+        rawSize: 900_000,
+      },
+    })
+    expect(report).toContain('scripts/lost.mjs')
+    expect(report).not.toContain('mechanism-review.mjs --record')
+  })
+
+  // The hand-over paths print the record command without spending a round, so a
+  // short-fall there must still say WHOSE review it is waiting for.
+  it('keeps naming the reviewer when a hand-over is refused a record', () => {
+    const swap = formatReviewReport({
+      decision: decideReview({ outcome: { ok: false, kind: 'self-review', cause: 'Sol authored it' }, parsed: {}, authorModel: ['GPT-5.6 Sol'] }),
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      shortfall: { reason: 'needs-passes', passes: [{ index: 1, files: ['x.mjs'] }], budget: 10, rawSize: 99, truncated: [], omitted: [] },
+    })
+    expect(swap).toContain('ROLE SWAP')
+    expect(swap).toContain('Opus 5')
+    expect(swap).toContain('does not fit ONE review round')
+    expect(swap).not.toContain('mechanism-review.mjs --record')
+
+    const down = formatReviewReport({
+      decision: decideReview({ outcome: { ok: false, kind: 'unreachable', cause: 'the host could not be reached' }, parsed: {} }),
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      shortfall: { reason: 'unplanned', detail: 'never measured', truncated: [], omitted: [], budget: 1, size: 0, rawSize: 0 },
+    })
+    expect(down).toContain(FALLBACK_MODEL_NAME)
+    expect(down).toContain('unknown fit refuses')
+  })
+
   it('carries the pass a verdict covers, so a composition can be recorded', () => {
     const report = formatReviewReport({
       decision: decideReview(okRun()),

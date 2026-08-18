@@ -661,6 +661,11 @@ export function formatReviewReport({
       `  NO RECORD COMMAND IS PRINTED. A record at ${String(sha).slice(0, 7)} clears every commit it contains,`,
       `  back to ${short(partial.coverageBase)}, and this review only saw back to ${short(partial.reviewedBase)}.`,
       '  Re-run without --since to review the whole range, then record that.',
+      // TWO REASONS ARE NOT ONE (cross-vendor review, second round): a narrowed
+      // range whose round ALSO overflowed used to report only the narrowing, and
+      // the files nobody read went unnamed — while the point demands each one be
+      // named in the refusal, whatever else is wrong with the round.
+      ...(shortfall ? ['', '  And it did not carry even that much:', formatShortfall(shortfall, { sha, plan })] : []),
     ].join('\n')
   }
   // A RECORD IS NEVER PRINTED FOR MATERIAL THE ROUND DID NOT CARRY (point 714).
@@ -670,9 +675,19 @@ export function formatReviewReport({
   // verdict is still reported, because the reviewer's findings are worth having;
   // the ready-to-run command is not.
   if (shortfall) {
-    const said = decision.fellBack
-      ? `${SOL_MODEL_NAME} did not review it: ${decision.cause}`
-      : `${SOL_MODEL_NAME} answered ${decision.verdict} on ${String(sha).slice(0, 7)}\n  ${decision.evidence}`
+    // THE HAND-OVER STILL HAS TO NAME ITS READER. A short-fall on a path that
+    // never ran Sol at all — the share switch, or a range Sol authored — is
+    // still a review somebody must do, and a refusal that dropped the reviewer's
+    // name left the caller with no idea whose review it was waiting for.
+    const who = decision.model
+    const handOver = who
+      ? `  The review is ${who}'s, and it is NOT done.`
+      : '  No model of the chain may review this range — every one of them authored part of it.'
+    const said = !decision.fellBack
+      ? `${SOL_MODEL_NAME} answered ${decision.verdict} on ${String(sha).slice(0, 7)}\n  ${decision.evidence}`
+      : decision.kind === OUTCOME.SELF_REVIEW
+        ? `ROLE SWAP — ${SOL_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.\n${handOver}`
+        : `${SOL_MODEL_NAME} did not review it: ${decision.cause}.\n${handOver}`
     return [`review-sol: ${said}`, '', formatShortfall(shortfall, { sha, plan })].join('\n')
   }
   const cmd = formatRecordCommand({

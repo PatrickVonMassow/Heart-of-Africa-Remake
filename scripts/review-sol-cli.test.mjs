@@ -83,6 +83,7 @@ let solSha = ''
 let orphanSha = ''
 let bulkSha = ''
 let oddSha = ''
+let bulkSolSha = ''
 /** A name git prints QUOTED, because it is not plain ASCII. */
 const ODD_NAME = 'ümlaut.txt'
 /** An EMPTY git template: a host `init.templateDir` must not seed the fixture. */
@@ -297,6 +298,17 @@ beforeAll(() => {
   // a modification and its current content must travel with the patch.
   git('checkout', '-q', '-b', 'odd-name', 'main')
   oddSha = commit(ODD_NAME, 'the odd-named file, revised in this range\n', 'Revise the odd-named file', 'Opus 5')
+
+  // …and the same bulk, authored by SOL: the role swap hands the whole range to
+  // a Claude reviewer, and a range no round can hold must be handed on as passes
+  // rather than as a whole-range record template (cross-vendor review, second
+  // round).
+  git('checkout', '-q', '-b', 'bulk-sol', 'main')
+  writeFileSync(join(repo, 'bulk-c.txt'), `${'c'.repeat(120_000)}\n`)
+  writeFileSync(join(repo, 'bulk-d.txt'), `${'d'.repeat(120_000)}\n`)
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', 'Add two more files no round can hold\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
+  bulkSolSha = git('rev-parse', 'HEAD')
 
   // A history sharing no ancestor with the rest: the third form of "not a proper
   // ancestor", which merge-base answers with nothing at all.
@@ -677,6 +689,48 @@ describe('a range too large for one round', () => {
       .join(',')
       .split(',')
     expect([...files].sort()).toEqual(['bulk-a.txt', 'bulk-b.txt'])
+  })
+
+  // THE HAND-OVER PATHS SPEND NO ROUND AND STILL OFFER A RECORD (cross-vendor
+  // review, second round): both printed a whole-range template while nobody had
+  // measured whether the range is reviewable in one round at all.
+  it('offers no whole-range record when SOL authored a range too large, and names the passes', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', bulkSolSha, '--brief', 'judge the bulk Sol range'])
+    expect(r.status, r.stderr).toBe(3)
+    expect(r.stdout).toMatch(/ROLE SWAP/)
+    // The reviewer is still named — a refusal that drops it leaves nobody owning
+    // the review.
+    expect(r.stdout).toContain('Opus 5')
+    expect(r.stdout).toContain('does not fit ONE review round')
+    expect(r.stdout).toContain('--pass 1')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(calls()).toEqual([])
+  })
+
+  it('offers no whole-range record at claude-only either, while the range does not fit', () => {
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'], { SOL_SHARE_FILE: shareFile })
+    expect(r.status).toBe(3)
+    expect(r.stdout).toMatch(/claude-only/)
+    expect(r.stdout).toContain('does not fit ONE review round')
+    expect(r.stdout).toContain('bulk-a.txt')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(calls()).toEqual([])
+    rmSync(shareFile, { force: true })
+  })
+
+  it('still hands over a record command where the range DOES fit', () => {
+    // The refusal is about the material, not about the hand-over: a small range
+    // must keep its ready-to-run template.
+    const shareFile = join(dir, 'sol-share.json')
+    writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
+    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'], { SOL_SHARE_FILE: shareFile })
+    expect(r.status).toBe(3)
+    expect(recordCommandIn(r.stdout)).toContain('--verdict <merge|')
+    rmSync(shareFile, { force: true })
   })
 
   it('refuses a pass number this range does not have', () => {

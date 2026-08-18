@@ -11,6 +11,7 @@ import {
   passByIndex,
   passComposition,
   planPasses,
+  planShortfall,
   sentMaterialMatches,
   splitPatchByFile,
   unquoteGitPath,
@@ -395,6 +396,69 @@ describe('the refusal a short-fall prints', () => {
   it('says plainly when the sent text is not the assembled one', () => {
     const text = formatShortfall({ reason: 'sent-differs', detail: 'what was sent is 3 characters' })
     expect(text).toContain('not what was assembled')
+  })
+
+  // EVERY BRANCH NAMES THE LOST FILES (cross-vendor review, second round): the
+  // two "cannot tell" reasons returned before the list, so the refusal that knew
+  // which files were dropped printed none of them.
+  it('names the lost files even where it cannot vouch for the round', () => {
+    const account = { truncated: ['scripts/a.mjs'], omitted: ['scripts/b.mjs'], budget: 200, size: 400, rawSize: 900 }
+    const unverified = formatShortfall({ reason: 'unverified', detail: 'nothing said', ...account })
+    expect(unverified).toContain('TRUNCATED: scripts/a.mjs')
+    expect(unverified).toContain('OMITTED ENTIRELY: scripts/b.mjs')
+    expect(unverified).toContain('over the ceiling')
+    const differs = formatShortfall({ reason: 'sent-differs', detail: 'sizes differ', ...account })
+    expect(differs).toContain('TRUNCATED: scripts/a.mjs')
+    expect(differs).toContain('OMITTED ENTIRELY: scripts/b.mjs')
+  })
+
+  it('stays quiet about losses where the accounting recorded none', () => {
+    const text = formatShortfall({ reason: 'unverified', detail: 'no assembly accounting was produced' })
+    expect(text).not.toContain('TRUNCATED')
+    expect(text).not.toContain('What the accounting saw')
+  })
+})
+
+// A RECORD IS REFUSED BEFORE A ROUND IS EVER SPENT, too: the hand-over paths
+// print a whole-range template without assembling anything, and an unmeasured
+// range is an unknown fit (cross-vendor review, second round).
+describe('the refusal a PLAN alone produces', () => {
+  const oversized = () =>
+    planPasses({
+      stat: 's',
+      patch: patchFor(['a.mjs', 'b.mjs']),
+      files: [file('a.mjs', 8000), file('b.mjs', 8000)],
+      budget: 10_000,
+    })
+
+  it('is null while the range fits one round', () => {
+    expect(planShortfall(planPasses({ stat: 's', patch: patchFor(['a.mjs']), files: [file('a.mjs', 10)], budget: 10_000 }))).toBeNull()
+  })
+
+  it('refuses an unmeasured range rather than assuming it fits', () => {
+    for (const nothing of [null, undefined, {}, { fits: 'maybe' }]) {
+      const short = planShortfall(nothing)
+      expect(short?.reason).toBe('unplanned')
+      expect(formatShortfall(short, { sha: 'abcdef1' })).toContain('unknown fit refuses')
+    }
+  })
+
+  it('names the passes the hand-over must be split into', () => {
+    const short = planShortfall(oversized())
+    expect(short.reason).toBe('needs-passes')
+    const text = formatShortfall(short, { sha: 'abcdef1' })
+    expect(text).toContain('does not fit ONE review round')
+    expect(text).toContain('--pass 1')
+    expect(text).toContain('a.mjs')
+    expect(text).not.toContain('mechanism-review.mjs --record')
+  })
+
+  it('names what NO pass can hold, so no record claims to have read it', () => {
+    const huge = ['diff --git a/x.md b/x.md', `+${'y'.repeat(30_000)}`].join('\n')
+    const plan = planPasses({ stat: 's', patch: `${huge}\n${patchFor(['a.mjs'])}`, files: [file('a.mjs', 100)], budget: 5000 })
+    const text = formatShortfall(planShortfall(plan), { sha: 'abcdef1' })
+    expect(text).toContain('BEYOND REACH')
+    expect(text).toContain('x.md')
   })
 
   it('lists the passes to run instead, when a plan is at hand', () => {

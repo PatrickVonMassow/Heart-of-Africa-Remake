@@ -486,28 +486,46 @@ export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/rev
   return lines.join('\n')
 }
 
-/** The refusal a short-fall produces: what was lost, and what to do instead. */
-export function formatShortfall(shortfall, { sha = '', plan = null } = {}) {
-  const at = String(sha).slice(0, 7) || '<sha>'
-  const lines = [`  NO RECORD COMMAND IS PRINTED for ${at}: this round did not carry the whole range.`]
-  if (shortfall.reason === 'unverified') {
-    lines.push(
-      `  The tool cannot tell whether the material fitted (${shortfall.detail}), and a round whose`,
-      '  coverage is unknown is recorded as covering nothing. That is the fail-open direction:',
-      '  a missing answer must never read as "everything was seen".',
-    )
-    return lines.join('\n')
+/**
+ * The reason a WHOLE-RANGE record may not be offered for a range NOBODY has
+ * reviewed yet, or null — the same question as materialShortfall, asked one step
+ * earlier, from the plan alone.
+ *
+ * It exists for the paths that print a record command without ever assembling
+ * anything (cross-vendor review, second round): the share switch at `claude-only`
+ * and a range Sol authored both hand the review to a Claude model and print the
+ * template it must record — for the WHOLE range, whose fit nobody had measured.
+ * The point's rule is the same wherever it is asked: an unknown fit refuses.
+ */
+export function planShortfall(plan = null) {
+  if (!plan || typeof plan.fits !== 'boolean' || !Array.isArray(plan.passes)) {
+    return {
+      reason: 'unplanned',
+      detail: 'the range was never measured against the budget',
+      truncated: [],
+      omitted: [],
+      budget: MATERIAL_BUDGET_CHARS,
+      size: 0,
+      rawSize: 0,
+    }
   }
-  if (shortfall.reason === 'sent-differs') {
-    lines.push(
-      `  What was SENT is not what was assembled (${shortfall.detail}), so the accounting below`,
-      '  describes a different text than the reviewer read. Nothing about this round can be recorded.',
-    )
-    return lines.join('\n')
+  if (plan.fits) return null
+  return {
+    reason: 'needs-passes',
+    detail: '',
+    truncated: [],
+    omitted: [],
+    passes: plan.passes,
+    uncoverable: plan.uncoverable ?? [],
+    budget: plan.budget,
+    size: 0,
+    rawSize: plan.rawSize,
   }
-  lines.push(
-    `  The material budget is ${shortfall.budget} characters and the complete material is ${shortfall.rawSize}.`,
-  )
+}
+
+/** Every file this round lost, one line each — the half no branch may skip. */
+function lostLines(shortfall) {
+  const lines = []
   // A ROUND CAN BE OVER ITS CEILING WITH NOTHING ON THE LOSS LIST: the frames
   // around the parts are charged to no file, so the size is named in its own
   // right rather than left to be inferred from an empty list.
@@ -518,17 +536,79 @@ export function formatShortfall(shortfall, { sha = '', plan = null } = {}) {
   }
   if (shortfall.statTruncated) lines.push('  · the DIFFSTAT was cut')
   if (shortfall.patchTruncated) lines.push('  · the PATCH was cut — the reviewer saw part of the diff')
-  for (const path of shortfall.truncated) lines.push(`  · TRUNCATED: ${path}`)
-  for (const path of shortfall.omitted) lines.push(`  · OMITTED ENTIRELY: ${path}`)
+  for (const path of shortfall.truncated ?? []) lines.push(`  · TRUNCATED: ${path}`)
+  for (const path of shortfall.omitted ?? []) lines.push(`  · OMITTED ENTIRELY: ${path}`)
+  return lines
+}
+
+/** The passes the caller is sent to instead, from the plan or from the shortfall. */
+function passLines(shortfall, plan) {
+  const passes = plan && !plan.fits ? plan.passes : (shortfall.passes ?? [])
+  const lines = passes.map((pass) => `    --pass ${pass.index}   ${(pass.files ?? []).join(', ')}`)
+  const beyond = plan && !plan.fits ? plan.uncoverable : (shortfall.uncoverable ?? [])
+  if (beyond?.length) {
+    lines.push(
+      '  BEYOND REACH — no pass can hold these, not even their diff alone, so no record may',
+      '  name them at all:',
+      ...beyond.map((u) => `    ${u.path} (diff ${u.patchChars}, content ${u.contentChars} characters)`),
+    )
+  }
+  return lines
+}
+
+/** The refusal a short-fall produces: what was lost, and what to do instead. */
+export function formatShortfall(shortfall, { sha = '', plan = null } = {}) {
+  const at = String(sha).slice(0, 7) || '<sha>'
+  const lines = [`  NO RECORD COMMAND IS PRINTED for ${at}: this round did not carry the whole range.`]
+  // EVERY BRANCH NAMES WHAT WAS LOST (cross-vendor review, second round). The
+  // two "cannot tell" reasons used to return before the file list, so the
+  // refusal that had the names printed none of them — and the point demands
+  // every truncated or omitted file be named in the refusal.
+  if (shortfall.reason === 'unverified') {
+    lines.push(
+      `  The tool cannot tell whether the material fitted (${shortfall.detail}), and a round whose`,
+      '  coverage is unknown is recorded as covering nothing. That is the fail-open direction:',
+      '  a missing answer must never read as "everything was seen".',
+      ...(lostLines(shortfall).length
+        ? ['  What the accounting saw of the round it cannot vouch for:', ...lostLines(shortfall)]
+        : []),
+    )
+    return lines.join('\n')
+  }
+  if (shortfall.reason === 'sent-differs') {
+    lines.push(
+      `  What was SENT is not what was assembled (${shortfall.detail}), so the accounting below`,
+      '  describes a different text than the reviewer read. Nothing about this round can be recorded.',
+      ...(lostLines(shortfall).length
+        ? ['  What the assembly it describes had already lost:', ...lostLines(shortfall)]
+        : []),
+    )
+    return lines.join('\n')
+  }
+  if (shortfall.reason === 'unplanned') {
+    lines.push(
+      `  The tool cannot tell whether this range fits one round (${shortfall.detail}), so it offers`,
+      '  no record for it: an unknown fit refuses rather than assumes.',
+    )
+    return lines.join('\n')
+  }
+  if (shortfall.reason === 'needs-passes') {
+    lines[0] = `  NO RECORD COMMAND IS PRINTED for ${at}: this range does not fit ONE review round.`
+    lines.push(
+      `  The material budget is ${shortfall.budget} characters and the complete material is ${shortfall.rawSize}.`,
+      `  A record here would clear every commit in the range. Review it in the ${(shortfall.passes ?? []).length}`,
+      '  PASSES over the file set instead — each pass records what it actually read:',
+      ...passLines(shortfall, plan),
+    )
+    return lines.join('\n')
+  }
   lines.push(
+    `  The material budget is ${shortfall.budget} characters and the complete material is ${shortfall.rawSize}.`,
+    ...lostLines(shortfall),
     '  A record here would clear every commit in the range, including these files. Review the',
     '  range in PASSES over the file set instead — each pass records what it actually read:',
+    ...passLines(shortfall, plan),
   )
-  if (plan && !plan.fits) {
-    for (const pass of plan.passes) {
-      lines.push(`    --pass ${pass.index}   ${pass.files.join(', ')}`)
-    }
-  }
   return lines.join('\n')
 }
 
