@@ -118,6 +118,21 @@ put it is the mistake this line exists to stop.
     LAND it, or PARK it explicitly. A parked branch is recorded with a reason and drops out of the
     count — `feat/336-croc-staging` at 13 days and 1679 commits behind is exactly that case, and
     today it is indistinguishable from live work.
+  - A SLOT IS ALSO NOT FREE WHILE ITS WORKTREE STILL HAS AN OCCUPANT. The commissioning check asks
+    the queue and the branch, never whether the target tree is already being worked, and on
+    18.08.2026 that let a session spawn a SECOND agent into a worktree whose agent had OUTLIVED its
+    dead parent session and was four commits along. The second agent recognised the peer itself and
+    stood down before its first write, so nothing was lost — but by its own judgment, not by any
+    mechanism. A declaration naming a DEAD author is no evidence the WORK is dead: the process
+    outlives its parent. Opening work on an existing worktree is therefore refused while that tree's
+    HEAD or its working files have moved since the brief was cut, and the refusal names the commits
+    and the times it measured.
+  - EVERY REFUSAL NAMES THE REMEDY THAT ACTUALLY LIFTS IT, and no other. The user-gated refusal must
+    not print the override command: an override recorded for a gated point is deliberately not
+    honoured, so following that printed remedy records a reason the decision then ignores and the
+    guard denies again — the block-loop class that cost ~30 turns on 24.07.2026. The slot refusal
+    names land-or-park, the queue refusal names the recorded override, and the gated refusal names
+    the user's word (its AWAITING-USER line).
   - BOTH REFUSALS STAND DOWN where every guard here does: a session that does not own the batch lock
     (`heldByOtherLiveOwner`) and a paused batch (`.claude/batch-paused`), so they never fire on a
     subagent or a paused run. Fail-open on their own error, like the rest of the chain.
@@ -137,7 +152,10 @@ put it is the mistake this line exists to stop.
   refused and the refusal names 700/701/707; a front candidate is accepted; a gated or in-flight
   point is skipped when the front three are chosen; an override with a recorded reason is accepted
   and the reason is reported back; nine open branches refuse a new point while two do not; a parked
-  branch does not count; a non-owner session and a paused batch are waved through unchanged.
+  branch does not count; a non-owner session and a paused batch are waved through unchanged. Plus:
+  a worktree whose HEAD or working files postdate the brief refuses a second occupant and names what
+  it measured, while a quiet one is accepted; and each refusal's text carries its own remedy, the
+  gated one naming the user's word rather than the override.
   Both files are guard-side decision cores, so the other model's recorded review is required before
   the merge (`mechanism-review-guard`).
   Criticality: HIGH for the batch's usefulness — it is the mechanism that makes the user's stated
