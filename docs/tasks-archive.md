@@ -18801,3 +18801,89 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: HIGH — it is a guard, so `mechanism-review-guard` demands the other
   model's recorded review, and its failure mode is the user acting on a question that
   was settled hours ago.
+
+- [x] 712. The queue binds the board and not the picker, and a finished agent's branch frees
+  its slot (user 17.08.2026, 19:41: »Warum holst du dir mit der 697 wieder einen neuen (nicht
+  sonderlich wichtigen) Task, anstatt erstmal die offenen Branches zu erledigen? … Nur die Tasks zur
+  Reduktion vom Token-Verbrauch sind aktuell noch höher priorisiert.«; 19:47: »Erstelle einen Punkt,
+  der das als Mechanismus erzwingt.«). The priority has now been stated three times over three weeks
+  and keeps slipping — the signature of a rule living only in prose. Point 590 recorded the same class
+  once already ("a declared priority that only the reader can see is not a priority"), after twelve
+  user-first points sat at queue position 60; the ORDER was single-sourced afterwards, the SELECTION
+  never was. MEASURED the same evening, both halves:
+  (a) THE PICK ANSWERS TO NOTHING. Point 697 (a tier-3 polish defect) was commissioned while the
+      sequence the work order derives read `700 701 707 708 711 705 706 710 662 553 596 597 686 687
+      688 689 690 691 692 659 …` — 697 sits far behind every one of them. `queue-order-guard` judges
+      the completeness of a ranking, the board's agreement with it and honest card claims — never
+      whether the point being WORKED is at the front. The one artefact that knows the priority is the
+      one the picker never consults, and the failure is silent: no guard fired.
+  (b) A SLOT FREES ITSELF, THE BRANCH STAYS. The pool cap of 3 (CLAUDE.md §6) counts CONCURRENT
+      AGENTS, so an agent that finishes returns its slot and leaves its branch standing; branches then
+      accumulate unbounded. Nine stood open on 17.08.2026: 336-croc-staging (13 d, 1679 commits behind
+      `main`), 686-five-word-lexicon (4 d, 81 behind), 687-bank-game (3 d, 81 behind),
+      687-roam-bound-fixes (9 h), 581 (10 h), 595-598 (8 h), 703 (4 h), 700, 711. The two OLDEST are
+      686 and 687 — the communication mechanic, the feature this release exists for. Built work that
+      never lands delivers nothing and costs more to merge every day it ages against a moving `main`.
+  NO NEW LIST IS DECLARED, deliberately: this project's named failure is a second place for one fact,
+  and the work order's header says so. The tiers the user names ARE the sequence of blocks in this
+  file; re-ranking already means moving a block (point 590). No tier field, no bundle-to-tier table,
+  no ordering prose — this point makes the existing sequence BIND.
+  FINAL STATE:
+  - COMMISSIONING A POINT IS CHECKED AGAINST THE FRONT OF THE QUEUE. Opening work on point N —
+    spawning its agent, creating its worktree, creating a `feat/<N>-…` branch — is refused when N is
+    not among the front-most WORKABLE candidates of `queueOrder`: the first three open points that
+    are neither user-gated nor already in flight, matching the pool cap. The refusal NAMES the
+    candidates it expected and N's actual position. It is overridable by a RECORDED one-line reason
+    (a red on `main` that masks other suites is a real one), never by silence — the reason is stored
+    with the point and printed by the reporting command, so an override is visible afterwards rather
+    than only at the moment it is taken.
+  - A SLOT IS NOT FREE UNTIL ITS BRANCH IS GONE. The pool cap counts OPEN `feat/*` BRANCHES, not
+    running agents. While three or more stand open, opening a further point is refused, and the
+    refusal lists them oldest first with each one's age and behind-count and names the two ways out:
+    LAND it, or PARK it explicitly. A parked branch is recorded with a reason and drops out of the
+    count — `feat/336-croc-staging` at 13 days and 1679 commits behind is exactly that case, and
+    today it is indistinguishable from live work.
+  - A SLOT IS ALSO NOT FREE WHILE ITS WORKTREE STILL HAS AN OCCUPANT. The commissioning check asks
+    the queue and the branch, never whether the target tree is already being worked, and on
+    18.08.2026 that let a session spawn a SECOND agent into a worktree whose agent had OUTLIVED its
+    dead parent session and was four commits along. The second agent recognised the peer itself and
+    stood down before its first write, so nothing was lost — but by its own judgment, not by any
+    mechanism. A declaration naming a DEAD author is no evidence the WORK is dead: the process
+    outlives its parent. Opening work on an existing worktree is therefore refused while that tree's
+    HEAD or its working files have moved since the brief was cut, and the refusal names the commits
+    and the times it measured.
+  - EVERY REFUSAL NAMES THE REMEDY THAT ACTUALLY LIFTS IT, and no other. The user-gated refusal must
+    not print the override command: an override recorded for a gated point is deliberately not
+    honoured, so following that printed remedy records a reason the decision then ignores and the
+    guard denies again — the block-loop class that cost ~30 turns on 24.07.2026. The slot refusal
+    names land-or-park, the queue refusal names the recorded override, and the gated refusal names
+    the user's word (its AWAITING-USER line).
+  - BOTH REFUSALS STAND DOWN where every guard here does: a session that does not own the batch lock
+    (`heldByOtherLiveOwner`) and a paused batch (`.claude/batch-paused`), so they never fire on a
+    subagent or a paused run. Fail-open on their own error, like the rest of the chain.
+  - The decision logic is PURE and lives in one core beside the ranking it reads
+    (`scripts/board-queue-core.mjs` owns `queueOrder`; the branch/slot judgment belongs with
+    `scripts/batch-in-flight-core.mjs`, which holds the free-slot judgment today). The wrappers stay
+    thin I/O. Point 707 carries both refusals into the preflight report; it does not decide them.
+  CONSTRAINTS: no second list, and do NOT rebuild what 608 delivered — the board already renders the
+  derived sequence, the `order` array is gone, and `queueOrderDrift` already blocks a published
+  sequence that differs. The pool cap stays 3 and stays a TARGET as well as a cap (CLAUDE.md §6,
+  `--slots-free`): this point changes what occupies a slot, not how many there are. The override
+  must remain possible; what is forbidden is taking it silently.
+  USER GATE, deliberately left open: the spec introduces no tier FIELD. If the user wants the three
+  tiers named as data rather than left implicit in the block order, that is a different point and
+  needs his word first.
+  VERIFIABLE: pure Vitest — the real 17.08.2026 state (697 commissioned against that queue) is
+  refused and the refusal names 700/701/707; a front candidate is accepted; a gated or in-flight
+  point is skipped when the front three are chosen; an override with a recorded reason is accepted
+  and the reason is reported back; nine open branches refuse a new point while two do not; a parked
+  branch does not count; a non-owner session and a paused batch are waved through unchanged. Plus:
+  a worktree whose HEAD or working files postdate the brief refuses a second occupant and names what
+  it measured, while a quiet one is accepted; and each refusal's text carries its own remedy, the
+  gated one naming the user's word rather than the override.
+  Both files are guard-side decision cores, so the other model's recorded review is required before
+  the merge (`mechanism-review-guard`).
+  Criticality: HIGH for the batch's usefulness — it is the mechanism that makes the user's stated
+  priority actually govern what gets built, and the one that stops built work from rotting unlanded.
+  No player-visible behaviour.
+  Bundle: Session- & Repo-Hygiene.
