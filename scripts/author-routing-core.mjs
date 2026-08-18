@@ -1,4 +1,4 @@
-// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@8b2f41d7
+// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@d7e58641
 //
 // The user pays two vendors, and authoring is the largest single item of the
 // spend, so it is split across both rather than sitting on one. It does NOT all
@@ -9,16 +9,19 @@
 // (cross-vendor audit 17.08.2026 — the header used to argue from one day's
 // quota reading, which then outlived it).
 //
-//   sol    GPT-5.6 Sol authors the MECHANICAL and MID-DIFFICULTY points, and
-//          Claude then reviews, runs the suites, judges the picture and lands.
-//   opus   Opus 5 keeps the HARD cases — difficult, complex, error-prone — as
-//          well as what only the main lane can honestly finish: a point whose
-//          VERIFICATION is the work (a picture judged on both backends is the
-//          main session's job, so authoring it elsewhere buys nothing).
-//   fable  Fable 5 takes ONE case and no longer the hard ones by default (user
-//          17.08.2026): work Opus authored that Sol still rejects after a
-//          re-work. Its weekly pool is the scarcest of the three, and routing
-//          every hard case there spent it on points Opus finishes itself.
+//   sol    GPT-5.6 Sol authors the points, and Claude then reviews, runs the
+//          suites, judges the picture and lands. Since 18.08.2026 that includes
+//          the HARD and CRITICAL ones — difficult, complex, error-prone or
+//          tagged HIGH criticality goes STRAIGHT here, where it used to be held
+//          back for Opus.
+//   opus   Opus 5 keeps what only the main lane can honestly finish: a point
+//          whose VERIFICATION is the work (a picture judged on both backends is
+//          the main session's job, so authoring it elsewhere buys nothing) —
+//          and only while nothing marks that point hard, because the user's
+//          18.08. ruling outranks this lane, not the other way round.
+//   fable  Fable 5 takes ONE case (user 17.08.2026): work whose re-work the
+//          review still finds problems in. Its weekly pool is the scarcest of
+//          the three, so nothing else is routed there.
 //
 // WHY A FUNCTION RATHER THAN A JUDGMENT CALL: the point says the cut is named,
 // not guessed. A dispatcher's taste is not reviewable and drifts with whoever
@@ -44,11 +47,14 @@ export const LANE_MODEL = Object.freeze({
  * The words CLAUDE.md §6 itself uses for the hard cases, plus the classic
  * error-prone subjects, which a spec names when it is one.
  *
- * Deliberately SHORT. Every word here diverts work away from the lane this point
- * exists to fill, so a term that merely sounds weighty ("careful", "important")
- * is not on the list: it would empty the Sol lane one plausible adjective at a
- * time. What IS here is either the policy's own wording or a subject where a
- * wrong answer is silent — a race, a lock, a migration of state that exists.
+ * Deliberately SHORT, and it stayed short when the lane it feeds REVERSED (user
+ * 18.08.2026). A hit no longer holds work back for Opus; it now OVERRIDES the
+ * verification lane below, which is the one thing that still costs something to
+ * get wrong. So a term that merely sounds weighty ("careful", "important") is
+ * still not on the list: it would pull picture points out of the main session
+ * one plausible adjective at a time. What IS here is either the policy's own
+ * wording or a subject where a wrong answer is silent — a race, a lock, a
+ * migration of state that exists.
  */
 export const HARD_MARKERS = Object.freeze([
   /\bdifficult\b/i,
@@ -184,7 +190,7 @@ function hits(markers, text) {
  * Inputs — all optional, because a caller rarely has all of them:
  *   body         the point's text out of the work order
  *   criticality  its tag, as `criticalityOf` reads it ('low' | 'med' | 'high')
- *   reworked     has Sol already found problems in a re-work of this point?
+ *   reworked     did the review still find problems in a re-work of this point?
  *                (CLAUDE.md §6: such work MOVES to Fable)
  *   override     a lane the caller insists on, beating even the tag
  *
@@ -209,13 +215,19 @@ export function authorLaneFor({ body = '', criticality = null, reworked = false,
   // stood BELOW the tag until the cross-vendor review of point 667 (P1) read the
   // order against the sentence claiming it, and `Author lane: sol` plus a failed
   // re-work therefore stayed with Sol.
-  if (reworked) return decide('fable', 'Sol still found problems after a re-work — §6 moves such work to Fable')
+  if (reworked) return decide('fable', 'the review still found problems after a re-work — §6 moves such work to Fable')
   if (tag) return decide(tag, `the point itself carries \`Author lane: ${tag}\``)
-  // A HARD CASE STAYS IN THE OPUS LANE (user 17.08.2026). It used to go to Fable
-  // from the start, which spent the scarcest weekly pool on work the main lane
-  // finishes itself; Fable is now the ESCALATION, reached by the branch above.
-  if (criticality === 'high') return decide('opus', 'the point is tagged HIGH criticality — a hard case, and hard cases stay with Opus')
-  if (hard.length) return decide('opus', `the spec names it a hard case (${hard.join(', ')}) — hard cases stay with Opus`)
+  // A HARD OR CRITICAL POINT GOES STRAIGHT TO SOL (user 18.08.2026). It used to
+  // be held back for Opus — and before that routed to Fable — and it now takes
+  // the direct route, ABOVE the verification lane: the user was asked which of
+  // the two wins and answered that these go to Sol as well. The picture is still
+  // judged here whoever authored it, so only the AUTHORING moves.
+  if (criticality === 'high') {
+    return decide('sol', 'the point is tagged HIGH criticality — hard and critical work goes straight to Sol')
+  }
+  if (hard.length) {
+    return decide('sol', `the spec names it a hard case (${hard.join(', ')}) — hard cases go straight to Sol`)
+  }
   if (verification.length) {
     return decide('opus', `its VERIFICATION is the work (${verification.join(', ')}) — the main session judges that anyway`)
   }

@@ -1,4 +1,4 @@
-// THE OPENAI AUTHORING LANE, decided (point 667). Pure half. rule:model-policy@8b2f41d7
+// THE OPENAI AUTHORING LANE, decided (point 667). Pure half. rule:model-policy@d7e58641
 //
 // `scripts/review-sol.mjs` and `scripts/ask-sol.mjs` send Sol work it may only
 // READ. This lane sends it work it WRITES: a point, on its own branch, in its
@@ -231,7 +231,7 @@ export function buildAuthoringPrompt({ point = '', brief = '', branch = '', find
   return [
     `You are AUTHORING work-order point ${point} for this repository as ${SOL_MODEL_NAME}.`,
     'You were chosen for it: this project runs two authoring lanes from different vendors, and',
-    'the mechanical and mid-difficulty points are yours. A Claude session then REVIEWS what you',
+    'the points are yours to write — the hard and critical ones included. A Claude session then REVIEWS what you',
     'wrote, runs the browser suites, judges the rendered picture and lands it — so write for a',
     'reviewer who will read every line, and leave nothing you would not defend.',
     '',
