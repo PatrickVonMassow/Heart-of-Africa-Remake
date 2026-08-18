@@ -283,6 +283,15 @@ export function receiptBalances(line) {
 export const MERGE_ACCOUNTING_SINCE = Date.UTC(2026, 7, 11)
 
 /**
+ * From when a record OWES its four-eyes MODE (point 541's recorder demands it;
+ * the GATE holds the same line against a hand-edited row — escalation round,
+ * pass 1). Grandfathered by DATE like the merge accounting above, never by "the
+ * field is missing": the ledger's last legitimately mode-less row is of
+ * 07.08.2026, and a row with no timestamp is not old, it is unstamped.
+ */
+export const MODE_REQUIRED_SINCE = Date.UTC(2026, 7, 8)
+
+/**
  * May THIS model MERGE the two lists of a blind-parallel stage? (point 634)
  *
  * The merge goes to the model that wrote NEITHER list. Until now it was done by
@@ -964,18 +973,33 @@ export function evaluateMechanismReview({
     const covering = [...new Set(commit?.coveringRecordShas ?? [])].flatMap((s) => bySha.get(String(s)) ?? [])
     // A record is only a review if it says who reviewed, how it ended AND what
     // was actually checked; a half-written line must not clear the gate. THE
-    // GATE REVALIDATES THE EVIDENCE ITSELF (sixth cross-vendor round): the
-    // recorder refuses an empty evidence line and one that admits the reviewer
-    // never saw the material, but the ledger is a tracked file anyone can
-    // hand-edit — a pass-less `merge` row with no evidence, or with "no
-    // material was delivered" written into it, entered `sound` and cleared the
-    // range on the recorder's say-so alone.
+    // GATE REVALIDATES THE ROW ITSELF, by the recorder's own rules (escalation
+    // round, pass 1): the recorder refuses an evidence line that is missing,
+    // too thin to mean anything, still the `<…>` placeholder, or an admission
+    // that the reviewer never saw the material — but the ledger is a tracked
+    // file anyone can hand-edit, and such a row entered `sound` and cleared
+    // the range on the recorder's say-so alone. The MODE is held to the same
+    // standard from the day the recorder began demanding it (see
+    // MODE_REQUIRED_SINCE): a row of that era naming no usable mode can only
+    // have arrived by hand.
+    const evidenceUsable = (r) => {
+      const ev = String(r?.evidence ?? '').trim()
+      return ev.length >= 10 && !/^<.*>$/.test(ev) && !blindReviewerAdmission(ev)
+    }
+    // Presence, not value: a mode this file does not know may be a NEWER CLI's
+    // legitimate mode, and discounting it would void a recorded review — while
+    // a mode-era row with NO mode at all can only have arrived by hand.
+    const modeUsable = (r) => {
+      if (String(r?.mode ?? '').trim()) return true
+      const at = Number(r?.at)
+      return Number.isFinite(at) && at > 0 && at < MODE_REQUIRED_SINCE
+    }
     const wellFormed = covering.filter(
       (r) =>
         VERDICTS.includes(String(r.verdict)) &&
         String(r.model ?? '').trim() &&
-        String(r.evidence ?? '').trim() &&
-        !blindReviewerAdmission(r.evidence),
+        evidenceUsable(r) &&
+        modeUsable(r),
     )
     // A SELF-MERGE IS AS EMPTY AS A SELF-REVIEW, and the ledger is a tracked file
     // anyone can hand-edit (four-eyes review of point 634): the recorder refuses

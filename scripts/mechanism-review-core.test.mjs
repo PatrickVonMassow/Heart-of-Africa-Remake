@@ -15,6 +15,7 @@ import {
   isMechanismPath,
   KNOWN_FLAGS,
   MERGE_ACCOUNTING_SINCE,
+  MODE_REQUIRED_SINCE,
   mechanismPathsIn,
   modelFromTrailers,
   modelsFromTrailers,
@@ -254,6 +255,28 @@ describe('validateRecord', () => {
     expect(validateRecord({ ...good, evidence: 'without access to the material there was nothing to judge here' }).ok).toBe(false)
   })
 
+  // ROUND-1 PASS-1 FINDING (18.08.2026): the reading verb affirmed a reading
+  // whatever followed it, so "Checked nothing; the material was not supplied"
+  // shielded its own subject-only admission past the net.
+  it('refuses an affirmation whose stated object is NO reading at all', () => {
+    for (const evidence of [
+      'Checked nothing; the material was not supplied to this run',
+      'Reviewed none of it — the diff could not be read',
+      'Checked no files, since the patch was not provided',
+      'Examined neither half; no access to the repository material',
+    ]) {
+      expect(validateRecord({ ...good, evidence }).ok, evidence).toBe(false)
+    }
+    // …while a real object keeps the affirmation an affirmation, and the net's
+    // vocabulary inside the FINDINGS still describes the code, not the run.
+    expect(
+      validateRecord({
+        ...good,
+        evidence: 'Checked the splitter against quoted paths; the patch was not supplied in the failing fixture',
+      }).ok,
+    ).toBe(true)
+  })
+
   it('refuses a FIRST-PERSON admission even beside an affirmed reading', () => {
     // "I could not read…" speaks about the run, not about the code; a finding
     // does not say "I".
@@ -294,6 +317,8 @@ describe('evaluateMechanismReview', () => {
     model: 'Fable 5',
     verdict: 'merge',
     evidence: 'checked the fast path against the unit layer',
+    // A row of the recorder's mode era owes its mode (MODE_REQUIRED_SINCE).
+    mode: 'review',
     // Written since the merge rule landed, so a blind-parallel row here owes its
     // merger and its count (the older rows are grandfathered by date).
     at: MERGE_ACCOUNTING_SINCE + 2000,
@@ -332,6 +357,54 @@ describe('evaluateMechanismReview', () => {
     expect(v.block).toBe(true)
     expect(v.findings[0].kind).toBe('self-review')
     expect(formatMechanismReviewVerdict(v)).toMatch(/a self-review is not a review/)
+  })
+
+  // ROUND-1 PASS-1 FINDING (18.08.2026): `wellFormed` asked only for a verdict
+  // and a model, so a hand-edited row with no usable evidence — or none of the
+  // mode the recorder has demanded since point 541 — entered `sound` and
+  // cleared the gate on the recorder's say-so alone.
+  it('REFUSES a hand-edited row whose evidence the recorder would refuse', () => {
+    const covered = commit({ coveringRecordShas: ['c'.repeat(40)] })
+    for (const evidence of [
+      '',
+      'looks ok',
+      '<what the review actually checked>',
+      'Checked nothing; the material was not supplied',
+      'the diff could not be read by this run',
+    ]) {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [covered],
+        records: [record({ evidence })],
+      })
+      expect(v.block, `evidence: "${evidence}"`).toBe(true)
+      expect(v.findings[0].kind).toBe('no-review')
+    }
+  })
+
+  it('REFUSES a mode-era row with no mode at all, and keeps the legacy rows clearing', () => {
+    // Presence, not value: an unknown mode may be a newer CLI's legitimate one
+    // (pinned below under "the mode is required to WRITE a record") — but a
+    // mode-era row with NONE, or with no timestamp to date it, is hand-made.
+    const covered = commit({ coveringRecordShas: ['c'.repeat(40)] })
+    for (const over of [{ mode: '' }, { mode: '', at: undefined }]) {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [covered],
+        records: [record(over)],
+      })
+      expect(v.block, JSON.stringify(over)).toBe(true)
+    }
+    // A row genuinely older than the recorder's mode flag owes none.
+    const legacy = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [covered],
+      records: [record({ mode: '', at: MODE_REQUIRED_SINCE - 5000 })],
+    })
+    expect(legacy.block).toBe(false)
   })
 
   it('REFUSES a hand-edited row whose UNION was merged by an author of it', () => {
