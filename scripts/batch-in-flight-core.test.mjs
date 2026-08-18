@@ -1453,8 +1453,8 @@ describe('slotReasonDecision — the cap is a target, and the demand is narrow',
   const running = ['scripts/batch-singleton.mjs']
 
   it('THE MEASURED STATE: one agent, free slots, an independent point → a reason is DEMANDED', () => {
-    const d = slotReasonDecision({ agents: 1, openPoints: independent, runningFiles: running })
-    expect(d).toMatchObject({ needsReason: true, agents: 1, slotsFree: POOL_CAP - 1, why: 'idle-slots' })
+    const d = slotReasonDecision({ agents: 1, openBranches: 1, openPoints: independent, runningFiles: running })
+    expect(d).toMatchObject({ needsReason: true, agents: 1, openBranches: 1, slotsFree: POOL_CAP - 1, why: 'idle-slots' })
     expect(d.candidates.map((c) => c.point)).toEqual([500])
   })
 
@@ -1475,15 +1475,19 @@ describe('slotReasonDecision — the cap is a target, and the demand is narrow',
 
   it('a FULL pool passes with no reason at all', () => {
     // Full of AGENTS here, which since point 712 is the separately named state:
-    // the occupancy rule counts branches, the agent cap still binds a spawn.
+    // the occupancy rule counts branches, the agent cap still binds a spawn — and
+    // the SLOT count stays the branch count, so a full set of agents that cut no
+    // branch reports the branch slots it really left free (Sol, review of 3078d166).
     expect(
       slotReasonDecision({ agents: POOL_CAP, openPoints: independent, runningFiles: running }),
-    ).toMatchObject({ needsReason: false, slotsFree: 0, why: 'agents-at-cap' })
+    ).toMatchObject({ needsReason: false, slotsFree: POOL_CAP, openBranches: 0, why: 'agents-at-cap' })
     expect(
       slotReasonDecision({ openBranches: POOL_CAP, openPoints: independent, runningFiles: running }),
     ).toMatchObject({ needsReason: false, slotsFree: 0, why: 'at-cap' })
     // …and over the cap is not negative slots.
-    expect(slotReasonDecision({ agents: POOL_CAP + 2, openPoints: independent, runningFiles: running }).slotsFree).toBe(0)
+    expect(
+      slotReasonDecision({ openBranches: POOL_CAP + 2, openPoints: independent, runningFiles: running }).slotsFree,
+    ).toBe(0)
   })
 
   it('a queue whose open points ALL touch the running branch passes', () => {
@@ -1553,9 +1557,9 @@ describe('slotReasonDecision — the cap is a target, and the demand is narrow',
 
   it('a junk cap or agent count falls back rather than demanding on nonsense', () => {
     expect(slotReasonDecision({ agents: NaN, openPoints: independent, runningFiles: running }).slotsFree).toBe(POOL_CAP)
-    expect(slotReasonDecision({ agents: 1, openPoints: independent, runningFiles: running, cap: 0 }).slotsFree).toBe(
-      POOL_CAP - 1,
-    )
+    expect(
+      slotReasonDecision({ agents: 1, openBranches: 1, openPoints: independent, runningFiles: running, cap: 0 }).slotsFree,
+    ).toBe(POOL_CAP - 1)
     expect(() => slotReasonDecision()).not.toThrow()
     expect(slotReasonDecision().needsReason).toBe(false)
   })
@@ -1612,7 +1616,7 @@ describe('the running-file set comes from the worktree too, not only from a --br
 })
 
 describe('slotsRemedy — the block must name BOTH honest answers', () => {
-  const slots = { agents: 1, slotsFree: 2, candidates: [{ point: 500 }, { point: 501 }] }
+  const slots = { agents: 1, openBranches: 1, slotsFree: 2, candidates: [{ point: 500 }, { point: 501 }] }
 
   it('names commissioning another point AND stating why the queue is unsuitable', () => {
     const text = slotsRemedy({ slots })
@@ -1624,6 +1628,7 @@ describe('slotsRemedy — the block must name BOTH honest answers', () => {
 
   it('names the numbers and the candidate points, so the reader need not go looking', () => {
     const text = slotsRemedy({ slots })
+    expect(text).toContain('1 open feat/* branch(es)')
     expect(text).toContain('1 agent(s) running')
     expect(text).toContain(`2 of ${POOL_CAP} slots FREE`)
     expect(text).toContain('500, 501')
@@ -2849,12 +2854,16 @@ describe('slotReasonDecision — the target half counts the same occupancy as th
     expect(slotReasonDecision({ agents: 0, openBranches: 3, openPoints: independent, runningFiles: running })).toMatchObject(
       { needsReason: false, why: 'at-cap', slotsFree: 0, openBranches: 3 },
     )
+    // THE AGENT COUNT NEVER OCCUPIES A BRANCH SLOT (Sol, review of 3078d166):
+    // three agents that cut no branch suppress the DEMAND under their own name,
+    // and still report the three branch slots that really stand empty. Folding
+    // the two into `max()` reported one free slot for a pool with none taken.
     expect(slotReasonDecision({ agents: 3, openBranches: 0, openPoints: independent, runningFiles: running })).toMatchObject(
-      { needsReason: false, why: 'agents-at-cap', slotsFree: 0, openBranches: 0 },
+      { needsReason: false, why: 'agents-at-cap', slotsFree: POOL_CAP, agents: 3, openBranches: 0 },
     )
-    // Neither full: the demand stands, and both counts are reported.
+    // Neither full: the demand stands, and both counts are reported SEPARATELY.
     expect(slotReasonDecision({ agents: 2, openBranches: 1, openPoints: independent, runningFiles: running })).toMatchObject(
-      { needsReason: true, why: 'idle-slots', slotsFree: 1, agents: 2, openBranches: 1 },
+      { needsReason: true, why: 'idle-slots', slotsFree: POOL_CAP - 1, agents: 2, openBranches: 1 },
     )
   })
 
@@ -2880,10 +2889,10 @@ describe('slotReasonDecision — the target half counts the same occupancy as th
   it('ignores a nonsensical branch count rather than inventing occupancy', () => {
     expect(
       slotReasonDecision({ agents: 1, openBranches: NaN, openPoints: independent, runningFiles: running }).slotsFree,
-    ).toBe(POOL_CAP - 1)
+    ).toBe(POOL_CAP)
     expect(
       slotReasonDecision({ agents: 1, openBranches: -4, openPoints: independent, runningFiles: running }).slotsFree,
-    ).toBe(POOL_CAP - 1)
+    ).toBe(POOL_CAP)
   })
 })
 

@@ -1019,22 +1019,24 @@ export function slotReasonDecision({
   // demand a fourth point while `commission-guard` refuses every one of them.
   //
   // A RUNNING AGENT WITHOUT A BRANCH STILL FILLS ITS SLOT, and that is a
-  // SEPARATE, NAMED state rather than a second occupancy rule (Sol's review of
-  // 91d88f9a read the bare `Math.max` as a divergence from the branch rule, and
-  // the test pinned the max rather than the reason for it). The branch count is
-  // the occupancy; the agent count is the concurrent-agent cap of CLAUDE.md §6,
-  // which still binds a spawn. Demanding a fourth point while three agents run
-  // would ask for a breach of it, so that state answers `agents-at-cap` — no
-  // demand, and the report says which of the two is full.
+  // SEPARATE, NAMED state rather than a second occupancy rule. The two must not
+  // be folded into one number: `max(agents, branches)` reported two agents and
+  // no branch as ONE free slot when three branch slots stand empty, and that is
+  // the agent count occupying a branch slot again (Sol, reviews of 91d88f9a and
+  // 3078d166). So `slotsFree` counts BRANCHES and nothing else, `agents` reports
+  // the agents actually declared, and the concurrent-agent cap of CLAUDE.md §6
+  // — which still binds a spawn — suppresses the demand under its OWN name:
+  // asking for a fourth point while three agents run would ask for a breach of
+  // it, so that state answers `agents-at-cap` and the report says which is full.
   const declared = Number.isFinite(agents) && agents > 0 ? Math.floor(agents) : 0
   const branches = Number.isFinite(openBranches) && openBranches > 0 ? Math.floor(openBranches) : 0
   const limit = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : POOL_CAP
-  const slotsFree = Math.max(0, limit - Math.max(declared, branches))
+  const slotsFree = Math.max(0, limit - branches)
   const candidates = independentOpenPoints({ points: openPoints, runningFiles })
   const no = (why) => ({
     needsReason: false,
     slotsFree,
-    agents: Math.max(declared, branches),
+    agents: declared,
     openBranches: branches,
     candidates,
     why,
@@ -1073,7 +1075,8 @@ export function slotsRemedy({ slots = {}, cap = POOL_CAP } = {}) {
     .filter((p) => p != null)
     .join(', ')
   return (
-    `THE AGENT POOL IS BELOW ITS CAP AND NOTHING SAYS WHY: ${slots.agents ?? 0} agent(s) running, ` +
+    `THE AGENT POOL IS BELOW ITS CAP AND NOTHING SAYS WHY: ${slots.openBranches ?? 0} open feat/* branch(es) and ` +
+    `${slots.agents ?? 0} agent(s) running, ` +
     `${slots.slotsFree ?? 0} of ${cap} slots FREE, and the queue holds independent open point(s) that touch none of ` +
     `the running branch's files (${names || 'see the work order'}). The declared wait is fine; the idle slots are ` +
     'not accounted for. TWO honest answers: (a) COMMISSION another point into a free slot — a worktree-isolated ' +
