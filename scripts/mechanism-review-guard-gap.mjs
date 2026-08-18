@@ -60,36 +60,61 @@ export function measureReviewMaterial({ baseline, head, run = git }) {
  * NEVER throws: a failure inside rules 'unmeasured', which keeps the gate
  * blocking — it does not assume the material fit, and it does not waive.
  */
-export async function assessReviewGap({ baseline, head, standingRecords = 0 }) {
+export async function assessReviewGap({
+  baseline,
+  head,
+  standingRecords = 0,
+  // Injectable for the unit layer only — production callers pass neither.
+  run = git,
+  loadTool = () => import('./review-material-core.mjs'),
+}) {
   let measured = null
   let measurementError = ''
   try {
-    measured = measureReviewMaterial({ baseline, head })
+    measured = measureReviewMaterial({ baseline, head, run })
   } catch (e) {
     measurementError = (e && e.message) || 'measurement failed'
   }
 
   let planner = null
   if (measured) {
+    // The splitter's ABSENCE and its FAILURE are opposite rulings (round-2
+    // pass 2): a tree without the tool genuinely cannot produce passes, so the
+    // core may rule 'no-splitter' on size alone — but a tool that exists and
+    // CRASHED leaves "would a split cover it?" unanswered, and answering
+    // 'no-splitter' there waives the gate on an assessment failure. The import
+    // is probed apart from the planning so the two cannot be conflated; any
+    // failure past a successful import rules 'unmeasured', which blocks.
+    let tool = null
     try {
-      const tool = await import('./review-material-core.mjs')
-      const plan = tool.planPasses({
-        stat: measured.stat,
-        patch: measured.patch,
-        files: measured.files,
-        budget: tool.MATERIAL_BUDGET_CHARS,
-      })
-      planner = {
-        available: true,
-        // Covered means every pass of the plan fits AND nothing is beyond the
-        // reach of any pass AND the diffstat is inside its share — the same
-        // three claims planPasses itself makes for an assemblable split.
-        covers: !plan.statTruncated && (plan.uncoverable ?? []).length === 0 && plan.passes.length >= 1,
-        uncoverable: (plan.uncoverable ?? []).map((u) => u.path),
-        budget: tool.MATERIAL_BUDGET_CHARS,
+      tool = await loadTool()
+    } catch (e) {
+      if (e?.code !== 'ERR_MODULE_NOT_FOUND') {
+        measurementError = `the splitting tool exists but could not load: ${(e && e.message) || e}`
       }
-    } catch {
-      planner = null // no splitting tool in this tree — the core rules on size alone
+      // ERR_MODULE_NOT_FOUND: no splitting tool in this tree — the core rules
+      // on size alone (the cherry-pick case this module is self-contained for).
+    }
+    if (tool) {
+      try {
+        const plan = tool.planPasses({
+          stat: measured.stat,
+          patch: measured.patch,
+          files: measured.files,
+          budget: tool.MATERIAL_BUDGET_CHARS,
+        })
+        planner = {
+          available: true,
+          // Covered means every pass of the plan fits AND nothing is beyond the
+          // reach of any pass AND the diffstat is inside its share — the same
+          // three claims planPasses itself makes for an assemblable split.
+          covers: !plan.statTruncated && (plan.uncoverable ?? []).length === 0 && plan.passes.length >= 1,
+          uncoverable: (plan.uncoverable ?? []).map((u) => u.path),
+          budget: tool.MATERIAL_BUDGET_CHARS,
+        }
+      } catch (e) {
+        measurementError = `the pass planner failed: ${(e && e.message) || e}`
+      }
     }
   }
 
@@ -114,7 +139,7 @@ export async function assessReviewGap({ baseline, head, standingRecords = 0 }) {
  * fails, and any sha whose parent cannot be resolved leaves the block
  * standing: null here means "block as before".
  */
-export async function assessCriticalityGap(findings = []) {
+export async function assessCriticalityGap(findings = [], opts = {}) {
   const { criticalityGapPlan, formatCriticalityGap } = await import(
     './mechanism-review-guard-gap-core.mjs'
   )
@@ -122,7 +147,7 @@ export async function assessCriticalityGap(findings = []) {
   if (!plan) return null
   const entries = []
   for (const e of plan) {
-    const decision = await assessReviewGap({ baseline: `${e.sha}^`, head: e.sha })
+    const decision = await assessReviewGap({ baseline: `${e.sha}^`, head: e.sha, ...opts })
     if (!decision.gap) return null
     entries.push({ ...e, decision })
   }

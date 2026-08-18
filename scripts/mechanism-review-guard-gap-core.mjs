@@ -161,14 +161,23 @@ export function guardOutcome({ blocked = false, gap = null } = {}) {
  * necessity — any such finding keeps the whole block standing, and this
  * returns null. Null also on an unrecognisable sha: an unmeasurable claim
  * never waives the gate.
+ *
+ * EVERY record a finding carries is planned, not only the first (round-2
+ * pass 2): the gate today puts exactly one record in each of these findings,
+ * but this helper must not assume that — one reviewable record among several
+ * is a demand somebody can meet, and skipping it would report a gap over it.
  */
 export function criticalityGapPlan(findings = []) {
   const entries = []
   for (const f of findings ?? []) {
     if (f?.kind !== 'unresolved' && f?.kind !== 'unanswered') return null
-    const sha = String(f?.records?.[0]?.sha ?? '')
-    if (!/^[0-9a-f]{7,40}$/i.test(sha)) return null
-    entries.push({ point: Number(f?.tick?.number ?? Number.NaN), sha })
+    const records = f?.records ?? []
+    if (!records.length) return null
+    for (const r of records) {
+      const sha = String(r?.sha ?? '')
+      if (!/^[0-9a-f]{7,40}$/i.test(sha)) return null
+      entries.push({ point: Number(f?.tick?.number ?? Number.NaN), sha })
+    }
   }
   return entries.length ? entries : null
 }

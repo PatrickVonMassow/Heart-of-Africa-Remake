@@ -195,6 +195,91 @@ describe('criticalityGapPlan — which criticality blocks may degrade at all', (
     expect(criticalityGapPlan([{ kind: 'unresolved', tick: { number: 1 }, records: [] }])).toBe(null)
     expect(criticalityGapPlan([])).toBe(null)
   })
+
+  it('plans EVERY record a finding carries, not only the first (round-2 pass 2)', () => {
+    // One reviewable record among several is a demand somebody can meet;
+    // measuring only records[0] would report a gap over it.
+    const two = { kind: 'unresolved', tick: { number: 700 }, records: [{ sha }, { sha: 'd'.repeat(40) }] }
+    expect(criticalityGapPlan([two])).toEqual([
+      { point: 700, sha },
+      { point: 700, sha: 'd'.repeat(40) },
+    ])
+    const second = { kind: 'unresolved', tick: { number: 700 }, records: [{ sha }, { sha: 'not-a-sha' }] }
+    expect(criticalityGapPlan([second])).toBe(null)
+  })
+})
+
+describe('assessReviewGap — the wrapper cannot waive on its own failure (round-2 pass 2)', () => {
+  // Injected git and splitter loader: no repository is touched, and each
+  // failure shape is played directly against the wrapper.
+  const bigRun = (args) => {
+    if (args[0] === 'diff' && args.includes('--stat')) return 'stat'
+    if (args[0] === 'diff' && args.includes('--name-only')) return 'big.md\0'
+    if (args[0] === 'diff') return 'x'.repeat(REVIEW_GAP_BUDGET_CHARS * 2)
+    if (args[0] === 'show') return 'body'
+    return ''
+  }
+  const absent = Object.assign(new Error('not found'), { code: 'ERR_MODULE_NOT_FOUND' })
+
+  it('a splitter that exists but CRASHES on load rules unmeasured — the gate keeps blocking', async () => {
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: bigRun,
+      loadTool: () => Promise.reject(new Error('syntax error in tool')),
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('unmeasured')
+    expect(d.detail).toContain('could not load')
+  })
+
+  it('a planner that THROWS rules unmeasured — never no-splitter', async () => {
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: bigRun,
+      loadTool: () =>
+        Promise.resolve({
+          MATERIAL_BUDGET_CHARS: REVIEW_GAP_BUDGET_CHARS,
+          planPasses: () => {
+            throw new Error('planner exploded')
+          },
+        }),
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('unmeasured')
+    expect(d.detail).toContain('planner failed')
+  })
+
+  it('only a genuinely ABSENT splitting tool rules no-splitter on size alone', async () => {
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: bigRun,
+      loadTool: () => Promise.reject(absent),
+    })
+    expect(d.gap).toBe(true)
+    expect(d.reason).toBe('no-splitter')
+  })
+
+  it('a covering split from the real planner shape keeps the demand standing', async () => {
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: bigRun,
+      loadTool: () =>
+        Promise.resolve({
+          MATERIAL_BUDGET_CHARS: REVIEW_GAP_BUDGET_CHARS,
+          planPasses: () => ({ statTruncated: false, uncoverable: [], passes: [{}, {}] }),
+        }),
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('splits')
+  })
 })
 
 describe('formatCriticalityGap', () => {
