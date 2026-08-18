@@ -504,6 +504,34 @@ describe('evaluateMechanismReview', () => {
     expect(v.findings[0].kind).toBe('no-review')
   })
 
+  // THE GATE REVALIDATES THE EVIDENCE, NOT ONLY THE RECORDER (sixth cross-vendor
+  // round, pass 1): the ledger is a tracked file anyone can hand-edit, so a
+  // pass-less `merge` row with no evidence — or with an admission that no
+  // material was delivered — entered `sound` and cleared the range.
+  it('does not clear on a hand-added row that carries NO evidence at all', () => {
+    for (const evidence of ['', '   ', undefined]) {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+        records: [record({ evidence })],
+      })
+      expect(v.block, JSON.stringify(evidence)).toBe(true)
+      expect(v.findings[0].kind).toBe('no-review')
+    }
+  })
+
+  it('does not clear on evidence ADMITTING that no material was delivered', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [record({ evidence: 'no material was supplied; the diff could not be read' })],
+    })
+    expect(v.block).toBe(true)
+    expect(v.findings[0].kind).toBe('no-review')
+  })
+
   it('leaves a turn that changed no mechanism completely alone', () => {
     const v = evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [], records: [] })
     expect(v).toMatchObject({ block: false, clear: true, bootstrap: false })

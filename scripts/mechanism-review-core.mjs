@@ -956,10 +956,20 @@ export function evaluateMechanismReview({
 
   for (const commit of pendingCommits ?? []) {
     const covering = [...new Set(commit?.coveringRecordShas ?? [])].flatMap((s) => bySha.get(String(s)) ?? [])
-    // A record is only a review if it says who reviewed and how it ended; a
-    // half-written line must not clear the gate.
+    // A record is only a review if it says who reviewed, how it ended AND what
+    // was actually checked; a half-written line must not clear the gate. THE
+    // GATE REVALIDATES THE EVIDENCE ITSELF (sixth cross-vendor round): the
+    // recorder refuses an empty evidence line and one that admits the reviewer
+    // never saw the material, but the ledger is a tracked file anyone can
+    // hand-edit — a pass-less `merge` row with no evidence, or with "no
+    // material was delivered" written into it, entered `sound` and cleared the
+    // range on the recorder's say-so alone.
     const wellFormed = covering.filter(
-      (r) => VERDICTS.includes(String(r.verdict)) && String(r.model ?? '').trim(),
+      (r) =>
+        VERDICTS.includes(String(r.verdict)) &&
+        String(r.model ?? '').trim() &&
+        String(r.evidence ?? '').trim() &&
+        !blindReviewerAdmission(r.evidence),
     )
     // A SELF-MERGE IS AS EMPTY AS A SELF-REVIEW, and the ledger is a tracked file
     // anyone can hand-edit (four-eyes review of point 634): the recorder refuses
