@@ -193,6 +193,15 @@ describe('the markdown strip reads shapes, not characters (round-7 pass 1)', () 
     expect(parsed.ok).toBe(false)
     expect(parsed.error).toContain('could not see the material')
   })
+
+  it('unshields NESTED emphasis too — the pair rule iterates to its fixpoint (closing round)', () => {
+    const parsed = parseAnswer({
+      kind: 'explain',
+      text: 'I read *no **material*** from this range because none arrived with the request at all.',
+    })
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error).toContain('could not see the material')
+  })
 })
 
 describe('reading the answer', () => {

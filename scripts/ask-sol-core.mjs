@@ -264,12 +264,22 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
   // Emphasis is stripped only as a MATCHED PAIR (round-8: an unmatched
   // word-edge marker is content — `src/foo_.mjs` names a file, and eating a
   // lone `_` in `no _material` would again build the admission phrase out of
-  // text that never said it).
-  const clean = String(text ?? '')
+  // text that never said it), and the pair rule is ITERATED so nesting
+  // unwraps outside-in (`*no **material***`, closing round): each pass may
+  // open after — and close before — another marker run, and a bounded loop
+  // reaches the fixpoint of any sane nesting depth.
+  let clean = String(text ?? '')
     .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
     .replace(/^[ \t]*>+[ \t]?/gm, '')
     .replace(/`+/g, '')
-    .replace(/(^|[\s([{])([*_]+)(?=\S)([^*_]+?)(?<=\S)\2(?=[\s)\]}.,;:!?]|$)/g, '$1$3')
+  for (let i = 0; i < 4; i++) {
+    const next = clean.replace(
+      /(^|[\s([{*_])([*_]+)(?=[^\s*_])([^*_]+?)(?<=[^\s*_])\2(?=[\s)\]}.,;:!?*_]|$)/g,
+      '$1$3',
+    )
+    if (next === clean) break
+    clean = next
+  }
   if (!clean.trim()) return { ok: false, kind: k, answer: null, summary: '', error: 'the run produced no answer at all' }
   // The two-tier judgment, not the raw net: an audit or diagnose answer about
   // THIS project's tooling describes failure modes in the net's own vocabulary,
