@@ -133,10 +133,10 @@ describe('isEnforcerWired — the fact, not the record of an intention', () => {
       const broad = settings('node scripts/a-guard.mjs', { event: 'PreToolUse', matcher })
       expect(isEnforcerWired(broad, 'a-guard.mjs', { event: 'PreToolUse', tools: ['Agent', 'Bash'] })).toBe(true)
     }
-    // A matcher that is no valid pattern falls back to EXACT alternatives —
-    // broken never reads as broad.
+    // An invalid pattern cannot reliably fire at all; a valid-looking
+    // alternative inside it must not salvage a false ARMED report.
     const broken = settings('node scripts/a-guard.mjs', { event: 'PreToolUse', matcher: 'Agent|[' })
-    expect(isEnforcerWired(broken, 'a-guard.mjs', { event: 'PreToolUse', tools: ['Agent'] })).toBe(true)
+    expect(isEnforcerWired(broken, 'a-guard.mjs', { event: 'PreToolUse', tools: ['Agent'] })).toBe(false)
     expect(isEnforcerWired(broken, 'a-guard.mjs', { event: 'PreToolUse', tools: ['Bash'] })).toBe(false)
   })
 

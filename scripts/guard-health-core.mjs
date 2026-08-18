@@ -158,8 +158,9 @@ export function executedScriptRefs(command) {
  * bare substring test read `SubAgent|TaskOutput|BashTool|PowerShellX` as
  * covering Agent/Task/Bash/PowerShell while it matches none of them (fourth
  * review, finding 15). `''` and `'*'` match every tool, as the harness does; a
- * matcher that is not a valid pattern falls back to exact `|`-alternatives,
- * because a broken matcher must not read as broad coverage.
+ * matcher that is not a valid pattern covers NOTHING: the harness cannot
+ * reliably fire it, and salvaging valid-looking alternatives would recreate a
+ * false ARMED report.
  */
 export function matcherCoversTool(matcher, tool) {
   const m = String(matcher ?? '').trim()
@@ -168,7 +169,7 @@ export function matcherCoversTool(matcher, tool) {
   try {
     return new RegExp(`^(?:${m})$`).test(t)
   } catch {
-    return m.split('|').some((alt) => alt.trim() === t)
+    return false
   }
 }
 
