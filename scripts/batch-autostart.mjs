@@ -498,6 +498,29 @@ if (batchParked) {
   bail()
 }
 
+// --- ANSWERED VDZK DEADLINE ---------------------------------------------------
+// A non-owning writing window cannot edit the board, so it deposits the user's
+// answer in .claude/vdzk-answers.json. Waiting for the owner's next Stop was not
+// bounded: a declared four-hour wait left the settled card asking for hours.
+// This tick is already the unattended layer allowed to publish, and it runs even
+// when a live owner makes the launcher decline a successor below. Past the ONE
+// deadline in decision-card-guard-core.mjs it removes exactly that card through
+// the sanctioned board command; failures leave the carrier entry for the next
+// tick. The user's explicit batch pause remains above this block and wins.
+try {
+  const out = execFileSync(process.execPath, [R('vdzk-answer.mjs'), '--redeem-due'], {
+    windowsHide: true,
+    cwd: REPO,
+    encoding: 'utf8',
+    timeout: 120000,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  for (const line of out.trim().split('\n').filter(Boolean)) log(`answered card: ${line}`)
+} catch (e) {
+  const detail = String(e.stderr || e.stdout || e.message || e).trim().split('\n').filter(Boolean).pop()
+  log(`answered-card redemption deferred${detail ? ` (${detail})` : ''}`)
+}
+
 // --- BOARD WATCHDOG (point 400, delta E) --------------------------------------
 // The BACKSTOP, not the mechanism. Delta D lets every session publish and delta B
 // makes it publish before it works, but both live inside a session — and the

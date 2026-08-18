@@ -128,3 +128,45 @@ describe('vdzk-answer carries the decision with its deadline', () => {
     expect(readFileSync(answersPath, 'utf8')).toBe('{broken')
   })
 })
+
+describe('deadline redemption is unattended and retry-safe', () => {
+  const redeem = (now, fail = '') => {
+    const source = `
+      const mod = await import('./scripts/vdzk-answer.mjs')
+      const result = mod.redeemDueVdzkAnswers({
+        now: ${Number(now)},
+        runBoard: (title) => {
+          if (title === ${JSON.stringify(fail)}) throw new Error('publish failed')
+          return title
+        },
+      })
+      process.stdout.write(JSON.stringify(result))
+    `
+    return JSON.parse(execFileSync(process.execPath, ['--input-type=module', '--eval', source], {
+      cwd: process.cwd(), env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    }))
+  }
+
+  it('applies a due answer, clears a vanished card, and leaves a future answer', () => {
+    reset('Danke.')
+    writeFileSync(answersPath, JSON.stringify([
+      { cardTitle: titles[0], answer: 'Schrift bleibt.', deadlineAt: 100 },
+      { cardTitle: titles[1], answer: 'Website zuerst.', deadlineAt: 300 },
+      { cardTitle: 'Schon entfernte Karte', answer: 'Erledigt.', deadlineAt: 100 },
+    ]))
+    const result = redeem(200)
+    expect(result.applied.map((entry) => entry.cardTitle)).toEqual([titles[0]])
+    expect(result.cleared.map((entry) => entry.cardTitle)).toEqual(['Schon entfernte Karte'])
+    expect(JSON.parse(readFileSync(answersPath, 'utf8')).map((entry) => entry.cardTitle)).toEqual([titles[1]])
+  })
+
+  it('retains a due answer when removing or publishing its card fails', () => {
+    reset('Danke.')
+    writeFileSync(answersPath, JSON.stringify([
+      { cardTitle: titles[0], answer: 'Schrift bleibt.', deadlineAt: 100 },
+    ]))
+    const result = redeem(200, titles[0])
+    expect(result.failed).toHaveLength(1)
+    expect(JSON.parse(readFileSync(answersPath, 'utf8'))).toHaveLength(1)
+  })
+})
