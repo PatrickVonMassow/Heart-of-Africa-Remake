@@ -889,8 +889,23 @@ describe('the flag surface itself', () => {
 // can check.
 // ---------------------------------------------------------------------------
 describe('validatePass', () => {
-  it('accepts a pass that names its number, its total and its files', () => {
+  it('REFUSES a spaced list rather than trimming it into different paths', () => {
+    // ` scripts/b.mjs` and `scripts/b.mjs` are two legal paths; the old trim
+    // collapsed them, and a coverage union then looked complete over a path
+    // nobody named (cross-vendor review, third round).
     const v = validatePass({ pass: '2/4', passFiles: 'scripts/a.mjs, scripts/b.mjs' })
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toContain('C-quoted')
+  })
+
+  it('reads a C-QUOTED path byte-exact — comma, quote and edge space included', () => {
+    const v = validatePass({ pass: '1/2', passFiles: '"scripts/git-hooks/check ",plain.mjs,"a,b.mjs"' })
+    expect(v.ok).toBe(true)
+    expect(v.pass.files).toEqual(['scripts/git-hooks/check ', 'plain.mjs', 'a,b.mjs'])
+  })
+
+  it('accepts a pass that names its number, its total and its files', () => {
+    const v = validatePass({ pass: '2/4', passFiles: 'scripts/a.mjs,scripts/b.mjs' })
     expect(v.ok).toBe(true)
     expect(v.pass).toEqual({ index: 2, total: 4, files: ['scripts/a.mjs', 'scripts/b.mjs'] })
   })

@@ -792,12 +792,17 @@ export function validatePass({ pass, passFiles } = {}) {
   }
   const parsed = spec ? parsePassSpec(spec) : { ok: false, errors: [] }
   errors.push(...parsed.errors)
-  const files = parsePassFiles(listed)
-  if (listed && !files.length) {
+  // The list parse FAILS LOUD on a path it cannot round-trip (a bare token with
+  // edge whitespace, an unclosed quote) rather than trimming it into a
+  // different path — a collapsed spelling is a coverage claim about a file
+  // nobody named (cross-vendor review, third round).
+  const list = parsePassFiles(listed)
+  errors.push(...list.errors)
+  if (listed && list.ok && !list.files.length) {
     errors.push('--pass-files "<a,b,c>": the paths this pass reviewed, comma-separated')
   }
   if (errors.length) return { ok: false, errors, pass: null }
-  return { ok: true, errors: [], pass: { index: parsed.index, total: parsed.total, files } }
+  return { ok: true, errors: [], pass: { index: parsed.index, total: parsed.total, files: list.files } }
 }
 
 /**

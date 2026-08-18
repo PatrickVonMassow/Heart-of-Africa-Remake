@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   assembleMaterial,
   formatBudgetNotice,
+  formatPassFiles,
   formatShortfall,
   MATERIAL_BUDGET_CHARS,
   materialShortfall,
@@ -492,9 +493,43 @@ describe('the pass flag', () => {
   })
 
   it('reads the file list, and treats an empty one as empty', () => {
-    expect(parsePassFiles('a.mjs, b.mjs ,')).toEqual(['a.mjs', 'b.mjs'])
-    expect(parsePassFiles('')).toEqual([])
-    expect(parsePassFiles(undefined)).toEqual([])
+    expect(parsePassFiles('a.mjs,b.mjs,')).toMatchObject({ ok: true, files: ['a.mjs', 'b.mjs'] })
+    expect(parsePassFiles('')).toMatchObject({ ok: true, files: [] })
+    expect(parsePassFiles(undefined)).toMatchObject({ ok: true, files: [] })
+  })
+
+  // ONE round-trippable representation for a git path (cross-vendor review,
+  // third round): the old `.split(',').map(trim)` could not carry a comma or an
+  // edge space at all, and ` x` COLLAPSED into `x` — a coverage claim about a
+  // path nobody named.
+  it('round-trips a path with a comma, a quote, a trailing space and __C__ intact', () => {
+    const odd = ['scripts/a,b.mjs', 'scripts/say "so".mjs', 'scripts/git-hooks/check ', ' lead', 'scripts/x__C__y.mjs', 'plain.mjs']
+    const written = formatPassFiles(odd)
+    expect(parsePassFiles(written)).toEqual({ ok: true, files: odd, errors: [] })
+  })
+
+  it('round-trips control characters as git octal escapes', () => {
+    const odd = ['scripts/we\tird.mjs', 'nl\nin-name']
+    expect(parsePassFiles(formatPassFiles(odd))).toMatchObject({ ok: true, files: odd })
+    expect(formatPassFiles(['scripts/we\tird.mjs'])).toBe('"scripts/we\\011ird.mjs"')
+  })
+
+  it('REFUSES a bare token with edge whitespace instead of trimming it into another path', () => {
+    const out = parsePassFiles('a.mjs, b.mjs')
+    expect(out.ok).toBe(false)
+    expect(out.errors.join('\n')).toContain('whitespace')
+    expect(out.errors.join('\n')).toContain('C-quoted')
+    // The collapse is exactly what must not happen: ` b.mjs` is not `b.mjs`.
+    expect(out.files).not.toContain('b.mjs')
+  })
+
+  it('REFUSES an unclosed quote and a quote not ending at a comma', () => {
+    expect(parsePassFiles('"a.mjs').ok).toBe(false)
+    expect(parsePassFiles('"a.mjs"x,b.mjs').ok).toBe(false)
+  })
+
+  it('leaves a plain list unquoted for the human reading the command', () => {
+    expect(formatPassFiles(['bulk-a.txt', 'bulk-b.txt'])).toBe('bulk-a.txt,bulk-b.txt')
   })
 })
 
@@ -571,9 +606,26 @@ describe('the composition a set of pass records rests on', () => {
   })
 
   it('ignores blank and duplicated entries in the expected set', () => {
-    const [group] = passComposition([rec(1, 2), rec(2, 2)], { expect: ['f1.mjs', ' f1.mjs ', '', null, 'f2.mjs'] })
+    const [group] = passComposition([rec(1, 2), rec(2, 2)], { expect: ['f1.mjs', 'f1.mjs', '', null, 'f2.mjs'] })
     expect(group.uncovered).toEqual([])
     expect(group.complete).toBe(true)
+  })
+
+  // BYTE-EXACT COVERAGE (cross-vendor review, third round): ` x` and `x` are
+  // two legal paths; trimming the expected set collapsed them into one entry,
+  // so a union could look complete without covering both.
+  it('does NOT collapse a path with edge whitespace into its trimmed spelling', () => {
+    const passes = [
+      { sha: 'abc1234', verdict: 'merge', at: 101, pass: { index: 1, total: 2, files: ['scripts/git-hooks/check'] } },
+      { sha: 'abc1234', verdict: 'merge', at: 102, pass: { index: 2, total: 2, files: ['f2.mjs'] } },
+    ]
+    const [group] = passComposition(passes, { expect: ['scripts/git-hooks/check ', 'f2.mjs'] })
+    expect(group.uncovered).toEqual(['scripts/git-hooks/check '])
+    expect(group.complete).toBe(false)
+    // …and the honest spelling covers it.
+    passes[0].pass.files = ['scripts/git-hooks/check ']
+    const [honest] = passComposition(passes, { expect: ['scripts/git-hooks/check ', 'f2.mjs'] })
+    expect(honest.complete).toBe(true)
   })
 
   it('takes the WORST verdict of a composition as the whole range verdict', () => {

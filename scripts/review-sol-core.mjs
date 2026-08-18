@@ -23,6 +23,7 @@
 import { BLIND_REVIEWER, blindReviewerAdmission, modelFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
 import {
   assembleMaterial,
+  formatPassFiles,
   formatShortfall,
   MATERIAL_BUDGET_CHARS,
   parseDiffHeader,
@@ -629,8 +630,11 @@ export function formatRecordCommand({
   // large for one round, so this verdict covers the files of this pass alone —
   // and the gate clears the range only once every pass of the same total is on
   // record, which is what makes a composition a coverage rather than a claim.
+  // The list is written in the ONE round-trippable representation (a path with
+  // a comma, a quote or edge whitespace travels C-quoted, as git prints it), so
+  // what the recorder stores is byte-identical to what this pass read.
   if (pass) {
-    parts.push(`--pass ${pass.index}/${pass.total}`, `--pass-files ${q((pass.files ?? []).join(','))}`)
+    parts.push(`--pass ${pass.index}/${pass.total}`, `--pass-files ${q(formatPassFiles(pass.files ?? []))}`)
   }
   return parts.join(' ')
 }

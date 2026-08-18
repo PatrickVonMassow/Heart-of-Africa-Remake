@@ -307,6 +307,8 @@ export const usage = () =>
   `       single review round can hold. The passes cut through the FILE SET, and the gate\n` +
   `       clears the range only once EVERY pass of the same total is recorded — a pass on\n` +
   `       its own covers the files it names and nothing else. review-sol.mjs prints them.\n` +
+  `       A path holding a comma, a quote or edge whitespace is written C-QUOTED, exactly\n` +
+  `       as git prints it; nothing is ever trimmed into a different path.\n` +
   `\nWHO REVIEWS (CLAUDE.md §6): the OTHER vendor, never an author of the range.\n` +
   `       Claude authored it → GPT-5.6 Sol at reasoning effort high, and when Sol is\n` +
   `       unavailable the first of Fable 5 / Opus 5 / Opus 4.8 that wrote no part of it.\n` +

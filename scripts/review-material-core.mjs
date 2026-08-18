@@ -637,12 +637,87 @@ export function parsePassSpec(value) {
   return errors.length ? { ok: false, errors } : { ok: true, index, total, errors: [] }
 }
 
-/** The `--pass-files` value, as a list of paths. */
+/**
+ * ONE representation for a git path on the `--pass-files` command line, chosen
+ * because the comma is the list separator and a LEGAL git path may contain a
+ * comma, a quote, or leading/trailing whitespace (cross-vendor review, third
+ * round — the old `.split(',').map(trim)` could not round-trip such a path, and
+ * `x` and ` x` COLLAPSED into one entry, so a union could look complete without
+ * covering both). A path that needs it travels C-QUOTED, exactly as git prints
+ * it — the same convention unquoteGitPath already decodes — and everything else
+ * travels byte-exact, never trimmed.
+ */
+const needsQuoting = (path) => /^[\s]|[\s]$|[,"\\ -]/.test(path)
+
+/** One path, C-quoted the way git would print it. */
+export function quotePassFile(path) {
+  const p = String(path ?? '')
+  if (!needsQuoting(p)) return p
+  let out = '"'
+  for (const ch of p) {
+    if (ch === '"') out += '\\"'
+    else if (ch === '\\') out += '\\\\'
+    else if (ch < ' ' || ch === '') {
+      for (const byte of Buffer.from(ch, 'utf8')) out += `\\${byte.toString(8).padStart(3, '0')}`
+    } else out += ch
+  }
+  return `${out}"`
+}
+
+/** The `--pass-files` value for a file list — the writer half of the round trip. */
+export function formatPassFiles(files = []) {
+  return (files ?? []).map(quotePassFile).join(',')
+}
+
+/**
+ * The `--pass-files` value, as a list of paths — { ok, files, errors }.
+ *
+ * FAIL LOUD, NEVER COLLAPSE: a bare token with leading or trailing whitespace
+ * is refused by name rather than trimmed, because trimming is how ` x` and `x`
+ * became one entry — the caller either meant the plain path (drop the space) or
+ * the real one (write it C-quoted). A quote that never closes, or a closed one
+ * followed by anything but the separator, is refused the same way.
+ */
 export function parsePassFiles(value) {
-  return String(value ?? '')
-    .split(',')
-    .map((p) => p.trim())
-    .filter(Boolean)
+  const raw = String(value ?? '')
+  const files = []
+  const errors = []
+  let i = 0
+  while (i < raw.length) {
+    if (raw[i] === ',') {
+      i++
+      continue
+    }
+    if (raw[i] === '"') {
+      const read = readQuoted(raw, i)
+      if (!read) {
+        errors.push(`--pass-files: the quote opened at position ${i} never closes — "${raw.slice(i, i + 30)}…"`)
+        break
+      }
+      files.push(read.value)
+      if (read.end < raw.length && raw[read.end] !== ',') {
+        errors.push(
+          `--pass-files: a quoted path must end at a comma, not at "${raw.slice(read.end, read.end + 10)}"`,
+        )
+        break
+      }
+      i = read.end
+      continue
+    }
+    const next = raw.indexOf(',', i)
+    const token = next < 0 ? raw.slice(i) : raw.slice(i, next)
+    i = next < 0 ? raw.length : next
+    if (!token.trim()) continue
+    if (token !== token.trim()) {
+      errors.push(
+        `--pass-files: "${token}" carries leading/trailing whitespace — trimming it would collapse two ` +
+          'legal paths into one, so either drop the space or write the path C-quoted ("…") as git prints it',
+      )
+      continue
+    }
+    files.push(token)
+  }
+  return { ok: errors.length === 0, files, errors }
 }
 
 /**
@@ -676,7 +751,10 @@ export function passComposition(records = [], { expect = [] } = {}) {
     // whole range supersedes the earlier one.
     if (!prior || Number(record.at ?? 0) >= Number(prior.at ?? 0)) group.byIndex.set(index, record)
   }
-  const wanted = [...new Set((expect ?? []).map((p) => String(p ?? '').trim()).filter(Boolean))]
+  // BYTE-EXACT, NEVER TRIMMED (cross-vendor review, third round): `x` and ` x`
+  // are two legal paths, and trimming the expected set collapsed them into one
+  // entry — a union could then look complete without covering both.
+  const wanted = [...new Set((expect ?? []).map((p) => String(p ?? '')).filter(Boolean))]
   return [...groups.values()].map((group) => {
     const missing = []
     for (let i = 1; i <= group.total; i++) if (!group.byIndex.has(i)) missing.push(i)
