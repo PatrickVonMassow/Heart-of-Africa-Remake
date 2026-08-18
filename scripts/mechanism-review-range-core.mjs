@@ -191,28 +191,28 @@ const contained = (record, sha) => {
 /**
  * The reading that rules one contribution, out of every reading of it.
  *
- * Ordering is by the recorded clock, the LAST row winning a tie: the ledger is
- * append-only, so the later line is the later reading even where the clock did
- * not move.  A row whose clock is unusable (`NaN`, `Infinity`, a string) has no
- * place in that order, so it never DECIDES one: where the readings disagree and
- * any clock is unusable, the refusal rules and the contribution stays owed.
- * Erring towards owed is the only safe side — the opposite clears a file the
- * newest reviewer refused, and nobody looks at it again.
+ * TWO ORDERINGS, AND THE WEAKER ONE IS ALWAYS AVAILABLE. Where both readings
+ * carry a readable clock the clock decides, the later LEDGER LINE breaking a
+ * tie.  Where either clock is unplaceable — absent, `NaN`, infinite, or a
+ * string, which is data of the wrong type and is never coerced into a time —
+ * the LINE decides alone: the ledger is append-only, so the row appended later
+ * is the later reading.  That keeps the rule total and RESOLVABLE, which a
+ * fail-safe "an unplaceable refusal wins" would not: one broken row would then
+ * freeze its contribution as owed for good, with no reading able to settle it,
+ * and an unsatisfiable gate is the very failure this point exists to remove.
  */
 export function newestReading(readings = []) {
   if (!readings.length) return null
-  const unusable = readings.some((row) => row.at === null)
-  const disagreed = new Set(readings.map((row) => String(row.record?.verdict))).size > 1
-  if (unusable && disagreed) {
-    const refusal = readings.find((row) => String(row.record?.verdict) === 'do-not-merge')
-    if (refusal) return refusal
-  }
-  let best = null
-  for (const row of readings) {
-    const at = row.at ?? Number.NEGATIVE_INFINITY
-    if (!best || at >= (best.at ?? Number.NEGATIVE_INFINITY)) best = row
-  }
+  let best = readings[0]
+  for (const row of readings) best = laterReading(best, row)
   return best
+}
+
+/** Of two readings of one contribution, the later. `b` wins a tie, so a scan in
+ *  ledger order ends on the last row of an otherwise equal set. */
+const laterReading = (a, b) => {
+  if (a.at !== null && b.at !== null) return b.at >= a.at ? b : a
+  return b.index >= a.index ? b : a
 }
 
 /**
@@ -227,7 +227,7 @@ export function outstandingContributions({ commits = [], records = [], recordUsa
   // the newest verdict, so a plan that counted the older clearance would hide
   // the very file the gate is blocking on and leave the block unresolvable.
   const latest = new Map()
-  for (const record of records ?? []) {
+  for (const [position, record] of (records ?? []).entries()) {
     const files = Array.isArray(record?.pass?.files) ? record.pass.files.map(String) : []
     const commitsRead = Array.isArray(record?.pass?.commits) ? record.pass.commits.map(String) : []
     if (!files.length || !commitsRead.length) continue
@@ -237,14 +237,16 @@ export function outstandingContributions({ commits = [], records = [], recordUsa
       if (!contained(record, contribution.sha)) continue
       if (contribution.authors.some((author) => sameModel(record.model, author))) continue
       const key = keyFor(contribution.sha, contribution.file)
-      // A clock that is not a finite number cannot be ordered at all, so it is
-      // carried as `null` rather than as a number: `Number('x') >= Number('x')`
-      // is false, which froze the FIRST such row as the permanent winner and
-      // let it hide every later reading behind it.
-      const clock = Number(record.at ?? 0)
-      const at = Number.isFinite(clock) ? clock : null
+      // A CLOCK IS A NUMBER OR IT IS NOTHING. `Number(record.at ?? 0)` read a
+      // numeric STRING as a time and an absent stamp as the epoch, so a row
+      // whose clock nobody wrote still outranked one that had it; and `NaN`
+      // could not be ordered at all, which froze the first such row as the
+      // permanent winner and hid every later reading behind it.
+      const at = typeof record.at === 'number' && Number.isFinite(record.at) ? record.at : null
       if (!latest.has(key)) latest.set(key, [])
-      latest.get(key).push({ record, at, contribution })
+      // The ledger POSITION travels with the reading: it is the ordering that
+      // survives when the clock does not.
+      latest.get(key).push({ record, at, contribution, index: position })
     }
   }
   const covered = new Set()

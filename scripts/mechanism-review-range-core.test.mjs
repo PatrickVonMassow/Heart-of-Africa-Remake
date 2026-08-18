@@ -221,42 +221,43 @@ describe('per-contribution review baseline', () => {
 
   // An unreadable clock used to decide every later comparison: `NaN >= NaN` is
   // false, so the first such row won forever and a clearance could bury the
-  // refusal that came after it.
-  for (const [name, at] of [['NaN', Number.NaN], ['an infinite stamp', Number.POSITIVE_INFINITY], ['a string', 'yesterday']]) {
-    it(`keeps a contribution owed when a clearance carries ${name} and another reading refuses it`, () => {
-      const row = (verdict, stamp) => ({
-        sha: sha('b'),
-        model: 'Opus 5',
-        verdict,
-        at: stamp,
-        containedShas: [sha('b')],
-        pass: { files: ['b'], commits: [sha('b')] },
-      })
-      for (const records of [
-        [row('merge', at), row('do-not-merge', 200)],
-        [row('do-not-merge', 200), row('merge', at)],
-      ]) {
-        const result = outstandingContributions({ commits, recordUsable: usable, records })
-        expect(result.outstanding.some((c) => c.file === 'b')).toBe(true)
-        expect(result.refusals).toHaveLength(1)
-      }
+  // refusal that came after it. A numeric string and an absent stamp were worse
+  // than unreadable — they were silently READ as a time and as the epoch.
+  const row = (verdict, at) => ({
+    sha: sha('b'),
+    model: 'Opus 5',
+    verdict,
+    ...(at === undefined ? {} : { at }),
+    containedShas: [sha('b')],
+    pass: { files: ['b'], commits: [sha('b')] },
+  })
+  const owed = (records) => outstandingContributions({ commits, recordUsable: usable, records })
+
+  for (const [name, at] of [
+    ['NaN', Number.NaN],
+    ['an infinite stamp', Number.POSITIVE_INFINITY],
+    ['a string', 'yesterday'],
+    ['a numeric string', '300'],
+    ['no stamp at all', undefined],
+  ]) {
+    it(`does not let a clearance carrying ${name} bury the refusal appended after it`, () => {
+      const result = owed([row('merge', at), row('do-not-merge', 200)])
+      expect(result.outstanding.some((c) => c.file === 'b')).toBe(true)
+      expect(result.refusals).toHaveLength(1)
+    })
+
+    it(`lets a reading appended later settle a refusal carrying ${name}`, () => {
+      // The counter-danger to the one above: a rule that let an unplaceable
+      // refusal win would freeze this contribution as owed for good, and an
+      // unsatisfiable gate is what this point exists to remove.
+      const result = owed([row('do-not-merge', at), row('merge', 500)])
+      expect(result.covered.some((c) => c.file === 'b')).toBe(true)
+      expect(result.refusals).toHaveLength(0)
     })
   }
 
   it('still lets a lone record with no clock rule its contribution', () => {
-    const result = outstandingContributions({
-      commits,
-      recordUsable: usable,
-      records: [
-        {
-          sha: sha('b'),
-          model: 'Opus 5',
-          verdict: 'merge',
-          containedShas: [sha('b')],
-          pass: { files: ['b'], commits: [sha('b')] },
-        },
-      ],
-    })
+    const result = owed([row('merge', undefined)])
     expect(result.covered.some((c) => c.file === 'b')).toBe(true)
     expect(result.refusals).toHaveLength(0)
   })
