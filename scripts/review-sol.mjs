@@ -772,10 +772,8 @@ export const usage = () =>
     'and split into PASSES over the FILE SET — --pass <k> reviews one of them, and the',
     'record it prints covers that pass alone. Splitting by COMMIT does not help: every',
     'commit ships the current content of the files it touches.',
-    '--carry-from <sha> (planning only, with neither --pass nor a fitting range): sorts the',
-    'pass plan into passes whose files are byte-identical at that earlier reviewed head —',
-    'their reading CARRIES via mechanism-review.mjs --carried-from, re-verified by the',
-    'recorder and the gates — and passes needing fresh eyes.',
+    'Recorded scoped passes remain cleared at their exact commit/file contributions; later',
+    'plans owe only new contributions. No carry record or carry planning flag is needed.',
     `Reviews run on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT} (CLAUDE.md §6). When it`,
     `cannot be reached the review is HANDED OVER to the first model of ${FALLBACK_CHAIN.join(' → ')}`,
     'that authored no part of the reviewed range — the recorded review always names the',
@@ -841,6 +839,13 @@ if (isMainModule(import.meta.url)) {
     // whole range, and an oversized range could never hand on one of its
     // passes. One selection serves every route.
     const passFlag = flag('--pass')
+    if (argv.includes('--carry-from')) {
+      console.error(
+        'review-sol: --carry-from is obsolete — recorded pass coverage now follows the exact ' +
+          'commit/file contributions it read, so the next plan automatically omits them and owes only new changes.',
+      )
+      process.exit(2)
+    }
     const passFor = (plan) => {
       if (!passFlag) return { pass: null }
       if (!plan) return { error: `--pass ${passFlag}: the range could not be measured, so no pass can be selected.` }

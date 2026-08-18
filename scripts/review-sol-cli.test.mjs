@@ -1050,4 +1050,17 @@ describe('a range too large for one round', () => {
     expect(r.status, r.stderr).toBe(0)
     expect(r.stderr).toContain('It fits in one round.')
   })
+
+  it('retires carry planning because recorded contribution coverage now persists directly', () => {
+    provenId()
+    const r = run([
+      '--sha', bulkSha,
+      '--brief', 'judge the remaining contributions',
+      '--carry-from', headSha,
+    ])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('--carry-from is obsolete')
+    expect(r.stderr).toContain('commit/file contributions')
+    expect(calls()).toEqual([])
+  })
 })
