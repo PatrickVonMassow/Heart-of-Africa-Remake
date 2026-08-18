@@ -621,6 +621,20 @@ describe('a range too large for one round', () => {
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
     expect(sent.length).toBeLessThanOrEqual(200_000)
     expect(sent).toContain('=== PATCH ===')
+    // THE RECORDER ACCEPTS IT, run rather than pattern-matched: a pass command
+    // the recorder refuses is a command that clears nothing.
+    const recorded = spawnSync(process.execPath, splitCommand(printed).slice(1), {
+      cwd: repo,
+      encoding: 'utf8',
+      windowsHide: true,
+      env: hermeticEnv(),
+    })
+    expect(recorded.status, recorded.stderr).toBe(0)
+    const ledger = readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')
+    expect(JSON.parse(ledger.at(-1))).toMatchObject({
+      sha: bulkSha,
+      pass: { index: 1, total: 2, files: [expect.stringMatching(/^bulk-[ab]\.txt$/)] },
+    })
   })
 
   it('reviews the OTHER pass, and the two together name both files', () => {

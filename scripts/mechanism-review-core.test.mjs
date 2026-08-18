@@ -25,6 +25,7 @@ import {
   receiptBalances,
   sameModel,
   validateMode,
+  validatePass,
   validateRecord,
   VERDICTS,
 } from './mechanism-review-core.mjs'
@@ -516,6 +517,84 @@ describe('evaluateMechanismReview', () => {
     })
     expect(v.block).toBe(true)
   })
+
+  // POINT 714: a range whose material no single round can hold is reviewed in
+  // passes over the FILE SET, and one pass clears nothing on its own.
+  describe('a review split into passes', () => {
+    const pass = (index, total, over = {}) =>
+      record({ pass: { index, total, files: [`scripts/f${index}.mjs`] }, at: MERGE_ACCOUNTING_SINCE + 1000 + index, ...over })
+    const covered = { coveringRecordShas: ['c'.repeat(40)] }
+
+    it('BLOCKS while a pass is still missing, and names which', () => {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [pass(1, 3), pass(3, 3)],
+      })
+      expect(v.block).toBe(true)
+      expect(v.findings[0].kind).toBe('incomplete-passes')
+      const text = formatMechanismReviewVerdict(v)
+      expect(text).toContain('split into 3 passes')
+      expect(text).toContain('missing pass 2')
+      expect(text).toContain('--pass 2')
+    })
+
+    it('CLEARS once every pass of the split is on record', () => {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [pass(1, 3), pass(2, 3), pass(3, 3)],
+      })
+      expect(v.block).toBe(false)
+    })
+
+    it('takes the WORST verdict of the composition — one refusing pass refuses the range', () => {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [pass(1, 2), pass(2, 2, { verdict: 'do-not-merge' })],
+      })
+      expect(v.block).toBe(true)
+      expect(v.findings[0].kind).toBe('do-not-merge')
+    })
+
+    it('keeps a WHOLE-RANGE record at the same sha working beside the passes', () => {
+      // The multimap: keyed by sha alone, the last row won and the earlier ones
+      // vanished — which is how a pass record could read as a whole-range review.
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [pass(1, 3), record({ at: MERGE_ACCOUNTING_SINCE + 9000 })],
+      })
+      expect(v.block).toBe(false)
+    })
+
+    it('does not let a pass of a self-review compose anything', () => {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [pass(1, 2, { model: 'Claude Opus 5' }), pass(2, 2, { model: 'Claude Opus 5' })],
+      })
+      expect(v.block).toBe(true)
+      expect(v.findings[0].kind).toBe('self-review')
+    })
+
+    it('does not mix two different splits of the same sha into one coverage', () => {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [pass(1, 2), pass(2, 3), pass(3, 3)],
+      })
+      expect(v.block).toBe(true)
+      expect(v.findings[0].kind).toBe('incomplete-passes')
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -685,6 +764,70 @@ describe('the flag surface itself', () => {
     expect(text).toContain('--a')
     expect(text).toContain('--b')
     expect(text.split('\n').length).toBeGreaterThan(2)
+  })
+
+  it('knows the pass flags, and lands their values where the record reads them', () => {
+    const p = parseArgs(['--record', 'abc1234', '--pass', '1/3', '--pass-files', 'a.mjs,b.mjs'])
+    expect(p.ok).toBe(true)
+    expect(p.values.pass).toBe('1/3')
+    expect(p.values.passFiles).toBe('a.mjs,b.mjs')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE PASS COMPOSITION (point 714). A range whose material no single review
+// round can hold is reviewed in passes over the FILE SET, and a record that
+// names one pass must say which files it read — or it claims a coverage nobody
+// can check.
+// ---------------------------------------------------------------------------
+describe('validatePass', () => {
+  it('accepts a pass that names its number, its total and its files', () => {
+    const v = validatePass({ pass: '2/4', passFiles: 'scripts/a.mjs, scripts/b.mjs' })
+    expect(v.ok).toBe(true)
+    expect(v.pass).toEqual({ index: 2, total: 4, files: ['scripts/a.mjs', 'scripts/b.mjs'] })
+  })
+
+  it('is silent on an ordinary record, which names no pass at all', () => {
+    expect(validatePass({})).toEqual({ ok: true, errors: [], pass: null })
+    expect(validatePass({ pass: '', passFiles: '' }).pass).toBeNull()
+  })
+
+  it('REFUSES a pass that does not say what it read', () => {
+    const v = validatePass({ pass: '1/2' })
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toContain('--pass-files')
+  })
+
+  it('REFUSES a file list belonging to no pass', () => {
+    const v = validatePass({ passFiles: 'scripts/a.mjs' })
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toContain('--pass')
+  })
+
+  it('REFUSES a single-pass split — that is an ordinary whole-range record', () => {
+    expect(validatePass({ pass: '1/1', passFiles: 'scripts/a.mjs' }).ok).toBe(false)
+  })
+
+  it('REFUSES a pass number outside its own split, and a malformed spec', () => {
+    expect(validatePass({ pass: '5/3', passFiles: 'a.mjs' }).ok).toBe(false)
+    expect(validatePass({ pass: 'two of three', passFiles: 'a.mjs' }).ok).toBe(false)
+  })
+
+  it('REFUSES a file list of nothing but separators', () => {
+    expect(validatePass({ pass: '1/2', passFiles: ' , , ' }).ok).toBe(false)
+  })
+
+  it('is asked by validateRecord, so a broken pass cannot be WRITTEN', () => {
+    const base = {
+      sha: 'a'.repeat(40),
+      model: 'GPT-5.6 Sol',
+      verdict: 'merge',
+      evidence: 'read both scripts of this pass end to end',
+      mode: 'review',
+      authoredBy: 'Claude Opus 5',
+    }
+    expect(validateRecord({ ...base, pass: '1/2', passFiles: 'scripts/a.mjs' }).ok).toBe(true)
+    expect(validateRecord({ ...base, pass: '1/2' }).ok).toBe(false)
   })
 })
 

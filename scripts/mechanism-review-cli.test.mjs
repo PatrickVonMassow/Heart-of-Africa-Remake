@@ -297,6 +297,8 @@ describe('the mode round-trips into the ledger', () => {
         'blind-merge-core.mjs',
         // the AUTHOR allowlist, which answers what a model trailer is (point 667)
         'model-guard-core.mjs',
+        // and how a review split into PASSES composes back into a coverage (714)
+        'review-material-core.mjs',
         'repo-paths.mjs',
         'is-main.mjs',
       ]) {

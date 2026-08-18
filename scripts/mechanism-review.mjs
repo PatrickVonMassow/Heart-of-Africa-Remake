@@ -47,6 +47,7 @@ import {
   modelsFromTrailers,
   MODES,
   parseArgs,
+  validatePass,
   validateRecord,
   VERDICTS,
 } from './mechanism-review-core.mjs'
@@ -151,6 +152,8 @@ export function buildRecord({
   unionPath = '',
   listAPath = '',
   listBPath = '',
+  pass = '',
+  passFiles = '',
   now = Date.now(),
   resolve = resolveCommit,
   countUnion = countUnionFiles,
@@ -172,6 +175,8 @@ export function buildRecord({
         mergedBy,
         mergeFallback,
         accounting,
+        pass,
+        passFiles,
       }).errors,
     }
   }
@@ -211,6 +216,8 @@ export function buildRecord({
     mergedBy,
     mergeFallback,
     accounting: receipt,
+    pass,
+    passFiles,
   })
   const errors = [...check.errors]
   // Optional, but never sloppy: a mistyped point number would record a review
@@ -221,6 +228,7 @@ export function buildRecord({
     errors.push('--point <N>: the work-order point this review settles, as a plain number')
   }
   if (errors.length) return { ok: false, errors }
+  const passField = validatePass({ pass, passFiles }).pass
   return {
     ok: true,
     record: {
@@ -246,6 +254,11 @@ export function buildRecord({
       // — and WHERE it came from: `computed` was measured from the files here,
       // `stated` was typed by whoever ran the merge.
       ...(String(receipt).trim() ? { accounting: String(receipt).trim(), accountingSource: source } : {}),
+      // WHICH PASS OF WHICH SPLIT, AND OVER WHICH FILES (point 714). A range no
+      // single round can hold is reviewed in passes over the file set; the gate
+      // clears it only once every pass of the same total is on record, so this
+      // field is what turns several partial verdicts into one coverage.
+      ...(passField ? { pass: passField } : {}),
       ...(wanted ? { point: Number(wanted) } : {}),
       at: now,
       atIso: new Date(now).toISOString(),
@@ -290,6 +303,10 @@ export const usage = () =>
   `       --union <U.json> --list-a <A> --list-b <B>   (preferred; --accounting then\n` +
   `       needs no value). Or run node scripts/blind-merge.mjs first and pass the line\n` +
   `       it prints as --accounting "<summary>".\n` +
+  `--pass <k>/<n> --pass-files "<a,b,c>" records ONE pass of a range whose material no\n` +
+  `       single review round can hold. The passes cut through the FILE SET, and the gate\n` +
+  `       clears the range only once EVERY pass of the same total is recorded — a pass on\n` +
+  `       its own covers the files it names and nothing else. review-sol.mjs prints them.\n` +
   `\nWHO REVIEWS (CLAUDE.md §6): the OTHER vendor, never an author of the range.\n` +
   `       Claude authored it → GPT-5.6 Sol at reasoning effort high, and when Sol is\n` +
   `       unavailable the first of Fable 5 / Opus 5 / Opus 4.8 that wrote no part of it.\n` +
@@ -329,7 +346,8 @@ if (isMainModule(import.meta.url)) {
             `[${r.mode || 'mode not recorded'}]  ${r.atIso ?? ''}` +
             `\n      ${r.evidence ?? ''}${r.framing ? `\n      framing: ${r.framing}` : ''}` +
             `${r.mergedBy ? `\n      union merged by: ${r.mergedBy}${r.mergeFallback ? ` (two-model fallback: ${r.mergeFallback})` : ''}` : ''}` +
-            `${r.accounting ? `\n      accounting: ${r.accounting}` : ''}`,
+            `${r.accounting ? `\n      accounting: ${r.accounting}` : ''}` +
+            `${r.pass ? `\n      pass ${r.pass.index}/${r.pass.total} over: ${(r.pass.files ?? []).join(', ')}` : ''}`,
         )
       }
       process.exit(0)

@@ -17,10 +17,14 @@
 // scripts/mechanism-review-guard.mjs (fail-open) and the record CLI
 // scripts/mechanism-review.mjs. Pinned by mechanism-review-core.test.mjs.
 
-// The ONE import: what a co-author trailer naming a MODEL looks like. It is the
-// author allowlist's own answer (scripts/model-guard-core.mjs, which imports
-// nothing), so "who authored this" cannot drift from "who may author at all".
+// What a co-author trailer naming a MODEL looks like. It is the author
+// allowlist's own answer (scripts/model-guard-core.mjs, which imports nothing),
+// so "who authored this" cannot drift from "who may author at all".
 import { modelNamesIn } from './model-guard-core.mjs'
+// …and how a review split into PASSES over the file set composes back into a
+// coverage (point 714). Both the recorder and this gate ask the same module, so
+// what may be WRITTEN and what CLEARS cannot drift apart.
+import { parsePassFiles, parsePassSpec, passComposition, worstVerdict } from './review-material-core.mjs'
 
 /** The verdicts a review may end in, weakest refusal last. */
 export const VERDICTS = Object.freeze(['merge', 'merge-with-fixes', 'do-not-merge'])
@@ -476,6 +480,10 @@ export const FLAG_SPEC = Object.freeze({
   '--union': true,
   '--list-a': true,
   '--list-b': true,
+  // A range whose material no single round can hold is reviewed in PASSES over
+  // the file set, and each pass records what it actually read (point 714).
+  '--pass': true,
+  '--pass-files': true,
   '--list': false,
 })
 
@@ -497,6 +505,8 @@ const VALUE_KEY = Object.freeze({
   '--union': 'unionPath',
   '--list-a': 'listAPath',
   '--list-b': 'listBPath',
+  '--pass': 'pass',
+  '--pass-files': 'passFiles',
 })
 
 /** Levenshtein distance — small inputs only, so the simple two-row form. */
@@ -697,6 +707,42 @@ export function validateMode({ mode, framing } = {}) {
 }
 
 /**
+ * Is the PASS this record claims a usable one, and does it say what it read?
+ *
+ * A pass record is the answer to a range no single review round can hold (point
+ * 714): the material is cut through the FILE SET, each pass is reviewed on its
+ * own, and the range is cleared only once every pass is on record. So a pass
+ * MUST name its files — a verdict that covers "one of three passes" without
+ * saying which files it read is a coverage claim nobody can check — and the two
+ * flags come as a pair, because either alone describes half a composition.
+ *
+ * Returns { ok, errors, pass } with `pass` the parsed record field, or null.
+ */
+export function validatePass({ pass, passFiles } = {}) {
+  const spec = String(pass ?? '').trim()
+  const listed = String(passFiles ?? '').trim()
+  if (!spec && !listed) return { ok: true, errors: [], pass: null }
+  const errors = []
+  if (!spec) {
+    errors.push('--pass-files without --pass <k>/<n>: a file list belongs to a pass, and this record names none')
+  }
+  if (spec && !listed) {
+    errors.push(
+      '--pass <k>/<n> without --pass-files: a pass verdict covers the files it actually read, and a ' +
+        'record that does not name them claims a coverage nobody can check',
+    )
+  }
+  const parsed = spec ? parsePassSpec(spec) : { ok: false, errors: [] }
+  errors.push(...parsed.errors)
+  const files = parsePassFiles(listed)
+  if (listed && !files.length) {
+    errors.push('--pass-files "<a,b,c>": the paths this pass reviewed, comma-separated')
+  }
+  if (errors.length) return { ok: false, errors, pass: null }
+  return { ok: true, errors: [], pass: { index: parsed.index, total: parsed.total, files } }
+}
+
+/**
  * Is this a well-formed review record, and may it be WRITTEN?
  *
  * `authoredBy` is the model that authored the reviewed commit, read from its own
@@ -715,9 +761,12 @@ export function validateRecord({
   mergeFallback,
   accounting,
   authors,
+  pass,
+  passFiles,
 } = {}) {
   const errors = []
   errors.push(...validateMode({ mode, framing }).errors)
+  errors.push(...validatePass({ pass, passFiles }).errors)
   errors.push(...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors }).errors)
   if (!/^[0-9a-f]{7,40}$/i.test(String(sha ?? '').trim())) {
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
@@ -821,13 +870,19 @@ export function evaluateMechanismReview({
 } = {}) {
   if (!baseline) return { block: false, clear: true, bootstrap: true, findings: [], head }
 
-  const bySha = new Map((records ?? []).map((r) => [String(r?.sha ?? ''), r]))
+  // A MULTIMAP, not one row per sha (point 714). A range reviewed in passes has
+  // several records at the SAME sha, and keying them by sha alone kept only the
+  // last one — which would read as a whole-range review when it covers one pass.
+  const bySha = new Map()
+  for (const record of records ?? []) {
+    const key = String(record?.sha ?? '')
+    if (!bySha.has(key)) bySha.set(key, [])
+    bySha.get(key).push(record)
+  }
   const findings = []
 
   for (const commit of pendingCommits ?? []) {
-    const covering = (commit?.coveringRecordShas ?? [])
-      .map((s) => bySha.get(String(s)))
-      .filter(Boolean)
+    const covering = [...new Set(commit?.coveringRecordShas ?? [])].flatMap((s) => bySha.get(String(s)) ?? [])
     // A record is only a review if it says who reviewed and how it ended; a
     // half-written line must not clear the gate.
     const wellFormed = covering.filter(
@@ -841,9 +896,34 @@ export function evaluateMechanismReview({
     // than MERGE_ACCOUNTING_SINCE are grandfathered by DATE; treating a MISSING
     // field as legacy is what let an edited row simply omit it.
     const selfReviews = wellFormed.filter((r) => sameModel(r.model, commit?.authorModel) || mergeProblem(r, commit))
-    const valid = wellFormed.filter((r) => !sameModel(r.model, commit?.authorModel) && !mergeProblem(r, commit))
+    const sound = wellFormed.filter((r) => !sameModel(r.model, commit?.authorModel) && !mergeProblem(r, commit))
+
+    // A PASS CLEARS NOTHING ON ITS OWN (point 714). The material of a large range
+    // is cut through the file set and reviewed one pass at a time, so a single
+    // pass record covers the files it named and no more; only a COMPLETE
+    // composition — every pass of the same total — stands for the range. An
+    // incomplete one is reported as such rather than silently clearing the gate.
+    const compositions = passComposition(sound)
+    const complete = compositions.filter((g) => g.complete)
+    const incomplete = compositions.filter((g) => !g.complete)
+    const valid = [
+      ...sound.filter((r) => !r?.pass),
+      ...complete.map((g) => ({
+        ...g.records.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a)),
+        // The composition speaks with the WORST of its passes: one pass saying
+        // do-not-merge is a range that must not merge, whatever the others found.
+        verdict: worstVerdict(g.records),
+        at: Math.max(...g.records.map((r) => Number(r.at ?? 0))),
+        composedOf: g.total,
+      })),
+    ]
 
     if (!valid.length) {
+      if (incomplete.length) {
+        const worst = incomplete.reduce((a, b) => (b.missing.length >= a.missing.length ? b : a))
+        findings.push({ kind: 'incomplete-passes', commit, records: worst.records, passes: worst })
+        continue
+      }
       findings.push({
         kind: selfReviews.length ? 'self-review' : 'no-review',
         commit,
@@ -881,6 +961,18 @@ export function formatMechanismReviewVerdict(verdict) {
         `      ${files}`,
         `      ${String(r.model).trim()} reviewed this and said DO-NOT-MERGE: ${r.evidence ?? ''}`,
         '      Fix what the review found, then record the re-review — the verdict is not advisory.',
+      )
+      continue
+    }
+    if (f.kind === 'incomplete-passes') {
+      const p = f.passes ?? {}
+      lines.push(
+        `  ✗ ${short(c.sha)} ${c.subject ?? ''}`,
+        `      ${files}`,
+        `      the review was split into ${p.total} passes over the FILE SET and only ${p.have} are on ` +
+          `record — missing pass ${(p.missing ?? []).join(', ')}`,
+        '      A pass covers the files it named; the range is cleared when every pass is recorded:',
+        `      node scripts/review-sol.mjs --sha ${short(c.sha)} --brief "<what to judge>" --pass ${(p.missing ?? [])[0] ?? 1}`,
       )
       continue
     }
