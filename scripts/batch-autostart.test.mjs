@@ -178,6 +178,14 @@ describe('the launcher runs the board watchdog', () => {
     }
   })
 
+  it('redeems due carried answers before the watchdog and every owner no-spawn exit', () => {
+    const redeem = lineOf(/vdzk-answer\.mjs.*--redeem-due/, 'the carried-answer redemption')
+    const watch = lineOf(/board-watchdog\.mjs/, 'the board watchdog call')
+    expect(redeem).toBeLessThan(watch)
+    expect(watch).toBeLessThan(lineOf(/openPointCount\(\)/, 'the work-order read'))
+    expect(codeLines.slice(redeem, watch).join('\n')).toContain('answered-card redemption deferred')
+  })
+
   it('cannot stop the launcher: the block is wrapped and fails open', () => {
     // A board check that could throw would take the RESURRECTION down with it —
     // the launcher's job is bringing the batch back, and this is a backstop.

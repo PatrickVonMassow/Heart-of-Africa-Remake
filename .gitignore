@@ -112,6 +112,16 @@ scripts/.tile-cache
 .claude/batch-lock.json.reaping
 .claude/timestamp-guard-state.json
 .claude/decision-card-guard-state.json
+.claude/decision-card-guard-state.json.tmp-*
+.claude/vdzk-answers.json
+.claude/vdzk-answers.json.tmp-*
+# The board read-modify-write mutex and its private fencing state. Like the board
+# itself these identify processes on this machine, not repository content.
+.claude/board-edit-lock.json
+.claude/board-edit-lock.json.tmp-*
+.claude/board-edit-lock.json.reaping
+.claude/board-edit-lock.json.fence
+.claude/board-edit-lock.json.fence.tmp-*
 .claude/batch-boundary.json
 .claude/batch-boundary.json.tmp-*
 .claude/batch-boundary-prepared.json
