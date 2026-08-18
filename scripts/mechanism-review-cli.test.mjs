@@ -161,7 +161,11 @@ describe('the mode round-trips into the ledger', () => {
       verdict: 'merge',
       evidence: 'read the core against the spec and ran the pure cases',
       now: 1_700_000_000_000,
-      resolve: () => stub(),
+      // The stub ANSWERS THE REF IT WAS ASKED (not a fixed sha): the recorder
+      // resolves every contribution boundary through the same resolver, and a
+      // stub blind to its argument would hide a boundary resolved to the wrong
+      // commit.
+      resolve: (ref) => stub({ sha: String(ref) }),
       ...over,
     })
 
@@ -214,6 +218,48 @@ describe('the mode round-trips into the ledger', () => {
       files: ['scripts/shared-guard.mjs'],
       commits: [a, b],
     })
+  })
+
+  it('stores a contribution boundary WHOLE, so the gate can match it at all', () => {
+    const full = 'a'.repeat(40)
+    const built = build({
+      mode: 'review',
+      pass: '1/2',
+      passFiles: 'scripts/shared-guard.mjs',
+      // The flag accepts an abbreviation; the gate compares against full shas.
+      passCommits: full.slice(0, 8),
+      resolve: (ref) => ({ ...stub(), sha: String(ref).length === 40 ? String(ref) : full }),
+    })
+    expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
+    expect(built.record.pass.commits).toEqual([full])
+  })
+
+  it('refuses a contribution boundary this repository cannot resolve', () => {
+    const built = build({
+      mode: 'review',
+      pass: '1/2',
+      passFiles: 'scripts/shared-guard.mjs',
+      passCommits: 'deadbeef',
+      resolve: (ref) => {
+        if (String(ref) === 'deadbeef') throw new Error('no such commit')
+        return stub({ sha: String(ref) })
+      },
+    })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join('\n')).toContain('--pass-commits deadbeef')
+  })
+
+  it('refuses two boundaries that name the same commit once resolved', () => {
+    const full = 'a'.repeat(40)
+    const built = build({
+      mode: 'review',
+      pass: '1/2',
+      passFiles: 'scripts/shared-guard.mjs',
+      passCommits: `${full.slice(0, 8)},${full}`,
+      resolve: (ref) => ({ ...stub(), sha: String(ref).length === 40 ? String(ref) : full }),
+    })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join('\n')).toContain('resolve to the same commit')
   })
 
   it('refuses to carry an authorship scope into a different plan', () => {

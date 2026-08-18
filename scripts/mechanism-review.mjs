@@ -284,7 +284,30 @@ export function buildRecord({
     errors.push('--point <N>: the work-order point this review settles, as a plain number')
   }
   if (errors.length) return { ok: false, errors }
-  const passField = validatePass({ pass, passFiles, passCommits }).pass
+  let passField = validatePass({ pass, passFiles, passCommits }).pass
+  // A CONTRIBUTION BOUNDARY IS STORED WHOLE. The flag accepts a 7–40 character
+  // sha, but the gate matches a record's commits against the range's FULL shas
+  // by exact string — an abbreviated boundary therefore covered NOTHING while
+  // the record looked complete, the silent shape point 714 exists to refuse. So
+  // the boundary is resolved here, and a sha this repository cannot resolve is
+  // a refusal rather than a row nobody can act on.
+  if (passField?.commits) {
+    const resolved = []
+    for (const boundary of passField.commits) {
+      try {
+        resolved.push(resolve(boundary).sha)
+      } catch (e) {
+        return { ok: false, errors: [`--pass-commits ${boundary}: ${(e && e.message) || e}`] }
+      }
+    }
+    if (new Set(resolved).size !== resolved.length) {
+      return {
+        ok: false,
+        errors: ['--pass-commits: two boundaries resolve to the same commit; each contribution is named once'],
+      }
+    }
+    passField = { ...passField, commits: resolved }
+  }
   return {
     ok: true,
     record: {
