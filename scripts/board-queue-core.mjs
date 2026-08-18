@@ -885,14 +885,22 @@ export function commissionDecision({
   if (!known) return ok('no-point')
   if (order.length === 0) return ok('no-work-order')
   if (idx < 0) return ok('not-in-work-order')
+  // A point waiting on the user cannot be worked AT ALL, and that is a different
+  // sentence from "it is behind others" — reporting the second for the first is
+  // how a gate reads as a queue-order quibble.
+  //
+  // IT IS ASKED BEFORE THE IN-FLIGHT QUESTION, and the order is the rule (Sol,
+  // review of 91d88f9a): asked after it, an existing branch for a gated point
+  // bought every further commissioning on it — spawn an agent, start an
+  // authoring run — which is the opposite of "cannot be worked at all". A branch
+  // that already stands does not turn the user's gate into permission; the
+  // recorded override is not an escape here either: the queue's ORDER is mine to
+  // depart from with a reason, the user's gate is not.
+  if (g.gated.has(n)) return { ...out, allowed: false, why: 'user-gated' }
   // Work already under way is not being OPENED. The refusal fires at the moment
   // a point is picked up; a session pushing to the branch it already holds, or
   // re-cutting one that exists, is finishing, not starting.
   if (busy.has(n)) return ok('already-in-flight')
-  // A point waiting on the user cannot be worked at all, and that is a different
-  // sentence from "it is behind others" — reporting the second for the first is
-  // how a gate reads as a queue-order quibble.
-  if (g.gated.has(n)) return { ...out, allowed: false, why: 'user-gated' }
   if (candidates.includes(n)) return ok('at-front')
   if (candidates.length === 0) return ok('no-candidates')
   if (reason) return ok('override')

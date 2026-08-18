@@ -1037,6 +1037,21 @@ describe('commissionDecision — the real 17.08.2026 pick is refused', () => {
     })
   })
 
+  // THE INTERSECTION, which the two cases above miss between them (Sol, review of
+  // 91d88f9a): a gated point WITH a branch standing. Asked in the other order, an
+  // open branch bought every further commissioning on a point the user has
+  // stopped — the opposite of "cannot be worked at all".
+  it('a GATED point stays refused even while its branch stands open', () => {
+    const gates = { gated: new Set([697]), answered: new Set(), since: new Map() }
+    const d = commissionDecision({ point: 697, open: QUEUE_17_08, gates, inFlight: [697] })
+    expect(d).toMatchObject({ allowed: false, why: 'user-gated' })
+    expect(commissionRefusal(d)).toContain('WAITING ON THE USER')
+    // …and with a typed reason on top of the branch, still refused.
+    expect(
+      commissionDecision({ point: 697, open: QUEUE_17_08, gates, inFlight: [697], override: 'urgent' }).allowed,
+    ).toBe(false)
+  })
+
   it('cannot judge, so it ALLOWS: no point, no work order, a point the order does not carry', () => {
     expect(commissionDecision({ open: QUEUE_17_08 })).toMatchObject({ allowed: true, why: 'no-point' })
     expect(commissionDecision({ point: 0, open: QUEUE_17_08 }).why).toBe('no-point')
