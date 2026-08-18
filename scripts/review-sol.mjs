@@ -77,7 +77,6 @@ import {
 } from './review-sol-core.mjs'
 import {
   assembleMaterial,
-  formatPassFiles,
   formatPassManifest,
   formatShortfall,
   isBinaryPatchSection,
@@ -513,15 +512,6 @@ function mergeBase(ref, sha, { explicit = false } = {}) {
       `    --since ${sha.slice(0, 7)}~1   (this commit alone)\n` +
       '    --since <the last reviewed sha>',
   )
-}
-
-/** Every model that authored a commit in the reviewed range. */
-function authorsIn(sha, base) {
-  const field = '%(trailers:key=Co-Authored-By,valueonly,separator=;)'
-  const log = git(['log', `--format=${field}`, `${base}..${sha}`])
-  // EVERY model on each line, not just its first: a commit naming two would
-  // otherwise hide one, and the chain could hand the review to an author.
-  return String(log).split('\n').flatMap((line) => modelsInTrailerField(line))
 }
 
 /**
