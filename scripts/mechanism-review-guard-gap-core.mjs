@@ -33,6 +33,33 @@
  */
 export const REVIEW_GAP_BUDGET_CHARS = 200_000
 
+/** MIRRORS `MAX_PASS_TOTAL` in scripts/review-material-core.mjs, for the same
+ *  reason as the budget mirror above: the recorder accepts no split of more
+ *  than this many passes, so `budget × this` is the most material ANY
+ *  recordable split can carry — a proven floor above it needs no plan to rule. */
+export const REVIEW_GAP_MAX_PASS_TOTAL = 256
+
+/** What DELIVERY adds to the raw parts in a single no-manifest round, mirrored
+ *  from assembleMaterial (the section frames and the receipt line, then one
+ *  header and its separators per carried file). The no-splitter ruling reads
+ *  the rendered floor through these; where the tool exists its own fit ruling
+ *  outranks this estimate. The per-file constant is the header's fixed text
+ *  plus its two separators, deliberately a couple of characters ABOVE the real
+ *  cost: at the margin an over-estimate reports a gap the assembly would just
+ *  have fitted (fail-open by a hair), while an under-estimate re-arms the
+ *  permanent trap this file exists to end. */
+export const REVIEW_GAP_FIXED_DELIVERY_CHARS = 96
+export const REVIEW_GAP_PER_FILE_DELIVERY_CHARS = 40
+
+/** The rendered floor of a no-splitter round: the raw parts plus what delivery
+ *  adds. Pure, so the wrapper and the tests read the same arithmetic. */
+export function estimateRenderedChars({ measuredChars = 0, filePaths = [] } = {}) {
+  const parts = Number(measuredChars) || 0
+  let overhead = REVIEW_GAP_FIXED_DELIVERY_CHARS
+  for (const p of filePaths ?? []) overhead += REVIEW_GAP_PER_FILE_DELIVERY_CHARS + String(p ?? '').length
+  return parts + overhead
+}
+
 /**
  * Rule on the gap for ONE range.
  *
@@ -55,6 +82,8 @@ export function decideReviewGap({
   budget = REVIEW_GAP_BUDGET_CHARS,
   planner = null,
   measurementError = '',
+  oversizeProven = false,
+  renderedChars = null,
 } = {}) {
   const cap = Math.max(0, Number(budget) || 0) || REVIEW_GAP_BUDGET_CHARS
   // An ABSENT measurement is not the number zero: Number(null) is 0, and a
@@ -67,6 +96,25 @@ export function decideReviewGap({
       gap: false,
       reason: 'unmeasured',
       detail: String(measurementError || 'the material size could not be measured'),
+      budget: cap,
+    }
+  }
+  // A READING THAT OVERFLOWED ITS BUFFER IS A MEASUREMENT, NOT A FAILURE
+  // (landing-round pass 3): git output past the measurement buffer used to
+  // throw, rule 'unmeasured' and keep blocking — so material large enough to
+  // be UNASSEMBLABLE BY NECESSITY recreated the permanent trap this ruling
+  // exists to end. What the overflow proves is a FLOOR: at least `size`
+  // characters. Above the widest recordable split (budget × max pass total)
+  // no plan can exist and the gap is proven without one; a floor below that
+  // ceiling proves nothing either way, and an unproven claim keeps blocking.
+  if (oversizeProven) {
+    if (size > cap * REVIEW_GAP_MAX_PASS_TOTAL) {
+      return { gap: true, reason: 'beyond-any-split', measuredChars: size, floor: true, budget: cap }
+    }
+    return {
+      gap: false,
+      reason: 'unmeasured',
+      detail: `the material overflowed the measurement buffer (a floor of ${size} characters, which proves nothing at this budget)`,
       budget: cap,
     }
   }
@@ -86,7 +134,14 @@ export function decideReviewGap({
       uncoverable: [...(planner.uncoverable ?? [])].map((p) => String(p)),
     }
   }
-  if (size <= cap) return { gap: false, reason: 'fits', measuredChars: size, budget: cap }
+  // WITHOUT THE TOOL, THE RENDERED FLOOR DECIDES, not the raw sum (landing-
+  // round pass 3): delivery adds frames, headers and the receipt, so raw
+  // material just under the budget could exceed it once rendered — and the
+  // guard then demanded a review the assembly refuses. The wrapper hands the
+  // estimate in (estimateRenderedChars); a caller without one falls back to
+  // the raw sum, which is the old, narrower reading.
+  const rendered = Number.isFinite(Number(renderedChars)) && renderedChars !== null ? Number(renderedChars) : size
+  if (Math.max(size, rendered) <= cap) return { gap: false, reason: 'fits', measuredChars: size, budget: cap }
   return { gap: true, reason: 'no-splitter', measuredChars: size, budget: cap }
 }
 
@@ -106,10 +161,17 @@ export function formatReviewGap({ baseline = '', head = '', decision = {}, stand
   const range = `${String(baseline).slice(0, 12)}..${String(head).slice(0, 12)}`
   const lines = [
     `mechanism-review-guard: REVIEW GAP — the material for ${range} cannot be assembled for review:`,
-    `  measured ${decision.measuredChars} characters against the ${decision.budget}-character round budget.`,
+    `  measured ${decision.measuredChars}${decision.floor ? '+' : ''} characters against the ${decision.budget}-character round budget` +
+      `${decision.floor ? ' (a proven floor — the reading overflowed the measurement buffer)' : ''}.`,
   ]
   if (decision.reason === 'no-splitter') {
     lines.push('  This tree carries no pass-splitting tool, so no round can hold the range at all.')
+  }
+  if (decision.reason === 'beyond-any-split') {
+    lines.push(
+      `  That floor exceeds the widest recordable split (${REVIEW_GAP_MAX_PASS_TOTAL} passes of ` +
+        `${decision.budget} characters), so no pass plan can cover this range whatever it cuts.`,
+    )
   }
   if (decision.reason === 'split-cannot-cover' && decision.uncoverable?.length) {
     lines.push(

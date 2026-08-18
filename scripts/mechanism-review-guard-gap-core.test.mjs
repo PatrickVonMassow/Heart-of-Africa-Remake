@@ -8,10 +8,12 @@ import { SPLITTER_SPELLINGS } from './mechanism-review-guard-gap.mjs'
 import {
   criticalityGapPlan,
   decideReviewGap,
+  estimateRenderedChars,
   formatCriticalityGap,
   formatReviewGap,
   guardOutcome,
   REVIEW_GAP_BUDGET_CHARS,
+  REVIEW_GAP_MAX_PASS_TOTAL,
 } from './mechanism-review-guard-gap-core.mjs'
 
 const material = await import('./review-material-core.mjs').catch(() => null)
@@ -70,6 +72,35 @@ describe('decideReviewGap', () => {
       expect(d.gap, JSON.stringify(broken)).toBe(false)
       expect(d.reason).toBe('unmeasured')
     }
+  })
+
+  it('a PROVEN oversize floor past the widest split rules the gap without a plan (landing round)', () => {
+    const d = decideReviewGap({
+      measuredChars: REVIEW_GAP_BUDGET_CHARS * REVIEW_GAP_MAX_PASS_TOTAL + 1,
+      oversizeProven: true,
+    })
+    expect(d.gap).toBe(true)
+    expect(d.reason).toBe('beyond-any-split')
+    expect(d.floor).toBe(true)
+  })
+
+  it('a proven floor BELOW the widest split proves nothing — it keeps blocking', () => {
+    const d = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS * 2, oversizeProven: true })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('unmeasured')
+  })
+
+  it('the no-splitter branch judges the RENDERED floor, not the raw sum (landing round)', () => {
+    // Raw material just under the budget exceeds it once frames, headers and
+    // the receipt render — the guard then demanded a review the assembly
+    // refuses.
+    const raw = REVIEW_GAP_BUDGET_CHARS - 10
+    const over = decideReviewGap({ measuredChars: raw, renderedChars: REVIEW_GAP_BUDGET_CHARS + 1 })
+    expect(over.gap).toBe(true)
+    expect(over.reason).toBe('no-splitter')
+    const fits = decideReviewGap({ measuredChars: raw, renderedChars: REVIEW_GAP_BUDGET_CHARS })
+    expect(fits.gap).toBe(false)
+    expect(fits.reason).toBe('fits')
   })
 
   it('a measurement error outranks a plausible size — the error is the truth', () => {
@@ -326,8 +357,62 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
       ['diff', '--stat', range],
       ['diff', '--no-ext-diff', '--no-textconv', range],
       ['diff', '--name-only', '-z', range],
+      ['cat-file', '-s', `${'b'.repeat(40)}:big.md`],
       ['show', `${'b'.repeat(40)}:big.md`],
     ])
+  })
+
+  it('an overflowed range reading rules a PROVEN floor, never unmeasured (landing-round pass 3)', async () => {
+    // ENOBUFS on the patch used to throw into the measurement catch and rule
+    // 'unmeasured' — blocking forever exactly where the material is provably
+    // unassemblable. The overflow proves a floor far beyond any recordable
+    // split, and the gap is ruled without a plan.
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const overflowing = (args) => {
+      if (args[0] === 'diff' && !args.includes('--stat') && !args.includes('--name-only')) {
+        throw Object.assign(new Error('spawnSync git ENOBUFS'), { code: 'ENOBUFS' })
+      }
+      return bigRun(args)
+    }
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: overflowing,
+      loadTool: () => Promise.reject(absent),
+    })
+    expect(d.gap).toBe(true)
+    expect(d.reason).toBe('beyond-any-split')
+    expect(d.floor).toBe(true)
+    expect(d.report).toContain('proven floor')
+  })
+
+  it('asks a blob its size first and never reads a huge one whole (landing-round pass 3)', async () => {
+    // `git show` on a big-enough blob overflowed the buffer and ruled
+    // 'unmeasured' — the same permanent trap through the content door. The
+    // size is asked in a dozen characters; a blob past the read limit feeds
+    // the ruling a stand-in with the same planning consequence instead.
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const seen = []
+    const sized = (args) => {
+      seen.push(args)
+      if (args[0] === 'cat-file') return String(64 * 1024 * 1024)
+      if (args[0] === 'diff' && args.includes('--stat')) return 'stat'
+      if (args[0] === 'diff' && args.includes('--name-only')) return 'big.md\0'
+      if (args[0] === 'diff') return 'patch'
+      if (args[0] === 'show') throw new Error('a huge blob must never be read whole')
+      return ''
+    }
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: sized,
+      loadTool: () => Promise.reject(absent),
+    })
+    expect(seen.some((a) => a[0] === 'show')).toBe(false)
+    // 64 MiB floors to 16M characters — over budget, no splitter: a gap.
+    expect(d.gap).toBe(true)
+    expect(d.reason).toBe('no-splitter')
+    expect(d.measuredChars).toBeGreaterThan(REVIEW_GAP_BUDGET_CHARS)
   })
 
   it('a blob read that fails for anything but ABSENCE rules unmeasured (final-round pass 3)', async () => {
@@ -420,5 +505,28 @@ describe('the budget mirror', () => {
     // Declared apart so the clause survives a tree without the tool; pinned
     // equal so the two never drift where both exist.
     expect(REVIEW_GAP_BUDGET_CHARS).toBe(material.MATERIAL_BUDGET_CHARS)
+  })
+
+  it.skipIf(!material)('the pass-total mirror equals MAX_PASS_TOTAL too', () => {
+    expect(REVIEW_GAP_MAX_PASS_TOTAL).toBe(material.MAX_PASS_TOTAL)
+  })
+
+  it.skipIf(!material)('the rendered estimate never UNDER-counts what the assembly writes', () => {
+    // The no-splitter ruling reads the rendered floor through this estimate;
+    // an under-count re-arms the trap at the margin, so the pin is one-sided.
+    // Every file carries a section, as in a real measurement: the paths come
+    // off the same diff the patch was read from.
+    const section = (p) =>
+      `diff --git a/${p} b/${p}\nindex 1..2 100644\n--- a/${p}\n+++ b/${p}\n@@ -1 +1 @@\n+x\n`
+    const stat = ' a.txt | 2 +-\n 1 file changed\n'
+    const patch = `${section('a.txt')}${section('some/deeper/path-name.md')}`
+    const files = [
+      { path: 'a.txt', text: 'the body of a\n' },
+      { path: 'some/deeper/path-name.md', text: 'the body of b\n' },
+    ]
+    const assembled = material.assembleMaterial({ stat, patch, files })
+    const raw = stat.length + patch.length + files.reduce((n, f) => n + f.text.length, 0)
+    const estimate = estimateRenderedChars({ measuredChars: raw, filePaths: files.map((f) => f.path) })
+    expect(estimate).toBeGreaterThanOrEqual(assembled.size)
   })
 })

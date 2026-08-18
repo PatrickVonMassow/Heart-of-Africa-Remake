@@ -32,19 +32,50 @@ export const SPLITTER_SPELLINGS = Object.freeze(
   })(),
 )
 import { REPO_ROOT } from './repo-paths.mjs'
-import { decideReviewGap, formatReviewGap, REVIEW_GAP_BUDGET_CHARS } from './mechanism-review-guard-gap-core.mjs'
+import {
+  decideReviewGap,
+  estimateRenderedChars,
+  formatReviewGap,
+  REVIEW_GAP_BUDGET_CHARS,
+} from './mechanism-review-guard-gap-core.mjs'
 
 // The patch of a jammed range is megabytes by definition here — the default
 // 1 MiB pipe would throw ENOBUFS and turn every measurement into 'unmeasured'.
 const MAX_BUFFER = 512 * 1024 * 1024
 
-const git = (args) =>
-  execFileSync('git', args, {
-    cwd: REPO_ROOT,
-    windowsHide: true,
-    encoding: 'utf8',
-    maxBuffer: MAX_BUFFER,
-  })
+// A read that OVERFLOWS the buffer is a MEASUREMENT (landing-round pass 3): it
+// proves the output holds at least MAX_BUFFER bytes, hence at least this many
+// characters (UTF-8 spends at most four bytes per character) — far past what
+// any recordable split can carry, so the trap this file ends must not re-arm
+// on the ranges big enough to need it most. The error is tagged, never
+// swallowed: everything that is not the overflow still rethrows.
+export const OVERSIZE_FLOOR_CHARS = Math.floor(MAX_BUFFER / 4)
+
+// A blob whose size is beyond any pass's content room is never READ whole for
+// a measurement — a stand-in string of the same planning consequence is fed to
+// the splitter instead (see measureReviewMaterial). Well under MAX_BUFFER, so
+// `git show` on a file this measurement does read cannot overflow.
+const CONTENT_READ_LIMIT_BYTES = 8 * 1024 * 1024
+
+const git = (args) => {
+  try {
+    return execFileSync('git', args, {
+      cwd: REPO_ROOT,
+      windowsHide: true,
+      encoding: 'utf8',
+      maxBuffer: MAX_BUFFER,
+    })
+  } catch (e) {
+    if (e?.code === 'ENOBUFS' || /ENOBUFS/.test(String(e?.message ?? ''))) {
+      const oversize = new Error(
+        `git ${args[0]} output exceeded the ${MAX_BUFFER}-byte measurement buffer — at least ${OVERSIZE_FLOOR_CHARS} characters`,
+      )
+      oversize.oversize = true
+      throw oversize
+    }
+    throw e
+  }
+}
 
 /**
  * Assemble and measure the range's material. Character counts over the same
@@ -54,15 +85,58 @@ const git = (args) =>
  */
 export function measureReviewMaterial({ baseline, head, run = git }) {
   const range = `${baseline}..${head}`
-  const stat = run(['diff', '--stat', range])
-  // The same external-driver hardening as gatherRange (round-4 pass 7): the
-  // measurement must weigh git's own patch, not a substituted one.
-  const patch = run(['diff', '--no-ext-diff', '--no-textconv', range])
-  const paths = run(['diff', '--name-only', '-z', range]).split('\0').filter(Boolean)
+  // AN OVERFLOW ON THE PATCH SIDE IS A PROVEN FLOOR, NOT A FAILURE (landing-
+  // round pass 3): the stat, the patch and the path list describe the range
+  // itself, so any of them past the buffer proves the material holds at least
+  // the floor — the core rules on that without a plan, and the trap stays open.
+  let stat
+  let patch
+  let paths
+  try {
+    stat = run(['diff', '--stat', range])
+    // The same external-driver hardening as gatherRange (round-4 pass 7): the
+    // measurement must weigh git's own patch, not a substituted one.
+    patch = run(['diff', '--no-ext-diff', '--no-textconv', range])
+    paths = run(['diff', '--name-only', '-z', range]).split('\0').filter(Boolean)
+  } catch (e) {
+    // Recognised on the ERROR ITSELF, not only on the internal helper's tag,
+    // so an injected runner (the unit layer) and the real one rule alike.
+    const oversize = e?.oversize || e?.code === 'ENOBUFS' || /ENOBUFS/.test(String(e?.message ?? ''))
+    if (oversize) {
+      return { measuredChars: OVERSIZE_FLOOR_CHARS, oversizeProven: true, stat: '', patch: '', files: [] }
+    }
+    throw e
+  }
   const files = []
+  let measuredChars = stat.length + patch.length
   for (const path of paths) {
+    // THE BLOB'S SIZE IS ASKED BEFORE ITS BYTES (landing-round pass 3): `git
+    // show` on a big-enough blob overflowed the buffer, ruled 'unmeasured'
+    // and blocked forever. cat-file -s answers in a dozen characters; a blob
+    // beyond the read limit is never read whole — its content could not
+    // travel inside any pass anyway, only its patch could, so the splitter is
+    // fed a STAND-IN whose only consulted property (its length forcing the
+    // patch-only/uncoverable ruling) is the same, while the measured total
+    // carries the conservative character floor of the real size.
+    let sizeBytes = null
+    try {
+      sizeBytes = Number(run(['cat-file', '-s', `${head}:${path}`]).trim())
+    } catch {
+      // Absent at head (deleted) or unanswerable — the show below rules, with
+      // its own absent-only tolerance.
+      sizeBytes = null
+    }
     let text = ''
     try {
+      if (Number.isFinite(sizeBytes) && sizeBytes > CONTENT_READ_LIMIT_BYTES) {
+        const floorChars = Math.floor(sizeBytes / 4)
+        measuredChars += floorChars
+        // Long enough that no pass room can hold it, short enough to cost
+        // nothing: every planner decision over it is identical to the real
+        // content's.
+        files.push({ path, text: 'x'.repeat(Math.min(floorChars, 1_000_000)) })
+        continue
+      }
       text = run(['show', `${head}:${path}`])
     } catch (e) {
       // ONLY git's own "absent" may contribute nothing (final-round pass 3):
@@ -72,10 +146,9 @@ export function measureReviewMaterial({ baseline, head, run = git }) {
       // measurement catch, which rules 'unmeasured' — and blocks.
       if (!/does not exist|exists on disk, but not in/i.test(String(e?.message ?? ''))) throw e
     }
+    measuredChars += text.length
     files.push({ path, text })
   }
-  let measuredChars = stat.length + patch.length
-  for (const f of files) measuredChars += f.text.length
   return { measuredChars, stat, patch, files }
 }
 
@@ -102,7 +175,9 @@ export async function assessReviewGap({
   }
 
   let planner = null
-  if (measured) {
+  // A PROVEN OVERSIZE PLANS NOTHING: the parts were never read whole, so no
+  // splitter can be consulted — the core rules on the floor alone.
+  if (measured && !measured.oversizeProven) {
     // The splitter's ABSENCE and its FAILURE are opposite rulings (round-2
     // pass 2): a tree without the tool genuinely cannot produce passes, so the
     // core may rule 'no-splitter' on size alone — but a tool that exists and
@@ -160,6 +235,15 @@ export async function assessReviewGap({
     budget: planner?.budget ?? REVIEW_GAP_BUDGET_CHARS,
     planner,
     measurementError,
+    oversizeProven: Boolean(measured?.oversizeProven),
+    // The no-splitter branch judges the RENDERED floor, not the raw sum
+    // (landing-round pass 3) — delivery adds frames, headers and the receipt.
+    renderedChars: measured
+      ? estimateRenderedChars({
+          measuredChars: measured.measuredChars,
+          filePaths: (measured.files ?? []).map((f) => f.path),
+        })
+      : null,
   })
   return {
     ...decision,
