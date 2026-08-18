@@ -1025,7 +1025,23 @@ export function evaluateMechanismReview({
     // touched and no pass named blocks, even where a later commit reverted it out
     // of the reviewed diff, because the way out is one honest pass record and the
     // way out of the other error is a guard nobody read.
-    const compositions = passComposition(sound, { expect: commit?.files ?? [] })
+    //
+    // THE EXPECTED SET IS THE RECORD'S WHOLE RANGE where the wrapper measured it
+    // (escalation round, passes 1 and 2): this gate keeps only mechanism paths
+    // per commit, so a composition judged against them alone could read complete
+    // while ordinary files of the reviewed range were in no pass — a range-wide
+    // clearance over files nobody read. Each record carries `rangeFiles`, the
+    // file set of `baseline..record.sha`; the commit's own mechanism paths stay
+    // in the union so the older, narrower demand can never be relaxed by the
+    // wider one, and a record without the measurement falls back to exactly the
+    // narrower check this gate always made.
+    const compositions = [...new Set(sound.map((r) => String(r?.sha ?? '')))].flatMap((sha) => {
+      const rows = sound.filter((r) => String(r?.sha ?? '') === sha)
+      const range = [...new Set(rows.flatMap((r) => (Array.isArray(r?.rangeFiles) ? r.rangeFiles : [])))]
+      return passComposition(rows, {
+        expect: [...new Set([...range, ...(commit?.files ?? [])])],
+      })
+    })
     const complete = compositions.filter((g) => g.complete)
     const incomplete = compositions.filter((g) => !g.complete)
     // A RECORDED SPLIT IS THE MEASUREMENT THAT ITS RANGE DID NOT FIT ONE ROUND

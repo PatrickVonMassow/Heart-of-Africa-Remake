@@ -169,6 +169,32 @@ describe('attachCoverage', () => {
     expect(pendingCommits.map((c) => c.coveringRecordShas)).toEqual([['recA'], ['recA', 'recB'], []])
   })
 
+  // ESCALATION ROUND, PASSES 1/2: a pass composition judged against the pending
+  // commit's mechanism paths alone could read complete while ordinary files of
+  // the reviewed range were in no pass. The wrapper therefore attaches, to each
+  // branch record, the FILE SET its range would clear.
+  it('attaches each branch record’s range file set, and survives a diff that cannot answer', () => {
+    const pendingCommits = [{ sha: 'c0' }]
+    const records = attachCoverage({
+      pendingCommits,
+      allRecords: [{ sha: 'recA' }, { sha: 'recB' }],
+      head: 'head',
+      revList: (rev) => ({ head: 'c0\nrecA\nrecB', recA: 'c0', recB: 'c0' })[rev] ?? '',
+      rangeFiles: (sha) => {
+        if (sha === 'recB') throw new Error('undiffable')
+        return ['scripts/a-guard.mjs', 'docs/notes.md', ' edge-space.mjs']
+      },
+    })
+    expect(records.find((r) => r.sha === 'recA').rangeFiles).toEqual([
+      'scripts/a-guard.mjs',
+      'docs/notes.md',
+      ' edge-space.mjs',
+    ])
+    // The failed measurement attaches nothing — the evaluator then falls back
+    // to the commit's own paths, a narrower demand, never a wider clearance.
+    expect(records.find((r) => r.sha === 'recB').rangeFiles).toBeUndefined()
+  })
+
   it('asks git NOTHING when no mechanism commit is pending — the common turn', () => {
     const asked = []
     expect(

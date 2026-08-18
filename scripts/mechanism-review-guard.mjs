@@ -314,6 +314,15 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
     effective,
     head,
     revList: (rev) => git(`rev-list ${rev} --not ${effective}`),
+    // WHAT A RECORD AT THAT SHA WOULD CLEAR — every file of its range, not only
+    // the pending commits' mechanism paths (escalation round, passes 1 and 2):
+    // this parser keeps only mechanism paths, so a pass composition judged
+    // against them alone could read complete while ordinary files of the
+    // reviewed range were in no pass — a whole-range clearance over files
+    // nobody read. `-z` hands the paths over raw, exactly as gatherRange and
+    // the pass records spell them.
+    rangeFiles: (sha) =>
+      gitRaw(`diff --name-only -z "${effective}..${sha}"`).split('\0').filter(Boolean),
   })
 
   return {
@@ -350,7 +359,7 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
  * `effective..head`. A record at or before `effective` reaches nothing that
  * `effective` does not, so its contained set is empty by construction.
  */
-export function attachCoverage({ pendingCommits = [], allRecords = [], head, revList }) {
+export function attachCoverage({ pendingCommits = [], allRecords = [], head, revList, rangeFiles = null }) {
   const lines = (rev) =>
     new Set(
       String(revList(rev) ?? '')
@@ -358,12 +367,27 @@ export function attachCoverage({ pendingCommits = [], allRecords = [], head, rev
         .map((l) => l.trim())
         .filter(Boolean),
     )
-  // Call 1 of 1 + R: the whole branch range, which selects the records at all.
+  // Call 1 of 1 + 2R: the whole branch range, which selects the records at all.
   const branchRange = pendingCommits.length ? lines(head) : new Set()
   const records = (pendingCommits.length ? allRecords : []).filter((r) => branchRange.has(r.sha))
-  // Calls 2..1+R: one per SURVIVING record — the reviews recorded on this
-  // branch, never the whole ledger.
-  for (const r of records) r.containedShas = lines(r.sha)
+  // Calls 2..1+2R: two per SURVIVING record — the reviews recorded on this
+  // branch, never the whole ledger. `rangeFiles` is what a record at that sha
+  // would CLEAR: the file set of `effective..record.sha`, which the gate holds
+  // a pass composition's union against (escalation round). An unanswerable
+  // diff attaches nothing, and the gate then falls back to the pending
+  // commit's own mechanism paths — a NARROWER expected set, so the failure
+  // can only ever demand less, never clear more.
+  for (const r of records) {
+    r.containedShas = lines(r.sha)
+    if (rangeFiles) {
+      try {
+        const files = rangeFiles(r.sha)
+        if (Array.isArray(files)) r.rangeFiles = files.map((f) => String(f))
+      } catch {
+        /* unanswered — the evaluator falls back to the commit's own paths */
+      }
+    }
+  }
   for (const c of pendingCommits) {
     c.coveringRecordShas = records.filter((r) => r.containedShas?.has(c.sha)).map((r) => r.sha)
   }

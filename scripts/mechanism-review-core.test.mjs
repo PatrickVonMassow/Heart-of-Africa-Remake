@@ -687,6 +687,37 @@ describe('evaluateMechanismReview', () => {
       expect(v.block).toBe(false)
     })
 
+    // ESCALATION ROUND, PASSES 1/2: the gate keeps only mechanism paths per
+    // commit, so a composition judged against them alone read complete while
+    // ordinary files of the reviewed range were in no pass — a range-wide
+    // clearance over files nobody read. Where the wrapper measured the
+    // record's range (rangeFiles), its WHOLE file set is what the union must
+    // cover.
+    it('BLOCKS a complete-looking split whose union misses a file of the reviewed range', () => {
+      const rangeFiles = [MECH, 'scripts/f2.mjs', 'scripts/f3.mjs', 'docs/ordinary.md']
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [pass(1, 3, { rangeFiles }), pass(2, 3, { rangeFiles }), pass(3, 3, { rangeFiles })],
+      })
+      expect(v.block).toBe(true)
+      expect(v.findings[0].kind).toBe('incomplete-passes')
+      expect(v.findings[0].passes.uncovered).toEqual(['docs/ordinary.md'])
+      expect(formatMechanismReviewVerdict(v)).toContain('docs/ordinary.md')
+    })
+
+    it('CLEARS the same split once its union covers the whole measured range', () => {
+      const rangeFiles = [MECH, 'scripts/f1.mjs', 'scripts/f2.mjs', 'scripts/f3.mjs']
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [pass(1, 3, { rangeFiles }), pass(2, 3, { rangeFiles }), pass(3, 3, { rangeFiles })],
+      })
+      expect(v.block).toBe(false)
+    })
+
     it('takes the WORST verdict of the composition — one refusing pass refuses the range', () => {
       const v = evaluateMechanismReview({
         baseline: 'b',
