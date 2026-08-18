@@ -150,6 +150,36 @@ describe('the material', () => {
   })
 })
 
+describe('the markdown strip reads shapes, not characters (round-7 pass 1)', () => {
+  it('keeps an underscore inside a path — content is not decoration', () => {
+    const parsed = parseAnswer({
+      kind: 'diagnose',
+      text: 'reasoning\n\nCAUSE: the fixture writes early\nEVIDENCE: src/foo_bar.mjs:12 writes outside the shutter',
+    })
+    expect(parsed.ok).toBe(true)
+    expect(parsed.answer.evidence).toContain('src/foo_bar.mjs')
+  })
+
+  it('cannot FABRICATE an admission from a mid-word asterisk', () => {
+    // 'no ma*terial' is not 'no material': deleting the character globally
+    // built the very phrase the net scans for out of text that never said it.
+    const parsed = parseAnswer({
+      kind: 'explain',
+      text: 'The token no ma*terial appears verbatim in the fixture and is asserted by the failing case there.',
+    })
+    expect(parsed.ok).toBe(true)
+  })
+
+  it('still UNSHIELDS an emphasised admission at word edges', () => {
+    const parsed = parseAnswer({
+      kind: 'explain',
+      text: 'I checked nothing because **no** material was supplied to this run at all, sadly.',
+    })
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error).toContain('could not see the material')
+  })
+})
+
 describe('reading the answer', () => {
   const end = (...lines) => `some reasoning here\n\n${lines.join('\n')}`
 

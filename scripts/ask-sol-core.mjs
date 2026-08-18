@@ -253,13 +253,20 @@ function parseEntries(clean, prefix, { allowEmpty = false } = {}) {
 export function parseAnswer({ kind = '', text = '' } = {}) {
   const k = normaliseKind(kind)
   if (!k) throw new Error(`ask-sol: not a kind: ${kind}`)
-  // Markdown DECORATION only, deliberately unbounded (round-6 pass 1 asked):
-  // this strips emphasis/heading/quote characters so the nets below read the
-  // words themselves. It can only ever UNSHIELD an admission ('*no* material'
-  // becomes 'no material'), never create or destroy one — the admission words
-  // contain none of these characters — and is unrelated to the FILENAME
-  // decoration strip in mechanism-review-core, which is bounded.
-  const clean = String(text ?? '').replace(/[*`_#>]/g, '')
+  // Markdown DECORATION by its SHAPE, never by bare character (round-7
+  // pass 1, sharpening round 6): deleting every `*_#>` globally corrupted
+  // structured answers (`src/foo_bar.mjs` → `src/foobar.mjs`) and could
+  // FABRICATE the very admission the net scans for (`no ma*terial` →
+  // `no material`). Stripped instead: headings and quote markers at line
+  // starts, backtick runs, and emphasis runs only at WORD EDGES — an
+  // underscore or asterisk inside a word is content and stays, so the strip
+  // can unshield an admission (`**no** material`) but never invent one.
+  const clean = String(text ?? '')
+    .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
+    .replace(/^[ \t]*>+[ \t]?/gm, '')
+    .replace(/`+/g, '')
+    .replace(/(^|[\s([{])[*_]+(?=\S)/g, '$1')
+    .replace(/(?<=\S)[*_]+(?=[\s)\]}.,;:!?]|$)/g, '')
   if (!clean.trim()) return { ok: false, kind: k, answer: null, summary: '', error: 'the run produced no answer at all' }
   // The two-tier judgment, not the raw net: an audit or diagnose answer about
   // THIS project's tooling describes failure modes in the net's own vocabulary,
