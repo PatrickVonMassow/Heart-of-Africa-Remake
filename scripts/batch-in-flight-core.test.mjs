@@ -1474,8 +1474,13 @@ describe('slotReasonDecision — the cap is a target, and the demand is narrow',
   })
 
   it('a FULL pool passes with no reason at all', () => {
+    // Full of AGENTS here, which since point 712 is the separately named state:
+    // the occupancy rule counts branches, the agent cap still binds a spawn.
     expect(
       slotReasonDecision({ agents: POOL_CAP, openPoints: independent, runningFiles: running }),
+    ).toMatchObject({ needsReason: false, slotsFree: 0, why: 'agents-at-cap' })
+    expect(
+      slotReasonDecision({ openBranches: POOL_CAP, openPoints: independent, runningFiles: running }),
     ).toMatchObject({ needsReason: false, slotsFree: 0, why: 'at-cap' })
     // …and over the cap is not negative slots.
     expect(slotReasonDecision({ agents: POOL_CAP + 2, openPoints: independent, runningFiles: running }).slotsFree).toBe(0)
@@ -2835,13 +2840,41 @@ describe('slotReasonDecision — the target half counts the same occupancy as th
     ).toMatchObject({ needsReason: true, why: 'idle-slots' })
   })
 
-  it('takes the LARGER of the two readings — an agent without a branch still occupies', () => {
-    expect(slotReasonDecision({ agents: 3, openBranches: 0, openPoints: independent, runningFiles: running }).why).toBe(
-      'at-cap',
+  // REWRITTEN after Sol's review of 91d88f9a: the old case pinned the bare
+  // `Math.max` and so pinned a divergence from the branch rule instead of the
+  // rule. The two states are DIFFERENT and are now named as such — the branch
+  // count is the occupancy point 712 specifies, and a full set of running agents
+  // is the concurrent-agent cap of CLAUDE.md §6, which still binds a spawn.
+  it('names WHICH cap is full — the branches, or the agents that have not cut one', () => {
+    expect(slotReasonDecision({ agents: 0, openBranches: 3, openPoints: independent, runningFiles: running })).toMatchObject(
+      { needsReason: false, why: 'at-cap', slotsFree: 0, openBranches: 3 },
     )
-    expect(slotReasonDecision({ agents: 0, openBranches: 3, openPoints: independent, runningFiles: running }).why).toBe(
-      'at-cap',
+    expect(slotReasonDecision({ agents: 3, openBranches: 0, openPoints: independent, runningFiles: running })).toMatchObject(
+      { needsReason: false, why: 'agents-at-cap', slotsFree: 0, openBranches: 0 },
     )
+    // Neither full: the demand stands, and both counts are reported.
+    expect(slotReasonDecision({ agents: 2, openBranches: 1, openPoints: independent, runningFiles: running })).toMatchObject(
+      { needsReason: true, why: 'idle-slots', slotsFree: 1, agents: 2, openBranches: 1 },
+    )
+  })
+
+  it('demands NOTHING while the branch count could not be read at all', () => {
+    // A git that cannot be questioned reads as zero branches, which is exactly
+    // what a repository with no open branch reads as — so the demand would fire
+    // on unmeasured occupancy. It stands down instead.
+    expect(
+      slotReasonDecision({
+        agents: 1,
+        openBranches: 0,
+        branchesReadable: false,
+        openPoints: independent,
+        runningFiles: running,
+      }),
+    ).toMatchObject({ needsReason: false, why: 'branches-unreadable' })
+    // …but a PAUSE and a freeze still answer first: they are the stronger reason.
+    expect(
+      slotReasonDecision({ branchesReadable: false, paused: true, openPoints: independent, runningFiles: running }).why,
+    ).toBe('paused')
   })
 
   it('ignores a nonsensical branch count rather than inventing occupancy', () => {

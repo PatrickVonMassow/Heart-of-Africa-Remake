@@ -1005,6 +1005,7 @@ export function closingFreezeActive({ marker = false, closingState = null, head 
 export function slotReasonDecision({
   agents = 0,
   openBranches = 0,
+  branchesReadable = true,
   openPoints = [],
   runningFiles = [],
   reason = '',
@@ -1012,25 +1013,42 @@ export function slotReasonDecision({
   closingFreeze = false,
   cap = POOL_CAP,
 } = {}) {
-  // WHAT OCCUPIES A SLOT IS THE OPEN BRANCH (point 712), and the target half has
-  // to count it the same way the refusal does — otherwise the two rules trap the
-  // session between them: nine branches open and one agent running would have
-  // this demand a fourth point while `commission-guard` refuses every one of
-  // them. The larger of the two readings is the honest occupancy, the same rule
-  // `declaredAgentCount` follows: an agent that has not cut its branch yet is
-  // still an agent, and a branch whose agent has finished is still a slot.
+  // WHAT OCCUPIES A SLOT IS THE OPEN BRANCH (point 712), and this half counts it
+  // the same way the refusal does — otherwise the two rules trap the session
+  // between them: nine branches open and one agent running would have this
+  // demand a fourth point while `commission-guard` refuses every one of them.
+  //
+  // A RUNNING AGENT WITHOUT A BRANCH STILL FILLS ITS SLOT, and that is a
+  // SEPARATE, NAMED state rather than a second occupancy rule (Sol's review of
+  // 91d88f9a read the bare `Math.max` as a divergence from the branch rule, and
+  // the test pinned the max rather than the reason for it). The branch count is
+  // the occupancy; the agent count is the concurrent-agent cap of CLAUDE.md §6,
+  // which still binds a spawn. Demanding a fourth point while three agents run
+  // would ask for a breach of it, so that state answers `agents-at-cap` — no
+  // demand, and the report says which of the two is full.
   const declared = Number.isFinite(agents) && agents > 0 ? Math.floor(agents) : 0
   const branches = Number.isFinite(openBranches) && openBranches > 0 ? Math.floor(openBranches) : 0
-  const running = Math.max(declared, branches)
   const limit = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : POOL_CAP
-  const slotsFree = Math.max(0, limit - running)
+  const slotsFree = Math.max(0, limit - Math.max(declared, branches))
   const candidates = independentOpenPoints({ points: openPoints, runningFiles })
-  const no = (why) => ({ needsReason: false, slotsFree, agents: running, candidates, why })
+  const no = (why) => ({
+    needsReason: false,
+    slotsFree,
+    agents: Math.max(declared, branches),
+    openBranches: branches,
+    candidates,
+    why,
+  })
   // A paused batch and a closing freeze are states in which commissioning MORE work
   // would be wrong — the freeze exists so the closing tests the final state.
   if (paused === true) return no('paused')
   if (closingFreeze === true) return no('closing-freeze')
-  if (slotsFree === 0) return no('at-cap')
+  // OCCUPANCY NOBODY COULD READ IS NOT IDLENESS. Where git could not be
+  // questioned the branch count is 0 for want of an answer, not because no
+  // branch stands, and demanding work on that is the fail-CLOSED direction.
+  if (branchesReadable !== true) return no('branches-unreadable')
+  if (branches >= limit) return no('at-cap')
+  if (declared >= limit) return no('agents-at-cap')
   if (candidates.length === 0) {
     // WHY the queue offered nothing matters (point 450). "Everything left waits
     // on the user" is a different state from "everything left touches the
@@ -1041,7 +1059,7 @@ export function slotReasonDecision({
     return no(gatedOnly ? 'queue-user-gated' : 'queue-overlaps')
   }
   if (String(reason ?? '').trim()) return no('reason-given')
-  return { needsReason: true, slotsFree, agents: running, candidates, why: 'idle-slots' }
+  return { ...no('idle-slots'), needsReason: true }
 }
 
 /**

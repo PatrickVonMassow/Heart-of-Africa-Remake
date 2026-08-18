@@ -532,16 +532,23 @@ export function gatherSlots(declaration, { cwd = REPO_ROOT, tasksPath = TASKS_PA
     // No readable running-file set means the overlap question cannot be answered, and
     // an unanswerable question is not a reason to demand anything.
     if (running.length === 0) return { needsReason: false, slotsFree: 0, agents: 0, candidates: [], why: 'overlap-unknown' }
+    // What OCCUPIES a slot is the open branch (point 712). The demand and the
+    // commissioning refusal must read the same occupancy, or they trap the
+    // session between them: nine branches open and one agent running would
+    // otherwise demand a fourth point that the refusal denies.
+    //
+    // AND THE UNREADABLE CASE IS CARRIED, not dropped. Throwing `readable` away
+    // fed an EMPTY branch list into the decision, so a git that could not be
+    // questioned looked exactly like a repository with no open branch and could
+    // demand work for slots nobody had counted (Sol, review of 91d88f9a).
+    const branchProbe = openFeatBranches({ cwd })
     return slotReasonDecision({
       agents: declaredAgentCount(evidence),
-      // What OCCUPIES a slot is the open branch (point 712). The demand and the
-      // commissioning refusal must read the same occupancy, or they trap the
-      // session between them: nine branches open and one agent running would
-      // otherwise demand a fourth point that the refusal denies.
       openBranches: openBranchSlots({
-        branches: openFeatBranches({ cwd }).branches,
+        branches: branchProbe.branches,
         parked: readCommissionRecord().parked,
       }).count,
+      branchesReadable: branchProbe.readable,
       openPoints: openPointSpecs(readTasksOpen(tasksPath)),
       runningFiles: running,
       reason: declaration?.slotsFree ?? '',
