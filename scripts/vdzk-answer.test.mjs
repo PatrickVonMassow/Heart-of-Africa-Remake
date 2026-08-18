@@ -43,6 +43,7 @@ function run(script, args) {
     cwd: process.cwd(),
     env,
     encoding: 'utf8',
+    windowsHide: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 }
@@ -143,7 +144,7 @@ describe('deadline redemption is unattended and retry-safe', () => {
       process.stdout.write(JSON.stringify(result))
     `
     return JSON.parse(execFileSync(process.execPath, ['--input-type=module', '--eval', source], {
-      cwd: process.cwd(), env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+      cwd: process.cwd(), env, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
     }))
   }
 
