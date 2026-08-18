@@ -4890,15 +4890,19 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: a reply written without the stamp is still refused (timestamp-guard
   blocks it) after the removal, and the Stop chain's process count drops by one.
 
-- [ ] 542. Three built guards are still asleep, and the arming needs an attended
-  SESSION (07.08.2026). `path-scope-guard`, `bundle-first-guard` and
-  `point-proof-guard` are built, tested and recorded in `INTENTIONALLY_DORMANT`
-  (`scripts/guard-health-core.mjs`). None of them enforces anything, because arming
+- [ ] 542. The built guards that are still asleep, and the arming needs an attended
+  SESSION (07.08.2026; the set keeps GROWING — 18.08.2026 it is four).
+  `path-scope-guard`, `bundle-first-guard`, `point-proof-guard` and
+  `context-fence-guard` (point 700) are built, tested and recorded in
+  `INTENTIONALLY_DORMANT` (`scripts/guard-health-core.mjs`), and every headless point
+  that delivers a guard adds another — the point therefore covers EVERY entry of that
+  record at the moment it is worked, not a fixed three.
+  None of them enforces anything, because arming
   one means editing `.claude/settings.json`, which always raises a permission prompt
   and can therefore not be done by a worktree agent or a headless batch session. A
   guard that exists and does not fire is worse than no guard: the map claims an
   enforcer where there is none.
-  FINAL STATE: all three wired, each in its own commit, each REMOVING its
+  FINAL STATE: every dormant entry wired, each in its own commit, each REMOVING its
   `INTENTIONALLY_DORMANT` entry in the SAME commit — the inverse check added with
   point 437 now BLOCKS on a wired enforcer that still carries a dormant record, so
   the two halves cannot drift apart. `point-proof-guard` goes into PreToolUse with
