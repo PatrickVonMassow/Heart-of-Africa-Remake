@@ -472,10 +472,22 @@ put it is the mistake this line exists to stop.
     and `docs/analysis_de/retrospektive-zusammenarbeit.md` (231k). The worst single commit reaches
     2.05M. A caller who reacts to a truncation by reviewing commit by commit therefore gets the
     same truncation one commit at a time, and pays a round per commit for it.
+  - EVERY FILE'S DELIVERY MODE IS NAMED IN THE MATERIAL, and there are three: carried whole,
+    PATCH-ONLY (its diff without its surrounding content), and absent — the last split again into
+    absent-by-design, covered by a named other pass, and absent-by-truncation. They license
+    different verdicts, so a reviewer that cannot tell them apart cannot say what its verdict
+    covers. The accounting counts a patch-only file as its patch alone; a record must never cover
+    content that was not sent. A bookkeeping path carrying no reviewable mechanism is delivered
+    patch-only by default: measured 18.08.2026 on `main@92af94cc`, the jammed range
+    `ae8539d2~1..657fc453` weighs 168355 characters of patch against 3014107 of touched-path
+    content, of which the four files above carry 2571262 — 85 % — leaving 442845 across the other
+    23. Shipping those four patch-only is what turns this range from unreviewable into three or
+    four passes.
   VERIFIABLE: Vitest over the pure assembly — material under the budget yields a record command,
   material over it yields the refusal naming the dropped files, and a two-pass composition yields a
   record naming both passes; plus a case pinning that a truncation notice inside the material alone
-  never satisfies the check.
+  never satisfies the check, and one pinning that a patch-only file is accounted as its patch and
+  never counted as content delivered.
   Criticality: high — it does not produce a wrong answer, it produces an unearned CLEARANCE, and
   the four-eyes rule the whole model policy rests on is only worth what its records cover.
   Bundle: unbundled (review tooling).
@@ -2846,6 +2858,26 @@ Build order, chosen so no two parallel agents own the same file:
   wait on its worktree at that moment and it changed nothing. Clause 2 below is
   therefore about the DEAD door specifically: its corroboration must sit on the
   pid-identity verdict itself, not only on the lease path 556 hardened.
+  A FOURTH TIME, AND THE STAND-DOWN HALF FAILED TOO (18.08.2026, 02:27:02Z): the
+  launcher spawned session 2f6ba837 against the LIVE owner 967c5fb6 (pid 4186031,
+  started 02:03:54Z, 23 minutes of age — the drift curve reaches the fixed
+  tolerance sooner than the half hour this point is named for). What is NEW is what
+  followed: the dispossessed owner did NOT stand down. Its authoring agent pushed
+  b7bd085e to `feat/714-review-material-budget` at 02:33:17Z, six minutes after the
+  successor had taken the lock, and the owner's process was still alive at
+  02:36:41Z. In the 05.08 and 08.08 occurrences the stand-down contained the damage
+  to one duplicated session; here both sessions worked the SAME branch.
+  THE COST IS A LOST REVIEW ROUND, which is the expensive kind: the successor was
+  running the four-pass cross-vendor round of point 714 against the head it had
+  frozen (fb983984), and the foreign commit moved that head mid-round — the SECOND
+  consecutive round on that point to be taken against a head that walked underneath
+  it, and precisely the defect point 714 exists to mechanise. `batch-doctor.mjs
+  --gate` reported `ownerAlive=true` and `consistent` throughout, so the doctor does
+  not see this shape as damage.
+  Clause 2's corroboration must therefore be joined by a clause 4: a takeover that
+  turns out to have dispossessed a LIVE owner is detected AFTERWARDS as well —
+  a second session's commit or push onto a branch the current owner has declared
+  in flight is an alarm, not a routine event.
   The drift-free handle of clause 1 has a concrete candidate on this host: identity
   as (`/proc/sys/kernel/random/boot_id`, `starttime` jiffies from `/proc/<pid>/stat`)
   — both boot-domain, so the wall clock never enters the comparison. Measured while
@@ -4858,15 +4890,19 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: a reply written without the stamp is still refused (timestamp-guard
   blocks it) after the removal, and the Stop chain's process count drops by one.
 
-- [ ] 542. Three built guards are still asleep, and the arming needs an attended
-  SESSION (07.08.2026). `path-scope-guard`, `bundle-first-guard` and
-  `point-proof-guard` are built, tested and recorded in `INTENTIONALLY_DORMANT`
-  (`scripts/guard-health-core.mjs`). None of them enforces anything, because arming
+- [ ] 542. The built guards that are still asleep, and the arming needs an attended
+  SESSION (07.08.2026; the set keeps GROWING — 18.08.2026 it is four).
+  `path-scope-guard`, `bundle-first-guard`, `point-proof-guard` and
+  `context-fence-guard` (point 700) are built, tested and recorded in
+  `INTENTIONALLY_DORMANT` (`scripts/guard-health-core.mjs`), and every headless point
+  that delivers a guard adds another — the point therefore covers EVERY entry of that
+  record at the moment it is worked, not a fixed three.
+  None of them enforces anything, because arming
   one means editing `.claude/settings.json`, which always raises a permission prompt
   and can therefore not be done by a worktree agent or a headless batch session. A
   guard that exists and does not fire is worse than no guard: the map claims an
   enforcer where there is none.
-  FINAL STATE: all three wired, each in its own commit, each REMOVING its
+  FINAL STATE: every dormant entry wired, each in its own commit, each REMOVING its
   `INTENTIONALLY_DORMANT` entry in the SAME commit — the inverse check added with
   point 437 now BLOCKS on a wired enforcer that still carries a dormant record, so
   the two halves cannot drift apart. `point-proof-guard` goes into PreToolUse with
@@ -8369,10 +8405,24 @@ to land than a mechanism that needs a review.
   refuses, so a session that has handed over cannot write even if it is still running.
   Additionally the handover ENDS the session it hands from: after `--commit`, a predecessor that
   is still alive is stopped rather than trusted to stop itself.
+  (c) AN AUTHOR'S LIVENESS IS NOT A PROCESS QUESTION (measured 18.08.2026, 05:05-05:16). The
+  harness runs a delegated agent IN-PROCESS, so the only OS trace it leaves is the transient
+  shell of whatever command it happens to be running: `pgrep -P <session-pid>` returned no
+  children twice and a full `/proc` cwd scan over the worktree found nothing, while that author
+  committed five times between 05:09 and 05:14. On the resulting "both agents are dead" reading
+  the successor rescue-committed the live author's in-flight edits in BOTH worktrees and
+  dispatched a SECOND author onto one of them; only that agent's own detection of the live writer
+  kept two authors out of one tree. So an AUTHOR is judged by what its WORK does over a sampled
+  interval — a branch tip that advances, worktree mtimes that move, an unpushed commit that
+  appears — never by the presence of a process, under the same err-toward-alive tie-break as (a).
+  The judgment lives in the same pure core as (a), and both the rescue path and the dispatch path
+  ask it before they touch a foreign worktree.
   VERIFIABLE: Vitest cases over the pure liveness core proving a running, recently-committing pid
   is judged alive and that the tie-break falls toward alive; a case over the fence proving a
-  commit and a push are refused for a session without the lock; and a case proving the boundary
-  commit leaves no live predecessor behind.
+  commit and a push are refused for a session without the lock; a case proving the boundary
+  commit leaves no live predecessor behind; and, for (c), a case proving a worktree whose branch
+  tip advanced inside the sample window is judged ALIVE with no process evidence at all, beside
+  one proving a quiet worktree of an ended session is judged dead.
   Criticality: high — this is the singleton itself. While it holds wrong, every resumed session
   can silently share a worktree with its predecessor, and the damage (a lost delegated run) is
   invisible in git.
