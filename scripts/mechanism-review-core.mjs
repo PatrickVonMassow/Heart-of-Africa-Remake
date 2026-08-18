@@ -772,7 +772,11 @@ export function validateMode({ mode, framing } = {}) {
  * fit one round" is not a question this function can even ask — while the
  * offering side, which does know, already refuses (review-sol.mjs). What IS
  * checkable travels with the pass: the files it read, which the gate holds
- * against the commit it would clear.
+ * against the commit it would clear. The check the recorder cannot make lives
+ * where the range IS known (escalation round of the same review): the GATE
+ * treats recorded passes at a sha as the measurement that its range did not fit
+ * one round, and a pass-less row at that same sha does not stand alone there
+ * (evaluateMechanismReview).
  *
  * Returns { ok, errors, pass } with `pass` the parsed record field, or null.
  */
@@ -978,8 +982,22 @@ export function evaluateMechanismReview({
     const compositions = passComposition(sound, { expect: commit?.files ?? [] })
     const complete = compositions.filter((g) => g.complete)
     const incomplete = compositions.filter((g) => !g.complete)
+    // A RECORDED SPLIT IS THE MEASUREMENT THAT ITS RANGE DID NOT FIT ONE ROUND
+    // (point 714, escalation round). The RECORDER cannot ask "did this range
+    // fit" — a record's range is fixed by this gate's baseline, not by anything
+    // the record carries — but the GATE holds both halves: pass records at a sha
+    // witness that the offering tool measured that sha's range as needing a
+    // split, and the tool never offers a whole-range record for such a range. A
+    // pass-less record AT THE SAME SHA therefore claims a reading the recorded
+    // measurement contradicts (it can only arrive by hand), and it does not
+    // stand alone; the way out is the honest one — complete the passes, or
+    // supersede at a head whose range was never measured as oversized.
+    const passRow = (r) =>
+      Number.isInteger(Number(r?.pass?.total)) && Number(r?.pass?.total) >= 2 && Number.isInteger(Number(r?.pass?.index))
+    const splitShas = new Set(sound.filter(passRow).map((r) => String(r.sha ?? '')))
+    const besideSplit = sound.filter((r) => !r?.pass && splitShas.has(String(r.sha ?? '')))
     const valid = [
-      ...sound.filter((r) => !r?.pass),
+      ...sound.filter((r) => !r?.pass && !splitShas.has(String(r.sha ?? ''))),
       ...complete.map((g) => ({
         ...g.records.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a)),
         // The composition speaks with the WORST of its passes: one pass saying
@@ -996,7 +1014,13 @@ export function evaluateMechanismReview({
         // named are the same failure — material the composition does not hold.
         const gap = (g) => (g.missing?.length ?? 0) + (g.uncovered?.length ?? 0)
         const worst = incomplete.reduce((a, b) => (gap(b) >= gap(a) ? b : a))
-        findings.push({ kind: 'incomplete-passes', commit, records: worst.records, passes: worst })
+        findings.push({
+          kind: 'incomplete-passes',
+          commit,
+          records: worst.records,
+          passes: worst,
+          besideSplit,
+        })
         continue
       }
       findings.push({
@@ -1058,8 +1082,15 @@ export function formatMechanismReviewVerdict(verdict) {
           `      the ${p.have} recorded pass(es) of this ${p.total}-part split name ` +
             `${(p.files ?? []).length} file(s), and these were in NONE of them — nobody read them:`,
           `        ${(p.uncovered ?? []).join(', ')}`,
-          '      Review those files in a pass of their own and record it, or record a review of the',
-          '      whole range — a composition covers its union and not one file more.',
+          '      Review those files in a pass of their own and record it — a composition covers',
+          '      its union and not one file more.',
+        )
+      }
+      if ((f.besideSplit ?? []).length) {
+        lines.push(
+          '      A pass-less record at this sha does NOT stand in for the split: the recorded',
+          '      passes ARE the measurement that this range did not fit one review round, so a',
+          '      whole-range claim beside them covers files nobody read. Complete the passes.',
         )
       }
       continue

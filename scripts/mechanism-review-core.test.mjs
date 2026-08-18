@@ -597,19 +597,57 @@ describe('evaluateMechanismReview', () => {
       expect(v.findings[0].kind).toBe('do-not-merge')
     })
 
-    it('keeps a WHOLE-RANGE record at the same sha working beside the passes', () => {
-      // The multimap: keyed by sha alone, the last row won and the earlier ones
-      // vanished — which is how a pass record could read as a whole-range review.
-      // A record naming no pass STAYS a whole-range review, deliberately: it is
-      // what a reviewer reading the repository itself produces, and the material
-      // budget is the sending tool's limit, not a property of the ledger (see
-      // validatePass). The offering side refuses what it could not carry; here
-      // the pass records are the ones whose coverage can be counted.
+    // A PASS-LESS RECORD DOES NOT STAND IN FOR A RECORDED SPLIT (escalation
+    // round of the cross-vendor review). The passes at a sha ARE the recorded
+    // measurement that its range did not fit one review round, and the offering
+    // tool never prints a whole-range record for such a range — so a pass-less
+    // row at the same sha can only arrive by hand, and clearing on it would
+    // cover the files the missing passes never read. The recorder cannot make
+    // this check (it does not know the range); the gate, which does, makes it.
+    it('BLOCKS a pass-less record at a sha whose recorded split is incomplete', () => {
       const v = evaluateMechanismReview({
         baseline: 'b',
         head: 'h',
         pendingCommits: [commit(covered)],
         records: [pass(1, 3), record({ at: MERGE_ACCOUNTING_SINCE + 9000 })],
+      })
+      expect(v.block).toBe(true)
+      expect(v.findings[0].kind).toBe('incomplete-passes')
+      const text = formatMechanismReviewVerdict(v)
+      expect(text).toContain('does NOT stand in')
+      expect(text).toContain('missing pass 2')
+    })
+
+    it('still clears a pass-less record at a sha with NO recorded split', () => {
+      // That is the ordinary whole-range review a reviewer reading the
+      // repository itself produces, and every row predating point 714.
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [record({ at: MERGE_ACCOUNTING_SINCE + 9000 })],
+      })
+      expect(v.block).toBe(false)
+    })
+
+    it('clears a COMPLETE split whatever pass-less rows stand beside it', () => {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [pass(1, 2), pass(2, 2), record({ at: MERGE_ACCOUNTING_SINCE + 9000 })],
+      })
+      expect(v.block).toBe(false)
+    })
+
+    it('lets a pass-less record at ANOTHER covering sha clear — that range was never split', () => {
+      // The split at sha c measures sha c's range; a record at head d claims
+      // d's range, about which the split says nothing.
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40), 'd'.repeat(40)] })],
+        records: [pass(1, 3), record({ sha: 'd'.repeat(40), at: MERGE_ACCOUNTING_SINCE + 9000 })],
       })
       expect(v.block).toBe(false)
     })
