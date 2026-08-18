@@ -53,6 +53,17 @@ describe('authorship-cut mechanism review planning', () => {
     expect(plan.unreviewable).toEqual([plan.groups[0]])
   })
 
+  it('names missing authorship as unreviewable instead of guessing a second model', () => {
+    const plan = planAuthorshipGroups({ commits: [{ sha: sha('a'), files: ['unknown-guard.mjs'] }] })
+    expect(plan.groups[0]).toMatchObject({
+      vendor: 'unknown',
+      authors: [],
+      reviewer: '',
+      files: ['unknown-guard.mjs'],
+    })
+    expect(plan.unreviewable).toEqual([plan.groups[0]])
+  })
+
   it('requires the other vendor even when another same-vendor model is not an author', () => {
     expect(eligibleReviewer(['Claude Fable 5'])).toBe('GPT-5.6 Sol')
     expect(eligibleReviewer(['GPT-5.6 Sol'])).toBe('Opus 5')

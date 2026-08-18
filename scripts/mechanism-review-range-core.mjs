@@ -8,7 +8,9 @@ import { sameModel } from './mechanism-review-core.mjs'
 
 export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', 'Fable 5', 'Opus 4.8'])
 
-const uniq = (xs) => [...new Set((xs ?? []).map(String).filter(Boolean))]
+const uniq = (xs) => [
+  ...new Set((xs ?? []).filter((value) => value !== null && value !== undefined && String(value)).map(String)),
+]
 const keyFor = (sha, file) => `${String(sha)}\0${String(file)}`
 
 const RANGE_RECORD = String.fromCharCode(0x1e)
@@ -61,6 +63,11 @@ export function commitAuthors(commit = {}) {
 
 export function eligibleReviewer(authors = [], candidates = REVIEWER_CANDIDATES) {
   const writtenBy = uniq(authors)
+  // No authorship fact means no candidate can prove it is the second pair of
+  // eyes. The model guard normally supplies the trailer, but a hand-built or
+  // historical commit must become an explicit unreviewable pass, not an
+  // assignment made from absence.
+  if (!writtenBy.length) return ''
   const vendors = new Set(writtenBy.map(vendorOf).filter((v) => v !== 'unknown'))
   return (
     (candidates ?? []).find((candidate) => {
@@ -108,6 +115,7 @@ export function planAuthorshipGroups({ commits = [], candidates = REVIEWER_CANDI
   const mixedFiles = []
   for (const [file, changes] of byFile) {
     const vendors = new Set(changes.flatMap((c) => c.authors.map(vendorOf)))
+    if (!vendors.size) vendors.add('unknown')
     if (vendors.size === 1) {
       const vendor = [...vendors][0]
       if (!exclusive.has(vendor)) exclusive.set(vendor, [])
