@@ -208,8 +208,12 @@ const contained = (record, sha) => {
  *     Appended BEFORE it, the refusal is superseded — nothing can freeze a
  *     contribution as permanently owed, an unsatisfiable gate being the failure
  *     this point exists to remove.
- *  4. With no clocked reading at all, the last line rules, so a lone record
- *     nobody stamped still settles its own contribution.
+ *  4. With NO clocked reading at all there is nothing to stand after, so rule 3
+ *     reduces to its safe half: any unclocked refusal rules, and the
+ *     contribution waits for a stamped clearance — which any reviewer can
+ *     record, so this is a wait and not a freeze. Failing a refusal, the last
+ *     line rules, so a lone record nobody stamped still settles its own
+ *     contribution.
  *
  * The LINE is the position in the list the caller passes, which is ledger order
  * — no row carries a line of its own that could be missing or malformed.
