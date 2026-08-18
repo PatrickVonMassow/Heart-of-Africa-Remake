@@ -506,7 +506,10 @@ if (batchParked) {
 // when a live owner makes the launcher decline a successor below. Past the ONE
 // deadline in decision-card-guard-core.mjs it removes exactly that card through
 // the sanctioned board command; failures leave the carrier entry for the next
-// tick. The user's explicit batch pause remains above this block and wins.
+// tick. `board.mjs` holds its cross-process edit lock from read through publish,
+// so this unattended writer serialises with a live owner's board command instead
+// of letting either atomic replacement overwrite the other's derivation. The
+// user's explicit batch pause remains above this block and wins.
 try {
   const out = execFileSync(process.execPath, [R('vdzk-answer.mjs'), '--redeem-due'], {
     windowsHide: true,

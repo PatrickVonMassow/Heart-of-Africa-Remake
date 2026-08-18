@@ -74,6 +74,7 @@ import { recordDecisionCardKeep } from './decision-card-guard.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { QUEUE_DATA_PATH, setQueueEntry } from './board-queue-core.mjs'
 import { readJson } from './dashboard-state.mjs'
+import { withBoardEditLock } from './board-edit-lock.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
 const PUBLISH_SCRIPT = 'scripts/board-publish.mjs'
@@ -111,8 +112,19 @@ function fallbackSubject(point) {
   return typeof title === 'string' && title.trim() ? title.trim() : null
 }
 
-/** Apply a pure card edit, rotate the archive overflow, publish, and say what is left by hand. */
+/**
+ * Serialize the ENTIRE board transaction, not merely its atomic replacement.
+ * The launcher can redeem an answered card while an owner is working; without
+ * this lock both processes can read the same board and the later write silently
+ * resurrects one edit. Rotation and publish stay inside too, so the transaction
+ * reports and publishes the board version it actually wrote.
+ */
 function edit(fn, done) {
+  return withBoardEditLock(() => applyEdit(fn, done))
+}
+
+/** Apply a pure card edit, rotate the archive overflow, publish, and say what is left by hand. */
+function applyEdit(fn, done) {
   // Both ends of the round trip name their encoding (point 410). The write used
   // to take the platform default, which is the other half of the way a German
   // card could reach the file as something the reader sees as damage.
