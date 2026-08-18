@@ -156,20 +156,25 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
     expect(roomy.block).toBe(false)
     expect(roomy.slots.reopens).toEqual(['feat/336-croc-staging'])
     let written = null
-    expect(unparkReopened(roomy.slots, { read: () => record, write: (r) => (written = r) })).toEqual([
-      'feat/336-croc-staging',
-    ])
+    expect(unparkReopened(roomy.slots, { read: () => record, write: (r) => (written = r) })).toEqual({
+      cleared: ['feat/336-croc-staging'],
+      unread: '',
+    })
     expect(written.parked).toEqual({})
     // A TORN record is never rewritten — clearing into it would erase the rest.
     written = null
-    expect(unparkReopened(roomy.slots, { read: () => ({ ...record, torn: true }), write: (r) => (written = r) })).toEqual(
-      [],
-    )
+    const torn = unparkReopened(roomy.slots, {
+      read: () => ({ ...record, torn: true }),
+      write: (r) => (written = r),
+    })
+    expect(torn).toEqual({ cleared: [], unread: 'record-unreadable' })
+    expect(unreadNotice(torn.unread)).toContain('ALLOWING WITHOUT JUDGMENT')
+    expect(unreadNotice(torn.unread)).toContain('commission record')
     expect(written).toBeNull()
     // …and nothing to reopen writes nothing.
-    expect(unparkReopened({ reopens: [] }, { read: () => record, write: () => { throw new Error('no write') } })).toEqual(
-      [],
-    )
+    expect(
+      unparkReopened({ reopens: [] }, { read: () => record, write: () => { throw new Error('no write') } }),
+    ).toEqual({ cleared: [], unread: '' })
   })
 
   it('does not let a parked behind-front point claim the already-in-flight queue exemption', () => {

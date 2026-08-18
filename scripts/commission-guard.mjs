@@ -291,17 +291,22 @@ export function ambiguityNotice(ambiguous) {
  * (fourth review, finding 6): between the assignment and the commit the branch
  * would otherwise hold no slot while an agent already works it, and at a full
  * pool that is occupancy past the cap. Called by the hook the moment an
- * allowed call reopens one; returns the refs it cleared. A TORN record is left
- * alone — rewriting what nobody could read would erase every other entry.
+ * allowed call reopens one; returns `{ cleared, unread }`. A TORN record is left
+ * alone — rewriting what nobody could read would erase every other entry — and
+ * is returned as unread so the hook announces its fail-open pass.
  */
 export function unparkReopened(slots, { read = readCommissionRecord, write = writeCommissionRecord } = {}) {
   const reopens = Array.isArray(slots?.reopens) ? slots.reopens : []
-  if (reopens.length === 0) return []
+  if (reopens.length === 0) return { cleared: [], unread: '' }
   let record = read()
-  if (record?.torn === true) return []
+  // The record can become torn after the verdict read it. Do not overwrite a
+  // state we can no longer preserve, but carry the failure back to the hook so
+  // this fail-open assignment is visible rather than silently leaving active
+  // work parked outside the count.
+  if (record?.torn === true) return { cleared: [], unread: 'record-unreadable' }
   for (const ref of reopens) record = clearParkedBranch(record, ref)
   write(record)
-  return reopens
+  return { cleared: reopens, unread: '' }
 }
 
 // ---- CLI ------------------------------------------------------------------
@@ -467,7 +472,9 @@ if (isMainModule(import.meta.url)) {
     // PreToolUse allow must not fabricate a permission decision just to speak.
     if (verdict.unread) console.error(unreadNotice(verdict.unread))
     if (!verdict.block && !verdict.unread && verdict.slots?.reopens?.length) {
-      for (const ref of unparkReopened(verdict.slots)) {
+      const result = unparkReopened(verdict.slots)
+      if (result.unread) console.error(unreadNotice(result.unread))
+      for (const ref of result.cleared) {
         console.error(
           `commission-guard: unparked ${ref} — work was assigned back onto it, so it occupies its slot again.`,
         )
