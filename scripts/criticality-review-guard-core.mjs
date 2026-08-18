@@ -194,7 +194,11 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
       // is 0, and a seconds-scale or `at: 1` row loses every "later than"
       // comparison, letting an earlier merge read a later refusal as answered.
       ledgerAtUsable(r?.at) &&
-      modeUsable(r)
+      modeUsable(r) &&
+      // A CARRIED ROW STANDS ONLY VERIFIED here too (delta rounds,
+      // 18.08.2026): the wrapper re-measures the blob identity and stamps it;
+      // unstamped, the row is no reading of its sha's content.
+      (r.carried === undefined || r.carriedVerified === true)
     const wellFormed = reachable.filter(rowWellFormed)
     // A MALFORMED REFUSAL POISONS, IT DOES NOT VANISH (final-round pass 1):
     // silently dropping a reachable refusal whose timestamp fails the domain

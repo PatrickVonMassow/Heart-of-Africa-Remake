@@ -1633,6 +1633,50 @@ describe('the mode is required to WRITE a record, never to READ one', () => {
     }
   })
 
+  it('a carried row stands only with the wrapper’s verification stamp (delta rounds)', () => {
+    // The gates re-measure a carry's blob identity (verifyCarried) and stamp
+    // it: unstamped or failed, a carried clearing composes nothing and a
+    // carried refusal poisons — a hand-edited carry clears nothing.
+    const base = {
+      sha: 'c'.repeat(40),
+      model: 'GPT-5.6 Sol',
+      authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+      evidence: 'CARRIED from abcdef0 (blobs verified identical): read the whole pass',
+      mode: 'review',
+      verdict: 'merge',
+      at: MERGE_ACCOUNTING_SINCE + 5000,
+      carried: { from: 'a'.repeat(40) },
+    }
+    for (const stamp of [{}, { carriedVerified: false }, { carriedVerified: 'yes' }]) {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+        records: [{ ...base, ...stamp }],
+      })
+      expect(v.block, JSON.stringify(stamp)).toBe(true)
+    }
+    const verified = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [{ ...base, carriedVerified: true }],
+    })
+    expect(verified.block).toBe(false)
+    // …and an UNVERIFIED carried refusal poisons rather than vanishing.
+    const poisoned = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [
+        { ...base, carriedVerified: true },
+        { ...base, verdict: 'do-not-merge', at: MERGE_ACCOUNTING_SINCE + 9000, carriedVerified: false },
+      ],
+    })
+    expect(poisoned.block).toBe(true)
+    expect(poisoned.findings[0].kind).toBe('malformed-record')
+  })
+
   it('a coerced non-string field never reads as a named reviewer or evidence (landing round)', () => {
     // `model: {}` coerces to '[object Object]' and walked the emptiness test;
     // `evidence: {}` walked the length test the same way. Neither may clear.

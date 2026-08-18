@@ -221,6 +221,19 @@ describe('evaluateCriticalityReview', () => {
     }
   })
 
+  it('a carried row clears only with the wrapper’s verification stamp (delta rounds)', () => {
+    const carriedMerge = record({ verdict: 'merge', carried: { from: 'f'.repeat(40) } })
+    const unstamped = evaluateCriticalityReview({ baseline: 'b', head: 'h', ticks: [tick()], records: [carriedMerge] })
+    expect(unstamped.block).toBe(true)
+    const stamped = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [{ ...carriedMerge, carriedVerified: true }],
+    })
+    expect(stamped.block).toBe(false)
+  })
+
   it('a whitespace-decorated refusal verdict poisons — it cannot vanish unnormalised (landing round)', () => {
     const v = evaluateCriticalityReview({
       baseline: 'b',

@@ -356,6 +356,142 @@ describe('the mode round-trips into the ledger', () => {
     }
   })
 
+  it('carries a pass ONLY over verified-identical blobs, copying the source verdict (delta rounds)', () => {
+    // The carry contract's recorder half: blob identity per file, the source
+    // reading itself, no fresh verdict — and every refusal shape refuses.
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-carry-'))
+    try {
+      const repo = join(dir, 'repo')
+      mkdirSync(join(repo, 'scripts'), { recursive: true })
+      for (const f of [
+        'mechanism-review.mjs',
+        'mechanism-review-core.mjs',
+        'blind-merge-core.mjs',
+        'model-guard-core.mjs',
+        'review-material-core.mjs',
+        'repo-paths.mjs',
+        'is-main.mjs',
+      ]) {
+        copyFileSync(resolve(process.cwd(), 'scripts', f), join(repo, 'scripts', f))
+      }
+      const git = (...args) =>
+        spawnSync('git', args, { cwd: repo, encoding: 'utf8', windowsHide: true, env: { ...process.env, HOME: dir } })
+      git('init', '-q', '-b', 'main')
+      git('config', 'user.email', 'test@example.invalid')
+      git('config', 'user.name', 'Test')
+      writeFileSync(join(repo, 'fileA.mjs'), 'alpha\n')
+      writeFileSync(join(repo, 'fileB.mjs'), 'beta\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', 'Lay down the pair\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      const S = git('rev-parse', 'HEAD').stdout.trim()
+      writeFileSync(join(repo, 'fileC.mjs'), 'gamma\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', 'Add a third file\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      const H = git('rev-parse', 'HEAD').stdout.trim()
+      mkdirSync(join(repo, '.claude'), { recursive: true })
+      writeFileSync(
+        join(repo, '.claude', 'mechanism-reviews.jsonl'),
+        `${JSON.stringify({
+          sha: S,
+          subject: 'Lay down the pair',
+          authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+          model: 'GPT-5.6 Sol',
+          verdict: 'merge-with-fixes',
+          evidence: 'read both files whole and found one soft spot',
+          mode: 'review',
+          pass: { index: 1, total: 2, files: ['fileA.mjs', 'fileB.mjs'] },
+          at: 1_787_000_000_000,
+          atIso: '2026-08-18T00:00:00.000Z',
+        })}\n`,
+      )
+      const runRecorder = (...args) =>
+        spawnSync(process.execPath, [join(repo, 'scripts', 'mechanism-review.mjs'), ...args], {
+          cwd: repo,
+          encoding: 'utf8',
+          windowsHide: true,
+        })
+      // The happy carry: unchanged blobs, source covers the exact set.
+      const ok = runRecorder('--record', H, '--carried-from', S, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
+      expect(ok.status, `${ok.stdout}${ok.stderr}`).toBe(0)
+      const rows = readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')
+      const carried = JSON.parse(rows.at(-1))
+      expect(carried).toMatchObject({
+        sha: H,
+        model: 'GPT-5.6 Sol',
+        verdict: 'merge-with-fixes',
+        mode: 'review',
+        carried: { from: S },
+        pass: { index: 1, total: 2, files: ['fileA.mjs', 'fileB.mjs'] },
+      })
+      expect(carried.evidence).toMatch(/^CARRIED from [0-9a-f]{7} \(blobs verified identical\): read both files whole/)
+      // A fresh verdict beside a carry is refused — a carry is provenance.
+      const fresh = runRecorder('--record', H, '--carried-from', S, '--verdict', 'merge', '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
+      expect(fresh.status).toBe(1)
+      expect(fresh.stderr).toContain('do not pass them')
+      // A file the source never read (or that does not exist there) refuses.
+      const unread = runRecorder('--record', H, '--carried-from', S, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileC.mjs')
+      expect(unread.status).toBe(1)
+      // A CHANGED blob refuses the carry outright.
+      writeFileSync(join(repo, 'fileA.mjs'), 'alpha, revised\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', 'Revise alpha\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      const H2 = git('rev-parse', 'HEAD').stdout.trim()
+      const changed = runRecorder('--record', H2, '--carried-from', S, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
+      expect(changed.status).toBe(1)
+      expect(changed.stderr).toContain('CHANGED')
+      // …and carrying FROM a carried row is refused: carry from the original.
+      const chained = runRecorder('--record', H2, '--carried-from', H, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
+      expect(chained.status).toBe(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('verifyCarried stamps only measured blob identity — everything else stamps false (delta rounds)', async () => {
+    // Runs against THIS repository's own history, read-only: a commit that
+    // changed a file cannot carry a pass naming it; identical blobs verify.
+    const { verifyCarried } = await import('./mechanism-review.mjs')
+    const sha = (rev) =>
+      spawnSync('git', ['rev-parse', rev], { cwd: process.cwd(), encoding: 'utf8', windowsHide: true }).stdout.trim()
+    const head = sha('HEAD')
+    const parent = sha('HEAD~1')
+    const changedSet = spawnSync('git', ['diff', '--name-only', 'HEAD~1..HEAD'], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      windowsHide: true,
+    })
+      .stdout.trim()
+      .split('\n')
+      .filter(Boolean)
+    const changedFile = changedSet[0] ?? ''
+    // Any tracked file the last commit did NOT touch — chosen dynamically so
+    // this test never pins a path a future commit might change.
+    const unchangedFile = spawnSync('git', ['ls-tree', '-r', '--name-only', 'HEAD'], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      windowsHide: true,
+    })
+      .stdout.trim()
+      .split('\n')
+      .find((f) => f && !changedSet.includes(f))
+    const rows = [
+      { sha: head, carried: { from: parent }, pass: { index: 1, total: 2, files: [unchangedFile] } },
+      { sha: head, carried: { from: parent }, pass: { index: 1, total: 2, files: [changedFile] } },
+      { sha: head, carried: { from: 'not-a-sha' }, pass: { index: 1, total: 2, files: [unchangedFile] } },
+      { sha: head, carried: { from: parent }, pass: { index: 1, total: 2, files: [] } },
+      { sha: head, carried: { from: parent }, pass: { index: 1, total: 2, files: 'x' } },
+      { sha: head, verdict: 'merge' },
+    ]
+    verifyCarried(rows)
+    expect(rows[0].carriedVerified, `${unchangedFile} unchanged HEAD~1..HEAD`).toBe(true)
+    expect(rows[1].carriedVerified, `${changedFile} changed`).toBe(false)
+    expect(rows[2].carriedVerified).toBe(false)
+    expect(rows[3].carriedVerified).toBe(false)
+    expect(rows[4].carriedVerified).toBe(false)
+    // A row without a carry is left unstamped — it owes no verification.
+    expect('carriedVerified' in rows[5]).toBe(false)
+  })
+
   it('refuses a non-hex --record sha by SHAPE, before git or any shell sees it (landing-round pass 4)', () => {
     // The sha used to be interpolated into a shell line before validation ran,
     // so `HEAD"; <command>; echo "` executed whatever it carried. The resolve

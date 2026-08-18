@@ -31,7 +31,7 @@ import { dirname } from 'node:path'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
-import { readRecords } from './mechanism-review.mjs'
+import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import {
   evaluateMechanismReview,
   formatMechanismReviewVerdict,
@@ -386,7 +386,9 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
   // ledger is not even read then: the overwhelmingly common turn changes no
   // mechanism at all, and a hook that costs a process per ledger line on every
   // turn end is a hook people switch off.
-  const records = attachCoverage({
+  // Carried rows are RE-MEASURED on every read (delta rounds, 18.08.2026):
+  // the blob-identity stamp is the wrapper's, never the ledger's own word.
+  const records = verifyCarried(attachCoverage({
     pendingCommits,
     allRecords: pendingCommits.length ? readRecords() : [],
     effective,
@@ -404,7 +406,7 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
     // main-only changes leak in, identical branch changes vanish — so the
     // completeness demand and the detection would talk about different ranges.
     rangeFiles: (sha) => gitRawFile(rangeFilesCommand(base, sha)).split('\0').filter(Boolean),
-  })
+  }))
 
   return {
     applicable: true,

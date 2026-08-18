@@ -154,6 +154,7 @@ export function buildRecord({
   listBPath = '',
   pass = '',
   passFiles = '',
+  carriedFrom = '',
   now = Date.now(),
   resolve = resolveCommit,
   countUnion = countUnionFiles,
@@ -204,6 +205,24 @@ export function buildRecord({
       ok: false,
       errors: [`--record <sha>: "${ref}" is not a commit sha (7–40 hex characters)`, ...rest],
     }
+  }
+  // A CARRY IS ITS OWN FLOW (delta rounds, 18.08.2026): everything but the
+  // sha, the pass scope and the point comes verified from the source reading.
+  if (String(carriedFrom ?? '').trim()) {
+    return buildCarriedRecord({
+      sha: ref,
+      carriedFrom,
+      pass,
+      passFiles,
+      point,
+      model,
+      verdict,
+      evidence,
+      mode,
+      framing,
+      now,
+      resolve,
+    })
   }
   // THE RECEIPT IS COUNTED HERE WHERE IT CAN BE (four-eyes review, third round):
   // a typed `--accounting` line is a claim, and the recorder can turn it into a
@@ -291,6 +310,168 @@ export function buildRecord({
   }
 }
 
+/**
+ * Build a CARRIED pass record (delta-scoped rounds, user decision 18.08.2026):
+ * a pass of an earlier round carries to a new head where every file it read is
+ * byte-identical there. The recorder VERIFIES rather than believes — the
+ * source sha must be an ancestor of the head, every pass file's blob must be
+ * identical at both, and the ledger must hold the source reading itself, whose
+ * verdict/model/evidence/mode are COPIED (a carry is provenance, never a fresh
+ * judgment; that is why --model/--verdict/--evidence/--mode are refused
+ * beside it). The gates re-verify the blob identity on every read
+ * (verifyCarried), so a hand-edited carried row clears nothing.
+ */
+export function buildCarriedRecord({
+  sha = '',
+  carriedFrom = '',
+  pass = '',
+  passFiles = '',
+  point = '',
+  model = '',
+  verdict = '',
+  evidence = '',
+  mode = '',
+  framing = '',
+  now = Date.now(),
+  resolve = resolveCommit,
+  records = null,
+} = {}) {
+  const errors = []
+  if ([model, verdict, evidence, mode, framing].some((v) => String(v ?? '').trim())) {
+    errors.push('--carried-from copies model, verdict, evidence and mode from the source pass — do not pass them')
+  }
+  const from = String(carriedFrom).trim()
+  if (!/^[0-9a-f]{7,40}$/i.test(from)) {
+    errors.push(`--carried-from: "${from}" is not a commit sha (7–40 hex characters)`)
+  }
+  const passCheck = validatePass({ pass, passFiles })
+  if (!passCheck.pass) {
+    errors.push('--carried-from needs --pass <k>/<n> and --pass-files — a carry is always one pass of a split')
+  }
+  const wanted = String(point ?? '').trim()
+  if (wanted && !/^\d+$/.test(wanted)) {
+    errors.push('--point <N>: the work-order point this review settles, as a plain number')
+  }
+  if (errors.length) return { ok: false, errors }
+  const commit = resolve(sha)
+  const source = resolve(from)
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', source.sha, commit.sha], {
+      windowsHide: true,
+      cwd: REPO_ROOT,
+      stdio: 'ignore',
+    })
+  } catch {
+    errors.push(`--carried-from: ${source.sha.slice(0, 7)} is not an ancestor of ${commit.sha.slice(0, 7)} — a carry only moves a reading FORWARD along this history`)
+  }
+  if (source.sha === commit.sha) {
+    errors.push('--carried-from names the recorded sha itself — record the original pass, not a carry')
+  }
+  for (const file of passCheck.pass?.files ?? []) {
+    let a = null
+    let b = null
+    try {
+      a = git(['rev-parse', `${source.sha}:${file}`])
+    } catch {
+      errors.push(`--carried-from: ${file} does not exist at ${source.sha.slice(0, 7)} — nothing there to carry`)
+      continue
+    }
+    try {
+      b = git(['rev-parse', `${commit.sha}:${file}`])
+    } catch {
+      errors.push(`--carried-from: ${file} does not exist at ${commit.sha.slice(0, 7)} — deleted content cannot be covered by a carry`)
+      continue
+    }
+    if (a !== b) {
+      errors.push(
+        `--carried-from: ${file} CHANGED between ${source.sha.slice(0, 7)} and ${commit.sha.slice(0, 7)} — a carry may only rest on identical blobs; review it fresh`,
+      )
+    }
+  }
+  const all = records ?? readRecords()
+  const wantedSet = [...(passCheck.pass?.files ?? [])].sort().join('\n')
+  const sources = all.filter(
+    (r) =>
+      r.sha === source.sha &&
+      r.pass &&
+      Array.isArray(r.pass.files) &&
+      [...r.pass.files].sort().join('\n') === wantedSet &&
+      VERDICTS.includes(String(r.verdict)) &&
+      // The source must be the ORIGINAL reading: blob identity is transitive,
+      // so where the source is itself carried, carry from ITS original.
+      r.carried === undefined,
+  )
+  if (!sources.length) {
+    errors.push(
+      `--carried-from: no recorded pass at ${source.sha.slice(0, 7)} covers exactly these files — a carry may only rest on a reading that happened (and where that reading is itself a carry, carry from its original)`,
+    )
+  }
+  if (errors.length) return { ok: false, errors }
+  const src = sources.reduce((x, y) => (Number(y.at ?? 0) >= Number(x.at ?? 0) ? y : x))
+  const copiedEvidence = `CARRIED from ${source.sha.slice(0, 7)} (blobs verified identical): ${String(src.evidence ?? '').trim()}`
+  const check = validateRecord({
+    sha: commit.sha,
+    model: src.model,
+    verdict: src.verdict,
+    evidence: copiedEvidence,
+    authoredBy: commit.authoredBy,
+    authors: commit.authors,
+    mode: src.mode,
+    pass,
+    passFiles,
+  })
+  if (check.errors.length) return { ok: false, errors: check.errors }
+  return {
+    ok: true,
+    record: {
+      sha: commit.sha,
+      subject: commit.subject,
+      authoredBy: commit.authoredBy,
+      model: String(src.model).trim(),
+      verdict: String(src.verdict).trim(),
+      evidence: copiedEvidence,
+      mode: String(src.mode).trim(),
+      pass: passCheck.pass,
+      carried: { from: source.sha },
+      ...(wanted ? { point: Number(wanted) } : {}),
+      at: now,
+      atIso: new Date(now).toISOString(),
+    },
+  }
+}
+
+/**
+ * Re-measure every carried row's claim and STAMP it (the gates' half of the
+ * carry contract): for each record with `carried.from`, every pass file's blob
+ * must be identical between the source and the recorded sha. Anything that
+ * cannot be verified — a malformed sha, a missing file, a git failure — stamps
+ * false, and the cores refuse the row. Mutates and returns `records`.
+ */
+export function verifyCarried(records) {
+  for (const r of records ?? []) {
+    if (!r || typeof r !== 'object' || r.carried === undefined) continue
+    r.carriedVerified = (() => {
+      try {
+        const from = String(r.carried?.from ?? '')
+        if (!/^[0-9a-f]{7,40}$/i.test(from)) return false
+        if (!/^[0-9a-f]{7,40}$/i.test(String(r.sha ?? ''))) return false
+        const files = Array.isArray(r.pass?.files) ? r.pass.files : null
+        if (!files || !files.length) return false
+        for (const file of files) {
+          if (typeof file !== 'string' || !file) return false
+          const a = git(['rev-parse', `${from}:${file}`])
+          const b = git(['rev-parse', `${r.sha}:${file}`])
+          if (!a || a !== b) return false
+        }
+        return true
+      } catch {
+        return false
+      }
+    })()
+  }
+  return records
+}
+
 /** Resolve a (possibly short) sha to the commit, its subject and its author model.
  *
  *  Each free-text fact through its OWN single-format `git show` (escalation
@@ -345,6 +526,10 @@ export const usage = () =>
   `       its own covers the files it names and nothing else. review-sol.mjs prints them.\n` +
   `       A path holding a comma, a quote or edge whitespace is written C-QUOTED, exactly\n` +
   `       as git prints it; nothing is ever trimmed into a different path.\n` +
+  `--carried-from <sha> carries an EARLIER round's pass to this head where every file it\n` +
+  `       read is byte-identical there: the recorder verifies the blob identity and the\n` +
+  `       source reading, and COPIES its verdict/model/evidence — do not pass them. The\n` +
+  `       gates re-verify the blobs on every read; a changed file refuses the carry.\n` +
   `\nWHO REVIEWS (CLAUDE.md §6): the OTHER vendor, never an author of the range.\n` +
   `       Claude authored it → GPT-5.6 Sol at reasoning effort high, and when Sol is\n` +
   `       unavailable the first of Fable 5 / Opus 5 / Opus 4.8 that wrote no part of it.\n` +

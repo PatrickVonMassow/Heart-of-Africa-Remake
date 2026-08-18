@@ -36,7 +36,7 @@ import { dirname } from 'node:path'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
-import { readRecords } from './mechanism-review.mjs'
+import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import {
   evaluateCriticalityReview,
   formatCriticalityReviewVerdict,
@@ -254,9 +254,11 @@ export function gatherCriticalityReviewInputs({ sessionId = '' } = {}) {
   // none, so the ancestry probes below cost nothing at all.
   const numbers = new Set(ticks.map((t) => t.number))
   const records = ticks.length
-    ? readRecords()
-        .filter((r) => numbers.has(Number(r?.point)))
-        .map((r) => ({ ...r, reachable: r.sha === head || isStrictAncestor(r.sha, head) }))
+    ? verifyCarried(
+        readRecords()
+          .filter((r) => numbers.has(Number(r?.point)))
+          .map((r) => ({ ...r, reachable: r.sha === head || isStrictAncestor(r.sha, head) })),
+      )
     : []
   for (const r of records) {
     r.descendsFrom = records

@@ -78,6 +78,7 @@ import {
 import {
   assembleMaterial,
   formatBudgetNotice,
+  formatPassFiles,
   formatPassManifest,
   formatShortfall,
   isBinaryPatchSection,
@@ -89,9 +90,11 @@ import {
   planPasses,
   planShortfall,
   patchSectionMap,
+  quotePassFile,
   splitPatchByFile,
   undecodablePaths,
 } from './review-material-core.mjs'
+import { readRecords } from './mechanism-review.mjs'
 
 /** Where codex keeps the ChatGPT login, and where we park a copy of it. */
 export const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), '.codex')
@@ -914,6 +917,53 @@ if (isMainModule(import.meta.url)) {
       // WILL BE REFUSED. The plan above says how to split it, so the run stops
       // here rather than paying for a verdict nothing may rest on.
       if (!passFlag) {
+        // DELTA-SCOPED ROUNDS (user decision 18.08.2026): with --carry-from
+        // <previous round's head>, a pass whose files are ALL byte-identical
+        // there and were ALL read by one recorded pass at that head needs no
+        // fresh round — its reading carries, and the recorder re-verifies
+        // every claim this planning makes (blob identity, the source row)
+        // before writing, as do the gates on every read. Anything less than
+        // fully unchanged+covered is reviewed fresh; the analysis only sorts
+        // the passes, it clears nothing itself.
+        const carryFlag = flag('--carry-from')
+        if (carryFlag) {
+          if (!/^[0-9a-f]{7,40}$/i.test(carryFlag)) {
+            console.error(`review-sol: --carry-from: "${carryFlag}" is not a commit sha (7–40 hex characters)`)
+            process.exit(2)
+          }
+          const carrySha = git(['rev-parse', `${carryFlag}^{commit}`], { required: false })
+          if (!carrySha) {
+            console.error(`review-sol: --carry-from ${carryFlag}: no such commit in this repository`)
+            process.exit(2)
+          }
+          const changed = new Set(
+            git(['diff', '--name-only', '-z', `${carrySha}..${full}`], { raw: true })
+              .split('\0')
+              .filter(Boolean),
+          )
+          const sourceRows = readRecords().filter(
+            (r) => r.sha === carrySha && r.pass && Array.isArray(r.pass.files) && r.carried === undefined,
+          )
+          const setOf = (files) => [...files].sort().join('\n')
+          const sourceSets = new Set(sourceRows.map((r) => setOf(r.pass.files)))
+          console.error(`review-sol: carry analysis against ${carrySha.slice(0, 7)}:`)
+          for (const p of plan.passes) {
+            const dirty = p.files.filter((f) => changed.has(f))
+            const covered = sourceSets.has(setOf(p.files))
+            if (!dirty.length && covered) {
+              console.error(
+                `  pass ${p.index}/${p.total} — unchanged and read there; CARRY it:\n` +
+                  `    node scripts/mechanism-review.mjs --record ${full} --carried-from ${carrySha} ` +
+                  `--pass ${p.index}/${p.total} --pass-files "${formatPassFiles(p.files)}"${point ? ` --point ${point}` : ''}`,
+              )
+            } else {
+              const why = dirty.length
+                ? `${dirty.length} file(s) changed: ${dirty.map((f) => quotePassFile(f)).join(', ')}`
+                : 'no recorded pass there covers exactly this file set'
+              console.error(`  pass ${p.index}/${p.total} — review it fresh (${why}): --pass ${p.index}`)
+            }
+          }
+        }
         console.error(
           'review-sol: REFUSING to spend a round on a range that cannot fit one — run the passes above.',
         )

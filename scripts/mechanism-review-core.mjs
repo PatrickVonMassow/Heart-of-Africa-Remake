@@ -524,6 +524,12 @@ export const FLAG_SPEC = Object.freeze({
   // the file set, and each pass records what it actually read (point 714).
   '--pass': true,
   '--pass-files': true,
+  // A pass of an EARLIER round carries forward to a new head where every file
+  // it read is byte-identical there (delta-scoped rounds, user decision
+  // 18.08.2026): the recorder verifies the blob identity and the source
+  // reading itself, and copies the source's verdict — a carry is provenance,
+  // never a fresh judgment.
+  '--carried-from': true,
   '--list': false,
 })
 
@@ -547,6 +553,7 @@ const VALUE_KEY = Object.freeze({
   '--list-b': 'listBPath',
   '--pass': 'pass',
   '--pass-files': 'passFiles',
+  '--carried-from': 'carriedFrom',
 })
 
 /** Levenshtein distance — small inputs only, so the simple two-row form. */
@@ -1065,7 +1072,13 @@ export function evaluateMechanismReview({
       // that DOMAIN may stand.
       ledgerAtUsable(r?.at) &&
       evidenceUsable(r) &&
-      modeUsable(r)
+      modeUsable(r) &&
+      // A CARRIED ROW STANDS ONLY VERIFIED (delta rounds, 18.08.2026): the
+      // guard re-measures the blob identity the recorder claimed
+      // (verifyCarried) and stamps it; a carried row without the stamp — a
+      // hand-edit, or blobs that no longer match — is not a reading of this
+      // sha's content, and composes nothing.
+      (r.carried === undefined || r.carriedVerified === true)
     const wellFormed = covering.filter(rowWellFormed)
     // A MALFORMED REFUSAL POISONS, IT DOES NOT VANISH (final-round pass 1,
     // applied to both gates): a covering do-not-merge whose timestamp fails
