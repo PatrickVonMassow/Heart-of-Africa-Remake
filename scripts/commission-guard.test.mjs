@@ -126,6 +126,73 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
     expect(v.block).toBe(false)
   })
 
+  // ONE CALL, TWO POINTS (Sol's review of 91d88f9a): a shell line that cuts two
+  // branches opens two points, and judging only the first judged neither.
+  it('judges EVERY point the call opens, and refuses when ANY of them is behind the front', () => {
+    const g = gatherCommissionInputs({
+      points: [700, 697],
+      cwd: '/repo',
+      paused: false,
+      otherOwner: false,
+      tasksText: TASKS,
+      branchProbe: () => ({ readable: true, branches: [] }),
+      record: { overrides: {}, parked: {}, torn: false },
+    })
+    expect(g.inputs.points).toEqual([700, 697])
+    const v = commissionVerdict(g.inputs, { now: AUG17 })
+    // 700 is at the front and passes; 697 is not, and the call carries both.
+    expect(v.verdicts.map((x) => [x.point, x.block])).toEqual([
+      [700, false],
+      [697, true],
+    ])
+    expect(v.block).toBe(true)
+    expect(v.reason).toContain('POINT 697')
+    expect(v.reason).toContain('700, 701, 707')
+  })
+
+  it('allows a two-point call when BOTH are at the front, and reads each own override', () => {
+    const record = { overrides: { 697: { reason: 'red on main masks other suites', at: '' } }, parked: {}, torn: false }
+    const both = gatherCommissionInputs({
+      points: [700, 701],
+      cwd: '/repo',
+      paused: false,
+      otherOwner: false,
+      tasksText: TASKS,
+      branchProbe: () => ({ readable: true, branches: [] }),
+      record,
+    })
+    expect(commissionVerdict(both.inputs, { now: AUG17 }).block).toBe(false)
+    // The SECOND point's own recorded override is the one that clears it — not
+    // the first point's, and not none at all.
+    const jumped = gatherCommissionInputs({
+      points: [700, 697],
+      cwd: '/repo',
+      paused: false,
+      otherOwner: false,
+      tasksText: TASKS,
+      branchProbe: () => ({ readable: true, branches: [] }),
+      record,
+    })
+    const v = commissionVerdict(jumped.inputs, { now: AUG17 })
+    expect(v.block).toBe(false)
+    expect(v.verdicts[1].queue.why).toBe('override')
+  })
+
+  it('prints the branch refusal ONCE for a call that opens two points', () => {
+    const g = gatherCommissionInputs({
+      points: [708, 705],
+      cwd: '/repo',
+      paused: false,
+      otherOwner: false,
+      tasksText: TASKS,
+      branchProbe: () => ({ readable: true, branches: NINE.slice(0, 3) }),
+      record: { overrides: {}, parked: {}, torn: false },
+    })
+    const v = commissionVerdict(g.inputs, { now: AUG17 })
+    expect(v.block).toBe(true)
+    expect(v.reason.match(/A SLOT IS NOT FREE/g)).toHaveLength(1)
+  })
+
   it('STANDS DOWN for a session that does not own the batch lock', () => {
     expect(gatherCommissionInputs({ point: 697, cwd: '/repo', paused: false, otherOwner: true })).toMatchObject({
       applicable: false,

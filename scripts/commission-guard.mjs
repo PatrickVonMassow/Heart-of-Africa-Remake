@@ -69,6 +69,9 @@ const PAUSE = repoPath('.claude', 'batch-paused')
 export function gatherCommissionInputs({
   sessionId = '',
   point = null,
+  // EVERY point the call opens, not only the first: one shell call can cut two
+  // branches, and judging one of them is judging none.
+  points = null,
   cwd = REPO_ROOT,
   behind = true,
   // The probes are injectable so the stand-downs are provable in the pure
@@ -91,10 +94,14 @@ export function gatherCommissionInputs({
   const tasks = tasksText ?? readTasksOpen(tasksPath)
   const { readable, branches } = branchProbe({ cwd, behind })
   const rec = record ?? readCommissionRecord()
+  const targets = (Array.isArray(points) && points.length ? points : [point])
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n > 0)
   return {
     applicable: true,
     inputs: {
-      point,
+      point: targets[0] ?? null,
+      points: targets,
       open: openPointsOf(tasks),
       gates: parseUserGates(tasks),
       // THE OPEN BRANCH IS THE IN-FLIGHT SIGNAL now that it is what holds a
@@ -103,39 +110,68 @@ export function gatherCommissionInputs({
       branches,
       readable,
       record: rec,
-      override: commissionOverrideFor(rec, point),
+      override: commissionOverrideFor(rec, targets[0] ?? point),
     },
   }
 }
 
-/** Both decisions, and the deny text when either refuses. Pure given inputs. */
+/**
+ * Both decisions for EVERY point the call opens, and the deny text when any of
+ * them refuses. Pure given inputs.
+ *
+ * THE QUEUE IS JUDGED PER POINT, THE SLOTS PER CALL. Which point may be started
+ * is a question about that point; whether the pool has room at all is a question
+ * about the call, and asking it once keeps the branch listing from being printed
+ * twice — the second point's queue refusal would be buried under the repeat.
+ *
+ * `queue` and `slots` carry the FIRST point's verdicts, which is what the
+ * single-target callers (`--status`, the preflight) read; `verdicts` carries one
+ * queue verdict per point. A call opening two points is refused when EITHER is
+ * refused — a line that cuts a front-most branch beside a queue-jumping one is
+ * still a queue jump.
+ */
 export function commissionVerdict(inputs, { now = Date.now() } = {}) {
-  const queue = commissionDecision({
-    point: inputs.point,
-    open: inputs.open,
-    gates: inputs.gates,
-    inFlight: inputs.inFlight,
-    cap: POOL_CAP,
-    override: inputs.override,
-  })
+  const targets =
+    Array.isArray(inputs?.points) && inputs.points.length ? inputs.points : inputs?.point != null ? [inputs.point] : []
+  const verdicts = targets.map((point) => ({
+    point,
+    queue: commissionDecision({
+      point,
+      open: inputs.open,
+      gates: inputs.gates,
+      inFlight: inputs.inFlight,
+      cap: POOL_CAP,
+      // Each point's OWN recorded override, never the first one's.
+      override: commissionOverrideFor(inputs.record, point) || (point === inputs.point ? inputs.override : ''),
+    }),
+  }))
+  for (const v of verdicts) v.block = !v.queue.allowed
   const slots = branchSlotDecision({
     branches: inputs.branches,
     parked: inputs.record?.parked ?? {},
-    point: inputs.point,
+    points: targets,
     cap: POOL_CAP,
     readable: inputs.readable,
     now,
   })
-  // A point whose branch already stands is being FINISHED, not opened, and
-  // neither rule applies to it. The test is the BRANCH, not the queue verdict:
-  // a branch outside the work order (a cross-cutting fix) is judged the same
-  // way, and pushing to it must never be refused for the pool it already sits
-  // in. Cutting a NEW branch outside the work order does take a slot.
-  const finishing = (Array.isArray(inputs.inFlight) ? inputs.inFlight : []).includes(Number(inputs.point))
+  // A point whose branch already stands is being FINISHED, not opened, and the
+  // SLOT rule does not apply to it. The test is the BRANCH, not the queue
+  // verdict: a branch outside the work order (a cross-cutting fix) is judged the
+  // same way, and pushing to it must never be refused for the pool it already
+  // sits in. Cutting a NEW branch outside the work order does take a slot — so
+  // a call is spared only when EVERY point it opens is already in flight.
+  const inFlight = Array.isArray(inputs.inFlight) ? inputs.inFlight : []
+  const finishing = targets.length > 0 && targets.every((p) => inFlight.includes(Number(p)))
   const parts = []
   if (!finishing && !slots.allowed) parts.push(branchSlotRefusal(slots))
-  if (!queue.allowed) parts.push(commissionRefusal(queue))
-  return { block: parts.length > 0, reason: parts.join('\n\n'), queue, slots }
+  for (const v of verdicts) if (v.block) parts.push(commissionRefusal(v.queue))
+  return {
+    block: parts.length > 0,
+    reason: parts.join('\n\n'),
+    queue: verdicts[0]?.queue ?? commissionDecision({ point: null, open: inputs.open, gates: inputs.gates }),
+    slots,
+    verdicts,
+  }
 }
 
 // ---- CLI ------------------------------------------------------------------
@@ -237,7 +273,7 @@ if (isMainModule(import.meta.url)) {
       description: input.description,
     })
     if (!target.point) process.exit(0) // opens nothing this rule knows about
-    const g = gatherCommissionInputs({ sessionId: payload.session_id || '', point: target.point })
+    const g = gatherCommissionInputs({ sessionId: payload.session_id || '', points: target.points })
     if (!g.applicable) process.exit(0)
     const verdict = commissionVerdict(g.inputs)
     if (verdict.block) {

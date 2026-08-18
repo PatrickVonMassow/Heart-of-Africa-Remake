@@ -1103,55 +1103,93 @@ export function pointOfBranch(ref) {
   return Number.isInteger(n) && n > 0 ? n : null
 }
 
+/** Every `feat/<N>` a text names, in order. `feat/712`, `feat/712-slug` and
+ *  `feat/712/x` are one branch name each — the separator is NOT required, or a
+ *  slugless branch would open work unseen. */
+const featPointsIn = (text) => [...String(text).matchAll(/feat\/(\d+)/gi)].map((m) => Number(m[1]))
+
+/** The three spellings that CUT a branch, each capturing the name it creates.
+ *  The name is read off the flag rather than off the whole command, so
+ *  `git checkout -b feat/712-x origin/feat/705-y` opens 712 and not the branch
+ *  it started FROM. `git branch -D …` is excluded by the `(?!-)`. */
+const CUT_PATTERNS = [/\bcheckout\b.*?\s-b\s+(\S+)/i, /\bswitch\b.*?\s-[cC]\s+(\S+)/, /\bgit\s+branch\s+(?!-)(\S+)/i]
+
+/** ONE shell segment, judged on its own. Returns { points, how }. */
+function segmentTarget(seg) {
+  const none = { points: [], how: 'none' }
+  const uniq = (nums) => [...new Set(nums.filter((n) => Number.isInteger(n) && n > 0))]
+  // An authoring run IS the commissioning of a point, whichever vendor runs it —
+  // unless it is one of the read-only legs, which produce no work at all.
+  if (!/--routing\b|--dry-run\b/.test(seg)) {
+    const authored = uniq([...seg.matchAll(/author-sol\.mjs.*?--point\s+(\d+)/gi)].map((m) => Number(m[1])))
+    if (authored.length) return { points: authored, how: 'author' }
+  }
+  if (/\bworktree\s+add\b/.test(seg)) {
+    // `-b` names the branch a new tree cuts; without it the tree is created ON a
+    // branch that is named plainly, and creating the tree is still the act.
+    const m = /\bworktree\s+add\b.*?\s-b\s+(\S+)/.exec(seg)
+    const created = uniq(m ? [pointOfBranch(m[1])] : featPointsIn(seg))
+    return created.length ? { points: created, how: 'worktree' } : none
+  }
+  const cut = uniq(CUT_PATTERNS.map((re) => re.exec(seg)).map((m) => (m ? pointOfBranch(m[1]) : null)))
+  return cut.length ? { points: cut, how: 'branch' } : none
+}
+
 /**
- * WHICH POINT IS THIS TOOL CALL OPENING WORK ON? PURE.
+ * WHICH POINTS IS THIS TOOL CALL OPENING WORK ON? PURE.
  *
- * Returns { point, how }: `how` names the act that was recognised — `agent` for
- * a spawn, `branch` for a `feat/<N>-…` being CUT, `worktree` for a tree created
- * on one, `author` for an authoring run commissioned on a point — and `none`
- * where the call opens nothing this rule knows about.
+ * Returns { points, point, how }: `points` is EVERY point the call opens, `point`
+ * the first of them (the single-target shorthand the CLI and the report use), and
+ * `how` names the act recognised for it — `agent` for a spawn, `branch` for a
+ * `feat/<N>-…` being CUT, `worktree` for a tree created on one, `author` for an
+ * authoring run — with `none` where the call opens nothing this rule knows about.
  *
- * AMBIGUITY ANSWERS NULL, deliberately. A prompt that names two point numbers
- * cannot say which one is being opened, and a guard that guesses would refuse
- * the wrong work; the whole mechanism is worth nothing if it fires on a call it
- * misread. Switching to an existing branch, pushing one, landing one — none of
- * them CREATES anything, and none is recognised here.
+ * A CALL THAT OPENS TWO POINTS OPENS BOTH, and every one of them is judged. The
+ * first cut of this rule answered NULL to any second number, which made
+ * `git checkout -b feat/697-a && git branch feat/705-b` — one shell call — a
+ * complete bypass of both refusals (Sol, review of 91d88f9a). A COMMAND is not
+ * ambiguous about what it creates: it is read SEGMENT BY SEGMENT (`&&`, `||`,
+ * `;`, `|`, newline), each judged on the branch its own flag names, so a push or
+ * a checkout standing beside a cut contributes nothing.
+ *
+ * PROSE STAYS AMBIGUOUS, and only prose. A spawn prompt that spells out two
+ * `feat/<N>` branches names two branches to be worked, and both are judged; but
+ * `point 697 depends on point 705` is a cross-reference, not a second
+ * commissioning, so the loose "point N" form is read only when it is the single
+ * number in the text. Switching to an existing branch, pushing one, landing one —
+ * none of them CREATES anything, and none is recognised here.
  *
  * A READ-ONLY RUN OPENS NOTHING either: `author-sol.mjs --routing` answers which
  * lane owns a point and `--dry-run` prints the prompt it would send. Refusing
  * those would deny the very question a session asks BEFORE it commissions.
  */
 export function commissionTarget({ toolName = '', command = '', prompt = '', description = '' } = {}) {
-  const none = { point: null, how: 'none' }
-  const only = (nums) => {
-    const set = [...new Set(nums.filter((n) => Number.isInteger(n) && n > 0))]
-    return set.length === 1 ? set[0] : null
-  }
-  // `feat/712`, `feat/712-slug` and `feat/712/x` are one branch name each — the
-  // separator is NOT required, or a slugless branch would open work unseen.
-  const featPoints = (text) => [...String(text).matchAll(/feat\/(\d+)/gi)].map((m) => Number(m[1]))
+  const none = { point: null, points: [], how: 'none' }
+  const uniq = (nums) => [...new Set(nums.filter((n) => Number.isInteger(n) && n > 0))]
+  const found = (points, how) => (points.length ? { point: points[0], points, how } : none)
   const tool = String(toolName ?? '')
   if (tool === 'Agent' || tool === 'Task') {
     const text = `${prompt ?? ''}\n${description ?? ''}`
-    const byBranch = only(featPoints(text))
-    if (byBranch) return { point: byBranch, how: 'agent' }
-    const named = only([...text.matchAll(/\b(?:point|punkt)\s+(\d+)\b/gi)].map((m) => Number(m[1])))
-    return named ? { point: named, how: 'agent' } : none
+    const byBranch = uniq(featPointsIn(text))
+    if (byBranch.length) return found(byBranch, 'agent')
+    const named = uniq([...text.matchAll(/\b(?:point|punkt)\s+(\d+)\b/gi)].map((m) => Number(m[1])))
+    return named.length === 1 ? found(named, 'agent') : none
   }
   const cmd = String(command ?? '')
   if (!cmd.trim()) return none
-  // An authoring run IS the commissioning of a point, whichever vendor runs it —
-  // unless it is one of the read-only legs, which produce no work at all.
-  const authored = /--routing\b|--dry-run\b/.test(cmd)
-    ? null
-    : only([...cmd.matchAll(/author-sol\.mjs[^|;&]*--point\s+(\d+)/gi)].map((m) => Number(m[1])))
-  if (authored) return { point: authored, how: 'author' }
-  const created = only(featPoints(cmd))
-  if (!created) return none
-  if (/\bworktree\s+add\b/.test(cmd)) return { point: created, how: 'worktree' }
-  const cuts =
-    /\bcheckout\s+[^|;&]*?-b\b/.test(cmd) || /\bswitch\s+[^|;&]*?-[cC]\b/.test(cmd) || /\bgit\s+branch\s+(?!-)/.test(cmd)
-  return cuts ? { point: created, how: 'branch' } : none
+  const points = []
+  let how = 'none'
+  for (const raw of cmd.split(/\n|&&|\|\||[;|&]/)) {
+    const seg = raw.trim()
+    if (!seg) continue
+    const t = segmentTarget(seg)
+    for (const n of t.points) {
+      if (points.includes(n)) continue
+      points.push(n)
+      if (how === 'none') how = t.how
+    }
+  }
+  return found(points, how)
 }
 
 /** An age a human reads at a glance: days past a day, hours past an hour. */
@@ -1261,16 +1299,18 @@ export function commissionRecordReport(record) {
  * which is the silent-override failure this point exists to end. A branch whose
  * tip date cannot be read stays parked: an unreadable date proves no movement.
  *
- * `exclude` is the point being commissioned. Its own branch is not a slot the
- * commissioning would consume — re-cutting or pushing an existing branch is
- * finishing, not opening.
+ * `exclude` is the point (or the POINTS — one shell call can open two) being
+ * commissioned. Their own branches are not slots the commissioning would consume
+ * — re-cutting or pushing an existing branch is finishing, not opening.
  */
 export function openBranchSlots({ branches = [], parked = {}, exclude = null, cap = POOL_CAP, now = Date.now() } = {}) {
   const parkedAt = new Map()
   for (const [ref, e] of Object.entries(parked && typeof parked === 'object' ? parked : {})) {
     parkedAt.set(normRef(ref), { reason: e?.reason ?? '', at: Date.parse(String(e?.at ?? '')) })
   }
-  const skip = Number(exclude)
+  const skip = new Set(
+    (Array.isArray(exclude) ? exclude : [exclude]).map(Number).filter((n) => Number.isInteger(n) && n > 0),
+  )
   const seen = new Map()
   const parkedOut = []
   for (const b of Array.isArray(branches) ? branches : []) {
@@ -1293,7 +1333,7 @@ export function openBranchSlots({ branches = [], parked = {}, exclude = null, ca
       seen.set(ref, true)
       continue
     }
-    if (Number.isInteger(skip) && skip > 0 && item.point === skip) {
+    if (item.point !== null && skip.has(item.point)) {
       seen.set(ref, true)
       continue
     }
@@ -1323,12 +1363,16 @@ export function branchSlotDecision({
   branches = [],
   parked = {},
   point = null,
+  points = null,
   cap = POOL_CAP,
   readable = true,
   now = Date.now(),
 } = {}) {
-  const slots = openBranchSlots({ branches, parked, exclude: point, cap, now })
-  const out = { ...slots, point: Number.isInteger(Number(point)) ? Number(point) : null }
+  const targets = (Array.isArray(points) && points.length ? points : [point])
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n > 0)
+  const slots = openBranchSlots({ branches, parked, exclude: targets, cap, now })
+  const out = { ...slots, point: targets[0] ?? null, points: targets }
   if (readable !== true) return { ...out, allowed: true, why: 'branches-unreadable' }
   if (slots.count < slots.cap) return { ...out, allowed: true, why: 'slots-free' }
   return { ...out, allowed: false, why: 'branches-open' }
@@ -1342,7 +1386,11 @@ export function branchSlotDecision({
 export function branchSlotRefusal(decision = {}, { limit = 10 } = {}) {
   const open = Array.isArray(decision?.open) ? decision.open : []
   const cap = decision?.cap ?? POOL_CAP
-  const n = decision?.point
+  const targets = Array.isArray(decision?.points) && decision.points.length ? decision.points : [decision?.point]
+  const named = targets.filter((p) => Number.isInteger(Number(p)) && Number(p) > 0)
+  // One call can open two points, and the refusal names both — a message that
+  // named one of them would read as if the other had been allowed.
+  const n = named.length > 1 ? `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}` : (named[0] ?? null)
   const lines = open.slice(0, limit).map((b) => {
     const age = describeBranchAge(Number.isFinite(b?.ageMs) ? b.ageMs : NaN)
     const behind = Number.isFinite(b?.behind)
@@ -1353,7 +1401,9 @@ export function branchSlotRefusal(decision = {}, { limit = 10 } = {}) {
   if (open.length > limit) lines.push(`  · …and ${open.length - limit} more`)
   return (
     `A SLOT IS NOT FREE UNTIL ITS BRANCH IS GONE: ${open.length} open feat/* branch(es) against a pool cap of ` +
-    `${cap}${n ? `, so opening point ${n} would add another` : ''}. Oldest first:\n${lines.join('\n')}\n` +
+    `${cap}${n ? `, so opening point${named.length > 1 ? 's' : ''} ${n} would add ${
+      named.length > 1 ? `${named.length} more` : 'another'
+    }` : ''}. Oldest first:\n${lines.join('\n')}\n` +
     `TWO WAYS OUT, both explicit: LAND one (${BRANCH_LAND_CMD}), or PARK it with a reason (${BRANCH_PARK_CMD}), ` +
     'which records the decision and drops the branch out of the count until it moves again. Built work that never ' +
     'lands delivers nothing and costs more to merge every day it ages against a moving main.'
