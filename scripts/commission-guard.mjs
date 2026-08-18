@@ -53,6 +53,7 @@ import {
   commissionTarget,
   describeBranchAge,
   normaliseBranchRef,
+  openBranchSlots,
   pointOfBranch,
   recordCommissionOverride,
   recordParkedBranch,
@@ -137,6 +138,7 @@ export function gatherCommissionInputs({
   const tasks = tasksText ?? readTasksOpen(tasksPath)
   const { readable, branches } = branchProbe({ cwd, behind })
   const rec = record ?? readCommissionRecord()
+  const occupied = openBranchSlots({ branches, parked: rec?.parked ?? {} }).open
   const targets = (Array.isArray(points) && points.length ? points : [point])
     .map(Number)
     .filter((n) => Number.isInteger(n) && n > 0)
@@ -151,7 +153,12 @@ export function gatherCommissionInputs({
       gates: parseUserGates(tasks),
       // THE OPEN BRANCH IS THE IN-FLIGHT SIGNAL now that it is what holds a
       // slot. One fact, one home: the same list answers both questions.
-      inFlight: [...new Set(branches.map((b) => pointOfBranch(b.ref)).filter((n) => n !== null))],
+      // A park removes a branch from occupancy, so it also removes the point
+      // from the queue's "already in flight" exemption. Otherwise assigning a
+      // behind-front parked point bypasses QUEUE before the slot decision can
+      // project its reoccupation. A park whose tip moved is present in `open`
+      // again and therefore regains the exemption honestly.
+      inFlight: [...new Set(occupied.map((b) => b.point).filter((n) => n !== null))],
       branches,
       readable,
       record: rec,

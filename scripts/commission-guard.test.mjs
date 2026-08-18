@@ -172,6 +172,21 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
     )
   })
 
+  it('does not let a parked behind-front point claim the already-in-flight queue exemption', () => {
+    const record = {
+      overrides: {},
+      parked: { 'feat/697-parked': { reason: 'deferred', at: '2026-08-17T19:00:00.000Z', tip: 'a1b2c3d4' } },
+      torn: false,
+    }
+    const branches = [{ ref: 'feat/697-parked', tipAt: AUG17 - hours(1), tip: 'a1b2c3d4', behind: 3 }]
+    const g = gather(697, { branches, record, refs: ['feat/697-parked'] })
+    expect(g.inputs.inFlight).not.toContain(697)
+    const v = commissionVerdict(g.inputs, { now: AUG17 })
+    expect(v.queue).toMatchObject({ allowed: false, why: 'behind-front' })
+    expect(v.slots.reopens).toEqual(['feat/697-parked'])
+    expect(v.block).toBe(true)
+  })
+
   it('treats the point whose branch already stands as work being FINISHED', () => {
     const v = commissionVerdict(gather(700, { branches: NINE }).inputs, { now: AUG17 })
     expect(v.block).toBe(false)
