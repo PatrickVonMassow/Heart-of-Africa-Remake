@@ -175,6 +175,31 @@ export function isBinaryPatchSection(text) {
   return false
 }
 
+/**
+ * What a bare `out.push(header, '')` costs the joined text beyond the header
+ * itself: TWO newline separators, not one. Charged as one short, a declared
+ * patch-only or binary file gave the round a character back it was still
+ * spending, and enough of them put a "nothing was lost" round over its ceiling.
+ */
+const HEADER_PAIR_COST = 2
+
+/** The hex length of the receipt token — see the RECEIPT note in assembleMaterial. */
+const RECEIPT_TOKEN_CHARS = 16
+
+/** The material's closing line, the one place the receipt token is ever written. */
+const receiptLine = (token) => `=== END OF MATERIAL — RECEIPT ${token} ===`
+
+/**
+ * What the receipt costs a round: its own line plus the newline before it.
+ *
+ * RESERVED BEFORE THE FILES ARE PACKED, because the receipt is written AFTER
+ * them and measured INSIDE `fit`. Unreserved, a round packed to the last
+ * character ended 51 characters over its ceiling and refused a record it had
+ * earned — the refusal is the safe direction, but it is still a round spent on
+ * material that did fit. The token's length is fixed, so the cost is exact.
+ */
+const RECEIPT_COST = 1 + receiptLine('0'.repeat(RECEIPT_TOKEN_CHARS)).length
+
 /** Cut `text` to `room`, saying so in the material where the cut falls. */
 const cut = (text, room) =>
   text.length > room
@@ -244,7 +269,9 @@ export function assembleMaterial({
     return sectionsSeen
   }
 
-  let left = Math.max(0, cap - out.join('\n').length)
+  // The receipt is written after the last file and counted in `fit`, so its room
+  // is taken off BEFORE the packing rather than discovered to be missing after it.
+  let left = Math.max(0, cap - out.join('\n').length - RECEIPT_COST)
   for (const file of files ?? []) {
     const path = String(file?.path ?? '?')
     const text = String(file?.text ?? '')
@@ -260,14 +287,16 @@ export function assembleMaterial({
     if (file?.binary) {
       const backed = !account.patchTruncated && patchSections().has(path)
       const header = binaryHeader(path)
-      if (!backed || left <= header.length + 1) {
+      // `out.push(header, '')` grows the joined text by header + TWO separators,
+      // so that is what the room is charged (see HEADER_PAIR_COST).
+      if (!backed || left <= header.length + HEADER_PAIR_COST) {
         out.push(omittedHeader(path), '')
         account.omitted.push(path)
         continue
       }
       out.push(header, '')
       account.binary.push(path)
-      left -= header.length + 1
+      left -= header.length + HEADER_PAIR_COST
       continue
     }
     // DECLARED, NOT DROPPED: the content is out by decision, the diff is in, and
@@ -293,14 +322,14 @@ export function assembleMaterial({
       // declared patch-only files were enough to do it (cross-vendor review,
       // second round). With nothing left the file is an ordinary OMISSION: the
       // round is spent, and saying so is what stops the record.
-      if (left <= header.length + 1) {
+      if (left <= header.length + HEADER_PAIR_COST) {
         out.push(omittedHeader(path), '')
         account.omitted.push(path)
         continue
       }
       out.push(header, '')
       account.patchOnly.push(path)
-      left -= header.length + 1
+      left -= header.length + HEADER_PAIR_COST
       continue
     }
     const header = fileHeader(path)
@@ -325,8 +354,8 @@ export function assembleMaterial({
   // contains it — which makes a returned token evidence that the child read
   // the material through to its END. parseVerdict enforces the echo.
   const body = out.join('\n')
-  const receipt = createHash('sha256').update(body, 'utf8').digest('hex').slice(0, 16)
-  const text = `${body}\n=== END OF MATERIAL — RECEIPT ${receipt} ===`
+  const receipt = createHash('sha256').update(body, 'utf8').digest('hex').slice(0, RECEIPT_TOKEN_CHARS)
+  const text = `${body}\n${receiptLine(receipt)}`
   return {
     ...account,
     text,

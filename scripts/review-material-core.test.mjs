@@ -219,6 +219,37 @@ describe('the assembly says what it could not hold', () => {
     // The receipt line stands INSIDE the measured size, so fit stays honest.
     expect(out.size).toBe(out.text.length)
   })
+
+  // The receipt is written AFTER the packing and measured INSIDE `fit`, so its
+  // room must be taken off BEFORE it. Declared patch-only files are the case
+  // that finds the error: each costs the round its header and nothing else, so
+  // they pack the room down to the last character. MEASURED against the
+  // unreserved code over budgets 700..1400: 54 of those budgets produced a
+  // round that lost NOTHING and still reported `fit: false` — a paid round
+  // refused over material that did fit, with an empty ledger of losses to
+  // explain it. Two undercharges caused it: the 51-character receipt line, and
+  // a header pair charged one separator short. Both are reserved now, and the
+  // sweep holds at zero.
+  it('reserves the receipt and the header separators — a round that lost nothing fitted', () => {
+    const paths = ['a.mjs', 'b.mjs', 'c.mjs', 'd.mjs']
+    const patch = patchFor(paths)
+    for (let budget = 700; budget <= 1400; budget++) {
+      const out = assembleMaterial({
+        stat: 's',
+        patch,
+        files: paths.map((p) => file(p, 5000)),
+        budget,
+        patchRoom: patch.length,
+        patchOnly: paths,
+      })
+      const lostNothing =
+        !out.statTruncated && !out.patchTruncated && out.truncated.length === 0 && out.omitted.length === 0
+      // No round ends over its ceiling with an empty ledger of losses…
+      if (lostNothing) expect(out.fit).toBe(true)
+      // …and a round that claims to have fitted really is inside the budget.
+      if (out.fit) expect(out.text.length).toBeLessThanOrEqual(budget)
+    }
+  })
 })
 
 // ROUND 4, PASS 4, FINDING 7: an added binary was skipped as "covered by the
@@ -697,9 +728,14 @@ describe('the manifest a pass carries — the material states its own shape', ()
   })
 
   it('counts against the ceiling — a manifest nobody reserved room for fails the fit', () => {
-    const bare = assembleMaterial({ stat: 's', patch: 'p', files: [], budget: 60 })
+    // The budget is 120 rather than the 60 this case first used: the material
+    // now ends in a mandatory 51-character RECEIPT line (finding 8), so the
+    // bare frame alone comes to 87. The case still asks exactly what it always
+    // asked — does the manifest cost the round its own room — with the frame's
+    // real size accounted instead of a number from before the receipt existed.
+    const bare = assembleMaterial({ stat: 's', patch: 'p', files: [], budget: 120 })
     expect(bare.fit).toBe(true)
-    const out = assembleMaterial({ stat: 's', patch: 'p', files: [], budget: 60, manifest: 'M'.repeat(60) })
+    const out = assembleMaterial({ stat: 's', patch: 'p', files: [], budget: 120, manifest: 'M'.repeat(60) })
     expect(out.fit).toBe(false)
   })
 })
