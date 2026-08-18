@@ -1000,18 +1000,26 @@ export function evaluateMechanismReview({
     // supersede at a head whose range was never measured as oversized.
     const passRow = (r) =>
       Number.isInteger(Number(r?.pass?.total)) && Number(r?.pass?.total) >= 2 && Number.isInteger(Number(r?.pass?.index))
-    // THE SPLIT IS READ OFF EVERY RECORD AT THE SHA, sound or not (fourth
-    // cross-vendor round): a pass row excluded as a self-review or a broken
-    // merge still WITNESSES that the offering tool measured this range as too
-    // large for one round — the measurement stands whether or not that row's
-    // verdict may count. Deriving it from `sound` alone let a pass-less record
-    // by a different model stand beside an unsound split and clear the range
-    // whole. Only records that COMPOSE must be sound; the evidence of the
-    // split need not be, and erring wide here only ever refuses.
-    const splitShas = new Set(covering.filter(passRow).map((r) => String(r.sha ?? '')))
-    const besideSplit = sound.filter((r) => !r?.pass && splitShas.has(String(r.sha ?? '')))
+    // THE SPLIT IS READ OFF EVERY RECORD AT EVERY COVERING SHA, sound or not
+    // (fourth cross-vendor round, widened by the fifth): a pass row excluded as
+    // a self-review or a broken merge still WITNESSES that the offering tool
+    // measured a range containing THIS COMMIT as too large for one round — the
+    // measurement stands whether or not that row's verdict may count, and a
+    // MALFORMED one (an index outside its total, no file list) witnesses it no
+    // less: the recorder refuses to write such a row, so it can only arrive by
+    // hand, and a hand-edited ledger earns a refusal, never a clearance.
+    // Restricting the poison to the SAME record sha let a pass-less record at a
+    // DESCENDANT sha clear the commit while the split's missing passes were
+    // never read (fifth round): the descendant's material CAN be smaller — a
+    // later commit may delete what overflowed — but this gate reads the ledger
+    // and cannot measure that, so it errs where erring only ever refuses. The
+    // way out stays honest and is always open: complete the recorded passes.
+    // Only records that COMPOSE must be sound; the evidence of the split need
+    // not be.
+    const split = covering.some(passRow)
+    const besideSplit = split ? sound.filter((r) => !r?.pass) : []
     const valid = [
-      ...sound.filter((r) => !r?.pass && !splitShas.has(String(r.sha ?? ''))),
+      ...(split ? [] : sound.filter((r) => !r?.pass)),
       ...complete.map((g) => ({
         ...g.records.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a)),
         // The composition speaks with the WORST of its passes: one pass saying

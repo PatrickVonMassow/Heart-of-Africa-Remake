@@ -640,16 +640,64 @@ describe('evaluateMechanismReview', () => {
       expect(v.block).toBe(false)
     })
 
-    it('lets a pass-less record at ANOTHER covering sha clear — that range was never split', () => {
-      // The split at sha c measures sha c's range; a record at head d claims
-      // d's range, about which the split says nothing.
+    it('BLOCKS a pass-less record at ANOTHER covering sha while a split stands incomplete', () => {
+      // The split at sha c measured a range CONTAINING this commit as too large
+      // for one round. A descendant head's material can genuinely be smaller —
+      // a later commit may delete what overflowed — but this gate reads the
+      // ledger and cannot measure that, so clearing on the descendant's
+      // pass-less row would cover the files c's missing passes never read
+      // (fifth cross-vendor round). Erring wide only ever refuses, and the way
+      // out is completing the recorded passes.
       const v = evaluateMechanismReview({
         baseline: 'b',
         head: 'h',
         pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40), 'd'.repeat(40)] })],
         records: [pass(1, 3), record({ sha: 'd'.repeat(40), at: MERGE_ACCOUNTING_SINCE + 9000 })],
       })
+      expect(v.block).toBe(true)
+      expect(v.findings[0].kind).toBe('incomplete-passes')
+    })
+
+    it('still clears a COMPLETE split beside a pass-less record at another covering sha', () => {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40), 'd'.repeat(40)] })],
+        records: [pass(1, 2), pass(2, 2), record({ sha: 'd'.repeat(40), at: MERGE_ACCOUNTING_SINCE + 9000 })],
+      })
       expect(v.block).toBe(false)
+    })
+
+    // MALFORMED PASS METADATA IS STILL SPLIT EVIDENCE (fifth cross-vendor
+    // round). The recorder refuses to write an index outside its total or a
+    // row without files, so such a row can only arrive by hand — and it still
+    // witnesses that somebody measured this range as split, so it poisons the
+    // pass-less shortcut rather than being ignored. It composes NOTHING: its
+    // index never fills a slot 1..total, so the composition stays incomplete.
+    it('lets a malformed pass row refuse the pass-less shortcut without composing anything', () => {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [
+          record({ pass: { index: 99, total: 2, files: [MECH] }, at: MERGE_ACCOUNTING_SINCE + 1500 }),
+          record({ at: MERGE_ACCOUNTING_SINCE + 9000 }),
+        ],
+      })
+      expect(v.block).toBe(true)
+    })
+
+    it('does not let malformed rows pose as a complete composition', () => {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [
+          record({ pass: { index: 0, total: 2, files: [MECH] }, at: MERGE_ACCOUNTING_SINCE + 1500 }),
+          record({ pass: { index: 99, total: 2, files: [MECH] }, at: MERGE_ACCOUNTING_SINCE + 1600 }),
+        ],
+      })
+      expect(v.block).toBe(true)
     })
 
     it('does not let a pass of a self-review compose anything', () => {
