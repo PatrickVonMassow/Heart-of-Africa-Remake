@@ -62,6 +62,13 @@ export const INTENTIONALLY_DORMANT = {
     'is a protected-path edit and needs an attended session. Its core and its spawned wrapper are fully ' +
     'tested, so it is correct the moment it is armed. REMOVE THIS ENTRY IN THE SAME COMMIT THAT ADDS THE ' +
     'HOOK LINE.',
+  'commission-guard.mjs':
+    'Built 18.08.2026 by a worktree agent (point 712), which may not touch .claude/settings.json — the ' +
+    'PreToolUse line ("Agent|Task|Bash|PowerShell" → node scripts/commission-guard.mjs) is a protected-path ' +
+    'edit and needs an attended session. Both its decisions are pure and swept (board-queue-core.test.mjs, ' +
+    'batch-in-flight-core.test.mjs), and its own wiring has commission-guard.test.mjs, so it is correct the ' +
+    'moment it is armed. Its CLI half (--status, --override, --park, --unpark) works dormant and is what ' +
+    'records a departure from the queue. REMOVE THIS ENTRY IN THE SAME COMMIT THAT ADDS THE HOOK LINE.',
 }
 
 /**

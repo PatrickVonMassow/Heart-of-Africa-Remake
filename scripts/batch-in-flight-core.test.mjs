@@ -2815,11 +2815,14 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
     })
   })
 
-  it('answers NULL where a prompt names two points — a guess would refuse the wrong work', () => {
+  it('answers NULL where two points are named — a guess would refuse the wrong work', () => {
     expect(
       commissionTarget({ toolName: 'Agent', prompt: 'branch feat/697-a; do not touch feat/705-b' }).point,
     ).toBeNull()
     expect(commissionTarget({ toolName: 'Agent', prompt: 'point 697 depends on point 705' }).point).toBeNull()
+    expect(
+      commissionTarget({ toolName: 'Bash', command: 'git checkout -b feat/697-a && git branch feat/705-b' }).point,
+    ).toBeNull()
   })
 
   it('prefers the BRANCH over prose when both appear — the branch is the binding name', () => {
@@ -2872,6 +2875,7 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
       'git switch feat/697-goat',
       'git branch -D feat/697-goat',
       'git merge --no-ff feat/697-goat',
+      'git log feat/697-goat',
       'node scripts/land-point.mjs 697 --model opus-5',
       'node scripts/point-brief.mjs 697',
     ]) {
