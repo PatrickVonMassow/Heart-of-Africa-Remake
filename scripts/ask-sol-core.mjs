@@ -232,8 +232,14 @@ function parseEntries(lines, prefix, { allowEmpty = false } = {}) {
     // on both readings; field-internal bytes travel exactly. A raw line whose
     // pipes the strip somehow invented falls back to the stripped fields —
     // visible, never silent loss.
-    const cleanFile = m[2].trim()
-    const cleanText = m[3].trim()
+    // Presence rules on the NET-ONLY spelling on top of the pair strip
+    // (landing round): the pair strip now leaves an UNPAIRED marker run
+    // standing as content — right for matching, wrong for emptiness, where a
+    // field holding only marker characters carries nothing whatever their
+    // pairing. Deletion cannot fabricate emptiness: a field of markers alone
+    // has no content to lose.
+    const cleanFile = charStripped(m[2]).trim() ? m[2].trim() : ''
+    const cleanText = charStripped(m[3]).trim() ? m[3].trim() : ''
     if (!cleanText) return { ok: false, error: `entry ${id} carries no finding at all` }
     if (seen.has(id)) return { ok: false, error: `the id ${id} is used twice — the merge accounts by id, so one of them would vanish` }
     seen.add(id)
