@@ -1149,35 +1149,48 @@ const CUT_PATTERNS = [
   /\bgit\s+branch\s+(?:-[cCmM]|--copy|--move)\s+(?:\S+\s+)?(\S+)/,
 ]
 
-/** ONE shell segment, judged on its own. Returns { points, how }. */
+/** ONE shell segment, judged on its own. Returns { points, refs, how }, where
+ *  `refs` are the branch names the segment CREATES — read off a cut flag, so
+ *  each one is a name git would bring into being, never a name merely mentioned. */
 function segmentTarget(seg) {
-  const none = { points: [], how: 'none' }
+  const none = { points: [], refs: [], how: 'none' }
   const uniq = (nums) => [...new Set(nums.filter((n) => Number.isInteger(n) && n > 0))]
   // An authoring run IS the commissioning of a point, whichever vendor runs it —
   // unless it is one of the read-only legs, which produce no work at all.
   if (!/--routing\b|--dry-run\b/.test(seg)) {
     const authored = uniq([...seg.matchAll(/author-sol\.mjs.*?--point\s+(\d+)/gi)].map((m) => Number(m[1])))
-    if (authored.length) return { points: authored, how: 'author' }
+    if (authored.length) return { points: authored, refs: [], how: 'author' }
   }
   if (/\bworktree\s+add\b/.test(seg)) {
     // `-b`/`-B` names the branch a new tree cuts; without it the tree is created
     // ON a branch that is named plainly, and creating the tree is still the act.
     const m = /\bworktree\s+add\b.*?\s-[bB](?:\s+|=)(\S+)/.exec(seg)
     const created = uniq(m ? [pointOfBranch(m[1])] : featPointsIn(seg))
-    return created.length ? { points: created, how: 'worktree' } : none
+    if (!created.length) return none
+    return { points: created, refs: m ? [normRef(m[1])] : [], how: 'worktree' }
   }
-  const cut = uniq(CUT_PATTERNS.map((re) => re.exec(seg)).map((m) => (m ? pointOfBranch(m[1]) : null)))
-  return cut.length ? { points: cut, how: 'branch' } : none
+  const names = CUT_PATTERNS.map((re) => re.exec(seg))
+    .map((m) => (m ? normRef(m[1]) : ''))
+    .filter((r) => pointOfBranch(r) !== null)
+  const cut = uniq(names.map(pointOfBranch))
+  return cut.length ? { points: cut, refs: [...new Set(names)], how: 'branch' } : none
 }
 
 /**
  * WHICH POINTS IS THIS TOOL CALL OPENING WORK ON? PURE.
  *
- * Returns { points, point, how }: `points` is EVERY point the call opens, `point`
- * the first of them (the single-target shorthand the CLI and the report use), and
+ * Returns { points, point, refs, how }: `points` is EVERY point the call opens,
+ * `point` the first of them (the single-target shorthand the CLI and the report
+ * use), `refs` the branch names the call CREATES where a cut flag names them, and
  * `how` names the act recognised for it — `agent` for a spawn, `branch` for a
  * `feat/<N>-…` being CUT, `worktree` for a tree created on one, `author` for an
  * authoring run — with `none` where the call opens nothing this rule knows about.
+ *
+ * `refs` is what separates FINISHING from opening a SECOND branch for one point
+ * (Sol, review of 3078d166): the point alone said "687 is already in flight", so
+ * `git branch feat/687-b` past a standing `feat/687-a` walked through a full
+ * pool. A ref is collected only where a FLAG creates it, never from prose — a
+ * spawn prompt naming `feat/697-goat` is identifying the branch it works on.
  *
  * A CALL THAT OPENS TWO POINTS OPENS BOTH, and every one of them is judged. The
  * first cut of this rule answered NULL to any second number, which made
@@ -1199,9 +1212,9 @@ function segmentTarget(seg) {
  * those would deny the very question a session asks BEFORE it commissions.
  */
 export function commissionTarget({ toolName = '', command = '', prompt = '', description = '' } = {}) {
-  const none = { point: null, points: [], how: 'none' }
+  const none = { point: null, points: [], refs: [], how: 'none' }
   const uniq = (nums) => [...new Set(nums.filter((n) => Number.isInteger(n) && n > 0))]
-  const found = (points, how) => (points.length ? { point: points[0], points, how } : none)
+  const found = (points, how, refs = []) => (points.length ? { point: points[0], points, refs, how } : none)
   const tool = String(toolName ?? '')
   if (tool === 'Agent' || tool === 'Task') {
     const text = `${prompt ?? ''}\n${description ?? ''}`
@@ -1213,6 +1226,7 @@ export function commissionTarget({ toolName = '', command = '', prompt = '', des
   const cmd = String(command ?? '')
   if (!cmd.trim()) return none
   const points = []
+  const refs = []
   let how = 'none'
   for (const raw of cmd.split(/\n|&&|\|\||[;|&]/)) {
     const seg = raw.trim()
@@ -1223,8 +1237,9 @@ export function commissionTarget({ toolName = '', command = '', prompt = '', des
       points.push(n)
       if (how === 'none') how = t.how
     }
+    for (const r of t.refs) if (r && !refs.includes(r)) refs.push(r)
   }
-  return found(points, how)
+  return found(points, how, refs)
 }
 
 /** An age a human reads at a glance: days past a day, hours past an hour. */
@@ -1373,8 +1388,23 @@ export function commissionRecordReport(record) {
  * `exclude` is the point (or the POINTS — one shell call can open two) being
  * commissioned. Their own branches are not slots the commissioning would consume
  * — re-cutting or pushing an existing branch is finishing, not opening.
+ *
+ * `excludeRefs` NARROWS that to the branch actually named, where the call names
+ * one. A point-wide exemption let a SECOND branch for a point in flight walk
+ * through a full pool (Sol, review of 3078d166): with `feat/687-a` standing,
+ * `git branch feat/687-b` was excused by its own point. So where the call names
+ * the ref it creates, only THAT ref is exempt, and the point's other branches go
+ * on holding their slots; where no ref is named — a spawn, a prose target — the
+ * point-wide exemption stands, because the branch cannot be identified.
  */
-export function openBranchSlots({ branches = [], parked = {}, exclude = null, cap = POOL_CAP, now = Date.now() } = {}) {
+export function openBranchSlots({
+  branches = [],
+  parked = {},
+  exclude = null,
+  excludeRefs = null,
+  cap = POOL_CAP,
+  now = Date.now(),
+} = {}) {
   const parkedAt = new Map()
   for (const [ref, e] of Object.entries(parked && typeof parked === 'object' ? parked : {})) {
     parkedAt.set(normRef(ref), {
@@ -1383,8 +1413,15 @@ export function openBranchSlots({ branches = [], parked = {}, exclude = null, ca
       tip: normaliseTip(e?.tip),
     })
   }
+  const skipRefs = new Set(
+    (Array.isArray(excludeRefs) ? excludeRefs : excludeRefs ? [excludeRefs] : []).map(normRef).filter(Boolean),
+  )
+  // A point whose OWN ref the call named is exempt for that ref alone.
+  const namedPoints = new Set([...skipRefs].map(pointOfBranch).filter((n) => n !== null))
   const skip = new Set(
-    (Array.isArray(exclude) ? exclude : [exclude]).map(Number).filter((n) => Number.isInteger(n) && n > 0),
+    (Array.isArray(exclude) ? exclude : [exclude])
+      .map(Number)
+      .filter((n) => Number.isInteger(n) && n > 0 && !namedPoints.has(n)),
   )
   const seen = new Map()
   const parkedOut = []
@@ -1409,7 +1446,7 @@ export function openBranchSlots({ branches = [], parked = {}, exclude = null, ca
       seen.set(ref, true)
       continue
     }
-    if (item.point !== null && skip.has(item.point)) {
+    if (skipRefs.has(ref) || (item.point !== null && skip.has(item.point))) {
       seen.set(ref, true)
       continue
     }
@@ -1462,6 +1499,7 @@ export function branchSlotDecision({
   parked = {},
   point = null,
   points = null,
+  refs = null,
   cap = POOL_CAP,
   readable = true,
   now = Date.now(),
@@ -1469,7 +1507,7 @@ export function branchSlotDecision({
   const targets = (Array.isArray(points) && points.length ? points : [point])
     .map(Number)
     .filter((n) => Number.isInteger(n) && n > 0)
-  const slots = openBranchSlots({ branches, parked, exclude: targets, cap, now })
+  const slots = openBranchSlots({ branches, parked, exclude: targets, excludeRefs: refs, cap, now })
   const out = { ...slots, point: targets[0] ?? null, points: targets }
   if (readable !== true) return { ...out, allowed: true, why: 'branches-unreadable' }
   if (slots.count < slots.cap) return { ...out, allowed: true, why: 'slots-free' }
