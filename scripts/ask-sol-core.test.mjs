@@ -170,6 +170,21 @@ describe('the markdown strip reads shapes, not characters (round-7 pass 1)', () 
     expect(parsed.ok).toBe(true)
   })
 
+  it('keeps an UNMATCHED word-edge marker — a lone underscore or asterisk is content (round 8)', () => {
+    // `src/foo_.mjs` names a file; `no _material` never said 'no material'.
+    const parsed = parseAnswer({
+      kind: 'diagnose',
+      text: 'reasoning\n\nCAUSE: the underscore is load-bearing\nEVIDENCE: src/foo_.mjs:3 exports the checked symbol',
+    })
+    expect(parsed.ok).toBe(true)
+    expect(parsed.answer.evidence).toContain('src/foo_.mjs')
+    const lone = parseAnswer({
+      kind: 'explain',
+      text: 'The corpus phrase no _material appears verbatim in that fixture and stays asserted by its failing case.',
+    })
+    expect(lone.ok).toBe(true)
+  })
+
   it('still UNSHIELDS an emphasised admission at word edges', () => {
     const parsed = parseAnswer({
       kind: 'explain',

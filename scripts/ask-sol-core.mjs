@@ -261,12 +261,15 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
   // starts, backtick runs, and emphasis runs only at WORD EDGES — an
   // underscore or asterisk inside a word is content and stays, so the strip
   // can unshield an admission (`**no** material`) but never invent one.
+  // Emphasis is stripped only as a MATCHED PAIR (round-8: an unmatched
+  // word-edge marker is content — `src/foo_.mjs` names a file, and eating a
+  // lone `_` in `no _material` would again build the admission phrase out of
+  // text that never said it).
   const clean = String(text ?? '')
     .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
     .replace(/^[ \t]*>+[ \t]?/gm, '')
     .replace(/`+/g, '')
-    .replace(/(^|[\s([{])[*_]+(?=\S)/g, '$1')
-    .replace(/(?<=\S)[*_]+(?=[\s)\]}.,;:!?]|$)/g, '')
+    .replace(/(^|[\s([{])([*_]+)(?=\S)([^*_]+?)(?<=\S)\2(?=[\s)\]}.,;:!?]|$)/g, '$1$3')
   if (!clean.trim()) return { ok: false, kind: k, answer: null, summary: '', error: 'the run produced no answer at all' }
   // The two-tier judgment, not the raw net: an audit or diagnose answer about
   // THIS project's tooling describes failure modes in the net's own vocabulary,
