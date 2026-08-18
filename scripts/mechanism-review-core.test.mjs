@@ -288,6 +288,10 @@ describe('validateRecord', () => {
       'Reviewed none of it — the diff could not be read',
       'Checked no files, since the patch was not provided',
       'Examined neither half; no access to the repository material',
+      // Round-2 pass 1: the numeric spellings of the same empty object.
+      'Checked zero files; the material was not supplied',
+      'Reviewed 0 files — no access to the diff',
+      'Checked not one file; the patch was not provided',
     ]) {
       expect(validateRecord({ ...good, evidence }).ok, evidence).toBe(false)
     }
@@ -682,6 +686,10 @@ describe('evaluateMechanismReview', () => {
       record({
         pass: { index, total, files: index === 1 ? [MECH, 'scripts/f1.mjs'] : [`scripts/f${index}.mjs`] },
         at: MERGE_ACCOUNTING_SINCE + 1000 + index,
+        // The wrapper's fresh range measurement (round-2 pass 1): a composition
+        // without one clears nothing, so every fixture carries the range its
+        // own split covers.
+        rangeFiles: [MECH, ...Array.from({ length: total }, (_, i) => `scripts/f${i + 1}.mjs`)],
         ...over,
       })
     const covered = { coveringRecordShas: ['c'.repeat(40)] }
@@ -740,6 +748,26 @@ describe('evaluateMechanismReview', () => {
         records: [pass(1, 3, { rangeFiles }), pass(2, 3, { rangeFiles }), pass(3, 3, { rangeFiles })],
       })
       expect(v.block).toBe(false)
+    })
+
+    it('BLOCKS a complete-looking split whose range was never measured (round-2 pass 1)', () => {
+      // The old fallback judged such passes against the commit's own mechanism
+      // paths alone — a narrower demand, silently, exactly when nothing could
+      // say which files the range really changed.
+      const unmeasured = (index, total) =>
+        record({
+          pass: { index, total, files: index === 1 ? [MECH, 'scripts/f1.mjs'] : [`scripts/f${index}.mjs`] },
+          at: MERGE_ACCOUNTING_SINCE + 1000 + index,
+        })
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [unmeasured(1, 2), unmeasured(2, 2)],
+      })
+      expect(v.block).toBe(true)
+      expect(v.findings[0].kind).toBe('incomplete-passes')
+      expect(v.findings[0].passes.coverageUnknown).toBe(true)
     })
 
     it('takes the WORST verdict of the composition — one refusing pass refuses the range', () => {
@@ -889,6 +917,7 @@ describe('evaluateMechanismReview', () => {
         record({
           pass: { index, total, files: [`scripts/f${index}.mjs`] },
           at: MERGE_ACCOUNTING_SINCE + 2000 + index,
+          rangeFiles: [MECH, 'scripts/f1.mjs', 'scripts/f2.mjs'],
         })
       const v = evaluateMechanismReview({
         baseline: 'b',
@@ -1434,14 +1463,18 @@ describe('the mode is required to WRITE a record, never to READ one', () => {
     expect(v.block).toBe(false)
   })
 
-  it('does not let an unknown mode on a row turn a recorded review into none', () => {
+  it('refuses an unknown mode whatever the row’s era — the recorder would never have written it', () => {
+    // Round-2 pass 1 reversed the "presence, not value" reading: the recorder
+    // and this gate version together in one tree, so a mode this file does not
+    // know can only have arrived by hand, and a legitimately newer mode arrives
+    // WITH the MODES entry that names it.
     const v = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',
       pendingCommits: [commit()],
       records: [legacy({ mode: 'nonsense-from-a-hand-edit' })],
     })
-    expect(v.block).toBe(false)
+    expect(v.block).toBe(true)
   })
 })
 

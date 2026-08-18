@@ -719,7 +719,7 @@ const BLIND_SUBJECT = new RegExp(
  * followed by nothing/none/"no <thing>"/neither is therefore not an affirmation.
  */
 const AFFIRMED_READING =
-  /^\W*(?:checked|reviewed|read|inspected|examined|verified|compared|traced|audited|analysed|analyzed|assessed|judged|covered)\b(?!\s*[:,;–—-]*\s*(?:nothing\b|none\b|neither\b|no\s))/im
+  /^\W*(?:checked|reviewed|read|inspected|examined|verified|compared|traced|audited|analysed|analyzed|assessed|judged|covered)\b(?!\s*[:,;–—-]*\s*(?:nothing\b|none\b|neither\b|no\s|zero\b|not\s+(?:a|one)\b|0\b))/im
 
 /** The union, kept for callers that want the raw net rather than the judgment. */
 export const BLIND_REVIEWER = new RegExp(`${BLIND_FIRST_PERSON.source}|${BLIND_SUBJECT.source}`, 'i')
@@ -1001,11 +1001,14 @@ export function evaluateMechanismReview({
       const ev = String(r?.evidence ?? '').trim()
       return ev.length >= 10 && !/^<.*>$/.test(ev) && !blindReviewerAdmission(ev)
     }
-    // Presence, not value: a mode this file does not know may be a NEWER CLI's
-    // legitimate mode, and discounting it would void a recorded review — while
-    // a mode-era row with NO mode at all can only have arrived by hand.
+    // Value, not only presence (round-2 pass 1): the recorder and this gate
+    // version together in one tree, so a mode this file does not know cannot
+    // have come from its recorder — "presence, not value" let a hand-edited
+    // `mode: "bogus"` row clear a gate whose own CLI would have refused it. A
+    // legitimately newer mode arrives WITH the MODES entry that names it.
     const modeUsable = (r) => {
-      if (String(r?.mode ?? '').trim()) return true
+      const m = String(r?.mode ?? '').trim()
+      if (m) return MODES.includes(m)
       const at = Number(r?.at)
       return Number.isFinite(at) && at > 0 && at < MODE_REQUIRED_SINCE
     }
@@ -1050,11 +1053,18 @@ export function evaluateMechanismReview({
     // in the union so the older, narrower demand can never be relaxed by the
     // wider one, and a record without the measurement falls back to exactly the
     // narrower check this gate always made.
+    // AN UNMEASURED RANGE NEVER NARROWS THE DEMAND (round-2 pass 1): where the
+    // wrapper's range measurement failed, the old fallback judged the passes
+    // against the commit's own mechanism paths alone — a smaller set, silently,
+    // exactly when nothing could say which files the range really changed. An
+    // empty expected set is passComposition's own unknown-coverage refusal, so
+    // the composition then blocks instead of clearing narrower.
     const compositions = [...new Set(sound.map((r) => String(r?.sha ?? '')))].flatMap((sha) => {
       const rows = sound.filter((r) => String(r?.sha ?? '') === sha)
+      const measured = rows.some((r) => Array.isArray(r?.rangeFiles))
       const range = [...new Set(rows.flatMap((r) => (Array.isArray(r?.rangeFiles) ? r.rangeFiles : [])))]
       return passComposition(rows, {
-        expect: [...new Set([...range, ...(commit?.files ?? [])])],
+        expect: measured ? [...new Set([...range, ...(commit?.files ?? [])])] : [],
       })
     })
     const complete = compositions.filter((g) => g.complete)
