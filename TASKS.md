@@ -8401,10 +8401,24 @@ to land than a mechanism that needs a review.
   refuses, so a session that has handed over cannot write even if it is still running.
   Additionally the handover ENDS the session it hands from: after `--commit`, a predecessor that
   is still alive is stopped rather than trusted to stop itself.
+  (c) AN AUTHOR'S LIVENESS IS NOT A PROCESS QUESTION (measured 18.08.2026, 05:05-05:16). The
+  harness runs a delegated agent IN-PROCESS, so the only OS trace it leaves is the transient
+  shell of whatever command it happens to be running: `pgrep -P <session-pid>` returned no
+  children twice and a full `/proc` cwd scan over the worktree found nothing, while that author
+  committed five times between 05:09 and 05:14. On the resulting "both agents are dead" reading
+  the successor rescue-committed the live author's in-flight edits in BOTH worktrees and
+  dispatched a SECOND author onto one of them; only that agent's own detection of the live writer
+  kept two authors out of one tree. So an AUTHOR is judged by what its WORK does over a sampled
+  interval — a branch tip that advances, worktree mtimes that move, an unpushed commit that
+  appears — never by the presence of a process, under the same err-toward-alive tie-break as (a).
+  The judgment lives in the same pure core as (a), and both the rescue path and the dispatch path
+  ask it before they touch a foreign worktree.
   VERIFIABLE: Vitest cases over the pure liveness core proving a running, recently-committing pid
   is judged alive and that the tie-break falls toward alive; a case over the fence proving a
-  commit and a push are refused for a session without the lock; and a case proving the boundary
-  commit leaves no live predecessor behind.
+  commit and a push are refused for a session without the lock; a case proving the boundary
+  commit leaves no live predecessor behind; and, for (c), a case proving a worktree whose branch
+  tip advanced inside the sample window is judged ALIVE with no process evidence at all, beside
+  one proving a quiet worktree of an ended session is judged dead.
   Criticality: high — this is the singleton itself. While it holds wrong, every resumed session
   can silently share a worktree with its predecessor, and the damage (a lost delegated run) is
   invisible in git.
