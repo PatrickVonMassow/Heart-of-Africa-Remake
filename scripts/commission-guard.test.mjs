@@ -65,6 +65,7 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
     const run = spawnSync(process.execPath, [resolve(import.meta.dirname, 'commission-guard.mjs')], {
       input: payload,
       encoding: 'utf8',
+      windowsHide: true,
     })
     expect(run.status).toBe(0)
     expect(run.stdout).toBe('')
@@ -79,6 +80,7 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
       const run = spawnSync(process.execPath, [resolve(import.meta.dirname, 'commission-guard.mjs')], {
         input,
         encoding: 'utf8',
+        windowsHide: true,
       })
       expect(run.status, input).toBe(0)
       expect(run.stdout, input).toBe('')

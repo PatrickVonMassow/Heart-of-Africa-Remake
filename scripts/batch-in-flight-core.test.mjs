@@ -2609,7 +2609,7 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
   it('marks the entire census unreadable when one requested behind-count fails', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-open-branches-'))
     const git = (...args) =>
-      execFileSync('git', args, { cwd: dir, stdio: 'ignore', env: { ...process.env, LC_ALL: 'C' } })
+      execFileSync('git', args, { cwd: dir, stdio: 'ignore', windowsHide: true, env: { ...process.env, LC_ALL: 'C' } })
     try {
       git('init', '-b', 'main')
       git('config', 'user.email', 'test@example.invalid')
