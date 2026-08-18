@@ -437,6 +437,23 @@ if (isMainModule(import.meta.url)) {
 
     const verdict = evaluateMechanismReview(gathered.inputs)
 
+    // THE GAP CLAUSE (point 714, c06a02d2): while the range's material CANNOT
+    // be assembled for review at all, demanding that review traps the session
+    // — so a blocking turn first MEASURES the range against the budget. A gap
+    // is reported and the turn may end; the block resumes the moment the
+    // material fits or splits into coverable passes. Loaded lazily: the common
+    // clear turn measures nothing, and a failed assessment rules NO gap — an
+    // unmeasured claim never waives the gate.
+    let gap = null
+    if (verdict.block && gathered.baseline && gathered.head) {
+      try {
+        const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+        gap = await assessReviewGap({ baseline: gathered.baseline, head: gathered.head })
+      } catch {
+        /* no ruling — the block below stands */
+      }
+    }
+
     if (status) {
       console.log(`HEAD:      ${gathered.head.slice(0, 7)} (branch ${gathered.branch})`)
       console.log(`baseline:  ${String(gathered.baseline ?? '<none — arms at this HEAD>').slice(0, 7)}`)
@@ -448,11 +465,19 @@ if (isMainModule(import.meta.url)) {
             `${c.coveringRecordShas.length} covering review(s)`,
         )
       }
-      console.log(verdict.block ? `\n${formatMechanismReviewVerdict(verdict)}` : '\nGATE CLEAR')
+      if (gap?.gap) console.log(`\n${gap.report}`)
+      else console.log(verdict.block ? `\n${formatMechanismReviewVerdict(verdict)}` : '\nGATE CLEAR')
       process.exit(0)
     }
 
     if (verdict.block) {
+      if (gap?.gap) {
+        // The gap holds: name it where the session sees it, and let the turn
+        // end. Deliberately NOT a baseline advance — the demand is suspended,
+        // never satisfied, and blocking resumes when the material fits again.
+        console.error(gap.report)
+        process.exit(0)
+      }
       process.stdout.write(
         JSON.stringify({ decision: 'block', reason: formatMechanismReviewVerdict(verdict) }),
       )
