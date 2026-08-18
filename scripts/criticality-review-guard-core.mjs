@@ -138,6 +138,56 @@ export function highTicks({ baseTasks = '', baseArchive = '', headTasks = '', he
 }
 
 /**
+ * ANCESTRY FOR A WHOLE SET OF SHAS, OUT OF ONE GIT CALL (18.08.2026).
+ *
+ * The wrapper used to ask git `merge-base --is-ancestor` once per PAIR of ledger
+ * rows for the same point. Point 714 alone accumulated 109 rows across its
+ * review rounds, so the pair loop spawned ~6 000 processes — MEASURED 43 s for a
+ * single gather, past the 30 s the preflight suite allows it, which turned the
+ * unit layer red and with it BLOCKED EVERY PUSH (the pre-push gate runs it). The
+ * cost grows with the square of a point's review rounds, so raising the budget
+ * only moves the wall.
+ *
+ * `git rev-list --topo-order --parents <head>` lists every commit reachable from
+ * head, a child always before its parents, so ONE walk from the far end
+ * accumulates for each commit which of the WANTED shas are its ancestors. The
+ * input is the raw rev-list text, so this stays pure and testable without a repo.
+ *
+ * Returns { reachable, ancestorsOf }:
+ *   reachable    Set of every sha in the graph — reachable from head, head itself
+ *                included.
+ *   ancestorsOf  (sha) => Set of the WANTED shas that are its STRICT ancestors,
+ *                or null when the graph does not hold that commit at all. Null is
+ *                "cannot say", never "no": the caller falls back to asking git,
+ *                so a truncated graph (a shallow clone) can never silently
+ *                under-report ancestry — which would clear a gate that should
+ *                block.
+ */
+export function ancestorIndex(revListParents = '', wanted = []) {
+  const want = new Set([...wanted].filter(Boolean).map(String))
+  const rows = String(revListParents)
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => l.split(/\s+/))
+  const reachable = new Set(rows.map((r) => r[0]))
+  // BACKWARDS over a topological listing = parents before children, which is what
+  // lets each commit inherit its parents' finished sets in a single pass.
+  const anc = new Map()
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const [sha, ...parents] = rows[i]
+    const set = new Set()
+    for (const p of parents) {
+      const inherited = anc.get(p)
+      if (inherited) for (const s of inherited) set.add(s)
+      if (want.has(p)) set.add(p)
+    }
+    anc.set(sha, set)
+  }
+  return { reachable, ancestorsOf: (sha) => anc.get(String(sha)) ?? null }
+}
+
+/**
  * The gate itself.
  *
  * Inputs (plain data — the wrapper does the git work):

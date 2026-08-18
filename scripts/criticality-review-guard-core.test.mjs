@@ -6,6 +6,7 @@
 // review real, in this history, and were its findings answered).
 import { describe, it, expect } from 'vitest'
 import {
+  ancestorIndex,
   CLEARING_VERDICT,
   criticalityOf,
   evaluateCriticalityReview,
@@ -402,5 +403,59 @@ describe('evaluateCriticalityReview', () => {
     const text = formatCriticalityReviewVerdict(v)
     expect(text).toContain('point 500')
     expect(text).toContain('point 501')
+  })
+})
+
+describe('ancestorIndex', () => {
+  // `git rev-list --topo-order --parents <head>`: one row per commit, the commit
+  // first and its parents after it, and a child always listed before its parents.
+  const graph = (...rows) => rows.join('\n')
+  const A = 'a'.repeat(40)
+  const B = 'b'.repeat(40)
+  const C = 'c'.repeat(40)
+  const D = 'd'.repeat(40)
+  const M = 'm'.repeat(40)
+
+  // D → C → B → A, oldest last, as git prints it.
+  const line = graph(`${D} ${C}`, `${C} ${B}`, `${B} ${A}`, `${A}`)
+
+  it('reports every wanted sha that is a strict ancestor, from one listing', () => {
+    const idx = ancestorIndex(line, [A, B, C])
+    expect([...idx.ancestorsOf(D)].sort()).toEqual([A, B, C].sort())
+    expect([...idx.ancestorsOf(B)]).toEqual([A])
+    expect([...idx.ancestorsOf(A)]).toEqual([])
+  })
+
+  it('never counts a commit as its own ancestor (the probe is STRICT)', () => {
+    expect([...ancestorIndex(line, [A, B]).ancestorsOf(B)]).toEqual([A])
+  })
+
+  it('keeps only the WANTED shas — the set is the ledger, not the history', () => {
+    // C is on the path from A to D but was not asked about, so it does not appear.
+    expect([...ancestorIndex(line, [A]).ancestorsOf(D)]).toEqual([A])
+  })
+
+  it('follows every parent of a merge', () => {
+    // M merges the B line and the C line; both sides are its ancestors.
+    const merged = graph(`${M} ${B} ${C}`, `${C} ${A}`, `${B} ${A}`, `${A}`)
+    expect([...ancestorIndex(merged, [A, B, C]).ancestorsOf(M)].sort()).toEqual([A, B, C].sort())
+  })
+
+  it('answers null — not "no" — for a commit outside the graph', () => {
+    // The distinction is the whole safety of this: a "no" here would clear a gate
+    // that should block, so the caller must be able to fall back to asking git.
+    expect(ancestorIndex(line, [A]).ancestorsOf(M)).toBe(null)
+  })
+
+  it('reports reachability as the graph itself', () => {
+    const idx = ancestorIndex(line, [A])
+    expect(idx.reachable.has(D)).toBe(true)
+    expect(idx.reachable.has(A)).toBe(true)
+    expect(idx.reachable.has(M)).toBe(false)
+  })
+
+  it('survives an empty listing and an empty wanted set', () => {
+    expect(ancestorIndex('', [A]).ancestorsOf(A)).toBe(null)
+    expect([...ancestorIndex(line, []).ancestorsOf(D)]).toEqual([])
   })
 })

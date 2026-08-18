@@ -38,6 +38,7 @@ import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import {
+  ancestorIndex,
   evaluateCriticalityReview,
   formatCriticalityReviewVerdict,
   highTicks,
@@ -172,13 +173,43 @@ export function bootstrapBase(head, revParse = (r) => git(`rev-parse ${r}`)) {
 }
 
 /** Is `a` a strict ancestor of `b`? Any git failure answers "cannot tell" = no. */
-function isStrictAncestor(a, b) {
+function gitIsStrictAncestor(a, b) {
   if (!a || !b || a === b) return false
   try {
     execSync(`git merge-base --is-ancestor "${a}" "${b}"`, { windowsHide: true, cwd: REPO_ROOT, stdio: 'ignore' })
     return true
   } catch {
     return false
+  }
+}
+
+/**
+ * The same question, asked of the commit graph ONCE instead of per pair (see
+ * `ancestorIndex` for the measurement that forced this). The per-pair probe stays
+ * as the fallback for anything the graph cannot answer — a commit outside it, or
+ * a shallow checkout, where the listing is truncated and a "no" would be a guess.
+ */
+function ancestryProbe(head, shas) {
+  let shallow = true
+  try {
+    shallow = git('rev-parse --is-shallow-repository') !== 'false'
+  } catch {
+    /* an ancient git without the flag — treat as shallow and keep asking git */
+  }
+  if (shallow) return gitIsStrictAncestor
+  let index = null
+  try {
+    index = ancestorIndex(git(`rev-list --topo-order --parents "${head}"`), shas)
+  } catch {
+    return gitIsStrictAncestor
+  }
+  return (a, b) => {
+    if (!a || !b || a === b) return false
+    const ancestors = index.ancestorsOf(b)
+    // The graph answers only for a WANTED sha; anything else is asked of git, so
+    // this is a speed-up of the common case and never a change of verdict.
+    if (!ancestors || !index.reachable.has(String(a))) return gitIsStrictAncestor(a, b)
+    return ancestors.has(String(a))
   }
 }
 
@@ -253,12 +284,17 @@ export function gatherCriticalityReviewInputs({ sessionId = '' } = {}) {
   // Only the ledger lines that name a pending point — in the common turn that is
   // none, so the ancestry probes below cost nothing at all.
   const numbers = new Set(ticks.map((t) => t.number))
-  const records = ticks.length
-    ? verifyCarried(
-        readRecords()
-          .filter((r) => numbers.has(Number(r?.point)))
-          .map((r) => ({ ...r, reachable: r.sha === head || isStrictAncestor(r.sha, head) })),
+  const candidates = ticks.length ? readRecords().filter((r) => numbers.has(Number(r?.point))) : []
+  // ONE graph for both loops below — the pair probe underneath them is quadratic
+  // in a point's review rounds, and twelve rounds were enough to stall the gate.
+  const isStrictAncestor = candidates.length
+    ? ancestryProbe(
+        head,
+        candidates.map((r) => r.sha),
       )
+    : gitIsStrictAncestor
+  const records = candidates.length
+    ? verifyCarried(candidates.map((r) => ({ ...r, reachable: r.sha === head || isStrictAncestor(r.sha, head) })))
     : []
   for (const r of records) {
     r.descendsFrom = records
