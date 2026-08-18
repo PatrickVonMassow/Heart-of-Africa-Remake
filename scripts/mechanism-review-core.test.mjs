@@ -572,6 +572,11 @@ describe('evaluateMechanismReview', () => {
     it('keeps a WHOLE-RANGE record at the same sha working beside the passes', () => {
       // The multimap: keyed by sha alone, the last row won and the earlier ones
       // vanished — which is how a pass record could read as a whole-range review.
+      // A record naming no pass STAYS a whole-range review, deliberately: it is
+      // what a reviewer reading the repository itself produces, and the material
+      // budget is the sending tool's limit, not a property of the ledger (see
+      // validatePass). The offering side refuses what it could not carry; here
+      // the pass records are the ones whose coverage can be counted.
       const v = evaluateMechanismReview({
         baseline: 'b',
         head: 'h',

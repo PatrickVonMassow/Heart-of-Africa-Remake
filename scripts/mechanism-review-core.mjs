@@ -716,6 +716,18 @@ export function validateMode({ mode, framing } = {}) {
  * saying which files it read is a coverage claim nobody can check — and the two
  * flags come as a pair, because either alone describes half a composition.
  *
+ * A record naming NO pass is an ordinary whole-range review and stays one — that
+ * is what a reviewer reading the repository itself produces, and every row
+ * predating this point is of that shape. It is worth saying why the recorder
+ * does not measure such a record against the material budget (asked by the
+ * cross-vendor review, first round): the budget is the SENDING tool's attention
+ * limit, and the recorder does not know the range. A record's range is fixed by
+ * the GATE's baseline, not by anything the record carries, so "does this range
+ * fit one round" is not a question this function can even ask — while the
+ * offering side, which does know, already refuses (review-sol.mjs). What IS
+ * checkable travels with the pass: the files it read, which the gate holds
+ * against the commit it would clear.
+ *
  * Returns { ok, errors, pass } with `pass` the parsed record field, or null.
  */
 export function validatePass({ pass, passFiles } = {}) {
