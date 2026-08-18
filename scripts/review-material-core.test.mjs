@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   assembleMaterial,
@@ -812,6 +814,26 @@ describe('a range too large travels COMPLETE in passes', () => {
     // A path with no section contributes nothing — and no stray separator.
     expect(joinPatchSections(['a.mjs', 'gone.mjs', 'b.mjs'], sections)).toBe('AAA\nBBB')
     expect(joinPatchSections([], sections)).toBe('')
+  })
+})
+
+// A REVIEW TOOL THAT CANNOT BE REVIEWED IS THE ONE FILE THIS MUST NOT HAPPEN TO.
+describe('the review scripts stay reviewable as text', () => {
+  it('holds no NUL byte in any script — one would make the file travel as BINARY', () => {
+    // gatherRange declares any file whose content contains a NUL to be BINARY:
+    // its bytes cannot travel as review text, so only its PATCH is sent and its
+    // content never reaches a reviewer. This module had a literal 0x00 and 0x7f
+    // inside a regex character class — written as escape SEQUENCES they mean
+    // exactly the same thing, and the file stays plain text. It also made grep
+    // and ripgrep skip the file silently, so searches missed it.
+    const dir = resolve(process.cwd(), 'scripts')
+    const offenders = []
+    for (const name of readdirSync(dir)) {
+      if (!name.endsWith('.mjs')) continue
+      const bytes = readFileSync(join(dir, name))
+      if (bytes.includes(0)) offenders.push(name)
+    }
+    expect(offenders).toEqual([])
   })
 })
 

@@ -1025,7 +1025,7 @@ export function parsePassSpec(value) {
  * it — the same convention unquoteGitPath already decodes — and everything else
  * travels byte-exact, never trimmed.
  */
-const needsQuoting = (path) => /^[\s]|[\s]$|[,"\\ -]/.test(path)
+const needsQuoting = (path) => /^[\s]|[\s]$|[,"\\\u0000-\u001f\u007f]/.test(path)
 
 /** One path, C-quoted the way git would print it. */
 export function quotePassFile(path) {
