@@ -180,6 +180,22 @@ export function isBinaryPatchSection(text) {
 }
 
 /**
+ * Does this binary file's patch section DELIVER its change (round-1 passes
+ * 3/4)? Three shapes, licensing different answers:
+ *   - `GIT binary patch` — the bytes themselves, base85: delivered.
+ *   - `Binary files … differ` — a marker and NOTHING else: the content changed
+ *     and none of it travelled, so a record over it would clear bytes nobody
+ *     saw. NOT delivered.
+ *   - neither — a metadata-only section (pure rename, mode change): the whole
+ *     change IS the metadata, which the section carries whole. Delivered.
+ */
+export function binarySectionDeliversChange(text) {
+  const lines = String(text ?? '').split('\n')
+  if (lines.includes('GIT binary patch')) return true
+  return !lines.some((line) => /^Binary files .* differ$/.test(line))
+}
+
+/**
  * What a bare `out.push(header, '')` costs the joined text beyond the header
  * itself: TWO newline separators, not one. Charged as one short, a declared
  * patch-only or binary file gave the round a character back it was still
@@ -269,7 +285,7 @@ export function assembleMaterial({
   // checked against them.
   let sectionsSeen = null
   const patchSections = () => {
-    if (!sectionsSeen) sectionsSeen = new Set(splitPatchByFile(patchText).map((s) => s.path))
+    if (!sectionsSeen) sectionsSeen = new Map(splitPatchByFile(patchText).map((s) => [s.path, s.text]))
     return sectionsSeen
   }
 
@@ -289,7 +305,14 @@ export function assembleMaterial({
     // sees; the declaration is verified against the patch exactly like the
     // patch-only one, and refuses to an omission where nothing backs it.
     if (file?.binary) {
-      const backed = !account.patchTruncated && patchSections().has(path)
+      // BACKED means the change itself travelled (round-1 passes 3/4): a
+      // section holding only `Binary files … differ` delivers no byte, so the
+      // declaration over it cleared content the reviewer never received — the
+      // patch must carry the `GIT binary patch` bytes, or be a metadata-only
+      // section whose metadata IS the whole change. An erroneous binary flag
+      // on a text section degrades to patch-alone delivery, never below it.
+      const section = account.patchTruncated ? undefined : patchSections().get(path)
+      const backed = typeof section === 'string' && binarySectionDeliversChange(section)
       const header = binaryHeader(path)
       // `out.push(header, '')` grows the joined text by header + TWO separators,
       // so that is what the room is charged (see HEADER_PAIR_COST).

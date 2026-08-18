@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   assembleMaterial,
+  binarySectionDeliversChange,
   formatBudgetNotice,
   formatPassFiles,
   formatPassManifest,
@@ -301,10 +302,34 @@ describe('a binary file is declared, never dropped or mangled', () => {
     expect(isBinaryPatchSection('diff --git a/x b/x\n+Binary files a and b differ')).toBe(false)
   })
 
-  it('declares it in the material and the accounting, and the round stays complete', () => {
+  // ROUND-1 PASSES 3/4: the bare `Binary files … differ` marker delivers no
+  // byte of the change, so a round that declared completeness over it cleared
+  // binary content the reviewer never received. Only a section that CARRIES
+  // the change backs the declaration.
+  it('REFUSES the declaration over a bare differ-marker — no byte of the change travelled', () => {
     const out = assembleMaterial({
       stat: 's',
       patch: binSection,
+      files: [{ path: 'img.png', binary: true }],
+      budget: 10_000,
+    })
+    expect(out.fit).toBe(false)
+    expect(out.binary).toEqual([])
+    expect(out.omitted).toEqual(['img.png'])
+  })
+
+  it('declares it and stays complete where the GIT binary patch carries the bytes', () => {
+    const gitBinSection = [
+      'diff --git a/img.png b/img.png',
+      'new file mode 100644',
+      'index 0000000..1111111',
+      'GIT binary patch',
+      'literal 8',
+      'Pc$~sf00001',
+    ].join('\n')
+    const out = assembleMaterial({
+      stat: 's',
+      patch: gitBinSection,
       files: [{ path: 'img.png', binary: true }],
       budget: 10_000,
     })
@@ -312,6 +337,29 @@ describe('a binary file is declared, never dropped or mangled', () => {
     expect(out.binary).toEqual(['img.png'])
     expect(out.sent).toEqual([])
     expect(out.text).toContain('=== FILE IS BINARY — its bytes cannot travel as review text; judge its change from the PATCH above: img.png ===')
+  })
+
+  it('accepts a metadata-only section — a pure rename’s whole change IS its metadata', () => {
+    const renameSection = [
+      'diff --git a/old.png b/img.png',
+      'similarity index 100%',
+      'rename from old.png',
+      'rename to img.png',
+    ].join('\n')
+    const out = assembleMaterial({
+      stat: 's',
+      patch: renameSection,
+      files: [{ path: 'img.png', binary: true }],
+      budget: 10_000,
+    })
+    expect(out.fit).toBe(true)
+    expect(out.binary).toEqual(['img.png'])
+  })
+
+  it('tells the two backing shapes apart from the marker', () => {
+    expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5')).toBe(true)
+    expect(binarySectionDeliversChange(binSection)).toBe(false)
+    expect(binarySectionDeliversChange('diff --git a/x b/x\nold mode 100644\nnew mode 100755')).toBe(true)
   })
 
   it('refuses the declaration when the patch does not back it, exactly like patch-only', () => {

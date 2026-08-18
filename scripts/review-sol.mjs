@@ -184,7 +184,17 @@ function gatherRange(sha, base) {
   // The patch travels RAW too (fourth round): trimming it ate a trailing space
   // off a rename destination's last line together with the final newline — a
   // silently different path, with the accounting none the wiser.
-  const patch = git(['diff', range], { raw: true })
+  // `--binary` because a declared binary file's CHANGE must actually travel
+  // (round-1 passes 3/4): the ordinary diff writes only `Binary files …
+  // differ`, which delivers no byte — arbitrary binary content was then
+  // cleared unread. The base85 `GIT binary patch` is pure ASCII, so it rides
+  // the text pipeline losslessly, and assembleMaterial refuses the binary
+  // declaration where that section is missing. `--no-textconv` because a
+  // configured textconv driver replaces file bytes with a transformed
+  // representation while avoiding the binary marker — the real blob then
+  // reaches no pass while the accounting reports complete delivery (round-1
+  // second run, pass 5).
+  const patch = git(['diff', '--binary', '--no-textconv', range], { raw: true })
   // A BINARY FILE'S BYTES CANNOT TRAVEL AS REVIEW TEXT (fourth cross-vendor
   // round, pass 4, finding 7). An ADDED binary was skipped as "covered by the
   // patch" while the ordinary diff carries only `Binary files … differ` — the
