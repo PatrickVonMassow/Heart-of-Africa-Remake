@@ -70,8 +70,13 @@ export function decideReviewGap({
       budget: cap,
     }
   }
-  if (size <= cap) return { gap: false, reason: 'fits', measuredChars: size, budget: cap }
+  // THE SPLITTER'S OWN FIT RULING OUTRANKS THE RAW SIZE (final-round pass 3):
+  // the raw sum omits what delivery adds — manifest, section headers, the
+  // receipt — so material just over the budget once rendered read as fitting
+  // here. Where the tool measured, its answer is the answer; the bare size
+  // rules only in a tree without the tool.
   if (planner && planner.available) {
+    if (planner.fits === true) return { gap: false, reason: 'fits', measuredChars: size, budget: cap }
     if (planner.covers) return { gap: false, reason: 'splits', measuredChars: size, budget: cap }
     return {
       gap: true,
@@ -81,6 +86,7 @@ export function decideReviewGap({
       uncoverable: [...(planner.uncoverable ?? [])].map((p) => String(p)),
     }
   }
+  if (size <= cap) return { gap: false, reason: 'fits', measuredChars: size, budget: cap }
   return { gap: true, reason: 'no-splitter', measuredChars: size, budget: cap }
 }
 

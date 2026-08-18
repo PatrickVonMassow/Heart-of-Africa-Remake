@@ -64,8 +64,13 @@ export function measureReviewMaterial({ baseline, head, run = git }) {
     let text = ''
     try {
       text = run(['show', `${head}:${path}`])
-    } catch {
-      /* deleted at head, or unreadable as text — it contributes no content */
+    } catch (e) {
+      // ONLY git's own "absent" may contribute nothing (final-round pass 3):
+      // swallowing every failure let a crash or an overflowed buffer shrink
+      // the measurement, and an over-budget range could then rule its own gap
+      // over a PARTIAL reading. Anything else rethrows into the caller's
+      // measurement catch, which rules 'unmeasured' — and blocks.
+      if (!/does not exist|exists on disk, but not in/i.test(String(e?.message ?? ''))) throw e
     }
     files.push({ path, text })
   }
@@ -134,6 +139,9 @@ export async function assessReviewGap({
         })
         planner = {
           available: true,
+          // The tool's OWN fit ruling, which prices the delivery overhead the
+          // raw sum omits (final-round pass 3).
+          fits: plan.fits === true,
           // Covered means every pass of the plan fits AND nothing is beyond the
           // reach of any pass AND the diffstat is inside its share — the same
           // three claims planPasses itself makes for an assemblable split.

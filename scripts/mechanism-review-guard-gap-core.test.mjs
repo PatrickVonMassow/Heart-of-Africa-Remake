@@ -330,6 +330,63 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     ])
   })
 
+  it('a blob read that fails for anything but ABSENCE rules unmeasured (final-round pass 3)', async () => {
+    // Swallowing every show failure shrank the measurement, and an over-budget
+    // range could rule its own gap over a PARTIAL reading.
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const broken = (args) => {
+      if (args[0] === 'show') throw new Error('fatal: unable to read blob (corrupt loose object)')
+      return bigRun(args)
+    }
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: broken,
+      loadTool: () => Promise.reject(absent),
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('unmeasured')
+
+    // …while git's own "absent" still contributes nothing and the ruling proceeds.
+    const deleted = (args) => {
+      if (args[0] === 'show') throw new Error("fatal: path 'big.md' does not exist in 'bbbb'")
+      return bigRun(args)
+    }
+    const ruled = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: deleted,
+      loadTool: () => Promise.reject(absent),
+    })
+    expect(ruled.reason).toBe('no-splitter')
+  })
+
+  it('the splitter’s own fit ruling outranks the raw size (final-round pass 3)', async () => {
+    // The raw sum omits delivery overhead, so rendered material just over the
+    // budget read as fitting; where the tool measured, its answer rules.
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const smallRun = (args) => {
+      if (args[0] === 'diff' && args.includes('--stat')) return 'stat'
+      if (args[0] === 'diff' && args.includes('--name-only')) return 'a.md\0'
+      if (args[0] === 'diff') return 'x'.repeat(1000)
+      if (args[0] === 'show') return 'body'
+      return ''
+    }
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: smallRun,
+      loadTool: () =>
+        Promise.resolve({
+          MATERIAL_BUDGET_CHARS: REVIEW_GAP_BUDGET_CHARS,
+          // The tool says: does NOT fit once rendered, but a split covers it.
+          planPasses: () => ({ fits: false, statTruncated: false, uncoverable: [], passes: [{}, {}] }),
+        }),
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('splits')
+  })
+
   it('a covering split from the real planner shape keeps the demand standing', async () => {
     const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
     const d = await assessReviewGap({
