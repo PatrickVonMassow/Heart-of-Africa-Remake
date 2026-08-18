@@ -296,6 +296,17 @@ export function hookInputNotice() {
   )
 }
 
+/** The verdict read a sound record, but the assignment-time update did not.
+ * This is distinct from `unreadNotice`: the refusals WERE decided; only the
+ * immediate reoccupation could not be persisted. */
+export function reoccupationFailureNotice() {
+  return (
+    'commission-guard: ALLOWING, BUT REOCCUPATION WAS NOT RECORDED — the commission record became TORN after ' +
+    `the queue and slot verdicts. Active work may still appear PARKED and outside the slot count. Repair the record, ` +
+    `then unpark the assigned branch explicitly; inspect it with ${COMMISSION_STATUS_CMD}.`
+  )
+}
+
 /**
  * A PARKED BRANCH IS UNPARKED WHEN WORK IS ASSIGNED, not at its first commit
  * (fourth review, finding 6): between the assignment and the commit the branch
@@ -487,7 +498,7 @@ if (isMainModule(import.meta.url)) {
     if (verdict.unread) console.error(unreadNotice(verdict.unread))
     if (!verdict.block && !verdict.unread && verdict.slots?.reopens?.length) {
       const result = unparkReopened(verdict.slots)
-      if (result.unread) console.error(unreadNotice(result.unread))
+      if (result.unread) console.error(reoccupationFailureNotice())
       for (const ref of result.cleared) {
         console.error(
           `commission-guard: unparked ${ref} — work was assigned back onto it, so it occupies its slot again.`,

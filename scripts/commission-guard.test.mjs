@@ -17,6 +17,7 @@ import {
   hookInputNotice,
   commissionVerdict,
   parkBranch,
+  reoccupationFailureNotice,
   unparkReopened,
   unreadNotice,
   wiringReport,
@@ -185,8 +186,9 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
       write: (r) => (written = r),
     })
     expect(torn).toEqual({ cleared: [], unread: 'record-unreadable' })
-    expect(unreadNotice(torn.unread)).toContain('ALLOWING WITHOUT JUDGMENT')
-    expect(unreadNotice(torn.unread)).toContain('commission record')
+    expect(reoccupationFailureNotice()).toContain('REOCCUPATION WAS NOT RECORDED')
+    expect(reoccupationFailureNotice()).toContain('became TORN after the queue and slot verdicts')
+    expect(reoccupationFailureNotice()).toContain('unpark the assigned branch explicitly')
     expect(written).toBeNull()
     // …and nothing to reopen writes nothing.
     expect(
