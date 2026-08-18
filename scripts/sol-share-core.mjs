@@ -134,7 +134,7 @@ const ROUTING = Object.freeze({
 export const SETTING_NOTES = Object.freeze({
   'claude-only': 'the escape hatch when the ChatGPT side is the scarce one — nothing goes to Sol',
   default: 'reviews to Sol, everything else to Claude — BELOW the standing policy of CLAUDE.md §6',
-  'prefer-sol': 'the standing policy of CLAUDE.md §6: every read-only kind AND the authoring of a point — the hard and critical ones included — goes to Sol; Claude reviews it, runs the suites, judges the picture and lands',
+  'prefer-sol': 'the standing policy of CLAUDE.md §6: every read-only kind AND the authoring of every point the cut does not keep here — the hard and critical ones included — goes to Sol; Claude reviews it, runs the suites, judges the picture and lands',
 })
 
 /** WHAT IS NEVER ROUTED, whatever the setting says. Printed, so nobody has to ask. */

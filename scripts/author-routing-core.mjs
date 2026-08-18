@@ -74,14 +74,19 @@ export const HARD_MARKERS = Object.freeze([
  * …and the markers of a point whose VERIFICATION IS THE WORK.
  *
  * Not a difficulty judgment: these name work whose ANSWER is a rendered picture
- * or a browser run, and CLAUDE.md §6 keeps both with the main session whoever
- * authored the code. Handing such a point to another lane splits it in two and
- * saves nothing — the expensive half stays here either way.
+ * or a browser run. The main session judges that picture whoever authored the
+ * code, so for an ORDINARY such point authoring it elsewhere splits it in two
+ * and saves little — which is why this lane exists at all.
+ *
+ * IT IS THE LAST WORD ONLY WHERE NOTHING MARKS THE POINT HARD (user
+ * 18.08.2026). A hard or HIGH-criticality picture point is Sol's: the branch
+ * above returns before this one, and the test file pins that order. What is left
+ * here is the ordinary picture point.
  *
  * THEY ERR TOWARDS MATCHING, deliberately (cross-vendor review of point 667,
  * P1): a mechanical rename that merely mentions WebGPU is routed here and costs
- * the Sol lane one point, while a real picture point routed to Sol costs a
- * rebuild. The point's own `Author lane:` tag is the cheap way back.
+ * the Sol lane one point. The point's own `Author lane:` tag is the cheap way
+ * back.
  */
 export const VERIFICATION_MARKERS = Object.freeze([
   /\bscreenshots?\b/i,
@@ -209,7 +214,7 @@ export function authorLaneFor({ body = '', criticality = null, reworked = false,
   if (LANES.includes(String(override).toLowerCase())) {
     return decide(String(override).toLowerCase(), `the caller asked for the ${override} lane explicitly`)
   }
-  // A RE-WORK THAT SOL STILL FINDS PROBLEMS IN OUTRANKS EVERY OTHER SIGNAL
+  // A RE-WORK THE REVIEW STILL FINDS PROBLEMS IN OUTRANKS EVERY OTHER SIGNAL
   // (CLAUDE.md §6). Whatever the text looks like — and whatever lane it was
   // TAGGED for — the evidence says the lane it was on could not finish it. It
   // stood BELOW the tag until the cross-vendor review of point 667 (P1) read the

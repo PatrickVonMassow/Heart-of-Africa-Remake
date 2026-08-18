@@ -123,8 +123,9 @@ export const usage = () =>
     ...SETTINGS.map((s) => `  ${s.padEnd(12)} ${SETTING_NOTES[s]}`),
     '',
     'The board shows a non-default setting while it is on, and the delegation brief tells',
-    'every agent which kinds to hand over. At prefer-sol Sol also AUTHORS the points, the',
-    'hard and critical ones included; Claude reviews them. What no setting routes is listed under',
+    'every agent which kinds to hand over. At prefer-sol Sol also AUTHORS every point the',
+    'routing cut does not keep here, the hard and critical ones included; Claude reviews them.',
+    'What no setting routes is listed under',
     '"NEVER routed" by --status.',
   ].join('\n')
 
