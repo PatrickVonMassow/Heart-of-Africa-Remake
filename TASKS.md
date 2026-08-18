@@ -337,8 +337,9 @@ put it is the mistake this line exists to stop.
   and a paused batch are waved through.
   A SECOND, BLIND SPECIFICATION EXISTS and is owed a counted merge BEFORE this point is built (user
   17.08.2026: »Lasse Sol das auch nochmal blind spezifizieren.«). Both halves stand in
-  `local/blind-713/` (list-a, Opus 5, 14 entries; list-b, Sol, 21 entries; material.md, the shared
-  input) and `blind-merge.mjs` reports 0 identical against 56 candidate pairs. Per CLAUDE.md §6 the
+  `docs/blind-713/` (list-a, Opus 5, 14 entries; list-b, Sol, 21 entries; material.md, the shared
+  input; rescued from git-ignored `local/` on 18.08.2026, point 723's U16) and `blind-merge.mjs`
+  reports 0 identical against 56 candidate pairs. Per CLAUDE.md §6 the
   merge goes to a model that wrote NEITHER list and is recorded with `--union … --merged-by`, every
   entry accounted for. Four of Sol's entries CONTRADICT the wording above and the merge decides them,
   it does not average them: only the structured record may create a card (a `feat/<N>` branch absent
@@ -547,10 +548,10 @@ put it is the mistake this line exists to stop.
 
 - [ ] 710. The remaining forty-five sequences of the multi-step analysis are worked into the
   order, bundle-first (the blind-parallel stage of 17.08.2026, run on the user's instruction).
-  The union in `local/multistep-analysis-17-08/multistep-union.json` holds 57 accounted entries;
-  its six priority findings already resolve to points 700, 701, 705, 707 and 708, but 45 entries
-  named only by Sol's list stand nowhere in the work order, each with its own defect line — and
-  `local/` is git-ignored, so nothing but this point keeps them from rotting with the checkout.
+  The union in `docs/multistep-analysis-17-08/multistep-union.json` holds 57 accounted entries
+  (rescued from git-ignored `local/` on 18.08.2026, point 723's U16); its six priority findings
+  already resolve to points 700, 701, 705, 707 and 708, but 45 entries named only by Sol's list
+  stand nowhere in the work order, each with its own defect line.
   FINAL STATE:
   - Every union entry is either MAPPED to a standing point (named in the mapping), FILED into an
     existing bundle per bundle-first (a new point only where no bundle fits), or REJECTED with a
