@@ -77,6 +77,89 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 623. An answered card outlives its answer (user 10.08.2026, in the attended
+  window: "Das ist schon ein paar mal passiert, dass eine Karte nicht gelöscht wurde,
+  die ich beantwortet habe. Etabliere einen Mechanismus dagegen."; bundle Chat & Tafel).
+  Measured the same evening: the card "design.md: 102 Wörter mehr, oder 102 anderswo
+  streichen?" was answered through the board chat around 21:00, the answer was carried
+  durably into the memory rule AND into point 621 by 21:11 — and the card still stood
+  on the board ninety minutes later, until the user asked why. `decision-card-guard`
+  covers the OPPOSITE direction only (a decision requested of the user must exist as a
+  card); nothing checks that a card the user has ANSWERED goes away, so the board keeps
+  asking what is settled and the user cannot tell an open question from a closed one.
+  FINAL STATE — both halves inside the EXISTING `decision-card-guard` (core plus
+  `.claude/decision-card-guard-state.json`; a second guard would double the surface for
+  one rule):
+  1. THE REVIEW IS DUE AT EVERY USER MESSAGE. A turn that carries a user message may
+     not END while an open VDZK card stands undecided AGAINST that message. The channel
+     does not matter and needs no integration: a typed prompt and a chat message the
+     watcher spawned a responder for both arrive as the last USER entry of the
+     transcript the Stop hook already reads. Per card
+     the session either REMOVES it (`node scripts/board.mjs vdzk-remove "<fragment>"`)
+     or records that this message did not answer it (`node scripts/board.mjs vdzk-keep
+     "<fragment>" [...]`, several fragments in one call, written to the guard state and
+     never to the board). The record is keyed to the MESSAGE (its transcript uuid), so
+     the NEXT user message arms every card again — he answers whichever he likes,
+     whenever — and a card ADDED in that same turn is never demanded, it postdates the
+     message.
+  2. A SUSPECTED HIT COSTS A REASON. Where a card's title and the user's message share
+     a distinctive term (normalised, at least 5 characters, outside the stop list),
+     `vdzk-keep` for that card REQUIRES `--why "<why the message did not answer it>"`;
+     every other card is kept by being listed. That is the two-tier loudness this
+     project already uses elsewhere: cheap where nothing points at the card, deliberate
+     where something does.
+  3. A SESSION THAT MAY NOT TOUCH THE BOARD CARRIES THE ANSWER INSTEAD. The window the
+     user writes into is usually NOT the batch owner (stand-down: no board edit) —
+     which is exactly what happened on 10.08. For it both remedies collapse into one:
+     `node scripts/vdzk-answer.mjs "<fragment>" --answer "<what the user decided>"`,
+     appended to `.claude/vdzk-answers.json`. THIS half does NOT stand down for a
+     non-owner: it demands a RECORD, not a board edit. The OWNER's turn end is then
+     blocked while an unapplied answer waits; it removes the card and clears the entry
+     (`node scripts/vdzk-answer.mjs --applied "<fragment>"`), and an entry naming a card
+     that no longer exists clears itself.
+  4. Fail-OPEN like every guard here (an internal error allows the stop), the decision
+     logic pure in `decision-card-guard-core.mjs`, and the remedy NAMES the exact
+     command per card — a guard that only says "decide" is a guard that gets
+     rubber-stamped.
+  5. AND THE SAME GUARD STOPS COUNTING A LOOK BACK AS A REQUEST (measured 10.08.2026,
+     two turns lost in one session; bundled here because it is the same core). "Die beste
+     Werbung für deine Entscheidung von heute Abend" ASKS FOR NOTHING — it names a ruling
+     the user gave hours earlier — and the guard blocked it, because a `address: 'sentence'`
+     phrase only tests whether the sentence ADDRESSES the user, which a retrospect does
+     exactly as much as a request. So a sentence in the PAST TENSE, or carrying a
+     backward-pointing marker (von heute, von gestern, vorhin, damals, bereits, schon),
+     is not a request while it has neither a question mark nor an imperative. The
+     fail direction is unchanged — in doubt, block — but a pure retrospect is not a
+     doubtful case. The SAME holds for a sentence that merely DESCRIBES a standing
+     arrangement ("poc bleibt deine Entscheidung", "das Taggen liegt bei dir"): it reports
+     who decides, it does not ask. Measured 11.08.2026, two turns in one morning, both on
+     the phrase `deine entscheidung`; a phrase that names a decision-MAKER without a
+     question mark and without an imperative is a statement, and the gate says so.
+  6. THE CARRIED ANSWER NEEDS A DEADLINE, or item 3 does not reach the board (measured
+     18.08.2026, the SECOND time the user asked for this mechanism). The answer to "Was
+     landet zuerst, wenn der Freigabe-Stau gelöst ist?" arrived at 07:40 in a
+     non-owning window and lay in the carrier from 05:44Z; at 10:13 the card still
+     stood, because the owner had been inside a declared wait since 09:44 and was not
+     due at a turn end before 13:44. A duty that only fires at the OWNER's turn end can
+     therefore sit for hours — which is item 3's blind spot, not a lapse. So a carried
+     answer names a deadline, and past it the entry is redeemed WITHOUT the owner:
+     either by the launcher tick, which runs every few minutes and may publish, or by a
+     narrowly scoped exception that lets the writing window remove that one card and
+     publish. Whichever is chosen is stated here with its reason, and the deadline is
+     one constant in the pure core.
+  VERIFIABLE: Vitest cases in `scripts/decision-card-guard-core.test.mjs` covering — a
+  user message with two open cards blocks; one removed plus one kept passes; the same
+  cards pass silently on a turn with NO user message; a NEW user message re-arms both;
+  a card added this turn is not demanded; a shared distinctive term forces `--why`
+  while a shared stop word ("nicht", "board", "punkt") does not; a carried answer blocks
+  the owner and passes the non-owner; an answer naming a vanished card self-clears; a
+  throwing state read allows the stop. Plus the replay of the 10.08 case: the real card
+  titles and the real user message, which must block; and, for item 5, the real sentence
+  that must NOT block beside a present-tense request that still must.
+  Criticality: HIGH — it is a guard, so `mechanism-review-guard` demands the other
+  model's recorded review, and its failure mode is the user acting on a question that
+  was settled hours ago.
+
 - [ ] 712. The queue binds the board and not the picker, and a finished agent's branch frees
   its slot (user 17.08.2026, 19:41: »Warum holst du dir mit der 697 wieder einen neuen (nicht
   sonderlich wichtigen) Task, anstatt erstmal die offenen Branches zu erledigen? … Nur die Tasks zur
@@ -1508,6 +1591,228 @@ put it is the mistake this line exists to stop.
   keeps hitting the bugs.
   Bundle: Verständigung.
 
+- [ ] 719. The Stop chain fires ONCE per headless batch session, so every guard whose
+  stated effect is "blocks the turn end" is in truth a session-END guard for the
+  one session that does the work (measured 18.08.2026, 15:1x).
+
+  MEASURED, on the live owner d559dcb0 which had then been running 8 hours:
+  `.claude/dashboard-state.json` holds `turnStartedAtBySession[d559dcb0] =
+  18.08. 07:17:32` — its session start, unchanged since. The only Stop-hook
+  record that session ever wrote is `.claude/decision-card-guard-state.json` at
+  07:23:39; nothing after it. A `claude -p` session has one prompt and one long
+  answer, so the Stop chain has one moment to run, at the end. Everything the
+  chain enforces is therefore enforced once, hours after the state it judges came
+  about. The visible cost that day: eight findings-carrier entries waited up to
+  9.5 hours while `findings-core.mjs` line 373 (`ownsBatch && carrierPending > 0`)
+  would have blocked every one of them — the rule was right, the hook never ran.
+
+  FINAL STATE:
+
+  1. THE FIRING RATE IS MEASURED, NOT ESTIMATED. `node scripts/stop-chain-audit.mjs`
+     reports, per batch session of the last N days: session start and end, how
+     often the Stop chain actually ran, and the longest stretch between two runs.
+     It reads what already exists — the per-session turn stamps in
+     `.claude/dashboard-state.json`, the timestamps every guard state file writes,
+     and the session transcripts — and states per guard whether it ran once, never
+     or repeatedly. A guard whose state file carries no per-session timestamp is
+     reported as UNMEASURABLE by name rather than counted as silent: the audit's
+     own blind spots are part of its output.
+
+  2. EVERY WIRED STOP GUARD GETS A VERDICT, in a table in
+     `docs/guard-enforcement-timing.md`: does its rule need to hold DURING the run
+     (then its enforcement must move to a hook that fires during the run —
+     PostToolUse, as `lock-heartbeat-hook.mjs` already does), or is the end of the
+     work genuinely the only moment it can judge (then it stays, and the doc says
+     why). The verdict is written per guard, never per family, because the families
+     mix both kinds.
+
+  3. THREE ARE DECIDED FIRST, because their lateness is already on record: the
+     findings drain (this measurement), the board currency (the 25-minute window of
+     28.07.2026 that produced `board-first-guard`), and the model allowlist (a
+     forbidden author is worth catching at the commit, not eight hours later).
+
+  4. WHAT MOVES, MOVES ONCE. A rule relocated to a during-the-run hook is REMOVED
+     from the Stop chain in the same commit, so no rule is enforced twice with two
+     different verdicts, and the fail-open wrapper and the pure Vitest-covered core
+     stay as they are.
+
+  5. THE SESSION LENGTH IS THE OTHER LEVER AND IS NAMED, NOT SILENTLY PREFERRED.
+     If the audit shows the chain runs once per session as a rule, then a shorter
+     session is the alternative fix — the context boundary already ends sessions at
+     a point boundary. The point states which lever it chose for each guard and why;
+     it does not have to choose the same one for all of them.
+
+  VERIFIABLE: `node scripts/stop-chain-audit.mjs` runs against the recorded
+  sessions of the last seven days and prints a per-session count plus a per-guard
+  verdict; `npm run test:unit` covers its pure core, including a session with one
+  run, a session with many, and a guard whose state carries no timestamp.
+  `docs/guard-enforcement-timing.md` lists every guard wired in
+  `.claude/settings.json`, and a unit test fails when a guard is wired without an
+  entry there.
+
+  Criticality: high — it is not one broken guard but the question of whether the
+  Stop chain, this project's main enforcement surface, reaches the session that
+  does the work at all. The four-eyes mechanism review applies.
+
+  Bundle: unbundled (batch autonomy).
+
+- [ ] 720. The findings carrier rings through the delivery that already runs on every tool
+  call, instead of waiting for a turn end the batch owner does not have (user
+  18.08.2026, 15:16).
+
+  WHY HERE AND NOT A NEW CHANNEL. A stood-down window — the one the user talks to,
+  and the one that therefore finds most of what he asks about — can write to the
+  carrier and to nothing else. On 18.08. eight entries waited there up to 9.5
+  hours. The transport was never the problem: `deliverPendingMessages()` in
+  `scripts/chat-spool.mjs` already puts text into the owner's context on EVERY tool
+  call, through `scripts/lock-heartbeat-hook.mjs` (PostToolUse, `*`), and the
+  inbound chat leg is a live subscription that spooled the user's 14:30:45 message
+  at 14:30:46. What is missing is that the carrier has no bell on that path. A
+  SECOND message kind or a second transport was considered and rejected: it would
+  split findings across two stores and re-open the signature and identity question
+  that makes the chat inbox unusable for a session (an inbox envelope carries a
+  direction and an HMAC, no sender, so anything a session posts there arrives as
+  the user's own words).
+
+  FINAL STATE:
+
+  1. `deliverPendingMessages` gains a SECOND SOURCE beside the chat spool: when the
+     reading session OWNS the batch and the carrier holds waiting entries, the
+     delivery emits ONE line — the count, the oldest entry's timestamp, its title,
+     and the drain command (`node scripts/finding.mjs --drain`). It reads the
+     carrier through `parseCarrier`/`carrierPath`; it never writes to it, and the
+     drain stays `finding.mjs --drained "<title>"`.
+
+  2. ZERO BYTES WHILE NOTHING WAITS. The token rule the chat delivery already holds
+     applies unchanged: an empty carrier produces empty stdout, because injected
+     context is re-sent with every later request of the session.
+
+  3. ONE INTERRUPTION PER CALL. A tool call that already delivers a chat message
+     does not also ring the carrier bell — the user's own words go first, and the
+     bell rides the next call.
+
+  4. IT DOES NOT NAG. The line is emitted at most once per REMINDER_INTERVAL
+     (15 minutes, one constant, in the pure core) and again immediately whenever
+     the waiting count RISES, so a new finding is announced at once while an
+     ignored one does not repeat every second.
+
+  5. IT FOLLOWS THE PAUSE DECISION, WHATEVER IT BECOMES. Today
+     `deliverPendingMessages` returns '' while the batch is paused. That
+     suppression is itself under review (a pause is when an instruction matters
+     most); the bell inherits whatever that review decides rather than carving out
+     its own exception.
+
+  6. NON-OWNERS SEE NOTHING. The carrier is drained by the owner alone, so a
+     stood-down window is never told about entries it may not act on.
+
+  VERIFIABLE: Vitest over the pure decision core — waiting entries plus ownership
+  yields one line; an empty carrier yields ''; a non-owner yields ''; a call that
+  carries a chat message yields the chat message only; a second call inside the
+  interval yields ''; a risen count yields the line again. And the process-level
+  shape in the manner of `scripts/chat-delivery-hook.test.mjs`: `node
+  scripts/lock-heartbeat-hook.mjs` against an isolated temp repo writes the exact
+  `hookSpecificOutput` envelope, and writes nothing at all for an empty carrier.
+
+  Criticality: medium — it delivers no verdict of its own and cannot block work; it
+  makes an existing, already-enforced duty visible while it can still be done. Its
+  fail direction is silence, which is today's state.
+
+  Bundle: Chat & Tafel.
+
+- [ ] 515. The parallel-session detector counts a placeholder owner as a second
+  SESSION (measured 05.08.2026). The batch PAUSED ITSELF at 13:06 because the
+  alert "PARALLEL batch sessions" had gone five times unanswered. The alert was
+  FALSE. `.claude/batch-lock.json` carried the placeholder `x` as its `sessionId`
+  (still visible as `sessionIdBefore`, restamped 12:07). The detector compares the
+  lock's owner id against the observed session ids; a placeholder matches no real
+  id, so EVERY live session read as an additional one. The log proves it twice
+  over: `08:06 owner=x plus 45289138-…`, `11:06 owner=x plus 52543006-…` — two
+  different "second" ids against the same placeholder owner, and on both occasions
+  exactly ONE claude process was running (pid 1470, the very pid the lock names).
+  The cost is not the alert but the escalation: a self-pause that only a human can
+  lift, on evidence that was never there.
+  FINAL STATE:
+  1. A lock whose `sessionId` is not a valid session id counts as owner UNKNOWN,
+     never as a foreign owner. The detector may then report "owner unknown"; it may
+     not report parallel sessions.
+  2. A session whose pid equals the lock's pid is NEVER a second session, whatever
+     the ids say — the pid is the stronger evidence and settles it first.
+  3. Both cases are covered by Vitest in the pure decision core.
+  4. The escalation chain itself stays untouched: five unanswered alerts still
+     pause the batch. The point removes the false alert, never the response to a
+     real one.
+  5. A self-pause no longer writes a card into "Von dir zu klären" (user
+     05.08.2026: "das liegt nicht in meiner Hand. Analysiere und behebe du das").
+     That section holds GENUINE user decisions only; diagnosing a pause and
+     lifting it is the session's own work. The pause is instead reported where the
+     session's own state is reported — the now-card — so the reader sees it
+     without being asked to act on it.
+  WHERE THE PLACEHOLDER COMES FROM, MEASURED 05.08.2026 21:08 — the point above
+  treats it as weather; it is written by our own code. `ownsLock(sessionId)`
+  (`scripts/batch-singleton.mjs`) RESTAMPS the lock's `sessionId` to whatever id
+  the CALLER passed as soon as process ancestry proves the lock belongs to this
+  process tree. Any caller reaching it with a throwaway id — `--session x` through
+  `resolveSessionId` — therefore renames a LIVE owner's lock to that id, which is
+  exactly the `sessionIdBefore: <real id>` / `sessionId: "x"` pair both incidents
+  left behind. `isProbeSessionId` is the only filter and does not recognise a bare
+  placeholder.
+  WHAT IT COST TODAY, and why item 2 above is not enough on its own: the renamed
+  owner could no longer prove itself either, because `ownsLock` with the REAL id
+  then answered `pid-reused` — point 504's drifting start-time compare, on the same
+  lock, in the same minute. The live session was fenced out of its OWN batch (no
+  merge, no push, no tick) with two delegated agents still building, and the claim
+  path could not resolve it: the owner that must honour a claim at its next clean
+  moment IS that fenced session, so the handover deadlocks. Ownership was restored
+  by writing the recorded `sessionIdBefore` back by hand — the repair the toolchain
+  does not offer.
+  6. A RESTAMP DEMANDS A PLAUSIBLE SESSION ID. `ownsLock` renames a lock only for
+     an id of the shape a real session carries; a placeholder, a probe id or an
+     empty string leaves the recorded owner untouched and answers the ownership
+     question without writing. Renaming a lock is a side effect of asking a
+     question, so the question must be safe to ask.
+  7. AN OWNER HOLDING THE LOCK'S PID HAS A SUPPORTED WAY BACK. Where the lock's
+     `pid` is this very process (argv and session match) but the id no longer does,
+     one command re-stamps it — `node scripts/batch-doctor.mjs --repair` treats it
+     as a torn state and names it in its verdict, rather than reporting "consistent"
+     as it did today. Hand-editing the lock is then never the only path.
+  8. A SESSION THE SINGLETON ITSELF STOOD DOWN IS NOT A PARALLEL BATCH SESSION
+     (measured 18.08.2026 from `.claude/autostart.log`). At 09:18Z and 12:18Z the
+     detector reported "PARALLEL SESSIONS DETECTED: owner=d559dcb0 plus 7fe2e051"
+     — 7fe2e051 being the user's ATTENDED chat window, which the singleton had put
+     on STAND DOWN and which ran read-only measurements all day: no merge, no
+     tick, no batch action of any kind. Here the COUNT was right and the JUDGEMENT
+     wrong: the detector cannot see that it silenced one of the two itself. Five
+     unanswered alerts then paused the batch at 14:18; the restart clock lifted it
+     at 14:48. So a session carrying the stand-down note and no mutating action
+     since counts as attended-observing — no alert, no escalation. The alarm for a
+     genuinely second WORKING session is untouched. This branch is separate from
+     items 1/2 above: those answer the placeholder owner, this one answers a real
+     second process.
+  9. A PAUSED BATCH STILL DELIVERS THE USER'S WORDS (measured 18.08.2026 15:0x,
+     and it is the same incident's second half). The instruction "714: authoring
+     lane Sol from now on" was sent at 14:30:45 and lay in the spool at 14:30:46 —
+     the inbound leg is a live subscription and was one second fast — yet it
+     reached the owner only around 14:49. Cause, at two places:
+     `scripts/lock-heartbeat-hook.mjs` calls `deliverPendingMessages({ ownsBatch,
+     paused })`, which returns '' while the batch is paused, and the launcher
+     additionally stopped the watcher at 14:33 ("chat watcher: stopped (paused)").
+     That is the wrong direction: a paused batch is exactly when an instruction
+     matters most — lift the pause, do X first, stop Y — and the pause card asks
+     the user to act in the same breath. FINAL STATE: the per-tool-call delivery
+     keeps running while the batch is paused (the suppression was token thrift for
+     an idle session, not correctness), and the watcher is NOT stopped by a pause —
+     or, if it must stop for resource reasons, the launcher poll replaces it for
+     the pause's duration and the pause card names the delay that then applies.
+  VERIFIABLE: a lock carrying a placeholder id plus one live session produces no
+  parallel-session alert in the pure core's tests, and the same setup replayed
+  against the real detector stays silent; a Vitest case pins that the pause path
+  writes no "Von dir zu klären" card; a placeholder id passed to `ownsLock` leaves
+  the lock's recorded owner byte-identical while a real id still restamps; the
+  doctor reports the pid-mine/id-foreign lock as torn and repairs it; a stood-down
+  session with no mutating action since the note raises no parallel-session alert
+  while a second WORKING session still does; and the pure core answers "paused
+  plus a waiting message" with delivery rather than silence.
+
 - [ ] 581. The settlement boundary is too faint, and its slider is already at the ceiling
   (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
   Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
@@ -2850,197 +3155,6 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: the unit layer pins both directions against a drifting base, and a
   batch owner older than an hour is still read as alive by
   `node scripts/batch-doctor.mjs` on this host.
-
-- [ ] 719. The Stop chain fires ONCE per headless batch session, so every guard whose
-  stated effect is "blocks the turn end" is in truth a session-END guard for the
-  one session that does the work (measured 18.08.2026, 15:1x).
-
-  MEASURED, on the live owner d559dcb0 which had then been running 8 hours:
-  `.claude/dashboard-state.json` holds `turnStartedAtBySession[d559dcb0] =
-  18.08. 07:17:32` — its session start, unchanged since. The only Stop-hook
-  record that session ever wrote is `.claude/decision-card-guard-state.json` at
-  07:23:39; nothing after it. A `claude -p` session has one prompt and one long
-  answer, so the Stop chain has one moment to run, at the end. Everything the
-  chain enforces is therefore enforced once, hours after the state it judges came
-  about. The visible cost that day: eight findings-carrier entries waited up to
-  9.5 hours while `findings-core.mjs` line 373 (`ownsBatch && carrierPending > 0`)
-  would have blocked every one of them — the rule was right, the hook never ran.
-
-  FINAL STATE:
-
-  1. THE FIRING RATE IS MEASURED, NOT ESTIMATED. `node scripts/stop-chain-audit.mjs`
-     reports, per batch session of the last N days: session start and end, how
-     often the Stop chain actually ran, and the longest stretch between two runs.
-     It reads what already exists — the per-session turn stamps in
-     `.claude/dashboard-state.json`, the timestamps every guard state file writes,
-     and the session transcripts — and states per guard whether it ran once, never
-     or repeatedly. A guard whose state file carries no per-session timestamp is
-     reported as UNMEASURABLE by name rather than counted as silent: the audit's
-     own blind spots are part of its output.
-
-  2. EVERY WIRED STOP GUARD GETS A VERDICT, in a table in
-     `docs/guard-enforcement-timing.md`: does its rule need to hold DURING the run
-     (then its enforcement must move to a hook that fires during the run —
-     PostToolUse, as `lock-heartbeat-hook.mjs` already does), or is the end of the
-     work genuinely the only moment it can judge (then it stays, and the doc says
-     why). The verdict is written per guard, never per family, because the families
-     mix both kinds.
-
-  3. THREE ARE DECIDED FIRST, because their lateness is already on record: the
-     findings drain (this measurement), the board currency (the 25-minute window of
-     28.07.2026 that produced `board-first-guard`), and the model allowlist (a
-     forbidden author is worth catching at the commit, not eight hours later).
-
-  4. WHAT MOVES, MOVES ONCE. A rule relocated to a during-the-run hook is REMOVED
-     from the Stop chain in the same commit, so no rule is enforced twice with two
-     different verdicts, and the fail-open wrapper and the pure Vitest-covered core
-     stay as they are.
-
-  5. THE SESSION LENGTH IS THE OTHER LEVER AND IS NAMED, NOT SILENTLY PREFERRED.
-     If the audit shows the chain runs once per session as a rule, then a shorter
-     session is the alternative fix — the context boundary already ends sessions at
-     a point boundary. The point states which lever it chose for each guard and why;
-     it does not have to choose the same one for all of them.
-
-  VERIFIABLE: `node scripts/stop-chain-audit.mjs` runs against the recorded
-  sessions of the last seven days and prints a per-session count plus a per-guard
-  verdict; `npm run test:unit` covers its pure core, including a session with one
-  run, a session with many, and a guard whose state carries no timestamp.
-  `docs/guard-enforcement-timing.md` lists every guard wired in
-  `.claude/settings.json`, and a unit test fails when a guard is wired without an
-  entry there.
-
-  Criticality: high — it is not one broken guard but the question of whether the
-  Stop chain, this project's main enforcement surface, reaches the session that
-  does the work at all. The four-eyes mechanism review applies.
-
-  Bundle: unbundled (batch autonomy).
-
-- [ ] 720. The findings carrier rings through the delivery that already runs on every tool
-  call, instead of waiting for a turn end the batch owner does not have (user
-  18.08.2026, 15:16).
-
-  WHY HERE AND NOT A NEW CHANNEL. A stood-down window — the one the user talks to,
-  and the one that therefore finds most of what he asks about — can write to the
-  carrier and to nothing else. On 18.08. eight entries waited there up to 9.5
-  hours. The transport was never the problem: `deliverPendingMessages()` in
-  `scripts/chat-spool.mjs` already puts text into the owner's context on EVERY tool
-  call, through `scripts/lock-heartbeat-hook.mjs` (PostToolUse, `*`), and the
-  inbound chat leg is a live subscription that spooled the user's 14:30:45 message
-  at 14:30:46. What is missing is that the carrier has no bell on that path. A
-  SECOND message kind or a second transport was considered and rejected: it would
-  split findings across two stores and re-open the signature and identity question
-  that makes the chat inbox unusable for a session (an inbox envelope carries a
-  direction and an HMAC, no sender, so anything a session posts there arrives as
-  the user's own words).
-
-  FINAL STATE:
-
-  1. `deliverPendingMessages` gains a SECOND SOURCE beside the chat spool: when the
-     reading session OWNS the batch and the carrier holds waiting entries, the
-     delivery emits ONE line — the count, the oldest entry's timestamp, its title,
-     and the drain command (`node scripts/finding.mjs --drain`). It reads the
-     carrier through `parseCarrier`/`carrierPath`; it never writes to it, and the
-     drain stays `finding.mjs --drained "<title>"`.
-
-  2. ZERO BYTES WHILE NOTHING WAITS. The token rule the chat delivery already holds
-     applies unchanged: an empty carrier produces empty stdout, because injected
-     context is re-sent with every later request of the session.
-
-  3. ONE INTERRUPTION PER CALL. A tool call that already delivers a chat message
-     does not also ring the carrier bell — the user's own words go first, and the
-     bell rides the next call.
-
-  4. IT DOES NOT NAG. The line is emitted at most once per REMINDER_INTERVAL
-     (15 minutes, one constant, in the pure core) and again immediately whenever
-     the waiting count RISES, so a new finding is announced at once while an
-     ignored one does not repeat every second.
-
-  5. IT FOLLOWS THE PAUSE DECISION, WHATEVER IT BECOMES. Today
-     `deliverPendingMessages` returns '' while the batch is paused. That
-     suppression is itself under review (a pause is when an instruction matters
-     most); the bell inherits whatever that review decides rather than carving out
-     its own exception.
-
-  6. NON-OWNERS SEE NOTHING. The carrier is drained by the owner alone, so a
-     stood-down window is never told about entries it may not act on.
-
-  VERIFIABLE: Vitest over the pure decision core — waiting entries plus ownership
-  yields one line; an empty carrier yields ''; a non-owner yields ''; a call that
-  carries a chat message yields the chat message only; a second call inside the
-  interval yields ''; a risen count yields the line again. And the process-level
-  shape in the manner of `scripts/chat-delivery-hook.test.mjs`: `node
-  scripts/lock-heartbeat-hook.mjs` against an isolated temp repo writes the exact
-  `hookSpecificOutput` envelope, and writes nothing at all for an empty carrier.
-
-  Criticality: medium — it delivers no verdict of its own and cannot block work; it
-  makes an existing, already-enforced duty visible while it can still be done. Its
-  fail direction is silence, which is today's state.
-
-  Bundle: Chat & Tafel.
-
-- [ ] 515. The parallel-session detector counts a placeholder owner as a second
-  SESSION (measured 05.08.2026). The batch PAUSED ITSELF at 13:06 because the
-  alert "PARALLEL batch sessions" had gone five times unanswered. The alert was
-  FALSE. `.claude/batch-lock.json` carried the placeholder `x` as its `sessionId`
-  (still visible as `sessionIdBefore`, restamped 12:07). The detector compares the
-  lock's owner id against the observed session ids; a placeholder matches no real
-  id, so EVERY live session read as an additional one. The log proves it twice
-  over: `08:06 owner=x plus 45289138-…`, `11:06 owner=x plus 52543006-…` — two
-  different "second" ids against the same placeholder owner, and on both occasions
-  exactly ONE claude process was running (pid 1470, the very pid the lock names).
-  The cost is not the alert but the escalation: a self-pause that only a human can
-  lift, on evidence that was never there.
-  FINAL STATE:
-  1. A lock whose `sessionId` is not a valid session id counts as owner UNKNOWN,
-     never as a foreign owner. The detector may then report "owner unknown"; it may
-     not report parallel sessions.
-  2. A session whose pid equals the lock's pid is NEVER a second session, whatever
-     the ids say — the pid is the stronger evidence and settles it first.
-  3. Both cases are covered by Vitest in the pure decision core.
-  4. The escalation chain itself stays untouched: five unanswered alerts still
-     pause the batch. The point removes the false alert, never the response to a
-     real one.
-  5. A self-pause no longer writes a card into "Von dir zu klären" (user
-     05.08.2026: "das liegt nicht in meiner Hand. Analysiere und behebe du das").
-     That section holds GENUINE user decisions only; diagnosing a pause and
-     lifting it is the session's own work. The pause is instead reported where the
-     session's own state is reported — the now-card — so the reader sees it
-     without being asked to act on it.
-  WHERE THE PLACEHOLDER COMES FROM, MEASURED 05.08.2026 21:08 — the point above
-  treats it as weather; it is written by our own code. `ownsLock(sessionId)`
-  (`scripts/batch-singleton.mjs`) RESTAMPS the lock's `sessionId` to whatever id
-  the CALLER passed as soon as process ancestry proves the lock belongs to this
-  process tree. Any caller reaching it with a throwaway id — `--session x` through
-  `resolveSessionId` — therefore renames a LIVE owner's lock to that id, which is
-  exactly the `sessionIdBefore: <real id>` / `sessionId: "x"` pair both incidents
-  left behind. `isProbeSessionId` is the only filter and does not recognise a bare
-  placeholder.
-  WHAT IT COST TODAY, and why item 2 above is not enough on its own: the renamed
-  owner could no longer prove itself either, because `ownsLock` with the REAL id
-  then answered `pid-reused` — point 504's drifting start-time compare, on the same
-  lock, in the same minute. The live session was fenced out of its OWN batch (no
-  merge, no push, no tick) with two delegated agents still building, and the claim
-  path could not resolve it: the owner that must honour a claim at its next clean
-  moment IS that fenced session, so the handover deadlocks. Ownership was restored
-  by writing the recorded `sessionIdBefore` back by hand — the repair the toolchain
-  does not offer.
-  6. A RESTAMP DEMANDS A PLAUSIBLE SESSION ID. `ownsLock` renames a lock only for
-     an id of the shape a real session carries; a placeholder, a probe id or an
-     empty string leaves the recorded owner untouched and answers the ownership
-     question without writing. Renaming a lock is a side effect of asking a
-     question, so the question must be safe to ask.
-  7. AN OWNER HOLDING THE LOCK'S PID HAS A SUPPORTED WAY BACK. Where the lock's
-     `pid` is this very process (argv and session match) but the id no longer does,
-     one command re-stamps it — `node scripts/batch-doctor.mjs --repair` treats it
-     as a torn state and names it in its verdict, rather than reporting "consistent"
-     as it did today. Hand-editing the lock is then never the only path.
-  VERIFIABLE: a lock carrying a placeholder id plus one live session produces no
-  parallel-session alert in the pure core's tests, and the same setup replayed
-  against the real detector stays silent; a Vitest case pins that the pause path
-  writes no "Von dir zu klären" card; a placeholder id passed to `ownsLock` leaves
-  the lock's recorded owner byte-identical while a real id still restamps; and the
-  doctor reports the pid-mine/id-foreign lock as torn and repairs it.
 
 - [ ] 517. The lease-expiry takeover ignores an honoured claim (measured
   05.08.2026). The launcher tick took the batch from session 91c1ac42 after 67
@@ -7515,77 +7629,6 @@ to land than a mechanism that needs a review.
   so a mistake there silences the whole gate; the other model's mechanism review
   applies.
 
-- [ ] 623. An answered card outlives its answer (user 10.08.2026, in the attended
-  window: "Das ist schon ein paar mal passiert, dass eine Karte nicht gelöscht wurde,
-  die ich beantwortet habe. Etabliere einen Mechanismus dagegen."; bundle Chat & Tafel).
-  Measured the same evening: the card "design.md: 102 Wörter mehr, oder 102 anderswo
-  streichen?" was answered through the board chat around 21:00, the answer was carried
-  durably into the memory rule AND into point 621 by 21:11 — and the card still stood
-  on the board ninety minutes later, until the user asked why. `decision-card-guard`
-  covers the OPPOSITE direction only (a decision requested of the user must exist as a
-  card); nothing checks that a card the user has ANSWERED goes away, so the board keeps
-  asking what is settled and the user cannot tell an open question from a closed one.
-  FINAL STATE — both halves inside the EXISTING `decision-card-guard` (core plus
-  `.claude/decision-card-guard-state.json`; a second guard would double the surface for
-  one rule):
-  1. THE REVIEW IS DUE AT EVERY USER MESSAGE. A turn that carries a user message may
-     not END while an open VDZK card stands undecided AGAINST that message. The channel
-     does not matter and needs no integration: a typed prompt and a chat message the
-     watcher spawned a responder for both arrive as the last USER entry of the
-     transcript the Stop hook already reads. Per card
-     the session either REMOVES it (`node scripts/board.mjs vdzk-remove "<fragment>"`)
-     or records that this message did not answer it (`node scripts/board.mjs vdzk-keep
-     "<fragment>" [...]`, several fragments in one call, written to the guard state and
-     never to the board). The record is keyed to the MESSAGE (its transcript uuid), so
-     the NEXT user message arms every card again — he answers whichever he likes,
-     whenever — and a card ADDED in that same turn is never demanded, it postdates the
-     message.
-  2. A SUSPECTED HIT COSTS A REASON. Where a card's title and the user's message share
-     a distinctive term (normalised, at least 5 characters, outside the stop list),
-     `vdzk-keep` for that card REQUIRES `--why "<why the message did not answer it>"`;
-     every other card is kept by being listed. That is the two-tier loudness this
-     project already uses elsewhere: cheap where nothing points at the card, deliberate
-     where something does.
-  3. A SESSION THAT MAY NOT TOUCH THE BOARD CARRIES THE ANSWER INSTEAD. The window the
-     user writes into is usually NOT the batch owner (stand-down: no board edit) —
-     which is exactly what happened on 10.08. For it both remedies collapse into one:
-     `node scripts/vdzk-answer.mjs "<fragment>" --answer "<what the user decided>"`,
-     appended to `.claude/vdzk-answers.json`. THIS half does NOT stand down for a
-     non-owner: it demands a RECORD, not a board edit. The OWNER's turn end is then
-     blocked while an unapplied answer waits; it removes the card and clears the entry
-     (`node scripts/vdzk-answer.mjs --applied "<fragment>"`), and an entry naming a card
-     that no longer exists clears itself.
-  4. Fail-OPEN like every guard here (an internal error allows the stop), the decision
-     logic pure in `decision-card-guard-core.mjs`, and the remedy NAMES the exact
-     command per card — a guard that only says "decide" is a guard that gets
-     rubber-stamped.
-  5. AND THE SAME GUARD STOPS COUNTING A LOOK BACK AS A REQUEST (measured 10.08.2026,
-     two turns lost in one session; bundled here because it is the same core). "Die beste
-     Werbung für deine Entscheidung von heute Abend" ASKS FOR NOTHING — it names a ruling
-     the user gave hours earlier — and the guard blocked it, because a `address: 'sentence'`
-     phrase only tests whether the sentence ADDRESSES the user, which a retrospect does
-     exactly as much as a request. So a sentence in the PAST TENSE, or carrying a
-     backward-pointing marker (von heute, von gestern, vorhin, damals, bereits, schon),
-     is not a request while it has neither a question mark nor an imperative. The
-     fail direction is unchanged — in doubt, block — but a pure retrospect is not a
-     doubtful case. The SAME holds for a sentence that merely DESCRIBES a standing
-     arrangement ("poc bleibt deine Entscheidung", "das Taggen liegt bei dir"): it reports
-     who decides, it does not ask. Measured 11.08.2026, two turns in one morning, both on
-     the phrase `deine entscheidung`; a phrase that names a decision-MAKER without a
-     question mark and without an imperative is a statement, and the gate says so.
-  VERIFIABLE: Vitest cases in `scripts/decision-card-guard-core.test.mjs` covering — a
-  user message with two open cards blocks; one removed plus one kept passes; the same
-  cards pass silently on a turn with NO user message; a NEW user message re-arms both;
-  a card added this turn is not demanded; a shared distinctive term forces `--why`
-  while a shared stop word ("nicht", "board", "punkt") does not; a carried answer blocks
-  the owner and passes the non-owner; an answer naming a vanished card self-clears; a
-  throwing state read allows the stop. Plus the replay of the 10.08 case: the real card
-  titles and the real user message, which must block; and, for item 5, the real sentence
-  that must NOT block beside a present-tense request that still must.
-  Criticality: HIGH — it is a guard, so `mechanism-review-guard` demands the other
-  model's recorded review, and its failure mode is the user acting on a question that
-  was settled hours ago.
-
 - [ ] 625. The same defect was built twice, in parallel (measured 11.08.2026, 00:12).
   Point 590 ("THE BOARD'S QUEUE ORDER IS A SECOND COPY OF THE WORK ORDER, AND IT KEEPS
   DRIFTING", from the user's report of 09.08.) and point 608 ("THE BOARD'S ORDER IS
@@ -8366,9 +8409,11 @@ to land than a mechanism that needs a review.
     timestamp rather than needing anyone to remember to clear it.
   - An author or agent run that dies on a provider limit RECORDS that provider as exhausted
     before it exits, so the next session does not repeat the delegation that just failed.
-  - The ordinary cut of `authorLaneFor` is UNCHANGED: mechanical and mid-difficulty to Sol, the
-    hard cases and the verification-is-the-work points to Opus 5, and Fable only as the escalation
-    for Opus work Sol still rejects after a re-work. This point adds a veto on an empty lane, not a
+  - The ordinary cut of `authorLaneFor` is UNCHANGED, as the user's ruling of 18.08.2026
+    (commit c3256a50) left it: a hard marker or criticality HIGH answers Sol, ABOVE the
+    verification lane, so the hard and critical points go there too; Opus 5 keeps the points
+    whose VERIFICATION is the work and that nothing marks hard; Fable stays the escalation for
+    work the review still rejects after a re-work. This point adds a veto on an empty lane, not a
     second opinion about difficulty.
   VERIFIABLE: Vitest cases over the pure core — exhausted lane never recommended and the
   substitution named in the reason; missing, corrupt and lapsed pool file → today's routing
