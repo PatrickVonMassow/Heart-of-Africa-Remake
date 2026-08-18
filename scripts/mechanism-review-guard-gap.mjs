@@ -8,36 +8,17 @@
 // one — whether a split covers the range, and hands the numbers to the pure
 // ruling. The common clear turn never reaches this file.
 //
-// Self-contained by design: the splitting tool (review-material-core.mjs) is
-// consulted through a dynamic import that tolerates its absence, because this
-// clause is cherry-picked AHEAD of the tool onto trees the trap is live on.
+// THE GATE CHAIN REQUIRES THE SPLITTER MODULE (review-material-core.mjs) AND
+// FAILS LOUDLY WITHOUT IT. An earlier revision documented a pre-splitter
+// cherry-pick tree this file would tolerate — a claim the rest of the chain
+// (the guard, the recorder, the core) defeated at import time, so it was a
+// capability that failed on its first import. Retired (second landing round,
+// pass 4): a splitter that cannot load is a measurement failure, which rules
+// 'unmeasured' and keeps the gate blocking.
 
 import { execFileSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
-
-/** The one module whose ABSENCE (never a transitive import's) may rule
- *  'no-splitter' — spelled exactly as Node names it in ERR_MODULE_NOT_FOUND,
- *  as URL and (where this module runs from a file: URL) as path. Exported so
- *  the tests build their absence fakes from the same spellings. */
-export const SPLITTER_SPELLINGS = Object.freeze(
-  (() => {
-    const url = new URL('./review-material-core.mjs', import.meta.url)
-    const spellings = [url.href]
-    try {
-      spellings.push(fileURLToPath(url))
-    } catch {
-      /* not a file: URL (a bundler/test transform) — the href spelling stands */
-    }
-    return spellings
-  })(),
-)
 import { REPO_ROOT } from './repo-paths.mjs'
-import {
-  decideReviewGap,
-  estimateRenderedChars,
-  formatReviewGap,
-  REVIEW_GAP_BUDGET_CHARS,
-} from './mechanism-review-guard-gap-core.mjs'
+import { decideReviewGap, formatReviewGap, REVIEW_GAP_BUDGET_CHARS } from './mechanism-review-guard-gap-core.mjs'
 
 // The patch of a jammed range is megabytes by definition here — the default
 // 1 MiB pipe would throw ENOBUFS and turn every measurement into 'unmeasured'.
@@ -191,31 +172,14 @@ export async function assessReviewGap({
   // A PROVEN OVERSIZE PLANS NOTHING: the parts were never read whole, so no
   // splitter can be consulted — the core rules on the floor alone.
   if (measured && !measured.oversizeProven) {
-    // The splitter's ABSENCE and its FAILURE are opposite rulings (round-2
-    // pass 2): a tree without the tool genuinely cannot produce passes, so the
-    // core may rule 'no-splitter' on size alone — but a tool that exists and
-    // CRASHED leaves "would a split cover it?" unanswered, and answering
-    // 'no-splitter' there waives the gate on an assessment failure. The import
-    // is probed apart from the planning so the two cannot be conflated; any
-    // failure past a successful import rules 'unmeasured', which blocks.
+    // A SPLITTER THAT CANNOT LOAD IS A MEASUREMENT FAILURE, whatever the
+    // failure (second landing round, pass 4): the gate chain requires the
+    // module, so absence and breakage rule alike — 'unmeasured', which blocks.
     let tool = null
     try {
       tool = await loadTool()
     } catch (e) {
-      // ERR_MODULE_NOT_FOUND alone is AMBIGUOUS (round-3 pass 2): Node raises
-      // the same code when the splitter exists but one of its own imports is
-      // missing — a broken tool, not an absent one. Only a failure that names
-      // THE SPLITTER ITSELF as the module it cannot find proves the cherry-pick
-      // tree without the tool; everything else is an assessment failure, which
-      // blocks.
-      const missing = /Cannot find (?:module|package) '([^']+)'/.exec(String(e?.message ?? ''))?.[1] ?? ''
-      // THE EXACT SIBLING, not a basename (round-4 pass 2): a missing
-      // transitive module that happens to be NAMED review-material-core.mjs
-      // elsewhere in the tree must not read as the splitter's absence.
-      const toolAbsent = e?.code === 'ERR_MODULE_NOT_FOUND' && SPLITTER_SPELLINGS.includes(missing)
-      if (!toolAbsent) {
-        measurementError = `the splitting tool exists but could not load: ${(e && e.message) || e}`
-      }
+      measurementError = `the pass-splitting tool could not load (the gate chain requires it): ${(e && e.message) || e}`
     }
     if (tool) {
       try {
@@ -256,14 +220,6 @@ export async function assessReviewGap({
     planner,
     measurementError,
     oversizeProven: Boolean(measured?.oversizeProven),
-    // The no-splitter branch judges the RENDERED floor, not the raw sum
-    // (landing-round pass 3) — delivery adds frames, headers and the receipt.
-    renderedChars: measured
-      ? estimateRenderedChars({
-          measuredChars: measured.measuredChars,
-          filePaths: (measured.files ?? []).map((f) => f.path),
-        })
-      : null,
   })
   return {
     ...decision,

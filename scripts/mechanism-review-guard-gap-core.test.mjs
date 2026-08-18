@@ -4,11 +4,9 @@
 // pinned here; the live trap this closes held every turn on main hostage to a
 // review no caller could produce (measured 18.08.2026).
 import { describe, it, expect } from 'vitest'
-import { SPLITTER_SPELLINGS } from './mechanism-review-guard-gap.mjs'
 import {
   criticalityGapPlan,
   decideReviewGap,
-  estimateRenderedChars,
   formatCriticalityGap,
   formatReviewGap,
   guardOutcome,
@@ -20,21 +18,24 @@ const material = await import('./review-material-core.mjs').catch(() => null)
 
 describe('decideReviewGap', () => {
   it('rules NO gap while the material fits — the ordinary demand stands', () => {
-    const d = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS - 1 })
+    const d = decideReviewGap({
+      measuredChars: REVIEW_GAP_BUDGET_CHARS - 1,
+      planner: { available: true, fits: true, covers: true, uncoverable: [] },
+    })
     expect(d.gap).toBe(false)
     expect(d.reason).toBe('fits')
   })
 
-  it('resumes blocking AT the budget exactly — fitting means fitting', () => {
-    expect(decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS }).gap).toBe(false)
-  })
-
-  it('rules a GAP for an over-budget range in a tree with no splitting tool', () => {
-    // The cherry-pick case: the clause lands ahead of the pass tooling, on the
-    // very tree the trap is live on.
-    const d = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS * 3, planner: null })
-    expect(d.gap).toBe(true)
-    expect(d.reason).toBe('no-splitter')
+  it('BLOCKS without a planner ruling, whatever the size — the gate chain requires the splitter (second landing round)', () => {
+    // The earlier no-splitter waiver served a pre-splitter cherry-pick tree
+    // nobody runs, and a documented capability the chain's own imports defeat
+    // is worse than none: retired. No planner, no waiver.
+    for (const measuredChars of [REVIEW_GAP_BUDGET_CHARS - 1, REVIEW_GAP_BUDGET_CHARS, REVIEW_GAP_BUDGET_CHARS * 3]) {
+      const d = decideReviewGap({ measuredChars, planner: null })
+      expect(d.gap, String(measuredChars)).toBe(false)
+      expect(d.reason).toBe('unmeasured')
+      expect(d.detail).toContain('requires the splitter')
+    }
   })
 
   it('rules NO gap where a split COVERS the range — the pass review is owed', () => {
@@ -95,24 +96,6 @@ describe('decideReviewGap', () => {
     expect(d.reason).toBe('unmeasured')
   })
 
-  it('the no-splitter branch judges the RENDERED floor, not the raw sum (landing round)', () => {
-    // Raw material just under the budget exceeds it once frames, headers and
-    // the receipt render — the guard then demanded a review the assembly
-    // refuses.
-    const raw = REVIEW_GAP_BUDGET_CHARS - 10
-    const over = decideReviewGap({ measuredChars: raw, renderedChars: REVIEW_GAP_BUDGET_CHARS + 1 })
-    expect(over.gap).toBe(true)
-    expect(over.reason).toBe('no-splitter')
-    // …and the quantity that ruled is carried and reported beside the raw sum.
-    expect(over.renderedChars).toBe(REVIEW_GAP_BUDGET_CHARS + 1)
-    expect(formatReviewGap({ baseline: 'a', head: 'b', decision: over })).toContain(
-      `at least ${REVIEW_GAP_BUDGET_CHARS + 1} characters`,
-    )
-    const fits = decideReviewGap({ measuredChars: raw, renderedChars: REVIEW_GAP_BUDGET_CHARS })
-    expect(fits.gap).toBe(false)
-    expect(fits.reason).toBe('fits')
-  })
-
   it('a measurement error outranks a plausible size — the error is the truth', () => {
     const d = decideReviewGap({ measuredChars: 10, measurementError: 'partial read' })
     expect(d.gap).toBe(false)
@@ -126,7 +109,10 @@ describe('formatReviewGap', () => {
   const head = 'b'.repeat(40)
 
   it('names the range, the measured size and the budget — the spec’s own three', () => {
-    const decision = decideReviewGap({ measuredChars: 3_014_107, planner: null })
+    const decision = decideReviewGap({
+      measuredChars: 3_014_107,
+      planner: { available: true, covers: false, uncoverable: ['docs/huge.md'] },
+    })
     const text = formatReviewGap({ baseline: base, head, decision })
     expect(text).toContain(`${base.slice(0, 12)}..${head.slice(0, 12)}`)
     expect(text).toContain('3014107')
@@ -177,8 +163,14 @@ describe('guardOutcome — the junction where a do-not-merge could be waved thro
   })
 
   it('the same range, once it fits again, blocks again — the gap suspends, never clears', () => {
-    const over = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS * 3, planner: null })
-    const fits = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS - 1 })
+    const over = decideReviewGap({
+      measuredChars: REVIEW_GAP_BUDGET_CHARS * 3,
+      planner: { available: true, covers: false, uncoverable: ['docs/huge.md'] },
+    })
+    const fits = decideReviewGap({
+      measuredChars: REVIEW_GAP_BUDGET_CHARS - 1,
+      planner: { available: true, fits: true, covers: true, uncoverable: [] },
+    })
     expect(guardOutcome({ blocked: true, gap: over }).action).toBe('report-gap')
     expect(guardOutcome({ blocked: true, gap: fits }).action).toBe('block')
   })
@@ -261,11 +253,10 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     if (args[0] === 'show') return 'body'
     return ''
   }
-  // The genuine-absence shape names THE SPLITTER ITSELF — by one of its exact
-  // spellings, not a basename (round-4 pass 2) — as the unfindable module; the
-  // same code with any other spelling is a broken tool.
+  // A load failure of ANY shape — absence included — is a measurement failure
+  // now: the gate chain requires the splitter (second landing round, pass 4).
   const absent = Object.assign(
-    new Error(`Cannot find module '${SPLITTER_SPELLINGS[SPLITTER_SPELLINGS.length - 1]}' imported from x`),
+    new Error("Cannot find module '/repo/scripts/review-material-core.mjs' imported from x"),
     { code: 'ERR_MODULE_NOT_FOUND' },
   )
 
@@ -301,52 +292,27 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     expect(d.detail).toContain('planner failed')
   })
 
-  it('only a genuinely ABSENT splitting tool rules no-splitter on size alone', async () => {
-    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
-    const d = await assessReviewGap({
-      baseline: 'a'.repeat(40),
-      head: 'b'.repeat(40),
-      run: bigRun,
-      loadTool: () => Promise.reject(absent),
-    })
-    expect(d.gap).toBe(true)
-    expect(d.reason).toBe('no-splitter')
-  })
-
-  it('a splitter whose own TRANSITIVE import is missing is broken, not absent (round-3 pass 2)', async () => {
-    // Node raises ERR_MODULE_NOT_FOUND for both shapes; only the one naming
-    // the splitter itself proves the tree without the tool.
+  it('an ABSENT splitter blocks like a broken one — the gate chain requires it (second landing round)', async () => {
+    // The no-splitter waiver served a pre-splitter cherry-pick tree nobody
+    // runs, and the chain's own static imports defeated it at load time — a
+    // capability that fails on its first import invites reliance. Retired:
+    // absence, a broken transitive import, and a crash all rule 'unmeasured'.
     const transitive = Object.assign(
       new Error("Cannot find module '/repo/scripts/repo-paths.mjs' imported from /repo/scripts/review-material-core.mjs"),
       { code: 'ERR_MODULE_NOT_FOUND' },
     )
-    // …including one that merely SHARES the splitter's basename elsewhere in
-    // the tree (round-4 pass 2).
-    const sameBasename = Object.assign(
-      new Error("Cannot find module '/repo/vendor/review-material-core.mjs' imported from /repo/scripts/review-material-core.mjs"),
-      { code: 'ERR_MODULE_NOT_FOUND' },
-    )
-    for (const shape of [sameBasename]) {
-      const { assessReviewGap: assess } = await import('./mechanism-review-guard-gap.mjs')
-      const ruled = await assess({
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    for (const shape of [absent, transitive, new Error('syntax error in tool')]) {
+      const d = await assessReviewGap({
         baseline: 'a'.repeat(40),
         head: 'b'.repeat(40),
         run: bigRun,
         loadTool: () => Promise.reject(shape),
       })
-      expect(ruled.gap).toBe(false)
-      expect(ruled.reason).toBe('unmeasured')
+      expect(d.gap, shape.message).toBe(false)
+      expect(d.reason).toBe('unmeasured')
+      expect(d.detail).toContain('requires it')
     }
-    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
-    const d = await assessReviewGap({
-      baseline: 'a'.repeat(40),
-      head: 'b'.repeat(40),
-      run: bigRun,
-      loadTool: () => Promise.reject(transitive),
-    })
-    expect(d.gap).toBe(false)
-    expect(d.reason).toBe('unmeasured')
-    expect(d.detail).toContain('could not load')
   })
 
   it('issues its git calls as EXACT argument arrays — no shell, nothing reordered (round-6 pass 3)', async () => {
@@ -440,12 +406,14 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
       baseline: 'a'.repeat(40),
       head: 'b'.repeat(40),
       run: sized,
-      loadTool: () => Promise.reject(absent),
+      loadTool: () => import('./review-material-core.mjs'),
     })
     expect(seen.some((a) => a[0] === 'show')).toBe(false)
-    // 64 MiB floors to 16M characters — over budget, no splitter: a gap.
+    // 64 MiB floors to 16M characters; the stand-in reaches the REAL planner,
+    // which finds the file's content beyond any pass (its patch section is
+    // missing in this fixture) — a measured gap, not a waiver on absence.
     expect(d.gap).toBe(true)
-    expect(d.reason).toBe('no-splitter')
+    expect(d.reason).toBe('split-cannot-cover')
     expect(d.measuredChars).toBeGreaterThan(REVIEW_GAP_BUDGET_CHARS)
   })
 
@@ -475,9 +443,13 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
       baseline: 'a'.repeat(40),
       head: 'b'.repeat(40),
       run: deleted,
-      loadTool: () => Promise.reject(absent),
+      loadTool: () => import('./review-material-core.mjs'),
     })
-    expect(ruled.reason).toBe('no-splitter')
+    // The ruling PROCEEDED to the planner — the tolerated absence is not a
+    // measurement failure. (This degenerate fixture's patch parses to no
+    // sections, so the planner rules its own measured verdict; what matters
+    // here is only that 'unmeasured' was not the answer.)
+    expect(ruled.reason).not.toBe('unmeasured')
   })
 
   it('the splitter’s own fit ruling outranks the raw size (final-round pass 3)', async () => {
@@ -525,7 +497,10 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
 
 describe('formatCriticalityGap', () => {
   it('names each point, its record range and the resume rule', () => {
-    const decision = decideReviewGap({ measuredChars: 3_000_000, planner: null })
+    const decision = decideReviewGap({
+      measuredChars: 3_000_000,
+      planner: { available: true, covers: false, uncoverable: ['docs/huge.md'] },
+    })
     const text = formatCriticalityGap([{ point: 700, sha: 'e'.repeat(40), decision }])
     expect(text).toContain('point 700')
     expect(text).toContain('e'.repeat(12))
@@ -545,26 +520,4 @@ describe('the budget mirror', () => {
     expect(REVIEW_GAP_MAX_PASS_TOTAL).toBe(material.MAX_PASS_TOTAL)
   })
 
-  it.skipIf(!material)('the rendered estimate never OVER-counts what the assembly writes', () => {
-    // The estimate feeds a WAIVER, so it must be a proven FLOOR (landing-round
-    // pass 3): an over-count would waive the gate on a range that actually
-    // fits. The pin is one-sided the safe way — the few real characters above
-    // the floor keep a hairline-marginal range blocking, never waived.
-    // Every file carries a section, as in a real measurement: the paths come
-    // off the same diff the patch was read from.
-    const section = (p) =>
-      `diff --git a/${p} b/${p}\nindex 1..2 100644\n--- a/${p}\n+++ b/${p}\n@@ -1 +1 @@\n+x\n`
-    const stat = ' a.txt | 2 +-\n 1 file changed\n'
-    const patch = `${section('a.txt')}${section('some/deeper/path-name.md')}`
-    const files = [
-      { path: 'a.txt', text: 'the body of a\n' },
-      { path: 'some/deeper/path-name.md', text: 'the body of b\n' },
-    ]
-    const assembled = material.assembleMaterial({ stat, patch, files })
-    const raw = stat.length + patch.length + files.reduce((n, f) => n + f.text.length, 0)
-    const estimate = estimateRenderedChars({ measuredChars: raw, filePaths: files.map((f) => f.path) })
-    expect(estimate).toBeLessThanOrEqual(assembled.size)
-    // …while still counting real overhead above the raw parts.
-    expect(estimate).toBeGreaterThan(raw)
-  })
 })
