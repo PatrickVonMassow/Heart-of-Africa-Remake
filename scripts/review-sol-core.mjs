@@ -797,8 +797,15 @@ export function formatReviewReport({
       '',
       'Record it (the model named is the one that actually ran):',
       `  ${cmd}`,
-      ...(pass && pass.index < pass.total
-        ? ['', `  The range is NOT cleared until every pass is recorded — next: --pass ${pass.index + 1}`]
+      // EVERY pass carries the not-cleared warning (round-3 pass 6): the
+      // passes may run in any order, so the final-NUMBERED pass is not the
+      // final pass run — only the next-pass suggestion is order-dependent.
+      ...(pass
+        ? [
+            '',
+            `  The range is NOT cleared until every pass is recorded` +
+              (pass.index < pass.total ? ` — next: --pass ${pass.index + 1}` : ''),
+          ]
         : []),
     ].join('\n')
   }

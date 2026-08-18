@@ -292,6 +292,10 @@ describe('validateRecord', () => {
       'Checked zero files; the material was not supplied',
       'Reviewed 0 files — no access to the diff',
       'Checked not one file; the patch was not provided',
+      // Round-3 pass 1: qualifiers between the verb and the zero.
+      'Checked exactly 0 files; the material was not supplied',
+      'Reviewed only zero of the files; no access to the material',
+      'Examined just nothing here — the diff could not be read',
     ]) {
       expect(validateRecord({ ...good, evidence }).ok, evidence).toBe(false)
     }
@@ -1461,6 +1465,30 @@ describe('the mode is required to WRITE a record, never to READ one', () => {
       records: [legacy({ mode: 'review' })],
     })
     expect(v.block).toBe(false)
+  })
+
+  it('a non-finite timestamp cannot out-stand a later do-not-merge (round-3 pass 1)', () => {
+    // Every "latest verdict" reduction compares Number(at), and NaN loses
+    // every comparison — a hand-made merge row with at:"unknown" stayed
+    // "latest" past a later, finite-dated refusal and cleared it.
+    const base = {
+      sha: 'c'.repeat(40),
+      model: 'GPT-5.6 Sol',
+      authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+      evidence: 'checked the guard change against its spec end to end',
+      mode: 'review',
+    }
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [
+        { ...base, verdict: 'merge', at: 'unknown' },
+        { ...base, verdict: 'do-not-merge', at: MERGE_ACCOUNTING_SINCE + 5000 },
+      ],
+    })
+    expect(v.block).toBe(true)
+    expect(v.findings[0].kind).toBe('do-not-merge')
   })
 
   it('refuses an unknown mode whatever the row’s era — the recorder would never have written it', () => {

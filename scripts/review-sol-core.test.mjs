@@ -540,7 +540,10 @@ describe('the record the command prints', () => {
     expect(report).toMatch(/NOT cleared until every pass is recorded/)
   })
 
-  it('stops promising a next pass once the last one is reviewed', () => {
+  it('keeps the not-cleared warning on the final-NUMBERED pass, and only drops the next suggestion', () => {
+    // Round-3 pass 6: passes may run in any order, so `--pass 3` of 3 is not
+    // proof the composition is complete — dropping the warning there read as
+    // a cleared range whenever the highest number happened to run first.
     const report = formatReviewReport({
       decision: decideReview(okRun()),
       sha: 'a'.repeat(40),
@@ -548,7 +551,8 @@ describe('the record the command prints', () => {
       pass: { index: 3, total: 3, files: ['scripts/c.mjs'] },
     })
     expect(report).toContain('--pass 3/3')
-    expect(report).not.toMatch(/NOT cleared until every pass is recorded/)
+    expect(report).toMatch(/NOT cleared until every pass is recorded/)
+    expect(report).not.toMatch(/next: --pass/)
   })
 
   it('decides coverage strictly: only an EQUAL base is full coverage', () => {

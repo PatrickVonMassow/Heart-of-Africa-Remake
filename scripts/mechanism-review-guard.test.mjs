@@ -233,9 +233,47 @@ describe('attachCoverage', () => {
       'docs/notes.md',
       ' edge-space.mjs',
     ])
-    // The failed measurement attaches nothing — the evaluator then falls back
-    // to the commit's own paths, a narrower demand, never a wider clearance.
+    // The failed measurement attaches nothing…
     expect(records.find((r) => r.sha === 'recB').rangeFiles).toBeUndefined()
+  })
+
+  it('an unattached range measurement BLOCKS the composition, never narrows it (round-3 pass 3)', async () => {
+    // The half the wrapper test above cannot claim alone: what the evaluator
+    // DOES with records that carry no rangeFiles. A complete-looking split
+    // whose range was never measured has unknown coverage and blocks — the
+    // old fallback judged it against the commit's own mechanism paths, a
+    // silently narrower demand, exactly when git could not say what the range
+    // really changed.
+    const { evaluateMechanismReview } = await import('./mechanism-review-core.mjs')
+    const recSha = 'c'.repeat(40)
+    const rec = (index) => ({
+      sha: recSha,
+      model: 'GPT-5.6 Sol',
+      authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+      verdict: 'merge',
+      evidence: 'checked the guard change against its spec end to end',
+      mode: 'review',
+      at: Date.now(),
+      pass: { index, total: 2, files: index === 1 ? ['scripts/x-guard.mjs'] : ['scripts/y.mjs'] },
+      // Deliberately NO rangeFiles — the wrapper's diff could not answer.
+    })
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [
+        {
+          sha: '1'.repeat(40),
+          subject: 'change a guard',
+          authorModel: 'Claude Opus 5',
+          files: ['scripts/x-guard.mjs'],
+          coveringRecordShas: [recSha],
+        },
+      ],
+      records: [rec(1), rec(2)],
+    })
+    expect(v.block).toBe(true)
+    expect(v.findings[0].kind).toBe('incomplete-passes')
+    expect(v.findings[0].passes.coverageUnknown).toBe(true)
   })
 
   it('asks git NOTHING when no mechanism commit is pending — the common turn', () => {

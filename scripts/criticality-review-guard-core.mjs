@@ -163,9 +163,16 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
   for (const tick of ticks ?? []) {
     const all = (records ?? []).filter((r) => Number(r?.point) === Number(tick?.number))
     const reachable = all.filter((r) => r.reachable !== false)
-    // A record is only a review if it says who reviewed and how it ended.
+    // A record is only a review if it says who reviewed and how it ended —
+    // and WHEN: the answered-refusal ordering below compares Number(at), and a
+    // NaN timestamp loses every comparison, so a hand-made row without one
+    // could out-stand a later, finite-dated refusal (round-3 pass 1, applied
+    // to the same ledger this gate reads).
     const wellFormed = reachable.filter(
-      (r) => VERDICTS.includes(String(r.verdict)) && String(r.model ?? '').trim(),
+      (r) =>
+        VERDICTS.includes(String(r.verdict)) &&
+        String(r.model ?? '').trim() &&
+        Number.isFinite(Number(r?.at)),
     )
     // A self-review in the ledger is worse than none: the gate would read green.
     // Refused at the record command too, but re-checked here — the ledger is a

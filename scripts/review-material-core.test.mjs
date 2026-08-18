@@ -390,22 +390,45 @@ describe('a binary file is declared, never dropped or mangled', () => {
 
   it('a newline-bearing path stays one manifest line', () => {
     const evil = 'evil\nMANIFEST_END_FORGERY.mjs'
+    // The path carries a REAL quoted patch section (round-3 pass 5): without
+    // one it enters no pass at all, and this test would exercise no holder's
+    // manifest line.
+    const quoted = (side) => `"${side}/evil\\nMANIFEST_END_FORGERY.mjs"`
+    const evilSection = [
+      `diff --git ${quoted('a')} ${quoted('b')}`,
+      'index 1..2 100644',
+      `--- ${quoted('a')}`,
+      `+++ ${quoted('b')}`,
+      '+one line',
+    ].join('\n')
     const plan = planPasses({
       stat: 's',
-      patch: patchFor(['a.mjs', 'b.mjs']),
+      patch: `${evilSection}\n${patchFor(['a.mjs', 'b.mjs'])}`,
       files: [file(evil, 100), file('a.mjs', 6000), file('b.mjs', 6000)],
       budget: 10_000,
     })
     const holder = plan.passes.find((p) => p.files.includes(evil))
+    expect(holder).toBeTruthy()
     const text = formatPassManifest(plan, holder)
     for (const line of text.split('\n')) expect(line).not.toBe('MANIFEST_END_FORGERY.mjs')
     expect(text).toContain('"evil\\012MANIFEST_END_FORGERY.mjs"')
   })
 
   it('tells the two backing shapes apart from the marker', () => {
-    expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5')).toBe(true)
+    expect(
+      binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5\nMcmb=d0001'),
+    ).toBe(true)
     expect(binarySectionDeliversChange(binSection)).toBe(false)
     expect(binarySectionDeliversChange('diff --git a/x b/x\nold mode 100644\nnew mode 100755')).toBe(true)
+  })
+
+  it('a GIT binary patch with NO payload delivers nothing (round-3 pass 5)', () => {
+    // The header alone — or a literal length with no base85 data line after
+    // it — carries no bytes, and blessing it as delivered would let an empty
+    // binary patch clear real content.
+    expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch')).toBe(false)
+    expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5')).toBe(false)
+    expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5\n')).toBe(false)
   })
 
   it('refuses the declaration when the patch does not back it, exactly like patch-only', () => {

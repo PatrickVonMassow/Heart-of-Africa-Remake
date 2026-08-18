@@ -201,7 +201,17 @@ export function isBinaryPatchSection(text) {
  */
 export function binarySectionDeliversChange(text) {
   const lines = String(text ?? '').split('\n')
-  if (lines.includes('GIT binary patch')) return true
+  const at = lines.indexOf('GIT binary patch')
+  if (at >= 0) {
+    // THE BYTES MUST ACTUALLY BE THERE (round-3 pass 5): the header alone, or
+    // a `literal N` with no base85 data line after it, delivers nothing — and
+    // a fixture blessing that shape as delivered would let an empty binary
+    // patch clear real bytes. Delivered means: a literal/delta length line AND
+    // at least one non-empty payload line following it.
+    const length = lines[at + 1] ?? ''
+    const payload = lines[at + 2] ?? ''
+    return /^(?:literal|delta) \d+$/.test(length) && payload.trim() !== ''
+  }
   return !lines.some((line) => /^Binary files .* differ$/.test(line))
 }
 
@@ -804,7 +814,11 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
     })
   }
   for (const [path, text] of sections) {
-    if (!seen.has(path)) entries.push({ path, content: '', patchText: text })
+    // A SECTION-ONLY PATH KEEPS ITS BINARY CLASSIFICATION (round-3 pass 4): a
+    // deleted binary arrives here with no content entry to carry the caller's
+    // flag, and reading it as text let a bare `Binary files … differ` marker
+    // pack as deliverable while a GIT binary patch missed its declared line.
+    if (!seen.has(path)) entries.push({ path, content: '', patchText: text, binary: isBinaryPatchSection(text) })
   }
   let rawSize = statText.length
   for (const entry of entries) rawSize += entry.patchText.length + entry.content.length
@@ -924,12 +938,27 @@ export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/rev
   // Structural path lists spell every name through quotePassFile (round-2
   // pass 3): a legal path holding a newline or comma could otherwise forge a
   // line or make the printed pass membership ambiguous.
+  //
+  // A SPLIT OF ONE CANNOT BE RECORDED (round-3 pass 4): a plan that packs one
+  // coverable pass beside files beyond reach would advertise `--pass 1` of a
+  // total the recorder refuses (a pass record needs a total of at least 2 — a
+  // pass of one IS a whole range). No runnable command is printed for it.
+  const recordable = plan.passes.length >= 2
   for (const pass of plan.passes) {
     lines.push(
       `    pass ${pass.index}/${pass.total}  ${pass.files.length} file(s), ~${pass.size} characters` +
         (pass.patchOnly.length ? `  [diff only: ${pass.patchOnly.map((p) => quotePassFile(p)).join(', ')}]` : ''),
       `      ${pass.files.map((p) => quotePassFile(p)).join(', ')}`,
-      `      ${command} --sha ${at || '<sha>'} --brief "<what to judge>" --pass ${pass.index}`,
+    )
+    if (recordable) {
+      lines.push(`      ${command} --sha ${at || '<sha>'} --brief "<what to judge>" --pass ${pass.index}`)
+    }
+  }
+  if (!recordable) {
+    lines.push(
+      '  This range packs into ONE coverable pass beside what is beyond reach, and a split of',
+      '  one cannot be recorded as passes. No record can cover this range: narrow the range,',
+      '  or split the change itself.',
     )
   }
   if (plan.uncoverable.length) {

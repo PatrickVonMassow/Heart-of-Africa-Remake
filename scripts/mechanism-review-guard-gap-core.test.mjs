@@ -219,7 +219,12 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     if (args[0] === 'show') return 'body'
     return ''
   }
-  const absent = Object.assign(new Error('not found'), { code: 'ERR_MODULE_NOT_FOUND' })
+  // The genuine-absence shape names THE SPLITTER ITSELF as the unfindable
+  // module; the same code with another module's name is a broken tool.
+  const absent = Object.assign(
+    new Error("Cannot find module '/repo/scripts/review-material-core.mjs' imported from /repo/scripts/x.mjs"),
+    { code: 'ERR_MODULE_NOT_FOUND' },
+  )
 
   it('a splitter that exists but CRASHES on load rules unmeasured — the gate keeps blocking', async () => {
     const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
@@ -263,6 +268,25 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     })
     expect(d.gap).toBe(true)
     expect(d.reason).toBe('no-splitter')
+  })
+
+  it('a splitter whose own TRANSITIVE import is missing is broken, not absent (round-3 pass 2)', async () => {
+    // Node raises ERR_MODULE_NOT_FOUND for both shapes; only the one naming
+    // the splitter itself proves the tree without the tool.
+    const transitive = Object.assign(
+      new Error("Cannot find module '/repo/scripts/repo-paths.mjs' imported from /repo/scripts/review-material-core.mjs"),
+      { code: 'ERR_MODULE_NOT_FOUND' },
+    )
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: bigRun,
+      loadTool: () => Promise.reject(transitive),
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('unmeasured')
+    expect(d.detail).toContain('could not load')
   })
 
   it('a covering split from the real planner shape keeps the demand standing', async () => {

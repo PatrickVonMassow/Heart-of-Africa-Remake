@@ -921,7 +921,11 @@ describe('a range too large for one round', () => {
     expect(r.status).toBe(3)
     expect(r.stdout).toMatch(/claude-only/)
     expect(r.stdout).toContain('--pass 1/2')
-    expect(r.stdout).toContain('--pass-files')
+    // The scope is PARSED, not merely present (round-3 pass 6): a hand-off
+    // whose record command covered both bulk files would satisfy a bare
+    // toContain. Pass 1 of this fixture holds exactly the first bulk file.
+    const passFiles = /--pass-files "([^"]*)"/.exec(r.stdout)?.[1]
+    expect(passFiles).toBe('bulk-a.txt')
     expect(calls()).toEqual([])
     rmSync(shareFile, { force: true })
   })

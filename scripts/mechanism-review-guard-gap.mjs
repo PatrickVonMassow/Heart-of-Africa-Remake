@@ -89,11 +89,18 @@ export async function assessReviewGap({
     try {
       tool = await loadTool()
     } catch (e) {
-      if (e?.code !== 'ERR_MODULE_NOT_FOUND') {
+      // ERR_MODULE_NOT_FOUND alone is AMBIGUOUS (round-3 pass 2): Node raises
+      // the same code when the splitter exists but one of its own imports is
+      // missing — a broken tool, not an absent one. Only a failure that names
+      // THE SPLITTER ITSELF as the module it cannot find proves the cherry-pick
+      // tree without the tool; everything else is an assessment failure, which
+      // blocks.
+      const missing = /Cannot find (?:module|package) '([^']+)'/.exec(String(e?.message ?? ''))?.[1] ?? ''
+      const toolAbsent =
+        e?.code === 'ERR_MODULE_NOT_FOUND' && /(?:^|[/\\])review-material-core\.mjs$/.test(missing)
+      if (!toolAbsent) {
         measurementError = `the splitting tool exists but could not load: ${(e && e.message) || e}`
       }
-      // ERR_MODULE_NOT_FOUND: no splitting tool in this tree — the core rules
-      // on size alone (the cherry-pick case this module is self-contained for).
     }
     if (tool) {
       try {

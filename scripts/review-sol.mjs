@@ -133,21 +133,24 @@ function git(args, { required = true, raw = false } = {}) {
   })
   const errText = (res.stderr ?? Buffer.alloc(0)).toString('utf8')
   if (res.status !== 0 || res.error) {
-    // AN OPTIONAL READ IS ONLY OPTIONAL ABOUT ABSENCE (round-2 pass 5): null
-    // means "the commit does not carry that path", and answering it for a
-    // spawn error, corruption or an overflowed buffer silently treated an
-    // unreadable blob as deleted. Anything that is not git saying "absent"
-    // fails loud, required or not.
+    // AN OPTIONAL READ IS ONLY OPTIONAL ABOUT ABSENCE (round-2 pass 5,
+    // narrowed by round-3 pass 7): null means "git itself answered absent",
+    // and the answer that counts as absent depends on the QUESTION. A blob
+    // read (`show sha:path`) is absent only when git names the PATH as not in
+    // that tree — `bad object` there can mean corruption, and skipping the
+    // blob would treat an unreadable change as deleted. The quiet queries
+    // (rev-parse --verify --quiet, merge-base) answer absence as a bare
+    // non-zero exit with nothing on stderr. A crash, a signal or an overflowed
+    // buffer never matches either shape (res.error/res.signal), and everything
+    // else fails loud, required or not.
+    const blobRead = args[0] === 'show'
     const absent =
       !res.error &&
       res.status !== null &&
-      (/does not exist|exists on disk, but not in|bad object|invalid object name|bad revision|unknown revision/i.test(
-        errText,
-      ) ||
-        // --quiet reads (rev-parse --verify --quiet, merge-base) say "absent"
-        // as a bare non-zero exit with NOTHING on stderr. A crash, a signal or
-        // an overflowed buffer never answers that way (res.error/res.signal).
-        errText.trim() === '')
+      (blobRead
+        ? /does not exist|exists on disk, but not in/i.test(errText)
+        : /does not exist|exists on disk, but not in|bad revision|unknown revision/i.test(errText) ||
+          errText.trim() === '')
     if (!required && absent) return null
     throw new Error(`git ${args.join(' ')} failed: ${(errText || res.error?.message || '').trim()}`)
   }
@@ -734,6 +737,13 @@ if (isMainModule(import.meta.url)) {
           error: `--pass ${passFlag} names a pass of a split this range does not need — it fits in one round.`,
         }
       }
+      if (plan.passes.length < 2) {
+        return {
+          error:
+            `--pass ${passFlag}: this range packs into one coverable pass beside files beyond ` +
+            'reach, and a split of one cannot be recorded — narrow the range or split the change.',
+        }
+      }
       const pass = passByIndex(plan, passFlag)
       if (!pass) return { error: `--pass ${passFlag}: this range splits into ${plan.passes.length} pass(es).` }
       return { pass }
@@ -869,6 +879,16 @@ if (isMainModule(import.meta.url)) {
           'review-sol: REFUSING to spend a round on a range that cannot fit one — run the passes above.',
         )
         process.exit(4)
+      }
+      // A split of one cannot be recorded (round-3 pass 4): the recorder
+      // refuses totals below 2, so spending a round on `--pass 1` of such a
+      // plan buys a verdict nothing can carry.
+      if (plan.passes.length < 2) {
+        console.error(
+          `review-sol: --pass ${passFlag}: this range packs into one coverable pass beside files ` +
+            'beyond reach, and a split of one cannot be recorded — narrow the range or split the change.',
+        )
+        process.exit(2)
       }
       pass = passByIndex(plan, passFlag)
       if (!pass) {

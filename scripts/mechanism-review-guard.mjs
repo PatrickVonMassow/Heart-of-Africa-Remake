@@ -39,7 +39,7 @@ import {
   modelFromTrailers,
   modelsFromTrailers,
 } from './mechanism-review-core.mjs'
-import { unquoteGitPath } from './review-material-core.mjs'
+import { quotePassFile, unquoteGitPath } from './review-material-core.mjs'
 import { guardOutcome } from './mechanism-review-guard-gap-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
@@ -366,9 +366,12 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
     // against them alone could read complete while ordinary files of the
     // reviewed range were in no pass — a whole-range clearance over files
     // nobody read. `-z` hands the paths over raw, exactly as gatherRange and
-    // the pass records spell them.
-    rangeFiles: (sha) =>
-      gitRaw(rangeFilesCommand(effective, sha)).split('\0').filter(Boolean),
+    // the pass records spell them. FROM THE SAME MERGE-BASE as the pending
+    // commits (round-3 pass 3): diffing from the raw stored baseline describes
+    // a DIFFERENT file set on a branch whose baseline is no ancestor —
+    // main-only changes leak in, identical branch changes vanish — so the
+    // completeness demand and the detection would talk about different ranges.
+    rangeFiles: (sha) => gitRaw(rangeFilesCommand(base, sha)).split('\0').filter(Boolean),
   })
 
   return {
@@ -430,7 +433,10 @@ export function attachCoverage({ pendingCommits = [], allRecords = [], head, rev
         const files = rangeFiles(r.sha)
         if (Array.isArray(files)) r.rangeFiles = files.map((f) => String(f))
       } catch {
-        /* unanswered — the evaluator falls back to the commit's own paths */
+        /* unanswered — rangeFiles stays absent, and the evaluator treats an
+           unmeasured range as UNKNOWN coverage, which BLOCKS (round-3 pass 3:
+           the old fallback narrowed the demand to the commit's own paths
+           exactly when nothing could say what the range really changed) */
       }
     }
   }
@@ -491,7 +497,10 @@ if (isMainModule(import.meta.url)) {
       console.log(`mechanism commits since the baseline: ${pending.length}`)
       for (const c of pending) {
         console.log(
-          `  ${c.sha.slice(0, 7)}  ${c.files.join(', ')}\n      authored by ${c.authorModel || 'unknown'}, ` +
+          // Quoted like every structural path list (round-3 pass 3): the log
+          // parser unquotes git's spelling, so a legal newline or comma in a
+          // name could forge a --status line if joined raw.
+          `  ${c.sha.slice(0, 7)}  ${c.files.map((f) => quotePassFile(f)).join(', ')}\n      authored by ${c.authorModel || 'unknown'}, ` +
             `${c.coveringRecordShas.length} covering review(s)`,
         )
       }

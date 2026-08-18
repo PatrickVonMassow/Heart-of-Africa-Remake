@@ -718,8 +718,24 @@ const BLIND_SUBJECT = new RegExp(
  * all — shielded, it walked the subject-only admission past the net. The verb
  * followed by nothing/none/"no <thing>"/neither is therefore not an affirmation.
  */
-const AFFIRMED_READING =
-  /^\W*(?:checked|reviewed|read|inspected|examined|verified|compared|traced|audited|analysed|analyzed|assessed|judged|covered)\b(?!\s*[:,;–—-]*\s*(?:nothing\b|none\b|neither\b|no\s|zero\b|not\s+(?:a|one)\b|0\b))/im
+// The verb and its OBJECT CLAUSE (up to the first `;`, `.` or line end) are
+// read together: the zero-object test must survive qualifiers between them
+// (round-3 pass 1 — "Checked exactly 0 files" walked the lookahead).
+const AFFIRMED_READING_LINE =
+  /^\W*(?:checked|reviewed|read|inspected|examined|verified|compared|traced|audited|analysed|analyzed|assessed|judged|covered)\b([^.;\n]*)/gim
+// A vacuous object: optional quantity qualifiers, then a zero word. Scoped to
+// the clause START so a genuine finding later in the sentence ("…and found no
+// drift") cannot un-affirm a real reading.
+const VACUOUS_OBJECT =
+  /^[\s:,;–—-]*(?:(?:exactly|only|just|precisely|merely|altogether|literally|in\s+total|a\s+total\s+of)\s+)*(?:nothing\b|none\b|neither\b|zero\b|0\b|not\s+(?:a\s+single|one|a)\b|no\s)/i
+const AFFIRMED_READING = {
+  test(t) {
+    for (const m of String(t ?? '').matchAll(AFFIRMED_READING_LINE)) {
+      if (!VACUOUS_OBJECT.test(m[1] ?? '')) return true
+    }
+    return false
+  },
+}
 
 /** The union, kept for callers that want the raw net rather than the judgment. */
 export const BLIND_REVIEWER = new RegExp(`${BLIND_FIRST_PERSON.source}|${BLIND_SUBJECT.source}`, 'i')
@@ -1016,6 +1032,12 @@ export function evaluateMechanismReview({
       (r) =>
         VERDICTS.includes(String(r.verdict)) &&
         String(r.model ?? '').trim() &&
+        // A NON-FINITE TIMESTAMP DEFEATS THE ORDERING (round-3 pass 1): every
+        // "latest verdict" reduction compares Number(at), and NaN loses every
+        // comparison — a malformed early merge row would stay "latest" past a
+        // later, finite-dated do-not-merge. The recorder always writes a
+        // finite `at`, so a row without one can only have arrived by hand.
+        Number.isFinite(Number(r?.at)) &&
         evidenceUsable(r) &&
         modeUsable(r),
     )
