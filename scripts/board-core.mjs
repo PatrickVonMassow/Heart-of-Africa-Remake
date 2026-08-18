@@ -570,13 +570,94 @@ export function toDone(html, point, { text, end = berlinStamp() } = {}) {
   if (!body) throw new Error('board: refusing to archive a card with an empty body')
   const start = (metaOf(card).match(/^\s*(\d{1,2}:\d{2})/) ?? [])[1] ?? end
   const title = stripPointPrefix(titleOf(card), point)
-  const entry =
+  const out = html.replace(card, '')
+  // ONE POINT, ONE ERLEDIGT CARD (user 18.08.2026, measured on point 700, which
+  // stood there FOUR times). A point comes back into current work whenever a
+  // session boundary or a follow-up reopens it, and every archiving appended
+  // another card, so the section read as four finished points. The EARLIEST
+  // start is kept — that is when the work began — the newest end and the newest
+  // closing text replace the old ones.
+  // The OLDEST card's start is the true one, and it is found by ORDER, not by
+  // comparing clock faces: the archive is newest-first and the stamps carry no
+  // date, so `21:17` from last night is EARLIER than `00:45` this morning while
+  // arithmetic says the opposite (measured on point 700's four cards).
+  const existing = doneCards(out, point)
+  const earliest = existing.length ? doneStart(existing[existing.length - 1]) || start : start
+  const entry = renderDoneEntry({ point, title, start: earliest, end, body })
+  const cleaned = existing.reduce((acc, card) => acc.replace(card, ''), out)
+  const { from } = sectionBounds(cleaned, 'done')
+  return `${cleaned.slice(0, from)}\n${entry}${cleaned.slice(from).replace(/^\n/, '')}`
+}
+
+/** One Erledigt entry, the single writer of that markup. */
+function renderDoneEntry({ point, title, start, end, body }) {
+  return (
     `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
     `<span class="right"><span class="meta">${start} · ${end}</span></span></summary>\n` +
     `  <div class="body">\n${renderCardBody(body)}\n  </div>\n</details>\n`
-  const out = html.replace(card, '')
-  const { from } = sectionBounds(out, 'done')
-  return `${out.slice(0, from)}\n${entry}${out.slice(from).replace(/^\n/, '')}`
+  )
+}
+
+/** The Erledigt section's text, or '' when the board has no such section. */
+function doneSectionText(html) {
+  try {
+    const { from, end } = sectionBounds(String(html ?? ''), 'done')
+    return String(html).slice(from, end)
+  } catch {
+    return ''
+  }
+}
+
+/** Every Erledigt card for `point`, newest first — normally none or one. */
+export function doneCards(html, point) {
+  const section = doneSectionText(html)
+  const re = new RegExp(
+    `<details>\\s*<summary><span class="num">\\s*${point}\\s*</span>[\\s\\S]*?</details>\\n?`,
+    'g',
+  )
+  return section.match(re) ?? []
+}
+
+/** The FIRST Erledigt card for `point`, or null. */
+export function doneCard(html, point) {
+  return doneCards(html, point)[0] ?? null
+}
+
+/** The start stamp an Erledigt card carries (`hh:mm · hh:mm`), or ''. */
+export function doneStart(card) {
+  return (String(card ?? '').match(/class="meta">\s*(\d{1,2}:\d{2})/) ?? [])[1] ?? ''
+}
+
+/**
+ * Fold every duplicate Erledigt card into one, for a board that already carries
+ * them (point 700 stood there four times before `toDone` learned to merge).
+ *
+ * The NEWEST card wins the text and the end stamp, the earliest start survives,
+ * and the merged card stays where the newest one stood — the archive is ordered
+ * by when a point finished, and the newest finish is the true one.
+ */
+export function mergeDoneDuplicates(html) {
+  const section = doneSectionText(html)
+  if (!section) return { html: String(html ?? ''), merged: [] }
+  const points = [...section.matchAll(/<details>\s*<summary><span class="num">\s*(\d+)\s*<\/span>/g)].map(
+    (m) => m[1],
+  )
+  const duplicated = [...new Set(points.filter((p, i) => points.indexOf(p) !== i))]
+  let out = String(html ?? '')
+  for (const point of duplicated) {
+    const cards = doneCards(out, point)
+    if (cards.length < 2) continue
+    const [newest] = cards
+    const older = cards.slice(1)
+    const start = doneStart(cards[cards.length - 1]) || doneStart(newest)
+    const merged = newest.replace(
+      /(class="meta">\s*)(\d{1,2}:\d{2})/,
+      (_, lead) => `${lead}${start}`,
+    )
+    out = out.replace(newest, merged)
+    for (const card of older) out = out.replace(card, '')
+  }
+  return { html: out, merged: duplicated }
 }
 
 // ═══ Point 416 — closing a point must not leave the board blank ═══

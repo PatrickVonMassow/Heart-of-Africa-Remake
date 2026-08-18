@@ -275,6 +275,32 @@ const ALLOW = { block: false, reason: '' }
  *   touchedFiles             working-tree changed/untracked paths
  *   snapshots                integritySnapshots from dashboard-state.json
  */
+/**
+ * Point numbers standing in the Erledigt section more than once.
+ *
+ * WHY IT IS A CHECK AND NOT ONLY A FIX: `board.mjs done` folds duplicates now,
+ * but the board is a FILE, and a hand-edit or a merge of two published versions
+ * can reintroduce them — point 700 stood there four times before anyone looked
+ * (user 18.08.2026). Reading only the Erledigt section matters: the same point
+ * legitimately has a queue card and a now-card beside its archive entry.
+ */
+export function duplicateDonePoints(dashboardHtml) {
+  const html = String(dashboardHtml ?? '')
+  const at = html.indexOf('<summary><h2>Erledigt</h2></summary>')
+  if (at < 0) return []
+  const section = html.slice(at)
+  const points = [...section.matchAll(/<details>\s*<summary><span class="num">\s*(\d+)\s*<\/span>/g)].map(
+    (m) => m[1],
+  )
+  const seen = new Set()
+  const twice = new Set()
+  for (const p of points) {
+    if (seen.has(p)) twice.add(p)
+    seen.add(p)
+  }
+  return [...twice]
+}
+
 export function evaluate(input) {
   try {
     const { dashboardHtml, tasksMd, focusPoint = null, commitSubjects = [], touchedFiles = [], snapshots = null } =
@@ -306,6 +332,17 @@ export function evaluate(input) {
       problems.push(
         `UNKNOWN QUEUE CARD(S): point(s) ${unknown.join(', ')} have a Warteschlange card but NO TASKS.md ` +
           'point. Fix the card number or remove the card, republish, re-run --synced.',
+      )
+    }
+
+    // (D) one point, one Erledigt card (user 18.08.2026)
+    const twice = duplicateDonePoints(dashboardHtml)
+    if (twice.length) {
+      problems.push(
+        `POINT(S) ${twice.join(', ')} STAND IN ERLEDIGT MORE THAN ONCE: a point that comes back into ` +
+          'current work is archived again, and each archiving used to append another card, so the ' +
+          'section counts one finished point several times. Fold them: ' +
+          `node scripts/board.mjs merge-done, then ${REPUBLISH}.`,
       )
     }
 

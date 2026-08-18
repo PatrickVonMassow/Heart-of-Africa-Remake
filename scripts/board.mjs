@@ -66,6 +66,7 @@ import {
   toNow,
   toQueue,
   upgradeNowCards,
+  mergeDoneDuplicates,
 } from './board-core.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
@@ -308,6 +309,20 @@ try {
     edit(
       (html) => promoteToNow(html, point, { title, times, status: textOf(words) }),
       `${point} promoted to current work`,
+    )
+  } else if (cmd === 'merge-done') {
+    // One point, one Erledigt card. `done` folds them at write time; this is for
+    // a board that already carries duplicates (point 700 stood there four times).
+    const folded = []
+    edit((html) => {
+      const r = mergeDoneDuplicates(html)
+      folded.push(...r.merged)
+      return r.html
+    }, 'Erledigt duplicates folded')
+    console.log(
+      folded.length
+        ? `board: folded duplicate Erledigt cards for point(s) ${folded.join(', ')}`
+        : 'board: no duplicate Erledigt cards',
     )
   } else if (cmd === 'focus') {
     const [point, ...words] = rest
