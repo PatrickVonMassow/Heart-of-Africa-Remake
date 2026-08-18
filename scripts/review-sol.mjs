@@ -190,7 +190,12 @@ function gatherRange(sha, base) {
   const files = []
   for (const path of [...new Set(paths)]) {
     if (added.has(path)) continue
-    const text = git(['show', `${sha}:${path}`], { required: false })
+    // RAW, like the patch and the paths (fourth cross-vendor round, pass 4):
+    // the default read trims, which strips a body's leading/trailing
+    // whitespace and its final newline — and the assembly then recorded that
+    // ALTERED string as complete, so byte-inexact delivery passed the
+    // accounting. What the commit holds is what travels.
+    const text = git(['show', `${sha}:${path}`], { required: false, raw: true })
     // Null = the commit does not carry that path (it was deleted); the patch
     // above still shows what happened to it.
     if (text !== null) files.push({ path, text })

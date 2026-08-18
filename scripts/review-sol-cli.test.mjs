@@ -413,6 +413,25 @@ describe('a review that runs', () => {
   })
 })
 
+describe('the file bodies travel byte-exact', () => {
+  it('keeps a body’s leading and trailing blank lines, which a trim would eat', () => {
+    // Fourth cross-vendor round, pass 4: gatherRange read bodies through the
+    // trimming git() default, so every file lost its edge whitespace and final
+    // newline — and the assembly recorded the ALTERED string as complete, so
+    // byte-inexact delivery passed the accounting. Asserted on what the child
+    // process actually received, not on any log line.
+    provenId()
+    git('checkout', '-q', '-b', 'padded-work', 'main')
+    // A MODIFIED file, so its body travels as current content — an added one
+    // rides inside the patch and would not exercise the body read.
+    const sha = commit('world.txt', '\n\n  body with edges  \n\n', 'Pad a file with blank edges', 'Opus 5')
+    const r = run(['--sha', sha, '--brief', 'judge the padding'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain('=== FILE (current content): world.txt ===\n\n\n  body with edges  \n\n')
+  })
+})
+
 describe('a review that does not run', () => {
   it('names the cause, hands the review on, and exits 3 — never 0', () => {
     provenId()
