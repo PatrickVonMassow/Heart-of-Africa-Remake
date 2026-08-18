@@ -99,14 +99,53 @@ export function isEnforcerWired(settingsText, name, { event = null, tools = [] }
   for (const ev of events) {
     for (const entry of Array.isArray(hooks[ev]) ? hooks[ev] : []) {
       const names = (Array.isArray(entry?.hooks) ? entry.hooks : []).some((h) =>
-        scriptRefsInCommand(h?.command).some((ref) => ref.split(/[/\\]/).pop() === wanted),
+        executedScriptRefs(h?.command).some((ref) => ref.split(/[/\\]/).pop() === wanted),
       )
       if (!names) continue
-      const matcher = String(entry?.matcher ?? '')
-      if (needed.every((t) => matcher.includes(t))) return true
+      if (needed.every((t) => matcherCoversTool(entry?.matcher, t))) return true
     }
   }
   return false
+}
+
+/**
+ * The script each shell segment EXECUTES — never one that is merely an ARGUMENT
+ * (fourth review, finding 14: `node scripts/other-guard.mjs --config
+ * scripts/commission-guard.mjs` reported the commission guard ARMED, the exact
+ * failure the structural parse was installed to end). The rule: a command is
+ * read segment by segment (`&&`, `||`, `;`, `|`, `&`, newline), and the FIRST
+ * script path in a segment is the one being run — everything after it is that
+ * script's arguments. A preloaded module (`node -r scripts/x.mjs scripts/y.mjs`)
+ * misreads toward a FALSE DORMANT, which is the visible direction this module
+ * prefers to the invisible false ARMED.
+ */
+export function executedScriptRefs(command) {
+  const out = []
+  for (const seg of String(command ?? '').split(/\n|&&|\|\||[;|&]/)) {
+    const first = seg.match(SCRIPT_REF_RE)
+    if (first && first[0]) out.push(first[0])
+  }
+  return out
+}
+
+/**
+ * DOES THIS MATCHER COVER THIS TOOL? The harness treats a PreToolUse matcher as
+ * a full-string pattern per tool name, so it is judged HERE the same way — a
+ * bare substring test read `SubAgent|TaskOutput|BashTool|PowerShellX` as
+ * covering Agent/Task/Bash/PowerShell while it matches none of them (fourth
+ * review, finding 15). `''` and `'*'` match every tool, as the harness does; a
+ * matcher that is not a valid pattern falls back to exact `|`-alternatives,
+ * because a broken matcher must not read as broad coverage.
+ */
+export function matcherCoversTool(matcher, tool) {
+  const m = String(matcher ?? '').trim()
+  if (m === '' || m === '*') return true
+  const t = String(tool ?? '')
+  try {
+    return new RegExp(`^(?:${m})$`).test(t)
+  } catch {
+    return m.split('|').some((alt) => alt.trim() === t)
+  }
 }
 
 /**
