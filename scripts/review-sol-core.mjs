@@ -322,6 +322,38 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review', pass 
  *  belongs to the `LABEL: value` / `id | file | text` format the prompts
  *  demand; the bytes INSIDE a field travel exactly. A whole-message quote
  *  (ask-sol's explain) is not a labelled field and trims NOTHING. */
+/** The SHAPE-AWARE decoration strip every ruling reads (final-round pass 1,
+ *  third instance): deleting `[*_#>` + backtick] characters outright let a
+ *  FABRICATED label match — `D_ONE:` became `DONE:` — so label recognition
+ *  must unwrap decoration without merging word fragments. Headings and quote
+ *  markers at line starts, backtick runs, and emphasis runs at word edges as
+ *  MATCHED PAIRS (iterated for nesting); a marker inside a word is content.
+ *  Preserves the line count, so stripped and raw lines pair by index. */
+export function stripDecoration(text) {
+  let clean = String(text ?? '')
+    .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
+    .replace(/^[ \t]*>+[ \t]?/gm, '')
+    .replace(/`+/g, '')
+  for (let i = 0; i < 4; i++) {
+    const next = clean.replace(
+      /(^|[^\w*_])([*_]+)(?=[^\s*_])([^*_]+?)(?<=[^\s*_])\2(?=[^\w*_]|[*_]|$)/g,
+      '$1$3',
+    )
+    if (next === clean) break
+    clean = next
+  }
+  return clean
+}
+
+/** The NET-ONLY spelling beside raw and stripped (final-round pass 1): every
+ *  marker character deleted outright. Mixed nesting (`**_no_**`) defeats both
+ *  the raw scan (markers break the word boundaries) and the pair strip (the
+ *  runs differ), but no decoration survives deletion. It can FABRICATE an
+ *  admission from mid-word markers — which only ever refuses a round
+ *  (fail-closed), never clears one — so it is used by the admission scan
+ *  ALONE, never for matching or quoting. */
+export const charStripped = (text) => String(text ?? '').replace(/[*`_#>~]/g, '')
+
 export function rawFieldValue(rawLine) {
   const at = String(rawLine ?? '').indexOf(':')
   if (at < 0) return ''
@@ -348,7 +380,7 @@ export function parseVerdict(text, { receipt = '' } = {}) {
   const expected = String(receipt ?? '').trim()
   const pairs = raw
     .split('\n')
-    .map((line) => ({ raw: line, clean: line.replace(/[*`_#>]/g, '').trim() }))
+    .map((line) => ({ raw: line, clean: stripDecoration(line).trim() }))
     .filter((p) => p.clean)
   const tailPairs = pairs.slice(expected ? -3 : -2)
   const tail = tailPairs.map((p) => p.clean)
@@ -395,7 +427,11 @@ export function parseVerdict(text, { receipt = '' } = {}) {
   // raw spelling may shield the words behind decoration the stripped one
   // unwraps, and vice versa.
   const evidenceClean = (/^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1] ?? '')?.[1] ?? '').trim()
-  if (blindReviewerAdmission(evidence) || blindReviewerAdmission(evidenceClean)) {
+  if (
+    blindReviewerAdmission(evidence) ||
+    blindReviewerAdmission(evidenceClean) ||
+    blindReviewerAdmission(charStripped(evidence))
+  ) {
     return { ok: false, verdict: '', evidence: '', error: 'the reviewer says it could not see the change' }
   }
   // A line still in its angle brackets is the PLACEHOLDER echoed back, not an

@@ -177,6 +177,23 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
         // comparison, letting an earlier merge read a later refusal as answered.
         ledgerAtUsable(r?.at),
     )
+    // A MALFORMED REFUSAL POISONS, IT DOES NOT VANISH (final-round pass 1):
+    // silently dropping a reachable refusal whose timestamp fails the domain
+    // let a valid OLDER merge stand alone and clear the point — the exact
+    // suppression the answered-refusal ordering exists to prevent. The
+    // recorder never writes such a row, so it can only have arrived by hand,
+    // and a hand-edited ledger earns a refusal, never a clearance; the way
+    // out is fixing or removing the row, on the record.
+    const malformedRefusals = reachable.filter(
+      (r) =>
+        VERDICTS.includes(String(r.verdict)) &&
+        String(r.verdict) !== CLEARING_VERDICT &&
+        !ledgerAtUsable(r?.at),
+    )
+    if (malformedRefusals.length) {
+      findings.push({ kind: 'malformed-record', tick, records: malformedRefusals })
+      continue
+    }
     // A self-review in the ledger is worse than none: the gate would read green.
     // Refused at the record command too, but re-checked here — the ledger is a
     // file anyone can hand-edit.
@@ -229,6 +246,14 @@ export function formatCriticalityReviewVerdict(verdict) {
     const r = f.records?.[0] ?? {}
     if (f.kind === 'no-review') {
       lines.push(head, '      no review recorded for this point')
+    } else if (f.kind === 'malformed-record') {
+      lines.push(
+        head,
+        `      a recorded ${r.verdict} on ${short(r.sha)} carries a timestamp outside the ledger's ` +
+          'millisecond domain — the recorder never writes that, so the row can only have arrived by',
+        '      hand, and it cannot be ORDERED against the reviews around it. It refuses rather than',
+        '      vanishes: fix or remove the row, on the record.',
+      )
     } else if (f.kind === 'not-in-history') {
       lines.push(
         head,

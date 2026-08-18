@@ -18,7 +18,7 @@
 // Side-effect free: the process spawn, the material gathering and the printing belong to
 // scripts/ask-sol.mjs. Pinned by ask-sol-core.test.mjs.
 
-import { blindReviewerAdmission, MATERIAL_BUDGET_CHARS, rawFieldValue, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
+import { blindReviewerAdmission, charStripped, MATERIAL_BUDGET_CHARS, rawFieldValue, SOL_MODEL_NAME, stripDecoration, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 
 export { MATERIAL_BUDGET_CHARS, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
 
@@ -290,22 +290,7 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
   // unwraps outside-in (`*no **material***`, closing round): each pass may
   // open after — and close before — another marker run, and a bounded loop
   // reaches the fixpoint of any sane nesting depth.
-  let clean = String(text ?? '')
-    .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
-    .replace(/^[ \t]*>+[ \t]?/gm, '')
-    .replace(/`+/g, '')
-  // The boundary is ANY non-word position, as a complement rather than an
-  // enumerated class (closing round: a quote-adjacent pair survived the
-  // whitespace list, and every list invites the next shape). A marker run
-  // inside a word — foo_.mjs, ma*terial — never opens or closes.
-  for (let i = 0; i < 4; i++) {
-    const next = clean.replace(
-      /(^|[^\w*_])([*_]+)(?=[^\s*_])([^*_]+?)(?<=[^\s*_])\2(?=[^\w*_]|[*_]|$)/g,
-      '$1$3',
-    )
-    if (next === clean) break
-    clean = next
-  }
+  const clean = stripDecoration(text)
   if (!clean.trim()) return { ok: false, kind: k, answer: null, summary: '', error: 'the run produced no answer at all' }
   // The two-tier judgment, not the raw net: an audit or diagnose answer about
   // THIS project's tooling describes failure modes in the net's own vocabulary,
@@ -320,7 +305,7 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
   // the raw scan; whatever decoration SHIELDS the raw words is unwrapped for
   // the stripped scan. A strip defect can now only ever widen the net, never
   // shield it.
-  if (blindReviewerAdmission(text) || blindReviewerAdmission(clean)) {
+  if (blindReviewerAdmission(text) || blindReviewerAdmission(clean) || blindReviewerAdmission(charStripped(text))) {
     return { ok: false, kind: k, answer: null, summary: '', error: 'the model says it could not see the material' }
   }
   // THE STRIPPED COPY MATCHES, THE RAW TEXT IS QUOTED (final convergence,

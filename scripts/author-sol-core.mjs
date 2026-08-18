@@ -32,7 +32,7 @@
 
 import { ALLOWED_TRAILERS, classifyTrailer, modelNamesIn } from './model-guard-core.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
-import { rawFieldValue, SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
+import { rawFieldValue, stripDecoration, SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 
 export { SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
 
@@ -333,9 +333,11 @@ export function gatesProblem(gates) {
  *  — and these three fields are read and reported by the caller. The strip
  *  removes no newline, so lines pair one to one. */
 export function parseAuthoringAnswer(text) {
+  // stripDecoration, not character deletion (final-round pass 1): deleting
+  // characters let a fabricated `D_ONE:` label match `DONE:`.
   const pairs = String(text ?? '')
     .split('\n')
-    .map((line) => ({ raw: line, clean: line.replace(/[*`_#>]/g, '').trim() }))
+    .map((line) => ({ raw: line, clean: stripDecoration(line).trim() }))
     .filter((p) => p.clean)
   const tail = pairs.slice(-3)
   // EVERY RULING — presence and placeholder — reads the STRIPPED captures

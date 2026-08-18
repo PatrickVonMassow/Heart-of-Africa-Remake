@@ -1018,6 +1018,19 @@ export function evaluateMechanismReview({
 
   for (const commit of pendingCommits ?? []) {
     const covering = [...new Set(commit?.coveringRecordShas ?? [])].flatMap((s) => bySha.get(String(s)) ?? [])
+    // A MALFORMED REFUSAL POISONS, IT DOES NOT VANISH (final-round pass 1,
+    // applied to both gates): a covering do-not-merge whose timestamp fails
+    // the millisecond domain fell out of wellFormed below, and the remaining
+    // sound rows — an older merge among them — cleared the commit past a
+    // refusal somebody recorded. The recorder never writes such a row; it can
+    // only have arrived by hand, and it refuses until fixed or removed.
+    const malformedRefusals = covering.filter(
+      (r) => String(r?.verdict) === BLOCKING_VERDICT && !ledgerAtUsable(r?.at),
+    )
+    if (malformedRefusals.length) {
+      findings.push({ kind: 'malformed-record', commit, records: malformedRefusals })
+      continue
+    }
     // A record is only a review if it says who reviewed, how it ended AND what
     // was actually checked; a half-written line must not clear the gate. THE
     // GATE REVALIDATES THE ROW ITSELF, by the recorder's own rules (escalation
@@ -1218,6 +1231,18 @@ export function formatMechanismReviewVerdict(verdict) {
         `      ${files}`,
         `      ${String(r.model).trim()} reviewed this and said DO-NOT-MERGE: ${r.evidence ?? ''}`,
         '      Fix what the review found, then record the re-review — the verdict is not advisory.',
+      )
+      continue
+    }
+    if (f.kind === 'malformed-record') {
+      const r = f.records[0] ?? {}
+      lines.push(
+        `  ✗ ${short(c.sha)} ${c.subject ?? ''}`,
+        `      ${files}`,
+        `      a recorded do-not-merge on ${short(r.sha)} carries a timestamp outside the ledger's`,
+        '      millisecond domain — the recorder never writes that, so the row can only have arrived',
+        '      by hand, and it cannot be ORDERED against the reviews around it. It refuses rather',
+        '      than vanishes: fix or remove the row, on the record.',
       )
       continue
     }

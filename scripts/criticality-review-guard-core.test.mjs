@@ -187,6 +187,23 @@ describe('evaluateCriticalityReview', () => {
     }
   })
 
+  it('a malformed-timestamp REFUSAL poisons the point — a valid merge cannot clear past it (final round)', () => {
+    // The suppression path: the bad-at do-not-merge vanished from wellFormed,
+    // the valid merge stood alone, and the high point cleared.
+    const v = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [
+        record({ verdict: 'merge', at: 1_787_000_002_000 }),
+        { ...record({ verdict: 'do-not-merge' }), at: 1 },
+      ],
+    })
+    expect(v.block).toBe(true)
+    expect(v.findings[0].kind).toBe('malformed-record')
+    expect(formatCriticalityReviewVerdict(v)).toContain('cannot be ORDERED')
+  })
+
   it('BLOCKS on a self-review — a green ledger is worse than an empty one', () => {
     const v = evaluateCriticalityReview({
       baseline: 'b',

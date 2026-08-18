@@ -160,29 +160,30 @@ describe('the markdown strip reads shapes, not characters (round-7 pass 1)', () 
     expect(parsed.answer.evidence).toContain('src/foo_bar.mjs')
   })
 
-  it('cannot FABRICATE an admission from a mid-word asterisk', () => {
-    // 'no ma*terial' is not 'no material': deleting the character globally
-    // built the very phrase the net scans for out of text that never said it.
+  it('a mid-word marker CAN admit through the net-only spelling — the deliberate fail-closed cost', () => {
+    // Final round, pass 1: mixed nesting defeated both the raw scan and the
+    // pair strip, so the admission net gained a third spelling with every
+    // marker deleted outright. That spelling fabricates 'no material' out of
+    // 'no ma*terial' — a REFUSED round (work handed on), never a cleared one,
+    // which is the direction the net may err in.
     const parsed = parseAnswer({
       kind: 'explain',
       text: 'The token no ma*terial appears verbatim in the fixture and is asserted by the failing case there.',
     })
-    expect(parsed.ok).toBe(true)
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error).toContain('could not see the material')
   })
 
-  it('keeps an UNMATCHED word-edge marker — a lone underscore or asterisk is content (round 8)', () => {
-    // `src/foo_.mjs` names a file; `no _material` never said 'no material'.
+  it('keeps an UNMATCHED word-edge marker in QUOTED output — a lone marker is content (round 8)', () => {
+    // `src/foo_.mjs` names a file: quoting and matching never mangle it. (The
+    // ADMISSION net's net-only spelling is the one deliberate exception — see
+    // the fail-closed case above.)
     const parsed = parseAnswer({
       kind: 'diagnose',
       text: 'reasoning\n\nCAUSE: the underscore is load-bearing\nEVIDENCE: src/foo_.mjs:3 exports the checked symbol',
     })
     expect(parsed.ok).toBe(true)
     expect(parsed.answer.evidence).toContain('src/foo_.mjs')
-    const lone = parseAnswer({
-      kind: 'explain',
-      text: 'The corpus phrase no _material appears verbatim in that fixture and stays asserted by its failing case.',
-    })
-    expect(lone.ok).toBe(true)
   })
 
   it('still UNSHIELDS an emphasised admission at word edges', () => {
@@ -215,6 +216,10 @@ describe('the markdown strip reads shapes, not characters (round-7 pass 1)', () 
       'I read *no **material*** from this range because none arrived with the request at all.',
       // quote-adjacent emphasis (round 9 — the shape the enumerated boundary missed)
       'It ended early: "**no** material was supplied" is the whole story of this run, regrettably.',
+      // MIXED nesting (final round, pass 1): opening **_ never equals closing _**,
+      // so the pair strip keeps it and the raw word boundary is broken — only
+      // the net-only spelling sees it.
+      'I checked **_no_** material from this range because none arrived with the request, sadly.',
     ]) {
       const parsed = parseAnswer({ kind: 'explain', text })
       expect(parsed.ok, text).toBe(false)

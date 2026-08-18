@@ -1575,6 +1575,32 @@ describe('the mode is required to WRITE a record, never to READ one', () => {
     }
   })
 
+  it('a malformed-timestamp REFUSAL poisons the commit — a valid merge cannot clear past it (final round)', () => {
+    // The suppression path: the bad-at do-not-merge fell out of wellFormed and
+    // the valid (even older) merge stood alone.
+    const base = {
+      sha: 'c'.repeat(40),
+      model: 'GPT-5.6 Sol',
+      authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+      evidence: 'checked the guard change against its spec end to end',
+      mode: 'review',
+    }
+    for (const at of [1, 'unknown', null]) {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+        records: [
+          { ...base, verdict: 'merge', at: MERGE_ACCOUNTING_SINCE + 5000 },
+          { ...base, verdict: 'do-not-merge', at },
+        ],
+      })
+      expect(v.block, `at=${String(at)}`).toBe(true)
+      expect(v.findings[0].kind).toBe('malformed-record')
+      expect(formatMechanismReviewVerdict(v)).toContain('cannot be ORDERED')
+    }
+  })
+
   it('a non-finite timestamp cannot out-stand a later do-not-merge (round-3 pass 1)', () => {
     // Every "latest verdict" reduction compares Number(at), and NaN loses
     // every comparison — a hand-made merge row with at:"unknown" stayed
