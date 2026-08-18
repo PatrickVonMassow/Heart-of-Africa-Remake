@@ -51,6 +51,18 @@ import {
   markTransferred,
   transferBlockMessage,
   POOL_CAP,
+  COMMISSION_RECORD_PATH,
+  pointOfBranch,
+  describeBranchAge,
+  parseCommissionRecord,
+  commissionOverrideFor,
+  recordCommissionOverride,
+  recordParkedBranch,
+  clearParkedBranch,
+  commissionRecordReport,
+  openBranchSlots,
+  branchSlotDecision,
+  branchSlotRefusal,
 } from './batch-in-flight-core.mjs'
 import {
   assessOwner,
@@ -2529,5 +2541,249 @@ describe('transferredMutationRefusal — the adoption record is not this side’
       }),
     ).toBeNull()
     expect(transferredMutationRefusal({ declaration: null, marker: sealed, now: NOW })).toBeNull()
+  })
+})
+
+// ---- A SLOT IS NOT FREE UNTIL ITS BRANCH IS GONE (point 712) ---------------
+
+/** The evening the nine branches were counted. */
+const AUG17 = Date.parse('2026-08-17T19:41:00.000Z')
+const days = (n) => n * 86400000
+const hours = (n) => n * 3600000
+
+/** The nine open branches of 17.08.2026, exactly as they were measured. */
+const NINE_BRANCHES = [
+  { ref: 'feat/336-croc-staging', tipAt: AUG17 - days(13), behind: 1679 },
+  { ref: 'feat/686-five-word-lexicon', tipAt: AUG17 - days(4), behind: 81 },
+  { ref: 'feat/687-bank-game', tipAt: AUG17 - days(3), behind: 81 },
+  { ref: 'feat/687-roam-bound-fixes', tipAt: AUG17 - hours(9), behind: 12 },
+  { ref: 'feat/581-settlement-boundary-contrast', tipAt: AUG17 - hours(10), behind: 14 },
+  { ref: 'feat/595-598-verification-ladder-brief', tipAt: AUG17 - hours(8), behind: 9 },
+  { ref: 'feat/703-board-write-report', tipAt: AUG17 - hours(4), behind: 5 },
+  { ref: 'feat/700-context-fence', tipAt: AUG17 - hours(2), behind: 2 },
+  { ref: 'feat/711-queue-rank', tipAt: AUG17 - hours(1), behind: 1 },
+]
+
+describe('pointOfBranch / describeBranchAge — reading a branch name and an age', () => {
+  it('reads the point out of a feat branch in every spelling git prints', () => {
+    expect(pointOfBranch('feat/336-croc-staging')).toBe(336)
+    expect(pointOfBranch('origin/feat/336-croc-staging')).toBe(336)
+    expect(pointOfBranch('refs/heads/feat/712-queue-binds-picker')).toBe(712)
+    expect(pointOfBranch('refs/remotes/origin/feat/595-598-verification-ladder-brief')).toBe(595)
+  })
+
+  it('answers null for anything that is not a numbered feat branch', () => {
+    expect(pointOfBranch('main')).toBeNull()
+    expect(pointOfBranch('worktree-agent-a1')).toBeNull()
+    expect(pointOfBranch('feat/no-number')).toBeNull()
+    expect(pointOfBranch('feat/0-zero')).toBeNull()
+    expect(pointOfBranch('')).toBeNull()
+    expect(pointOfBranch()).toBeNull()
+  })
+
+  it('says days past a day, hours past an hour, and admits when it cannot say', () => {
+    expect(describeBranchAge(days(13))).toBe('13 d')
+    expect(describeBranchAge(hours(9))).toBe('9 h')
+    expect(describeBranchAge(45 * 60000)).toBe('45 min')
+    expect(describeBranchAge(NaN)).toBe('age unknown')
+    expect(describeBranchAge(null)).toBe('age unknown')
+    expect(describeBranchAge(-5)).toBe('age unknown')
+  })
+})
+
+describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agents', () => {
+  it('REFUSES a further point while the nine of 17.08.2026 stand open', () => {
+    const d = branchSlotDecision({ branches: NINE_BRANCHES, point: 697, now: AUG17 })
+    expect(d.allowed).toBe(false)
+    expect(d.why).toBe('branches-open')
+    expect(d.count).toBe(9)
+    expect(d.slotsFree).toBe(0)
+  })
+
+  it('lists them OLDEST FIRST with age and behind-count, and names LAND and PARK', () => {
+    const text = branchSlotRefusal(branchSlotDecision({ branches: NINE_BRANCHES, point: 697, now: AUG17 }))
+    expect(text).toContain('feat/336-croc-staging — 13 d, 1679 commits behind main')
+    expect(text.indexOf('feat/336-croc-staging')).toBeLessThan(text.indexOf('feat/686-five-word-lexicon'))
+    expect(text.indexOf('feat/686-five-word-lexicon')).toBeLessThan(text.indexOf('feat/711-queue-rank'))
+    expect(text).toContain('land-point.mjs')
+    expect(text).toContain('--park')
+    expect(text).toContain('697')
+  })
+
+  it('ALLOWS while only two branches stand open', () => {
+    const two = NINE_BRANCHES.slice(0, 2)
+    expect(branchSlotDecision({ branches: two, point: 697, now: AUG17 })).toMatchObject({
+      allowed: true,
+      why: 'slots-free',
+      count: 2,
+      slotsFree: 1,
+    })
+  })
+
+  it('refuses at exactly the cap — three open branches are three occupied slots', () => {
+    expect(branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), point: 697, now: AUG17 }).allowed).toBe(false)
+  })
+
+  it('does not count a PARKED branch', () => {
+    const parked = { 'feat/336-croc-staging': { reason: '1679 behind, superseded', at: '2026-08-17T18:00:00.000Z' } }
+    const d = branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), parked, point: 697, now: AUG17 })
+    expect(d).toMatchObject({ allowed: true, why: 'slots-free', count: 2 })
+    expect(d.parkedOut.map((b) => b.ref)).toEqual(['feat/336-croc-staging'])
+    expect(d.parkedOut[0].reason).toBe('1679 behind, superseded')
+  })
+
+  it('takes a parked branch BACK into the count once it receives a commit', () => {
+    const parked = { 'feat/336-croc-staging': { reason: 'superseded', at: '2026-08-17T18:00:00.000Z' } }
+    // Its tip (13 days before 17.08.) is OLDER than the park → still parked.
+    expect(branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), parked, point: 697, now: AUG17 }).count).toBe(2)
+    // A commit after the park makes it live work again.
+    const moved = [{ ...NINE_BRANCHES[0], tipAt: Date.parse('2026-08-17T18:30:00.000Z') }, ...NINE_BRANCHES.slice(1, 3)]
+    expect(branchSlotDecision({ branches: moved, parked, point: 697, now: AUG17 }).count).toBe(3)
+  })
+
+  it('keeps a parked branch parked when its tip date cannot be read', () => {
+    const parked = { 'feat/336-croc-staging': { reason: 'superseded', at: '2026-08-17T18:00:00.000Z' } }
+    const blind = [{ ref: 'feat/336-croc-staging', tipAt: null, behind: null }, ...NINE_BRANCHES.slice(1, 3)]
+    expect(branchSlotDecision({ branches: blind, parked, point: 697, now: AUG17 }).count).toBe(2)
+  })
+
+  it('matches a park written in any git spelling of the same branch', () => {
+    const parked = { 'origin/feat/336-croc-staging': { reason: 'superseded', at: '2026-08-17T18:00:00.000Z' } }
+    expect(branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), parked, point: 697, now: AUG17 }).count).toBe(2)
+  })
+
+  it('counts one branch once across its local and remote spellings', () => {
+    const doubled = NINE_BRANCHES.slice(0, 3).flatMap((b) => [b, { ...b, ref: `origin/${b.ref}` }])
+    expect(branchSlotDecision({ branches: doubled, point: 697, now: AUG17 }).count).toBe(3)
+  })
+
+  it('counts TWO branches for one point as two — both were real work standing open', () => {
+    const both = [NINE_BRANCHES[2], NINE_BRANCHES[3]]
+    expect(branchSlotDecision({ branches: both, point: 697, now: AUG17 }).count).toBe(2)
+  })
+
+  it('does not count the branch of the point being commissioned — that is finishing, not opening', () => {
+    const three = NINE_BRANCHES.slice(0, 3)
+    expect(branchSlotDecision({ branches: three, point: 336, now: AUG17 })).toMatchObject({
+      allowed: true,
+      count: 2,
+    })
+  })
+
+  it('FAILS OPEN when git could not be questioned', () => {
+    expect(branchSlotDecision({ branches: NINE_BRANCHES, point: 697, readable: false, now: AUG17 })).toMatchObject({
+      allowed: true,
+      why: 'branches-unreadable',
+    })
+  })
+
+  it('never throws on hostile input, and refuses nothing it cannot see', () => {
+    expect(() => branchSlotDecision()).not.toThrow()
+    expect(branchSlotDecision().allowed).toBe(true)
+    expect(branchSlotDecision({ branches: 'nonsense' }).allowed).toBe(true)
+    expect(branchSlotDecision({ branches: [null, {}, { ref: '   ' }] }).count).toBe(0)
+    expect(() => branchSlotRefusal()).not.toThrow()
+    expect(() => openBranchSlots()).not.toThrow()
+  })
+
+  it('caps the listing and says how many it left out', () => {
+    const text = branchSlotRefusal(branchSlotDecision({ branches: NINE_BRANCHES, now: AUG17 }), { limit: 3 })
+    expect(text).toContain('…and 6 more')
+  })
+})
+
+describe('the commission record — an override is visible AFTERWARDS, not only when taken', () => {
+  it('stores an override with the point and reports the reason back', () => {
+    const rec = recordCommissionOverride(parseCommissionRecord(''), 697, 'red on main masks other suites', {
+      at: '2026-08-17T19:41:00.000Z',
+    })
+    expect(commissionOverrideFor(rec, 697)).toBe('red on main masks other suites')
+    expect(commissionOverrideFor(rec, 700)).toBe('')
+    const text = commissionRecordReport(rec)
+    expect(text).toContain('point 697')
+    expect(text).toContain('red on main masks other suites')
+    expect(text).toContain('2026-08-17T19:41:00.000Z')
+  })
+
+  it('refuses to store an EMPTY reason — that is the silence the mechanism forbids', () => {
+    const empty = parseCommissionRecord('')
+    expect(commissionOverrideFor(recordCommissionOverride(empty, 697, '   '), 697)).toBe('')
+    expect(commissionOverrideFor(recordCommissionOverride(empty, 697, null), 697)).toBe('')
+    expect(recordParkedBranch(empty, 'feat/336-croc-staging', '').parked).toEqual({})
+    expect(recordCommissionOverride(empty, 0, 'why').overrides).toEqual({})
+  })
+
+  it('parks and unparks a branch under one spelling', () => {
+    let rec = recordParkedBranch(parseCommissionRecord(''), 'origin/feat/336-croc-staging', 'superseded by 703', {
+      at: '2026-08-17T19:00:00.000Z',
+    })
+    expect(Object.keys(rec.parked)).toEqual(['feat/336-croc-staging'])
+    expect(commissionRecordReport(rec)).toContain('feat/336-croc-staging — superseded by 703')
+    rec = clearParkedBranch(rec, 'refs/heads/feat/336-croc-staging')
+    expect(rec.parked).toEqual({})
+    expect(commissionRecordReport(rec)).toContain('Parked branches: none.')
+  })
+
+  it('round-trips through JSON, and survives a torn file by saying so', () => {
+    const rec = recordParkedBranch(recordCommissionOverride(parseCommissionRecord(''), 697, 'why', { at: 'x' }), 'feat/1-a', 'parked')
+    expect(parseCommissionRecord(JSON.stringify(rec))).toMatchObject({
+      overrides: { 697: { reason: 'why', at: 'x' } },
+      parked: { 'feat/1-a': { reason: 'parked', at: '' } },
+      torn: false,
+    })
+    for (const bad of ['{', '[]', 'null', '"text"', '{"overrides":5}']) {
+      const parsed = parseCommissionRecord(bad)
+      expect(parsed.overrides).toEqual({})
+      expect(parsed.parked).toEqual({})
+    }
+    expect(parseCommissionRecord('{').torn).toBe(true)
+    expect(commissionRecordReport(parseCommissionRecord('{'))).toContain(COMMISSION_RECORD_PATH)
+    expect(parseCommissionRecord('').torn).toBe(false)
+    expect(parseCommissionRecord(null).torn).toBe(false)
+    // A well-formed file with a hostile entry keeps only what it can trust.
+    expect(parseCommissionRecord('{"overrides":{"x":{"reason":"a"},"7":{"reason":""}},"parked":{"":{"reason":"a"}}}'))
+      .toMatchObject({ overrides: {}, parked: {}, torn: false })
+  })
+
+  it('never throws on hostile input', () => {
+    expect(() => commissionRecordReport()).not.toThrow()
+    expect(() => recordCommissionOverride(null, 1, 'a')).not.toThrow()
+    expect(() => clearParkedBranch(null, 'feat/1-a')).not.toThrow()
+    expect(commissionOverrideFor(null, 1)).toBe('')
+  })
+})
+
+describe('slotReasonDecision — the target half counts the same occupancy as the refusal', () => {
+  const independent = [{ point: 9, files: ['src/a.ts'] }]
+  const running = ['src/b.ts']
+
+  it('reads a full pool of OPEN BRANCHES as at-cap, however few agents run', () => {
+    expect(
+      slotReasonDecision({ agents: 1, openBranches: 9, openPoints: independent, runningFiles: running }),
+    ).toMatchObject({ needsReason: false, why: 'at-cap', slotsFree: 0 })
+  })
+
+  it('still demands a reason where branches and agents both leave room', () => {
+    expect(
+      slotReasonDecision({ agents: 1, openBranches: 1, openPoints: independent, runningFiles: running }),
+    ).toMatchObject({ needsReason: true, why: 'idle-slots' })
+  })
+
+  it('takes the LARGER of the two readings — an agent without a branch still occupies', () => {
+    expect(slotReasonDecision({ agents: 3, openBranches: 0, openPoints: independent, runningFiles: running }).why).toBe(
+      'at-cap',
+    )
+    expect(slotReasonDecision({ agents: 0, openBranches: 3, openPoints: independent, runningFiles: running }).why).toBe(
+      'at-cap',
+    )
+  })
+
+  it('ignores a nonsensical branch count rather than inventing occupancy', () => {
+    expect(
+      slotReasonDecision({ agents: 1, openBranches: NaN, openPoints: independent, runningFiles: running }).slotsFree,
+    ).toBe(POOL_CAP - 1)
+    expect(
+      slotReasonDecision({ agents: 1, openBranches: -4, openPoints: independent, runningFiles: running }).slotsFree,
+    ).toBe(POOL_CAP - 1)
   })
 })

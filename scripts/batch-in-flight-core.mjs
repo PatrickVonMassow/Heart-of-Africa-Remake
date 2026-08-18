@@ -47,7 +47,7 @@
 // costs one command, a wrong allow cost five and a half hours.
 import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
 import { CLOSING_STEPS, missingSteps } from './closing-guard-core.mjs'
-import { parseGateLine } from './user-gate-core.mjs'
+import { parseGateLine, sanitiseReason } from './user-gate-core.mjs'
 import { SECTION_TITLES, sliceSections, parseCards, etaStatus } from './dashboard-guard-core.mjs'
 import { NOW_CARD_CMD, REPUBLISH } from './board-remedy.mjs'
 
@@ -1004,6 +1004,7 @@ export function closingFreezeActive({ marker = false, closingState = null, head 
  */
 export function slotReasonDecision({
   agents = 0,
+  openBranches = 0,
   openPoints = [],
   runningFiles = [],
   reason = '',
@@ -1011,7 +1012,16 @@ export function slotReasonDecision({
   closingFreeze = false,
   cap = POOL_CAP,
 } = {}) {
-  const running = Number.isFinite(agents) && agents > 0 ? Math.floor(agents) : 0
+  // WHAT OCCUPIES A SLOT IS THE OPEN BRANCH (point 712), and the target half has
+  // to count it the same way the refusal does — otherwise the two rules trap the
+  // session between them: nine branches open and one agent running would have
+  // this demand a fourth point while `commission-guard` refuses every one of
+  // them. The larger of the two readings is the honest occupancy, the same rule
+  // `declaredAgentCount` follows: an agent that has not cut its branch yet is
+  // still an agent, and a branch whose agent has finished is still a slot.
+  const declared = Number.isFinite(agents) && agents > 0 ? Math.floor(agents) : 0
+  const branches = Number.isFinite(openBranches) && openBranches > 0 ? Math.floor(openBranches) : 0
+  const running = Math.max(declared, branches)
   const limit = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : POOL_CAP
   const slotsFree = Math.max(0, limit - running)
   const candidates = independentOpenPoints({ points: openPoints, runningFiles })
@@ -1053,6 +1063,247 @@ export function slotsRemedy({ slots = {}, cap = POOL_CAP } = {}) {
     'makes the queue\'s next points unsuitable right now: `node scripts/batch-in-flight.mjs --waiting-on "<what>" ' +
     '<evidence> --slots-free "<why>"` (file overlap with the running branch, a closing freeze, a user pause are ' +
     'all valid reasons). A paused batch, a recorded closing freeze and a full pool need no reason at all.'
+  )
+}
+
+// ---- A SLOT IS NOT FREE UNTIL ITS BRANCH IS GONE (point 712) ---------------
+//
+// The cap above counts CONCURRENT AGENTS, so an agent that finishes returns its
+// slot and leaves its branch standing. Branches then accumulate unbounded: nine
+// stood open on 17.08.2026, the two OLDEST of them the communication mechanic
+// this release exists for — `feat/336-croc-staging` 13 days old and 1679 commits
+// behind `main`, indistinguishable from live work. Built work that never lands
+// delivers nothing and costs more to merge every day it ages.
+//
+// So what OCCUPIES a slot is the open branch, not the running agent, and the
+// only way to give one back is to LAND it or to PARK it on the record.
+
+/** The refusals' recorded state: the overrides taken per point and the branches
+ *  parked out of the count. Git-ignored, like the other `.claude/` state files —
+ *  it describes THIS checkout's batch, not the repository's content. */
+export const COMMISSION_RECORD_PATH = '.claude/commission-record.json'
+
+/** How a branch is taken out of the count — named by the refusal itself. */
+export const BRANCH_PARK_CMD = 'node scripts/commission-guard.mjs --park <branch> --reason "<why>"'
+
+/** …and the other way out, which is the one that should normally be taken. */
+export const BRANCH_LAND_CMD = 'node scripts/land-point.mjs <N> --model <m>'
+
+/** `refs/heads/x`, `heads/x`, `origin/x` and `x` all name one branch — the
+ *  spelling rule the evidence checks already use, exported so the branch-slot
+ *  judgment and its record cannot drift into a second one. */
+export const normaliseBranchRef = normRef
+
+/** The point a `feat/<N>-…` branch belongs to, or null. The branch NAME is the
+ *  only thing tying an open branch to a work-order point, which is exactly why
+ *  the workflow prescribes that name. */
+export function pointOfBranch(ref) {
+  const m = /^feat\/(\d+)(?:[-/]|$)/.exec(normRef(ref))
+  const n = m ? Number(m[1]) : NaN
+  return Number.isInteger(n) && n > 0 ? n : null
+}
+
+/** An age a human reads at a glance: days past a day, hours past an hour. */
+export function describeBranchAge(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return 'age unknown'
+  const min = Math.round(ms / 60000)
+  if (min < 60) return `${min} min`
+  const h = Math.round(ms / 3600000)
+  return h < 24 ? `${h} h` : `${Math.round(ms / 86400000)} d`
+}
+
+/**
+ * The record, from the file's text. PURE, and hostile-tolerant: it is
+ * hand-editable, and a torn one must degrade to "nothing recorded" rather than
+ * throw inside a hook. `torn` is carried so the CLI can SAY so — a silently
+ * empty record would look exactly like a clean one.
+ */
+export function parseCommissionRecord(text) {
+  const empty = { overrides: {}, parked: {}, torn: false }
+  if (text === null || text === undefined || String(text).trim() === '') return empty
+  let parsed
+  try {
+    parsed = JSON.parse(String(text))
+  } catch {
+    return { ...empty, torn: true }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { ...empty, torn: true }
+  const out = { overrides: {}, parked: {}, torn: false }
+  const entry = (v) => ({ reason: sanitiseReason(v?.reason), at: typeof v?.at === 'string' ? v.at : '' })
+  const src = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {})
+  for (const [key, value] of Object.entries(src(parsed.overrides))) {
+    const n = Number(key)
+    const e = entry(value)
+    if (Number.isInteger(n) && n > 0 && e.reason) out.overrides[n] = e
+  }
+  for (const [key, value] of Object.entries(src(parsed.parked))) {
+    const ref = normRef(key)
+    const e = entry(value)
+    if (ref && e.reason) out.parked[ref] = e
+  }
+  return out
+}
+
+/** The override recorded for a point, or '' — the string `commissionDecision`
+ *  takes. The record is the ONE place a reason is kept; the queue core never
+ *  reads a file. */
+export function commissionOverrideFor(record, point) {
+  const n = Number(point)
+  return (Number.isInteger(n) ? record?.overrides?.[n]?.reason : '') || ''
+}
+
+/** Record an override for a point. Returns a NEW record; an empty reason changes
+ *  nothing, because silence is the one thing this mechanism forbids. */
+export function recordCommissionOverride(record, point, reason, { at = '' } = {}) {
+  const base = record && typeof record === 'object' ? record : { overrides: {}, parked: {} }
+  const n = Number(point)
+  const text = sanitiseReason(reason)
+  if (!Number.isInteger(n) || n <= 0 || !text) return base
+  return { ...base, overrides: { ...base.overrides, [n]: { reason: text, at: String(at ?? '') } } }
+}
+
+/** Park a branch out of the slot count, with its reason and the moment it was
+ *  taken — the stamp is what lets a parked branch come BACK when it moves. */
+export function recordParkedBranch(record, ref, reason, { at = '' } = {}) {
+  const base = record && typeof record === 'object' ? record : { overrides: {}, parked: {} }
+  const name = normRef(ref)
+  const text = sanitiseReason(reason)
+  if (!name || !text) return base
+  return { ...base, parked: { ...base.parked, [name]: { reason: text, at: String(at ?? '') } } }
+}
+
+/** Take a branch back into the count deliberately. */
+export function clearParkedBranch(record, ref) {
+  const base = record && typeof record === 'object' ? record : { overrides: {}, parked: {} }
+  const name = normRef(ref)
+  if (!name || !base.parked?.[name]) return base
+  const parked = { ...base.parked }
+  delete parked[name]
+  return { ...base, parked }
+}
+
+/** What the reporting command prints, so an override is visible AFTERWARDS and
+ *  not only in the moment it is taken. PURE — the wording is pinned by a test. */
+export function commissionRecordReport(record) {
+  const lines = []
+  if (record?.torn) lines.push(`${COMMISSION_RECORD_PATH} does not parse — nothing recorded can be read from it.`)
+  const overrides = Object.entries(record?.overrides ?? {}).sort((a, b) => Number(a[0]) - Number(b[0]))
+  const parked = Object.entries(record?.parked ?? {}).sort((a, b) => a[0].localeCompare(b[0]))
+  lines.push(overrides.length ? 'Recorded queue overrides:' : 'Recorded queue overrides: none.')
+  for (const [n, e] of overrides) lines.push(`  · point ${n} — ${e.reason}${e.at ? ` (${e.at})` : ''}`)
+  lines.push(parked.length ? 'Parked branches (out of the slot count):' : 'Parked branches: none.')
+  for (const [ref, e] of parked) lines.push(`  · ${ref} — ${e.reason}${e.at ? ` (${e.at})` : ''}`)
+  return lines.join('\n')
+}
+
+/**
+ * WHICH OPEN BRANCHES OCCUPY A SLOT? PURE.
+ *
+ * `branches` is [{ ref, tipAt, behind }] — every `feat/*` branch not contained in
+ * `main`, as the wrapper reads them from git. Local and remote spellings of one
+ * branch are ONE branch; two branches for one point are TWO (687 had exactly
+ * that on 17.08.2026, and both were real work standing open).
+ *
+ * A PARKED BRANCH THAT MOVES IS LIVE AGAIN. The park records the moment it was
+ * taken, so a commit landing on a parked branch afterwards puts it straight back
+ * into the count — otherwise parking would be a permanent exemption bought once,
+ * which is the silent-override failure this point exists to end. A branch whose
+ * tip date cannot be read stays parked: an unreadable date proves no movement.
+ *
+ * `exclude` is the point being commissioned. Its own branch is not a slot the
+ * commissioning would consume — re-cutting or pushing an existing branch is
+ * finishing, not opening.
+ */
+export function openBranchSlots({ branches = [], parked = {}, exclude = null, cap = POOL_CAP, now = Date.now() } = {}) {
+  const parkedAt = new Map()
+  for (const [ref, e] of Object.entries(parked && typeof parked === 'object' ? parked : {})) {
+    parkedAt.set(normRef(ref), { reason: e?.reason ?? '', at: Date.parse(String(e?.at ?? '')) })
+  }
+  const skip = Number(exclude)
+  const seen = new Map()
+  const parkedOut = []
+  for (const b of Array.isArray(branches) ? branches : []) {
+    const ref = normRef(b?.ref)
+    if (!ref || seen.has(ref)) continue
+    const tipAt = Number.isFinite(b?.tipAt) ? b.tipAt : null
+    const item = {
+      ref,
+      point: pointOfBranch(ref),
+      tipAt,
+      ageMs: tipAt === null || !Number.isFinite(now) ? null : Math.max(0, now - tipAt),
+      behind: Number.isFinite(b?.behind) ? b.behind : null,
+    }
+    const park = parkedAt.get(ref)
+    // Moved since it was parked → back in the count. An unparsable park stamp is
+    // read as "parked forever ago", so a moving branch still returns.
+    const movedSincePark = park && tipAt !== null && Number.isFinite(park.at) && tipAt > park.at
+    if (park && !movedSincePark) {
+      parkedOut.push({ ...item, reason: park.reason })
+      seen.set(ref, true)
+      continue
+    }
+    if (Number.isInteger(skip) && skip > 0 && item.point === skip) {
+      seen.set(ref, true)
+      continue
+    }
+    seen.set(ref, item)
+  }
+  const open = [...seen.values()]
+    .filter((v) => v !== true)
+    // Oldest first: the branch that has been standing longest is the one to land.
+    .sort((a, b) => (a.tipAt ?? Infinity) - (b.tipAt ?? Infinity) || a.ref.localeCompare(b.ref))
+  const limit = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : POOL_CAP
+  return { open, parkedOut, count: open.length, slotsFree: Math.max(0, limit - open.length), cap: limit }
+}
+
+/**
+ * MAY A FURTHER POINT BE OPENED, GIVEN THE BRANCHES THAT STAND? PURE.
+ *
+ * Returns { allowed, why, open, parkedOut, count, slotsFree, cap }. `readable`
+ * false is the fail-open case the wrapper passes when git could not be
+ * questioned: a branch list nobody could read is not evidence of debris.
+ *
+ * There is deliberately NO reason-override here. The first refusal's escape is a
+ * recorded reason because the queue's order can legitimately be departed from;
+ * this one's escapes are LAND and PARK, both of which change the real state
+ * rather than excusing it, and parking is recorded exactly as an override is.
+ */
+export function branchSlotDecision({
+  branches = [],
+  parked = {},
+  point = null,
+  cap = POOL_CAP,
+  readable = true,
+  now = Date.now(),
+} = {}) {
+  const slots = openBranchSlots({ branches, parked, exclude: point, cap, now })
+  const out = { ...slots, point: Number.isInteger(Number(point)) ? Number(point) : null }
+  if (readable !== true) return { ...out, allowed: true, why: 'branches-unreadable' }
+  if (slots.count < slots.cap) return { ...out, allowed: true, why: 'slots-free' }
+  return { ...out, allowed: false, why: 'branches-open' }
+}
+
+/**
+ * The branch refusal's wording. PURE: the point requires it to list the open
+ * branches OLDEST FIRST with each one's age and behind-count, and to name the
+ * two ways out.
+ */
+export function branchSlotRefusal(decision = {}, { limit = 10 } = {}) {
+  const open = Array.isArray(decision?.open) ? decision.open : []
+  const cap = decision?.cap ?? POOL_CAP
+  const n = decision?.point
+  const lines = open.slice(0, limit).map((b) => {
+    const age = describeBranchAge(Number.isFinite(b?.ageMs) ? b.ageMs : NaN)
+    const behind = Number.isFinite(b?.behind) ? `${b.behind} commits behind main` : 'behind-count unknown'
+    return `  · ${b?.ref} — ${age}, ${behind}`
+  })
+  if (open.length > limit) lines.push(`  · …and ${open.length - limit} more`)
+  return (
+    `A SLOT IS NOT FREE UNTIL ITS BRANCH IS GONE: ${open.length} open feat/* branch(es) against a pool cap of ` +
+    `${cap}${n ? `, so opening point ${n} would add another` : ''}. Oldest first:\n${lines.join('\n')}\n` +
+    `TWO WAYS OUT, both explicit: LAND one (${BRANCH_LAND_CMD}), or PARK it with a reason (${BRANCH_PARK_CMD}), ` +
+    'which records the decision and drops the branch out of the count until it moves again. Built work that never ' +
+    'lands delivers nothing and costs more to merge every day it ages against a moving main.'
   )
 }
 
