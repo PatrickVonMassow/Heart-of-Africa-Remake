@@ -38,6 +38,18 @@ describe('the assembly says what it could not hold', () => {
     expect(out.text).toContain('=== FILE (current content): a.mjs ===')
   })
 
+  it('carries the patch BYTE-EXACT — a rename to a trailing-space destination survives', () => {
+    // `rename to new ` names a path ending in a space; the old trim ate that
+    // space with the final newline while `patchTruncated` stayed false, so the
+    // normalised assembly still matched what was sent (cross-vendor review,
+    // fourth round). A silent edit to the artefact is not an accounting.
+    const patch = 'diff --git a/old b/new \nsimilarity index 100%\nrename from old\nrename to new \n'
+    const out = assembleMaterial({ stat: ' old => new | 0', patch, budget: 10_000 })
+    expect(out.patchTruncated).toBe(false)
+    expect(out.fit).toBe(true)
+    expect(out.text).toContain('rename to new \n')
+  })
+
   it('NAMES the file it had to cut, and stops calling the round complete', () => {
     const out = assembleMaterial({ stat: 's', patch: 'p', files: [file('big.md', 5000)], budget: 1500 })
     expect(out.fit).toBe(false)

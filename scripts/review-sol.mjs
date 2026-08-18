@@ -164,7 +164,10 @@ function gatherRange(sha, base) {
   // whitespace makes a different path, one `git show` misses — the real file
   // then travelled in no pass while nothing named the loss (third round).
   const paths = git(['diff', '--name-only', '-z', range], { raw: true }).split('\0').filter(Boolean)
-  const patch = git(['diff', range])
+  // The patch travels RAW too (fourth round): trimming it ate a trailing space
+  // off a rename destination's last line together with the final newline — a
+  // silently different path, with the accounting none the wiser.
+  const patch = git(['diff', range], { raw: true })
   // A file the patch ADDS whole is already there in full; sending its content
   // again only spends the budget the other files need — but only while the patch
   // itself fits, or the file would fall out of both halves.
@@ -180,7 +183,7 @@ function gatherRange(sha, base) {
   // THE RAW PARTS, NOT THE FORMATTED MATERIAL (point 714). The budget decision,
   // the pass plan and the accounting all need the parts separately; assembling
   // here would leave the caller with a string and no way to tell what it lost.
-  return { stat: git(['diff', '--stat', range]), patch, files }
+  return { stat: git(['diff', '--stat', range], { raw: true }), patch, files }
 }
 
 /**

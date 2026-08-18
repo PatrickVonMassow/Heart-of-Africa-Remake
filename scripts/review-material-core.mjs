@@ -100,8 +100,14 @@ export function assembleMaterial({
   patchOnly = [],
 } = {}) {
   const cap = Math.max(0, Number(budget) || 0)
-  const statText = String(stat).trim()
-  const patchText = String(patch).trim()
+  // NEVER TRIMMED (fourth cross-vendor round): a trim is a silent edit to the
+  // artefact before it is accounted. A pure rename whose destination carries a
+  // trailing space ends the patch in `rename to new ` — the trim ate that space
+  // with the final newline, the material named a path that does not exist, and
+  // `patchTruncated` stayed false because the accounting only ever saw the
+  // altered text. What git handed over is what travels, byte for byte.
+  const statText = String(stat)
+  const patchText = String(patch)
   const statRoom = Math.floor(cap * STAT_SHARE)
   const room = Number.isFinite(Number(patchRoom)) && patchRoom !== null
     ? Math.max(0, Number(patchRoom))
@@ -436,7 +442,9 @@ export function splitPatchByFile(patch) {
  */
 export function planPasses({ stat = '', patch = '', files = [], budget = MATERIAL_BUDGET_CHARS } = {}) {
   const cap = Math.max(0, Number(budget) || 0)
-  const statText = String(stat).trim()
+  // Untrimmed, exactly as assembleMaterial reads it: the plan and the assembly
+  // must measure the SAME bytes, or the plan clears what the assembly refuses.
+  const statText = String(stat)
   const sections = new Map(splitPatchByFile(patch).map((s) => [s.path, s.text]))
   const statCost = Math.min(statText.length, Math.floor(cap * STAT_SHARE))
   const room = Math.max(0, cap - statCost - PASS_RESERVE)
