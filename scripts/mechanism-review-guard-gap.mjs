@@ -13,6 +13,24 @@
 // clause is cherry-picked AHEAD of the tool onto trees the trap is live on.
 
 import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+
+/** The one module whose ABSENCE (never a transitive import's) may rule
+ *  'no-splitter' — spelled exactly as Node names it in ERR_MODULE_NOT_FOUND,
+ *  as URL and (where this module runs from a file: URL) as path. Exported so
+ *  the tests build their absence fakes from the same spellings. */
+export const SPLITTER_SPELLINGS = Object.freeze(
+  (() => {
+    const url = new URL('./review-material-core.mjs', import.meta.url)
+    const spellings = [url.href]
+    try {
+      spellings.push(fileURLToPath(url))
+    } catch {
+      /* not a file: URL (a bundler/test transform) — the href spelling stands */
+    }
+    return spellings
+  })(),
+)
 import { REPO_ROOT } from './repo-paths.mjs'
 import { decideReviewGap, formatReviewGap, REVIEW_GAP_BUDGET_CHARS } from './mechanism-review-guard-gap-core.mjs'
 
@@ -37,7 +55,9 @@ const git = (args) =>
 export function measureReviewMaterial({ baseline, head, run = git }) {
   const range = `${baseline}..${head}`
   const stat = run(['diff', '--stat', range])
-  const patch = run(['diff', range])
+  // The same external-driver hardening as gatherRange (round-4 pass 7): the
+  // measurement must weigh git's own patch, not a substituted one.
+  const patch = run(['diff', '--no-ext-diff', '--no-textconv', range])
   const paths = run(['diff', '--name-only', '-z', range]).split('\0').filter(Boolean)
   const files = []
   for (const path of paths) {
@@ -96,8 +116,10 @@ export async function assessReviewGap({
       // tree without the tool; everything else is an assessment failure, which
       // blocks.
       const missing = /Cannot find (?:module|package) '([^']+)'/.exec(String(e?.message ?? ''))?.[1] ?? ''
-      const toolAbsent =
-        e?.code === 'ERR_MODULE_NOT_FOUND' && /(?:^|[/\\])review-material-core\.mjs$/.test(missing)
+      // THE EXACT SIBLING, not a basename (round-4 pass 2): a missing
+      // transitive module that happens to be NAMED review-material-core.mjs
+      // elsewhere in the tree must not read as the splitter's absence.
+      const toolAbsent = e?.code === 'ERR_MODULE_NOT_FOUND' && SPLITTER_SPELLINGS.includes(missing)
       if (!toolAbsent) {
         measurementError = `the splitting tool exists but could not load: ${(e && e.message) || e}`
       }

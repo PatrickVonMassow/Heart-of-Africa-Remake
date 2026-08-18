@@ -4,6 +4,7 @@
 // pinned here; the live trap this closes held every turn on main hostage to a
 // review no caller could produce (measured 18.08.2026).
 import { describe, it, expect } from 'vitest'
+import { SPLITTER_SPELLINGS } from './mechanism-review-guard-gap.mjs'
 import {
   criticalityGapPlan,
   decideReviewGap,
@@ -219,10 +220,11 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     if (args[0] === 'show') return 'body'
     return ''
   }
-  // The genuine-absence shape names THE SPLITTER ITSELF as the unfindable
-  // module; the same code with another module's name is a broken tool.
+  // The genuine-absence shape names THE SPLITTER ITSELF — by one of its exact
+  // spellings, not a basename (round-4 pass 2) — as the unfindable module; the
+  // same code with any other spelling is a broken tool.
   const absent = Object.assign(
-    new Error("Cannot find module '/repo/scripts/review-material-core.mjs' imported from /repo/scripts/x.mjs"),
+    new Error(`Cannot find module '${SPLITTER_SPELLINGS[SPLITTER_SPELLINGS.length - 1]}' imported from x`),
     { code: 'ERR_MODULE_NOT_FOUND' },
   )
 
@@ -277,6 +279,23 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
       new Error("Cannot find module '/repo/scripts/repo-paths.mjs' imported from /repo/scripts/review-material-core.mjs"),
       { code: 'ERR_MODULE_NOT_FOUND' },
     )
+    // …including one that merely SHARES the splitter's basename elsewhere in
+    // the tree (round-4 pass 2).
+    const sameBasename = Object.assign(
+      new Error("Cannot find module '/repo/vendor/review-material-core.mjs' imported from /repo/scripts/review-material-core.mjs"),
+      { code: 'ERR_MODULE_NOT_FOUND' },
+    )
+    for (const shape of [sameBasename]) {
+      const { assessReviewGap: assess } = await import('./mechanism-review-guard-gap.mjs')
+      const ruled = await assess({
+        baseline: 'a'.repeat(40),
+        head: 'b'.repeat(40),
+        run: bigRun,
+        loadTool: () => Promise.reject(shape),
+      })
+      expect(ruled.gap).toBe(false)
+      expect(ruled.reason).toBe('unmeasured')
+    }
     const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
     const d = await assessReviewGap({
       baseline: 'a'.repeat(40),

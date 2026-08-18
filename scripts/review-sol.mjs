@@ -246,7 +246,11 @@ function gatherRange(sha, base) {
   // representation while avoiding the binary marker — the real blob then
   // reaches no pass while the accounting reports complete delivery (round-1
   // second run, pass 5).
-  const patch = git(['diff', '--binary', '--no-textconv', range], { raw: true })
+  // `--no-ext-diff` beside it (round-4 pass 7): a configured diff.external or
+  // per-path external driver REPLACES git's own patch generation, so a helper
+  // emitting plausible `diff --git` sections could deliver transformed or
+  // incomplete content the section accounting accepts as the real patch.
+  const patch = git(['diff', '--binary', '--no-textconv', '--no-ext-diff', range], { raw: true })
   // A BINARY FILE'S BYTES CANNOT TRAVEL AS REVIEW TEXT (fourth cross-vendor
   // round, pass 4, finding 7). An ADDED binary was skipped as "covered by the
   // patch" while the ordinary diff carries only `Binary files … differ` — the

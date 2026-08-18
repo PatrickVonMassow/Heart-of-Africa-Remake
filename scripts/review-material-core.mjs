@@ -820,42 +820,68 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
     // pack as deliverable while a GIT binary patch missed its declared line.
     if (!seen.has(path)) entries.push({ path, content: '', patchText: text, binary: isBinaryPatchSection(text) })
   }
+  // A RENAME'S ONE SECTION IS CHARGED ONCE (round-4 pass 4): it sits under
+  // both its spellings, and the assembly's join deduplicates it — a plan that
+  // charged it per alias could refuse a fitting round or split needlessly.
   let rawSize = statText.length
-  for (const entry of entries) rawSize += entry.patchText.length + entry.content.length
+  const charged = new Set()
+  for (const entry of entries) {
+    rawSize += entry.content.length
+    if (entry.patchText && !charged.has(entry.patchText)) {
+      charged.add(entry.patchText)
+      rawSize += entry.patchText.length
+    }
+  }
 
   const pack = (room) => {
     const passes = []
     const uncoverable = []
     let current = null
+    let currentSections = null
     for (const entry of entries) {
       const frame = FILE_FRAME_CHARS + fileHeader(entry.path).length
-      const patchLen = entry.patchText.length
+      // An alias whose section the CURRENT pass already carries costs the pass
+      // no second copy — the join sends it once (round-4 pass 4). The fit test
+      // and the uncoverable ruling keep the full length: alone in a pass, the
+      // section is paid for in full.
+      const sectionLen = entry.patchText.length
       // A PASS MAY ONLY PROMISE WHAT THE ASSEMBLY WOULD DELIVER (round-2 pass
       // 3): a carried path with no patch section is an omission the assembly
       // refuses, and a binary declaration whose section carries no change (the
       // bare 'Binary files … differ' marker, or no section at all) is refused
       // the same way — so a plan that packed either certified material the
       // round could never send, and the plan-only hand-off paths offered a
-      // record over an undelivered change. Both are named beyond reach.
+      // record over an undelivered change. Both are named beyond reach. This
+      // ruling reads the SECTION's own length, never the alias-deduped cost.
       const undeliverable = entry.binary
-        ? patchLen === 0 || !binarySectionDeliversChange(entry.patchText)
-        : patchLen === 0
-      if (undeliverable || frame + patchLen > room) {
-        uncoverable.push({ path: entry.path, patchChars: patchLen, contentChars: entry.content.length })
+        ? sectionLen === 0 || !binarySectionDeliversChange(entry.patchText)
+        : sectionLen === 0
+      if (undeliverable || frame + sectionLen > room) {
+        uncoverable.push({ path: entry.path, patchChars: sectionLen, contentChars: entry.content.length })
         continue
       }
-      const whole = frame + patchLen + entry.content.length
-      const patchOnly = !entry.binary && whole > room
-      const cost = patchOnly || entry.binary ? frame + patchLen : whole
-      if (!current || current.size + cost > room) {
+      // An alias whose section the CURRENT pass already carries costs it no
+      // second copy — the join sends the section once (round-4 pass 4). In a
+      // FRESH pass the section is paid for in full again.
+      const shape = (sections) => {
+        const patchLen = sections?.has(entry.patchText) ? 0 : sectionLen
+        const whole = frame + patchLen + entry.content.length
+        const patchOnly = !entry.binary && whole > room
+        return { patchLen, patchOnly, cost: patchOnly || entry.binary ? frame + patchLen : whole }
+      }
+      let placed = shape(currentSections)
+      if (!current || current.size + placed.cost > room) {
         current = { files: [], patchOnly: [], binary: [], patchChars: 0, size: 0 }
+        currentSections = new Set()
         passes.push(current)
+        placed = shape(currentSections)
       }
       current.files.push(entry.path)
-      if (patchOnly) current.patchOnly.push(entry.path)
+      if (placed.patchOnly) current.patchOnly.push(entry.path)
       if (entry.binary) current.binary.push(entry.path)
-      current.patchChars += patchLen
-      current.size += cost
+      current.patchChars += placed.patchLen
+      current.size += placed.cost
+      currentSections.add(entry.patchText)
     }
     return { passes, uncoverable }
   }
@@ -1161,6 +1187,10 @@ const needsQuoting = (path) => {
   for (const ch of p) {
     const code = ch.codePointAt(0)
     if (ch === ',' || ch === '"' || ch === '\\' || code < 0x20 || code === 0x7f) return true
+    // The Unicode line breaks beyond ASCII (round-4 pass 4): NEL, LINE
+    // SEPARATOR and PARAGRAPH SEPARATOR render as new lines in many viewers,
+    // so a legal name carrying one could visually forge a structural line.
+    if (code === 0x85 || code === 0x2028 || code === 0x2029) return true
   }
   return false
 }
@@ -1173,7 +1203,7 @@ export function quotePassFile(path) {
   for (const ch of p) {
     if (ch === '"') out += '\\"'
     else if (ch === '\\') out += '\\\\'
-    else if (ch < ' ' || ch === '') {
+    else if (ch < ' ' || ch === '' || ch === '\u0085' || ch === '\u2028' || ch === '\u2029') {
       for (const byte of Buffer.from(ch, 'utf8')) out += `\\${byte.toString(8).padStart(3, '0')}`
     } else out += ch
   }

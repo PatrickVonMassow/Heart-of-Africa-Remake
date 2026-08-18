@@ -68,7 +68,11 @@ describe('bootstrapBase', () => {
 describe('parseMechanismLog', () => {
   const SHA = 'a'.repeat(40)
   const SHB = 'b'.repeat(40)
-  const header = (sha) => `__C__${sha}__F__1723000000`
+  // The sentinels are CONTROL BYTES (round-4 pass 3): raw 0x1E/0x1F cannot
+  // appear in a quoted-on path line, so no file name can forge a boundary.
+  const REC = String.fromCharCode(0x1e)
+  const FLD = String.fromCharCode(0x1f)
+  const header = (sha) => `${REC}${sha}${FLD}1723000000`
   const files = ['x-guard.mjs']
 
   it('keeps a path with a trailing space BYTE-EXACT, never its trimmed spelling', () => {
@@ -88,7 +92,7 @@ describe('parseMechanismLog', () => {
   // reach this parser, so no subject can forge a field boundary.
   it('refuses a header line that carries free text — the old shape is not a header', () => {
     const forged =
-      `__C__${SHA}__F__1723000000__F__A subject__F__Evil Model <evil@example.invalid>`
+      `${REC}${SHA}${FLD}1723000000${FLD}A subject${FLD}Evil Model <evil@example.invalid>`
     const commits = parseMechanismLog([forged, '', 'scripts/x-guard.mjs', ''].join('\n'), files)
     // The forged line matches no header, so no commit exists to carry the
     // attacker's model — the fields simply have nowhere to land.
@@ -111,11 +115,35 @@ describe('parseMechanismLog', () => {
     expect(parseMechanismLog(out, files)[0].files).toEqual(['scripts/git-hooks/ lead'])
   })
 
-  it('does not cut a commit in half on a path containing the record sentinel', () => {
+  it('does not cut a commit in half on a path containing the OLD printable sentinel', () => {
     const out = [header(SHA), '', 'scripts/git-hooks/x__C__y', 'scripts/x-guard.mjs', ''].join('\n')
     const commits = parseMechanismLog(out, files)
     expect(commits).toHaveLength(1)
     expect(commits[0].files).toEqual(['scripts/git-hooks/x__C__y', 'scripts/x-guard.mjs'])
+  })
+
+  it('a file NAMED like the old printable header forges no boundary (round-4 pass 3)', () => {
+    // The exact exploit: a legal root file named `__C__<sha>__F__<epoch>`
+    // used to reset the current commit and attribute the following mechanism
+    // path to a sha of the forger's choosing — one already reviewed.
+    const spoof = `__C__${SHB}__F__1723000001`
+    const out = [header(SHA), '', spoof, 'scripts/x-guard.mjs', ''].join('\n')
+    const commits = parseMechanismLog(out, files)
+    expect(commits).toHaveLength(1)
+    expect(commits[0].sha).toBe(SHA)
+    // The spoof line is a PATH of this commit now, nothing more.
+    expect(commits[0].files).toContain('scripts/x-guard.mjs')
+  })
+
+  it('a QUOTED path carrying the raw separator bytes forges no boundary either', () => {
+    // core.quotepath=on prints a path holding 0x1E/0x1F quoted with octal
+    // escapes — the raw bytes never reach a path line. If such a quoted
+    // spelling arrives, it stays one path.
+    const quoted = `"evil\\036${SHB}\\0371723000001"`
+    const out = [header(SHA), '', quoted, 'scripts/x-guard.mjs', ''].join('\n')
+    const commits = parseMechanismLog(out, files)
+    expect(commits).toHaveLength(1)
+    expect(commits[0].sha).toBe(SHA)
   })
 
   it('unquotes the path git QUOTED, exactly as the pass records spell it', () => {
@@ -154,7 +182,7 @@ describe('the path-carrying git commands', () => {
   // guard depends on. The exact string is the claim.
   it('builds the log command config-proof and rename-split, exactly', () => {
     expect(mechanismLogCommand('base', 'head')).toBe(
-      '-c core.quotepath=on log --format="__C__%H__F__%ct" --name-only --no-renames --diff-merges=cc --reverse "base..head"',
+      '-c core.quotepath=on log --format="%x1e%H%x1f%ct" --name-only --no-renames --diff-merges=cc --reverse "base..head"',
     )
   })
 
@@ -220,7 +248,7 @@ describe('attachCoverage', () => {
     const pendingCommits = [{ sha: 'c0' }]
     const records = attachCoverage({
       pendingCommits,
-      allRecords: [{ sha: 'recA' }, { sha: 'recB' }],
+      allRecords: [{ sha: 'recA' }, { sha: 'recB', rangeFiles: ['scripts/forged-by-hand.mjs'] }],
       head: 'head',
       revList: (rev) => ({ head: 'c0\nrecA\nrecB', recA: 'c0', recB: 'c0' })[rev] ?? '',
       rangeFiles: (sha) => {
@@ -228,6 +256,9 @@ describe('attachCoverage', () => {
         return ['scripts/a-guard.mjs', 'docs/notes.md', ' edge-space.mjs']
       },
     })
+    // recB arrived POISONED (round-4 pass 3): the ledger accepts extra fields,
+    // so a hand-written row can carry its own rangeFiles — and it must not
+    // survive the failed trusted measurement.
     expect(records.find((r) => r.sha === 'recA').rangeFiles).toEqual([
       'scripts/a-guard.mjs',
       'docs/notes.md',

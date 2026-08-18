@@ -49,15 +49,22 @@ const PAUSE = repoPath('.claude/batch-paused')
  *  while the ledger that must travel — the reviews — is the tracked one. */
 export const BASELINE_PATH = repoPath('.claude/mechanism-review-baseline.json')
 
-/** Record/field sentinels for the one `git log` this guard runs. Plain ASCII:
- *  a raw control byte or a `%`-pair in the command line is a Windows shell
- *  hazard, and this hook runs on Windows. REC marks the START of a header LINE
- *  and is matched by the full header shape below — never split on, because the
- *  sentinel is a legal path substring (`scripts/git-hooks/x__C__y`), and a
- *  split cut such a commit's record in half (cross-vendor review, third
- *  round). */
-const REC = '__C__'
-const FLD = '__F__'
+/** Record/field sentinels for the one `git log` this guard runs. The COMMAND
+ *  LINE stays plain ASCII (git's %x1e/%x1f escapes expand server-side — a raw
+ *  control byte in the command is a Windows shell hazard, and this hook runs
+ *  on Windows). REC marks the START of a header LINE and is matched by the
+ *  full header shape below — never split on, so a partial match can still not
+ *  cut a commit's record in half (cross-vendor review, third round). */
+// CONTROL CHARACTERS, NOT PRINTABLE MARKERS (round-4 pass 3): a printable
+// sentinel is a legal path substring, so a root file literally NAMED
+// `__C__<sha>__F__<epoch>` forged a record boundary and attributed the paths
+// after it to a sha of the forger's choosing. With `core.quotepath=on` a real
+// path holding 0x1E/0x1F is printed QUOTED (octal escapes inside quotes), so a
+// RAW separator byte can only ever come from the --format string itself — the
+// boundary is unforgeable by file name. Spelled via fromCharCode so this
+// source file stays free of raw control bytes.
+const REC = String.fromCharCode(0x1e)
+const FLD = String.fromCharCode(0x1f)
 
 /** A header line, whole: sentinel, 40-hex sha, epoch — and NOTHING FREE-TEXT
  *  (escalation round, pass 2). The header used to carry the subject and the
@@ -262,7 +269,10 @@ function commitFacts(sha) {
  *    demands its review.
  */
 export const mechanismLogCommand = (base, head) =>
-  `-c core.quotepath=on log --format="${REC}%H${FLD}%ct" --name-only --no-renames --diff-merges=cc --reverse "${base}..${head}"`
+  // %x1e/%x1f are expanded by GIT, so the command line itself stays ASCII and
+  // the separators reach the output as raw control bytes no quoted path can
+  // carry (round-4 pass 3).
+  `-c core.quotepath=on log --format="%x1e%H%x1f%ct" --name-only --no-renames --diff-merges=cc --reverse "${base}..${head}"`
 
 export const rangeFilesCommand = (base, sha) => `diff --name-only -z --no-renames "${base}..${sha}"`
 
@@ -428,6 +438,12 @@ export function attachCoverage({ pendingCommits = [], allRecords = [], head, rev
   // can only ever demand less, never clear more.
   for (const r of records) {
     r.containedShas = lines(r.sha)
+    // MEASURED HERE OR NOT AT ALL (round-4 pass 3): the ledger accepts extra
+    // fields, so a hand-written row could arrive CARRYING a rangeFiles of its
+    // own — and surviving the failed measurement below, it would stand in for
+    // the trusted diff. The field is stripped before the measurement, so the
+    // only value it can ever hold is this guard's own.
+    delete r.rangeFiles
     if (rangeFiles) {
       try {
         const files = rangeFiles(r.sha)

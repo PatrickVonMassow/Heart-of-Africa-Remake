@@ -537,22 +537,25 @@ describe('the record the command prints', () => {
     expect(report).toContain('--pass 1/3')
     expect(report).toContain('--pass-files "scripts/a.mjs,scripts/b.mjs"')
     expect(report).toContain('PASS 1/3')
-    expect(report).toMatch(/NOT cleared until every pass is recorded/)
+    expect(report).toMatch(/NOT cleared until every pass 1\.\.3 is recorded/)
   })
 
-  it('keeps the not-cleared warning on the final-NUMBERED pass, and only drops the next suggestion', () => {
-    // Round-3 pass 6: passes may run in any order, so `--pass 3` of 3 is not
-    // proof the composition is complete — dropping the warning there read as
-    // a cleared range whenever the highest number happened to run first.
-    const report = formatReviewReport({
-      decision: decideReview(okRun()),
-      sha: 'a'.repeat(40),
-      mode: 'review',
-      pass: { index: 3, total: 3, files: ['scripts/c.mjs'] },
-    })
-    expect(report).toContain('--pass 3/3')
-    expect(report).toMatch(/NOT cleared until every pass is recorded/)
-    expect(report).not.toMatch(/next: --pass/)
+  it('sends the caller to the LEDGER for the remainder, never to a guessed next number', () => {
+    // Round-3 pass 6 kept the warning on every pass; round-4 pass 6 removed
+    // the numeric hint entirely — passes run in any order, so "next: k+1"
+    // recommended already-recorded passes and fell silent on unrecorded ones
+    // whenever the highest number ran first.
+    for (const index of [1, 3]) {
+      const report = formatReviewReport({
+        decision: decideReview(okRun()),
+        sha: 'a'.repeat(40),
+        mode: 'review',
+        pass: { index, total: 3, files: ['scripts/c.mjs'] },
+      })
+      expect(report).toMatch(/NOT cleared until every pass 1\.\.3 is recorded/)
+      expect(report).toContain('mechanism-review.mjs --list')
+      expect(report).not.toMatch(/next: --pass/)
+    }
   })
 
   it('decides coverage strictly: only an EQUAL base is full coverage', () => {

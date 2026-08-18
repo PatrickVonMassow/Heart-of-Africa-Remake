@@ -172,7 +172,11 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
       (r) =>
         VERDICTS.includes(String(r.verdict)) &&
         String(r.model ?? '').trim() &&
-        Number.isFinite(Number(r?.at)),
+        // Typed, not coerced (round-4 pass 1): Number(null) is 0, which is
+        // finite, so a row with no timestamp at all passed the coercing test.
+        typeof r?.at === 'number' &&
+        Number.isFinite(r.at) &&
+        r.at > 0,
     )
     // A self-review in the ledger is worse than none: the gate would read green.
     // Refused at the record command too, but re-checked here — the ledger is a

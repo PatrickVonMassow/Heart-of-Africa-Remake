@@ -844,7 +844,7 @@ describe('a range too large for one round', () => {
     const printed = recordCommandIn(r.stdout)
     expect(printed).toMatch(/--pass 1\/2/)
     expect(printed).toMatch(/--pass-files "bulk-[ab]\.txt"/)
-    expect(r.stdout).toContain('NOT cleared until every pass is recorded')
+    expect(r.stdout).toContain('NOT cleared until every pass 1..2 is recorded')
     // What actually went to the reviewer stayed inside the budget.
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
     expect(sent.length).toBeLessThanOrEqual(200_000)

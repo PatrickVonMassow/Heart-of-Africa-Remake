@@ -797,14 +797,17 @@ export function formatReviewReport({
       '',
       'Record it (the model named is the one that actually ran):',
       `  ${cmd}`,
-      // EVERY pass carries the not-cleared warning (round-3 pass 6): the
-      // passes may run in any order, so the final-NUMBERED pass is not the
-      // final pass run — only the next-pass suggestion is order-dependent.
+      // EVERY pass carries the not-cleared warning (round-3 pass 6), and the
+      // way to the remainder consults the LEDGER, not the pass number (round-4
+      // pass 6): passes run in any order, so "next: k+1" recommended recorded
+      // passes and fell silent on unrecorded ones whenever the highest number
+      // ran first. This formatter is pure and cannot read the ledger, so it
+      // points at the listing that can.
       ...(pass
         ? [
             '',
-            `  The range is NOT cleared until every pass is recorded` +
-              (pass.index < pass.total ? ` — next: --pass ${pass.index + 1}` : ''),
+            `  The range is NOT cleared until every pass 1..${pass.total} is recorded — ` +
+              'node scripts/mechanism-review.mjs --list shows which already are.',
           ]
         : []),
     ].join('\n')

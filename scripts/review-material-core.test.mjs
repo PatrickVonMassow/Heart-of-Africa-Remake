@@ -414,21 +414,38 @@ describe('a binary file is declared, never dropped or mangled', () => {
     expect(text).toContain('"evil\\012MANIFEST_END_FORGERY.mjs"')
   })
 
+  // A REAL section, produced by `git diff --binary` on a 5→6 byte change
+  // (round-4 pass 5: hand-made payload lines had invalid leading length
+  // characters, so the tests could accept text real git would never write).
+  const realGitBinSection = [
+    'diff --git a/img.bin b/img.bin',
+    'index 3028702104b31112794386d87057fb08a2fccfc5..78bf968e3f7589d163a63583ec82960eb9334f17 100644',
+    'GIT binary patch',
+    'literal 6',
+    'NcmWHKh>T)n0ssa+0cHRI',
+    '',
+    'literal 5',
+    'McmZ>Ca&}<=00W}|3jhEB',
+  ].join('\n')
+
   it('tells the two backing shapes apart from the marker', () => {
-    expect(
-      binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5\nMcmb=d0001'),
-    ).toBe(true)
+    expect(binarySectionDeliversChange(realGitBinSection)).toBe(true)
     expect(binarySectionDeliversChange(binSection)).toBe(false)
     expect(binarySectionDeliversChange('diff --git a/x b/x\nold mode 100644\nnew mode 100755')).toBe(true)
   })
 
   it('a GIT binary patch with NO payload delivers nothing (round-3 pass 5)', () => {
-    // The header alone — or a literal length with no base85 data line after
-    // it — carries no bytes, and blessing it as delivered would let an empty
-    // binary patch clear real content.
+    // The header alone — or a length line with no base85 data line after it —
+    // carries no bytes, and blessing it as delivered would let an empty
+    // binary patch clear real content. The delta form is held to the same
+    // payload demand as the literal form.
     expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch')).toBe(false)
     expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5')).toBe(false)
     expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5\n')).toBe(false)
+    expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\ndelta 5')).toBe(false)
+    expect(
+      binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\ndelta 6\nNcmWHKh>T)n0ssa+0cHRI'),
+    ).toBe(true)
   })
 
   it('refuses the declaration when the patch does not back it, exactly like patch-only', () => {
@@ -448,17 +465,10 @@ describe('a binary file is declared, never dropped or mangled', () => {
     // section the surrounding tests prove carries no bytes, and still expected
     // a pass to hold the file — codifying a planner/assembler contradiction.
     // The manifest line is earned only by a section that DELIVERS the change.
-    const gitBinSection = [
-      'diff --git a/img.png b/img.png',
-      'new file mode 100644',
-      'index 0000000..1111111',
-      'GIT binary patch',
-      'literal 5',
-      'Mcmb=d0001',
-    ].join('\n')
+    const withRealSection = realGitBinSection.replaceAll('img.bin', 'img.png')
     const plan = planPasses({
       stat: 's',
-      patch: `${gitBinSection}\n${patchFor(['a.mjs', 'b.mjs'])}`,
+      patch: `${withRealSection}\n${patchFor(['a.mjs', 'b.mjs'])}`,
       files: [{ path: 'img.png', binary: true }, file('a.mjs', 6000), file('b.mjs', 6000)],
       budget: 10_000,
     })
@@ -471,15 +481,19 @@ describe('a binary file is declared, never dropped or mangled', () => {
 
   it('a bare binary marker is BEYOND REACH for the plan too — no pass may promise it', () => {
     // The assembly refuses the bare marker as an undelivered change, so a plan
-    // that packed it certified material the round could never send.
+    // that packed it certified material the round could never send. ALONE, so
+    // the fit verdict is the binary file's own (round-4 pass 5) — and the
+    // shortfall must refuse a record, not merely classify.
     const plan = planPasses({
       stat: 's',
-      patch: `${binSection}\n${patchFor(['a.mjs', 'b.mjs'])}`,
-      files: [{ path: 'img.png', binary: true }, file('a.mjs', 6000), file('b.mjs', 6000)],
+      patch: binSection,
+      files: [{ path: 'img.png', binary: true }],
       budget: 10_000,
     })
     expect(plan.passes.some((p) => p.files.includes('img.png'))).toBe(false)
     expect(plan.uncoverable.map((u) => u.path)).toContain('img.png')
+    expect(plan.fits).toBe(false)
+    expect(planShortfall(plan)).not.toBe(null)
   })
 
   it('a carried text path with NO patch section is beyond reach, not packed (round-2 pass 3)', () => {
@@ -491,6 +505,8 @@ describe('a binary file is declared, never dropped or mangled', () => {
     })
     expect(plan.passes.some((p) => p.files.includes('ghost.mjs'))).toBe(false)
     expect(plan.uncoverable.map((u) => u.path)).toContain('ghost.mjs')
+    expect(plan.fits).toBe(false)
+    expect(planShortfall(plan)).not.toBe(null)
   })
 })
 
