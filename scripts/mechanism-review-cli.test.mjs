@@ -356,6 +356,68 @@ describe('the mode round-trips into the ledger', () => {
     }
   })
 
+  it('reads authorship past a subject containing the old field separator', () => {
+    // ROUND-1 PASS 2, the recorder's half: subject and trailers used to travel
+    // in ONE delimited `git show` format, so a legal subject containing the
+    // separator shifted the trailers out of their field — authoredBy read
+    // empty, and the authoring model could record its own review. Each fact now
+    // travels through its own single-format call; this commit is the exploit.
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-record-fld-'))
+    try {
+      const repo = join(dir, 'repo')
+      mkdirSync(join(repo, 'scripts'), { recursive: true })
+      for (const f of [
+        'mechanism-review.mjs',
+        'mechanism-review-core.mjs',
+        'blind-merge-core.mjs',
+        'model-guard-core.mjs',
+        'review-material-core.mjs',
+        'repo-paths.mjs',
+        'is-main.mjs',
+      ]) {
+        copyFileSync(resolve(process.cwd(), 'scripts', f), join(repo, 'scripts', f))
+      }
+      const git = (...args) =>
+        spawnSync('git', args, { cwd: repo, encoding: 'utf8', windowsHide: true, env: { ...process.env, HOME: dir } })
+      git('init', '-q', '-b', 'main')
+      git('config', 'user.email', 'test@example.invalid')
+      git('config', 'user.name', 'Test')
+      writeFileSync(join(repo, 'world.txt'), 'a fixture world\n')
+      git('add', '-A')
+      const subject = 'Route the __F__ marker past the splitter'
+      git('commit', '-q', '-m', `${subject}\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>`)
+      const sha = git('rev-parse', 'HEAD').stdout.trim()
+      const record = (model) =>
+        spawnSync(
+          process.execPath,
+          [
+            join(repo, 'scripts', 'mechanism-review.mjs'),
+            '--record', sha,
+            '--model', model,
+            '--verdict', 'merge',
+            '--evidence', 'read the fixture change against its stated intent',
+            '--mode', 'review',
+          ],
+          { cwd: repo, encoding: 'utf8', windowsHide: true },
+        )
+
+      // The exploit itself: the commit's own author records its review. Before
+      // the fix the shifted field hid the authorship and this PASSED.
+      const self = record('GPT-5.6 Sol')
+      expect(self.status, `${self.stdout}${self.stderr}`).not.toBe(0)
+
+      // A cross-model record works, and the ledger row carries the subject
+      // whole and the authorship exactly as the trailer spells it.
+      const ok = record('Claude Fable 5')
+      expect(ok.status, `${ok.stdout}${ok.stderr}`).toBe(0)
+      const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim())
+      expect(row.subject).toBe(subject)
+      expect(row.authoredBy).toBe('GPT-5.6 Sol <noreply@openai.com>')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('marks a typed receipt as stated, so the ledger says which it was', () => {
     expect(build({ mode: 'blind-parallel', ...merged }).record.accountingSource).toBe('stated')
   })

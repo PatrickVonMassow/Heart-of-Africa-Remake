@@ -61,8 +61,7 @@ describe('bootstrapBase', () => {
 describe('parseMechanismLog', () => {
   const SHA = 'a'.repeat(40)
   const SHB = 'b'.repeat(40)
-  const header = (sha, trailers = 'Claude Opus 5 <noreply@anthropic.com>') =>
-    `__C__${sha}__F__1723000000__F__A subject__F__${trailers}`
+  const header = (sha) => `__C__${sha}__F__1723000000`
   const files = ['x-guard.mjs']
 
   it('keeps a path with a trailing space BYTE-EXACT, never its trimmed spelling', () => {
@@ -71,11 +70,33 @@ describe('parseMechanismLog', () => {
     expect(commits).toHaveLength(1)
     expect(commits[0].files).toEqual(['scripts/git-hooks/check '])
     expect(commits[0].files).not.toContain('scripts/git-hooks/check')
-    expect(commits[0]).toMatchObject({
-      sha: SHA,
-      subject: 'A subject',
-      authorModel: 'Claude Opus 5 <noreply@anthropic.com>',
-    })
+    expect(commits[0]).toMatchObject({ sha: SHA, at: 1723000000000 })
+  })
+
+  // ROUND-1 PASS 2: the header used to carry the subject and the trailers behind
+  // two more `__F__` separators, and a legal subject CONTAINING that separator
+  // shifted the trailer field out of the destructuring — the authoring model
+  // then read empty or attacker-chosen, and the self-review refusal missed. The
+  // header now carries machine-shaped fields ONLY; free text can no longer
+  // reach this parser, so no subject can forge a field boundary.
+  it('refuses a header line that carries free text — the old shape is not a header', () => {
+    const forged =
+      `__C__${SHA}__F__1723000000__F__A subject__F__Evil Model <evil@example.invalid>`
+    const commits = parseMechanismLog([forged, '', 'scripts/x-guard.mjs', ''].join('\n'), files)
+    // The forged line matches no header, so no commit exists to carry the
+    // attacker's model — the fields simply have nowhere to land.
+    expect(commits).toEqual([])
+  })
+
+  it('exposes NO author or subject fields — free text travels outside the log', () => {
+    const out = [header(SHA), '', 'scripts/x-guard.mjs', ''].join('\n')
+    const [commit] = parseMechanismLog(out, files)
+    // The wrapper fetches subject and trailers per commit through single-format
+    // git calls; anything author-shaped in THIS output would have come from
+    // text an author controls.
+    expect(commit.subject).toBeUndefined()
+    expect(commit.authorModel).toBeUndefined()
+    expect(commit.authorModels).toBeUndefined()
   })
 
   it('keeps a leading space too, and strips only a trailing carriage return', () => {
@@ -100,7 +121,7 @@ describe('parseMechanismLog', () => {
       header(SHA),
       '',
       'src/App.tsx',
-      header(SHB, 'Claude Fable 5 <noreply@anthropic.com>;GPT-5.6 Sol <noreply@openai.com>'),
+      header(SHB),
       '',
       'scripts/x-guard.mjs',
       '',
@@ -108,10 +129,6 @@ describe('parseMechanismLog', () => {
     const commits = parseMechanismLog(out, files)
     expect(commits).toHaveLength(1)
     expect(commits[0].sha).toBe(SHB)
-    expect(commits[0].authorModels).toEqual([
-      'Claude Fable 5 <noreply@anthropic.com>',
-      'GPT-5.6 Sol <noreply@openai.com>',
-    ])
   })
 
   it('parses nothing from an empty or fileless log', () => {
