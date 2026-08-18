@@ -17,6 +17,7 @@ afterAll(() => rmSync(dir, { recursive: true, force: true }))
 const boardPath = join(dir, 'board.html')
 const statePath = join(dir, 'guard-state.json')
 const answersPath = join(dir, 'answers.json')
+const transcriptPath = join(dir, 'transcript.jsonl')
 const session = 'answer-test-session'
 const titles = ['Kartenschrift auf der Tafel', 'Freigabe nach dem Stau']
 const env = {
@@ -137,6 +138,53 @@ describe('the per-session turn baseline', () => {
     expect(Object.keys(sessions).sort()).toEqual(['recent', session].sort())
     expect(sessions[session]).toMatchObject({ titles, seededAtTurnStart: true })
     expect(sessions[session].at).toBeGreaterThanOrEqual(now)
+  })
+
+  it('stays at turn start across two passing Stops with a card added between them', () => {
+    const assistant = (id, text) => JSON.stringify({
+      type: 'assistant',
+      message: { id, content: [{ type: 'text', text }] },
+    })
+    const transcript = [
+      JSON.stringify({
+        type: 'user',
+        uuid: 'same-turn-user',
+        promptSource: 'typed',
+        message: { content: 'Arbeite weiter.' },
+      }),
+      assistant('first-stop', 'Zwischenstand ohne Frage.'),
+    ]
+    writeFileSync(boardPath, boardHtml({ klaerungExtra: [] }))
+    writeFileSync(statePath, JSON.stringify({
+      version: 2,
+      sessions: {
+        [session]: {
+          titles: [],
+          userMessage: { id: 'same-turn-user', text: 'Arbeite weiter.' },
+          review: { messageId: 'same-turn-user', kept: {} },
+          at: Date.now(),
+          seededAtTurnStart: true,
+        },
+      },
+    }))
+    writeFileSync(transcriptPath, transcript.join('\n'))
+    rmSync(answersPath, { force: true })
+
+    const stop = () => execFileSync(process.execPath, [join(process.cwd(), 'scripts', 'decision-card-guard.mjs')], {
+      cwd: process.cwd(),
+      env,
+      encoding: 'utf8',
+      windowsHide: true,
+      input: JSON.stringify({ session_id: session, transcript_path: transcriptPath }),
+    })
+    expect(stop()).toBe('')
+    expect(JSON.parse(readFileSync(statePath, 'utf8')).sessions[session].titles).toEqual([])
+
+    writeFileSync(boardPath, boardHtml({ klaerungExtra: ['Neu gestellte Farbauswahl'] }))
+    transcript.push(assistant('second-stop', 'Welche Kartenhöhe willst du?'))
+    writeFileSync(transcriptPath, transcript.join('\n'))
+    expect(stop()).toBe('')
+    expect(JSON.parse(readFileSync(statePath, 'utf8')).sessions[session].titles).toEqual([])
   })
 })
 
