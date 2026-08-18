@@ -526,8 +526,12 @@ if (isMainModule(import.meta.url)) {
         try {
           // Use the SAME authorship-then-size planner that prints the runnable
           // review-sol commands. Counting authorship groups alone understates
-          // the debt whenever one group needs several budget-sized rounds —
-          // the live range was three passes while --status claimed one.
+          // the debt whenever one group needs several budget-sized rounds.
+          // What this counts is ROUNDS FOR THE STILL-OWED CONTRIBUTIONS, freshly
+          // planned — not the pass NUMBERING of the whole range, which review-sol
+          // keeps stable per commit so a recorded pass number never shifts. The
+          // two differ by construction: on 18.08.2026 the owed debt was one round
+          // here while review-sol still listed it as four of its fifteen passes.
           const { buildAuthorshipPassPlan } = await import('./review-sol.mjs')
           statusPlan = buildAuthorshipPassPlan({
             sha: gathered.head,

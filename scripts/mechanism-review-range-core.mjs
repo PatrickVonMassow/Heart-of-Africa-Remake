@@ -281,9 +281,15 @@ export function summarizeReviewDebt({ outstanding = [], sizedPlan = null } = {})
   if (!sizedPlan || !Array.isArray(sizedPlan.passes) || !Number.isFinite(Number(sizedPlan.rawSize))) {
     return { passCount: null, materialChars: null, groups: [] }
   }
+  // The size a reader can ACT on is what the owed passes carry, because that is
+  // what a round reads and what the budget bounds. The plan's own `rawSize` is
+  // the UNSPLIT assembly of every group — measured 18.08.2026 it stood at 466106
+  // beside a one-round plan whose pass carried 116875, and a figure four times
+  // the budget beside "1 pass" reads as a count that cannot be true.
+  const passMaterial = sizedPlan.passes.reduce((sum, pass) => sum + Number(pass?.rawSize ?? pass?.size ?? 0), 0)
   return {
     passCount: sizedPlan.passes.length,
-    materialChars: Number(sizedPlan.rawSize),
+    materialChars: passMaterial > 0 ? passMaterial : Number(sizedPlan.rawSize),
     groups: sizedPlan.passes,
   }
 }

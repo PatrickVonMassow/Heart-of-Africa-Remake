@@ -327,6 +327,17 @@ describe('visible review debt', () => {
     })).toEqual({ passCount: 3, materialChars: 462_972, groups: passes })
   })
 
+  it('reports the material the owed passes carry, not the unsplit assembly', () => {
+    // The unsplit figure counts every group's whole-file assembly, so it stood
+    // at 466106 beside a one-round plan carrying 116875 — four times the budget
+    // beside a count of one, which reads as a count that cannot be true.
+    const passes = [{ index: 1, rawSize: 116_875 }]
+    expect(summarizeReviewDebt({
+      outstanding: [{ file: 'a' }],
+      sizedPlan: { passes, rawSize: 466_106 },
+    })).toEqual({ passCount: 1, materialChars: 116_875, groups: passes })
+  })
+
   it('distinguishes cleared debt from an unavailable measurement', () => {
     expect(summarizeReviewDebt({ outstanding: [] })).toEqual({ passCount: 0, materialChars: 0, groups: [] })
     expect(summarizeReviewDebt({ outstanding: [{ file: 'a' }] })).toEqual({
