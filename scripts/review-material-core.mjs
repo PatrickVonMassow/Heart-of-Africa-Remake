@@ -63,8 +63,14 @@ const PASS_RESERVE = 1024
  */
 const FILE_FRAME_CHARS = 320
 
-const fileHeader = (path) => `=== FILE (current content): ${path} ===`
-const omittedHeader = (path) => `=== FILE OMITTED ENTIRELY (material budget spent): ${path} ===`
+// EVERY STRUCTURAL LINE SPELLS ITS PATH THROUGH quotePassFile (round-1 pass
+// 3): git permits newlines and control bytes in file names, and a raw
+// interpolation let such a path forge manifest entries, fake file headers or
+// an early MANIFEST_END — the reviewer then could not tell which path or
+// delivery mode the material really named. The C-quoted spelling is one line
+// by construction and round-trips through unquoteGitPath.
+const fileHeader = (path) => `=== FILE (current content): ${quotePassFile(path)} ===`
+const omittedHeader = (path) => `=== FILE OMITTED ENTIRELY (material budget spent): ${quotePassFile(path)} ===`
 
 /** The last line of a pass manifest, so the reviewer sees where the shape ends. */
 export const MANIFEST_END = '=== END OF PASS MANIFEST — the DIFFSTAT and PATCH follow ==='
@@ -105,22 +111,22 @@ export function formatPassManifest(plan, pass) {
   for (const path of carried) {
     lines.push(
       binary.has(path)
-        ? `  · ${path} — BINARY, declared: its bytes cannot travel as text; the PATCH marks the change`
+        ? `  · ${quotePassFile(path)} — BINARY, declared: its bytes cannot travel as text; the PATCH marks the change`
         : patchOnly.has(path)
-          ? `  · ${path} — DIFF ONLY, by design (content larger than a round; its PATCH is complete)`
-          : `  · ${path} — complete: its diff in the PATCH, its current content below`,
+          ? `  · ${quotePassFile(path)} — DIFF ONLY, by design (content larger than a round; its PATCH is complete)`
+          : `  · ${quotePassFile(path)} — complete: its diff in the PATCH, its current content below`,
     )
   }
   const absent = (plan?.passes ?? []).filter((p) => p.index !== index)
   if (absent.some((p) => (p.files ?? []).length)) {
     lines.push('ABSENT BY DESIGN — every other changed file, covered by the pass named beside it:')
     for (const other of absent) {
-      for (const path of other.files ?? []) lines.push(`  · ${path} → pass ${other.index}/${total}`)
+      for (const path of other.files ?? []) lines.push(`  · ${quotePassFile(path)} → pass ${other.index}/${total}`)
     }
   }
   if ((plan?.uncoverable ?? []).length) {
     lines.push('BEYOND THE REACH OF ANY PASS — no round can hold these; NO pass covers them:')
-    for (const u of plan.uncoverable) lines.push(`  · ${u.path}`)
+    for (const u of plan.uncoverable) lines.push(`  · ${quotePassFile(u.path)}`)
   }
   lines.push(
     'A file declared ABSENT BY DESIGN here is NOT truncated — the two mean opposite things:',
@@ -151,19 +157,19 @@ export function manifestAllowance(paths = []) {
  * exactly that instead of being left to guess which of the three it is.
  */
 const patchOnlyHeader = (path) =>
-  `=== FILE CONTENT NOT SENT — it is larger than one whole review round; its COMPLETE diff is in the PATCH above: ${path} ===`
+  `=== FILE CONTENT NOT SENT — it is larger than one whole review round; its COMPLETE diff is in the PATCH above: ${quotePassFile(path)} ===`
 
 /** The header of a patch-only declaration the patch does not back — an omission. */
 const unbackedHeader = (path) =>
-  `=== FILE OMITTED ENTIRELY (declared patch-only, but the PATCH above does not carry its complete diff): ${path} ===`
+  `=== FILE OMITTED ENTIRELY (declared patch-only, but the PATCH above does not carry its complete diff): ${quotePassFile(path)} ===`
 
 /** The header of a carried file whose diff the PATCH does not hold — an omission. */
 const difflessHeader = (path) =>
-  `=== FILE OMITTED ENTIRELY (its diff is not in the PATCH above, so the change itself was never delivered): ${path} ===`
+  `=== FILE OMITTED ENTIRELY (its diff is not in the PATCH above, so the change itself was never delivered): ${quotePassFile(path)} ===`
 
 /** The declared marker of a file whose bytes cannot travel as review text. */
 const binaryHeader = (path) =>
-  `=== FILE IS BINARY — its bytes cannot travel as review text; judge its change from the PATCH above: ${path} ===`
+  `=== FILE IS BINARY — its bytes cannot travel as review text; judge its change from the PATCH above: ${quotePassFile(path)} ===`
 
 /**
  * Is this per-file patch section a BINARY change? git writes `Binary files …
@@ -892,7 +898,7 @@ export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/rev
   if (plan.uncoverable.length) {
     lines.push(
       '  BEYOND REACH — no round can hold these, not even their diff alone:',
-      ...plan.uncoverable.map((u) => `    ${u.path} (diff ${u.patchChars}, content ${u.contentChars} characters)`),
+      ...plan.uncoverable.map((u) => `    ${quotePassFile(u.path)} (diff ${u.patchChars}, content ${u.contentChars} characters)`),
       '  They are covered by NO pass. Split the change itself, or review them by another means',
       '  and say so — a record that names them would be claiming a reading nobody did.',
     )
@@ -951,8 +957,8 @@ function lostLines(shortfall) {
   }
   if (shortfall.statTruncated) lines.push('  · the DIFFSTAT was cut')
   if (shortfall.patchTruncated) lines.push('  · the PATCH was cut — the reviewer saw part of the diff')
-  for (const path of shortfall.truncated ?? []) lines.push(`  · TRUNCATED: ${path}`)
-  for (const path of shortfall.omitted ?? []) lines.push(`  · OMITTED ENTIRELY: ${path}`)
+  for (const path of shortfall.truncated ?? []) lines.push(`  · TRUNCATED: ${quotePassFile(path)}`)
+  for (const path of shortfall.omitted ?? []) lines.push(`  · OMITTED ENTIRELY: ${quotePassFile(path)}`)
   return lines
 }
 
@@ -965,7 +971,7 @@ function passLines(shortfall, plan) {
     lines.push(
       '  BEYOND REACH — no pass can hold these, not even their diff alone, so no record may',
       '  name them at all:',
-      ...beyond.map((u) => `    ${u.path} (diff ${u.patchChars}, content ${u.contentChars} characters)`),
+      ...beyond.map((u) => `    ${quotePassFile(u.path)} (diff ${u.patchChars}, content ${u.contentChars} characters)`),
     )
   }
   return lines
