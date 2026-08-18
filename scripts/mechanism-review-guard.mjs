@@ -38,7 +38,14 @@ import {
   mechanismPathsIn,
   modelFromTrailers,
   modelsFromTrailers,
+  mergeProblem,
+  reviewRecordWellFormed,
 } from './mechanism-review-core.mjs'
+import {
+  commitsForContributions,
+  outstandingContributions,
+  planAuthorshipGroups,
+} from './mechanism-review-range-core.mjs'
 import { quotePassFile, unquoteGitPath } from './review-material-core.mjs'
 import { guardOutcome, reviewGapRange } from './mechanism-review-guard-gap-core.mjs'
 
@@ -215,16 +222,13 @@ function scriptFiles() {
  * form matches neither a mechanism path nor a pass record's file list — so
  * every path line goes through unquoteGitPath.
  */
-export function parseMechanismLog(out, files) {
+export function parseRangeLog(out) {
   const commits = []
   let current = null
   const finish = () => {
     if (!current) return
-    const mech = mechanismPathsIn(current.touched, { scriptFiles: files })
-    if (mech.length) {
-      const { touched: _touched, ...commit } = current
-      commits.push({ ...commit, files: mech })
-    }
+    const { touched: _touched, ...commit } = current
+    commits.push({ ...commit, files: current.touched })
     current = null
   }
   for (const raw of String(out ?? '').split('\n')) {
@@ -240,6 +244,12 @@ export function parseMechanismLog(out, files) {
   }
   finish()
   return commits
+}
+
+export function parseMechanismLog(out, files) {
+  return parseRangeLog(out)
+    .map((commit) => ({ ...commit, files: mechanismPathsIn(commit.files, { scriptFiles: files }) }))
+    .filter((commit) => commit.files.length)
 }
 
 /**
@@ -298,17 +308,17 @@ export const rangeFilesCommand = (base, sha) => [
   `${base}..${sha}`,
 ]
 
-function mechanismCommits(base, head, files) {
+function rangeCommits(base, head, files) {
   const out = gitRawFile(mechanismLogCommand(base, head))
-  return parseMechanismLog(out, files).map((commit) => {
-    const facts = commitFacts(commit.sha)
+  return parseRangeLog(out).map((commit) => {
+    const trailers = git(`show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${commit.sha}"`)
     return {
       ...commit,
-      subject: facts.subject,
-      authorModel: modelFromTrailers(facts.trailers),
+      authorModel: modelFromTrailers(trailers),
       // EVERY co-author, not only the first: a commit naming two models has
       // two list authors, and neither may merge the union (point 634).
-      authorModels: modelsFromTrailers(facts.trailers),
+      authorModels: modelsFromTrailers(trailers),
+      mechanismFiles: mechanismPathsIn(commit.files, { scriptFiles: files }),
     }
   })
 }
@@ -352,9 +362,13 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
   }
   let effective = baseline
   let pendingCommits = []
+  let commits = []
   if (base !== head) {
     try {
-      pendingCommits = mechanismCommits(base, head, scriptFiles())
+      commits = rangeCommits(base, head, scriptFiles())
+      pendingCommits = commits
+        .filter((commit) => commit.mechanismFiles.length)
+        .map((commit) => ({ ...commit, subject: commitFacts(commit.sha).subject, files: commit.mechanismFiles }))
     } catch (e) {
       // ONLY a baseline that is genuinely GONE may move the gate. A baseline
       // rebased away or gc'd makes the range undiffable forever, and falling
@@ -381,7 +395,10 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
       } catch {
         /* the raw range below decides */
       }
-      pendingCommits = base === head ? [] : mechanismCommits(base, head, scriptFiles())
+      commits = base === head ? [] : rangeCommits(base, head, scriptFiles())
+      pendingCommits = commits
+        .filter((commit) => commit.mechanismFiles.length)
+        .map((commit) => ({ ...commit, subject: commitFacts(commit.sha).subject, files: commit.mechanismFiles }))
     }
   }
 
@@ -412,6 +429,17 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
     rangeFiles: (sha) => gitRawFile(rangeFilesCommand(base, sha)).split('\0').filter(Boolean),
   }))
 
+  // A scoped pass advances only the commit/file contribution it actually read.
+  // The remaining contribution list is both the gate's debt and the next pass
+  // plan's input; a cleared file therefore never returns merely because HEAD
+  // moved elsewhere in the range.
+  const debt = outstandingContributions({
+    commits,
+    records,
+    recordUsable: (record, commit) => reviewRecordWellFormed(record) && !mergeProblem(record, commit),
+  })
+  const authorshipPlan = planAuthorshipGroups({ commits: commitsForContributions(debt.outstanding) })
+
   return {
     applicable: true,
     head,
@@ -422,6 +450,9 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
     // support a gap waiver.
     rangeBase,
     inputs: { baseline: effective, head, pendingCommits, records },
+    commits,
+    debt,
+    authorshipPlan,
   }
 }
 
@@ -543,6 +574,15 @@ if (isMainModule(import.meta.url)) {
     const outcome = guardOutcome({ blocked: verdict.block, gap })
 
     if (status) {
+      let measuredChars = null
+      if (gathered.rangeBase && gathered.head && (gathered.debt?.outstanding ?? []).length) {
+        try {
+          const { measureReviewMaterial } = await import('./mechanism-review-guard-gap.mjs')
+          measuredChars = measureReviewMaterial({ baseline: gathered.rangeBase, head: gathered.head }).measuredChars
+        } catch {
+          /* the status names an unavailable measurement instead of inventing zero */
+        }
+      }
       console.log(`HEAD:      ${gathered.head.slice(0, 7)} (branch ${gathered.branch})`)
       console.log(`baseline:  ${String(gathered.baseline ?? '<none — arms at this HEAD>').slice(0, 7)}`)
       const pending = gathered.inputs.pendingCommits ?? []
@@ -554,6 +594,16 @@ if (isMainModule(import.meta.url)) {
           // name could forge a --status line if joined raw.
           `  ${c.sha.slice(0, 7)}  ${c.files.map((f) => quotePassFile(f)).join(', ')}\n      authored by ${c.authorModel || 'unknown'}, ` +
             `${c.coveringRecordShas.length} covering review(s)`,
+        )
+      }
+      console.log(`outstanding review passes: ${gathered.authorshipPlan?.groups?.length ?? 0}`)
+      console.log(
+        `outstanding material: ${measuredChars === null ? '<measurement unavailable>' : `${measuredChars} characters`}`,
+      )
+      for (const group of gathered.authorshipPlan?.groups ?? []) {
+        console.log(
+          `  ${group.kind === 'commit' ? `commit ${group.commits[0].slice(0, 7)}` : `${group.vendor} files`} → ` +
+            `${group.reviewer || 'NO ELIGIBLE REVIEWER'}: ${group.files.map((f) => quotePassFile(f)).join(', ')}`,
         )
       }
       if (outcome.action === 'report-gap') console.log(`\n${gap.report}`)

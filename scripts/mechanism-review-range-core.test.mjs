@@ -6,6 +6,7 @@ import {
   planAuthorshipGroups,
   vendorOf,
 } from './mechanism-review-range-core.mjs'
+import { evaluateMechanismReview } from './mechanism-review-core.mjs'
 
 const sha = (letter) => letter.repeat(40)
 const commit = (id, authorModel, files) => ({ sha: sha(id), authorModel, files })
@@ -132,5 +133,52 @@ describe('per-contribution review baseline', () => {
       [sha('a'), ['shared']],
       [sha('b'), ['shared']],
     ])
+  })
+
+  it('removes a recorded scoped file from the mechanism gate\'s next demand', () => {
+    const head = sha('b')
+    const record = {
+      sha: head,
+      model: 'GPT-5.6 Sol',
+      verdict: 'merge',
+      evidence: 'checked file a against its complete contribution patch',
+      mode: 'review',
+      at: 1_787_000_000_000,
+      pass: { index: 1, total: 2, files: ['a'], commits: [sha('a')] },
+    }
+    const verdict = evaluateMechanismReview({
+      baseline: sha('0'),
+      head,
+      records: [record],
+      pendingCommits: [
+        {
+          ...commits[0],
+          subject: 'change two mechanism files',
+          coveringRecordShas: [head],
+        },
+      ],
+    })
+    expect(verdict.block).toBe(true)
+    expect(verdict.findings[0].commit.files).toEqual(['shared'])
+  })
+
+  it('clears a commit once scoped passes have read each file', () => {
+    const head = sha('b')
+    const rows = ['a', 'shared'].map((file, index) => ({
+      sha: head,
+      model: 'GPT-5.6 Sol',
+      verdict: 'merge',
+      evidence: `checked ${file} against its complete contribution patch`,
+      mode: 'review',
+      at: 1_787_000_000_000 + index,
+      pass: { index: index + 1, total: 2, files: [file], commits: [sha('a')] },
+    }))
+    const verdict = evaluateMechanismReview({
+      baseline: sha('0'),
+      head,
+      records: rows,
+      pendingCommits: [{ ...commits[0], coveringRecordShas: [head] }],
+    })
+    expect(verdict.block).toBe(false)
   })
 })

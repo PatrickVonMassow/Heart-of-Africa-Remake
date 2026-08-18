@@ -133,11 +133,11 @@ export function outstandingContributions({ commits = [], records = [], recordUsa
   const covered = new Set()
   const refusals = []
   for (const record of records ?? []) {
-    if (!recordUsable(record)) continue
     const files = Array.isArray(record?.pass?.files) ? record.pass.files.map(String) : []
     const commitsRead = Array.isArray(record?.pass?.commits) ? record.pass.commits.map(String) : []
     if (!files.length || !commitsRead.length) continue
     for (const contribution of contributions) {
+      if (!recordUsable(record, contribution.commit)) continue
       if (!files.includes(contribution.file) || !commitsRead.includes(contribution.sha)) continue
       if (!contained(record, contribution.sha)) continue
       if (contribution.authors.some((author) => sameModel(record.model, author))) continue
