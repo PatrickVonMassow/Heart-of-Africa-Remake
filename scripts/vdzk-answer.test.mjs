@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { ANSWER_DEADLINE_MS } from './decision-card-guard-core.mjs'
-import { extractLastUserMessage } from './decision-card-guard.mjs'
+import {
+  DECISION_CARD_SESSION_RETENTION_MS,
+  extractLastUserMessage,
+} from './decision-card-guard.mjs'
 import { boardHtml } from './dashboard-guard-fixtures.mjs'
 import { buildResponderPrompt } from './chat-watcher-core.mjs'
 
@@ -106,6 +109,34 @@ describe('the transcript user-message boundary', () => {
     expect(extractLastUserMessage(entry({ message: { content: buildResponderPrompt([
       { id: 'chat-1', ts: 1, text: 'Kartenschrift bleibt.' },
     ]) + ' fremder Nachsatz' } }))).toBeNull()
+  })
+})
+
+describe('the per-session turn baseline', () => {
+  it('prunes expired sessions while keeping the current session unconditionally', () => {
+    const now = Date.now()
+    writeFileSync(boardPath, boardHtml({ klaerungExtra: titles }))
+    writeFileSync(statePath, JSON.stringify({
+      version: 2,
+      sessions: {
+        [session]: { titles: ['old current title'], at: now - DECISION_CARD_SESSION_RETENTION_MS - 60_000 },
+        recent: { titles: ['recent title'], at: now },
+        expired: { titles: ['expired title'], at: now - DECISION_CARD_SESSION_RETENTION_MS - 60_000 },
+        undated: { titles: ['undated title'] },
+      },
+    }))
+    const source = `
+      const mod = await import('./scripts/decision-card-guard.mjs')
+      process.stdout.write(String(mod.seedDecisionCardBaseline(${JSON.stringify(session)})))
+    `
+    expect(execFileSync(process.execPath, ['--input-type=module', '--eval', source], {
+      cwd: process.cwd(), env, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+    })).toBe('true')
+
+    const sessions = JSON.parse(readFileSync(statePath, 'utf8')).sessions
+    expect(Object.keys(sessions).sort()).toEqual(['recent', session].sort())
+    expect(sessions[session]).toMatchObject({ titles, seededAtTurnStart: true })
+    expect(sessions[session].at).toBeGreaterThanOrEqual(now)
   })
 })
 

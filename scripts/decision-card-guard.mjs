@@ -41,6 +41,11 @@ const STATE_PATH =
   process.env.DECISION_CARD_GUARD_STATE ||
   repoPath('.claude/decision-card-guard-state.json')
 
+/** Old sessions are useful only as short-lived overlap between active turns.
+ * The current session is always retained below, even when one turn lasts longer
+ * than this window. */
+export const DECISION_CARD_SESSION_RETENTION_MS = 24 * 60 * 60 * 1000
+
 /** The titles of every "Von dir zu klären" card, or null when the board cannot be
  *  parsed into sections at all — null is the fail-open signal to the core. */
 export function vdzkTitles(html) {
@@ -169,6 +174,13 @@ export function seedDecisionCardBaseline(sessionId, { transcriptPath = '' } = {}
     const state = readDecisionCardState() ?? {}
     const sessions = sessionsOf(state)
     const prior = decisionSession(state, sessionId) ?? {}
+    const now = Date.now()
+    const retainedSessions = Object.fromEntries(Object.entries(sessions).filter(([id, session]) =>
+      id === sessionId || (
+        Number.isFinite(session?.at) &&
+        now - session.at <= DECISION_CARD_SESSION_RETENTION_MS
+      ),
+    ))
     const userMessage = transcriptPath && existsSync(transcriptPath)
       ? extractLastUserMessage(readFileSync(transcriptPath, 'utf8'))
       : null
@@ -177,12 +189,12 @@ export function seedDecisionCardBaseline(sessionId, { transcriptPath = '' } = {}
       ...state,
       version: 2,
       sessions: {
-        ...sessions,
+        ...retainedSessions,
         [sessionId || '']: {
           titles,
           userMessage,
           review: sameMessage ? prior.review : (userMessage ? { messageId: userMessage.id, kept: {} } : null),
-          at: Date.now(),
+          at: now,
           seededAtTurnStart: true,
         },
       },
