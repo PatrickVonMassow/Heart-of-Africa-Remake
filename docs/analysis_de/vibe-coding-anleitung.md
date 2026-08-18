@@ -175,46 +175,45 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
   die das Werkzeug liest; oder die Verbesserung ist fertig, nur führt nichts jemanden dorthin.
-  → *Prompt:* „Eine Ausnahme trägst du **im selben Zug** dort ein, wo der Mechanismus sie liest;
-  bei einer Fähigkeit die Stelle, an der jemand danach greift, und **woran** man ihre Benutzung
-  erkennt. Und wenn etwas ‚wartet': **worauf genau**?"
+  → *Prompt:* „Eine Ausnahme trägst du **im selben Zug** dort ein, wo der Mechanismus sie liest,
+  eine Fähigkeit dort, wo jemand nach ihr greift. Und wenn etwas ‚wartet': **worauf genau**?"
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
   → *Prompt:* „Laufzeiten, Performance und Kosten nennst du nur **gemessen**, Performance auf der
-  **Ziel-Hardware**. Was altern kann, erhebe **am Verwendungsort** neu."
+  **Ziel-Hardware**; was altern kann, erhebe neu."
 
 - **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt an der Größe jedes
   Kontexts, nicht an den Stunden: lange Sitzungen, und Helfer, die ihren Auftrag erst in
   großen Dokumenten *suchen*.
-  → *Prompt:* „Nenne mir die **gemessenen** Treiber. Schicke jedem Helfer seinen Auftrag als
-  fertigen Kurzbrief mit, und fang für jede Aufgabe einen **frischen Kontext** an."
+  → *Prompt:* „Nenne mir die **gemessenen** Treiber, schick jedem Helfer seinen Auftrag als
+  fertigen Kurzbrief mit und fang je Aufgabe einen **frischen Kontext** an."
 
 - **Der autonome Lauf bleibt stehen — still oder wartend.** Der Fortschritt endet unbemerkt
   oder hängt an einer Rückfrage — beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
-  Aufgabe. Bleib **nie mit einer Rückfrage stehen**: vernünftigste Annahme treffen, sichtbar
+  Aufgabe, und bleib **nie mit einer Rückfrage stehen**: vernünftigste Annahme treffen, sichtbar
   festhalten, was mich braucht, weitergehen. Jedes Warten bricht auch beim **Fehler** ab."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
-  → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, kurz,
-  fürs Handy lesbar — und halte Format- und Sprachvorgaben auf **allen** Ausgaben ein."
+  → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, fürs
+  Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
 - **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last;
   oder er ist nur dort grün, wo er lief.
   → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, Zeitgrenzen richten sich nach der
-  gemessenen Last, und sein **Nachweis** landet dort, wo der Hauptstand ihn liest — die
-  Arbeitskopie wird gelöscht. Vor dem Abgeben: ‚auch im **Hauptstand** grün?'"
+  gemessenen Last, und sein **Nachweis** landet dort, wo der Hauptstand ihn liest. Vor dem
+  Abgeben: ‚auch im **Hauptstand** grün?'"
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
-  halte Messläufe frei von störenden Fenstern."
+  miss auf einer ruhigen Maschine."
 
 - **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte ist
-  trotzdem nicht passiert; eine Warnung in der Ausgabe einer **geglückten** Aktion ist
-  faktisch unsichtbar.
+  trotzdem nicht passiert; eine Warnung in einer **geglückten** Aktion ist unsichtbar — und ein
+  Tor, das den Push zu Recht verweigert, meldet nichts — es wächst nur ein Stapel.
   → *Prompt:* „Beleg nach jeder Aktion mit Fernwirkung den **Zielzustand** statt der
-  Erfolgsmeldung; eine Abfrage ohne Treffer ist ein Befund."
+  Erfolgsmeldung, und melde beim Start, was **lokal fertig, aber nirgends angekommen** ist."
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an Widersprüchen
   und an Regeln, deren Absicherung enger greift als ihr Satz: Sie feuert, wird geglaubt, deckt
@@ -410,4 +409,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: ee4015f4acf2925a29911e0126884965edd90c7664e51fab26f61542c8b21e00 -->
+<!-- GUIDE-FINGERPRINT: 3ea2a126a20bf83150b0ce887cd9b2ae8651f1c53f8f75c2bbafb46ef62fdac2 -->

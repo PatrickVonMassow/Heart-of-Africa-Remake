@@ -266,6 +266,7 @@ export function driftedCards(input) {
 // ---- top-level decision ------------------------------------------------------
 
 const ALLOW = { block: false, reason: '' }
+const block = (reason) => ({ block: true, reason })
 
 /**
  * Decide on the raw inputs. All optional; any bad shape → allow:
@@ -275,14 +276,56 @@ const ALLOW = { block: false, reason: '' }
  *   touchedFiles             working-tree changed/untracked paths
  *   snapshots                integritySnapshots from dashboard-state.json
  */
+/**
+ * Point numbers standing in the Erledigt section more than once.
+ *
+ * WHY IT IS A CHECK AND NOT ONLY A FIX: `board.mjs done` folds duplicates now,
+ * but the board is a FILE, and a hand-edit or a merge of two published versions
+ * can reintroduce them — point 700 stood there four times before anyone looked
+ * (user 18.08.2026). Reading only the Erledigt section matters: the same point
+ * legitimately has a queue card and a now-card beside its archive entry.
+ */
+export function duplicateDonePoints(dashboardHtml) {
+  const html = String(dashboardHtml ?? '')
+  const at = html.indexOf('<summary><h2>Erledigt</h2></summary>')
+  if (at < 0) return []
+  // STOP AT THE NEXT SECTION (cross-vendor review 18.08.2026): slicing to the end
+  // of the file counted a queue or now section placed AFTER Erledigt, which is
+  // the cross-section false positive this function claims to avoid.
+  const next = html.indexOf('<details class="sect">', at)
+  const section = html.slice(at, next < 0 ? html.length : next)
+  const points = [...section.matchAll(/<details>\s*<summary><span class="num">\s*(\d+)\s*<\/span>/g)].map(
+    (m) => m[1],
+  )
+  const seen = new Set()
+  const twice = new Set()
+  for (const p of points) {
+    if (seen.has(p)) twice.add(p)
+    seen.add(p)
+  }
+  return [...twice]
+}
+
 export function evaluate(input) {
   try {
     const { dashboardHtml, tasksMd, focusPoint = null, commitSubjects = [], touchedFiles = [], snapshots = null } =
       input ?? {}
+    // (D) ONE POINT, ONE ERLEDIGT CARD — checked BEFORE every early return
+    // (cross-vendor review 18.08.2026): a finished batch and a board holding
+    // nothing but duplicated archive cards both left this check unreached, which
+    // is exactly the state it exists for.
+    const duplicateDone = duplicateDonePoints(dashboardHtml)
+    const duplicateProblem = duplicateDone.length
+      ? `POINT(S) ${duplicateDone.join(', ')} STAND IN ERLEDIGT MORE THAN ONCE: a point that comes ` +
+        'back into current work is archived again, and each archiving used to append another card, ' +
+        'so the section counts one finished point several times. Fold them: ' +
+        `node scripts/board.mjs merge-done, then ${REPUBLISH}.`
+      : ''
+
     const specs = parsePointSpecs(tasksMd)
     let anyOpen = false
     for (const s of specs.values()) if (s.open) anyOpen = true
-    if (!anyOpen) return ALLOW // batch complete — no dashboard duty
+    if (!anyOpen) return duplicateProblem ? block(duplicateProblem) : ALLOW
 
     const cards = parseQueueCards(dashboardHtml)
     const nowCard = parseNowCard(dashboardHtml)
@@ -290,9 +333,14 @@ export function evaluate(input) {
     // active parallel work (user decision 22.07.2026), so check A must accept
     // evidence for any of them, not only the first card.
     const nowPoints = parseNowCardPoints(dashboardHtml)
-    if (!nowCard && cards.length === 0) return ALLOW // no board — dashboard-guard owns registration
+    if (!nowCard && cards.length === 0) {
+      // no board — dashboard-guard owns registration, but a duplicated archive is
+      // still a duplicated archive
+      return duplicateProblem ? block(duplicateProblem) : ALLOW
+    }
 
     const problems = []
+    if (duplicateProblem) problems.push(duplicateProblem)
 
     // (B) stale queue cards
     const { closed, unknown } = staleQueueCards(cards.map((c) => c.point), specs)

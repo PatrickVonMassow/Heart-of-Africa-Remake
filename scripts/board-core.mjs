@@ -570,13 +570,177 @@ export function toDone(html, point, { text, end = berlinStamp() } = {}) {
   if (!body) throw new Error('board: refusing to archive a card with an empty body')
   const start = (metaOf(card).match(/^\s*(\d{1,2}:\d{2})/) ?? [])[1] ?? end
   const title = stripPointPrefix(titleOf(card), point)
-  const entry =
+  const out = html.replace(card, '')
+  // ONE POINT, ONE ERLEDIGT CARD (user 18.08.2026, measured on point 700, which
+  // stood there FOUR times). A point comes back into current work whenever a
+  // session boundary or a follow-up reopens it, and every archiving appended
+  // another card, so the section read as four finished points. The EARLIEST
+  // start is kept — that is when the work began — the newest end and the newest
+  // closing text replace the old ones.
+  // The OLDEST card's start is the true one, and it is found by ORDER, not by
+  // comparing clock faces: the archive is newest-first and the stamps carry no
+  // date, so `21:17` from last night is EARLIER than `00:45` this morning while
+  // arithmetic says the opposite (measured on point 700's four cards).
+  const existing = doneCards(out, point)
+  const earliest = earliestStart(existing) || start
+  const entry = renderDoneEntry({ point, title, start: earliest, end, body })
+  const cleaned = dropDoneCards(out, point)
+  const { from } = sectionBounds(cleaned, 'done')
+  return `${cleaned.slice(0, from)}\n${entry}${cleaned.slice(from).replace(/^\n/, '')}`
+}
+
+/** One Erledigt entry, the single writer of that markup. */
+function renderDoneEntry({ point, title, start, end, body }) {
+  return (
     `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
     `<span class="right"><span class="meta">${start} · ${end}</span></span></summary>\n` +
     `  <div class="body">\n${renderCardBody(body)}\n  </div>\n</details>\n`
-  const out = html.replace(card, '')
-  const { from } = sectionBounds(out, 'done')
-  return `${out.slice(0, from)}\n${entry}${out.slice(from).replace(/^\n/, '')}`
+  )
+}
+
+/**
+ * A card with its START field replaced, whatever shape the old one had.
+ *
+ * The field is everything between `class="meta">` and the range separator (or
+ * the closing tag when the card carries a single stamp), so a damaged start is
+ * REPLACED rather than partially overwritten (review rounds 3 and 5).
+ */
+export function withStart(card, start) {
+  return String(card ?? '').replace(/(class="meta">)([^<]*)/, (whole, lead, content) => {
+    const at = content.indexOf('·')
+    return at < 0 ? `${lead}${start}` : `${lead}${start} ${content.slice(at)}`
+  })
+}
+
+/** Remove every Erledigt card for `point`, INSIDE the section alone. */
+function dropDoneCards(html, point) {
+  const source = String(html ?? '')
+  const b = doneBounds(source)
+  if (!b) return source
+  const entries = doneEntries(source).filter((e) => e.point === String(point))
+  if (!entries.length) return source
+  const section = source.slice(b.from, b.end)
+  let out = ''
+  let cursor = 0
+  for (const e of entries) {
+    out += section.slice(cursor, e.at)
+    cursor = e.at + e.text.length
+  }
+  out += section.slice(cursor)
+  return `${source.slice(0, b.from)}${out}${source.slice(b.end)}`
+}
+
+/** Where the Erledigt section's cards sit, or null when there is no section. */
+function doneBounds(html) {
+  try {
+    return sectionBounds(String(html ?? ''), 'done')
+  } catch {
+    return null
+  }
+}
+
+/** An Erledigt card, matched inside the section alone. */
+const DONE_CARD_RE = /<details>\s*<summary><span class="num">\s*(\d+)\s*<\/span>[\s\S]*?<\/details>\n?/g
+
+/** Every Erledigt card as `{ point, text, at }`, in document order (newest first). */
+export function doneEntries(html) {
+  const b = doneBounds(html)
+  if (!b) return []
+  const section = String(html).slice(b.from, b.end)
+  return [...section.matchAll(DONE_CARD_RE)].map((m) => ({ point: m[1], text: m[0], at: m.index }))
+}
+
+/** Every Erledigt card for `point`, newest first — normally none or one. */
+export function doneCards(html, point) {
+  return doneEntries(html)
+    .filter((e) => e.point === String(point))
+    .map((e) => e.text)
+}
+
+/** The FIRST Erledigt card for `point`, or null. */
+export function doneCard(html, point) {
+  return doneCards(html, point)[0] ?? null
+}
+
+/**
+ * The start stamp an Erledigt card carries, or '' when it carries none that is
+ * a real time of day.
+ *
+ * `99:99` used to pass and then win the comparison it took part in
+ * (cross-vendor review 18.08.2026): a damaged card must not decide when the work
+ * began — it must simply not answer.
+ */
+export function doneStart(card) {
+  // The stamp must END where the markup says it does (review rounds 2 and 4):
+  // a bare digit boundary still read `12:34:56` and `12:34x` as `12:34`, so a
+  // damaged card could decide the merged start. What may follow is the range
+  // separator or the closing tag, nothing else.
+  const m = String(card ?? '').match(/class="meta">\s*(\d{1,2}):(\d{2})(?=\s*(?:·|<\/span>))/)
+  if (!m) return ''
+  const [, h, min] = m
+  if (Number(h) > 23 || Number(min) > 59) return ''
+  return `${h}:${min}`
+}
+
+/**
+ * The start of the OLDEST card that carries a usable one.
+ *
+ * By ORDER, not by comparing clock faces: the archive is newest-first and the
+ * stamps carry no date, so last night's `21:17` precedes this morning's `00:45`
+ * while arithmetic says the opposite. Scanning on past a malformed card matters
+ * for the same reason — one damaged stamp must not throw the answer back to the
+ * newest card (same review).
+ */
+export function earliestStart(cards = []) {
+  for (let i = cards.length - 1; i >= 0; i--) {
+    const s = doneStart(cards[i])
+    if (s) return s
+  }
+  return ''
+}
+
+/**
+ * Fold every duplicate Erledigt card into one, for a board that already carries
+ * them (point 700 stood there four times before `toDone` learned to merge).
+ *
+ * The NEWEST card keeps its POSITION and its text — the archive is ordered by
+ * when a point finished — and takes the earliest start it can find. The section
+ * is rebuilt from its own cards rather than string-replaced: two byte-identical
+ * duplicates made `replace` delete the FIRST occurrence, which is the survivor,
+ * and an identical card in another section could be deleted instead (same
+ * review).
+ */
+export function mergeDoneDuplicates(html) {
+  const source = String(html ?? '')
+  const b = doneBounds(source)
+  if (!b) return { html: source, merged: [] }
+  const entries = doneEntries(source)
+  const counts = new Map()
+  for (const e of entries) counts.set(e.point, (counts.get(e.point) ?? 0) + 1)
+  const merged = [...counts.entries()].filter(([, n]) => n > 1).map(([point]) => point)
+  if (!merged.length) return { html: source, merged: [] }
+
+  const section = source.slice(b.from, b.end)
+  let out = ''
+  let cursor = 0
+  const seen = new Set()
+  for (const e of entries) {
+    out += section.slice(cursor, e.at)
+    cursor = e.at + e.text.length
+    if (seen.has(e.point)) continue // an older duplicate: dropped
+    seen.add(e.point)
+    if (counts.get(e.point) > 1) {
+      const start = earliestStart(doneCards(source, e.point))
+      // The whole START FIELD is replaced, not the digits in it (review rounds 3
+      // and 5): a damaged newest stamp is not always numeric — `oops · 01:10`
+      // survived untouched and `12x:34` became `21:17x:34`.
+      out += start ? withStart(e.text, start) : e.text
+    } else {
+      out += e.text
+    }
+  }
+  out += section.slice(cursor)
+  return { html: `${source.slice(0, b.from)}${out}${source.slice(b.end)}`, merged }
 }
 
 // ═══ Point 416 — closing a point must not leave the board blank ═══

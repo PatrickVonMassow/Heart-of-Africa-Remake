@@ -220,7 +220,7 @@ describe('the registry itself', () => {
       'scripts/model-guard-core.mjs',
       'scripts/review-sol-core.mjs',
       'scripts/sol-share-core.mjs',
-      'memory/fable-authors-hard-cases.md',
+      'memory/hard-cases-go-to-sol.md',
       'memory/fable-sparingly.md',
       'memory/serving-model-watch.md',
     ])
@@ -496,7 +496,9 @@ describe('the real placement of a stamp (review round 8)', () => {
   const hookText = readFileSync(resolve(process.cwd(), 'scripts/batch-resume-hook.mjs'), 'utf8')
 
   it('accepts a quote from the policy text it marks', () => {
-    expect(quoteIsInFile(hookText, 'OPUS 5 keeps the HARD cases', { id: 'model-policy' }).ok).toBe(true)
+    expect(
+      quoteIsInFile(hookText, 'HARD and CRITICAL ones go STRAIGHT to it', { id: 'model-policy' }).ok,
+    ).toBe(true)
   })
 
   it('refuses a quote of the commentary ABOUT the stamp', () => {

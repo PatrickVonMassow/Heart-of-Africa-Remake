@@ -175,8 +175,9 @@ const RESUME_BODY =
   'changes (guards, docs, dashboard, process files) go directly to main. MAXIMAL ' +
   'DELEGATION (user decision 22.07.2026): delegate implementation AND infra/guard/doc/' +
   'dashboard work to parallel WORKTREE-ISOLATED subagents on NON-OVERLAPPING files — under ' +
-  'the model policy stated above, so the mechanical and mid-difficulty points go to GPT-5.6 ' +
-  'Sol, while the hard cases and any point whose verification is the work stay with Opus 5 ' +
+  'the model policy stated above, so the points go to GPT-5.6 Sol — the hard and critical ' +
+  'ones included — while a point whose verification is the work stays with Opus 5 unless ' +
+  'its spec marks it hard ' +
   '(each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
   'session keeps only the picture-verification on both backends, the serial merge -> ' +
   'fast-gate -> tick -> deploy -> cleanup, and the board publish. Every defect the user ' +
@@ -235,14 +236,15 @@ try {
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
 
-      // rule:model-policy@8b2f41d7
-      'MODEL POLICY (25.07.-17.08.2026, CLAUDE.md par.6): AUTHORING HAS THREE LANES. ' +
-      'GPT-5.6 Sol authors the MECHANICAL and MID-DIFFICULTY points via ' +
-      'scripts/author-sol.mjs; OPUS 5 keeps the HARD cases — difficult, complex or ' +
-      'error-prone — as well as a point whose VERIFICATION is the work; FABLE 5 is the ' +
-      'ESCALATION and takes over Opus work once Sol still finds problems after a re-work, ' +
-      'never a hard case from the start (user 17.08.2026 — its weekly pool is the ' +
-      'scarcest). scripts/author-routing-core.mjs makes the cut, and ' +
+      // rule:model-policy@05eaa324
+      'MODEL POLICY (25.07.-18.08.2026, CLAUDE.md par.6): AUTHORING HAS THREE LANES. ' +
+      'GPT-5.6 Sol authors the points via scripts/author-sol.mjs, and since 18.08.2026 the ' +
+      'HARD and CRITICAL ones go STRAIGHT to it — difficult, complex, error-prone or tagged ' +
+      'HIGH criticality is a reason FOR Sol, not against it; OPUS 5 authors what is left, a ' +
+      'point whose VERIFICATION is the work and that nothing marks hard; FABLE 5 is the ' +
+      'ESCALATION the CUT reaches only once a re-work still comes back with problems, though ' +
+      'a point\'s own `Author lane:` tag may name any lane (its weekly pool is the scarcest). ' +
+      'scripts/author-routing-core.mjs makes the cut, and ' +
       'scripts/sol-share.mjs --status says what the switch routes right now. REVIEW is ' +
       'CROSS-VENDOR: Sol reads Anthropic-authored work (scripts/review-sol.mjs), Claude ' +
       'reads Sol-authored work, and no model reviews its own. ' +

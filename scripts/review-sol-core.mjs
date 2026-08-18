@@ -1,6 +1,6 @@
 // Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624).
 //
-// rule:model-policy@8b2f41d7
+// rule:model-policy@05eaa324
 // WHY IT EXISTS: our two reviewers were Opus 5 and Fable 5 — one house, similar
 // training, therefore CORRELATED blind spots, which is exactly what the
 // four-eyes rule is bought against (CLAUDE.md §6). A model from a different
@@ -20,11 +20,24 @@
 // Side-effect free: the process spawn, the temp files and the printing belong to
 // scripts/review-sol.mjs. Pinned by review-sol-core.test.mjs.
 
-import { BLIND_REVIEWER, modelFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
+import { BLIND_REVIEWER, blindReviewerAdmission, modelFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
+import {
+  assembleMaterial,
+  formatPassFiles,
+  formatShortfall,
+  MATERIAL_BUDGET_CHARS,
+  parseDiffHeader,
+  PATCH_SHARE,
+} from './review-material-core.mjs'
 
 // Re-exported: the runner and the recorder refuse the same sentence, from one
 // definition (mechanism-review-core.mjs).
-export { BLIND_REVIEWER }
+export { BLIND_REVIEWER, blindReviewerAdmission }
+
+// The material budget and its split live with the accounting that spends them
+// (review-material-core.mjs); re-exported here because this is where every
+// caller of the review command already looks for them.
+export { MATERIAL_BUDGET_CHARS, PATCH_SHARE }
 
 /** The model id `codex exec -m` is given, and the name a record calls it by. */
 export const SOL_MODEL_ID = 'gpt-5.6-sol'
@@ -219,8 +232,9 @@ export function codexArgs({
  * transcribed into the ledger verbatim — a verdict word this project's recorder
  * accepts, and one honest line of what was actually checked.
  */
-export function buildReviewPrompt({ sha = '', brief = '', mode = 'review' } = {}) {
+export function buildReviewPrompt({ sha = '', brief = '', mode = 'review', pass = null, receipt = '' } = {}) {
   const divergent = String(mode) === 'blind-parallel'
+  const withReceipt = Boolean(String(receipt ?? '').trim())
   return [
     'You are the SECOND pair of eyes on a change in this repository, working under the',
     'four-eyes rule of CLAUDE.md §6. You were chosen because you are a DIFFERENT model',
@@ -235,6 +249,21 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review' } = {}
     'cannot create user namespaces, so a shell command of yours would fail before it',
     'ran — judge the attached material, and if a part of it is marked TRUNCATED, say so',
     'in your evidence rather than guessing past the cut.',
+    // A PASS REVIEWER IS TOLD THE MATERIAL'S SHAPE UP FRONT (structural finding,
+    // fourth cross-vendor round): without this, every pass verdict degraded into
+    // a coverage refusal over files another pass carries by design.
+    ...(pass
+      ? [
+          '',
+          `THIS IS PASS ${Number(pass.index)} OF ${Number(pass.total)} of a review split over the range's`,
+          'FILE SET, because the whole range does not fit one round. The material OPENS WITH A',
+          'MANIFEST naming which files THIS pass carries (and at which delivery level) and which',
+          'are ABSENT BY DESIGN, each covered by another pass. A file the manifest declares',
+          'absent is NOT truncated: do not refuse a verdict over its absence. Your verdict',
+          'covers exactly the files this pass carries, and the range is cleared only once',
+          'every pass is recorded.',
+        ]
+      : []),
     '',
     `WHAT TO JUDGE: ${brief}`,
     '',
@@ -249,7 +278,15 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review' } = {}
         'spec, are its tests real tests, what breaks that nobody tested?',
     '',
     'Report ONLY findings you can point at a line for. End your final message with',
-    'EXACTLY these two lines and nothing after them:',
+    // THE TOKEN IS NEVER IN THE PROMPT (finding 8): it stands only on the
+    // material's last line, so echoing it back is evidence the material was
+    // read through to its end — a child that saw only this prompt cannot know it.
+    ...(withReceipt
+      ? [
+          'EXACTLY these three lines and nothing after them:',
+          'RECEIPT: <the hex token from the material\'s LAST line, "=== END OF MATERIAL — RECEIPT … ===">',
+        ]
+      : ['EXACTLY these two lines and nothing after them:']),
     `VERDICT: <${VERDICTS.join('|')}>`,
     'EVIDENCE: <one line naming what you actually checked and what you found>',
   ].join('\n')
@@ -263,16 +300,121 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review' } = {}
  * evidence line too thin to mean anything, is NOT a verdict. Such a run has not
  * been reviewed, and the caller falls back rather than record a guess.
  */
-export function parseVerdict(text) {
+/** The VALUE of a labelled RAW line: everything after its first colon — the
+ *  label always carries one, and decoration adds none before it. A label
+ *  written `**EVIDENCE:**` closes its decoration right after the colon; that
+ *  one marker run is dropped only when whitespace follows it, so a value that
+ *  genuinely begins with a marker stays.
+ *
+ *  THE BOUNDARY, so nobody re-litigates it (final convergence): a RULING —
+ *  anything that DECIDES by looking at the text: placeholder detection,
+ *  presence, length, any match or classification — reads the STRIPPED copy,
+ *  because decoration must not change a decision. A QUOTE — anything whose
+ *  text reaches output a caller reads, cites or acts on — reads the RAW text
+ *  through this helper, byte for byte, because the strip rewrites content
+ *  (`src/__init__.py` → `src/init.py`). The one deliberate exception is the
+ *  ADMISSION scan, which reads BOTH spellings: there the two readings can
+ *  only widen the net, never shield it.
+ *
+ *  PADDING IS FORMAT, NOT CONTENT (trim sweep, final convergence): a labelled
+ *  single-line field trims the separator whitespace at its edges — after the
+ *  label's colon, around an entry's pipes, at line end — because that padding
+ *  belongs to the `LABEL: value` / `id | file | text` format the prompts
+ *  demand; the bytes INSIDE a field travel exactly. A whole-message quote
+ *  (ask-sol's explain) is not a labelled field and trims NOTHING. */
+/** The SHAPE-AWARE decoration strip every ruling reads (final-round pass 1,
+ *  third instance): deleting `[*_#>` + backtick] characters outright let a
+ *  FABRICATED label match — `D_ONE:` became `DONE:` — so label recognition
+ *  must unwrap decoration without merging word fragments. Headings and quote
+ *  markers at line starts, backtick runs, and emphasis runs at word edges as
+ *  MATCHED PAIRS (iterated for nesting); a marker inside a word is content.
+ *  Preserves the line count, so stripped and raw lines pair by index. */
+export function stripDecoration(text) {
+  let clean = String(text ?? '')
+    .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
+    .replace(/^[ \t]*>+[ \t]?/gm, '')
+    // A FENCE LINE IS LINE-START DECORATION like a heading: a line holding
+    // only a backtick run (with an optional language tag) frames content and
+    // is no content itself — left standing it would displace the terminal
+    // label lines the parsers read off the message end.
+    .replace(/^[ \t]*`{3,}[\w-]*[ \t]*$/gm, '')
+  // BACKTICKS AS MATCHED PAIRS TOO (landing-round pass 7): deleting every
+  // backtick run outright merged word fragments exactly like the emphasis
+  // case this function exists to avoid — `` VERD`ICT: `` became `VERDICT:`
+  // and a fabricated label was accepted as the required terminal field. A
+  // backtick run unwraps only against an equal closing run at a word edge; a
+  // marker inside a word is content and stays.
+  for (let i = 0; i < 4; i++) {
+    const next = clean
+      .replace(/(^|[^\w`])(`+)(?=[^\s`])([^`]+?)(?<=[^\s`])\2(?=[^\w`]|`|$)/g, '$1$3')
+      .replace(/(^|[^\w*_])([*_]+)(?=[^\s*_])([^*_]+?)(?<=[^\s*_])\2(?=[^\w*_]|[*_]|$)/g, '$1$3')
+    if (next === clean) break
+    clean = next
+  }
+  return clean
+}
+
+/** The NET-ONLY spelling beside raw and stripped (final-round pass 1): every
+ *  marker character deleted outright. Mixed nesting (`**_no_**`) defeats both
+ *  the raw scan (markers break the word boundaries) and the pair strip (the
+ *  runs differ), but no decoration survives deletion. It can FABRICATE an
+ *  admission from mid-word markers — which only ever refuses a round
+ *  (fail-closed), never clears one — so it is used by the admission scan
+ *  ALONE, never for matching or quoting. */
+export const charStripped = (text) => String(text ?? '').replace(/[*`_#>~]/g, '')
+
+export function rawFieldValue(rawLine) {
+  const at = String(rawLine ?? '').indexOf(':')
+  if (at < 0) return ''
+  return String(rawLine)
+    .slice(at + 1)
+    .replace(/^\s*(?:[*_`]+(?=\s))?/, '')
+    .trim()
+}
+
+export function parseVerdict(text, { receipt = '' } = {}) {
   const raw = String(text ?? '')
-  const clean = raw.replace(/[*`_#>]/g, '')
   // THE PAIR MUST BE THE END OF THE MESSAGE (four-eyes finding, 10.08.2026). The
   // prompt asks for exactly two closing lines; taking the last match of each
   // INDEPENDENTLY would happily pair a verdict with an evidence line from some
   // earlier paragraph, so the two final non-empty lines are what is read.
-  const tail = clean.split('\n').map((l) => l.trim()).filter(Boolean).slice(-2)
+  //
+  // MATCHED ON THE STRIPPED LINE, QUOTED FROM THE RAW ONE (final convergence):
+  // the char-deleting strip exists so a decorated label still matches — but it
+  // rewrites content (`src/__init__.py` → `src/init.py`), and the EVIDENCE
+  // read here is what `--record` writes into the ledger. The character strip
+  // removes no newline, so lines pair one to one. Stated exceptions, safe by
+  // shape: the RECEIPT (hex token) and the VERDICT word are identifiers the
+  // strip cannot rewrite and are read from the stripped line.
+  const expected = String(receipt ?? '').trim()
+  const pairs = raw
+    .split('\n')
+    .map((line) => ({ raw: line, clean: stripDecoration(line).trim() }))
+    .filter((p) => p.clean)
+  const tailPairs = pairs.slice(expected ? -3 : -2)
+  const tail = tailPairs.map((p) => p.clean)
+  // THE RECEIPT IS DEMANDED WHERE ONE WAS ISSUED (fourth cross-vendor round,
+  // pass 4, finding 8): the token stands only on the material's last line,
+  // never in the prompt, so an answer that cannot repeat it is an answer from
+  // a run whose material is not proven read — and that is not a verdict.
+  if (expected) {
+    const got = (/^[-*]?\s*RECEIPT\s*:\s*([0-9a-f]+)\s*$/i.exec(tail[0] ?? '')?.[1] ?? '').toLowerCase()
+    if (got !== expected.toLowerCase()) {
+      return {
+        ok: false,
+        verdict: '',
+        evidence: '',
+        error: got
+          ? 'the RECEIPT line does not match the material\'s token — what was judged is not proven to be what was sent'
+          : 'the answer carries no RECEIPT line — nothing proves the material was read to its end',
+      }
+    }
+    tail.shift()
+    tailPairs.shift()
+  }
   const verdict = (/^[-*]?\s*VERDICT\s*:\s*(.+)$/i.exec(tail[0] ?? '')?.[1] ?? '').trim().toLowerCase()
-  const evidence = (/^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1] ?? '')?.[1] ?? '').trim()
+  const evidenceMatched = /^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.test(tail[1] ?? '')
+  const evidence = evidenceMatched ? rawFieldValue(tailPairs[1]?.raw) : ''
   if (!VERDICTS.includes(verdict)) {
     return {
       ok: false,
@@ -285,17 +427,38 @@ export function parseVerdict(text) {
   // first run of this command answered `do-not-merge` because none of its
   // commands reached the repository). Such an answer carries a valid verdict
   // word and would otherwise be recorded as a review. The check errs towards the
-  // fallback, which costs a second reviewer, never a false green.
-  if (BLIND_REVIEWER.test(evidence)) {
+  // fallback, which costs a second reviewer, never a false green — but it is the
+  // two-tier JUDGMENT, not the raw net: an evidence line that opens with what
+  // was checked and then describes the reviewed code in the net's vocabulary is
+  // a review, and routing its verdict to a fallback would discard it (measured
+  // 18.08.2026, point 714 pass 2 — see blindReviewerAdmission).
+  // Scanned RAW and STRIPPED, either hit admitting (the dual-scan rule): the
+  // raw spelling may shield the words behind decoration the stripped one
+  // unwraps, and vice versa.
+  const evidenceClean = (/^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1] ?? '')?.[1] ?? '').trim()
+  if (
+    blindReviewerAdmission(evidence) ||
+    blindReviewerAdmission(evidenceClean) ||
+    blindReviewerAdmission(charStripped(evidence))
+  ) {
     return { ok: false, verdict: '', evidence: '', error: 'the reviewer says it could not see the change' }
   }
   // A line still in its angle brackets is the PLACEHOLDER echoed back, not an
-  // observation. (The closing bracket is not required: the markdown strip above
-  // removes `>` as a blockquote marker, so only the opening one is reliable.)
-  if (evidence.length < 10 || /^</.test(evidence)) {
+  // observation. RULED on the STRIPPED capture (decoration must not change a
+  // decision — `**<placeholder>**` walks a raw `/^</` test), AND on the
+  // net-only spelling (landing round): an UNPAIRED marker survives the pair
+  // strip, so `EVIDENCE: _<one line…>` shielded the anchored test. The quoted
+  // evidence above stays raw.
+  // …and a leading bullet shields neither spelling (fourth landing round,
+  // pass 8): `EVIDENCE: - <one line…>` is still the placeholder.
+  if (
+    evidenceClean.length < 10 ||
+    /^[\s*-]*</.test(evidenceClean) ||
+    /^[\s*-]*</.test(charStripped(evidenceClean).trim())
+  ) {
     return { ok: false, verdict: '', evidence: '', error: 'no usable EVIDENCE line' }
   }
-  return { ok: true, verdict, evidence, error: '' }
+  return { ok: true, verdict, evidence: evidence || evidenceClean, error: '' }
 }
 
 /**
@@ -307,7 +470,7 @@ export function parseVerdict(text) {
  * so with an EMPTY verdict, because at that moment no second pair of eyes has
  * seen the change yet. `ready` says whether a record may be written at all.
  */
-export function decideReview({ outcome = {}, parsed = {}, authorModel = '' } = {}) {
+export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shortfall } = {}) {
   // THE REVERSED DIRECTION IS DECIDED BEFORE ANYTHING ELSE (point 667). Sol now
   // AUTHORS as well as reviews, and a model may not review its own work — so a
   // Sol run over a Sol-authored range is not a review whatever it answered, and
@@ -333,7 +496,14 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '' } = {
       verdict: parsed.verdict,
       evidence: parsed.evidence,
       fellBack: false,
-      ready: true,
+      // READY RESTS ON DELIVERY EVIDENCE, not on the exit code (escalation
+      // round): a clean exit with a parseable verdict says nothing about
+      // whether the round CARRIED its material. `shortfall` is the material
+      // accounting's answer — an explicit null (the round provably complete)
+      // is the only value that makes the record ready; a present shortfall
+      // refuses, and a caller that never asked (undefined) refuses too,
+      // because an unknown fit must never read as "everything was seen".
+      ready: shortfall === null,
       kind: OUTCOME.OK,
       cause: '',
     }
@@ -411,11 +581,6 @@ export function claudeReviewerFor(authorModels = '') {
   return firstNonAuthor(CLAUDE_REVIEW_CHAIN, authorModels)
 }
 
-/** How much material one review may carry — the patch plus the changed files —
- *  and the share of it the patch may take before the files get their turn. */
-export const MATERIAL_BUDGET_CHARS = 200_000
-export const PATCH_SHARE = 0.5
-
 /**
  * The review MATERIAL, assembled into what codex receives on stdin.
  *
@@ -428,40 +593,19 @@ export const PATCH_SHARE = 0.5
  * eyes. So the artefact travels WITH the request. The read-only sandbox stays on
  * regardless, for the machine where the launcher does work.
  *
- * The budget is spent in the order that matters — the patch first, then each
- * changed file — and what does not fit is CUT VISIBLY, because a reviewer that
- * silently saw half a file would report on the half it saw.
+ * The budget is spent in the order that matters — the patch first (which is
+ * CAPPED TOO: an uncapped diff used to blow the ceiling and leave nothing for the
+ * files, four-eyes finding 10.08.2026), then each changed file — and what does
+ * not fit is CUT VISIBLY, because a reviewer that silently saw half a file would
+ * report on the half it saw.
+ *
+ * THE TEXT IS ONLY HALF THE ANSWER (point 714). What the cut cost is accounted
+ * for in `assembleMaterial`, whose second return half is what decides whether a
+ * record may be printed at all — this wrapper keeps the string-only shape for the
+ * callers that just want the material.
  */
-export function formatReviewMaterial({ stat = '', patch = '', files = [], budget = MATERIAL_BUDGET_CHARS } = {}) {
-  // THE PATCH IS CAPPED TOO (four-eyes finding, 10.08.2026). It used to be
-  // written whole and merely SUBTRACTED from the budget, so a large diff blew
-  // the ceiling and left nothing for the files — measured on this branch: the
-  // reviewer saw the patch, a truncated README and none of the six scripts. It
-  // gets a fixed share, and what it loses is cut visibly like everything else.
-  const cut = (text, room) =>
-    text.length > room ? `${text.slice(0, Math.max(0, room))}\n… [TRUNCATED: ${text.length - room} characters not shown]` : text
-  const patchRoom = Math.floor(budget * PATCH_SHARE)
-  const out = [
-    '=== DIFFSTAT ===',
-    cut(String(stat).trim(), Math.floor(budget * 0.05)),
-    '',
-    '=== PATCH ===',
-    cut(String(patch).trim(), patchRoom),
-    '',
-  ]
-  let left = Math.max(0, budget - out.join('\n').length)
-  for (const file of files ?? []) {
-    const text = String(file?.text ?? '')
-    const header = `=== FILE (current content): ${file?.path ?? '?'} ===`
-    if (left <= header.length + 200) {
-      out.push(`=== FILE OMITTED ENTIRELY (material budget spent): ${file?.path ?? '?'} ===`, '')
-      continue
-    }
-    const room = left - header.length - 80
-    out.push(header, cut(text, room), '')
-    left -= header.length + Math.min(text.length, room) + 80
-  }
-  return out.join('\n')
+export function formatReviewMaterial(options = {}) {
+  return assembleMaterial(options).text
 }
 
 /**
@@ -489,9 +633,12 @@ export function newFilePathsIn(patch) {
   for (let i = 0; i < lines.length; i++) {
     if (!/^new file mode /.test(lines[i])) continue
     for (let j = i; j >= 0 && j > i - 6; j--) {
-      const m = /^diff --git a\/(.+) b\/(.+)$/.exec(lines[j])
-      if (m) {
-        paths.add(m[2])
+      // The SAME header parser the pass split uses, so a path git QUOTED is read
+      // as one path by both — two readers of one line that disagree are how a
+      // file falls out of the material with nothing said (cross-vendor round).
+      const header = parseDiffHeader(lines[j])
+      if (header) {
+        paths.add(header.b)
         break
       }
     }
@@ -614,7 +761,15 @@ const short = (s) => (/^[0-9a-f]{7,40}$/i.test(String(s ?? '')) ? String(s).slic
  * refuses — so a hand that pastes it without giving the review to Fable first
  * gets a refusal, not a green ledger line.
  */
-export function formatRecordCommand({ sha = '', model = '', verdict = '', evidence = '', mode = 'review', point = '' } = {}) {
+export function formatRecordCommand({
+  sha = '',
+  model = '',
+  verdict = '',
+  evidence = '',
+  mode = 'review',
+  point = '',
+  pass = null,
+} = {}) {
   const parts = [
     'node scripts/mechanism-review.mjs',
     `--record ${sha || '<sha>'}`,
@@ -624,6 +779,19 @@ export function formatRecordCommand({ sha = '', model = '', verdict = '', eviden
     `--mode ${mode}`,
   ]
   if (String(point ?? '').trim()) parts.push(`--point ${String(point).trim()}`)
+  // A PASS RECORD NAMES WHAT IT ACTUALLY READ (point 714). The range was too
+  // large for one round, so this verdict covers the files of this pass alone —
+  // and the gate clears the range only once every pass of the same total is on
+  // record, which is what makes a composition a coverage rather than a claim.
+  // The list is written in the ONE round-trippable representation (a path with
+  // a comma, a quote or edge whitespace travels C-quoted, as git prints it), so
+  // what the recorder stores is byte-identical to what this pass read.
+  if (pass) {
+    parts.push(`--pass ${pass.index}/${pass.total}`, `--pass-files ${q(formatPassFiles(pass.files ?? []))}`)
+    if (Array.isArray(pass.commits) && pass.commits.length) {
+      parts.push(`--pass-commits ${q(pass.commits.join(','))}`)
+    }
+  }
   return parts.join(' ')
 }
 
@@ -632,7 +800,40 @@ export function formatRecordCommand({ sha = '', model = '', verdict = '', eviden
  * happened — LOUD on a fallback, per the point's "name the cause in ONE line" —
  * then the record command.
  */
-export function formatReviewReport({ decision = {}, sha = '', mode = 'review', point = '', partial = null } = {}) {
+export function formatReviewReport({
+  decision = {},
+  sha = '',
+  mode = 'review',
+  point = '',
+  partial = null,
+  shortfall,
+  plan = null,
+  pass = null,
+} = {}) {
+  // THE REPORT RESTS ON decision.ready, NEVER ON A PARAMETER'S DEFAULT (fourth
+  // cross-vendor round, pass 3). decideReview answers ready:false for a round
+  // whose delivery accounting it was never shown — and this function then
+  // printed the record command anyway, because its own `shortfall` parameter
+  // defaulted to null, which is the accounting's word for "provably complete".
+  // That is the fail-open this point exists to close, surviving in the one
+  // function that decides what the caller is told to run. An absent accounting
+  // is now the same refusal the accounting itself makes of an unknown fit; the
+  // deliberate fallback templates (whose placeholders the recorder refuses
+  // anyway) keep their shape, so only the successful-run path is gated here.
+  const gap =
+    shortfall !== null && shortfall !== undefined
+      ? shortfall
+      : !decision.fellBack && decision.ready !== true
+        ? {
+            reason: 'unverified',
+            detail: 'the caller never asked the material accounting whether this round carried its range',
+            truncated: [],
+            omitted: [],
+            budget: MATERIAL_BUDGET_CHARS,
+            size: 0,
+            rawSize: 0,
+          }
+        : null
   // A RECORD IS NEVER PRINTED FOR LESS THAN IT CLEARS (fourth cross-vendor
   // round). Both gates treat a record as covering every commit it CONTAINS, so a
   // narrowed range — `--since <sha>~1` on a branch with older commits — would
@@ -646,9 +847,41 @@ export function formatReviewReport({ decision = {}, sha = '', mode = 'review', p
       `review-sol: ${said}`,
       '',
       `  NO RECORD COMMAND IS PRINTED. A record at ${String(sha).slice(0, 7)} clears every commit it contains,`,
-      `  back to ${short(partial.coverageBase)}, and this review only saw back to ${short(partial.reviewedBase)}.`,
+      // A hand-over never SAW anything, but the refusal is the same: only the
+      // narrowed range was measured, and a template for the whole sha would
+      // claim the rest (escalation round — both early routes printed one).
+      decision.fellBack
+        ? `  back to ${short(partial.coverageBase)}, and only the range back to ${short(partial.reviewedBase)} was measured here.`
+        : `  back to ${short(partial.coverageBase)}, and this review only saw back to ${short(partial.reviewedBase)}.`,
       '  Re-run without --since to review the whole range, then record that.',
+      // TWO REASONS ARE NOT ONE (cross-vendor review, second round): a narrowed
+      // range whose round ALSO overflowed used to report only the narrowing, and
+      // the files nobody read went unnamed — while the point demands each one be
+      // named in the refusal, whatever else is wrong with the round.
+      ...(gap ? ['', '  And it did not carry even that much:', formatShortfall(gap, { sha, plan })] : []),
     ].join('\n')
+  }
+  // A RECORD IS NEVER PRINTED FOR MATERIAL THE ROUND DID NOT CARRY (point 714).
+  // The truncation notice is written INTO the material, so it reached the caller
+  // only if the model chose to mention it — and a model that did not would have
+  // produced a clean-looking record command covering files nobody read. The
+  // verdict is still reported, because the reviewer's findings are worth having;
+  // the ready-to-run command is not.
+  if (gap) {
+    // THE HAND-OVER STILL HAS TO NAME ITS READER. A short-fall on a path that
+    // never ran Sol at all — the share switch, or a range Sol authored — is
+    // still a review somebody must do, and a refusal that dropped the reviewer's
+    // name left the caller with no idea whose review it was waiting for.
+    const who = decision.model
+    const handOver = who
+      ? `  The review is ${who}'s, and it is NOT done.`
+      : '  No model of the chain may review this range — every one of them authored part of it.'
+    const said = !decision.fellBack
+      ? `${SOL_MODEL_NAME} answered ${decision.verdict} on ${String(sha).slice(0, 7)}\n  ${decision.evidence}`
+      : decision.kind === OUTCOME.SELF_REVIEW
+        ? `ROLE SWAP — ${SOL_MODEL_NAME} AUTHORED part of ${String(sha).slice(0, 7)}, so it may not review it.\n${handOver}`
+        : `${SOL_MODEL_NAME} did not review it: ${decision.cause}.\n${handOver}`
+    return [`review-sol: ${said}`, '', formatShortfall(gap, { sha, plan })].join('\n')
   }
   const cmd = formatRecordCommand({
     sha,
@@ -657,14 +890,32 @@ export function formatReviewReport({ decision = {}, sha = '', mode = 'review', p
     evidence: decision.evidence,
     mode,
     point,
+    pass,
   })
+  // EVERY pass template carries the not-cleared warning — the fallback and
+  // role-swap templates included (round-5 pass 6) — and the way to the
+  // remainder consults the LEDGER, not the pass number (round-4 pass 6):
+  // passes run in any order, so "next: k+1" recommended recorded passes and
+  // fell silent on unrecorded ones. This formatter is pure and cannot read
+  // the ledger, so it points at the listing that can.
+  const passWarning = pass
+    ? [
+        '',
+        `  The range is NOT cleared until every pass 1..${pass.total} is recorded — ` +
+          'node scripts/mechanism-review.mjs --list shows which already are.',
+      ]
+    : []
   if (!decision.fellBack) {
+    const scope = pass
+      ? ` (PASS ${pass.index}/${pass.total} — ${(pass.files ?? []).length} file(s) of a range too large for one round)`
+      : ''
     return [
-      `review-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}`,
+      `review-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}${scope}`,
       `  ${decision.evidence}`,
       '',
       'Record it (the model named is the one that actually ran):',
       `  ${cmd}`,
+      ...passWarning,
     ].join('\n')
   }
   // The prose names the model the DECISION picked, not the usual one: where
@@ -689,6 +940,7 @@ export function formatReviewReport({ decision = {}, sha = '', mode = 'review', p
       '  Record what IT says — never a verdict this command invented:',
       '',
       `     ${cmd}`,
+      ...passWarning,
     ].join('\n')
   }
   if (!who) {
@@ -699,6 +951,25 @@ export function formatReviewReport({ decision = {}, sha = '', mode = 'review', p
       `  fix the ${SOL_MODEL_NAME} run, or review a narrower range one of them did not write.`,
     ].join('\n')
   }
+  // A FAILED DELIVERY OFFERS NO RECORD IN ANY SHAPE (escalation round). A record
+  // is offered only for what was actually read — and after a spawn error, a
+  // timeout, a dead host, a refused login or an error exit, nothing was: the
+  // material was lost with the run. The placeholder template used to survive
+  // here for the next reviewer to fill, but a ready-made whole-sha template is
+  // an offer no completed hand-off backs. The two kinds below are different: a
+  // NO_VERDICT run completed its transfer and answered unusably, and the share
+  // switch never attempted one — both hand-offs rest on a measured, fitting
+  // plan, so their template (whose placeholders the recorder refuses anyway)
+  // stays. Every other kind — the unknown ones included — refuses.
+  if (decision.kind !== OUTCOME.NO_VERDICT && decision.kind !== OUTCOME.SWITCHED_OFF) {
+    return [
+      `review-sol: FALLBACK — ${SOL_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
+      '  NO RECORD COMMAND IS PRINTED: the hand-off did not complete, so nothing of this range',
+      "  was read — the whole round's material was lost with the run.",
+      `  The review is NOT done — it is ${who}'s now. Hand it the commit and the brief above;`,
+      '  it reads the range itself, and only what IT actually read may be recorded.',
+    ].join('\n')
+  }
   return [
     `review-sol: FALLBACK — ${SOL_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
     `  The review is NOT done. Hand it to ${who} and record what IT says:`,
@@ -706,5 +977,6 @@ export function formatReviewReport({ decision = {}, sha = '', mode = 'review', p
     `  1. give ${who} the commit and the brief above,`,
     `  2. then record its verdict — never this command's:`,
     `     ${cmd}`,
+    ...passWarning,
   ].join('\n')
 }

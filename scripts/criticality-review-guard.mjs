@@ -36,11 +36,13 @@ import { dirname } from 'node:path'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
-import { readRecords } from './mechanism-review.mjs'
+import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import {
+  ancestorIndex,
   evaluateCriticalityReview,
   formatCriticalityReviewVerdict,
   highTicks,
+  strictAncestorProbe,
 } from './criticality-review-guard-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
@@ -172,13 +174,37 @@ export function bootstrapBase(head, revParse = (r) => git(`rev-parse ${r}`)) {
 }
 
 /** Is `a` a strict ancestor of `b`? Any git failure answers "cannot tell" = no. */
-function isStrictAncestor(a, b) {
+function gitIsStrictAncestor(a, b) {
   if (!a || !b || a === b) return false
   try {
     execSync(`git merge-base --is-ancestor "${a}" "${b}"`, { windowsHide: true, cwd: REPO_ROOT, stdio: 'ignore' })
     return true
   } catch {
     return false
+  }
+}
+
+/**
+ * The same question, asked of the commit graph ONCE instead of per pair (see
+ * `ancestorIndex` for the measurement that forced this). The per-pair probe stays
+ * as the fallback for anything the graph cannot answer — a commit outside it, or
+ * a shallow checkout, where the listing is truncated and a "no" would be a guess.
+ */
+function ancestryProbe(head, shas) {
+  let shallow = true
+  try {
+    shallow = git('rev-parse --is-shallow-repository') !== 'false'
+  } catch {
+    /* an ancient git without the flag — treat as shallow and keep asking git */
+  }
+  if (shallow) return gitIsStrictAncestor
+  try {
+    // The graph answers only about the shas it was BUILT for; everything else is
+    // asked of git, so this is a speed-up of the common case and never a change
+    // of verdict (`strictAncestorProbe` holds that line).
+    return strictAncestorProbe(ancestorIndex(git(`rev-list --topo-order --parents "${head}"`), shas), gitIsStrictAncestor)
+  } catch {
+    return gitIsStrictAncestor
   }
 }
 
@@ -253,10 +279,17 @@ export function gatherCriticalityReviewInputs({ sessionId = '' } = {}) {
   // Only the ledger lines that name a pending point — in the common turn that is
   // none, so the ancestry probes below cost nothing at all.
   const numbers = new Set(ticks.map((t) => t.number))
-  const records = ticks.length
-    ? readRecords()
-        .filter((r) => numbers.has(Number(r?.point)))
-        .map((r) => ({ ...r, reachable: r.sha === head || isStrictAncestor(r.sha, head) }))
+  const candidates = ticks.length ? readRecords().filter((r) => numbers.has(Number(r?.point))) : []
+  // ONE graph for both loops below — the pair probe underneath them is quadratic
+  // in a point's review rounds, and twelve rounds were enough to stall the gate.
+  const isStrictAncestor = candidates.length
+    ? ancestryProbe(
+        head,
+        candidates.map((r) => r.sha),
+      )
+    : gitIsStrictAncestor
+  const records = candidates.length
+    ? verifyCarried(candidates.map((r) => ({ ...r, reachable: r.sha === head || isStrictAncestor(r.sha, head) })))
     : []
   for (const r of records) {
     r.descendsFrom = records
@@ -291,6 +324,23 @@ if (isMainModule(import.meta.url)) {
 
     const verdict = evaluateCriticalityReview(gathered.inputs)
 
+    // THE GAP CLAUSE, mirrored from mechanism-review-guard (point 714): a
+    // standing refusal whose re-review no caller can assemble must not trap
+    // the session. Only where EVERY blocking finding is record-backed AND
+    // every record's own range measures unassemblable does the block degrade
+    // to a report; a finding without a record demands a fresh review of a sha
+    // the caller chooses, so it always keeps blocking. Keyed on measurement
+    // alone; a failed assessment rules no gap.
+    let gap = null
+    if (verdict.block) {
+      try {
+        const { assessCriticalityGap } = await import('./mechanism-review-guard-gap.mjs')
+        gap = await assessCriticalityGap(verdict.findings)
+      } catch {
+        /* no ruling — the block below stands */
+      }
+    }
+
     if (status) {
       console.log(`HEAD:      ${gathered.head.slice(0, 7)} (branch ${gathered.branch})`)
       console.log(`baseline:  ${String(gathered.baseline ?? '<none — arms at this HEAD>').slice(0, 7)}`)
@@ -303,11 +353,18 @@ if (isMainModule(import.meta.url)) {
             `${mine.length} record(s), ${mine.filter((r) => r.reachable).length} in this history`,
         )
       }
-      console.log(verdict.block ? `\n${formatCriticalityReviewVerdict(verdict)}` : '\nGATE CLEAR')
+      if (gap?.gap) console.log(`\n${gap.report}`)
+      else console.log(verdict.block ? `\n${formatCriticalityReviewVerdict(verdict)}` : '\nGATE CLEAR')
       process.exit(0)
     }
 
     if (verdict.block) {
+      if (gap?.gap) {
+        // Deliberately NOT a baseline advance: the demand is suspended, never
+        // satisfied, and blocking resumes when the material fits again.
+        console.error(gap.report)
+        process.exit(0)
+      }
       process.stdout.write(
         JSON.stringify({ decision: 'block', reason: formatCriticalityReviewVerdict(verdict) }),
       )

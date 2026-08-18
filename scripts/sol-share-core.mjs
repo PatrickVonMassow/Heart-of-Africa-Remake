@@ -1,5 +1,5 @@
 // THE SWITCH THAT MOVES WORK BETWEEN THE TWO VENDORS (point 654, widened by 667).
-// rule:model-policy@8b2f41d7
+// rule:model-policy@05eaa324
 //
 // WHY IT EXISTS: the user pays two vendors whose allowances run out at different times,
 // and wants the load moved BEFORE one of them is nearly spent. It began as a read-only
@@ -26,8 +26,8 @@ export const SETTINGS = Object.freeze(['claude-only', 'default', 'prefer-sol'])
  * What an ABSENT file routes as — not the project's standing policy.
  *
  * The name is a file-format default, and the two are different things (cross-vendor
- * audit, 17.08.2026): CLAUDE.md §6 has Sol authoring the mechanical and mid-difficulty
- * points, which only `prefer-sol` routes. A checkout that never set the switch therefore
+ * audit, 17.08.2026): CLAUDE.md §6 has Sol authoring the points — the hard and critical
+ * ones included — which only `prefer-sol` routes. A checkout that never set the switch therefore
  * runs BELOW the standing policy rather than at it — deliberately, because an unset file
  * must never spend a vendor nobody chose.
  */
@@ -116,7 +116,7 @@ export const KIND_NOTES = Object.freeze({
   audit: 'the enumerating plausibility and bug-finding sweeps',
   enumerate: 'risk, test-case and option lists (a blind-parallel half)',
   explain: 'what a subsystem does, where something is handled',
-  author: 'authoring a mechanical or mid-difficulty point (scripts/author-sol.mjs)',
+  author: 'authoring a point, the hard and critical ones included (scripts/author-sol.mjs)',
 })
 
 /**
@@ -134,12 +134,12 @@ const ROUTING = Object.freeze({
 export const SETTING_NOTES = Object.freeze({
   'claude-only': 'the escape hatch when the ChatGPT side is the scarce one — nothing goes to Sol',
   default: 'reviews to Sol, everything else to Claude — BELOW the standing policy of CLAUDE.md §6',
-  'prefer-sol': 'the standing policy of CLAUDE.md §6: every read-only kind AND the authoring of a mechanical or mid-difficulty point goes to Sol; Claude reviews it, runs the suites, judges the picture and lands',
+  'prefer-sol': 'the standing policy of CLAUDE.md §6: every read-only kind AND the authoring of every point the cut does not keep here — the hard and critical ones included — goes to Sol; Claude reviews it, runs the suites, judges the picture and lands',
 })
 
 /** WHAT IS NEVER ROUTED, whatever the setting says. Printed, so nobody has to ask. */
 export const NEVER_ROUTED = Object.freeze([
-  'the HARD cases and anything whose verification is the work (scripts/author-routing-core.mjs decides)',
+  'a point whose VERIFICATION is the work, unless its spec marks it hard or names a lane (scripts/author-routing-core.mjs decides)',
   'REVIEWING what Sol itself authored — no model reviews its own work',
   'driving the browser suites and JUDGING the picture',
   'the landing (scripts/land-point.mjs) and the main session bookkeeping',
