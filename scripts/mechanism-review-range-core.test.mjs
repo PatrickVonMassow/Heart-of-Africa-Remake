@@ -177,6 +177,90 @@ describe('per-contribution review baseline', () => {
     expect(result.refusals).toHaveLength(0)
   })
 
+  it('reads the clock, not the ledger position, when the rows arrive out of order', () => {
+    const row = (verdict, at) => ({
+      sha: sha('b'),
+      model: 'Opus 5',
+      verdict,
+      at,
+      containedShas: [sha('b')],
+      pass: { files: ['b'], commits: [sha('b')] },
+    })
+    // The refusal is the NEWER reading but stands FIRST in the array.
+    const result = outstandingContributions({
+      commits,
+      recordUsable: usable,
+      records: [row('do-not-merge', 200), row('merge', 100)],
+    })
+    expect(result.outstanding.some((c) => c.file === 'b')).toBe(true)
+    expect(result.refusals).toHaveLength(1)
+  })
+
+  it('lets the last line win an equal timestamp, in both directions', () => {
+    const row = (verdict) => ({
+      sha: sha('b'),
+      model: 'Opus 5',
+      verdict,
+      at: 100,
+      containedShas: [sha('b')],
+      pass: { files: ['b'], commits: [sha('b')] },
+    })
+    const cleared = outstandingContributions({
+      commits,
+      recordUsable: usable,
+      records: [row('do-not-merge'), row('merge')],
+    })
+    expect(cleared.covered.some((c) => c.file === 'b')).toBe(true)
+    const refused = outstandingContributions({
+      commits,
+      recordUsable: usable,
+      records: [row('merge'), row('do-not-merge')],
+    })
+    expect(refused.outstanding.some((c) => c.file === 'b')).toBe(true)
+  })
+
+  // An unreadable clock used to decide every later comparison: `NaN >= NaN` is
+  // false, so the first such row won forever and a clearance could bury the
+  // refusal that came after it.
+  for (const [name, at] of [['NaN', Number.NaN], ['an infinite stamp', Number.POSITIVE_INFINITY], ['a string', 'yesterday']]) {
+    it(`keeps a contribution owed when a clearance carries ${name} and another reading refuses it`, () => {
+      const row = (verdict, stamp) => ({
+        sha: sha('b'),
+        model: 'Opus 5',
+        verdict,
+        at: stamp,
+        containedShas: [sha('b')],
+        pass: { files: ['b'], commits: [sha('b')] },
+      })
+      for (const records of [
+        [row('merge', at), row('do-not-merge', 200)],
+        [row('do-not-merge', 200), row('merge', at)],
+      ]) {
+        const result = outstandingContributions({ commits, recordUsable: usable, records })
+        expect(result.outstanding.some((c) => c.file === 'b')).toBe(true)
+        expect(result.refusals).toHaveLength(1)
+      }
+    })
+  }
+
+  it('still lets a lone record with no clock rule its contribution', () => {
+    const result = outstandingContributions({
+      commits,
+      recordUsable: usable,
+      records: [
+        {
+          sha: sha('b'),
+          model: 'Opus 5',
+          verdict: 'merge',
+          containedShas: [sha('b')],
+          pass: { files: ['b'], commits: [sha('b')] },
+        },
+      ],
+    })
+    expect(result.covered.some((c) => c.file === 'b')).toBe(true)
+    expect(result.refusals).toHaveLength(0)
+  })
+
   it('rebuilds the next plan with only still-owed files', () => {
     const debt = outstandingContributions({ commits, records: [], recordUsable: usable })
     const rebuilt = commitsForContributions(debt.outstanding.filter((c) => c.file === 'shared'))

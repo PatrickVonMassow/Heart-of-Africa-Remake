@@ -189,6 +189,33 @@ const contained = (record, sha) => {
 }
 
 /**
+ * The reading that rules one contribution, out of every reading of it.
+ *
+ * Ordering is by the recorded clock, the LAST row winning a tie: the ledger is
+ * append-only, so the later line is the later reading even where the clock did
+ * not move.  A row whose clock is unusable (`NaN`, `Infinity`, a string) has no
+ * place in that order, so it never DECIDES one: where the readings disagree and
+ * any clock is unusable, the refusal rules and the contribution stays owed.
+ * Erring towards owed is the only safe side — the opposite clears a file the
+ * newest reviewer refused, and nobody looks at it again.
+ */
+export function newestReading(readings = []) {
+  if (!readings.length) return null
+  const unusable = readings.some((row) => row.at === null)
+  const disagreed = new Set(readings.map((row) => String(row.record?.verdict))).size > 1
+  if (unusable && disagreed) {
+    const refusal = readings.find((row) => String(row.record?.verdict) === 'do-not-merge')
+    if (refusal) return refusal
+  }
+  let best = null
+  for (const row of readings) {
+    const at = row.at ?? Number.NEGATIVE_INFINITY
+    if (!best || at >= (best.at ?? Number.NEGATIVE_INFINITY)) best = row
+  }
+  return best
+}
+
+/**
  * Remove only contribution pairs actually read by a valid authorship-scoped
  * pass.  The caller supplies `recordUsable`, because ledger-era validation is
  * owned by mechanism-review-core; this function owns coverage, not trust.
@@ -210,16 +237,20 @@ export function outstandingContributions({ commits = [], records = [], recordUsa
       if (!contained(record, contribution.sha)) continue
       if (contribution.authors.some((author) => sameModel(record.model, author))) continue
       const key = keyFor(contribution.sha, contribution.file)
-      const at = Number(record.at ?? 0)
-      const prev = latest.get(key)
-      // `>=` keeps the LAST row of a tie: the ledger is append-only, so the
-      // later line is the later reading even where the clock did not move.
-      if (!prev || at >= prev.at) latest.set(key, { record, at, contribution })
+      // A clock that is not a finite number cannot be ordered at all, so it is
+      // carried as `null` rather than as a number: `Number('x') >= Number('x')`
+      // is false, which froze the FIRST such row as the permanent winner and
+      // let it hide every later reading behind it.
+      const clock = Number(record.at ?? 0)
+      const at = Number.isFinite(clock) ? clock : null
+      if (!latest.has(key)) latest.set(key, [])
+      latest.get(key).push({ record, at, contribution })
     }
   }
   const covered = new Set()
   const refusals = []
-  for (const [key, read] of latest) {
+  for (const [key, readings] of latest) {
+    const read = newestReading(readings)
     if (String(read.record.verdict) === 'do-not-merge') refusals.push({ contribution: read.contribution, record: read.record })
     else covered.add(key)
   }
