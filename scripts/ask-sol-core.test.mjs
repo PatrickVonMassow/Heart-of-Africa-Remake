@@ -310,6 +310,19 @@ describe('the markdown strip reads shapes, not characters (round-7 pass 1)', () 
     expect(bare.ok).toBe(false)
     const explained = parseAnswer({ kind: 'audit', text: 'sweep\n\nNO FINDINGS: checked the loader end to end' })
     expect(explained.ok).toBe(true)
+    // …and the PROMPT'S OWN TEMPLATE names nothing checked (fourth landing
+    // round): the echoed placeholder is not an explanation.
+    expect(parseAnswer({ kind: 'audit', text: 'sweep\n\nNO FINDINGS: <what you checked>' }).ok).toBe(false)
+  })
+
+  it('refuses marker-only and marker-shielded DIAGNOSE fields (fourth landing round)', () => {
+    expect(parseAnswer({ kind: 'diagnose', text: 'looked.\n\nCAUSE: _\nEVIDENCE: __________' }).ok).toBe(false)
+    expect(
+      parseAnswer({ kind: 'diagnose', text: 'looked.\n\nCAUSE: _<the one cause>\nEVIDENCE: _<the two lines that prove it>' }).ok,
+    ).toBe(false)
+    expect(
+      parseAnswer({ kind: 'diagnose', text: 'looked.\n\nCAUSE: the poller drops the lock\nEVIDENCE: the stamp is written before the rename lands' }).ok,
+    ).toBe(true)
   })
 
   it('does not admit a genuine review that merely SPEAKS the net’s vocabulary, raw or stripped', () => {

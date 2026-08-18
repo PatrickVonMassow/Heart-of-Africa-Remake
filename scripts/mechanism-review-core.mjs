@@ -1207,8 +1207,21 @@ export function evaluateMechanismReview({
     // pass supersedes it, which is the same later-answers-earlier rule every
     // verdict here obeys.
     const newestAt = (g) => Math.max(...g.records.map((r) => Number(r.at ?? 0)))
+    // …AND BY DESCENT, not the clock alone (fourth landing round, carried
+    // pass 3): a later-recorded review of an ANCESTOR or sibling sha — the
+    // tool allows reviewing an older sha at any time — must not mask an
+    // incomplete split on newer work. The superseding review must be AT the
+    // split's sha (the same content, completely covered) or at a DESCENDANT
+    // of it; the ancestry fact is the guard's measured containedShas, and a
+    // missing fact supersedes nothing.
+    const supersedes = (v, g) => {
+      if (String(v.sha) === String(g.sha)) return true
+      const fact = v.containedShas
+      const set = fact instanceof Set ? fact : Array.isArray(fact) ? new Set(fact.map(String)) : null
+      return set ? set.has(String(g.sha)) : false
+    }
     const standingIncomplete = incomplete.filter(
-      (g) => !valid.some((v) => Number(v.at ?? 0) > newestAt(g)),
+      (g) => !valid.some((v) => Number(v.at ?? 0) > newestAt(g) && supersedes(v, g)),
     )
     if (standingIncomplete.length) {
       // The widest gap is the one reported: a missing pass and a file no pass

@@ -431,6 +431,19 @@ describe('the mode round-trips into the ledger', () => {
       // A file the source never read (or that does not exist there) refuses.
       const unread = runRecorder('--record', H, '--carried-from', S, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileC.mjs')
       expect(unread.status).toBe(1)
+      // Carrying FROM a carried row is refused IN ISOLATION (fourth landing
+      // round, pass 2): H3 changes neither carried file, so blob identity
+      // holds H..H3 and the ONLY refusal reason is the chained source.
+      writeFileSync(join(repo, 'fileD.mjs'), 'delta\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', 'Add a fourth file\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      const H3 = git('rev-parse', 'HEAD').stdout.trim()
+      const chained = runRecorder('--record', H3, '--carried-from', H, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
+      expect(chained.status).toBe(1)
+      expect(chained.stderr).toContain('carry from its original')
+      // …while carrying from the ORIGINAL at the same head succeeds.
+      const rechained = runRecorder('--record', H3, '--carried-from', S, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
+      expect(rechained.status, `${rechained.stdout}${rechained.stderr}`).toBe(0)
       // A CHANGED blob refuses the carry outright.
       writeFileSync(join(repo, 'fileA.mjs'), 'alpha, revised\n')
       git('add', '-A')
@@ -439,9 +452,6 @@ describe('the mode round-trips into the ledger', () => {
       const changed = runRecorder('--record', H2, '--carried-from', S, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
       expect(changed.status).toBe(1)
       expect(changed.stderr).toContain('CHANGED')
-      // …and carrying FROM a carried row is refused: carry from the original.
-      const chained = runRecorder('--record', H2, '--carried-from', H, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
-      expect(chained.status).toBe(1)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

@@ -1077,6 +1077,16 @@ export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/rev
       '  record can hold, so no pass of it could ever be recorded. No round is worth spending:',
       '  narrow the range, or split the change itself.',
     )
+    // WHAT IS BEYOND REACH IS STILL NAMED (fourth landing round, carried
+    // pass 7): the early return silently dropped the files no pass covers.
+    if (plan.uncoverable.length) {
+      lines.push(
+        '  BEYOND REACH — no round can hold these, not even their diff alone:',
+        ...plan.uncoverable.map(
+          (u) => `    ${quotePassFile(u.path)} (diff ${u.patchChars}, content ${u.contentChars} characters)`,
+        ),
+      )
+    }
     return lines.join('\n')
   }
   for (const pass of plan.passes) {

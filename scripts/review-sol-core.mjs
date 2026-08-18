@@ -449,7 +449,13 @@ export function parseVerdict(text, { receipt = '' } = {}) {
   // net-only spelling (landing round): an UNPAIRED marker survives the pair
   // strip, so `EVIDENCE: _<one line…>` shielded the anchored test. The quoted
   // evidence above stays raw.
-  if (evidenceClean.length < 10 || /^</.test(evidenceClean) || /^</.test(charStripped(evidenceClean).trim())) {
+  // …and a leading bullet shields neither spelling (fourth landing round,
+  // pass 8): `EVIDENCE: - <one line…>` is still the placeholder.
+  if (
+    evidenceClean.length < 10 ||
+    /^[\s*-]*</.test(evidenceClean) ||
+    /^[\s*-]*</.test(charStripped(evidenceClean).trim())
+  ) {
     return { ok: false, verdict: '', evidence: '', error: 'no usable EVIDENCE line' }
   }
   return { ok: true, verdict, evidence: evidence || evidenceClean, error: '' }

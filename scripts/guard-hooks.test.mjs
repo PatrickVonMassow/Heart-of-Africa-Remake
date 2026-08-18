@@ -721,6 +721,46 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
     }
   })
 
+  it('uses the feature merge-base for the gap ruling after main advances', () => {
+    // The stored fallback baseline follows main, but this feature branch forked
+    // earlier. Main-only bulk must not enter the gap measurement: pending
+    // detection and pass coverage both describe fork..feature, so measuring
+    // main-tip..feature would manufacture an uncoverable deletion and waive a
+    // small, reviewable guard change.
+    write(LEDGER, '')
+    const trunk = branch()
+    const fork = head()
+    if (trunk !== 'main') expect(git('branch', '-f', 'main', trunk).status).toBe(0)
+
+    expect(git('checkout', '-q', '-b', 'feat/main-advanced-gap-range').status).toBe(0)
+    write('scripts/demo-gap-range-guard.mjs', '// small and reviewable\n')
+    commit(`add a reviewable range guard\n\n${AUTHOR}`)
+
+    expect(git('checkout', '-q', 'main').status).toBe(0)
+    write('main-only-bulk.txt', 'main-only material\n'.repeat(20_000))
+    commit(`advance main with unrelated bulk\n\n${AUTHOR}`)
+    const advancedMain = head()
+    expect(git('checkout', '-q', 'feat/main-advanced-gap-range').status).toBe(0)
+    write(BASELINE, JSON.stringify({ baselines: { main: advancedMain } }))
+
+    try {
+      const hook = runHook('mechanism-review-guard.mjs')
+      expect(hook.status, hook.stderr).toBe(0)
+      expect(
+        hook.decision?.decision,
+        `stdout was ${JSON.stringify(hook.stdout)}; stderr was ${hook.stderr}`,
+      ).toBe('block')
+      expect(hook.decision.reason).toContain('scripts/demo-gap-range-guard.mjs')
+      expect(hook.stderr).not.toContain('REVIEW GAP')
+      expect(git('merge-base', advancedMain, head()).stdout.trim()).toBe(fork)
+    } finally {
+      // Keep this isolated fixture's main-only bulk out of the serial cases
+      // below; all of these refs belong to the temporary test repository.
+      expect(git('branch', '-f', 'main', fork).status).toBe(0)
+      expect(git('checkout', '-q', trunk).status).toBe(0)
+    }
+  })
+
   it('does NOT advance the baseline while it is blocking', () => {
     // A gate that pins its baseline on a blocked turn clears itself on the next
     // one — the block would be a single-turn nuisance instead of a gate.

@@ -10,11 +10,31 @@ import {
   formatCriticalityGap,
   formatReviewGap,
   guardOutcome,
+  reviewGapRange,
   REVIEW_GAP_BUDGET_CHARS,
   REVIEW_GAP_MAX_PASS_TOTAL,
 } from './mechanism-review-guard-gap-core.mjs'
 
 const material = await import('./review-material-core.mjs').catch(() => null)
+
+describe('reviewGapRange — one range for detection, coverage and gap ruling', () => {
+  it('uses the computed merge-base in either divergence direction, never the stored baseline', () => {
+    const head = 'h'.repeat(40)
+    for (const base of ['a'.repeat(40), 'z'.repeat(40)]) {
+      expect(reviewGapRange({ blocked: true, base, head })).toEqual({ baseline: base, head })
+    }
+  })
+
+  it('leaves the block standing when the common range cannot be established', () => {
+    const range = reviewGapRange({ blocked: true, base: null, head: 'h'.repeat(40) })
+    expect(range).toBe(null)
+    expect(guardOutcome({ blocked: true, gap: range })).toEqual({ action: 'block' })
+  })
+
+  it('does not ask for a measurement on an already-clear turn', () => {
+    expect(reviewGapRange({ blocked: false, base: 'a'.repeat(40), head: 'h'.repeat(40) })).toBe(null)
+  })
+})
 
 describe('decideReviewGap', () => {
   it('rules NO gap while the material fits — the ordinary demand stands', () => {
@@ -84,6 +104,11 @@ describe('decideReviewGap', () => {
       { available: true, fits: false, covers: false },
       { available: true, fits: false, covers: false, uncoverable: 'docs/huge.md' },
       { available: 1, fits: false, covers: false, uncoverable: [] },
+      // Entries must be non-empty strings (fourth landing round, pass 4):
+      // coerced nulls and objects are no path names and authorize no waiver.
+      { available: true, fits: false, covers: false, uncoverable: [null] },
+      { available: true, fits: false, covers: false, uncoverable: [{}] },
+      { available: true, fits: false, covers: false, uncoverable: ['a.md', ''] },
     ]) {
       const d = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS * 3, planner })
       expect(d.gap, JSON.stringify(planner)).toBe(false)

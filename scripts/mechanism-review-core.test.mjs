@@ -963,6 +963,10 @@ describe('evaluateMechanismReview', () => {
           pass: { index, total: 2, files: index === 1 ? [MECH, 'scripts/f1.mjs'] : ['scripts/f2.mjs'] },
           at: MERGE_ACCOUNTING_SINCE + 9000 + index,
           rangeFiles: [MECH, 'scripts/f1.mjs', 'scripts/f2.mjs'],
+          // The superseding review DESCENDS from the split it masks (fourth
+          // landing round): the guard's measured ancestry fact travels on the
+          // record, and a later clock alone supersedes nothing.
+          containedShas: new Set([newSha, oldSha]),
         })
       const v = evaluateMechanismReview({
         baseline: 'b',
@@ -971,6 +975,17 @@ describe('evaluateMechanismReview', () => {
         records: [earlierIncomplete, laterComplete(1), laterComplete(2)],
       })
       expect(v.block).toBe(false)
+      // …while the SAME later complete review at an unrelated sibling — no
+      // ancestry fact containing the split's sha — masks nothing.
+      const sibling = (index) => ({ ...laterComplete(index), containedShas: new Set([newSha]) })
+      const masked = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: [oldSha, newSha] })],
+        records: [earlierIncomplete, sibling(1), sibling(2)],
+      })
+      expect(masked.block).toBe(true)
+      expect(masked.findings[0].kind).toBe('incomplete-passes')
     })
 
     it('an UNPARSABLE pass claim poisons the shortcut too (round-6 pass 2)', () => {

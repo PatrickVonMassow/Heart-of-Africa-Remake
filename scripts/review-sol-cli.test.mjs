@@ -858,11 +858,10 @@ describe('a path with a trailing space', () => {
     const r = run(['--sha', edgeSha, '--brief', 'judge the edge name'])
     expect(r.status, r.stderr).toBe(0)
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
-    expect(sent).toContain('content behind the trailing space')
-    // The header carries the UNTRIMMED path, C-QUOTED so its edge whitespace
-    // is visible and unforgeable (round-1 pass 3): the structural lines spell
-    // every path that needs it exactly as git would print it.
-    expect(sent).toContain(`=== FILE (current content): "${EDGE_NAME}" ===`)
+    // CONTIGUOUS, header and body as one string (fourth landing round,
+    // carried pass 8): asserted separately, the body's presence in the PATCH
+    // kept this green even if the current-content lookup failed.
+    expect(sent).toContain(`=== FILE (current content): "${EDGE_NAME}" ===\ncontent behind the trailing space\n`)
     expect(sent).not.toContain('OMITTED ENTIRELY')
   })
 })

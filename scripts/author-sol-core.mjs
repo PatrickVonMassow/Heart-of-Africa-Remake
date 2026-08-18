@@ -351,6 +351,13 @@ export function parseAuthoringAnswer(text) {
   if (!doneClean || !gatesClean || !openClean) {
     return { ok: false, error: 'the message does not end in the DONE/GATES/OPEN lines' }
   }
+  // A MARKER-ONLY FIELD IS AN EMPTY FIELD (fourth landing round, pass 1):
+  // the pair strip leaves an unmatched `_` standing, so `DONE: _` and
+  // `OPEN: _` read as answered fields. Presence rules on the net-only
+  // spelling, which deletion cannot fabricate.
+  if (!charStripped(doneClean).trim() || !charStripped(gatesClean).trim() || !charStripped(openClean).trim()) {
+    return { ok: false, error: 'a closing line holds only marker characters — the field was not answered' }
+  }
   // ALL THREE fields, OPEN included (final-round pass 1): the check covered
   // only DONE and GATES, so `OPEN: **<what you left undone>**` parsed clean and
   // judgeAuthoring reported a clean run over an unanswered required field.

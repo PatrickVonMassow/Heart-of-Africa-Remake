@@ -40,7 +40,7 @@ import {
   modelsFromTrailers,
 } from './mechanism-review-core.mjs'
 import { quotePassFile, unquoteGitPath } from './review-material-core.mjs'
-import { guardOutcome } from './mechanism-review-guard-gap-core.mjs'
+import { guardOutcome, reviewGapRange } from './mechanism-review-guard-gap-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 
@@ -343,8 +343,10 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
   // baseline sits on main, and a two-dot diff would re-show main's own (already
   // confirmed) mechanism work as pending.
   let base = baseline
+  let rangeBase = null
   try {
     base = git(`merge-base "${baseline}" "${head}"`)
+    if (base) rangeBase = base
   } catch {
     /* unrelated baseline — the raw range below decides, or re-arms us at HEAD */
   }
@@ -372,8 +374,10 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
       // looking would be the same silent pass in a new place.
       effective = bootstrapBase(head)
       base = effective
+      rangeBase = null
       try {
         base = git(`merge-base "${effective}" "${head}"`)
+        if (base) rangeBase = base
       } catch {
         /* the raw range below decides */
       }
@@ -413,6 +417,10 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
     head,
     branch,
     baseline: effective,
+    // Null if git could not establish a merge-base: pending detection may keep
+    // using its conservative raw fallback, but that unproved range can never
+    // support a gap waiver.
+    rangeBase,
     inputs: { baseline: effective, head, pendingCommits, records },
   }
 }
@@ -516,12 +524,16 @@ if (isMainModule(import.meta.url)) {
     // the measurement alone, never on what a verdict's prose said; the count of
     // standing refusals travels into the report from the STRUCTURED findings.
     let gap = null
-    if (verdict.block && gathered.baseline && gathered.head) {
+    const gapRange = reviewGapRange({
+      blocked: verdict.block,
+      base: gathered.rangeBase,
+      head: gathered.head,
+    })
+    if (gapRange) {
       try {
         const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
         gap = await assessReviewGap({
-          baseline: gathered.baseline,
-          head: gathered.head,
+          ...gapRange,
           standingRecords: (verdict.findings ?? []).filter((f) => f.kind === 'do-not-merge').length,
         })
       } catch {

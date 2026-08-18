@@ -509,6 +509,12 @@ describe('a binary file is declared, never dropped or mangled', () => {
     const meg = Buffer.alloc(1024 * 1024)
     expect(binarySectionDeliversChange(literalSection(meg))).toBe(true)
     expect(binarySectionDeliversChange(literalSection(meg, MAX_INFLATED_BINARY_BYTES + 1))).toBe(false)
+    // DISCRIMINATING at the boundary (fourth landing round, carried pass 8):
+    // with a MATCHING stream, an implementation without the cap would inflate
+    // the whole declared size, find length === declared and answer true —
+    // only the bound itself refuses it. Exactly AT the cap still delivers.
+    expect(binarySectionDeliversChange(literalSection(Buffer.alloc(MAX_INFLATED_BINARY_BYTES)))).toBe(true)
+    expect(binarySectionDeliversChange(literalSection(Buffer.alloc(MAX_INFLATED_BINARY_BYTES + 1)))).toBe(false)
     // A stream that would inflate PAST its own declaration is stopped by the
     // output bound (the declared length is the most validation may produce).
     expect(binarySectionDeliversChange(literalSection(meg, 16))).toBe(false)

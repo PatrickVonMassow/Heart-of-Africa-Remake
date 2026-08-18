@@ -40,6 +40,19 @@ export const REVIEW_GAP_BUDGET_CHARS = 200_000
 export const REVIEW_GAP_MAX_PASS_TOTAL = 256
 
 /**
+ * The one range the mechanism guard may submit for a gap ruling. `base` is the
+ * merge-base already used to find pending commits and measure pass coverage;
+ * the stored baseline is deliberately not an input here because it may sit on
+ * main beyond a feature branch's fork. A missing base means that common range
+ * was not established, so there is no gap assessment and the existing block
+ * remains in force.
+ */
+export function reviewGapRange({ blocked = false, base = '', head = '' } = {}) {
+  if (!blocked || typeof base !== 'string' || !base || typeof head !== 'string' || !head) return null
+  return { baseline: base, head }
+}
+
+/**
  * Rule on the gap for ONE range.
  *
  *   measuredChars     what the range's material assembles to (diffstat + patch
@@ -118,13 +131,15 @@ export function decideReviewGap({
     // a waiver on planner data that ruled nothing. Only a planner that
     // answered both questions with booleans and named its uncoverable set
     // may rule the gap; anything malformed blocks as unmeasured.
-    if (planner.fits === false && planner.covers === false && Array.isArray(planner.uncoverable)) {
+    const uncoverableSound =
+      Array.isArray(planner.uncoverable) && planner.uncoverable.every((p) => typeof p === 'string' && p)
+    if (planner.fits === false && planner.covers === false && uncoverableSound) {
       return {
         gap: true,
         reason: 'split-cannot-cover',
         measuredChars: size,
         budget: cap,
-        uncoverable: planner.uncoverable.map((p) => String(p)),
+        uncoverable: [...planner.uncoverable],
       }
     }
     return {

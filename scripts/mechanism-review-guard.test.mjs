@@ -14,6 +14,7 @@ import {
   parseMechanismLog,
   rangeFilesCommand,
 } from './mechanism-review-guard.mjs'
+import { reviewGapRange } from './mechanism-review-guard-gap-core.mjs'
 
 describe('baselineFor', () => {
   const state = { baselines: { main: 'aaa', 'feat/x': 'bbb' } }
@@ -205,6 +206,16 @@ describe('the path-carrying git commands', () => {
       '--no-renames',
       'base..sha',
     ])
+  })
+
+  it('starts pending detection, coverage and gap assessment at the same merge-base', () => {
+    const base = 'a'.repeat(40)
+    const head = 'b'.repeat(40)
+    const record = 'c'.repeat(40)
+    const gap = reviewGapRange({ blocked: true, base, head })
+
+    expect(mechanismLogCommand(base, head).at(-1)).toBe(`${gap.baseline}..${gap.head}`)
+    expect(rangeFilesCommand(base, record).at(-1)).toBe(`${gap.baseline}..${record}`)
   })
 })
 

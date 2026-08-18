@@ -696,6 +696,10 @@ export const usage = () =>
     'and split into PASSES over the FILE SET — --pass <k> reviews one of them, and the',
     'record it prints covers that pass alone. Splitting by COMMIT does not help: every',
     'commit ships the current content of the files it touches.',
+    '--carry-from <sha> (planning only, with neither --pass nor a fitting range): sorts the',
+    'pass plan into passes whose files are byte-identical at that earlier reviewed head —',
+    'their reading CARRIES via mechanism-review.mjs --carried-from, re-verified by the',
+    'recorder and the gates — and passes needing fresh eyes.',
     `Reviews run on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT} (CLAUDE.md §6). When it`,
     `cannot be reached the review is HANDED OVER to the first model of ${FALLBACK_CHAIN.join(' → ')}`,
     'that authored no part of the reviewed range — the recorded review always names the',
@@ -900,6 +904,11 @@ if (isMainModule(import.meta.url)) {
     let pass = null
     let assembly
     if (plan.fits) {
+      if (flag('--carry-from')) {
+        console.error(
+          'review-sol: --carry-from does nothing here — this range fits in one round, which must be read whole.',
+        )
+      }
       if (passFlag) {
         console.error(
           `review-sol: --pass ${passFlag} names a pass of a split this range does not need — it fits in one round.`,
@@ -917,6 +926,15 @@ if (isMainModule(import.meta.url)) {
       // WILL BE REFUSED. The plan above says how to split it, so the run stops
       // here rather than paying for a verdict nothing may rest on.
       if (!passFlag) {
+        // An over-cap split can never be recorded: refuse BEFORE any carry
+        // analysis prints unrecordable commands (fourth landing round).
+        if (plan.passes.length > MAX_PASS_TOTAL) {
+          console.error(
+            `review-sol: this range splits into ${plan.passes.length} passes — more than the ` +
+              `${MAX_PASS_TOTAL} a record can hold. Narrow the range or split the change.`,
+          )
+          process.exit(2)
+        }
         // DELTA-SCOPED ROUNDS (user decision 18.08.2026): with --carry-from
         // <previous round's head>, a pass whose files are ALL byte-identical
         // there and were ALL read by one recorded pass at that head needs no
@@ -944,7 +962,10 @@ if (isMainModule(import.meta.url)) {
           const sourceRows = readRecords().filter(
             (r) => r.sha === carrySha && r.pass && Array.isArray(r.pass.files) && r.carried === undefined,
           )
-          const setOf = (files) => [...files].sort().join('\n')
+          // INJECTIVE (JSON, never a join) — advisory only, and the recorder
+          // re-verifies every claim, but a colliding key here recommends a
+          // carry the recorder then refuses (fourth landing round).
+          const setOf = (files) => JSON.stringify([...files].map(String).sort())
           const sourceSets = new Set(sourceRows.map((r) => setOf(r.pass.files)))
           console.error(`review-sol: carry analysis against ${carrySha.slice(0, 7)}:`)
           for (const p of plan.passes) {
@@ -968,6 +989,11 @@ if (isMainModule(import.meta.url)) {
           'review-sol: REFUSING to spend a round on a range that cannot fit one — run the passes above.',
         )
         process.exit(4)
+      }
+      if (flag('--carry-from')) {
+        console.error(
+          'review-sol: --carry-from is a planning aid and does not combine with --pass — this call pays a fresh review of the named pass.',
+        )
       }
       // A split of one cannot be recorded (round-3 pass 4): the recorder
       // refuses totals below 2, so spending a round on `--pass 1` of such a

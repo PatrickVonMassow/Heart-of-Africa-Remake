@@ -239,6 +239,8 @@ describe('parseAuthoringAnswer', () => {
     expect(
       parseAuthoringAnswer('DONE: built\nGATES: test:unit, build and lint all green\nOPEN: _<what you left undone>').ok,
     ).toBe(false)
+    // A MARKER-ONLY field is an unanswered field (fourth landing round).
+    expect(parseAuthoringAnswer('DONE: _\nGATES: test:unit, build and lint all green\nOPEN: _').ok).toBe(false)
   })
 
   it('quotes DONE/GATES/OPEN from the raw lines byte-for-byte', () => {

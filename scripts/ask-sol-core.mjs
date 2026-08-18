@@ -193,7 +193,16 @@ function parseDiagnose(lines) {
   // the raw `/^</` test); the QUOTED values read the raw lines, byte for byte
   // (see rawFieldValue's boundary note).
   if (!causeClean || !evidenceClean) return { ok: false, error: 'the message does not end in the CAUSE/EVIDENCE pair' }
-  if (/^</.test(causeClean) || /^</.test(evidenceClean) || evidenceClean.length < 10) {
+  // RULED ON THE NET-ONLY SPELLING TOO (fourth landing round, pass 1): an
+  // UNMATCHED marker survives the pair strip, so `CAUSE: _<the one cause>`
+  // shielded the anchored test and `CAUSE: _` read as a present field.
+  // Deletion can only widen a refusal, never clear one.
+  const netCause = charStripped(causeClean).trim()
+  const netEvidence = charStripped(evidenceClean).trim()
+  if (!netCause || !netEvidence) {
+    return { ok: false, error: 'a CAUSE/EVIDENCE line holds only marker characters — no diagnosis was given' }
+  }
+  if (/^[\s*-]*</.test(netCause) || /^[\s*-]*</.test(netEvidence) || /^</.test(causeClean) || /^</.test(evidenceClean) || netEvidence.length < 10) {
     return { ok: false, error: 'the CAUSE/EVIDENCE lines are the placeholders echoed back' }
   }
   const cause = rawFieldValue(tail[0].raw) || causeClean
@@ -261,7 +270,11 @@ function parseEntries(lines, prefix, { allowEmpty = false } = {}) {
   // `NO FINDINGS: _` read as an explained clean audit while naming nothing
   // checked. Deletion cannot fabricate emptiness.
   const explained = /(^|\n)\s*[-*]?\s*NO FINDINGS\s*:\s*(\S[^\n]*)/i.exec(clean)
-  const statesNone = Boolean(explained && charStripped(explained[2]).trim())
+  // …and the PROMPT'S OWN TEMPLATE is no explanation (fourth landing round,
+  // pass 1): `NO FINDINGS: <what you checked>` echoed back names nothing
+  // checked — a placeholder is ruled exactly as everywhere else.
+  const explanation = explained ? charStripped(explained[2]).trim() : ''
+  const statesNone = Boolean(explanation && !/^[\s*-]*</.test(explanation))
   if (!entries.length) {
     if (allowEmpty && statesNone) return { ok: true, answer: { entries: [] }, summary: 'no findings' }
     return { ok: false, error: `no entry in the form \`${prefix}1 | <file> | <one line>\`` }
