@@ -372,6 +372,17 @@ describe('visible review debt', () => {
     })).toEqual({ passCount: 2, materialChars: null, groups: passes })
   })
 
+  it('names a non-numeric rawSize unavailable instead of coercing it to zero', () => {
+    // `Number(null)` and `Number('')` are 0, so an unmeasured assembly would
+    // have reported ZERO material for owed work — a cleared-looking figure.
+    for (const rawSize of [null, '', '466106', undefined]) {
+      expect(summarizeReviewDebt({
+        outstanding: [{ file: 'a' }],
+        sizedPlan: { passes: [{ index: 1 }], rawSize },
+      })).toEqual({ passCount: null, materialChars: null, groups: [] })
+    }
+  })
+
   it('distinguishes cleared debt from an unavailable measurement', () => {
     expect(summarizeReviewDebt({ outstanding: [] })).toEqual({ passCount: 0, materialChars: 0, groups: [] })
     expect(summarizeReviewDebt({ outstanding: [{ file: 'a' }] })).toEqual({

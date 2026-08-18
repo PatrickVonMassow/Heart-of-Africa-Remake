@@ -306,7 +306,15 @@ export function commitsForContributions(contributions = []) {
 export function summarizeReviewDebt({ outstanding = [], sizedPlan = null } = {}) {
   const owed = Array.isArray(outstanding) ? outstanding.length : 0
   if (!owed) return { passCount: 0, materialChars: 0, groups: [] }
-  if (!sizedPlan || !Array.isArray(sizedPlan.passes) || !Number.isFinite(Number(sizedPlan.rawSize))) {
+  // `typeof` before coercion: `Number(null)` and `Number('')` are 0, so an
+  // UNMEASURED rawSize would pass a bare isFinite check and report zero
+  // material — a cleared-looking figure for work nobody measured.
+  if (
+    !sizedPlan ||
+    !Array.isArray(sizedPlan.passes) ||
+    typeof sizedPlan.rawSize !== 'number' ||
+    !Number.isFinite(sizedPlan.rawSize)
+  ) {
     return { passCount: null, materialChars: null, groups: [] }
   }
   // The size a reader can ACT on is what the owed passes carry, because that is
