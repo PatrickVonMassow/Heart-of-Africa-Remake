@@ -289,7 +289,16 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
   // THIS project's tooling describes failure modes in the net's own vocabulary,
   // and a whole message swallowed for one such phrase is work discarded
   // (measured 18.08.2026, point 714 pass 2, on the review path).
-  if (blindReviewerAdmission(clean)) {
+  //
+  // SCANNED TWICE, RAW AND STRIPPED — either hit is an admission (final
+  // convergence, structural by construction): four rounds chased Markdown
+  // shapes that shielded an admission from the stripped scan alone (flat,
+  // nested, quote-adjacent emphasis), and each fix invited the next shape.
+  // Whatever decoration the stripper misses leaves the RAW text untouched for
+  // the raw scan; whatever decoration SHIELDS the raw words is unwrapped for
+  // the stripped scan. A strip defect can now only ever widen the net, never
+  // shield it.
+  if (blindReviewerAdmission(text) || blindReviewerAdmission(clean)) {
     return { ok: false, kind: k, answer: null, summary: '', error: 'the model says it could not see the material' }
   }
   if (k === 'explain') {

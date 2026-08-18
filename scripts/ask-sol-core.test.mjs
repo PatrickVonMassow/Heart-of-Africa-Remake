@@ -202,6 +202,33 @@ describe('the markdown strip reads shapes, not characters (round-7 pass 1)', () 
     expect(parsed.ok).toBe(false)
     expect(parsed.error).toContain('could not see the material')
   })
+
+  it('admits on EITHER the raw or the stripped scan — no shape can shield both (final convergence)', () => {
+    // Every shape that defeated the stripped scan alone in an earlier round,
+    // plus the plain phrase: the double scan must catch each one.
+    for (const text of [
+      // plain, no decoration at all — the raw scan's own bread and butter
+      'I could not read the material for this range, so nothing here was judged by me.',
+      // flat emphasis (round 7)
+      'I checked nothing because **no** material was supplied to this run at all, sadly.',
+      // nested emphasis (round 8)
+      'I read *no **material*** from this range because none arrived with the request at all.',
+      // quote-adjacent emphasis (round 9 — the shape the enumerated boundary missed)
+      'It ended early: "**no** material was supplied" is the whole story of this run, regrettably.',
+    ]) {
+      const parsed = parseAnswer({ kind: 'explain', text })
+      expect(parsed.ok, text).toBe(false)
+      expect(parsed.error).toContain('could not see the material')
+    }
+  })
+
+  it('does not admit a genuine review that merely SPEAKS the net’s vocabulary, raw or stripped', () => {
+    const parsed = parseAnswer({
+      kind: 'explain',
+      text: 'Checked the **splitter** against quoted paths; the patch was not supplied in the failing fixture, which is the defect.',
+    })
+    expect(parsed.ok).toBe(true)
+  })
 })
 
 describe('reading the answer', () => {
