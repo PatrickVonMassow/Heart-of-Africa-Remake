@@ -422,9 +422,11 @@ describe('a review that does not run', () => {
     expect(r.stdout).toMatch(/login/i)
     expect(r.stdout).toContain(FALLBACK_MODEL_NAME)
     expect(r.stdout).toContain('The review is NOT done')
-    // The printed record cannot be run as it stands: the verdict is a placeholder.
-    expect(r.stdout).toMatch(/--verdict <merge\|merge-with-fixes\|do-not-merge>/)
-    expect(r.stdout).not.toContain('--model "GPT-5.6 Sol"')
+    // A FAILED DELIVERY OFFERS NO RECORD IN ANY SHAPE (escalation round): the
+    // run errored, so nothing of the range was read, and even a placeholder
+    // template at the whole sha is an offer no completed hand-off backs.
+    expect(r.stdout).toContain('NO RECORD COMMAND IS PRINTED')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
   })
 
   it('treats an answer that admits it saw nothing as no review at all', () => {
@@ -459,8 +461,10 @@ describe('a review that does not run', () => {
     provenId()
     const r = run(['--sha', fableSha, '--brief', 'judge it'], { STUB_MODE: 'fail' })
     expect(r.status).toBe(3)
+    // The hand-over names its reviewer in PROSE — after a failed delivery no
+    // record command is printed at all, not even a placeholder template.
     expect(r.stdout).toContain(SECOND_FALLBACK_MODEL_NAME)
-    expect(r.stdout).toContain(`--model "${SECOND_FALLBACK_MODEL_NAME}"`)
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
     expect(r.stdout).not.toMatch(/Hand it to Fable/)
   })
 })

@@ -339,8 +339,18 @@ export function runCodex({ prompt, input = '', modelId = SOL_MODEL_ID, timeoutMs
     // received, so comparing against it pins the CALL SITE — a caller that
     // rebuilt, trimmed or swapped the variable fails the sent-differs check.
     // It is NOT a witness of the transport: nothing codex prints echoes its
-    // stdin back, so a kernel-level truncation is invisible from here. What
-    // the process layer DOES report travels beside it (escalation round) …
+    // stdin back. What the process layer DOES report travels beside it
+    // (escalation round): a child that closes stdin while more material is
+    // still being written surfaces as an EPIPE spawn error even at exit 0
+    // (measured 18.08.2026), which lands in transportError below and refuses.
+    // NAMED RESIDUAL, erring to a wrong GRANT and not closable from here: a
+    // material SMALLER than the kernel pipe buffer (~64 KiB) is accepted by
+    // the OS in one write, so a child that exits 0 without ever reading it
+    // raises nothing — no spawn error, no signal — and a parseable verdict
+    // over unread material would pass this layer. spawnSync exposes no
+    // read-side evidence that could close it; the admission check in
+    // parseVerdict (a reviewer saying it could not see) is the only, partial,
+    // mitigation. What the process layer DOES report is still honoured …
     sentInput: input,
     // … and where the spawn layer reported an error, or the run was killed on
     // its budget mid-stream, whether the material arrived is UNKNOWN — the
@@ -736,10 +746,18 @@ if (isMainModule(import.meta.url)) {
     const run = runCodex({ prompt: buildReviewPrompt({ sha: full, brief, mode }), input: assembly.text, timeoutMs })
     const outcome = classifyOutcome(run)
     const parsed = outcome.ok ? parseVerdict(run.finalMessage) : { ok: false }
+    // DID THIS ROUND CARRY WHAT IT CLAIMS TO HAVE JUDGED? Asked of the accounting
+    // and of the string that actually went to codex — never of the material's own
+    // text, which a reviewed source file can carry the truncation marker in — and
+    // of the process layer's own report: a hand-off that died mid-transmit is an
+    // UNKNOWN coverage, and unknown refuses. Asked BEFORE the decision, because
+    // `ready` rests on this answer (escalation round): a clean exit with a
+    // parseable verdict is not delivery evidence.
+    const shortfall = materialShortfall({ assembly, sent: run.sentInput, transportError: run.transportError })
     // WHO AUTHORED IT decides who may review it if Sol is unavailable: Fable
     // cannot review its own commit (see fallbackReviewerFor), and the record
     // covers the whole range, so every author in it counts.
-    const decision = decideReview({ outcome, parsed, authorModel: rangeAuthors })
+    const decision = decideReview({ outcome, parsed, authorModel: rangeAuthors, shortfall })
     // THE FINDINGS ARE THE POINT, not the verdict word: a `do-not-merge` whose
     // reasons were never printed cannot be acted on, and the evidence line the
     // ledger carries is one sentence by design. So the reviewer's whole answer
@@ -748,12 +766,6 @@ if (isMainModule(import.meta.url)) {
     if (said) {
       console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end of review ---\n`)
     }
-    // DID THIS ROUND CARRY WHAT IT CLAIMS TO HAVE JUDGED? Asked of the accounting
-    // and of the string that actually went to codex — never of the material's own
-    // text, which a reviewed source file can carry the truncation marker in — and
-    // of the process layer's own report: a hand-off that died mid-transmit is an
-    // UNKNOWN coverage, and unknown refuses.
-    const shortfall = materialShortfall({ assembly, sent: run.sentInput, transportError: run.transportError })
     console.log(formatReviewReport({ decision, sha: full, mode, point, partial, shortfall, plan, pass }))
     // A fallback is not an error of THIS command — it did its job by refusing to
     // invent a review — but it must not read as a finished one either, so the

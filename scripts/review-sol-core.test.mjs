@@ -38,9 +38,12 @@ import {
 const solSays = (verdict = 'merge', evidence = 'read the diff and the guard test; the fail-open path is covered') =>
   `I checked the change.\n\nVERDICT: ${verdict}\nEVIDENCE: ${evidence}\n`
 
+// `shortfall: null` is the material accounting's explicit "the round provably
+// carried everything" — the only value that lets a decision become ready.
 const okRun = (text = solSays()) => ({
   outcome: classifyOutcome({ exitCode: 0, stdout: text }),
   parsed: parseVerdict(text),
+  shortfall: null,
 })
 
 describe('classifyOutcome — how a codex run ended', () => {
@@ -239,6 +242,17 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     expect(d).toMatchObject({ model: SOL_MODEL_NAME, fellBack: false, ready: true, verdict: 'merge' })
   })
 
+  it('is NOT ready without delivery evidence — a clean exit is not a carried round', () => {
+    // `ready` rested on outcome.ok && parsed.ok alone (escalation round): the
+    // exit code says nothing about whether the material reached the reviewer.
+    // A present shortfall refuses, and a caller that never asked refuses too.
+    const run = okRun()
+    expect(decideReview({ ...run, shortfall: undefined }).ready).toBe(false)
+    expect(decideReview({ ...run, shortfall: { reason: 'unverified' } }).ready).toBe(false)
+    // The verdict itself is still reported — the findings are worth having.
+    expect(decideReview({ ...run, shortfall: { reason: 'unverified' } }).verdict).toBe('merge')
+  })
+
   it.each([
     ['an unreachable host', { exitCode: 1, stderr: 'error sending request for url' }, OUTCOME.UNREACHABLE],
     ['an expired login', { exitCode: 1, stderr: 'not logged in' }, OUTCOME.LOGIN_EXPIRED],
@@ -309,6 +323,25 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     // An instruction naming Fable beside a command naming Opus is how a
     // self-review gets recorded.
     expect(report).not.toMatch(/Hand it to Fable/)
+  })
+
+  it.each([
+    ['a timeout', { timedOut: true }],
+    ['an error exit', { exitCode: 9, stderr: 'panicked at src/main.rs' }],
+    ['a dead host', { exitCode: 1, stderr: 'error sending request for url' }],
+  ])('prints NO record command after %s — a failed delivery offers no record in any shape', (_n, run) => {
+    const d = decideReview({ outcome: classifyOutcome(run), parsed: { ok: false } })
+    const report = formatReviewReport({ decision: d, sha: 'a'.repeat(40), mode: 'review' })
+    expect(report).toContain('NO RECORD COMMAND IS PRINTED')
+    expect(report).not.toContain('mechanism-review.mjs --record')
+    expect(report).toContain(FALLBACK_MODEL_NAME)
+  })
+
+  it('still hands a NO-VERDICT run on with the placeholder template — its transfer completed', () => {
+    const d = decideReview(okRun('I had a look and it seems fine.'))
+    const report = formatReviewReport({ decision: d, sha: 'a'.repeat(40), mode: 'review' })
+    expect(report).toContain('mechanism-review.mjs --record')
+    expect(report).toMatch(/--verdict <merge\|merge-with-fixes\|do-not-merge>/)
   })
 
   it('never names Sol on a failed run, and never names Fable on a successful one', () => {

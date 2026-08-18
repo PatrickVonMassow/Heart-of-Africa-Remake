@@ -324,7 +324,7 @@ export function parseVerdict(text) {
  * so with an EMPTY verdict, because at that moment no second pair of eyes has
  * seen the change yet. `ready` says whether a record may be written at all.
  */
-export function decideReview({ outcome = {}, parsed = {}, authorModel = '' } = {}) {
+export function decideReview({ outcome = {}, parsed = {}, authorModel = '', shortfall } = {}) {
   // THE REVERSED DIRECTION IS DECIDED BEFORE ANYTHING ELSE (point 667). Sol now
   // AUTHORS as well as reviews, and a model may not review its own work — so a
   // Sol run over a Sol-authored range is not a review whatever it answered, and
@@ -350,7 +350,14 @@ export function decideReview({ outcome = {}, parsed = {}, authorModel = '' } = {
       verdict: parsed.verdict,
       evidence: parsed.evidence,
       fellBack: false,
-      ready: true,
+      // READY RESTS ON DELIVERY EVIDENCE, not on the exit code (escalation
+      // round): a clean exit with a parseable verdict says nothing about
+      // whether the round CARRIED its material. `shortfall` is the material
+      // accounting's answer — an explicit null (the round provably complete)
+      // is the only value that makes the record ready; a present shortfall
+      // refuses, and a caller that never asked (undefined) refuses too,
+      // because an unknown fit must never read as "everything was seen".
+      ready: shortfall === null,
       kind: OUTCOME.OK,
       cause: '',
     }
@@ -757,6 +764,25 @@ export function formatReviewReport({
       `  And EVERY model in the fallback chain (${FALLBACK_CHAIN.join(', ')}) authored part of this`,
       '  range, so none of them may review it. The review is NOT done and cannot be recorded:',
       `  fix the ${SOL_MODEL_NAME} run, or review a narrower range one of them did not write.`,
+    ].join('\n')
+  }
+  // A FAILED DELIVERY OFFERS NO RECORD IN ANY SHAPE (escalation round). A record
+  // is offered only for what was actually read — and after a spawn error, a
+  // timeout, a dead host, a refused login or an error exit, nothing was: the
+  // material was lost with the run. The placeholder template used to survive
+  // here for the next reviewer to fill, but a ready-made whole-sha template is
+  // an offer no completed hand-off backs. The two kinds below are different: a
+  // NO_VERDICT run completed its transfer and answered unusably, and the share
+  // switch never attempted one — both hand-offs rest on a measured, fitting
+  // plan, so their template (whose placeholders the recorder refuses anyway)
+  // stays. Every other kind — the unknown ones included — refuses.
+  if (decision.kind !== OUTCOME.NO_VERDICT && decision.kind !== OUTCOME.SWITCHED_OFF) {
+    return [
+      `review-sol: FALLBACK — ${SOL_MODEL_NAME} did not review ${String(sha).slice(0, 7)}: ${decision.cause}.`,
+      '  NO RECORD COMMAND IS PRINTED: the hand-off did not complete, so nothing of this range',
+      "  was read — the whole round's material was lost with the run.",
+      `  The review is NOT done — it is ${who}'s now. Hand it the commit and the brief above;`,
+      '  it reads the range itself, and only what IT actually read may be recorded.',
     ].join('\n')
   }
   return [
