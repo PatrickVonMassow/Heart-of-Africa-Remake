@@ -184,7 +184,13 @@ put it is the mistake this line exists to stop.
      --status` states the outstanding pass count and the material size, and the batch reports
      it like any other backlog — a gate that first speaks at a turn end has already cost the
      turn.
-  4. THE EXISTING BACKLOG IS WORKED OFF, not waived: the twenty passes of the current range are
+  4. THE CRITICALITY GATE HANGS ON THE SAME CAUSE and is cleared with it. Point 700's HIGH tick
+     carries a `do-not-merge` whose own evidence says why: three successive passes were refused
+     on TRUNCATED material rather than on a defect, and the recorder refused to manufacture a
+     clearance by re-asking with a friendlier framing. So the re-review of 700 that this gate
+     wants is only possible once the range is reviewable at all — it is the first record the
+     rebuilt plan must produce, and until then BOTH gates block every turn end for one cause.
+  5. THE EXISTING BACKLOG IS WORKED OFF, not waived: the twenty passes of the current range are
      run under rule 1 and recorded, or the range is explicitly re-baselined with a written
      justification naming every file that re-baselining leaves unread.
   VERIFIABLE: the pass plan for the current range assigns every pass a reviewer that authored
