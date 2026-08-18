@@ -32,7 +32,7 @@
 
 import { ALLOWED_TRAILERS, classifyTrailer, modelNamesIn } from './model-guard-core.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
-import { SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
+import { rawFieldValue, SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 
 export { SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
 
@@ -327,11 +327,19 @@ export function gatesProblem(gates) {
   return GREEN.test(whole) ? '' : 'it never says the gates PASSED — an absent complaint is not a green run'
 }
 
-/** The closing lines of an authoring answer, read off the END of the message. */
+/** The closing lines of an authoring answer, read off the END of the message.
+ *  MATCHED on the stripped line, QUOTED from the raw one (the one rule): the
+ *  character strip rewrites content — `src/__init__.py` loses its underscores
+ *  — and these three fields are read and reported by the caller. The strip
+ *  removes no newline, so lines pair one to one. */
 export function parseAuthoringAnswer(text) {
-  const clean = String(text ?? '').replace(/[*`_#>]/g, '')
-  const tail = clean.split('\n').map((l) => l.trim()).filter(Boolean).slice(-3)
-  const field = (line, name) => (new RegExp(`^[-*]?\\s*${name}\\s*:\\s*(.+)$`, 'i').exec(line ?? '')?.[1] ?? '').trim()
+  const pairs = String(text ?? '')
+    .split('\n')
+    .map((line) => ({ raw: line, clean: line.replace(/[*`_#>]/g, '').trim() }))
+    .filter((p) => p.clean)
+  const tail = pairs.slice(-3)
+  const field = (pair, name) =>
+    new RegExp(`^[-*]?\\s*${name}\\s*:\\s*(.+)$`, 'i').test(pair?.clean ?? '') ? rawFieldValue(pair.raw) : ''
   const done = field(tail[0], 'DONE')
   const gates = field(tail[1], 'GATES')
   const open = field(tail[2], 'OPEN')

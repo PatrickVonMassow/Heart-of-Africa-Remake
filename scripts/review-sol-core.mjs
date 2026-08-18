@@ -300,16 +300,42 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review', pass 
  * evidence line too thin to mean anything, is NOT a verdict. Such a run has not
  * been reviewed, and the caller falls back rather than record a guess.
  */
+/** The VALUE of a labelled RAW line: everything after its first colon — the
+ *  label always carries one, and decoration adds none before it. A label
+ *  written `**EVIDENCE:**` closes its decoration right after the colon; that
+ *  one marker run is dropped only when whitespace follows it, so a value that
+ *  genuinely begins with a marker stays. Shared by every parser that obeys the
+ *  one rule: the STRIPPED copy matches, the RAW text is quoted. */
+export function rawFieldValue(rawLine) {
+  const at = String(rawLine ?? '').indexOf(':')
+  if (at < 0) return ''
+  return String(rawLine)
+    .slice(at + 1)
+    .replace(/^\s*(?:[*_`]+(?=\s))?/, '')
+    .trim()
+}
+
 export function parseVerdict(text, { receipt = '' } = {}) {
   const raw = String(text ?? '')
-  const clean = raw.replace(/[*`_#>]/g, '')
   // THE PAIR MUST BE THE END OF THE MESSAGE (four-eyes finding, 10.08.2026). The
   // prompt asks for exactly two closing lines; taking the last match of each
   // INDEPENDENTLY would happily pair a verdict with an evidence line from some
   // earlier paragraph, so the two final non-empty lines are what is read.
+  //
+  // MATCHED ON THE STRIPPED LINE, QUOTED FROM THE RAW ONE (final convergence):
+  // the char-deleting strip exists so a decorated label still matches — but it
+  // rewrites content (`src/__init__.py` → `src/init.py`), and the EVIDENCE
+  // read here is what `--record` writes into the ledger. The character strip
+  // removes no newline, so lines pair one to one. Stated exceptions, safe by
+  // shape: the RECEIPT (hex token) and the VERDICT word are identifiers the
+  // strip cannot rewrite and are read from the stripped line.
   const expected = String(receipt ?? '').trim()
-  const lines = clean.split('\n').map((l) => l.trim()).filter(Boolean)
-  const tail = lines.slice(expected ? -3 : -2)
+  const pairs = raw
+    .split('\n')
+    .map((line) => ({ raw: line, clean: line.replace(/[*`_#>]/g, '').trim() }))
+    .filter((p) => p.clean)
+  const tailPairs = pairs.slice(expected ? -3 : -2)
+  const tail = tailPairs.map((p) => p.clean)
   // THE RECEIPT IS DEMANDED WHERE ONE WAS ISSUED (fourth cross-vendor round,
   // pass 4, finding 8): the token stands only on the material's last line,
   // never in the prompt, so an answer that cannot repeat it is an answer from
@@ -327,9 +353,11 @@ export function parseVerdict(text, { receipt = '' } = {}) {
       }
     }
     tail.shift()
+    tailPairs.shift()
   }
   const verdict = (/^[-*]?\s*VERDICT\s*:\s*(.+)$/i.exec(tail[0] ?? '')?.[1] ?? '').trim().toLowerCase()
-  const evidence = (/^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1] ?? '')?.[1] ?? '').trim()
+  const evidenceMatched = /^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.test(tail[1] ?? '')
+  const evidence = evidenceMatched ? rawFieldValue(tailPairs[1]?.raw) : ''
   if (!VERDICTS.includes(verdict)) {
     return {
       ok: false,
@@ -347,12 +375,16 @@ export function parseVerdict(text, { receipt = '' } = {}) {
   // was checked and then describes the reviewed code in the net's vocabulary is
   // a review, and routing its verdict to a fallback would discard it (measured
   // 18.08.2026, point 714 pass 2 — see blindReviewerAdmission).
-  if (blindReviewerAdmission(evidence)) {
+  // Scanned RAW and STRIPPED, either hit admitting (the dual-scan rule): the
+  // raw spelling may shield the words behind decoration the stripped one
+  // unwraps, and vice versa.
+  const evidenceClean = (/^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1] ?? '')?.[1] ?? '').trim()
+  if (blindReviewerAdmission(evidence) || blindReviewerAdmission(evidenceClean)) {
     return { ok: false, verdict: '', evidence: '', error: 'the reviewer says it could not see the change' }
   }
   // A line still in its angle brackets is the PLACEHOLDER echoed back, not an
-  // observation. (The closing bracket is not required: the markdown strip above
-  // removes `>` as a blockquote marker, so only the opening one is reliable.)
+  // observation. (Only the opening bracket is required, so the check holds for
+  // both the raw and any stripped spelling.)
   if (evidence.length < 10 || /^</.test(evidence)) {
     return { ok: false, verdict: '', evidence: '', error: 'no usable EVIDENCE line' }
   }

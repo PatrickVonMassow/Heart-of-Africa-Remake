@@ -18,7 +18,7 @@
 // Side-effect free: the process spawn, the material gathering and the printing belong to
 // scripts/ask-sol.mjs. Pinned by ask-sol-core.test.mjs.
 
-import { blindReviewerAdmission, MATERIAL_BUDGET_CHARS, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
+import { blindReviewerAdmission, MATERIAL_BUDGET_CHARS, rawFieldValue, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 
 export { MATERIAL_BUDGET_CHARS, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
 
@@ -184,27 +184,13 @@ export function formatAskMaterial({ sections = [], budget = MATERIAL_BUDGET_CHAR
 }
 
 /** The two closing lines of a DIAGNOSE answer, read off the END of the message. */
-/** The VALUE of a labelled raw line: everything after its first colon — the
- *  label always carries one, and decoration adds none before it. A label
- *  written `**CAUSE:**` closes its decoration right after the colon; that one
- *  trailing marker run is dropped only when whitespace follows it, so a value
- *  that genuinely BEGINS with a marker (`_private …` has none after) stays. */
-const rawValueAfterColon = (rawLine) => {
-  const at = String(rawLine ?? '').indexOf(':')
-  if (at < 0) return ''
-  return String(rawLine)
-    .slice(at + 1)
-    .replace(/^\s*(?:[*_`]+(?=\s))?/, '')
-    .trim()
-}
-
 function parseDiagnose(lines) {
   const tail = lines.map((l) => ({ clean: l.clean.trim(), raw: l.raw })).filter((l) => l.clean).slice(-2)
   const causeLabel = /^[-*]?\s*CAUSE\s*:\s*(.+)$/i.exec(tail[0]?.clean ?? '')?.[1] ?? ''
   const evidenceLabel = /^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1]?.clean ?? '')?.[1] ?? ''
   // Recognised on the stripped line, QUOTED from the raw one (see parseAnswer).
-  const cause = causeLabel ? rawValueAfterColon(tail[0].raw) : ''
-  const evidence = evidenceLabel ? rawValueAfterColon(tail[1].raw) : ''
+  const cause = causeLabel ? rawFieldValue(tail[0].raw) : ''
+  const evidence = evidenceLabel ? rawFieldValue(tail[1].raw) : ''
   if (!cause || !evidence) return { ok: false, error: 'the message does not end in the CAUSE/EVIDENCE pair' }
   if (/^</.test(cause) || /^</.test(evidence) || evidence.length < 10) {
     return { ok: false, error: 'the CAUSE/EVIDENCE lines are the placeholders echoed back' }
@@ -342,9 +328,13 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
       ? cleanLines.map((c, i) => ({ clean: c, raw: rawLines[i] }))
       : cleanLines.map((c) => ({ clean: c, raw: c }))
   if (k === 'explain') {
+    // The thinness ruling reads the stripped prose (matching); what the caller
+    // gets is the RAW text, byte-exact — the one rule, applied here too (an
+    // explanation quotes paths, and the strip rewrites src/__init__.py).
     const prose = clean.trim()
     if (prose.length < 40) return { ok: false, kind: k, answer: null, summary: '', error: 'the answer is too thin to be an explanation' }
-    return { ok: true, kind: k, answer: { text: prose }, summary: prose.split('\n')[0].slice(0, 120), error: '' }
+    const rawProse = String(text ?? '').trim()
+    return { ok: true, kind: k, answer: { text: rawProse }, summary: rawProse.split('\n')[0].slice(0, 120), error: '' }
   }
   // A sweep may honestly find nothing; a DIVERGENT enumeration that lists nothing is no
   // half of a blind-parallel stage, so only the audit may come back empty.

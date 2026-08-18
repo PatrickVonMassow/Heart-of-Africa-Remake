@@ -256,6 +256,26 @@ describe('the markdown strip reads shapes, not characters (round-7 pass 1)', () 
     ])
   })
 
+  it('an ENUMERATE entry quotes raw too — every list kind obeys the one rule', () => {
+    const parsed = parseAnswer({
+      kind: 'enumerate',
+      text: 'my own list\n\nB1 | src/__init__.py | the __all__ export omits the loader symbol',
+    })
+    expect(parsed.ok).toBe(true)
+    expect(parsed.answer.entries).toEqual([
+      { id: 'B1', file: 'src/__init__.py', text: 'the __all__ export omits the loader symbol' },
+    ])
+  })
+
+  it('an EXPLAIN answer is the raw text byte-for-byte, never the stripped copy', () => {
+    const text =
+      'The module src/__init__.py wires the loader: it re-exports __all__ from the package and keeps the flag literal.'
+    const parsed = parseAnswer({ kind: 'explain', text })
+    expect(parsed.ok).toBe(true)
+    expect(parsed.answer.text).toBe(text)
+    expect(parsed.summary).toContain('src/__init__.py')
+  })
+
   it('does not admit a genuine review that merely SPEAKS the net’s vocabulary, raw or stripped', () => {
     const parsed = parseAnswer({
       kind: 'explain',
