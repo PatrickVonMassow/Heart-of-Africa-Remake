@@ -452,11 +452,19 @@ export function parsePassFiles(value) {
  * Which passes a set of records for ONE sha holds, and which are still owed.
  *
  * A pass record clears NOTHING on its own: the composition is complete only when
- * every pass of the same total is on record. The worst verdict of the set is the
- * verdict of the whole — one pass saying do-not-merge is a range that must not
- * merge, whatever the other passes found.
+ * every pass of the same total is on record AND the files those passes name
+ * COVER what the composition is asked to clear. The worst verdict of the set is
+ * the verdict of the whole — one pass saying do-not-merge is a range that must
+ * not merge, whatever the other passes found.
+ *
+ * `expect` is that file set, and it is the half that makes the count mean
+ * anything (cross-vendor review of this point, first round): counting passes
+ * alone, two records that both name the SAME file — or arbitrary files, or the
+ * files of a plan whose UNCOVERABLE entry no pass ever held — read as `1/2` and
+ * `2/2` and cleared a range nobody read. A caller with nothing to compare
+ * against passes none and gets the count alone, which is what it asked for.
  */
-export function passComposition(records = []) {
+export function passComposition(records = [], { expect = [] } = {}) {
   const groups = new Map()
   for (const record of records ?? []) {
     const total = Number(record?.pass?.total)
@@ -471,17 +479,23 @@ export function passComposition(records = []) {
     // whole range supersedes the earlier one.
     if (!prior || Number(record.at ?? 0) >= Number(prior.at ?? 0)) group.byIndex.set(index, record)
   }
+  const wanted = [...new Set((expect ?? []).map((p) => String(p ?? '').trim()).filter(Boolean))]
   return [...groups.values()].map((group) => {
     const missing = []
     for (let i = 1; i <= group.total; i++) if (!group.byIndex.has(i)) missing.push(i)
     const held = [...group.byIndex.values()]
     const files = [...new Set(held.flatMap((r) => r.pass?.files ?? []))]
+    // WHAT NO PASS NAMED WAS NOT READ. The union of the passes is the coverage
+    // the composition claims, so a file of the expected set that appears in none
+    // of them is a file the range would be cleared over unread.
+    const uncovered = wanted.filter((p) => !files.includes(p))
     return {
       sha: group.sha,
       total: group.total,
       have: group.byIndex.size,
       missing,
-      complete: missing.length === 0,
+      uncovered,
+      complete: missing.length === 0 && uncovered.length === 0,
       records: held,
       files,
     }

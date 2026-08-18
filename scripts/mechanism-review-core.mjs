@@ -901,9 +901,18 @@ export function evaluateMechanismReview({
     // A PASS CLEARS NOTHING ON ITS OWN (point 714). The material of a large range
     // is cut through the file set and reviewed one pass at a time, so a single
     // pass record covers the files it named and no more; only a COMPLETE
-    // composition — every pass of the same total — stands for the range. An
-    // incomplete one is reported as such rather than silently clearing the gate.
-    const compositions = passComposition(sound)
+    // composition — every pass of the same total, and their files covering THIS
+    // COMMIT'S mechanism paths — stands for the range. An incomplete one is
+    // reported as such rather than silently clearing the gate.
+    //
+    // THE FILE SET IS PASSED IN, and without it the count alone decided (first
+    // cross-vendor round on this point): two records naming the same file, or
+    // files from nowhere near this commit, read as `1/2` and `2/2` and cleared it.
+    // The conservative direction is deliberate — a mechanism path this commit
+    // touched and no pass named blocks, even where a later commit reverted it out
+    // of the reviewed diff, because the way out is one honest pass record and the
+    // way out of the other error is a guard nobody read.
+    const compositions = passComposition(sound, { expect: commit?.files ?? [] })
     const complete = compositions.filter((g) => g.complete)
     const incomplete = compositions.filter((g) => !g.complete)
     const valid = [
@@ -920,7 +929,10 @@ export function evaluateMechanismReview({
 
     if (!valid.length) {
       if (incomplete.length) {
-        const worst = incomplete.reduce((a, b) => (b.missing.length >= a.missing.length ? b : a))
+        // The widest gap is the one reported: a missing pass and a file no pass
+        // named are the same failure — material the composition does not hold.
+        const gap = (g) => (g.missing?.length ?? 0) + (g.uncovered?.length ?? 0)
+        const worst = incomplete.reduce((a, b) => (gap(b) >= gap(a) ? b : a))
         findings.push({ kind: 'incomplete-passes', commit, records: worst.records, passes: worst })
         continue
       }
@@ -966,14 +978,27 @@ export function formatMechanismReviewVerdict(verdict) {
     }
     if (f.kind === 'incomplete-passes') {
       const p = f.passes ?? {}
-      lines.push(
-        `  ✗ ${short(c.sha)} ${c.subject ?? ''}`,
-        `      ${files}`,
-        `      the review was split into ${p.total} passes over the FILE SET and only ${p.have} are on ` +
-          `record — missing pass ${(p.missing ?? []).join(', ')}`,
-        '      A pass covers the files it named; the range is cleared when every pass is recorded:',
-        `      node scripts/review-sol.mjs --sha ${short(c.sha)} --brief "<what to judge>" --pass ${(p.missing ?? [])[0] ?? 1}`,
-      )
+      lines.push(`  ✗ ${short(c.sha)} ${c.subject ?? ''}`, `      ${files}`)
+      if ((p.missing ?? []).length) {
+        lines.push(
+          `      the review was split into ${p.total} passes over the FILE SET and only ${p.have} are on ` +
+            `record — missing pass ${(p.missing ?? []).join(', ')}`,
+          '      A pass covers the files it named; the range is cleared when every pass is recorded:',
+          `      node scripts/review-sol.mjs --sha ${short(c.sha)} --brief "<what to judge>" --pass ${(p.missing ?? [])[0] ?? 1}`,
+        )
+      }
+      // COUNTING THE PASSES IS NOT COUNTING THE FILES. Passes that are all on
+      // record still cover only what they NAMED, and a mechanism path none of
+      // them names is one this record would clear unread.
+      if ((p.uncovered ?? []).length) {
+        lines.push(
+          `      the ${p.have} recorded pass(es) of this ${p.total}-part split name ` +
+            `${(p.files ?? []).length} file(s), and these were in NONE of them — nobody read them:`,
+          `        ${(p.uncovered ?? []).join(', ')}`,
+          '      Review those files in a pass of their own and record it, or record a review of the',
+          '      whole range — a composition covers its union and not one file more.',
+        )
+      }
       continue
     }
     const blind = (f.records ?? []).find((r) => mergeProblem(r, c))

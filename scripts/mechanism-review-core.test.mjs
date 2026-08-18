@@ -521,8 +521,16 @@ describe('evaluateMechanismReview', () => {
   // POINT 714: a range whose material no single round can hold is reviewed in
   // passes over the FILE SET, and one pass clears nothing on its own.
   describe('a review split into passes', () => {
+    // The commit's OWN mechanism file travels in pass 1: a composition covers
+    // what its passes NAME, so a split whose files never mention the changed
+    // guard covers nothing about it (cross-vendor review, first round).
+    const MECH = 'scripts/pre-push-gate-core.mjs'
     const pass = (index, total, over = {}) =>
-      record({ pass: { index, total, files: [`scripts/f${index}.mjs`] }, at: MERGE_ACCOUNTING_SINCE + 1000 + index, ...over })
+      record({
+        pass: { index, total, files: index === 1 ? [MECH, 'scripts/f1.mjs'] : [`scripts/f${index}.mjs`] },
+        at: MERGE_ACCOUNTING_SINCE + 1000 + index,
+        ...over,
+      })
     const covered = { coveringRecordShas: ['c'.repeat(40)] }
 
     it('BLOCKS while a pass is still missing, and names which', () => {
@@ -582,6 +590,73 @@ describe('evaluateMechanismReview', () => {
       })
       expect(v.block).toBe(true)
       expect(v.findings[0].kind).toBe('self-review')
+    })
+
+    // THE HOLE THE FIRST CROSS-VENDOR ROUND FOUND: the count of passes was the
+    // whole check, so any two records marked 1/2 and 2/2 cleared the commit —
+    // whatever files they named, and even when they both named the same one.
+    it('BLOCKS when every pass is on record but none of them names what the commit changed', () => {
+      const elsewhere = (index, total) =>
+        record({
+          pass: { index, total, files: [`scripts/f${index}.mjs`] },
+          at: MERGE_ACCOUNTING_SINCE + 2000 + index,
+        })
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [elsewhere(1, 2), elsewhere(2, 2)],
+      })
+      expect(v.block).toBe(true)
+      expect(v.findings[0].kind).toBe('incomplete-passes')
+      expect(v.findings[0].passes.uncovered).toEqual(['scripts/pre-push-gate-core.mjs'])
+      const text = formatMechanismReviewVerdict(v)
+      expect(text).toContain('nobody read them')
+      expect(text).toContain('scripts/pre-push-gate-core.mjs')
+      // …and it does not claim a pass is missing, because none is.
+      expect(text).not.toContain('missing pass')
+    })
+
+    it('BLOCKS when both passes name the SAME file', () => {
+      const same = (index, total) =>
+        record({
+          pass: { index, total, files: ['scripts/f1.mjs'] },
+          at: MERGE_ACCOUNTING_SINCE + 3000 + index,
+        })
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [same(1, 2), same(2, 2)],
+      })
+      expect(v.block).toBe(true)
+      expect(v.findings[0].kind).toBe('incomplete-passes')
+    })
+
+    // A file the plan calls UNCOVERABLE (no round can hold even its diff) is in
+    // no pass at all, so a complete-looking composition must not clear the commit
+    // that touched it.
+    it('BLOCKS while a file BEYOND the reach of any pass went unnamed', () => {
+      const beyond = commit({ ...covered, files: ['scripts/pre-push-gate-core.mjs', 'scripts/huge-guard.mjs'] })
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [beyond],
+        records: [pass(1, 2), pass(2, 2)],
+      })
+      expect(v.block).toBe(true)
+      expect(v.findings[0].passes.uncovered).toEqual(['scripts/huge-guard.mjs'])
+      expect(formatMechanismReviewVerdict(v)).toContain('scripts/huge-guard.mjs')
+    })
+
+    it('CLEARS when the passes name more than the commit itself touched', () => {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit(covered)],
+        records: [pass(1, 2), pass(2, 2)],
+      })
+      expect(v.block).toBe(false)
     })
 
     it('does not mix two different splits of the same sha into one coverage', () => {

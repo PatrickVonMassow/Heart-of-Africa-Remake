@@ -388,6 +388,44 @@ describe('the composition a set of pass records rests on', () => {
     expect(passComposition()).toEqual([])
   })
 
+  // THE COUNT IS ONLY HALF THE COVERAGE (cross-vendor review, first round): two
+  // passes that both name the same file count as 1/2 and 2/2 and cleared a range
+  // whose other files nobody had read.
+  it('is INCOMPLETE while a file it must cover appears in no pass', () => {
+    const [group] = passComposition([rec(1, 2), rec(2, 2)], { expect: ['f1.mjs', 'f2.mjs', 'guard.mjs'] })
+    expect(group.missing).toEqual([])
+    expect(group.uncovered).toEqual(['guard.mjs'])
+    expect(group.complete).toBe(false)
+  })
+
+  it('is INCOMPLETE when every pass names the SAME file', () => {
+    const both = { pass: { index: 1, total: 2, files: ['same.mjs'] } }
+    const [group] = passComposition(
+      [rec(1, 2, both), rec(2, 2, { pass: { index: 2, total: 2, files: ['same.mjs'] } })],
+      { expect: ['same.mjs', 'other.mjs'] },
+    )
+    expect(group.uncovered).toEqual(['other.mjs'])
+    expect(group.complete).toBe(false)
+  })
+
+  it('is complete when the passes name MORE than was expected of them', () => {
+    const [group] = passComposition([rec(1, 2), rec(2, 2)], { expect: ['f2.mjs'] })
+    expect(group.uncovered).toEqual([])
+    expect(group.complete).toBe(true)
+  })
+
+  it('asks for nothing when the caller has nothing to compare against', () => {
+    const [group] = passComposition([rec(1, 2), rec(2, 2)])
+    expect(group.uncovered).toEqual([])
+    expect(group.complete).toBe(true)
+  })
+
+  it('ignores blank and duplicated entries in the expected set', () => {
+    const [group] = passComposition([rec(1, 2), rec(2, 2)], { expect: ['f1.mjs', ' f1.mjs ', '', null, 'f2.mjs'] })
+    expect(group.uncovered).toEqual([])
+    expect(group.complete).toBe(true)
+  })
+
   it('takes the WORST verdict of a composition as the whole range verdict', () => {
     expect(worstVerdict([{ verdict: 'merge' }, { verdict: 'do-not-merge' }])).toBe('do-not-merge')
     expect(worstVerdict([{ verdict: 'merge' }, { verdict: 'merge-with-fixes' }])).toBe('merge-with-fixes')
