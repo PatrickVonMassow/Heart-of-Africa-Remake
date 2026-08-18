@@ -223,20 +223,27 @@ function parseEntries(lines, prefix, { allowEmpty = false } = {}) {
     const m = re.exec(cleanLine.trim())
     if (!m) continue
     const id = m[1].toUpperCase()
-    // The id is recognised on the stripped line; the FILE and FINDING are cut
-    // from the raw line between/after its pipes, so a path the strip would
-    // rewrite (`src/__init__.py`) travels byte-exact (see parseAnswer). A raw
-    // line whose pipes the strip somehow invented falls back to the stripped
-    // fields — visible, never silent loss.
-    const firstPipe = raw.indexOf('|')
-    const secondPipe = firstPipe < 0 ? -1 : raw.indexOf('|', firstPipe + 1)
-    const file = secondPipe < 0 ? m[2].trim() : raw.slice(firstPipe + 1, secondPipe).trim()
-    const text = secondPipe < 0 ? m[3].trim() : raw.slice(secondPipe + 1).trim()
-    if (!text) return { ok: false, error: `entry ${id} carries no finding at all` }
+    // EVERY RULING — presence included — reads the STRIPPED captures (final
+    // convergence: a decoration-only finding, 'A1 | a.mjs | ```', had a
+    // non-empty RAW field and walked the emptiness check); the QUOTED fields
+    // are cut from the raw line between/after its pipes, so a path the strip
+    // would rewrite (`src/__init__.py`) travels byte-exact. The whitespace
+    // PADDING around a pipe is the entry FORMAT, not content, and is trimmed
+    // on both readings; field-internal bytes travel exactly. A raw line whose
+    // pipes the strip somehow invented falls back to the stripped fields —
+    // visible, never silent loss.
+    const cleanFile = m[2].trim()
+    const cleanText = m[3].trim()
+    if (!cleanText) return { ok: false, error: `entry ${id} carries no finding at all` }
     if (seen.has(id)) return { ok: false, error: `the id ${id} is used twice — the merge accounts by id, so one of them would vanish` }
     seen.add(id)
-    // A finding that names no file is still a finding; it is marked, never dropped.
-    entries.push({ id, file: file || '(unspecified)', text })
+    const firstPipe = raw.indexOf('|')
+    const secondPipe = firstPipe < 0 ? -1 : raw.indexOf('|', firstPipe + 1)
+    const rawFile = secondPipe < 0 ? cleanFile : raw.slice(firstPipe + 1, secondPipe).trim()
+    const rawText = secondPipe < 0 ? cleanText : raw.slice(secondPipe + 1).trim()
+    // A finding that names no file is still a finding; it is marked, never
+    // dropped — and the RULING that nothing was named reads the stripped file.
+    entries.push({ id, file: cleanFile ? rawFile || cleanFile : '(unspecified)', text: rawText || cleanText })
   }
   // TWO READINGS OF THE SAME MARKER, deliberately different (last round). ACCEPTING an
   // empty audit demands the explanation — a bare "NO FINDINGS:" says nothing about what
@@ -331,13 +338,16 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
       ? cleanLines.map((c, i) => ({ clean: c, raw: rawLines[i] }))
       : cleanLines.map((c) => ({ clean: c, raw: c }))
   if (k === 'explain') {
-    // The thinness ruling reads the stripped prose (matching); what the caller
-    // gets is the RAW text, byte-exact — the one rule, applied here too (an
-    // explanation quotes paths, and the strip rewrites src/__init__.py).
+    // The thinness RULING reads the stripped prose; what the caller gets is
+    // the RAW text BYTE-EXACT — untrimmed (final convergence: a .trim() here
+    // ate the answer's boundary whitespace, and the fidelity test's input had
+    // none to show it). The summary alone skips leading blank lines: it is a
+    // display slice, not the quoted answer.
     const prose = clean.trim()
     if (prose.length < 40) return { ok: false, kind: k, answer: null, summary: '', error: 'the answer is too thin to be an explanation' }
-    const rawProse = String(text ?? '').trim()
-    return { ok: true, kind: k, answer: { text: rawProse }, summary: rawProse.split('\n')[0].slice(0, 120), error: '' }
+    const rawProse = String(text ?? '')
+    const summaryLine = rawProse.split('\n').find((l) => l.trim()) ?? ''
+    return { ok: true, kind: k, answer: { text: rawProse }, summary: summaryLine.slice(0, 120), error: '' }
   }
   // A sweep may honestly find nothing; a DIVERGENT enumeration that lists nothing is no
   // half of a blind-parallel stage, so only the audit may come back empty.

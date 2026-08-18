@@ -279,12 +279,25 @@ describe('the markdown strip reads shapes, not characters (round-7 pass 1)', () 
   })
 
   it('an EXPLAIN answer is the raw text byte-for-byte, never the stripped copy', () => {
+    // WITH boundary whitespace: a fidelity test whose input cannot expose the
+    // loss is not a test — the old .trim() ate exactly these bytes.
     const text =
-      'The module src/__init__.py wires the loader: it re-exports __all__ from the package and keeps the flag literal.'
+      '\n  The module src/__init__.py wires the loader: it re-exports __all__ from the package and keeps the flag literal.\n\n'
     const parsed = parseAnswer({ kind: 'explain', text })
     expect(parsed.ok).toBe(true)
     expect(parsed.answer.text).toBe(text)
     expect(parsed.summary).toContain('src/__init__.py')
+  })
+
+  it('rules entry PRESENCE on the stripped captures — decoration-only fields are empty fields', () => {
+    // 'A1 | a.mjs | ```' strips to an empty finding: refused, not accepted.
+    const noFinding = parseAnswer({ kind: 'audit', text: 'sweep\n\nA1 | a.mjs | ```' })
+    expect(noFinding.ok).toBe(false)
+    expect(noFinding.error).toContain('carries no finding')
+    // A decoration-only FILE field is an unnamed file, never a quoted marker.
+    const noFile = parseAnswer({ kind: 'audit', text: 'sweep\n\nA1 | ``` | the loader drops the flag field' })
+    expect(noFile.ok).toBe(true)
+    expect(noFile.answer.entries[0].file).toBe('(unspecified)')
   })
 
   it('does not admit a genuine review that merely SPEAKS the net’s vocabulary, raw or stripped', () => {

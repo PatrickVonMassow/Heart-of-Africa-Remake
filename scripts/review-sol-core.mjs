@@ -314,7 +314,14 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review', pass 
  *  through this helper, byte for byte, because the strip rewrites content
  *  (`src/__init__.py` → `src/init.py`). The one deliberate exception is the
  *  ADMISSION scan, which reads BOTH spellings: there the two readings can
- *  only widen the net, never shield it. */
+ *  only widen the net, never shield it.
+ *
+ *  PADDING IS FORMAT, NOT CONTENT (trim sweep, final convergence): a labelled
+ *  single-line field trims the separator whitespace at its edges — after the
+ *  label's colon, around an entry's pipes, at line end — because that padding
+ *  belongs to the `LABEL: value` / `id | file | text` format the prompts
+ *  demand; the bytes INSIDE a field travel exactly. A whole-message quote
+ *  (ask-sol's explain) is not a labelled field and trims NOTHING. */
 export function rawFieldValue(rawLine) {
   const at = String(rawLine ?? '').indexOf(':')
   if (at < 0) return ''
