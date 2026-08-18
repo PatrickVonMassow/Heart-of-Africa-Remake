@@ -6,7 +6,9 @@
 // batch-in-flight-core.test.mjs; what is under test here is the wiring: which
 // facts reach which decision, and when the guard says nothing at all.
 import { describe, it, expect } from 'vitest'
-import { gatherCommissionInputs, commissionVerdict } from './commission-guard.mjs'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { COMMISSION_HOOK_LINE, gatherCommissionInputs, commissionVerdict, wiringReport } from './commission-guard.mjs'
 import { POOL_CAP } from './batch-in-flight-core.mjs'
 
 const AUG17 = Date.parse('2026-08-17T19:41:00.000Z')
@@ -227,6 +229,31 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
     const v = commissionVerdict(g.inputs, { now: AUG17 })
     expect(v.slots.why).toBe('branches-unreadable')
     expect(v.block).toBe(false)
+  })
+
+  // A GUARD NOBODY RUNS REFUSES NOTHING, and the first cut of this one was
+  // exactly that: the registration stood in a comment while the hook list did
+  // not name it (Sol, review of 91d88f9a). It is armed now, and both halves of
+  // that are held: the guard says which state it is in, and this repository's
+  // own settings are asserted to be the armed one.
+  it('says whether it is ARMED or DORMANT, out of the settings text', () => {
+    expect(wiringReport('node scripts/commission-guard.mjs')).toContain('ARMED')
+    expect(wiringReport('node scripts/other-guard.mjs')).toContain('DORMANT')
+    expect(wiringReport('node scripts/other-guard.mjs')).toContain(COMMISSION_HOOK_LINE)
+    // A near miss is not a hit, and an unreadable file is never reported armed.
+    expect(wiringReport('node scripts/commission-guard-core.mjs')).toContain('DORMANT')
+    expect(wiringReport(null)).toContain('UNKNOWN')
+  })
+
+  it('IS wired in this repository — the PreToolUse entry, not a comment about one', () => {
+    const settings = readFileSync(resolve(import.meta.dirname, '..', '.claude', 'settings.json'), 'utf8')
+    expect(wiringReport(settings)).toContain('ARMED')
+    const entry = JSON.parse(settings).hooks.PreToolUse.find((e) =>
+      (e.hooks ?? []).some((h) => String(h.command).includes('commission-guard.mjs')),
+    )
+    // The matcher has to carry every act that OPENS a point: the spawn tools and
+    // the shell that cuts the branch or runs the authoring lane.
+    for (const tool of ['Agent', 'Task', 'Bash', 'PowerShell']) expect(entry.matcher).toContain(tool)
   })
 
   it('reads the pool cap from one place', () => {

@@ -32,6 +32,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isWorktreeCheckout } from './board-first-core.mjs'
+import { isEnforcerWired } from './guard-health-core.mjs'
 import { isMainModule } from './is-main.mjs'
 import { readTasksOpen, TASKS_PATH } from './tasks-source.mjs'
 import { parseUserGates } from './user-gate-core.mjs'
@@ -58,6 +59,30 @@ import {
 import { branchTip, openFeatBranches, readCommissionRecord, writeCommissionRecord } from './batch-in-flight.mjs'
 
 const PAUSE = repoPath('.claude', 'batch-paused')
+const SETTINGS = repoPath('.claude', 'settings.json')
+
+/** The PreToolUse line that arms this guard, named wherever its state is reported. */
+export const COMMISSION_HOOK_LINE =
+  '{ "matcher": "Agent|Task|Bash|PowerShell", "hooks": [{ "type": "command", ' +
+  '"command": "node scripts/commission-guard.mjs" }] }'
+
+/**
+ * WHAT THIS GUARD IS WORTH RIGHT NOW, from the settings text. PURE.
+ *
+ * A guard that reports a verdict while nothing runs it reads as enforcement and
+ * is none — the failure `guard-health-core.mjs` exists for, and worse from the
+ * guard's own mouth. So `--status` says which it is, out of the FACT rather than
+ * out of a record of an intention.
+ */
+export function wiringReport(settingsText) {
+  if (settingsText === null || settingsText === undefined) {
+    return 'WIRING: UNKNOWN — .claude/settings.json could not be read from here, so whether this guard fires is unproven.'
+  }
+  return isEnforcerWired(settingsText, 'commission-guard.mjs')
+    ? 'WIRING: ARMED — a PreToolUse hook runs this guard, so a commissioning against the queue is really refused.'
+    : 'WIRING: DORMANT — no hook in .claude/settings.json names this guard, so it REFUSES NOTHING; only the ' +
+        `commands below still work. Arm it with one PreToolUse entry: ${COMMISSION_HOOK_LINE}`
+}
 
 /**
  * The guard's I/O half, shared with the read-only preflight (point 707 carries
@@ -183,6 +208,13 @@ const flag = (argv, name) => {
 
 function printStatus(argv) {
   const point = Number(flag(argv, '--point')) || null
+  let settings = null
+  try {
+    settings = readFileSync(SETTINGS, 'utf8')
+  } catch {
+    /* unreadable → reported as unknown, never as armed */
+  }
+  console.log(wiringReport(settings))
   const g = gatherCommissionInputs({ point, behind: true })
   if (!g.applicable) {
     console.log(`commission-guard STANDS DOWN: ${g.why}. Nothing is refused.`)
@@ -281,7 +313,15 @@ if (isMainModule(import.meta.url)) {
       description: input.description,
     })
     if (!target.point) process.exit(0) // opens nothing this rule knows about
-    const g = gatherCommissionInputs({ sessionId: payload.session_id || '', points: target.points })
+    // THE SESSION'S cwd, not the script's: the hook is wired anchored so it
+    // fires from any working directory (point 438), which means the script's own
+    // root can no longer say whether the CALLER is a delegated agent inside its
+    // own worktree — and that agent must pass untouched.
+    const g = gatherCommissionInputs({
+      sessionId: payload.session_id || '',
+      points: target.points,
+      cwd: payload.cwd || REPO_ROOT,
+    })
     if (!g.applicable) process.exit(0)
     const verdict = commissionVerdict(g.inputs)
     if (verdict.block) {

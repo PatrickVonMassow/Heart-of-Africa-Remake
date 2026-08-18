@@ -7,6 +7,7 @@ import {
   auditHookAnchoring,
   commandAnchoring,
   formatGuardHealth,
+  isEnforcerWired,
   refAnchoring,
   ENFORCER_RE,
   RELATIVE_WIRING_ROLLOUT,
@@ -20,6 +21,30 @@ const healthy = {
   wiredText: 'node scripts/a-guard.mjs',
   knownUntested: new Set(),
 }
+
+describe('isEnforcerWired — the fact, not the record of an intention', () => {
+  it('finds an enforcer under any anchoring, and only by its whole file name', () => {
+    for (const text of [
+      'node scripts/a-guard.mjs',
+      'node "$CLAUDE_PROJECT_DIR/scripts/a-guard.mjs"',
+      'node C:\\repo\\scripts\\a-guard.mjs',
+      '{"command":"node scripts/x.mjs && node scripts/a-guard.mjs"}',
+    ]) {
+      expect(isEnforcerWired(text, 'a-guard.mjs')).toBe(true)
+    }
+    expect(isEnforcerWired('node scripts/a-guard-core.mjs', 'a-guard.mjs')).toBe(false)
+    expect(isEnforcerWired('node scripts/aa-guard.mjs', 'a-guard.mjs')).toBe(false)
+    // A guard named only in PROSE is not wired — that is the whole failure mode.
+    expect(isEnforcerWired('# register a-guard.mjs one day', 'a-guard.mjs')).toBe(false)
+  })
+
+  it('never throws, and answers false on nothing at all', () => {
+    expect(isEnforcerWired('', 'a-guard.mjs')).toBe(false)
+    expect(isEnforcerWired(null, 'a-guard.mjs')).toBe(false)
+    expect(isEnforcerWired('node scripts/a-guard.mjs', '')).toBe(false)
+    expect(() => isEnforcerWired(undefined, undefined)).not.toThrow()
+  })
+})
 
 describe('ENFORCER_RE', () => {
   it('matches guards, gates and hooks but never their cores or tests', () => {

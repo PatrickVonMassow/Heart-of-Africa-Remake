@@ -62,13 +62,25 @@ export const INTENTIONALLY_DORMANT = {
     'is a protected-path edit and needs an attended session. Its core and its spawned wrapper are fully ' +
     'tested, so it is correct the moment it is armed. REMOVE THIS ENTRY IN THE SAME COMMIT THAT ADDS THE ' +
     'HOOK LINE.',
-  'commission-guard.mjs':
-    'Built 18.08.2026 by a worktree agent (point 712), which may not touch .claude/settings.json — the ' +
-    'PreToolUse line ("Agent|Task|Bash|PowerShell" → node scripts/commission-guard.mjs) is a protected-path ' +
-    'edit and needs an attended session. Both its decisions are pure and swept (board-queue-core.test.mjs, ' +
-    'batch-in-flight-core.test.mjs), and its own wiring has commission-guard.test.mjs, so it is correct the ' +
-    'moment it is armed. Its CLI half (--status, --override, --park, --unpark) works dormant and is what ' +
-    'records a departure from the queue. REMOVE THIS ENTRY IN THE SAME COMMIT THAT ADDS THE HOOK LINE.',
+  // commission-guard.mjs left this map on 18.08.2026, in the commit that added
+  // its PreToolUse line ("Agent|Task|Bash|PowerShell") — the rule above, kept.
+}
+
+/**
+ * IS THIS ENFORCER WIRED AT ALL? PURE, over the settings text.
+ *
+ * The blunt question the map above answers from MEMORY, asked of the FACT
+ * instead: a guard is wired when some hook command names its script. It is
+ * deliberately coarse — the anchoring audit judges hook commands row by row, and
+ * this one only wants to know whether the file is referenced at all, which is
+ * what a guard's own `--status` must be able to say about itself. A guard that
+ * reports itself armed while it is dormant is the failure this module exists
+ * for, and it is worse coming from the guard's own mouth.
+ */
+export function isEnforcerWired(settingsText, name) {
+  const wanted = String(name ?? '').trim()
+  if (!wanted) return false
+  return scriptRefsInCommand(settingsText).some((ref) => ref.split(/[/\\]/).pop() === wanted)
 }
 
 /**
