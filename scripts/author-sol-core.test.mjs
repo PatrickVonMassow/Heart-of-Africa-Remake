@@ -218,6 +218,25 @@ describe('parseAuthoringAnswer', () => {
     expect(parseAuthoringAnswer('').ok).toBe(false)
     expect(parseAuthoringAnswer('DONE: <what you built>\nGATES: <the result>\nOPEN: none').ok).toBe(false)
   })
+
+  it('rules the placeholder on the STRIPPED capture — decoration cannot smuggle it', () => {
+    expect(
+      parseAuthoringAnswer('DONE: **<what you built>**\nGATES: test:unit green\nOPEN: none').ok,
+    ).toBe(false)
+  })
+
+  it('quotes DONE/GATES/OPEN from the raw lines byte-for-byte', () => {
+    // A token the stripper would mangle must reach the caller unrewritten.
+    const parsed = parseAuthoringAnswer(
+      'prose\n\nDONE: ported src/__init__.py and its __slots__ handling\nGATES: test:unit, build and lint all green\nOPEN: the __all__ export list is still owed',
+    )
+    expect(parsed).toMatchObject({
+      ok: true,
+      done: 'ported src/__init__.py and its __slots__ handling',
+      gates: 'test:unit, build and lint all green',
+      open: 'the __all__ export list is still owed',
+    })
+  })
 })
 
 describe('judgeAuthoring — what GIT says, not what the run claimed', () => {

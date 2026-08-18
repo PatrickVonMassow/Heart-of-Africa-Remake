@@ -186,15 +186,18 @@ export function formatAskMaterial({ sections = [], budget = MATERIAL_BUDGET_CHAR
 /** The two closing lines of a DIAGNOSE answer, read off the END of the message. */
 function parseDiagnose(lines) {
   const tail = lines.map((l) => ({ clean: l.clean.trim(), raw: l.raw })).filter((l) => l.clean).slice(-2)
-  const causeLabel = /^[-*]?\s*CAUSE\s*:\s*(.+)$/i.exec(tail[0]?.clean ?? '')?.[1] ?? ''
-  const evidenceLabel = /^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1]?.clean ?? '')?.[1] ?? ''
-  // Recognised on the stripped line, QUOTED from the raw one (see parseAnswer).
-  const cause = causeLabel ? rawFieldValue(tail[0].raw) : ''
-  const evidence = evidenceLabel ? rawFieldValue(tail[1].raw) : ''
-  if (!cause || !evidence) return { ok: false, error: 'the message does not end in the CAUSE/EVIDENCE pair' }
-  if (/^</.test(cause) || /^</.test(evidence) || evidence.length < 10) {
+  const causeClean = (/^[-*]?\s*CAUSE\s*:\s*(.+)$/i.exec(tail[0]?.clean ?? '')?.[1] ?? '').trim()
+  const evidenceClean = (/^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1]?.clean ?? '')?.[1] ?? '').trim()
+  // EVERY RULING reads the STRIPPED captures — presence, placeholder, length —
+  // because decoration must not change a decision (`**<placeholder>**` walked
+  // the raw `/^</` test); the QUOTED values read the raw lines, byte for byte
+  // (see rawFieldValue's boundary note).
+  if (!causeClean || !evidenceClean) return { ok: false, error: 'the message does not end in the CAUSE/EVIDENCE pair' }
+  if (/^</.test(causeClean) || /^</.test(evidenceClean) || evidenceClean.length < 10) {
     return { ok: false, error: 'the CAUSE/EVIDENCE lines are the placeholders echoed back' }
   }
+  const cause = rawFieldValue(tail[0].raw) || causeClean
+  const evidence = rawFieldValue(tail[1].raw) || evidenceClean
   return { ok: true, answer: { cause, evidence }, summary: cause }
 }
 

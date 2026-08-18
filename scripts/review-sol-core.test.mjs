@@ -160,6 +160,22 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
     })
   })
 
+  it('quotes the EVIDENCE from the raw line byte-for-byte — the strip must not rewrite it', () => {
+    // This string reaches the ledger via --record; a stripped copy rewrote
+    // src/__init__.py into src/init.py.
+    const evidence = 'checked src/__init__.py and the __slots__ handling end to end'
+    expect(parseVerdict(`prose\n\nVERDICT: merge\nEVIDENCE: ${evidence}`)).toMatchObject({
+      ok: true,
+      evidence,
+    })
+  })
+
+  it('rules the placeholder on the STRIPPED capture — decoration cannot smuggle it', () => {
+    const parsed = parseVerdict('prose\n\nVERDICT: merge\nEVIDENCE: **<one line naming what you actually checked>**')
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error).toContain('no usable EVIDENCE line')
+  })
+
   it('survives markdown emphasis and a leading bullet', () => {
     expect(parseVerdict('- **VERDICT:** `do-not-merge`\n- **EVIDENCE:** the fallback records a verdict nobody gave')).toMatchObject(
       { ok: true, verdict: 'do-not-merge' },

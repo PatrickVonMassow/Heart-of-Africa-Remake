@@ -304,8 +304,17 @@ export function buildReviewPrompt({ sha = '', brief = '', mode = 'review', pass 
  *  label always carries one, and decoration adds none before it. A label
  *  written `**EVIDENCE:**` closes its decoration right after the colon; that
  *  one marker run is dropped only when whitespace follows it, so a value that
- *  genuinely begins with a marker stays. Shared by every parser that obeys the
- *  one rule: the STRIPPED copy matches, the RAW text is quoted. */
+ *  genuinely begins with a marker stays.
+ *
+ *  THE BOUNDARY, so nobody re-litigates it (final convergence): a RULING —
+ *  anything that DECIDES by looking at the text: placeholder detection,
+ *  presence, length, any match or classification — reads the STRIPPED copy,
+ *  because decoration must not change a decision. A QUOTE — anything whose
+ *  text reaches output a caller reads, cites or acts on — reads the RAW text
+ *  through this helper, byte for byte, because the strip rewrites content
+ *  (`src/__init__.py` → `src/init.py`). The one deliberate exception is the
+ *  ADMISSION scan, which reads BOTH spellings: there the two readings can
+ *  only widen the net, never shield it. */
 export function rawFieldValue(rawLine) {
   const at = String(rawLine ?? '').indexOf(':')
   if (at < 0) return ''
@@ -383,12 +392,13 @@ export function parseVerdict(text, { receipt = '' } = {}) {
     return { ok: false, verdict: '', evidence: '', error: 'the reviewer says it could not see the change' }
   }
   // A line still in its angle brackets is the PLACEHOLDER echoed back, not an
-  // observation. (Only the opening bracket is required, so the check holds for
-  // both the raw and any stripped spelling.)
-  if (evidence.length < 10 || /^</.test(evidence)) {
+  // observation. RULED on the STRIPPED capture (decoration must not change a
+  // decision — `**<placeholder>**` walks a raw `/^</` test), while the quoted
+  // evidence above stays raw.
+  if (evidenceClean.length < 10 || /^</.test(evidenceClean)) {
     return { ok: false, verdict: '', evidence: '', error: 'no usable EVIDENCE line' }
   }
-  return { ok: true, verdict, evidence, error: '' }
+  return { ok: true, verdict, evidence: evidence || evidenceClean, error: '' }
 }
 
 /**

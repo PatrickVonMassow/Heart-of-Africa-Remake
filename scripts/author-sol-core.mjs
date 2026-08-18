@@ -338,14 +338,27 @@ export function parseAuthoringAnswer(text) {
     .map((line) => ({ raw: line, clean: line.replace(/[*`_#>]/g, '').trim() }))
     .filter((p) => p.clean)
   const tail = pairs.slice(-3)
-  const field = (pair, name) =>
-    new RegExp(`^[-*]?\\s*${name}\\s*:\\s*(.+)$`, 'i').test(pair?.clean ?? '') ? rawFieldValue(pair.raw) : ''
-  const done = field(tail[0], 'DONE')
-  const gates = field(tail[1], 'GATES')
-  const open = field(tail[2], 'OPEN')
-  if (!done || !gates || !open) return { ok: false, error: 'the message does not end in the DONE/GATES/OPEN lines' }
-  if (/^</.test(done) || /^</.test(gates)) return { ok: false, error: 'the closing lines are the placeholders echoed back' }
-  return { ok: true, done, gates, open, error: '' }
+  // EVERY RULING — presence and placeholder — reads the STRIPPED captures
+  // (decoration must not change a decision: `**<what you built>**` walked the
+  // raw `/^</` test); the returned values are QUOTED from the raw lines.
+  const cleanField = (pair, name) =>
+    (new RegExp(`^[-*]?\\s*${name}\\s*:\\s*(.+)$`, 'i').exec(pair?.clean ?? '')?.[1] ?? '').trim()
+  const doneClean = cleanField(tail[0], 'DONE')
+  const gatesClean = cleanField(tail[1], 'GATES')
+  const openClean = cleanField(tail[2], 'OPEN')
+  if (!doneClean || !gatesClean || !openClean) {
+    return { ok: false, error: 'the message does not end in the DONE/GATES/OPEN lines' }
+  }
+  if (/^</.test(doneClean) || /^</.test(gatesClean)) {
+    return { ok: false, error: 'the closing lines are the placeholders echoed back' }
+  }
+  return {
+    ok: true,
+    done: rawFieldValue(tail[0].raw) || doneClean,
+    gates: rawFieldValue(tail[1].raw) || gatesClean,
+    open: rawFieldValue(tail[2].raw) || openClean,
+    error: '',
+  }
 }
 
 /**

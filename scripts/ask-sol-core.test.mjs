@@ -229,10 +229,21 @@ describe('the markdown strip reads shapes, not characters (round-7 pass 1)', () 
     // is cut from the raw one.
     const parsed = parseAnswer({
       kind: 'diagnose',
-      text: 'reasoning\n\nCAUSE: the module initialiser writes early\nEVIDENCE: src/__init__.py:3 writes the frame outside the shutter',
+      text: 'reasoning\n\nCAUSE: the __init__ module writes early\nEVIDENCE: src/__init__.py:3 writes the frame outside the shutter',
     })
     expect(parsed.ok).toBe(true)
-    expect(parsed.answer.evidence).toContain('src/__init__.py:3')
+    // BYTE-IDENTICAL to the raw input, not merely containing the token.
+    expect(parsed.answer.cause).toBe('the __init__ module writes early')
+    expect(parsed.answer.evidence).toBe('src/__init__.py:3 writes the frame outside the shutter')
+  })
+
+  it('rules the diagnose placeholder on the STRIPPED capture — decoration cannot smuggle it', () => {
+    const parsed = parseAnswer({
+      kind: 'diagnose',
+      text: 'reasoning\n\nCAUSE: **<the one cause, named>**\nEVIDENCE: **<the lines in the material>**',
+    })
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error).toContain('placeholders')
   })
 
   it('still recognises a DECORATED label — the stripped line matches, the raw line is quoted', () => {
