@@ -342,6 +342,54 @@ describe('the record the command prints', () => {
     expect(report).toContain('merge')
   })
 
+  it('is NOT printed at all when the round did not carry the material (point 714)', () => {
+    const report = formatReviewReport({
+      decision: decideReview(okRun()),
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      shortfall: {
+        reason: 'over-budget',
+        truncated: ['scripts/context-fence-guard.mjs'],
+        omitted: ['scripts/context-fence-core.test.mjs'],
+        budget: 200_000,
+        size: 200_000,
+        rawSize: 900_000,
+      },
+    })
+    expect(report).toMatch(/NO RECORD COMMAND IS PRINTED/)
+    expect(report).not.toContain('mechanism-review.mjs --record')
+    // Every file the reviewer never saw is NAMED — the whole failure was that
+    // this list existed only inside the material.
+    expect(report).toContain('scripts/context-fence-guard.mjs')
+    expect(report).toContain('scripts/context-fence-core.test.mjs')
+    // …and the reviewer's answer is still reported: the findings are worth having.
+    expect(report).toContain('merge')
+  })
+
+  it('carries the pass a verdict covers, so a composition can be recorded', () => {
+    const report = formatReviewReport({
+      decision: decideReview(okRun()),
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      pass: { index: 1, total: 3, files: ['scripts/a.mjs', 'scripts/b.mjs'] },
+    })
+    expect(report).toContain('--pass 1/3')
+    expect(report).toContain('--pass-files "scripts/a.mjs,scripts/b.mjs"')
+    expect(report).toContain('PASS 1/3')
+    expect(report).toMatch(/NOT cleared until every pass is recorded/)
+  })
+
+  it('stops promising a next pass once the last one is reviewed', () => {
+    const report = formatReviewReport({
+      decision: decideReview(okRun()),
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      pass: { index: 3, total: 3, files: ['scripts/c.mjs'] },
+    })
+    expect(report).toContain('--pass 3/3')
+    expect(report).not.toMatch(/NOT cleared until every pass is recorded/)
+  })
+
   it('decides coverage strictly: only an EQUAL base is full coverage', () => {
     // The deciding line itself, not just the report it feeds: reverting it must
     // redden a test (four-eyes finding, fifth round).

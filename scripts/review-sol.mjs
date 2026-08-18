@@ -61,7 +61,6 @@ import {
   decideReview,
   OUTCOME,
   FALLBACK_CHAIN,
-  formatReviewMaterial,
   formatReviewReport,
   isUnknownModelRefusal,
   modelsInTrailerField,
@@ -76,6 +75,15 @@ import {
   SOL_MODEL_NAME,
   SOL_REASONING_EFFORT,
 } from './review-sol-core.mjs'
+import {
+  assembleMaterial,
+  formatBudgetNotice,
+  materialShortfall,
+  MATERIAL_BUDGET_CHARS,
+  passByIndex,
+  planPasses,
+  splitPatchByFile,
+} from './review-material-core.mjs'
 
 /** Where codex keeps the ChatGPT login, and where we park a copy of it. */
 export const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), '.codex')
@@ -135,7 +143,7 @@ function git(args, { required = true } = {}) {
  * symlink yields its own target text (a few harmless bytes, and visible as such)
  * and nothing outside the commit can travel at all.
  */
-function gatherMaterial(sha, base) {
+function gatherRange(sha, base) {
   // THE WHOLE RANGE, NOT THE LAST COMMIT (10.08.2026). One record covers every
   // commit it CONTAINS — that is how both gates read the ledger — so a review of
   // a branch head that only saw the head's own diff would clear commits nobody
@@ -157,7 +165,30 @@ function gatherMaterial(sha, base) {
     // above still shows what happened to it.
     if (text !== null) files.push({ path, text })
   }
-  return formatReviewMaterial({ stat: git(['diff', '--stat', range]), patch, files })
+  // THE RAW PARTS, NOT THE FORMATTED MATERIAL (point 714). The budget decision,
+  // the pass plan and the accounting all need the parts separately; assembling
+  // here would leave the caller with a string and no way to tell what it lost.
+  return { stat: git(['diff', '--stat', range]), patch, files }
+}
+
+/**
+ * The material for ONE pass — the pass's own files, their patch sections, and the
+ * whole range's diffstat so the reviewer still sees the shape of what it is a
+ * part of. `patchOnly` files travel as their complete diff without the
+ * surrounding file, which is the only way a bookkeeping file measured in
+ * megabytes is reviewable at all (see planPasses).
+ */
+function assemblePass(range, pass) {
+  const sections = new Map(splitPatchByFile(range.patch).map((s) => [s.path, s.text]))
+  const files = pass.files
+  return assembleMaterial({
+    stat: range.stat,
+    patch: files.map((p) => sections.get(p)).filter(Boolean).join('\n'),
+    files: range.files.filter((f) => files.includes(f.path)),
+    budget: MATERIAL_BUDGET_CHARS,
+    patchRoom: pass.patchRoom,
+    patchOnly: pass.patchOnly,
+  })
 }
 
 /**
@@ -257,6 +288,11 @@ export function runCodex({ prompt, input = '', modelId = SOL_MODEL_ID, timeoutMs
     // its own would otherwise read as an ordinary error exit.
     timedOut: res.signal === 'SIGTERM' || String(res.error?.code ?? '') === 'ETIMEDOUT',
     finalMessage: last || res.stdout || '',
+    // WHAT ACTUALLY WENT OUT (point 714). The caller compares this against what
+    // it assembled: an assembly can be perfect and the hand-off still lose it,
+    // and a coverage claim resting on "presumably the same string" is the kind
+    // of assumption this whole point exists to remove.
+    sentInput: input,
   }
 }
 
@@ -438,12 +474,17 @@ function restoreLogin() {
 export const usage = () =>
   [
     'usage: node scripts/review-sol.mjs --sha <sha> --brief "<what to judge>" \\',
-    '           [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>]',
+    '           [--mode review|blind-parallel] [--point <N>] [--since <ref>] [--timeout <ms>] \\',
+    '           [--pass <k>]',
     '       node scripts/review-sol.mjs --probe            (is -m honoured?)',
     '       node scripts/review-sol.mjs --save-login | --restore-login',
     '',
     'The material is the whole range <since>..<sha> (--since defaults to main), because',
     'one record covers every commit it contains.',
+    `A round carries at most ${MATERIAL_BUDGET_CHARS} characters. A range beyond that is REFUSED`,
+    'and split into PASSES over the FILE SET — --pass <k> reviews one of them, and the',
+    'record it prints covers that pass alone. Splitting by COMMIT does not help: every',
+    'commit ships the current content of the files it touches.',
     `Reviews run on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT} (CLAUDE.md §6). When it`,
     `cannot be reached the review is HANDED OVER to the first model of ${FALLBACK_CHAIN.join(' → ')}`,
     'that authored no part of the reviewed range — the recorded review always names the',
@@ -543,12 +584,48 @@ if (isMainModule(import.meta.url)) {
     // The decision itself is pure and tested (coverageDecision).
     const coverageBase = sinceFlag ? git(['merge-base', 'main', full], { required: false }) : base
     const partial = coverageDecision({ reviewedBase: base, coverageBase })
-    const material = gatherMaterial(full, base)
+
+    // THE THRESHOLD IS NAMED BEFORE THE ROUND IS SPENT (point 714). A caller who
+    // learns of the overflow from the verdict has already paid for a review that
+    // covers less than it looks like it does; a caller who learns of it here can
+    // split the review instead.
+    const range = gatherRange(full, base)
+    const plan = planPasses({ ...range, budget: MATERIAL_BUDGET_CHARS })
+    console.error(formatBudgetNotice(plan, { sha: full }))
+
+    const passFlag = flag('--pass')
+    let pass = null
+    let assembly
+    if (plan.fits) {
+      if (passFlag) {
+        console.error(
+          `review-sol: --pass ${passFlag} names a pass of a split this range does not need — it fits in one round.`,
+        )
+        process.exit(2)
+      }
+      assembly = assembleMaterial({ ...range, budget: MATERIAL_BUDGET_CHARS })
+    } else {
+      // A ROUND OVER MATERIAL THAT CANNOT FIT IS A ROUND SPENT ON A RECORD THAT
+      // WILL BE REFUSED. The plan above says how to split it, so the run stops
+      // here rather than paying for a verdict nothing may rest on.
+      if (!passFlag) {
+        console.error(
+          'review-sol: REFUSING to spend a round on a range that cannot fit one — run the passes above.',
+        )
+        process.exit(4)
+      }
+      pass = passByIndex(plan, passFlag)
+      if (!pass) {
+        console.error(`review-sol: --pass ${passFlag}: this range splits into ${plan.passes.length} pass(es).`)
+        process.exit(2)
+      }
+      assembly = assemblePass(range, pass)
+    }
     console.error(
-      `  material: ${material.length} characters of diff and file content ` +
-        `(${base.slice(0, 7)}..${full.slice(0, 7)})`,
+      `  material: ${assembly.size} characters of diff and file content ` +
+        `(${base.slice(0, 7)}..${full.slice(0, 7)}${pass ? `, pass ${pass.index}/${pass.total}` : ''})`,
     )
-    const run = runCodex({ prompt: buildReviewPrompt({ sha: full, brief, mode }), input: material, timeoutMs })
+    const run = runCodex({ prompt: buildReviewPrompt({ sha: full, brief, mode }), input: assembly.text, timeoutMs })
     const outcome = classifyOutcome(run)
     const parsed = outcome.ok ? parseVerdict(run.finalMessage) : { ok: false }
     // WHO AUTHORED IT decides who may review it if Sol is unavailable: Fable
@@ -563,11 +640,16 @@ if (isMainModule(import.meta.url)) {
     if (said) {
       console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end of review ---\n`)
     }
-    console.log(formatReviewReport({ decision, sha: full, mode, point, partial }))
+    // DID THIS ROUND CARRY WHAT IT CLAIMS TO HAVE JUDGED? Asked of the accounting
+    // and of the string that actually went to codex — never of the material's own
+    // text, which a reviewed source file can carry the truncation marker in.
+    const shortfall = materialShortfall({ assembly, sent: run.sentInput })
+    console.log(formatReviewReport({ decision, sha: full, mode, point, partial, shortfall, plan, pass }))
     // A fallback is not an error of THIS command — it did its job by refusing to
     // invent a review — but it must not read as a finished one either, so the
-    // exit code distinguishes them for any script that chains on it.
-    process.exit(decision.fellBack ? 3 : 0)
+    // exit code distinguishes them for any script that chains on it. A short-fall
+    // is the same shape of answer: a verdict was given, no record may rest on it.
+    process.exit(decision.fellBack || shortfall ? 3 : 0)
   } catch (e) {
     console.error(`review-sol failed: ${(e && e.message) || e}`)
     process.exit(1)

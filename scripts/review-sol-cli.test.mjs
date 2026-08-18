@@ -47,6 +47,10 @@ import { FALLBACK_MODEL_NAME, SECOND_FALLBACK_MODEL_NAME, SOL_MODEL_NAME } from 
 const SCRIPT_FILES = [
   'review-sol.mjs',
   'review-sol-core.mjs',
+  // The material budget, its accounting and the pass plan (point 714): the
+  // command refuses a record whose round did not carry the range, and the suite
+  // exercises that refusal against the real command.
+  'review-material-core.mjs',
   // The recorder too: the suite RUNS the record command the report prints, which
   // is the only honest way to claim that command is complete.
   'mechanism-review.mjs',
@@ -77,6 +81,7 @@ let headSha = ''
 let fableSha = ''
 let solSha = ''
 let orphanSha = ''
+let bulkSha = ''
 /** An EMPTY git template: a host `init.templateDir` must not seed the fixture. */
 let emptyTemplate = ''
 
@@ -269,6 +274,15 @@ beforeAll(() => {
   git('add', '-A')
   git('commit', '--no-verify', '-q', '-m', 'Write something as Sol\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
   solSha = git('rev-parse', 'HEAD')
+
+  // A branch whose material CANNOT fit one round (point 714): two files of 120k
+  // characters, so the range needs more than the 200k budget however it is cut.
+  git('checkout', '-q', '-b', 'bulk', 'main')
+  writeFileSync(join(repo, 'bulk-a.txt'), `${'a'.repeat(120_000)}\n`)
+  writeFileSync(join(repo, 'bulk-b.txt'), `${'b'.repeat(120_000)}\n`)
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', 'Add two files no single round can hold\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+  bulkSha = git('rev-parse', 'HEAD')
 
   // A history sharing no ancestor with the rest: the third form of "not a proper
   // ancestor", which merge-base answers with nothing at all.
@@ -573,5 +587,74 @@ describe('a range SOL authored', () => {
     expect(calls()).toEqual([])
     // And no verdict is invented: the record command still carries the placeholder.
     expect(r.stdout).toMatch(/--verdict <merge\|/)
+  })
+})
+
+// POINT 714: a range whose material cannot fit one round must be recognised
+// BEFORE the round is spent, and no record may be offered for what was not read.
+describe('a range too large for one round', () => {
+  it('names the threshold, refuses to spend the round, and prints the pass plan', () => {
+    provenId()
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'])
+    expect(r.status, r.stderr).toBe(4)
+    expect(r.stderr).toContain('material budget is 200000 characters')
+    expect(r.stderr).toContain('PASSES over the FILE SET')
+    expect(r.stderr).toContain('bulk-a.txt')
+    expect(r.stderr).toContain('bulk-b.txt')
+    expect(r.stderr).toContain('--pass 1')
+    // THE ROUND IS NOT SPENT: the whole cost of the old behaviour was a paid
+    // review whose record covered files nobody read.
+    expect(calls()).toEqual([])
+    // And nothing that looks like a record reaches the caller.
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+  })
+
+  it('reviews ONE pass on demand and offers a record for that pass alone', () => {
+    provenId()
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '1'])
+    expect(r.status, r.stderr).toBe(0)
+    const printed = recordCommandIn(r.stdout)
+    expect(printed).toMatch(/--pass 1\/2/)
+    expect(printed).toMatch(/--pass-files "bulk-[ab]\.txt"/)
+    expect(r.stdout).toContain('NOT cleared until every pass is recorded')
+    // What actually went to the reviewer stayed inside the budget.
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent.length).toBeLessThanOrEqual(200_000)
+    expect(sent).toContain('=== PATCH ===')
+  })
+
+  it('reviews the OTHER pass, and the two together name both files', () => {
+    provenId()
+    const one = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '1'])
+    const two = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '2'])
+    expect(two.status, two.stderr).toBe(0)
+    const files = [one.stdout, two.stdout]
+      .map((out) => /--pass-files "([^"]*)"/.exec(recordCommandIn(out))?.[1] ?? '')
+      .join(',')
+      .split(',')
+    expect([...files].sort()).toEqual(['bulk-a.txt', 'bulk-b.txt'])
+  })
+
+  it('refuses a pass number this range does not have', () => {
+    provenId()
+    const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range', '--pass', '9'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('splits into 2 pass(es)')
+    expect(calls()).toEqual([])
+  })
+
+  it('refuses --pass on a range that fits, rather than recording a split nobody needs', () => {
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range', '--pass', '1'])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('fits in one round')
+    expect(calls()).toEqual([])
+  })
+
+  it('says a range that fits does so, before the round', () => {
+    provenId()
+    const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).toContain('It fits in one round.')
   })
 })

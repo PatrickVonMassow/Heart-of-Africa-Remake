@@ -21,10 +21,21 @@
 // scripts/review-sol.mjs. Pinned by review-sol-core.test.mjs.
 
 import { BLIND_REVIEWER, modelFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
+import {
+  assembleMaterial,
+  formatShortfall,
+  MATERIAL_BUDGET_CHARS,
+  PATCH_SHARE,
+} from './review-material-core.mjs'
 
 // Re-exported: the runner and the recorder refuse the same sentence, from one
 // definition (mechanism-review-core.mjs).
 export { BLIND_REVIEWER }
+
+// The material budget and its split live with the accounting that spends them
+// (review-material-core.mjs); re-exported here because this is where every
+// caller of the review command already looks for them.
+export { MATERIAL_BUDGET_CHARS, PATCH_SHARE }
 
 /** The model id `codex exec -m` is given, and the name a record calls it by. */
 export const SOL_MODEL_ID = 'gpt-5.6-sol'
@@ -411,11 +422,6 @@ export function claudeReviewerFor(authorModels = '') {
   return firstNonAuthor(CLAUDE_REVIEW_CHAIN, authorModels)
 }
 
-/** How much material one review may carry — the patch plus the changed files —
- *  and the share of it the patch may take before the files get their turn. */
-export const MATERIAL_BUDGET_CHARS = 200_000
-export const PATCH_SHARE = 0.5
-
 /**
  * The review MATERIAL, assembled into what codex receives on stdin.
  *
@@ -428,40 +434,19 @@ export const PATCH_SHARE = 0.5
  * eyes. So the artefact travels WITH the request. The read-only sandbox stays on
  * regardless, for the machine where the launcher does work.
  *
- * The budget is spent in the order that matters — the patch first, then each
- * changed file — and what does not fit is CUT VISIBLY, because a reviewer that
- * silently saw half a file would report on the half it saw.
+ * The budget is spent in the order that matters — the patch first (which is
+ * CAPPED TOO: an uncapped diff used to blow the ceiling and leave nothing for the
+ * files, four-eyes finding 10.08.2026), then each changed file — and what does
+ * not fit is CUT VISIBLY, because a reviewer that silently saw half a file would
+ * report on the half it saw.
+ *
+ * THE TEXT IS ONLY HALF THE ANSWER (point 714). What the cut cost is accounted
+ * for in `assembleMaterial`, whose second return half is what decides whether a
+ * record may be printed at all — this wrapper keeps the string-only shape for the
+ * callers that just want the material.
  */
-export function formatReviewMaterial({ stat = '', patch = '', files = [], budget = MATERIAL_BUDGET_CHARS } = {}) {
-  // THE PATCH IS CAPPED TOO (four-eyes finding, 10.08.2026). It used to be
-  // written whole and merely SUBTRACTED from the budget, so a large diff blew
-  // the ceiling and left nothing for the files — measured on this branch: the
-  // reviewer saw the patch, a truncated README and none of the six scripts. It
-  // gets a fixed share, and what it loses is cut visibly like everything else.
-  const cut = (text, room) =>
-    text.length > room ? `${text.slice(0, Math.max(0, room))}\n… [TRUNCATED: ${text.length - room} characters not shown]` : text
-  const patchRoom = Math.floor(budget * PATCH_SHARE)
-  const out = [
-    '=== DIFFSTAT ===',
-    cut(String(stat).trim(), Math.floor(budget * 0.05)),
-    '',
-    '=== PATCH ===',
-    cut(String(patch).trim(), patchRoom),
-    '',
-  ]
-  let left = Math.max(0, budget - out.join('\n').length)
-  for (const file of files ?? []) {
-    const text = String(file?.text ?? '')
-    const header = `=== FILE (current content): ${file?.path ?? '?'} ===`
-    if (left <= header.length + 200) {
-      out.push(`=== FILE OMITTED ENTIRELY (material budget spent): ${file?.path ?? '?'} ===`, '')
-      continue
-    }
-    const room = left - header.length - 80
-    out.push(header, cut(text, room), '')
-    left -= header.length + Math.min(text.length, room) + 80
-  }
-  return out.join('\n')
+export function formatReviewMaterial(options = {}) {
+  return assembleMaterial(options).text
 }
 
 /**
@@ -614,7 +599,15 @@ const short = (s) => (/^[0-9a-f]{7,40}$/i.test(String(s ?? '')) ? String(s).slic
  * refuses — so a hand that pastes it without giving the review to Fable first
  * gets a refusal, not a green ledger line.
  */
-export function formatRecordCommand({ sha = '', model = '', verdict = '', evidence = '', mode = 'review', point = '' } = {}) {
+export function formatRecordCommand({
+  sha = '',
+  model = '',
+  verdict = '',
+  evidence = '',
+  mode = 'review',
+  point = '',
+  pass = null,
+} = {}) {
   const parts = [
     'node scripts/mechanism-review.mjs',
     `--record ${sha || '<sha>'}`,
@@ -624,6 +617,13 @@ export function formatRecordCommand({ sha = '', model = '', verdict = '', eviden
     `--mode ${mode}`,
   ]
   if (String(point ?? '').trim()) parts.push(`--point ${String(point).trim()}`)
+  // A PASS RECORD NAMES WHAT IT ACTUALLY READ (point 714). The range was too
+  // large for one round, so this verdict covers the files of this pass alone —
+  // and the gate clears the range only once every pass of the same total is on
+  // record, which is what makes a composition a coverage rather than a claim.
+  if (pass) {
+    parts.push(`--pass ${pass.index}/${pass.total}`, `--pass-files ${q((pass.files ?? []).join(','))}`)
+  }
   return parts.join(' ')
 }
 
@@ -632,7 +632,16 @@ export function formatRecordCommand({ sha = '', model = '', verdict = '', eviden
  * happened — LOUD on a fallback, per the point's "name the cause in ONE line" —
  * then the record command.
  */
-export function formatReviewReport({ decision = {}, sha = '', mode = 'review', point = '', partial = null } = {}) {
+export function formatReviewReport({
+  decision = {},
+  sha = '',
+  mode = 'review',
+  point = '',
+  partial = null,
+  shortfall = null,
+  plan = null,
+  pass = null,
+} = {}) {
   // A RECORD IS NEVER PRINTED FOR LESS THAN IT CLEARS (fourth cross-vendor
   // round). Both gates treat a record as covering every commit it CONTAINS, so a
   // narrowed range — `--since <sha>~1` on a branch with older commits — would
@@ -650,6 +659,18 @@ export function formatReviewReport({ decision = {}, sha = '', mode = 'review', p
       '  Re-run without --since to review the whole range, then record that.',
     ].join('\n')
   }
+  // A RECORD IS NEVER PRINTED FOR MATERIAL THE ROUND DID NOT CARRY (point 714).
+  // The truncation notice is written INTO the material, so it reached the caller
+  // only if the model chose to mention it — and a model that did not would have
+  // produced a clean-looking record command covering files nobody read. The
+  // verdict is still reported, because the reviewer's findings are worth having;
+  // the ready-to-run command is not.
+  if (shortfall) {
+    const said = decision.fellBack
+      ? `${SOL_MODEL_NAME} did not review it: ${decision.cause}`
+      : `${SOL_MODEL_NAME} answered ${decision.verdict} on ${String(sha).slice(0, 7)}\n  ${decision.evidence}`
+    return [`review-sol: ${said}`, '', formatShortfall(shortfall, { sha, plan })].join('\n')
+  }
   const cmd = formatRecordCommand({
     sha,
     model: decision.model,
@@ -657,14 +678,21 @@ export function formatReviewReport({ decision = {}, sha = '', mode = 'review', p
     evidence: decision.evidence,
     mode,
     point,
+    pass,
   })
   if (!decision.fellBack) {
+    const scope = pass
+      ? ` (PASS ${pass.index}/${pass.total} — ${(pass.files ?? []).length} file(s) of a range too large for one round)`
+      : ''
     return [
-      `review-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}`,
+      `review-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}${scope}`,
       `  ${decision.evidence}`,
       '',
       'Record it (the model named is the one that actually ran):',
       `  ${cmd}`,
+      ...(pass && pass.index < pass.total
+        ? ['', `  The range is NOT cleared until every pass is recorded — next: --pass ${pass.index + 1}`]
+        : []),
     ].join('\n')
   }
   // The prose names the model the DECISION picked, not the usual one: where
