@@ -456,6 +456,25 @@ describe('a binary file in the range', () => {
     // The declaration is not a loss: the record command is still offered.
     expect(r.stdout).toContain('mechanism-review.mjs --record')
   })
+
+  // ROUND-1 PASS 5: invalid UTF-8 without a NUL slipped past the binary check
+  // as replacement characters, and the ALTERED text was recorded as complete
+  // delivery. The strict decode refuses such bytes by name instead.
+  it('refuses a range whose diff bytes are not valid UTF-8, rather than recording mojibake', () => {
+    provenId()
+    git('checkout', '-q', '-b', 'latin1-work', 'main')
+    // 0xFF is not valid UTF-8 anywhere, and there is no NUL — git diffs this
+    // as TEXT, which is exactly the hole: the lenient decode wrote U+FFFD and
+    // called the material complete.
+    writeFileSync(join(repo, 'legacy.txt'), Buffer.from([0x61, 0xff, 0x62, 0x0a]))
+    git('add', '-A')
+    git('commit', '--no-verify', '-q', '-m', 'Add a latin1 body\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+    const sha = git('rev-parse', 'HEAD')
+    const r = run(['--sha', sha, '--brief', 'judge the legacy bytes'])
+    expect(r.status).not.toBe(0)
+    expect(`${r.stdout}${r.stderr}`).toContain('not valid UTF-8')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+  })
 })
 
 describe('a child that never read its material', () => {
@@ -769,8 +788,10 @@ describe('a path with a trailing space', () => {
     expect(r.status, r.stderr).toBe(0)
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
     expect(sent).toContain('content behind the trailing space')
-    // The header carries the UNTRIMMED spelling — the space sits before the ===.
-    expect(sent).toContain(`=== FILE (current content): ${EDGE_NAME} ===`)
+    // The header carries the UNTRIMMED path, C-QUOTED so its edge whitespace
+    // is visible and unforgeable (round-1 pass 3): the structural lines spell
+    // every path that needs it exactly as git would print it.
+    expect(sent).toContain(`=== FILE (current content): "${EDGE_NAME}" ===`)
     expect(sent).not.toContain('OMITTED ENTIRELY')
   })
 })

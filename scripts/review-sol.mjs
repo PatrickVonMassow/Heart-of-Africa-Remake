@@ -122,21 +122,43 @@ export const SAVED_AUTH_FILE = join(STATE_DIR, 'codex-auth.json')
  * 10.08.2026). The optional reads are the per-file ones, where "not in this
  * commit" is an ordinary answer.
  */
+/** Decodes strictly or throws — the lossy default writes U+FFFD and moves on. */
+const utf8Strict = new TextDecoder('utf-8', { fatal: true })
+
 function git(args, { required = true, raw = false } = {}) {
   const res = spawnSync('git', args, {
     cwd: REPO_ROOT,
-    encoding: 'utf8',
     windowsHide: true,
     maxBuffer: 128 * 1024 * 1024,
   })
+  const errText = (res.stderr ?? Buffer.alloc(0)).toString('utf8')
   if (res.status !== 0 || res.error) {
     if (!required) return null
-    throw new Error(`git ${args.join(' ')} failed: ${(res.stderr || res.error?.message || '').trim()}`)
+    throw new Error(`git ${args.join(' ')} failed: ${(errText || res.error?.message || '').trim()}`)
   }
+  const out = res.stdout ?? Buffer.alloc(0)
   // `raw` skips the trim for output that IS paths: a legal path may begin or
   // end in whitespace, and trimming the stream eats it off the first and last
-  // one (cross-vendor review, third round).
-  return raw ? (res.stdout ?? '') : (res.stdout ?? '').trim()
+  // one (cross-vendor review, third round). It also decodes STRICTLY (round-1
+  // pass 5): the lenient default turned invalid UTF-8 into replacement
+  // characters, the NUL-only binary check then read the ALTERED text as
+  // complete, and a pass could record byte-inexact material as wholly
+  // delivered. Bytes this string pipeline cannot carry are refused by name —
+  // the caller decides whether that refuses the round (patch, stat, paths) or
+  // degrades the one file to a declared binary (blob reads).
+  if (raw) {
+    try {
+      return utf8Strict.decode(out)
+    } catch {
+      const e = new Error(
+        `git ${args.join(' ')} returned bytes that are not valid UTF-8 — ` +
+          'this pipeline cannot carry them byte-exact, and a lossy decode must never be recorded as complete',
+      )
+      e.undecodable = true
+      throw e
+    }
+  }
+  return out.toString('utf8').trim()
 }
 
 /**
@@ -222,8 +244,18 @@ function gatherRange(sha, base) {
     // the default read trims, which strips a body's leading/trailing
     // whitespace and its final newline — and the assembly then recorded that
     // ALTERED string as complete, so byte-inexact delivery passed the
-    // accounting. What the commit holds is what travels.
-    const text = git(['show', `${sha}:${path}`], { required: false, raw: true })
+    // accounting. What the commit holds is what travels. A blob whose bytes
+    // are not valid UTF-8 cannot travel as text AT ALL (round-1 pass 5): it
+    // degrades to a declared binary, exactly like the NUL case below, never
+    // to a replacement-character copy recorded as complete.
+    let text
+    try {
+      text = git(['show', `${sha}:${path}`], { required: false, raw: true })
+    } catch (e) {
+      if (!e?.undecodable) throw e
+      files.push({ path, binary: true })
+      continue
+    }
     // Null = the commit does not carry that path (it was deleted); the patch
     // above still shows what happened to it.
     if (text === null) continue
