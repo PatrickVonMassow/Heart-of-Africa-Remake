@@ -5,7 +5,8 @@
 // and blocking live in the fail-open wrapper scripts/model-guard.mjs.
 //
 // Model policy (users 25.07.2026 / 18.08.2026): ONLY Opus 5 (the serving
-// session, and the author of the points whose verification is the work),
+// session, and the author of the points whose verification is the work and
+// that nothing marks hard — a hard one is Sol's),
 // Opus 4.8 (fallback when Opus 5 is unavailable), Fable 5 (the escalation: work
 // whose re-work the review still rejects) and GPT-5.6 Sol (the OpenAI authoring
 // lane, point 667, which since 18.08.2026 takes the hard and critical points
