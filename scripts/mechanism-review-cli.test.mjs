@@ -404,7 +404,10 @@ describe('the mode round-trips into the ledger', () => {
       // The exploit itself: the commit's own author records its review. Before
       // the fix the shifted field hid the authorship and this PASSED.
       const self = record('GPT-5.6 Sol')
-      expect(self.status, `${self.stdout}${self.stderr}`).not.toBe(0)
+      // The refusal is asserted by its own wording, not a bare exit code — a
+      // spawn that never ran would satisfy .not.toBe(0) with empty output.
+      expect(self.stderr, `${self.stdout}${self.stderr}`).toContain('SELF-REVIEW is refused')
+      expect(self.stderr).toContain('GPT-5.6 Sol')
 
       // A cross-model record works, and the ledger row carries the subject
       // whole and the authorship exactly as the trailer spells it.
