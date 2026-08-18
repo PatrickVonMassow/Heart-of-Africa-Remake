@@ -61,16 +61,36 @@ describe('the transcript user-message boundary', () => {
     ...overrides,
   })
 
-  it('arms only a string prompt positively marked as typed', () => {
+  it('arms string and array prompts positively marked as typed', () => {
     expect(extractLastUserMessage(entry({ promptSource: 'typed' })))
       .toEqual({ id: 'message', text: 'Nachricht.' })
     expect(extractLastUserMessage(entry({
       promptSource: 'typed',
-      message: { content: [{ type: 'text', text: 'Kein String.' }] },
-    }))).toBeNull()
+      message: { content: [
+        { type: 'text', text: 'Erster Text.' },
+        { type: 'text', text: 'Zweiter Text.' },
+      ] },
+    }))).toEqual({ id: 'message', text: 'Erster Text.\nZweiter Text.' })
+    expect(extractLastUserMessage(entry({
+      promptSource: 'typed',
+      message: { content: [
+        { type: 'text', text: 'Bildbeschreibung.' },
+        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'abc' } },
+      ] },
+    }))).toEqual({ id: 'message', text: 'Bildbeschreibung.' })
     expect(extractLastUserMessage(entry({
       promptSource: 'typed',
       isSidechain: true,
+    }))).toBeNull()
+  })
+
+  it('rejects a typed content array carrying a tool result', () => {
+    expect(extractLastUserMessage(entry({
+      promptSource: 'typed',
+      message: { content: [
+        { type: 'text', text: 'Begleittext.' },
+        { type: 'tool_result', content: 'done' },
+      ] },
     }))).toBeNull()
   })
 

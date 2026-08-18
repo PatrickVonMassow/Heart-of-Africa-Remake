@@ -109,6 +109,20 @@ function responderUserText(text) {
   return messages.length ? messages.join('\n') : null
 }
 
+/** Text carried by a positively marked typed prompt. Attachments are separate
+ * content parts, so retain every text part while ignoring those attachments. A
+ * tool result makes the whole array machine traffic even when text accompanies
+ * it and must never arm a review. */
+function typedUserText(content) {
+  if (typeof content === 'string') return content.trim() ? content : null
+  if (!Array.isArray(content) || content.some((part) => part?.type === 'tool_result')) return null
+  const text = content
+    .filter((part) => part?.type === 'text' && typeof part.text === 'string')
+    .map((part) => part.text)
+    .join('\n')
+  return text.trim() ? text : null
+}
+
 /** The last positively identified user message in Claude's JSONL transcript.
  *
  * There are exactly two accepted channels: a CLI entry marked
@@ -130,11 +144,14 @@ export function extractLastUserMessage(jsonl) {
     }
     if (!entry || entry.type !== 'user' || entry.isSidechain) continue
     const content = entry.message?.content
-    if (typeof content !== 'string' || !content.trim()) continue
     const id = entry.uuid || entry.message?.id
     if (typeof id !== 'string' || !id.trim()) continue
-    if (entry.promptSource === 'typed') last = { id, text: content }
+    if (entry.promptSource === 'typed') {
+      const text = typedUserText(content)
+      if (text) last = { id, text }
+    }
     else {
+      if (typeof content !== 'string' || !content.trim()) continue
       const text = responderUserText(content)
       if (text) last = { id, text }
     }
