@@ -439,12 +439,18 @@ if (section('panorama-wildlife')) {
   // body's yaw would manufacture movement for a contact whose coordinates did
   // not change.
   //
-  // OPEN MEASUREMENT — the browser reviewer owes this lane after the planted-leg
-  // reach limit is in place: run several consecutive
-  // `VERIFY_GL=webgl npm test -- polish --section=panorama-wildlife` passes and
-  // record each pass's worst foot/body figure and interval count here. Until
-  // that WebGL 2 spread is recorded, neither the new interval population nor
-  // the result against the 0.25 bar is claimed as measured evidence.
+  // MEASURED SPREAD (19.08.2026, this section run six consecutive times on the
+  // branch state, three passes per backend, against the 0.25 bar and the
+  // eight-interval enough-gate). Settlement walker (goat), the lane that was
+  // red: WebGL 2 — 35/36/36 intervals, worst foot/body travel 0.000 in every
+  // pass, body turn up to 0.299/0.247/0.292 rad; WebGPU — 13/15/18 intervals,
+  // worst 0.000 in every pass, turn up to 0.433/0.815/0.595 rad. Panorama
+  // silhouette over the same runs: WebGL 2 48/50/49 intervals, worst
+  // 0.025/0.026/0.026; WebGPU 49/50/47 intervals, worst 0.023/0.023/0.025. The
+  // interval population therefore clears the gate on both backends with room
+  // (13 is the thinnest run), the goat's contact does not move at all while the
+  // body turns up to 0.8 rad over it, and the silhouette's tenth-of-the-bar
+  // residue is the only travel any pass measured.
   {
     /** Record the tracked walkers frame by frame, inside the page: one round trip
      *  for the whole series, so no sample window can be stretched by the host.
