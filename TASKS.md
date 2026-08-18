@@ -8582,3 +8582,59 @@ to land than a mechanism that needs a review.
   goes blank exactly when he checks it often.
   Bundle: Chat & Tafel.
 
+
+- [ ] 716. A session that loses the batch lock leaves its own subagent to die mid-step (measured
+  18.08.2026: the point-714 agent was building in its worktree while its parent session stood down
+  after the lock passed to a successor, and the successor's brief described that live agent as
+  provably dead). The stand-down path takes no boundary: it neither transfers the running agent nor
+  detaches it, so the agent keeps working for a session that no longer owns the batch, and whatever
+  it holds uncommitted dies with the parent process. Today it survived only because the SUCCESSOR's
+  agent noticed it was alive, waited it out and pushed its six commits — a rescue nobody designed
+  and nothing guarantees. The reverse cost is on record too: the successor acted on "the previous
+  owner was provably dead" while that owner's agent was writing files, which is how two strands come
+  to edit one worktree.
+  FINAL STATE:
+  - A stand-down is a BOUNDARY, not an exit. A session that loses or releases the lock while an
+    agent of its own is running takes the same two-phase handover a landed point takes: the running
+    work is DECLARED with its branch, worktree and pushed checkpoints, and transferred to whoever
+    owns the batch next — the mechanism `batch-in-flight.mjs --adopt` already provides, driven from
+    the stand-down path rather than only from the boundary.
+  - The claim that an owner is dead is MEASURED before it is stated, and the measurement covers the
+    owner's CHILDREN: a live worktree, a branch tip that moved, a running process. `--agent-check`
+    already judges exactly this and already refuses to declare a working agent dead; the stand-down
+    and the successor's orientation must ASK it instead of concluding from the lock alone.
+  - A successor's orientation never describes an unmeasured agent as dead. Where the state cannot be
+    read, it says so and names what to probe — an honest unknown, since acting on a wrong death is
+    what puts two writers in one tree.
+  VERIFIABLE: Vitest over the pure core — a stand-down with a live declared agent produces a
+  transfer rather than a silent exit; one with no agent produces today's plain stand-down; an
+  adopting successor sees the transferred declaration; and a dead-owner verdict is refused while a
+  child's worktree or branch tip is still moving.
+  Criticality: high — it is the batch singleton's blind side, and both of its failure directions
+  destroy work: an abandoned agent loses whatever it has not pushed, and a wrong death sends two
+  sessions into one worktree.
+  Bundle: unbundled (batch autonomy).
+
+- [ ] 717. The review-material chain's remaining sharpenings, named by the reviewer while point 714
+  was built and deliberately deferred so the mechanism could land (18.08.2026). None of them lets a
+  record cover unread material — that hole is closed — but each leaves a smaller edge unswept.
+  FINAL STATE:
+  - A binary file delivered as a DELTA patch is delivered or refused, not silently never delivered:
+    today only literal base85 streams are accepted, and a delta patch produces no content at all.
+    Either the base blob travels beside the delta so the reviewer can reconstruct it, or the file is
+    reported as absent-by-design with the reason named — the decision to make is which, and the
+    material must state whichever is chosen.
+  - The pass-warning and ledger-pointer rulings are pinned where the reviewer looks for them: they
+    currently live in `review-sol-cli.test.mjs` and `review-sol-core.test.mjs` while the material
+    suite carries no pin, so a reader of that suite cannot see the rule is held. Either duplicate the
+    pin there or name its location in the suite.
+  - The Windows shell-expansion lane is proven, not merely argued: the args-array no-shell path
+    closes `%VAR%` expansion by construction, and this environment cannot execute it. An integration
+    test on a Windows runner is what turns that argument into evidence; until one exists the residual
+    is stated as untested rather than closed.
+  VERIFIABLE: Vitest for the first two — a delta-patched binary yields either a reconstructable
+  delivery or an absent-by-design entry naming the reason, never silence; and the material suite
+  holds the pass-warning and ledger-pointer rulings. The Windows case is verified by a runner or
+  recorded as an open residual with its reason.
+  Criticality: medium — the clearance-covering hole is closed; these are edges around it.
+  Bundle: unbundled (review tooling).
