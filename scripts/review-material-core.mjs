@@ -477,7 +477,16 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
   // must measure the SAME bytes, or the plan clears what the assembly refuses.
   const statText = String(stat)
   const sections = new Map(splitPatchByFile(patch).map((s) => [s.path, s.text]))
-  const statCost = Math.min(statText.length, Math.floor(cap * STAT_SHARE))
+  // A DIFFSTAT OVER ITS SHARE FAILS THE PLAN, exactly as it fails the assembly
+  // (fourth cross-vendor round): Math.min silently assumed the cut, so a range
+  // whose stat overflowed could plan as one fitting pass while assembleMaterial
+  // marked that same round statTruncated — and the plan-only hand-off paths,
+  // which never assemble, then offered a whole-range record for material that
+  // cannot fit. Every pass carries the whole stat for context, so no pass of
+  // such a range can assemble complete either; the plan says so.
+  const statRoom = Math.floor(cap * STAT_SHARE)
+  const statTruncated = statText.length > statRoom
+  const statCost = Math.min(statText.length, statRoom)
   const room = Math.max(0, cap - statCost - PASS_RESERVE)
 
   // Every path the range touched: the ones with content, plus the ones the patch
@@ -523,8 +532,10 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
     budget: cap,
     room,
     rawSize,
-    // ONE pass and nothing beyond reach is the ordinary case: the range fits.
-    fits: total <= 1 && uncoverable.length === 0,
+    statTruncated,
+    // ONE pass, nothing beyond reach and a stat inside its share is the
+    // ordinary case: the range fits — the same claim the assembly will make.
+    fits: total <= 1 && uncoverable.length === 0 && !statTruncated,
     passes: passes.map((p, i) => ({
       index: i + 1,
       total,
@@ -554,6 +565,13 @@ export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/rev
   const at = String(sha).slice(0, 7)
   const head = `review-sol: the material budget is ${plan.budget} characters per round; this range assembles ${plan.rawSize}.`
   if (plan.fits) return `${head}\n  It fits in one round.`
+  if (plan.statTruncated) {
+    return [
+      head,
+      '  The DIFFSTAT ALONE exceeds its share of a round, and every pass carries the whole',
+      '  diffstat — no pass of this range can assemble complete. Review a NARROWER range.',
+    ].join('\n')
+  }
   const lines = [
     head,
     `  IT DOES NOT FIT, so ${at || 'this range'} is reviewed in ${plan.passes.length} PASSES over the FILE SET`,
@@ -606,6 +624,7 @@ export function planShortfall(plan = null) {
   return {
     reason: 'needs-passes',
     detail: '',
+    statTruncated: Boolean(plan.statTruncated),
     truncated: [],
     omitted: [],
     passes: plan.passes,
@@ -689,6 +708,20 @@ export function formatShortfall(shortfall, { sha = '', plan = null } = {}) {
     lines[0] = `  NO RECORD COMMAND IS PRINTED for ${at}: this range does not fit ONE review round.`
     lines.push(
       `  The material budget is ${shortfall.budget} characters and the complete material is ${shortfall.rawSize}.`,
+    )
+    // NO PASS CAN CARRY AN OVERSIZED DIFFSTAT EITHER — every pass ships the
+    // whole range's stat for context, so sending the caller to the passes
+    // would only move the refusal to the assembly, one paid round later.
+    if (shortfall.statTruncated) {
+      lines.push(
+        `  The DIFFSTAT ALONE exceeds the share of a round it may take (${Math.floor((shortfall.budget ?? 0) * STAT_SHARE)}`,
+        '  characters), and every pass carries the whole diffstat — so no pass of this range can',
+        '  assemble complete either. No record can be offered in any shape here: review a',
+        '  NARROWER range whose diffstat fits.',
+      )
+      return lines.join('\n')
+    }
+    lines.push(
       `  A record here would clear every commit in the range. Review it in the ${(shortfall.passes ?? []).length}`,
       '  PASSES over the file set instead — each pass records what it actually read:',
       ...passLines(shortfall, plan),

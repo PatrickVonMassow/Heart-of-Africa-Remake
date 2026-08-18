@@ -395,6 +395,36 @@ describe('the passes a range too large is cut into', () => {
     expect(plan.passes[0].patchRoom).toBeGreaterThan(Math.floor(10_000 * 0.5))
   })
 
+  it('does NOT call a range fitting whose DIFFSTAT exceeds its share — the assembly will refuse it', () => {
+    // Math.min silently assumed the cut, so the plan said one fitting pass
+    // while assembleMaterial marked the same round statTruncated: the plan-only
+    // hand-off paths then offered a whole-range record for material that
+    // cannot fit (cross-vendor review, fourth round).
+    const budget = 10_000
+    const plan = planPasses({
+      stat: 's'.repeat(2000), // over the 5% share of 10_000
+      patch: patchFor(['a.mjs']),
+      files: [file('a.mjs', 100)],
+      budget,
+    })
+    expect(plan.statTruncated).toBe(true)
+    expect(plan.fits).toBe(false)
+    // …and the refusal it produces names the diffstat, not a futile pass list:
+    // every pass carries the whole stat, so no pass can assemble complete.
+    const shortfall = planShortfall(plan)
+    expect(shortfall).not.toBeNull()
+    const text = formatShortfall(shortfall, { sha: 'a'.repeat(40), plan })
+    expect(text).toContain('NO RECORD COMMAND IS PRINTED')
+    expect(text).toContain('DIFFSTAT ALONE')
+    expect(text).toContain('NARROWER range')
+    expect(text).not.toContain('--pass 1')
+    expect(formatBudgetNotice(plan, { sha: 'a'.repeat(40) })).toContain('DIFFSTAT ALONE')
+    // The assembly agrees: the same parts do not fit one round.
+    const assembly = assembleMaterial({ stat: 's'.repeat(2000), patch: patchFor(['a.mjs']), files: [file('a.mjs', 100)], budget })
+    expect(assembly.statTruncated).toBe(true)
+    expect(assembly.fit).toBe(false)
+  })
+
   it('plans nothing for a range that touched nothing', () => {
     const plan = planPasses({ stat: '', patch: '', files: [], budget: 10_000 })
     expect(plan.passes).toEqual([])
