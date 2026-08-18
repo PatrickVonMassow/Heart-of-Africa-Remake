@@ -45,8 +45,12 @@ import {
   gatedEntryPoints,
   gatedMeta,
   normaliseGates,
+  frontCandidates,
+  commissionDecision,
+  commissionRefusal,
 } from './board-queue-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
+import { POOL_CAP } from './batch-in-flight-core.mjs'
 
 const board = (queue) => `<title>B</title>
 <main><h1>Dashboard</h1>
@@ -912,5 +916,161 @@ describe('the request card inside a rebuilt queue', () => {
     expect(codes.filter((c) => c !== 'queue-stubbed')).toEqual([])
     expect(concisenessOffenders(html)).toEqual([])
     expect(evaluateTopic({ dashboardHtml: html, tasksText: '- [ ] 439. X\n- [ ] 465. Y\n' }).block).toBe(false)
+  })
+})
+
+// ---- THE QUEUE BINDS THE PICKER (point 712) --------------------------------
+//
+// The measured 17.08.2026 state is the fixture the blocks below run on: point
+// 697 was commissioned while the derived sequence read `700 701 707 708 711 705
+// 706 710 662 …`, and nothing refused it.
+
+/** The open sequence as the work order carried it on 17.08.2026, abridged after
+ *  the head that matters — the order is what is under test, not the length. */
+const QUEUE_17_08 = [700, 701, 707, 708, 711, 705, 706, 710, 662, 553, 596, 597, 686, 687, 697]
+
+describe('frontCandidates — the workable head of the derived order', () => {
+  it('is the first `count` open points of queueOrder', () => {
+    expect(frontCandidates({ open: QUEUE_17_08 })).toEqual([700, 701, 707])
+    expect(frontCandidates({ open: QUEUE_17_08, count: 1 })).toEqual([700])
+    expect(frontCandidates({ open: QUEUE_17_08, count: 5 })).toEqual([700, 701, 707, 708, 711])
+  })
+
+  it('SKIPS a user-gated point — it cannot be worked, so it may not hold a slot open', () => {
+    const gates = { gated: new Set([700, 701]), answered: new Set(), since: new Map() }
+    expect(frontCandidates({ open: QUEUE_17_08, gates })).toEqual([707, 708, 711])
+  })
+
+  it('SKIPS a point already in flight, so the window stays three real candidates deep', () => {
+    expect(frontCandidates({ open: QUEUE_17_08, inFlight: [700, 707] })).toEqual([701, 708, 711])
+  })
+
+  it('lifts an ANSWERED point to the head, exactly as the board ranks it', () => {
+    const gates = { gated: new Set(), answered: new Set([662]), since: new Map() }
+    expect(frontCandidates({ open: QUEUE_17_08, gates })).toEqual([662, 700, 701])
+  })
+
+  it('accepts the raw work-order text as its gates, like every other queue rule', () => {
+    const tasks = '- [ ] 700. A\n- [ ] 701. B AWAITING-USER(2026-08-17; needs his word)\n- [ ] 707. C\n- [ ] 708. D\n'
+    expect(frontCandidates({ open: [700, 701, 707, 708], gates: tasks })).toEqual([700, 707, 708])
+  })
+
+  it('never throws and never invents a candidate on hostile input', () => {
+    expect(frontCandidates()).toEqual([])
+    expect(frontCandidates({ open: [], inFlight: 'nonsense' })).toEqual([])
+    expect(frontCandidates({ open: QUEUE_17_08, count: 0 })).toHaveLength(POOL_CAP)
+    expect(frontCandidates({ open: QUEUE_17_08, count: -4 })).toHaveLength(POOL_CAP)
+    expect(frontCandidates({ open: QUEUE_17_08, count: 2.7 })).toEqual([700, 701])
+    expect(frontCandidates({ open: QUEUE_17_08, inFlight: [null, 'x', 0, -1] })).toEqual([700, 701, 707])
+  })
+})
+
+describe('commissionDecision — the real 17.08.2026 pick is refused', () => {
+  it('REFUSES point 697 against that queue and names 700, 701 and 707', () => {
+    const d = commissionDecision({ point: 697, open: QUEUE_17_08 })
+    expect(d.allowed).toBe(false)
+    expect(d.why).toBe('behind-front')
+    expect(d.candidates).toEqual([700, 701, 707])
+    expect(d.position).toBe(15)
+    expect(d.total).toBe(15)
+    const text = commissionRefusal(d)
+    expect(text).toContain('697')
+    expect(text).toContain('700, 701, 707')
+    expect(text).toContain('15 of 15')
+    expect(text).toContain('--override')
+  })
+
+  it('ACCEPTS a front candidate — each of the three, not merely the first', () => {
+    for (const n of [700, 701, 707]) {
+      expect(commissionDecision({ point: n, open: QUEUE_17_08 })).toMatchObject({ allowed: true, why: 'at-front' })
+    }
+  })
+
+  it('lets the fourth point through the moment the three ahead of it are in flight', () => {
+    expect(commissionDecision({ point: 708, open: QUEUE_17_08 })).toMatchObject({ allowed: false })
+    expect(commissionDecision({ point: 708, open: QUEUE_17_08, inFlight: [700, 701, 707] })).toMatchObject({
+      allowed: true,
+      why: 'at-front',
+    })
+  })
+
+  it('skips a GATED point when the front three are chosen, and refuses commissioning it', () => {
+    const gates = { gated: new Set([701]), answered: new Set(), since: new Map() }
+    const d = commissionDecision({ point: 708, open: QUEUE_17_08, gates })
+    expect(d.candidates).toEqual([700, 707, 708])
+    expect(d).toMatchObject({ allowed: true, why: 'at-front' })
+    const gated = commissionDecision({ point: 701, open: QUEUE_17_08, gates })
+    expect(gated).toMatchObject({ allowed: false, why: 'user-gated' })
+    expect(commissionRefusal(gated)).toContain('WAITING ON THE USER')
+  })
+
+  it('skips an IN-FLIGHT point when the front three are chosen', () => {
+    const d = commissionDecision({ point: 708, open: QUEUE_17_08, inFlight: [701] })
+    expect(d.candidates).toEqual([700, 707, 708])
+    expect(d.allowed).toBe(true)
+  })
+
+  it('ACCEPTS an override with a recorded reason and reports the reason back', () => {
+    const d = commissionDecision({ point: 697, open: QUEUE_17_08, override: '  red on main masks other suites  ' })
+    expect(d).toMatchObject({ allowed: true, why: 'override' })
+    expect(d.override).toBe('red on main masks other suites')
+  })
+
+  it('takes an EMPTY or whitespace override as no override at all — silence is the forbidden way', () => {
+    for (const override of ['', '   ', '\n\t', null, undefined]) {
+      expect(commissionDecision({ point: 697, open: QUEUE_17_08, override }).allowed).toBe(false)
+    }
+  })
+
+  it('does not override a USER GATE — a gated point waits, whatever reason is typed', () => {
+    const gates = { gated: new Set([697]), answered: new Set(), since: new Map() }
+    expect(commissionDecision({ point: 697, open: QUEUE_17_08, gates, override: 'urgent' })).toMatchObject({
+      allowed: false,
+      why: 'user-gated',
+    })
+  })
+
+  it('lets work on a point already in flight through — that is finishing, not opening', () => {
+    expect(commissionDecision({ point: 697, open: QUEUE_17_08, inFlight: [697] })).toMatchObject({
+      allowed: true,
+      why: 'already-in-flight',
+    })
+  })
+
+  it('cannot judge, so it ALLOWS: no point, no work order, a point the order does not carry', () => {
+    expect(commissionDecision({ open: QUEUE_17_08 })).toMatchObject({ allowed: true, why: 'no-point' })
+    expect(commissionDecision({ point: 0, open: QUEUE_17_08 }).why).toBe('no-point')
+    expect(commissionDecision({ point: 'x', open: QUEUE_17_08 }).why).toBe('no-point')
+    expect(commissionDecision({ point: 697, open: [] })).toMatchObject({ allowed: true, why: 'no-work-order' })
+    expect(commissionDecision({ point: 999, open: QUEUE_17_08 })).toMatchObject({
+      allowed: true,
+      why: 'not-in-work-order',
+    })
+  })
+
+  it('ALLOWS when the front offers nothing — a refusal naming no alternative is a trap', () => {
+    const gates = { gated: new Set(QUEUE_17_08), answered: new Set(), since: new Map() }
+    const d = commissionDecision({ point: 999, open: QUEUE_17_08, gates })
+    expect(d.candidates).toEqual([])
+    expect(d).toMatchObject({ allowed: true, why: 'not-in-work-order' })
+    // …and with every OTHER point in flight, the one left is still commissionable.
+    const busy = QUEUE_17_08.filter((n) => n !== 697)
+    expect(commissionDecision({ point: 697, open: QUEUE_17_08, inFlight: busy })).toMatchObject({
+      allowed: true,
+      why: 'at-front',
+    })
+  })
+
+  it('never throws on hostile input', () => {
+    expect(() => commissionDecision()).not.toThrow()
+    expect(commissionDecision().allowed).toBe(true)
+    expect(() => commissionRefusal()).not.toThrow()
+    expect(commissionRefusal()).toContain('?')
+    expect(commissionRefusal({ point: 5, candidates: [], position: null, total: 0 })).toContain('no workable candidate')
+  })
+
+  it('follows the pool cap rather than a second number', () => {
+    expect(commissionDecision({ point: 708, open: QUEUE_17_08, cap: 4 })).toMatchObject({ allowed: true })
+    expect(commissionDecision({ point: 708, open: QUEUE_17_08, cap: POOL_CAP })).toMatchObject({ allowed: false })
   })
 })
