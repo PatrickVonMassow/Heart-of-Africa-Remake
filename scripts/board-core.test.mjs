@@ -1184,13 +1184,37 @@ describe('mergeDoneDuplicates — a board that already carries them', () => {
     // implementation deleted the QUEUE copy and left both archive copies, which
     // a total of two chips could not tell apart.
     expect(doneCards(out.html, 700)).toHaveLength(1)
-    expect(queueCard(out.html, 700)).not.toBeNull()
+    // SCOPED to the queue section (third review round): a document-wide lookup
+    // could return the surviving ARCHIVE card and call the queue card intact.
+    const queueSection = out.html.slice(
+      out.html.indexOf('<h2>Warteschlange</h2>'),
+      out.html.indexOf('<h2>Erledigt</h2>'),
+    )
+    expect(queueSection).toContain('class="num">700')
   })
 
-  it('leaves the section’s own markup untouched around the cards', () => {
-    const html = fullBoard({ done: card(700, 'Neu', '01:04 · 01:10') + card(700, 'Alt', '21:17 · 00:44') })
+  it('folds a DAMAGED newest stamp whole instead of leaving a stray digit', () => {
+    const html = fullBoard({ done: card(700, 'Neu', '12:345 · 01:10') + card(700, 'Alt', '21:17 · 00:44') })
+    const out = mergeDoneDuplicates(html).html
+    expect(out).toContain('<span class="meta">21:17 · 01:10</span>')
+    expect(out).not.toContain('21:175')
+  })
+
+  it('leaves the section’s own markup untouched around and BETWEEN the cards', () => {
+    // Section-local sentinels (third review round): a heading that exists
+    // somewhere proves nothing — the archive link and a note between two cards
+    // are what a rebuild would silently drop.
+    const html = fullBoard({
+      done:
+        '<p class="archivelink">Ältere Einträge im Archiv</p>\n' +
+        card(700, 'Neu', '01:04 · 01:10') +
+        '<!-- Notiz zwischen zwei Karten -->\n' +
+        card(700, 'Alt', '21:17 · 00:44'),
+    })
     const out = mergeDoneDuplicates(html).html
     expect(out).toContain('<summary><h2>Erledigt</h2></summary>')
+    expect(out).toContain('<p class="archivelink">Ältere Einträge im Archiv</p>')
+    expect(out).toContain('<!-- Notiz zwischen zwei Karten -->')
     expect(out.match(/<details class="sect">/g)).toHaveLength(html.match(/<details class="sect">/g).length)
     expect(out.endsWith(html.slice(html.lastIndexOf('</main>')))).toBe(true)
   })

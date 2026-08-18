@@ -715,7 +715,10 @@ export function mergeDoneDuplicates(html) {
     seen.add(e.point)
     if (counts.get(e.point) > 1) {
       const start = earliestStart(doneCards(source, e.point))
-      out += start ? e.text.replace(/(class="meta">\s*)\d{1,2}:\d{2}/, `$1${start}`) : e.text
+      // The WHOLE numeric run is replaced, not a well-formed prefix of it
+      // (third review round): a damaged newest stamp like `12:345` had its first
+      // four characters swapped and left the stray digit behind — `21:175`.
+      out += start ? e.text.replace(/(class="meta">\s*)[\d:]+/, `$1${start}`) : e.text
     } else {
       out += e.text
     }
