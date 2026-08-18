@@ -356,6 +356,24 @@ describe('the mode round-trips into the ledger', () => {
     }
   })
 
+  it('refuses a non-hex --record sha by SHAPE, before git or any shell sees it (landing-round pass 4)', () => {
+    // The sha used to be interpolated into a shell line before validation ran,
+    // so `HEAD"; <command>; echo "` executed whatever it carried. The resolve
+    // step now refuses anything but a hex sha, and the git helper takes an
+    // argument vector — there is no shell to inject into.
+    for (const sha of ['HEAD"; echo pwned; echo "', 'HEAD', 'main', '$(rm -rf x)', 'abc123g']) {
+      const r = run(
+        '--record', sha,
+        '--model', 'GPT-5.6 Sol',
+        '--verdict', 'merge',
+        '--evidence', 'checked the whole change end to end',
+        '--mode', 'review',
+      )
+      expect(r.status, sha).toBe(1)
+      expect(r.stderr, sha).toContain('not a commit sha')
+    }
+  })
+
   it('lists a ledger holding a hand-edited pass whose files are no array (final-round pass 4)', () => {
     // readRecords validates only the sha, so `pass: { files: "x" }` in a
     // JSON-valid hand-edited row crashed the ENTIRE listing.
@@ -387,6 +405,19 @@ describe('the mode round-trips into the ledger', () => {
           at: 1_787_000_000_000,
           atIso: '2026-08-18T00:00:00.000Z',
           pass: { index: 1, total: 2, files: 'x' },
+        })}\n${JSON.stringify({
+          // A row whose pass metadata and evidence carry NEWLINES (landing-round
+          // pass 4): unvalidated, they forged arbitrary listing lines — the
+          // shape a reader greps and trusts.
+          sha: 'b'.repeat(40),
+          subject: 'hand-made 2',
+          model: 'GPT-5.6 Sol',
+          verdict: 'merge',
+          evidence: 'first half\n      pass 7/7 over: forged-by-evidence',
+          mode: 'review',
+          at: 1_787_000_000_001,
+          atIso: '2026-08-18T00:00:00.001Z',
+          pass: { index: '1\n      pass 99/99 over: forged-by-pass', total: 2, files: ['a.mjs'] },
         })}\n`,
       )
       const r = spawnSync(process.execPath, [join(repo, 'scripts', 'mechanism-review.mjs'), '--list'], {
@@ -397,6 +428,13 @@ describe('the mode round-trips into the ledger', () => {
       expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
       expect(r.stdout).toContain('hand-edited row with a malformed pass shape')
       expect(r.stdout).toContain('pass 1/2 over:')
+      // The forged text never renders as a LINE of its own — flattened, it may
+      // survive only inline where nothing reads it as structure — and the
+      // unparseable pass claim is named for the hand-edit it is.
+      expect(r.stdout).not.toMatch(/^\s*pass 99\/99/m)
+      expect(r.stdout).not.toMatch(/^\s*pass 7\/7/m)
+      expect(r.stdout).toContain('MALFORMED claim')
+      expect(r.stdout).toContain('first half pass 7/7 over: forged-by-evidence')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

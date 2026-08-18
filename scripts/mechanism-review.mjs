@@ -36,7 +36,7 @@
 // fails LOUD — it is a command, not a hook.
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { accountUnion, formatAccounting, parseListText, summaryLine, validateInputs } from './blind-merge-core.mjs'
@@ -60,7 +60,11 @@ export { KNOWN_FLAGS }
 /** The tracked ledger of recorded mechanism reviews (JSON Lines). */
 export const RECORDS_PATH = repoPath('.claude/mechanism-reviews.jsonl')
 
-const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+// AN ARGUMENT VECTOR, NEVER A SHELL LINE (landing-round pass 4): the sha this
+// command interpolated reached a shell before any validation ran, so a value
+// like `HEAD"; <command>; echo "` executed. execFileSync hands git its
+// arguments directly — there is no shell to inject into.
+const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
 /** Every recorded review. A malformed line is skipped, never fatal — the ledger
  *  outlives the code that writes it, and one bad line must not blind the gate. */
@@ -176,6 +180,31 @@ export function buildRecord({
       }).errors,
     }
   }
+  // THE SHA IS VALIDATED BY SHAPE BEFORE ANYTHING RESOLVES IT (landing-round
+  // pass 4): the record command is only ever printed with a hex sha, so
+  // anything else — HEAD, a branch name, a shell fragment — is refused here
+  // with the usage, and never reaches git in any form. The remaining flags
+  // are still checked so the refusal names everything at once.
+  const ref = String(sha).trim()
+  if (!/^[0-9a-f]{7,40}$/i.test(ref)) {
+    const rest = validateRecord({
+      sha: '',
+      model,
+      verdict,
+      evidence,
+      mode,
+      framing,
+      mergedBy,
+      mergeFallback,
+      accounting,
+      pass,
+      passFiles,
+    }).errors.filter((e) => !/--record\b/.test(e))
+    return {
+      ok: false,
+      errors: [`--record <sha>: "${ref}" is not a commit sha (7–40 hex characters)`, ...rest],
+    }
+  }
   // THE RECEIPT IS COUNTED HERE WHERE IT CAN BE (four-eyes review, third round):
   // a typed `--accounting` line is a claim, and the recorder can turn it into a
   // measurement by reading the two lists and the union itself. Hand the files to
@@ -270,9 +299,16 @@ export function buildRecord({
  *  authoring model then read wrong, and the self-review refusal missed. With
  *  one format per call there is no separator to forge. */
 export function resolveCommit(sha) {
-  const full = git(`rev-parse "${String(sha).trim()}^{commit}"`)
-  const subject = git(`show -s --format=%s "${full}"`)
-  const trailers = git(`show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${full}"`)
+  // VALIDATED BEFORE GIT SEES IT (landing-round pass 4): the record command is
+  // only ever printed with a hex sha, so anything else is refused by shape —
+  // with the one message that names what this command wants.
+  const ref = String(sha).trim()
+  if (!/^[0-9a-f]{7,40}$/i.test(ref)) {
+    throw new Error(`--record <sha>: "${ref}" is not a commit sha (7–40 hex characters)`)
+  }
+  const full = git(['rev-parse', `${ref}^{commit}`])
+  const subject = git(['show', '-s', '--format=%s', full])
+  const trailers = git(['show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', full])
   return {
     sha: full,
     subject,
@@ -339,22 +375,39 @@ if (isMainModule(import.meta.url)) {
       if (!records.length) {
         console.log('no mechanism reviews recorded yet')
       }
+      // EVERY FREE-TEXT FIELD RENDERS AS ONE LINE (landing-round pass 4):
+      // readRecords validates only the sha, and a hand-edited row with a
+      // newline in any field forged arbitrary listing lines — the shape a
+      // reader greps and trusts. Control characters flatten to one space.
+      const oneLine = (v) => String(v ?? '').replace(/\s+/g, ' ')
+      // …and the pass CLAIM is validated before it is rendered: Number() turns
+      // any decorated or multi-line index into NaN, and a claim that is not a
+      // plausible k-of-n is printed as the malformed hand-edit it is.
+      const passLine = (p) => {
+        const index = Number(p?.index)
+        const total = Number(p?.total)
+        const files = (Array.isArray(p?.files) ? p.files : []).map((q) => quotePassFile(q)).join(', ')
+        const shaped = Number.isSafeInteger(index) && Number.isSafeInteger(total) && index >= 1 && index <= total
+        return shaped
+          ? `\n      pass ${index}/${total} over: ${files}`
+          : `\n      pass (MALFORMED claim ${oneLine(JSON.stringify({ index: p?.index, total: p?.total })).slice(0, 80)}) over: ${files}`
+      }
       for (const r of records) {
         console.log(
-          `${String(r.sha).slice(0, 7)}  ${String(r.verdict).padEnd(16)} by ${String(r.model).padEnd(12)} ` +
-            `(authored by ${r.authoredBy || 'unknown'})${r.point ? `  point ${r.point}` : ''}  ` +
+          `${String(r.sha).slice(0, 7)}  ${oneLine(r.verdict).padEnd(16)} by ${oneLine(r.model).padEnd(12)} ` +
+            `(authored by ${oneLine(r.authoredBy) || 'unknown'})${r.point ? `  point ${oneLine(r.point)}` : ''}  ` +
             // A row from before --mode existed has none; it reads as unrecorded,
             // never as one of the two modes.
-            `[${r.mode || 'mode not recorded'}]  ${r.atIso ?? ''}` +
-            `\n      ${r.evidence ?? ''}${r.framing ? `\n      framing: ${r.framing}` : ''}` +
-            `${r.mergedBy ? `\n      union merged by: ${r.mergedBy}${r.mergeFallback ? ` (two-model fallback: ${r.mergeFallback})` : ''}` : ''}` +
-            `${r.accounting ? `\n      accounting: ${r.accounting}` : ''}` +
+            `[${oneLine(r.mode) || 'mode not recorded'}]  ${oneLine(r.atIso ?? '')}` +
+            `\n      ${oneLine(r.evidence ?? '')}${r.framing ? `\n      framing: ${oneLine(r.framing)}` : ''}` +
+            `${r.mergedBy ? `\n      union merged by: ${oneLine(r.mergedBy)}${r.mergeFallback ? ` (two-model fallback: ${oneLine(r.mergeFallback)})` : ''}` : ''}` +
+            `${r.accounting ? `\n      accounting: ${oneLine(r.accounting)}` : ''}` +
             // Quoted like every structural path list (round-2 pass 3): a path
             // holding a newline or comma must not forge a line here either.
             // And GUARDED (final-round pass 4): readRecords validates only the
             // sha, so a hand-edited `pass.files` that is no array crashed the
             // whole listing.
-            `${r.pass ? `\n      pass ${r.pass.index}/${r.pass.total} over: ${(Array.isArray(r.pass.files) ? r.pass.files : []).map((p) => quotePassFile(p)).join(', ')}` : ''}`,
+            `${r.pass ? passLine(r.pass) : ''}`,
         )
       }
       process.exit(0)
