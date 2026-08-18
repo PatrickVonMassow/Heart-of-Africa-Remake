@@ -14,6 +14,7 @@ import {
   COMMISSION_HOOK_LINE,
   ambiguityNotice,
   gatherCommissionInputs,
+  hookInputNotice,
   commissionVerdict,
   parkBranch,
   unparkReopened,
@@ -71,6 +72,20 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
     expect(run.stderr).toContain('705, 712')
     expect(run.stderr).toContain('feat/705-a, feat/712-b')
     expect(ambiguityNotice(null)).toBe('')
+  })
+
+  it('reports unreadable hook stdin through the real process path', () => {
+    for (const input of ['', '{not json', 'null', '[]']) {
+      const run = spawnSync(process.execPath, [resolve(import.meta.dirname, 'commission-guard.mjs')], {
+        input,
+        encoding: 'utf8',
+      })
+      expect(run.status, input).toBe(0)
+      expect(run.stdout, input).toBe('')
+      expect(run.stderr, input).toContain('ALLOWING WITHOUT JUDGMENT')
+      expect(run.stderr, input).toContain('PreToolUse stdin')
+    }
+    expect(hookInputNotice()).toContain('internal guard failure')
   })
   it('refuses the real 17.08.2026 pick on BOTH counts and names each', () => {
     const g = gather(697, { branches: NINE })

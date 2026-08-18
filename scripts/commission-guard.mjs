@@ -286,6 +286,17 @@ export function ambiguityNotice(ambiguous) {
   )
 }
 
+/** Hook stdin is the evidence of what operation is about to run. If it cannot
+ * be decoded, allowing is still the guard's fail-open policy, but silence would
+ * misreport an internal failure as "nothing was commissioned". */
+export function hookInputNotice() {
+  return (
+    'commission-guard: ALLOWING WITHOUT JUDGMENT — PreToolUse stdin was empty, unreadable, or not valid JSON, ' +
+    `so the call could not be classified. This is an internal guard failure, not evidence that no work opens. ` +
+    `Check the hook wiring and run ${COMMISSION_STATUS_CMD}.`
+  )
+}
+
 /**
  * A PARKED BRANCH IS UNPARKED WHEN WORK IS ASSIGNED, not at its first commit
  * (fourth review, finding 6): between the assignment and the commit the branch
@@ -440,9 +451,13 @@ if (isMainModule(import.meta.url)) {
     try {
       payload = JSON.parse(readFileSync(0, 'utf8'))
     } catch {
-      process.exit(0) // no/non-JSON stdin (manual run) → nothing to guard
+      console.error(hookInputNotice())
+      process.exit(0)
     }
-    if (!payload) process.exit(0)
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      console.error(hookInputNotice())
+      process.exit(0)
+    }
     const input = payload.tool_input ?? {}
     const target = commissionTarget({
       toolName: payload.tool_name,
