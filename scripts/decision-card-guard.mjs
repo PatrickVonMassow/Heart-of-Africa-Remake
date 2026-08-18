@@ -31,7 +31,7 @@ import { isMainModule } from './is-main.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { readVdzkAnswers, writeVdzkAnswers } from './vdzk-answer.mjs'
 import { repoPath } from './repo-paths.mjs'
-import { LAUNCHER_RESUME_PROMPT_MARKER } from './batch-autostart-core.mjs'
+import { RESPONDER_PROMPT_HEAD } from './chat-watcher-core.mjs'
 
 const DASHBOARD =
   process.env.DECISION_CARD_DASHBOARD || repoPath('.batch-dashboard.html')
@@ -69,9 +69,49 @@ export const writeDecisionCardState = (state) => {
   }
 }
 
-/** The last real user prompt in Claude's JSONL transcript. Tool-result entries
- * and the OS launcher's synthetic `-p` prompt also carry type `user`; neither is
- * a decision-bearing message from the user, so both are skipped. */
+/** Extract the user-authored messages from the chat watcher's own prompt.
+ *
+ * The framing is deliberately discarded: only the JSON-quoted list entries may
+ * contribute terms to the decision-card review. Requiring the exact envelope
+ * head and its timestamped list makes this a positive channel marker, not an
+ * inference from whatever synthetic prompt shapes happen to be known today. */
+function responderUserText(text) {
+  if (!text.startsWith(RESPONDER_PROMPT_HEAD)) return null
+  const list = text.slice(RESPONDER_PROMPT_HEAD.length)
+  if (!list.startsWith(' ')) return null
+
+  const item = /- \[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)\] ("(?:\\.|[^"\\])*")(?= |$)/y
+  const messages = []
+  let cursor = 1
+  while (cursor < list.length) {
+    item.lastIndex = cursor
+    const match = item.exec(list)
+    if (!match) return null
+    let message
+    try {
+      message = JSON.parse(match[2])
+    } catch {
+      return null
+    }
+    if (typeof message !== 'string' || !message.trim()) return null
+    messages.push(message)
+    cursor = item.lastIndex
+    if (cursor < list.length) {
+      if (list[cursor] !== ' ') return null
+      cursor += 1
+    }
+  }
+  return messages.length ? messages.join('\n') : null
+}
+
+/** The last positively identified user message in Claude's JSONL transcript.
+ *
+ * There are exactly two accepted channels: a CLI entry marked
+ * `promptSource: "typed"`, and the chat watcher's own responder envelope. All
+ * other `type: "user"` entries are machine traffic and cannot arm a review.
+ * Older CLI versions that omit `promptSource` therefore cannot arm the typed
+ * channel; that conservative miss is preferable to assigning a duty from
+ * machine text. The independently marked chat channel remains available. */
 export function extractLastUserMessage(jsonl) {
   if (typeof jsonl !== 'string' || !jsonl.trim()) return null
   let last = null
@@ -85,21 +125,14 @@ export function extractLastUserMessage(jsonl) {
     }
     if (!entry || entry.type !== 'user' || entry.isSidechain) continue
     const content = entry.message?.content
-    let text = ''
-    if (typeof content === 'string') text = content
-    else if (Array.isArray(content) && !content.some((part) => part?.type === 'tool_result')) {
-      text = content
-        .filter((part) => part?.type === 'text')
-        .map((part) => String(part.text ?? ''))
-        .join('\n')
-    }
+    if (typeof content !== 'string' || !content.trim()) continue
     const id = entry.uuid || entry.message?.id
-    if (
-      typeof id === 'string' &&
-      id.trim() &&
-      text.trim() &&
-      !text.startsWith(LAUNCHER_RESUME_PROMPT_MARKER)
-    ) last = { id, text }
+    if (typeof id !== 'string' || !id.trim()) continue
+    if (entry.promptSource === 'typed') last = { id, text: content }
+    else {
+      const text = responderUserText(content)
+      if (text) last = { id, text }
+    }
   }
   return last
 }

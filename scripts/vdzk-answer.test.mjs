@@ -6,7 +6,6 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { ANSWER_DEADLINE_MS } from './decision-card-guard-core.mjs'
 import { extractLastUserMessage } from './decision-card-guard.mjs'
 import { boardHtml } from './dashboard-guard-fixtures.mjs'
-import { RESUME_PROMPT, chatPromptSuffix } from './batch-autostart-core.mjs'
 import { buildResponderPrompt } from './chat-watcher-core.mjs'
 
 const dir = mkdtempSync(join(tmpdir(), 'vdzk-answer-'))
@@ -51,33 +50,62 @@ function run(script, args) {
 }
 
 describe('the transcript user-message boundary', () => {
-  it('returns the last real prompt UUID and skips tool results and sidechains', () => {
+  const entry = (overrides) => JSON.stringify({
+    type: 'user',
+    uuid: 'message',
+    message: { content: 'Nachricht.' },
+    ...overrides,
+  })
+
+  it('arms only a string prompt positively marked as typed', () => {
+    expect(extractLastUserMessage(entry({ promptSource: 'typed' })))
+      .toEqual({ id: 'message', text: 'Nachricht.' })
+    expect(extractLastUserMessage(entry({
+      promptSource: 'typed',
+      message: { content: [{ type: 'text', text: 'Kein String.' }] },
+    }))).toBeNull()
+    expect(extractLastUserMessage(entry({
+      promptSource: 'typed',
+      isSidechain: true,
+    }))).toBeNull()
+  })
+
+  it.each([
+    ['SDK launcher or task notification', { promptSource: 'sdk' }],
+    ['SDK agent-to-agent message', { promptSource: 'sdk', isMeta: true }],
+    ['hook feedback', { isMeta: true, message: { content: 'Stop hook feedback: GitHub CI is RED.' } }],
+    ['command or compaction text', { message: { content: '<command-name>/clear</command-name>' } }],
+    ['tool result', { message: { content: [{ type: 'tool_result', content: 'done' }] } }],
+  ])('does not arm from %s', (_shape, overrides) => {
+    expect(extractLastUserMessage(entry(overrides))).toBeNull()
+  })
+
+  it('does not promote last-position Stop hook feedback into a user message', () => {
     const transcript = [
-      JSON.stringify({ type: 'user', uuid: 'first', message: { content: 'Erste Nachricht.' } }),
-      JSON.stringify({ type: 'user', uuid: 'tool', message: { content: [{ type: 'tool_result', content: 'done' }] } }),
-      JSON.stringify({ type: 'user', uuid: 'sub', isSidechain: true, message: { content: 'Subagent.' } }),
-      JSON.stringify({ type: 'user', uuid: 'last', message: { content: [{ type: 'text', text: 'Letzte Nachricht.' }] } }),
+      entry({ uuid: 'typed', promptSource: 'typed', message: { content: 'Echte Nachricht.' } }),
+      entry({ uuid: 'feedback', isMeta: true, message: { content: 'Stop hook feedback: GitHub CI is RED.' } }),
     ].join('\n')
-    expect(extractLastUserMessage(transcript)).toEqual({ id: 'last', text: 'Letzte Nachricht.' })
-    expect(extractLastUserMessage('broken\n')).toBeNull()
+    expect(extractLastUserMessage(transcript)).toEqual({ id: 'typed', text: 'Echte Nachricht.' })
+    expect(extractLastUserMessage(transcript.split('\n')[1])).toBeNull()
   })
 
-  it('rejects the OS launcher prompt, including a chat suffix', () => {
-    const launcherEntry = (text) => JSON.stringify({
-      type: 'user',
-      uuid: 'launcher',
-      message: { content: [{ type: 'text', text }] },
+  it('arms from the chat watcher marker but reviews only its quoted user messages', () => {
+    const prompt = buildResponderPrompt([
+      { id: 'chat-1', ts: 1, text: 'Kartenschrift bleibt.' },
+      { id: 'chat-2', ts: 2, text: 'Die Freigabe wartet.' },
+    ])
+    const transcript = entry({ uuid: 'watcher', promptSource: 'sdk', message: { content: prompt } })
+    expect(extractLastUserMessage(transcript)).toEqual({
+      id: 'watcher',
+      text: 'Kartenschrift bleibt.\nDie Freigabe wartet.',
     })
-    expect(extractLastUserMessage(launcherEntry(RESUME_PROMPT))).toBeNull()
-    expect(extractLastUserMessage(launcherEntry(RESUME_PROMPT + chatPromptSuffix([
-      { ts: 1, text: 'Kartenschrift bleibt.' },
-    ])))).toBeNull()
   })
 
-  it('keeps arming on the chat watcher responder prompt', () => {
-    const prompt = buildResponderPrompt([{ id: 'chat-1', ts: 1, text: 'Kartenschrift bleibt.' }])
-    const transcript = JSON.stringify({ type: 'user', uuid: 'watcher', message: { content: prompt } })
-    expect(extractLastUserMessage(transcript)).toEqual({ id: 'watcher', text: prompt })
+  it('fails open for malformed transcript lines and a malformed watcher list', () => {
+    expect(extractLastUserMessage('broken\n')).toBeNull()
+    expect(extractLastUserMessage(entry({ message: { content: buildResponderPrompt([
+      { id: 'chat-1', ts: 1, text: 'Kartenschrift bleibt.' },
+    ]) + ' fremder Nachsatz' } }))).toBeNull()
   })
 })
 
