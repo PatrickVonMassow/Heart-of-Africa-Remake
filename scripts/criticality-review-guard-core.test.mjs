@@ -171,6 +171,22 @@ describe('evaluateCriticalityReview', () => {
     expect(evaluateCriticalityReview({ baseline: 'b', ticks: [], records: [] }).block).toBe(false)
   })
 
+  it('treats a record OUTSIDE the millisecond timestamp domain as no review at all (round-6 pass 1)', () => {
+    // Removing ledgerAtUsable from the filter must redden this: at:null, at:1
+    // and a seconds-scale epoch each lose every later-than comparison, so a
+    // refusal dated that way could read as answered by an earlier merge.
+    for (const at of [null, undefined, 'unknown', 1, 1_787_027_296, 4_102_444_800_001]) {
+      const v = evaluateCriticalityReview({
+        baseline: 'b',
+        head: 'h',
+        ticks: [tick()],
+        records: [{ ...record({ verdict: 'merge' }), at }],
+      })
+      expect(v.block, `at=${String(at)}`).toBe(true)
+      expect(v.findings[0].kind).toBe('no-review')
+    }
+  })
+
   it('BLOCKS on a self-review — a green ledger is worse than an empty one', () => {
     const v = evaluateCriticalityReview({
       baseline: 'b',

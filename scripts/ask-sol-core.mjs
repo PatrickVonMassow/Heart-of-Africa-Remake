@@ -253,6 +253,12 @@ function parseEntries(clean, prefix, { allowEmpty = false } = {}) {
 export function parseAnswer({ kind = '', text = '' } = {}) {
   const k = normaliseKind(kind)
   if (!k) throw new Error(`ask-sol: not a kind: ${kind}`)
+  // Markdown DECORATION only, deliberately unbounded (round-6 pass 1 asked):
+  // this strips emphasis/heading/quote characters so the nets below read the
+  // words themselves. It can only ever UNSHIELD an admission ('*no* material'
+  // becomes 'no material'), never create or destroy one — the admission words
+  // contain none of these characters — and is unrelated to the FILENAME
+  // decoration strip in mechanism-review-core, which is bounded.
   const clean = String(text ?? '').replace(/[*`_#>]/g, '')
   if (!clean.trim()) return { ok: false, kind: k, answer: null, summary: '', error: 'the run produced no answer at all' }
   // The two-tier judgment, not the raw net: an audit or diagnose answer about

@@ -886,6 +886,25 @@ describe('evaluateMechanismReview', () => {
       expect(v.block).toBe(true)
     })
 
+    it('an UNPARSABLE pass claim poisons the shortcut too (round-6 pass 2)', () => {
+      // `pass: { total: 2, index: "x" }` was no pass row to the old shape test
+      // — it neither composed nor poisoned, and the sound pass-less sibling
+      // cleared the commit past it. A pass field that exists at all was written
+      // to claim a split; what cannot be validated blocks.
+      for (const pass of [{ total: 2, index: 'x' }, { total: 'x' }, {}, 'garbage']) {
+        const v = evaluateMechanismReview({
+          baseline: 'b',
+          head: 'h',
+          pendingCommits: [commit(covered)],
+          records: [
+            record({ pass, at: MERGE_ACCOUNTING_SINCE + 1500 }),
+            record({ at: MERGE_ACCOUNTING_SINCE + 9000 }),
+          ],
+        })
+        expect(v.block, JSON.stringify(pass)).toBe(true)
+      }
+    })
+
     it('does not let malformed rows pose as a complete composition', () => {
       const v = evaluateMechanismReview({
         baseline: 'b',

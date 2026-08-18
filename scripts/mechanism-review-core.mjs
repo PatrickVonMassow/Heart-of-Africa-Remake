@@ -1117,8 +1117,13 @@ export function evaluateMechanismReview({
     // measurement contradicts (it can only arrive by hand), and it does not
     // stand alone; the way out is the honest one — complete the passes, or
     // supersede at a head whose range was never measured as oversized.
-    const passRow = (r) =>
-      Number.isInteger(Number(r?.pass?.total)) && Number(r?.pass?.total) >= 2 && Number.isInteger(Number(r?.pass?.index))
+    // ANY PRESENT PASS CLAIM IS SPLIT EVIDENCE, however malformed (round-6
+    // pass 2): the old shape test asked for a parseable total AND index, so a
+    // hand-made row with `pass: { total: 2, index: "x" }` was no pass row at
+    // all — it neither composed nor poisoned, and a sound pass-less sibling
+    // could clear the commit past it. A `pass` field that exists at all can
+    // only have been written to claim a split; what cannot be validated blocks.
+    const passRow = (r) => r?.pass !== undefined && r?.pass !== null
     // THE SPLIT IS READ OFF EVERY RECORD AT EVERY COVERING SHA, sound or not
     // (fourth cross-vendor round, widened by the fifth): a pass row excluded as
     // a self-review or a broken merge still WITNESSES that the offering tool

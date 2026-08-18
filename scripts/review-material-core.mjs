@@ -20,6 +20,7 @@
 // answers about the wrong thing in both directions.
 //
 import { createHash } from 'node:crypto'
+import { inflateSync } from 'node:zlib'
 
 // SPLITTING BY COMMIT DOES NOT HELP, which is why planPasses cuts through the
 // FILE SET (measured 18.08.2026 over 41 commits): the material ships the CURRENT
@@ -211,26 +212,61 @@ export function binarySectionDeliversChange(text) {
     //    pass 5): its leading letter encodes 1..52 decoded bytes, and the data
     //    must be exactly the ceil(bytes/4)*5 characters that length demands —
     //    "any non-empty text" blessed payloads real git would never write.
-    const length = lines[at + 1] ?? ''
-    return /^literal \d+$/.test(length) && isBase85PayloadLine(lines[at + 2] ?? '')
+    return literalStreamDelivers(lines, at)
   }
   return !lines.some((line) => /^Binary files .* differ$/.test(line))
 }
 
-/** One line of git's base85 binary-patch payload, validated against its own
- *  declared length (see base85.c: length letter A..Z = 1..26, a..z = 27..52,
- *  then 5 encoded characters per 4 decoded bytes). */
-function isBase85PayloadLine(line) {
+/** git's own base85 alphabet, in decode order (base85.c). */
+const B85_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~'
+const B85_VALUE = new Map([...B85_ALPHABET].map((ch, i) => [ch, i]))
+
+/** Decode ONE payload line (length letter A..Z = 1..26, a..z = 27..52, then 5
+ *  encoded characters per 4 decoded bytes) — null on any malformation. */
+function decodeBase85Line(line) {
   const s = String(line ?? '')
-  if (!s) return false
   const c = s.charCodeAt(0)
   let bytes = 0
   if (c >= 65 && c <= 90) bytes = c - 64
   else if (c >= 97 && c <= 122) bytes = c - 70
-  else return false
+  else return null
   const data = s.slice(1)
-  if (data.length !== Math.ceil(bytes / 4) * 5) return false
-  return /^[0-9A-Za-z!#$%&()*+;<=>?@^_`{|}~-]+$/.test(data)
+  if (data.length !== Math.ceil(bytes / 4) * 5) return null
+  const out = Buffer.alloc(Math.ceil(bytes / 4) * 4)
+  for (let g = 0; g < data.length / 5; g++) {
+    let acc = 0
+    for (let k = 0; k < 5; k++) {
+      const v = B85_VALUE.get(data[g * 5 + k])
+      if (v === undefined) return null
+      acc = acc * 85 + v
+    }
+    if (acc > 0xffffffff) return null
+    out.writeUInt32BE(acc, g * 4)
+  }
+  return out.subarray(0, bytes)
+}
+
+/** THE WHOLE STREAM, NOT ITS FIRST LINE (round-6 pass 5): a first line alone
+ *  accepted `literal 1000` over six characters — a fabricated or truncated
+ *  literal recorded as delivered bytes. Delivered means: every payload line
+ *  decodes, the concatenation INFLATES, and the inflated length IS the
+ *  declared one. */
+function literalStreamDelivers(lines, at) {
+  const m = /^literal (\d+)$/.exec(lines[at + 1] ?? '')
+  if (!m) return false
+  const declared = Number(m[1])
+  const chunks = []
+  for (let i = at + 2; i < lines.length && lines[i] !== ''; i++) {
+    const decoded = decodeBase85Line(lines[i])
+    if (!decoded) return false
+    chunks.push(decoded)
+  }
+  if (!chunks.length) return false
+  try {
+    return inflateSync(Buffer.concat(chunks)).length === declared
+  } catch {
+    return false
+  }
 }
 
 /**

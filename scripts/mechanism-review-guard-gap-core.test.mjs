@@ -308,6 +308,28 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     expect(d.detail).toContain('could not load')
   })
 
+  it('issues its git calls as EXACT argument arrays — no shell, nothing reordered (round-6 pass 3)', async () => {
+    const seen = []
+    const recordingRun = (args) => {
+      seen.push(args)
+      return bigRun(args)
+    }
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: recordingRun,
+      loadTool: () => Promise.reject(absent),
+    })
+    const range = `${'a'.repeat(40)}..${'b'.repeat(40)}`
+    expect(seen).toEqual([
+      ['diff', '--stat', range],
+      ['diff', '--no-ext-diff', '--no-textconv', range],
+      ['diff', '--name-only', '-z', range],
+      ['show', `${'b'.repeat(40)}:big.md`],
+    ])
+  })
+
   it('a covering split from the real planner shape keeps the demand standing', async () => {
     const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
     const d = await assessReviewGap({
