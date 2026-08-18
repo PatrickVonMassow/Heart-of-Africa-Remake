@@ -492,6 +492,16 @@ describe('strictAncestorProbe', () => {
     expect(asked).toEqual([[B, C]])
   })
 
+  it('FALLS BACK for a wanted sha the listing never reached — round 2 of the same review', () => {
+    // An incomplete listing: the rows stop before A, so A is in no set although
+    // real history has it under D. Answering "no" from a listing that simply does
+    // not go back that far is the same false NO in the other argument.
+    const [fallback, asked] = spying()
+    const partial = [`${C} ${B}`, `${B} ${A}`].join('\n')
+    expect(strictAncestorProbe(ancestorIndex(partial, [A, C]), fallback)(A, C)).toBe(true)
+    expect(asked).toEqual([[A, C]])
+  })
+
   it('falls back for a commit outside the graph, where the index says nothing', () => {
     const [fallback, asked] = spying()
     expect(strictAncestorProbe(ancestorIndex(line, [A]), fallback)(A, M)).toBe(true)

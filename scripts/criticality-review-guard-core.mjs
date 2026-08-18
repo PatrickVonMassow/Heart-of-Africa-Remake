@@ -193,19 +193,23 @@ export function ancestorIndex(revListParents = '', wanted = []) {
  * The strict-ancestor question, answered from an index where the index can and by
  * `fallback` where it cannot.
  *
- * THE CONDITION IS WANTEDNESS, NOT REACHABILITY (found by the cross-vendor review
- * of the change above, 18.08.2026). The index holds only the wanted shas, so for a
- * commit that IS in the graph but was never asked about, the set is silently empty
- * and "not in it" would read as "not an ancestor" — a false NO, which on this gate
- * clears what should block. Every call site today passes exactly the ledger shas as
- * wanted, so nothing was mis-answered; the contract was wrong all the same, and a
- * contract is what the next caller reads.
+ * THE INDEX MAY ANSWER ONLY WHERE IT KNOWS BOTH ENDS, and both halves of that were
+ * found by the cross-vendor review of this change (18.08.2026, two rounds):
+ *   - `a` must be WANTED. The index holds only the wanted shas, so for a commit
+ *     that is in the graph but was never asked about, the set is silently empty
+ *     and "not in it" would read as "not an ancestor".
+ *   - `a` must be IN the graph. A listing that does not reach back to `a` — a
+ *     truncated or partial one — leaves it out of every set, with the same effect.
+ *   - `b` must be in the graph, or there is no set to read at all.
+ * Each miss is a false NO, and on this gate a false NO CLEARS what must block. So
+ * anything the index does not fully know goes to `fallback`, which asks git.
  */
 export function strictAncestorProbe(index, fallback) {
   return (a, b) => {
     if (!a || !b || a === b) return false
     const ancestors = index?.ancestorsOf?.(b)
-    if (!ancestors || !index.wanted?.has(String(a))) return fallback(a, b)
+    const known = index?.wanted?.has(String(a)) && index?.reachable?.has(String(a))
+    if (!ancestors || !known) return fallback(a, b)
     return ancestors.has(String(a))
   }
 }
