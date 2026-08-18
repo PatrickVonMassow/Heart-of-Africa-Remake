@@ -183,12 +183,15 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
     // suppression the answered-refusal ordering exists to prevent. The
     // recorder never writes such a row, so it can only have arrived by hand,
     // and a hand-edited ledger earns a refusal, never a clearance; the way
-    // out is fixing or removing the row, on the record.
+    // out is fixing or removing the row, on the record. EVERY well-formedness
+    // criterion poisons, not only the timestamp (landing-round pass 1): a
+    // refusal with a valid `at` but a missing `model` fell out of wellFormed
+    // AND out of this net, and vanished the same way.
     const malformedRefusals = reachable.filter(
       (r) =>
         VERDICTS.includes(String(r.verdict)) &&
         String(r.verdict) !== CLEARING_VERDICT &&
-        !ledgerAtUsable(r?.at),
+        !(String(r.model ?? '').trim() && ledgerAtUsable(r?.at)),
     )
     if (malformedRefusals.length) {
       findings.push({ kind: 'malformed-record', tick, records: malformedRefusals })
@@ -249,10 +252,10 @@ export function formatCriticalityReviewVerdict(verdict) {
     } else if (f.kind === 'malformed-record') {
       lines.push(
         head,
-        `      a recorded ${r.verdict} on ${short(r.sha)} carries a timestamp outside the ledger's ` +
-          'millisecond domain — the recorder never writes that, so the row can only have arrived by',
-        '      hand, and it cannot be ORDERED against the reviews around it. It refuses rather than',
-        '      vanishes: fix or remove the row, on the record.',
+        `      a recorded ${r.verdict} on ${short(r.sha)} is malformed — a timestamp outside the ` +
+          "ledger's millisecond domain (it then cannot be ORDERED against the reviews around it)",
+        '      or a missing model. The recorder never writes such a row, so it can only have',
+        '      arrived by hand. It refuses rather than vanishes: fix or remove the row, on the record.',
       )
     } else if (f.kind === 'not-in-history') {
       lines.push(

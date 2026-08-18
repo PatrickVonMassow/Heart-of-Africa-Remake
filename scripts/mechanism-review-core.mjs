@@ -695,6 +695,11 @@ const BLIND_FIRST_PERSON = new RegExp(
     // "I could not read/see/access …", "we were unable to inspect …"
     /\b(?:i|we)\s+(?:could\s+not|couldn't|can(?:no|')t|(?:was|were)\s+(?:unable|not\s+able)\s+to|did\s+not\s+(?:get|receive|have))\b[^.\n]{0,80}\b(?:read|see|inspect|access|reach|open|review|view|retrieve|fetch|verify|validate|confirm|check|examine|evaluate|assess)\b/
       .source,
+    // "I did not receive the patch" — a first-person no-review admission whose
+    // OBJECT is the material itself, with no second inspection verb to anchor
+    // on (landing-round pass 2): what was never received was never reviewed.
+    /\b(?:i|we)\s+(?:did\s+not|didn't|never|do\s+not|don't|have\s+not|haven't)\s+(?:get|got|receive[d]?|have|had|obtain(?:ed)?)\b[^.\n]{0,80}\b(?:patch(?:es)?|diff(?:s)?|material|files?|content|repository|repo|change(?:s)?|input|access)\b/
+      .source,
     // "none of my commands reached …"
     /\bnone\s+of\s+(?:my|our)\s+commands\b/.source,
   ].join('|'),
@@ -1018,19 +1023,6 @@ export function evaluateMechanismReview({
 
   for (const commit of pendingCommits ?? []) {
     const covering = [...new Set(commit?.coveringRecordShas ?? [])].flatMap((s) => bySha.get(String(s)) ?? [])
-    // A MALFORMED REFUSAL POISONS, IT DOES NOT VANISH (final-round pass 1,
-    // applied to both gates): a covering do-not-merge whose timestamp fails
-    // the millisecond domain fell out of wellFormed below, and the remaining
-    // sound rows — an older merge among them — cleared the commit past a
-    // refusal somebody recorded. The recorder never writes such a row; it can
-    // only have arrived by hand, and it refuses until fixed or removed.
-    const malformedRefusals = covering.filter(
-      (r) => String(r?.verdict) === BLOCKING_VERDICT && !ledgerAtUsable(r?.at),
-    )
-    if (malformedRefusals.length) {
-      findings.push({ kind: 'malformed-record', commit, records: malformedRefusals })
-      continue
-    }
     // A record is only a review if it says who reviewed, how it ended AND what
     // was actually checked; a half-written line must not clear the gate. THE
     // GATE REVALIDATES THE ROW ITSELF, by the recorder's own rules (escalation
@@ -1057,19 +1049,36 @@ export function evaluateMechanismReview({
       const at = Number(r?.at)
       return Number.isFinite(at) && at > 0 && at < MODE_REQUIRED_SINCE
     }
-    const wellFormed = covering.filter(
-      (r) =>
-        VERDICTS.includes(String(r.verdict)) &&
-        String(r.model ?? '').trim() &&
-        // A NON-NUMERIC TIMESTAMP DEFEATS THE ORDERING (round-3 pass 1,
-        // tightened twice: Number(null) is 0, and a positive-but-seconds-scale
-        // value still loses every comparison against real rows — round-5
-        // pass 1). The recorder writes `at` as a millisecond epoch, and only
-        // that DOMAIN may stand.
-        ledgerAtUsable(r?.at) &&
-        evidenceUsable(r) &&
-        modeUsable(r),
+    const rowWellFormed = (r) =>
+      VERDICTS.includes(String(r.verdict)) &&
+      String(r.model ?? '').trim() &&
+      // A NON-NUMERIC TIMESTAMP DEFEATS THE ORDERING (round-3 pass 1,
+      // tightened twice: Number(null) is 0, and a positive-but-seconds-scale
+      // value still loses every comparison against real rows — round-5
+      // pass 1). The recorder writes `at` as a millisecond epoch, and only
+      // that DOMAIN may stand.
+      ledgerAtUsable(r?.at) &&
+      evidenceUsable(r) &&
+      modeUsable(r)
+    const wellFormed = covering.filter(rowWellFormed)
+    // A MALFORMED REFUSAL POISONS, IT DOES NOT VANISH (final-round pass 1,
+    // applied to both gates): a covering do-not-merge whose timestamp fails
+    // the millisecond domain fell out of wellFormed, and the remaining sound
+    // rows — an older merge among them — cleared the commit past a refusal
+    // somebody recorded. EVERY well-formedness criterion poisons, not only
+    // the timestamp (landing-round pass 2): a refusal with a valid `at` but a
+    // `mode: "bogus"`, a missing model or unusable evidence fell out of
+    // `sound` the same way, composed nothing, poisoned nothing — and an older
+    // complete merge composition cleared past it. The recorder never writes
+    // such a row; it can only have arrived by hand, and a hand-edited ledger
+    // earns a refusal, never a clearance — it refuses until fixed or removed.
+    const malformedRefusals = covering.filter(
+      (r) => String(r?.verdict) === BLOCKING_VERDICT && !rowWellFormed(r),
     )
+    if (malformedRefusals.length) {
+      findings.push({ kind: 'malformed-record', commit, records: malformedRefusals })
+      continue
+    }
     // A SELF-MERGE IS AS EMPTY AS A SELF-REVIEW, and the ledger is a tracked file
     // anyone can hand-edit (four-eyes review of point 634): the recorder refuses
     // a blind-parallel row whose merger wrote one of the lists or whose union was
@@ -1239,10 +1248,11 @@ export function formatMechanismReviewVerdict(verdict) {
       lines.push(
         `  ✗ ${short(c.sha)} ${c.subject ?? ''}`,
         `      ${files}`,
-        `      a recorded do-not-merge on ${short(r.sha)} carries a timestamp outside the ledger's`,
-        '      millisecond domain — the recorder never writes that, so the row can only have arrived',
-        '      by hand, and it cannot be ORDERED against the reviews around it. It refuses rather',
-        '      than vanishes: fix or remove the row, on the record.',
+        `      a recorded do-not-merge on ${short(r.sha)} is malformed — a timestamp outside the`,
+        "      ledger's millisecond domain (it then cannot be ORDERED against the reviews around",
+        '      it), a missing model, unusable evidence or an unknown mode. The recorder never',
+        '      writes such a row, so it can only have arrived by hand. It refuses rather than',
+        '      vanishes: fix or remove the row, on the record.',
       )
       continue
     }

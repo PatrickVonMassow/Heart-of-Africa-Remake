@@ -206,6 +206,10 @@ describe('parseVerdict — only a real verdict is a verdict', () => {
       'I could not read the diff, so no line-level review actually ran',
       'None of my commands reached the repository, so nothing was verified',
       'We were unable to access the files under review',
+      // No second inspection verb after the receive verb (landing-round pass
+      // 2): what was never received was never reviewed.
+      'I did not receive the patch',
+      'We never got the material for this range',
     ]) {
       expect(parseVerdict(`VERDICT: do-not-merge\nEVIDENCE: ${evidence}`)).toMatchObject({ ok: false })
       expect(parseVerdict(`VERDICT: merge\nEVIDENCE: ${evidence}`)).toMatchObject({ ok: false })

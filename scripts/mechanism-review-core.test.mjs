@@ -1601,6 +1601,58 @@ describe('the mode is required to WRITE a record, never to READ one', () => {
     }
   })
 
+  it('an unsound REFUSAL cannot vanish behind an older complete composition (landing round)', () => {
+    // The suppression path pass 2 named: a newer hand-edited do-not-merge pass
+    // row with a valid timestamp but a mode the recorder refuses fell out of
+    // `sound`, composed no incomplete composition and poisoned nothing — and
+    // the older complete merge composition cleared the commit past it. Every
+    // well-formedness criterion now poisons a refusal, mode included.
+    const base = {
+      sha: 'c'.repeat(40),
+      model: 'GPT-5.6 Sol',
+      authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+      evidence: 'checked the guard change against its spec end to end',
+      rangeFiles: ['scripts/demo-guard.mjs', 'scripts/other.mjs'],
+    }
+    for (const bad of [
+      { mode: 'bogus' },
+      { model: '' },
+      { evidence: 'no' },
+    ]) {
+      const v = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+        records: [
+          {
+            ...base,
+            mode: 'review',
+            verdict: 'merge',
+            at: MERGE_ACCOUNTING_SINCE + 5000,
+            pass: { index: 1, total: 2, files: ['scripts/demo-guard.mjs'] },
+          },
+          {
+            ...base,
+            mode: 'review',
+            verdict: 'merge',
+            at: MERGE_ACCOUNTING_SINCE + 6000,
+            pass: { index: 2, total: 2, files: ['scripts/other.mjs'] },
+          },
+          {
+            ...base,
+            mode: 'review',
+            verdict: 'do-not-merge',
+            at: MERGE_ACCOUNTING_SINCE + 9000,
+            pass: { index: 1, total: 2, files: ['scripts/demo-guard.mjs'] },
+            ...bad,
+          },
+        ],
+      })
+      expect(v.block, JSON.stringify(bad)).toBe(true)
+      expect(v.findings[0].kind, JSON.stringify(bad)).toBe('malformed-record')
+    }
+  })
+
   it('a non-finite timestamp cannot out-stand a later do-not-merge (round-3 pass 1)', () => {
     // Every "latest verdict" reduction compares Number(at), and NaN loses
     // every comparison — a hand-made merge row with at:"unknown" stayed

@@ -225,6 +225,17 @@ describe('parseAuthoringAnswer', () => {
     ).toBe(false)
   })
 
+  it('refuses an OPEN placeholder too — a clean-looking run with an unanswered field (landing round)', () => {
+    // The check covered only DONE and GATES: real DONE, green GATES and
+    // `OPEN: **<what you left undone>**` parsed clean.
+    expect(
+      parseAuthoringAnswer('DONE: built\nGATES: test:unit, build and lint all green\nOPEN: <what you left undone>').ok,
+    ).toBe(false)
+    expect(
+      parseAuthoringAnswer('DONE: built\nGATES: test:unit, build and lint all green\nOPEN: **<what you left undone>**').ok,
+    ).toBe(false)
+  })
+
   it('quotes DONE/GATES/OPEN from the raw lines byte-for-byte', () => {
     // A token the stripper would mangle must reach the caller unrewritten.
     const parsed = parseAuthoringAnswer(

@@ -204,6 +204,26 @@ describe('evaluateCriticalityReview', () => {
     expect(formatCriticalityReviewVerdict(v)).toContain('cannot be ORDERED')
   })
 
+  it('a missing-model REFUSAL poisons the same way — no criterion lets it vanish (landing round)', () => {
+    // The residual of the timestamp fix: a do-not-merge with a valid `at` but
+    // no model fell out of wellFormed AND out of the poison net, and the older
+    // valid merge cleared the point past it.
+    for (const model of ['', '   ', null, undefined]) {
+      const v = evaluateCriticalityReview({
+        baseline: 'b',
+        head: 'h',
+        ticks: [tick()],
+        records: [
+          record({ verdict: 'merge', at: 1_787_000_002_000 }),
+          record({ verdict: 'do-not-merge', model, at: 1_787_000_001_000 }),
+        ],
+      })
+      expect(v.block, `model=${String(model)}`).toBe(true)
+      expect(v.findings[0].kind).toBe('malformed-record')
+      expect(formatCriticalityReviewVerdict(v)).toContain('missing model')
+    }
+  })
+
   it('BLOCKS on a self-review — a green ledger is worse than an empty one', () => {
     const v = evaluateCriticalityReview({
       baseline: 'b',

@@ -351,7 +351,10 @@ export function parseAuthoringAnswer(text) {
   if (!doneClean || !gatesClean || !openClean) {
     return { ok: false, error: 'the message does not end in the DONE/GATES/OPEN lines' }
   }
-  if (/^</.test(doneClean) || /^</.test(gatesClean)) {
+  // ALL THREE fields, OPEN included (final-round pass 1): the check covered
+  // only DONE and GATES, so `OPEN: **<what you left undone>**` parsed clean and
+  // judgeAuthoring reported a clean run over an unanswered required field.
+  if (/^</.test(doneClean) || /^</.test(gatesClean) || /^</.test(openClean)) {
     return { ok: false, error: 'the closing lines are the placeholders echoed back' }
   }
   return {
