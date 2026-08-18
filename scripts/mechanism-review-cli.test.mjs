@@ -465,6 +465,17 @@ describe('the mode round-trips into the ledger', () => {
       spawnSync('git', ['rev-parse', rev], { cwd: process.cwd(), encoding: 'utf8', windowsHide: true }).stdout.trim()
     const head = sha('HEAD')
     const parent = sha('HEAD~1')
+    // A SHALLOW CHECKOUT HAS NO PARENT, and this check is about git history, not
+    // about the machine it runs on (measured 18.08.2026): `actions/checkout`
+    // clones at depth 1 unless told otherwise, so `HEAD~1` resolved to '' in CI
+    // and every carry failed to verify — a RED that says nothing about
+    // `verifyCarried`. The workflow now checks out depth 2 so this really runs
+    // there; where the history is genuinely absent the check says so and stands
+    // down, per the house rule: fail-soft on the environment, loud on the product.
+    if (!parent) {
+      console.warn('SKIPPED: no HEAD~1 in this checkout (shallow clone) — verifyCarried needs two commits')
+      return
+    }
     const changedSet = spawnSync('git', ['diff', '--name-only', 'HEAD~1..HEAD'], {
       cwd: process.cwd(),
       encoding: 'utf8',
