@@ -2846,6 +2846,26 @@ Build order, chosen so no two parallel agents own the same file:
   wait on its worktree at that moment and it changed nothing. Clause 2 below is
   therefore about the DEAD door specifically: its corroboration must sit on the
   pid-identity verdict itself, not only on the lease path 556 hardened.
+  A FOURTH TIME, AND THE STAND-DOWN HALF FAILED TOO (18.08.2026, 02:27:02Z): the
+  launcher spawned session 2f6ba837 against the LIVE owner 967c5fb6 (pid 4186031,
+  started 02:03:54Z, 23 minutes of age — the drift curve reaches the fixed
+  tolerance sooner than the half hour this point is named for). What is NEW is what
+  followed: the dispossessed owner did NOT stand down. Its authoring agent pushed
+  b7bd085e to `feat/714-review-material-budget` at 02:33:17Z, six minutes after the
+  successor had taken the lock, and the owner's process was still alive at
+  02:36:41Z. In the 05.08 and 08.08 occurrences the stand-down contained the damage
+  to one duplicated session; here both sessions worked the SAME branch.
+  THE COST IS A LOST REVIEW ROUND, which is the expensive kind: the successor was
+  running the four-pass cross-vendor round of point 714 against the head it had
+  frozen (fb983984), and the foreign commit moved that head mid-round — the SECOND
+  consecutive round on that point to be taken against a head that walked underneath
+  it, and precisely the defect point 714 exists to mechanise. `batch-doctor.mjs
+  --gate` reported `ownerAlive=true` and `consistent` throughout, so the doctor does
+  not see this shape as damage.
+  Clause 2's corroboration must therefore be joined by a clause 4: a takeover that
+  turns out to have dispossessed a LIVE owner is detected AFTERWARDS as well —
+  a second session's commit or push onto a branch the current owner has declared
+  in flight is an alarm, not a routine event.
   The drift-free handle of clause 1 has a concrete candidate on this host: identity
   as (`/proc/sys/kernel/random/boot_id`, `starttime` jiffies from `/proc/<pid>/stat`)
   — both boot-domain, so the wall clock never enters the comparison. Measured while
