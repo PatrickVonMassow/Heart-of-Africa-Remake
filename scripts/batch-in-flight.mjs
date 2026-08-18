@@ -536,8 +536,16 @@ export function runningBranchFiles(evidence = [], { cwd = REPO_ROOT } = {}) {
  * pure (`slotReasonDecision`); this gathers the four facts. Anything unreadable ends
  * as "no demand" — the lower bound on the pool is worth a nudge, never a wedge.
  */
-export function gatherSlots(declaration, { cwd = REPO_ROOT, tasksPath = TASKS_PATH } = {}) {
+export function gatherSlots(
+  declaration,
+  { cwd = REPO_ROOT, tasksPath = TASKS_PATH, recordProbe = readCommissionRecord } = {},
+) {
   try {
+    const record = recordProbe()
+    // The parks are occupancy input. A torn record is not an empty set of
+    // parks; carry the unreadable state into the same pure decision that carries
+    // an unreadable branch census, so the status report and refusal path agree.
+    if (record?.torn === true) return slotReasonDecision({ recordReadable: false })
     const evidence = Array.isArray(declaration?.evidence) ? declaration.evidence : []
     const running = runningBranchFiles(evidence, { cwd })
     // No readable running-file set means the overlap question cannot be answered, and
@@ -557,9 +565,10 @@ export function gatherSlots(declaration, { cwd = REPO_ROOT, tasksPath = TASKS_PA
       agents: declaredAgentCount(evidence),
       openBranches: openBranchSlots({
         branches: branchProbe.branches,
-        parked: readCommissionRecord().parked,
+        parked: record.parked,
       }).count,
       branchesReadable: branchProbe.readable,
+      recordReadable: record?.torn !== true,
       openPoints: openPointSpecs(readTasksOpen(tasksPath)),
       runningFiles: running,
       reason: declaration?.slotsFree ?? '',

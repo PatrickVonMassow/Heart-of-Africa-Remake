@@ -84,6 +84,7 @@ import {
   processCommandOf,
   runRecordFor,
   gatherInFlight,
+  gatherSlots,
   openFeatBranches,
   maxAgeMs,
   readDeclaration,
@@ -3088,6 +3089,22 @@ describe('slotReasonDecision — the target half counts the same occupancy as th
     expect(
       slotReasonDecision({ branchesReadable: false, paused: true, openPoints: independent, runningFiles: running }).why,
     ).toBe('paused')
+  })
+
+  it('carries a torn commission record into the pure slot decision and report', () => {
+    expect(
+      slotReasonDecision({
+        agents: 1,
+        openBranches: 3,
+        recordReadable: false,
+        openPoints: independent,
+        runningFiles: running,
+      }),
+    ).toMatchObject({ needsReason: false, why: 'record-unreadable' })
+    expect(gatherSlots({}, { recordProbe: () => ({ overrides: {}, parked: {}, torn: true }) })).toMatchObject({
+      needsReason: false,
+      why: 'record-unreadable',
+    })
   })
 
   it('ignores a nonsensical branch count rather than inventing occupancy', () => {

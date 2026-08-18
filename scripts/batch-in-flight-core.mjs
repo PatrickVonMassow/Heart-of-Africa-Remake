@@ -1006,6 +1006,7 @@ export function slotReasonDecision({
   agents = 0,
   openBranches = 0,
   branchesReadable = true,
+  recordReadable = true,
   openPoints = [],
   runningFiles = [],
   reason = '',
@@ -1049,6 +1050,7 @@ export function slotReasonDecision({
   // questioned the branch count is 0 for want of an answer, not because no
   // branch stands, and demanding work on that is the fail-CLOSED direction.
   if (branchesReadable !== true) return no('branches-unreadable')
+  if (recordReadable !== true) return no('record-unreadable')
   if (branches >= limit) return no('at-cap')
   if (declared >= limit) return no('agents-at-cap')
   if (candidates.length === 0) {
