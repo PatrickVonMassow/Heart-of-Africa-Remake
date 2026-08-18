@@ -59,29 +59,10 @@ const PAUSE = repoPath('.claude/batch-paused')
  *  while the ledger that must travel — the reviews — is the tracked one. */
 export const BASELINE_PATH = repoPath('.claude/mechanism-review-baseline.json')
 
-/** Record/field sentinels for the one `git log` this guard runs. The COMMAND
- *  LINE stays plain ASCII (git's %x1e/%x1f escapes expand server-side — a raw
- *  control byte in the command is a Windows shell hazard, and this hook runs
- *  on Windows). REC marks the START of a header LINE and is matched by the
- *  full header shape below — never split on, so a partial match can still not
- *  cut a commit's record in half (cross-vendor review, third round). */
-// CONTROL CHARACTERS, NOT PRINTABLE MARKERS (round-4 pass 3): a printable
-// sentinel is a legal path substring, so a root file literally NAMED
-// `__C__<sha>__F__<epoch>` forged a record boundary and attributed the paths
-// after it to a sha of the forger's choosing. With `core.quotepath=on` a real
-// path holding 0x1E/0x1F is printed QUOTED (octal escapes inside quotes), so a
-// RAW separator byte can only ever come from the --format string itself — the
-// boundary is unforgeable by file name. Spelled via fromCharCode so this
-// source file stays free of raw control bytes.
-
-/** A header line, whole: sentinel, 40-hex sha, epoch — and NOTHING FREE-TEXT
- *  (escalation round, pass 2). The header used to carry the subject and the
- *  trailers behind two more separators, and a legal SUBJECT containing the
- *  separator shifted the real trailer field out of the destructuring — the
- *  authoring model then read as empty or attacker-chosen, and the self-review
- *  refusal could not bite. Machine-shaped fields cannot contain the separator;
- *  the free-text facts travel per commit through their own single-format git
- *  calls (see commitFacts), where there is no separator to forge. */
+// The record/field sentinels and the header shape of the one `git log` this
+// guard runs now live with the parser that owns them, in
+// mechanism-review-range-core.mjs — including WHY they are raw control bytes
+// and why the header carries no free text. This file only consumes them.
 
 const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 

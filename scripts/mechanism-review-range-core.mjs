@@ -13,10 +13,30 @@ const uniq = (xs) => [
 ]
 const keyFor = (sha, file) => `${String(sha)}\0${String(file)}`
 
+// CONTROL CHARACTERS, NOT PRINTABLE MARKERS (round-4 pass 3, and the reason
+// this parser must keep them): a printable sentinel is a legal path substring,
+// so a root file literally NAMED `__C__<sha>__F__<epoch>` forged a record
+// boundary and attributed the paths after it to a sha of the forger's choosing.
+// With `core.quotepath=on` a real path holding 0x1E/0x1F is printed QUOTED
+// (octal escapes inside quotes), so a RAW separator byte can only ever come
+// from the --format string itself — the boundary is unforgeable by file name.
+// Spelled via fromCharCode so this source file stays free of raw control bytes.
 const RANGE_RECORD = String.fromCharCode(0x1e)
 const RANGE_FIELD = String.fromCharCode(0x1f)
+// A header line, WHOLE: sentinel, 40-hex sha, epoch — and nothing free-text
+// (escalation round, pass 2). The header used to carry the subject and the
+// trailers behind two more separators, and a legal SUBJECT containing the
+// separator shifted the real trailer field out of the destructuring — the
+// authoring model then read as empty or attacker-chosen, and the self-review
+// refusal could not bite. Machine-shaped fields cannot contain the separator;
+// the free-text facts travel per commit through their own single-format git
+// calls, where there is no separator to forge.
 const RANGE_HEADER = new RegExp(`^${RANGE_RECORD}([0-9a-f]{40})${RANGE_FIELD}(\\d+)$`)
 
+// %x1e/%x1f are expanded by GIT, so the arguments stay ASCII and the separators
+// reach the output as raw control bytes no quoted path can carry (round-4
+// pass 3). AS AN ARGS ARRAY, never a shell line (round-5 pass 3): cmd.exe
+// expands %-spans as environment variables before git runs.
 export const mechanismLogCommand = (base, head) => [
   '-c',
   'core.quotepath=on',
