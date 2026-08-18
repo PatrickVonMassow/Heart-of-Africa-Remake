@@ -339,11 +339,22 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
   // that are held: the guard says which state it is in, and this repository's
   // own settings are asserted to be the armed one.
   it('says whether it is ARMED or DORMANT, out of the settings text', () => {
-    expect(wiringReport('node scripts/commission-guard.mjs')).toContain('ARMED')
-    expect(wiringReport('node scripts/other-guard.mjs')).toContain('DORMANT')
-    expect(wiringReport('node scripts/other-guard.mjs')).toContain(COMMISSION_HOOK_LINE)
+    const hooked = (command, { event = 'PreToolUse', matcher = 'Agent|Task|Bash|PowerShell' } = {}) =>
+      JSON.stringify({ hooks: { [event]: [{ matcher, hooks: [{ type: 'command', command }] }] } })
+
+    expect(wiringReport(hooked('node "$CLAUDE_PROJECT_DIR/scripts/commission-guard.mjs"'))).toContain('ARMED')
+    expect(wiringReport(hooked('node scripts/other-guard.mjs'))).toContain('DORMANT')
+    expect(wiringReport(hooked('node scripts/other-guard.mjs'))).toContain(COMMISSION_HOOK_LINE)
     // A near miss is not a hit, and an unreadable file is never reported armed.
-    expect(wiringReport('node scripts/commission-guard-core.mjs')).toContain('DORMANT')
+    expect(wiringReport(hooked('node scripts/commission-guard-core.mjs'))).toContain('DORMANT')
+    expect(wiringReport('node scripts/commission-guard.mjs')).toContain('DORMANT')
+    // The EVENT and the MATCHER are the wiring, not decoration: a hook that never
+    // sees the call which opens work refuses nothing, and neither does one blind
+    // to a tool that can open it.
+    expect(wiringReport(hooked('node scripts/commission-guard.mjs', { event: 'Stop' }))).toContain('DORMANT')
+    expect(wiringReport(hooked('node scripts/commission-guard.mjs', { matcher: 'Agent|Task|Bash' }))).toContain(
+      'DORMANT',
+    )
     expect(wiringReport(null)).toContain('UNKNOWN')
   })
 

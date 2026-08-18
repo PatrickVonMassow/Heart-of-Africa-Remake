@@ -23,25 +23,52 @@ const healthy = {
 }
 
 describe('isEnforcerWired — the fact, not the record of an intention', () => {
+  /** A settings file as the harness writes one, with a single hook entry in it. */
+  const settings = (command, { event = 'Stop', matcher = '' } = {}) =>
+    JSON.stringify({ hooks: { [event]: [{ matcher, hooks: [{ type: 'command', command }] }] } })
+
   it('finds an enforcer under any anchoring, and only by its whole file name', () => {
-    for (const text of [
+    for (const command of [
       'node scripts/a-guard.mjs',
       'node "$CLAUDE_PROJECT_DIR/scripts/a-guard.mjs"',
       'node C:\\repo\\scripts\\a-guard.mjs',
-      '{"command":"node scripts/x.mjs && node scripts/a-guard.mjs"}',
+      'node scripts/x.mjs && node scripts/a-guard.mjs',
     ]) {
-      expect(isEnforcerWired(text, 'a-guard.mjs')).toBe(true)
+      expect(isEnforcerWired(settings(command), 'a-guard.mjs')).toBe(true)
     }
-    expect(isEnforcerWired('node scripts/a-guard-core.mjs', 'a-guard.mjs')).toBe(false)
-    expect(isEnforcerWired('node scripts/aa-guard.mjs', 'a-guard.mjs')).toBe(false)
-    // A guard named only in PROSE is not wired — that is the whole failure mode.
-    expect(isEnforcerWired('# register a-guard.mjs one day', 'a-guard.mjs')).toBe(false)
+    expect(isEnforcerWired(settings('node scripts/a-guard-core.mjs'), 'a-guard.mjs')).toBe(false)
+    expect(isEnforcerWired(settings('node scripts/aa-guard.mjs'), 'a-guard.mjs')).toBe(false)
+  })
+
+  // WHY THE SETTINGS ARE PARSED RATHER THAN SCANNED (Sol, review of dd7fd78c):
+  // the first cut searched the whole file for the basename, so a name sitting in
+  // another guard's ARGUMENTS, or the guard wired on an event that never sees the
+  // call, both read as armed. A guard reporting itself armed while it refuses
+  // nothing is the failure this module exists for.
+  it('reads the STRUCTURE, so a name outside a hook command arms nothing', () => {
+    const named = JSON.stringify({
+      permissions: { allow: ['Bash(node scripts/a-guard.mjs)'] },
+      hooks: { Stop: [{ matcher: '', hooks: [{ type: 'command', command: 'node scripts/b-guard.mjs --then a-guard.mjs' }] }] },
+    })
+    expect(isEnforcerWired(named, 'a-guard.mjs')).toBe(false)
+    // Not JSON at all is NOT wired — an unreadable file proves no wiring.
+    expect(isEnforcerWired('{ hooks: PreToolUse …', 'a-guard.mjs')).toBe(false)
+    expect(isEnforcerWired(JSON.stringify({ hooks: [] }), 'a-guard.mjs')).toBe(false)
+  })
+
+  it('demands the EVENT and every tool the caller names in the matcher', () => {
+    const wired = settings('node scripts/a-guard.mjs', { event: 'PreToolUse', matcher: 'Agent|Task|Bash' })
+    expect(isEnforcerWired(wired, 'a-guard.mjs', { event: 'PreToolUse', tools: ['Agent', 'Bash'] })).toBe(true)
+    // A hook that never sees the call it must refuse is no wiring: wrong event…
+    expect(isEnforcerWired(wired, 'a-guard.mjs', { event: 'Stop' })).toBe(false)
+    // …and a matcher short of one demanded tool leaves that tool unguarded.
+    expect(isEnforcerWired(wired, 'a-guard.mjs', { event: 'PreToolUse', tools: ['Agent', 'PowerShell'] })).toBe(false)
   })
 
   it('never throws, and answers false on nothing at all', () => {
     expect(isEnforcerWired('', 'a-guard.mjs')).toBe(false)
     expect(isEnforcerWired(null, 'a-guard.mjs')).toBe(false)
-    expect(isEnforcerWired('node scripts/a-guard.mjs', '')).toBe(false)
+    expect(isEnforcerWired(settings('node scripts/a-guard.mjs'), '')).toBe(false)
     expect(() => isEnforcerWired(undefined, undefined)).not.toThrow()
   })
 })
