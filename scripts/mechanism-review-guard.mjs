@@ -40,6 +40,7 @@ import {
   modelsFromTrailers,
 } from './mechanism-review-core.mjs'
 import { unquoteGitPath } from './review-material-core.mjs'
+import { guardOutcome } from './mechanism-review-guard-gap-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 
@@ -463,16 +464,25 @@ if (isMainModule(import.meta.url)) {
     // is reported and the turn may end; the block resumes the moment the
     // material fits or splits into coverable passes. Loaded lazily: the common
     // clear turn measures nothing, and a failed assessment rules NO gap — an
-    // unmeasured claim never waives the gate.
+    // unmeasured claim never waives the gate. It fires for BOTH block shapes —
+    // no record at all, and a standing do-not-merge whose re-review the range
+    // cannot deliver (the trap's second door, measured 18.08.2026) — keyed on
+    // the measurement alone, never on what a verdict's prose said; the count of
+    // standing refusals travels into the report from the STRUCTURED findings.
     let gap = null
     if (verdict.block && gathered.baseline && gathered.head) {
       try {
         const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
-        gap = await assessReviewGap({ baseline: gathered.baseline, head: gathered.head })
+        gap = await assessReviewGap({
+          baseline: gathered.baseline,
+          head: gathered.head,
+          standingRecords: (verdict.findings ?? []).filter((f) => f.kind === 'do-not-merge').length,
+        })
       } catch {
         /* no ruling — the block below stands */
       }
     }
+    const outcome = guardOutcome({ blocked: verdict.block, gap })
 
     if (status) {
       console.log(`HEAD:      ${gathered.head.slice(0, 7)} (branch ${gathered.branch})`)
@@ -485,19 +495,19 @@ if (isMainModule(import.meta.url)) {
             `${c.coveringRecordShas.length} covering review(s)`,
         )
       }
-      if (gap?.gap) console.log(`\n${gap.report}`)
+      if (outcome.action === 'report-gap') console.log(`\n${gap.report}`)
       else console.log(verdict.block ? `\n${formatMechanismReviewVerdict(verdict)}` : '\nGATE CLEAR')
       process.exit(0)
     }
 
-    if (verdict.block) {
-      if (gap?.gap) {
-        // The gap holds: name it where the session sees it, and let the turn
-        // end. Deliberately NOT a baseline advance — the demand is suspended,
-        // never satisfied, and blocking resumes when the material fits again.
-        console.error(gap.report)
-        process.exit(0)
-      }
+    if (outcome.action === 'report-gap') {
+      // The gap holds: name it where the session sees it, and let the turn
+      // end. Deliberately NOT a baseline advance — the demand is suspended,
+      // never satisfied, and blocking resumes when the material fits again.
+      console.error(gap.report)
+      process.exit(0)
+    }
+    if (outcome.action === 'block') {
       process.stdout.write(
         JSON.stringify({ decision: 'block', reason: formatMechanismReviewVerdict(verdict) }),
       )

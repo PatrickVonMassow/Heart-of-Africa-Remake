@@ -5,8 +5,11 @@
 // review no caller could produce (measured 18.08.2026).
 import { describe, it, expect } from 'vitest'
 import {
+  criticalityGapPlan,
   decideReviewGap,
+  formatCriticalityGap,
   formatReviewGap,
+  guardOutcome,
   REVIEW_GAP_BUDGET_CHARS,
 } from './mechanism-review-guard-gap-core.mjs'
 
@@ -102,6 +105,106 @@ describe('formatReviewGap', () => {
     })
     const text = formatReviewGap({ baseline: base, head, decision })
     expect(text).toContain('docs/tasks-archive.md')
+  })
+})
+
+describe('guardOutcome — the junction where a do-not-merge could be waved through', () => {
+  // The trap's second door (measured 18.08.2026): the block came from a
+  // RECORDED do-not-merge, not from a missing record, and the gap never fired.
+  // The key is the measurement alone — never the verdict's prose.
+
+  it('a standing verdict on a range that FITS blocks exactly as before — whatever it said', () => {
+    const gap = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS - 1 })
+    expect(guardOutcome({ blocked: true, gap }).action).toBe('block')
+  })
+
+  it('a standing verdict on a range that SPLITS into covering passes blocks — the pass review is owed', () => {
+    const gap = decideReviewGap({
+      measuredChars: REVIEW_GAP_BUDGET_CHARS * 3,
+      planner: { available: true, covers: true, uncoverable: [] },
+    })
+    expect(guardOutcome({ blocked: true, gap }).action).toBe('block')
+  })
+
+  it('a block on a range that measures over budget and uncoverable degrades to the report', () => {
+    const gap = decideReviewGap({
+      measuredChars: REVIEW_GAP_BUDGET_CHARS * 3,
+      planner: { available: true, covers: false, uncoverable: ['docs/huge.md'] },
+    })
+    expect(guardOutcome({ blocked: true, gap }).action).toBe('report-gap')
+  })
+
+  it('the same range, once it fits again, blocks again — the gap suspends, never clears', () => {
+    const over = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS * 3, planner: null })
+    const fits = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS - 1 })
+    expect(guardOutcome({ blocked: true, gap: over }).action).toBe('report-gap')
+    expect(guardOutcome({ blocked: true, gap: fits }).action).toBe('block')
+  })
+
+  it('an absent or failed ruling BLOCKS — fail-closed on the judgment', () => {
+    expect(guardOutcome({ blocked: true, gap: null }).action).toBe('block')
+    const unmeasured = decideReviewGap({ measurementError: 'git exploded' })
+    expect(guardOutcome({ blocked: true, gap: unmeasured }).action).toBe('block')
+  })
+
+  it('an unblocked turn clears, gap ruling or none', () => {
+    expect(guardOutcome({ blocked: false, gap: null }).action).toBe('clear')
+  })
+})
+
+describe('formatReviewGap — the record door says so', () => {
+  it('names the standing do-not-merge records and that their demand is suspended, not satisfied', () => {
+    const decision = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS * 3, planner: null })
+    const text = formatReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      decision,
+      standingRecords: 2,
+    })
+    expect(text).toContain('2 do-not-merge record(s) stand on this range')
+    expect(text).toContain('SUSPENDED for material, not satisfied')
+  })
+
+  it('says nothing about records where the block had none', () => {
+    const decision = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS * 3, planner: null })
+    const text = formatReviewGap({ baseline: 'a'.repeat(40), head: 'b'.repeat(40), decision })
+    expect(text).not.toContain('do-not-merge record(s)')
+  })
+})
+
+describe('criticalityGapPlan — which criticality blocks may degrade at all', () => {
+  const sha = 'c'.repeat(40)
+  const backed = (kind, s = sha, point = 700) => ({ kind, tick: { number: point }, records: [{ sha: s }] })
+
+  it('plans the record-backed refusals, each with its point and sha', () => {
+    const plan = criticalityGapPlan([backed('unresolved'), backed('unanswered', 'd'.repeat(40), 712)])
+    expect(plan).toEqual([
+      { point: 700, sha },
+      { point: 712, sha: 'd'.repeat(40) },
+    ])
+  })
+
+  it('refuses the whole plan when ANY finding demands a fresh review a caller can always produce', () => {
+    for (const kind of ['no-review', 'self-review', 'not-in-history']) {
+      expect(criticalityGapPlan([backed('unresolved'), backed(kind)]), kind).toBe(null)
+    }
+  })
+
+  it('refuses on a record whose sha cannot name a range — unmeasurable never waives', () => {
+    expect(criticalityGapPlan([backed('unresolved', '')])).toBe(null)
+    expect(criticalityGapPlan([{ kind: 'unresolved', tick: { number: 1 }, records: [] }])).toBe(null)
+    expect(criticalityGapPlan([])).toBe(null)
+  })
+})
+
+describe('formatCriticalityGap', () => {
+  it('names each point, its record range and the resume rule', () => {
+    const decision = decideReviewGap({ measuredChars: 3_000_000, planner: null })
+    const text = formatCriticalityGap([{ point: 700, sha: 'e'.repeat(40), decision }])
+    expect(text).toContain('point 700')
+    expect(text).toContain('e'.repeat(12))
+    expect(text).toContain('3000000')
+    expect(text).toMatch(/RESUMES blocking/)
   })
 })
 

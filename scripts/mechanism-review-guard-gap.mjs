@@ -60,7 +60,7 @@ export function measureReviewMaterial({ baseline, head, run = git }) {
  * NEVER throws: a failure inside rules 'unmeasured', which keeps the gate
  * blocking — it does not assume the material fit, and it does not waive.
  */
-export async function assessReviewGap({ baseline, head }) {
+export async function assessReviewGap({ baseline, head, standingRecords = 0 }) {
   let measured = null
   let measurementError = ''
   try {
@@ -99,5 +99,32 @@ export async function assessReviewGap({ baseline, head }) {
     planner,
     measurementError,
   })
-  return { ...decision, report: decision.gap ? formatReviewGap({ baseline, head, decision }) : '' }
+  return {
+    ...decision,
+    report: decision.gap ? formatReviewGap({ baseline, head, decision, standingRecords }) : '',
+  }
+}
+
+/**
+ * The criticality mirror (the second door of the 18.08.2026 trap): rule on the
+ * gate's blocking findings as a whole. Non-null ONLY when every finding is
+ * record-backed (criticalityGapPlan) AND every record's own commit range —
+ * `sha^..sha`, the material a re-review of that point's work needs — rules a
+ * gap. Any finding that keeps the demand producible, any measurement that
+ * fails, and any sha whose parent cannot be resolved leaves the block
+ * standing: null here means "block as before".
+ */
+export async function assessCriticalityGap(findings = []) {
+  const { criticalityGapPlan, formatCriticalityGap } = await import(
+    './mechanism-review-guard-gap-core.mjs'
+  )
+  const plan = criticalityGapPlan(findings)
+  if (!plan) return null
+  const entries = []
+  for (const e of plan) {
+    const decision = await assessReviewGap({ baseline: `${e.sha}^`, head: e.sha })
+    if (!decision.gap) return null
+    entries.push({ ...e, decision })
+  }
+  return { gap: true, entries, report: formatCriticalityGap(entries) }
 }

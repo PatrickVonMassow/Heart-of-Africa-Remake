@@ -291,6 +291,23 @@ if (isMainModule(import.meta.url)) {
 
     const verdict = evaluateCriticalityReview(gathered.inputs)
 
+    // THE GAP CLAUSE, mirrored from mechanism-review-guard (point 714): a
+    // standing refusal whose re-review no caller can assemble must not trap
+    // the session. Only where EVERY blocking finding is record-backed AND
+    // every record's own range measures unassemblable does the block degrade
+    // to a report; a finding without a record demands a fresh review of a sha
+    // the caller chooses, so it always keeps blocking. Keyed on measurement
+    // alone; a failed assessment rules no gap.
+    let gap = null
+    if (verdict.block) {
+      try {
+        const { assessCriticalityGap } = await import('./mechanism-review-guard-gap.mjs')
+        gap = await assessCriticalityGap(verdict.findings)
+      } catch {
+        /* no ruling — the block below stands */
+      }
+    }
+
     if (status) {
       console.log(`HEAD:      ${gathered.head.slice(0, 7)} (branch ${gathered.branch})`)
       console.log(`baseline:  ${String(gathered.baseline ?? '<none — arms at this HEAD>').slice(0, 7)}`)
@@ -303,11 +320,18 @@ if (isMainModule(import.meta.url)) {
             `${mine.length} record(s), ${mine.filter((r) => r.reachable).length} in this history`,
         )
       }
-      console.log(verdict.block ? `\n${formatCriticalityReviewVerdict(verdict)}` : '\nGATE CLEAR')
+      if (gap?.gap) console.log(`\n${gap.report}`)
+      else console.log(verdict.block ? `\n${formatCriticalityReviewVerdict(verdict)}` : '\nGATE CLEAR')
       process.exit(0)
     }
 
     if (verdict.block) {
+      if (gap?.gap) {
+        // Deliberately NOT a baseline advance: the demand is suspended, never
+        // satisfied, and blocking resumes when the material fits again.
+        console.error(gap.report)
+        process.exit(0)
+      }
       process.stdout.write(
         JSON.stringify({ decision: 'block', reason: formatCriticalityReviewVerdict(verdict) }),
       )

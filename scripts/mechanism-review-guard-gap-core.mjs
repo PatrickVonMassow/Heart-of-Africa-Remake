@@ -89,8 +89,14 @@ export function decideReviewGap({
  * names the range, the measured size and the budget — the caller must be able
  * to see the gap before a round is spent on it — and states the resume rule,
  * so nobody reads the stand-down as a cleared gate.
+ *
+ * `standingRecords` is the count of do-not-merge findings the block rests on,
+ * taken from the evaluator's STRUCTURED verdict (never from reviewer prose):
+ * the gap through the record door (a verdict standing on a range nobody can
+ * re-review) must say so explicitly, or the stand-down reads like a clearance
+ * of what the record found.
  */
-export function formatReviewGap({ baseline = '', head = '', decision = {} } = {}) {
+export function formatReviewGap({ baseline = '', head = '', decision = {}, standingRecords = 0 } = {}) {
   const range = `${String(baseline).slice(0, 12)}..${String(head).slice(0, 12)}`
   const lines = [
     `mechanism-review-guard: REVIEW GAP — the material for ${range} cannot be assembled for review:`,
@@ -106,10 +112,87 @@ export function formatReviewGap({ baseline = '', head = '', decision = {} } = {}
       ...decision.uncoverable.map((p) => `    ${p}`),
     )
   }
+  if (Number(standingRecords) > 0) {
+    lines.push(
+      `  ${Number(standingRecords)} do-not-merge record(s) stand on this range. Whatever they found`,
+      '  keeps its standing — but the re-review that would answer them cannot be assembled,',
+      '  so that demand is SUSPENDED for material, not satisfied. It is owed again the',
+      '  moment the material fits.',
+    )
+  }
   lines.push(
     '  A review nobody can produce is not demanded: this turn may end. Recorded verdicts on',
     '  this range keep their standing — the gap suspends the demand, never the record. The',
     '  gate RESUMES blocking the moment the material fits, or splits into coverable passes.',
+  )
+  return lines.join('\n')
+}
+
+/**
+ * What the guard DOES with a blocking verdict and the gap ruling — the one
+ * junction where a do-not-merge could be waved through, so it is pure and
+ * pinned (the measured trap of 18.08.2026 entered through this door: a
+ * RECORDED do-not-merge on a range nobody could re-assemble blocked every
+ * turn on main, and the gap clause keyed only on the missing-record shape).
+ *
+ * The key is the MEASUREMENT alone, never the verdict's prose: a verdict on a
+ * range that fits (or splits into covering passes) keeps blocking exactly as
+ * before, whatever it says — the re-review it demands is producible. Only a
+ * range no reviewer can be given degrades to the report, and an absent or
+ * failed ruling (`gap: false`, reason 'unmeasured') blocks: fail-closed on the
+ * judgment, fail-open only on the guard's own crash.
+ */
+export function guardOutcome({ blocked = false, gap = null } = {}) {
+  if (!blocked) return { action: 'clear' }
+  if (gap && gap.gap === true) return { action: 'report-gap' }
+  return { action: 'block' }
+}
+
+/**
+ * Which of the CRITICALITY gate's blocking findings may degrade to a gap
+ * report, and the range each one's re-review would need.
+ *
+ * Only a RECORD-BACKED refusal ('unresolved' — a standing do-not-merge /
+ * merge-with-fixes — or 'unanswered' — a refusal no later merge record
+ * answers) names a range at all: the recorded sha's own commit range, which is
+ * what a re-review of that point's work must be able to assemble. A finding
+ * with no record ('no-review', 'self-review', 'not-in-history') demands a
+ * FRESH review whose sha the caller chooses, so nothing is unassemblable by
+ * necessity — any such finding keeps the whole block standing, and this
+ * returns null. Null also on an unrecognisable sha: an unmeasurable claim
+ * never waives the gate.
+ */
+export function criticalityGapPlan(findings = []) {
+  const entries = []
+  for (const f of findings ?? []) {
+    if (f?.kind !== 'unresolved' && f?.kind !== 'unanswered') return null
+    const sha = String(f?.records?.[0]?.sha ?? '')
+    if (!/^[0-9a-f]{7,40}$/i.test(sha)) return null
+    entries.push({ point: Number(f?.tick?.number ?? Number.NaN), sha })
+  }
+  return entries.length ? entries : null
+}
+
+/**
+ * The criticality gate's stand-in for its refusal while EVERY blocking record
+ * rests on an unassemblable range. Same three facts per point — range,
+ * measured size, budget — and the same resume rule.
+ */
+export function formatCriticalityGap(entries = []) {
+  const lines = [
+    'criticality-review-guard: REVIEW GAP — every blocking record stands on a range that',
+    'cannot be assembled for review:',
+  ]
+  for (const e of entries ?? []) {
+    lines.push(
+      `  point ${e.point} — record ${String(e.sha).slice(0, 12)}: measured ${e.decision?.measuredChars} characters ` +
+        `against the ${e.decision?.budget}-character round budget.`,
+    )
+  }
+  lines.push(
+    '  The refusals keep their standing — the gap suspends the re-review demand, never the',
+    '  record. The gate RESUMES blocking the moment the material fits, or splits into',
+    '  coverable passes.',
   )
   return lines.join('\n')
 }
