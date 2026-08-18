@@ -8619,11 +8619,17 @@ to land than a mechanism that needs a review.
   was built and deliberately deferred so the mechanism could land (18.08.2026). None of them lets a
   record cover unread material — that hole is closed — but each leaves a smaller edge unswept.
   FINAL STATE:
-  - A binary file delivered as a DELTA patch is delivered or refused, not silently never delivered:
-    today only literal base85 streams are accepted, and a delta patch produces no content at all.
-    Either the base blob travels beside the delta so the reviewer can reconstruct it, or the file is
-    reported as absent-by-design with the reason named — the decision to make is which, and the
-    material must state whichever is chosen.
+  - BINARY FILES AND SUBMODULE POINTERS ARE DELIVERED AS ABSENT-BY-DESIGN, with the reason named,
+    and the machinery that tried to carry their content is DELETED — the base85 literal delivery,
+    the inflate path with its bounds, and the gitlink content classification with its
+    false-positive surface. The decision (18.08.2026) is deliberate and it is a CUT, not an
+    omission: the spec requires only that every file's delivery mode be NAMED, which
+    "absent-by-design, binary" satisfies, while carrying that content cost a whole class of
+    review findings — memory-exhaustion bounds, delta patches that silently delivered nothing, a
+    text file containing `+Subproject commit` losing its body. Deleting a capability deletes its
+    finding class; bounding it does not. The cut was held back from point 714 only because
+    executing it there would have perturbed the files whose stability let the review passes carry
+    forward.
   - The pass-warning and ledger-pointer rulings are pinned where the reviewer looks for them: they
     currently live in `review-sol-cli.test.mjs` and `review-sol-core.test.mjs` while the material
     suite carries no pin, so a reader of that suite cannot see the rule is held. Either duplicate the
@@ -8632,9 +8638,20 @@ to land than a mechanism that needs a review.
     closes `%VAR%` expansion by construction, and this environment cannot execute it. An integration
     test on a Windows runner is what turns that argument into evidence; until one exists the residual
     is stated as untested rather than closed.
-  VERIFIABLE: Vitest for the first two — a delta-patched binary yields either a reconstructable
-  delivery or an absent-by-design entry naming the reason, never silence; and the material suite
-  holds the pass-warning and ledger-pointer rulings. The Windows case is verified by a runner or
-  recorded as an open residual with its reason.
+  - The review tail the twelve rounds of point 714 confirmed but did not chase, each named on the
+    record there: the tests that assert a guarantee more weakly than they claim it, the diagnostics
+    whose wording does not say which side refused, the carry-forward's usability edges, and the
+    set-key that a newline can make non-injective. None of them can clear a range nobody read —
+    that is why they were deferred rather than fixed — but each is a place where the mechanism
+    reads as stronger than it is.
+  - Two residuals stand ACCEPTED and stay stated rather than closed, because both fail in the safe
+    direction: an empty `authoredBy` cannot be told apart from a hand-typed empty one, and the
+    hairline band between the under-estimated rendered floor and the real rendered size keeps
+    blocking where it could in principle waive.
+  VERIFIABLE: Vitest for the first two — a binary or a submodule pointer yields an absent-by-design
+  entry naming the reason, never silence and never a decode path, and the deleted machinery has no
+  caller left; and the material suite holds the pass-warning and ledger-pointer rulings. Each tail
+  item is verified where it lives. The Windows case is verified by a runner or recorded as an open
+  residual with its reason.
   Criticality: medium — the clearance-covering hole is closed; these are edges around it.
   Bundle: unbundled (review tooling).
