@@ -351,7 +351,10 @@ if (isMainModule(import.meta.url)) {
             `${r.accounting ? `\n      accounting: ${r.accounting}` : ''}` +
             // Quoted like every structural path list (round-2 pass 3): a path
             // holding a newline or comma must not forge a line here either.
-            `${r.pass ? `\n      pass ${r.pass.index}/${r.pass.total} over: ${(r.pass.files ?? []).map((p) => quotePassFile(p)).join(', ')}` : ''}`,
+            // And GUARDED (final-round pass 4): readRecords validates only the
+            // sha, so a hand-edited `pass.files` that is no array crashed the
+            // whole listing.
+            `${r.pass ? `\n      pass ${r.pass.index}/${r.pass.total} over: ${(Array.isArray(r.pass.files) ? r.pass.files : []).map((p) => quotePassFile(p)).join(', ')}` : ''}`,
         )
       }
       process.exit(0)

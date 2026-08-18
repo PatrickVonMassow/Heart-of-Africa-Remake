@@ -33,6 +33,16 @@ const file = (path, size, ch = 'x') => ({ path, text: ch.repeat(size) })
 const patchFor = (paths) =>
   paths.map((p) => [`diff --git a/${p} b/${p}`, 'index 1..2 100644', `--- a/${p}`, `+++ b/${p}`, '+one line'].join('\n')).join('\n')
 
+const deletionSection = [
+  'diff --git a/gone.mjs b/gone.mjs',
+  'deleted file mode 100644',
+  'index 1234567..0000000',
+  '--- a/gone.mjs',
+  '+++ /dev/null',
+  '@@ -1 +0,0 @@',
+  '-the removed line',
+].join('\n')
+
 describe('the assembly says what it could not hold', () => {
   it('reports a complete round as fitting, and lists every file it sent', () => {
     const out = assembleMaterial({
@@ -225,9 +235,12 @@ describe('the assembly says what it could not hold', () => {
   })
 
   it('is fine with a commit that only deleted files', () => {
-    const out = assembleMaterial({ stat: 's', patch: 'p', files: [], budget: 10_000 })
+    // A REAL deletion-form section (final-round pass 6): 'p' was no deletion,
+    // so deletion handling could regress while this stayed green.
+    const out = assembleMaterial({ stat: 's', patch: deletionSection, files: [], budget: 10_000 })
     expect(out.fit).toBe(true)
     expect(out.text).toContain('=== PATCH ===')
+    expect(out.text).toContain('+++ /dev/null')
   })
 
   it('survives a nonsense budget rather than throwing at the reviewer', () => {
@@ -771,6 +784,22 @@ describe('the patch, split per file', () => {
     expect(alias.alias).toBe(true)
   })
 
+  it('never mixes pass records across SHAS, identical totals included (final-round pass 6)', () => {
+    // Two records of the same total at DIFFERENT shas are two separate,
+    // incomplete compositions — an implementation pooling them by total alone
+    // would report complete coverage nobody produced.
+    const rec = (sha, index) => ({
+      sha,
+      at: 1_787_000_000_000 + index,
+      pass: { index, total: 2, files: index === 1 ? ['a.mjs'] : ['b.mjs'] },
+    })
+    const groups = passComposition([rec('c'.repeat(40), 1), rec('d'.repeat(40), 2)], {
+      expect: ['a.mjs', 'b.mjs'],
+    })
+    expect(groups).toHaveLength(2)
+    for (const g of groups) expect(g.complete).toBe(false)
+  })
+
   it('bounds a composition total, so a hand-written ledger row cannot spin the walk (final round)', () => {
     const groups = passComposition(
       [
@@ -850,7 +879,8 @@ describe('the passes a range too large is cut into', () => {
   })
 
   it('costs a deleted file from the patch alone, so it is not lost from the plan', () => {
-    const plan = planPasses({ stat: 's', patch: patchFor(['gone.mjs']), files: [], budget: 20_000 })
+    // The real deletion form, not an added-line patch (final-round pass 6).
+    const plan = planPasses({ stat: 's', patch: deletionSection, files: [], budget: 20_000 })
     expect(plan.passes[0].files).toEqual(['gone.mjs'])
   })
 

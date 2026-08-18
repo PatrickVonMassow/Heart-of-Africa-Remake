@@ -356,6 +356,52 @@ describe('the mode round-trips into the ledger', () => {
     }
   })
 
+  it('lists a ledger holding a hand-edited pass whose files are no array (final-round pass 4)', () => {
+    // readRecords validates only the sha, so `pass: { files: "x" }` in a
+    // JSON-valid hand-edited row crashed the ENTIRE listing.
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-list-malformed-'))
+    try {
+      const repo = join(dir, 'repo')
+      mkdirSync(join(repo, 'scripts'), { recursive: true })
+      for (const f of [
+        'mechanism-review.mjs',
+        'mechanism-review-core.mjs',
+        'blind-merge-core.mjs',
+        'model-guard-core.mjs',
+        'review-material-core.mjs',
+        'repo-paths.mjs',
+        'is-main.mjs',
+      ]) {
+        copyFileSync(resolve(process.cwd(), 'scripts', f), join(repo, 'scripts', f))
+      }
+      mkdirSync(join(repo, '.claude'), { recursive: true })
+      writeFileSync(
+        join(repo, '.claude', 'mechanism-reviews.jsonl'),
+        `${JSON.stringify({
+          sha: 'a'.repeat(40),
+          subject: 'hand-made',
+          model: 'GPT-5.6 Sol',
+          verdict: 'do-not-merge',
+          evidence: 'hand-edited row with a malformed pass shape',
+          mode: 'review',
+          at: 1_787_000_000_000,
+          atIso: '2026-08-18T00:00:00.000Z',
+          pass: { index: 1, total: 2, files: 'x' },
+        })}\n`,
+      )
+      const r = spawnSync(process.execPath, [join(repo, 'scripts', 'mechanism-review.mjs'), '--list'], {
+        cwd: repo,
+        encoding: 'utf8',
+        windowsHide: true,
+      })
+      expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
+      expect(r.stdout).toContain('hand-edited row with a malformed pass shape')
+      expect(r.stdout).toContain('pass 1/2 over:')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('reads authorship past a subject containing the old field separator', () => {
     // ROUND-1 PASS 2, the recorder's half: subject and trailers used to travel
     // in ONE delimited `git show` format, so a legal subject containing the

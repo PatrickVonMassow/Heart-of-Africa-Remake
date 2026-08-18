@@ -264,6 +264,17 @@ function gatherRange(sha, base) {
       .filter((s) => isBinaryPatchSection(s.text))
       .map((s) => s.path),
   )
+  // A MODIFIED GITLINK IS ITS PATCH (final-round pass 8): a submodule entry
+  // points at a COMMIT object, so `git show sha:path` answers `bad object` —
+  // which reads as corruption and fails the round — or, with the submodule
+  // present, would ship commit output as file content. The pointer change IS
+  // the whole change, and the patch carries it; the path travels with no
+  // content of its own.
+  const gitlinkPaths = new Set(
+    splitPatchByFile(patch)
+      .filter((s) => /^(?:[+-]Subproject commit [0-9a-f]{4,40}|(?:old|new|deleted file|new file) mode 160000)$/m.test(s.text))
+      .map((s) => s.path),
+  )
   // A file the patch ADDS whole is already there in full; sending its content
   // again only spends the budget the other files need — but only while the patch
   // itself fits, or the file would fall out of both halves.
@@ -272,6 +283,10 @@ function gatherRange(sha, base) {
   for (const path of [...new Set(paths)]) {
     if (binaryPaths.has(path)) {
       files.push({ path, binary: true })
+      continue
+    }
+    if (gitlinkPaths.has(path)) {
+      files.push({ path, text: '' })
       continue
     }
     if (added.has(path)) continue

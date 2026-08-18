@@ -84,6 +84,7 @@ let solHeadSha = ''
 let orphanSha = ''
 let bulkSha = ''
 let oddSha = ''
+let gitlinkSha = ''
 let bulkSolSha = ''
 let edgeSha = ''
 /** A name git prints QUOTED, because it is not plain ASCII. */
@@ -327,6 +328,15 @@ beforeAll(() => {
   // a modification and its current content must travel with the patch.
   git('checkout', '-q', '-b', 'odd-name', 'main')
   oddSha = commit(ODD_NAME, 'the odd-named file, revised in this range\n', 'Revise the odd-named file', 'Opus 5')
+
+  // …and a branch adding a GITLINK (a submodule pointer, mode 160000): its
+  // blob cannot be shown — the entry names a COMMIT object — so the pointer
+  // change must travel as its patch (final-round pass 8). cacheinfo writes
+  // the entry without any submodule machinery.
+  git('checkout', '-q', '-b', 'gitlink', 'main')
+  git('update-index', '--add', '--cacheinfo', `160000,${'f'.repeat(40)},vendor-sub`)
+  git('commit', '--no-verify', '-q', '-m', 'Pin the vendored subproject\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+  gitlinkSha = git('rev-parse', 'HEAD')
 
   // …and a branch touching a path with a TRAILING SPACE, which git prints
   // UNQUOTED — the spelling a trim corrupts into a different path (point 714,
@@ -756,10 +766,34 @@ describe('a path git writes in quotes', () => {
     const r = run(['--sha', oddSha, '--brief', 'judge the odd name'])
     expect(r.status, r.stderr).toBe(0)
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
-    // The CONTENT is the proof the path resolved: `git show <sha>:<path>` only
-    // answers for the real path, and the quoted form is not one.
-    expect(sent).toContain('the odd-named file, revised in this range')
-    expect(sent).toContain('=== FILE (current content):')
+    // The CONTENT is the proof the path resolved — asserted CONTIGUOUSLY under
+    // ITS OWN header (final-round pass 7): the bare toContain was satisfied by
+    // the PATCH carrying the line, so the odd name's body could resolve empty
+    // while this stayed green. The header must NAME the odd file and the body
+    // must follow it before the next structural marker.
+    // The material spells the DECODED name (git's quoted octal form resolves
+    // to the real path, and needsQuoting has nothing to escape in it).
+    const header = `=== FILE (current content): ${ODD_NAME} ===`
+    expect(sent).toContain(header)
+    const body = sent.slice(sent.indexOf(header) + header.length)
+    const nextMarker = body.indexOf('=== ')
+    expect(body.slice(0, nextMarker < 0 ? undefined : nextMarker)).toContain(
+      'the odd-named file, revised in this range',
+    )
+    expect(sent).not.toContain('OMITTED ENTIRELY')
+  })
+})
+
+// FINAL-ROUND PASS 8: a submodule entry points at a COMMIT object, so its blob
+// cannot travel — the pointer change is the patch, and the round must complete
+// rather than fail on `bad object`.
+describe('a modified gitlink', () => {
+  it('travels as its patch, and the round completes', () => {
+    provenId()
+    const r = run(['--sha', gitlinkSha, '--brief', 'judge the submodule pin'])
+    expect(r.status, r.stderr).toBe(0)
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain(`+Subproject commit ${'f'.repeat(40)}`)
     expect(sent).not.toContain('OMITTED ENTIRELY')
   })
 })
