@@ -1,0 +1,605 @@
+// THE REVIEW-GAP RULING (point 714): the guard stands down — with a measured,
+// named report — while a range's review material cannot be assembled at all,
+// and resumes blocking the moment it can. Every branch of the pure ruling is
+// pinned here; the live trap this closes held every turn on main hostage to a
+// review no caller could produce (measured 18.08.2026).
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { describe, it, expect } from 'vitest'
+import {
+  criticalityGapPlan,
+  decideReviewGap,
+  formatCriticalityGap,
+  formatReviewGap,
+  guardOutcome,
+  reviewGapRange,
+  REVIEW_GAP_BUDGET_CHARS,
+  REVIEW_GAP_MAX_PASS_TOTAL,
+} from './mechanism-review-guard-gap-core.mjs'
+
+const material = await import('./review-material-core.mjs').catch(() => null)
+
+it('keeps the shell-expansion proof on a Windows CI runner', () => {
+  const workflow = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8')
+  expect(workflow).toContain('windows-argv-proof:')
+  expect(workflow).toContain('runs-on: windows-latest')
+  expect(workflow).toContain('scripts/mechanism-review-guard-gap-core.test.mjs')
+})
+
+// OPEN RESIDUAL UNTIL THE WINDOWS JOB PASSES: Linux can prove the argument
+// array but cannot execute cmd.exe's `%VAR%` expansion rules. This integration
+// is skipped here and run by CI's windows-argv-proof job on windows-latest.
+it.skipIf(process.platform !== 'win32')('the production Git runner keeps a literal %VAR% ref on Windows', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hoa-review-argv-'))
+  const git = (...args) => execFileSync('git', args, { cwd: dir, windowsHide: true, encoding: 'utf8' }).trim()
+  try {
+    git('init', '-q', '-b', 'main')
+    git('config', 'user.email', 'test@example.invalid')
+    git('config', 'user.name', 'Test')
+    writeFileSync(join(dir, 'proof.txt'), 'literal branch\n')
+    git('add', 'proof.txt')
+    git('commit', '-q', '-m', 'Create literal ref target')
+    const literal = git('rev-parse', 'HEAD')
+    git('branch', '%HOA_REVIEW_REF%')
+    writeFileSync(join(dir, 'proof.txt'), 'environment branch\n')
+    git('commit', '-q', '-am', 'Move main elsewhere')
+    const expanded = git('rev-parse', 'main')
+    expect(expanded).not.toBe(literal)
+
+    const { runGitArgs } = await import('./mechanism-review-guard-gap.mjs')
+    const resolved = runGitArgs(['rev-parse', '%HOA_REVIEW_REF%'], {
+      cwd: dir,
+      env: { ...process.env, HOA_REVIEW_REF: 'main' },
+    }).trim()
+    expect(resolved).toBe(literal)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+describe('reviewGapRange — one range for detection, coverage and gap ruling', () => {
+  it('uses the computed merge-base as the assessment baseline', () => {
+    const head = 'h'.repeat(40)
+    const base = 'a'.repeat(40)
+    expect(reviewGapRange({ blocked: true, base, head })).toEqual({ baseline: base, head })
+  })
+
+  it('leaves the block standing when the common range cannot be established', () => {
+    const range = reviewGapRange({ blocked: true, base: null, head: 'h'.repeat(40) })
+    expect(range).toBe(null)
+    expect(guardOutcome({ blocked: true, gap: range })).toEqual({ action: 'block' })
+  })
+
+  it('does not ask for a measurement on an already-clear turn', () => {
+    expect(reviewGapRange({ blocked: false, base: 'a'.repeat(40), head: 'h'.repeat(40) })).toBe(null)
+  })
+})
+
+describe('decideReviewGap', () => {
+  it('rules NO gap while the material fits — the ordinary demand stands', () => {
+    const d = decideReviewGap({
+      measuredChars: REVIEW_GAP_BUDGET_CHARS - 1,
+      planner: { available: true, fits: true, covers: true, uncoverable: [] },
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('fits')
+  })
+
+  it('BLOCKS without a planner ruling, whatever the size — the gate chain requires the splitter (second landing round)', () => {
+    // The earlier no-splitter waiver served a pre-splitter cherry-pick tree
+    // nobody runs, and a documented capability the chain's own imports defeat
+    // is worse than none: retired. No planner, no waiver.
+    for (const measuredChars of [REVIEW_GAP_BUDGET_CHARS - 1, REVIEW_GAP_BUDGET_CHARS, REVIEW_GAP_BUDGET_CHARS * 3]) {
+      const d = decideReviewGap({ measuredChars, planner: null })
+      expect(d.gap, String(measuredChars)).toBe(false)
+      expect(d.reason).toBe('unmeasured')
+      expect(d.detail).toContain('requires the splitter')
+    }
+  })
+
+  it('rules NO gap where a split COVERS the range — the pass review is owed', () => {
+    // Not a blanket waiver: material that can be produced pass by pass keeps
+    // the demand standing.
+    const d = decideReviewGap({
+      measuredChars: REVIEW_GAP_BUDGET_CHARS * 3,
+      planner: { available: true, covers: true, uncoverable: [] },
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('splits')
+  })
+
+  it('rules a GAP where even the split cannot carry the range, naming the files', () => {
+    const d = decideReviewGap({
+      measuredChars: REVIEW_GAP_BUDGET_CHARS * 3,
+      planner: { available: true, fits: false, covers: false, uncoverable: ['docs/huge.md'] },
+    })
+    expect(d.gap).toBe(true)
+    expect(d.reason).toBe('split-cannot-cover')
+    expect(d.uncoverable).toEqual(['docs/huge.md'])
+  })
+
+  it('NEVER rules a gap from a failed measurement — it says so instead of assuming', () => {
+    // Waiving the gate on an unmeasured claim would be the unearned clearance
+    // this point exists to prevent: the check that cannot tell keeps blocking.
+    for (const broken of [
+      { measurementError: 'git exploded' },
+      { measuredChars: null },
+      { measuredChars: Number.NaN },
+      { measuredChars: -1 },
+      {},
+    ]) {
+      const d = decideReviewGap(broken)
+      expect(d.gap, JSON.stringify(broken)).toBe(false)
+      expect(d.reason).toBe('unmeasured')
+    }
+  })
+
+  it('a MALFORMED planner ruling blocks as unmeasured — never a waiver (third landing round)', () => {
+    // `{ available: true }` used to fall through to split-cannot-cover and
+    // SUSPEND a blocking verdict on planner data that ruled nothing.
+    for (const planner of [
+      { available: true },
+      { available: true, fits: 'no', covers: 'no', uncoverable: [] },
+      { available: true, fits: false, covers: false },
+      { available: true, fits: false, covers: false, uncoverable: 'docs/huge.md' },
+      { available: 1, fits: false, covers: false, uncoverable: [] },
+      // Entries must be non-empty strings (fourth landing round, pass 4):
+      // coerced nulls and objects are no path names and authorize no waiver.
+      { available: true, fits: false, covers: false, uncoverable: [null] },
+      { available: true, fits: false, covers: false, uncoverable: [{}] },
+      { available: true, fits: false, covers: false, uncoverable: ['a.md', ''] },
+    ]) {
+      const d = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS * 3, planner })
+      expect(d.gap, JSON.stringify(planner)).toBe(false)
+      expect(d.reason).toBe('unmeasured')
+    }
+  })
+
+  it('a PROVEN oversize floor at or past the widest split rules the gap without a plan (landing round)', () => {
+    // AT the ceiling exactly: every pass spends budget on its own manifest
+    // and receipt, so no split's payload ever reaches budget × passes — the
+    // boundary itself is already proven uncoverable.
+    for (const at of [0, 1]) {
+      const d = decideReviewGap({
+        measuredChars: REVIEW_GAP_BUDGET_CHARS * REVIEW_GAP_MAX_PASS_TOTAL + at,
+        oversizeProven: true,
+      })
+      expect(d.gap, `+${at}`).toBe(true)
+      expect(d.reason).toBe('beyond-any-split')
+      expect(d.floor).toBe(true)
+    }
+  })
+
+  it('a proven floor BELOW the widest split proves nothing — it keeps blocking', () => {
+    const d = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS * 2, oversizeProven: true })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('unmeasured')
+  })
+
+  it('a measurement error outranks a plausible size — the error is the truth', () => {
+    const d = decideReviewGap({ measuredChars: 10, measurementError: 'partial read' })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('unmeasured')
+    expect(d.detail).toContain('partial read')
+  })
+})
+
+describe('formatReviewGap', () => {
+  const base = 'a'.repeat(40)
+  const head = 'b'.repeat(40)
+
+  it('names the range, the measured size and the budget — the spec’s own three', () => {
+    const decision = decideReviewGap({
+      measuredChars: 3_014_107,
+      planner: { available: true, fits: false, covers: false, uncoverable: ['docs/huge.md'] },
+    })
+    const text = formatReviewGap({ baseline: base, head, decision })
+    expect(text).toContain(`${base.slice(0, 12)}..${head.slice(0, 12)}`)
+    expect(text).toContain('3014107')
+    expect(text).toContain(String(REVIEW_GAP_BUDGET_CHARS))
+  })
+
+  it('states the resume rule and that records keep their standing — no cleared-gate reading', () => {
+    const decision = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS + 1, planner: null })
+    const text = formatReviewGap({ baseline: base, head, decision })
+    expect(text).toMatch(/RESUMES blocking/)
+    expect(text).toMatch(/keep their standing/)
+  })
+
+  it('lists what even a split cannot carry', () => {
+    const decision = decideReviewGap({
+      measuredChars: REVIEW_GAP_BUDGET_CHARS * 5,
+      planner: { available: true, fits: false, covers: false, uncoverable: ['docs/tasks-archive.md'] },
+    })
+    const text = formatReviewGap({ baseline: base, head, decision })
+    expect(text).toContain('docs/tasks-archive.md')
+  })
+})
+
+describe('guardOutcome — the junction where a do-not-merge could be waved through', () => {
+  // The trap's second door (measured 18.08.2026): the block came from a
+  // RECORDED do-not-merge, not from a missing record, and the gap never fired.
+  // The key is the measurement alone — never the verdict's prose.
+
+  it('a standing verdict on a range that FITS blocks exactly as before — whatever it said', () => {
+    const gap = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS - 1 })
+    expect(guardOutcome({ blocked: true, gap }).action).toBe('block')
+  })
+
+  it('a standing verdict on a range that SPLITS into covering passes blocks — the pass review is owed', () => {
+    const gap = decideReviewGap({
+      measuredChars: REVIEW_GAP_BUDGET_CHARS * 3,
+      planner: { available: true, covers: true, uncoverable: [] },
+    })
+    expect(guardOutcome({ blocked: true, gap }).action).toBe('block')
+  })
+
+  it('a block on a range that measures over budget and uncoverable degrades to the report', () => {
+    const gap = decideReviewGap({
+      measuredChars: REVIEW_GAP_BUDGET_CHARS * 3,
+      planner: { available: true, fits: false, covers: false, uncoverable: ['docs/huge.md'] },
+    })
+    expect(guardOutcome({ blocked: true, gap }).action).toBe('report-gap')
+  })
+
+  it('the same range, once it fits again, blocks again — the gap suspends, never clears', () => {
+    const over = decideReviewGap({
+      measuredChars: REVIEW_GAP_BUDGET_CHARS * 3,
+      planner: { available: true, fits: false, covers: false, uncoverable: ['docs/huge.md'] },
+    })
+    const fits = decideReviewGap({
+      measuredChars: REVIEW_GAP_BUDGET_CHARS - 1,
+      planner: { available: true, fits: true, covers: true, uncoverable: [] },
+    })
+    expect(guardOutcome({ blocked: true, gap: over }).action).toBe('report-gap')
+    expect(guardOutcome({ blocked: true, gap: fits }).action).toBe('block')
+  })
+
+  it('an absent or failed ruling BLOCKS — fail-closed on the judgment', () => {
+    expect(guardOutcome({ blocked: true, gap: null }).action).toBe('block')
+    const unmeasured = decideReviewGap({ measurementError: 'git exploded' })
+    expect(guardOutcome({ blocked: true, gap: unmeasured }).action).toBe('block')
+  })
+
+  it('an unblocked turn clears, gap ruling or none', () => {
+    expect(guardOutcome({ blocked: false, gap: null }).action).toBe('clear')
+  })
+})
+
+describe('formatReviewGap — the record door says so', () => {
+  it('names the standing do-not-merge records and that their demand is suspended, not satisfied', () => {
+    const decision = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS * 3, planner: null })
+    const text = formatReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      decision,
+      standingRecords: 2,
+    })
+    expect(text).toContain('2 do-not-merge record(s) stand on this range')
+    expect(text).toContain('SUSPENDED for material, not satisfied')
+  })
+
+  it('says nothing about records where the block had none', () => {
+    const decision = decideReviewGap({ measuredChars: REVIEW_GAP_BUDGET_CHARS * 3, planner: null })
+    const text = formatReviewGap({ baseline: 'a'.repeat(40), head: 'b'.repeat(40), decision })
+    expect(text).not.toContain('do-not-merge record(s)')
+  })
+})
+
+describe('criticalityGapPlan — which criticality blocks may degrade at all', () => {
+  const sha = 'c'.repeat(40)
+  const backed = (kind, s = sha, point = 700) => ({ kind, tick: { number: point }, records: [{ sha: s }] })
+
+  it('plans the record-backed refusals, each with its point and sha', () => {
+    const plan = criticalityGapPlan([backed('unresolved'), backed('unanswered', 'd'.repeat(40), 712)])
+    expect(plan).toEqual([
+      { point: 700, sha },
+      { point: 712, sha: 'd'.repeat(40) },
+    ])
+  })
+
+  it('refuses the whole plan when ANY finding demands a fresh review a caller can always produce', () => {
+    for (const kind of ['no-review', 'self-review', 'not-in-history']) {
+      expect(criticalityGapPlan([backed('unresolved'), backed(kind)]), kind).toBe(null)
+    }
+  })
+
+  it('refuses on a record whose sha cannot name a range — unmeasurable never waives', () => {
+    expect(criticalityGapPlan([backed('unresolved', '')])).toBe(null)
+    expect(criticalityGapPlan([{ kind: 'unresolved', tick: { number: 1 }, records: [] }])).toBe(null)
+    expect(criticalityGapPlan([])).toBe(null)
+  })
+
+  it('plans EVERY record a finding carries, not only the first (round-2 pass 2)', () => {
+    // One reviewable record among several is a demand somebody can meet;
+    // measuring only records[0] would report a gap over it.
+    const two = { kind: 'unresolved', tick: { number: 700 }, records: [{ sha }, { sha: 'd'.repeat(40) }] }
+    expect(criticalityGapPlan([two])).toEqual([
+      { point: 700, sha },
+      { point: 700, sha: 'd'.repeat(40) },
+    ])
+    const second = { kind: 'unresolved', tick: { number: 700 }, records: [{ sha }, { sha: 'not-a-sha' }] }
+    expect(criticalityGapPlan([second])).toBe(null)
+  })
+})
+
+describe('assessReviewGap — the wrapper cannot waive on its own failure (round-2 pass 2)', () => {
+  // Injected git and splitter loader: no repository is touched, and each
+  // failure shape is played directly against the wrapper.
+  const bigRun = (args) => {
+    if (args[0] === 'diff' && args.includes('--stat')) return 'stat'
+    if (args[0] === 'diff' && args.includes('--name-only')) return 'big.md\0'
+    if (args[0] === 'diff') return 'x'.repeat(REVIEW_GAP_BUDGET_CHARS * 2)
+    if (args[0] === 'show') return 'body'
+    return ''
+  }
+  // A load failure of ANY shape — absence included — is a measurement failure
+  // now: the gate chain requires the splitter (second landing round, pass 4).
+  const absent = Object.assign(
+    new Error("Cannot find module '/repo/scripts/review-material-core.mjs' imported from x"),
+    { code: 'ERR_MODULE_NOT_FOUND' },
+  )
+
+  it('a splitter that exists but CRASHES on load rules unmeasured — the gate keeps blocking', async () => {
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: bigRun,
+      loadTool: () => Promise.reject(new Error('syntax error in tool')),
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('unmeasured')
+    expect(d.detail).toContain('could not load')
+  })
+
+  it('a planner that THROWS rules unmeasured — never no-splitter', async () => {
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: bigRun,
+      loadTool: () =>
+        Promise.resolve({
+          MATERIAL_BUDGET_CHARS: REVIEW_GAP_BUDGET_CHARS,
+          planPasses: () => {
+            throw new Error('planner exploded')
+          },
+        }),
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('unmeasured')
+    expect(d.detail).toContain('planner failed')
+  })
+
+  it('an ABSENT splitter blocks like a broken one — the gate chain requires it (second landing round)', async () => {
+    // The no-splitter waiver served a pre-splitter cherry-pick tree nobody
+    // runs, and the chain's own static imports defeated it at load time — a
+    // capability that fails on its first import invites reliance. Retired:
+    // absence, a broken transitive import, and a crash all rule 'unmeasured'.
+    const transitive = Object.assign(
+      new Error("Cannot find module '/repo/scripts/repo-paths.mjs' imported from /repo/scripts/review-material-core.mjs"),
+      { code: 'ERR_MODULE_NOT_FOUND' },
+    )
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    for (const shape of [absent, transitive, new Error('syntax error in tool')]) {
+      const d = await assessReviewGap({
+        baseline: 'a'.repeat(40),
+        head: 'b'.repeat(40),
+        run: bigRun,
+        loadTool: () => Promise.reject(shape),
+      })
+      expect(d.gap, shape.message).toBe(false)
+      expect(d.reason).toBe('unmeasured')
+      expect(d.detail).toContain('requires it')
+    }
+  })
+
+  it('issues its git calls as EXACT argument arrays — no shell, nothing reordered (round-6 pass 3)', async () => {
+    const seen = []
+    const recordingRun = (args) => {
+      seen.push(args)
+      return bigRun(args)
+    }
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: recordingRun,
+      loadTool: () => Promise.reject(absent),
+    })
+    const range = `${'a'.repeat(40)}..${'b'.repeat(40)}`
+    expect(seen).toEqual([
+      ['diff', '--stat', range],
+      ['diff', '--no-ext-diff', '--no-textconv', range],
+      ['diff', '--name-only', '-z', range],
+      ['cat-file', '-s', `${'b'.repeat(40)}:big.md`],
+      ['show', `${'b'.repeat(40)}:big.md`],
+    ])
+  })
+
+  it('an overflowed range reading rules a PROVEN floor, never unmeasured (landing-round pass 3)', async () => {
+    // ENOBUFS on the patch used to throw into the measurement catch and rule
+    // 'unmeasured' — blocking forever exactly where the material is provably
+    // unassemblable. The overflow proves a floor far beyond any recordable
+    // split, and the gap is ruled without a plan — but ONLY where the
+    // CAPTURED STDOUT itself proves the overflow (landing-round pass 4).
+    const { assessReviewGap, MAX_BUFFER } = await import('./mechanism-review-guard-gap.mjs')
+    const overflowing = (args) => {
+      if (args[0] === 'diff' && !args.includes('--stat') && !args.includes('--name-only')) {
+        throw Object.assign(new Error('spawnSync git ENOBUFS'), {
+          code: 'ENOBUFS',
+          stdout: { length: MAX_BUFFER },
+        })
+      }
+      return bigRun(args)
+    }
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: overflowing,
+      loadTool: () => Promise.reject(absent),
+    })
+    expect(d.gap).toBe(true)
+    expect(d.reason).toBe('beyond-any-split')
+    expect(d.floor).toBe(true)
+    expect(d.report).toContain('proven floor')
+  })
+
+  it('ENOBUFS without a full captured stdout proves nothing — a stderr flood blocks (landing-round pass 4)', async () => {
+    // execFileSync raises ENOBUFS when EITHER stream overflows; only stdout
+    // at the buffer limit says anything about the material's size.
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const stderrFlood = (args) => {
+      if (args[0] === 'diff' && !args.includes('--stat') && !args.includes('--name-only')) {
+        throw Object.assign(new Error('spawnSync git ENOBUFS'), { code: 'ENOBUFS', stdout: 'tiny' })
+      }
+      return bigRun(args)
+    }
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: stderrFlood,
+      loadTool: () => Promise.reject(absent),
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('unmeasured')
+  })
+
+  it('asks a blob its size first and never reads a huge one whole (landing-round pass 3)', async () => {
+    // `git show` on a big-enough blob overflowed the buffer and ruled
+    // 'unmeasured' — the same permanent trap through the content door. The
+    // size is asked in a dozen characters; a blob past the read limit feeds
+    // the ruling a stand-in with the same planning consequence instead.
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const seen = []
+    const sized = (args) => {
+      seen.push(args)
+      if (args[0] === 'cat-file') return String(64 * 1024 * 1024)
+      if (args[0] === 'diff' && args.includes('--stat')) return 'stat'
+      if (args[0] === 'diff' && args.includes('--name-only')) return 'big.md\0'
+      if (args[0] === 'diff') return 'patch'
+      if (args[0] === 'show') throw new Error('a huge blob must never be read whole')
+      return ''
+    }
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: sized,
+      loadTool: () => import('./review-material-core.mjs'),
+    })
+    expect(seen.some((a) => a[0] === 'show')).toBe(false)
+    // 64 MiB floors to 16M characters; the stand-in reaches the REAL planner,
+    // which finds the file's content beyond any pass (its patch section is
+    // missing in this fixture) — a measured gap, not a waiver on absence.
+    expect(d.gap).toBe(true)
+    expect(d.reason).toBe('split-cannot-cover')
+    expect(d.measuredChars).toBeGreaterThan(REVIEW_GAP_BUDGET_CHARS)
+  })
+
+  it('a blob read that fails for anything but ABSENCE rules unmeasured (final-round pass 3)', async () => {
+    // Swallowing every show failure shrank the measurement, and an over-budget
+    // range could rule its own gap over a PARTIAL reading.
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const broken = (args) => {
+      if (args[0] === 'show') throw new Error('fatal: unable to read blob (corrupt loose object)')
+      return bigRun(args)
+    }
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: broken,
+      loadTool: () => Promise.reject(absent),
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('unmeasured')
+
+    // …while git's own "absent" still contributes nothing and the ruling proceeds.
+    const deleted = (args) => {
+      if (args[0] === 'show') throw new Error("fatal: path 'big.md' does not exist in 'bbbb'")
+      return bigRun(args)
+    }
+    const ruled = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: deleted,
+      loadTool: () => import('./review-material-core.mjs'),
+    })
+    // The ruling PROCEEDED to the planner — the tolerated absence is not a
+    // measurement failure. (This degenerate fixture's patch parses to no
+    // sections, so the planner rules its own measured verdict; what matters
+    // here is only that 'unmeasured' was not the answer.)
+    expect(ruled.reason).not.toBe('unmeasured')
+  })
+
+  it('the splitter’s own fit ruling outranks the raw size (final-round pass 3)', async () => {
+    // The raw sum omits delivery overhead, so rendered material just over the
+    // budget read as fitting; where the tool measured, its answer rules.
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const smallRun = (args) => {
+      if (args[0] === 'diff' && args.includes('--stat')) return 'stat'
+      if (args[0] === 'diff' && args.includes('--name-only')) return 'a.md\0'
+      if (args[0] === 'diff') return 'x'.repeat(1000)
+      if (args[0] === 'show') return 'body'
+      return ''
+    }
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: smallRun,
+      loadTool: () =>
+        Promise.resolve({
+          MATERIAL_BUDGET_CHARS: REVIEW_GAP_BUDGET_CHARS,
+          // The tool says: does NOT fit once rendered, but a split covers it.
+          planPasses: () => ({ fits: false, statTruncated: false, uncoverable: [], passes: [{}, {}] }),
+        }),
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('splits')
+  })
+
+  it('a covering split from the real planner shape keeps the demand standing', async () => {
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: bigRun,
+      loadTool: () =>
+        Promise.resolve({
+          MATERIAL_BUDGET_CHARS: REVIEW_GAP_BUDGET_CHARS,
+          planPasses: () => ({ statTruncated: false, uncoverable: [], passes: [{}, {}] }),
+        }),
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('splits')
+  })
+})
+
+describe('formatCriticalityGap', () => {
+  it('names each point, its record range and the resume rule', () => {
+    const decision = decideReviewGap({
+      measuredChars: 3_000_000,
+      planner: { available: true, fits: false, covers: false, uncoverable: ['docs/huge.md'] },
+    })
+    const text = formatCriticalityGap([{ point: 700, sha: 'e'.repeat(40), decision }])
+    expect(text).toContain('point 700')
+    expect(text).toContain('e'.repeat(12))
+    expect(text).toContain('3000000')
+    expect(text).toMatch(/RESUMES blocking/)
+  })
+})
+
+describe('the budget mirror', () => {
+  it.skipIf(!material)('equals MATERIAL_BUDGET_CHARS wherever the splitting tool exists', () => {
+    // Declared apart so the clause survives a tree without the tool; pinned
+    // equal so the two never drift where both exist.
+    expect(REVIEW_GAP_BUDGET_CHARS).toBe(material.MATERIAL_BUDGET_CHARS)
+  })
+
+  it.skipIf(!material)('the pass-total mirror equals MAX_PASS_TOTAL too', () => {
+    expect(REVIEW_GAP_MAX_PASS_TOTAL).toBe(material.MAX_PASS_TOTAL)
+  })
+
+})

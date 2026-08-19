@@ -18,7 +18,7 @@
 // Side-effect free: the process spawn, the material gathering and the printing belong to
 // scripts/ask-sol.mjs. Pinned by ask-sol-core.test.mjs.
 
-import { BLIND_REVIEWER, MATERIAL_BUDGET_CHARS, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
+import { blindReviewerAdmission, charStripped, MATERIAL_BUDGET_CHARS, rawFieldValue, SOL_MODEL_NAME, stripDecoration, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 
 export { MATERIAL_BUDGET_CHARS, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
 
@@ -184,14 +184,29 @@ export function formatAskMaterial({ sections = [], budget = MATERIAL_BUDGET_CHAR
 }
 
 /** The two closing lines of a DIAGNOSE answer, read off the END of the message. */
-function parseDiagnose(clean) {
-  const tail = clean.split('\n').map((l) => l.trim()).filter(Boolean).slice(-2)
-  const cause = (/^[-*]?\s*CAUSE\s*:\s*(.+)$/i.exec(tail[0] ?? '')?.[1] ?? '').trim()
-  const evidence = (/^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1] ?? '')?.[1] ?? '').trim()
-  if (!cause || !evidence) return { ok: false, error: 'the message does not end in the CAUSE/EVIDENCE pair' }
-  if (/^</.test(cause) || /^</.test(evidence) || evidence.length < 10) {
+function parseDiagnose(lines) {
+  const tail = lines.map((l) => ({ clean: l.clean.trim(), raw: l.raw })).filter((l) => l.clean).slice(-2)
+  const causeClean = (/^[-*]?\s*CAUSE\s*:\s*(.+)$/i.exec(tail[0]?.clean ?? '')?.[1] ?? '').trim()
+  const evidenceClean = (/^[-*]?\s*EVIDENCE\s*:\s*(.+)$/i.exec(tail[1]?.clean ?? '')?.[1] ?? '').trim()
+  // EVERY RULING reads the STRIPPED captures — presence, placeholder, length —
+  // because decoration must not change a decision (`**<placeholder>**` walked
+  // the raw `/^</` test); the QUOTED values read the raw lines, byte for byte
+  // (see rawFieldValue's boundary note).
+  if (!causeClean || !evidenceClean) return { ok: false, error: 'the message does not end in the CAUSE/EVIDENCE pair' }
+  // RULED ON THE NET-ONLY SPELLING TOO (fourth landing round, pass 1): an
+  // UNMATCHED marker survives the pair strip, so `CAUSE: _<the one cause>`
+  // shielded the anchored test and `CAUSE: _` read as a present field.
+  // Deletion can only widen a refusal, never clear one.
+  const netCause = charStripped(causeClean).trim()
+  const netEvidence = charStripped(evidenceClean).trim()
+  if (!netCause || !netEvidence) {
+    return { ok: false, error: 'a CAUSE/EVIDENCE line holds only marker characters — no diagnosis was given' }
+  }
+  if (/^[\s*-]*</.test(netCause) || /^[\s*-]*</.test(netEvidence) || /^</.test(causeClean) || /^</.test(evidenceClean) || netEvidence.length < 10) {
     return { ok: false, error: 'the CAUSE/EVIDENCE lines are the placeholders echoed back' }
   }
+  const cause = rawFieldValue(tail[0].raw) || causeClean
+  const evidence = rawFieldValue(tail[1].raw) || evidenceClean
   return { ok: true, answer: { cause, evidence }, summary: cause }
 }
 
@@ -208,27 +223,58 @@ function parseDiagnose(clean) {
  * refusing it would report a clean audit as "Sol did not answer" after the allowance was
  * already spent. It must SAY so in the prescribed line — silence is still no answer.
  */
-function parseEntries(clean, prefix, { allowEmpty = false } = {}) {
+function parseEntries(lines, prefix, { allowEmpty = false } = {}) {
   const re = new RegExp(`^[-*]?\\s*(${prefix}\\d+)\\s*\\|\\s*([^|]*)\\|\\s*(.*)$`, 'i')
   const entries = []
   const seen = new Set()
-  for (const line of clean.split('\n')) {
-    const m = re.exec(line.trim())
+  const clean = lines.map((l) => l.clean).join('\n')
+  for (const { clean: cleanLine, raw } of lines) {
+    const m = re.exec(cleanLine.trim())
     if (!m) continue
     const id = m[1].toUpperCase()
-    const text = m[3].trim()
-    if (!text) return { ok: false, error: `entry ${id} carries no finding at all` }
+    // EVERY RULING — presence included — reads the STRIPPED captures (final
+    // convergence: a decoration-only finding, 'A1 | a.mjs | ```', had a
+    // non-empty RAW field and walked the emptiness check); the QUOTED fields
+    // are cut from the raw line between/after its pipes, so a path the strip
+    // would rewrite (`src/__init__.py`) travels byte-exact. The whitespace
+    // PADDING around a pipe is the entry FORMAT, not content, and is trimmed
+    // on both readings; field-internal bytes travel exactly. A raw line whose
+    // pipes the strip somehow invented falls back to the stripped fields —
+    // visible, never silent loss.
+    // Presence rules on the NET-ONLY spelling on top of the pair strip
+    // (landing round): the pair strip now leaves an UNPAIRED marker run
+    // standing as content — right for matching, wrong for emptiness, where a
+    // field holding only marker characters carries nothing whatever their
+    // pairing. Deletion cannot fabricate emptiness: a field of markers alone
+    // has no content to lose.
+    const cleanFile = charStripped(m[2]).trim() ? m[2].trim() : ''
+    const cleanText = charStripped(m[3]).trim() ? m[3].trim() : ''
+    if (!cleanText) return { ok: false, error: `entry ${id} carries no finding at all` }
     if (seen.has(id)) return { ok: false, error: `the id ${id} is used twice — the merge accounts by id, so one of them would vanish` }
     seen.add(id)
-    // A finding that names no file is still a finding; it is marked, never dropped.
-    entries.push({ id, file: m[2].trim() || '(unspecified)', text })
+    const firstPipe = raw.indexOf('|')
+    const secondPipe = firstPipe < 0 ? -1 : raw.indexOf('|', firstPipe + 1)
+    const rawFile = secondPipe < 0 ? cleanFile : raw.slice(firstPipe + 1, secondPipe).trim()
+    const rawText = secondPipe < 0 ? cleanText : raw.slice(secondPipe + 1).trim()
+    // A finding that names no file is still a finding; it is marked, never
+    // dropped — and the RULING that nothing was named reads the stripped file.
+    entries.push({ id, file: cleanFile ? rawFile || cleanFile : '(unspecified)', text: rawText || cleanText })
   }
   // TWO READINGS OF THE SAME MARKER, deliberately different (last round). ACCEPTING an
   // empty audit demands the explanation — a bare "NO FINDINGS:" says nothing about what
   // was checked. DETECTING a contradiction only demands the claim: an answer that lists a
   // finding and then writes the marker at all is saying two things, explanation or not.
   const claimsNone = /(^|\n)\s*[-*]?\s*NO FINDINGS\b/i.test(clean)
-  const statesNone = /(^|\n)\s*[-*]?\s*NO FINDINGS\s*:\s*\S/i.test(clean)
+  // The EXPLANATION rules on the net-only spelling, like entry presence above
+  // (landing round): the pair strip leaves an unpaired marker standing, so
+  // `NO FINDINGS: _` read as an explained clean audit while naming nothing
+  // checked. Deletion cannot fabricate emptiness.
+  const explained = /(^|\n)\s*[-*]?\s*NO FINDINGS\s*:\s*(\S[^\n]*)/i.exec(clean)
+  // …and the PROMPT'S OWN TEMPLATE is no explanation (fourth landing round,
+  // pass 1): `NO FINDINGS: <what you checked>` echoed back names nothing
+  // checked — a placeholder is ruled exactly as everywhere else.
+  const explanation = explained ? charStripped(explained[2]).trim() : ''
+  const statesNone = Boolean(explanation && !/^[\s*-]*</.test(explanation))
   if (!entries.length) {
     if (allowEmpty && statesNone) return { ok: true, answer: { entries: [] }, summary: 'no findings' }
     return { ok: false, error: `no entry in the form \`${prefix}1 | <file> | <one line>\`` }
@@ -253,19 +299,68 @@ function parseEntries(clean, prefix, { allowEmpty = false } = {}) {
 export function parseAnswer({ kind = '', text = '' } = {}) {
   const k = normaliseKind(kind)
   if (!k) throw new Error(`ask-sol: not a kind: ${kind}`)
-  const clean = String(text ?? '').replace(/[*`_#>]/g, '')
+  // Markdown DECORATION by its SHAPE, never by bare character (round-7
+  // pass 1, sharpening round 6): deleting every `*_#>` globally corrupted
+  // structured answers (`src/foo_bar.mjs` → `src/foobar.mjs`) and could
+  // FABRICATE the very admission the net scans for (`no ma*terial` →
+  // `no material`). Stripped instead: headings and quote markers at line
+  // starts, backtick runs, and emphasis runs only at WORD EDGES — an
+  // underscore or asterisk inside a word is content and stays, so the strip
+  // can unshield an admission (`**no** material`) but never invent one.
+  // Emphasis is stripped only as a MATCHED PAIR (round-8: an unmatched
+  // word-edge marker is content — `src/foo_.mjs` names a file, and eating a
+  // lone `_` in `no _material` would again build the admission phrase out of
+  // text that never said it), and the pair rule is ITERATED so nesting
+  // unwraps outside-in (`*no **material***`, closing round): each pass may
+  // open after — and close before — another marker run, and a bounded loop
+  // reaches the fixpoint of any sane nesting depth.
+  const clean = stripDecoration(text)
   if (!clean.trim()) return { ok: false, kind: k, answer: null, summary: '', error: 'the run produced no answer at all' }
-  if (BLIND_REVIEWER.test(clean)) {
+  // The two-tier judgment, not the raw net: an audit or diagnose answer about
+  // THIS project's tooling describes failure modes in the net's own vocabulary,
+  // and a whole message swallowed for one such phrase is work discarded
+  // (measured 18.08.2026, point 714 pass 2, on the review path).
+  //
+  // SCANNED TWICE, RAW AND STRIPPED — either hit is an admission (final
+  // convergence, structural by construction): four rounds chased Markdown
+  // shapes that shielded an admission from the stripped scan alone (flat,
+  // nested, quote-adjacent emphasis), and each fix invited the next shape.
+  // Whatever decoration the stripper misses leaves the RAW text untouched for
+  // the raw scan; whatever decoration SHIELDS the raw words is unwrapped for
+  // the stripped scan. A strip defect can now only ever widen the net, never
+  // shield it.
+  if (blindReviewerAdmission(text) || blindReviewerAdmission(clean) || blindReviewerAdmission(charStripped(text))) {
     return { ok: false, kind: k, answer: null, summary: '', error: 'the model says it could not see the material' }
   }
+  // THE STRIPPED COPY MATCHES, THE RAW TEXT IS QUOTED (final convergence,
+  // second half of the dual-scan principle): every strip rule preserves the
+  // LINE COUNT (nothing removes a newline), so lines pair by index — a label
+  // or entry id is recognised on the stripped line, robust against
+  // decoration, and the field VALUE is cut from the raw line, so content the
+  // strip would rewrite (`src/__init__.py`) reaches the caller byte-exact.
+  // Should the pairing ever break, extraction falls back to the stripped
+  // lines alone — a wrong-but-visible spelling, never a crash.
+  const rawLines = String(text ?? '').split('\n')
+  const cleanLines = clean.split('\n')
+  const lines =
+    rawLines.length === cleanLines.length
+      ? cleanLines.map((c, i) => ({ clean: c, raw: rawLines[i] }))
+      : cleanLines.map((c) => ({ clean: c, raw: c }))
   if (k === 'explain') {
+    // The thinness RULING reads the stripped prose; what the caller gets is
+    // the RAW text BYTE-EXACT — untrimmed (final convergence: a .trim() here
+    // ate the answer's boundary whitespace, and the fidelity test's input had
+    // none to show it). The summary alone skips leading blank lines: it is a
+    // display slice, not the quoted answer.
     const prose = clean.trim()
     if (prose.length < 40) return { ok: false, kind: k, answer: null, summary: '', error: 'the answer is too thin to be an explanation' }
-    return { ok: true, kind: k, answer: { text: prose }, summary: prose.split('\n')[0].slice(0, 120), error: '' }
+    const rawProse = String(text ?? '')
+    const summaryLine = rawProse.split('\n').find((l) => l.trim()) ?? ''
+    return { ok: true, kind: k, answer: { text: rawProse }, summary: summaryLine.slice(0, 120), error: '' }
   }
   // A sweep may honestly find nothing; a DIVERGENT enumeration that lists nothing is no
   // half of a blind-parallel stage, so only the audit may come back empty.
-  const parsed = k === 'diagnose' ? parseDiagnose(clean) : parseEntries(clean, entryPrefix(k), { allowEmpty: k === 'audit' })
+  const parsed = k === 'diagnose' ? parseDiagnose(lines) : parseEntries(lines, entryPrefix(k), { allowEmpty: k === 'audit' })
   return parsed.ok
     ? { ok: true, kind: k, answer: parsed.answer, summary: parsed.summary, error: '' }
     : { ok: false, kind: k, answer: null, summary: '', error: parsed.error }

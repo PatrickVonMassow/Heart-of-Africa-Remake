@@ -48,6 +48,42 @@ describe('classifyFailureCause', () => {
     expect(c.remedy).toContain('No push in this repository')
   })
 
+  it('passes a Pages API outage when the queue is provably empty, with a deadline and no fake remedy', () => {
+    const now = Date.parse('2026-08-17T20:03:00Z')
+    const c = classifyFailureCause({
+      workflowName: PAGES_WORKFLOW,
+      conclusion: 'failure',
+      now,
+      pagesBlockers: [],
+      jobs: [
+        job({ name: 'build' }),
+        job({
+          name: 'deploy',
+          conclusion: 'failure',
+          steps: [
+            { name: 'Deploy to GitHub Pages', conclusion: 'failure' },
+            { name: 'Deploy to GitHub Pages (retry once)', conclusion: 'failure' },
+          ],
+        }),
+      ],
+    })
+    expect(c).toMatchObject({ cause: 'external', actionable: false, alertDetail: true })
+    expect(c.detail).toContain('no in-progress deployment to cancel')
+    expect(c.remedy).toContain('2026-08-18T02:03:00.000Z')
+    expect(c.remedy).not.toContain('pages-deploy-unblock.mjs --cancel')
+  })
+
+  it('keeps the cancel refusal when the read-only Pages check finds a real blocker', () => {
+    const c = classifyFailureCause({
+      workflowName: PAGES_WORKFLOW,
+      conclusion: 'failure',
+      pagesBlockers: [{ sha: 'a'.repeat(40), status: 'deployment_in_progress' }],
+      jobs: [job({ name: 'build' }), job({ name: 'deploy', conclusion: 'failure' })],
+    })
+    expect(c.actionable).not.toBe(false)
+    expect(c.remedy).toContain('pages-deploy-unblock.mjs --cancel')
+  })
+
   it('calls a failed Pages BUILD job ours — it stays a fixing push', () => {
     const c = classifyFailureCause({
       workflowName: PAGES_WORKFLOW,

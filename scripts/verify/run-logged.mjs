@@ -38,16 +38,26 @@
 //   --keep N        the structured-line budget of the end digest (default 120)
 //   --tail N        raw tail lines on a failure (default 40)
 //   --log-file P    write the log here instead of local/verify-logs/<stamp>.log
+//                   (a launch WITHOUT it re-execs itself with the resolved path
+//                   appended — the record writer's argv must name its log; see
+//                   `commandNamesRun` in scripts/batch-in-flight.mjs)
 import { spawn } from 'node:child_process'
 import { createWriteStream, mkdirSync, readFileSync } from 'node:fs'
+import { constants as osConstants } from 'node:os'
 import { dirname, isAbsolute, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DEFAULTS, buildDigest, createSelector, failureSurface, showWindow } from './run-digest-core.mjs'
 import { backendsFrom, buildReceipt, formatReceipt, planRun } from './run-wait-core.mjs'
-import { framesWrittenSince, gitPosition, readRecord, recordPathFor, writeRecord } from './run-record.mjs'
+import { framesWrittenSince, gitPosition, readRecord, recordPathFor, selfCommandLine, writeRecord } from './run-record.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
+
+/** The termination signals both layers FORWARD to their child rather than
+ *  dying around it — SIGHUP/SIGQUIT beside the classic two (Sol round 5), so
+ *  a hangup reaches the runner instead of killing a middle layer and
+ *  orphaning it. */
+const FORWARDED_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGQUIT']
 
 /** Split our own flags out of the argv; everything else goes to run-all. */
 function parseOwnArgs(argv) {
@@ -189,6 +199,12 @@ function runVerify() {
     polls: 0,
     status: 'running',
     pid: process.pid,
+    // The writer's own argv, recorded as EVIDENCE. The identity the transfer
+    // probe matches is the LOG PATH inside it — guaranteed present because a
+    // launch without --log-file re-execs itself with the path appended (a bare
+    // argv is no identity: a recycled pid re-running the identical default
+    // invocation must not read as this run — Sol round 4).
+    cmdline: selfCommandLine(),
     finishedAt: null,
     exitCode: null,
     framesWritten: null,
@@ -228,7 +244,7 @@ function runVerify() {
   child.stdout.on('data', consume)
   child.stderr.on('data', consume)
 
-  for (const sig of ['SIGINT', 'SIGTERM']) {
+  for (const sig of FORWARDED_SIGNALS) {
     process.on(sig, () => {
       try {
         child.kill(sig)
@@ -283,6 +299,68 @@ function runVerify() {
   })
 }
 
+// ── The default launch RE-EXECS itself with the log path in argv ────────────
+// (point 700, Sol round 4). The run record's liveness probe identifies the
+// wrapper by the RECORDED LOG PATH standing in the probed process's own argv
+// (`commandNamesRun` in scripts/batch-in-flight.mjs) — a bare argv is not an
+// identity: a recycled pid re-running the identical default command line would
+// read as THIS run. So a launch that names no `--log-file` computes the path
+// once and re-execs itself with it appended; the record writer's argv then
+// always names its log. Costs one idle shim process for the run's duration —
+// Node has no in-place exec — which is nothing beside a browser regression.
+// The shim WAITS for the child however long it runs — a child that ignores a
+// forwarded signal included. Sol round 5 read that as "can remain alive
+// indefinitely"; it is INTENDED: waiting for the child IS the shim's job, its
+// exit status is the run's verdict, and the handlers below only forward —
+// they never end the shim while the child lives. What round 5 did find real
+// is the exit SHAPE: `code === null ? 1` flattened a signal-killed child into
+// an ordinary exit-1 failure, so an interrupted run recorded as a red one.
+// The termination is now REPRODUCED instead — see the close handler.
+function reexecWithLogPath() {
+  const logPath = logPathFor(forward, own)
+  // The DISPLAY form (ROOT-relative where possible): it is what the record's
+  // `log` field will carry, so argv word and recorded path compare equal.
+  const child = spawn(process.execPath, [...process.argv.slice(1), '--log-file', forDisplay(logPath)], {
+    windowsHide: true,
+    stdio: 'inherit',
+    env: process.env,
+  })
+  for (const sig of FORWARDED_SIGNALS) {
+    process.on(sig, () => {
+      try {
+        child.kill(sig)
+      } catch {
+        /* already gone */
+      }
+    })
+  }
+  child.on('close', (code, signal) => {
+    if (signal) {
+      // A signal-killed child is reproduced, not flattened to exit 1 (Sol
+      // round 5). Our own forwarders come off first, so the re-raise reaches
+      // the default disposition instead of a handler whose child is already
+      // gone.
+      for (const sig of FORWARDED_SIGNALS) process.removeAllListeners(sig)
+      try {
+        process.kill(process.pid, signal)
+      } catch {
+        /* a signal this platform cannot re-raise — fall through */
+      }
+      // Reached when the signal could not be re-raised (or until it lands):
+      // 128+n is the shell's own spelling of a death by that signal.
+      const num = osConstants.signals[signal]
+      process.exitCode = typeof num === 'number' ? 128 + num : 1
+      return
+    }
+    process.exitCode = code === null ? 1 : code
+  })
+  child.on('error', (err) => {
+    console.log(`FAIL  run-logged   could not re-exec with the log path: ${err.message}`)
+    process.exitCode = 1
+  })
+}
+
 const { own, forward } = parseOwnArgs(process.argv.slice(2))
 if (own.show) process.exitCode = showLog(own.show)
-else runVerify()
+else if (own.logFile) runVerify()
+else reexecWithLogPath()

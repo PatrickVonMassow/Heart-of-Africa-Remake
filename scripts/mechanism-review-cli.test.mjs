@@ -13,7 +13,15 @@ import { spawnSync } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { appendRecord, buildRecord, KNOWN_FLAGS, readRecords, usage } from './mechanism-review.mjs'
+import {
+  appendRecord,
+  buildRecord,
+  KNOWN_FLAGS,
+  readRecords,
+  resolveCommit,
+  reviewFileSetKey,
+  usage,
+} from './mechanism-review.mjs'
 import { MODES, VERDICTS } from './mechanism-review-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'mechanism-review.mjs')
@@ -27,7 +35,11 @@ const run = (...args) =>
 
 describe('the flag surface', () => {
   it('knows every flag its usage documents', () => {
-    const flags = ['--record', '--model', '--verdict', '--evidence', '--point', '--mode', '--framing', '--list']
+    const flags = [
+      '--record', '--model', '--verdict', '--evidence', '--point', '--mode', '--framing',
+      '--author-framing', '--spec-examination',
+      '--pass', '--pass-files', '--pass-commits', '--carried-from', '--list',
+    ]
     for (const flag of flags) {
       expect(KNOWN_FLAGS.has(flag), `${flag} must be accepted`).toBe(true)
     }
@@ -42,6 +54,21 @@ describe('the flag surface', () => {
     // the difference between a usage block and a git error.
     expect(text).toContain('mechanism-review-guard.mjs --status')
     expect(text).toContain('criticality-review-guard.mjs --status')
+  })
+
+  it('states the accepted clean-pass convergence cost', () => {
+    expect(usage()).toContain('answer a finding is still a NEW contribution by design')
+    expect(usage()).toContain('confirming clean pass')
+  })
+})
+
+describe('review pass file-set identity', () => {
+  it('is injective where a newline-joined key collides', () => {
+    const left = ['a\nb', 'c']
+    const right = ['a', 'b\nc']
+    expect([...left].sort().join('\n')).toBe([...right].sort().join('\n'))
+    expect(reviewFileSetKey(left)).not.toBe(reviewFileSetKey(right))
+    expect(reviewFileSetKey(left)).toBe(reviewFileSetKey([...left].reverse()))
   })
 })
 
@@ -158,7 +185,11 @@ describe('the mode round-trips into the ledger', () => {
       verdict: 'merge',
       evidence: 'read the core against the spec and ran the pure cases',
       now: 1_700_000_000_000,
-      resolve: () => stub(),
+      // The stub ANSWERS THE REF IT WAS ASKED (not a fixed sha): the recorder
+      // resolves every contribution boundary through the same resolver, and a
+      // stub blind to its argument would hide a boundary resolved to the wrong
+      // commit.
+      resolve: (ref) => stub({ sha: String(ref) }),
       ...over,
     })
 
@@ -193,6 +224,79 @@ describe('the mode round-trips into the ledger', () => {
         expect(back[0].verdict).toBe('merge')
       })
     }
+  })
+
+  it('round-trips an authorship pass contribution scope', () => {
+    const a = 'a'.repeat(40)
+    const b = 'b'.repeat(40)
+    const built = build({
+      mode: 'review',
+      pass: '1/2',
+      passFiles: 'scripts/shared-guard.mjs',
+      passCommits: `${a},${b}`,
+    })
+    expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
+    expect(built.record.pass).toEqual({
+      index: 1,
+      total: 2,
+      files: ['scripts/shared-guard.mjs'],
+      commits: [a, b],
+    })
+    expect(built.record.partialReview).toBe(true)
+  })
+
+  it('stores a contribution boundary WHOLE, so the gate can match it at all', () => {
+    const full = 'a'.repeat(40)
+    const built = build({
+      mode: 'review',
+      pass: '1/2',
+      passFiles: 'scripts/shared-guard.mjs',
+      // The flag accepts an abbreviation; the gate compares against full shas.
+      passCommits: full.slice(0, 8),
+      resolve: (ref) => ({ ...stub(), sha: String(ref).length === 40 ? String(ref) : full }),
+    })
+    expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
+    expect(built.record.pass.commits).toEqual([full])
+  })
+
+  it('refuses a contribution boundary this repository cannot resolve', () => {
+    const built = build({
+      mode: 'review',
+      pass: '1/2',
+      passFiles: 'scripts/shared-guard.mjs',
+      passCommits: 'deadbeef',
+      resolve: (ref) => {
+        if (String(ref) === 'deadbeef') throw new Error('no such commit')
+        return stub({ sha: String(ref) })
+      },
+    })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join('\n')).toContain('--pass-commits deadbeef')
+  })
+
+  it('refuses two boundaries that name the same commit once resolved', () => {
+    const full = 'a'.repeat(40)
+    const built = build({
+      mode: 'review',
+      pass: '1/2',
+      passFiles: 'scripts/shared-guard.mjs',
+      passCommits: `${full.slice(0, 8)},${full}`,
+      resolve: (ref) => ({ ...stub(), sha: String(ref).length === 40 ? String(ref) : full }),
+    })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join('\n')).toContain('resolve to the same commit')
+  })
+
+  it('refuses to carry an authorship scope into a different plan', () => {
+    const built = build({
+      mode: '',
+      carriedFrom: 'a'.repeat(40),
+      pass: '1/2',
+      passFiles: 'scripts/shared-guard.mjs',
+      passCommits: 'b'.repeat(40),
+    })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join('\n')).toContain('cannot be carried')
   })
 
   it('carries the same-model fallback framing through with a blind-parallel mode', () => {
@@ -297,6 +401,8 @@ describe('the mode round-trips into the ledger', () => {
         'blind-merge-core.mjs',
         // the AUTHOR allowlist, which answers what a model trailer is (point 667)
         'model-guard-core.mjs',
+        // and how a review split into PASSES composes back into a coverage (714)
+        'review-material-core.mjs',
         'repo-paths.mjs',
         'is-main.mjs',
       ]) {
@@ -354,6 +460,368 @@ describe('the mode round-trips into the ledger', () => {
     }
   })
 
+  it('carries a pass ONLY over verified-identical blobs, copying the source verdict (delta rounds)', () => {
+    // The carry contract's recorder half: blob identity per file, the source
+    // reading itself, no fresh verdict — and every refusal shape refuses.
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-carry-'))
+    try {
+      const repo = join(dir, 'repo')
+      mkdirSync(join(repo, 'scripts'), { recursive: true })
+      for (const f of [
+        'mechanism-review.mjs',
+        'mechanism-review-core.mjs',
+        'blind-merge-core.mjs',
+        'model-guard-core.mjs',
+        'review-material-core.mjs',
+        'repo-paths.mjs',
+        'is-main.mjs',
+      ]) {
+        copyFileSync(resolve(process.cwd(), 'scripts', f), join(repo, 'scripts', f))
+      }
+      const git = (...args) =>
+        spawnSync('git', args, { cwd: repo, encoding: 'utf8', windowsHide: true, env: { ...process.env, HOME: dir } })
+      git('init', '-q', '-b', 'main')
+      git('config', 'user.email', 'test@example.invalid')
+      git('config', 'user.name', 'Test')
+      writeFileSync(join(repo, 'fileA.mjs'), 'alpha\n')
+      writeFileSync(join(repo, 'fileB.mjs'), 'beta\n')
+      writeFileSync(join(repo, 'gone.mjs'), 'present only at the source\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', 'Lay down the pair\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      const S = git('rev-parse', 'HEAD').stdout.trim()
+      rmSync(join(repo, 'gone.mjs'))
+      writeFileSync(join(repo, 'fileC.mjs'), 'gamma\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', 'Add a third file\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      const H = git('rev-parse', 'HEAD').stdout.trim()
+      mkdirSync(join(repo, '.claude'), { recursive: true })
+      writeFileSync(
+        join(repo, '.claude', 'mechanism-reviews.jsonl'),
+        `${JSON.stringify({
+          sha: S,
+          subject: 'Lay down the pair',
+          authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
+          model: 'GPT-5.6 Sol',
+          verdict: 'merge-with-fixes',
+          evidence: 'read both files whole and found one soft spot',
+          mode: 'review',
+          pass: { index: 1, total: 2, files: ['fileA.mjs', 'fileB.mjs'] },
+          at: 1_787_000_000_000,
+          atIso: '2026-08-18T00:00:00.000Z',
+        })}\n`,
+      )
+      const runRecorder = (...args) =>
+        spawnSync(process.execPath, [join(repo, 'scripts', 'mechanism-review.mjs'), ...args], {
+          cwd: repo,
+          encoding: 'utf8',
+          windowsHide: true,
+        })
+      // The happy carry: unchanged blobs, source covers the exact set.
+      const ok = runRecorder('--record', H, '--carried-from', S, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
+      expect(ok.status, `${ok.stdout}${ok.stderr}`).toBe(0)
+      const rows = readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')
+      const carried = JSON.parse(rows.at(-1))
+      expect(carried).toMatchObject({
+        sha: H,
+        model: 'GPT-5.6 Sol',
+        verdict: 'merge-with-fixes',
+        mode: 'review',
+        carried: { from: S },
+        pass: { index: 1, total: 2, files: ['fileA.mjs', 'fileB.mjs'] },
+        partialReview: true,
+      })
+      expect(carried.evidence).toMatch(/^CARRIED from [0-9a-f]{7} \(blobs verified identical\): read both files whole/)
+      // A fresh verdict beside a carry is refused — a carry is provenance.
+      const fresh = runRecorder('--record', H, '--carried-from', S, '--verdict', 'merge', '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
+      expect(fresh.status).toBe(1)
+      expect(fresh.stderr).toContain('do not pass them')
+      // A file the source never read (or that does not exist there) refuses.
+      const unread = runRecorder('--record', H, '--carried-from', S, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileC.mjs')
+      expect(unread.status).toBe(1)
+      expect(unread.stderr).toContain(`fileC.mjs does not exist at ${S.slice(0, 7)} — nothing there to carry`)
+      const deleted = runRecorder('--record', H, '--carried-from', S, '--pass', '1/2', '--pass-files', 'gone.mjs')
+      expect(deleted.status).toBe(1)
+      expect(deleted.stderr).toContain(`gone.mjs does not exist at ${H.slice(0, 7)} — deleted content cannot be covered`)
+      // Carrying FROM a carried row is refused IN ISOLATION (fourth landing
+      // round, pass 2): H3 changes neither carried file, so blob identity
+      // holds H..H3 and the ONLY refusal reason is the chained source.
+      writeFileSync(join(repo, 'fileD.mjs'), 'delta\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', 'Add a fourth file\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      const H3 = git('rev-parse', 'HEAD').stdout.trim()
+      const chained = runRecorder('--record', H3, '--carried-from', H, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
+      expect(chained.status).toBe(1)
+      expect(chained.stderr).toContain('carry from its original')
+      // …while carrying from the ORIGINAL at the same head succeeds.
+      const rechained = runRecorder('--record', H3, '--carried-from', S, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
+      expect(rechained.status, `${rechained.stdout}${rechained.stderr}`).toBe(0)
+      // A CHANGED blob refuses the carry outright.
+      writeFileSync(join(repo, 'fileA.mjs'), 'alpha, revised\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', 'Revise alpha\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      const H2 = git('rev-parse', 'HEAD').stdout.trim()
+      const changed = runRecorder('--record', H2, '--carried-from', S, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
+      expect(changed.status).toBe(1)
+      expect(changed.stderr).toContain(`CHANGED between ${S.slice(0, 7)} and ${H2.slice(0, 7)}`)
+      expect(changed.stderr).toContain('review it fresh')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('verifyCarried stamps only measured blob identity — everything else stamps false (delta rounds)', async () => {
+    // Runs against THIS repository's own history, read-only: a commit that
+    // changed a file cannot carry a pass naming it; identical blobs verify.
+    const { verifyCarried } = await import('./mechanism-review.mjs')
+    const sha = (rev) =>
+      spawnSync('git', ['rev-parse', rev], { cwd: process.cwd(), encoding: 'utf8', windowsHide: true }).stdout.trim()
+    const head = sha('HEAD')
+    const parent = sha('HEAD~1')
+    // A SHALLOW CHECKOUT HAS NO PARENT, and this check is about git history, not
+    // about the machine it runs on (measured 18.08.2026): `actions/checkout`
+    // clones at depth 1 unless told otherwise, so `HEAD~1` resolved to '' in CI
+    // and every carry failed to verify — a RED that says nothing about
+    // `verifyCarried`. The workflow now checks out depth 2 so this really runs
+    // there; where the history is genuinely absent the check says so and stands
+    // down, per the house rule: fail-soft on the environment, loud on the product.
+    if (!parent) {
+      console.warn('SKIPPED: no HEAD~1 in this checkout (shallow clone) — verifyCarried needs two commits')
+      return
+    }
+    const changedSet = spawnSync('git', ['diff', '--name-only', 'HEAD~1..HEAD'], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      windowsHide: true,
+    })
+      .stdout.trim()
+      .split('\n')
+      .filter(Boolean)
+    const changedFile = changedSet[0] ?? ''
+    // Any tracked file the last commit did NOT touch — chosen dynamically so
+    // this test never pins a path a future commit might change.
+    const unchangedFile = spawnSync('git', ['ls-tree', '-r', '--name-only', 'HEAD'], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      windowsHide: true,
+    })
+      .stdout.trim()
+      .split('\n')
+      .find((f) => f && !changedSet.includes(f))
+    // The SOURCE READING the carried rows quote (third landing round, pass
+    // 5): blob identity alone let a hand-edited carried row INVENT its
+    // verdict — the stamp now also demands the original pass row whose
+    // fields the carry copied.
+    const source = {
+      sha: parent,
+      model: 'GPT-5.6 Sol',
+      verdict: 'merge-with-fixes',
+      evidence: 'read the pass whole and found one soft spot',
+      mode: 'review',
+      pass: { index: 1, total: 2, files: [unchangedFile] },
+      at: 1_787_000_000_000,
+    }
+    const carriedRow = (over = {}) => ({
+      sha: head,
+      model: source.model,
+      verdict: source.verdict,
+      evidence: `CARRIED from ${parent.slice(0, 7)} (blobs verified identical): ${source.evidence}`,
+      mode: source.mode,
+      carried: { from: parent },
+      pass: { index: 1, total: 2, files: [unchangedFile] },
+      ...over,
+    })
+    const rows = [
+      carriedRow(),
+      carriedRow({ pass: { index: 1, total: 2, files: [changedFile] } }),
+      carriedRow({ carried: { from: 'not-a-sha' } }),
+      carriedRow({ pass: { index: 1, total: 2, files: [] } }),
+      carriedRow({ pass: { index: 1, total: 2, files: 'x' } }),
+      { sha: head, verdict: 'merge' },
+      // An INVENTED verdict, blobs identical: must not stamp.
+      carriedRow({ verdict: 'merge' }),
+      // A fabricated evidence line, blobs identical: must not stamp.
+      carriedRow({ evidence: 'CARRIED from abcdef0 (blobs verified identical): something nobody wrote' }),
+      // No source row in the ledger at all: must not stamp.
+      carriedRow({ model: 'Fable 5' }),
+    ]
+    verifyCarried(rows, [source])
+    expect(rows[0].carriedVerified, `${unchangedFile} unchanged + source matches`).toBe(true)
+    expect(rows[1].carriedVerified, `${changedFile} changed`).toBe(false)
+    expect(rows[2].carriedVerified).toBe(false)
+    expect(rows[3].carriedVerified).toBe(false)
+    expect(rows[4].carriedVerified).toBe(false)
+    // A row without a carry is left unstamped — it owes no verification.
+    expect('carriedVerified' in rows[5]).toBe(false)
+    expect(rows[6].carriedVerified, 'invented verdict').toBe(false)
+    expect(rows[7].carriedVerified, 'fabricated evidence').toBe(false)
+    expect(rows[8].carriedVerified, 'no matching source').toBe(false)
+  })
+
+  it('refuses a non-hex --record sha by SHAPE, before git or any shell sees it (landing-round pass 4)', () => {
+    // The sha used to be interpolated into a shell line before validation ran,
+    // so `HEAD"; <command>; echo "` executed whatever it carried. The resolve
+    // step now refuses anything but a hex sha, and the git helper takes an
+    // argument vector — there is no shell to inject into.
+    for (const sha of ['HEAD"; echo pwned; echo "', 'HEAD', 'main', '$(rm -rf x)', 'abc123g']) {
+      const r = run(
+        '--record', sha,
+        '--model', 'GPT-5.6 Sol',
+        '--verdict', 'merge',
+        '--evidence', 'checked the whole change end to end',
+        '--mode', 'review',
+      )
+      expect(r.status, sha).toBe(1)
+      expect(r.stderr, sha).toContain('not a commit sha')
+    }
+  })
+
+  it('lists a ledger holding a hand-edited pass whose files are no array (final-round pass 4)', () => {
+    // readRecords validates only the sha, so `pass: { files: "x" }` in a
+    // JSON-valid hand-edited row crashed the ENTIRE listing.
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-list-malformed-'))
+    try {
+      const repo = join(dir, 'repo')
+      mkdirSync(join(repo, 'scripts'), { recursive: true })
+      for (const f of [
+        'mechanism-review.mjs',
+        'mechanism-review-core.mjs',
+        'blind-merge-core.mjs',
+        'model-guard-core.mjs',
+        'review-material-core.mjs',
+        'repo-paths.mjs',
+        'is-main.mjs',
+      ]) {
+        copyFileSync(resolve(process.cwd(), 'scripts', f), join(repo, 'scripts', f))
+      }
+      mkdirSync(join(repo, '.claude'), { recursive: true })
+      writeFileSync(
+        join(repo, '.claude', 'mechanism-reviews.jsonl'),
+        `${JSON.stringify({
+          sha: 'a'.repeat(40),
+          subject: 'hand-made',
+          model: 'GPT-5.6 Sol',
+          verdict: 'do-not-merge',
+          evidence: 'hand-edited row with a malformed pass shape',
+          mode: 'review',
+          at: 1_787_000_000_000,
+          atIso: '2026-08-18T00:00:00.000Z',
+          pass: { index: 1, total: 2, files: 'x' },
+        })}\n${JSON.stringify({
+          // A row whose pass metadata and evidence carry NEWLINES (landing-round
+          // pass 4): unvalidated, they forged arbitrary listing lines — the
+          // shape a reader greps and trusts.
+          sha: 'b'.repeat(40),
+          subject: 'hand-made 2',
+          model: 'GPT-5.6 Sol',
+          verdict: 'merge',
+          evidence: 'first half\n      pass 7/7 over: forged-by-evidence',
+          mode: 'review',
+          at: 1_787_000_000_001,
+          atIso: '2026-08-18T00:00:00.001Z',
+          pass: { index: '1\n      pass 99/99 over: forged-by-pass', total: 2, files: ['a.mjs'] },
+        })}\n${JSON.stringify({
+          // …and one WELL-FORMED row, so the ordinary rendering is pinned too.
+          sha: 'd'.repeat(40),
+          subject: 'recorded',
+          model: 'GPT-5.6 Sol',
+          verdict: 'merge',
+          evidence: 'a valid pass row rendered normally',
+          mode: 'review',
+          at: 1_787_000_000_002,
+          atIso: '2026-08-18T00:00:00.002Z',
+          pass: { index: 1, total: 2, files: ['b.mjs'] },
+        })}\n`,
+      )
+      const r = spawnSync(process.execPath, [join(repo, 'scripts', 'mechanism-review.mjs'), '--list'], {
+        cwd: repo,
+        encoding: 'utf8',
+        windowsHide: true,
+      })
+      expect(r.status, `${r.stdout}${r.stderr}`).toBe(0)
+      expect(r.stdout).toContain('hand-edited row with a malformed pass shape')
+      // A files value that is NO ARRAY is part of the malformed claim
+      // (second landing round, pass 4) — it renders named, never as a
+      // normal-looking pass line.
+      expect(r.stdout).toContain('"files":"x"')
+      // …while the well-formed row keeps the ordinary rendering.
+      expect(r.stdout).toContain('PARTIAL REVIEW — pass 1/2 over: b.mjs')
+      // The forged text never renders as a LINE of its own — flattened, it may
+      // survive only inline where nothing reads it as structure — and the
+      // unparseable pass claim is named for the hand-edit it is.
+      expect(r.stdout).not.toMatch(/^\s*pass 99\/99/m)
+      expect(r.stdout).not.toMatch(/^\s*pass 7\/7/m)
+      expect(r.stdout).toContain('MALFORMED claim')
+      expect(r.stdout).toContain('first half pass 7/7 over: forged-by-evidence')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reads authorship past a subject containing the old field separator', () => {
+    // ROUND-1 PASS 2, the recorder's half: subject and trailers used to travel
+    // in ONE delimited `git show` format, so a legal subject containing the
+    // separator shifted the trailers out of their field — authoredBy read
+    // empty, and the authoring model could record its own review. Each fact now
+    // travels through its own single-format call; this commit is the exploit.
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-record-fld-'))
+    try {
+      const repo = join(dir, 'repo')
+      mkdirSync(join(repo, 'scripts'), { recursive: true })
+      for (const f of [
+        'mechanism-review.mjs',
+        'mechanism-review-core.mjs',
+        'blind-merge-core.mjs',
+        'model-guard-core.mjs',
+        'review-material-core.mjs',
+        'repo-paths.mjs',
+        'is-main.mjs',
+      ]) {
+        copyFileSync(resolve(process.cwd(), 'scripts', f), join(repo, 'scripts', f))
+      }
+      const git = (...args) =>
+        spawnSync('git', args, { cwd: repo, encoding: 'utf8', windowsHide: true, env: { ...process.env, HOME: dir } })
+      git('init', '-q', '-b', 'main')
+      git('config', 'user.email', 'test@example.invalid')
+      git('config', 'user.name', 'Test')
+      writeFileSync(join(repo, 'world.txt'), 'a fixture world\n')
+      git('add', '-A')
+      const subject = 'Route the __F__ marker past the splitter'
+      git('commit', '-q', '-m', `${subject}\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>`)
+      const sha = git('rev-parse', 'HEAD').stdout.trim()
+      const record = (model) =>
+        spawnSync(
+          process.execPath,
+          [
+            join(repo, 'scripts', 'mechanism-review.mjs'),
+            '--record', sha,
+            '--model', model,
+            '--verdict', 'merge',
+            '--evidence', 'read the fixture change against its stated intent',
+            '--mode', 'review',
+          ],
+          { cwd: repo, encoding: 'utf8', windowsHide: true },
+        )
+
+      // The exploit itself: the commit's own author records its review. Before
+      // the fix the shifted field hid the authorship and this PASSED.
+      const self = record('GPT-5.6 Sol')
+      // The refusal is asserted by its own wording, not a bare exit code — a
+      // spawn that never ran would satisfy .not.toBe(0) with empty output.
+      expect(self.stderr, `${self.stdout}${self.stderr}`).toContain('SELF-REVIEW is refused')
+      expect(self.stderr).toContain('GPT-5.6 Sol')
+
+      // A cross-model record works, and the ledger row carries the subject
+      // whole and the authorship exactly as the trailer spells it.
+      const ok = record('Claude Fable 5')
+      expect(ok.status, `${ok.stdout}${ok.stderr}`).toBe(0)
+      const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim())
+      expect(row.subject).toBe(subject)
+      expect(row.authoredBy).toBe('GPT-5.6 Sol <noreply@openai.com>')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('marks a typed receipt as stated, so the ledger says which it was', () => {
     expect(build({ mode: 'blind-parallel', ...merged }).record.accountingSource).toBe('stated')
   })
@@ -380,6 +848,32 @@ describe('the mode round-trips into the ledger', () => {
     const built = build({ mode: 'review' })
     expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
     expect(Object.hasOwn(built.record, 'framing')).toBe(false)
+  })
+
+  it('records the re-authoring framing beside an ordinary review', () => {
+    const authorFraming = 'Act as a hostile tester and probe every adjacent transition.'
+    const built = build({ mode: 'review', authorFraming })
+    expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
+    expect(built.record.authorFraming).toBe(authorFraming)
+    expect(built.record.framing).toBeUndefined()
+    expect(build({ mode: 'review', authorFraming: `${authorFraming}\nforged round` }).ok).toBe(false)
+  })
+
+  it('records one sound or amended spec examination, never as an authoring round', () => {
+    for (const specExamination of ['sound', 'amended']) {
+      const built = build({ mode: 'review', verdict: 'merge', specExamination })
+      expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
+      expect(built.record.specExamination).toBe(specExamination)
+    }
+    expect(build({ mode: 'review', specExamination: 'unclear' }).errors.join('\n')).toContain('sound | amended')
+    expect(build({ mode: 'review', verdict: 'do-not-merge', specExamination: 'sound' }).ok).toBe(false)
+    expect(
+      build({
+        mode: 'review',
+        specExamination: 'sound',
+        authorFraming: 'Act as a hostile tester and probe every adjacent transition.',
+      }).ok,
+    ).toBe(false)
   })
 
   it('still reads a legacy row that predates the flag', () => {
@@ -433,5 +927,73 @@ describe('the mode at the command line', () => {
     expect(text).toContain('--mode')
     expect(text).toContain('--framing')
     for (const mode of MODES) expect(text).toContain(mode)
+  })
+})
+
+describe('a boundary resolves against the object database, not against refs', () => {
+  // Real `--disambiguate` only ever lists objects that CARRY the queried prefix,
+  // so the fixtures do too: a fake free to answer with an unrelated sha would
+  // pin a contract git does not have.
+  const PREFIX = 'aaaaaaa'
+  const OBJECT = `${PREFIX}${'0'.repeat(33)}`
+  const SIBLING = `${PREFIX}${'1'.repeat(33)}`
+  // What a hex-named REF would have resolved to: unrelated to the prefix, which
+  // is exactly the damage — a different commit recorded than the one named.
+  const SHADOW = 'b'.repeat(40)
+
+  const runner = ({ objects = [OBJECT], types = {}, unreadable = [], calls = [] } = {}) => {
+    const fake = (args) => {
+      calls.push(args.join(' '))
+      if (args[0] === 'rev-parse' && String(args[1]).startsWith('--disambiguate=')) {
+        const prefix = String(args[1]).slice('--disambiguate='.length)
+        return objects.filter((object) => object.startsWith(prefix)).join('\n')
+      }
+      if (args[0] === 'cat-file') {
+        if (unreadable.includes(args[2])) throw new Error(`fatal: git cat-file: could not get object info`)
+        return types[args[2]] ?? 'commit'
+      }
+      if (args[0] === 'rev-parse') return SHADOW
+      if (args[0] === 'show') return String(args[2]).includes('%s') ? 'subject' : 'GPT-5.6 Sol <noreply@openai.com>'
+      return ''
+    }
+    fake.calls = calls
+    return fake
+  }
+
+  it('takes the object a prefix names, not the commit a hex-named ref points at', () => {
+    const run = runner()
+    expect(resolveCommit(PREFIX, { run }).sha).toBe(OBJECT)
+    expect(run.calls.some((call) => call.includes('^{commit}'))).toBe(false)
+  })
+
+  it('resolves a full 40-character sha through the object database too', () => {
+    const run = runner()
+    // A ref may legally be named in 40 hex characters as well, so the long form
+    // must not fall back to ref resolution either.
+    expect(resolveCommit(OBJECT, { run }).sha).toBe(OBJECT)
+    expect(run.calls.some((call) => call.includes('^{commit}'))).toBe(false)
+  })
+
+  it('refuses an ambiguous prefix instead of picking one', () => {
+    const run = runner({ objects: [OBJECT, SIBLING] })
+    expect(() => resolveCommit(PREFIX, { run })).toThrow(/ambiguous/)
+  })
+
+  it('refuses a prefix that names no commit', () => {
+    expect(() => resolveCommit(PREFIX, { run: runner({ objects: [] }) })).toThrow(/names no commit/)
+    const blob = runner({ types: { [OBJECT]: 'blob' } })
+    expect(() => resolveCommit(PREFIX, { run: blob })).toThrow(/names no commit/)
+  })
+
+  it('passes over a non-commit object sharing the prefix', () => {
+    const run = runner({ objects: [SIBLING, OBJECT], types: { [SIBLING]: 'tree' } })
+    expect(resolveCommit(PREFIX, { run }).sha).toBe(OBJECT)
+  })
+
+  it('refuses when a candidate cannot be typed, rather than resolving around it', () => {
+    // An unreadable object could itself be a commit; dropping it would let
+    // ambiguity fail open, which is the one direction this check must not fail.
+    const run = runner({ objects: [OBJECT, SIBLING], unreadable: [SIBLING] })
+    expect(() => resolveCommit(PREFIX, { run })).toThrow(/cannot read/)
   })
 })

@@ -98,6 +98,16 @@ function copyLine(now) {
   return `**${berlinStamp(now)}**`
 }
 
+/** What the preflight can decide before the reply exists: the exact opening it
+ * will be judged against, and the action that settles the condition this turn. */
+export function timestampReplyCondition(now = new Date()) {
+  return (
+    `The not-yet-written reply must begin with ${copyLine(now)} in the canonical ` +
+    '`**Wochentag, TT.MM.JJJJ, HH:MM**` form (German weekday, Europe/Berlin). ' +
+    'Action: compose the reply with that line first; the Stop hook then judges the actual reply.'
+  )
+}
+
 /**
  * Verdict for the last reply text. Returns null (allow) or
  * {decision:'block', reason} with the current stamp ready to copy verbatim.

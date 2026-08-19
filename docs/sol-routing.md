@@ -111,15 +111,19 @@ node scripts/author-sol.mjs --point 651 --dry-run  # the prompt and the argv, no
 node scripts/author-sol.mjs --point 651 --findings f.md   # the second leg: answer the review
 ```
 
-**The cut is a function, not a taste.** `scripts/author-routing-core.mjs` reads
-the point's own text: the hard cases (difficult, complex, error-prone, or tagged
-HIGH criticality) stay with Fable, a point whose VERIFICATION is the work stays
-with the main session that judges pictures anyway, and what is left —
-mechanical and mid-difficulty — is Sol's. Measured over the whole open queue on
-13.08.2026: **170 points → 57 Sol / 40 Fable / 73 main session.** A point may
-override the function with `Author lane: sol|fable|opus` **on a line of its
-own** in its spec; `--reworked` says Sol has already been round this point and
-the review still found problems, which sends it to Fable whatever the text says.
+<!-- rule:model-policy@19ee578a -->
+**The cut is a function, not a taste.** CLAUDE.md §6 is the single prose source
+for the authoring and escalation policy. `scripts/author-routing-core.mjs`
+applies it from the point text and recorded review history. A point may override
+the function with `Author lane: sol|fable|opus` **on a line of its own** in its
+spec, and `--rounds <n>` is the deliberate override for history the ledger
+cannot know.
+
+**What the cut actually moved**, measured over the whole open queue on
+18.08.2026, before and after the day's ruling: **203 points → 120 Sol / 0 Fable
+/ 83 main session**, against 65 / 0 / 138 the day before. This is a MEASUREMENT,
+not a restatement of the policy — it stands here because nothing else records it,
+and it is the reading against which a later re-measurement is judged.
 
 **The lane runs like any delegated agent**: an isolated worktree, its own
 `feat/` branch, the point handed over as a BRIEF rather than a reading
@@ -166,8 +170,10 @@ reported as having authored nothing.
 
 ## What is never routed, at any setting
 
-- The HARD cases and any point whose verification is the work (the routing
-  function decides, and `--anyway` is the deliberate override).
+- A point whose verification is the work, unless its spec marks it hard — since
+  18.08.2026 a hard or critical point is Sol's whatever else it says. No SETTING
+  routes it; the routing function decides, and a point's own `Author lane:` tag
+  or `--anyway` is the deliberate override.
 - REVIEWING what Sol itself authored — no model reviews its own work, so
   `review-sol.mjs` refuses such a range before it spends a call on it.
 - Driving the browser suites and **judging the picture**.

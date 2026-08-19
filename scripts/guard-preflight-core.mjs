@@ -38,6 +38,7 @@ export const STATUS = {
    * this report exists to end (point 437 E).
    */
   notJudged: 'not-judged',
+  condition: 'condition',
   unknown: 'session-unknown',
   error: 'error',
 }
@@ -99,6 +100,7 @@ export const ACTIONS = {
   // the same answer twice. `--for answer` is therefore the whole chain under
   // the name of the moment it is asked at — before composing, not after.
   answer: null,
+  commission: ['commission-guard'],
   merge: [
     'model-guard',
     'render-verify-guard',
@@ -135,7 +137,7 @@ export const isKnownAction = (action) => Object.hasOwn(ACTIONS, String(action))
 /** The guards `action` governs, out of `guards`. An unknown action means all. */
 export function selectGuards(guards, action = 'turn-end') {
   const ids = ACTIONS[action]
-  if (!ids) return guards
+  if (!ids) return guards.filter((g) => g.turnEnd !== false)
   return guards.filter((g) => ids.includes(g.id))
 }
 
@@ -152,7 +154,34 @@ export function normaliseVerdict(verdict) {
     return { block: verdict.length > 0, reason: verdict.length ? JSON.stringify(verdict) : '' }
   }
   const block = verdict.block === true || verdict.decision === 'block'
-  return { block, reason: block ? String(verdict.reason ?? '(no reason given)') : '' }
+  return {
+    block,
+    reason: block
+      ? String(verdict.reason ?? '(no reason given)')
+      : verdict.reason == null
+        ? ''
+        : String(verdict.reason),
+  }
+}
+
+function preflightResult(guard, gathered, sessionKnown) {
+  if (gathered.applicable === false) {
+    const blind = !sessionKnown && gathered.cause === CAUSE.notLockOwner
+    const unjudgeable = gathered.cause === CAUSE.notJudged
+    return {
+      id: guard.id,
+      status: blind ? STATUS.unknown : unjudgeable ? STATUS.notJudged : STATUS.skip,
+      reason: blind
+        ? 'no session id available, so the batch lock cannot say whether THIS session owns it — ' +
+          'the guard was not judged. Pass --session <id> to get a real answer.'
+        : (gathered.why ?? 'stands down here'),
+    }
+  }
+  if (gathered.condition === true) {
+    return { id: guard.id, status: STATUS.condition, reason: gathered.why ?? 'settle this condition before the action' }
+  }
+  const { block, reason } = normaliseVerdict(guard.decide(gathered.inputs ?? {}))
+  return { id: guard.id, status: block ? STATUS.block : STATUS.clean, reason }
 }
 
 /**
@@ -169,21 +198,26 @@ export function runPreflight(guards, { sessionId = '', sessionKnown = true } = {
   for (const guard of guards) {
     try {
       const gathered = guard.gather({ sessionId }) ?? {}
-      if (gathered.applicable === false) {
-        const blind = !sessionKnown && gathered.cause === CAUSE.notLockOwner
-        const unjudgeable = gathered.cause === CAUSE.notJudged
-        results.push({
-          id: guard.id,
-          status: blind ? STATUS.unknown : unjudgeable ? STATUS.notJudged : STATUS.skip,
-          reason: blind
-            ? 'no session id available, so the batch lock cannot say whether THIS session owns it — ' +
-              'the guard was not judged. Pass --session <id> to get a real answer.'
-            : (gathered.why ?? 'stands down here'),
-        })
-        continue
-      }
-      const { block, reason } = normaliseVerdict(guard.decide(gathered.inputs ?? {}))
-      results.push({ id: guard.id, status: block ? STATUS.block : STATUS.clean, reason })
+      if (typeof gathered?.then === 'function') throw new Error('async gather requires runPreflightAsync')
+      results.push(preflightResult(guard, gathered, sessionKnown))
+    } catch (e) {
+      results.push({ id: guard.id, status: STATUS.error, reason: (e && e.message) || String(e) })
+    }
+  }
+  return results
+}
+
+/** Async sibling used by the CLI now that CI performs its required network
+ * round trip. Synchronous unit callers keep the smaller `runPreflight` API. */
+export async function runPreflightAsync(
+  guards,
+  { sessionId = '', sessionKnown = true, ...context } = {},
+) {
+  const results = []
+  for (const guard of guards) {
+    try {
+      const gathered = (await guard.gather({ sessionId, ...context })) ?? {}
+      results.push(preflightResult(guard, gathered, sessionKnown))
     } catch (e) {
       results.push({ id: guard.id, status: STATUS.error, reason: (e && e.message) || String(e) })
     }
@@ -237,6 +271,7 @@ export function formatPreflightReport(results, { action = 'turn-end', unregister
       [STATUS.clean]: '✓',
       [STATUS.skip]: '–',
       [STATUS.notJudged]: '?',
+      [STATUS.condition]: '◇',
       [STATUS.unknown]: '?',
       [STATUS.error]: '!',
     }[r.status]
@@ -245,9 +280,13 @@ export function formatPreflightReport(results, { action = 'turn-end', unregister
     )
   }
   const blocking = results.filter((r) => r.status === STATUS.block)
-  const unjudged = results.filter(
-    (r) => r.status === STATUS.notJudged || r.status === STATUS.unknown || r.status === STATUS.error,
+  const unresolved = results.filter(
+    (r) =>
+      r.status === STATUS.notJudged ||
+      r.status === STATUS.unknown ||
+      r.status === STATUS.error,
   )
+  const conditions = results.filter((r) => r.status === STATUS.condition)
   lines.push('')
   // THE SUMMARY MAY NOT READ CLEAN WHILE SOMETHING WENT UNJUDGED (point 437 E).
   // "No registered guard would block right now" was the sentence a session acted
@@ -255,9 +294,10 @@ export function formatPreflightReport(results, { action = 'turn-end', unregister
   // claim the reader took from it.
   if (blocking.length) {
     lines.push(`${blocking.length} guard(s) WOULD BLOCK: ${blocking.map((b) => b.id).join(', ')} — fix these first.`)
-  } else if (unjudged.length || drift.length) {
+  } else if (unresolved.length || conditions.length || drift.length) {
     const parts = []
-    if (unjudged.length) parts.push(`${unjudged.length} was/were NOT judged`)
+    if (unresolved.length) parts.push(`${unresolved.length} was/were NOT judged`)
+    if (conditions.length) parts.push(`${conditions.length} future-input condition(s) remain`)
     if (drift.length) parts.push(`${drift.length} wired Stop hook(s) are not registered here`)
     lines.push(
       `No guard this report could judge would block right now — but ${parts.join(' and ')}, ` +
@@ -269,6 +309,9 @@ export function formatPreflightReport(results, { action = 'turn-end', unregister
   for (const b of blocking) {
     lines.push('', `--- ${b.id} ---`, b.reason)
   }
+  for (const condition of conditions) {
+    lines.push('', `--- ${condition.id} (condition) ---`, condition.reason)
+  }
   const errors = results.filter((r) => r.status === STATUS.error)
   if (errors.length) {
     lines.push('', `NOTE: ${errors.map((e) => e.id).join(', ')} could not be evaluated — treat as unknown.`)
@@ -279,6 +322,13 @@ export function formatPreflightReport(results, { action = 'turn-end', unregister
       '',
       `NOTE: ${notJudged.map((r) => r.id).join(', ')} are wired and were NOT JUDGED here — their verdict ` +
         'needs something this read-only report does not have. They can still block.',
+    )
+  }
+  if (conditions.length) {
+    lines.push(
+      '',
+      `CONDITIONS: ${conditions.map((r) => r.id).join(', ')} judge the action's not-yet-existing input. ` +
+        'Their rows name the exact condition and the action that settles it in this turn.',
     )
   }
   const blind = results.filter((r) => r.status === STATUS.unknown)

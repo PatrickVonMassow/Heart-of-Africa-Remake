@@ -14,8 +14,9 @@
 // handling, the unavailability classification and the model-id freshness probe are
 // IMPORTED from that path, not rebuilt.
 //
-// SOL AUTHORS NOTHING HERE. The answer is text a Claude session acts on; no commit
-// carries Sol's trailer, so the author allowlist and the model guard are untouched.
+// SOL AUTHORS NOTHING ON THIS PATH. The answer is text a Claude session acts on, and no
+// commit carries Sol's trailer from here. Sol's AUTHORING lane is a different command
+// (scripts/author-sol.mjs, point 667), where the trailer and the allowlist do apply.
 //
 // WHEN SOL IS NOT AVAILABLE — or when the share switch has moved the load away from it —
 // this says so in ONE line, names the cause, hands the work back to the Claude chain and

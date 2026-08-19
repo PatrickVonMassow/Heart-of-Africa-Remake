@@ -51,6 +51,29 @@ permissions:
   statuses: write
 
 jobs:
+  # Windows evidence for the review-material residual (18.08.2026). The
+  # production helper uses an argv array with no shell; this runner proves a
+  # literal `%VAR%` Git ref reaches Git unchanged under Windows rather than
+  # relying on the construction argument from Linux. The test is skipped on
+  # every non-Windows unit run, so this job is the only lane that can close it.
+  windows-argv-proof:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+      - uses: actions/setup-node@v4
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+        with:
+          node-version: 20
+          cache: npm
+      - name: install
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+        run: npm ci
+      - name: prove literal Windows argv transport
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+        run: npm run test:unit -- --run scripts/mechanism-review-guard-gap-core.test.mjs
+
   fast:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -60,6 +83,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+        with:
+          # TWO COMMITS, not one: the unit layer contains checks that read this
+          # repository's own history (verifyCarried compares a file's blob at HEAD
+          # against HEAD~1). At the default depth 1 there is no parent, so such a
+          # check goes red for the checkout rather than for the code.
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
         with:

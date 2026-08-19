@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest'
 import {
   blockReason,
   cachedAnswer,
+  ciRedAlertMessage,
   classifyRuns,
   failedRuns,
   notifiedFromState,
@@ -654,5 +655,26 @@ describe('sweepTargets', () => {
     const got = await sweep({ targets: [branchTarget], famine: { CI: t(9999) }, runsBySha: { [BRANCH]: redRun(BRANCH) } })
     expect(got.famine).toEqual({})
     expect(got.decision).toContain('origin/feat/x')
+  })
+})
+
+describe('ciRedAlertMessage', () => {
+  it('carries the deadline of a non-blocking external red into the alert', () => {
+    const message = ciRedAlertMessage({
+      target: { ref: 'origin/main', sha: HEAD },
+      standDown: true,
+      classification: {
+        workflowName: 'Deploy to GitHub Pages',
+        runId: 32054043421,
+        conclusion: 'failure',
+        cause: 'external',
+        alertDetail: true,
+        detail: 'the Pages queue is empty',
+        remedy: 'outage deadline: 2026-08-18T02:03:00.000Z',
+      },
+    })
+    expect(message).toContain('nothing in the repository can clear it')
+    expect(message).toContain('the Pages queue is empty')
+    expect(message).toContain('2026-08-18T02:03:00.000Z')
   })
 })

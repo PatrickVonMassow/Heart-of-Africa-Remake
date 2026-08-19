@@ -1,0 +1,290 @@
+{
+  "mergedBy": "Fable 5",
+  "entries": [
+    {
+      "id": "U1",
+      "from": ["A1", "B17"],
+      "defect": "Board upkeep forces a publish per edit and re-publish cycles: board.mjs's edit helper couples every card change with an archive rotation and a publish (no edit-only/staged mode), while the structure, conciseness, one-topic, decision-card and real-state checks fire only afterwards and demand further edit+publish rounds. Measured 17.08.2026: ~12 publishes in 50 minutes drove raw.githubusercontent into HTTP 429 and took the user's board offline. One reconcile step should run every pure validation first, let several edits accumulate, and publish once atomically."
+    },
+    {
+      "id": "U2",
+      "from": ["A2"],
+      "defect": "board-queue-core.mjs (parseSetArgs) silently swallows a positional text that follows a mode flag: --title/--estimate switch a MODE, so `set 702 --estimate \"~2 h\" \"<prose>\"` files the prose into the estimate bucket where normalisation discards it, and the command still reports success — three calls per card instead of the one the usage line advertises. An argument the processing discards must be refused loudly."
+    },
+    {
+      "id": "U3",
+      "from": ["A3", "B20"],
+      "defect": "guard-preflight is advisory, incomplete, and loops: it cannot judge four wired guards (ci-status, timestamp, decision-card, batch-progress), which then block the turn end one after another, and every governed action runs preflight -> interpret remedies -> N separate remedy commands -> retry preflight -> the still-separately-guarded action. Measured 17.08.2026: the batch-progress-guard loop alone cost seven replies at ~250k context each. Each governed action needs one transactional wrapper that verifies all guards under the same snapshot, applies safe remedies, and names the clearing action for anything it cannot judge."
+    },
+    {
+      "id": "U4",
+      "from": ["A4", "B10"],
+      "defect": "batch-boundary is a hand-driven two-phase protocol: --prepare names bookkeeping the caller must perform by hand — including a board card the script itself already generates (boundaryCardText), imports PUBLISH_CMD for, and could place with its own execFileSync — before --commit may run last. Measured: three refused --commit runs (card missing, card names no point, card byte-identical within a minute) plus a conciseness re-put. One --complete should verify prerequisites once, place and publish the card, perform the bookkeeping, and seal the marker atomically."
+    },
+    {
+      "id": "U5",
+      "from": ["A5", "B2"],
+      "defect": "Filing one new point is ~10 hand-driven calls with no helper: append to TASKS.md, three guard checks, commit, push, three board-queue set calls, render, publish, queue-rank --ranked — and queue-order-guard blocks the turn end when the ranking is forgotten, while spec/order validation only fires late. Run three times on 17.08.2026. One add-point command should validate the final-state spec and order once, then atomically update TASKS.md, the ranking and the board."
+    },
+    {
+      "id": "U6",
+      "from": ["A6", "B1"],
+      "defect": "Starting/commissioning a point is fully unbundled: git worktree add -b feat/<n>-<slug>, worktree-bootstrap, brief generation, author launch (author-sol requires an EXISTING worktree and branch), plus board focus/publish — and board-first can still refuse the first mutation after all that setup. The END of a point has land-point.mjs with 15 bundled steps; the START has nothing. One start-point <N> should verify revision, queue order, branch/worktree, brief and board state, then launch the author."
+    },
+    {
+      "id": "U7",
+      "from": ["A7", "B19", "B51"],
+      "defect": "The turn-end duty chain has no single command: focus set/confirm, board-publish, dashboard-guard --synced, board.mjs attest, chat-timestamp/inbox reconciliation and guard-preflight --for answer are separate calls (attest bundles three of them but neither the publish nor the focus, and batch-progress-guard alone names seven distinct remedy commands), and a duty or timestamp guard that fires after the response work wastes the finished reply turn. One prepare-answer should reconcile every end-state family — including the verified latest chat timestamp — and return a single authorization to answer last."
+    },
+    {
+      "id": "U8",
+      "from": ["A8"],
+      "defect": "The bundling is asymmetric by design history: the project bundled the RARE, dangerous end of a point (land-point.mjs, 15 steps, 'the landing is ONE command') while every FREQUENT sequence — point starts, checkpoints, turn ends — stays hand-driven. Since cost scales with call count times context size, the frequent unbundled sequences are where the spend actually is."
+    },
+    {
+      "id": "U9",
+      "from": ["A9"],
+      "defect": "The cost mechanism itself is unmeasured in operation: the 17.08.2026 session paid 378 model calls at an average of 158,001 tokens of context per call (last 20 calls: 251,884) — about 58 million cached input tokens — while landing ZERO points. Every avoided tool call and every avoided blocked turn is worth roughly one full context, which is what makes bundling a cost lever rather than tidiness; the project has no operational measurement of tokens per finished task."
+    },
+    {
+      "id": "U10",
+      "from": ["B3"],
+      "defect": "A cross-cutting change on main chains: decide it is 'small', edit, obtain the other-model review if it touches a mechanism, record the review, construct the model trailer, commit and push — with failures surfacing only at commit or turn end. One land-infra-change should verify scope, review and attribution before committing and pushing."
+    },
+    {
+      "id": "U11",
+      "from": ["B4"],
+      "defect": "Every ordinary checkpoint repeats edit -> test -> compose an attributed commit -> commit -> immediate push -> wait for concluded CI -> clear the turn-end guard, re-paying network and guard calls per commit. One checkpoint command should prevalidate tests, scope and trailer, then commit, push and follow the single resulting SHA."
+    },
+    {
+      "id": "U12",
+      "from": ["B5"],
+      "defect": "A rescue checkpoint requires hand-coordinating '[skip ci]' in the subject, the 'Rescue:' trailer and the author-model trailer, and the commit-msg hook rejects a missing half only after the commit is attempted. One rescue-checkpoint --reason should construct and verify all metadata once, then commit and push."
+    },
+    {
+      "id": "U13",
+      "from": ["B6"],
+      "defect": "Syncing a stale feature branch is hand-sequenced: fetch/update main, merge main into the branch, resolve conflicts, rerun the relevant verification, commit/push the merge, then verify finally again. One sync-feature should verify divergence, perform the merge, identify conflict-touched code and run exactly the required gate before pushing."
+    },
+    {
+      "id": "U14",
+      "from": ["B7"],
+      "defect": "Completing a point spans author push -> other-vendor review -> rework/re-review loops -> reviewer-run suites -> picture judgment where applicable -> proof recording -> landing, and each downstream guard can reject an already-costly turn. One finish-point orchestrator should verify the branch's author/reviewer/proof requirements once and then land it."
+    },
+    {
+      "id": "U15",
+      "from": ["B8"],
+      "defect": "Render verification duplicates work per backend by hand: classify changed paths, start the required backend, navigate/capture/judge, record, repeat on the second backend when sensitive, then satisfy the Stop guard — blocking late if one record is absent. One verify-render-change should calculate the required coverage once, run all inspections and atomically record the verdicts."
+    },
+    {
+      "id": "U16",
+      "from": ["B9"],
+      "defect": "Landing and the mandatory session boundary are separate protocols even though the boundary must follow the landing: the operator runs land-point, waits through its steps, then separately begins the boundary, and an omission is discovered only at answer/stop. One land-and-handover should verify landing success and immediately execute the sealed boundary transaction."
+    },
+    {
+      "id": "U17",
+      "from": ["B11"],
+      "defect": "The 150k context watermark is detected after the work: the owner must notice it, prepare a --context handover, update the board reason, drain unpushed work, commit the boundary and stop — and late detection can force another full-context turn. One pre-call context-safe-action should verify remaining context and either execute the action or complete the context handover."
+    },
+    {
+      "id": "U18",
+      "from": ["B12"],
+      "defect": "A handover with pushed checkpoints requires the predecessor to record in-flight work and seal the boundary, and the successor to separately claim ownership AND run batch-in-flight --adopt; a missed adoption leaves a carrier for a Stop guard to trip on. One successor-start step should verify the sealed transfer and atomically claim ownership plus adopt all carriers."
+    },
+    {
+      "id": "U19",
+      "from": ["B13"],
+      "defect": "The ownership lease must be renewed before each governed call as separate guard traffic (renew -> call -> renew -> call), and an expiry makes later merge/push/tick/publish writes fail. Every governed operation should be one lease-wrapped action that verifies and renews ownership immediately before acting."
+    },
+    {
+      "id": "U20",
+      "from": ["B14"],
+      "defect": "The return path for an attended window spans blocked/waiting turns: issue a claim, wait for the owner's next hook, wait for merge/agent/verification quiescence, release, then rerun the claim before it expires. One supervised claim-and-transfer should watch quiescence and expiry continuously and perform release plus acquisition atomically."
+    },
+    {
+      "id": "U21",
+      "from": ["B15"],
+      "defect": "Maintaining the three-agent pool target requires repeated hand cycles: inspect the queue, identify non-overlapping points, inspect free slots, launch each worktree agent or supply --slots-free reasons, and repeat after each completion. One fill-author-pool should verify independence and capacity once and launch the maximal safe set."
+    },
+    {
+      "id": "U22",
+      "from": ["B16"],
+      "defect": "board-first-guard refuses a turn's first state-changing call when focus/publish state is stale, forcing set/confirm focus -> publish -> retry across turns. One board-ready <action> wrapper should verify focus, the open-point set and publication once, repair them, then execute the requested action."
+    },
+    {
+      "id": "U23",
+      "from": ["B18"],
+      "defect": "Asking the user a question requires creating a single-topic decision card, ensuring it references deployed main, publishing, verifying publication, then asking — and a missing or malformed card blocks only at turn end. One ask-deployed-decision should verify deployment state and card semantics, publish once and emit the question."
+    },
+    {
+      "id": "U24",
+      "from": ["B21", "B57"],
+      "defect": "Pushes and CI settlement are hand-tracked per ref: every push creates another watched SHA whose workflow must be separately discovered, awaited and judged (arrival detection -> workflow discovery per pushed ref -> wait -> verdict -> Stop guard), and repeated polling scales with the number of network writes in a task. One push-and-settle should verify local eligibility, push the complete intended ref set once, track every created ref and return a single aggregated final CI verdict."
+    },
+    {
+      "id": "U25",
+      "from": ["B22"],
+      "defect": "A red CI run produces only a guard refusal; the cause inspection, cause naming, fix/charge/open-point decision, repair commit/push, new CI wait and guard retry are all separate steps. One resolve-ci-run should require the cause disposition with the repair push and then follow it to a conclusive green or a durable open item."
+    },
+    {
+      "id": "U26",
+      "from": ["B23"],
+      "defect": "An investigation can reach its answer with no durable artifact and only then be blocked by findings-guard, paying a full context for a predictable condition, after which the finding is created and the answer retried. One finish-investigation step should verify whether the turn produced a durable result and create/close the finding before answer authorization."
+    },
+    {
+      "id": "U27",
+      "from": ["B24"],
+      "defect": "An owned findings carrier is discovered only at Stop, then separately drained or reassigned and the Stop retried — the check runs too late. One owner-work wrapper should verify and drain all owned carriers before allowing unrelated work or an answer."
+    },
+    {
+      "id": "U28",
+      "from": ["B25"],
+      "defect": "Retrospective staleness is an after-the-fact full-turn penalty: work proceeds, Stop blocks on the stale retrospective, sources are gathered, the refresh runs, the answer is retried. One ensure-retro-current should verify source revisions and refresh once before the first closing action."
+    },
+    {
+      "id": "U29",
+      "from": ["B26"],
+      "defect": "Nonstandard work-order maintenance (edit TASKS, move closed text verbatim to the archive or restore open text, check duplicates/state/order/final-state wording, publish the changed queue) is policed by separate late guards that multiply repair cycles. One edit-work-order should validate the proposed TASKS/archive pair once and atomically write plus publish them."
+    },
+    {
+      "id": "U30",
+      "from": ["B27"],
+      "defect": "Changing an acceptance criterion requires three coordinated same-number edits — the short CLAUDE.md §7.1 entry, the detail section and the evidence section — in one commit, and an omission is detected only in later tests or review. One criterion-update step should verify number/link parity and apply the coordinated change as one act."
+    },
+    {
+      "id": "U31",
+      "from": ["B28"],
+      "defect": "A user-requested design change requires determining whether it touches design content or build order, then updating design.md, CLAUDE.md and the code together, with repeated document reads and partial-state guards costing context. One change-scaffold step should verify the affected authoritative sections once and stage every required surface."
+    },
+    {
+      "id": "U32",
+      "from": ["B29"],
+      "defect": "Each journal/UI text change requires authoring English, authoring contextual German, adding emotional voice markup to both journal variants, and verifying display stripping plus speech parsing — with omissions emerging only in tests afterwards. One localization-entry operation should validate both languages and the markup before installing the pair."
+    },
+    {
+      "id": "U33",
+      "from": ["B30"],
+      "defect": "Major-system verification is a hand-chained matrix — build, lint, conditional audit when the lockfile moved, unit tests, the selected browser gate, core-view screenshot checks, often a later LARGE — where separate commands repeat startup costs and a late layer invalidates the whole turn. One change-aware verify-once should detect paths/lockfile/backend sensitivity and execute exactly the required matrix for a single verdict."
+    },
+    {
+      "id": "U34",
+      "from": ["B31"],
+      "defect": "A screenshot only fails at the shutter, after browser setup and navigation, when the declared subject is not in frame (frameSubject.mjs refuses the write). One verified shutter action should resolve and project the subject first, then capture only under that same verified frame state."
+    },
+    {
+      "id": "U35",
+      "from": ["B32"],
+      "defect": "Closing a red browser run requires retaining the retry, investigating the cause, choosing among fix / charge / open point / one-run defer, possibly running the eight-run throttle probe, and recording the disposition — retries alone cover nothing and each choice is another command. One adjudicate-red should verify the evidence and atomically record exactly one valid closure path."
+    },
+    {
+      "id": "U36",
+      "from": ["B33"],
+      "defect": "Entering the closing freeze requires hand-verifying quiescence: stop spawning, enumerate live agents, let each finish or park, drain/transfer carriers, verify nothing can land — and a race restarts the closing. One enter-closing-freeze should verify quiescence and atomically freeze landing and spawning before returning success."
+    },
+    {
+      "id": "U37",
+      "from": ["B34", "B49"],
+      "defect": "The closing itself is the largest hand-driven chain — first LARGE, two blind cleanup authors, third-model semantic merge with accounting, cleanup commit, second LARGE on the final commit, ordered evidence, tag approval — and every step's evidence is a hand-crafted `--step <id> --evidence` string that malformed or temporally stale content gets rejected for only late; any missed ordering blocks the release. One resumable run-closing should drive the complete state machine, verify the frozen SHA at each boundary, and capture SHA/time/tool verdicts as evidence directly under the same verified state."
+    },
+    {
+      "id": "U38",
+      "from": ["B35"],
+      "defect": "A divergent four-eyes stage is hand-assembled: prepare identical inputs, launch two blind runs, ensure every entry has an ID, select a third non-author merger, merge by meaning, account for every A/B ID, record the merger's identity — and omissions vanish silently or are rejected late. One run-divergent-stage should verify blindness, identities and complete accounting before accepting the merged artifact."
+    },
+    {
+      "id": "U39",
+      "from": ["B36"],
+      "defect": "A guard/gate/hook change whose other-model review is obtained but not recorded wastes the completed turn at the Stop guard: implement, hand over the artifact, receive the review, record model and verdict, satisfy the guard are all separate steps. One review-and-record-mechanism should verify reviewer independence and atomically attach the review to the changed mechanism."
+    },
+    {
+      "id": "U40",
+      "from": ["B37"],
+      "defect": "Routing a point through the model policy is hand-decided — classify difficulty/verification-as-work, route to Sol or Claude/Fable, detect escalation after a Sol rework, launch the permitted other-vendor reviewer, record the roles — and a misroute is discovered by guards only after expensive authoring. One route-and-run-point should verify criticality and role independence once before launching either role."
+    },
+    {
+      "id": "U41",
+      "from": ["B38", "B39"],
+      "defect": "A release is a hand-driven multi-write outward transaction: verify the closing for the exact commit, obtain explicit approval for that version, create vX.Y, move the poc tag to the same SHA, push both, then — because tag pushes do not deploy — manually dispatch the Pages workflow (or arrange a later main push), wait, test /poc/ and /vX.Y/, and unblock/retry if stale; each network phase can consume a turn and repeated outward writes can leave split state. One approval-gated release-version should reverify the approved SHA once and perform the tag, deploy dispatch, run-following and both-URL verification as a single followed transaction."
+    },
+    {
+      "id": "U42",
+      "from": ["B40"],
+      "defect": "A TASKS point that itself delivers a version cannot be ticked through normal landing until every closing step is separately recorded for that commit and the tag approval, release and tick follow — so land-point can stop late on that special dependency. A release-point landing operation should verify the closing evidence and approval before beginning any merge/tick state change."
+    },
+    {
+      "id": "U43",
+      "from": ["B41"],
+      "defect": "A render fix that needs the user's aesthetic sign-off spans several costly waits: local two-backend verification, landing to main, CI wait, Pages wait, verifying the deployed state, then creating and publishing the decision card and asking. One land-deploy-and-request-judgment should verify correctness once, follow the deployment, and publish the URL-bound question automatically."
+    },
+    {
+      "id": "U44",
+      "from": ["B42"],
+      "defect": "When normal branch cleanup is missed, the Stop guard discovers a merged branch and the operator must resolve containment and remove the worktree, the local branch and the remote branch as separate destructive steps before retrying. One prune-landed-branch should verify exact SHA containment once and remove all three artifacts safely."
+    },
+    {
+      "id": "U45",
+      "from": ["B43"],
+      "defect": "A commit whose trailer names no author model only blocks at turn end, after which transcripts are searched to resolve the identity, metadata is repaired or work paused, and the guard retried — a full context spent on something knowable at commit time. A commit wrapper should resolve and validate the author model before accepting the commit."
+    },
+    {
+      "id": "U46",
+      "from": ["B44"],
+      "defect": "Documentation ceilings are measured only at Stop: an oversized edit is rejected after the fact and the author must reopen, compress or split the document and retry. One doc-update operation should calculate the proposed budget and required destination before applying the edit."
+    },
+    {
+      "id": "U47",
+      "from": ["B45"],
+      "defect": "A brief with an unresolved/ambiguous reference or a stale revision is discovered only by the launched agent, which must escalate so the main session regenerates and relaunches — costing an agent turn. The launch operation should verify the revision and all references before creating the worktree agent."
+    },
+    {
+      "id": "U48",
+      "from": ["B46"],
+      "defect": "A dependency change chains justification, lockfile modification, install/hook wiring, build/lint/unit and the audit, and a late audit or hook failure discards the prior work. One add-dependency step should preflight availability, advisories and justification, then install and run the required verification once."
+    },
+    {
+      "id": "U49",
+      "from": ["B47"],
+      "defect": "The closing manually re-confirms graphics-detail-doc parity that qualityDoc.test.ts already proves on every unit run, and then separately records that closing evidence — duplicate verification. The closing recorder should consume the unit-test proof automatically and record the confirmation once."
+    },
+    {
+      "id": "U50",
+      "from": ["B48"],
+      "defect": "Legitimate waiting on an external job requires hand-managing a wait marker: establish it, poll the job, clear/update the marker, resume, and pass the no-idle-stop guard — with mishandling producing a blocked stop. One supervised wait operation should verify the awaited object, maintain the marker and resume automatically at conclusion."
+    },
+    {
+      "id": "U51",
+      "from": ["B50"],
+      "defect": "The message-driven return path spreads its state across the watcher, the claim and the launcher (poll, verify untrusted inbox input, bounded claim, no-owner/no-honoured-claimant check, spawn responder, hand back or release), inviting expired claims and extra turns. One message-dispatch transaction should verify authorization and ownership once before spawning the responder."
+    },
+    {
+      "id": "U52",
+      "from": ["B52"],
+      "defect": "A mechanism change can be reviewed and committed while its inventory/hook wiring is checked only separately, so guard-health reports an unwired or drifting guard at Stop and the wiring/test/review cycle repeats. One mechanism installation step should verify inventory, hook registration, fail-open behavior and review before committing."
+    },
+    {
+      "id": "U53",
+      "from": ["B53"],
+      "defect": "Charging a red run to its owning open point requires identifying the run, selecting the point, writing the charge, verifying the point exists in the TASKS/archive sources, and satisfying both the render and finding guards — with invalid ownership discovered only after recording. One charge-red should verify the target point and atomically attach the evidence."
+    },
+    {
+      "id": "U54",
+      "from": ["B54"],
+      "defect": "Deferring a matter to the user requires a durable deferral artifact plus a compliant single-topic, deployed-state decision card plus a publish, and the separate artifacts can drift and trigger multiple guards. One defer-to-user should validate and publish the linked deferral/card pair in a single step."
+    },
+    {
+      "id": "U55",
+      "from": ["B55"],
+      "defect": "Arming a new setting or git hook in an attended session chains the attended edit, hook enable/install, prep-state verification, hook tests, the mechanism review and its recording, and the commit/push — and a late prep or review guard wastes the scarce attended turn. One arm-mechanism should verify wiring, tests and the independent review before applying the attended mutation."
+    },
+    {
+      "id": "U56",
+      "from": ["B56"],
+      "defect": "Changing suite routing requires parallel hand edits to the tier map, the README and the tier unit tests, then the selected backend matrix — a mismatch is found only after separate tests. One tier-map editor should validate suite/backend invariants and generate both code and documentation from one verified specification."
+    },
+    {
+      "id": "U57",
+      "from": ["B58"],
+      "defect": "Recording an open item from unclear design requires keeping three artifacts consistent by hand — the `// OPEN` code marker, the corresponding work-order item with final-state wording and order, and the board publish — and forgetting the durable counterpart either blocks the turn or loses the issue. One record-open-item should verify the ambiguity and atomically create the code marker, the work-order entry and the board card."
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-// THE OPENAI AUTHORING LANE, decided (point 667). Pure half.
+// THE OPENAI AUTHORING LANE, decided (point 667). Pure half. rule:model-policy@19ee578a
 //
 // `scripts/review-sol.mjs` and `scripts/ask-sol.mjs` send Sol work it may only
 // READ. This lane sends it work it WRITES: a point, on its own branch, in its
@@ -32,7 +32,7 @@
 
 import { ALLOWED_TRAILERS, classifyTrailer, modelNamesIn } from './model-guard-core.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
-import { SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
+import { charStripped, rawFieldValue, stripDecoration, SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 
 export { SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
 
@@ -226,12 +226,13 @@ export const HOUSE_RULES = Object.freeze([
  * reviewed, and these are the findings to answer. That is where the four eyes
  * actually close, so it is the same command rather than a separate one.
  */
-export function buildAuthoringPrompt({ point = '', brief = '', branch = '', findings = '' } = {}) {
+export function buildAuthoringPrompt({ point = '', brief = '', branch = '', findings = '', framing = '' } = {}) {
   const answering = String(findings ?? '').trim()
+  const stance = String(framing ?? '').trim()
   return [
     `You are AUTHORING work-order point ${point} for this repository as ${SOL_MODEL_NAME}.`,
     'You were chosen for it: this project runs two authoring lanes from different vendors, and',
-    'the mechanical and mid-difficulty points are yours. A Claude session then REVIEWS what you',
+    'the points are yours to write — the hard and critical ones included. A Claude session then REVIEWS what you',
     'wrote, runs the browser suites, judges the rendered picture and lands it — so write for a',
     'reviewer who will read every line, and leave nothing you would not defend.',
     '',
@@ -242,6 +243,14 @@ export function buildAuthoringPrompt({ point = '', brief = '', branch = '', find
     // A rule that runs over one line continues INDENTED, not as a second bullet.
     ...HOUSE_RULES.map((rule) => (/^\s/.test(rule) ? `    ${rule.trim()}` : `  - ${rule}`)),
     '',
+    ...(stance
+      ? [
+          'THIS ROUND IS DELIBERATELY RE-FRAMED. Carry this stance through the whole answer:',
+          stance,
+          'The framing supplements the findings and the point; it does not replace either.',
+          '',
+        ]
+      : []),
     answering
       ? [
           'THIS IS THE SECOND LEG: your work was REVIEWED and the findings are below. Answer every',
@@ -266,6 +275,41 @@ export function buildAuthoringPrompt({ point = '', brief = '', branch = '', find
     'DONE: <what you built, in one line>',
     'GATES: <NAME each of test:unit, build and lint with what it did — an unnamed gate reads as one you did not run>',
     'OPEN: <what you left undone or escalated, or the single word none>',
+  ].join('\n')
+}
+
+/**
+ * The non-authoring step immediately before Fable escalation. It gives the
+ * other vendor the point text, the generated brief and every recorded finding
+ * in one read, and asks for the only two outcomes the ledger accepts.
+ */
+export function buildSpecExaminationPrompt({
+  point = '',
+  pointText = '',
+  brief = '',
+  history = {},
+  currentFindings = '',
+} = {}) {
+  const rounds = Array.isArray(history?.rounds) ? history.rounds : []
+  const findings = rounds.length
+    ? rounds.map((round) => `round ${round.freshRound ?? 'repeat'}: ${round.evidence || '(no finding text recorded)'}`).join('\n')
+    : '(no unsuccessful findings recorded)'
+  return [
+    `SPEC EXAMINATION FOR WORK-ORDER POINT ${point} — this is not an authoring commission.`,
+    'Read the point and its generated brief against every recorded finding below.',
+    'Return `sound` if the specification is coherent and the difficulty is real.',
+    'Return `amended` only if the work-order point itself must change; identify the exact amendment.',
+    'Do not run a suite and do not write a commit.',
+    '',
+    '=== POINT TEXT ===',
+    String(pointText ?? '').trim() || '(point text unavailable)',
+    '=== GENERATED POINT BRIEF ===',
+    String(brief ?? '').trim() || '(generated brief unavailable)',
+    '=== FINDINGS SO FAR ===',
+    findings,
+    ...(String(currentFindings ?? '').trim()
+      ? ['=== CURRENT FINDINGS HAND-OFF ===', String(currentFindings).trim()]
+      : []),
   ].join('\n')
 }
 
@@ -327,17 +371,55 @@ export function gatesProblem(gates) {
   return GREEN.test(whole) ? '' : 'it never says the gates PASSED — an absent complaint is not a green run'
 }
 
-/** The closing lines of an authoring answer, read off the END of the message. */
+/** The closing lines of an authoring answer, read off the END of the message.
+ *  MATCHED on the stripped line, QUOTED from the raw one (the one rule): the
+ *  character strip rewrites content — `src/__init__.py` loses its underscores
+ *  — and these three fields are read and reported by the caller. The strip
+ *  removes no newline, so lines pair one to one. */
 export function parseAuthoringAnswer(text) {
-  const clean = String(text ?? '').replace(/[*`_#>]/g, '')
-  const tail = clean.split('\n').map((l) => l.trim()).filter(Boolean).slice(-3)
-  const field = (line, name) => (new RegExp(`^[-*]?\\s*${name}\\s*:\\s*(.+)$`, 'i').exec(line ?? '')?.[1] ?? '').trim()
-  const done = field(tail[0], 'DONE')
-  const gates = field(tail[1], 'GATES')
-  const open = field(tail[2], 'OPEN')
-  if (!done || !gates || !open) return { ok: false, error: 'the message does not end in the DONE/GATES/OPEN lines' }
-  if (/^</.test(done) || /^</.test(gates)) return { ok: false, error: 'the closing lines are the placeholders echoed back' }
-  return { ok: true, done, gates, open, error: '' }
+  // stripDecoration, not character deletion (final-round pass 1): deleting
+  // characters let a fabricated `D_ONE:` label match `DONE:`.
+  const pairs = String(text ?? '')
+    .split('\n')
+    .map((line) => ({ raw: line, clean: stripDecoration(line).trim() }))
+    .filter((p) => p.clean)
+  const tail = pairs.slice(-3)
+  // EVERY RULING — presence and placeholder — reads the STRIPPED captures
+  // (decoration must not change a decision: `**<what you built>**` walked the
+  // raw `/^</` test); the returned values are QUOTED from the raw lines.
+  const cleanField = (pair, name) =>
+    (new RegExp(`^[-*]?\\s*${name}\\s*:\\s*(.+)$`, 'i').exec(pair?.clean ?? '')?.[1] ?? '').trim()
+  const doneClean = cleanField(tail[0], 'DONE')
+  const gatesClean = cleanField(tail[1], 'GATES')
+  const openClean = cleanField(tail[2], 'OPEN')
+  if (!doneClean || !gatesClean || !openClean) {
+    return { ok: false, error: 'the message does not end in the DONE/GATES/OPEN lines' }
+  }
+  // A MARKER-ONLY FIELD IS AN EMPTY FIELD (fourth landing round, pass 1):
+  // the pair strip leaves an unmatched `_` standing, so `DONE: _` and
+  // `OPEN: _` read as answered fields. Presence rules on the net-only
+  // spelling, which deletion cannot fabricate.
+  if (!charStripped(doneClean).trim() || !charStripped(gatesClean).trim() || !charStripped(openClean).trim()) {
+    return { ok: false, error: 'a closing line holds only marker characters — the field was not answered' }
+  }
+  // ALL THREE fields, OPEN included (final-round pass 1): the check covered
+  // only DONE and GATES, so `OPEN: **<what you left undone>**` parsed clean and
+  // judgeAuthoring reported a clean run over an unanswered required field.
+  // RULED ON THE NET-ONLY SPELLING TOO (landing round): an UNPAIRED marker
+  // survives the pair strip, so `OPEN: _<what you left undone>` shielded the
+  // placeholder from the anchored test. Character deletion can only ever
+  // widen this refusal, never clear one.
+  const placeholder = (v) => /^</.test(v) || /^</.test(charStripped(v).trim())
+  if (placeholder(doneClean) || placeholder(gatesClean) || placeholder(openClean)) {
+    return { ok: false, error: 'the closing lines are the placeholders echoed back' }
+  }
+  return {
+    ok: true,
+    done: rawFieldValue(tail[0].raw) || doneClean,
+    gates: rawFieldValue(tail[1].raw) || gatesClean,
+    open: rawFieldValue(tail[2].raw) || openClean,
+    error: '',
+  }
 }
 
 /**
@@ -418,7 +500,15 @@ const short = (sha) => String(sha ?? '').slice(0, 7)
  * is real either way — commits that exist are reviewed and landed or thrown
  * away deliberately, never left lying on a branch nobody looked at.
  */
-export function formatAuthoringReport({ point = '', branch = '', judged = {}, parsed = {}, reviewer = 'Opus 5', pushed = null } = {}) {
+export function formatAuthoringReport({
+  point = '',
+  branch = '',
+  judged = {},
+  parsed = {},
+  reviewer = 'Opus 5',
+  pushed = null,
+  framing = '',
+} = {}) {
   const lines = []
   const commits = judged.commits ?? []
   if (judged.delivered) {
@@ -448,7 +538,8 @@ export function formatAuthoringReport({ point = '', branch = '', judged = {}, pa
     '    2. run the gates and, for a render change, the picture on both backends,',
     `    3. hand the findings back for a second leg:  node scripts/author-sol.mjs --point ${point} --findings <file>`,
     '    4. record the review where a mechanism was touched:',
-    `       node scripts/mechanism-review.mjs --record <sha> --model "${reviewer}" --verdict <v> --evidence "<what you read>" --point ${point}`,
+    `       node scripts/mechanism-review.mjs --record <sha> --model "${reviewer}" --verdict <v> --evidence "<what you read>" --mode review --point ${point}` +
+      `${String(framing).trim() ? ` --author-framing "${String(framing).trim()}"` : ''}`,
     `    5. then land it:  node scripts/land-point.mjs ${point} --model "${SOL_MODEL_NAME}"`,
   )
   return lines.join('\n')

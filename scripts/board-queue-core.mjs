@@ -53,6 +53,10 @@ import {
 import { normaliseLineEndings } from './board-core.mjs'
 import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
+// The pool cap is the width of the queue's front (point 712) — three slots,
+// three candidates. It is IMPORTED rather than restated: a second 3 in this file
+// would be a second home for the number CLAUDE.md §6 states.
+import { POOL_CAP } from './batch-in-flight-core.mjs'
 
 // The stub meta is DEFINED beside the audit rule that exempts it and re-exported
 // here: two copies of that string would be a block loop waiting to happen. The
@@ -792,4 +796,152 @@ export function openPointsOf(tasksText) {
  *  is positive evidence that a half-written file cannot fabricate. */
 export function closedPointsOf(tasksText) {
   return parseTasks(String(tasksText ?? '')).done
+}
+
+// ---- THE QUEUE BINDS THE PICKER (point 712) --------------------------------
+//
+// `queueOrder` above has ranked the board since point 608, and the board has
+// agreed with it since — but NOTHING asked it which point may be STARTED. On
+// 17.08.2026 point 697, a tier-3 polish defect, was commissioned while the
+// derived sequence read `700 701 707 708 711 705 706 710 662 …`; no guard fired,
+// because every existing rule judges the ranking's completeness, the board's
+// agreement with it and the honesty of its cards — never the pick.
+//
+// So the decision lives HERE, beside the ranking it reads, and no second list is
+// introduced: the front of the queue is `queueOrder`'s own head. What the picker
+// may open is decided from that alone.
+
+/** How an override is recorded, and where it becomes visible afterwards. Both
+ *  are named by the refusal — a rule whose remedy is not in its own message is a
+ *  rule the reader has to go and look up. */
+export const COMMISSION_OVERRIDE_CMD = 'node scripts/commission-guard.mjs --override <N> --reason "<why>"'
+
+/** The reporting command that prints every recorded override and park. */
+export const COMMISSION_STATUS_CMD = 'node scripts/commission-guard.mjs --status'
+
+/**
+ * The front-most WORKABLE candidates of the queue. PURE.
+ *
+ * "Workable" is the whole subtlety: the head of `queueOrder` may hold points
+ * that cannot be started at all — one waiting on the user (point 450), one whose
+ * branch is already open — and a front that named those would refuse everything
+ * while offering nothing. Both are SKIPPED, so the window is always `count` real
+ * candidates deep whenever the queue holds that many.
+ *
+ * `count` is the pool cap, deliberately: three slots, three candidates, so the
+ * three agents the pool may run are exactly the three points at the front.
+ */
+export function frontCandidates({ open = [], gates = null, inFlight = [], count = POOL_CAP } = {}) {
+  const g = normaliseGates(gates)
+  const busy = new Set((Array.isArray(inFlight) ? inFlight : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))
+  const want = Number.isFinite(count) && count > 0 ? Math.floor(count) : POOL_CAP
+  const out = []
+  for (const n of queueOrder(open, g)) {
+    if (g.gated.has(n) || busy.has(n)) continue
+    out.push(n)
+    if (out.length >= want) break
+  }
+  return out
+}
+
+/**
+ * MAY WORK BE OPENED ON THIS POINT? PURE.
+ *
+ * Returns { allowed, point, candidates, position, total, override, why }. Every
+ * verdict carries the state that produced it, so the wrapper's message can say
+ * which rule applied and the preflight (point 707) can report it without
+ * re-deciding anything.
+ *
+ * EVERY "cannot judge" ANSWERS ALLOWED, by decision rather than by luck: a call
+ * that names no point, a work order that reads as empty, a point the work order
+ * does not carry (a cross-cutting branch, a hotfix) and a front that offers no
+ * candidate at all are all states in which a refusal would name no alternative.
+ * A guard that blocks while it cannot say what to do instead is a trap.
+ */
+export function commissionDecision({
+  point = null,
+  open = [],
+  gates = null,
+  inFlight = [],
+  cap = POOL_CAP,
+  override = '',
+} = {}) {
+  const g = normaliseGates(gates)
+  const n = Number(point)
+  const reason = String(override ?? '').trim()
+  const known = Number.isInteger(n) && n > 0
+  const order = queueOrder(open, g)
+  const idx = known ? order.indexOf(n) : -1
+  const candidates = frontCandidates({ open, gates: g, inFlight, count: cap })
+  const busy = new Set((Array.isArray(inFlight) ? inFlight : []).map(Number))
+  const out = {
+    point: known ? n : null,
+    candidates,
+    position: idx >= 0 ? idx + 1 : null,
+    total: order.length,
+    override: reason || null,
+  }
+  const ok = (why) => ({ ...out, allowed: true, why })
+  if (!known) return ok('no-point')
+  if (order.length === 0) return ok('no-work-order')
+  if (idx < 0) return ok('not-in-work-order')
+  // A point waiting on the user cannot be worked AT ALL, and that is a different
+  // sentence from "it is behind others" — reporting the second for the first is
+  // how a gate reads as a queue-order quibble.
+  //
+  // IT IS ASKED BEFORE THE IN-FLIGHT QUESTION, and the order is the rule (Sol,
+  // review of 91d88f9a): asked after it, an existing branch for a gated point
+  // bought every further commissioning on it — spawn an agent, start an
+  // authoring run — which is the opposite of "cannot be worked at all". A branch
+  // that already stands does not turn the user's gate into permission; the
+  // recorded override is not an escape here either: the queue's ORDER is mine to
+  // depart from with a reason, the user's gate is not.
+  if (g.gated.has(n)) return { ...out, allowed: false, why: 'user-gated' }
+  // Work already under way is not being OPENED. The refusal fires at the moment
+  // a point is picked up; a session pushing to the branch it already holds, or
+  // re-cutting one that exists, is finishing, not starting.
+  if (busy.has(n)) return ok('already-in-flight')
+  if (candidates.includes(n)) return ok('at-front')
+  if (candidates.length === 0) return ok('no-candidates')
+  if (reason) return ok('override')
+  return { ...out, allowed: false, why: 'behind-front' }
+}
+
+/**
+ * The refusal's wording. PURE, so it is pinned by a test rather than left to a
+ * script: the point requires it to NAME the candidates it expected and the
+ * refused point's own position, and to say how an override is taken.
+ *
+ * EVERY REFUSAL NAMES THE REMEDY THAT ACTUALLY LIFTS IT, AND NO OTHER (spec,
+ * fourth review finding 13). The GATED refusal therefore never prints the
+ * override command: an override recorded for a gated point is deliberately not
+ * honoured (`commissionDecision` asks the gate first), so a reader who followed
+ * that printed remedy would record a reason the decision then ignores and be
+ * denied again — the block-loop class that cost ~30 turns on 24.07.2026. What
+ * lifts a gate is the USER'S WORD, closing the point's AWAITING-USER line in
+ * the work order, and that is what the refusal says.
+ */
+export function commissionRefusal(decision = {}) {
+  const n = decision?.point ?? '?'
+  const names = (Array.isArray(decision?.candidates) ? decision.candidates : []).join(', ')
+  const front = names ? `the front of the queue holds ${names}` : 'the queue offers no workable candidate'
+  const total = decision?.total ?? 0
+  const where =
+    decision?.position != null
+      ? `the work order ranks it ${decision.position} of ${total} open points`
+      : 'the work order does not rank it'
+  if (decision?.why === 'user-gated') {
+    return (
+      `POINT ${n} IS WAITING ON THE USER (its AWAITING-USER line in the work order), so no work may be opened ` +
+      `on it: ${front}. The ONLY thing that lifts this is the user's answer — his word closes the point's ` +
+      'AWAITING-USER line, and the point becomes workable in the same moment. A recorded override is ' +
+      'deliberately NOT honoured for a gated point, so do not record one: work a front candidate, or ask the ' +
+      'user (the board carries the decision card).'
+    )
+  }
+  const remedy =
+    `Work one of those instead, or RECORD why ${n} goes first: ${COMMISSION_OVERRIDE_CMD}. ` +
+    `The reason is stored with the point and printed by \`${COMMISSION_STATUS_CMD}\`, so an override stays ` +
+    'visible afterwards — overriding is allowed, taking it silently is not.'
+  return `COMMISSIONING POINT ${n} ANSWERS TO NOTHING: ${where}, while ${front}. ${remedy}`
 }

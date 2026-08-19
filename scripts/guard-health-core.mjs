@@ -56,6 +56,121 @@ export const INTENTIONALLY_DORMANT = {
     'cleared before it is armed: it reports 29 open points in no bundle of docs/work-packages.md, which is ' +
     'the drift it exists to catch, and a worktree agent may not edit that file either. Reconcile the scheme ' +
     '(`node scripts/bundle-first-guard.mjs --status`), THEN wire it and REMOVE THIS ENTRY IN THE SAME COMMIT.',
+  'context-fence-guard.mjs':
+    'Built 17.08.2026 by a worktree agent (point 700), which may not touch .claude/settings.json — the ' +
+    'PreToolUse line ("Edit|Write|NotebookEdit|Agent|Task|Bash|PowerShell" → node scripts/context-fence-guard.mjs) ' +
+    'is a protected-path edit and needs an attended session. Its core and its spawned wrapper are fully ' +
+    'tested, so it is correct the moment it is armed. REMOVE THIS ENTRY IN THE SAME COMMIT THAT ADDS THE ' +
+    'HOOK LINE.',
+  // commission-guard.mjs left this map on 18.08.2026, in the commit that added
+  // its PreToolUse line ("Agent|Task|Bash|PowerShell") — the rule above, kept.
+}
+
+/**
+ * IS THIS ENFORCER WIRED, AND ON THE EVENT AND TOOLS IT NEEDS? PURE, over the
+ * settings TEXT.
+ *
+ * The blunt question the map above answers from MEMORY, asked of the FACT
+ * instead, and asked of the STRUCTURE rather than of the characters: the first
+ * cut scanned the whole file for the basename, so a malformed settings file, a
+ * name inside another guard's arguments, or the guard wired on the WRONG event
+ * all read as armed (Sol, review of dd7fd78c). A guard that reports itself armed
+ * while it refuses nothing is the failure this module exists for, and it is
+ * worse coming from the guard's own mouth — so anything that does not parse, or
+ * parses without the entry, is NOT wired.
+ *
+ * `event` narrows to one hook event (`PreToolUse`, `Stop`, …); `tools` demands
+ * that the entry's matcher name every one of them, because a hook that never
+ * sees the call that opens work refuses nothing either.
+ */
+export function isEnforcerWired(settingsText, name, { event = null, tools = [] } = {}) {
+  const wanted = String(name ?? '').trim()
+  if (!wanted) return false
+  let parsed
+  try {
+    parsed = JSON.parse(String(settingsText ?? ''))
+  } catch {
+    return false
+  }
+  const hooks = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed.hooks : null
+  if (!hooks || typeof hooks !== 'object' || Array.isArray(hooks)) return false
+  const events = event ? [event] : Object.keys(hooks)
+  const needed = (Array.isArray(tools) ? tools : [tools]).map((t) => String(t)).filter(Boolean)
+  const covered = new Set()
+  for (const ev of events) {
+    for (const entry of Array.isArray(hooks[ev]) ? hooks[ev] : []) {
+      const names = (Array.isArray(entry?.hooks) ? entry.hooks : []).some((h) =>
+        h?.type === 'command' && executedScriptRefs(h?.command).some((ref) => ref.split(/[/\\]/).pop() === wanted),
+      )
+      if (!names) continue
+      if (needed.length === 0) return true
+      for (const tool of needed) if (matcherCoversTool(entry?.matcher, tool)) covered.add(tool)
+    }
+  }
+  return needed.length > 0 && needed.every((tool) => covered.has(tool))
+}
+
+/**
+ * The script each shell segment EXECUTES — never one that is merely an ARGUMENT
+ * (fourth review, finding 14: `node scripts/other-guard.mjs --config
+ * scripts/commission-guard.mjs` reported the commission guard ARMED, the exact
+ * failure the structural parse was installed to end). The rule: a command is
+ * read segment by segment (`&&`, `||`, `;`, `|`, `&`, newline), and the FIRST
+ * script's arguments. A segment only counts when its command is Node and the
+ * path is Node's entry script. Thus `echo scripts/x.mjs`, `git diff --
+ * scripts/x.mjs`, and `node --check scripts/x.mjs` execute no guard.
+ */
+export function executedScriptRefs(command) {
+  const out = []
+  for (const seg of String(command ?? '').split(/\n|&&|\|\||[;|&]/)) {
+    const tokens = seg.match(/"(?:\\.|[^"])*"|'[^']*'|\S+/g) ?? []
+    const unquote = (token) => String(token ?? '').replace(/^(['"])(.*)\1$/, '$2')
+    const program = unquote(tokens.shift())
+    if (!/(?:^|[/\\])node(?:\.exe)?$/i.test(program)) continue
+    let entry = ''
+    for (let i = 0; i < tokens.length; i += 1) {
+      const token = unquote(tokens[i])
+      if (token === '--check' || token === '-c' || token === '--eval' || token === '-e' || token === '--print' || token === '-p') {
+        entry = ''
+        break
+      }
+      if (token === '--require' || token === '-r' || token === '--import') {
+        i += 1
+        continue
+      }
+      if (token === '--') {
+        entry = unquote(tokens[i + 1])
+        break
+      }
+      if (token.startsWith('-')) continue
+      entry = token
+      break
+    }
+    const ref = entry.match(SCRIPT_REF_RE)?.[0]
+    if (ref) out.push(ref)
+  }
+  return out
+}
+
+/**
+ * DOES THIS MATCHER COVER THIS TOOL? The harness treats a PreToolUse matcher as
+ * a full-string pattern per tool name, so it is judged HERE the same way — a
+ * bare substring test read `SubAgent|TaskOutput|BashTool|PowerShellX` as
+ * covering Agent/Task/Bash/PowerShell while it matches none of them (fourth
+ * review, finding 15). `''` and `'*'` match every tool, as the harness does; a
+ * matcher that is not a valid pattern covers NOTHING: the harness cannot
+ * reliably fire it, and salvaging valid-looking alternatives would recreate a
+ * false ARMED report.
+ */
+export function matcherCoversTool(matcher, tool) {
+  const m = String(matcher ?? '').trim()
+  if (m === '' || m === '*') return true
+  const t = String(tool ?? '')
+  try {
+    return new RegExp(`^(?:${m})$`).test(t)
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -150,6 +265,18 @@ export function refAnchoring(ref) {
   // The braces must MATCH: `"${CLAUDE_PROJECT_DIR/scripts/x.mjs"` is a bad
   // substitution at runtime, and an independently optional `{`/`}` cleared it.
   if (/^(\$CLAUDE_PROJECT_DIR|\$\{CLAUDE_PROJECT_DIR\}|%CLAUDE_PROJECT_DIR%)[/\\]/.test(text)) return 'project-dir'
+  // A DEFAULTED form counts ONLY when its default is itself ABSOLUTE:
+  // `${CLAUDE_PROJECT_DIR:-/srv/hoa}/scripts/x.mjs` fires from any cwd whether
+  // the variable is set or not, which is this function's whole contract.
+  // `:-.` does NOT qualify and `:-` (empty) least of all — the first is
+  // cwd-relative when the variable is unset, the second expands to the already
+  // rejected `/scripts/x.mjs`. I first accepted any default on the argument that
+  // it is "never worse than the bare form"; Sol's re-review of 044ec3dd showed
+  // that misses the point — the contract is ANY working directory, not "no worse
+  // than the other broken one", and the test then merely pinned the
+  // misclassification. A `:-.` line is an unfinished rollout line and belongs in
+  // RELATIVE_WIRING_ROLLOUT, where it is visible, not silently blessed here.
+  if (/^\$\{CLAUDE_PROJECT_DIR:-[/\\][^}]*\}[/\\]/.test(text)) return 'project-dir'
   if (/^([A-Za-z]:[/\\]|[/\\])/.test(text)) return 'absolute'
   return 'relative'
 }
@@ -251,6 +378,11 @@ export const RELATIVE_WIRING_ROLLOUT = {
     'queue-order-guard.mjs',
     'render-verify-guard.mjs',
     'retro-currency-guard.mjs',
+    // Wired 17.08.2026 as `${CLAUDE_PROJECT_DIR:-.}/scripts/rule-echo-guard.mjs`.
+    // The default makes it fire from the repo root when the variable is unset,
+    // which is better than the bare form but still not "from ANY cwd" — so it is
+    // an unfinished rollout line like the rest, recorded rather than blessed.
+    'rule-echo-guard.mjs',
     'rule-review-guard.mjs',
     'tasks-archive-guard.mjs',
     'tasks-spec-guard.mjs',

@@ -26,19 +26,31 @@
 // CLI:
 //   node scripts/mechanism-review-guard.mjs --status
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { execSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
 import { dirname } from 'node:path'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
-import { readRecords } from './mechanism-review.mjs'
+import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import {
   evaluateMechanismReview,
   formatMechanismReviewVerdict,
   mechanismPathsIn,
   modelFromTrailers,
   modelsFromTrailers,
+  mergeProblem,
+  reviewRecordWellFormed,
 } from './mechanism-review-core.mjs'
+import {
+  commitsForContributions,
+  mechanismLogCommand,
+  outstandingContributions,
+  parseRangeLog as parseWholeRangeLog,
+  planAuthorshipGroups,
+  summarizeReviewDebt,
+} from './mechanism-review-range-core.mjs'
+import { quotePassFile, unquoteGitPath } from './review-material-core.mjs'
+import { guardOutcome, reviewGapRange } from './mechanism-review-guard-gap-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 
@@ -47,13 +59,23 @@ const PAUSE = repoPath('.claude/batch-paused')
  *  while the ledger that must travel — the reviews — is the tracked one. */
 export const BASELINE_PATH = repoPath('.claude/mechanism-review-baseline.json')
 
-/** Record/field separators for the one `git log` this guard runs. Plain ASCII:
- *  a raw control byte or a `%`-pair in the command line is a Windows shell
- *  hazard, and this hook runs on Windows. */
-const REC = '__C__'
-const FLD = '__F__'
+// The record/field sentinels and the header shape of the one `git log` this
+// guard runs now live with the parser that owns them, in
+// mechanism-review-range-core.mjs — including WHY they are raw control bytes
+// and why the header carries no free text. This file only consumes them.
 
 const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+
+/** The NO-SHELL lane for the two path-carrying commands (round-5 pass 3): on
+ *  Windows, execSync routes through cmd.exe, which expands `%x1e%`-shaped
+ *  spans as environment variables BEFORE git sees the format string — the
+ *  headers then never appear and an empty parse would clear the gate. An args
+ *  array through execFileSync reaches git verbatim on every platform. The
+ *  output is UNTRIMMED — its last line can be a PATH, and trimming the log
+ *  would strip a real trailing space off it (cross-vendor review, third
+ *  round). */
+const gitRawFile = (args) =>
+  execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })
 
 /**
  * True when `sha` names no reachable commit — the ONE condition under which an
@@ -154,35 +176,98 @@ function scriptFiles() {
  *  bite on the record the trapped session would write. `cc` shows only what the
  *  merge changed against ALL its parents: nothing for a clean merge, the
  *  resolution delta for an evil one. */
-function mechanismCommits(base, head, files) {
-  const out = git(
-    `log --format="${REC}%H${FLD}%ct${FLD}%s${FLD}%(trailers:key=Co-Authored-By,valueonly,separator=;)" ` +
-      `--name-only --diff-merges=cc --reverse "${base}..${head}"`,
-  )
-  const commits = []
-  for (const chunk of out.split(REC)) {
-    if (!chunk.trim()) continue
-    const lines = chunk.split('\n')
-    const [sha, ct, subject, trailers] = lines[0].split(FLD)
-    if (!sha) continue
-    const touched = lines
-      .slice(1)
-      .map((l) => l.trim())
-      .filter(Boolean)
-    const mech = mechanismPathsIn(touched, { scriptFiles: files })
-    if (!mech.length) continue
-    commits.push({
-      sha: sha.trim(),
-      at: Number(ct) * 1000 || 0,
-      subject: (subject ?? '').trim(),
-      authorModel: modelFromTrailers(trailers),
-      // EVERY co-author, not only the first: a commit naming two models has two
-      // list authors, and neither may merge the union (point 634).
-      authorModels: modelsFromTrailers(trailers),
-      files: mech,
-    })
+/**
+ * The pure half of mechanismCommits: the raw `git log --name-only` output,
+ * parsed into the commits that touch a mechanism path. EXPORTED for the test —
+ * the parsing IS the gate's view of the tree, and two of its old habits each
+ * blinded it to a legal path (cross-vendor review, second and third rounds):
+ *
+ *  - a path is read BYTE-EXACT, never trimmed. git does not quote a plain
+ *    leading or trailing space, so `scripts/git-hooks/check ` printed as-is and
+ *    the trim turned it into a DIFFERENT path — one a pass record could then
+ *    name in the trimmed spelling and satisfy the union without anyone reading
+ *    the changed file. Only a trailing `\r` is stripped: a path really ending
+ *    in `\r` is git-quoted, so a bare one is line-ending noise.
+ *  - a header is a LINE matching the full header shape, never a `split(REC)`:
+ *    the sentinel is a legal path substring, and the split cut such a commit's
+ *    record in half. RESIDUAL, accepted: a committed path whose whole line
+ *    mimics the header shape (sentinel + 40-hex sha + epoch) would still be
+ *    read as one — that shape names itself as adversarial, and git quotes any
+ *    path that could smuggle a newline to fake a line of its own.
+ *
+ * The header carries NO free-text field — the subject and the trailers travel
+ * per commit through commitFacts (escalation round, pass 2) — so this parser
+ * returns { sha, at, files } and the wrapper adds who wrote it.
+ *
+ * git QUOTES a path with a tab, a quote or a high byte in it, and the quoted
+ * form matches neither a mechanism path nor a pass record's file list — so
+ * every path line goes through unquoteGitPath.
+ */
+export function parseRangeLog(out) {
+  return parseWholeRangeLog(out, { decodePath: unquoteGitPath })
+}
+
+export function parseMechanismLog(out, files) {
+  return parseRangeLog(out)
+    .map((commit) => ({ ...commit, files: mechanismPathsIn(commit.files, { scriptFiles: files }) }))
+    .filter((commit) => commit.files.length)
+}
+
+/**
+ * The free-text facts of ONE commit — its subject and its co-author trailers —
+ * each through its own single-format `git show`, so no separator exists for a
+ * crafted subject to forge (escalation round, pass 2: the combined format's
+ * separator inside a legal subject shifted the trailers out of their field,
+ * and the self-review refusal read an empty author). Two calls per PENDING
+ * MECHANISM commit only — the common turn has none.
+ */
+function commitFacts(sha) {
+  return {
+    subject: git(`show -s --format=%s "${sha}"`),
+    trailers: git(`show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${sha}"`),
   }
-  return commits
+}
+
+/**
+ * The two path-carrying git commands, built pure so the unit layer can pin
+ * their flags (round-1 pass 2, both findings):
+ *  - `-c core.quotepath=on` makes the LOG's path spelling CONFIG-INDEPENDENT:
+ *    with a user's `core.quotePath=false`, a legal non-UTF-8 file name arrived
+ *    as raw bytes and the UTF-8 decode collapsed distinct paths into one
+ *    replacement-character spelling. Quoted-on, every such byte travels as a
+ *    pure-ASCII octal escape and unquoteGitPath decodes it; what remains
+ *    undecodable surfaces as U+FFFD, which the pass records can never name
+ *    (parsePassFiles refuses it), so a conflated path can only ever DENY a
+ *    clearance. (The -z range listing below never quotes, by design.)
+ *  - `--no-renames` closes the rename-out blindness: with rename detection on,
+ *    `--name-only` reports only the DESTINATION, so renaming a guard to an
+ *    ordinary path hid the mechanism's removal from the gate. Split into
+ *    delete + add, BOTH spellings are listed and the old guard path still
+ *    demands its review.
+ */
+export { mechanismLogCommand }
+
+export const rangeFilesCommand = (base, sha) => [
+  'diff',
+  '--name-only',
+  '-z',
+  '--no-renames',
+  `${base}..${sha}`,
+]
+
+function rangeCommits(base, head, files) {
+  const out = gitRawFile(mechanismLogCommand(base, head))
+  return parseRangeLog(out).map((commit) => {
+    const trailers = git(`show -s --format="%(trailers:key=Co-Authored-By,valueonly,separator=;)" "${commit.sha}"`)
+    return {
+      ...commit,
+      authorModel: modelFromTrailers(trailers),
+      // EVERY co-author, not only the first: a commit naming two models has
+      // two list authors, and neither may merge the union (point 634).
+      authorModels: modelsFromTrailers(trailers),
+      mechanismFiles: mechanismPathsIn(commit.files, { scriptFiles: files }),
+    }
+  })
 }
 
 /**
@@ -215,16 +300,22 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
   // baseline sits on main, and a two-dot diff would re-show main's own (already
   // confirmed) mechanism work as pending.
   let base = baseline
+  let rangeBase = null
   try {
     base = git(`merge-base "${baseline}" "${head}"`)
+    if (base) rangeBase = base
   } catch {
     /* unrelated baseline — the raw range below decides, or re-arms us at HEAD */
   }
   let effective = baseline
   let pendingCommits = []
+  let commits = []
   if (base !== head) {
     try {
-      pendingCommits = mechanismCommits(base, head, scriptFiles())
+      commits = rangeCommits(base, head, scriptFiles())
+      pendingCommits = commits
+        .filter((commit) => commit.mechanismFiles.length)
+        .map((commit) => ({ ...commit, subject: commitFacts(commit.sha).subject, files: commit.mechanismFiles }))
     } catch (e) {
       // ONLY a baseline that is genuinely GONE may move the gate. A baseline
       // rebased away or gc'd makes the range undiffable forever, and falling
@@ -244,12 +335,17 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
       // looking would be the same silent pass in a new place.
       effective = bootstrapBase(head)
       base = effective
+      rangeBase = null
       try {
         base = git(`merge-base "${effective}" "${head}"`)
+        if (base) rangeBase = base
       } catch {
         /* the raw range below decides */
       }
-      pendingCommits = base === head ? [] : mechanismCommits(base, head, scriptFiles())
+      commits = base === head ? [] : rangeCommits(base, head, scriptFiles())
+      pendingCommits = commits
+        .filter((commit) => commit.mechanismFiles.length)
+        .map((commit) => ({ ...commit, subject: commitFacts(commit.sha).subject, files: commit.mechanismFiles }))
     }
   }
 
@@ -258,20 +354,52 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
   // ledger is not even read then: the overwhelmingly common turn changes no
   // mechanism at all, and a hook that costs a process per ledger line on every
   // turn end is a hook people switch off.
-  const records = attachCoverage({
+  // Carried rows are RE-MEASURED on every read (delta rounds, 18.08.2026):
+  // the blob-identity stamp is the wrapper's, never the ledger's own word.
+  const records = verifyCarried(attachCoverage({
     pendingCommits,
     allRecords: pendingCommits.length ? readRecords() : [],
     effective,
     head,
     revList: (rev) => git(`rev-list ${rev} --not ${effective}`),
+    // WHAT A RECORD AT THAT SHA WOULD CLEAR — every file of its range, not only
+    // the pending commits' mechanism paths (escalation round, passes 1 and 2):
+    // this parser keeps only mechanism paths, so a pass composition judged
+    // against them alone could read complete while ordinary files of the
+    // reviewed range were in no pass — a whole-range clearance over files
+    // nobody read. `-z` hands the paths over raw, exactly as gatherRange and
+    // the pass records spell them. FROM THE SAME MERGE-BASE as the pending
+    // commits (round-3 pass 3): diffing from the raw stored baseline describes
+    // a DIFFERENT file set on a branch whose baseline is no ancestor —
+    // main-only changes leak in, identical branch changes vanish — so the
+    // completeness demand and the detection would talk about different ranges.
+    rangeFiles: (sha) => gitRawFile(rangeFilesCommand(base, sha)).split('\0').filter(Boolean),
+  }))
+
+  // A scoped pass advances only the commit/file contribution it actually read.
+  // The remaining contribution list is both the gate's debt and the next pass
+  // plan's input; a cleared file therefore never returns merely because HEAD
+  // moved elsewhere in the range.
+  const debt = outstandingContributions({
+    commits,
+    records,
+    recordUsable: (record, commit) => reviewRecordWellFormed(record) && !mergeProblem(record, commit),
   })
+  const authorshipPlan = planAuthorshipGroups({ commits: commitsForContributions(debt.outstanding) })
 
   return {
     applicable: true,
     head,
     branch,
     baseline: effective,
+    // Null if git could not establish a merge-base: pending detection may keep
+    // using its conservative raw fallback, but that unproved range can never
+    // support a gap waiver.
+    rangeBase,
     inputs: { baseline: effective, head, pendingCommits, records },
+    commits,
+    debt,
+    authorshipPlan,
   }
 }
 
@@ -300,7 +428,7 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
  * `effective..head`. A record at or before `effective` reaches nothing that
  * `effective` does not, so its contained set is empty by construction.
  */
-export function attachCoverage({ pendingCommits = [], allRecords = [], head, revList }) {
+export function attachCoverage({ pendingCommits = [], allRecords = [], head, revList, rangeFiles = null }) {
   const lines = (rev) =>
     new Set(
       String(revList(rev) ?? '')
@@ -308,12 +436,36 @@ export function attachCoverage({ pendingCommits = [], allRecords = [], head, rev
         .map((l) => l.trim())
         .filter(Boolean),
     )
-  // Call 1 of 1 + R: the whole branch range, which selects the records at all.
+  // Call 1 of 1 + 2R: the whole branch range, which selects the records at all.
   const branchRange = pendingCommits.length ? lines(head) : new Set()
   const records = (pendingCommits.length ? allRecords : []).filter((r) => branchRange.has(r.sha))
-  // Calls 2..1+R: one per SURVIVING record — the reviews recorded on this
-  // branch, never the whole ledger.
-  for (const r of records) r.containedShas = lines(r.sha)
+  // Calls 2..1+2R: two per SURVIVING record — the reviews recorded on this
+  // branch, never the whole ledger. `rangeFiles` is what a record at that sha
+  // would CLEAR: the file set of `effective..record.sha`, which the gate holds
+  // a pass composition's union against (escalation round). An unanswerable
+  // diff attaches nothing, and the gate then falls back to the pending
+  // commit's own mechanism paths — a NARROWER expected set, so the failure
+  // can only ever demand less, never clear more.
+  for (const r of records) {
+    r.containedShas = lines(r.sha)
+    // MEASURED HERE OR NOT AT ALL (round-4 pass 3): the ledger accepts extra
+    // fields, so a hand-written row could arrive CARRYING a rangeFiles of its
+    // own — and surviving the failed measurement below, it would stand in for
+    // the trusted diff. The field is stripped before the measurement, so the
+    // only value it can ever hold is this guard's own.
+    delete r.rangeFiles
+    if (rangeFiles) {
+      try {
+        const files = rangeFiles(r.sha)
+        if (Array.isArray(files)) r.rangeFiles = files.map((f) => String(f))
+      } catch {
+        /* unanswered — rangeFiles stays absent, and the evaluator treats an
+           unmeasured range as UNKNOWN coverage, which BLOCKS (round-3 pass 3:
+           the old fallback narrowed the demand to the commit's own paths
+           exactly when nothing could say what the range really changed) */
+      }
+    }
+  }
   for (const c of pendingCommits) {
     c.coveringRecordShas = records.filter((r) => r.containedShas?.has(c.sha)).map((r) => r.sha)
   }
@@ -338,22 +490,98 @@ if (isMainModule(import.meta.url)) {
 
     const verdict = evaluateMechanismReview(gathered.inputs)
 
+    // THE GAP CLAUSE (point 714, c06a02d2): while the range's material CANNOT
+    // be assembled for review at all, demanding that review traps the session
+    // — so a blocking turn first MEASURES the range against the budget. A gap
+    // is reported and the turn may end; the block resumes the moment the
+    // material fits or splits into coverable passes. Loaded lazily: the common
+    // clear turn measures nothing, and a failed assessment rules NO gap — an
+    // unmeasured claim never waives the gate. It fires for BOTH block shapes —
+    // no record at all, and a standing do-not-merge whose re-review the range
+    // cannot deliver (the trap's second door, measured 18.08.2026) — keyed on
+    // the measurement alone, never on what a verdict's prose said; the count of
+    // standing refusals travels into the report from the STRUCTURED findings.
+    let gap = null
+    const gapRange = reviewGapRange({
+      blocked: verdict.block,
+      base: gathered.rangeBase,
+      head: gathered.head,
+    })
+    if (gapRange) {
+      try {
+        const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+        gap = await assessReviewGap({
+          ...gapRange,
+          standingRecords: (verdict.findings ?? []).filter((f) => f.kind === 'do-not-merge').length,
+        })
+      } catch {
+        /* no ruling — the block below stands */
+      }
+    }
+    const outcome = guardOutcome({ blocked: verdict.block, gap })
+
     if (status) {
+      let statusPlan = null
+      if (gathered.rangeBase && gathered.head && (gathered.debt?.outstanding ?? []).length) {
+        try {
+          // Use the SAME authorship-then-size planner that prints the runnable
+          // review-sol commands. Counting authorship groups alone understates
+          // the debt whenever one group needs several budget-sized rounds.
+          // What this counts is ROUNDS FOR THE STILL-OWED CONTRIBUTIONS, freshly
+          // planned — not the pass NUMBERING of the whole range, which review-sol
+          // keeps stable per commit so a recorded pass number never shifts. The
+          // two differ by construction: on 18.08.2026 the owed debt was one round
+          // here while review-sol still listed it as four of its fifteen passes.
+          const { buildAuthorshipPassPlan } = await import('./review-sol.mjs')
+          statusPlan = buildAuthorshipPassPlan({
+            sha: gathered.head,
+            base: gathered.rangeBase,
+            commits: commitsForContributions(gathered.debt.outstanding),
+          })
+        } catch {
+          /* the status names an unavailable plan instead of inventing a count */
+        }
+      }
       console.log(`HEAD:      ${gathered.head.slice(0, 7)} (branch ${gathered.branch})`)
       console.log(`baseline:  ${String(gathered.baseline ?? '<none — arms at this HEAD>').slice(0, 7)}`)
       const pending = gathered.inputs.pendingCommits ?? []
       console.log(`mechanism commits since the baseline: ${pending.length}`)
       for (const c of pending) {
         console.log(
-          `  ${c.sha.slice(0, 7)}  ${c.files.join(', ')}\n      authored by ${c.authorModel || 'unknown'}, ` +
+          // Quoted like every structural path list (round-3 pass 3): the log
+          // parser unquotes git's spelling, so a legal newline or comma in a
+          // name could forge a --status line if joined raw.
+          `  ${c.sha.slice(0, 7)}  ${c.files.map((f) => quotePassFile(f)).join(', ')}\n      authored by ${c.authorModel || 'unknown'}, ` +
             `${c.coveringRecordShas.length} covering review(s)`,
         )
       }
-      console.log(verdict.block ? `\n${formatMechanismReviewVerdict(verdict)}` : '\nGATE CLEAR')
+      const debtStatus = summarizeReviewDebt({ outstanding: gathered.debt?.outstanding, sizedPlan: statusPlan })
+      console.log(`outstanding review passes: ${debtStatus.passCount ?? '<plan unavailable>'}`)
+      const outstandingMaterial = debtStatus.materialChars === null
+        ? '<measurement unavailable>'
+        : `${debtStatus.materialChars} characters`
+      console.log(
+        `outstanding material: ${outstandingMaterial}`,
+      )
+      for (const group of debtStatus.groups.length ? debtStatus.groups : gathered.authorshipPlan?.groups ?? []) {
+        console.log(
+          `  ${(group.authorshipKind ?? group.kind) === 'commit' ? `commit ${group.commits[0].slice(0, 7)}` : `${group.vendor ?? 'authored'} files`} → ` +
+            `${group.reviewer || 'NO ELIGIBLE REVIEWER'}: ${group.files.map((f) => quotePassFile(f)).join(', ')}`,
+        )
+      }
+      if (outcome.action === 'report-gap') console.log(`\n${gap.report}`)
+      else console.log(verdict.block ? `\n${formatMechanismReviewVerdict(verdict)}` : '\nGATE CLEAR')
       process.exit(0)
     }
 
-    if (verdict.block) {
+    if (outcome.action === 'report-gap') {
+      // The gap holds: name it where the session sees it, and let the turn
+      // end. Deliberately NOT a baseline advance — the demand is suspended,
+      // never satisfied, and blocking resumes when the material fits again.
+      console.error(gap.report)
+      process.exit(0)
+    }
+    if (outcome.action === 'block') {
       process.stdout.write(
         JSON.stringify({ decision: 'block', reason: formatMechanismReviewVerdict(verdict) }),
       )

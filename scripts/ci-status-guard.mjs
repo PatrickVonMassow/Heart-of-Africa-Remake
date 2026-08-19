@@ -29,10 +29,11 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { request } from 'node:https'
-import { fileURLToPath } from 'node:url'
 import { readJson, writeJsonAtomic } from './dashboard-state.mjs'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import {
   failedRuns,
+  ciRedAlertMessage,
   notifiedFromState,
   pruneFamine,
   pruneNotifiedRefs,
@@ -41,18 +42,30 @@ import {
   refTargets,
   sweepTargets,
 } from './ci-status-guard-core.mjs'
-import { JOBS_PAGE_SIZE, classifyFailureCause, jobsComplete, moreJobPages } from './ci-failure-cause-core.mjs'
+import {
+  JOBS_PAGE_SIZE,
+  PAGES_WORKFLOW,
+  classifyFailureCause,
+  failedJobNames,
+  jobsComplete,
+  moreJobPages,
+} from './ci-failure-cause-core.mjs'
+import {
+  INSPECT_LIMIT,
+  blockingDeployments,
+  candidateDeployments,
+} from './pages-deploy-unblock-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { isMainModule } from './is-main.mjs'
 
-const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
-const PAUSE = fileURLToPath(new URL('../.claude/batch-paused', import.meta.url))
-const STATE = fileURLToPath(new URL('../.claude/ci-status-guard-state.json', import.meta.url))
-const NTFY_TOPIC_FILE = fileURLToPath(new URL('../.claude/ntfy-topic', import.meta.url))
+const PAUSE = repoPath('.claude/batch-paused')
+const STATE = repoPath('.claude/ci-status-guard-state.json')
+const NTFY_TOPIC_FILE = repoPath('.claude/ntfy-topic')
 // The PAT lives OUTSIDE version control; candidates in preference order. Read
 // at call time, never logged. Missing token → unauthenticated (public repo,
 // lower rate limit) → still works; API failure → fail-open.
 const TOKEN_PATHS = [
-  fileURLToPath(new URL('../.secrets/github-token', import.meta.url)),
+  repoPath('.secrets/github-token'),
   'C:\\Users\\Patri\\.claude\\projects\\c--Users-Patri-Documents-Developing-hoa\\.secrets\\github-token',
 ]
 
@@ -205,7 +218,7 @@ async function workflowsUntouchedSince(repo, runs, runClassification, head) {
  *  scope widens rather than narrows on doubt. */
 function callsAReusableWorkflow(path) {
   try {
-    return /uses:\s*\.\/\.github\/workflows\//.test(readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'))
+    return /uses:\s*\.\/\.github\/workflows\//.test(readFileSync(repoPath(path), 'utf8'))
   } catch {
     return true
   }
@@ -277,6 +290,49 @@ async function fetchJobs(repo, runId) {
   return jobsComplete({ fetched: jobs.length, totalCount }) ? jobs : null
 }
 
+/** Read-only proof of which Pages deployments can still be holding the queue.
+ * `[]` is returned only when the complete probe proves there is no blocker;
+ * null means the API could not decide, and keeps the conservative old refusal. */
+async function fetchPagesBlockers(repo) {
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'hoa-ci-status-guard',
+    'X-GitHub-Api-Version': '2022-11-28',
+  }
+  const token = readToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const listed = await httpsRequest(
+    `https://api.github.com/repos/${repo}/deployments?environment=github-pages&per_page=${INSPECT_LIMIT}`,
+    { headers },
+  )
+  if (!listed || listed.status !== 200) return null
+  let candidates
+  try {
+    candidates = candidateDeployments(JSON.parse(listed.body))
+  } catch {
+    return null
+  }
+  const inspected = []
+  for (const candidate of candidates) {
+    const res = await httpsRequest(
+      `https://api.github.com/repos/${repo}/pages/deployments/${candidate.sha}`,
+      { headers },
+    )
+    if (!res) return null
+    if (res.status === 404) {
+      inspected.push({ ...candidate, status: 'not_found' })
+      continue
+    }
+    if (res.status !== 200) return null
+    try {
+      inspected.push({ ...candidate, status: JSON.parse(res.body)?.status ?? '' })
+    } catch {
+      return null
+    }
+  }
+  return blockingDeployments(inspected)
+}
+
 /** ntfy push, same channel as scripts/notify.mjs but via node:https (see top).
  *  Silent no-op without a configured topic; failures never break the guard. */
 async function notifyCiRed(message) {
@@ -342,10 +398,17 @@ async function judgeRed(repo, { sha, runs, classification, famine, now }) {
   const judged = []
   const stillFamished = {}
   for (const red of reds.length > 0 ? reds : [classification]) {
+    const jobs = await fetchJobs(repo, red.runId)
+    const failed = failedJobNames(jobs)
+    const pagesBlockers =
+      red.workflowName === PAGES_WORKFLOW && failed.length > 0 && failed.every((name) => name === 'deploy')
+        ? await fetchPagesBlockers(repo)
+        : null
     const cause = classifyFailureCause({
       workflowName: red.workflowName,
       conclusion: red.conclusion,
-      jobs: await fetchJobs(repo, red.runId),
+      jobs,
+      pagesBlockers,
       workflowsUntouched: await workflowsUntouchedSince(repo, runs, red, sha),
       famineSince: Number(famine[red.workflowName]) || 0,
       now,
@@ -365,20 +428,29 @@ async function judgeRed(repo, { sha, runs, classification, famine, now }) {
   }
 }
 
-/** Returns the block-decision JSON string, or null to allow. */
-async function main() {
-  let sid = ''
-  try {
-    sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
-  } catch {
-    /* no/non-JSON stdin (manual run) — CI state is global truth, not session-local */
+/** The wrapper's own CI gathering, shared with guard-preflight. `readOnly` still
+ * asks GitHub — that network verdict is the point — but bypasses the terminal
+ * cache and performs no state write or ntfy alert. */
+export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } = {}) {
+  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
+  if (heldByOtherLiveOwner(sessionId)) {
+    return {
+      applicable: false,
+      why: 'another live session owns the batch lock',
+      cause: 'not-lock-owner',
+    }
   }
 
-  if (existsSync(PAUSE)) return null // user-paused: no batch duty in flight
-  if (heldByOtherLiveOwner(sid)) return null // hard singleton: a non-owner session stands down — no batch duty
-
   const repo = githubRepo()
-  if (!repo) return null
+  if (!repo) {
+    return {
+      applicable: false,
+      cause: 'not-judged',
+      why:
+        'the GitHub repository could not be resolved. Action: repair the `origin` remote, then run ' +
+        '`node scripts/ci-status-guard.mjs` in this turn.',
+    }
+  }
 
   const now = Date.now()
   const head = git(['rev-parse', 'HEAD'])
@@ -387,7 +459,7 @@ async function main() {
   // can expire. Kept per workflow name, not per sha: the very failure mode is one
   // workflow dying identically across commit after commit.
   const famine = pruneFamine(state.famine, now)
-  const cache = pruneShaCache(state.shas, now)
+  const cache = readOnly ? {} : pruneShaCache(state.shas, now)
   const existingRefs = remoteRefNames()
   const notified = pruneNotifiedRefs(notifiedFromState(state), existingRefs)
 
@@ -401,7 +473,7 @@ async function main() {
     headSha: head,
     headPushed: isPushed(head),
   })
-  if (targets.length === 0) return null // nothing pushed → no API call at all
+  if (targets.length === 0) return { applicable: true, inputs: { decision: null, failedOpen: [] } }
 
   const swept = await sweepTargets({
     targets,
@@ -411,18 +483,13 @@ async function main() {
     now,
     fetchRuns: (sha) => fetchRuns(repo, sha),
     judgeRed: (args) => judgeRed(repo, args),
-    notify: ({ target, classification, standDown }) =>
-      notifyCiRed(
-        `CI failed for pushed ${target.ref} ${String(target.sha).slice(0, 7)}: "${classification.workflowName}" ` +
-          `run ${classification.runId} (${classification.conclusion}, cause: ${classification.cause}` +
-          `${standDown ? ', nothing in the repository can clear it' : ''}). ${classification.url ?? ''}` +
-          // Once the outage waiver has expired, the alert stops saying "nothing
-          // to do" and NAMES the reading only a push can fix.
-          (classification.escalate ? ` ${classification.detail}. ${classification.remedy}` : ''),
-      ),
+    notify: readOnly
+      ? async () => {}
+      : ({ target, classification, standDown }) =>
+          notifyCiRed(ciRedAlertMessage({ target, classification, standDown })),
   })
 
-  if (swept.dirty || JSON.stringify(state.notifiedRefs ?? {}) !== JSON.stringify(swept.notified)) {
+  if (!readOnly && (swept.dirty || JSON.stringify(state.notifiedRefs ?? {}) !== JSON.stringify(swept.notified))) {
     writeJsonAtomic(STATE, {
       famine: swept.famine,
       shas: swept.cache,
@@ -434,17 +501,38 @@ async function main() {
   // A fail-open SAYS why (point 387): a silently swallowed API error is
   // indistinguishable from a green, which is the confusion this point ends.
   if (swept.failedOpen.length > 0) {
-    console.error(`ci-status-guard allowed the stop without a verdict for: ${swept.failedOpen.join('; ')}`)
+    if (!readOnly) {
+      console.error(`ci-status-guard allowed the stop without a verdict for: ${swept.failedOpen.join('; ')}`)
+    }
+    if (!swept.decision) {
+      return {
+        applicable: false,
+        cause: 'not-judged',
+        why:
+          `${swept.failedOpen.join('; ')}. Action: restore GitHub/API access and run ` +
+          '`node scripts/ci-status-guard.mjs` again in this turn.',
+      }
+    }
   }
-  return swept.decision ? JSON.stringify({ decision: 'block', reason: swept.decision }) : null
+  return { applicable: true, inputs: { decision: swept.decision, failedOpen: swept.failedOpen } }
 }
 
-// No process.exit after awaits (libuv teardown race on Windows) — print the
-// decision and let the loop drain; any error allows the stop (fail-open).
-main()
-  .then((decision) => {
-    if (decision) process.stdout.write(decision)
-  })
-  .catch((e) => {
+async function main() {
+  let sessionId = ''
+  try {
+    sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+  } catch {
+    /* no/non-JSON stdin (manual run) — CI state is global truth, not session-local */
+  }
+  const gathered = await gatherCiStatusInputs({ sessionId })
+  const decision = gathered.applicable ? gathered.inputs?.decision : null
+  if (decision) process.stdout.write(JSON.stringify({ decision: 'block', reason: decision }))
+}
+
+if (isMainModule(import.meta.url)) {
+  // No process.exit after awaits (libuv teardown race on Windows) — print the
+  // decision and let the loop drain; any error allows the stop (fail-open).
+  main().catch((e) => {
     console.error(`ci-status-guard error (allowing stop): ${e && e.message}`)
   })
+}

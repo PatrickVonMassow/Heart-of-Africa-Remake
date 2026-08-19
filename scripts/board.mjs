@@ -16,6 +16,7 @@
 //   node scripts/board.mjs closing <point> "<reason>"  # …still owed: its closing duties
 //   node scripts/board.mjs vdzk-add "<title>" "<question>"  # ask the user a decision
 //   node scripts/board.mjs vdzk-remove "<title>"      # drop an answered question
+//   node scripts/board.mjs vdzk-keep "<title>" [...] # message did not answer it
 //   node scripts/board.mjs focus  <point> "<note>"    # declare focus + stamp
 //   node scripts/board.mjs attest                     # rotate, publish, audit, confirm
 //
@@ -50,8 +51,6 @@ import {
   addVdzk,
   berlinStamp,
   closeCard,
-  dropStrayNowCards,
-  normaliseLineEndings,
   parseClosingArgs,
   parseDoneArgs,
   pointSubject,
@@ -65,14 +64,17 @@ import {
   toNoCurrentWork,
   toNow,
   toQueue,
-  upgradeNowCards,
+  mergeDoneDuplicates,
 } from './board-core.mjs'
-import { PUBLISH_CMD } from './board-remedy.mjs'
+import { runBoardEdit } from './board-edit-core.mjs'
+import { recordDecisionCardKeep } from './decision-card-guard.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { QUEUE_DATA_PATH, setQueueEntry } from './board-queue-core.mjs'
 import { readJson } from './dashboard-state.mjs'
+import { withBoardEditLock } from './board-edit-lock.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
+const TASKS = resolve(REPO_ROOT, 'TASKS.md')
 const PUBLISH_SCRIPT = 'scripts/board-publish.mjs'
 const run = (args) => execFileSync(process.execPath, args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })
 
@@ -108,8 +110,19 @@ function fallbackSubject(point) {
   return typeof title === 'string' && title.trim() ? title.trim() : null
 }
 
-/** Apply a pure card edit, rotate the archive overflow, publish, and say what is left by hand. */
+/**
+ * Serialize the ENTIRE board transaction, not merely its atomic replacement.
+ * The launcher can redeem an answered card while an owner is working; without
+ * this lock both processes can read the same board and the later write silently
+ * resurrects one edit. Rotation and publish stay inside too, so the transaction
+ * reports and publishes the board version it actually wrote.
+ */
 function edit(fn, done) {
+  return withBoardEditLock(() => applyEdit(fn, done))
+}
+
+/** Apply a pure card edit, rotate the archive overflow, publish, and say what is left by hand. */
+function applyEdit(fn, done) {
   // Both ends of the round trip name their encoding (point 410). The write used
   // to take the platform default, which is the other half of the way a German
   // card could reach the file as something the reader sees as damage.
@@ -131,40 +144,18 @@ function edit(fn, done) {
   // beside it blocks the state writers — so the board would stay unpublishable.
   // It is said out loud, because an edit that silently swallowed a card's prose
   // would be its own defect.
-  const swept = dropStrayNowCards(normaliseLineEndings(readFileSync(BOARD, 'utf8')))
-  for (const { title, text } of swept.dropped) {
-    console.error(`board: dropped the current-work card "${title}" — it named neither a point nor a state.`)
-    console.error(`  its text, so nothing is lost unsaid: ${text}`)
-  }
-  const edited = dropStrayNowCards(upgradeNowCards(normaliseLineEndings(fn(swept.html))))
-  writeTextAtomic(BOARD, edited.html)
-  console.log(done)
-  console.log(run(['scripts/board-archive-rotate.mjs']).trim().split('\n')[0])
-  // THE LIVE PAGE IS PUBLISHED HERE (point 400, delta D — four-eyes finding 2).
-  // This is the one-command board loop, so a loop that only synced a local copy
-  // left the LIVE page behind on every edit while the due mark was cleared — the
-  // launcher would then alert about a board the session had updated exactly as
-  // documented, which trains the reader to ignore the one channel that speaks
-  // when a session is wedged.
-  //
-  // A REFUSAL MUST BE READABLE (four-eyes NEW-2). The child's stdio is piped, so
-  // a non-zero exit throws — and an uncaught throw here would abort the rest of
-  // the loop AND reduce the publisher's whole remedy text to `e.message`. The
-  // refusal is the most useful thing it ever prints, so it is printed, and the
-  // mirror still runs: the board file is already written either way.
-  let published = true
-  try {
-    console.log(run([PUBLISH_SCRIPT]).trim().split('\n')[0])
-  } catch (e) {
-    published = false
-    console.error(String(e.stderr || '').trimEnd() || `board-publish failed: ${e.message}`)
-    console.error(`The LIVE page was NOT updated — fix the above, then: ${PUBLISH_CMD}`)
-    process.exitCode = 1
-  }
-  // The success line is GATED (four-eyes NEW-3): printed unconditionally it sat
-  // two lines under "The LIVE page was NOT updated", so a session skimming the
-  // tail read success in exactly the failure case this reporting exists for.
-  if (published) console.log('The live page is updated. NEXT: node scripts/board.mjs attest')
+  const result = runBoardEdit({
+    html: readFileSync(BOARD, 'utf8'),
+    tasksText: readFileSync(TASKS, 'utf8'),
+    transform: fn,
+    done,
+    write: (html) => writeTextAtomic(BOARD, html),
+    rotate: () => run(['scripts/board-archive-rotate.mjs']),
+    publish: () => run([PUBLISH_SCRIPT]),
+    stdout: (line) => console.log(line),
+    stderr: (line) => console.error(line),
+  })
+  if (!result.published) process.exitCode = 1
 }
 
 const [cmd, ...rest] = process.argv.slice(2)
@@ -300,6 +291,15 @@ try {
     const fragment = textOf(rest)
     if (!fragment) throw new Error('usage: board.mjs vdzk-remove "<title>"|--text-stdin')
     edit((html) => removeVdzk(html, fragment), `open question removed: ${fragment}`)
+  } else if (cmd === 'vdzk-keep') {
+    const whyAt = rest.indexOf('--why')
+    const fragments = whyAt < 0 ? rest : rest.slice(0, whyAt)
+    const whyWords = whyAt < 0 ? [] : rest.slice(whyAt + 1)
+    if (!fragments.length || (whyAt >= 0 && whyWords.length !== 1)) {
+      throw new Error('usage: board.mjs vdzk-keep "<title>" [...] [--why "<reason>"]')
+    }
+    const kept = recordDecisionCardKeep(fragments, whyWords[0] ?? '')
+    console.log(`message recorded as not answering: ${kept.join(' | ')}`)
   } else if (cmd === 'promote') {
     const [point, times, title, ...words] = rest
     if (!point || !times || !title || words.length === 0) {
@@ -308,6 +308,20 @@ try {
     edit(
       (html) => promoteToNow(html, point, { title, times, status: textOf(words) }),
       `${point} promoted to current work`,
+    )
+  } else if (cmd === 'merge-done') {
+    // One point, one Erledigt card. `done` folds them at write time; this is for
+    // a board that already carries duplicates (point 700 stood there four times).
+    const folded = []
+    edit((html) => {
+      const r = mergeDoneDuplicates(html)
+      folded.push(...r.merged)
+      return r.html
+    }, 'Erledigt duplicates folded')
+    console.log(
+      folded.length
+        ? `board: folded duplicate Erledigt cards for point(s) ${folded.join(', ')}`
+        : 'board: no duplicate Erledigt cards',
     )
   } else if (cmd === 'focus') {
     const [point, ...words] = rest
@@ -325,6 +339,7 @@ try {
         'done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] | ' +
         'none "<reason>" | closing <point> ["--title <Betreff>"] "<reason>" | ' +
         'vdzk-add "<title>" "<question>" | vdzk-remove "<title>" | ' +
+        'vdzk-keep "<title>" [...] [--why "<reason>"] | ' +
         'promote <point> "<times>" "<title>" "<status>" | focus <point> "<note>" | attest\n' +
         `Any "<text>" may be replaced by ${TEXT_STDIN_FLAG} and piped in — use that for German prose.`,
     )
