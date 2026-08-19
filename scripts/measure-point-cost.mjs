@@ -215,7 +215,9 @@ export function formatConsole(snapshot) {
     )
   }
   lines.push('')
-  lines.push('LEVER EFFECTIVENESS — difference = fired mean minus absent mean')
+  const withoutAbsent = LEVERS.filter((lever) => snapshot.effectiveness[lever].absent === 0).length
+  lines.push(`LEVER EFFECTIVENESS — n=${snapshot.ledger.length}; ${withoutAbsent} of ${LEVERS.length} levers have no absent group`)
+  lines.push('Signed differences are suppressed where workload or incurred cost triggers the observation.')
   for (const lever of LEVERS) {
     const effect = snapshot.effectiveness[lever]
     lines.push(
@@ -264,7 +266,16 @@ export function formatMarkdown(snapshot) {
     const agents = Object.entries(row.origins.agents).map(([agent, tokens]) => `${agent} ${tokens}`).join('<br>') || '—'
     lines.push(`| ${row.point} | ${iso(row.landedAt) ?? 'n/a'} | ${row.tokens} | ${row.origins.mainSession} | ${row.origins.crossVendorReviews} | ${agents} |`)
   }
-  lines.push('', '## Lever effectiveness', '', '| lever | fired points | events | absent | fired mean | absent mean | difference | verdict |', '| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |')
+  const withoutAbsent = LEVERS.filter((lever) => snapshot.effectiveness[lever].absent === 0).length
+  lines.push(
+    '',
+    '## Lever effectiveness',
+    '',
+    `This reading has n = ${snapshot.ledger.length} landed points; ${withoutAbsent} of ${LEVERS.length} levers have no absent group at all. Signed differences are suppressed where the workload or cost already incurred triggers the observation, because these records cannot separate the lever from that reverse causality.`,
+    '',
+    '| lever | fired points | events | absent | fired mean | absent mean | difference | verdict |',
+    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |',
+  )
   for (const lever of LEVERS) {
     const effect = snapshot.effectiveness[lever]
     lines.push(`| ${LEVER_LABELS[lever]} | ${effect.fired} | ${effect.events} | ${effect.absent} | ${effect.firedMean ?? 'n/a'} | ${effect.absentMean ?? 'n/a'} | ${effect.difference ?? 'n/a'} | ${effect.verdict} |`)

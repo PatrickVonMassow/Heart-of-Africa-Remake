@@ -194,6 +194,26 @@ describe('effectiveness verdicts say when the data cannot support a lever', () =
       verdict: 'cannot be shown to move per-point cost: no comparison group',
     })
   })
+
+  it('suppresses a signed comparison when cost itself triggers the lever', () => {
+    expect(
+      leverEffect(
+        [
+          { tokens: 900, levers: { contextWatermark: true } },
+          { tokens: 100, levers: { contextWatermark: false } },
+        ],
+        'contextWatermark',
+      ),
+    ).toEqual({
+      fired: 1,
+      absent: 1,
+      firedMean: null,
+      absentMean: null,
+      difference: null,
+      differencePct: null,
+      verdict: 'UNMEASURABLE from these records: reverse causality; accumulated context cost triggers the watermark',
+    })
+  })
 })
 
 describe('selectLandedPoints', () => {

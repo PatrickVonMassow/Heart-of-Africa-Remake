@@ -33,6 +33,15 @@ export const LEVER_LABELS = {
   docBudgets: 'document-budget guard observed',
 }
 
+// These observations are selected by the workload or by cost already incurred.
+// Fired-minus-absent would therefore encode reverse causality, not lever effect.
+export const LEVER_CONFOUNDS = {
+  pointBoundary: 'UNMEASURABLE from these records: a missing boundary is missing instrumentation, not an untreated point',
+  contextWatermark: 'UNMEASURABLE from these records: reverse causality; accumulated context cost triggers the watermark',
+  boundedVerifyDigest: 'UNMEASURABLE from these records: reverse causality; running enough verification to need a digest is part of the cost',
+  docBudgets: 'UNMEASURABLE from these records: workload selection; documentation-heavy work triggers the guard and also costs more',
+}
+
 export const ITEM_LABELS = {
   pictureReads: 'picture reads',
   agentReports: 'agent reports',
@@ -511,6 +520,18 @@ const mean = (values) => (values.length ? Math.round(values.reduce((sum, value) 
 export function leverEffect(rows = [], lever = '') {
   const fired = rows.filter((row) => row.levers?.[lever]).map((row) => row.tokens)
   const absent = rows.filter((row) => !row.levers?.[lever]).map((row) => row.tokens)
+  const confound = LEVER_CONFOUNDS[lever]
+  if (confound) {
+    return {
+      fired: fired.length,
+      absent: absent.length,
+      firedMean: null,
+      absentMean: null,
+      difference: null,
+      differencePct: null,
+      verdict: confound,
+    }
+  }
   const firedMean = mean(fired)
   const absentMean = mean(absent)
   const difference = firedMean != null && absentMean != null ? firedMean - absentMean : null
