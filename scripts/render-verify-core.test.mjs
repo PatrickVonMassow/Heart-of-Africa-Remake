@@ -1556,6 +1556,21 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(cascade, { suite: 'settings', backend: 'webgl', kind: 'console', featureLevel: 'compatibility' })).toBeNull()
   })
 
+  // THE SAME LANE FAULT FROM THE CHECK SIDE. The console half was scoped to the
+  // compatibility level while the CHECKS reporting the identical cascade were
+  // charged unscoped, so one door was shut and the other left open: a matching
+  // failure on the core adapter would still have been excused (review,
+  // 19.08.2026).
+  it('charges the MSAA cascade\'s CHECKS to that level too, not just its console errors', () => {
+    const scoped = { suite: 'settings', backend: 'webgpu', kind: 'check' }
+    for (const name of ['TRAA off again: no new console errors', 'F9 low: the frame still draws', 'Graphics levels: no new console errors across the F9 cycle']) {
+      expect(chargeFor(red(name), { ...scoped, featureLevel: 'compatibility' }).point).toBe(514)
+      // The player's adapter, and a run that recorded no level at all.
+      expect(chargeFor(red(name), { ...scoped, featureLevel: 'core' })).toBeNull()
+      expect(chargeFor(red(name), scoped)).toBeNull()
+    }
+  })
+
   it('charges the fixed render-target leak to NOBODY — a mended red is a red again', () => {
     // Point 546 released the bird's-eye cascade shadow maps and its entry left
     // the ledger with the tick. Should the leak ever come back, it must count

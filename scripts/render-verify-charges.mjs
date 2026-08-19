@@ -155,10 +155,16 @@ export const RED_CHARGES = [
     point: 514,
     suite: 'settings',
     backend: 'webgpu',
+    featureLevel: 'compatibility',
     why:
       'THE LANE, NOT THE PRODUCT — point 514 §5/§6 already owns this family in prose; this is ' +
       'the machine-readable half, added 13.08.2026 when it stood between a DOM-only change and ' +
-      'its merge. On the WebGPU compatibility lane every check that switches TRAA OFF falls back ' +
+      'its merge. SCOPED TO THE COMPATIBILITY LEVEL 19.08.2026 (cross-vendor review), like the ' +
+      'console half below and for the same reason: the fault is the lane\'s, so on the CORE ' +
+      'adapter the player runs each of these checks stays a real red. Both 13.08.2026 ' +
+      'webgpu/settings records this was read off recorded featureLevel=compatibility, so the ' +
+      'evidence is unchanged by the narrowing. ' +
+      'On the WebGPU compatibility lane every check that switches TRAA OFF falls back ' +
       'to an MSAA path that cannot exist there: `RGBA16Float does not support multisampling` ' +
       'arrives as an uncaptured GPUValidationError and the scene then renders black (mean 2.2-2.5), ' +
       'which also reddens the ground-detail and F9 graphics-level checks and every "no new console ' +
