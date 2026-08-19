@@ -372,6 +372,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Eine Grenze verwehrt die **erste** Handlung nach dem Überschreiten, nicht die
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
+- **Zwei Wächter halten dieselbe Tür zu.** Einer verlangt am Schluss eine Handlung, ein anderer
+  verbietet sie gerade — beide zu Recht, und die Sitzung kommt nicht heraus. Die Abhilfe war
+  gebaut, aber nur an die Wächter angeschlossen, bei denen der Konflikt auffiel.
+  → *Prompt:* „Jeder Wächter, der eine Handlung **fordert**, stellt zuerst dieselbe Frage wie
+  der, der sie **verbietet**: darf diese Sitzung das noch? Nein → die Pflicht **übergeben**,
+  nicht einfordern. Und schließ die **Klasse**, nicht die Stichprobe: ein Test zählt die
+  Pflicht-Wächter auf und fällt durch, sobald einer die Frage nicht stellt."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -410,4 +418,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 9ddba0b8b6b0f03110fd49426ea87a431bc5bbbc40bfd5f13a1d3a39a6762580 -->
+<!-- GUIDE-FINGERPRINT: 87a78c02adc561b425ecd4a21c164ef3169e7e1b0646cb31fc97c0d9b7ee22b9 -->

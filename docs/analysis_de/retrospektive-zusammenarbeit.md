@@ -1313,7 +1313,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 19.08.2026, 22:00 · Quellen-Fingerprint: `4bec55b12bce…`
+Zuletzt aktualisiert: Mittwoch, 19.08.2026, 22:30 · Quellen-Fingerprint: `87a78c02adc5…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1334,7 +1334,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | F6 bug-report zips the user hands over are saved into the repo's git-ignored local/ folder — search there first, not only Downloads | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A newly found problem goes into an EXISTING bundle point first; a new standalone point is the exception, and may instead re-cut the bundles | 1 | niedrig | bundle-first-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
 | Work packages are SPOKEN by name, never by letter — the user cannot read \"bundle H\"; the letter stays only as an internal ID | 1 | niedrig | bundle-first-guard.mjs | ✔ Mechanismus |
-| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 7 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
+| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 8 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
@@ -1408,8 +1408,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 85 Feedback-/Projekt-Memories · 54 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 62 Prozess-/Meta-TASKS-Punkte (davon 27 offen).
 
-<!-- RETRO-FINGERPRINT: 4bec55b12bce29c6c2e4622e672d1a519e53a3be58344a9735646d5a28a50bf1 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-19T20:00:06.364Z -->
+<!-- RETRO-FINGERPRINT: 87a78c02adc561b425ecd4a21c164ef3169e7e1b0646cb31fc97c0d9b7ee22b9 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-19T20:30:21.655Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1839,3 +1839,41 @@ denselben Krankheitstyp an verschiedenen Stellen findet, ist der Befund nicht di
 sondern die Form der Lösung — dann hört das Nachbessern auf und die Entscheidung wird
 getroffen, samt Löschen des Weges, den man nicht genommen hat. Die Prüffrage lautet: *Sind
 das n Fehler, oder ist es einer, den ich an n Stellen sehe?*
+
+### 3.129 Zwei Durchsetzer, die einander die Tür zuhalten
+
+Am Abend des 19.08.2026 landete eine Sitzung bei 173.544 Token genau den Punkt, der den
+Kontext-Zaun repariert hatte: Eine Sitzung über der Wassermarke soll nichts Neues mehr
+anfangen — kein Agent, keine Browser-Suite, kein neu verfasster Dokumentabschnitt —, damit
+sie ihre Arbeit abschließt und übergibt, statt teuer weiterzulaufen. Der Punkt war grün,
+gemergt, abgehakt. Und dann kam die Sitzung nicht heraus: Der Bündel-Wächter verlangte, den
+soeben eingereichten neuen Punkt in ein Arbeitspaket einzutragen, und der Zaun verweigerte
+genau diese Zeile als »einen Dokumentabschnitt verfassen«. Zwei Mechanismen, beide richtig
+gebaut, beide für sich begründet — und zusammen eine Tür, die von beiden Seiten zugehalten
+wird.
+
+Es blieb nicht bei einem. Der Warteschlangen-Wächter verlangt, einen angehängten Punkt an
+seinen Rang zu schieben, was Blöcke in der Arbeitsordnung verschiebt — auch das eine
+Schreibhandlung, die der Zaun verbietet; nur ein ausdrücklicher Ausweg (`--ranked`) ließ die
+Sitzung passieren. Der Retrospektiven-Wächter hat es doppelt: Die maschinelle Auffrischung
+läuft, aber der Prosa-Absatz für eine neue Problemklasse — dieser hier — und die Durchsicht
+der Einsteiger-Anleitung sind Verfassen. Der Karten-Wächter dagegen war harmlos, weil eine
+Karte umzuschreiben Tafelarbeit ist, die der Zaun erlaubt. Vier Pflichten, drei davon in
+derselben Falle.
+
+Der Punkt, der den Zaun baute, hatte die Regel selbst schon aufgeschrieben: Eine Pflicht,
+die eine eingezäunte Sitzung NICHT mehr erfüllen kann, wird dem Nachfolger übergeben, nicht
+am Ausgang eingefordert. Er hatte sogar den Mechanismus dafür gebaut — eine gemeinsame
+Abfrage, an der ein Wächter erkennt, dass er gerade eine verbotene Handlung verlangt. Nur
+hatte er ihn an die **vier Wächter angeschlossen, die er gemessen hatte**, und der Rest der
+Pflicht-Kette kannte ihn nicht. Die Regel stand, der Mechanismus stand, die Verdrahtung
+endete beim Messbereich.
+
+**Lehren:** Wo zwei Durchsetzer aufeinandertreffen, gehört die Frage »kann die Sitzung tun,
+was ich verlange?« in **jeden** von ihnen — nicht in die, bei denen der Konflikt zuerst
+aufgefallen ist. Ein Wächter, der eine Handlung fordert, muss dieselbe Zaunfrage stellen wie
+der, der sie verbietet, sonst ist der wechselseitige Block nur eine Frage der Zeit. Zweitens:
+Der Fund ist hier ausdrücklich **kein langsamer Wächter** und keine zu strenge Regel — beide
+Seiten waren richtig; falsch war allein, dass sie nichts voneinander wussten. Und drittens,
+als Gegenprobe zu §3.44: Wer eine Abhilfe nur für den gemessenen Ausschnitt verdrahtet, hat
+die Klasse nicht geschlossen, sondern die Stichprobe.
